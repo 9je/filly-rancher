@@ -1,0 +1,6 @@
+assets_raw/
+tools/bin/
+game/assets/converted/
+game/.godot/
+build/
+*.import
