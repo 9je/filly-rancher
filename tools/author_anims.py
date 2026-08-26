@@ -63,7 +63,14 @@ FEET = [
 ANIMATED = [BELLY, HEAD] + [name for name, _ in FEET]
 
 WALK_FRAMES = 20        # loop length; frame WALK_FRAMES+1 repeats frame 1
-STRIDE = 0.30           # fore/aft hoof travel (front leg chain is ~1.066 long)
+# Fore/aft hoof travel per stride. This is the number that sets how fast the clip
+# says she is moving, so it is also what a consumer scene has to match to avoid foot
+# skate -- see IMPLIED_SPEED below and WALK_SPEED in scenes/test/walk_test.gd.
+# 0.30 (the first pass) was a mincing shuffle for a model whose front leg chain is
+# 1.066 long; 0.55 is roughly half a leg length per step, which reads as a walk and
+# still clears full extension by a comfortable margin (worst-case reach over the
+# cycle is 1.039 at mid-stance, and that peak is set by the body bob, not by STRIDE).
+STRIDE = 0.55
 LIFT = 0.16             # swing-phase hoof clearance
 BODY_BOB = 0.045        # vertical body oscillation, twice per gait cycle
 BODY_PITCH = math.radians(2.5)
@@ -76,7 +83,7 @@ BODY_PITCH = math.radians(2.5)
 # zero for a single frame at t=0.5. Dropping the body a few centimetres restores the
 # bend margin (sqrt(0.994^2 + 0.15^2) = 1.005) and the pop disappears. Rear legs have
 # 0.069 of slack already (they carry a hock) and never needed this.
-BODY_CROUCH = 0.06
+BODY_CROUCH = 0.09
 
 IDLE_FRAMES = 48        # 2 s at 24 fps
 IDLE_BOB = 0.018
@@ -183,8 +190,14 @@ def build_walk(arm):
         # does and what keeps the front chain furthest from full extension exactly
         # when the hoof is at its most fore/aft.
         belly = arm.pose.bones[BELLY]
+        # Both bob and pitch run at twice the gait frequency -- once per diagonal-pair
+        # footfall. Pitching at 1x (the first pass) gave the two diagonal pairs
+        # different body attitudes even though their hoof paths are mirror images, so
+        # one side rode closer to full extension than the other: at STRIDE=0.55 the
+        # front-right chain reached 99.2% of its length and the knee started popping
+        # again, while front-left sat at 95.6%. At 2x both pairs see the same body.
         _set_offset(belly, UP * (-BODY_BOB * math.cos(4.0 * math.pi * t) - BODY_CROUCH))
-        _set_rotation(belly, SIDE, BODY_PITCH * math.sin(2.0 * math.pi * t))
+        _set_rotation(belly, SIDE, BODY_PITCH * math.sin(4.0 * math.pi * t))
         belly.keyframe_insert("location", frame=frame, group=BELLY)
         belly.keyframe_insert("rotation_quaternion", frame=frame, group=BELLY)
 
@@ -227,11 +240,31 @@ def build_idle(arm):
     return action
 
 
+STANCE_FRACTION = 0.5   # half the cycle planted, half swinging (see _foot_offset)
+
+
+def implied_ground_speed(fps):
+    """Ground speed in units/second that the walk clip depicts.
+
+    A planted hoof travels STRIDE backwards relative to the body over the stance
+    phase, so a body moving at exactly this speed keeps its hooves stuck to the
+    ground. Note the divisor is the *stance* duration, not the full cycle: with
+    diagonal pairs, each hoof is only planted for half the cycle, and dividing by
+    the whole cycle understates the depicted speed by 2x. Any consumer scene that
+    translates a pony while playing `walk` must use this speed or she will skate.
+    """
+    cycle_seconds = WALK_FRAMES / float(fps)
+    return STRIDE / (cycle_seconds * STANCE_FRACTION)
+
+
 def author(arm):
     """Create both clips. Returns them in export order."""
     if arm is None or arm.type != "ARMATURE":
         raise SystemExit(f"--anims needs an armature object, got {arm!r}")
     actions = [build_idle(arm), build_walk(arm)]
+    fps = bpy.context.scene.render.fps
+    print(f"WALK_IMPLIED_SPEED {implied_ground_speed(fps):.4f} units/s "
+          f"(stride={STRIDE} frames={WALK_FRAMES} fps={fps})")
     # Leaving `walk` as the active action is deliberate: Blender's glTF exporter in
     # its default ACTIONS mode still needs a bound animation_data block on the object
     # to consider it animatable at all.

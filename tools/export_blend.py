@@ -254,15 +254,27 @@ if args.rotate_z and target is not None:
     target.rotation_mode = "XYZ"
     target.rotation_euler.z += args.rotate_z * 3.141592653589793 / 180.0
 
-bpy.ops.export_scene.gltf(
+export_kwargs = dict(
     filepath=args.out,
     export_format="GLB",
     use_selection=use_selection,
     export_apply=True,           # apply modifiers except armatures
     export_animations=True,
-    export_animation_mode="ACTIONS",  # one glTF animation per Action, named after it
-    export_bake_animation=True,       # bake the IK solve into the DEF_ bone tracks
     export_skins=True,
     export_yup=True,
 )
+# --- These two must stay gated on --anims. `export_bake_animation` means "force
+# exporting animation on every object", so with it on an armature that has no Action
+# still emits a full baked clip named after the object -- a 423-channel animation
+# called "TS_Rig" that holds the rest pose and animates nothing. That silently broke
+# the no-anims contract (a plain Task-4-style export used to yield animations=[]) and,
+# worse, made `validate_gltf.py --require-anims` pass vacuously on a model with no
+# real clips. Only ask for baking when we have actually authored something to bake.
+if args.anims:
+    export_kwargs.update(
+        export_animation_mode="ACTIONS",  # one glTF animation per Action, named after it
+        export_bake_animation=True,       # bake the IK solve into the DEF_ bone tracks
+    )
+
+bpy.ops.export_scene.gltf(**export_kwargs)
 print(f"EXPORT_OK {args.out}")
