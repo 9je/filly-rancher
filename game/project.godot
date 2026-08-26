@@ -7,3 +7,24 @@ config/features=PackedStringArray("4.5", "Forward Plus")
 
 [rendering]
 renderer/rendering_method="forward_plus"
+
+; glTF carries no loop flag, so Godot imports every clip as LOOP_NONE and a pony
+; plays her 0.875 s walk once and then slides around frozen. The usual per-file fix
+; lives in the .glb's .import sidecar, but everything under game/assets/converted/ is
+; generated and gitignored, so that setting would vanish on a fresh clone. Declaring
+; it as a scene-importer default keeps it in tracked config and applies to every pony
+; .glb the pipeline produces. loop_mode 1 = LOOP_LINEAR.
+[importer_defaults]
+
+scene={
+"_subresources": {
+"animations": {
+"idle": {
+"settings/loop_mode": 1
+},
+"walk": {
+"settings/loop_mode": 1
+}
+}
+}
+}

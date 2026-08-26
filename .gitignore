@@ -4,3 +4,4 @@ game/assets/converted/
 game/.godot/
 build/
 *.import
+__pycache__/
