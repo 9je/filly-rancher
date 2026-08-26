@@ -1,6 +1,12 @@
 """Headless Blender: export a .blend (or one collection/object in it) to glTF.
 Usage: blender -b file.blend -P tools/export_blend.py -- --out out.glb [--object Twilight]
                                                         [--anims] [--rotate-z 180]
+
+Prop variant (Task 8): for a source FBX prop instead of an already-open .blend,
+run with no .blend argument and pass --fbx-in:
+  blender -b -P tools/export_blend.py -- --fbx-in prop.fbx --out prop.glb
+This imports the FBX into the (empty) default scene before the rest of the
+pipeline below runs unchanged -- material rebuild, pack_all, export.
 """
 import argparse, os, sys
 import bpy
@@ -14,7 +20,29 @@ p.add_argument("--anims", action="store_true",
                     "(see tools/author_anims.py); the packs ship none of their own")
 p.add_argument("--rotate-z", type=float, default=0.0, metavar="DEG",
                help="yaw the exported root this many degrees about +Z before export")
+p.add_argument("--fbx-in", default=None, metavar="PATH",
+               help="import this FBX into the current (normally empty) scene before "
+                    "doing anything else -- lets this script convert a standalone FBX "
+                    "prop without a pre-authored .blend to open it from")
 args = p.parse_args(argv)
+
+if args.fbx_in:
+    # --- Quirk (Task 8): `blender -b` with no .blend argument opens Blender's
+    # default startup scene (a Cube + Camera + Light), not an empty one. Since
+    # nothing below restricts export to a selection unless --object is also
+    # passed, exporting after the FBX import would include that leftover
+    # default Cube alongside the real prop -- it did, silently, the first time
+    # this ran: `kenney_survival_structure.glb` came out with two meshes, an
+    # untextured 2x2x2 "Cube" plus the real "structure" mesh, and it still
+    # passed `validate_gltf.py --props` (meshes>=1) without anyone noticing
+    # until a rendered frame showed a flat grey box sitting on the real prop.
+    # Fix: snapshot what's in the scene before importing, then delete exactly
+    # those pre-existing objects afterward -- whatever the FBX import added is
+    # the only thing that survives. Safe because this .blend is never saved.
+    _pre_import_objects = set(bpy.data.objects)
+    bpy.ops.import_scene.fbx(filepath=args.fbx_in)
+    for obj in _pre_import_objects:
+        bpy.data.objects.remove(obj, do_unlink=True)
 
 # --- Quirk: CreatorOfPony / MythicSpeed reupload packs (2015-era Blender Internal
 # files opened in Blender 4.2) never got their materials migrated to Principled BSDF.

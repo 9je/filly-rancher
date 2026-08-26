@@ -77,7 +77,7 @@ Verify: `tools/bin/godot --version` prints `4.5.2.stable.official....`;
 assets_raw/<source>/            # downloaded, unmodified source packs (gitignored)
   blender-native/<Character>_<ver>/...   # tier a: CreatorOfPony/MythicSpeed .blend packs
   sfm/...                                # tier c: SFM/GMod .mdl compiled packs
-  props/<model-slug>/...                 # tier b: Sketchfab glTF/FBX prop downloads
+  props/<pack-slug>/...                   # tier b: Kenney CC0 glTF/FBX prop packs
 
 game/assets/converted/<kind>/   # pipeline output, gitignored (regenerated from assets_raw/)
   ponies/<name>.glb
@@ -179,45 +179,125 @@ flag — those correctly report `animations=[]` and still pass the base
 
 ---
 
-## 4. Tier b recipe — glTF/FBX props (Sketchfab)
+## 4. Tier b recipe — glTF/FBX props (Kenney)
 
-**Status: as-designed, not yet exercised.** Task 8 (map-props probe) is
-blocked on the owner's Sketchfab downloads (login-walled; see
-`docs/shopping-list.md` §3) and has not run yet. The recipe below is the
-plan's intended path, carried into this doc so the pipeline stays complete
-end-to-end; it has **not** been proven against a real download the way
-tiers a and c have. **Verified pending Task 8** — update this section (and
-remove this notice) once that task runs for real, including any quirks it
-finds.
+**Status: exercised for real (Task 8).** The original plan sourced this
+tier from Sketchfab, but those specific downloads sit behind a login wall
+with no anonymous/direct path — a controller ruling redirected Task 8 to
+login-free CC0 packs instead. **Source:** Kenney.nl (CC0), fetched with a
+plain `curl -A "<browser UA>"` (no login, no API key):
 
-**Source:** Sketchfab buildings + tree pack (see `docs/shopping-list.md`
-§3), saved into `assets_raw/props/<model-slug>/`.
+- [Fantasy Town Kit 2.0](https://kenney.nl/assets/fantasy-town-kit) —
+  `windmill.glb`, `watermill.glb`, `stall-red.glb` (buildings/structures).
+- [Nature Kit 2.1](https://kenney.nl/assets/nature-kit) — `tree_oak.glb`,
+  `tree_pineTallA.glb`, `tree_default.glb`, `tree_fat.glb`.
+- [Survival Kit 2.0](https://kenney.nl/assets/survival-kit) —
+  `structure.fbx` (taken through the FBX path deliberately, to exercise
+  that branch; every other prop here had a ready-made GLB).
 
-**As-designed steps:**
+All saved into `assets_raw/props/kenney-<pack>/`.
 
-1. **glTF downloads** — Sketchfab exports every downloadable model as glTF
-   directly. Copy the `.gltf`/`.glb` (plus any loose textures) straight into
-   `game/assets/converted/props/<name>.glb` — no Blender round-trip needed.
-2. **FBX downloads** (if glTF isn't offered for a given model) — convert via
-   Blender: import the FBX headlessly (`bpy.ops.import_scene.fbx(...)`),
-   then reuse `export_blend.py`'s export call/material-rebuild logic against
-   the imported scene.
-3. **Validate** with `tools/validate_gltf.py`, but props don't ship a skin —
-   the plan calls for a `--props` mode that only gates on `meshes>=1`, since
-   the existing script's `ok = bool(meshes) and bool(skins)` would
-   incorrectly fail a static, unrigged prop. This validator extension is
-   part of Task 8's scope, not yet implemented.
-4. Scatter converted props into a `terrain_probe.tscn` (mirrors
-   `model_gallery.gd`'s load-all-from-a-folder pattern) on a large ground
-   plane, print `PROBE_OK count=N`, and — per the standing project ruling
-   that visual checks batch to the owner separately — get a verdict on
-   scale sanity (props sized correctly relative to a dropped-in pony) and
-   whether it reads as "a place in Ponyville."
+**glTF/GLB downloads** — copy straight into
+`game/assets/converted/props/<name>.glb`, no Blender round-trip:
 
-When Task 8 runs, replace this section with the actual commands run, any
-per-model quirks found (Sketchfab exports are generally clean glTF, but this
-is unverified for these specific 4 models), and the resulting verdict on the
-props-on-Godot-terrain approach for Phase 1's ranch map.
+```bash
+cp "assets_raw/props/kenney-fantasy-town-kit/extracted/Models/GLB format/windmill.glb" \
+   game/assets/converted/props/kenney_windmill.glb
+# ...and so on for watermill.glb, stall-red.glb, the four tree_*.glb files
+```
+
+**FBX downloads** — `tools/export_blend.py` gained an additive `--fbx-in`
+flag (existing `--object`/`--anims`/`--rotate-z` callers, and the plain
+`blender -b file.blend -P export_blend.py --` invocation, are unaffected):
+
+```bash
+tools/bin/blender/blender -b -P tools/export_blend.py -- \
+  --fbx-in "assets_raw/props/kenney-survival-kit/extracted/Models/FBX format/structure.fbx" \
+  --out game/assets/converted/props/kenney_survival_structure.glb
+```
+
+**Validate** — `tools/validate_gltf.py` gained an additive `--props` flag:
+gates on `meshes>=1` only (no skin required), instead of the character
+gate's `meshes>=1 and skins>=1`. Existing calls (`validate_gltf.py file.glb`
+and `--require-anims`) are unchanged.
+
+```bash
+for f in game/assets/converted/props/*.glb; do
+  python3 tools/validate_gltf.py "$f" --props
+done
+```
+
+All 8 pass: `meshes=1 skins=0 ... textured=True` for the 4 buildings/GLB
+props (windmill, watermill, stall, the FBX-converted structure); the 4
+Nature Kit trees report `textured=False` **by design**, not a defect — that
+pack ships flat named materials (`leafsGreen`, `woodBark`, solid
+`baseColorFactor`, no image) rather than a colormap texture.
+
+### Quirks discovered running this for real
+
+| # | Quirk | Symptom if unfixed | Fix |
+|---|---|---|---|
+| 1 | **Kenney's own "GLB" files aren't fully self-contained.** `windmill.glb`, `watermill.glb`, and `stall-red.glb` reference their shared atlas via an external `"uri":"Textures/colormap.png"` image entry rather than embedding it in the binary chunk — unusual for a `.glb`, but that's what these ship. | Importing the bare `.glb` alone leaves every building textureless (`ERROR: Can't open file from path '.../Textures/colormap.png'`, silently falls back to grey/white — no crash, no failed validator, just a flat-shaded box). | Copy the pack's `Models/GLB format/Textures/colormap.png` alongside the copied `.glb`s, into `game/assets/converted/props/Textures/colormap.png`, before the Godot editor import pass. |
+| 2 | **Godot's importer doesn't retroactively notice a newly-added dependency.** Running the editor import pass *before* `Textures/colormap.png` existed baked a texture-less import for the three affected `.glb`s into `.godot/imported/`; adding the PNG afterward and re-running the editor pass did **not** relink them — their `.import` mtime hadn't changed, so Godot skipped reimporting them. | Buildings render flat grey/white even though the texture file is now present on disk and imports cleanly on its own. | Delete the affected `.glb.import` files (forces a fresh import) before rerunning the editor pass, once every referenced texture is actually in place. Order matters: get all dependent files present *first*, then do the one editor pass. |
+| 3 | **`blender -b` with no `.blend` argument opens Blender's default startup scene** (a Cube + Camera + Light), not an empty one — relevant only to the new `--fbx-in` path, which by design runs with no `.blend`. Exporting afterward with no `--object` filter (`use_selection=False`) included that leftover default Cube alongside the real imported prop. | `kenney_survival_structure.glb` silently came out with **two** meshes: an untextured 2×2×2 "Cube" plus the real "structure" mesh. This passed `validate_gltf.py --props` (`meshes>=1`) without complaint — only a rendered frame showed a flat grey box sitting on top of the real prop. | `export_blend.py`'s `--fbx-in` handling now snapshots `bpy.data.objects` before import and deletes exactly that snapshot's objects afterward, so only what the FBX import actually added survives to export. Safe because this `.blend` is never saved back to disk. |
+| 4 | **FBX unit conversion is not reliable for this pack.** The same `structure` model exists as both a Kenney-authored `.glb` (already correctly scaled to the pack's 2-unit module grid: `2×2×2`) and an `.fbx` (imported via Blender's automatic cm→m unit conversion). After quirk 3's fix, the FBX path's `structure` mesh measures **0.5 units tall in Godot — 4× smaller** than the GLB sibling's 2.0. | A prop converted via the FBX path can silently land at the wrong scale relative to the same pack's other (GLB-sourced) props, with no validator check catching it (structural gates don't know what size is "correct"). | Not fixed in-place (documented, not patched, per this doc's own "record quirks, don't paper over them" convention) — kept as `kenney_survival_structure.glb` at its native (undersized) scale. **Recommendation:** prefer the direct-GLB path whenever a pack offers one; if only FBX is available, sanity-check the imported scale against a known reference (another model from the same pack, or the pack's own stated grid unit) rather than trusting Blender's automatic FBX unit conversion. |
+
+### Scale finding — props vs. the converted ponies
+
+Measured in Godot (world-space AABB height, native/as-imported scale, no
+manual correction applied):
+
+| Prop | Height (units) | vs. Twilight (4.28 u) |
+|---|---|---|
+| Twilight (`twilight.glb`) | 4.28 | — |
+| `kenney_windmill.glb` | 3.11 | 73% |
+| `kenney_watermill.glb` | 1.80 | 42% |
+| `kenney_survival_structure.glb` | 0.50 | 12% (see quirk 4) |
+| `kenney_market_stall.glb` | 1.24 | 29% |
+| `kenney_tree_default.glb` | 1.71 | 40% |
+| `kenney_tree_pine.glb` | 1.53 | 36% |
+| `kenney_tree_oak.glb` | 1.23 | 29% |
+| `kenney_tree_fat.glb` | 1.15 | 27% |
+
+At native scale, every prop — trees included — is **shorter than the
+pony**, which reads as absurd (a pony taller than a windmill, trees like
+shrubs at her hooves; confirmed visually, not just numerically, via an
+`xvfb-run` + llvmpipe offscreen capture of `terrain_probe.tscn`). This is
+the same mismatch `docs/pipeline.md` §"Deferred to Phase 1" item 1 already
+flagged from the pony side (`twilight.glb` measures **~3× life size** if 1
+Godot unit = 1 meter) — Task 8 corroborates it independently from the
+world-geometry side: Kenney's kits are built on a real-world-meter-scale
+module grid (their standard wall/door piece is a 2-unit cube, i.e. ~2m,
+sane for a human-scale doorway), so the mismatch is the pony rig's
+oversized scale, not the props'.
+
+**Recommended reconciliation:** scale Kenney (and by extension
+similarly-sourced) props up by **~3×** when placing them in a map that also
+contains the current pony rigs, rather than rescaling the ponies (which
+would require re-tuning every animation-speed constant calibrated against
+their current size, e.g. `walk_test.gd`'s `WALK_STRIDE`/`WALK_SPEED`). A
+`terrain_probe.tscn` re-render at `--prop-scale=3.0` confirms this reads
+sensibly: buildings tower over the pony (windmill → 9.3 u), trees end up
+comparable to or taller than her (3.5–5.1 u) instead of shorter. This is a
+map-build-time multiplier on imported world geometry, not a change to any
+already-shipped asset — cheap to apply, cheap to revisit once Phase 1 makes
+the real scale-normalization call the deferred-decision doc calls for.
+
+### Task 8 verdict — props-on-Godot-terrain viability
+
+**Viable for Phase 1, with two caveats to carry forward.** Kenney's CC0
+kits convert cleanly through both the direct-GLB and FBX-via-Blender
+paths (`export_blend.py --fbx-in`, additive), validate structurally
+(`validate_gltf.py --props`), import into Godot without incident once
+their external textures are copied alongside them, and render with real
+textures and a low-poly cartoon look that suits this project. The
+`terrain_probe.tscn` gate (`PROBE_OK count=8`, exit 0) passes comfortably
+above the `count>=3` bar. Caveats: (1) the pony/prop scale mismatch is
+real and must be resolved with a deliberate map-build-time scale factor
+(recommend ~3×, see above) — not a blocker, but a decision Phase 1 must
+make explicitly rather than inherit by accident; (2) FBX-sourced props
+need a manual scale sanity-check against a same-pack reference, since
+Blender's automatic unit conversion is not trustworthy on its own (quirk 4).
 
 ---
 
@@ -402,6 +482,13 @@ tools/bin/godot --headless --path game scenes/test/walk_test.tscn
 # Baseline smoke test (also the export smoke test's main scene, §8)
 tools/bin/godot --headless --path game scenes/test/smoke.tscn
 # -> SMOKE_OK renderer=forward_plus   exit 0
+
+# Map-props probe (Task 8, §4): scatters every converted prop plus Twilight
+# on a grass ground plane
+tools/bin/godot --headless --path game scenes/test/terrain_probe.tscn
+# -> LOADED <name>.glb pos=<Vector3> native_height=<n>   (one line per prop)
+# -> PONY twilight height=<n>
+# -> PROBE_OK count=<n>   exit 0
 ```
 
 **Quirk: the first `.glb` import needs an editor pass before headless runs
@@ -545,6 +632,11 @@ durable home for a decision Phase 1 planning needs.
    match the models' native scale instead. Not decided; needs a deliberate
    call before Phase 1 world geometry gets built around either assumption,
    since redoing it later means reworking either every asset or every map.
+   **Task 8 corroborates this from the world-geometry side:** Kenney CC0
+   kits (real-world-meter-scale module grid) measure every prop shorter
+   than the ~4.28-unit pony at native scale, and reads sensibly once
+   scaled ~3× to match — the same ratio this item already derived from the
+   pony side alone. See §4's "Scale finding" for the measured numbers.
 2. **Owner's visual/audio verdicts are still pending**, across three
    deliverables that were structurally validated but never subjectively
    judged by a human: walk quality *in motion* (the gait is measured
