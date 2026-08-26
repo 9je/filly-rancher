@@ -48,4 +48,59 @@ fi
 
 ./godot --version
 ./blender/blender --version | head -1
+
+# SourceIO: Blender addon for importing Source-engine .mdl/.bsp/.vtf/.vmt (Task 6, tier-c probe).
+# Master's __init__.py hard-requires bpy.app.version >= (4, 2, 0) and Python 3.11+
+# (Blender 4.2 is the oldest Blender bundling Python 3.11, which the addon's
+# compiled pylib needs) -- https://github.com/REDxEYE/SourceIO/blob/master/__init__.py
+# Release 5.5.4 (2026-08-03, non-prerelease) is current as of 2026-08-26 and its
+# release notes list "Minimum Blender version raised to 4.0", i.e. compatible with
+# our pinned Blender 4.2.23. Hash below is sha256 of the downloaded SourceIO.zip,
+# cross-checked against the "digest" field GitHub's Releases API reports for this
+# asset (`gh api repos/REDxEYE/SourceIO/releases/tags/5.5.4`) -- both matched exactly.
+#
+# NOTE on layout: this portable Blender has no "portable install" marker, so by
+# default it reads/writes user prefs and addons from the OS user config dir
+# (~/.config/blender/4.2/), not a tree under tools/bin/. To keep the addon itself
+# repo-local we register a *second* script-search root via the
+# preferences.filepaths.script_directories API (Blender 4.2+) pointing at
+# tools/bin/blender_scripts/{addons/SourceIO}, then call bpy.utils.refresh_script_paths()
+# so sys.path actually picks it up (addon_utils.modules() lists the module without
+# this, but bpy.ops.preferences.addon_enable's importlib.import_module still fails
+# with "No module named 'SourceIO'" until refresh_script_paths() runs). That
+# script-directory registration + the addon's enabled flag are then persisted via
+# save_userpref() into the (non-portable, home-dir) userpref.blend, so later
+# headless invocations of tools/bin/blender/blender pick SourceIO up automatically
+# with no extra flags/env vars -- verified by relaunching blender fresh and checking
+# hasattr(bpy.ops, 'sourceio') without repeating any of the steps below.
+SOURCEIO_VER="5.5.4"
+SOURCEIO_SHA256="c6da6d989120b430df0a74315307fc42b8f87fa3c1d98554ee589c7e93f79e4d"
+SCRIPTS_ROOT="$PWD/blender_scripts"
+ADDONS_DIR="$SCRIPTS_ROOT/addons"
+if [ ! -d "$ADDONS_DIR/SourceIO" ]; then
+  mkdir -p "$ADDONS_DIR"
+  curl -fL --connect-timeout 30 --max-time 300 -o sourceio.zip "https://github.com/REDxEYE/SourceIO/releases/download/${SOURCEIO_VER}/SourceIO.zip"
+  verify_checksum sourceio.zip "$SOURCEIO_SHA256" sha256sum
+  # The release zip's top-level folder is "SourceIO-master/", not "SourceIO/" --
+  # bpy's addon loader keys the module name off the folder name, so it must be
+  # renamed or bpy.ops.preferences.addon_enable(module='SourceIO') can't find it.
+  rm -rf "$ADDONS_DIR/SourceIO"
+  unzip -oq sourceio.zip -d "$ADDONS_DIR" && rm sourceio.zip
+  mv "$ADDONS_DIR/SourceIO-master" "$ADDONS_DIR/SourceIO"
+fi
+./blender/blender -b --python-expr "
+import bpy
+sd = bpy.context.preferences.filepaths.script_directories
+if 'SourceIO_root' not in sd:
+    item = sd.new()
+    item.name = 'SourceIO_root'
+    item.directory = '$SCRIPTS_ROOT'
+bpy.utils.refresh_script_paths()
+import addon_utils
+addon_utils.modules_refresh()
+bpy.ops.preferences.addon_enable(module='SourceIO')
+bpy.ops.wm.save_userpref()
+print('SOURCEIO_OK')
+"
+
 echo "toolchain ready"
