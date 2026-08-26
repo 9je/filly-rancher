@@ -3,5 +3,9 @@ tools/bin/
 game/assets/converted/
 game/.godot/
 build/
-*.import
+# Only the .import sidecars of *generated* assets are ignored. Deliberately NOT a
+# project-wide `*.import`: any asset committed to the repo must ship its sidecar too,
+# or Godot regenerates it independently on each machine and the resource UIDs diverge
+# (broken/duplicated references in scenes that point at them).
+game/assets/converted/**/*.import
 __pycache__/

@@ -278,6 +278,12 @@ if args.anims:
 # -Z at the target, so an unrotated pony walks backwards down her own path. Yawing
 # the exported root 180 degrees bakes Godot's forward convention into the asset,
 # which keeps consumer scenes free of per-model fudge rotations.
+# Without --object there is no single root to yaw (a whole-scene export has no one
+# "the model" object), so the flag is a no-op -- say so out loud rather than letting
+# a caller believe the rotation was applied.
+if args.rotate_z and target is None:
+    print(f"WARNING: --rotate-z {args.rotate_z} ignored -- it needs --object to pick "
+          f"a root to rotate; export is unrotated", file=sys.stderr)
 if args.rotate_z and target is not None:
     target.rotation_mode = "XYZ"
     target.rotation_euler.z += args.rotate_z * 3.141592653589793 / 180.0

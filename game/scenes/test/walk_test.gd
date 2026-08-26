@@ -8,8 +8,17 @@ extends Node3D
 ## cycle -- dividing by the full cycle understates the clip's speed by 2x.
 ## These constants must track tools/author_anims.py, which prints the same number as
 ## WALK_IMPLIED_SPEED on every export; compare them if you retune the clip.
+## FOUR values are duplicated here with no automatic sync: STRIDE (0.55), WALK_FRAMES
+## (20), STANCE_FRACTION (the 0.5 divisor) and -- the easiest one to miss -- the frame
+## rate. 24 is hardcoded below, whereas author_anims.py reads it from
+## bpy.context.scene.render.fps, i.e. from whatever the source .blend happens to be
+## set to. A pack authored at any other fps silently desyncs this scene's WALK_SPEED
+## while every structural gate still passes; the only symptom is foot skate. Compare
+## against the WALK_IMPLIED_SPEED line the export prints before trusting this number.
 const WALK_STRIDE := 0.55
-const WALK_CYCLE_SECONDS := 20.0 / 24.0
+const WALK_FRAMES := 20.0
+const WALK_FPS := 24.0            # must match the source .blend's scene.render.fps
+const WALK_CYCLE_SECONDS := WALK_FRAMES / WALK_FPS
 const WALK_SPEED := WALK_STRIDE / (WALK_CYCLE_SECONDS * 0.5)  # 1.32 units/s
 
 var pony: Node3D

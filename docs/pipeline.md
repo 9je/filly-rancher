@@ -16,6 +16,36 @@ the recipe, scripts, and small hand-authored assets are committed.
 
 ## 1. Toolchain setup
 
+### Prerequisites (host commands, not installed by this repo)
+
+`setup_env.sh` vendors Godot, Blender and SourceIO, but it cannot vendor the
+shell utilities it uses to fetch and verify them. Required on the host before
+the bootstrap will run at all — the script now preflight-checks these and
+exits 1 naming the missing one rather than failing mid-download:
+
+| Command | Used for |
+|---|---|
+| `curl` | every download |
+| `unzip` | Godot zip, SourceIO zip, export-template `.tpz` |
+| `tar` | Blender `.tar.xz` |
+| `sha256sum`, `sha512sum` | the pinned-checksum verification (§1 quirks) |
+| `awk` | parsing checksum-tool output |
+
+Needed by the wider recipe but *not* by the bootstrap, so not preflighted:
+
+| Command | Used for |
+|---|---|
+| `python3` | `tools/validate_gltf.py` (stdlib only, no pip installs) |
+| `ffmpeg` | voice-line resampling (§8, `docs/notes-voice.md`) |
+| `xvfb-run` + a software GL/Vulkan stack (Mesa llvmpipe) | the offscreen render check §7 recommends — the only gate that catches a rendering bug the structural gates cannot see |
+
+**`setup_env.sh` is not the *whole* bootstrap.** It does **not** install
+Godot's export templates: that is a separate ~1.3GB manual download,
+documented in §9, and it is a prerequisite for `--export-release` (nothing
+else in this doc). Do it once per machine, before §9.
+
+### Bootstrap
+
 One command, idempotent, run from the repo root:
 
 ```bash
@@ -65,6 +95,16 @@ a near-instant no-op once everything is in place (`[ ! -x ... ]` guards).
   new machine or fresh checkout, even if `tools/bin/` already looks
   populated — it's cheap (near-instant if already installed) and is the only
   thing that reliably re-establishes SourceIO's enabled state.
+- **Blender exits 0 even when a `--python-expr` raises**, so `set -euo
+  pipefail` cannot see a failed addon-enable on its own. The SourceIO block
+  therefore captures Blender's output and gates on the literal `SOURCEIO_OK`
+  marker before `toolchain ready` is printed; a failed enable now exits 1 with
+  `ERROR: SourceIO enable failed`. It also rewrites the registered script
+  directory *unconditionally* rather than only creating it when absent — the
+  entry is keyed by name, so a `userpref.blend` inherited from a moved,
+  renamed, or second checkout would otherwise keep a stale path forever. Both
+  of these are load-bearing for the self-healing claim above; don't
+  "simplify" either away.
 
 Verify: `tools/bin/godot --version` prints `4.5.2.stable.official....`;
 `tools/bin/blender/blender --version` prints `Blender 4.2.23 LTS`.
@@ -80,11 +120,19 @@ assets_raw/<source>/            # downloaded, unmodified source packs (gitignore
   props/<pack-slug>/...                   # tier b: Kenney CC0 glTF/FBX prop packs
 
 game/assets/converted/<kind>/   # pipeline output, gitignored (regenerated from assets_raw/)
-  ponies/<name>.glb
-  props/<name>.glb
+  ponies/<name>.glb             # tier a only -- the playable character set
+  props/<name>.glb              # tier b
+  probe/<name>.glb              # tier c probe output, deliberately NOT in ponies/
 
 game/assets/audio/voice/<character>/<category>_<nn>.wav   # committed (small, hand-picked)
 ```
+
+**`ponies/` holds tier-a characters only.** It is what
+`scenes/test/model_gallery.gd` globs (so anything dropped there inflates
+`GALLERY_OK count=`) and what §3's validation loop sweeps *with
+`--require-anims`* (so anything animation-less there fails the loop). The
+tier-c probe ships zero animations and is a probe, not a character, hence the
+separate `probe/` folder — see §5.
 
 `assets_raw/` and `game/assets/converted/` are both gitignored — nothing in
 either tree is committed. This means **a fresh clone has no converted
@@ -176,6 +224,13 @@ meshes=15 skins=1 materials=11 textured=True animations=['idle', 'walk']   # flu
 (Drop `--require-anims` for a plain structural export with no `--anims`
 flag — those correctly report `animations=[]` and still pass the base
 `meshes>=1 skins>=1` gate.)
+
+The loop above sweeps `ponies/*.glb` and expects **exactly the three tier-a
+characters** — keep tier-b props in `props/` and the tier-c probe in `probe/`
+(§2), or this loop fails on them. `validate_gltf.py` parses its arguments with
+argparse: a mistyped flag (e.g. `--require-anim`, singular) is a hard error
+rather than being silently ignored, which used to turn the animation gate off
+without any visible sign.
 
 ---
 
@@ -314,14 +369,26 @@ by `tools/setup_env.sh` every run (§1). If you see
 **Conversion** — `tools/convert_mdl.py`:
 
 ```bash
+mkdir -p game/assets/converted/probe
+
 tools/bin/blender/blender -b -P tools/convert_mdl.py -- \
   --mdl "assets_raw/sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_maudpie.mdl" \
-  --out game/assets/converted/ponies/sfm_probe.glb
-# -> MDL_EXPORT_OK game/assets/converted/ponies/sfm_probe.glb
+  --out game/assets/converted/probe/sfm_probe.glb
+# -> MDL_EXPORT_OK game/assets/converted/probe/sfm_probe.glb
 
-python3 tools/validate_gltf.py game/assets/converted/ponies/sfm_probe.glb
+python3 tools/validate_gltf.py game/assets/converted/probe/sfm_probe.glb
 # -> meshes=14 skins=1 materials=12 textured=True animations=[]
 ```
+
+**Output goes to `probe/`, not `ponies/`** (§2). Tier c ships no animations,
+so a tier-c `.glb` sitting in `ponies/` makes §3's `--require-anims`
+validation loop print `VALIDATION FAILED` when run verbatim, and inflates
+`model_gallery.tscn`'s `GALLERY_OK count=` past the three real characters.
+Note also that `convert_mdl.py` applies neither `rebuild_materials_for_gltf()`
+(unneeded — SourceIO already emits Principled BSDFs) nor `--rotate-z 180`, so
+the probe faces backwards relative to the tier-a ponies; harmless for a
+structural probe, but any tier-c model promoted to a real character needs that
+yaw baked in (§6).
 
 ### Quirks discovered
 
@@ -444,7 +511,13 @@ in `author()`. Load-bearing things to know before touching it:
   `STRIDE / (cycle_seconds * 0.5)` = `1.32 u/s`) — cross-check comments sit
   at both sites, but they are not automatically kept in sync. If you retune
   `STRIDE`, update both, or the walk-test pony's feet will skate. See §8 for
-  why the divisor is *half* the cycle, not the whole cycle.
+  why the divisor is *half* the cycle, not the whole cycle. **Four values are
+  duplicated, not one**: `STRIDE`, `WALK_FRAMES`, `STANCE_FRACTION`, and the
+  frame rate — and the frame rate is the sneaky one, because `author_anims.py`
+  reads it from `bpy.context.scene.render.fps` (i.e. from whatever the source
+  `.blend` is set to) while `walk_test.gd` hardcodes `24.0`. A pack authored
+  at a different fps desyncs the two with no gate failing. Always compare
+  against the `WALK_IMPLIED_SPEED` line the export prints.
 - **Loop mode is a tracked project default, not a per-asset setting.** glTF
   carries no loop flag, so Godot imports every animation as `LOOP_NONE` —
   since `game/assets/converted/` (and its `.import` sidecars) is gitignored,
@@ -456,9 +529,10 @@ in `author()`. Load-bearing things to know before touching it:
   Blender, which `export_yup` maps to +Z in glTF, but Godot's
   `Node3D.look_at()` aims −Z — an unrotated pony moonwalks down her own
   path. This is baked into the asset (not fixed in scene code) so consumer
-  scenes stay free of a per-model fudge rotation. It is a silent no-op
-  without `--object` (there's no single target to rotate for a whole-scene
-  export).
+  scenes stay free of a per-model fudge rotation. It is a no-op without
+  `--object` (there's no single target to rotate for a whole-scene export) —
+  no longer a *silent* one: that combination now prints a `WARNING: --rotate-z
+  ... ignored` line to stderr.
 
 ---
 
@@ -472,7 +546,8 @@ python3 tools/validate_gltf.py game/assets/converted/ponies/twilight.glb --requi
 # Gallery: loads every pony .glb in the folder, verifies skeleton + bone count
 tools/bin/godot --headless --path game scenes/test/model_gallery.tscn
 # -> LOADED <name>.glb skeleton=true bones=<n>   (one line per pony)
-# -> GALLERY_OK count=<n>   exit 0
+# -> GALLERY_OK count=3   exit 0   (the three converted tier-a characters;
+#    the tier-c probe lives in probe/, not ponies/, so it is not counted)
 
 # Animated walk test: Twilight walks a 4-waypoint square using the 'walk' clip
 tools/bin/godot --headless --path game scenes/test/walk_test.tscn

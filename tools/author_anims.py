@@ -62,7 +62,8 @@ FEET = [
 # idle first came out with the hooves frozen half a stride apart.
 ANIMATED = [BELLY, HEAD] + [name for name, _ in FEET]
 
-WALK_FRAMES = 20        # loop length; frame WALK_FRAMES+1 repeats frame 1
+WALK_FRAMES = 20        # loop length; clips start at frame 0, so frame WALK_FRAMES
+                        # (20) is the seam and repeats frame 0
 # Fore/aft hoof travel per stride. This is the number that sets how fast the clip
 # says she is moving, so it is also what a consumer scene has to match to avoid foot
 # skate -- see IMPLIED_SPEED below and WALK_SPEED in scenes/test/walk_test.gd.

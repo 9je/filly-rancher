@@ -1,5 +1,11 @@
 """Headless Blender: import a Source-engine .mdl via SourceIO, export glTF.
-Usage: blender -b -P tools/convert_mdl.py -- --mdl pony.mdl --out pony.glb
+Usage: blender -b -P tools/convert_mdl.py -- --mdl pony.mdl --out probe.glb
+
+Output convention: tier-c probe output goes to game/assets/converted/probe/, NOT
+game/assets/converted/ponies/. The ponies/ folder is the tier-a character set that
+scenes/test/model_gallery.gd globs and that docs/pipeline.md §3 validates with
+--require-anims; a tier-c model (which ships zero animations) dropped in there
+fails that loop and inflates GALLERY_OK's count.
 
 Requires the SourceIO addon installed + enabled by tools/setup_env.sh (which also
 registers tools/bin/blender_scripts as an extra script-search root and persists that
@@ -26,8 +32,16 @@ Notes from the tier-c probe (Task 6):
   as separate mesh objects, not just the "default" combination a game would show.
   This script exports everything it finds; picking the intended bodygroup subset
   per-model is left as manual follow-up (see task-6-report.md verdict).
+- This script is deliberately a thin probe, NOT the tier-a pipeline: it applies
+  neither export_blend.py's rebuild_materials_for_gltf() (unnecessary -- SourceIO
+  builds Principled-BSDF materials the glTF exporter already understands) nor its
+  `--rotate-z 180` facing fix. Consequence: the probe's output faces *backwards*
+  relative to the converted tier-a ponies, so it would moonwalk if a scene drove it
+  with Node3D.look_at(). Fine for a structural probe; anything promoting a tier-c
+  model to a real character needs the same 180-degree yaw baked in (see
+  docs/pipeline.md §6).
 """
-import argparse, sys
+import argparse, os, sys
 import bpy
 
 argv = sys.argv[sys.argv.index("--") + 1:]
@@ -36,7 +50,6 @@ p.add_argument("--mdl", required=True)
 p.add_argument("--out", required=True)
 args = p.parse_args(argv)
 
-import os
 mdl_path = os.path.abspath(args.mdl)
 mdl_dir = os.path.dirname(mdl_path) + os.sep
 mdl_name = os.path.basename(mdl_path)

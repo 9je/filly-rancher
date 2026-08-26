@@ -103,46 +103,84 @@ version" banner on the old V6 page that redirects to the one listed above.
 
 ---
 
-## 3. Map props (Sketchfab) — tier b
+## 3. Map props (Kenney CC0) — tier b
 
-**Save to:** `assets_raw/props/`
+**Save to:** `assets_raw/props/kenney-<pack>/`
 
-I checked every candidate against Sketchfab's own API
-(`api.sketchfab.com/v3/models/<uid>`), which reports `isDownloadable` and
-`license` authoritatively — page-scraping alone was unreliable (Sketchfab
-is a heavy JS SPA and some pages returned useless static HTML). Two
-`discopears` "Ponyville Building" models I found first (`OGB_2`, `Pink_B`)
-looked perfect thematically but the API says `isDownloadable: False` — they
-are view-only, so I dropped them. Everything below is confirmed
-`isDownloadable: true` with a real license.
+> **This section was rewritten after Task 8 ran.** The original list here
+> pointed at four Sketchfab models. Every Sketchfab download — free or not —
+> requires clicking **Download 3D Model** while logged in, and there is no
+> anonymous/direct URL behind it, so an automated (curl-only, no-account)
+> fetch could not reach them. A controller ruling redirected Task 8 to
+> login-free CC0 packs. **The packs below are what Phase 0 actually
+> downloaded, converted, validated and shipped** (`docs/pipeline.md` §4);
+> the Sketchfab options are retained further down as an *optional* flavor
+> upgrade, not as the tier-b source.
 
-**Buildings (3):**
+Everything here is **Kenney.nl, CC0** (public domain — no attribution
+required, no account, no API key). Downloadable with a plain `curl` carrying
+a browser user-agent; Kenney's own CDN does not bot-block:
+
+```bash
+UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122 Safari/537.36"
+curl -sS -L -A "$UA" -o kenney_<pack>.zip "<url from the table>"
+```
+
+| Pack | Direct zip URL | License | Used for |
+|---|---|---|---|
+| Fantasy Town Kit 2.0 | https://kenney.nl/media/pages/assets/fantasy-town-kit/efe948d309-1754222374/kenney_fantasy-town-kit_2.0.zip | CC0 | buildings: `windmill.glb`, `watermill.glb`, `stall-red.glb` |
+| Nature Kit 2.1 | https://kenney.nl/media/pages/assets/nature-kit/37ac38a37b-1677698939/kenney_nature-kit.zip | CC0 | trees: `tree_oak.glb`, `tree_pineTallA.glb`, `tree_default.glb`, `tree_fat.glb` |
+| Survival Kit 2.0 | https://kenney.nl/media/pages/assets/survival-kit/4065a8185b-1712149243/kenney_survival-kit.zip | CC0 | `structure.fbx` — taken through the FBX branch deliberately, to exercise it |
+
+Pack landing pages (if a hashed CDN URL above ever rots, the current one is
+linked from these): https://kenney.nl/assets/fantasy-town-kit ,
+https://kenney.nl/assets/nature-kit , https://kenney.nl/assets/survival-kit .
+
+Unzip each into its own subfolder so Task 8's commands resolve verbatim:
+
+```
+assets_raw/props/kenney-fantasy-town-kit/extracted/...
+assets_raw/props/kenney-nature-kit/extracted/...
+assets_raw/props/kenney-survival-kit/extracted/...
+```
+
+Each kit ships `Models/{GLB format,GLTF format,FBX format,OBJ format}/` plus a
+shared `Textures/colormap.png` atlas. **Prefer the GLB/glTF path** — Task 8
+found Blender's automatic FBX unit conversion put the FBX-sourced prop at 4×
+undersize versus the same pack's GLB sibling (`docs/pipeline.md` §4, quirk 4).
+Also note Kenney's "GLB" files reference that atlas via an *external* URI
+rather than embedding it, so the PNG has to be copied alongside the converted
+`.glb`s (§4, quirk 1).
+
+A fourth pack, **Holiday Kit 2.0**
+(https://kenney.nl/media/pages/assets/holiday-kit/3976a6496a-1733923970/kenney_holiday-kit.zip,
+CC0), was downloaded and inspected but **not used** — nothing in it fit a
+Ponyville village. Skip it unless you want winter dressing.
+
+### Optional: Sketchfab, for more MLP-specific buildings
+
+Kenney's kits are generic-fantasy-village, not Ponyville. If you want
+thematically closer buildings later and don't mind a **manual, logged-in
+browser download**, these were verified downloadable via Sketchfab's own API
+(`api.sketchfab.com/v3/models/<uid>`, reading the raw `isDownloadable` and
+`license.label` fields — page-scraping was unreliable). All are $0; a free
+Sketchfab account is still required to click **Download 3D Model**, then pick
+the **glTF** export format:
 
 | Model | License | Link |
 |---|---|---|
 | Low Poly MLP Ponyville Style Medieval House | Free Standard | https://sketchfab.com/3d-models/low-poly-mlp-ponyville-style-medieval-house-219d6a66c06c4da299a20fc874b9fce1 |
 | Low-Poly Stylized Cottage | CC Attribution | https://sketchfab.com/3d-models/low-poly-stylized-cottage-6bcf4819b1c542b584153504f97bab47 |
 | Stylized Cottage | CC Attribution | https://sketchfab.com/3d-models/stylized-cottage-c313cc0200804b02976e520a9ce08ce5 |
-
-**Tree/foliage set (1):**
-
-| Model | License | Link |
-|---|---|---|
 | Stylized Low Poly Tree Pack for Free (18 trees) | CC Attribution | https://sketchfab.com/3d-models/stylized-low-poly-tree-pack-for-free-23d062eb4c8e4770a349cb83c6166bb9 |
 
-For each: open the link, click **Download 3D Model**, choose the **glTF**
-format in the download dialog (Sketchfab offers glTF for every downloadable
-model as a standard export option alongside the original/source format).
-A free Sketchfab account is required to click Download (their standard
-click-through, not a paywall — all four models above are $0). Unzip each
-download into `assets_raw/props/` as its own subfolder (e.g.
-`assets_raw/props/ponyville-medieval-house/`, etc.) so Task 4/8 can glob
-per-model.
+Two `discopears` "Ponyville Building" models (`OGB_2`, `Pink_B`) look ideal
+thematically but the API reports `isDownloadable: False` — view-only, dropped.
 
-**How I verified this:** queried the Sketchfab public API per model UID and
-recorded the raw `isDownloadable` and `license.label` fields shown in the
-table (not inferred from page text, which Sketchfab renders inconsistently
-depending on whether Cloudflare serves the static shell or the full SPA).
+Unzip any of these into `assets_raw/props/` as its own subfolder (e.g.
+`assets_raw/props/ponyville-medieval-house/`). The CC-Attribution ones need a
+credits entry; the Kenney CC0 packs do not — one more reason they are the
+default.
 
 ---
 
@@ -182,19 +220,24 @@ needed now; this is just so the option is on record for Task 9.
 
 ## 5. Hand-off
 
+> **Status: Phase 0 is done — this hand-off is history, kept because the
+> download recipe is still the way to re-populate `assets_raw/` on a fresh
+> machine** (the whole tree is gitignored, so a fresh clone has none of it).
+> The only manual step left is §1 and §2; §3's Kenney packs are fetched by
+> `curl` with no account. See `docs/pipeline.md` for what to do once they are
+> in place.
+
 Once everything above is unzipped into place:
 
 ```
 assets_raw/
-  blender-native/   <- Task 3.1 zips, unzipped
-  sfm/              <- Task 3.2 zip, unzipped
-  props/            <- Task 3.3 zips, unzipped (one subfolder per model)
+  blender-native/            <- §1 zips, unzipped (one subfolder per character)
+  sfm/                       <- §2 zip, unzipped
+  props/kenney-<pack>/       <- §3 zips, unzipped (one subfolder per pack)
 ```
 
-Tell Claude: **"assets are in"** — that's the signal to resume at Task 4.
-You don't need to wait for every optional extra (more Mane 6 characters,
-the second tree pack, etc.) — just the tier-a Blender pack (at minimum
-Twilight Sparkle + 2 others), the one SFM pack, and the 3 Sketchfab props.
-If the Sketchfab or SFM downloads lag behind the Blender pack, that's fine
-— Tasks 6/8 (which consume them) can be deferred independently; Task 4
-only needs the Blender pack to start.
+Minimum set that exercises the whole pipeline: the tier-a Blender pack (at
+least Twilight Sparkle + 2 others), the one SFM pack, and the three Kenney
+kits. The three tiers are independent — a missing SFM or props download only
+defers the tier-c/tier-b steps (`docs/pipeline.md` §5 / §4); the tier-a
+`.blend` recipe (§3 of that doc) needs nothing else.

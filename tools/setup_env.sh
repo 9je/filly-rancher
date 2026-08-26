@@ -2,6 +2,13 @@
 # Downloads portable Godot + Blender into tools/bin/. Idempotent. No sudo.
 set -euo pipefail
 cd "$(dirname "$0")"
+
+# Preflight: every external command this script shells out to. Failing here with a
+# clear name beats failing 200MB into a download with a bare "command not found".
+for c in curl unzip tar sha256sum sha512sum awk; do
+  command -v "$c" >/dev/null || { echo "missing required command: $c" >&2; exit 1; }
+done
+
 mkdir -p bin && cd bin
 
 # Verifies $1 against the pinned hash $2 using algorithm $3 (sha256sum/sha512sum).
@@ -88,19 +95,32 @@ if [ ! -d "$ADDONS_DIR/SourceIO" ]; then
   unzip -oq sourceio.zip -d "$ADDONS_DIR" && rm sourceio.zip
   mv "$ADDONS_DIR/SourceIO-master" "$ADDONS_DIR/SourceIO"
 fi
-./blender/blender -b --python-expr "
+# The `directory` is (re)assigned unconditionally, not just when the named entry is
+# missing: the entry is keyed by NAME, so a userpref.blend carrying a 'SourceIO_root'
+# pointing at a moved/renamed/other checkout would otherwise never be corrected and
+# every tier-c run would keep failing with ModuleNotFoundError. Rewriting it every
+# run is what actually makes this self-healing.
+#
+# Blender exits 0 even when a --python-expr raises, so `set -e` cannot see a failed
+# enable -- the SOURCEIO_OK marker is the only trustworthy success signal, hence the
+# grep gate below. Without it this script printed "toolchain ready" over a broken
+# SourceIO install.
+sourceio_log="$(./blender/blender -b --python-expr "
 import bpy
 sd = bpy.context.preferences.filepaths.script_directories
-if 'SourceIO_root' not in sd:
+item = sd.get('SourceIO_root')
+if item is None:
     item = sd.new()
     item.name = 'SourceIO_root'
-    item.directory = '$SCRIPTS_ROOT'
+item.directory = '$SCRIPTS_ROOT'
 bpy.utils.refresh_script_paths()
 import addon_utils
 addon_utils.modules_refresh()
 bpy.ops.preferences.addon_enable(module='SourceIO')
 bpy.ops.wm.save_userpref()
 print('SOURCEIO_OK')
-"
+" 2>&1 || true)"
+printf '%s\n' "$sourceio_log"
+printf '%s\n' "$sourceio_log" | grep -q SOURCEIO_OK || { echo "ERROR: SourceIO enable failed" >&2; exit 1; }
 
 echo "toolchain ready"
