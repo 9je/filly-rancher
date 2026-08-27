@@ -1,14 +1,22 @@
 class_name Storage
 extends RefCounted
 ## The pony you just caught has to go somewhere. This is that somewhere: a fixed-capacity
-## LIFO container of PonyData records, owned by the magic beam
+## LIFO container of PonyInstance records, owned by the magic beam
 ## (game/actors/player/magic_beam.gd) and read by whatever HUD, corral or barn wants to
 ## know what the player is carrying.
 ##
-## RECORDS, NOT NODES. What goes in is the PonyData the captured pony was built from, not
-## the Pony node itself. A captured pony is freed at the moment of capture and rebuilt
-## from her record when she is let out again, through the same
-## PonyRegistry -> PonyVisuals path everything else spawns through
+## INSTANCES, NOT CHARACTER DEFINITIONS -- and that is a bug fix, not a refactor. This
+## container used to hold PonyData, the shared one-per-CHARACTER resource, so catching two
+## Twilights put two pointers to the SAME record in the bag: a reviewer inspected it and
+## saw `contents=[twilight, twilight]`. There was nowhere for one of them to be hungrier
+## than the other, which blocked every other thing Phase 1B wants to do. What goes in now
+## is a PonyInstance (game/systems/pony_instance.gd): one individual, with her own uid and
+## her own happiness/hunger. Her CHARACTER is still a shared PonyData, resolved on demand
+## through inst.data().
+##
+## RECORDS, NOT NODES. What goes in is a record, not the Pony node itself. A captured pony
+## is freed at the moment of capture and rebuilt from her record when she is let out again,
+## through the same PonyRegistry -> PonyVisuals path everything else spawns through
 ## (docs/notes-hair-sim.md: loading a .glb directly is what silently drops the mane/tail
 ## spring simulation). Keeping nodes alive-but-hidden in a backpack instead would mean
 ## carrying a physics body, a detection area and a skeleton per captured pony, and would
@@ -40,35 +48,48 @@ signal changed()
 var capacity: int = 0
 
 ## Newest last. Never handed out directly -- see contents().
-var _items: Array[PonyData] = []
+var _items: Array[PonyInstance] = []
 
 
 func _init(p_capacity: int) -> void:
 	capacity = maxi(0, p_capacity)
 
 
-## Put `data` in the bag. Returns false -- and changes nothing at all -- if the bag is
-## full or `data` is null; the caller is then still responsible for the pony it was
+## Put `instance` in the bag. Returns false -- and changes nothing at all -- if the bag is
+## full or `instance` is null; the caller is then still responsible for the pony it was
 ## holding (the beam drops her back into the world unharmed).
 ##
 ## `null` is refused rather than stored because release() already uses null to mean
 ## "there was nothing in here"; a stored null would make those two states
 ## indistinguishable to every reader.
-func store(data: PonyData) -> bool:
-	if data == null or is_full():
+##
+## Deliberately does NOT reject an instance whose uid is already in the bag. A duplicate
+## uid would be a minting bug upstream, and silently swallowing the second copy here would
+## hide it while ALSO losing a pony the caller is holding -- exactly the leak the
+## no-pony-ever-dies rule forbids. PonyInstance.create() is the one place uids come from,
+## and it is what guarantees they differ.
+func store(instance: PonyInstance) -> bool:
+	if instance == null or is_full():
 		return false
-	_items.append(data)
+	_items.append(instance)
 	changed.emit()
 	return true
 
 
 ## Take the most recently stored pony back out, or null if there is nothing in here.
-func release() -> PonyData:
+##
+## THIS IS THE HANDOVER POINT, not the end of the story. What comes back is a record; the
+## caller is what puts a live Pony in the world again from it -- MagicBeam.release_stored()
+## (game/actors/player/magic_beam.gd) does that for the player, and Task 3's pens will do
+## the same when a pony is let out into one. Her state rides along in the instance, so a
+## pony let out and caught again is the SAME pony, at the same happiness, with the same
+## uid, rather than a fresh copy of her character.
+func release() -> PonyInstance:
 	if _items.is_empty():
 		return null
-	var data: PonyData = _items.pop_back()
+	var instance: PonyInstance = _items.pop_back()
 	changed.emit()
-	return data
+	return instance
 
 
 ## How many ponies are in the bag right now.
@@ -83,12 +104,13 @@ func is_full() -> bool:
 
 ## The most recently stored pony without removing her, or null if empty. For a HUD that
 ## wants to show "next out" without disturbing the contents.
-func peek() -> PonyData:
+func peek() -> PonyInstance:
 	return _items.back() if not _items.is_empty() else null
 
 
 ## A COPY of the contents, oldest first, for display. A copy rather than the array
 ## itself: handing out the live array would let a HUD append to, clear or reorder the
 ## player's inventory by accident, and `changed` would never fire for it.
-func contents() -> Array[PonyData]:
+func contents() -> Array[PonyInstance]:
 	return _items.duplicate()
+

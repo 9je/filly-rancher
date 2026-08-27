@@ -149,9 +149,23 @@ func test_a_pony_left_alone_wanders_off_and_walks_while_she_does() -> void:
 		"...on the ground, not through it or above it")
 	assert_eq(pony.get_animation_player().current_animation, "walk",
 		"she plays 'walk' while ambling")
-	assert_almost_eq(pony.get_animation_player().speed_scale,
-		GaitScript.playback_scale_for_speed(pony.get_ground_speed()), 0.001,
-		"playback must be scaled to her ground speed, not left at 1.0")
+	# PINNED TO LITERALS, NOT TO GaitScript. This used to read `assert_almost_eq(
+	# ...speed_scale, GaitScript.playback_scale_for_speed(pony.get_ground_speed()), 0.001)`
+	# -- the engine's answer against the very function that produced it, so stubbing
+	# playback_scale_for_speed() to return a flat 1.0 made both sides 1.0 and this passed
+	# while measuring nothing. Phase 1A's final review found it, along with the siblings in
+	# game/test/test_player.gd and game/scenes/test/playground.gd.
+	#
+	# Derived once, by hand: pony.gd ambles at NOMINAL_WANDER_SPEED (the `walk` clip's own
+	# 0.66 m/s) scaled by base_speed / REFERENCE_BASE_SPEED, so 3.4 / 4.0 x 0.66 = 0.561 m/s
+	# -- inside the clamp band at both ends, so this is a real scaled value and not a bound
+	# reading itself back. 0.561 m/s of a 0.66 m/s clip is 0.85x playback. NOT 1.0, which is
+	# what makes the stub above fail here rather than coincide.
+	assert_almost_eq(pony.get_ground_speed(), 0.561, 0.02,
+		"a base_speed 3.4 pony ambles at 0.561 m/s -- 0.85x of the walk clip's own speed")
+	assert_almost_eq(pony.get_animation_player().speed_scale, 0.85, 0.01,
+		"...so her walk plays at 0.85x, a literal expected value rather than whatever "
+		+ "Gait would have answered for the speed we just read off her")
 
 
 func test_grazing_stands_still_and_plays_idle_then_hands_back_to_idle() -> void:

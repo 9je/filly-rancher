@@ -1,7 +1,7 @@
 class_name PonyRegistry
 extends RefCounted
 ## Loads PonyData resources (game/systems/pony_data.gd) out of a directory of
-## .tres files and indexes them for lookup by zone or rarity. No scene-tree
+## .tres files and indexes them for lookup by id, zone or rarity. No scene-tree
 ## dependency -- constructible and testable headlessly with plain `.new()`
 ## (see game/test/test_pony_registry.gd).
 ##
@@ -103,6 +103,21 @@ func _load_one(path: String) -> void:
 		])
 
 	_by_id[data.id] = data
+
+
+## The PonyData indexed under `id`, or NULL if this registry has never heard of her.
+##
+## NULL IS A SUPPORTED ANSWER. A PonyInstance (game/systems/pony_instance.gd) stores only
+## a `data_id` and resolves it through here, so a save file -- or a traded pony blob --
+## naming a character this build does not carry lands on this null. Callers show a default
+## rather than crash; substituting some other pony's record would put a stranger on screen
+## wearing the missing pony's name, which is worse than a blank.
+##
+## Not a `has()` plus an indexed read at every call site: two lookups where one will do,
+## and the two-step version invites the race-free-looking `if has(x): use(_by_id[x])`
+## pattern that stops being right the moment anything can reload the registry.
+func by_id(id: StringName) -> PonyData:
+	return _by_id.get(id, null)
 
 
 ## Ponies whose spawn_zones includes `zone`. Empty array if none match --

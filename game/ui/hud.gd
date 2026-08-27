@@ -41,6 +41,7 @@ extends CanvasLayer
 ## below is in those units on every screen.
 
 const PonyDataScript := preload("res://systems/pony_data.gd")
+const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const MagicBeamScript := preload("res://actors/player/magic_beam.gd")
 
 ## Radius of the reticle ring, in (1920x1080-base) pixels. Small: it has to mark a point
@@ -76,6 +77,12 @@ const PIP_BORDER := Color(0.0, 0.0, 0.0, 0.5)
 ## Filled-pip colour by PonyData.Rarity. The bag is the only place the player ever sees
 ## what she has actually collected, so a caught pony's TIER being legible at a glance is
 ## most of what makes a row of pips worth drawing instead of a bare number.
+##
+## RARITY IS A PROPERTY OF THE CHARACTER, NOT OF THE INDIVIDUAL. Storage holds
+## PonyInstances now (one per pony you own), and rarity lives on the shared PonyData behind
+## her `data_id` -- so the pip colour comes from `instance.data().rarity`, resolved through
+## PonyRegistry. An instance whose character this build does not carry resolves to null and
+## draws as COMMON rather than crashing the overlay; see _on_storage_changed().
 const RARITY_COLORS := {
 	PonyDataScript.Rarity.COMMON: Color(0.72, 0.78, 0.72),
 	PonyDataScript.Rarity.UNCOMMON: Color(0.47, 0.82, 0.45),
@@ -212,15 +219,23 @@ func _bind() -> void:
 
 func _on_storage_changed() -> void:
 	_rarities.clear()
-	for data: PonyData in _storage.contents():
+	for instance: PonyInstance in _storage.contents():
+		# Two separate nulls to survive, both reachable: a hole in the bag (which
+		# Storage.store() refuses, so this is belt and braces), and an instance whose
+		# character is not on this build's roster -- a save from a build with a pony this
+		# one lacks, or a traded pony. Neither may take the whole overlay down; both draw
+		# as the most conservative tier instead.
+		var data: PonyData = instance.data() if instance != null else null
 		_rarities.append(data.rarity if data != null else PonyDataScript.Rarity.COMMON)
 	_bag_count.text = "%d / %d" % [_storage.count(), _capacity]
 	_pips.queue_redraw()
 
 
-func _on_captured(data: PonyData) -> void:
-	var who := data.display_name if data != null and data.display_name != "" else "a pony"
-	toast("Caught %s!" % who)
+func _on_captured(instance: PonyInstance) -> void:
+	# display_name() falls back nickname -> character's name -> raw data_id, so this line
+	# always names somebody even for a pony whose record is missing on this machine.
+	var who := instance.display_name() if instance != null else "a pony"
+	toast("Caught %s!" % (who if not who.is_empty() else "a pony"))
 
 
 ## The bag was full, so she was set down instead of stored -- the one capture outcome
