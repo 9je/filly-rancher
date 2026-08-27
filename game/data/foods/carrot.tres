@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="FoodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/food_data.gd" id="1_crt01"]
+
+[resource]
+script = ExtResource("1_crt01")
+id = &"carrot"
+display_name = "Carrot"
+grow_seconds = 75.0
+seed_cost = 4
