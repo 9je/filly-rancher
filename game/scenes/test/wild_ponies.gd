@@ -64,6 +64,7 @@ const PonyDataScript := preload("res://systems/pony_data.gd")
 const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 const SpawnTableScript := preload("res://systems/spawn_table.gd")
 const GaitScript := preload("res://systems/gait.gd")
+const GateWatchdogScript := preload("res://scripts/gate_watchdog.gd")
 
 ## Fixed seed so the herd, and every wander target it picks, is identical on every run.
 ##
@@ -163,6 +164,7 @@ var _detection_distance_at_arrival: Array[float] = []
 
 
 func _ready() -> void:
+	GateWatchdogScript.arm(self, "WILD", 60.0)
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--screenshot-dir="):
 			_screenshot_dir = arg.split("=")[1]

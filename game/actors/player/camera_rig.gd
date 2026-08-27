@@ -395,6 +395,7 @@ func _update_subject_fade() -> void:
 		return
 	_subject_fade = opacity
 
+	var should_be_visible := opacity > 0.001
 	for mesh in _subject_meshes:
 		if not is_instance_valid(mesh):
 			# A rebuilt body (a different pony wearing this rig) invalidates the cache.
@@ -402,7 +403,17 @@ func _update_subject_fade() -> void:
 			_subject_fade = -1.0
 			return
 		mesh.transparency = 1.0 - opacity
-		mesh.visible = opacity > 0.001
+		# `visible` is only WRITTEN when the fade actually needs to flip it, not
+		# reassigned to the same value on every opacity change (which happens on every
+		# tiny camera-distance jitter while the arm sits in the fade band). This rig
+		# does not own `visible` the way it owns `transparency` -- see the class comment
+		# above on why `transparency` is the per-instance property used instead of the
+		# shared material -- so stamping `true` over it every update would silently win
+		# a fight with any other system that also wants a say over whether this mesh is
+		# drawn (a future capture animation, an invisibility effect, ...), even though
+		# this rig only actually cares about the two edges of that boolean.
+		if mesh.visible != should_be_visible:
+			mesh.visible = should_be_visible
 
 
 ## Collect the subject's own meshes -- and ONLY those.

@@ -19,6 +19,7 @@ extends Node3D
 ## scripts/pony_rig.gd and docs/notes-hair-sim.md.
 const PonyRigScript := preload("res://scripts/pony_rig.gd")
 const GaitScript := preload("res://systems/gait.gd")
+const GateWatchdogScript := preload("res://scripts/gate_watchdog.gd")
 
 const WALK_SPEED := GaitScript.WALK_CLIP_SPEED  # 0.66 m/s
 
@@ -37,6 +38,7 @@ var target_idx := 0
 var frames := 0
 
 func _ready() -> void:
+    GateWatchdogScript.arm(self, "WALK", 60.0)
     pony = PonyRigScript.spawn("twilight")
     add_child(pony)
     var anim: AnimationPlayer = pony.find_child("AnimationPlayer", true, false)

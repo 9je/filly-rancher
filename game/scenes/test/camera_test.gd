@@ -24,6 +24,7 @@ extends Node3D
 
 const CameraRigScript := preload("res://actors/player/camera_rig.gd")
 const PlayerScript := preload("res://actors/player/player.gd")
+const GateWatchdogScript := preload("res://scripts/gate_watchdog.gd")
 
 ## Physics frames to let SpringArm3D's collision probe settle after a pose change
 ## (its cast runs once per physics frame) before a screenshot is taken.
@@ -37,6 +38,7 @@ var _screenshot_dir := ""
 
 
 func _ready() -> void:
+	GateWatchdogScript.arm(self, "CAMERA")
 	_rig = player.get_camera_pivot().get_node("CameraRig")
 	_build_wall()
 

@@ -36,6 +36,7 @@ extends Node3D
 
 const GaitScript := preload("res://systems/gait.gd")
 const PlayerScript := preload("res://actors/player/player.gd")
+const GateWatchdogScript := preload("res://scripts/gate_watchdog.gd")
 
 ## One second at 60 Hz, per the task brief's "~60 physics frames of forward input".
 const DRIVE_FRAMES := 60
@@ -72,6 +73,7 @@ var _drive_speed := 0.0
 
 
 func _ready() -> void:
+	GateWatchdogScript.arm(self, "PLAYER")
 	if DisplayServer.get_name() != "headless":
 		return
 	_headless = true

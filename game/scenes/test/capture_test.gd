@@ -62,6 +62,7 @@ const PonyScript := preload("res://actors/pony/pony.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 const MagicBeamScript := preload("res://actors/player/magic_beam.gd")
+const GateWatchdogScript := preload("res://scripts/gate_watchdog.gd")
 
 ## Physics frames to let the player settle onto the ground and the spring arm's collision
 ## probe run before anything is aimed or grabbed.
@@ -128,6 +129,7 @@ var _shot_index := 0
 
 
 func _ready() -> void:
+	GateWatchdogScript.arm(self, "CAPTURE", 60.0)
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--screenshot-dir="):
 			_screenshot_dir = arg.split("=")[1]

@@ -1049,9 +1049,10 @@ xvfb-run -a ./build/filly-rancher-linux.x86_64 -- --screenshot-dir=/tmp/shots
 ```
 
 (`--`, then `--screenshot-dir=`; `game/world/ranch.gd` reads it out of
-`OS.get_cmdline_user_args()`.) That saves the same five shots the scene run
-saves — establishing, player's-eye, a spawn zone, the camera against a wall, and
-the barn at eye level — **from inside the `.pck`**, so a missing model, a missing
+`OS.get_cmdline_user_args()`.) That saves the same six shots the scene run
+saves — establishing, player's-eye, a spawn zone, the camera pressed against a
+wall (`04a`) and backed off from it (`04b`), and the barn at eye level —
+**from inside the `.pck`**, so a missing model, a missing
 material or a HUD whose script failed to pack shows up as a picture rather than
 as nothing at all. Note that it is `xvfb-run` **without** `--headless`: headless
 uses the dummy rasteriser and renders nothing.

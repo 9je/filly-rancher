@@ -167,13 +167,19 @@ func get_markers() -> Array[ZoneMarker]:
 ##
 ## Pruning here rather than making every caller defensive: "who is still out there" is
 ## this node's own question to answer, and there is exactly one right answer to it.
+##
+## Returns a COPY, not `_spawned` itself: a caller that appended to or cleared the
+## array it got back would be silently corrupting this node's own bookkeeping of who
+## is out there, rather than just reading it. `.duplicate()` is a shallow copy -- the
+## CharacterBody3D elements themselves are shared (as they must be; callers need the
+## real pony nodes), only the array container is independent.
 func get_spawned() -> Array[CharacterBody3D]:
 	var live: Array[CharacterBody3D] = []
 	for pony in _spawned:
 		if is_instance_valid(pony):
 			live.append(pony)
 	_spawned = live
-	return _spawned
+	return _spawned.duplicate()
 
 
 ## How many ponies had to be placed WITHOUT a ground hit. Must be zero: a non-zero

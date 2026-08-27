@@ -19,6 +19,7 @@ extends Node3D
 const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 const PonyVisualsScript := preload("res://actors/pony/pony_visuals.gd")
 const PonyRigScript := preload("res://scripts/pony_rig.gd")
+const GateWatchdogScript := preload("res://scripts/gate_watchdog.gd")
 
 const PONY_DIR := "res://data/ponies/"
 
@@ -29,6 +30,7 @@ const AUTHORED_CLIPS := ["idle", "walk", "gallop"]
 
 
 func _ready() -> void:
+	GateWatchdogScript.arm(self, "REGISTRY")
 	var registry := PonyRegistryScript.new()
 	var ponies := registry.load_all(PONY_DIR)
 

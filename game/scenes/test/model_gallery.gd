@@ -6,10 +6,12 @@ extends Node3D
 ## simulation, which is what makes the gallery show what the ponies actually look like
 ## in game rather than with their manes welded to their skulls.
 const PonyRigScript := preload("res://scripts/pony_rig.gd")
+const GateWatchdogScript := preload("res://scripts/gate_watchdog.gd")
 
 const PONY_DIR := "res://assets/converted/ponies/"
 
 func _ready() -> void:
+    GateWatchdogScript.arm(self, "GALLERY")
     var loaded := 0
     var dir := DirAccess.open(PONY_DIR)
     for file in dir.get_files():

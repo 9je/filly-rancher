@@ -7,6 +7,8 @@ extends Node3D
 ## Mirrors model_gallery.gd's directory-scan load pattern, but pairs each
 ## discovered file with a hardcoded position instead of a single line of ponies.
 
+const GateWatchdogScript := preload("res://scripts/gate_watchdog.gd")
+
 const PROP_DIR := "res://assets/converted/props/"
 const PONY_PATH := "res://assets/converted/ponies/twilight.glb"
 
@@ -32,6 +34,7 @@ const LAYOUT := {
 var prop_scale := 1.0
 
 func _ready() -> void:
+    GateWatchdogScript.arm(self, "PROBE")
     for arg in OS.get_cmdline_user_args():
         if arg.begins_with("--prop-scale="):
             prop_scale = arg.split("=")[1].to_float()

@@ -66,6 +66,13 @@ extends Node3D
 
 const LayersScript := preload("res://world/collision_layers.gd")
 const PropsScript := preload("res://world/props.gd")
+const GateWatchdogScript := preload("res://scripts/gate_watchdog.gd")
+
+## Headless watchdog ceiling. A normal run (assets present) finishes in under 2s on
+## this machine; 30s leaves a wide margin for a slower box while still failing in
+## seconds rather than in whatever an external timeout happens to be set to -- see
+## GateWatchdog's own doc comment for why this exists at all.
+const WATCHDOG_TIMEOUT_SEC := 30.0
 
 ## Physics frames awaited before the spawner's raycasts run. The terrain and prop
 ## colliders are created during _ready(); the physics server has not stepped since,
@@ -127,6 +134,10 @@ var _duplicate_check_labels: Array[String] = []
 
 
 func _ready() -> void:
+	# Armed FIRST, before anything below has a chance to raise mid-function -- see
+	# GateWatchdogScript's doc comment for the exact hang this guards against.
+	GateWatchdogScript.arm(self, "RANCH", WATCHDOG_TIMEOUT_SEC)
+
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--screenshot-dir="):
 			_screenshot_dir = arg.split("=")[1]
@@ -350,10 +361,18 @@ func _report(pony_count: int, prop_count: int) -> void:
 	var hud_scripted: bool = hud != null and hud.has_method("get_beam")
 	_set_check(checks, "the HUD is mounted and its script loaded", hud_scripted)
 	if hud_scripted:
-		_set_check(checks, "the HUD found the magic beam",
-			hud.get_beam() == player.get_magic_beam())
+		# `player.get_magic_beam()` fetched ONCE and null-checked before anything chains
+		# off it. The unguarded version of this (calling `.get_magic_beam()` twice more
+		# and dereferencing straight into `.get_storage().capacity`) is the exact line a
+		# reviewer proved turns "the beam failed to wire up" into a silent 240s hang
+		# instead of a failed check: a null beam raises a GDScript runtime error mid-
+		# function, which aborts this whole report -- including its own `quit()` -- with
+		# nothing printed. GateWatchdogScript.arm() above is the backstop for THAT
+		# failure mode generally; this null check is the actual fix for THIS call.
+		var beam: Node3D = player.get_magic_beam()
+		_set_check(checks, "the HUD found the magic beam", hud.get_beam() == beam)
 		_set_check(checks, "the HUD is showing the beam's real capacity",
-			hud.get_capacity() == player.get_magic_beam().get_storage().capacity
+			beam != null and hud.get_capacity() == beam.get_storage().capacity
 				and hud.get_capacity() > 0)
 
 	# --- the camera ---------------------------------------------------------------
