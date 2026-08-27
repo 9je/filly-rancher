@@ -15,6 +15,7 @@ extends GutTest
 ## documented at the top of game/scripts/pony_rig.gd.
 
 const PlayerScene := preload("res://actors/player/player.tscn")
+const PlayerScript := preload("res://actors/player/player.gd")
 const GaitScript := preload("res://systems/gait.gd")
 
 ## Big enough that nothing in these tests can walk off it.
@@ -60,6 +61,41 @@ func _aim_camera(forward: Vector3) -> void:
 	_camera.global_position = Vector3(0.0, 3.0, 0.0) - forward * 4.0
 	_camera.look_at(Vector3(0.0, 1.0, 0.0), Vector3.UP)
 	_camera.current = true
+
+
+## The two gameplay speeds, checked against what the animation can actually depict.
+##
+## THE PLAYTEST BOUGHT SPEED WITH FOOT SKATE, ON PURPOSE, AND THIS IS THE RECEIPT. The
+## owner's first session said "move speed a bit slow for my liking"; the walk went up 25%
+## and stayed free (it is still inside the `walk` clip's playback window), and the gallop
+## went up 20% to 4.8 m/s, which is past Gait.TOP_SKATE_FREE_SPEED (4.29 m/s) -- the
+## fastest ground speed any authored clip depicts with the hooves planted. Gait's own
+## perceptibility ladder calls a skate ratio up to ~1.25 imperceptible in motion and 2.0
+## unmistakable moonwalking.
+##
+## So the assertion is not "there is no skate" any more -- that would be a test asserting
+## a decision that was deliberately reversed. It is that the skate stays inside the BUDGET
+## somebody chose. Somebody nudging GALLOP_SPEED to 6 "because it still feels a bit slow"
+## crosses 1.4 and this goes red, which is the whole point: the budget is the thing worth
+## defending, not the number.
+func test_the_two_gameplay_speeds_stay_inside_their_animation_budget() -> void:
+	assert_eq(GaitScript.clip_for_speed(PlayerScript.WALK_SPEED), &"walk",
+		"walking must play the `walk` clip, not hand over to `gallop`")
+	assert_almost_eq(GaitScript.skate_ratio(PlayerScript.WALK_SPEED), 1.0, 0.0001,
+		"the walk speed costs nothing and must stay that way")
+
+	assert_eq(GaitScript.clip_for_speed(PlayerScript.GALLOP_SPEED), &"gallop",
+		"galloping must play the `gallop` clip")
+	var skate: float = GaitScript.skate_ratio(PlayerScript.GALLOP_SPEED)
+	assert_lte(skate, 1.25,
+		("the gallop's foot skate must stay inside the imperceptible band -- %.3f m/s " +
+		"against a %.3f m/s ceiling is a ratio of %.3f") % [
+			PlayerScript.GALLOP_SPEED, GaitScript.TOP_SKATE_FREE_SPEED, skate])
+	assert_gt(PlayerScript.GALLOP_SPEED, GaitScript.TOP_SKATE_FREE_SPEED,
+		"...and the player must out-run the fastest flee Pony.flee_speed_for() can " +
+		"produce, which that ceiling is exactly what clamps")
+	assert_gt(PlayerScript.GALLOP_SPEED, PlayerScript.WALK_SPEED * 2.0,
+		"the gallop has to be worth holding the button for")
 
 
 func test_all_required_input_actions_exist() -> void:
@@ -136,15 +172,17 @@ func test_gallop_modifier_raises_the_top_speed() -> void:
 	Input.action_press("gallop")
 	await wait_physics_frames(RUN_FRAMES)
 	var gallop_speed: float = _player.get_ground_speed()
-	assert_almost_eq(walk_speed, 2.0 * GaitScript.WALK_CLIP_SPEED, 0.01,
-		"walking must settle on exactly 2x the clip's own speed, so the hooves stay planted")
+	# What the CONTROLLER is asserted to do: reach both commanded speeds and tell them
+	# apart. What those speeds cost in animation terms is asserted once, on the constants,
+	# in test_the_two_gameplay_speeds_stay_inside_their_animation_budget -- this test used
+	# to re-derive the budget here as well ("must stay inside what an authored clip can
+	# depict", "must not skate"), which meant the deliberate playtest decision to spend a
+	# little skate on the gallop had to be argued in two places at once.
+	assert_almost_eq(walk_speed, PlayerScript.WALK_SPEED, 0.01,
+		"walking must settle on exactly WALK_SPEED, not merely somewhere near it")
+	assert_almost_eq(gallop_speed, PlayerScript.GALLOP_SPEED, 0.01,
+		"...and holding `gallop` must settle on exactly GALLOP_SPEED")
 	assert_gt(gallop_speed, walk_speed * 2.0, "gallop must be substantially faster than walk")
-	# The reason the `gallop` clip was authored at all: this speed used to sit above
-	# everything the walk clip could depict and moonwalked by ~2x to get there.
-	assert_lt(gallop_speed, GaitScript.TOP_SKATE_FREE_SPEED,
-		"the player's top speed must stay inside what an authored clip can depict")
-	assert_almost_eq(GaitScript.skate_ratio(gallop_speed), 1.0, 0.0001,
-		"galloping at top speed must not skate")
 
 
 func test_stands_still_and_stays_on_the_floor_with_no_input() -> void:
@@ -176,14 +214,16 @@ func test_plays_idle_at_rest_and_walk_when_moving() -> void:
 	# three are fixed the same way.
 	#
 	# The numbers are derived once, by hand, from the authoring constants rather than from
-	# the function under test: player.gd holds WALK_SPEED, defined as exactly 2.0 x the
-	# `walk` clip's own 0.66 m/s = 1.32 m/s, and a clip driven at twice the speed it depicts
-	# plays at 2.0x. test_gait.gd pins 0.66 against the exporter's printed
-	# WALK_IMPLIED_SPEED, so a retuned stride goes red THERE and points at these.
-	assert_almost_eq(_player.get_ground_speed(), 1.32, 0.01,
-		"holding forward must settle her at WALK_SPEED, 1.32 m/s")
-	assert_almost_eq(anim.speed_scale, 2.0, 0.01,
-		"...and 1.32 m/s of a 0.66 m/s clip is exactly 2.0x playback -- a literal, because "
+	# the function under test: player.gd holds WALK_SPEED, defined as exactly 2.5 x the
+	# `walk` clip's own 0.66 m/s = 1.65 m/s (the playtest's speed-up, see player.gd's
+	# tuning-history comment), and a clip driven at 2.5x the speed it depicts plays at
+	# 2.5x -- "zero skate" by construction, well inside gait.gd's 0.5..3.0 walk window.
+	# test_gait.gd pins 0.66 against the exporter's printed WALK_IMPLIED_SPEED, so a
+	# retuned stride goes red THERE and points at these.
+	assert_almost_eq(_player.get_ground_speed(), 1.65, 0.01,
+		"holding forward must settle her at WALK_SPEED, 1.65 m/s")
+	assert_almost_eq(anim.speed_scale, 2.5, 0.01,
+		"...and 1.65 m/s of a 0.66 m/s clip is exactly 2.5x playback -- a literal, because "
 		+ "asking Gait for the expected value is what made this check a tautology")
 
 
@@ -203,14 +243,19 @@ func test_plays_gallop_above_the_walk_band() -> void:
 	assert_gt(speed, GaitScript.GALLOP_HANDOVER_SPEED,
 		"holding 'gallop' must take her past the speed the walk clip can depict")
 	assert_eq(anim.current_animation, "gallop", "above the walk band she plays 'gallop'")
-	# Same tautology, same fix, one band up. player.gd's GALLOP_SPEED is a literal 4.0 m/s
-	# and the `gallop` clip depicts 3.30 m/s at 1.0x, so the honest rate is 4.0 / 3.3 =
-	# 1.2121x -- comfortably inside gait.gd's 0.6..1.3 gallop window, so this is a real
-	# scaled value and not a clamp reading back its own bound.
-	assert_almost_eq(speed, 4.0, 0.01, "holding 'gallop' must settle her at GALLOP_SPEED")
-	assert_almost_eq(anim.speed_scale, 1.2121, 0.01,
+	# Same tautology, same fix, one band up. The playtest bought GALLOP_SPEED's speed-up
+	# (4.0 -> 4.8 m/s) at the cost of headroom: 4.8 / 3.3 = 1.4545x would be the honest
+	# rate, but gait.gd's gallop window tops out at GALLOP_MAX_PLAYBACK (1.3x) before the
+	# legs start reading as a blur, so player.gd's own comment is explicit that GALLOP_SPEED
+	# is now DEFINED as the clip saturated at that bound, not merely clamped incidentally.
+	# The expected playback is therefore GaitScript.GALLOP_MAX_PLAYBACK itself -- still a
+	# literal, not a call to gallop_playback_scale_for_speed(speed), so a build that broke
+	# the clamp (or unclamped it) cannot mark its own homework here.
+	assert_almost_eq(speed, 4.8, 0.01, "holding 'gallop' must settle her at GALLOP_SPEED")
+	assert_almost_eq(anim.speed_scale, 1.3, 0.01,
 		"gallop playback must be scaled to ground speed too, not left at 1.0 -- and the "
-		+ "expected rate is a literal, not gallop_playback_scale_for_speed(speed) itself")
+		+ "expected rate is a literal (GALLOP_MAX_PLAYBACK), not "
+		+ "gallop_playback_scale_for_speed(speed) itself")
 
 	# ...and back down again. A one-way handover would leave her galloping on the spot
 	# after the modifier is released, which no headless distance check would notice.

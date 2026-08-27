@@ -14,12 +14,27 @@ extends CanvasLayer
 ##     guess -- the centre of the SCREEN is several degrees off the centre of the
 ##     character. A reticle is the whole of the fix.
 ##
-##   THE STRUGGLE RING. The beam's entire tension is a timer: SHY ponies break free in
-##     1.5 s, CURIOUS in 2.5 s, BOLD in 4.0 s (magic_beam.gd's STRUGGLE_*). Before this
-##     ring, that timer was invisible -- you held the button, and either a pony went in
-##     the bag or she did not, with no way to learn that a Fluttershy has to be released
-##     almost immediately and a Rainbow Dash can be admired for a while. The ring drains
-##     clockwise from full, so "let go NOW" is a shape rather than a number.
+##   THE STRUGGLE RING, AND THE SECURE ARC INSIDE IT. A capture is a contest between two
+##     clocks (magic_beam.gd's SECURE_SECONDS and STRUGGLE_*): the beam needs 1.15 s to
+##     subdue her, and she has 1.9 s (SHY) / 2.6 s (CURIOUS) / 4.0 s (BOLD) of fight in
+##     her. Let go inside the first and she slips out; hold past the second and she wins.
+##     BOTH of those have to be on screen or the mechanic is a coin toss:
+##       - the OUTER ring drains clockwise from full over her struggle time, green to red,
+##         so "she is about to win" is a shape rather than a number;
+##       - the INNER arc FILLS over the secure time, and the whole reticle snaps to a
+##         distinct colour and grows the instant it completes. That snap is the "let go
+##         NOW" cue, and it is deliberately a discontinuous change rather than a gradual
+##         one -- a player watching it in peripheral vision while a pony thrashes about in
+##         front of them needs an event, not a gradient.
+##     Before the ring was made to mean this, the outer countdown was drawn over a
+##     decision that had already been made: releasing at any moment stored her, so the
+##     timer was information about nothing.
+##
+##   THE IN-RANGE RETICLE. "Hard to gauge distance of beam" was the owner's report, and
+##     half the answer is in the world (magic_beam.gd's landing ring) and half is here:
+##     when the crosshair has something grabbable within MagicBeam.REACH, the reticle
+##     says so before you press anything. Without it, "am I close enough?" is a question
+##     you can only answer by trying and failing.
 ##
 ##   THE SADDLEBAG. Capacity is finite (magic_beam.gd's storage_capacity) and a full bag
 ##     REFUSES a capture and sets the pony back down. Without a visible count the first
@@ -57,13 +72,25 @@ const TICK_LENGTH := 7.0
 const STRUGGLE_RADIUS := 32.0
 const STRUGGLE_WIDTH := 6.0
 
-## The reticle's three states. White at rest, so it reads against grass and sky alike;
+## The secure arc sits INSIDE the struggle ring, in the gap between it and the reticle,
+## and is thinner: the two are different claims (how far the beam has got, versus how
+## long she will last) and drawing them at the same weight makes one ring with two
+## colours instead of two readings.
+const SECURE_RADIUS := 24.0
+const SECURE_WIDTH := 4.0
+
+## The reticle's states. White at rest, so it reads against grass and sky alike;
 ## Twilight's own aura colour while the beam is on, so "the beam is live" is visible
-## even when it is pointed at empty sky; and amber while something is actually in the
-## beam, because that is the state with a deadline attached to it.
+## even when it is pointed at empty sky; a brighter lock colour when the crosshair has
+## something grabbable within reach; amber while something is in the beam but not yet
+## subdued; and green the moment letting go would actually keep her.
 const COLOR_IDLE := Color(1.0, 1.0, 1.0, 0.82)
 const COLOR_BEAMING := Color(0.98, 0.55, 0.95, 0.95)
+const COLOR_IN_RANGE := Color(1.0, 0.86, 0.42, 1.0)
 const COLOR_HOLDING := Color(1.0, 0.82, 0.35, 1.0)
+const COLOR_SECURED := Color(0.42, 1.0, 0.52, 1.0)
+## The secure arc while it is still filling. Cool, so it is clearly not the "go" colour.
+const COLOR_SECURING := Color(0.55, 0.80, 1.0, 0.95)
 ## Every stroke is drawn twice, this colour first and one pixel wider. Without it the
 ## white reticle disappears against a bright sky and the pink one against the pink beam.
 const COLOR_OUTLINE := Color(0.0, 0.0, 0.0, 0.55)
@@ -117,6 +144,10 @@ var _elapsed := 0.0
 ## Whether the beam was on last frame, so the reticle gets one final redraw when it
 ## switches off instead of being left frozen in its "beaming" colour.
 var _was_beaming := false
+## ...and whether it had a target in range last frame, for the same reason: the in-range
+## reticle has to repaint on the frame the crosshair leaves her, not on the next time
+## something else happens to trigger a redraw.
+var _was_in_range := false
 
 
 func _ready() -> void:
@@ -145,12 +176,17 @@ func _process(delta: float) -> void:
 		_toast_left -= delta
 		_toast.modulate.a = clampf(_toast_left / TOAST_FADE, 0.0, 1.0)
 
-	# The reticle animates (the beam pulse, the struggle ring draining) so it is
-	# redrawn every frame the beam is on, and left alone the rest of the time.
+	# The reticle animates (the beam pulse, the struggle ring draining, the secure arc
+	# filling) so it is redrawn every frame the beam is on. It ALSO has to redraw when the
+	# in-range state flips with the beam off, which is a thing the player causes by turning
+	# on the spot -- so that transition is tracked rather than polled into a repaint every
+	# frame for the whole session.
 	var beaming: bool = _beam != null and _beam.is_active()
-	if beaming or _was_beaming:
+	var in_range: bool = _beam != null and _beam.has_target()
+	if beaming or _was_beaming or in_range != _was_in_range:
 		_crosshair.queue_redraw()
 	_was_beaming = beaming
+	_was_in_range = in_range
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -244,7 +280,14 @@ func _on_capture_refused(_body: Node3D) -> void:
 	toast("Saddlebag full!")
 
 
+## Two very different mistakes reach this signal (MagicBeam.Loss), and saying which one
+## just happened is the only teaching the capture window ever gets. "She wriggled free"
+## on a hold the player abandoned after half a second would be a straight lie, and would
+## teach exactly the wrong lesson -- let go SOONER next time.
 func _on_escaped(_body: Node3D) -> void:
+	if _beam != null and _beam.get_last_loss() == MagicBeamScript.Loss.SLIPPED:
+		toast("She slipped out -- hold her longer!")
+		return
 	toast("She wriggled free!")
 
 
@@ -254,16 +297,35 @@ func _draw_crosshair() -> void:
 	var centre: Vector2 = _crosshair.size * 0.5
 	var holding: bool = _beam != null and _beam.is_holding()
 	var beaming: bool = _beam != null and _beam.is_active()
+	var secured: bool = holding and _beam.is_secured()
+	# Deliberately NOT conditioned on the beam being on: the whole value of this state is
+	# that it answers "can I take her from here?" before the button is pressed.
+	var in_range: bool = not holding and _beam != null and _beam.has_target()
 
 	var color := COLOR_IDLE
-	if holding:
+	if secured:
+		color = COLOR_SECURED
+	elif holding:
 		color = COLOR_HOLDING
+	elif in_range:
+		# Steady, not pulsing: "she is in range" is a fact, and a fact that blinks reads
+		# as a warning.
+		color = COLOR_IN_RANGE
 	elif beaming:
 		# A slow pulse, so a beam that is on but has caught nothing still reads as live.
 		color = COLOR_BEAMING
 		color.a *= 0.72 + 0.28 * sin(_elapsed * 7.0)
 
-	var radius := CROSSHAIR_RADIUS * (1.25 if holding else 1.0)
+	# The reticle GROWS at both of the moments that matter -- something is in range, and
+	# she is secured -- so the state change is legible without reading a colour.
+	var scale := 1.0
+	if secured:
+		scale = 1.45
+	elif holding:
+		scale = 1.25
+	elif in_range:
+		scale = 1.18
+	var radius := CROSSHAIR_RADIUS * scale
 
 	_ring(centre, radius, color, 2.0)
 	for direction: Vector2 in [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]:
@@ -275,6 +337,7 @@ func _draw_crosshair() -> void:
 
 	if holding:
 		_draw_struggle_ring(centre)
+		_draw_secure_arc(centre)
 
 
 ## The countdown on the current hold, drawn as a ring that drains clockwise from the
@@ -296,6 +359,27 @@ func _draw_struggle_ring(centre: Vector2) -> void:
 	if remaining > 0.0:
 		_crosshair.draw_arc(centre, STRUGGLE_RADIUS, start, start + TAU * remaining, 64,
 			color, STRUGGLE_WIDTH, true)
+
+
+## How far the beam has got toward subduing her, drawn as an arc FILLING clockwise from
+## the top inside the struggle ring. Filling rather than draining, and in the opposite
+## sense to the ring outside it, precisely so the two cannot be mistaken for each other:
+## one is growing toward the moment you may let go, the other is shrinking toward the
+## moment she leaves.
+##
+## Once it completes it is drawn as a full ring in the "she is yours" colour rather than
+## being hidden -- a control that disappears at the moment of truth teaches the player
+## nothing about why.
+func _draw_secure_arc(centre: Vector2) -> void:
+	var progress: float = _beam.get_secure_progress()
+	_crosshair.draw_arc(centre, SECURE_RADIUS, 0.0, TAU, 48,
+		COLOR_OUTLINE, SECURE_WIDTH + 2.0, true)
+	if progress <= 0.0:
+		return
+	var color := COLOR_SECURED if progress >= 1.0 else COLOR_SECURING
+	var start := -PI * 0.5
+	_crosshair.draw_arc(centre, SECURE_RADIUS, start, start + TAU * progress, 48,
+		color, SECURE_WIDTH, true)
 
 
 func _draw_pips() -> void:
@@ -343,7 +427,8 @@ const HINTS := [
 	["LOOK", "Mouse", "Right stick"],
 	["ZOOM", "Scroll / = -", "D-pad up/down"],
 	["MAGIC BEAM", "Right mouse (hold)", "Right trigger (hold)"],
-	["", "hold to reel her in, release to stow her", ""],
+	["", "hold until the inner ring fills, then let go to stow her", ""],
+	["", "let go too soon and she slips out; too late and she wriggles free", ""],
 	["FREE CURSOR", "Esc", ""],
 	["THIS CARD", "H", "Back"],
 ]

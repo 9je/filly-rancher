@@ -15,8 +15,22 @@ extends Node3D
 ##                                 assigned, so it probes with a ray rather than a
 ##                                 volume) and pulls the camera in if something is in
 ##                                 the way, so the rig never clips through a wall.
-##       Camera3D               -- `current = true`, identity local transform. No fixed
-##                                 flip is needed here -- see below.
+##       CameraMount           -- a bare Node3D that exists ONLY to be the node the
+##                                 spring arm positions. It carries no offset of its
+##                                 own; its position IS the arm's answer.
+##         Camera3D            -- `current = true`. Carries the SHOULDER OFFSET in its
+##                                 local transform (see SHOULDER_SIDE below), and no
+##                                 rotation at all -- no fixed flip is needed, see below.
+##
+## WHY THE MOUNT NODE EXISTS -- checked against the engine, not assumed. SpringArm3D
+## OVERWRITES the position of every direct Node3D child every physics frame with
+## `(0, 0, current_spring_length)`; a local offset written onto a Camera3D parented
+## straight to the arm is silently stomped on the next physics tick. Verified with a
+## throwaway scene (a bare SpringArm3D with a Camera3D child at local `(0.65, 0.22, 0)`
+## and a Node3D child holding a Camera3D grandchild at the same local offset): the direct
+## child came back as `(0, 0, 3.5)`, the grandchild kept `(0.65, 0.22, 0)` and landed at
+## `(0.65, 0.22, 3.5)`. So the offset has to live one level below whatever the arm moves.
+## If this ever needs re-checking, re-check it that way rather than reasoning about it.
 ##
 ## NO 180-DEGREE FLIP ANYWHERE IN THIS RIG, ON PURPOSE.
 ## It is tempting to assume a Camera3D child of a SpringArm3D needs a local yaw flip so
@@ -88,7 +102,7 @@ const PITCH_MAX_DEG := 30.0
 ## player asked for). SpringArm3D's own collision pull-in -- what actually happens
 ## when something is in the way -- is a separate mechanism this constant plays no
 ## part in, and measured against the ranch's barn (game/world/ranch.gd's
-## camera-vs-building probe) the arm pulls in to 0.73 m, inside SPRING_MIN and inside
+## camera-vs-building probe) the arm pulls in to 0.55 m, inside SPRING_MIN and inside
 ## the pony. A previous version of this comment claimed SPRING_MIN held "even when
 ## the spring arm is fully pulled in against a wall" -- that was false; do not
 ## reintroduce it. Do NOT "fix" this by clamping the pull-in to SPRING_MIN either: at
@@ -143,33 +157,83 @@ const ZOOM_STEP := 0.5
 ## predates the ranch and builds its ground on the default layer still works.
 @export_flags_3d_physics var probe_mask := CollisionLayersScript.WORLD
 
-# SPRINGARM3D.MARGIN IS NOT USED HERE, AND THAT IS A MEASURED DECISION, NOT AN
-# OVERSIGHT. The obvious companion to the subject fade below is to also hold the
-# camera a little off whatever it hit, so its near plane cannot end up inside a barn
-# wall -- and `SpringArm3D.margin` reads exactly like the property for that.
+# SPRINGARM3D.MARGIN IS LIVE, AND IT BECAME LIVE AS A SIDE EFFECT OF THE SHOULDER
+# OFFSET. Read this before touching either.
 #
-# It does nothing on this rig. Measured, twice, against the ranch's own camera probe
-# (game/world/ranch.gd, which prints both the arm's `get_hit_length()` and the camera's
-# real distance from the pivot): with `margin = 0.01` the numbers are `hit=0.73
-# actual=0.73`, and with `margin = 1.0` -- a value that could not possibly be subtle --
-# they are still `hit=0.73 actual=0.73`. Not a rounding effect, not a smaller effect
-# than expected: no effect at all.
+# It used to do nothing at all, and this comment used to say so at length: measured
+# against the ranch's own camera probe, `margin = 0.01` and `margin = 1.0` -- a value
+# that could not possibly be subtle -- both produced `hit=0.73 actual=0.73`. That
+# measurement was real. The explanation attached to it ("margin only participates in
+# the shape-cast branch, and this arm has no shape") was wrong.
 #
-# The reason is that this arm has no `shape` assigned, so it probes with a RAY (see the
-# node-structure note at the top of this file), and margin only participates in the
-# shape-cast branch. Setting it here would have been a knob that looked like it was
-# doing something and was not -- the exact failure mode this project keeps finding in
-# its own gates. If a future task genuinely needs wall clearance, the way to get it is
-# to give the arm a small SphereShape3D and re-measure, not to set this property and
-# assume.
+# THE ACTUAL RULE, measured directly against the engine with a throwaway scene (one
+# wall, five arms, identical geometry, margin and child nesting varied):
+#     direct Camera3D child, margin 0.0/0.2/1.0 -> hit = 1.2715, 1.2715, 1.2715
+#     Node3D->Camera3D child, margin 0.0        -> hit = 1.2779
+#     Node3D->Camera3D child, margin 0.2        -> hit = 1.0779
+# So SpringArm3D special-cases a Camera3D that is its DIRECT child and ignores `margin`
+# for it entirely (landing ~0.006 m off the surface instead). Nest that camera one level
+# deeper -- which the shoulder offset had to do, because the arm overwrites its direct
+# children's transforms (see the class comment) -- and the property starts working.
+#
+# The consequence is the wall clearance the previous version of this comment said would
+# need a SphereShape3D to get: the lens now stops 0.2 m short of what the arm hits
+# instead of 0.006 m short. It is kept deliberately. It is also why the pull-in numbers
+# this file and game/world/ranch.gd quote moved: the barn probe reads 0.55 m where it
+# read 0.73 m, and `04_obstacle` in game/scenes/test/camera_test.tscn reads 1.08 m where
+# it read 1.27 m. Same wall, same arm, same mask -- 0.2 m of margin that is now applied.
+# If a future change ever parents a Camera3D straight to this arm again, expect every one
+# of those numbers to jump back up, and expect no warning of any kind.
+#
+# NOW SCRIPT-OWNED (SPRING_ARM_MARGIN below), NOT LEFT IN camera_rig.tscn, and not just
+# for tidiness: it used to be the only collision-relevant property on this rig that
+# _ready() did not assign from a script-owned value (collision_mask does, from
+# `probe_mask`), which meant it was editable in the scene file with no gate watching it.
+# Worse, game/world/ranch.gd's own camera check (`pull_in >= MIN_CAMERA_PULL_IN`) can only
+# get GREENER as margin grows -- margin subtracts directly from where the arm leaves the
+# mount, so a margin regression (someone shrinking or dropping it) would never fail that
+# assertion; it would only ever make the barn shot creep back toward the pre-margin
+# close-up with nothing red anywhere. Reread as a constant here at least gives a future
+# editor one place that says "this number is load-bearing," even though no gate currently
+# asserts its value directly -- see MOUNT_MIN_Z below for the one thing that IS asserted
+# about its consequences.
+const SPRING_ARM_MARGIN := 0.2
+
+## THE FLIP THIS MARGIN CAN CAUSE, AND THE CLAMP THAT STOPS IT.
+##
+## SpringArm3D's own math, confirmed against the engine and not just reasoned about: when
+## it has a hit, it leaves the mount at local z = (hit distance - margin), not at the hit
+## distance itself. That is fine right up until something is nearer than `margin` -- an
+## overhang, an eave, a steep bank within SPRING_ARM_MARGIN (0.2 m) of the 1.45 m pivot --
+## at which point the subtraction goes NEGATIVE and drives the mount THROUGH the pivot to
+## the FRONT of the player, looking back through her own body. Measured directly with a
+## throwaway scene (game/scenes/test/_proof_margin.gd, not kept in the tree): hit distances
+## of 0.05 / 0.10 / 0.15 m against SPRING_ARM_MARGIN's 0.2 m left the mount at local z
+## -0.15 / -0.10 / -0.05 -- exactly the flip, and silent: nothing else in this rig or in
+## game/world/ranch.gd's camera probe would have noticed, because get_arm_distance() reads
+## a DISTANCE (`global_position.distance_to`), which is the same magnitude whether the
+## mount is 0.15 m behind the pivot or 0.15 m in front of it.
+##
+## It is narrow in every scene this project currently ships (the ranch's barn pulls the arm
+## in only to 0.55 m, nowhere near 0.2 m), which is exactly why it is the kind of bug that
+## survives review and then goes off in someone's hands months later. Clamped every frame,
+## right after the arm's own physics step positions the mount (see _process()) -- the same
+## timing _update_shoulder_offset() already depends on, for the same reason.
+##
+## 0.10 m, not 0.0 m: zero would stop the through-the-pivot flip but would still let the
+## near plane straddle or sit behind the pivot at the clamp boundary. 0.10 m is twice the
+## camera's default near-plane distance (0.05 m), the same "twice the near plane" reasoning
+## SHOULDER_SKIN below uses for the same reason.
+const MOUNT_MIN_Z := 0.10
 
 ## THE FIX FOR THE CLOSE-UP-INSIDE-THE-PONY BUG, and the reason SPRING_MIN's comment
 ## above says not to clamp the pull-in.
 ##
 ## What the bug looks like: back the player against the ranch's barn and the arm pulls
-## in from its 3.5 m rest to 0.73 m (measured -- game/world/ranch.gd's camera probe
-## prints it every run, and its `04a_camera_pressed_to_wall` render is the picture).
-## 0.73 m from a pivot at her withers is INSIDE her body, so the shot is an unreadable
+## in from its 3.5 m rest to 0.55 m (measured -- game/world/ranch.gd's camera probe
+## prints it every run, and its `04a_camera_pressed_to_wall` render is the picture; it
+## was 0.73 m before the arm's `margin` came alive, see the note above).
+## 0.55 m from a pivot at her withers is INSIDE her body, so the shot is an unreadable
 ## wall of flank with the world completely hidden behind it. Clamping the arm was
 ## considered and rejected: SPRING_MIN (1.2 m) against that same wall would put the
 ## camera 0.47 m inside the BARN instead, which is strictly worse -- you would be
@@ -203,8 +267,111 @@ const ZOOM_STEP := 0.5
 const FADE_START := 1.7
 const FADE_END := SPRING_MIN
 
+## THE SHOULDER OFFSET: the camera sits off the pony's centre line, third-person-shooter
+## style, instead of directly behind her.
+##
+## THE BUG IT FIXES. Everything this rig aims with goes through the SCREEN CENTRE:
+## get_aim_ray() is projected from there, the HUD reticle is drawn there, and the magic
+## beam casts along that ray. With the camera on her centre line, the screen centre is
+## exactly where her own body is -- so the crosshair rested on her mane at every zoom the
+## player could select, and you aimed THROUGH your own pony. It was the loudest feel
+## complaint left in Phase 1A, it is visible in the very first frame of the game, and no
+## number in this project could see it (the ray was, and still is, perfectly accurate --
+## it was pointed at her back).
+##
+## WHY A FIXED NUMBER OF METRES AND NOT A FRACTION OF THE ARM LENGTH. The thing the offset
+## has to clear is her SILHOUETTE, and that is a fixed size in metres (her capsule radius
+## is 0.42 m -- player.gd -- and her mane and barrel sit inside about the same half-width,
+## measured off the rendered rest frame: ~67 px of a 1600 px shot at 3.5 m, which back-
+## projects to 0.40 m). Displacing the camera sideways by S metres displaces the whole aim
+## LINE sideways by S at every depth, so `S > her half-width` clears her at every zoom with
+## one number. A distance-proportional offset would instead hold her at a constant place
+## ON SCREEN, which sounds tidier and is the wrong invariant: to clear 0.45 m at the
+## tightest zoom it would need a ratio that puts the camera 1.7 m off her centre line at
+## the widest, and aiming at anything close then means a large yaw for no reason.
+##
+## 0.70 m clears that ~0.42 m half-width by a comfortable margin at every distance. On
+## screen at the default 3.5 m zoom that is ~117 px of an 800 px half-screen, so she sits
+## about 15% left of centre -- in the same band third-person shooters use, and enough that
+## the reticle is over open world with daylight around it rather than skimming her outline.
+##
+## IT ALSO MAKES THE BEAM LEGIBLE, which was the second half of the same complaint. The
+## beam is drawn from her HORN to whatever the crosshair is on (magic_beam.gd). With the
+## camera on her centre line those two points are nearly collinear with the view direction,
+## so a beam reaching for a distant pony projected to a few pixels and the target's aura
+## carried the whole read. Offset, the horn projects ~137 px left of centre while the far
+## end stays at the centre, so the same beam is drawn ACROSS the view as a diagonal.
+##
+## NO CONVERGENCE / TOE-IN, DELIBERATELY. Offset cameras in shooters normally need the
+## camera toed in so the crosshair agrees with a weapon that fires from somewhere else.
+## Nothing here fires from somewhere else: the beam is cast along get_aim_ray(), which is
+## projected out of THIS camera through the screen centre, so the crosshair and the ray are
+## the same line by construction at every distance. Adding a convergence angle would buy
+## nothing and would make that guarantee harder to reason about. (The horn is still where
+## the beam is DRAWN from, and magic_beam.gd already projects it onto the ray, so range
+## stays measured from the player.)
+##
+## NO SHOULDER SWAP, DELIBERATELY. There is no cover mechanic here for a swap to serve, and
+## a swap is not local to this file: magic_beam.gd parks a held pony HOLD_SIDE (2.4 m)
+## screen-RIGHT, sized so she is clear of the player's silhouette. With the camera offset
+## right, the player sits left of centre and the held pony right of it -- they are as far
+## apart as they can be. Swapping the camera to the left shoulder without also swapping the
+## beam would move the player back across the frame INTO the held pony. If a later phase
+## wants a swap, both constants have to move together, and that is the reason why.
+const SHOULDER_SIDE := 0.70
+## Metres the camera is also lifted, in the ARM's local frame -- i.e. screen-up, so it
+## stays screen-up at any pitch, the same convention magic_beam.gd's HOLD_LIFT uses.
+## Small: it is here to look a little more OVER her back than along it (and to show a bit
+## more ground ahead of her), not to become a bird's-eye view. 0.22 m at the default zoom
+## drops her ~37 px in frame.
+const SHOULDER_LIFT := 0.22
+
+## Metres of clearance kept between the lens and whatever the shoulder probe hits.
+##
+## THE PROBE IS NOT BELT-AND-BRACES; IT IS THE FIX FOR A BUG THE FIRST RENDER OF THIS
+## FEATURE SHOWED. The spring arm probes BACKWARDS along her centre line, so it cannot see
+## anything beside her -- and the shoulder offset moves the lens sideways off the line the
+## arm cleared. Stand her flank against a wall (her own capsule stops her 0.42 m from it,
+## and the offset wants 0.70 m) and the lens ends up INSIDE the wall: with backface culling
+## the wall then disappears from the shot entirely, leaving nothing but its shadow on the
+## grass and a clear view through solid geometry. That is exactly what
+## game/scenes/test/camera_test.tscn's `06_side_wall` render showed, with every number in
+## that gate green -- the offset was applied perfectly, to a place the camera should not be.
+##
+## So the lateral hop gets a probe of its own: a RayCast3D from the mount out along the
+## offset, on the same mask as the arm, and the offset is shortened to whatever room it
+## reports. Note what the worst case degrades TO -- an offset of zero, i.e. the camera back
+## on her centre line, which is precisely the behaviour this rig had before this feature and
+## is already the sanctioned answer for a camera with nowhere to go (see FADE_START: she is
+## faded out by then anyway). It can never push the lens INTO anything, which is what makes
+## this clamp a different animal from the spring-length clamp SPRING_MIN's comment forbids.
+##
+## 0.10 m is twice the camera's default near-plane distance, so the near plane clears the
+## surface rather than straddling it.
+##
+## KNOWN LIMITATION, DOCUMENTED RATHER THAN FIXED: hugging a wall FLANK-ON collapses the
+## offset back to zero, and the "offset of zero" this file's design leans on so heavily
+## elsewhere (see the paragraph above, and FADE_START) is not free here the way it is at
+## a pull-in. At a pull-in the subject is fading or gone, so a centred camera has nothing
+## to aim through. Pressed flank-on against a wall, she is still fully drawn -- so a
+## collapsed offset restores exactly the bug this whole feature exists to fix: the
+## crosshair rests on her own body again, for as long as the flank-hug lasts. Measured,
+## not assumed -- the centre pixel in that pose is her body.
+##
+## The standard fix is mirroring to the free shoulder (probe the LEFT offset too when the
+## right one is blocked, and vice versa) so the camera only ever collapses when BOTH sides
+## are obstructed. It is deliberately deferred: it is a second probe and a side-selection
+## policy, not a one-line change, and "no shoulder swap" was already a considered decision
+## for the beam side (see SHOULDER_SIDE's comment) that a mirror would have to be threaded
+## through carefully rather than bolted on.
+const SHOULDER_SKIN := 0.10
+
 @onready var _spring_arm: SpringArm3D = $SpringArm3D
-@onready var _camera: Camera3D = $SpringArm3D/Camera3D
+## The node the spring arm actually positions. See the class comment.
+@onready var _mount: Node3D = $SpringArm3D/CameraMount
+## Casts from the mount out along the shoulder offset. See SHOULDER_SKIN.
+@onready var _shoulder_probe: RayCast3D = $SpringArm3D/CameraMount/ShoulderProbe
+@onready var _camera: Camera3D = $SpringArm3D/CameraMount/Camera3D
 
 ## Current pitch in the "intuitive" sense described above. Kept as the source of truth
 ## instead of reading it back out of `rotation.x` so the clamp is applied in exactly
@@ -226,6 +393,18 @@ func _ready() -> void:
 	_spring_arm.rotation.x = deg_to_rad(_look_pitch)
 	_spring_arm.spring_length = SPRING_DEFAULT
 	_spring_arm.collision_mask = probe_mask
+	_spring_arm.margin = SPRING_ARM_MARGIN
+
+	# The shoulder probe reaches the full offset plus its clearance, and sees exactly what
+	# the arm sees: one exported mask decides what this whole rig can look through, so a
+	# future layer change cannot leave the two halves disagreeing about what a wall is.
+	# It is a CHILD OF THE MOUNT rather than of this node, which is what makes its cast
+	# start from where the arm actually left the camera this frame: the arm positions the
+	# mount during its own internal physics step, and Godot notifies a parent before its
+	# children, so the probe's cast for the frame runs after the mount has moved.
+	var reach: Vector3 = Vector3(SHOULDER_SIDE, SHOULDER_LIFT, 0.0)
+	_shoulder_probe.target_position = reach.normalized() * (reach.length() + SHOULDER_SKIN)
+	_shoulder_probe.collision_mask = probe_mask
 
 	# Exclude whatever body this rig is mounted on from its own collision probe, or a
 	# spring arm whose origin ends up inside the player's capsule (it should not --
@@ -267,6 +446,13 @@ func _process(delta: float) -> void:
 	if Input.is_action_just_pressed("zoom_out"):
 		add_zoom_delta(ZOOM_STEP)
 
+	# Corrects the arm's own placement BEFORE anything below reads it -- see MOUNT_MIN_Z.
+	_clamp_mount_margin()
+
+	# Both of these read where the spring arm ACTUALLY put the mount, which it decides in
+	# the physics step. Godot's main loop runs its physics ticks, then _process, then
+	# renders, so reading it here is reading this frame's answer, not last frame's.
+	_update_shoulder_offset()
 	_update_subject_fade()
 
 
@@ -327,6 +513,13 @@ class AimRay:
 		direction = p_direction
 
 
+## This rig's Camera3D. Exposed so callers (gates, the ranch's shot list) stop reaching in
+## by node path: the camera moved one level deeper when the shoulder offset landed, and
+## four call sites across the project had to be edited to follow it. There should be one.
+func get_camera() -> Camera3D:
+	return _camera
+
+
 ## A ray from the camera through the SCREEN CENTRE: `origin` is the camera's eye point,
 ## `direction` is a normalized world-space vector toward whatever the crosshair is
 ## resting on. THIS IS DELIBERATELY NOT THE PLAYER'S FACING -- Task 8's magic beam
@@ -338,6 +531,14 @@ class AimRay:
 ## methods already account for the camera's actual projection matrix and viewport
 ## size, a plain `-global_transform.basis.z` would not for anything but a dead-centre
 ## default projection.
+##
+## THE SHOULDER OFFSET DOES NOT PUT THIS RAY OUT OF STEP WITH THE CROSSHAIR, and that is
+## the whole reason the offset could be a plain translation with no convergence angle: the
+## ray is projected out of the camera through the centre of the viewport, which is exactly
+## where the HUD draws its reticle, so moving the camera moves both together. Verified
+## rather than asserted -- game/scenes/test/camera_test.tscn takes a point along this ray
+## and `unproject_position`s it back, and requires it to land within a pixel of the
+## viewport centre at several distances, in every pose it renders.
 func get_aim_ray() -> AimRay:
 	var vp := get_viewport()
 	var center := vp.get_visible_rect().size * 0.5
@@ -356,25 +557,110 @@ static func subject_opacity_for_distance(distance: float) -> float:
 	return smoothstep(FADE_END, FADE_START, distance)
 
 
-## The distance the camera is ACTUALLY at from the pivot, in metres. This is the number
-## the fade is driven by, and the number that is 0.73 m with the player's back against
-## the ranch's barn.
+## The shoulder offset to apply at a given arm distance, in the ARM's local frame:
+## `x` screen-right, `y` screen-up. Static and pure for the same reason the fade ramp
+## above is -- the rule is testable without a spring arm or a rendered frame.
 ##
-## MEASURED OFF THE CAMERA'S OWN TRANSFORM, not read from `spring_length` (which is only
-## the distance the player ASKED for and says nothing about a wall) and not from
+## EASED OUT OVER EXACTLY THE FADE BAND, and that is one decision, not two. The offset
+## exists to keep the crosshair off the player's body; below FADE_START her body is being
+## dissolved out of the shot precisely because the camera is close enough to be inside it,
+## so there is nothing left to aim past and the reason for the offset has gone with her.
+## Sliding the camera back onto her centre line as she disappears means:
+##   * maximum zoom-in stays the clean, CENTRED near-first-person aiming view FADE_START's
+##     comment promises, instead of a first-person view mysteriously half a metre to the
+##     right of her head;
+##   * a camera SHOVED in by geometry (the ranch's barn pulls this arm to 0.55 m) gets no
+##     lateral offset at all, so the offset -- which is applied inside the arm and is
+##     therefore not itself collision-probed -- cannot push the lens sideways into a wall
+##     in the one situation where it is already hard against one. The arm's measured
+##     pull-in behaviour is untouched by this whole feature, which is what keeps
+##     game/world/ranch.gd's camera-vs-building numbers exactly as they were.
+static func shoulder_offset_for_distance(distance: float) -> Vector3:
+	# `ramp`, not `ease`: `ease()` is a GDScript global function, and shadowing it here
+	# would be a warning in a file that has none.
+	var ramp := smoothstep(FADE_END, FADE_START, distance)
+	return Vector3(SHOULDER_SIDE * ramp, SHOULDER_LIFT * ramp, 0.0)
+
+
+## How far from the pivot the spring ARM has put the camera mount, in metres: the arm's
+## resolved length, and the number that is 0.55 m with the player's back against the
+## ranch's barn. Drives both the subject fade and the shoulder ease.
+##
+## MEASURED OFF A REAL TRANSFORM, not read from `spring_length` (which is only the
+## distance the player ASKED for and says nothing about a wall) and not from
 ## `get_hit_length()` either. The second is nearly right and was this function's first
-## draft; it is avoided because it is the arm's own bookkeeping rather than where the
-## lens ended up, and this rig has already been bitten once by trusting a spring-arm
-## property that did not mean what it read as -- see the `margin` note above.
+## draft; it is avoided because it is the arm's own bookkeeping rather than where the arm
+## actually left the mount, and this rig has already been bitten once by trusting a
+## spring-arm property that did not mean what it read as -- see the `margin` note above.
+##
+## THE MOUNT AND NOT THE LENS, deliberately: the lens carries the shoulder offset, and the
+## size of that offset is itself a function of this distance, so measuring it off the lens
+## would feed the offset back into its own input. (It would also quietly widen the fade
+## band by the length of the offset.) The lens's own distance is get_camera_distance().
+func get_arm_distance() -> float:
+	return _mount.global_position.distance_to(global_position)
+
+
+## Where the lens really ended up relative to the pivot, in metres -- the arm's distance
+## with the shoulder offset added on. Reported by game/world/ranch.gd's camera probe;
+## nothing is DRIVEN by it, since driving anything by it would be circular (see above).
 func get_camera_distance() -> float:
 	return _camera.global_position.distance_to(global_position)
+
+
+## The shoulder offset currently applied to the lens, in the arm's local frame. Exposed so
+## a gate can assert the ease actually fired at a measured pull-in rather than only that a
+## screenshot looked right -- the same reason get_subject_opacity() exists.
+##
+## This is what was APPLIED, which is shoulder_offset_for_distance() shortened by whatever
+## the shoulder probe found in the way (SHOULDER_SKIN). The two differ only when something
+## is actually beside the camera, and a gate wanting to prove the probe fired wants both.
+func get_shoulder_offset() -> Vector3:
+	return _camera.position
+
+
+## Stops SpringArm3D's own margin math from driving the mount through the pivot to the
+## front of the player. See MOUNT_MIN_Z for the full derivation and the measured numbers.
+##
+## SpringArm3D writes only `position.z` on its direct Node3D child every physics step (see
+## the class comment); `position.x`/`position.y` are never touched, so there is nothing
+## else here to clamp.
+func _clamp_mount_margin() -> void:
+	if _mount.position.z < MOUNT_MIN_Z:
+		_mount.position.z = MOUNT_MIN_Z
+
+
+## Slide the lens off the pony's centre line by however much the current arm distance has
+## earned, and by however much room there actually is out there. See SHOULDER_SIDE for the
+## framing reasoning and SHOULDER_SKIN for the probe.
+##
+## Written every frame rather than once in _ready() because the arm distance moves (zoom,
+## and geometry shoving the arm in), and because SpringArm3D would stomp it anyway if this
+## were written onto the arm's own child -- see the class comment.
+func _update_shoulder_offset() -> void:
+	_camera.position = _room_for(shoulder_offset_for_distance(get_arm_distance()))
+
+
+## `wanted` shortened to whatever the shoulder probe says fits, keeping its direction.
+## Returns `wanted` unchanged when nothing is in the way, which is the normal case.
+func _room_for(wanted: Vector3) -> Vector3:
+	if _shoulder_probe == null or not _shoulder_probe.is_colliding():
+		return wanted
+	var length := wanted.length()
+	if length < 0.0001:
+		return wanted
+	var room: float = _mount.global_position.distance_to(
+		_shoulder_probe.get_collision_point()) - SHOULDER_SKIN
+	if room >= length:
+		return wanted
+	return wanted * (maxf(room, 0.0) / length)
 
 
 ## How opaque the subject is being drawn right now, 1.0 (fully drawn) to 0.0 (hidden).
 ## Exposed so a gate can assert the fade actually fired at a measured close pull-in,
 ## rather than only that a screenshot looked right.
 func get_subject_opacity() -> float:
-	return subject_opacity_for_distance(get_camera_distance())
+	return subject_opacity_for_distance(get_arm_distance())
 
 
 ## Fade the subject in or out to match how close the camera has been pulled. See
@@ -390,7 +676,7 @@ func _update_subject_fade() -> void:
 		if _subject_meshes.is_empty():
 			return
 
-	var opacity := subject_opacity_for_distance(get_camera_distance())
+	var opacity := subject_opacity_for_distance(get_arm_distance())
 	if is_equal_approx(opacity, _subject_fade):
 		return
 	_subject_fade = opacity

@@ -18,6 +18,7 @@ const HudScene := preload("res://ui/hud.tscn")
 const StorageScript := preload("res://systems/storage.gd")
 const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
+const MagicBeamScript := preload("res://actors/player/magic_beam.gd")
 
 var _hud: CanvasLayer
 ## The HUD's own parent. It looks for a sibling named "Player" (that is how it is
@@ -45,6 +46,28 @@ func _instance(id: String) -> PonyInstance:
 func test_the_hud_scene_loads_and_carries_its_script() -> void:
 	assert_true(_hud.has_method("get_beam"),
 		"hud.tscn must have hud.gd attached -- a parse error leaves a bare CanvasLayer")
+
+
+## NOTHING ELSE IN THE PROJECT GATES THIS. The magic beam aims along
+## CameraRig.get_aim_ray() (game/actors/player/camera_rig.gd), which is projected
+## through the camera's SCREEN CENTRE -- and hud.gd draws the reticle at
+## `_crosshair.size * 0.5` (its `_draw_crosshair()`), the centre of the "Crosshair"
+## Control. Those two only agree because that Control is anchored to fill the whole
+## viewport (hud.tscn: anchors_preset=15, offsets zero) so ITS centre lands on the
+## viewport's. Nothing ties the two centres together at runtime; a single anchor/offset
+## edit on that one node would silently move the reticle off the aim ray while
+## game/scenes/test/camera_test.gd's own crosshair round-trip -- which only ever checks
+## the camera/projection half of that agreement, never the HUD's node layout -- stayed
+## green throughout. This is the other half.
+func test_the_crosshair_control_is_centred_on_the_viewport() -> void:
+	var crosshair: Control = _hud.get_node("Crosshair")
+	await wait_process_frames(1)
+	var viewport_centre: Vector2 = _hud.get_viewport().get_visible_rect().size * 0.5
+	var crosshair_centre: Vector2 = crosshair.global_position + crosshair.size * 0.5
+	assert_almost_eq(crosshair_centre.x, viewport_centre.x, 0.5,
+		"the crosshair control's centre must land on the viewport's horizontal centre")
+	assert_almost_eq(crosshair_centre.y, viewport_centre.y, 0.5,
+		"the crosshair control's centre must land on the viewport's vertical centre")
 
 
 func test_an_unbound_hud_reports_that_it_is_unbound() -> void:
@@ -109,6 +132,32 @@ class FakeBeam:
 
 	func is_holding() -> bool:
 		return false
+
+	# The rest of the reading surface the HUD's crosshair uses. Unreachable while
+	# is_active() and is_holding() both answer false (the draw code short-circuits on
+	# them), and declared anyway: a stand-in missing half the interface it stands in for
+	# is one refactor away from turning a HUD change into a null-method crash in a test
+	# that is nominally about the saddlebag.
+	func has_target() -> bool:
+		return false
+
+	func is_secured() -> bool:
+		return false
+
+	func get_secure_progress() -> float:
+		return 0.0
+
+	func get_secure_seconds() -> float:
+		return 0.0
+
+	func get_struggle_seconds() -> float:
+		return INF
+
+	func get_hold_seconds() -> float:
+		return 0.0
+
+	func get_last_loss() -> int:
+		return MagicBeamScript.Loss.NONE
 
 
 class FakePlayer:

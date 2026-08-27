@@ -9,8 +9,19 @@ extends Node3D
 ## Interface other tasks depend on -- do not rename:
 ##   grab() / release()     -- start and stop beaming.
 ##   is_holding() -> bool   -- whether something is currently in the beam.
+##   is_secured() -> bool   -- whether releasing right now would KEEP her (see below).
 ##   get_storage() -> Storage -- what has been caught so far.
 ##   release_stored()       -- let the last one caught back out into the world.
+##
+## A CAPTURE IS A CONTEST WITH TWO CLOCKS, which is the shape the first playtest asked
+## for. The beam needs SECURE_SECONDS of unbroken hold to subdue a pony; she has
+## STRUGGLE_* seconds of fight in her. Let go too early and she slips out; hold too long
+## and she wins. Everything between is the window you are aiming for, and how wide it is
+## is the whole of what her personality means under the beam. Before this, release()
+## stored whatever was in the beam the instant it was called and the struggle timers were
+## decorations on a decision already made -- the owner's report was "catching is really
+## quick", and it was: point, click, done, in about a third of a second. The full
+## reasoning and the numbers are on SECURE_SECONDS.
 ##
 ## WHO OWNS A CAPTURE. This node does, outright. pony.gd used to run a beam-hold timer of
 ## its own and fire captured() off an exported capture_seconds -- a second capture state
@@ -37,9 +48,11 @@ extends Node3D
 ##
 ## NO PONY EVER DIES. Project-wide rule, and this is the file with the most opportunity
 ## to break it: every exit from a hold puts a live pony back somewhere. Stored (record in
-## the bag, node freed, rebuildable through PonyRegistry -> PonyVisuals), broken free
-## (physics handed back, escaped() reported), or refused by a full bag (set_held(false)
-## and she drops where she was floating, unharmed). There is no fourth path, and the
+## the bag, node freed, rebuildable through PonyRegistry -> PonyVisuals), broken free --
+## either because she out-lasted the struggle timer or because the beam was let go before
+## it had secured her, both through _lose() (physics handed back, escaped() reported) --
+## or refused by a full bag (set_held(false) and she drops where she was floating,
+## unharmed). There is no fourth path, and the
 ## verification scene asserts the refused one specifically, because "the bag was full" is
 ## exactly the branch where a careless implementation would drop a pony on the floor in
 ## the other sense.
@@ -77,6 +90,16 @@ signal capture_refused(body: Node3D)
 ## The input action, bound in project.godot to right mouse / right trigger.
 const BEAM_ACTION := &"beam"
 
+## Why the last hold that did not end in a capture ended. Both values report `escaped()`
+## -- from the pony's side they are the same event -- but they are two different MISTAKES,
+## and a HUD that tells them apart is what makes the capture window learnable instead of
+## mysterious. Read through get_last_loss().
+enum Loss {
+	NONE,       ## Nothing has been lost yet this session.
+	SLIPPED,    ## Let go before SECURE_SECONDS: the beam never subdued her.
+	STRUGGLED,  ## Held past her struggle time: she won on her own.
+}
+
 ## Twilight's greeting line, played once on the FIRST successful capture as a placeholder
 ## for the future voice system (docs/notes-voice.md). Deliberately a plain constant path
 ## rather than PonyData.voice_bank: this is the player character reacting to her own
@@ -84,14 +107,38 @@ const BEAM_ACTION := &"beam"
 ## the repo so far. When the voice system lands, this is the one call site to rewrite.
 const VOICE_LINE := "res://assets/audio/voice/twilight/greeting_01.wav"
 
-## How far past the player the beam reaches, in metres. Sized against the pony's own
-## DETECTION_RADIUS (5 m, pony.gd): inside that radius a SHY pony is already bolting, so a
-## beam that only reached 5 m would mean every shy pony had a head start by the time she
-## was grabbable, and catching one would be a foot race rather than an aim. 8.5 m leaves a
-## clear couple of metres of "spot her, aim, take her" before she has even noticed you.
-## The ceiling is the 60 x 60 m ranch and the readability of the beam itself -- past ~10 m
-## the far end of the beam is a few pixels and you cannot tell what you have hit.
+## How far past the player the beam reaches, in metres.
+##
+## THE COMMENT THAT USED TO BE HERE ARGUED FOR EXACTLY THE WRONG RELATIONSHIP, AND THE
+## GAME SHIPPED WITH IT. It read: "sized against the pony's own DETECTION_RADIUS (5 m):
+## ... 8.5 m leaves a clear couple of metres of 'spot her, aim, take her' before she has
+## even noticed you." That is a description of the bug, written down as if it were the
+## design. A beam that out-reaches a pony's own senses means the player can ALWAYS take
+## her before she reacts -- so the flee behaviour, which works perfectly, never once
+## happens in play. The owner's first session found it immediately: "I could just hold
+## click and walk up and catch them -- they should start running away farther than the
+## range of the beam."
+##
+## The relationship is now the other way round and Pony.DETECTION_RADIUS (12 m) is the
+## number that moved, not this one: REACH stays at 8.5 m because it is bounded by
+## something real and unrelated -- past ~10 m the far end of the beam is a few pixels on
+## screen and you cannot tell what you have hit. What the beam gains from here is
+## upgrades: Phase 1B's shop sells reach, and every metre it sells eats into the 3.5 m of
+## warning a pony currently gets, which is exactly what makes buying it feel like
+## something. That is also the reason MIN_DETECTION_MARGIN below is stated as a margin
+## rather than the two constants simply being compared: an upgrade path that can raise
+## REACH needs a floor under how little warning a pony may be left with.
 const REACH := 8.5
+
+## Metres by which Pony.DETECTION_RADIUS must exceed REACH: the head start a pony is
+## guaranteed even after every reach upgrade the shop can sell. 3.0 m is about six tenths
+## of a second of the player's gallop, which is the least that can still read as "she saw
+## me coming" -- and it also has to swallow GRAB_ASSIST_RADIUS, since the forgiveness pass
+## makes the beam's EFFECTIVE grab distance half a metre longer than REACH says. Today's
+## actual margin is 3.5 m (12.0 - 8.5). Asserted in game/test/test_magic_beam.gd and
+## re-checked live in scenes/test/capture_test.gd -- see the note above on why this
+## invariant, of all the numbers in this file, gets an explicit gate.
+const MIN_DETECTION_MARGIN := 3.0
 
 ## Metres past the player, along the aim ray, that a held body floats. 2.2 m puts a pony
 ## (about 1.4 m nose to tail, 1.16 m at the withers) clearly in front of the player and
@@ -150,10 +197,15 @@ const MIN_HOLD_DISTANCE := 1.6
 
 ## Exponential rate at which a held body is reeled toward the hold point, in 1/seconds.
 ## Framerate-independent (1 - exp(-k*dt)), same idiom as the player's and the pony's turn
-## smoothing. At 8.0 a body closes 90% of the gap in ln(10)/8 = 0.29 s, so a pony grabbed
-## at the far end of REACH is floating in front of you in about a third of a second: fast
-## enough to read as a yank rather than a tow, slow enough that you see her come.
-const PULL_RESPONSE := 8.0
+## smoothing. At 6.0 a body closes 90% of the gap in ln(10)/6 = 0.38 s.
+##
+## Slowed from 8.0 (0.29 s) after the playtest. On its own this is a small change -- the
+## reel is a third longer and you get to watch her come -- and it is NOT the fix for
+## "catching is really quick"; SECURE_SECONDS below is. It matters because the pull-in
+## used to BE the whole capture: she arrived in 0.29 s and was stowable from that instant,
+## so the struggle timers underneath were decoration. Now the pull is the first beat of a
+## capture rather than the whole of it.
+const PULL_RESPONSE := 6.0
 
 ## Radius, in metres, of the forgiveness pass -- see _try_acquire(). Half a metre is about
 ## one pony-capsule diameter, so "I was aiming at the grass just under her hooves" works
@@ -184,31 +236,78 @@ const RELEASE_LIFT := 0.15
 ## Seconds after a body wins its struggle during which the beam refuses to acquire
 ## anything. Without it, the beam is still on when she breaks free, so it re-grabs her on
 ## the very next frame and the escape means nothing at all.
-const ESCAPE_COOLDOWN := 0.75
+##
+## Raised from 0.75 s once losing a pony became a real outcome (see SECURE_SECONDS). At
+## 0.75 s an escapee got back roughly to where she started -- she is set down at the hold
+## point, about 3.3 m from the player, and 0.75 s of accelerating from a standstill buys
+## her about 1.4 m, still deep inside REACH -- so "she wriggled free" cost the player a
+## button press. 1.25 s puts her at her full flee speed and about 3 m further out, so the
+## second attempt is a moving target at the edge of the beam and you have to work for it.
+const ESCAPE_COOLDOWN := 1.25
 
-## Seconds a held pony resists before she breaks free, by personality. This is the whole
-## of the mechanic's tension: you have this long to decide, and how long it is tells you
-## something about who you caught.
+## Seconds the beam must have a pony in it before she can be stowed. THE FIX FOR THE
+## OWNER'S FIRST COMPLAINT: "catching is really quick -- it took me several tries to get a
+## screenshot of one."
+##
+## Before this constant existed, release() stored whatever was in the beam, unconditionally
+## and instantly. The pull-in finishes in ~0.3 s, so the entire mechanic was: point,
+## click, done. The per-personality struggle timers below were real, ran correctly, and
+## were tuned with care -- and no player would ever have discovered any of it, because
+## nobody has a reason to hold a button down when letting go already won. The HUD's
+## struggle ring was drawing a countdown on a decision that had already been made.
+##
+## So a capture is now a two-sided clock. The beam needs SECURE_SECONDS of unbroken hold
+## to subdue her; she has STRUGGLE_* seconds of fight in her. Let go inside the first and
+## she slips out of the field and drops back into the world -- alive, and now spooked. Hold
+## past the second and she wins outright. Between them is a window whose WIDTH is the
+## difference of the two numbers, and that window is the mechanic:
+##
+##   SHY      1.90 - 1.15 = 0.75 s   a real scramble; you must be watching the ring
+##   CURIOUS  2.60 - 1.15 = 1.45 s   comfortable if you are paying attention
+##   BOLD     4.00 - 1.15 = 2.85 s   effectively a free catch, as the trait says
+##
+## WHY THE SUBDUE TIME IS THE SAME FOR EVERYONE and only the resistance varies: it keeps
+## one number as "what the beam does" and one as "who she is", so the personalities stay
+## legible. A player learns "Fluttershy is a handful" from the ring draining fast, not
+## from the beam behaving differently.
+##
+## 1.15 s specifically: comfortably past the 0.38 s pull-in, so the whole of the secure
+## phase is spent watching a pony who has actually arrived and is visibly fighting; and
+## short enough that the twelfth catch of a session is a second-and-a-bit of commitment
+## rather than a chore. The floor on it is the pull-in (a secure time under ~0.5 s would
+## complete while she was still in transit and the contest would be invisible again); the
+## ceiling is STRUGGLE_SHY, and test_magic_beam.gd asserts a real margin under it, because
+## a secure time that met or passed a personality's struggle time would make that
+## personality flatly uncatchable.
+const SECURE_SECONDS := 1.15
+
+## Seconds a held pony resists before she breaks free, by personality. Together with
+## SECURE_SECONDS above these are the whole of the mechanic's tension: how long you have
+## to act, and how long it is tells you something about who you caught.
 ##
 ## SHY is the short one (the brief's requirement, and the obvious reading of the trait --
-## a pony who runs from you at 5 m is not going to hang about in a magic field), BOLD the
-## long one (she was not worried about you on the ground and she is not worried now), and
-## CURIOUS sits between them, which matches her behaviour everywhere else: she is the one
-## who walks TOWARD the player, so she has the least reason to fight and the most reason
-## to stay and see what happens.
+## a pony who bolts the moment she sees you is not going to hang about in a magic field),
+## BOLD the long one (she was not worried about you on the ground and she is not worried
+## now), and CURIOUS sits between them, which matches her behaviour everywhere else: she
+## is the one who walks TOWARD the player, so she has the least reason to fight and the
+## most reason to stay and see what happens.
 ##
-## The floor on all three is the pull-in: PULL_RESPONSE reels a body to the hold point in
-## about 0.3 s, so anything under ~0.8 s would let a pony escape before she had even
-## arrived and the player would never see what they caught. 1.5 s leaves a SHY pony about
-## 1.2 s of actual float time -- enough to register and release, tight enough to feel like
-## a scramble -- and 4.0 s makes a BOLD pony effectively a free catch.
-const STRUGGLE_SHY := 1.5
-const STRUGGLE_CURIOUS := 2.5
+## Nudged from 1.5 / 2.5 / 4.0 rather than rewritten: SHY up to 1.90 so that subtracting
+## the new secure time still leaves a window a human can hit (0.75 s -- three reaction
+## times), CURIOUS up to 2.60 to keep the spacing, BOLD left exactly where it was because
+## 2.85 s of window is already "free catch" and more would just be waiting.
+const STRUGGLE_SHY := 1.9
+const STRUGGLE_CURIOUS := 2.6
 const STRUGGLE_BOLD := 4.0
 
 ## Struggle time for anything that is not a pony, in seconds. Props do not resist; a crate
 ## stays in the beam until the player lets go.
 const STRUGGLE_NEVER := INF
+
+## Secure time for anything that is not a pony, in seconds. A crate is not subdued, it is
+## simply carried, so there is nothing to wait out before dropping it -- and a drag-and-
+## drop toy with a mandatory 1.15 s arming delay would be a worse toy.
+const SECURE_NEVER := 0.0
 
 @export_group("Storage")
 ## How many ponies the player can carry. Twelve is a placeholder for whatever the barn
@@ -219,16 +318,31 @@ const STRUGGLE_NEVER := INF
 ## than as a bent stick at any length the beam can reach.
 const BEAM_SEGMENTS := 16
 
-## How far the beam bows sideways, as a fraction of its own length. 0.30 of a typical 4 m
-## hold is about 1.2 m of clearance -- comfortably past the player's 0.42 m capsule from
-## every camera angle, without the arc looking like it is going somewhere else.
+## How far the beam bows sideways, as a fraction of its own length, and the absolute
+## ceiling on that. 0.30 of a typical 4 m hold is about 1.2 m of clearance -- comfortably
+## past the player's 0.42 m capsule from every camera angle.
+##
+## THE CAP IS THE PLAYTEST FIX for "the curve as well is nice, curved a bit odd". A pure
+## fraction keeps growing: at the far end of REACH the control point was 2.55 m out to one
+## side, which puts the arc's apex more than a metre off the line between the horn and
+## what you are pointing at. Since the bow is always taken toward CAMERA-right, aiming at
+## something on your LEFT sent the beam swerving out to the right and back again -- the
+## beam visibly went somewhere other than where it was going. The clearance the bow exists
+## to buy is a fixed thing (getting past the player's own silhouette), so the sideways
+## offset should saturate rather than scale: short beams keep the same clearance they
+## always had and long ones straighten out into a clean lob.
 const BOW_FRACTION := 0.30
+const BOW_SIDE_MAX := 1.2
 
-## How far the beam also lofts upward, as a fraction of its own length. Small, but it is
-## what puts the apex of a long reach against the SKY rather than against the green ground
-## the pony at the far end is also standing on -- a pink ribbon on grass at 8 m is a lot
-## harder to pick out than the same ribbon on grey.
-const BOW_LIFT_FRACTION := 0.14
+## How far the beam also lofts upward, as a fraction of its own length. Deliberately NOT
+## capped, unlike the sideways bow: the loft is the one part of the arc that is doing
+## legible work at range. It puts the apex of a long reach against the SKY rather than
+## against the green ground the pony at the far end is also standing on (a pink ribbon on
+## grass at 8 m is a lot harder to pick out than the same ribbon on grey) -- and because it
+## keeps growing with length, HOW HIGH THE ARC RIDES IS ITSELF A DISTANCE CUE, which is
+## exactly what the owner said was missing ("hard to gauge distance of beam"). Raised from
+## 0.14 now that the sideways swerve is no longer competing with it for the eye.
+const BOW_LIFT_FRACTION := 0.18
 
 ## Half-width of the ribbon at the horn and at the far end, in metres. Narrow where it
 ## leaves her and flared where it lands, so it reads as something being projected rather
@@ -240,6 +354,67 @@ const BEAM_WIDTH_FAR := 0.30
 ## for something, and a wider, fainter aura wrapping whatever it has hold of.
 const GLOW_TIP_RADIUS := 0.28
 const GLOW_HELD_RADIUS := 0.70
+
+# --- the landing marker ----------------------------------------------------------------
+# THE OTHER HALF OF "HARD TO GAUGE DISTANCE OF BEAM". An arc hanging in the air has no
+# ground reference, and a third-person camera 3.5 m behind the player flattens depth
+# further -- so a beam ending 4 m away and a beam ending 8 m away look much the same. The
+# fix is the oldest one in 3D games: put a mark ON THE GROUND under where the beam lands.
+# The ground is a surface the player is already reading perspective off, so a ring on it
+# is unambiguous in a way a floating bead is not, and it moves with the crosshair, which
+# makes sweeping for range a thing you can DO rather than guess at.
+#
+# It doubles as the in-range answer: the ring is one colour over bare ground and another,
+# larger one when there is actually something grabbable within reach under the crosshair.
+# "Can I take her from here?" stops being a question you answer by trying.
+#
+# STRICTLY IT IS A LANDING MARK, NOT A GROUND MARK -- it lies on whatever surface the beam
+# actually reached, oriented to that surface's normal, and only falls back to a downward
+# probe when the beam ran out over open air. Over an empty field that is the grass, which
+# is the case this was built for. Over a pony it is HER, and the render showed that reads
+# as a target-lock ring around her, which is the right answer for the wrong reason and is
+# kept deliberately: the rule stays the simple one ("the mark is where the beam lands"),
+# and the picture is better than a ring hidden under her hooves would have been.
+
+## Outer radius of the landing ring in metres, sweeping and locked-on.
+##
+## SIZED FROM A RENDER, not from what looks reasonable in the source. The first pass used
+## 0.45 m and it was invisible in practice: the ring lies FLAT, and the camera sits about
+## two metres off the ground, so at the far end of REACH it is foreshortened to roughly a
+## twentieth of its width and reads as a couple of pink pixels lost in the grass. That
+## foreshortening is not a flaw -- it is exactly the perspective cue that makes a ground
+## marker worth drawing at all -- but the ring has to be big enough to survive it. At
+## 0.75 m it is about a pony's own footprint, which is also the honest size for something
+## that means "this is where the beam lands".
+const MARK_RADIUS := 0.75
+const MARK_LOCKED_RADIUS := 1.15
+## Radial thickness of the ring's band. Wide enough that the near edge of a heavily
+## foreshortened ring is still a band rather than a line.
+const MARK_THICKNESS := 0.14
+## Segments around the ring. 32 is smooth at the near distances where it is biggest.
+const MARK_SEGMENTS := 32
+## Metres the ring is lifted off the surface it was found on, so it does not z-fight with
+## the terrain it is lying on.
+const MARK_LIFT := 0.04
+## How far above and below the beam's far end the ground is probed for, when the beam is
+## pointing at open sky and there is no ray hit to sit the ring on.
+const MARK_PROBE_UP := 3.0
+const MARK_PROBE_DOWN := 40.0
+## Colour of the ring when the crosshair has something grabbable in range. Deliberately
+## NOT the beam's pink: this is the one piece of the effect that has to be readable AS a
+## different state, and a brighter shade of the same hue reads as "the beam, but more".
+## Matches the HUD reticle's own in-range colour so the two are obviously one signal.
+const MARK_LOCKED_COLOR := Color(1.0, 0.86, 0.42)
+
+## Half-width of the drop line, in metres: the thin vertical connector from the beam's far
+## end down to the ring, drawn only when the beam ends in mid-air rather than on a surface
+## (aimed over a hollow, or out at open sky). Without it those two are just a ribbon
+## stopping at nothing and an unrelated circle on the grass some way below; with it the
+## whole thing reads as one plumb line, which is the same trick every level editor's
+## translate gizmo uses for the same reason.
+const MARK_DROP_WIDTH := 0.045
+## Metres of separation below which the drop line is not worth drawing.
+const MARK_DROP_MIN := 0.20
 
 @export_group("Look")
 ## The beam's colour: Twilight's magic aura. Exported so a future second caster (or a
@@ -272,6 +447,7 @@ var _beaming := false
 var _held: Node3D
 var _hold_seconds := 0.0
 var _struggle_seconds := STRUGGLE_NEVER
+var _secure_seconds := SECURE_NEVER
 ## Offset from the hold point to the held body's ORIGIN -- see PONY_HOLD_LIFT.
 var _hold_offset := Vector3.ZERO
 ## RigidBody3D state borrowed at grab time and handed back on release.
@@ -279,14 +455,29 @@ var _prev_freeze := false
 var _prev_freeze_mode := RigidBody3D.FREEZE_MODE_STATIC
 
 var _cooldown := 0.0
+## Why the most recent lost hold was lost -- see the Loss enum.
+var _last_loss := Loss.NONE
 ## Where the beam visual currently ends when nothing is held: the ray's hit point, or the
 ## end of its reach.
 var _ray_end := Vector3.ZERO
 var _elapsed := 0.0
 
+## Whether the last scan found something grabbable inside REACH under the crosshair --
+## refreshed every frame the beam is on and empty, INDEPENDENTLY of whether the beam was
+## allowed to take it (the post-escape cooldown must not blank the reticle's answer to
+## "is she in range", or the readout lies for a second and a quarter at exactly the moment
+## the player is re-aiming at an escapee).
+var _has_target := false
+## Where the landing ring sits and which way it lies, from the last scan.
+var _mark_point := Vector3.ZERO
+var _mark_normal := Vector3.UP
+var _mark_valid := false
+
 var _beam_mesh: MeshInstance3D
 var _beam_material: StandardMaterial3D
 var _glow_mesh: MeshInstance3D
+var _mark_mesh: MeshInstance3D
+var _mark_material: StandardMaterial3D
 var _voice: AudioStreamPlayer
 var _voice_played := false
 var _assist_shape: SphereShape3D
@@ -336,19 +527,29 @@ func grab() -> void:
 	_beaming = true
 
 
-## Switch the beam off, and settle whatever was in it. A held pony goes into storage if
-## there is room -- her record is stored, `captured()` fires, her node is freed -- and
-## otherwise is set down in the world unharmed with `capture_refused()`. A held prop just
-## drops.
+## Switch the beam off, and settle whatever was in it.
+##
+## THE OUTCOME NOW DEPENDS ON HOW LONG YOU HELD HER, which is the whole of the capture
+## contest (see SECURE_SECONDS). A pony held at least that long is SECURED: she goes into
+## storage if there is room -- her record is stored, `captured()` fires, her node is freed
+## -- and otherwise is set down in the world unharmed with `capture_refused()`. A pony let
+## go before that has not been subdued at all; the field slips off her and she drops back
+## into the world exactly the way she does when she out-lasts the struggle timer, reported
+## the same way (`escaped()`), because from her point of view it is the same event: the
+## beam let go and she is still free. A held prop was never being subdued and just drops.
 func release() -> void:
 	_beaming = false
 	var body := _held
+	var was_secured := is_secured()
 	_take_back_physics(body)
 	_held = null
 
 	if body != null and is_instance_valid(body):
 		if body is PonyScript:
-			_settle_pony(body)
+			if was_secured:
+				_settle_pony(body)
+			else:
+				_lose(body, Loss.SLIPPED)
 	_hide_effect()
 
 
@@ -491,6 +692,54 @@ func get_struggle_seconds() -> float:
 	return _struggle_seconds if is_holding() else STRUGGLE_NEVER
 
 
+## Seconds the beam needs to subdue the currently held body before it can be stowed, or 0
+## for something that does not need subduing at all (a prop).
+func get_secure_seconds() -> float:
+	return _secure_seconds if is_holding() else SECURE_NEVER
+
+
+## How far the current hold has got toward being secured, 0..1. What the HUD fills its
+## capture arc from -- exposed as a fraction rather than as two clocks so there is one
+## place that decides what "nearly there" means.
+func get_secure_progress() -> float:
+	if not is_holding() or _secure_seconds <= 0.0:
+		return 1.0
+	return clampf(_hold_seconds / _secure_seconds, 0.0, 1.0)
+
+
+## Whether the current hold has lasted long enough that letting go would STOW her rather
+## than lose her. False when nothing is held.
+func is_secured() -> bool:
+	return is_holding() and _hold_seconds >= _secure_seconds
+
+
+## Why the most recent `escaped()` happened: Loss.SLIPPED (let go too early) or
+## Loss.STRUGGLED (held too long). Loss.NONE until one has.
+func get_last_loss() -> int:
+	return _last_loss
+
+
+## Whether the crosshair currently has something grabbable within reach -- a pony or a
+## loose prop the beam could take from here. True whether or not the beam is switched on
+## (see the scan note in _physics_process: an in-range readout you can only get by pressing
+## the button is a readout that arrives after the decision), and true while actually
+## holding something. The HUD's in-range reticle reads this; it is the answer to the
+## question the owner could not answer by looking ("hard to gauge distance of beam"),
+## which no amount of tuning the beam's own geometry can give on its own.
+func has_target() -> bool:
+	return is_holding() or _has_target
+
+
+## Where the beam's landing ring is being drawn, in world space, and whether it is being
+## drawn at all (false when the beam is off, or aimed at open sky over nothing).
+func get_mark_point() -> Vector3:
+	return _mark_point
+
+
+func has_mark() -> bool:
+	return _mark_valid and _beaming and not is_holding()
+
+
 ## Where a held body is being pulled to right now, in world space.
 func get_hold_point() -> Vector3:
 	return hold_point(_aim_origin, _aim_direction, _anchor_position())
@@ -508,6 +757,16 @@ static func struggle_seconds_for(personality: int) -> float:
 		_:
 			# BOLD, and anything a future roster adds without a struggle time of its own.
 			return STRUGGLE_BOLD
+
+
+## The seconds of slack a player has to let go in, for a pony with this `personality`:
+## everything between "the beam has subdued her" and "she has won". This is the number
+## that says how hard she is to catch, and it is the difference of two other numbers --
+## which is exactly why it gets a name, because neither of them means anything on its own
+## and a retune of either silently changes it. Static and pure; pinned by
+## game/test/test_magic_beam.gd.
+static func capture_window_for(personality: int) -> float:
+	return struggle_seconds_for(personality) - SECURE_SECONDS
 
 
 ## The point a held body floats at: `anchor` projected onto the aim ray, plus HOLD_LEAD
@@ -552,17 +811,30 @@ func _physics_process(delta: float) -> void:
 	if _held != null and not is_instance_valid(_held):
 		_held = null
 
+	_update_aim()
+
+	# SCANNED EVERY FRAME, INCLUDING WHEN THE BEAM IS SWITCHED OFF. Three jobs, and the
+	# third is why this is not gated on `_beaming` any more:
+	#   1. it finds what to grab;
+	#   2. it tells the effect where to END (which is why it also runs during the
+	#      post-escape cooldown, when it may not grab -- otherwise the beam would be drawn
+	#      to a stale point for the whole of it);
+	#   3. it answers has_target(), which the HUD reticle uses to say "she is in range".
+	# That third answer is worthless if it can only be had while the beam is ON, because
+	# switching the beam on with a pony in the crosshair GRABS her on the same frame -- so
+	# the in-range state would exist for one frame, after the decision it was supposed to
+	# inform. "Am I close enough?" has to be answerable before you commit, or the reticle
+	# is telling you something you already know.
+	#
+	# The cost is one ray cast and one small sphere query per physics frame while idle,
+	# which is nothing next to what the rest of the frame is doing; the mark and the ribbon
+	# are still only DRAWN while the beam is on (see has_mark(), and _hide_effect below).
+	if _held == null:
+		_scan(_beaming and _cooldown <= 0.0)
+
 	if not _beaming:
 		_hide_effect()
 		return
-
-	_update_aim()
-
-	# Scanned every frame the beam is on and empty, even during the post-escape cooldown:
-	# the scan is also what tells the effect where to END, and skipping it would leave the
-	# beam drawn to a stale point for the three quarters of a second after an escape.
-	if _held == null:
-		_scan(_cooldown <= 0.0)
 
 	if _held != null:
 		_pull(delta)
@@ -613,6 +885,9 @@ func _update_aim() -> void:
 ## grabbable thing overlapping it. That forgives "I was aiming at the grass under her" and
 ## nothing wider.
 func _scan(can_grab: bool) -> void:
+	_has_target = false
+	_mark_valid = false
+
 	var space := get_world_3d().direct_space_state
 	if space == null:
 		return
@@ -626,15 +901,23 @@ func _scan(can_grab: bool) -> void:
 	var hit := space.intersect_ray(query)
 	if not hit.is_empty():
 		_ray_end = hit["position"]
+		# The surface the ray landed on IS the surface to lie the ring on, normal and all
+		# -- no second cast needed, and it means the ring hugs a slope rather than floating
+		# level over it.
+		_mark_at(hit["position"], hit.get("normal", Vector3.UP))
 		var body: Object = hit["collider"]
-		if can_grab and _is_grabbable(body):
-			_begin_hold(body)
-			return
+		if _is_grabbable(body):
+			# Recorded BEFORE the cooldown gate, deliberately: "there is something in range"
+			# stays true through the post-escape cooldown, because that is exactly when the
+			# player is re-aiming and needs to know it.
+			_has_target = true
+			if can_grab:
+				_begin_hold(body)
+				return
 
-	if not can_grab:
-		return
-
-	# Forgiveness pass, centred on whatever the ray actually reached.
+	# Forgiveness pass, centred on whatever the ray actually reached. Runs whether or not
+	# the beam may grab, for the same reason as above -- the reticle must answer the same
+	# question the grab would.
 	var params := PhysicsShapeQueryParameters3D.new()
 	params.shape = _assist_shape
 	params.transform = Transform3D(Basis(), _ray_end)
@@ -651,7 +934,35 @@ func _scan(can_grab: bool) -> void:
 			nearest = candidate
 			nearest_distance = gap
 	if nearest != null:
-		_begin_hold(nearest)
+		_has_target = true
+		if can_grab:
+			_begin_hold(nearest)
+			return
+
+	if not _mark_valid:
+		# The beam is pointing at open sky, so the ray gave no surface to mark. Probe
+		# straight down from the far end instead: the ring then sits on the ground BELOW
+		# where the beam runs out, which is still the answer to "how far does this thing
+		# go", and is the case a player sweeping across an empty field is in most of the
+		# time.
+		var probe := PhysicsRayQueryParameters3D.create(
+			_ray_end + Vector3.UP * MARK_PROBE_UP, _ray_end + Vector3.DOWN * MARK_PROBE_DOWN)
+		probe.exclude = _exclusions()
+		var ground := space.intersect_ray(probe)
+		if not ground.is_empty():
+			_mark_at(ground["position"], ground.get("normal", Vector3.UP))
+
+
+## Record where the landing ring goes. Degenerate normals (a collider that reports none)
+## fall back to straight up rather than producing a ring lying in an undefined plane.
+func _mark_at(point: Vector3, normal: Vector3) -> void:
+	var up := normal
+	if up.length_squared() < 0.000001:
+		up = Vector3.UP
+	up = up.normalized()
+	_mark_point = point + up * MARK_LIFT
+	_mark_normal = up
+	_mark_valid = true
 
 
 ## A wild pony, or any loose rigid body. The rigid bodies cost almost nothing to support
@@ -685,6 +996,7 @@ func _begin_hold(body: Node3D) -> void:
 		var data: PonyData = body.get_data()
 		_struggle_seconds = struggle_seconds_for(
 			data.personality if data != null else PonyDataScript.Personality.BOLD)
+		_secure_seconds = SECURE_SECONDS
 		return
 
 	if body is RigidBody3D:
@@ -697,6 +1009,7 @@ func _begin_hold(body: Node3D) -> void:
 		rigid.freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
 		rigid.freeze = true
 		_struggle_seconds = STRUGGLE_NEVER
+		_secure_seconds = SECURE_NEVER
 
 
 ## Reel the held body toward the hold point and turn it slowly while it floats.
@@ -718,7 +1031,25 @@ func _run_struggle(delta: float) -> void:
 	var body := _held
 	_take_back_physics(body)
 	_held = null
+	_lose(body, Loss.STRUGGLED)
+
+
+## The one exit from a hold that is not a capture, used by BOTH ways of failing one: she
+## out-lasted the struggle timer (_run_struggle above), or she was let go before the beam
+## had subdued her (release()). Deliberately one code path -- an escape that set the
+## cooldown and a slip that did not would be a mechanic with a hole in it exactly where
+## the player is fumbling. Callers hand the physics back first.
+##
+## Reported as `escaped()` in both cases: from the pony's point of view they are the same
+## event -- the beam let go and she is still free. `reason` is recorded rather than
+## signalled, so listeners that do not care are unaffected and the HUD, which does care,
+## can tell the player WHICH mistake they just made. Teaching "you let go too soon" is the
+## difference between a mechanic a player learns and one they think is random.
+func _lose(body: Node3D, reason: int) -> void:
+	_last_loss = reason
 	_cooldown = ESCAPE_COOLDOWN
+	if body == null or not is_instance_valid(body):
+		return
 	if body is PonyScript:
 		# break_free() is what releases the hold AND reports escaped() -- the pony still
 		# owns the announcement, this file only owns the decision.
@@ -836,6 +1167,23 @@ func _build_effect() -> void:
 	_glow_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_glow_mesh)
 
+	# The landing ring. Its own material because it needs `no_depth_test`: the ring lies
+	# ON the ground it is marking, and MARK_LIFT alone is not enough to keep a 4 cm offset
+	# from being eaten by the depth buffer on a slope at 8 m. Drawing it through the
+	# terrain is the right trade for a marker whose entire job is to be seen.
+	var mark_material: StandardMaterial3D = material.duplicate()
+	mark_material.no_depth_test = true
+	# Rendered after everything else, so it is not sorted behind the ground it overlays.
+	mark_material.render_priority = 1
+	_mark_material = mark_material
+
+	_mark_mesh = MeshInstance3D.new()
+	_mark_mesh.name = "BeamMark"
+	_mark_mesh.mesh = ImmediateMesh.new()
+	_mark_mesh.top_level = true
+	_mark_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_mark_mesh)
+
 
 ## Placeholder voice playback. AudioStreamPlayer (not ...3D) because this is the player
 ## character's own voice, not a sound happening somewhere in the world.
@@ -894,7 +1242,11 @@ func _draw_effect() -> void:
 	side = side.normalized()
 	if camera != null and side.dot(camera.global_transform.basis.x) < 0.0:
 		side = -side
-	var control := from + span * 0.5 + side * (length * BOW_FRACTION) \
+	# The sideways bow SATURATES (see BOW_SIDE_MAX) and the loft does not. Short beams --
+	# the hold, mostly -- keep exactly the clearance they always had; long ones straighten
+	# out sideways and gain height instead, which is both a calmer shape and a distance cue.
+	var control := from + span * 0.5 \
+		+ side * minf(length * BOW_FRACTION, BOW_SIDE_MAX) \
 		+ Vector3.UP * (length * BOW_LIFT_FRACTION)
 
 	# ONE ribbon plane for the whole beam, perpendicular to both the beam and the line of
@@ -935,6 +1287,64 @@ func _draw_effect() -> void:
 	_glow_mesh.global_transform = Transform3D(Basis().scaled(Vector3.ONE * pulse), to)
 	_glow_mesh.visible = true
 
+	_draw_mark()
+
+
+## The ring on the ground under where the beam lands -- the distance cue. Hidden while
+## something is held (there is nothing left to judge the range of; the pony is in the
+## beam) and while the beam has found no surface at all.
+func _draw_mark() -> void:
+	if not has_mark():
+		_mark_mesh.visible = false
+		return
+
+	# Two axes spanning the marked surface, so the ring lies flat ON a slope rather than
+	# hovering level over it. UP is the natural reference; the fallback covers a wall or
+	# an overhang, where the first cross product collapses.
+	var right := _mark_normal.cross(Vector3.UP)
+	if right.length_squared() < 0.000001:
+		right = _mark_normal.cross(Vector3.RIGHT)
+	right = right.normalized()
+	var forward := right.cross(_mark_normal).normalized()
+
+	var locked := _has_target
+	var outer: float = MARK_LOCKED_RADIUS if locked else MARK_RADIUS
+	# The same slow pulse the tip glow uses, so the two read as one effect.
+	outer *= 1.0 + 0.06 * sin(_elapsed * 9.0)
+	var inner: float = maxf(outer - MARK_THICKNESS, 0.01)
+	var color: Color = MARK_LOCKED_COLOR if locked else beam_color
+
+	var mesh: ImmediateMesh = _mark_mesh.mesh
+	mesh.clear_surfaces()
+	_mark_material.albedo_color = Color(color.r, color.g, color.b, 0.9 if locked else 0.55)
+	_mark_material.emission = color
+	mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP, _mark_material)
+	for i in range(MARK_SEGMENTS + 1):
+		var angle := TAU * float(i) / float(MARK_SEGMENTS)
+		var dir := right * cos(angle) + forward * sin(angle)
+		mesh.surface_add_vertex(_mark_point + dir * inner)
+		mesh.surface_add_vertex(_mark_point + dir * outer)
+	mesh.surface_end()
+
+	# The drop line, when the beam ran out in mid-air above the ground it marked.
+	var drop := _ray_end - _mark_point
+	if drop.length() > MARK_DROP_MIN:
+		var camera := get_viewport().get_camera_3d() if get_viewport() != null else null
+		var eye: Vector3 = camera.global_position if camera != null else _aim_origin
+		var across := drop.cross(eye - _mark_point)
+		if across.length_squared() < 0.000001:
+			across = drop.cross(Vector3.RIGHT)
+		across = across.normalized() * MARK_DROP_WIDTH
+		mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP, _mark_material)
+		mesh.surface_add_vertex(_mark_point - across)
+		mesh.surface_add_vertex(_mark_point + across)
+		mesh.surface_add_vertex(_ray_end - across)
+		mesh.surface_add_vertex(_ray_end + across)
+		mesh.surface_end()
+
+	_mark_mesh.global_transform = Transform3D.IDENTITY
+	_mark_mesh.visible = true
+
 
 ## Quadratic Bezier through `control`, used for the beam's bow.
 static func _bezier(a: Vector3, control: Vector3, b: Vector3, t: float) -> Vector3:
@@ -947,6 +1357,8 @@ func _hide_effect() -> void:
 		_beam_mesh.visible = false
 	if _glow_mesh != null:
 		_glow_mesh.visible = false
+	if _mark_mesh != null:
+		_mark_mesh.visible = false
 
 
 # --- mounting -------------------------------------------------------------------------

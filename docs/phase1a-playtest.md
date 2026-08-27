@@ -69,10 +69,19 @@ This is the whole game right now, so it is worth spelling out.
    you are slightly off, sweep across her rather than letting go and trying again.
 3. Once she is caught she is lifted out of the world and reeled in to float up and
    to the right of you, wrapped in a pink aura.
-4. **A ring appears around the crosshair and drains away.** That is how long she
-   will put up with it. Let go before the ring runs out and she goes in your
-   saddlebag; let it run out and she wriggles free and drops back to the grass.
-5. Ponies resist for different lengths of time depending on who they are — see §4.
+4. **Two rings appear around the crosshair, and they mean different things.**
+   * The **inner ring fills up** as the beam subdues her. It takes about **1.2 s**,
+     the same for every pony. Until it is full she is not yours — let go early and
+     she slips out of the field and drops back to the grass.
+   * The **outer ring drains away** — that is how long she will put up with it, and
+     it is different for every pony (§4). Let it empty and she wriggles free.
+5. So: **hold until the inner ring completes, then let go.** The gap between the
+   two is your window, and it is wide for a Rainbow Dash and narrow for a
+   Fluttershy. The reticle turns **green and grows** the moment letting go would
+   keep her; that flash is the cue to release.
+6. If you fumble it, the toast tells you *which* mistake you made — "she slipped
+   out" (too early) or "she wriggled free" (too late) — and the beam will not
+   re-take her for about a second and a quarter, so a lost pony gets a head start.
 
 **No pony is ever hurt, ever, by anything.** That is a rule the whole project is
 built on. A pony who escapes, or who cannot be stored because your bag is full, is
@@ -90,14 +99,21 @@ through the ground or get stuck somewhere, that is a bug worth reporting.
   wide shot of the ranch.
 * **Back yourself into a wall and look at the camera.** It pulls in rather than
   clipping through, and Twilight fades out instead of filling the frame.
-* **Find all three kinds of pony.** There are eight wild ponies in three grazing
-  areas: north past the barn, east over the rise, and south-west beyond the
-  clearing. Every one of the three characters in the game is out there somewhere.
+* **Find all three kinds of pony.** There are ten wild ponies in five grazing
+  areas: one right next to where you start, north past the barn, east over the
+  rise, south-west beyond the clearing, and one out west near the map edge. Every
+  one of the three characters in the game is out there somewhere.
 * **Stand still and let a curious one come to you.** Some ponies walk toward you,
   some bolt, and some completely ignore you (§4).
-* **Chase a shy one.** A fleeing Fluttershy runs at about 2.5 m/s and your gallop
-  is 4.0 m/s, so you will catch her — but she is genuinely running, and she will
-  keep running as long as you are close enough for her to see you.
+* **Chase a shy one.** A Fluttershy notices you at 12 m and is running before you
+  are anywhere near beam range, at about 2.5 m/s against your 4.8 m/s gallop — so
+  you will catch her, but you have to commit to the chase, and she keeps running
+  as long as she can see you. Hold **Shift**; walking will not close the gap fast
+  enough to be fun.
+* **Watch the crosshair as you walk up to a pony.** It turns **amber and grows**
+  the moment she is inside beam range, before you press anything. Switch the beam
+  on over open ground and a ring appears on the grass where the beam lands — sweep
+  it about to see how far 8.5 m actually is.
 * **Try to catch one through a wall.** You cannot; the beam stops at whatever the
   crosshair is actually resting on.
 * **Walk to the edge of the map.** There is an invisible wall, not a cliff.
@@ -110,21 +126,31 @@ through the ground or get stuck somewhere, that is a bug worth reporting.
 Three characters, and the difference between them is not cosmetic — each one
 behaves differently on the ground *and* under the beam.
 
-| | Reacts to you by | Resists the beam for | Rarity |
-|---|---|---|---|
-| **Fluttershy** | fleeing at a gallop | **1.5 s** — you have to be quick | uncommon |
-| **Twilight Sparkle** | walking over to see what you are | 2.5 s | rare |
-| **Rainbow Dash** | ignoring you completely | 4.0 s — near enough a free catch | rare |
+| | Reacts to you by | Resists the beam for | Your window to let go | Rarity |
+|---|---|---|---|---|
+| **Fluttershy** | fleeing at a gallop | **1.9 s** | **0.75 s** — a real scramble | uncommon |
+| **Twilight Sparkle** | walking over to see what you are | 2.6 s | 1.45 s | rare |
+| **Rainbow Dash** | ignoring you completely | 4.0 s | 2.85 s — near enough free | rare |
+
+The "window" column is the one that matters: it is her resistance minus the ~1.2 s
+the beam needs to subdue her, and it is how long you actually have between "let go
+now and she slips out" and "let go now and she has already gone".
 
 Rarity decides the odds when the herd is drawn; the herd this build actually ships
-with is **three Fluttershies, three Rainbow Dashes and two Twilights**, spread
-across the three grazing areas.
+with is **four Fluttershies, three Rainbow Dashes and three Twilights**, spread
+across the five grazing areas.
 
-A pony notices you from about 5 m. The beam reaches 8.5 m, so you can take a shy
-pony from outside her notice range if you spot her first — that is the whole point
-of the beam being longer than her eyesight.
+**A pony notices you from 12 m, and the beam only reaches 8.5 m.** That way round
+is the point: a shy pony is *already running* by the time you are close enough to
+take her, so catching one is a chase you commit to rather than a click you get in
+first. (It used to be the other way round — 5 m of eyesight against 8.5 m of
+reach — which meant every catch happened before its target had reacted to
+anything, and the fleeing behaviour, which works, never actually happened in a
+game. That was the single worst bug the first playtest found.) A longer beam is
+something the Phase 1B shop will sell you, and every metre of it eats into her
+head start, which is what will make buying it feel like something.
 
-The eight ponies, where they stand, and where they wander are **the same every
+The ten ponies, where they stand, and where they wander are **the same every
 time you launch the game**. That is deliberate: a collection game whose map
 reshuffles on every boot is a map you cannot learn.
 
@@ -140,7 +166,7 @@ reshuffles on every boot is a map you cannot learn.
   she is in for the session. Releasing is part of the pen system, so it lands with
   Phase 1B.
 * **Nothing is saved.** Close the game and your catches are gone. Also Phase 1B.
-* **The bag holds twelve and there are only eight ponies**, so you cannot fill it
+* **The bag holds twelve and there are only ten ponies**, so you cannot fill it
   yet. The "saddlebag full" message exists and works; you just cannot reach it.
 * **The trees and bushes are mint green.** That is the Kenney Nature Kit's own
   stylised palette shipped as it comes, not a lighting bug and not a
@@ -155,19 +181,25 @@ reshuffles on every boot is a map you cannot learn.
 
 ### Real rough edges
 
-* **A beam that is *reaching* for a distant pony is hard to see.** The camera sits
-  directly behind Twilight, and the beam runs from her horn toward the middle of
-  the screen — which is almost straight away from you, so it compresses into a
-  few pixels. Once she has hold of something it is obvious (the pony floats out to
-  the side with a bright aura and the beam is clearly drawn to her); it is only the
-  empty sweep that is faint. The proper fix is to move the camera off to one side,
-  which is its own piece of work and is deliberately not in this build.
-* **Walking is slow on purpose, and it may still feel too slow.** Twilight's walk
-  is 1.32 m/s. That is not an arbitrary choice: the authored walk cycle depicts
-  0.66 m/s of ground travel, and 1.32 is exactly double, which is as fast as the
-  clip can be played before her hooves start sliding over the ground. **The gallop
-  (Shift / LB, 4.0 m/s) is the real travel speed** and the map is sized around it —
-  the ground runs about 140 m across. If you find yourself ambling anywhere, hold
+* **Judging beam range is still partly guesswork.** The camera sits behind
+  Twilight and the beam runs from her horn toward the middle of the screen, which
+  is almost straight away from you, so a long beam is heavily foreshortened. Three
+  things now answer "how far does this go?" — the arc rides higher the further it
+  reaches, a ring is drawn on the ground where it lands, and the crosshair turns
+  amber when something grabbable is in range — but none of them is a distance in
+  metres, and reading depth in a third-person view will never be exact.
+* **The gallop slides its hooves very slightly.** Top speed is 4.8 m/s and the
+  authored gallop cycle honestly depicts 4.29 m/s, so at a flat run Twilight
+  covers about 12% more ground than her legs account for. It is below the
+  threshold where that is visible in motion, and it is a deliberate purchase:
+  4.29 m/s is also exactly the fastest a *fleeing* pony can be animated, so a
+  player capped at it could never close a chase. The clean fix is a faster
+  authored gallop cycle, which is an animation job.
+* **Walking is capped by the animation, not by taste.** Twilight's walk is
+  1.65 m/s: the authored walk cycle depicts 0.66 m/s of travel and 1.65 is 2.5x,
+  near the top of what that clip can be played at before her hooves slide. **The
+  gallop (Shift / LB, 4.8 m/s) is the real travel speed** and the map — about
+  140 m across — is sized around it. If you find yourself ambling anywhere, hold
   Shift; you are meant to. Making the *walk* genuinely faster means authoring a
   longer stride, not turning a number up.
 * **The buildings are boxes.** The Kenney prop pack turned out to contain no actual
@@ -190,12 +222,21 @@ reshuffles on every boot is a map you cannot learn.
 In rough order of usefulness:
 
 1. **Does catching a pony feel good?** That is the one thing the whole phase is
-   built around. Is the ring the right length? Is 8.5 m the right reach? Is the
-   moment she comes flying in satisfying, or fiddly?
-2. **Can you tell what is going on without being told?** You have this document;
-   the next person will not. Was the crosshair enough? Did you work out that you
-   have to *release* to keep her?
-3. **Does the ranch read as a place** — somewhere with a shape you could learn —
+   built around, and everything in §2's beam section was rebuilt after the first
+   session reported it was over before it began. Is the hold long enough to be a
+   moment and short enough not to be a chore on the twelfth catch? Is a
+   Fluttershy's 0.75 s window a fair challenge or an unfair one? Is losing one
+   annoying or motivating?
+2. **Is the chase fun?** A shy pony now bolts before you can reach her, so every
+   catch of one starts with a run. Does that read as exciting or as tedious —
+   and does it change how you feel about the ones that *don't* run?
+3. **Can you tell what is going on without being told?** You have this document;
+   the next person will not. Are two rings one too many? Did you work out from the
+   screen alone that the inner one has to fill before letting go means anything?
+4. **Are there ponies where you walk?** The herd was all round the rim last time;
+   there are now ten of them in five places, one of which is next to where you
+   start. Does the ranch feel inhabited or crowded?
+5. **Does the ranch read as a place** — somewhere with a shape you could learn —
    or as objects scattered on a field?
-4. Anything that looked broken. Especially anything involving a pony ending up
+6. Anything that looked broken. Especially anything involving a pony ending up
    somewhere she should not be.

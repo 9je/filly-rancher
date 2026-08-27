@@ -102,10 +102,34 @@ enum State { IDLE, WANDER, GRAZE, FLEE, APPROACH, HELD }
 ## as a real transition somewhere down the line.
 const NO_REACTION := -1
 
-## Radius of the DetectionArea sphere, in metres -- "notices the player from a few
-## metres away". Applied to the shape in _ready() so this constant, which is what the
-## rest of the code reasons about, cannot drift from what pony.tscn ships.
-const DETECTION_RADIUS := 5.0
+## Radius of the DetectionArea sphere, in metres. Applied to the shape in _ready() so
+## this constant, which is what the rest of the code reasons about, cannot drift from
+## what pony.tscn ships.
+##
+## THIS NUMBER MUST COMFORTABLY EXCEED MagicBeam.REACH, AND IT IS THE WHOLE OF THE FIX
+## FOR THE WORST BUG THE FIRST PLAYTEST FOUND. It was 5.0 while the beam reached 8.5 m,
+## and the consequence was not subtle: a pony could not notice the player until he was
+## 5 m away, but he could beam her from 8.5 m, so EVERY grab happened before she had
+## reacted to anything. The owner's words were "I could just hold click and walk up and
+## catch them". The flee behaviour below was not broken -- FLEE, the leash, the gallop
+## clip, all of it worked -- it was simply unreachable in play, because the beam always
+## got there first. A whole personality's worth of behaviour existed and no player could
+## ever see it.
+##
+## 12.0 m is 3.5 m of clear warning past MagicBeam.REACH. Sized against the chase that
+## has to follow: the player closes that gap at (GALLOP_SPEED - her flee speed), which
+## for the slowest bolt on the roster (Fluttershy, 2.48 m/s) is 2.3 m/s -- about a second
+## and a half of committed galloping, long enough that the chase is a thing that happened
+## and short enough that it is not a commute. Widening it further is not free: a CURIOUS
+## pony starts walking over from here too, and a SHY one this far out spends the whole
+## approach fleeing rather than grazing, so the world stops looking inhabited and starts
+## looking alarmed.
+##
+## The invariant (detection > reach, with margin) is asserted in game/test/
+## test_magic_beam.gd and again as a live check in scenes/test/capture_test.gd, because
+## it is a relationship between two constants in two files and nothing but an assertion
+## can stop it silently inverting again.
+const DETECTION_RADIUS := 12.0
 
 ## `base_speed` value that maps to exactly the nominal speeds below. Sits in the middle
 ## of the current roster (3.0 / 3.4 / 6.5) so a typical pony moves at the nominal rate
@@ -118,18 +142,31 @@ const REFERENCE_BASE_SPEED := 4.0
 ## be slower than the player's brisk 1.32 m/s -- she is not going anywhere.
 const NOMINAL_WANDER_SPEED := GaitScript.WALK_CLIP_SPEED
 
-## Ceiling on an amble, as a playback rate of the `walk` clip: 2.0x, i.e. 1.32 m/s --
-## exactly the player's own WALK_SPEED, which is already described in player.gd as "a
-## brisk amble". Deliberately NOT Gait.SKATE_FREE_TOP_SPEED (3.0x, 1.98 m/s): that is
-## the exact speed at which Gait hands over to the `gallop` clip, so clamping there
-## would produce a "wandering" pony that Gait then asks to gallop. A pony pottering
-## about her field should not be moving faster than the player walks anyway; anything
-## faster is a flee, and flee_speed_for() handles that.
+## Ceiling on an amble, as a playback rate of the `walk` clip: 2.0x, i.e. 1.32 m/s.
+## Deliberately NOT Gait.SKATE_FREE_TOP_SPEED (3.0x, 1.98 m/s): that is the exact speed
+## at which Gait hands over to the `gallop` clip, so clamping there would produce a
+## "wandering" pony that Gait then asks to gallop. A pony pottering about her field
+## should not be moving faster than the player WALKS (player.gd's WALK_SPEED, 1.65 m/s
+## since the playtest retune) anyway; anything faster is a flee, and flee_speed_for()
+## handles that. This used to be pinned to the player's walk speed exactly; it is a
+## plain 2.0x now, because the two numbers answer different questions and tying them
+## together meant every retune of how the PLAYER handles silently retuned how a grazing
+## animal ambles.
 const MAX_WANDER_PLAYBACK := 2.0
 
 ## Bolting speed for a REFERENCE_BASE_SPEED pony: exactly the `gallop` clip's own speed,
-## 3.30 m/s, played at 1.0x. Faster than the player's walk and slower than her gallop
-## (4.0 m/s), so a spooked pony has to be chased but can be caught.
+## 3.30 m/s, played at 1.0x. Faster than the player's walk (1.65 m/s) and slower than her
+## gallop (4.80 m/s), so a spooked pony has to be chased but can be caught.
+##
+## The CEILING is the interesting number, and it is not set here -- flee_speed_for()
+## clamps to Gait.TOP_SKATE_FREE_SPEED (4.29 m/s), the fastest any authored clip can
+## honestly depict. That clamp is what makes the player's 4.80 m/s gallop strictly faster
+## than ANY wild pony can flee, whatever a roster edit puts in `base_speed`: a SHY Rainbow
+## Dash (base_speed 6.5, which scales to 5.36 m/s) is pinned back to 4.29 and is therefore
+## still catchable. Before the playtest retune the player's gallop was 4.0 m/s and that
+## same pony would have been 7% FASTER than the player and literally uncatchable in a
+## straight line. She is BOLD on today's roster, so nobody ever hit it -- it was a
+## landmine waiting for a personality edit, not a live bug.
 const NOMINAL_FLEE_SPEED := GaitScript.GALLOP_CLIP_SPEED
 
 ## How close a CURIOUS pony comes before stopping to watch, in metres. Comfortably

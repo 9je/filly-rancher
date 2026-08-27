@@ -5,8 +5,32 @@ extends Node3D
 ##
 ## WHAT IT IS. Terrain (game/world/terrain.gd) with a sun and a sky, a homestead of
 ## Kenney props at the validated 1.5x scale (game/world/props.gd), the player
-## standing in the yard, three ZoneMarkers out in open country, and a Spawner
+## standing in the yard, five ZoneMarkers spread over the map, and a Spawner
 ## (game/world/spawner.gd) that fills them with wild ponies drawn from the registry.
+##
+## WHERE THE ZONES ARE, AND WHY THERE ARE FIVE OF THEM NOW. The first playtest's report
+## was "ponies were only around the perimeter", and it was right: the three original
+## markers sat at (2, -42), (40, 8) and (-30, 38), all of them 40 m or more from the
+## player's spawn and none of them anywhere a player crossing the middle of the map would
+## meet one. Eight ponies on a 140 x 140 m map is not many to begin with, and putting all
+## eight around the rim meant the entire middle of the ranch -- the part you actually walk
+## through -- was empty.
+##
+## The three original markers are kept (they are on real relief, which the raycast
+## placement check below depends on) at two ponies each, and two more are added where the
+## map was bare: HomePasture, a small herd in the open ground north-east of the pen plots,
+## about 10 m from where the player spawns, so the FIRST thing a new session contains is
+## a pony; and WestHollow, out west between the tree line and the map edge, which was the
+## largest continuously empty quarter of the map. Ten ponies over five places rather than
+## eight over three.
+##
+## Sizing all five is bounded by things this file's own checks care about: no disc may
+## overlap the pen-plot clearing (game/world/props.gd's PEN_PLOTS_*), no disc may sit on
+## a prop's footprint, and no two markers may be close enough that a pony spawned in one
+## ends up nearer another -- "every pony was spawned inside her zone" is checked against
+## her NEAREST marker, so overlapping discs would fail it. HomePasture's 6.5 m radius is
+## the one that is tight rather than chosen: it is the largest circle at (7, 19) that
+## clears the pen plots to the west and the oak at (14, 27) to the north-east.
 ##
 ## THIS FILE IS ALSO THE GATE. `RANCH_OK ponies=<n> props=<n> assets=<state>`, exit
 ## 0, printed only when every check below actually held. The checks are chosen the
@@ -66,10 +90,16 @@ extends Node3D
 ##
 ## OFFSCREEN RENDERING. `xvfb-run tools/bin/godot --path game --audio-driver Dummy
 ## world/ranch.tscn -- --screenshot-dir=<path>` (NOT --headless) runs the same checks
-## and then saves five PNGs: the establishing shot, the view from the player's own
+## and then saves a dozen PNGs: the establishing shot, the view from the player's own
 ## eyes at spawn, a spawn zone with ponies in it, the camera pressed against a
-## building, and an eye-level look at the barn for scale. Every check in this file is
-## a number; whether the place READS as a place is not something a number can answer.
+## building, an eye-level look at the barn for scale, and -- added by the playtest pass,
+## see _capture_the_mechanic() -- THE CORE LOOP ITSELF through the player's own camera
+## with the real HUD over it: a shy pony bolting from beyond beam range, the beam and its
+## landing ring at range, and a capture mid-struggle. Every check in this file is a
+## number; whether the place READS as a place, and whether the mechanic READS at all, are
+## not things a number can answer -- and the second of those had never been photographed
+## in the real scene at all before the first playtest went and found five problems with
+## it by hand.
 ## `--audio-driver Dummy` is required explicitly here (not implied, since this run is
 ## NOT --headless) -- this is the main scene, a captured pony here can fire the same
 ## first-capture voice line scenes/test/capture_test.gd's header describes, and
@@ -87,6 +117,8 @@ const PlotRegistryScript := preload("res://systems/plot_registry.gd")
 const PenScript := preload("res://world/pen.gd")
 const EconomyScript := preload("res://systems/economy.gd")
 const ZoneMarkerScript := preload("res://world/zone_marker.gd")
+const PonyScript := preload("res://actors/pony/pony.gd")
+const PonyDataScript := preload("res://systems/pony_data.gd")
 
 ## Headless watchdog ceiling. A normal run (assets present) finishes in under 2s on
 ## this machine; 30s leaves a wide margin for a slower box while still failing in
@@ -1129,9 +1161,15 @@ func _report(pony_count: int, prop_count: int) -> void:
 		# `hit` is the spring arm's own bookkeeping; `actual` is where the lens really
 		# ended up, measured off its transform, and `fade` is what CameraRig does about
 		# it. All three, because the first two have already disagreed once on this rig
-		# (see CameraRig.probe_margin) and because a fade of 0.00 at 0.73 m is the whole
-		# of the fix for the camera-inside-the-pony close-up -- worth a printed number
-		# rather than only a screenshot.
+		# (see CameraRig's note on SpringArm3D.margin) and because a fade of 0.00 at
+		# 0.55 m is the whole of the fix for the camera-inside-the-pony close-up --
+		# worth a printed number rather than only a screenshot.
+		#
+		# `actual` is now the LENS -- shoulder offset and all -- while the fade is driven
+		# by where the ARM left the mount (CameraRig.get_arm_distance()), so at a normal
+		# distance the two are allowed to differ by the offset. At this pose they agree,
+		# because the ramp has eased the offset to nothing by the time the arm is this
+		# short.
 		print("RANCH camera building=%s rest=%.2f hit=%.2f actual=%.2f pull_in=%.2f subject_opacity=%.2f"
 			% [pull_in["building"], pull_in["rest"], pull_in["hit"], pull_in["actual"],
 				pull_in["pull_in"], pull_in["opacity"]])
@@ -1630,7 +1668,7 @@ func _capture_all() -> void:
 	await _capture("01_establishing")
 
 	# 02 -- what the owner actually sees the instant the game boots.
-	_rig.get_node("SpringArm3D/Camera3D").make_current()
+	_rig.get_camera().make_current()
 	await _capture("02_player_eye_at_spawn")
 
 	# 03 -- a spawn zone with ponies in it, framed from the herd's own centre of mass
@@ -1661,11 +1699,11 @@ func _capture_all() -> void:
 		_rig.add_look_delta(0.0, deg_to_rad(_rig.get_look_pitch_degrees()))
 		for i in range(CAMERA_SETTLE_FRAMES):
 			await get_tree().physics_frame
-		_rig.get_node("SpringArm3D/Camera3D").make_current()
+		_rig.get_camera().make_current()
 		await _capture("04a_camera_pressed_to_wall")
 
 		# ...and again from 1.2 m further out. Both shots are worth keeping: 04a is
-		# the strict pose the check measures -- the arm at 0.6 m, well inside the pony
+		# the strict pose the check measures -- the arm at 0.55 m, well inside the pony
 		# -- and it is now the picture of CameraRig's subject fade doing its job (she
 		# is gone and the world is visible). Until Phase 1A Task 9 the same shot was an
 		# unreadable macro close-up of her flank, which is what the fade was written to
@@ -1683,6 +1721,8 @@ func _capture_all() -> void:
 
 		player.global_position = player_spawn.global_position
 		_rig.rotation.y = 0.0
+
+	await _capture_the_mechanic()
 
 	# 05 -- eye level in the yard, for judging prop scale against a 1.16 m pony.
 	var barn := _tallest_building()
@@ -1787,6 +1827,203 @@ func _capture_plots() -> void:
 	capture_camera.look_at(at + Vector3(0.0, 1.05, 0.0), Vector3.UP)
 	capture_camera.make_current()
 	await _capture("09b_pen_scale_at_the_fence")
+
+
+## THE SHOTS THE PLAYTEST ASKED FOR: the core loop, through the player's own camera, with
+## the real HUD over it. Everything above this point photographs the PLACE; nothing in the
+## project photographed the MECHANIC in the place, and every one of the owner's five
+## complaints was about how the mechanic feels rather than about how the ranch looks.
+##
+## Screenshot-pass only (this whole function is downstream of the headless quit), and
+## deliberately so: it moves the player about and takes a pony out of the world, which is
+## exactly what a gate must not do to the state its own checks were computed from. Every
+## check in _report() has already run and printed by the time this is reached.
+##
+## Numbers are printed beside each shot for the same reason wild_ponies.gd prints them:
+## a picture of a beam and a printed hold time that disagree is the paper-correct-but-
+## visually-wrong bug the whole capture pass exists to catch.
+func _capture_the_mechanic() -> void:
+	var beam: Node3D = player.get_magic_beam()
+	if beam == null:
+		return
+
+	# 06 -- a SHY pony noticing the player from beyond the beam's reach, and bolting. The
+	# whole of the headline fix, in one frame: he is not close enough to take her, and she
+	# is already leaving.
+	var shy := _find_pony_by_personality(PonyDataScript.Personality.SHY)
+	if shy != null:
+		var reach: float = beam.REACH
+		# Stood at the midpoint of the warning band -- outside REACH, inside detection.
+		var stand_off: float = (reach + PonyScript.DETECTION_RADIUS) * 0.5
+		await _stand_player_near(shy, stand_off)
+		await _aim_rig_at(shy.global_position + Vector3(0.0, 0.65, 0.0))
+		for i in range(18):
+			await get_tree().physics_frame
+		# Re-aimed after the wait: she has been running the whole time, and a shot of the
+		# grass she left is not a shot of a pony fleeing.
+		await _aim_rig_at(shy.global_position + Vector3(0.0, 0.65, 0.0))
+		var gap: float = _ground_gap(player.global_position, shy.global_position)
+		print("RANCH mechanic flee pony=%s state=%s gap=%.2f reach=%.2f detection=%.2f speed=%.2f"
+			% [shy.name, PonyScript.state_name(shy.state), gap, reach,
+				PonyScript.DETECTION_RADIUS, shy.get_ground_speed()])
+		_rig.get_camera().make_current()
+		await _capture("06_she_bolts_before_you_are_in_range")
+
+	# The beam shots want a pony who holds still while she is photographed, which on this
+	# roster means a BOLD one -- she has no reaction to the player at all, so the framing
+	# is not racing her state machine. Falls back to whoever is left.
+	var target := _find_pony_by_personality(PonyDataScript.Personality.BOLD)
+	if target == null:
+		var live: Array[CharacterBody3D] = spawner.get_spawned()
+		target = live[0] if not live.is_empty() else null
+	if target == null:
+		return
+
+	# 07 -- the beam sweeping empty ground at full stretch: the arc, and the ring lying on
+	# the grass under where it runs out. This is the shot for "hard to gauge distance of
+	# beam" -- the ring is on a surface the eye is already reading perspective off, and it
+	# is drawn even when the beam has hit nothing, so sweeping for range is something the
+	# player can DO rather than guess at. Aimed 15 degrees off the pony so nothing gets
+	# grabbed and the beam stays empty.
+	await _stand_player_near(target, beam.REACH - 0.6)
+	var aside := (target.global_position - player.global_position).rotated(Vector3.UP, deg_to_rad(28.0))
+	await _aim_rig_at(player.global_position + aside + Vector3(0.0, 0.4, 0.0))
+	beam.grab()
+	for i in range(8):
+		await get_tree().physics_frame
+	print("RANCH mechanic sweep holding=%s has_target=%s has_mark=%s mark=(%.1f, %.2f, %.1f) gap=%.2f"
+		% [beam.is_holding(), beam.has_target(), beam.has_mark(),
+			beam.get_mark_point().x, beam.get_mark_point().y, beam.get_mark_point().z,
+			_ground_gap(player.global_position, beam.get_mark_point())])
+	_rig.get_camera().make_current()
+	await _capture("07a_beam_landing_ring_at_range")
+	beam.release()
+	for i in range(int(beam.ESCAPE_COOLDOWN * 60.0) + 4):
+		await get_tree().physics_frame
+
+	# 07b -- the same distance, aimed AT her, beam off: the reticle alone says she is in
+	# range, before the button is pressed.
+	await _aim_rig_at(target.global_position + Vector3(0.0, 0.65, 0.0))
+	print("RANCH mechanic in_range pony=%s gap=%.2f has_target=%s (beam still OFF)"
+		% [target.name, _ground_gap(player.global_position, target.global_position),
+			beam.has_target()])
+	_rig.get_camera().make_current()
+	await _capture("07b_in_range_before_pressing")
+
+	# 07c -- the fumbled catch, and the one state in which the LOCKED landing ring is
+	# visible at all. Aiming the beam at a pony in range takes her on the same frame, so
+	# "beam on, target in range, nothing held" only exists during the post-slip cooldown --
+	# which is exactly the moment the player is re-lining up a catch they just dropped, and
+	# so exactly the moment the ring is worth having. Also gets the toast that teaches the
+	# mistake ("she slipped out") into a frame.
+	beam.grab()
+	for i in range(3):
+		await get_tree().physics_frame
+	beam.release()
+	for i in range(10):
+		await get_tree().physics_frame
+	await _aim_rig_at(target.global_position + Vector3(0.0, 0.65, 0.0))
+	beam.grab()
+	for i in range(4):
+		await get_tree().physics_frame
+	print("RANCH mechanic cooling loss=%s holding=%s has_target=%s has_mark=%s"
+		% [beam.get_last_loss(), beam.is_holding(), beam.has_target(), beam.has_mark()])
+	await _capture("07c_locked_on_during_the_cooldown")
+	beam.release()
+	for i in range(int(beam.ESCAPE_COOLDOWN * 60.0) + 6):
+		await get_tree().physics_frame
+	await _aim_rig_at(target.global_position + Vector3(0.0, 0.65, 0.0))
+
+	beam.grab()
+	for i in range(6):
+		await get_tree().physics_frame
+	print("RANCH mechanic beam holding=%s secure_progress=%.2f mark=%s"
+		% [beam.is_holding(), beam.get_secure_progress(), beam.has_mark()])
+	await _capture("08_beam_reaching")
+
+	# 09 -- mid-struggle: the outer ring part-drained, the inner secure arc part-filled.
+	# Waited to a FRACTION of the secure time rather than a fixed frame count, so this
+	# stays the mid-struggle shot whatever SECURE_SECONDS becomes.
+	while beam.is_holding() and beam.get_secure_progress() < 0.55:
+		await get_tree().physics_frame
+	print("RANCH mechanic struggle hold=%.2fs secure=%.2fs struggle=%.2fs progress=%.2f secured=%s"
+		% [beam.get_hold_seconds(), beam.get_secure_seconds(), beam.get_struggle_seconds(),
+			beam.get_secure_progress(), beam.is_secured()])
+	await _capture("09_struggle_ring_half_drained")
+
+	# 10 -- secured: let go NOW.
+	while beam.is_holding() and not beam.is_secured():
+		await get_tree().physics_frame
+	print("RANCH mechanic secured hold=%.2fs secured=%s" % [
+		beam.get_hold_seconds(), beam.is_secured()])
+	await _capture("10_secured_let_go_now")
+
+	beam.release()
+	for i in range(4):
+		await get_tree().physics_frame
+	await _capture("11_caught_her")
+
+	player.global_position = player_spawn.global_position
+	player.velocity = Vector3.ZERO
+
+	# 12 -- the whole map from above, for the complaint a close-up cannot answer: "ponies
+	# were only around the perimeter". A herd is a handful of pixels from up here, so the
+	# picture is read alongside the per-pony `RANCH pony ... home=(x, y, z)` table printed
+	# by _report() -- the shot is for judging whether the SPREAD looks like a place with
+	# animals living all over it, and the table is for knowing exactly where they are.
+	var wide := $CaptureCamera as Camera3D
+	wide.global_position = Vector3(6.0, 64.0, 80.0)
+	wide.look_at(Vector3(-2.0, 0.0, -8.0), Vector3.UP)
+	wide.make_current()
+	# The HUD is hidden for this one shot and put back afterwards. It is drawn for the
+	# player, at the player's eye, and over a map shot the hints card covers a whole
+	# quadrant of the thing the picture is of.
+	var hud := $HUD as CanvasLayer
+	var hud_was_visible: bool = hud.visible
+	hud.visible = false
+	await _capture("12_spawn_spread")
+	hud.visible = hud_was_visible
+
+
+## Stand the player `distance` metres from `pony` on the ground, on the side she is
+## currently facing away from, and level the rig at her. Used only by the screenshot pass.
+func _stand_player_near(pony: Node3D, distance: float) -> void:
+	var away := player.global_position - pony.global_position
+	away.y = 0.0
+	if away.length_squared() < 0.01:
+		away = Vector3.FORWARD
+	var stand: Vector3 = pony.global_position + away.normalized() * distance
+	stand.y = terrain.height_at(stand.x, stand.z) + 0.15
+	player.global_position = stand
+	player.velocity = Vector3.ZERO
+	for i in range(CAMERA_SETTLE_FRAMES):
+		await get_tree().physics_frame
+
+
+## Drive the camera rig until get_aim_ray() points at `target`. The same iterative
+## correction scenes/test/capture_test.gd uses, and iterative for the same reason: the
+## camera hangs off a spring arm, so changing the pitch moves the eye the ray starts from.
+func _aim_rig_at(target: Vector3) -> void:
+	for i in range(12):
+		var ray = _rig.get_aim_ray()
+		var want: Vector3 = (target - ray.origin).normalized()
+		var have: Vector3 = ray.direction
+		var yaw_error := wrapf(atan2(-want.x, -want.z) - atan2(-have.x, -have.z), -PI, PI)
+		var pitch_error := asin(clampf(want.y, -1.0, 1.0)) - asin(clampf(have.y, -1.0, 1.0))
+		_rig.add_look_delta(-yaw_error, -pitch_error)
+		await get_tree().physics_frame
+
+
+func _find_pony_by_personality(personality: int) -> CharacterBody3D:
+	for pony: CharacterBody3D in spawner.get_spawned():
+		var data: PonyData = pony.get_data()
+		if data != null and data.personality == personality:
+			return pony
+	return null
+
+
+func _ground_gap(a: Vector3, b: Vector3) -> float:
+	return Vector2(a.x - b.x, a.z - b.z).length()
 
 
 func _capture(shot_name: String) -> void:
