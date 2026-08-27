@@ -398,19 +398,31 @@ func _report(pony_count: int, prop_count: int) -> void:
 			pull_in["opacity"] <= 0.01)
 		_set_check(checks, "the camera pulls in against a building",
 			pull_in["pull_in"] >= MIN_CAMERA_PULL_IN)
-	elif assets_state == "present":
+	else:
 		# The barn and farmhouse are hand-built in building.gd and exist on EVERY
 		# checkout, assetless or not -- they are not gated on assets_state. So a probe
-		# that comes back empty while assets=present means _find_wall_stand_point()'s
-		# raycast found no wall on a map that unquestionably has one: a real regression
-		# (wrong layer, wrong mask, a building that failed to build), not an assetless
-		# checkout with nothing to probe. A silent SKIP here would let exactly that
-		# regression pass as green -- so it is a FAILED check, not a log line.
-		print("RANCH camera check FAILED -- no building found to probe, but assets=present")
-		_set_check(checks, "the camera pulls in against a building", false)
-	else:
-		print("RANCH camera check SKIPPED -- no building on this checkout (assets=%s)"
+		# that comes back empty means _find_wall_stand_point()'s raycast found no wall
+		# on a map that unquestionably has one: a real regression (wrong layer, wrong
+		# mask, a building that failed to build, or -- the case a reviewer actually
+		# caught -- a building's collider disabled outright), not an assetless
+		# checkout with nothing to probe.
+		#
+		# This USED to branch on assets_state: a FAILED check when assets=present, but
+		# only a `print` -- no _set_check() call at all, so the label never entered
+		# `checks` -- when assets was absent or partial. That branch was reasoned to be
+		# unreachable; it is not. It is exactly the path CI runs (assets are always
+		# absent in CI -- see docs/ci.md section 4), so a reviewer disabling both
+		# buildings' colliders sailed straight through: this whole check silently did
+		# not exist for that run, `RANCH_OK ponies=0 props=2 assets=absent` printed,
+		# exit 0. A missing dictionary entry is not visible in the "every check held"
+		# loop below the way `false` is -- so a silent SKIP here is worse than a wrong
+		# answer, it's a gate CI runs that cannot fail this way at all.
+		#
+		# An empty probe is now an unconditional FAILED check, in every assets_state,
+		# with no SKIP path left to fall into.
+		print("RANCH camera check FAILED -- no building found to probe (assets=%s)"
 			% assets_state)
+		_set_check(checks, "the camera pulls in against a building", false)
 
 	# --- verdict -------------------------------------------------------------------
 	# A duplicate label is not a check that failed -- it is a check that never ran. It

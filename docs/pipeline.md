@@ -862,6 +862,29 @@ tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/hair_lag
 # -> HAIRLAG <tip> leaf trails body by +N ticks (+M ms) ...   (one line per chain)
 # -> HAIRLAG_OK leaf_chains=6 moving=6 lagging=6 worst_wobble=0.032   exit 0
 # Add `-- character=rainbowdash` to point it at another pack.
+#
+# WATCHDOG: armed at 120s (GateWatchdogScript.arm, see game/scripts/gate_watchdog.gd).
+# A bad `character=` value used to hang this gate indefinitely -- a reviewer confirmed
+# it twice, rc=124 on an external timeout, no marker printed at all. PonyRig.spawn()
+# returns null for an unknown name rather than hanging itself, but the very next line,
+# `add_child(pony)`, then raises an ordinary GDScript runtime error on that null, which
+# aborts _ready()'s coroutine (including its own eventual quit()) while the engine keeps
+# ticking -- nothing about that looks like an infinite loop from the outside. If this
+# still hangs past ~120s, the watchdog itself is broken; that is now the bug to chase,
+# not "give it more time." A correct run against a bad character now prints
+# `HAIRLAG_FAILED watchdog_timeout=120s` and exits 1 well inside that window instead of
+# hanging.
+#
+# EXPECTED FAILURE, BY DESIGN, ON RAINBOW DASH AND FLUTTERSHY: `-- character=rainbowdash`
+# and `-- character=fluttershy` both print `HAIRLAG_FAIL`, not `HAIRLAG_OK` -- their hair
+# chains are known-failing and explicitly out of scope (see docs/notes-hair-sim.md's
+# verdict section: Rainbow Dash 10/14 leaf chains pass, Fluttershy 1/3). An operator
+# running this gate against either of those characters should expect `HAIRLAG_FAIL` and
+# must not treat it as a regression. (This gate is not part of automated CI at all --
+# see .github/workflows/smoke_run.sh, which only checks the exported build for
+# `RANCH_OK` -- so the character this must pass for is whichever one a task or a
+# reviewer is actually validating; the default with no `character=` argument, Twilight,
+# is the one this project ships as passing.)
 
 # Map-props probe (Task 8, §4): scatters every converted prop plus Twilight
 # on a grass ground plane

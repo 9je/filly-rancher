@@ -38,6 +38,7 @@ extends Node3D
 ## would not actually be a baseline.)
 
 const PonyRigScript := preload("res://scripts/pony_rig.gd")
+const GateWatchdogScript := preload("res://scripts/gate_watchdog.gd")
 
 ## Default subject. Override with `-- character=<name>` to check another pack's chains
 ## are found and behave; the gate itself always runs Twilight.
@@ -136,6 +137,19 @@ var finished := false
 
 
 func _ready() -> void:
+	# This was the one gate with no watchdog, and a reviewer confirmed twice (rc=124,
+	# no marker) that a bad `character=` value hangs it indefinitely. PonyRigScript.spawn()
+	# for a name that resolves to no .glb DOES return -- null, after its own push_error --
+	# but the very next line here, `add_child(pony)`, raises an ordinary GDScript runtime
+	# error on that null ("Parameter p_child is null"). Exactly the class of bug
+	# GateWatchdogScript's doc comment describes: the error aborts THIS coroutine only,
+	# so nothing after it -- including this function's own eventual quit() -- ever runs,
+	# while the engine and its SceneTree keep right on ticking. Nothing about that looks
+	# like an infinite loop, so the process just sits there until something external
+	# kills it. Armed first, before the call that can raise, for the same reason every
+	# other gate arms it first.
+	GateWatchdogScript.arm(self, "HAIRLAG", 120)
+
 	var character := CHARACTER
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("character="):

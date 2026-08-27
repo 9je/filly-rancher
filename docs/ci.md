@@ -286,11 +286,12 @@ CLI:
 gh run download <run-id> -n filly-rancher-windows -D ./win-build
 ```
 
-Then, on Windows: unzip, and keep `filly-rancher-windows.exe` and
-`filly-rancher-windows.pck` **in the same folder** — the engine finds its data pack
-by executable name, and the `.exe` alone will not start. Same rule on Linux for
-`filly-rancher-linux.x86_64` + `.pck` (plus `chmod +x`, since zip archives don't
-carry the execute bit).
+Then, on Windows: unzip and run `filly-rancher-windows.exe` — that's the whole
+build, one file. Both export presets set `binary_format/embed_pck=true` (see
+`docs/distribution.md` §2), so the `.pck` is embedded directly in the
+executable; there is no sibling `.pck` to keep alongside it any more. Same on
+Linux: unzip `filly-rancher-linux.x86_64` and run it (plus `chmod +x`, since
+zip archives don't carry the execute bit) — no `.pck` there either.
 
 Note that the repo is private, so downloading artifacts requires a GitHub account
 with access to it.
