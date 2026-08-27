@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="FoodData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/food_data.gd" id="1_daf01"]
+
+[resource]
+script = ExtResource("1_daf01")
+id = &"daffodil"
+display_name = "Daffodil"
+grow_seconds = 120.0
+seed_cost = 8
