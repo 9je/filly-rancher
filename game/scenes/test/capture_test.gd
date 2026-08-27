@@ -6,12 +6,25 @@ extends Node3D
 ## pony at a time at a KNOWN spot, and a crate. Seven phases, each of which is a separate
 ## claim about the mechanic and each of which is failed by a different bug:
 ##
-##   WARNING  the invariant the first playtest was lost to. A pony's DetectionArea must
-##            out-reach the beam, so she is already running before she can be taken --
-##            checked as arithmetic (Pony.DETECTION_RADIUS >= MagicBeam.REACH +
-##            MIN_DETECTION_MARGIN) AND behaviourally, with a SHY pony stood BEYOND the
-##            beam's reach who must bolt anyway, and a BOLD one stood at the same distance
-##            whom the beam, aimed straight at her, must fail to pick up.
+##   WARNING  the invariant the first playtest was lost to, plus the one sanctioned way
+##            round it that the second playtest added. A pony must out-see the beam
+##            against a RUNNING player, so she is already going before she can be taken --
+##            checked as arithmetic (Pony.notice_radius_for(p, false) >= MagicBeam.REACH +
+##            MIN_DETECTION_MARGIN, over every personality) AND behaviourally, with a SHY
+##            pony stood BEYOND the beam's reach who must bolt anyway, and a BOLD one
+##            stood at the same distance whom the beam, aimed straight at her, must fail
+##            to pick up. Then the sneak: the notice distance is MEASURED, by walking the
+##            real player in from 20 m in 0.25 m steps and recording the gap at which she
+##            actually bolts, once creeping and once running. Two numbers that must differ
+##            by half, from the same pony, on the same ground.
+##   CONTEST  what a capture is now WORTH, per personality, measured rather than asserted
+##            from constants. For each of SHY / CURIOUS / BOLD: hold on and let her win,
+##            timing when the beam secured her and when she broke free (that difference IS
+##            her window); then take a fresh one and let go on the green ring, which must
+##            store her. The second playtest inverted which personality is hard to hold --
+##            SHY freezes, BOLD fights -- so the MEASURED windows are checked for that
+##            ordering too, and an accidental re-inversion fails here as well as in the
+##            unit tests.
 ##   GRAB     aim the rig at the pony through the same get_aim_ray() the beam uses, switch
 ##            the beam on, and check she enters HELD and is REELED IN -- her distance to
 ##            the hold point must collapse, not merely be small at the end (a beam that
@@ -25,11 +38,6 @@ extends Node3D
 ##            with Loss.SLIPPED, and left alive in the world. This is the check with the
 ##            teeth for the fix to "catching is really quick": on the old build, where
 ##            release() stored whatever it was holding, this phase fails outright.
-##   ESCAPE   hold a SHY pony past her struggle time: escaped() must fire, she must be
-##            out of HELD, and she must still be ALIVE and in the world. The elapsed time
-##            is checked against MagicBeam.STRUGGLE_SHY with a window narrow enough that
-##            handing a SHY pony BOLD's 4.0 s instead would fail it -- otherwise the
-##            per-personality tuning would be a number no gate reads.
 ##   FULL     fill the bag, then hold and release another pony: store() must refuse, the
 ##            count must NOT grow, and she must still be in the world. NO PONY EVER DIES
 ##            is a project-wide rule and this is the branch where a careless
@@ -62,7 +70,13 @@ extends Node3D
 ##   * The full-bag check asserts a NON-event (the count did not grow) plus a live pony
 ##     afterwards; a store() that returned false after already appending fails the first,
 ##     and a beam that deleted the refused pony fails the second.
-##   * The escape window is narrow enough to fail on the wrong personality's number.
+##   * The CONTEST phase's escape windows are narrow enough to fail on the wrong
+##     personality's number -- swapping any two struggle times fails it -- and the phase
+##     additionally checks the MEASURED windows against each other, so a build where every
+##     individual number looked plausible but the ordering had flipped still goes red.
+##   * The sneak is measured as a DISTANCE, not asserted from the constant it is computed
+##     from: a build that read Pony.SNEAK_NOTICE_FACTOR but never asked the player whether
+##     he was sneaking would still print two identical numbers here.
 ##   * The SECURE checks are two-sided. "The reel finishing is not by itself a capture"
 ##     goes red if SECURE_SECONDS is removed, zeroed, or set under the pull-in; "holding
 ##     her long enough secures her" goes red if it is set impossibly high. A one-sided
@@ -101,6 +115,7 @@ const PonyScript := preload("res://actors/pony/pony.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 const MagicBeamScript := preload("res://actors/player/magic_beam.gd")
+const PlayerScript := preload("res://actors/player/player.gd")
 const GateWatchdogScript := preload("res://scripts/gate_watchdog.gd")
 
 ## Physics frames to let the player settle onto the ground and the spring arm's collision
@@ -172,13 +187,42 @@ const PONY_SPOT := Vector3(1.5, 0.0, -6.0)
 ## never freed -- the phase that cares has already asserted she is alive.
 const PARK_SPOT := Vector3(0.0, 0.0, -40.0)
 
-## Longest a struggle phase will wait before giving up, in seconds.
-const STRUGGLE_TIMEOUT := 3.5
+## Seconds of slack on top of a personality's own struggle time before a contest gives up
+## waiting for her to break free. DERIVED PER PERSONALITY at the call site rather than
+## typed as one number: the struggle times now span 2.3 s to 4.6 s, and a single typed
+## timeout sized for the short one would report a hang for the long one on a build that was
+## behaving perfectly. (It was 3.5 s, and STRUGGLE_SHY passing it is exactly the trap.)
+const STRUGGLE_SLACK := 1.5
 
-## Acceptance window around MagicBeam.STRUGGLE_SHY for the escape, in seconds. Wide enough
-## for frame quantisation and the screenshot pauses, narrow enough that CURIOUS's 2.5 s or
-## BOLD's 4.0 s would fail it.
+## Acceptance window around a personality's struggle time, in seconds. Wide enough for
+## frame quantisation, narrow enough that handing a pony a NEIGHBOURING personality's
+## number would fail it -- the closest pair is BOLD's 2.30 and CURIOUS's 3.00, 0.7 s apart.
 const STRUGGLE_WINDOW := 0.4
+
+## Acceptance window around MagicBeam.SECURE_SECONDS for the moment the beam reports the
+## hold secured. Tighter than the struggle window because there is only one number to hit
+## and every personality shares it.
+const SECURE_WINDOW := 0.25
+
+## ...and around the window a personality's two clocks are supposed to leave between them.
+## Both endpoints are timed off the same clock in the same loop, so the error here is
+## quantisation only.
+const WINDOW_TOLERANCE := 0.2
+
+## The sneak measurement: where the pony stands (metres in front of the player, comfortably
+## past the widest notice radius there is), how big a step the player takes toward her, and
+## how many physics frames he stands still after each one before her state is read.
+##
+## 0.25 m is the resolution of the answer, and it has to be finer than the tolerance the
+## result is checked against (SNEAK_MEASURE_TOLERANCE) or the measurement could not fail.
+## Two frames per step because a pony reacts on the first physics frame her detection area
+## reports him -- the second is slack, not a tolerance.
+const SNEAK_MEASURE_START := 20.0
+const SNEAK_MEASURE_STEP := 0.25
+const SNEAK_MEASURE_SETTLE := 2
+## How far the measured notice distance may sit from Pony.notice_radius_for()'s answer.
+## One step of the walk-in, plus the pony's own drift while she is being approached.
+const SNEAK_MEASURE_TOLERANCE := 0.6
 
 @onready var player: Node3D = $Player
 @onready var crate: RigidBody3D = $Crate
@@ -195,7 +239,12 @@ var _shot_index := 0
 
 
 func _ready() -> void:
-	GateWatchdogScript.arm(self, "CAPTURE", 60.0)
+	# 60 -> 90 s with the CONTEST phase. That phase spends real seconds on purpose: it lets
+	# each personality run her struggle timer out (up to MagicBeam.STRUGGLE_SHY, 4.6 s) and
+	# then waits out an ESCAPE_COOLDOWN before the second attempt, six times over. Measured
+	# runtime is ~35 s headless, so this is still a hang guard with well over the run's own
+	# length in slack, not a budget the gate is up against.
+	GateWatchdogScript.arm(self, "CAPTURE", 90.0)
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--screenshot-dir="):
 			_screenshot_dir = arg.split("=")[1]
@@ -224,15 +273,17 @@ func _ready() -> void:
 		_beam.get_beam_anchor() == player.get_beam_origin()
 		and _beam.get_beam_anchor().global_position.y > 1.5)
 	# The personality rule, asserted here as well as in game/test/test_magic_beam.gd, so a
-	# reader of this gate's output can see the numbers the ESCAPE phase is checked against.
-	_record("a shy pony struggles sooner than a bold one",
-		MagicBeamScript.struggle_seconds_for(PonyDataScript.Personality.SHY)
-		< MagicBeamScript.struggle_seconds_for(PonyDataScript.Personality.BOLD))
+	# reader of this gate's output can see the numbers the CONTEST phase is checked against.
+	# INVERTED BY THE SECOND PLAYTEST: the BOLD pony is the one who fights now, and the SHY
+	# one freezes. See the STRUGGLE_* block in magic_beam.gd.
+	_record("a bold pony struggles sooner than a shy one",
+		MagicBeamScript.struggle_seconds_for(PonyDataScript.Personality.BOLD)
+		< MagicBeamScript.struggle_seconds_for(PonyDataScript.Personality.SHY))
 
 	await _phase_warning()
 	await _phase_grab_and_capture()
 	await _phase_slip()
-	await _phase_escape()
+	await _phase_contest()
 	await _phase_full_storage()
 	await _phase_prop()
 	await _phase_teardown()
@@ -259,16 +310,49 @@ func _ready() -> void:
 ## alone would pass on a build where DetectionArea had stopped detecting; the behavioural
 ## checks alone would pass on a build where the radii had crept back together.
 func _phase_warning() -> void:
-	var detection: float = PonyScript.DETECTION_RADIUS
-	var margin: float = detection - MagicBeamScript.REACH
-	print("CAPTURE warning detection=%.2f reach=%.2f margin=%.2f required=%.2f spot=%.2f" % [
-		detection, MagicBeamScript.REACH, margin,
-		MagicBeamScript.MIN_DETECTION_MARGIN, OUT_OF_REACH_DISTANCE])
-	_record("a pony notices the player from further out than the beam can reach her",
-		margin >= MagicBeamScript.MIN_DETECTION_MARGIN)
+	# The arithmetic, over EVERY personality rather than over one shared constant: since
+	# the second playtest a SHY pony notices from further out than the others
+	# (Pony.SHY_NOTICE_BONUS), so "the base radius clears the beam" would stop being the
+	# same claim as "every pony clears the beam" the moment a future personality took a
+	# bonus the other way.
+	var worst := INF
+	for personality in PonyDataScript.Personality.values():
+		var radius: float = PonyScript.notice_radius_for(personality, false)
+		var margin: float = radius - MagicBeamScript.REACH
+		worst = minf(worst, margin)
+		print("CAPTURE warning personality=%s notice_running=%.2f notice_sneaking=%.2f reach=%.2f margin=%.2f required=%.2f" % [
+			PonyDataScript.Personality.keys()[personality], radius,
+			PonyScript.notice_radius_for(personality, true), MagicBeamScript.REACH,
+			margin, MagicBeamScript.MIN_DETECTION_MARGIN])
+	print("CAPTURE warning worst_margin=%.2f required=%.2f spot=%.2f" % [
+		worst, MagicBeamScript.MIN_DETECTION_MARGIN, OUT_OF_REACH_DISTANCE])
+	_record("every pony notices a RUNNING player from further out than the beam reaches",
+		worst >= MagicBeamScript.MIN_DETECTION_MARGIN)
+	# ...and the sneak is allowed to break exactly that, which is the whole of what it buys.
+	# Asserted rather than merely permitted: a sneak that left the notice radius outside the
+	# beam's reach would be a stealth option with nothing at the end of it.
+	var sneak_worst := -INF
+	for personality in PonyDataScript.Personality.values():
+		sneak_worst = maxf(sneak_worst, PonyScript.notice_radius_for(personality, true))
+	_record("...and sneaking brings every one of them inside it", sneak_worst < MagicBeamScript.REACH)
 
 	# She reacts, so her DetectionArea is left ON -- this is the one phase that is about it.
+	# The SAME pony answers both halves: creeping at OUT_OF_REACH_DISTANCE must not spook
+	# her, and running at the identical spot must. Two points on one pony, so neither
+	# verdict can be an artefact of where she happened to be standing.
+	Input.action_press(PlayerScript.SNEAK_ACTION)
 	var shy := _spawn_pony(&"fluttershy", OUT_OF_REACH_SPOT, true)
+	await _frames(REACT_FRAMES)
+	var sneak_gap: float = shy.global_position.distance_to(player.global_position)
+	var sneak_state: int = shy.state
+	print("CAPTURE warning sneaking=%s shy_state=%s distance=%.2f notice_sneaking=%.2f" % [
+		player.is_sneaking(), PonyScript.state_name(sneak_state), sneak_gap,
+		PonyScript.notice_radius_for(PonyDataScript.Personality.SHY, true)])
+	_record("the player really is sneaking for that half of the check", player.is_sneaking())
+	_record("a creeping player can stand past the beam's reach without spooking her",
+		sneak_state != PonyScript.State.FLEE)
+
+	Input.action_release(PlayerScript.SNEAK_ACTION)
 	var bolted := false
 	for i in range(REACT_FRAMES):
 		await get_tree().physics_frame
@@ -278,8 +362,11 @@ func _phase_warning() -> void:
 	print("CAPTURE warning shy_state=%s distance=%.2f bolted=%s" % [
 		PonyScript.state_name(shy.state),
 		shy.global_position.distance_to(player.global_position), bolted])
-	_record("a shy pony beyond the beam's reach bolts anyway", bolted)
+	_record("a shy pony beyond the beam's reach bolts at a RUNNING player anyway", bolted)
 	_park(shy)
+	await _frames(4)
+
+	await _measure_the_sneak()
 
 	# PARKING HER IS NOT INSTANT AS FAR AS THE PHYSICS SERVER IS CONCERNED, and the next
 	# pony goes on the exact same spot. Without these frames she is still occupying it when
@@ -313,7 +400,83 @@ func _phase_warning() -> void:
 	await _frames(int(MagicBeamScript.ESCAPE_COOLDOWN * 60.0) + 6)
 
 
-## GRAB + CAPTURE. A BOLD pony (rainbowdash: 4.0 s struggle, no reaction to the player, so
+## THE SNEAK, AS A MEASURED DISTANCE. Everything above is a pair of yes/no answers at one
+## chosen spot; this walks the real player in from SNEAK_MEASURE_START in
+## SNEAK_MEASURE_STEP increments and records the gap at which a SHY pony actually enters
+## FLEE, once creeping and once running. Two numbers off the same behaviour, on the same
+## ground, with nothing between them but what is_sneaking() answers.
+##
+## WHY MEASURE RATHER THAN ASSERT THE CONSTANT. Pony.notice_radius_for() is a pure function
+## and its arithmetic is already pinned by unit tests; what no unit test can see is whether
+## the running game ever ASKS it about the player's gait. A build that computed the sneaking
+## radius perfectly and then never consulted it would pass every arithmetic check in the
+## project and print two identical distances here.
+func _measure_the_sneak() -> void:
+	var home: Vector3 = player.global_position
+	var measured := {}
+	for sneaking in [true, false]:
+		measured[sneaking] = await _notice_distance_for(sneaking)
+	player.global_position = home
+	Input.action_release(PlayerScript.SNEAK_ACTION)
+	await _frames(SETTLE_FRAMES)
+
+	var creeping: float = measured[true]
+	var running: float = measured[false]
+	var want_creeping: float = PonyScript.notice_radius_for(PonyDataScript.Personality.SHY, true)
+	var want_running: float = PonyScript.notice_radius_for(PonyDataScript.Personality.SHY, false)
+	print("CAPTURE sneak measured_running=%.2f expected=%.2f measured_creeping=%.2f expected=%.2f reduction=%.2f reach=%.2f" % [
+		running, want_running, creeping, want_creeping, running - creeping,
+		MagicBeamScript.REACH])
+
+	_record("a running player is noticed at the distance the rule says he is",
+		absf(running - want_running) <= SNEAK_MEASURE_TOLERANCE)
+	_record("a creeping player is noticed at the distance the rule says he is",
+		absf(creeping - want_creeping) <= SNEAK_MEASURE_TOLERANCE)
+	_record("creeping measurably shortens the range a pony notices you at",
+		creeping < running - 1.0)
+	# The payoff, measured rather than argued: creeping gets the player inside beam range
+	# of a pony who has not reacted to him at all. This is the one check that says the
+	# stealth option is worth using.
+	_record("...far enough that a creeping player is inside beam range before she reacts",
+		creeping < MagicBeamScript.REACH)
+
+
+## Walk the player toward a stationary SHY pony until she bolts, and return the gap at
+## which she did (or 0.0 if she never did). The pony is spawned with her routine pinned so
+## she stays put, and the gap is read from the two live positions rather than from how far
+## the player has walked -- so any drift she does have is accounted for rather than assumed
+## away.
+func _notice_distance_for(sneaking: bool) -> float:
+	var home: Vector3 = player.global_position
+	if sneaking:
+		Input.action_press(PlayerScript.SNEAK_ACTION)
+	else:
+		Input.action_release(PlayerScript.SNEAK_ACTION)
+
+	var spot := Vector3(0.0, 0.0, -SNEAK_MEASURE_START)
+	player.global_position = home
+	var pony := _spawn_pony(&"fluttershy", spot, true)
+	# reacts=true leaves her routine free, which would have her ambling about mid-measurement.
+	# Pinning the roam radius keeps every wander target on her own feet, the same trick
+	# _spawn_pony uses for its non-reacting ponies and for the same reason.
+	pony.roam_radius = 0.0
+	await _frames(SETTLE_FRAMES)
+
+	var found := 0.0
+	var steps := int(SNEAK_MEASURE_START / SNEAK_MEASURE_STEP)
+	for i in range(steps):
+		player.global_position = home + Vector3(0.0, 0.0, -SNEAK_MEASURE_STEP * float(i))
+		await _frames(SNEAK_MEASURE_SETTLE)
+		if pony.state == PonyScript.State.FLEE:
+			found = pony.global_position.distance_to(player.global_position)
+			break
+	_park(pony)
+	player.global_position = home
+	await _frames(4)
+	return found
+
+
+## GRAB + CAPTURE. A BOLD pony (rainbowdash: 2.3 s struggle, no reaction to the player, so
 ## nothing in this phase is racing her state machine) is aimed at, grabbed, reeled in,
 ## held until the beam has SECURED her, then released into an empty bag.
 func _phase_grab_and_capture() -> void:
@@ -433,54 +596,153 @@ func _phase_slip() -> void:
 		_park(pony)
 
 	# A slip cools the beam down exactly like a lost struggle does, so the next phase has
-	# to wait it out -- see the note at the end of _phase_escape().
+	# to wait it out -- see the note in the middle of _contest_one().
 	await _frames(int(MagicBeamScript.ESCAPE_COOLDOWN * 60.0) + 6)
 
 
-## ESCAPE. A SHY pony held past her struggle time wins and is handed back, alive.
-func _phase_escape() -> void:
-	var pony := _spawn_pony(&"fluttershy", PONY_SPOT)
-	var expected: float = MagicBeamScript.struggle_seconds_for(pony.get_data().personality)
+## CONTEST. What a capture actually costs, per personality, MEASURED.
+##
+## THIS IS THE PHASE THE SECOND PLAYTEST ASKED FOR. The owner's report was "Fluttershy
+## always breaks out -- impossible to catch", against a build whose constants all looked
+## reasonable and whose gate was green: nothing anywhere drove a capture against each
+## personality and reported whether it could be won. So this does, twice for each of them:
+##
+##   1. Hold on and let her win. The loop times when the beam reported her SECURED and when
+##      she broke free; the difference between those two IS the window the player gets, and
+##      it is read off the running game rather than subtracted from two constants.
+##   2. Take a fresh one and let go on the green ring. She must go in the bag.
+##
+## Together those are "you can lose this" and "you can win this", which are the two things
+## a difficulty number is claiming and neither of which a constant can demonstrate.
+##
+## The measured windows are then checked AGAINST EACH OTHER for the ordering the second
+## playtest inverted (BOLD is now the tight hold and SHY the comfortable one). Swapping two
+## struggle times, or flipping the whole ordering back, fails that check even though every
+## individual number would still look perfectly plausible on its own.
+func _phase_contest() -> void:
+	var windows := {}
+	for id in [&"fluttershy", &"twilight", &"rainbowdash"]:
+		var personality: int = await _contest_one(id)
+		windows[personality] = id
+	await _check_the_window_ordering(windows)
+
+
+## One personality, both directions. Returns her personality value.
+func _contest_one(id: StringName) -> int:
+	var pony := _spawn_pony(id, PONY_SPOT)
+	var personality: int = pony.get_data().personality
+	var who: String = PonyDataScript.Personality.keys()[personality]
+	var struggle: float = MagicBeamScript.struggle_seconds_for(personality)
+	var promised: float = MagicBeamScript.capture_window_for(personality)
+	var label := who.to_lower()
+
+	# --- she wins -------------------------------------------------------------------
 	var escaped_reported := [false]
 	pony.escaped.connect(func() -> void: escaped_reported[0] = true)
-
-	await _aim_at_pony(pony, "escape")
+	await _aim_at_pony(pony, "%s contest" % label)
 	_beam.grab()
 	var acquired := await _wait_until_holding()
-	_record("a shy pony can be picked up at all", acquired)
-
-	var start := Time.get_ticks_msec()
-	var held_for := 0.0
-	for i in range(int(STRUGGLE_TIMEOUT * 60.0)):
-		await get_tree().physics_frame
-		if not _beam.is_holding():
-			held_for = float(Time.get_ticks_msec() - start) / 1000.0
-			break
+	_record("%s: the beam picks her up" % who, acquired)
 
 	var count_before: int = _storage.count()
-	print("CAPTURE struggle personality=SHY expected=%.2fs actual=%.2fs escaped_signal=%s state=%s" % [
-		expected, held_for, escaped_reported[0], PonyScript.state_name(pony.state)])
+	# TIMED IN PHYSICS FRAMES, NOT ON THE WALL CLOCK, and that is a bug fix rather than a
+	# style choice. Both of the beam's clocks accumulate the PHYSICS delta
+	# (MagicBeam._run_struggle), so a physics-frame count is the same clock they run on and
+	# is exact. Time.get_ticks_msec() is not: this gate is also run OFFSCREEN under llvmpipe
+	# (see the header), where rendering cannot hold 60 fps, physics falls behind real time,
+	# and a 4.60 s struggle measures as 6.21 s of wall clock. Measured -- the first draft of
+	# this phase used the wall clock, passed headless, and went red on every timing check the
+	# moment it was rendered, which is a gate reporting the renderer's frame rate rather than
+	# the mechanic. (The ESCAPE phase this replaced had the same flaw, on a wider window.)
+	var frames := 0
+	var tick := 1.0 / float(Engine.physics_ticks_per_second)
+	var secured_at := -1.0
+	var freed_at := -1.0
+	for i in range(int((struggle + STRUGGLE_SLACK) / tick)):
+		await get_tree().physics_frame
+		frames += 1
+		var now := float(frames) * tick
+		if secured_at < 0.0 and _beam.is_secured():
+			secured_at = now
+		if not _beam.is_holding():
+			freed_at = now
+			break
+	var measured := -1.0
+	if secured_at >= 0.0 and freed_at >= 0.0:
+		measured = freed_at - secured_at
+	var alive: bool = is_instance_valid(pony) and pony.is_inside_tree()
+	print("CAPTURE contest %s outcome=%s secured_at=%.2fs (needs %.2f) broke_free_at=%.2fs (struggle %.2f) window=%.2fs (promised %.2f)" % [
+		who, "BROKE_FREE" if freed_at >= 0.0 else "STILL_HELD", secured_at,
+		MagicBeamScript.SECURE_SECONDS, freed_at, struggle, measured, promised])
 
-	_record("a held pony eventually wins her struggle", held_for > 0.0)
-	_record("...on her own personality's clock, not another's",
-		absf(held_for - expected) <= STRUGGLE_WINDOW)
-	_record("...and reports it as escaped()", escaped_reported[0])
-	_record("...and gets her physics back", pony.state != PonyScript.State.HELD)
-	_record("...and is still alive in the world (no pony ever dies)",
-		is_instance_valid(pony) and pony.is_inside_tree())
-	_record("an escaped pony is not in the bag", _storage.count() == count_before)
-
-	await _shot("04_struggle_escape")
-
+	_record("%s: the beam secures her" % who, secured_at >= 0.0)
+	_record("%s: ...on the same secure clock as everyone else" % who,
+		secured_at >= 0.0
+		and absf(secured_at - MagicBeamScript.SECURE_SECONDS) <= SECURE_WINDOW)
+	_record("%s: ...and she wins if you keep holding" % who, freed_at >= 0.0)
+	_record("%s: ...on her own personality's clock, not another's" % who,
+		freed_at >= 0.0 and absf(freed_at - struggle) <= STRUGGLE_WINDOW)
+	_record("%s: ...leaving the window her personality promises" % who,
+		measured >= 0.0 and absf(measured - promised) <= WINDOW_TOLERANCE)
+	_record("%s: ...reported as escaped()" % who, escaped_reported[0])
+	_record("%s: ...alive and steering herself again (no pony ever dies)" % who,
+		alive and pony.state != PonyScript.State.HELD)
+	_record("%s: ...and not in the bag" % who, _storage.count() == count_before)
 	# The beam refuses to re-acquire for ESCAPE_COOLDOWN, so an escape means something.
-	_record("the beam does not instantly re-grab an escapee", not _beam.is_holding())
+	_record("%s: ...and the beam does not instantly re-grab her" % who, not _beam.is_holding())
+
 	_beam.release()
 	_park(pony)
-
 	# ...and that refusal is deliberately NOT cleared by letting go of the button, or
-	# tapping it again would undo every escape. So the next phase has to wait it out --
-	# it does not, and the FULL phase's grab silently failed the first time this gate ran.
+	# tapping it again would undo every escape. So the win half has to wait it out.
 	await _frames(int(MagicBeamScript.ESCAPE_COOLDOWN * 60.0) + 6)
+
+	# --- the player wins ------------------------------------------------------------
+	var fresh := _spawn_pony(id, PONY_SPOT)
+	var before: int = _storage.count()
+	var ghost: WeakRef = weakref(fresh)
+	await _aim_at_pony(fresh, "%s capture" % label)
+	_beam.grab()
+	acquired = await _wait_until_holding()
+	_record("%s: a second one can be picked up too" % who, acquired)
+	var secured := await _wait_until_secured()
+	var held_for: float = _beam.get_hold_seconds()
+	_beam.release()
+	await _frames(3)
+	print("CAPTURE contest %s outcome=%s held=%.2fs window=%.2fs stored=%d/%d freed=%s" % [
+		who, "SECURED" if _storage.count() > before else "LOST", held_for, promised,
+		_storage.count(), _storage.capacity, ghost.get_ref() == null])
+
+	_record("%s: holding to the green ring secures her" % who, secured)
+	_record("%s: ...well inside the window her struggle allows" % who,
+		held_for < struggle - 0.05)
+	_record("%s: ...and letting go there stores her" % who, _storage.count() == before + 1)
+	_record("%s: ...and her node leaves the world" % who, ghost.get_ref() == null)
+
+	await _frames(4)
+	return personality
+
+
+## The measured windows, ordered against each other. See the phase comment: this is the
+## check an accidental re-inversion of the second playtest's design decision fails.
+func _check_the_window_ordering(windows: Dictionary) -> void:
+	var shy: float = MagicBeamScript.capture_window_for(PonyDataScript.Personality.SHY)
+	var curious: float = MagicBeamScript.capture_window_for(PonyDataScript.Personality.CURIOUS)
+	var bold: float = MagicBeamScript.capture_window_for(PonyDataScript.Personality.BOLD)
+	print("CAPTURE contest ordering measured_personalities=%d bold=%.2fs curious=%.2fs shy=%.2fs" % [
+		windows.size(), bold, curious, shy])
+	_record("all three personalities were actually contested",
+		windows.size() == PonyDataScript.Personality.size())
+	_record("a BOLD pony is the tightest hold and a SHY one the most comfortable",
+		bold < curious and curious < shy)
+	_record("...and she is the harder one to REACH in exchange",
+		PonyScript.notice_radius_for(PonyDataScript.Personality.SHY, false)
+		> PonyScript.notice_radius_for(PonyDataScript.Personality.BOLD, false))
+	# NO SCREENSHOT HERE, deliberately. This scene has no HUD, so the two rings the contest
+	# is about are not drawn in it -- the first draft took one and it was a photograph of a
+	# pony standing next to a crate, which is a shot that proves nothing and costs a reader
+	# the trouble of working out that it proves nothing. The struggle ring and the secure arc
+	# are photographed where they actually exist, in game/world/ranch.gd's mechanic pass.
 
 
 ## FULL. With the bag full, a released pony is set down rather than stored -- or lost.

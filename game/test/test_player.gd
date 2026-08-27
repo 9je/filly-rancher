@@ -51,7 +51,7 @@ func before_each() -> void:
 func after_each() -> void:
 	# Input actions are global engine state; a leaked press would corrupt every test
 	# that ran afterwards (and the scene gates, which share the process under GUT).
-	for action in ["move_forward", "move_back", "move_left", "move_right", "jump", "gallop", "beam"]:
+	for action in ["move_forward", "move_back", "move_left", "move_right", "jump", "sneak", "beam"]:
 		Input.action_release(action)
 
 
@@ -65,37 +65,38 @@ func _aim_camera(forward: Vector3) -> void:
 
 ## The two gameplay speeds, checked against what the animation can actually depict.
 ##
-## THE PLAYTEST BOUGHT SPEED WITH FOOT SKATE, ON PURPOSE, AND THIS IS THE RECEIPT. The
-## owner's first session said "move speed a bit slow for my liking"; the walk went up 25%
-## and stayed free (it is still inside the `walk` clip's playback window), and the gallop
-## went up 20% to 4.8 m/s, which is past Gait.TOP_SKATE_FREE_SPEED (4.29 m/s) -- the
-## fastest ground speed any authored clip depicts with the hooves planted. Gait's own
-## perceptibility ladder calls a skate ratio up to ~1.25 imperceptible in motion and 2.0
-## unmistakable moonwalking.
+## THE PLAYTESTS BOUGHT SPEED WITH FOOT SKATE, ON PURPOSE, AND THIS IS THE RECEIPT. The
+## owner's sessions said "move speed a bit slow for my liking" and then "running feels
+## good, maybe a tad too slow still", so the running speed went 4.0 -> 4.8 -> 5.2 m/s,
+## which is past Gait.TOP_SKATE_FREE_SPEED (4.29 m/s) -- the fastest ground speed any
+## authored clip depicts with the hooves planted. Gait's own perceptibility ladder calls a
+## skate ratio up to ~1.25 imperceptible in motion and 2.0 unmistakable moonwalking.
 ##
-## So the assertion is not "there is no skate" any more -- that would be a test asserting
-## a decision that was deliberately reversed. It is that the skate stays inside the BUDGET
-## somebody chose. Somebody nudging GALLOP_SPEED to 6 "because it still feels a bit slow"
-## crosses 1.4 and this goes red, which is the whole point: the budget is the thing worth
-## defending, not the number.
+## So the assertion is not "there is no skate" any more -- that would be a test asserting a
+## decision that was deliberately reversed. It is that the skate stays inside the BUDGET
+## somebody chose, which matters more now than it did: running is the DEFAULT gait since
+## the second playtest, so this skate is what the player sees all the time rather than only
+## while a button is held. Somebody nudging RUN_SPEED to 6 "because it still feels a bit
+## slow" crosses 1.25 and this goes red, which is the whole point: the budget is the thing
+## worth defending, not the number.
 func test_the_two_gameplay_speeds_stay_inside_their_animation_budget() -> void:
-	assert_eq(GaitScript.clip_for_speed(PlayerScript.WALK_SPEED), &"walk",
-		"walking must play the `walk` clip, not hand over to `gallop`")
-	assert_almost_eq(GaitScript.skate_ratio(PlayerScript.WALK_SPEED), 1.0, 0.0001,
-		"the walk speed costs nothing and must stay that way")
+	assert_eq(GaitScript.clip_for_speed(PlayerScript.SNEAK_SPEED), &"walk",
+		"sneaking must play the `walk` clip, not hand over to `gallop`")
+	assert_almost_eq(GaitScript.skate_ratio(PlayerScript.SNEAK_SPEED), 1.0, 0.0001,
+		"the sneak speed costs nothing and must stay that way")
 
-	assert_eq(GaitScript.clip_for_speed(PlayerScript.GALLOP_SPEED), &"gallop",
-		"galloping must play the `gallop` clip")
-	var skate: float = GaitScript.skate_ratio(PlayerScript.GALLOP_SPEED)
+	assert_eq(GaitScript.clip_for_speed(PlayerScript.RUN_SPEED), &"gallop",
+		"running must play the `gallop` clip")
+	var skate: float = GaitScript.skate_ratio(PlayerScript.RUN_SPEED)
 	assert_lte(skate, 1.25,
-		("the gallop's foot skate must stay inside the imperceptible band -- %.3f m/s " +
+		("the run's foot skate must stay inside the imperceptible band -- %.3f m/s " +
 		"against a %.3f m/s ceiling is a ratio of %.3f") % [
-			PlayerScript.GALLOP_SPEED, GaitScript.TOP_SKATE_FREE_SPEED, skate])
-	assert_gt(PlayerScript.GALLOP_SPEED, GaitScript.TOP_SKATE_FREE_SPEED,
+			PlayerScript.RUN_SPEED, GaitScript.TOP_SKATE_FREE_SPEED, skate])
+	assert_gt(PlayerScript.RUN_SPEED, GaitScript.TOP_SKATE_FREE_SPEED,
 		"...and the player must out-run the fastest flee Pony.flee_speed_for() can " +
 		"produce, which that ceiling is exactly what clamps")
-	assert_gt(PlayerScript.GALLOP_SPEED, PlayerScript.WALK_SPEED * 2.0,
-		"the gallop has to be worth holding the button for")
+	assert_gt(PlayerScript.RUN_SPEED, PlayerScript.SNEAK_SPEED * 2.0,
+		"the sneak has to cost enough speed to be a real trade, not a rounding error")
 
 
 func test_all_required_input_actions_exist() -> void:
@@ -106,7 +107,7 @@ func test_all_required_input_actions_exist() -> void:
 func test_every_movement_action_has_a_keyboard_and_a_gamepad_binding() -> void:
 	var expectations := {
 		"move_forward": true, "move_back": true, "move_left": true, "move_right": true,
-		"jump": true, "beam": true, "gallop": true,
+		"jump": true, "beam": true, "sneak": true,
 	}
 	for action in expectations:
 		var has_desktop := false
@@ -164,25 +165,38 @@ func test_strafe_is_relative_to_the_camera_too() -> void:
 	assert_almost_eq(travel.x, 0.0, 0.1, "strafing must not creep forward")
 
 
-func test_gallop_modifier_raises_the_top_speed() -> void:
+func test_the_default_gait_is_the_run_and_sneak_slows_her_down() -> void:
+	# THE SECOND PLAYTEST'S INVERSION, stated as the thing a player's hands actually do:
+	# press a direction and nothing else, and you RUN. This is the test that goes red if
+	# somebody restores the old modifier sense while every constant still looks fine.
 	_aim_camera(Vector3.FORWARD)
 	Input.action_press("move_forward")
 	await wait_physics_frames(RUN_FRAMES)
-	var walk_speed: float = _player.get_ground_speed()
-	Input.action_press("gallop")
+	var default_speed: float = _player.get_ground_speed()
+	assert_false(_player.is_sneaking(), "nothing is held, so she is not sneaking")
+	Input.action_press("sneak")
 	await wait_physics_frames(RUN_FRAMES)
-	var gallop_speed: float = _player.get_ground_speed()
+	var sneak_speed: float = _player.get_ground_speed()
+	assert_true(_player.is_sneaking(), "holding the modifier must report as sneaking")
 	# What the CONTROLLER is asserted to do: reach both commanded speeds and tell them
 	# apart. What those speeds cost in animation terms is asserted once, on the constants,
 	# in test_the_two_gameplay_speeds_stay_inside_their_animation_budget -- this test used
 	# to re-derive the budget here as well ("must stay inside what an authored clip can
 	# depict", "must not skate"), which meant the deliberate playtest decision to spend a
-	# little skate on the gallop had to be argued in two places at once.
-	assert_almost_eq(walk_speed, PlayerScript.WALK_SPEED, 0.01,
-		"walking must settle on exactly WALK_SPEED, not merely somewhere near it")
-	assert_almost_eq(gallop_speed, PlayerScript.GALLOP_SPEED, 0.01,
-		"...and holding `gallop` must settle on exactly GALLOP_SPEED")
-	assert_gt(gallop_speed, walk_speed * 2.0, "gallop must be substantially faster than walk")
+	# little skate had to be argued in two places at once.
+	assert_almost_eq(default_speed, PlayerScript.RUN_SPEED, 0.01,
+		"moving with no modifier held must settle on exactly RUN_SPEED")
+	assert_almost_eq(sneak_speed, PlayerScript.SNEAK_SPEED, 0.01,
+		"...and holding `sneak` must settle on exactly SNEAK_SPEED")
+	assert_lt(sneak_speed, default_speed * 0.5,
+		"the sneak must be substantially SLOWER than the default, not faster")
+
+	# ...and letting go of the modifier hands her back the run, or the stealth option would
+	# be a one-way trip into the slow gait.
+	Input.action_release("sneak")
+	await wait_physics_frames(RUN_FRAMES)
+	assert_almost_eq(_player.get_ground_speed(), PlayerScript.RUN_SPEED, 0.01,
+		"releasing `sneak` must put her back at RUN_SPEED")
 
 
 func test_stands_still_and_stays_on_the_floor_with_no_input() -> void:
@@ -195,43 +209,47 @@ func test_stands_still_and_stays_on_the_floor_with_no_input() -> void:
 	assert_almost_eq(_player.get_ground_speed(), 0.0, 0.001, "no input means no velocity")
 
 
-func test_plays_idle_at_rest_and_walk_when_moving() -> void:
+func test_plays_idle_at_rest_and_walk_when_sneaking() -> void:
+	# `sneak` held, because the walk clip is the SNEAKING gait since the second playtest --
+	# a moving player with nothing held runs, and that path is covered by
+	# test_plays_gallop_by_default_and_drops_to_walk_when_sneaking.
 	_aim_camera(Vector3.FORWARD)
 	var anim: AnimationPlayer = _player.get_animation_player()
 	assert_not_null(anim, "the player's body must build with a reachable AnimationPlayer")
 	await wait_physics_frames(5)
 	assert_eq(anim.current_animation, "idle", "a standing player plays 'idle'")
 
+	Input.action_press("sneak")
 	Input.action_press("move_forward")
 	await wait_physics_frames(RUN_FRAMES)
-	assert_eq(anim.current_animation, "walk", "a moving player plays 'walk'")
+	assert_eq(anim.current_animation, "walk", "a sneaking player plays 'walk'")
 	assert_almost_eq(anim.speed_scale,
 		GaitScript.playback_scale_for_speed(_player.get_ground_speed()), 0.001,
 		"playback must be scaled to ground speed so the gait matches the ground")
 
 
-func test_plays_gallop_above_the_walk_band() -> void:
+func test_plays_gallop_by_default_and_drops_to_walk_when_sneaking() -> void:
 	# The clip choice is Gait's, not this controller's, but the wiring between them is
 	# exactly what a future edit to _update_animation() would break -- so assert the
-	# observable end of it: hold the gallop modifier, get the gallop clip, at the rate
-	# that keeps its hooves planted.
+	# observable end of it: move with nothing held, get the gallop clip, at the rate that
+	# keeps its hooves as planted as 5.2 m/s allows.
 	_aim_camera(Vector3.FORWARD)
 	var anim: AnimationPlayer = _player.get_animation_player()
 	assert_not_null(anim, "the player's body must build with a reachable AnimationPlayer")
 	Input.action_press("move_forward")
-	Input.action_press("gallop")
 	await wait_physics_frames(RUN_FRAMES)
 
 	var speed: float = _player.get_ground_speed()
 	assert_gt(speed, GaitScript.GALLOP_HANDOVER_SPEED,
-		"holding 'gallop' must take her past the speed the walk clip can depict")
+		"the default gait must be past the speed the walk clip can depict")
 	assert_eq(anim.current_animation, "gallop", "above the walk band she plays 'gallop'")
 	assert_almost_eq(anim.speed_scale,
 		GaitScript.gallop_playback_scale_for_speed(speed), 0.001,
 		"gallop playback must be scaled to ground speed too, not left at 1.0")
 
-	# ...and back down again. A one-way handover would leave her galloping on the spot
-	# after the modifier is released, which no headless distance check would notice.
-	Input.action_release("gallop")
+	# ...and down to the walk clip when she creeps. A handover that only worked upwards
+	# would leave her galloping on the spot at 1.32 m/s, which no headless distance check
+	# would notice.
+	Input.action_press("sneak")
 	await wait_physics_frames(RUN_FRAMES)
-	assert_eq(anim.current_animation, "walk", "releasing 'gallop' must drop her to 'walk'")
+	assert_eq(anim.current_animation, "walk", "holding 'sneak' must drop her to 'walk'")

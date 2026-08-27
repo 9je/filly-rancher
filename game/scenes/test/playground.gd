@@ -3,7 +3,7 @@ extends Node3D
 ## `player.tscn` now carries its own third-person `CameraRig`, see below).
 ##
 ## Windowed, this is the scene the owner plays to judge feel -- WASD/left stick to
-## move, Shift/LB to gallop, Space/A to jump, mouse/right-stick to look, scroll/d-pad
+## run, Shift/LB to walk/sneak, Space/A to jump, mouse/right-stick to look, scroll/d-pad
 ## to zoom, Escape to release the mouse, and a low ledge off to the right at x=+5 to
 ## jump onto. The camera is `player.tscn`'s own `CameraRig` (Task 5,
 ## game/actors/player/camera_rig.gd) mounted on `CameraPivot` -- this scene no longer
@@ -16,12 +16,16 @@ extends Node3D
 ## assertion -- a player who fell through the floor, drifted with no input, or slid
 ## sideways would all pass it. So the two phases check the two halves of that:
 ##
-##   Phase 1 (60 physics frames, `move_forward` held): she must have covered a
-##     plausible distance for one second at WALK_SPEED (not zero, and not a runaway),
-##     travelled along the CAMERA's forward axis rather than her own or some world
-##     axis, still be on the floor, still be at ground level (so falling through the
-##     world fails rather than reading as "moved a long way"), and be playing `walk`
-##     at the playback rate game/systems/gait.gd prescribes for her speed.
+##   Phase 1 (60 physics frames, `move_forward` held, nothing else): she must have
+##     covered a plausible distance for one second at RUN_SPEED (not zero, and not a
+##     runaway), travelled along the CAMERA's forward axis rather than her own or some
+##     world axis, still be on the floor, still be at ground level (so falling through
+##     the world fails rather than reading as "moved a long way"), and be playing the
+##     clip game/systems/gait.gd picks for her speed at the rate it prescribes.
+##
+##     RUN_SPEED, not the walk, since the second playtest: running is the DEFAULT gait
+##     now and `sneak` (Shift) is the held modifier. That is the whole reason this scene
+##     drives with no modifier and expects the `gallop` clip.
 ##
 ##   Phase 2 (60 more frames, no input at all): she must brake to a stop and stay
 ##     put. Coasting more than a hand's width, or any residual velocity, fails --
@@ -44,28 +48,40 @@ const DRIVE_FRAMES := 60
 const COAST_FRAMES := 60
 
 ## Bounds on the distance covered during phase 1, as fractions of one second at
-## Player.WALK_SPEED.
+## Player.RUN_SPEED.
 ##
 ## DERIVED RATHER THAN TYPED, and that is a fix rather than a flourish: they were hard
-## numbers (1.0 and 1.6) sized against a 1.32 m/s walk, and when the playtest raised the
-## walk to 1.65 m/s they survived only because the new distance happened to land inside
+## numbers (1.0 and 1.6) sized against a 1.32 m/s walk, and when the first playtest raised
+## the walk to 1.65 m/s they survived only because the new distance happened to land inside
 ## the old window with 0.2 m to spare. A check that keeps passing by luck through a retune
-## it was not updated for is one retune away from passing through a real regression. The
+## it was not updated for is one retune away from passing through a real regression -- and
+## the second playtest proved the point by quadrupling the speed this phase measures. The
 ## band is what has to hold: she covers most of a second's travel (the acceleration ramp
 ## from a standstill eats the rest) and cannot cover more than all of it.
 ##
+## The floor moved 0.70 -> 0.60 with the speed. It is not a loosening: the acceleration
+## ramp costs a FIXED distance (v^2/2a, plus the first few frames at `air_control` while
+## she drops the 0.1 m she is spawned above the plane), and the second of travel it is
+## subtracted from grew by 3.2x -- so the same physics now eats a bigger FRACTION. Measured
+## at 5.2 m/s the run covers 3.50 m of a possible 5.20, i.e. 0.674, so this floor sits
+## 0.38 m under a correct run -- the same absolute slack 0.70 left under the old walk's
+## 1.44 m of 1.65.
+##
 ## Still narrow enough to fail on everything it was written to fail on: a stationary
-## player, a galloping one (Player.GALLOP_SPEED is nearly 3x the walk), and one in
-## freefall.
-const MIN_DRIVE_FRACTION := 0.70
+## player, one stuck at the sneak speed (Player.SNEAK_SPEED is a quarter of this, and 0.25
+## is nowhere near 0.60), and one in freefall.
+const MIN_DRIVE_FRACTION := 0.60
 const MAX_DRIVE_FRACTION := 1.06
 
 ## How far off the commanded axis she may drift over phase 1.
 const MAX_LATERAL_DRIFT := 0.1
-## How far she may coast after input stops (deceleration 18 m/s^2 from 1.65 m/s
-## needs ~0.076 m), and the residual speed allowed once stopped.
-const MAX_COAST_DISTANCE := 0.15
+## Residual speed allowed once stopped. (How far she may COAST is not a constant any more
+## -- braking distance is v^2/2a and the speed it is measured from just went up by 3.9x,
+## so _finish() derives it from her actual speed and her own `deceleration` instead. A
+## typed 0.15 m here was sized for a 1.65 m/s walk and would fail a correct build.)
 const MAX_RESIDUAL_SPEED := 0.02
+## Slack on that derived braking distance, in metres: one frame of travel plus a little.
+const COAST_TOLERANCE := 0.1
 ## The capsule's bottom sits at the player's origin, so a player standing on the
 ## ground plane has y == 0. Anything outside this band is falling or floating.
 const MAX_GROUND_OFFSET := 0.03
@@ -117,20 +133,24 @@ func _finish() -> void:
 	var residual := player.get_ground_speed()
 	var anim: AnimationPlayer = player.get_animation_player()
 	var rest_clip: String = anim.current_animation if anim != null else ""
-	var expected_scale := GaitScript.playback_scale_for_speed(_drive_speed)
+	var expected_clip := GaitScript.clip_for_speed(_drive_speed)
+	var expected_scale := GaitScript.playback_scale_for_clip(expected_clip, _drive_speed)
+	# Braking distance for the speed she was ACTUALLY at, using her OWN deceleration --
+	# both of which changed under this check once without it noticing (see the constants).
+	var coast_budget: float = pow(_drive_speed, 2.0) / (2.0 * player.deceleration) + COAST_TOLERANCE
 
 	print("PLAYER drive dist=%.3f window=[%.3f, %.3f] travel=(%.3f, %.3f, %.3f) speed=%.3f on_floor=%s clip=%s scale=%.3f" % [
-		dist, PlayerScript.WALK_SPEED * MIN_DRIVE_FRACTION,
-		PlayerScript.WALK_SPEED * MAX_DRIVE_FRACTION,
+		dist, PlayerScript.RUN_SPEED * MIN_DRIVE_FRACTION,
+		PlayerScript.RUN_SPEED * MAX_DRIVE_FRACTION,
 		travel.x, travel.y, travel.z, _drive_speed, _drive_on_floor, _drive_clip, _drive_scale
 	])
-	print("PLAYER coast dist=%.4f residual_speed=%.4f y=%.4f clip=%s" % [
-		coast_dist, residual, player.global_position.y, rest_clip
+	print("PLAYER coast dist=%.4f budget=%.4f residual_speed=%.4f y=%.4f clip=%s" % [
+		coast_dist, coast_budget, residual, player.global_position.y, rest_clip
 	])
 
-	# One second of walking, bounded as a fraction of the walk speed -- see the constants.
-	var min_dist: float = PlayerScript.WALK_SPEED * MIN_DRIVE_FRACTION
-	var max_dist: float = PlayerScript.WALK_SPEED * MAX_DRIVE_FRACTION
+	# One second of running, bounded as a fraction of the run speed -- see the constants.
+	var min_dist: float = PlayerScript.RUN_SPEED * MIN_DRIVE_FRACTION
+	var max_dist: float = PlayerScript.RUN_SPEED * MAX_DRIVE_FRACTION
 
 	var checks := {
 		"moved a plausible distance": dist >= min_dist and dist <= max_dist,
@@ -139,9 +159,9 @@ func _finish() -> void:
 		"was on the floor while driving": _drive_on_floor,
 		"stayed at ground level": absf(player.global_position.y) <= MAX_GROUND_OFFSET,
 		"is on the floor at rest": player.is_on_floor(),
-		"played 'walk' while moving": _drive_clip == "walk",
-		"scaled walk playback to its ground speed": is_equal_approx(_drive_scale, expected_scale),
-		"stopped instead of drifting": coast_dist <= MAX_COAST_DISTANCE,
+		"played the clip Gait picks for her ground speed": _drive_clip == String(expected_clip),
+		"scaled that clip's playback to its ground speed": is_equal_approx(_drive_scale, expected_scale),
+		"stopped instead of drifting": coast_dist <= coast_budget,
 		"has no residual velocity": residual <= MAX_RESIDUAL_SPEED,
 		"returned to 'idle' at rest": rest_clip == "idle",
 	}

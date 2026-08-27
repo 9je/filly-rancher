@@ -16,7 +16,7 @@ extends CanvasLayer
 ##
 ##   THE STRUGGLE RING, AND THE SECURE ARC INSIDE IT. A capture is a contest between two
 ##     clocks (magic_beam.gd's SECURE_SECONDS and STRUGGLE_*): the beam needs 1.15 s to
-##     subdue her, and she has 1.9 s (SHY) / 2.6 s (CURIOUS) / 4.0 s (BOLD) of fight in
+##     subdue her, and she has 2.3 s (BOLD) / 3.0 s (CURIOUS) / 4.6 s (SHY) of fight in
 ##     her. Let go inside the first and she slips out; hold past the second and she wins.
 ##     BOTH of those have to be on screen or the mechanic is a coin toss:
 ##       - the OUTER ring drains clockwise from full over her struggle time, green to red,
@@ -405,9 +405,14 @@ func _style_label(label: Label, size: int, color: Color) -> void:
 ## A GridContainer of Labels rather than one pre-aligned block of text: Godot's default
 ## UI font is proportional, so space-padded columns line up in the source file and
 ## nowhere else.
+## RUNNING IS THE DEFAULT AND SHIFT SLOWS YOU DOWN, which is the opposite of what every
+## other game trains a player to expect -- so the card says what the slow gait BUYS on its
+## own continuation line rather than leaving "why would I ever hold this?" as something
+## the player has to work out from a speed change alone.
 const HINTS := [
-	["MOVE", "W A S D", "Left stick"],
-	["GALLOP", "Shift (hold)", "LB (hold)"],
+	["MOVE (run)", "W A S D", "Left stick"],
+	["WALK / SNEAK", "Shift (hold)", "LB (hold)"],
+	["", "creep quietly -- ponies notice you from half as far", ""],
 	["JUMP", "Space", "A"],
 	["LOOK", "Mouse", "Right stick"],
 	["ZOOM", "Scroll / = -", "D-pad up/down"],

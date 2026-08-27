@@ -70,6 +70,50 @@ func test_personality_chooses_the_reaction_and_bold_has_none() -> void:
 		"a BOLD pony ignores the player entirely")
 
 
+func test_a_shy_pony_notices_a_running_player_from_further_out_than_the_others() -> void:
+	# HALF OF THE SECOND PLAYTEST'S INVERSION, and the half that lives in this file. SHY is
+	# now the hardest personality to REACH -- she starts running 2 m before anyone else
+	# would -- and the compensating half (she is the easiest to HOLD) is pinned in
+	# game/test/test_magic_beam.gd. Neither is meaningful without the other, so both name
+	# the other in their comments.
+	var shy: float = PonyScript.notice_radius_for(PonyDataScript.Personality.SHY, false)
+	var curious: float = PonyScript.notice_radius_for(PonyDataScript.Personality.CURIOUS, false)
+	var bold: float = PonyScript.notice_radius_for(PonyDataScript.Personality.BOLD, false)
+	assert_gt(shy, curious, "a SHY pony must spot a running player before a CURIOUS one")
+	assert_gt(shy, bold, "...and before a BOLD one")
+	assert_gte(curious, PonyScript.DETECTION_RADIUS,
+		"nobody may notice a running player from LESS than the base radius -- that is the " +
+		"number MagicBeam.MIN_DETECTION_MARGIN is asserted against")
+	assert_gte(bold, PonyScript.DETECTION_RADIUS, "...including a BOLD one")
+
+
+func test_sneaking_shortens_every_ponys_notice_radius_by_the_same_fraction() -> void:
+	# The sneak is a multiplier rather than a subtraction on purpose: a flat "-6 m" would
+	# help least against the jumpiest pony, which is backwards for a stealth option whose
+	# whole purpose is getting near a Fluttershy.
+	for personality in PonyDataScript.Personality.values():
+		var running: float = PonyScript.notice_radius_for(personality, false)
+		var sneaking: float = PonyScript.notice_radius_for(personality, true)
+		assert_almost_eq(sneaking, running * PonyScript.SNEAK_NOTICE_FACTOR, 0.0001,
+			"%s must lose the same FRACTION of her eyesight to a creeping player" % [
+				PonyDataScript.Personality.keys()[personality]])
+		assert_lt(sneaking, running,
+			"sneaking must never make a pony MORE alert (%s)" % [
+				PonyDataScript.Personality.keys()[personality]])
+
+
+func test_the_detection_area_is_wide_enough_to_report_the_widest_notice_radius() -> void:
+	# The Area3D is only the broad phase; a pony cannot notice a body the physics server
+	# never told her about. If SHY_NOTICE_BONUS were ever raised past the authored sphere,
+	# a SHY pony would silently stop noticing the player over the top of her own range and
+	# nothing else in the project would say so.
+	for personality in PonyDataScript.Personality.values():
+		assert_lte(PonyScript.notice_radius_for(personality, false),
+			PonyScript.DETECTION_AREA_RADIUS,
+			"DetectionArea must reach at least as far as %s can notice" % [
+				PonyDataScript.Personality.keys()[personality]])
+
+
 func test_no_reaction_is_not_a_state_value() -> void:
 	# If NO_REACTION ever collided with a real State, "she has no reaction" would start
 	# silently meaning "transition to that state".
@@ -233,10 +277,59 @@ func test_a_bold_pony_ignores_the_player_completely() -> void:
 
 func test_a_pony_only_reacts_to_a_player_inside_her_detection_radius() -> void:
 	var pony := _spawn(PonyDataScript.Personality.SHY, 3.0, Vector3.ZERO)
-	_add_player(Vector3(PonyScript.DETECTION_RADIUS + 4.0, 0.0, 0.0))
+	_add_player(Vector3(PonyScript.DETECTION_AREA_RADIUS + 4.0, 0.0, 0.0))
 	await wait_physics_frames(RUN_FRAMES)
 	assert_ne(pony.state, PonyScript.State.FLEE,
 		"a player well outside DetectionArea must not spook her")
+
+
+func test_a_pony_ignores_a_player_who_is_inside_the_area_but_outside_her_notice_radius() -> void:
+	# THE CHECK WITH THE TEETH FOR THE TWO-STAGE DETECTION. DetectionArea is now wider than
+	# any personality's notice radius (it has to be -- it is one shared sphere serving the
+	# widest of them), so "the area reported him" and "she can see him" became two different
+	# facts. A build that went back to treating the area's enter/exit as the whole answer
+	# would pass every other test in this file and fail this one: the player below is INSIDE
+	# the sphere and OUTSIDE what a CURIOUS pony can notice.
+	var pony := _spawn(PonyDataScript.Personality.CURIOUS, 3.4, Vector3.ZERO)
+	var notice: float = PonyScript.notice_radius_for(PonyDataScript.Personality.CURIOUS, false)
+	assert_lt(notice, PonyScript.DETECTION_AREA_RADIUS,
+		"this test is only meaningful while some personality sees less far than the area")
+	var at := (notice + PonyScript.DETECTION_AREA_RADIUS) * 0.5
+	_add_player(Vector3(at, 0.0, 0.0))
+	await wait_physics_frames(RUN_FRAMES)
+	assert_ne(pony.state, PonyScript.State.APPROACH,
+		"a player at %.2f m is inside the %.2f m area but past her %.2f m notice radius" % [
+			at, PonyScript.DETECTION_AREA_RADIUS, notice])
+
+
+func test_a_sneaking_player_can_get_closer_before_a_shy_pony_bolts() -> void:
+	# THE SNEAK, MEASURED AS BEHAVIOUR rather than as arithmetic. The stand-in stands at a
+	# distance that is inside a SHY pony's running notice radius and outside her sneaking
+	# one, and the ONLY thing that changes between the two halves is what is_sneaking()
+	# answers -- so a build that read the radius but never asked about the gait fails the
+	# first half, and one that hard-coded "sneaking means invisible" fails the second.
+	var pony := _spawn(PonyDataScript.Personality.SHY, 3.0, Vector3.ZERO)
+	var running: float = PonyScript.notice_radius_for(PonyDataScript.Personality.SHY, false)
+	var sneaking: float = PonyScript.notice_radius_for(PonyDataScript.Personality.SHY, true)
+	var at := (running + sneaking) * 0.5
+	var player := _add_player(Vector3(at, 0.0, 0.0))
+	player.sneaking = true
+
+	await wait_physics_frames(RUN_FRAMES)
+	assert_ne(pony.state, PonyScript.State.FLEE,
+		"a creeping player at %.2f m must not spook a SHY pony (she notices a sneak at " % at +
+		"%.2f m)" % sneaking)
+
+	player.sneaking = false
+	var bolted := false
+	for i in range(RUN_FRAMES):
+		await wait_physics_frames(1)
+		if pony.state == PonyScript.State.FLEE:
+			bolted = true
+			break
+	assert_true(bolted,
+		"...and the same player at the same spot must spook her the moment he runs " +
+		"(she notices a runner at %.2f m)" % running)
 
 
 func test_a_fleeing_pony_stays_inside_her_roam_radius() -> void:
@@ -378,10 +471,22 @@ func _spawn(personality: int, base_speed: float, position: Vector3) -> Character
 	return pony
 
 
+## A stand-in that can also answer is_sneaking(), which is how Pony._player_is_sneaking()
+## asks about the player's gait. Deliberately NOT the real Player: driving her through
+## Input.action_press() would make these ponies' behaviour depend on global engine state
+## that every other test in this process shares, and what is under test here is the PONY's
+## rule, not the player's input mapping. `sneaking` is a plain flag a test flips.
+class Sneaker:
+	extends CharacterBody3D
+	var sneaking := false
+	func is_sneaking() -> bool:
+		return sneaking
+
+
 ## A body the DetectionArea will accept as the player, via the `player` group rather
 ## than by being an actual player.tscn -- see Pony.PLAYER_GROUP.
-func _add_player(position: Vector3) -> CharacterBody3D:
-	var body := CharacterBody3D.new()
+func _add_player(position: Vector3) -> Sneaker:
+	var body := Sneaker.new()
 	body.add_to_group(PonyScript.PLAYER_GROUP)
 	var shape := CollisionShape3D.new()
 	var capsule := CapsuleShape3D.new()

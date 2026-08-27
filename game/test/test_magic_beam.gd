@@ -23,12 +23,17 @@ const MagicBeamScript := preload("res://actors/player/magic_beam.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 
 
-func test_shy_ponies_struggle_sooner_than_curious_ones_and_bold_ones() -> void:
+func test_bold_ponies_struggle_sooner_than_curious_ones_and_shy_ones() -> void:
+	# INVERTED BY THE SECOND PLAYTEST, and the direction is the whole point -- this test
+	# asserted the opposite until then, and was green while pinning a build the owner
+	# called impossible. A SHY pony FREEZES in the beam (she is too frightened to fight)
+	# and a BOLD one thrashes (she was never frightened of you in the first place). See
+	# the STRUGGLE_* block in magic_beam.gd.
 	var shy: float = MagicBeamScript.struggle_seconds_for(PonyDataScript.Personality.SHY)
 	var curious: float = MagicBeamScript.struggle_seconds_for(PonyDataScript.Personality.CURIOUS)
 	var bold: float = MagicBeamScript.struggle_seconds_for(PonyDataScript.Personality.BOLD)
-	assert_lt(shy, curious, "a SHY pony must break free before a CURIOUS one")
-	assert_lt(curious, bold, "...and a CURIOUS one before a BOLD one")
+	assert_lt(bold, curious, "a BOLD pony must break free before a CURIOUS one")
+	assert_lt(curious, shy, "...and a CURIOUS one before a SHY one")
 
 
 func test_every_struggle_time_outlasts_the_pull_in() -> void:
@@ -51,6 +56,12 @@ func test_an_unknown_personality_gets_the_bold_default_rather_than_zero() -> voi
 	assert_eq(fallback, MagicBeamScript.STRUGGLE_BOLD,
 		"an unknown personality falls back to BOLD's struggle time")
 	assert_gt(fallback, 0.0)
+	# BOLD is the STRICTEST hold since the second playtest's inversion, so this fallback
+	# stopped being the forgiving one. It still has to leave a window a human can hit, or a
+	# roster addition with an unrecognised personality would be flatly uncatchable.
+	assert_gt(fallback - MagicBeamScript.SECURE_SECONDS, 0.4,
+		"the fallback must still leave a hittable window (%.2f s of struggle against " % fallback +
+		"%.2f s of securing)" % MagicBeamScript.SECURE_SECONDS)
 
 
 func test_the_hold_point_sits_hold_lead_metres_past_the_player() -> void:
@@ -140,7 +151,7 @@ func test_the_hold_point_never_lands_inside_the_camera() -> void:
 		"a held body must never be pulled into the camera's near plane")
 
 
-func test_a_pony_notices_the_player_before_the_beam_can_reach_her() -> void:
+func test_a_running_player_is_noticed_before_the_beam_can_reach_her() -> void:
 	# THE INVARIANT THE FIRST PLAYTEST WAS LOST TO, AND THE ONE ASSERTION THAT WOULD HAVE
 	# CAUGHT IT. The test that used to live here asserted the OPPOSITE -- that the beam
 	# out-reaches a pony's detection radius -- and it passed, because that is exactly what
@@ -156,16 +167,86 @@ func test_a_pony_notices_the_player_before_the_beam_can_reach_her() -> void:
 	# makes the effective grab distance longer than REACH, and because Phase 1B's shop is
 	# going to sell REACH upgrades -- so "detection is bigger by a hair" is not enough, it
 	# has to stay bigger by something a player can act inside.
+	#
+	# QUANTIFIED OVER EVERY PERSONALITY SINCE THE SECOND PLAYTEST, because the notice
+	# radius stopped being one shared constant: a SHY pony sees 2 m further than the others
+	# (Pony.SHY_NOTICE_BONUS). Checking only the base number would leave a future
+	# personality with a NEGATIVE bonus able to slip under the invariant unseen, which is
+	# exactly the class of bug this test exists for. Sneaking is deliberately excluded --
+	# see test_sneaking_is_allowed_to_beat_the_head_start_and_only_sneaking.
 	var pony_script := load("res://actors/pony/pony.gd")
-	var detection: float = pony_script.DETECTION_RADIUS
-	var margin: float = detection - MagicBeamScript.REACH
-	assert_gte(margin, MagicBeamScript.MIN_DETECTION_MARGIN,
-		("a pony must notice the player at least MIN_DETECTION_MARGIN (%.1f m) before he " +
-		"can beam her -- detection %.1f m, reach %.1f m, margin %.1f m") % [
-			MagicBeamScript.MIN_DETECTION_MARGIN, detection, MagicBeamScript.REACH, margin])
+	for personality in PonyDataScript.Personality.values():
+		var radius: float = pony_script.notice_radius_for(personality, false)
+		var margin: float = radius - MagicBeamScript.REACH
+		assert_gte(margin, MagicBeamScript.MIN_DETECTION_MARGIN,
+			("a %s pony must notice a RUNNING player at least MIN_DETECTION_MARGIN " +
+			"(%.1f m) before he can beam her -- notice %.1f m, reach %.1f m, margin " +
+			"%.1f m") % [
+				PonyDataScript.Personality.keys()[personality],
+				MagicBeamScript.MIN_DETECTION_MARGIN, radius, MagicBeamScript.REACH, margin])
 	assert_gt(MagicBeamScript.MIN_DETECTION_MARGIN, MagicBeamScript.GRAB_ASSIST_RADIUS,
 		"the required margin must at least swallow the grab-assist radius, or a pony " +
 		"could be snatched out of the forgiveness pass before she had reacted")
+
+
+func test_sneaking_is_allowed_to_beat_the_head_start_and_only_sneaking() -> void:
+	# THE ONE SANCTIONED EXCEPTION TO THE INVARIANT ABOVE, and it is asserted rather than
+	# merely permitted -- a sneak that did NOT bring the notice radius inside the beam's
+	# reach would be a stealth option that buys nothing, which is the failure mode a "the
+	# radius got smaller" check would happily pass.
+	#
+	# Both directions are pinned. Too little reduction and creeping is pointless; too much
+	# and a pony has effectively stopped reacting to the player at all, which would undo
+	# the first playtest's fix by a different route.
+	var pony_script := load("res://actors/pony/pony.gd")
+	for personality in PonyDataScript.Personality.values():
+		var running: float = pony_script.notice_radius_for(personality, false)
+		var sneaking: float = pony_script.notice_radius_for(personality, true)
+		var who: String = PonyDataScript.Personality.keys()[personality]
+		assert_lt(sneaking, MagicBeamScript.REACH,
+			("sneaking must get the player inside beam range of a %s pony unnoticed " +
+			"(%.1f m sneaking against %.1f m of reach) or the stealth option buys " +
+			"nothing") % [who, sneaking, MagicBeamScript.REACH])
+		assert_lt(sneaking, running * 0.75,
+			"a %s pony's notice radius must drop MATERIALLY when the player creeps " % who +
+			"(%.1f m -> %.1f m)" % [running, sneaking])
+		assert_gt(sneaking, MagicBeamScript.HOLD_LEAD * 2.0,
+			("...but a sneaking player must still be noticeable well before he is on top " +
+			"of a %s pony (%.1f m)") % [who, sneaking])
+
+
+func test_reaching_a_pony_and_holding_her_get_harder_in_opposite_directions() -> void:
+	# THE DESIGN DECISION THE OWNER MADE IN THE SECOND PLAYTEST, pinned as one assertion
+	# because it is a claim about two files at once and neither file can state it alone.
+	#
+	# "It makes sense Fluttershy runs but freezes." So a SHY pony is the hardest to REACH
+	# (she notices you from furthest away, and she is the only personality that runs) and
+	# the easiest to HOLD; a BOLD pony has no reaction at all -- you walk right up to her --
+	# and is the hardest to hold. Before this, both dials pointed the same way, which made
+	# BOLD (Rainbow Dash, RARE) the easiest pony in the game to collect and SHY two hard
+	# things in series.
+	#
+	# Without this test the ordering could be re-inverted one constant at a time and every
+	# other check in the project would stay green, because each individual number would
+	# still look perfectly reasonable.
+	var pony_script := load("res://actors/pony/pony.gd")
+	var reach_hardness := {}
+	var hold_hardness := {}
+	for personality in PonyDataScript.Personality.values():
+		reach_hardness[personality] = pony_script.notice_radius_for(personality, false)
+		hold_hardness[personality] = -MagicBeamScript.capture_window_for(personality)
+
+	var shy: int = PonyDataScript.Personality.SHY
+	var bold: int = PonyDataScript.Personality.BOLD
+	assert_gt(reach_hardness[shy], reach_hardness[bold],
+		"a SHY pony must be harder to REACH than a BOLD one -- she notices you sooner")
+	assert_gt(hold_hardness[bold], hold_hardness[shy],
+		"...and a BOLD pony must be harder to HOLD than a SHY one -- she is the one " +
+		"who fights")
+	assert_eq(pony_script.reaction_state(bold), pony_script.NO_REACTION,
+		"...and 'trivial to reach' for a BOLD pony means literally no reaction at all")
+	assert_eq(pony_script.reaction_state(shy), pony_script.State.FLEE,
+		"...while a SHY pony is hard to reach because she actually runs")
 
 
 func test_the_capture_needs_a_real_hold_rather_than_a_click() -> void:
@@ -196,17 +277,17 @@ func test_every_personality_has_a_window_wide_enough_to_hit() -> void:
 				MagicBeamScript.SECURE_SECONDS])
 
 
-func test_a_shy_pony_is_the_hardest_catch_and_a_bold_one_the_easiest() -> void:
+func test_a_bold_pony_is_the_hardest_hold_and_a_shy_one_the_easiest() -> void:
 	# The whole point of per-personality struggle times, stated as the thing a player
 	# actually experiences -- how much slack they get -- rather than as raw timer values.
 	var shy: float = MagicBeamScript.capture_window_for(PonyDataScript.Personality.SHY)
 	var curious: float = MagicBeamScript.capture_window_for(PonyDataScript.Personality.CURIOUS)
 	var bold: float = MagicBeamScript.capture_window_for(PonyDataScript.Personality.BOLD)
-	assert_lt(shy, curious, "a SHY pony must be a tighter catch than a CURIOUS one")
-	assert_lt(curious, bold, "...and a CURIOUS one than a BOLD one")
-	assert_gt(bold, shy * 2.0,
-		"and the spread must be big enough to feel: BOLD should be a comfortable catch " +
-		"where SHY is a scramble")
+	assert_lt(bold, curious, "a BOLD pony must be a tighter hold than a CURIOUS one")
+	assert_lt(curious, shy, "...and a CURIOUS one than a SHY one")
+	assert_gt(shy, bold * 2.0,
+		"and the spread must be big enough to feel: SHY should be a comfortable hold " +
+		"where BOLD is a scramble")
 
 
 func test_losing_her_costs_the_player_the_re_grab() -> void:

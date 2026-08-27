@@ -47,8 +47,12 @@ extends Node3D
 ##     or seed change breaks coverage, the gate goes red and asks for a new seed rather
 ##     than quietly going hollow.
 ##   * DETECTION GEOMETRY is asserted too, for the same reason: at the moment the player
-##     arrives, every pony must actually be inside Pony.DETECTION_RADIUS of him. Without
-##     that, "no BOLD pony reacted" could be passing because no pony could see anything.
+##     arrives, every pony must actually be inside HER OWN notice radius of him
+##     (Pony.notice_radius_for, which since the second playtest differs by personality --
+##     a SHY pony sees 2 m further than the others). Without that, "no BOLD pony reacted"
+##     could be passing because no pony could see anything. The stand-in is not a Player
+##     and cannot answer is_sneaking(), so he counts as running here, which is the case
+##     these radii are the widest for and therefore the one this geometry has to clear.
 ##
 ## OFFSCREEN RENDERING (`xvfb-run tools/bin/godot --path game --audio-driver Dummy
 ## scenes/test/wild_ponies.tscn -- --screenshot-dir=<path>`, NOT `--headless` --
@@ -84,25 +88,30 @@ const SPAWN_COUNT := 6
 ## The herd is deliberately tight, and the numbers below are load-bearing rather than
 ## decorative: a pony spawns SPAWN_RING_RADIUS from the origin and strays at most
 ## ROAM_RADIUS from her spawn point, so nobody is ever further than 4.5 m from the
-## origin -- comfortably inside Pony.DETECTION_RADIUS (12 m since the playtest retune, 5 m
-## when these were chosen) of a player standing there. That is what makes "every pony can
-## see him in the reaction phase" true by construction rather than by luck; the run asserts
-## it anyway. Left at 2.0 m rather than widened with the detection radius: the point of the
-## tight ring is that the herd is legible in one screenshot, and the detection check below
-## has more slack now, not less.
+## origin -- comfortably inside every personality's notice radius (12 m, or 14 m for a SHY
+## pony, against 5 m when these were chosen) of a player standing there. That is what makes
+## "every pony can see him in the reaction phase" true by construction rather than by luck;
+## the run asserts it anyway. Left at 2.0 m rather than widened with the notice radius: the
+## point of the tight ring is that the herd is legible in one screenshot, and the detection
+## check below has more slack now, not less.
 const SPAWN_RING_RADIUS := 2.0
 const ROAM_RADIUS := 2.0
 
 const TOTAL_FRAMES := 300
 const REACTION_FRAME := 180
 
-## Where the stand-in player waits during the routine phase: far enough that no pony's
-## detection sphere can reach him, near enough to stay on the ground plane. The margin is
-## thinner than it was -- the radius went from 5 m to 12 m in the playtest retune, and the
-## furthest a pony can be from the origin is 4.5 m, so the closest any of them can get to
-## him here is 15.5 m against a 12 m radius. Three and a half metres of slack, and the
-## "nobody reacted before he arrived" check per pony below is what goes red if a future
-## retune eats the rest of it.
+## Where the stand-in player waits during the routine phase: far enough that no pony can
+## notice him, near enough to stay on the ground plane.
+##
+## MOVED OUT FROM 20 m TO 22 m BY THE SECOND PLAYTEST, and the arithmetic is why rather
+## than taste. The widest notice radius went 5 -> 12 (first retune) -> 14 for a SHY pony
+## (Pony.SHY_NOTICE_BONUS, second retune), while the furthest a pony can be from the origin
+## is 4.5 m. At 20 m the closest any of them could get to him was 15.5 m against a 14 m
+## radius: one and a half metres of slack, thin enough that a wander target near the edge
+## plus a braking overshoot could spook a pony this scene asserts is unspooked, and the
+## gate would go red on a build behaving perfectly. At 22 m the closest approach is 17.5 m
+## and the slack is back to three and a half. wild_ponies.tscn carries the same number --
+## see below.
 ##
 ## wild_ponies.tscn ALSO places him here, and that is load-bearing rather than
 ## redundant. He originally sat at the origin in the scene and was moved out here in
@@ -112,7 +121,7 @@ const REACTION_FRAME := 180
 ## wanders first" guarantee was spent on a wander that lasted one frame. Ponies that then
 ## drew GRAZE stood still for the entire routine phase and the gate went red. Starting
 ## him out here means there is never an overlap to mis-report.
-const PLAYER_FAR := Vector3(0.0, 0.1, 20.0)
+const PLAYER_FAR := Vector3(0.0, 0.1, 22.0)
 
 ## Where he stands for the reaction phase.
 const PLAYER_NEAR := Vector3(0.0, 0.1, 0.0)
@@ -345,8 +354,9 @@ func _finish() -> void:
 			and not _routine_states[i].has(PonyScript.State.APPROACH)
 		)
 		checks["%s was never held (nothing held her)" % who] = not _reaction_states[i].has(PonyScript.State.HELD)
-		checks["%s was inside her detection radius of the player" % who] = (
-			_detection_distance_at_arrival[i] <= PonyScript.DETECTION_RADIUS
+		checks["%s was inside her own notice radius of the player" % who] = (
+			_detection_distance_at_arrival[i]
+			<= PonyScript.notice_radius_for(data.personality, false)
 		)
 
 		match data.personality:

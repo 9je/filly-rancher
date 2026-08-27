@@ -114,16 +114,28 @@ const VOICE_LINE := "res://assets/audio/voice/twilight/greeting_01.wav"
 ## something. That is also the reason MIN_DETECTION_MARGIN below is stated as a margin
 ## rather than the two constants simply being compared: an upgrade path that can raise
 ## REACH needs a floor under how little warning a pony may be left with.
+##
+## THE SECOND PLAYTEST ADDED THE ONE SANCTIONED WAY TO BEAT THAT HEAD START: sneaking.
+## Pony.SNEAK_NOTICE_FACTOR halves a pony's notice radius while the player holds
+## Player.SNEAK_ACTION, which puts every personality's sneaking radius (6.0 - 7.0 m) INSIDE
+## this reach. That inverts the invariant deliberately, and only for a player who has
+## chosen to move at a quarter speed -- which is the entire point of a stealth option.
 const REACH := 8.5
 
-## Metres by which Pony.DETECTION_RADIUS must exceed REACH: the head start a pony is
-## guaranteed even after every reach upgrade the shop can sell. 3.0 m is about six tenths
-## of a second of the player's gallop, which is the least that can still read as "she saw
-## me coming" -- and it also has to swallow GRAB_ASSIST_RADIUS, since the forgiveness pass
-## makes the beam's EFFECTIVE grab distance half a metre longer than REACH says. Today's
-## actual margin is 3.5 m (12.0 - 8.5). Asserted in game/test/test_magic_beam.gd and
-## re-checked live in scenes/test/capture_test.gd -- see the note above on why this
-## invariant, of all the numbers in this file, gets an explicit gate.
+## Metres by which a pony's notice radius must exceed REACH FOR A RUNNING PLAYER: the head
+## start a pony is guaranteed even after every reach upgrade the shop can sell. 3.0 m is
+## about six tenths of a second of the player's run, which is the least that can still read
+## as "she saw me coming" -- and it also has to swallow GRAB_ASSIST_RADIUS, since the
+## forgiveness pass makes the beam's EFFECTIVE grab distance half a metre longer than REACH
+## says. Today's actual margin is 3.5 m for a CURIOUS or BOLD pony and 5.5 m for a SHY one.
+##
+## "FOR A RUNNING PLAYER" IS LOAD-BEARING AND IS NOT A WEAKENING OF THE INVARIANT. Running
+## is the default gait -- it is what happens when you press a movement key and nothing
+## else -- so this is still a promise about how the game behaves unless the player takes a
+## deliberate, slow, costly action to change it. Asserted over EVERY personality in
+## game/test/test_magic_beam.gd and re-checked live in scenes/test/capture_test.gd, which
+## also demonstrates both halves behaviourally: a running player is bolted from at 10.25 m,
+## and a sneaking one at the same spot is not noticed at all.
 const MIN_DETECTION_MARGIN := 3.0
 
 ## Metres past the player, along the aim ray, that a held body floats. 2.2 m puts a pony
@@ -238,9 +250,9 @@ const ESCAPE_COOLDOWN := 1.25
 ## past the second and she wins outright. Between them is a window whose WIDTH is the
 ## difference of the two numbers, and that window is the mechanic:
 ##
-##   SHY      1.90 - 1.15 = 0.75 s   a real scramble; you must be watching the ring
-##   CURIOUS  2.60 - 1.15 = 1.45 s   comfortable if you are paying attention
-##   BOLD     4.00 - 1.15 = 2.85 s   effectively a free catch, as the trait says
+##   BOLD     2.30 - 1.15 = 1.15 s   a real fight; you must be watching the ring
+##   CURIOUS  3.00 - 1.15 = 1.85 s   comfortable if you are paying attention
+##   SHY      4.60 - 1.15 = 3.45 s   she has frozen; effectively a free hold
 ##
 ## WHY THE SUBDUE TIME IS THE SAME FOR EVERYONE and only the resistance varies: it keeps
 ## one number as "what the beam does" and one as "who she is", so the personalities stay
@@ -252,29 +264,45 @@ const ESCAPE_COOLDOWN := 1.25
 ## short enough that the twelfth catch of a session is a second-and-a-bit of commitment
 ## rather than a chore. The floor on it is the pull-in (a secure time under ~0.5 s would
 ## complete while she was still in transit and the contest would be invisible again); the
-## ceiling is STRUGGLE_SHY, and test_magic_beam.gd asserts a real margin under it, because
-## a secure time that met or passed a personality's struggle time would make that
-## personality flatly uncatchable.
+## ceiling is the SHORTEST struggle time -- STRUGGLE_BOLD since the inversion below -- and
+## test_magic_beam.gd asserts a real margin under it, because a secure time that met or
+## passed a personality's struggle time would make that personality flatly uncatchable.
 const SECURE_SECONDS := 1.15
 
 ## Seconds a held pony resists before she breaks free, by personality. Together with
 ## SECURE_SECONDS above these are the whole of the mechanic's tension: how long you have
 ## to act, and how long it is tells you something about who you caught.
 ##
-## SHY is the short one (the brief's requirement, and the obvious reading of the trait --
-## a pony who bolts the moment she sees you is not going to hang about in a magic field),
-## BOLD the long one (she was not worried about you on the ground and she is not worried
-## now), and CURIOUS sits between them, which matches her behaviour everywhere else: she
-## is the one who walks TOWARD the player, so she has the least reason to fight and the
-## most reason to stay and see what happens.
+## THE SECOND PLAYTEST TURNED THIS ORDERING UPSIDE DOWN, AT THE OWNER'S CALL. The report
+## was "Fluttershy always breaks out -- impossible to catch; the fix needs to be better",
+## and the fix he asked for was not a wider window for the same design, it was a different
+## design: "it makes sense Fluttershy runs but freezes." So:
 ##
-## Nudged from 1.5 / 2.5 / 4.0 rather than rewritten: SHY up to 1.90 so that subtracting
-## the new secure time still leaves a window a human can hit (0.75 s -- three reaction
-## times), CURIOUS up to 2.60 to keep the spacing, BOLD left exactly where it was because
-## 2.85 s of window is already "free catch" and more would just be waiting.
-const STRUGGLE_SHY := 1.9
-const STRUGGLE_CURIOUS := 2.6
-const STRUGGLE_BOLD := 4.0
+##   SHY (4.60 s) is now the LONG one. She is terrified, and a terrified prey animal in a
+##     magic field does not fight it -- she goes rigid. The difficulty of a Fluttershy has
+##     moved entirely out into the world (Pony.SHY_NOTICE_BONUS: she sees you from 14 m and
+##     is gone before you are close), where the player can do something about it with a
+##     chase or a sneak. It was previously in a 0.75 s reaction window that arrived after a
+##     chase the player had already had to win, which is how "impossible" happens: two hard
+##     things in series, with the second one unwinnable if you were even slightly late.
+##   BOLD (2.30 s) is now the SHORT one. She never ran from you and she is not frightened
+##     of you now; she is simply not having it, and she thrashes. She is trivial to REACH
+##     -- no reaction state at all, walk right up to her -- so the whole of her difficulty
+##     sits here, in a 1.15 s window that a distracted player will miss.
+##   CURIOUS (3.00 s) sits between them, as she does everywhere else.
+##
+## The old ordering also had a structural problem the first playtest round flagged and did
+## not fix: BOLD is Rainbow Dash, who is RARE, so the rarest pony in the game was both the
+## easiest to walk up to AND the easiest to hold. Difficulty and rarity now agree.
+##
+## Sized against the window, not typed: STRUGGLE_BOLD - SECURE_SECONDS = 1.15 s is about
+## three reaction times, which is a fight you can lose without it being a coin toss, and
+## it is bought against a target who is standing still and did not have to be chased.
+## STRUGGLE_SHY - SECURE_SECONDS = 3.45 s is not meant to be a challenge at all; it is the
+## exhale after the chase.
+const STRUGGLE_SHY := 4.6
+const STRUGGLE_CURIOUS := 3.0
+const STRUGGLE_BOLD := 2.3
 
 ## Struggle time for anything that is not a pony, in seconds. Props do not resist; a crate
 ## stays in the beam until the player lets go.
@@ -625,6 +653,13 @@ static func struggle_seconds_for(personality: int) -> float:
 			return STRUGGLE_CURIOUS
 		_:
 			# BOLD, and anything a future roster adds without a struggle time of its own.
+			# Note that since the second playtest's inversion this is the STRICTEST of the
+			# three rather than the most forgiving -- an unknown personality now defaults to
+			# the hardest hold. Kept as BOLD anyway, because it is the same fallback
+			# Pony.reaction_state() uses, and a roster addition that behaves like a BOLD pony
+			# on the ground and like a CURIOUS one in the beam would be worse than one that
+			# is simply a bit of a handful. test_magic_beam.gd pins that the fallback still
+			# leaves a hittable window.
 			return STRUGGLE_BOLD
 
 
