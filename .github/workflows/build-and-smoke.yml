@@ -107,6 +107,13 @@ jobs:
             ../build/filly-rancher-windows.exe 2>&1 | tee export-windows.log
           ls -la build/
           file build/filly-rancher-windows.exe
+          # Both presets now set binary_format/embed_pck=true (game/export_presets.cfg),
+          # so each platform ships as ONE file with no sibling .pck -- assert that stays
+          # true rather than silently re-splitting on a future preset edit.
+          if ls build/*.pck >/dev/null 2>&1; then
+            echo "::error::Found a .pck next to the export -- embed_pck should make these single-file builds." >&2
+            exit 1
+          fi
 
       # game/assets/converted/** is gitignored, so a CI checkout has no pony models,
       # props or converted audio, and the export produces an ASSETLESS build (see
@@ -138,9 +145,9 @@ jobs:
         if: always()
         with:
           name: filly-rancher-linux
-          path: |
-            build/filly-rancher-linux.x86_64
-            build/filly-rancher-linux.pck
+          # embed_pck=true (game/export_presets.cfg) merges the .pck into the binary,
+          # so this is the single file the game ships as -- no sibling .pck to list.
+          path: build/filly-rancher-linux.x86_64
           if-no-files-found: error
           retention-days: 30
 
@@ -149,11 +156,8 @@ jobs:
         if: always()
         with:
           name: filly-rancher-windows
-          # The .pck must sit next to the .exe with this exact name -- the engine
-          # locates it by executable name. Keep both files in one artifact.
-          path: |
-            build/filly-rancher-windows.exe
-            build/filly-rancher-windows.pck
+          # Same embed_pck=true story as the Linux upload above: one .exe, no .pck.
+          path: build/filly-rancher-windows.exe
           if-no-files-found: error
           retention-days: 30
 
