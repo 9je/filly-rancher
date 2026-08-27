@@ -1,10 +1,13 @@
 extends Node3D
-## Task 4 verification scene: a ground plane, a light, a fixed camera and the player.
+## Task 4/5 verification scene: a ground plane, a light, and the player (whose
+## `player.tscn` now carries its own third-person `CameraRig`, see below).
 ##
 ## Windowed, this is the scene the owner plays to judge feel -- WASD/left stick to
-## move, Shift/LB to gallop, Space/A to jump, and a low ledge off to the right at
-## x=+5 to jump onto. The camera is fixed and deliberately dumb; Task 5 replaces it
-## with a real spring-arm rig.
+## move, Shift/LB to gallop, Space/A to jump, mouse/right-stick to look, scroll/d-pad
+## to zoom, Escape to release the mouse, and a low ledge off to the right at x=+5 to
+## jump onto. The camera is `player.tscn`'s own `CameraRig` (Task 5,
+## game/actors/player/camera_rig.gd) mounted on `CameraPivot` -- this scene no longer
+## carries a separate fixed Camera3D of its own.
 ##
 ## Headless, it drives the player through a scripted two-phase run and gates on the
 ## result, printing PLAYER_OK dist=<metres> and quitting 0 only if every check holds.
@@ -24,10 +27,12 @@ extends Node3D
 ##     put. Coasting more than a hand's width, or any residual velocity, fails --
 ##     which is what catches a controller that drifts without input.
 ##
-## The camera looks down the -Z axis, so "forward" for the player is -Z: a controller
-## that ignored the camera basis and used its own -Z would pass by coincidence here,
-## which is why the camera-relative behaviour is additionally covered by the GUT test
-## in game/test/test_player.gd against a rotated camera.
+## `CameraRig` starts at yaw 0 (a slight default downward pitch, but no yaw), so its
+## flattened-onto-the-ground forward -- what `Player._movement_basis()` actually reads
+## -- is exactly -Z: a controller that ignored the camera basis and used its own -Z
+## would pass by coincidence here, which is why the camera-relative behaviour is
+## additionally covered by the GUT test in game/test/test_player.gd against a rotated
+## camera.
 
 const GaitScript := preload("res://systems/gait.gd")
 const PlayerScript := preload("res://actors/player/player.gd")

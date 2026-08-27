@@ -50,10 +50,5 @@ mesh = SubResource("LedgeMesh")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Ledge"]
 shape = SubResource("LedgeShape")
 
-[node name="Camera3D" type="Camera3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0.9724, -0.2334, 0, 0.2334, 0.9724, 0, 2.2, 5)
-current = true
-far = 200.0
-
 [node name="Player" parent="." instance=ExtResource("2")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0)
