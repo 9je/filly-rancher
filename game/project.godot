@@ -2,7 +2,7 @@ config_version=5
 
 [application]
 config/name="Filly Rancher"
-run/main_scene="res://scenes/test/smoke.tscn"
+run/main_scene="res://world/ranch.tscn"
 config/features=PackedStringArray("4.5", "Forward Plus")
 
 [rendering]

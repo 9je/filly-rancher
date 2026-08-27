@@ -22,17 +22,19 @@ exists for development but has no business in a build a player runs:
 * `game/assets/converted/probe/` — the throwaway Source-engine test pony from
   the Phase 0 tier-c experiment (~34 MB, unused by anything in `game/`).
 
-**`scenes/test/smoke.tscn` and `smoke_test.gd` are deliberately kept in the
-build**, even though they live under the excluded `scenes/test/` tree. The
-exclude patterns target each junk file by exact name
-(`hair_lag_test.*`, `model_gallery.*`, `terrain_probe.*`, `walk_test.*`,
-`tmp/*`) rather than the whole directory, specifically so the main scene
-(`res://scenes/test/smoke.tscn`, per `game/project.godot`) is never caught by
-a blanket wildcard. It's a two-line scene that just prints `SMOKE_OK` and
-quits — moving it wasn't worth the churn (and would have required editing
-`docs/pipeline.md`, which documents its current path and was being edited
-concurrently with this work). This was verified by exporting and confirming
-the build still prints `SMOKE_OK`.
+**The main scene is `res://world/ranch.tscn`** (`game/project.godot`), as of
+Phase 1A task 7. It sits outside `scenes/test/` entirely, so none of the exclude
+patterns above can reach it — which removes the hazard the paragraph that used to
+stand here was managing (the main scene living inside the excluded test tree, kept
+safe only because the patterns name each junk file individually rather than
+globbing the directory). Keep it that way: **exclude patterns must stay
+file-specific, not `scenes/test/*`**, because `scenes/test/smoke.tscn` and
+`smoke_test.gd` are still deliberately packed. They are no longer the main scene,
+but they remain the one gate that proves the engine boots with no content
+involved at all.
+
+Verified by exporting and running the build: it prints
+`RANCH_OK ponies=8 props=33 assets=present` and exits 0.
 
 Effect measured on this machine (a full local export, real assets present):
 
@@ -65,7 +67,8 @@ produces exactly one file per platform:
 Verified locally: `file build/filly-rancher-windows.exe` reports a normal
 PE32+ executable, `ls build/*.pck` finds nothing, and
 `./build/filly-rancher-linux.x86_64 --headless --quit-after 600` prints
-`SMOKE_OK` and exits 0. The Windows side of that same assertion runs for real
+`RANCH_OK ponies=8 props=33 assets=present` and exits 0 (it was `SMOKE_OK` until
+Phase 1A task 7 changed the main scene). The Windows side of that same assertion runs for real
 on `windows-latest` in CI (`.github/workflows/build-and-smoke.yml`) — this
 machine has no Wine and can't execute the `.exe` itself.
 

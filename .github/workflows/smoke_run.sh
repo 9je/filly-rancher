@@ -16,19 +16,26 @@ set -uo pipefail
 BIN="${1:?usage: smoke_run.sh <path-to-exported-binary>}"
 
 # ---------------------------------------------------------------------------
-# Accepted startup markers -- enumerated explicitly, on purpose.
+# Accepted startup marker -- exactly one, enumerated explicitly, on purpose.
 #
-#   SMOKE_OK  printed by game/scenes/test/smoke_test.gd, the main scene today.
-#   RANCH_OK  printed by the ranch scene that Phase 1A Task 7 promotes to main
-#             scene. Accepted in advance so the hand-over doesn't need a CI edit.
+#   RANCH_OK  printed by game/world/ranch.gd, the main scene since Phase 1A Task 7
+#             (game/project.godot: run/main_scene = res://world/ranch.tscn). It is
+#             printed ONLY when every check that scene runs actually held; the same
+#             scene prints RANCH_FAILED and exits 1 otherwise, which fails this
+#             script on the exit code as well as on the marker.
 #
-# Both are spelled out rather than matched loosely (e.g. '[A-Z]*_OK'), because a
-# loose pattern is exactly how this check would rot into a silent pass: after Task 7
-# a scene that prints some *other* _OK line, or prints nothing at all, must fail this
-# job. Two literal alternatives can only pass for the two scenes we actually mean.
-# When the ranch scene lands and SMOKE_OK is retired, drop SMOKE_OK from this list.
+# SMOKE_OK WAS REMOVED HERE WHEN THE RANCH LANDED, deliberately. game/scenes/test/
+# smoke.tscn still exists and still prints SMOKE_OK when run directly as a gate, but
+# it is no longer the main scene -- so leaving it in this list would mean a future
+# accident that reverted run/main_scene back to the retired smoke scene would sail
+# through CI green. The marker list has to name what the game is supposed to boot
+# into, not everything it has ever booted into.
+#
+# Spelled out as a literal rather than matched loosely (e.g. '[A-Z]*_OK') because a
+# loose pattern is exactly how this check would rot into a silent pass: a main scene
+# that prints some *other* _OK line, or prints nothing at all, must fail this job.
 # ---------------------------------------------------------------------------
-MARKERS='SMOKE_OK|RANCH_OK'
+MARKERS='RANCH_OK'
 
 STDOUT_LOG="ci_smoke_stdout.log"
 ENGINE_LOG="ci_smoke_engine.log"

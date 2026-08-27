@@ -52,6 +52,8 @@ extends Node3D
 ##
 ## `get_aim_ray()` is Task 8's contract (see its own doc comment) -- do not rename it.
 
+const CollisionLayersScript := preload("res://world/collision_layers.gd")
+
 ## Pitch clamp, in the "intuitive" sense: positive = looking up, negative = looking
 ## down. The task brief suggests roughly -60/+70; DOWN uses that suggestion as-is, but
 ## UP is deliberately tighter -- see the reasoning below, confirmed against actual
@@ -104,6 +106,28 @@ const ZOOM_STEP := 0.5
 ## top of the shot. Confirmed against the "at rest" screenshot in the task report.
 @export var default_pitch_deg := -12.0
 
+@export_group("Collision")
+## What the spring arm's pull-in probe collides with. Applied to the SpringArm3D in
+## _ready(), so this is the one place that decides what the camera can see through.
+##
+## THIS EXISTS BECAUSE LEAVING IT AT THE DEFAULT WAS A LATENT BUG. Until Phase 1A
+## Task 7 every collision object in the project sat on Godot's untouched
+## `collision_layer = 1`, and this arm probed with the untouched `collision_mask = 1`,
+## so the pull-in appeared to work -- by coincidence, not by design. The moment the
+## world got deliberately layered geometry (game/world/collision_layers.gd: buildings
+## on their own layer so a wall is distinguishable from a pony), a mask of 1 would
+## have stopped seeing buildings entirely and the camera would have clipped straight
+## through the barn, silently: no error, no warning, and nothing a numeric assertion
+## in this project could detect. game/world/ranch.gd asserts both this mask and an
+## actual measured pull-in against a real building for exactly that reason.
+##
+## WORLD is terrain plus props and deliberately NOT the player or the ponies: a
+## camera that yanks itself in every time a pony crosses behind the player is worse
+## than one that lets her pass through frame, and the rig already excludes the body
+## it is mounted on by RID below. TERRAIN is still bit 1, so every scene that
+## predates the ranch and builds its ground on the default layer still works.
+@export_flags_3d_physics var probe_mask := CollisionLayersScript.WORLD
+
 @onready var _spring_arm: SpringArm3D = $SpringArm3D
 @onready var _camera: Camera3D = $SpringArm3D/Camera3D
 
@@ -119,6 +143,7 @@ func _ready() -> void:
 	_look_pitch = clampf(default_pitch_deg, PITCH_MIN_DEG, PITCH_MAX_DEG)
 	_spring_arm.rotation.x = deg_to_rad(_look_pitch)
 	_spring_arm.spring_length = SPRING_DEFAULT
+	_spring_arm.collision_mask = probe_mask
 
 	# Exclude whatever body this rig is mounted on from its own collision probe, or a
 	# spring arm whose origin ends up inside the player's capsule (it should not --

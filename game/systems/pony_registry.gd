@@ -37,14 +37,45 @@ func load_all(dir: String) -> Dictionary:
 		return _by_id
 
 	da.list_dir_begin()
+	var seen := {}
 	var file_name := da.get_next()
 	while file_name != "":
-		if not da.current_is_dir() and file_name.get_extension() == "tres":
-			_load_one(dir.path_join(file_name))
+		if not da.current_is_dir():
+			var path := _resource_path(dir, file_name)
+			if path != "" and not seen.has(path):
+				seen[path] = true
+				_load_one(path)
 		file_name = da.get_next()
 	da.list_dir_end()
 
 	return _by_id
+
+
+## The res:// path to load for a directory entry, or "" if it is not a resource
+## this registry should read.
+##
+## WHY THIS IS NOT JUST `extension == "tres"`. It was, and that made the SHIPPED GAME
+## load zero ponies. Godot's exporter converts text resources to binary by default
+## (`editor/export/convert_text_resources_to_binary`), so `twilight.tres` is stored in
+## the .pck as `twilight.res`. Scanning for the `.tres` extension therefore matched
+## nothing at all inside an exported build: the registry came back empty, the player
+## spawned with no body, and no wild pony spawned anywhere. Nothing caught it for
+## three tasks because every gate so far ran the project from source via `--path
+## game`, where the files really are `.tres` -- it only surfaced the first time the
+## exported binary was asked to boot a scene that needed the roster (Phase 1A Task
+## 7's ranch, the first main scene that does).
+##
+## `.remap` is handled for the same class of reason: some export configurations leave
+## a `foo.tres.remap` stub pointing at the converted file, and the path to load in
+## that case is the ORIGINAL `foo.tres` (the engine follows the remap), not the stub.
+func _resource_path(dir: String, file_name: String) -> String:
+	var name := file_name
+	if name.get_extension() == "remap":
+		name = name.get_basename()
+	var ext := name.get_extension()
+	if ext == "tres" or ext == "res":
+		return dir.path_join(name)
+	return ""
 
 
 func _load_one(path: String) -> void:

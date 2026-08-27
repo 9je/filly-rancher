@@ -369,6 +369,7 @@ pack ships flat named materials (`leafsGreen`, `woodBark`, solid
 | 2 | **Godot's importer doesn't retroactively notice a newly-added dependency.** Running the editor import pass *before* `Textures/colormap.png` existed baked a texture-less import for the three affected `.glb`s into `.godot/imported/`; adding the PNG afterward and re-running the editor pass did **not** relink them — their `.import` mtime hadn't changed, so Godot skipped reimporting them. | Buildings render flat grey/white even though the texture file is now present on disk and imports cleanly on its own. | Delete the affected `.glb.import` files (forces a fresh import) before rerunning the editor pass, once every referenced texture is actually in place. Order matters: get all dependent files present *first*, then do the one editor pass. |
 | 3 | **`blender -b` with no `.blend` argument opens Blender's default startup scene** (a Cube + Camera + Light), not an empty one — relevant only to the new `--fbx-in` path, which by design runs with no `.blend`. Exporting afterward with no `--object` filter (`use_selection=False`) included that leftover default Cube alongside the real imported prop. | `kenney_survival_structure.glb` silently came out with **two** meshes: an untextured 2×2×2 "Cube" plus the real "structure" mesh. This passed `validate_gltf.py --props` (`meshes>=1`) without complaint — only a rendered frame showed a flat grey box sitting on top of the real prop. | `export_blend.py`'s `--fbx-in` handling now snapshots `bpy.data.objects` before import and deletes exactly that snapshot's objects afterward, so only what the FBX import actually added survives to export. Safe because this `.blend` is never saved back to disk. |
 | 4 | **FBX unit conversion is not reliable for this pack.** The same `structure` model exists as both a Kenney-authored `.glb` (already correctly scaled to the pack's 2-unit module grid: `2×2×2`) and an `.fbx` (imported via Blender's automatic cm→m unit conversion). After quirk 3's fix, the FBX path's `structure` mesh measures **0.5 units tall in Godot — 4× smaller** than the GLB sibling's 2.0. | A prop converted via the FBX path can silently land at the wrong scale relative to the same pack's other (GLB-sourced) props, with no validator check catching it (structural gates don't know what size is "correct"). | Not fixed in-place (documented, not patched, per this doc's own "record quirks, don't paper over them" convention) — kept as `kenney_survival_structure.glb` at its native (undersized) scale. **Recommendation:** prefer the direct-GLB path whenever a pack offers one; if only FBX is available, sanity-check the imported scale against a known reference (another model from the same pack, or the pack's own stated grid unit) rather than trusting Blender's automatic FBX unit conversion. |
+| 5 | **Three of the four "buildings" in this set are not buildings.** Discovered in Phase 1A task 7, the first time any of them was rendered from ground level rather than measured. `kenney_windmill.glb` is the Fantasy Town Kit's SAILS module -- a bare X of blades, no tower behind it. `kenney_watermill.glb` is a bare waterwheel, no mill. `kenney_survival_structure.glb` is an open timber frame. Only `kenney_market_stall.glb` is a complete object. These kits are MODULAR: their houses are assembled from wall/roof/door pieces, and the files whose names sound like buildings are the decorative attachments. | A homestead composed from them reads as farm equipment abandoned in a field. Nothing structural notices: they import, they validate (`meshes>=1`), they measure a plausible height, and they collide. The §4 scale table above lists windmill and watermill under "buildings/structures" purely on the strength of those numbers. | Not fixed at the asset level (task 7 was scoped away from `game/assets/`). The ranch's actual barn and farmhouse are assembled from primitives in `game/world/building.gd`, and the Kenney pieces are placed as yard fixtures. **The real fix is an asset task:** convert the Fantasy Town Kit's wall / roof / door / window modules and assemble a house from them, or find a pack that ships whole buildings. Until then, look at a prop before trusting its filename. |
 
 ### Scale finding — props vs. the converted ponies
 
@@ -420,6 +421,32 @@ shipped asset. Two things to weigh before committing to it:
 Re-render `terrain_probe.tscn` with `-- --prop-scale=1.5` before settling it;
 the probe takes the factor on the command line precisely so this call can be
 made from a picture rather than a table.
+
+**Task 7 applied 1.5× as written, and the map it produced flags one open
+question about it.** Everything derived above holds for the built objects: the
+market stall at 1.86 m next to a 2.14 m pony reads correctly, and the ranch's
+own hand-built barn (4.9 m to the ridge, `game/world/building.gd`) was
+deliberately sized into the same family. **The trees are the part that still
+looks wrong.** At 1.5× the Nature Kit trees stand 1.7–3.2 m, i.e. from
+shoulder-height on a pony to a little over her horn tip, and next to the barn
+they read as saplings or shrubs rather than trees — visible in the task-7
+renders (the establishing shot and the spawn-zone shot especially, where a tree
+and a pony are the same height). Task 7 did **not** override the factor, on the
+grounds that 1.5× is a validated number and a map-build task should not quietly
+re-derive one. The recommendation for whoever picks this up: keep 1.5× as the
+kit-wide factor and add a **tree-category multiplier of roughly 2×** on top
+(giving 3.5–6.5 m trees), or source a taller tree model. Either way it is a
+decision to make from the pictures, deliberately, and to record here.
+
+**Kenney prop origins are not consistent, so seat props by their bounding box.**
+`kenney_survival_structure` and `kenney_market_stall` have their origin at the
+base; `kenney_windmill` and `kenney_watermill` have theirs at the model's
+CENTRE. Placing every prop at `y = ground` therefore buried the windmill 2.34 m
+and the watermill 1.35 m — exactly half their height each — while leaving the
+other two correct, which looks like a layout mistake and is not one.
+`game/world/props.gd` seats each prop by measuring its world AABB and shifting
+it until its floor meets the terrain; do that rather than typing per-prop `y`
+offsets.
 
 ### Task 8 verdict — props-on-Godot-terrain viability
 
@@ -790,9 +817,19 @@ tools/bin/godot --headless --path game scenes/test/walk_test.tscn
 # -> ANIMS ["gallop", "idle", "walk"]
 # -> WALK_OK laps_progress=<n>   exit 0
 
-# Baseline smoke test (also the export smoke test's main scene, §8)
+# Baseline smoke test. NO LONGER the main scene -- since Phase 1A task 7 that is
+# world/ranch.tscn (§9). Still kept and still run: it is the one gate that proves the
+# engine boots with no content at all involved.
 tools/bin/godot --headless --path game scenes/test/smoke.tscn
 # -> SMOKE_OK renderer=forward_plus   exit 0
+
+# The ranch: the game's main scene. Terrain + homestead + herd, and every check
+# game/world/ranch.gd runs (player on the ground, props seated and collided, ponies
+# raycast onto real ground inside their zones, camera spring arm pulling in against
+# an actual building). Prints the marker ONLY if all of them held.
+tools/bin/godot --headless --path game world/ranch.tscn
+# -> RANCH_OK ponies=8 props=33 assets=present   exit 0
+# (assets=absent + zero counts on a checkout that has not run the asset pipeline)
 
 # Hair follow-through: measures how far the mane/tail trail the body, against a
 # rigid-hair baseline, over a scripted start-and-stop (see docs/notes-hair-sim.md)
@@ -929,17 +966,45 @@ ls -la build/
 ```
 
 Actual result: both exports complete with exit 0 in ~5s each (`[ DONE ]
-savepack`), producing `filly-rancher-linux.x86_64` + `.pck` and
-`filly-rancher-windows.exe` + `.pck` in `build/` (gitignored — exports are
-never committed). The Linux binary smoke test prints:
+savepack`), producing `filly-rancher-linux.x86_64` and
+`filly-rancher-windows.exe` in `build/` (gitignored — exports are never
+committed).
+
+**The export smoke expectation is `RANCH_OK`, not `SMOKE_OK`.** Since Phase 1A
+Task 7 the main scene is `res://world/ranch.tscn` (`game/project.godot`), not
+`res://scenes/test/smoke.tscn`. The Linux binary prints:
 
 ```
-SMOKE_OK renderer=forward_plus
+RANCH_OK ponies=8 props=33 assets=present
 ```
 
-exit 0 — same output as the headless scene run, confirming the exported
-binary boots the packed `smoke.tscn` main scene correctly, not just the
-editor-driven `--path` run.
+exit 0 — the same line the headless scene run prints, confirming the exported
+binary boots the packed ranch, builds its terrain, loads its props, spawns its
+herd and passes every check `game/world/ranch.gd` runs, not just that it starts.
+`smoke.tscn` still exists and still prints `SMOKE_OK` when run directly as a
+gate; it is simply no longer what the game boots into, and `SMOKE_OK` has been
+removed from the accepted markers in `.github/workflows/smoke_run.sh` so a
+future accidental revert of `run/main_scene` cannot pass CI silently.
+
+**`ponies=0 props=…` in the trailing fields is expected on a machine that has
+not run the asset pipeline** (and in CI): `game/assets/converted/` is gitignored,
+so those builds are assetless and the ranch says so with `assets=absent` /
+`assets=partial` rather than reporting a bare zero. See `docs/ci.md` §4.
+
+**Two bugs this export step caught the first time it was run against the ranch**,
+both invisible to every gate that ran the project from source with `--path game`:
+
+1. **The exporter converts `.tres` to binary `.res`** (`convert_text_resources_to_binary`
+   defaults on), and `PonyRegistry.load_all()` was filtering directory entries on
+   the `tres` extension — so in the **shipped game** the roster loaded as empty:
+   the player spawned with no body and no wild pony spawned at all. Fixed in
+   `game/systems/pony_registry.gd` (`_resource_path()` now accepts `.res` and
+   `.tres`, and follows `.remap` stubs). Anything else that scans a directory for
+   resources by extension needs the same treatment.
+2. Nothing in the repo had ever run the exported binary against a scene that
+   *needed* content. The lesson is the doc-level one: **re-run the export smoke
+   test whenever the main scene starts depending on something new**, because
+   `--path game` and the `.pck` are not the same filesystem.
 
 **Windows verification is remote.** Godot cross-exports the `.exe` + `.pck`
 from Linux with no Wine involved — this machine can confirm the file is a
