@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="PlotData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/plot_data.gd" id="1_pen02"]
+
+[resource]
+script = ExtResource("1_pen02")
+id = &"pen_large"
+display_name = "Big Pen"
+cost = 150
+scene_path = "res://world/pen.tscn"
+description = "Same square of ground, twice the ponies. Six of them, on proper sawn rails."
+capacity = 6

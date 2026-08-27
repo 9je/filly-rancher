@@ -118,6 +118,21 @@ var hunger := HUNGER_DEFAULT
 ## uids and gates stay reproducible (class comment, footgun 1).
 var caught_at_ms := 0
 
+## WHERE SHE LIVES: the `slot_id` of the PlotSlot whose pen she is in, or &"" for a pony in
+## the saddlebag (or one who has never been penned). Added by Phase 1B Task 3.
+##
+## HER ADDRESS RIDES IN HER OWN RECORD, deliberately, rather than in a second "who is in
+## pen 2" list in the save file. One fact in one place, so a pony and her address cannot
+## desync -- the failure that arrangement invites is a save where pen 2 lists a uid that no
+## pony record has, or a pony recorded in two pens at once, and both of those end with a
+## pony who exists in the file and is standing nowhere. It also means a traded pony blob
+## (the spec wants two players swapping ponies by sending each other JSON) carries where she
+## lived with her, which is strictly more information than a bare pony.
+##
+## Set and cleared ONLY by game/world/pen.gd's add_pony()/remove_pony(). A pony refused by a
+## full pen keeps her old address, because a refusal must change nothing.
+var home_slot: StringName = &""
+
 
 ## Mint a brand new individual of `character_id`. Every call produces a DIFFERENT pony,
 ## even for the same character -- that is the entire point of this class.
@@ -212,6 +227,7 @@ func to_dict() -> Dictionary:
 		"happiness": happiness,
 		"hunger": hunger,
 		"caught_at_ms": caught_at_ms,
+		"home_slot": String(home_slot),
 	}
 
 
@@ -247,6 +263,10 @@ static func from_dict(d: Dictionary) -> PonyInstance:
 	inst.happiness = clampf(float(d.get("happiness", HAPPINESS_DEFAULT)), STATE_MIN, STATE_MAX)
 	inst.hunger = clampf(float(d.get("hunger", HUNGER_DEFAULT)), STATE_MIN, STATE_MAX)
 	inst.caught_at_ms = int(d.get("caught_at_ms", 0))
+	# Absent in every save written before Phase 1B Task 3, and in every hand-traded blob
+	# from such a build. str() of the default gives "" -- a pony in the bag -- rather than a
+	# pony penned in a slot called "<null>".
+	inst.home_slot = StringName(str(d.get("home_slot", "")))
 	return inst
 
 

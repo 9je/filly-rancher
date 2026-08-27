@@ -114,6 +114,18 @@ static func _rate_for_happiness(happiness: float) -> float:
 	return lerpf(MIN_RATE_PER_SECOND, MAX_RATE_PER_SECOND, h)
 
 
+## A pony's banked fractional progress toward her next gem, in [0, 1). Zero for a pony this
+## ledger has never heard of -- which is the same answer as "she has just been forgotten",
+## and deliberately so: forget() is defined as making her indistinguishable from a pony who
+## has never produced.
+##
+## READ-ONLY, AND ADDED SO forget() COULD BE PROVEN. Without it, "leaving a pen clears her
+## entry" can only be checked by re-penning her and inferring it from when the next gem
+## arrives, which is a test that would still pass if forget() merely halved her progress.
+static func progress_of(uid: StringName) -> float:
+	return float(_progress.get(uid, 0.0))
+
+
 ## Clears one pony's banked fractional progress, as if she had never produced anything.
 ## Exposed for tests (replaying a tick sequence from a clean slate) and for the
 ## world-facing half: pen.gd may call this when a pony leaves a pen for any reason other
