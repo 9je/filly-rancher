@@ -102,6 +102,35 @@ func _node_pos(pony: Node3D, node_name: String, fallback: Vector3) -> Vector3:
 	return mesh.global_transform * aabb.get_center()
 
 
+## A rig-family-agnostic guess at where this pony's eyes are, from her world AABB alone.
+##
+## Used when the tier-a `Base_Iris.*` meshes are absent -- a tier-c SFM pony's eyes are
+## part of one head mesh with no node of their own. Deliberately geometric rather than
+## skeletal: the SFM rig HAS `LeftEye`/`RightEye` bones, but reading them through
+## `get_bone_global_pose()` came back with the two eyes separated along the wrong axis
+## (same x, 0.436 m apart in y -- the right SEPARATION, the wrong direction), i.e. the
+## skeleton's internal frame is not the one `skeleton.global_transform` maps from on
+## these imports. That is worth understanding one day; it is not worth blocking a review
+## camera on, and an AABB cannot be wrong about which way is up.
+##
+## Both fractions are measured, not guessed: eyes sit at 0.72 of total height on the
+## tier-a ponies (1.55 m of 2.14) and 0.68 on the SFM ones (1.50 m of 2.19), and the
+## model faces -Z, so the face is a little in from the near end of the box.
+func _eye_guess(pony: Node3D) -> Vector3:
+	var box := AABB()
+	var first := true
+	for node in pony.find_children("*", "MeshInstance3D", true, false):
+		var mesh := node as MeshInstance3D
+		var world := mesh.global_transform * mesh.get_aabb()
+		box = world if first else box.merge(world)
+		first = false
+	if first:
+		return Vector3(0.0, 1.4, 0.0)
+	return Vector3(box.get_center().x,
+		box.position.y + 0.70 * box.size.y,
+		box.position.z + 0.12 * box.size.z)
+
+
 ## Highest actual VERTEX of a named MeshInstance3D, in world space -- the tip of the
 ## horn. Deliberately the geometry and not the AABB: the horn is a cone tilted forward,
 ## so every corner of its box sits somewhere the horn is not.
@@ -165,8 +194,15 @@ func _run_face() -> void:
 	await _settle(90)
 	_experiment(pony)
 
-	var eye_l := _node_pos(pony, "Base_Iris.L", Vector3(0.0, 1.4, 0.0))
-	var eye_r := _node_pos(pony, "Base_Iris.R", eye_l)
+	# `Base_Iris.*` is a tier-a (CreatorOfPony) mesh name. A tier-c SFM pony has no such
+	# mesh -- her eyes are part of one head mesh -- so the fixed Vector3(0, 1.4, 0)
+	# fallback parked the camera inside her mane and every face shot came back as a wall
+	# of pink. Fall back to the SKELETON instead, which every rig family has: an eye bone
+	# by name if there is one, else the head bone. Both tier-c families name theirs
+	# `LeftEye`/`RightEye`.
+	var guess := _eye_guess(pony)
+	var eye_l := _node_pos(pony, "Base_Iris.L", guess + Vector3(0.11, 0.0, 0.0))
+	var eye_r := _node_pos(pony, "Base_Iris.R", guess + Vector3(-0.11, 0.0, 0.0))
 	var eyes := (eye_l + eye_r) * 0.5
 	print("EYES l=(%.3f, %.3f, %.3f) r=(%.3f, %.3f, %.3f) apart=%.3f m" % [
 		eye_l.x, eye_l.y, eye_l.z, eye_r.x, eye_r.y, eye_r.z, eye_l.distance_to(eye_r)])
@@ -226,7 +262,15 @@ func _run_motion() -> void:
 		var sim := pony.find_child("HairSpring", true, false)
 		if sim is SpringBoneSimulator3D:
 			(sim as SpringBoneSimulator3D).influence = 0.0
-	var speed := 0.66 if _clip == "walk" else 3.30
+	# The ground speed the clip depicts, so a planted hoof does not skate in the shot.
+	# `idle` depicts standing still and must travel at zero -- before this was spelled
+	# out, `clip=idle` fell through to the gallop's 3.30 m/s and slid a standing pony
+	# sideways across the frame, which is not a picture of anything.
+	var speed := 0.0
+	if _clip == "walk":
+		speed = 0.66
+	elif _clip == "gallop":
+		speed = 3.30
 	_camera.fov = 45.0
 
 	# Settle on the spot first so the springs are not starting from their rest pose,
