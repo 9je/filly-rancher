@@ -34,6 +34,8 @@ stallion alike. Only hair/tail/wing/accessory chains and the head mesh differ. T
 the same "one core rig, cosmetic chains diverge" story tier a has, so one authored
 clip set covers the whole pack.
 """
+import math
+
 import bpy
 from mathutils import Vector
 
@@ -124,6 +126,14 @@ BODYGROUPS = [
 ]
 
 
+## The roughness every Source material is flattened to. 0.5 is not a taste call: it is
+## what the tier-a packs already export (every material in twilight.glb ships
+## `roughnessFactor 0.5`), so the two rig families light identically and a mixed herd
+## reads as one herd. See flatten_source_materials for why the pack's own exponent maps
+## cannot supply this number.
+ROUGHNESS_FLAT = 0.5
+
+
 def flatten_source_materials(rebuild_fallback):
     """Make SourceIO's materials survive the trip through glTF. Returns a summary.
 
@@ -139,12 +149,40 @@ def flatten_source_materials(rebuild_fallback):
     docs/pipeline.md section 7 exists to warn about, caught the first time a frame was
     rendered.
 
-    So: unwire Metallic (leave Roughness alone -- inverting the phong exponent into
-    roughness is a defensible reading of the same texture, and it is what makes a hoof
-    read as harder than a coat), keep the normal map, and force OPAQUE on anything whose
-    alpha is not genuinely wired, which is the same rule the tier-a rebuild applies and
-    for the same reason: SourceIO hands every material over as HASHED and the exporter
-    turns that into a blended alphaMode on geometry that is meant to be solid.
+    THE SECOND HALF OF THE SAME DEFECT, WHICH THE FIRST PASS AT THIS TALKED ITSELF OUT
+    OF. This used to unwire Metallic and leave Roughness alone, reasoning that
+    "inverting the phong exponent into roughness is a defensible reading of the same
+    texture, and it is what makes a hoof read as harder than a coat". Both halves of
+    that are false in this pipeline, and a render showed it: Pinkie Pie's coat came out
+    near-white with a wet plastic sheen on every character in the pack.
+
+      * NOTHING INVERTS ANYTHING. The exponent map goes into Roughness as an image, and
+        glTF's metallicRoughness texture is a fixed channel packing -- GREEN is
+        roughness. So the number Godot lights the pony with is the exponent map's GREEN
+        channel, which in Source is the albedo-tint mask (RED is the exponent). On this
+        pack that channel is 15/255 everywhere, i.e. roughness 0.06: a mirror. Measured
+        on the shipped `common/body_exponent` and `common/phongexponenttexture`:
+        min 15, max 89, mean 15.2, identical on all three converted characters.
+      * THERE IS NO HOOF/COAT DISTINCTION TO LOSE. Same measurement -- the map is a
+        constant to within a handful of pixels, and every material in the pack points at
+        one of those two shared `common/` maps anyway.
+
+    A near-mirror surface adds a broad white specular lobe on top of the albedo, which
+    is invisible on a saturated mane and ruinous on a pale coat: Pinkie's body texture is
+    (237, 181, 203) and rendered at (233, 198, 221) -- green and blue lifted ~18 counts
+    each and red pulled down, i.e. albedo plus white.
+
+    Source's own answer to this is `$phongfresnelranges`/`$phongboost`, which confine
+    that lobe to grazing angles; glTF carries no equivalent, and Godot ignores the
+    `KHR_materials_specular` factor the exporter does write. So there is no reading of
+    the exponent map that survives the trip, and the honest thing is to drop it and pick
+    a roughness -- ROUGHNESS_FLAT, the same 0.5 the tier-a ponies already ship, so a
+    Source pony and a Blender pony standing in the same field are lit alike.
+
+    So: unwire Metallic AND Roughness, keep the normal map, and force OPAQUE on anything
+    whose alpha is not genuinely wired, which is the same rule the tier-a rebuild applies
+    and for the same reason: SourceIO hands every material over as HASHED and the
+    exporter turns that into a blended alphaMode on geometry that is meant to be solid.
 
     Materials whose Material Output is NOT fed by a Principled are SourceIO's procedural
     eye shaders (`ADD_SHADER`/`MIX_SHADER` stacks doing parallax iris refraction from
@@ -184,10 +222,11 @@ def flatten_source_materials(rebuild_fallback):
             node_tree.links.new(base_texture.outputs["Color"], base_color)
             if mat.name not in rewired:
                 rewired.append(mat.name)
-        metallic = shader.inputs["Metallic"]
-        for link in list(metallic.links):
-            node_tree.links.remove(link)
-        metallic.default_value = 0.0
+        for socket_name, value in (("Metallic", 0.0), ("Roughness", ROUGHNESS_FLAT)):
+            socket = shader.inputs[socket_name]
+            for link in list(socket.links):
+                node_tree.links.remove(link)
+            socket.default_value = value
         if not shader.inputs["Alpha"].links:
             for attr, value in (("blend_method", "OPAQUE"),
                                 ("surface_render_method", "DEFERRED")):
@@ -224,6 +263,67 @@ def _source_basetexture(node_tree):
                     and node.name.lower().startswith(param)):
                 return node
     return None
+
+
+## How far a bone may move when the animation interface is spliced in and nothing is
+## keyed. Zero would be defensible -- all three shipped characters currently measure
+## 0.000000 m / 0.0000 deg -- but the four IK chains re-solve every frame and a
+## numerical solver is entitled to land NEAR its own starting pose rather than exactly
+## on it, so the gate is set at a millimetre and a quarter degree: far below anything a
+## person could see in a frame, far above float noise.
+REST_TOLERANCE_M = 1.0e-3
+REST_TOLERANCE_DEG = 0.25
+
+
+def check_rest_pose_preserved(arm):
+    """Fail if `adapt()` moved the model. Returns ((bone, metres), (bone, degrees)).
+
+    THE DEFECT THIS EXISTS FOR. Building the interface must be invisible: with no
+    Action assigned, a pony that has been through `adapt()` has to stand in exactly the
+    pose the .mdl shipped. The first version of this module did not, and nothing caught
+    it -- `new_bone()` zeroes `roll`, and the `DEF_Head` alias is the one new bone that
+    is a TWIN of an existing one, so zeroing its roll left it 89.999 deg about its own
+    Y axis away from the `Head` bone it drives. `COPY_TRANSFORMS` (world space) then
+    imposed that 90 deg on the head on every frame of every clip, and the exported pony
+    galloped with her head cranked over her shoulder. Every structural gate was green:
+    the bone count was right, the clips existed, the hooves planted. Only a rendered
+    frame showed it, and only because someone looked.
+
+    So the invariant is asserted here, in the units a person judges it in, rather than
+    left for a render to catch: every bone that existed before `adapt()` must still
+    evaluate to its own rest matrix afterwards.
+    """
+    bpy.context.view_layer.update()
+    evaluated = arm.evaluated_get(bpy.context.evaluated_depsgraph_get())
+    # The two maxima are tracked INDEPENDENTLY, not as one "worst bone". A pure
+    # rotation about a bone's own head -- which is exactly the defect this was written
+    # for -- displaces that bone by nothing at all, so any single ranking that sorts on
+    # distance first would let a 90 deg twist hide behind a bone that had drifted a
+    # tenth of a millimetre.
+    moved_worst = ("<none>", 0.0)
+    turned_worst = ("<none>", 0.0)
+    for bone in arm.data.bones:
+        pose_bone = evaluated.pose.bones.get(bone.name)
+        if pose_bone is None:
+            continue
+        delta = bone.matrix_local.inverted() @ pose_bone.matrix
+        moved = delta.to_translation().length
+        turned = math.degrees(delta.to_quaternion().angle)
+        if moved > moved_worst[1]:
+            moved_worst = (bone.name, moved)
+        if turned > turned_worst[1]:
+            turned_worst = (bone.name, turned)
+    print(f"SFM_RIG_REST_DRIFT moved={moved_worst[1]:.6f}m ({moved_worst[0]}) "
+          f"turned={turned_worst[1]:.4f}deg ({turned_worst[0]})")
+    if moved_worst[1] > REST_TOLERANCE_M or turned_worst[1] > REST_TOLERANCE_DEG:
+        raise SystemExit(
+            f"sfm_rig.adapt() moved the rig off its own rest pose: "
+            f"{moved_worst[0]!r} is {moved_worst[1]:.6f} m from where the .mdl put it "
+            f"and {turned_worst[0]!r} is {turned_worst[1]:.4f} deg off "
+            f"(limits {REST_TOLERANCE_M} m / {REST_TOLERANCE_DEG} deg). The interface "
+            f"must be invisible until a clip drives it -- see "
+            f"sfm_rig.check_rest_pose_preserved.")
+    return moved_worst, turned_worst
 
 
 def _armature(objects=None):
@@ -361,11 +461,19 @@ def adapt(arm=None):
     bpy.ops.object.mode_set(mode="EDIT")
     eb = arm.data.edit_bones
 
-    def new_bone(name, head, tail, parent):
+    def new_bone(name, head, tail, parent, roll=0.0):
+        # ROLL IS A PARAMETER AND NOT A CONSTANT 0. A Blender bone's orientation is
+        # (head, tail, roll), and roll is the whole third of it: two bones sharing a
+        # head and a tail can still be a quarter turn apart about their own axis. It
+        # does not matter for the bones here that are nobody's twin -- CON_Root,
+        # CON_Belly, the IK end-effectors and the IK targets are all read for their
+        # POSITION -- but DEF_Head is a twin of `Head` by construction, and zeroing its
+        # roll is what put an SFM pony's head 90 deg over her shoulder in every clip.
+        # See check_rest_pose_preserved.
         bone = eb.new(name)
         bone.head = head
         bone.tail = tail
-        bone.roll = 0.0
+        bone.roll = roll
         bone.parent = parent
         bone.use_connect = False
         bone.use_deform = False   # nothing weights to a control bone
@@ -392,8 +500,18 @@ def adapt(arm=None):
     # leg bone there is driven by an FK_/IK_ twin the same way) and it means
     # author_anims can key `DEF_Head` on any rig family without that family having to
     # NAME a bone DEF_Head -- and without renaming a bone the mesh is skinned to.
+    #
+    # "Sharing its rest exactly" INCLUDES THE ROLL, which is the whole third of a bone's
+    # orientation and the one part `head`/`tail` do not carry. SourceIO gives every bone
+    # on these rigs the same 19 mm stub tail and encodes the Source bone's real rotation
+    # in the roll -- `Head` imports at roll -89.9994 deg -- so an alias built from its
+    # head and tail alone is a quarter turn away from it about its own axis, and the
+    # COPY_TRANSFORMS below (world space) hands that quarter turn to the head on every
+    # evaluated frame. That is not a subtle error: it is the head cranked back over the
+    # shoulders in idle, walk and gallop alike, on every character in the pack.
     head_head, head_tail = rest[HEAD_BONE]
-    new_bone(HEAD_ALIAS, head_head.copy(), head_tail.copy(), eb[HEAD_PARENT])
+    new_bone(HEAD_ALIAS, head_head.copy(), head_tail.copy(), eb[HEAD_PARENT],
+             roll=eb[HEAD_BONE].roll)
 
     # Four IK end-effectors and their targets.
     #
@@ -443,6 +561,8 @@ def adapt(arm=None):
         span = (toe - heads[0]).length + sum(
             (heads[i] - heads[i + 1]).length for i in range(len(heads) - 1))
         reach[target_name] = (span, (toe - heads[-1]).length)
+
+    check_rest_pose_preserved(arm)
 
     print(f"SFM_RIG_ADAPTED bones={len(arm.data.bones)} ground_z={ground:.4f} "
           f"chains={chains}")
