@@ -123,4 +123,44 @@ print('SOURCEIO_OK')
 printf '%s\n' "$sourceio_log"
 printf '%s\n' "$sourceio_log" | grep -q SOURCEIO_OK || { echo "ERROR: SourceIO enable failed" >&2; exit 1; }
 
+
+# GUT (Godot Unit Test): headless GDScript test framework, installed as a Godot addon
+# under game/addons/gut/ (must live inside the Godot project tree at that exact path --
+# it's loaded via res://addons/gut/..., not from tools/bin/).
+#
+# Version pin: GUT's own README compatibility table (https://github.com/bitwes/Gut/blob/master/README.md,
+# "Version Links" section) lists "9.5.0 | Valid Godot Version 4.5.x" as the row matching our
+# pinned Godot 4.5.2 -- 9.6.1/9.7.1 are for Godot 4.6.x/4.7.x respectively, so 9.5.0 is the
+# correct pin, not merely "latest". Fetched from the tag's GitHub source-archive zip (no
+# packaged release asset is published for this repo, only the archive/tarball links the
+# README itself points at). SHA256 below was computed locally on the downloaded bytes and
+# cross-checked by downloading the same URL a second time independently -- both runs produced
+# byte-identical zips and the identical hash.
+GUT_VER="9.5.0"
+GUT_SHA256="7f6197e34096b5ca62c2b84b3d268c3f270317dcbcc19d4acfe788a1d2b5e601"
+GUT_TARGET="../../game/addons/gut"
+if [ ! -f "$GUT_TARGET/plugin.cfg" ]; then
+  curl -fL --connect-timeout 30 --max-time 300 -o gut.zip "https://github.com/bitwes/Gut/archive/refs/tags/v${GUT_VER}.zip"
+  verify_checksum gut.zip "$GUT_SHA256" sha256sum
+  rm -rf gut_extract
+  mkdir -p gut_extract
+  unzip -oq gut.zip -d gut_extract
+  rm -f gut.zip
+  rm -rf "$GUT_TARGET"
+  mkdir -p "$(dirname "$GUT_TARGET")"
+  mv "gut_extract/Gut-${GUT_VER}/addons/gut" "$GUT_TARGET"
+  rm -rf gut_extract
+fi
+# Verify actual installed content, not just that the commands above didn't error --
+# a wrong archive-internal layout (e.g. a GitHub zip restructuring) could leave mv
+# succeeding against the wrong source path or the target missing its real contents.
+# Gated on a printed marker so this step can never be reported as succeeding when it
+# didn't (same reasoning as the SourceIO SOURCEIO_OK gate above).
+if [ -f "$GUT_TARGET/plugin.cfg" ] && grep -q "version=\"${GUT_VER}\"" "$GUT_TARGET/plugin.cfg"; then
+  echo "GUT_INSTALL_OK"
+else
+  echo "ERROR: GUT install verification failed (missing or wrong-version plugin.cfg at $GUT_TARGET)" >&2
+  exit 1
+fi
+
 echo "toolchain ready"
