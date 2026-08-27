@@ -1,0 +1,222 @@
+config_version=5
+
+[application]
+config/name="Filly Rancher"
+run/main_scene="res://world/ranch.tscn"
+config/features=PackedStringArray("4.5", "Forward Plus")
+
+; AudioSafety (game/systems/audio_safety.gd): mutes the Master bus for automated/
+; headless/offscreen-capture runs so a scripted invocation that forgot
+; `--audio-driver Dummy` still cannot make audible noise on the machine running it.
+; Listed first (and every gate/scene is a Node3D/Node subclass added AFTER autoloads
+; in Godot's boot order) so it is guaranteed to run before any scene's _ready() could
+; call AudioStreamPlayer.play() -- see the script's own header comment for the
+; incident this backstops and why the trigger condition is what it is. Does nothing
+; during genuine interactive play (no --screenshot* arg, not headless).
+[autoload]
+
+AudioSafety="*res://systems/audio_safety.gd"
+
+[rendering]
+renderer/rendering_method="forward_plus"
+
+; The HUD (game/ui/hud.gd) is authored in 1920x1080 units -- crosshair radii, pip
+; sizes, font sizes -- and `canvas_items` stretch is what makes those units mean the
+; same thing on a 1366x768 laptop and a 4K monitor instead of shrinking to a smear on
+; one and ballooning on the other. Without it a Control's offsets are raw device
+; pixels, which is the default and is wrong for anything shipped to a second machine
+; whose resolution nobody here knows.
+;
+; `expand` rather than `keep`: letterboxing a 16:10 or ultrawide screen to hold a
+; 16:9 base is worse than simply revealing more world at the sides, and every HUD
+; element is anchored to a corner or to the centre, so none of them care how wide the
+; canvas ends up. The 3D view is unaffected either way -- a Camera3D's projection is
+; driven by its own FOV and the real viewport aspect, not by this setting.
+;
+; The window itself is 1600x900 (a size that fits on a 1080p laptop screen with room
+; for the taskbar) while the BASE viewport stays 1920x1080; canvas_items scales the
+; difference. Deliberately not fullscreen: the mouse is captured on start
+; (game/actors/player/camera_rig.gd), so a player who cannot find Escape needs a
+; window they can still get away from.
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/size/window_width_override=1600
+window/size/window_height_override=900
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+; glTF carries no loop flag, so Godot imports every clip as LOOP_NONE and a pony
+; plays her 0.875 s walk once and then slides around frozen. The usual per-file fix
+; lives in the .glb's .import sidecar, but everything under game/assets/converted/ is
+; generated and gitignored, so that setting would vanish on a fresh clone. Declaring
+; it as a scene-importer default keeps it in tracked config and applies to every pony
+; .glb the pipeline produces. loop_mode 1 = LOOP_LINEAR.
+; EVERY new clip authored in tools/author_anims.py needs its own entry here, keyed by
+; the Action's name -- there is no wildcard. A clip that is missing from this list
+; imports LOOP_NONE and freezes on its last frame after one play, which no structural
+; gate can see. `gallop` (Phase 1A) was the third.
+;
+; `animation/fps` is the other half of this block, and it is the one that has teeth.
+; Godot RESAMPLES every imported animation onto its own uniform grid at this rate; the
+; default is 30, the clips are authored at the source .blend's 24, and 30 does not
+; divide 24 -- so out of a 20-frame walk cycle only frames 0, 5, 10, 15 and 20 survive
+; unmoved and every other authored pose is replaced by an interpolation between two
+; neighbours. Measured on the `walk` clip, that quietly shortened the hoof's stance
+; travel from 0.275 m to 0.264 (4% of permanent foot skate nobody could see the cause
+; of), and on the 12-frame `gallop` -- whose whole stance is two frames -- it rounded
+; the stance corners off badly enough to cost 16%. Setting it to the authoring rate
+; makes the resample an identity. If author_anims.py is ever run against a pack whose
+; scene.render.fps is not 24, this number has to follow it.
+[importer_defaults]
+
+scene={
+"animation/fps": 24,
+"_subresources": {
+"animations": {
+"idle": {
+"settings/loop_mode": 1
+},
+"walk": {
+"settings/loop_mode": 1
+},
+"gallop": {
+"settings/loop_mode": 1
+}
+}
+}
+}
+
+; Player controller input map (Phase 1A task 4). Every action below is bound for
+; BOTH keyboard/mouse and gamepad, per the task's interface contract -- later
+; tasks (camera, magic beam) add their own actions alongside these.
+;   move_forward/back/left/right : WASD + arrow keys + left stick (deadzone 0.2)
+;   jump                         : Space + gamepad A (button 0)
+;   gallop                       : Shift + gamepad LB (button 9) -- a HELD
+;                                  modifier rather than "fast above an analog
+;                                  threshold", because a keyboard has no analog
+;                                  magnitude: a threshold scheme would leave
+;                                  keyboard players permanently galloping with
+;                                  no way to amble. See game/actors/player/player.gd.
+;   beam                         : right mouse button + right trigger (axis 5)
+; Joypad events use device -1 (all devices) so a second controller works.
+; Movement keys bind PHYSICAL keycodes, so WASD stays in the same place on
+; AZERTY/Dvorak layouts; `gallop` binds the logical KEY_SHIFT so either Shift works.
+;
+; Camera rig input map (Phase 1A task 5, game/actors/player/camera_rig.gd).
+;   look_left/right/up/down : gamepad right stick (axis 2 = X, axis 3 = Y) +
+;                              numpad 4/6/8/2 as the keyboard fallback. Mouse look is
+;                              NOT one of these actions -- InputMap actions only cover
+;                              discrete press/release and joypad-axis events, and there
+;                              is no InputMap event type for continuous relative mouse
+;                              motion, so camera_rig.gd reads InputEventMouseMotion
+;                              directly in _unhandled_input() instead. Numpad rather
+;                              than the arrow keys because move_forward/back/left/right
+;                              already claim the arrows as their alternate binding.
+;   zoom_in/zoom_out         : scroll wheel + keyboard =/- + gamepad d-pad up/down.
+;                              Each scroll notch/keypress/d-pad press is one discrete
+;                              step (game/actors/player/camera_rig.gd's ZOOM_STEP),
+;                              same "held modifier, no analog keyboard equivalent"
+;                              reasoning `gallop` documents above.
+;
+; HUD input map (Phase 1A task 9, game/ui/hud.gd).
+;   toggle_hints             : H + gamepad Back (button 4). An ACTION rather than a
+;                              raw keycode check in hud.gd, for the same reason every
+;                              other control here is one: the gamepad player has to be
+;                              able to bring the control card back up too, and a
+;                              `event.keycode == KEY_H` in a script is a keyboard-only
+;                              binding by construction.
+
+[input]
+
+move_forward={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":87,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194320,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventJoypadMotion,"resource_local_to_scene":false,"resource_name":"","device":-1,"axis":1,"axis_value":-1.0,"script":null)
+]
+}
+move_back={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":83,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194322,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventJoypadMotion,"resource_local_to_scene":false,"resource_name":"","device":-1,"axis":1,"axis_value":1.0,"script":null)
+]
+}
+move_left={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":65,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194319,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventJoypadMotion,"resource_local_to_scene":false,"resource_name":"","device":-1,"axis":0,"axis_value":-1.0,"script":null)
+]
+}
+move_right={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":68,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194321,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventJoypadMotion,"resource_local_to_scene":false,"resource_name":"","device":-1,"axis":0,"axis_value":1.0,"script":null)
+]
+}
+jump={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":32,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventJoypadButton,"resource_local_to_scene":false,"resource_name":"","device":-1,"button_index":0,"pressure":0.0,"pressed":false,"script":null)
+]
+}
+gallop={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":4194325,"physical_keycode":0,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventJoypadButton,"resource_local_to_scene":false,"resource_name":"","device":-1,"button_index":9,"pressure":0.0,"pressed":false,"script":null)
+]
+}
+beam={
+"deadzone": 0.2,
+"events": [Object(InputEventMouseButton,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"button_mask":0,"position":Vector2(0, 0),"global_position":Vector2(0, 0),"factor":1.0,"button_index":2,"canceled":false,"pressed":false,"double_click":false,"script":null)
+, Object(InputEventJoypadMotion,"resource_local_to_scene":false,"resource_name":"","device":-1,"axis":5,"axis_value":1.0,"script":null)
+]
+}
+toggle_hints={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":72,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventJoypadButton,"resource_local_to_scene":false,"resource_name":"","device":-1,"button_index":4,"pressure":0.0,"pressed":false,"script":null)
+]
+}
+look_left={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":4194442,"physical_keycode":0,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventJoypadMotion,"resource_local_to_scene":false,"resource_name":"","device":-1,"axis":2,"axis_value":-1.0,"script":null)
+]
+}
+look_right={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":4194444,"physical_keycode":0,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventJoypadMotion,"resource_local_to_scene":false,"resource_name":"","device":-1,"axis":2,"axis_value":1.0,"script":null)
+]
+}
+look_up={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":4194446,"physical_keycode":0,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventJoypadMotion,"resource_local_to_scene":false,"resource_name":"","device":-1,"axis":3,"axis_value":-1.0,"script":null)
+]
+}
+look_down={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":4194440,"physical_keycode":0,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventJoypadMotion,"resource_local_to_scene":false,"resource_name":"","device":-1,"axis":3,"axis_value":1.0,"script":null)
+]
+}
+zoom_in={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":61,"physical_keycode":0,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventMouseButton,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"button_mask":0,"position":Vector2(0, 0),"global_position":Vector2(0, 0),"factor":1.0,"button_index":4,"canceled":false,"pressed":false,"double_click":false,"script":null)
+, Object(InputEventJoypadButton,"resource_local_to_scene":false,"resource_name":"","device":-1,"button_index":11,"pressure":0.0,"pressed":false,"script":null)
+]
+}
+zoom_out={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":45,"physical_keycode":0,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventMouseButton,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"button_mask":0,"position":Vector2(0, 0),"global_position":Vector2(0, 0),"factor":1.0,"button_index":5,"canceled":false,"pressed":false,"double_click":false,"script":null)
+, Object(InputEventJoypadButton,"resource_local_to_scene":false,"resource_name":"","device":-1,"button_index":12,"pressure":0.0,"pressed":false,"script":null)
+]
+}

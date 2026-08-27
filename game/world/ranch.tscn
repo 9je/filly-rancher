@@ -1,0 +1,130 @@
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://world/ranch.gd" id="1"]
+[ext_resource type="Script" path="res://world/terrain.gd" id="2"]
+[ext_resource type="Script" path="res://world/props.gd" id="3"]
+[ext_resource type="Script" path="res://world/zone_marker.gd" id="4"]
+[ext_resource type="Script" path="res://world/spawner.gd" id="5"]
+[ext_resource type="PackedScene" path="res://actors/player/player.tscn" id="6"]
+[ext_resource type="Script" path="res://world/building.gd" id="7"]
+[ext_resource type="PackedScene" path="res://ui/hud.tscn" id="8"]
+
+[sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
+sky_top_color = Color(0.309804, 0.505882, 0.760784, 1)
+sky_horizon_color = Color(0.717647, 0.803922, 0.870588, 1)
+sky_curve = 0.18
+ground_bottom_color = Color(0.219608, 0.294118, 0.196078, 1)
+ground_horizon_color = Color(0.415686, 0.529412, 0.34902, 1)
+sun_angle_max = 12.0
+sun_curve = 0.08
+
+[sub_resource type="Sky" id="Sky"]
+sky_material = SubResource("SkyMat")
+
+[sub_resource type="Environment" id="Env"]
+background_mode = 2
+sky = SubResource("Sky")
+ambient_light_source = 3
+ambient_light_color = Color(0.729412, 0.803922, 0.878431, 1)
+ambient_light_sky_contribution = 0.85
+ambient_light_energy = 0.32
+tonemap_mode = 3
+tonemap_white = 3.0
+fog_enabled = true
+fog_light_color = Color(0.741176, 0.803922, 0.858824, 1)
+fog_density = 0.0011
+fog_sky_affect = 0.35
+
+[node name="Ranch" type="Node3D"]
+script = ExtResource("1")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Env")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.7071068, -0.3535534, 0.6123724, 0, 0.8660254, 0.5, -0.7071068, -0.3535534, 0.6123724, 0, 22, 0)
+light_color = Color(1, 0.968627, 0.905882, 1)
+light_energy = 1.15
+shadow_enabled = true
+shadow_bias = 0.05
+directional_shadow_max_distance = 140.0
+
+[node name="Terrain" type="StaticBody3D" parent="."]
+script = ExtResource("2")
+
+[node name="Props" type="Node3D" parent="."]
+script = ExtResource("3")
+
+[node name="Buildings" type="Node3D" parent="."]
+
+[node name="Barn" type="StaticBody3D" parent="Buildings"]
+transform = Transform3D(0.9396926, 0, 0.34202015, 0, 1, 0, -0.34202015, 0, 0.9396926, -10, 0, -9)
+script = ExtResource("7")
+width = 9.5
+depth = 7.0
+wall_height = 3.4
+ridge_height = 4.9
+door_width = 3.0
+door_height = 2.9
+wall_color = Color(0.556863, 0.231373, 0.192157, 1)
+roof_color = Color(0.278431, 0.243137, 0.223529, 1)
+trim_color = Color(0.309804, 0.219608, 0.176471, 1)
+
+[node name="Farmhouse" type="StaticBody3D" parent="Buildings"]
+transform = Transform3D(0.9063078, 0, -0.42261824, 0, 1, 0, 0.42261824, 0, 0.9063078, 9, 0, -7)
+script = ExtResource("7")
+width = 6.6
+depth = 5.6
+wall_height = 2.9
+ridge_height = 4.1
+door_width = 1.8
+door_height = 2.6
+wall_color = Color(0.898039, 0.858824, 0.760784, 1)
+roof_color = Color(0.376471, 0.211765, 0.176471, 1)
+trim_color = Color(0.435294, 0.32549, 0.243137, 1)
+
+[node name="Zones" type="Node3D" parent="."]
+
+[node name="NorthMeadow" type="Area3D" parent="Zones"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, -42)
+script = ExtResource("4")
+zone_id = &"ranch"
+spawn_radius = 11.0
+spawn_count = 3
+roam_radius = 6.0
+
+[node name="EastField" type="Area3D" parent="Zones"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40, 0, 8)
+script = ExtResource("4")
+zone_id = &"ranch"
+spawn_radius = 11.0
+spawn_count = 3
+roam_radius = 6.0
+
+[node name="SouthOrchard" type="Area3D" parent="Zones"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -30, 0, 38)
+script = ExtResource("4")
+zone_id = &"ranch"
+spawn_radius = 9.0
+spawn_count = 2
+roam_radius = 5.0
+
+[node name="Spawner" type="Node3D" parent="."]
+script = ExtResource("5")
+
+[node name="PlayerSpawn" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0.3, 10)
+
+[node name="PenPlots" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0, 13)
+
+[node name="Player" parent="." instance=ExtResource("6")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0.3, 10)
+collision_layer = 4
+collision_mask = 15
+
+[node name="HUD" parent="." instance=ExtResource("8")]
+
+[node name="CaptureCamera" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44, 27, 46)
+far = 400.0

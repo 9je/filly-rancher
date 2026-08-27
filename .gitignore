@@ -1,0 +1,17 @@
+assets_raw/
+tools/bin/
+game/assets/converted/
+game/.godot/
+build/
+# GUT is a third-party addon fetched by tools/setup_env.sh (pinned version + checksum,
+# same pattern as tools/bin/'s Godot/Blender/SourceIO), not hand-authored project code --
+# gitignored for the same reason those are, even though it lives under game/addons/,
+# which is deliberately NOT blanket-ignored (a first-party or intentionally-committed
+# addon dropped elsewhere under game/addons/ is still tracked normally).
+game/addons/gut/
+# Only the .import sidecars of *generated* assets are ignored. Deliberately NOT a
+# project-wide `*.import`: any asset committed to the repo must ship its sidecar too,
+# or Godot regenerates it independently on each machine and the resource UIDs diverge
+# (broken/duplicated references in scenes that point at them).
+game/assets/converted/**/*.import
+__pycache__/

@@ -1,0 +1,54 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scenes/test/playground.gd" id="1"]
+[ext_resource type="PackedScene" path="res://actors/player/player.tscn" id="2"]
+
+[sub_resource type="StandardMaterial3D" id="GroundMat"]
+albedo_color = Color(0.278431, 0.564706, 0.219608, 1)
+roughness = 0.95
+
+[sub_resource type="PlaneMesh" id="GroundMesh"]
+material = SubResource("GroundMat")
+size = Vector2(60, 60)
+
+[sub_resource type="BoxShape3D" id="GroundShape"]
+size = Vector3(60, 1, 60)
+
+[sub_resource type="StandardMaterial3D" id="LedgeMat"]
+albedo_color = Color(0.72549, 0.588235, 0.435294, 1)
+roughness = 0.9
+
+[sub_resource type="BoxMesh" id="LedgeMesh"]
+material = SubResource("LedgeMat")
+size = Vector3(3, 0.5, 3)
+
+[sub_resource type="BoxShape3D" id="LedgeShape"]
+size = Vector3(3, 0.5, 3)
+
+[node name="Playground" type="Node3D"]
+script = ExtResource("1")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.707, 0.707, 0, -0.707, 0.707, 0, 10, 0)
+shadow_enabled = true
+
+[node name="Ground" type="StaticBody3D" parent="."]
+
+[node name="Mesh" type="MeshInstance3D" parent="Ground"]
+mesh = SubResource("GroundMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+shape = SubResource("GroundShape")
+
+[node name="Ledge" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0.25, -2)
+
+[node name="Mesh" type="MeshInstance3D" parent="Ledge"]
+mesh = SubResource("LedgeMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ledge"]
+shape = SubResource("LedgeShape")
+
+[node name="Player" parent="." instance=ExtResource("2")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0)

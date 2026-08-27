@@ -1,0 +1,186 @@
+name: build-and-smoke
+
+# Exports the game for Linux and Windows, then *runs* both exported binaries and
+# asserts each one reaches its startup marker. Full write-up: docs/ci.md.
+#
+# Trigger policy: this is a 2-person private repo on free CI minutes, and
+# windows-latest bills at a 2x multiplier -- so no "push to any branch" trigger.
+# Pushes to master, pull requests, and manual dispatch only.
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer commit on the same branch/PR makes the in-flight run's result worthless;
+# cancelling it back is free minutes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pinned to match tools/setup_env.sh (GODOT_VER) so CI and the owner's machine
+  # build with the same engine. Bumping the engine means bumping it in both places.
+  GODOT_VERSION: 4.5.2-stable
+  # Godot looks for templates in a folder named major.minor.patch.status -- the
+  # .tpz's own templates/version.txt reads exactly this. See docs/pipeline.md section 9.
+  GODOT_TEMPLATES_VERSION: 4.5.2.stable
+  # SHA512s published by the release itself (SHA512-SUMS.txt for 4.5.2-stable);
+  # the Godot one is the same hash tools/setup_env.sh pins, the templates one the
+  # same hash docs/pipeline.md section 9 pins.
+  GODOT_SHA512: e3ce6194b6d4d2dcef5e5b5136752c084d9d8b9071c10bc2d2011b947ec7439a257c8d23c541cb30699f16d9edea6dff36e6e84d2bec14a8fe9b4e9aacbe5a8d
+  TEMPLATES_SHA512: 003aa33743f58fb657717f090fc872ed3975e48d08a6012201a2259970d458a63d4d8a83090585307c23455ebfa4e6e0050e1057761c34863536095e3fcfab6c
+  NO_COLOR: "1"   # keep ANSI escapes out of the export log we grep below
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Export both platforms on Linux (Godot cross-exports the Windows .exe with no
+  # Wine involved -- the same thing the owner does locally), smoke-test the Linux
+  # build here, and hand the Windows build to the windows-latest job below.
+  # Doing the export once on the cheaper runner keeps Windows minutes to just the
+  # part that genuinely requires Windows: executing the .exe.
+  # -------------------------------------------------------------------------
+  export-and-linux-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # ~1.3GB of export templates + a 70MB engine. Keyed on the engine version, so
+      # every run after the first restores instead of re-downloading.
+      - name: Cache Godot + export templates
+        id: godot-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/godot-ci
+            ~/.local/share/godot/export_templates
+          key: godot-${{ env.GODOT_VERSION }}-linux-v1
+
+      - name: Fetch Godot and export templates
+        if: steps.godot-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p ~/godot-ci && cd ~/godot-ci
+
+          curl -fL --connect-timeout 30 --max-time 900 -C - -o godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          echo "${GODOT_SHA512}  godot.zip" | sha512sum -c -
+          unzip -oq godot.zip
+          mv "Godot_v${GODOT_VERSION}_linux.x86_64" godot
+          chmod +x godot
+          rm godot.zip
+
+          # -C - so a download this size resumes rather than restarting if it is
+          # interrupted (same reasoning as docs/pipeline.md section 9).
+          curl -fL --connect-timeout 30 --max-time 1800 -C - -o templates.tpz \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_export_templates.tpz"
+          echo "${TEMPLATES_SHA512}  templates.tpz" | sha512sum -c -
+          unzip -oq templates.tpz -d tpz_extract
+          mkdir -p ~/.local/share/godot/export_templates
+          rm -rf "$HOME/.local/share/godot/export_templates/${GODOT_TEMPLATES_VERSION}"
+          mv tpz_extract/templates "$HOME/.local/share/godot/export_templates/${GODOT_TEMPLATES_VERSION}"
+          rm -rf templates.tpz tpz_extract
+
+      - name: Verify toolchain
+        run: |
+          set -euo pipefail
+          ~/godot-ci/godot --version
+          # The folder name must match major.minor.patch.status exactly or the export
+          # fails with "no export template found" -- assert it instead of hoping.
+          test -f "$HOME/.local/share/godot/export_templates/${GODOT_TEMPLATES_VERSION}/version.txt"
+          grep -qx "${GODOT_TEMPLATES_VERSION}" "$HOME/.local/share/godot/export_templates/${GODOT_TEMPLATES_VERSION}/version.txt"
+
+      # The export paths below are the ones docs/pipeline.md section 9 documents:
+      # relative to the --path project dir, so `../build/...` lands in the repo-root
+      # build/ folder from any checkout location. Verified against a clean clone.
+      - name: Export Linux + Windows
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          ~/godot-ci/godot --headless --path game --export-release "Linux" \
+            ../build/filly-rancher-linux.x86_64 2>&1 | tee export-linux.log
+          ~/godot-ci/godot --headless --path game --export-release "Windows" \
+            ../build/filly-rancher-windows.exe 2>&1 | tee export-windows.log
+          ls -la build/
+          file build/filly-rancher-windows.exe
+          # Both presets now set binary_format/embed_pck=true (game/export_presets.cfg),
+          # so each platform ships as ONE file with no sibling .pck -- assert that stays
+          # true rather than silently re-splitting on a future preset edit.
+          if ls build/*.pck >/dev/null 2>&1; then
+            echo "::error::Found a .pck next to the export -- embed_pck should make these single-file builds." >&2
+            exit 1
+          fi
+
+      # game/assets/converted/** is gitignored, so a CI checkout has no pony models,
+      # props or converted audio, and the export produces an ASSETLESS build (see
+      # docs/ci.md). Today nothing references those paths statically, so the export
+      # log is error-free -- verified against a clean clone before this workflow was
+      # written. That makes a zero-tolerance gate practical rather than flaky, and
+      # worth having: an export that cannot resolve a resource still exits 0 and still
+      # produces a runnable binary, so without this gate the first scene that *does*
+      # reference a converted asset would ship a silently broken build that the
+      # startup-marker check below would happily pass.
+      - name: Fail on export-time resource errors
+        run: |
+          set -uo pipefail
+          if grep -nE 'ERROR:|Failed loading resource|Failed to load resource|Cannot open file|Resource file not found' \
+               export-linux.log export-windows.log; then
+            echo "::error::Export emitted resource/errors above -- the build would be broken. See docs/ci.md." >&2
+            exit 1
+          fi
+          echo "export logs clean"
+
+      - name: Smoke-test the Linux build
+        run: bash .github/workflows/smoke_run.sh ./build/filly-rancher-linux.x86_64
+
+      # Uploaded before the Windows job runs, both because that job consumes the
+      # Windows artifact and because a build that fails its smoke test is still the
+      # thing you want to download and debug.
+      - name: Upload Linux build
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: filly-rancher-linux
+          # embed_pck=true (game/export_presets.cfg) merges the .pck into the binary,
+          # so this is the single file the game ships as -- no sibling .pck to list.
+          path: build/filly-rancher-linux.x86_64
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Windows build
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: filly-rancher-windows
+          # Same embed_pck=true story as the Linux upload above: one .exe, no .pck.
+          path: build/filly-rancher-windows.exe
+          if-no-files-found: error
+          retention-days: 30
+
+  # -------------------------------------------------------------------------
+  # The point of the whole workflow: run the .exe on real Windows. Phase 0 only ever
+  # confirmed `file` reported "PE32+ executable", which proves nothing about booting.
+  # -------------------------------------------------------------------------
+  windows-smoke:
+    needs: export-and-linux-smoke
+    runs-on: windows-latest
+    timeout-minutes: 20
+    # bash here is Git Bash, so this job runs the exact same smoke_run.sh as Linux.
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4   # only needed for .github/workflows/smoke_run.sh
+
+      - name: Download Windows build
+        uses: actions/download-artifact@v4
+        with:
+          name: filly-rancher-windows
+          path: build
+
+      - name: Smoke-test the Windows build
+        run: bash .github/workflows/smoke_run.sh ./build/filly-rancher-windows.exe
