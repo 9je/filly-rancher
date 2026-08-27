@@ -238,6 +238,19 @@ scale by exactly the requested factor.
   `author_anims._require_metric_rig()` refuses to author onto a rig outside
   0.5–3.0 units tall rather than silently baking a stride the model does not
   have. Forgetting `--scale` is therefore a loud failure, not a subtle one.
+
+  **⚠ This is a deliberate breaking change to an old command line.**
+  `--anims` *without* `--scale` used to work and now aborts with exit 1 and an
+  explanation. That is not the guard being fussy — it is the guard reporting a
+  breakage that already existed. Once `STRIDE` became metric, that combination
+  stopped being able to reproduce its previous output at all: measured, it
+  emits a pack-scale (4.10-unit) rig whose IK hoof targets travel **0.275 per
+  stride instead of 0.55** — half the stride the legs want, i.e. the "mincing
+  shuffle" `author_anims.py` describes as its rejected first pass — while
+  printing `WALK_IMPLIED_SPEED 0.66 m/s`, which a consumer scene would then
+  match and get 2× foot skate. The choice was between failing loudly and
+  shipping that silently. Geometry-only exports (no `--anims`) are unaffected
+  and remain byte-identical without `--scale`.
 - The mane/tail spring simulation needed **no re-tuning**:
   `PonyRig.PROFILES` expresses stiffness and gravity per unit of bone length,
   which makes the whole solve scale-invariant. Confirmed by measurement —
@@ -605,6 +618,13 @@ tools/bin/blender/blender -b assets_raw/blender-native/<Pack>/<file>.blend \
 the normalised rig, and `author_anims._require_metric_rig()` aborts the export
 if the rig it is handed is not metre-sized. If a future pack is authored at
 some other size, the abort message prints the factor to use.
+
+**If you are copying an older command from somewhere and it fails**, this is
+why — `--anims` without `--scale` exits 1 since Phase 1A task 1. It is not a
+regression to route around: adding `--scale 0.5` is the whole fix, and the
+combination that now aborts would otherwise have shipped a full-size pony
+walking a half-length stride. §3's "Model scale" section has the measurements.
+Exports that do *not* pass `--anims` never enter this path and are unchanged.
 
 No changes to `tools/author_anims.py` are needed as long as the pack shares
 the 93-bone core naming convention (`DEF_*`, `FK_*`, `IK_*`, `CON_*`

@@ -173,6 +173,14 @@ def _require_metric_rig(arm):
     when they are applied to a rig in some other unit -- the export still succeeds,
     every structural gate still passes, and the only symptom is a pony mincing or
     lunging through a stride that does not match her legs. So check it here.
+
+    THIS DELIBERATELY BREAKS `--anims` WITHOUT `--scale`, which used to work. It is
+    not a compromise made to get a loud error: once STRIDE became metric, that
+    combination could no longer reproduce its old output *at all* -- measured, it
+    emits a rig at pack scale whose hooves travel exactly half the stride its legs
+    want, and prints a WALK_IMPLIED_SPEED a consumer scene would then match, giving
+    2x foot skate. The only choice was between failing here and shipping that
+    silently. See docs/pipeline.md section 3.
     """
     height = rig_height(arm)
     low, high = METRIC_RIG_HEIGHT_RANGE
@@ -181,11 +189,14 @@ def _require_metric_rig(arm):
             f"rig {arm.name!r} measures {height:.4f} units tall, outside the metric "
             f"range {METRIC_RIG_HEIGHT_RANGE}. This module's STRIDE/LIFT/BODY_* "
             f"constants are metres (1 unit = 1 metre); author them onto an "
-            f"un-normalised rig and the gait will not match the model. Pass "
-            f"`--scale {2.05 / height:.3g}` (or thereabouts -- that is what puts this "
-            f"rig at the tier-a family's 2.05 m hoof-to-horn height, i.e. ~1.2 m at "
-            f"the withers) to tools/export_blend.py; the tier-a packs use --scale 0.5. "
-            f"See docs/pipeline.md section 3."
+            f"un-normalised rig and the gait will not match the model.\n"
+            f"  Fix: add `--scale 0.5` to the tools/export_blend.py command -- that is "
+            f"the factor for every CreatorOfPony/MythicSpeed tier-a pack, and using the "
+            f"same one for all of them is what keeps the family comparable.\n"
+            f"  Only if this really is a differently-sized pack, the factor that would "
+            f"put THIS rig at the tier-a family's 2.05 m hoof-to-horn height (~1.2 m at "
+            f"the withers) is about {2.05 / height:.2g}.\n"
+            f"  See docs/pipeline.md section 3."
         )
     print(f"METRIC_RIG_OK height={height:.4f}")
 
