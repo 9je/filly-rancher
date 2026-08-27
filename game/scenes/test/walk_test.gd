@@ -15,6 +15,12 @@ extends Node3D
 ## set to. A pack authored at any other fps silently desyncs this scene's WALK_SPEED
 ## while every structural gate still passes; the only symptom is foot skate. Compare
 ## against the WALK_IMPLIED_SPEED line the export prints before trusting this number.
+## Spawn through PonyRig, not `load(...).instantiate()`: that is what attaches the
+## mane/tail SpringBoneSimulator3D, and this scene is where the missing follow-through
+## was first noticed ("hair bobbing out of sync with the pony"). See
+## scripts/pony_rig.gd and docs/notes-hair-sim.md.
+const PonyRigScript := preload("res://scripts/pony_rig.gd")
+
 const WALK_STRIDE := 0.55
 const WALK_FRAMES := 20.0
 const WALK_FPS := 24.0            # must match the source .blend's scene.render.fps
@@ -27,7 +33,7 @@ var target_idx := 0
 var frames := 0
 
 func _ready() -> void:
-    pony = load("res://assets/converted/ponies/twilight.glb").instantiate()
+    pony = PonyRigScript.spawn("twilight")
     add_child(pony)
     var anim: AnimationPlayer = pony.find_child("AnimationPlayer", true, false)
     assert(anim != null, "no AnimationPlayer in glb")
