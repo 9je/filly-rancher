@@ -60,11 +60,15 @@ func test_skate_appears_only_above_the_honest_ceiling() -> void:
 		"the walk clip's own ceiling is MAX_PLAYBACK x its clip speed")
 	assert_almost_eq(GaitScript.TOP_SKATE_FREE_SPEED, 4.29, 0.005,
 		"the ladder's ceiling is GALLOP_MAX_PLAYBACK x the gallop clip speed")
-	# player.gd's GALLOP_SPEED. Before the `gallop` clip existed this was 2.02 -- the
-	# documented cost of galloping on a walk clip. It is the whole reason that clip was
-	# authored, so it is worth a test rather than a comment.
+	# 4.0 m/s used to be player.gd's GALLOP_SPEED and is still a fact about the LADDER:
+	# everything up to TOP_SKATE_FREE_SPEED is depicted honestly. Before the `gallop` clip
+	# existed the ratio here was 2.02 -- the documented cost of galloping on a walk clip,
+	# and the whole reason that clip was authored. (The player now runs at 4.8 m/s, past
+	# this ceiling by a deliberate, budgeted amount; that budget is pinned in
+	# game/test/test_player.gd, next to the constant that spends it, rather than here,
+	# because this file is about the clips and not about who is riding them.)
 	assert_almost_eq(GaitScript.skate_ratio(4.0), 1.0, 0.0001,
-		"the player's 4.0 m/s gallop must be inside what the gallop clip can depict")
+		"4.0 m/s is inside what the gallop clip can depict")
 	assert_gt(GaitScript.skate_ratio(GaitScript.TOP_SKATE_FREE_SPEED * 1.5), 1.4,
 		"past the ladder's ceiling the gallop clip saturates and skate returns")
 

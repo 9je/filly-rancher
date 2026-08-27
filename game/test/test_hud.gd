@@ -17,6 +17,7 @@ extends GutTest
 const HudScene := preload("res://ui/hud.tscn")
 const StorageScript := preload("res://systems/storage.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
+const MagicBeamScript := preload("res://actors/player/magic_beam.gd")
 
 var _hud: CanvasLayer
 ## The HUD's own parent. It looks for a sibling named "Player" (that is how it is
@@ -130,6 +131,32 @@ class FakeBeam:
 
 	func is_holding() -> bool:
 		return false
+
+	# The rest of the reading surface the HUD's crosshair uses. Unreachable while
+	# is_active() and is_holding() both answer false (the draw code short-circuits on
+	# them), and declared anyway: a stand-in missing half the interface it stands in for
+	# is one refactor away from turning a HUD change into a null-method crash in a test
+	# that is nominally about the saddlebag.
+	func has_target() -> bool:
+		return false
+
+	func is_secured() -> bool:
+		return false
+
+	func get_secure_progress() -> float:
+		return 0.0
+
+	func get_secure_seconds() -> float:
+		return 0.0
+
+	func get_struggle_seconds() -> float:
+		return INF
+
+	func get_hold_seconds() -> float:
+		return 0.0
+
+	func get_last_loss() -> int:
+		return MagicBeamScript.Loss.NONE
 
 
 class FakePlayer:

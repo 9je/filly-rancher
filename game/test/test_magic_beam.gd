@@ -3,10 +3,18 @@ extends GutTest
 ##
 ## The beam itself is a scene-level thing -- it needs a camera, a physics space and a live
 ## pony to mean anything, and that is what scenes/test/capture_test.tscn exists for. What
-## is pinned HERE is the arithmetic the scene cannot isolate: the struggle times that make
-## the three personalities feel different, and the zoom-invariance of the reach and hold
-## distances. Both are static and pure precisely so they can be checked in milliseconds
-## instead of inferred from where a pony ended up 200 frames into a render.
+## is pinned HERE is the arithmetic the scene cannot isolate: the two clocks that make a
+## capture a contest, the struggle times that make the three personalities feel different,
+## and the zoom-invariance of the reach and hold distances. All are static and pure
+## precisely so they can be checked in milliseconds instead of inferred from where a pony
+## ended up 200 frames into a render.
+##
+## THE FIRST PLAYTEST REWROTE HALF OF THIS FILE, and the reason is worth stating plainly:
+## a test here USED to assert that the beam out-reaches a pony's detection radius, and it
+## was green, and it was pinning the project's worst gameplay bug in place. Numbers that
+## are individually reasonable can still be wrong RELATIVE to each other, and a test that
+## states the wrong relationship confidently is worse than no test at all. See
+## test_a_pony_notices_the_player_before_the_beam_can_reach_her.
 ##
 ## Preloads by path rather than by the global class_name, matching the convention
 ## documented at the top of game/scripts/pony_rig.gd.
@@ -132,10 +140,79 @@ func test_the_hold_point_never_lands_inside_the_camera() -> void:
 		"a held body must never be pulled into the camera's near plane")
 
 
-func test_the_beam_reaches_past_a_ponys_detection_radius() -> void:
-	# Sizing check with teeth: a SHY pony starts fleeing at Pony.DETECTION_RADIUS. A reach
-	# shorter than that would mean she is always already running by the time she is
-	# grabbable, and catching one would be a foot race rather than an aim.
+func test_a_pony_notices_the_player_before_the_beam_can_reach_her() -> void:
+	# THE INVARIANT THE FIRST PLAYTEST WAS LOST TO, AND THE ONE ASSERTION THAT WOULD HAVE
+	# CAUGHT IT. The test that used to live here asserted the OPPOSITE -- that the beam
+	# out-reaches a pony's detection radius -- and it passed, because that is exactly what
+	# the build did: REACH 8.5 against DETECTION_RADIUS 5.0. The consequence was that no
+	# pony could ever react before being grabbed, so the entire flee behaviour, which works
+	# and is itself gated, never once happened in play. The owner found it in his first
+	# session: "I could just hold click and walk up and catch them -- they should start
+	# running away farther than the range of the beam."
+	#
+	# It is a relationship between two constants in two different files, which is the kind
+	# of thing that has no natural home and therefore ends up with no owner. It gets one
+	# here. A margin rather than a bare `>` because MagicBeam.GRAB_ASSIST_RADIUS already
+	# makes the effective grab distance longer than REACH, and because Phase 1B's shop is
+	# going to sell REACH upgrades -- so "detection is bigger by a hair" is not enough, it
+	# has to stay bigger by something a player can act inside.
 	var pony_script := load("res://actors/pony/pony.gd")
-	assert_gt(MagicBeamScript.REACH, pony_script.DETECTION_RADIUS,
-		"the beam must out-reach the radius at which a shy pony bolts")
+	var detection: float = pony_script.DETECTION_RADIUS
+	var margin: float = detection - MagicBeamScript.REACH
+	assert_gte(margin, MagicBeamScript.MIN_DETECTION_MARGIN,
+		("a pony must notice the player at least MIN_DETECTION_MARGIN (%.1f m) before he " +
+		"can beam her -- detection %.1f m, reach %.1f m, margin %.1f m") % [
+			MagicBeamScript.MIN_DETECTION_MARGIN, detection, MagicBeamScript.REACH, margin])
+	assert_gt(MagicBeamScript.MIN_DETECTION_MARGIN, MagicBeamScript.GRAB_ASSIST_RADIUS,
+		"the required margin must at least swallow the grab-assist radius, or a pony " +
+		"could be snatched out of the forgiveness pass before she had reacted")
+
+
+func test_the_capture_needs_a_real_hold_rather_than_a_click() -> void:
+	# The fix for "catching is really quick": releasing the button no longer stores
+	# whatever is in the beam, it has to have been held SECURE_SECONDS first. The floor is
+	# the pull-in -- a secure time that completed while she was still in transit would put
+	# the mechanic straight back where it was, with the whole contest over before the
+	# player had seen what they caught.
+	var pull_in: float = log(10.0) / MagicBeamScript.PULL_RESPONSE
+	assert_gt(MagicBeamScript.SECURE_SECONDS, pull_in * 2.0,
+		"securing a pony must take longer than reeling her in (%.3f s)" % pull_in)
+	assert_lt(MagicBeamScript.SECURE_SECONDS, 2.0,
+		"...and not so long that the twelfth catch of a session is a chore")
+
+
+func test_every_personality_has_a_window_wide_enough_to_hit() -> void:
+	# The two clocks only produce a mechanic if the second is comfortably past the first.
+	# A struggle time at or under SECURE_SECONDS would make that personality flatly
+	# UNCATCHABLE -- and nothing else in the project would say so, because both numbers
+	# would still look individually reasonable and every other test would still pass.
+	for personality in PonyDataScript.Personality.values():
+		var window: float = MagicBeamScript.capture_window_for(personality)
+		assert_gt(window, 0.4,
+			("%s must leave a window a human can act inside (got %.2f s: struggle %.2f s " +
+			"minus secure %.2f s)") % [
+				PonyDataScript.Personality.keys()[personality], window,
+				MagicBeamScript.struggle_seconds_for(personality),
+				MagicBeamScript.SECURE_SECONDS])
+
+
+func test_a_shy_pony_is_the_hardest_catch_and_a_bold_one_the_easiest() -> void:
+	# The whole point of per-personality struggle times, stated as the thing a player
+	# actually experiences -- how much slack they get -- rather than as raw timer values.
+	var shy: float = MagicBeamScript.capture_window_for(PonyDataScript.Personality.SHY)
+	var curious: float = MagicBeamScript.capture_window_for(PonyDataScript.Personality.CURIOUS)
+	var bold: float = MagicBeamScript.capture_window_for(PonyDataScript.Personality.BOLD)
+	assert_lt(shy, curious, "a SHY pony must be a tighter catch than a CURIOUS one")
+	assert_lt(curious, bold, "...and a CURIOUS one than a BOLD one")
+	assert_gt(bold, shy * 2.0,
+		"and the spread must be big enough to feel: BOLD should be a comfortable catch " +
+		"where SHY is a scramble")
+
+
+func test_losing_her_costs_the_player_the_re_grab() -> void:
+	# An escape that the beam can undo on the next frame is not an escape. The cooldown
+	# also has to outlast the time she needs to get her legs under her -- she accelerates
+	# at Pony.ACCELERATION from a standstill at the hold point, a couple of metres from the
+	# player's face, so a cooldown much under a second hands her straight back.
+	assert_gt(MagicBeamScript.ESCAPE_COOLDOWN, 1.0,
+		"a lost pony must get long enough to become a moving target again")
