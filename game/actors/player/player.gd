@@ -134,8 +134,9 @@ func _ready() -> void:
 	_build_visuals()
 
 
-## The node the magic beam originates from (Task 8). Sits at Twilight's horn tip and
-## follows her facing, since it hangs off `Visuals` rather than off the body.
+## The node the magic beam originates from (Task 8). Sits at the horn tip and follows her
+## facing, since it hangs off `Visuals` rather than off the body. Its position is MEASURED
+## from the model at spawn -- see `_place_beam_origin`.
 func get_beam_origin() -> Node3D:
 	return beam_origin
 
@@ -296,6 +297,7 @@ func _build_visuals() -> void:
 		return
 
 	visuals.add_child(pony)
+	_place_beam_origin(pony)
 	_anim = pony.get_node_or_null(PonyVisualsScript.ANIMATION_PLAYER_PATH)
 	if _anim == null:
 		# PonyVisuals.build() refuses to return an instance without one, so this is
@@ -303,3 +305,45 @@ func _build_visuals() -> void:
 		push_error("Player: no AnimationPlayer at %s" % PonyVisualsScript.ANIMATION_PLAYER_PATH)
 		return
 	_play("idle")
+
+
+## Move `BeamOrigin` onto the actual tip of the actual horn of the actual model.
+##
+## The owner, first playtest: "beam doesn't come from horn". It did not: the marker sat
+## hand-placed at (0, 2.00, -0.30) in `player.tscn`, while Twilight's horn tip is at
+## (0.00, 2.13, -0.85) -- 0.55 m short along her forward axis, which puts the emitter
+## inside her skull, level with the cheek. It reads as a beam sprouting from her muzzle.
+##
+## Measured rather than hand-tuned, and measured PER MODEL rather than hardcoded for
+## Twilight: `pony_id` is an exported field, so the day someone plays a different unicorn
+## a literal here would be wrong again and nothing would catch it. The horn ships as its
+## own mesh object in every CreatorOfPony pack (`Base_Horn`, bone-parented to DEF_Head),
+## so the tip is just its highest vertex -- deliberately the geometry and not the bounding
+## box, because the horn is a cone RAKED FORWARD and every corner of its box is somewhere
+## the horn is not: measured, the box's highest corner sits 0.31 m behind the real tip and
+## 0.08 m off the centre line, which is over half the error this function exists to fix.
+##
+## Falls back silently to whatever `player.tscn` holds for a model with no horn mesh --
+## an earth pony or a pegasus has no horn to fire from, and that is a design question,
+## not a crash. The value in the scene is Twilight's measured tip, so the fallback is at
+## least a sane place rather than a guess.
+func _place_beam_origin(pony: Node3D) -> void:
+	var horn := pony.find_child("Base_Horn", true, false)
+	if not (horn is MeshInstance3D):
+		return
+	var mesh := horn as MeshInstance3D
+	if mesh.mesh == null:
+		return
+	# Bone-parented parts hang off a BoneAttachment3D that has not resolved its pose yet
+	# this early in _ready; without this the horn still reads at the skeleton's origin.
+	pony.force_update_transform()
+	var to_visuals := visuals.global_transform.affine_inverse() * mesh.global_transform
+	var tip := Vector3(0.0, -INF, 0.0)
+	for surface in mesh.mesh.get_surface_count():
+		var vertices: PackedVector3Array = mesh.mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]
+		for vertex in vertices:
+			var local: Vector3 = to_visuals * vertex
+			if local.y > tip.y:
+				tip = local
+	if is_finite(tip.y):
+		beam_origin.position = tip

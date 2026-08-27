@@ -739,3 +739,134 @@ the pattern to copy.
   amplification test lever-invariant at every depth. It costs one extra pass per
   chain, which is why it is not in this round.
 - **Still no human has looked at any of it.** §8 item 1 stands.
+
+---
+
+## 11. Playtest round — "fluttershy hair flowing crazy"
+
+§10.8 closed with "still no human has looked at any of it." One has now, and
+the thing they saw was not in any of the columns above.
+
+The owner, on a screenshot of Fluttershy galloping: **"fluttershy hair flowing
+crazy"**, and on the mechanism, **"there's some hair gravity that looks weird —
+I like the direction but poor implementation."** Rendered offscreen and
+confirmed: her mane and tail stream out horizontally behind her, a full body
+length of hair flying like a flag, and even at a walk her tail is an enormous
+S-curve dragging along the ground while her mane wraps through her own body.
+
+### 11.1 Why the metrics were green-ish and the picture was not
+
+Two blind spots, both worth writing down.
+
+**The gate only ever walks.** `hair_lag_test`'s manoeuvre travels at
+`TRAVEL_SPEED` = the `walk` clip's own 0.66 m/s. The player gallops at
+`Player.GALLOP_SPEED` = 4.0 m/s, six times faster. Godot's spring solver pulls
+a joint's tail back toward its rest direction by `stiffness * delta` — an
+absolute displacement, so `stiffness` is a *restoring speed in metres per
+second*, and a chain can only hold its shape while that speed comfortably
+exceeds how fast its anchor is being dragged through the world. Fluttershy's
+chains ran at 2.4 / 3.5 / 4.6 m/s of restoring speed. At 0.66 m/s they have
+several times the authority they need; at 4.0 m/s they have none, and the hair
+simply never catches up. After §11.2 they run at 7.7 / 20.0 / 14.8 m/s, i.e.
+2–5x the fastest the player can move, which is the margin the shape needs. Nothing in §§6–10 tested that, so nothing in §§6–10 could see it.
+
+**The chain-length term was missing.** `configure_setting` normalises stiffness
+by segment LENGTH, which makes one profile behave the same on a long bone and a
+short one. It says nothing about how *many* of them are strung together, and
+that is a second, independent multiplier. Each joint lags its parent by a small
+angle; the tip's displacement is the sum of every one of those angles times its
+own distance out to the tip, so for `n` roughly equal segments the tip error
+grows like `n²` even though each joint is behaving identically. Every chain in
+the sweep that produced `PROFILES` was Twilight's — **1 to 5 joints**, and
+Rainbow Dash's are 1 to 4. **Fluttershy's are 8, 8 and 10.**
+
+The evidence had actually been sitting in §10.8's own diagnostic run and was
+read as a gate artefact rather than as a defect: her forelock tip at
+`offset=0.236 m` on a 1.16 m-withers pony, with a correlation that never peaked
+inside the search window — the exact signature §10.1 had already named for
+Twilight's mane.
+
+### 11.2 The fix
+
+`PonyRig.SPAN_REFERENCE_JOINTS = 5`, `SPAN_EXPONENT = 2.5`:
+
+```
+stiffness *= max(1, joints / SPAN_REFERENCE_JOINTS) ** SPAN_EXPONENT
+```
+
+**One-sided on purpose.** Below the reference the correction would slacken
+chains that are already measured good, and Twilight's certified tuning is built
+entirely out of 1-to-5-joint chains. She and Rainbow Dash come out
+bit-identical to before the constant existed — `HAIRLAG_OK leaf_chains=6
+passing=6 bob_retention=56%..199% worst_self_gain=1.16 worst_wobble=0.036`
+before and after, every column to the digit. The defect lives entirely at the
+long end and this is the smallest change that reaches it.
+
+**Gravity is deliberately not scaled with it.** The droop a chain settles into
+is the ratio of gravity to stiffness, so raising stiffness alone pulls the
+static droop in by the same proportion — one knob for both halves of the defect
+(hair flung out while moving, hair hanging too far out while still).
+
+**The exponent.** The geometry above predicts 2. Swept at 1.0 / 1.5 / 2.0 / 2.5
+/ 3.0 through the new `span=<ref>,<exp>` hook and rendered at each:
+
+| exp | Fluttershy gallop, by eye | tail `offset` | mane `keep` |
+|---|---|---|---|
+| off | mane and tail horizontal, flag-like | 0.0243 | 207% |
+| 2.0 | mane still swept back over her spine | 0.0106 | 153% |
+| 2.5 | mane hangs and trails, tail droops and sweeps | 0.0067 | 120% |
+| 3.0 | very nearly the rigid reference — less life | — | — |
+
+2.5 and not 2.0 because the joint count is not the only thing that grew:
+Fluttershy's segments are ~1.5× longer than the reference chain's too, so her
+chains are 3× Twilight's in metres as well as 2× in joints, and the exponent
+absorbs the difference. That half is empirical and is flagged as such — a
+length-based reference would be more faithful but would give up the
+scale-invariance §9 paid for.
+
+### 11.3 What the gate still says, and why it is not the whole story
+
+```
+twilight    HAIRLAG_OK   leaf_chains=6  passing=6   (unchanged, bit-identical)
+rainbowdash HAIRLAG_FAIL leaf_chains=14 passing=10  (unchanged — all her chains are <= 4 joints)
+fluttershy  HAIRLAG_FAIL leaf_chains=3  passing=1   (unchanged count, different reasons)
+```
+
+Fluttershy's count did not move, and the honest thing to say is that **her two
+remaining flags are the two failure modes §10.8 already identified as
+confounded**, not a hair problem:
+
+- `DEF_Mane1-8` — `keep=120%` against the depth-0 upper bound of 110%. That
+  bound exists to catch resonance, and at depth 0 `self_gain` is 1.0 by
+  construction and cannot tell resonance from lever arm. An 8-joint chain's tip
+  sits far enough out that it traces a bigger arc than the head does for purely
+  geometric reasons — §10.4 proved exactly this for Twilight's branch chains by
+  pinning them rigid and watching the number not move. The fix is §10.8's
+  per-chain pinned reference, which is still not done.
+- `DEF_Tail1-10` — `keep=9%`, `leads`. This is the metric that most needs
+  replacing: her tail is 2.5 m of hair hanging off a 0.9 m hip, so it folds and
+  reaches the ground, and the vertical position of a tip in that arrangement is
+  set by where the strand runs out rather than by what the hip is doing. The
+  column that says the hair is alive is `dyn_dev` — mean dynamic displacement
+  from where a rigid bone would be — and hers is **0.069–0.101 m**, squarely
+  inside Twilight's own 0.083–0.161 m. It is not dead hair; it is hair the bob
+  metric cannot describe.
+
+Rainbow Dash is untouched by design (nothing she has is longer than 4 joints)
+and her four failures are unchanged: two forelock chains under the 40%
+retention floor, and two one-bone tail locks with `self_gain` 1.59 / 2.21. A
+sweep of the shared `hair` profile (10/0.86 → 14/0.90 → 18/0.92 → 22/0.94) was
+run against her and Twilight together: 14/0.90 fixes her `DEF_Hair4-3` jitter
+(wobble 0.074 → 0.049) and lifts `DEF_Hair2-3` to 41%, but flips `DEF_Hair1-2`
+to leading, so the passing count stays at 10 and only the reasons move.
+Rendered, her bangs are the pack's own spiky fringe and read correctly against
+the `tag=rigid` reference, so the profile was left alone rather than churned
+for a lateral move.
+
+### 11.4 The gate this round should have had
+
+`scenes/test/visual_review.tscn` (docs/pipeline.md §7). It renders; it asserts
+nothing. `mode=motion clip=gallop tag=rigid` is the single most useful thing in
+it: the rigid pass is what the model and the clip intend, and "does the
+simulated hair still read as that shape, only late" is the question the owner
+was actually asking. Run it at the gallop, not just the walk.

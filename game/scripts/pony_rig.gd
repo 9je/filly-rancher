@@ -141,6 +141,57 @@ const PROFILES: Array[Dictionary] = [
 ## override re-runs the pinning experiment on demand.
 const STACKED_CHAIN_STIFFNESS := 1.0
 
+## Chain length, in joints, that PROFILES' stiffness is calibrated for -- and the exponent
+## by which a LONGER chain's stiffness is raised. Together: a chain of `n` joints gets
+## `stiffness * max(1, n / SPAN_REFERENCE_JOINTS) ** SPAN_EXPONENT`.
+##
+## WHY. `configure_setting` already normalises by segment LENGTH (see PROFILES), which
+## makes one profile behave the same on a long bone and a short one. It does nothing about
+## how MANY of them are strung together, and that is a second, independent multiplier on
+## how far the tip ends up from where it should be. Each joint in a spring chain lags its
+## parent by some small angle; the tip's displacement is the sum of every one of those
+## angles multiplied by its own distance out to the tip, so for a chain of n roughly equal
+## segments the tip error grows like n squared even though each joint is behaving
+## identically. Twilight's longest chain is 5 joints and Rainbow Dash's is 4 -- the whole
+## sweep in PROFILES was run inside that band. **Fluttershy's are 8, 8 and 10**, and at 10
+## joints the same per-joint lag puts her tail tip four times further out of place.
+##
+## That is exactly what the owner saw. On a screenshot of Fluttershy galloping, her mane
+## and tail streamed straight out horizontally behind her, a full body length of hair
+## flying like a flag: "fluttershy hair flowing crazy", and, on the mechanism, "there's
+## some hair gravity that looks weird -- I like the direction but poor implementation."
+## The measurements agreed and nobody had read them that way: her forelock tip sat
+## `offset=0.236 m` out of place on a 1.16 m-withers pony and its correlation never peaked
+## inside the search window at all -- the signature of hair that never catches up, which
+## docs/notes-hair-sim.md section 10.1 had already named for Twilight's mane.
+##
+## ONE-SIDED ON PURPOSE -- `max(1, ...)`, so this only ever STIFFENS. Below the reference
+## the correction would slacken chains that are already measured good, and Twilight's
+## certified `HAIRLAG_OK` tuning is built out of 1-to-5-joint chains: the whole of her rig
+## and the whole of Rainbow Dash's sit at or under the reference and come out bit-identical
+## to before this constant existed. The defect being fixed lives entirely at the long end,
+## and this is the smallest change that reaches it.
+##
+## Gravity is deliberately NOT scaled alongside. The static droop a chain settles into is
+## the ratio of gravity to stiffness, so raising stiffness alone pulls the droop back in
+## proportion -- one knob for both halves of the defect (hair flung out while moving, hair
+## hanging too far out while still) instead of two that have to be kept in step.
+##
+## THE EXPONENT IS 2.5 AND THE GEOMETRY ABOVE ONLY PREDICTS 2 -- the extra half is
+## empirical and is flagged as such. Swept at 1.0 / 1.5 / 2.0 / 2.5 / 3.0 through
+## `hair_lag_test.gd`'s new `span=<ref>,<exp>` hook AND rendered at each through
+## `scenes/test/visual_review.tscn` (`mode=motion clip=gallop`, against the `tag=rigid`
+## reference), because the gate alone cannot answer this: it only ever drives a 0.66 m/s
+## walk ramp and the defect is at the player's 4.0 m/s gallop. At 2.0 Fluttershy's mane is
+## still swept back over her spine; at 2.5 it hangs and trails; at 3.0 she is
+## indistinguishable from the rigid reference, i.e. the follow-through is gone. The reason
+## the joint count alone falls short is that her SEGMENTS are ~1.5x longer than the
+## reference chain's too, so her chains are 3x Twilight's in metres as well as 2x in
+## joints -- a length-based reference would model that exactly but would give up the
+## scale-invariance section 9 of docs/notes-hair-sim.md paid for. See section 11 there.
+const SPAN_REFERENCE_JOINTS := 5
+const SPAN_EXPONENT := 2.5
+
 const SIMULATOR_NAME := "HairSpring"
 const PONY_DIR := "res://assets/converted/ponies/"
 
@@ -256,12 +307,25 @@ static func chain_depths(skeleton: Skeleton3D, chains: Array) -> PackedInt32Arra
 ## close enough (Twilight's tail: 0.17 / 0.23 / 0.21 m) for the difference not to show.
 static func configure_setting(sim: SpringBoneSimulator3D, skeleton: Skeleton3D,
 		index: int, chain: PackedInt32Array, profile: Dictionary, depth: int = 0,
-		stacked_factor: float = STACKED_CHAIN_STIFFNESS) -> void:
+		stacked_factor: float = STACKED_CHAIN_STIFFNESS,
+		span_reference: int = SPAN_REFERENCE_JOINTS,
+		span_exponent: float = SPAN_EXPONENT) -> void:
 	var scale := _mean_segment(skeleton, chain)
-	sim.set_stiffness(index, profile["stiffness"] * scale * pow(stacked_factor, depth))
+	sim.set_stiffness(index, profile["stiffness"] * scale
+		* span_factor(chain.size(), span_reference, span_exponent)
+		* pow(stacked_factor, depth))
 	sim.set_gravity(index, profile["gravity"] * scale)
 	sim.set_drag(index, profile["drag"])
 	sim.set_radius(index, profile["radius"] * scale)
+
+
+## Stiffness multiplier for a chain of `joints` joints -- see SPAN_REFERENCE_JOINTS.
+## 1.0 for anything at or under the reference, so it can only ever stiffen.
+static func span_factor(joints: int, reference: int = SPAN_REFERENCE_JOINTS,
+		exponent: float = SPAN_EXPONENT) -> float:
+	if reference <= 0 or joints <= reference:
+		return 1.0
+	return pow(float(joints) / float(reference), exponent)
 
 
 ## Local-space offset from a chain's end bone to the virtual tip the simulator extends

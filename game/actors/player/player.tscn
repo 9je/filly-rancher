@@ -23,7 +23,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.45, 0)
 [node name="Visuals" type="Node3D" parent="."]
 
 [node name="BeamOrigin" type="Marker3D" parent="Visuals"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, -0.3)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.1267, -0.8528)
 
 [node name="MagicBeam" type="Node3D" parent="."]
 script = ExtResource("3")

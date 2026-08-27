@@ -273,6 +273,8 @@ scale by exactly the requested factor.
 | 5 | **Loose (unpacked) texture PNGs** sit next to the `.blend` rather than packed into it. | Not actually broken (Blender resolves relative paths regardless of cwd) — a resilience measure, not a bug. | `bpy.ops.file.pack_all()` runs before export to remove any path ambiguity and make the export self-contained. |
 | 6 | Applejack's pack ships with viewport "simplify" mode on. | Cosmetic only — `export_apply=True` exports against the depsgraph, not simplified viewport display. Not exercised (Applejack unconverted this run) but documented as harmless per the source pack's own notes. | No fix needed. |
 
+| 7 | **The iris is shrinkwrapped onto an eyeball that is not the one we export.** Each eye is four objects — `Base_Eye.*` (the white, SUBSURF 2), `Base_Iris.*` and two `Base_EyeHighlight*.*` — with the caps floated off the white by a SHRINKWRAP in PROJECT/ABOVE_SURFACE mode. The iris's shrinkwrap carries `subsurf_levels=2`, i.e. it conforms to a level-**four** eyeball while the level-two one is what ships. | The sclera tears through the upper rim of every iris: a stable, sawtoothed white/colour boundary, worst on Fluttershy, present on all three packs. This is what the owner's first playtest called "eyes weird" / "eyes also a bit funny?". Nothing structural sees it — `materials=13 textured=True` is as green as ever. | `conform_shrinkwraps_to_exported_surface()` forces every shrinkwrap's `subsurf_levels` to 0 and multiplies **all** of the export's shrinkwrap offsets by one common factor, enough that the smallest clears 0.5% of its target's size. One factor rather than a per-modifier floor, because the caps are stacked (iris 0.0015, highlights 0.0020) and flattening them to the same value just moves the tearing up a layer. Measured on the shipped `.glb`, nearest-vertex signed distance along the sclera normal: iris `-0.00037 → +0.00161 m` minimum, `14 → 0` vertices inside the white; highlight-vs-iris `-0.00002 → +0.00060 m`, `3 → 0` inside. |
+
 **Known limitation carried forward:** glTF cannot express a color-plus-decal
 mix in one material, so the exported body keeps its flat base color and
 **loses the cutie mark**. This is a real fidelity regression, deferred to
@@ -860,7 +862,11 @@ tools/bin/godot --headless --audio-driver Dummy --path game world/ranch.tscn
 tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/hair_lag_test.tscn
 # -> CHAIN <tip> root=<..> joints=<n> leaf=<bool> stiffness=.. drag=.. gravity=..
 # -> HAIRLAG <tip> leaf trails body by +N ticks (+M ms) ...   (one line per chain)
-# -> HAIRLAG_OK leaf_chains=6 moving=6 lagging=6 worst_wobble=0.032   exit 0
+# -> HAIRLAG_OK leaf_chains=6 passing=6 bob_retention=56%..199% worst_self_gain=1.16
+#      worst_wobble=0.036   exit 0
+# This gate drives a 0.66 m/s WALK ramp and nothing else. Hair that passes it can still
+# stream out horizontally at the player's 4.0 m/s gallop -- that is a real defect this
+# project shipped, and only scenes/test/visual_review.tscn (below) can see it.
 # Add `-- character=rainbowdash` to point it at another pack.
 #
 # WATCHDOG: armed at 120s (GateWatchdogScript.arm, see game/scripts/gate_watchdog.gd).
@@ -928,10 +934,41 @@ textured=True`, correct bone counts, and `WALK_OK` all passed while an
 early export of Twilight was rendering almost entirely invisible (§3, quirk
 2) — none of these checks look at a single pixel. That defect was only
 caught by rendering actual frames off-screen (`xvfb-run` + llvmpipe
-software Vulkan) and inspecting them. **Recommendation for Phase 1:** add a
-cheap render-and-compare check to the pipeline (even "fraction of
-non-background pixels in a fixed camera shot") — it would have caught that
-defect three tasks earlier than it actually was.
+software Vulkan) and inspecting them. It happened again in the owner's first
+real playtest: three separate defects (torn irises, hair streaming out
+horizontally, a magic beam emerging from Twilight's cheek) that every gate
+above was green through.
+
+**So there is now a scene whose whole job is to render frames a human looks
+at**, `scenes/test/visual_review.tscn`. It asserts nothing — read the PNGs.
+
+```bash
+xvfb-run -a tools/bin/godot --path game --audio-driver Dummy \
+  --resolution 1280x720 scenes/test/visual_review.tscn -- \
+  mode=face character=fluttershy out=/tmp/shots
+# -> SHOT /tmp/shots/fluttershy_face_front.png  (+ threequarter, eye closeup, head wide)
+# -> VISUAL_REVIEW_DONE mode=face character=fluttershy shots=4
+```
+
+- `mode=face` — head close-ups. What "the eyes look funny" is judged on.
+- `mode=motion clip=walk|gallop` — the character travelling at the clip's own
+  speed with the springs live, captured at instants far enough apart to see
+  the trail. **Add `tag=rigid` for the reference shot** (`influence = 0`,
+  hair welded to the skull): that is the shape the model and the clip
+  intend, and every judgement about the springs is a comparison against it.
+  Judge the gallop, not just the walk — `hair_lag_test` only ever drives a
+  0.66 m/s walk ramp, and hair that reads fine there can still stream out
+  like a flag at the player's 4.0 m/s gallop. That is exactly the defect the
+  owner reported and the numbers missed.
+- `mode=beam` — a real `Player` with the beam on, side-on at head height,
+  and it prints `BEAM horn_tip=(…) beam_origin=(…) gap=…` so the mount's
+  placement is a number as well as a picture.
+- `mode=probe` — no pictures; prints measured landmarks (horn tip in model
+  space, eye centres) and every `MeshInstance3D` with its world position and
+  material. `player.tscn`'s `BeamOrigin` default came from here.
+
+Windowed/offscreen, **not** `--headless` (headless renders nothing to
+capture); `--audio-driver Dummy` as everywhere else.
 
 ---
 
