@@ -1,6 +1,7 @@
 """Headless Blender: export a .blend (or one collection/object in it) to glTF.
 Usage: blender -b file.blend -P tools/export_blend.py -- --out out.glb [--object Twilight]
                                                         [--anims] [--rotate-z 180]
+                                                        [--scale 0.5]
 
 Prop variant (Task 8): for a source FBX prop instead of an already-open .blend,
 run with no .blend argument and pass --fbx-in:
@@ -10,6 +11,7 @@ pipeline below runs unchanged -- material rebuild, pack_all, export.
 """
 import argparse, json, os, struct, sys
 import bpy
+from mathutils import Matrix
 
 argv = sys.argv[sys.argv.index("--") + 1:]
 p = argparse.ArgumentParser()
@@ -20,6 +22,12 @@ p.add_argument("--anims", action="store_true",
                     "(see tools/author_anims.py); the packs ship none of their own")
 p.add_argument("--rotate-z", type=float, default=0.0, metavar="DEG",
                help="yaw the exported root this many degrees about +Z before export")
+p.add_argument("--scale", type=float, default=1.0, metavar="FACTOR",
+               help="uniformly rescale everything being exported by FACTOR, baked into "
+                    "the geometry and the rig (not left on a root node). The project "
+                    "convention is 1 unit = 1 metre and the tier-a pony packs are "
+                    "authored ~2x that, so characters export with --scale 0.5 -- see "
+                    "docs/pipeline.md section 3. 1.0 (the default) touches nothing")
 p.add_argument("--fbx-in", default=None, metavar="PATH",
                help="import this FBX into the current (normally empty) scene before "
                     "doing anything else -- lets this script convert a standalone FBX "
@@ -285,6 +293,126 @@ def rebind_secondary_armatures(primary, meshes):
     return rebound
 
 
+# --- Normalizing model scale (Task 1, Phase 1A): 1 Godot unit = 1 metre.
+#
+# The CreatorOfPony packs are authored at roughly 2x life size (Twilight's withers --
+# the top of her back above the shoulder joint, the conventional way to state a horse's
+# height -- measure 2.337 units against a hoof plane at 0.010, and a show pony is ~1.2 m
+# there). Rather than build every map and physics constant around that, the factor is
+# baked into the asset at export time, once, by this function.
+#
+# WHY NOT `obj.scale = k` AND LEAVE IT ON THE ROOT. Two reasons. The glTF exporter would
+# emit a root node with a non-unit scale, so the .glb's *internal* units would still be
+# the pack's -- every bone rest, every animation translation, every value a consumer
+# reads out of Skeleton3D would be in 2x units while the world around it is metric, and
+# anything later parented under that root (a collision shape, a saddle, a particle
+# emitter) would silently inherit the scale. And `bpy.ops.object.transform_apply` is not
+# the fix either: applying a scale to a parent leaves its children at their original
+# size (Blender rewrites their parent inverse to compensate), which would put a
+# full-size mesh on a half-size skeleton.
+#
+# So bake the similarity directly. Every mesh/armature/curve datablock is scaled about
+# its own origin, and every object's placement inside the hierarchy is conjugated by the
+# same scale -- which, for a uniform factor, leaves rotations untouched and multiplies
+# translations by the factor, so the product down any parent chain comes out at exactly
+# FACTOR x the original world position.
+#
+# THE PARTS THAT DO NOT FOLLOW THE GEOMETRY. A handful of constraint and modifier
+# settings are lengths in the rig's own units and are stored, not derived, so scaling
+# the geometry alone leaves them behind:
+#   * CHILD_OF `inverse_matrix` (bone-level on DEF_Neck1/DEF_Neck2/DEF_Head, which is
+#     how this rig stabilises the head against body motion -- its translation is 5.17
+#     units on Twilight, so leaving it unscaled tears the head off the neck in the bake);
+#   * STRETCH_TO `rest_length` (DEF_Tongue1/2 deform the tongue; the VIS_*Knee helpers
+#     do not export but are scaled anyway for consistency);
+#   * SHRINKWRAP `offset` (0.0015-0.002, holding the iris and eye highlights off the
+#     eyeball surface) and MIRROR `merge_threshold`.
+# The IK constraints' `distance` is deliberately NOT in that list: all four are
+# `ik_type='COPY_POSE'`, where the field is unused.
+#
+# That list covers what these packs actually use, and it is a list, so it can be
+# incomplete for a future pack. `_extent()` below is the backstop for the geometry and
+# the hierarchy: the exported selection's bounding box is measured before and after, and
+# a box that did not scale by exactly the requested factor is a hard failure rather than
+# a subtly wrong asset. It reads base mesh data, so it deliberately does NOT claim to
+# cover the constraint/modifier list above -- that was checked the only way it can be,
+# end to end: exporting Twilight at 1.0 and at 0.5 and decoding both, every baked
+# animation translation in the scaled file is the unscaled one halved to within 3.5e-6
+# and every rotation is unchanged to within 2.0e-5 of a quaternion component. Re-run
+# that comparison if this list ever has to grow.
+_SCALED_CONSTRAINT_ATTRS = ("rest_length",)
+_SCALED_MODIFIER_ATTRS = {"SHRINKWRAP": ("offset",), "MIRROR": ("merge_threshold",),
+                          "SOLIDIFY": ("thickness",)}
+
+
+def _extent(objects):
+    """World-space bounding box of every mesh in `objects`, as (min, max) tuples."""
+    bpy.context.view_layer.update()
+    lo = [float("inf")] * 3
+    hi = [float("-inf")] * 3
+    for obj in objects:
+        if obj.type != "MESH":
+            continue
+        matrix = obj.matrix_world
+        for vert in obj.data.vertices:
+            world = matrix @ vert.co
+            for axis in range(3):
+                lo[axis] = min(lo[axis], world[axis])
+                hi[axis] = max(hi[axis], world[axis])
+    return tuple(lo), tuple(hi)
+
+
+def apply_uniform_scale(objects, factor):
+    """Bake a uniform scale of `factor` into `objects`' data, placement and rig."""
+    before_lo, before_hi = _extent(objects)
+    matrix = Matrix.Scale(factor, 4)
+    scaled_data = set()
+    for obj in sorted(objects, key=lambda o: o.name):
+        data = obj.data
+        key = None if data is None else data.as_pointer()
+        if key is not None and key not in scaled_data and hasattr(data, "transform"):
+            try:
+                data.transform(matrix, shape_keys=True)
+            except TypeError:
+                data.transform(matrix)   # armatures/curves take no shape_keys argument
+            scaled_data.add(key)
+        for attr in ("matrix_basis", "matrix_parent_inverse"):
+            placement = getattr(obj, attr).copy()
+            placement.translation *= factor
+            setattr(obj, attr, placement)
+        holders = [obj]
+        if obj.type == "ARMATURE":
+            holders += list(obj.pose.bones)
+        for holder in holders:
+            for con in holder.constraints:
+                if hasattr(con, "inverse_matrix"):
+                    inverse = con.inverse_matrix.copy()
+                    inverse.translation *= factor
+                    con.inverse_matrix = inverse
+                for attr in _SCALED_CONSTRAINT_ATTRS:
+                    if hasattr(con, attr):
+                        setattr(con, attr, getattr(con, attr) * factor)
+        for mod in obj.modifiers:
+            for attr in _SCALED_MODIFIER_ATTRS.get(mod.type, ()):
+                if hasattr(mod, attr):
+                    setattr(mod, attr, getattr(mod, attr) * factor)
+
+    after_lo, after_hi = _extent(objects)
+    size_before = [hi - lo for lo, hi in zip(before_lo, before_hi)]
+    size_after = [hi - lo for lo, hi in zip(after_lo, after_hi)]
+    for axis, (was, now) in enumerate(zip(size_before, size_after)):
+        if was > 1e-6 and abs(now / was - factor) > 1e-4:
+            raise SystemExit(
+                f"--scale {factor}: axis {axis} of the exported selection scaled by "
+                f"{now / was:.6f}, not {factor} -- something in this .blend holds a "
+                f"length that did not follow the geometry (see _SCALED_CONSTRAINT_ATTRS "
+                f"/ _SCALED_MODIFIER_ATTRS in tools/export_blend.py)"
+            )
+    print(f"SCALED factor={factor} datablocks={len(scaled_data)} "
+          f"objects={len(objects)} size={tuple(round(v, 4) for v in size_after)} "
+          f"(was {tuple(round(v, 4) for v in size_before)})")
+
+
 # --- Keeping mane/tail bones OUT of the baked clips.
 #
 # `export_bake_animation=True` means "sample every bone of the armature on every
@@ -402,6 +530,14 @@ else:
     target = None
     keep = set(bpy.data.objects)
     use_selection = False
+
+# Rescale BEFORE authoring clips, never after: --anims solves IK against whatever the
+# rig measures at that moment and bakes the result, and author_anims.py's length
+# constants (STRIDE, LIFT, BODY_BOB, ...) are metres. Rescaling afterwards would leave
+# the clip depicting a stride the model no longer has. Also before --rotate-z, though
+# that one is only for tidiness: a uniform scale and a rotation commute.
+if args.scale != 1.0:
+    apply_uniform_scale(keep, args.scale)
 
 # --- These packs ship zero character Actions (only a `CameraAxisAction` camera-orbit
 # helper), so there is nothing for `export_animations` to emit unless we author clips

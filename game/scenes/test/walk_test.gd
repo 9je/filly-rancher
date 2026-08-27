@@ -8,7 +8,7 @@ extends Node3D
 ## cycle -- dividing by the full cycle understates the clip's speed by 2x.
 ## These constants must track tools/author_anims.py, which prints the same number as
 ## WALK_IMPLIED_SPEED on every export; compare them if you retune the clip.
-## FOUR values are duplicated here with no automatic sync: STRIDE (0.55), WALK_FRAMES
+## FOUR values are duplicated here with no automatic sync: STRIDE (0.275), WALK_FRAMES
 ## (20), STANCE_FRACTION (the 0.5 divisor) and -- the easiest one to miss -- the frame
 ## rate. 24 is hardcoded below, whereas author_anims.py reads it from
 ## bpy.context.scene.render.fps, i.e. from whatever the source .blend happens to be
@@ -21,14 +21,23 @@ extends Node3D
 ## scripts/pony_rig.gd and docs/notes-hair-sim.md.
 const PonyRigScript := preload("res://scripts/pony_rig.gd")
 
-const WALK_STRIDE := 0.55
+const WALK_STRIDE := 0.275
 const WALK_FRAMES := 20.0
 const WALK_FPS := 24.0            # must match the source .blend's scene.render.fps
 const WALK_CYCLE_SECONDS := WALK_FRAMES / WALK_FPS
-const WALK_SPEED := WALK_STRIDE / (WALK_CYCLE_SECONDS * 0.5)  # 1.32 units/s
+const WALK_SPEED := WALK_STRIDE / (WALK_CYCLE_SECONDS * 0.5)  # 0.66 m/s
+
+## Everything below is metres, like everything else in the project (1 unit = 1 metre,
+## docs/pipeline.md section 3). The square path and the arrival radius are half what
+## they were before the ponies were normalised to metric scale, for the same reason
+## WALK_STRIDE is: the pony now covers half the ground per second, and this scene's
+## gate (WALK_OK at frame 300, i.e. 5 s) budgets no extra time. At 0.66 m/s she needs
+## ~4.1 s to reach the first waypoint, which leaves a ~0.9 s margin; a full-size path
+## would leave her still walking toward waypoint 1 when the gate fires.
+const ARRIVAL_RADIUS := 0.1
 
 var pony: Node3D
-var waypoints := [Vector3(4,0,4), Vector3(4,0,-4), Vector3(-4,0,-4), Vector3(-4,0,4)]
+var waypoints := [Vector3(2,0,2), Vector3(2,0,-2), Vector3(-2,0,-2), Vector3(-2,0,2)]
 var target_idx := 0
 var frames := 0
 
@@ -43,7 +52,7 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
     var target: Vector3 = waypoints[target_idx]
     var to_target := target - pony.position
-    if to_target.length() < 0.2:
+    if to_target.length() < ARRIVAL_RADIUS:
         target_idx = (target_idx + 1) % waypoints.size()
     else:
         pony.position += to_target.normalized() * WALK_SPEED * delta

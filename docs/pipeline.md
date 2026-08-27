@@ -169,13 +169,13 @@ and the actual character parented under one root armature: `TS_Rig`
 mkdir -p game/assets/converted/ponies
 
 tools/bin/blender/blender -b assets_raw/blender-native/TwilightSparkle_1-0/TwilightSparkle_1-0.blend \
-  -P tools/export_blend.py -- --out game/assets/converted/ponies/twilight.glb --object TS_Rig --anims --rotate-z 180
+  -P tools/export_blend.py -- --out game/assets/converted/ponies/twilight.glb --object TS_Rig --anims --rotate-z 180 --scale 0.5
 
 tools/bin/blender/blender -b assets_raw/blender-native/RainbowDash_1-1/RainbowDash4.blend \
-  -P tools/export_blend.py -- --out game/assets/converted/ponies/rainbowdash.glb --object RD_Rig --anims --rotate-z 180
+  -P tools/export_blend.py -- --out game/assets/converted/ponies/rainbowdash.glb --object RD_Rig --anims --rotate-z 180 --scale 0.5
 
 tools/bin/blender/blender -b assets_raw/blender-native/Fluttershy_1-0/Fluttershy_1-0.blend \
-  -P tools/export_blend.py -- --out game/assets/converted/ponies/fluttershy.glb --object FS_Rig --anims --rotate-z 180
+  -P tools/export_blend.py -- --out game/assets/converted/ponies/fluttershy.glb --object FS_Rig --anims --rotate-z 180 --scale 0.5
 ```
 
 `--object <Rig>` selects exactly the character (the script walks
@@ -183,11 +183,67 @@ tools/bin/blender/blender -b assets_raw/blender-native/Fluttershy_1-0/Fluttershy
 secondary `*_RigPhysics` armature and naturally excludes the camera,
 background planes, and unparented `BS_*` helpers). `--anims` authors `idle`
 + `walk` clips onto the rig before export (§5). `--rotate-z 180` fixes a
-facing-direction quirk (§5). Omit both flags for a static, unanimated export
-(e.g. for a prop or a quick structural check).
+facing-direction quirk (§5). `--scale 0.5` normalizes the model to metric
+scale — see immediately below; it is **mandatory for every new character**.
+Omit `--anims`/`--rotate-z` for a static, unanimated export (e.g. for a prop
+or a quick structural check) — but keep `--scale`.
 
 Each invocation prints a per-material resolution log line, then
+`SCALED factor=0.5 …`, `METRIC_RIG_OK height=2.0525`,
 `ANIMS_AUTHORED ['idle', 'walk']` (if `--anims`), then `EXPORT_OK <path>`.
+
+### Model scale — 1 unit = 1 metre, and `--scale` is how you get there
+
+**Settled decision (Phase 1A task 1).** One Godot unit is one metre,
+everywhere: assets, maps, physics, animation constants. The CreatorOfPony
+packs are authored at roughly twice that, so every tier-a character is
+exported with **`--scale 0.5`**.
+
+How the factor was chosen — measured, not assumed. The withers (top of the
+back above the shoulder joint, the conventional way to state a horse's
+height) is the reference, because the bounding box of these models is
+dominated by a raised head, ears, horn and mane rather than by the body:
+
+| | pack units | at `--scale 0.5` |
+|---|---|---|
+| Twilight, withers | 2.326 | **1.163 m** |
+| Twilight, bounding box (hoof → horn tip) | 4.276 | 2.138 m |
+| Rainbow Dash / Fluttershy, withers | 2.326 / 2.343 | 1.163 / 1.171 m |
+| front leg chain (shoulder → hoof) | 1.067 | 0.533 m |
+| rig extent, hoof plane → highest bone | 4.105 | 2.053 m |
+
+A show pony is small — 1.16 m at the withers is ~11.5 hands, a real (small)
+pony — and `0.5` lands there within 3% while being *exactly* representable in
+binary, so the rescale is an exponent shift rather than a rounding: verified
+by decoding both exports, every vertex position and node translation in the
+scaled `.glb` is the unscaled one halved to within 3.5e-6, and the inverse
+bind matrices to within 2.2e-5. Note the model's bounding box is **1.84× its
+withers height** (cartoon proportions), so "how tall is the pony" has two very
+different answers; world geometry has to clear 2.14 m, not 1.16 m.
+
+`--scale` bakes the factor into the geometry and the rig — it does *not* leave
+a scaled root node — so the `.glb`'s internal units are metres too: bone
+rests, animation translations and anything a consumer reads out of
+`Skeleton3D`. `tools/export_blend.py`'s `apply_uniform_scale()` documents
+which stored lengths (CHILD\_OF inverse matrices, `STRETCH_TO` rest lengths,
+shrinkwrap offsets) have to be scaled by hand because they do not follow the
+geometry, and hard-fails if the exported selection's bounding box did not
+scale by exactly the requested factor.
+
+**Two consequences to know about.**
+
+- `tools/author_anims.py`'s length constants (`STRIDE`, `LIFT`, `BODY_BOB`,
+  `BODY_CROUCH`, `IDLE_*`) are **metres**, and `--scale` runs *before*
+  authoring so the clips are solved against the normalised rig.
+  `author_anims._require_metric_rig()` refuses to author onto a rig outside
+  0.5–3.0 units tall rather than silently baking a stride the model does not
+  have. Forgetting `--scale` is therefore a loud failure, not a subtle one.
+- The mane/tail spring simulation needed **no re-tuning**:
+  `PonyRig.PROFILES` expresses stiffness and gravity per unit of bone length,
+  which makes the whole solve scale-invariant. Confirmed by measurement —
+  after the rescale `hair_lag_test` reports every chain's trail identical to
+  the tick and every displacement column exactly halved. See
+  `docs/notes-hair-sim.md` §9.
 
 ### Per-pack quirks (fixed generically inside `export_blend.py`, not by hand)
 
@@ -299,46 +355,60 @@ pack ships flat named materials (`leafsGreen`, `woodBark`, solid
 
 ### Scale finding — props vs. the converted ponies
 
-Measured in Godot (world-space AABB height, native/as-imported scale, no
-manual correction applied):
+Measured in Godot (world-space AABB height, native/as-imported prop scale, no
+manual correction applied). **The pony column has moved**: since Phase 1A task
+1 the ponies ship metric (§3), so Twilight is 2.14 m tall / 1.16 m at the
+withers rather than the 4.28 units these props were originally judged against.
+Prop heights themselves are unchanged — nothing was re-sourced or re-scaled.
 
-| Prop | Height (units) | vs. Twilight (4.28 u) |
-|---|---|---|
-| Twilight (`twilight.glb`) | 4.28 | — |
-| `kenney_windmill.glb` | 3.11 | 73% |
-| `kenney_watermill.glb` | 1.80 | 42% |
-| `kenney_survival_structure.glb` | 0.50 | 12% (see quirk 4) |
-| `kenney_market_stall.glb` | 1.24 | 29% |
-| `kenney_tree_default.glb` | 1.71 | 40% |
-| `kenney_tree_pine.glb` | 1.53 | 36% |
-| `kenney_tree_oak.glb` | 1.23 | 29% |
-| `kenney_tree_fat.glb` | 1.15 | 27% |
+| Prop | Height (units) | vs. Twilight's 2.14 m box | vs. her 1.16 m withers |
+|---|---|---|---|
+| Twilight (`twilight.glb`) | 2.14 | — | — |
+| `kenney_windmill.glb` | 3.11 | 146% | 268% |
+| `kenney_watermill.glb` | 1.80 | 84% | 155% |
+| `kenney_survival_structure.glb` | 0.50 | 23% | 43% (see quirk 4) |
+| `kenney_market_stall.glb` | 1.24 | 58% | 106% |
+| `kenney_tree_default.glb` | 1.71 | 80% | 147% |
+| `kenney_tree_pine.glb` | 1.53 | 72% | 132% |
+| `kenney_tree_oak.glb` | 1.23 | 57% | 105% |
+| `kenney_tree_fat.glb` | 1.15 | 54% | 99% |
 
-At native scale, every prop — trees included — is **shorter than the
-pony**, which reads as absurd (a pony taller than a windmill, trees like
-shrubs at her hooves; confirmed visually, not just numerically, via an
-`xvfb-run` + llvmpipe offscreen capture of `terrain_probe.tscn`). This is
-the same mismatch `docs/pipeline.md` §"Deferred to Phase 1" item 1 already
-flagged from the pony side (`twilight.glb` measures **~3× life size** if 1
-Godot unit = 1 meter) — Task 8 corroborates it independently from the
-world-geometry side: Kenney's kits are built on a real-world-meter-scale
-module grid (their standard wall/door piece is a 2-unit cube, i.e. ~2m,
-sane for a human-scale doorway), so the mismatch is the pony rig's
-oversized scale, not the props'.
+Task 8's original finding — every prop, trees included, shorter than the pony —
+was confirmed visually via an `xvfb-run` + llvmpipe offscreen capture of
+`terrain_probe.tscn`, and it identified the pony rigs as the side that was
+wrong: Kenney's kits are built on a real-world-metre module grid (their
+standard wall/door piece is a 2-unit cube, i.e. ~2 m, sane for a human-scale
+doorway). Task 1 fixed the pony side, which is why the ratios above are no
+longer absurd — but they are still not right. A market stall the same height
+as the pony's withers, and trees she can look over, still read as a toy
+village.
 
-**Recommended reconciliation:** scale Kenney (and by extension
-similarly-sourced) props up by **~3×** when placing them in a map that also
-contains the current pony rigs, rather than rescaling the ponies (which
-would require re-tuning every animation-speed constant calibrated against
-their current size, e.g. `walk_test.gd`'s `WALK_STRIDE`/`WALK_SPEED`). A
-`terrain_probe.tscn` re-render at `--prop-scale=3.0` confirms this reads
-sensibly: buildings tower over the pony (windmill → 9.3 u), trees end up
-comparable to or taller than her (3.5–5.1 u) instead of shorter. This is a
+**Recommended prop factor for the Phase 1A map-build task: `1.5×`.** That is
+exactly Task 8's validated `3.0×` carried through the pony rescale (`3.0 ×
+2.138 / 4.276 = 1.5`), so it reproduces the prop/pony relationship that was
+already judged to read sensibly on screen — windmill 4.67 m, watermill 2.70 m,
+trees 1.73–2.56 m, market stall 1.86 m against a 2.14 m pony. It is a
 map-build-time multiplier on imported world geometry, not a change to any
-already-shipped asset — cheap to apply, cheap to revisit once Phase 1 makes
-the real scale-normalization call the deferred-decision doc calls for.
+shipped asset. Two things to weigh before committing to it:
+
+- **`1.0×` is the "trust Kenney's grid" answer** and it is not crazy — the
+  kits claim metre-scale — but it makes the stall (1.24 m) shorter than the
+  pony's withers and every tree shorter than she is, which is the same failure
+  Task 8 rejected. The kits are stylised small, not metric.
+- **Doorways must clear 2.14 m, not 1.16 m.** These models are 1.84× taller at
+  the ear/horn tip than at the withers, so anything sized off "how tall is a
+  pony" against the withers figure will be too short to walk through. At
+  `1.5×` a Kenney 2-unit door module becomes 3 m, which clears comfortably.
+
+Re-render `terrain_probe.tscn` with `-- --prop-scale=1.5` before settling it;
+the probe takes the factor on the command line precisely so this call can be
+made from a picture rather than a table.
 
 ### Task 8 verdict — props-on-Godot-terrain viability
+
+*(Task 8's verdict below predates the pony rescale; its "recommend ~3×" is
+superseded by the `1.5×` above, which is the same visual relationship measured
+against the metric ponies. Everything else it says still stands.)*
 
 **Viable for Phase 1, with two caveats to carry forward.** Kenney's CC0
 kits convert cleanly through both the direct-GLB and FBX-via-Blender
@@ -528,8 +598,13 @@ pack, the existing clips apply for free — just export it:
 
 ```bash
 tools/bin/blender/blender -b assets_raw/blender-native/<Pack>/<file>.blend \
-  -P tools/export_blend.py -- --out game/assets/converted/ponies/<name>.glb --object <X>_Rig --anims --rotate-z 180
+  -P tools/export_blend.py -- --out game/assets/converted/ponies/<name>.glb --object <X>_Rig --anims --rotate-z 180 --scale 0.5
 ```
+
+`--scale 0.5` is not optional (§3): the clips are authored in metres against
+the normalised rig, and `author_anims._require_metric_rig()` aborts the export
+if the rig it is handed is not metre-sized. If a future pack is authored at
+some other size, the abort message prints the factor to use.
 
 No changes to `tools/author_anims.py` are needed as long as the pack shares
 the 93-bone core naming convention (`DEF_*`, `FK_*`, `IK_*`, `CON_*`
@@ -582,9 +657,10 @@ in `author()`. Load-bearing things to know before touching it:
   This was caught and fixed in review; the gating is load-bearing, don't
   remove it.
 - **`WALK_STRIDE` is duplicated** between `tools/author_anims.py` (the
-  authoring constant, `0.55`) and `game/scenes/test/walk_test.gd` (the
+  authoring constant, `0.275` m) and `game/scenes/test/walk_test.gd` (the
   scene's ground-speed constant, derived as
-  `STRIDE / (cycle_seconds * 0.5)` = `1.32 u/s`) — cross-check comments sit
+  `STRIDE / (cycle_seconds * 0.5)` = `0.66 m/s`; `hair_lag_test.gd`'s
+  `TRAVEL_SPEED` is a third copy) — cross-check comments sit
   at both sites, but they are not automatically kept in sync. If you retune
   `STRIDE`, update both, or the walk-test pony's feet will skate. See §8 for
   why the divisor is *half* the cycle, not the whole cycle. **Four values are
@@ -782,20 +858,16 @@ previously existed only in gitignored task-report files
 (`.superpowers/sdd/.../task-7-report.md`) or the ledger, which is not a
 durable home for a decision Phase 1 planning needs.
 
-1. **Model scale is undecided.** The converted ponies measure roughly `1.68
-   × 4.28 × 4.31` Blender units (width × height × depth,
-   `MODEL_AABB size=(1.68, 4.28, 4.31)`) — if 1 unit is meant to be 1 metre,
-   these ponies are **roughly 3× life size**. Two ways to resolve it:
-   normalize scale at export time (rescale every converted model into a
-   sane meter range), or build world geometry (terrain, buildings, props) to
-   match the models' native scale instead. Not decided; needs a deliberate
-   call before Phase 1 world geometry gets built around either assumption,
-   since redoing it later means reworking either every asset or every map.
-   **Task 8 corroborates this from the world-geometry side:** Kenney CC0
-   kits (real-world-meter-scale module grid) measure every prop shorter
-   than the ~4.28-unit pony at native scale, and reads sensibly once
-   scaled ~3× to match — the same ratio this item already derived from the
-   pony side alone. See §4's "Scale finding" for the measured numbers.
+1. ~~**Model scale is undecided.**~~ **SETTLED (Phase 1A task 1): 1 unit = 1
+   metre, ponies exported with `--scale 0.5`.** The factor was picked from a
+   withers measurement (2.326 pack units → 1.163 m, a small show pony) rather
+   than from the bounding box, which these cartoon proportions inflate to
+   1.84× the withers height. The full reasoning, the measured numbers and the
+   two things that follow from the decision (metric constants in
+   `author_anims.py`; the hair sim being scale-invariant by construction) live
+   in §3, "Model scale". The prop side is re-derived in §4: the recommended
+   map-build-time prop multiplier is now **1.5×**, not the 3× Task 8 quoted
+   against the old pony scale.
 2. **Owner's visual/audio verdicts are still pending**, across three
    deliverables that were structurally validated but never subjectively
    judged by a human: walk quality *in motion* (the gait is measured
@@ -812,8 +884,10 @@ durable home for a decision Phase 1 planning needs.
    as a known limitation in `tools/export_blend.py`'s module comment as well.
 4. **Root-motion extraction to eliminate residual foot slide.** The walk
    clip's stance speed was tuned to match `walk_test.gd`'s ground speed
-   (`STRIDE=0.55` → `1.32 u/s`, reducing measured slide ~3.5x from the
-   original tuning), but a residual **~0.257 u/s** stance slide remains —
+   (`STRIDE=0.275 m` → `0.66 m/s`, reducing measured slide ~3.5x from the
+   original tuning), but a residual **~0.13 m/s** stance slide remains
+   (it was measured as 0.257 u/s before the metric rescale halved every
+   length in the clip; the *relative* slide is unchanged) —
    caused by Bezier interpolation between authored keys plus Godot
    resampling a 24fps clip against `animation/fps=30` at a 60Hz physics
    tick, not by an error in the authored gait itself. Driving it to exactly

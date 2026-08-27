@@ -60,13 +60,15 @@ const TICK_SECONDS := 1.0 / 60.0
 ## speed the walk clip actually depicts. Travelling at some other speed would be a
 ## different experiment rather than a wrong one, but this keeps the manoeuvre to
 ## something a player would really see.
-const TRAVEL_SPEED := 1.32
+const TRAVEL_SPEED := 0.66
 ## Assets face -Z (export_blend.py --rotate-z 180 bakes in Godot's forward convention),
 ## so this is "forwards" and the hair should stream out behind her.
 const TRAVEL_DIRECTION := Vector3(0, 0, -1)
 ## A tip has to depart from its rigid path by at least this much (mean 3D distance, in
-## model units, against a ~4.3-unit-tall pony) before a lag number means anything.
-const MIN_DEVIATION := 0.005
+## metres, against a 2.05 m-tall pony -- 1 unit = 1 metre, docs/pipeline.md section 3)
+## before a lag number means anything. Halved along with the models when they were
+## normalised to metric scale, so it stays the same fraction of body height.
+const MIN_DEVIATION := 0.0025
 
 var pony: Node3D
 var skeleton: Skeleton3D
@@ -337,7 +339,7 @@ func _report() -> void:
 			   deviation, sag, _bob_span(rigid[i]), _bob_span(samples[i]),
 			   _wobble(rigid[i]), _wobble(samples[i]),
 			   "" if moves else "  [static]"])
-	print("MANOEUVRE settle=%d ticks, travel=%d ticks at %.2f u/s along %v, then %d ticks stationary"
+	print("MANOEUVRE settle=%d ticks, travel=%d ticks at %.2f m/s along %v, then %d ticks stationary"
 		% [SETTLE_TICKS, TRAVEL_TICKS, TRAVEL_SPEED, TRAVEL_DIRECTION, COAST_TICKS])
 	var ok := leaves > 0 and moving == leaves and lagging == leaves
 	print("HAIRLAG_%s leaf_chains=%d moving=%d lagging=%d worst_wobble=%.3f"

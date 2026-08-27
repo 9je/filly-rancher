@@ -29,7 +29,13 @@ parent, so a bone's armature-space offset is exactly `bone.matrix_local.to_3x3()
 location`; `_to_bone_space()` inverts that to turn an intended armature-space delta
 into the pose value. Same trick for rotation axes.
 
-ORIENTATION. The rig faces -Y in Blender (head at y=-1.05, rump at y=+0.97), which
+SCALE. `export_blend.py --scale` runs BEFORE this module, so the rig arrives already
+normalised and every length constant here is in metres (1 unit = 1 metre, see
+docs/pipeline.md section 3). Every measurement quoted in this file's comments is
+post-scale; the source .blend's own numbers are twice them, because the tier-a packs
+are authored at ~2x life size. `_require_metric_rig()` enforces the ordering.
+
+ORIENTATION. The rig faces -Y in Blender (head at y=-0.53, rump at y=+0.49), which
 `export_yup` turns into +Z in glTF. Godot's `look_at()` aims -Z at the target, so an
 unrotated export moonwalks. `export_blend.py --rotate-z 180` is the fix; it lives
 there rather than here because it is an export-orientation concern, not an animation
@@ -99,38 +105,89 @@ FEET = [
 # idle first came out with the hooves frozen half a stride apart.
 ANIMATED = [BELLY, HEAD] + [name for name, _ in FEET]
 
+# --- EVERY LENGTH BELOW IS IN METRES, because 1 unit = 1 metre is this project's
+# convention (docs/pipeline.md section 3) and `export_blend.py --scale` has already
+# normalised the rig by the time author() runs. The source packs are authored at ~2x
+# life size, so a pony reaches the authoring code at --scale 0.5 and every constant
+# here is exactly half what it was when these clips were first tuned against the
+# packs' native units. Ratios -- and therefore the gait, the IK margins and all the
+# reasoning below -- are unchanged: a uniform scale leaves every angle alone.
+# `_require_metric_rig()` refuses to author onto an un-normalised rig rather than
+# silently baking a stride the model does not have.
+
 WALK_FRAMES = 20        # loop length; clips start at frame 0, so frame WALK_FRAMES
                         # (20) is the seam and repeats frame 0
-# Fore/aft hoof travel per stride. This is the number that sets how fast the clip
-# says she is moving, so it is also what a consumer scene has to match to avoid foot
-# skate -- see IMPLIED_SPEED below and WALK_SPEED in scenes/test/walk_test.gd.
-# 0.30 (the first pass) was a mincing shuffle for a model whose front leg chain is
-# 1.066 long; 0.55 is roughly half a leg length per step, which reads as a walk and
-# still clears full extension by a comfortable margin (worst-case reach over the
-# cycle is 1.039 at mid-stance, and that peak is set by the body bob, not by STRIDE).
-STRIDE = 0.55
-LIFT = 0.16             # swing-phase hoof clearance
-BODY_BOB = 0.045        # vertical body oscillation, twice per gait cycle
+# Fore/aft hoof travel per stride, in metres. This is the number that sets how fast
+# the clip says she is moving, so it is also what a consumer scene has to match to
+# avoid foot skate -- see IMPLIED_SPEED below and WALK_SPEED in
+# scenes/test/walk_test.gd. 0.15 (the first pass) was a mincing shuffle for a model
+# whose front leg chain is 0.533 long; 0.275 is roughly half a leg length per step,
+# which reads as a walk and still clears full extension by a comfortable margin
+# (worst-case reach over the cycle is 0.520 at mid-stance, and that peak is set by
+# the body bob, not by STRIDE). It is also close to the geometric ceiling: the chain
+# runs out of reach not far above this, which is why the clip depicts a deliberate
+# 0.66 m/s walk rather than a brisker one -- see implied_ground_speed().
+STRIDE = 0.275
+LIFT = 0.08             # swing-phase hoof clearance
+BODY_BOB = 0.0225       # vertical body oscillation, twice per gait cycle
 BODY_PITCH = math.radians(2.5)
 
-# --- The front IK chain is 0.457 + 0.609 = 1.066 long but its rest shoulder-to-hoof
-# distance is 1.054, i.e. the rig stands with only 0.012 of bend left in the front
-# legs. Swinging a hoof half a stride fore or aft needs sqrt(1.054^2 + 0.15^2) =
-# 1.065, so the solver reaches full extension right at the stance extremes and the
+# --- The front IK chain is 0.229 + 0.305 = 0.533 long but its rest shoulder-to-hoof
+# distance is 0.527, i.e. the rig stands with only 0.006 of bend left in the front
+# legs. Swinging a hoof half a stride fore or aft needs sqrt(0.527^2 + 0.075^2) =
+# 0.532, so the solver reaches full extension right at the stance extremes and the
 # knee pops -- visible in the baked curve as DEF_FrontUpperLeg snapping back toward
 # zero for a single frame at t=0.5. Dropping the body a few centimetres restores the
-# bend margin (sqrt(0.994^2 + 0.15^2) = 1.005) and the pop disappears. Rear legs have
-# 0.069 of slack already (they carry a hock) and never needed this.
-BODY_CROUCH = 0.09
+# bend margin (sqrt(0.497^2 + 0.075^2) = 0.503) and the pop disappears. Rear legs have
+# 0.035 of slack already (they carry a hock) and never needed this.
+BODY_CROUCH = 0.045
 
 IDLE_FRAMES = 48        # 2 s at 24 fps
-IDLE_BOB = 0.018
-IDLE_CROUCH = 0.03      # same reason: keeps the idle bob's high point off full extension
+IDLE_BOB = 0.009
+IDLE_CROUCH = 0.015     # same reason: keeps the idle bob's high point off full extension
 IDLE_HEAD_NOD = math.radians(1.8)
+
+# --- Metric-rig guard. The tier-a packs measure 4.10 units from hoof plane to horn
+# tip in their own units and 2.05 after --scale 0.5; the window is wide enough for any
+# plausible pony pack and narrow enough that an un-normalised rig cannot slip through.
+METRIC_RIG_HEIGHT_RANGE = (0.5, 3.0)
 
 FORWARD = Vector((0.0, -1.0, 0.0))   # rig faces -Y in Blender
 UP = Vector((0.0, 0.0, 1.0))
 SIDE = Vector((1.0, 0.0, 0.0))
+
+
+def rig_height(arm):
+    """Hoof plane to highest bone tip, in the units the rig currently measures in."""
+    zs = []
+    for bone in arm.data.bones:
+        zs.append((arm.matrix_world @ bone.head_local).z)
+        zs.append((arm.matrix_world @ bone.tail_local).z)
+    return max(zs) - min(zs)
+
+
+def _require_metric_rig(arm):
+    """Refuse to author metre-sized clips onto a rig that is not metre-sized.
+
+    Every length constant in this module is metres. Nothing downstream fails loudly
+    when they are applied to a rig in some other unit -- the export still succeeds,
+    every structural gate still passes, and the only symptom is a pony mincing or
+    lunging through a stride that does not match her legs. So check it here.
+    """
+    height = rig_height(arm)
+    low, high = METRIC_RIG_HEIGHT_RANGE
+    if not low <= height <= high:
+        raise SystemExit(
+            f"rig {arm.name!r} measures {height:.4f} units tall, outside the metric "
+            f"range {METRIC_RIG_HEIGHT_RANGE}. This module's STRIDE/LIFT/BODY_* "
+            f"constants are metres (1 unit = 1 metre); author them onto an "
+            f"un-normalised rig and the gait will not match the model. Pass "
+            f"`--scale {2.05 / height:.3g}` (or thereabouts -- that is what puts this "
+            f"rig at the tier-a family's 2.05 m hoof-to-horn height, i.e. ~1.2 m at "
+            f"the withers) to tools/export_blend.py; the tier-a packs use --scale 0.5. "
+            f"See docs/pipeline.md section 3."
+        )
+    print(f"METRIC_RIG_OK height={height:.4f}")
 
 
 def _require(arm, names):
@@ -282,7 +339,7 @@ STANCE_FRACTION = 0.5   # half the cycle planted, half swinging (see _foot_offse
 
 
 def implied_ground_speed(fps):
-    """Ground speed in units/second that the walk clip depicts.
+    """Ground speed in metres/second that the walk clip depicts.
 
     A planted hoof travels STRIDE backwards relative to the body over the stance
     phase, so a body moving at exactly this speed keeps its hooves stuck to the
@@ -299,6 +356,7 @@ def author(arm):
     """Create both clips. Returns them in export order."""
     if arm is None or arm.type != "ARMATURE":
         raise SystemExit(f"--anims needs an armature object, got {arm!r}")
+    _require_metric_rig(arm)
     # --- Determinism: force the LEGACY IK solver for the bake.
     #
     # These packs ship `pose.ik_solver = 'ITASC'` (iterative damped least squares,
@@ -331,7 +389,7 @@ def author(arm):
     excluded = secondary_motion_bones(arm)
     print(f"SECONDARY_MOTION_BONES {len(excluded)} excluded from bake: {excluded}")
     fps = bpy.context.scene.render.fps
-    print(f"WALK_IMPLIED_SPEED {implied_ground_speed(fps):.4f} units/s "
+    print(f"WALK_IMPLIED_SPEED {implied_ground_speed(fps):.4f} m/s "
           f"(stride={STRIDE} frames={WALK_FRAMES} fps={fps})")
     # Leaving `walk` as the active action is deliberate: Blender's glTF exporter in
     # its default ACTIONS mode still needs a bound animation_data block on the object

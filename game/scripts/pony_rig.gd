@@ -55,13 +55,25 @@ const DEFORM_PREFIX := "DEF_"
 ## displacement of the joint's tail and then renormalises the segment to its own length,
 ## so the ANGULAR restoring force a joint feels is `stiffness * delta / length`: at one
 ## fixed stiffness a long bone is far floppier than a short one. These rigs vary 5x in
-## segment length within a single character (Twilight's forelock segments are ~0.22
-## units, her tail's are 0.34-1.13), and Fluttershy's hair is longer again, so a raw
-## number that suits the forelock leaves the tail behaving like wet rope: measured, the
-## tail tip's swing collapsed from 0.176 to 0.020 units and its phase fell ~250 degrees
-## behind the body -- not follow-through, just decoupled. Multiplying by each joint's own
-## rest length (see `_configure_setting`) makes one profile behave the same on every
-## chain of every character, which is the whole point of a name-pattern-driven rig.
+## segment length within a single character (Twilight's forelock segments are ~0.11 m,
+## her tail's are 0.17-0.57), and Fluttershy's hair is longer again, so a raw number that
+## suits the forelock leaves the tail behaving like wet rope: measured, the tail tip's
+## swing collapsed from 0.088 to 0.010 m and its phase fell ~250 degrees behind the body
+## -- not follow-through, just decoupled. Multiplying by each joint's own rest length
+## (see `_configure_setting`) makes one profile behave the same on every chain of every
+## character, which is the whole point of a name-pattern-driven rig.
+##
+## THE SAME PROPERTY MAKES THE WHOLE PROFILE SCALE-INVARIANT, which is why normalizing
+## the ponies to 1 unit = 1 metre (Phase 1A task 1, `export_blend.py --scale 0.5`)
+## needed no re-tuning of the numbers below. Both the spring force and the gravity the
+## solver applies are absolute displacements scaled here by the chain's mean segment
+## length, and the inertia term is a position difference, so halving the model halves
+## every term in the integrator and the solution is exactly half the old one at every
+## timestep -- same angles, same timing. Measured, not assumed: after the rescale
+## `hair_lag_test` reported every chain's trail identical to the tick (+40/+19/+9/+5),
+## every correlation identical to three decimals, and every displacement column exactly
+## half its previous value. Segment lengths in this file are metres; the packs' own
+## figures are twice them.
 ##
 ## HOW THESE NUMBERS WERE PICKED. `scenes/test/hair_lag_test.gd` measures, per chain,
 ## how many milliseconds the tip trails the body through a start-and-stop, plus how much
@@ -157,7 +169,7 @@ static func attach_hair_simulation(pony: Node3D) -> SpringBoneSimulator3D:
 ## flagged individual ends up ignoring the shared values too -- stiffness 1.0, drag 0.0,
 ## hair like a whip. Measured and confirmed, not guessed. Chain-mean scaling keeps the
 ## configuration in the setters that survive, and within one chain the segments are
-## close enough (Twilight's tail: 0.34 / 0.46 / 0.42) for the difference not to show.
+## close enough (Twilight's tail: 0.17 / 0.23 / 0.21 m) for the difference not to show.
 static func configure_setting(sim: SpringBoneSimulator3D, skeleton: Skeleton3D,
 		index: int, chain: PackedInt32Array, profile: Dictionary) -> void:
 	var scale := _mean_segment(skeleton, chain)

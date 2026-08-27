@@ -6,6 +6,12 @@ bobbing out of sync, looks off. Tail might be too."*
 This is the full write-up. `docs/pipeline.md` §6 carries the short version —
 the rules a future session must follow when adding a character.
 
+> **Units note.** §§1–8 were written before the ponies were normalised to
+> 1 unit = 1 metre (`export_blend.py --scale 0.5`, Phase 1A task 1), so every
+> length they quote is in the packs' own units — **halve them** for the shipped
+> assets. The tuning values themselves did not change and did not need to;
+> **§9** explains why, and carries the re-measured numbers.
+
 ---
 
 ## 1. Diagnosis
@@ -479,3 +485,57 @@ validate_gltf.py twilight.glb --require-anims
    0.1010 — its root barely follows the head's vertical motion. Combined with
    (2), if the owner reports the mane looking detached, that number is where to
    start: raise the mane profile's stiffness and re-run the lag scene.
+
+---
+
+## 9. The metric rescale, and why it changed nothing here
+
+Phase 1A task 1 normalised every pony to 1 unit = 1 metre by baking a 0.5
+factor into the geometry and the rig at export time (`export_blend.py
+--scale 0.5`; `docs/pipeline.md` §3). Halving a model that carries a spring
+simulation is exactly the kind of change that quietly ruins it — gravity in
+particular is usually an absolute world-space number — so this was re-measured
+rather than assumed.
+
+**It is invariant by construction.** Godot's spring solver integrates a joint's
+tail position as *(inertia)* `+ stiffness * delta` *+* `gravity * delta`, then
+renormalises the segment to its own length. The inertia term is a difference of
+positions, so it scales with the model. `PonyRig.configure_setting()` already
+multiplies the profile's stiffness **and** gravity by the chain's mean segment
+length (§4) — that scales with the model too. Every term in the integrator
+therefore halves together, so the trajectory is exactly half the old one at
+every timestep: same angles, same phase, same settling time. The one thing that
+does *not* follow is a hardcoded threshold, so `hair_lag_test.gd`'s
+`MIN_DEVIATION` was halved with everything else (0.005 → 0.0025) and its
+`TRAVEL_SPEED` re-derived from the clip (1.32 → 0.66 m/s).
+
+**Measured, before and after** — same scene, same profiles, Twilight:
+
+| chain | trail before | trail after | dyn_deviation before → after | corr |
+|---|---|---|---|---|
+| `DEF_Mane1-5` (interior) | +40 ticks (+666.7 ms) | +40 ticks (+666.7 ms) | 0.2768 → 0.1384 | 0.930 |
+| `DEF_Mane1-6` | +40 (+666.7 ms) | +40 (+666.7 ms) | 0.3869 → 0.1934 | 0.928 |
+| `DEF_Mane3-2` | +40 (+666.7 ms) | +40 (+666.7 ms) | 0.4015 → 0.2007 | 0.933 |
+| `DEF_Hair2-3` (forelock) | +19 (+316.7 ms) | +19 (+316.7 ms) | 0.0993 → 0.0496 | 0.936 |
+| `DEF_Hair4-3` (forelock) | +19 (+316.7 ms) | +19 (+316.7 ms) | 0.1207 → 0.0603 | 0.974 |
+| `DEF_Tail1-5` (interior) | +5 (+83.3 ms) | +5 (+83.3 ms) | 0.0889 → 0.0445 | 0.983 |
+| `DEF_Tail1-7` | +9 (+150.0 ms) | +9 (+150.0 ms) | 0.2092 → 0.1046 | 0.926 |
+| `DEF_Tail4` | +5 (+83.3 ms) | +5 (+83.3 ms) | 0.1562 → 0.0781 | 0.871 |
+
+`HAIRLAG_OK leaf_chains=6 moving=6 lagging=6 worst_wobble=0.032` before and
+after. Every trail time is identical to the tick, every correlation identical
+to three decimals, and every displacement column is exactly half — the
+prediction, confirmed. The absolute stiffness/gravity Godot receives halved
+with the segment lengths (e.g. `DEF_Tail4` 9.01/0.32 → 4.51/0.16), which is the
+mechanism, not a regression. `PROFILES` is unchanged, and re-tuning it for
+scale would have been wrong.
+
+**Still open, unchanged by any of this:** §8 item 2 — the mane's ≥667 ms trail
+saturates the ±40-tick correlation window and is suspected too floaty. Widening
+`LAG_WINDOW` does not resolve it into a trustworthy number: the window is
+subtracted from both ends of a 210-sample trace, so at 60 ticks the correlation
+runs on 90 samples instead of 130 and *every* chain's answer moves (the
+forelock jumps from +19 to +47). Read "≥667 ms" as "saturates", not as a value.
+Diagnosing the mane properly wants a longer manoeuvre, and re-tuning it is a
+judgement call about how a mane should look, which belongs with the owner's
+outstanding visual verdict rather than with a scale change.
