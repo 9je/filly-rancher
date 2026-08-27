@@ -126,6 +126,8 @@ var chains: Array = []
 var depths: PackedInt32Array = PackedInt32Array()
 var profiles: Array[Dictionary] = []
 var stacked_factor := 0.0
+var span_reference := 0
+var span_exponent := 0.0
 
 var ticks := 0
 var pass_index := PASS_RIGID
@@ -193,7 +195,8 @@ func _ready() -> void:
 		tip_offsets.append(PonyRigScript.tip_offset(skeleton, chain))
 		chain_names.append(skeleton.get_bone_name(tip))
 		leaf_chain.append(leaf)
-	print("CHAINS ", chains.size(), " depths=", depths, " stacked_factor=", stacked_factor)
+	print("CHAINS ", chains.size(), " depths=", depths, " stacked_factor=", stacked_factor,
+		" span=", span_reference, "/", span_exponent)
 
 	skeleton.skeleton_updated.connect(_on_skeleton_updated)
 	_begin_pass(PASS_RIGID)
@@ -216,6 +219,8 @@ func _body_anchor(bone: int) -> int:
 ## `character=<name>` is handled separately, in _ready().
 func _apply_overrides() -> void:
 	stacked_factor = PonyRigScript.STACKED_CHAIN_STIFFNESS
+	span_reference = PonyRigScript.SPAN_REFERENCE_JOINTS
+	span_exponent = PonyRigScript.SPAN_EXPONENT
 	profiles = []
 	for i in simulator.setting_count:
 		profiles.append(PonyRigScript.profile_for(simulator.get_root_bone_name(i)))
@@ -226,6 +231,16 @@ func _apply_overrides() -> void:
 		if parts[0] == "stacked":
 			stacked_factor = float(parts[1])
 			print("OVERRIDE ", arg)
+			continue
+		if parts[0] == "span":
+			# `span=<reference joints>,<exponent>` -- re-runs the chain-length stiffness
+			# correction (PonyRig.SPAN_REFERENCE_JOINTS) at other values. `span=0,0`
+			# turns it off entirely, which is what the pre-fix numbers were measured at.
+			var span_parts := parts[1].split(",")
+			if span_parts.size() == 2:
+				span_reference = int(span_parts[0])
+				span_exponent = float(span_parts[1])
+				print("OVERRIDE ", arg)
 			continue
 		var values := parts[1].split(",")
 		if values.size() != 3:
@@ -250,7 +265,8 @@ func _apply_overrides() -> void:
 func _configure(stacked: float) -> void:
 	for i in simulator.setting_count:
 		PonyRigScript.configure_setting(
-			simulator, skeleton, i, chains[i], profiles[i], depths[i], stacked)
+			simulator, skeleton, i, chains[i], profiles[i], depths[i], stacked,
+			span_reference, span_exponent)
 
 
 func _begin_pass(which: int) -> void:

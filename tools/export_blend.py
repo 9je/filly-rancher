@@ -294,6 +294,80 @@ def rebind_secondary_armatures(primary, meshes):
     return rebound
 
 
+# --- Quirk (eye defect, playtest 1): the iris is conformed to an eyeball THAT IS NOT
+# THE ONE WE EXPORT, so the white of the eye tears through the top of every iris.
+#
+# The owner, on close-ups of Twilight and Fluttershy: "eyes weird", "eyes also a bit
+# funny?". What is on screen is a ragged, sawtoothed boundary along the upper rim of
+# each iris where the sclera pokes through it -- most obvious on Fluttershy, present on
+# all three packs, and stable frame to frame (so it is interpenetrating geometry, not
+# z-fighting shimmer or an alpha artefact; forcing the iris material fully opaque in a
+# test render left the tear exactly as it was).
+#
+# The mechanism. Every pack builds an eye out of four separate objects: `Base_Eye.*`
+# (the white, SUBSURF level 2), `Base_Iris.*` and two `Base_EyeHighlight*.*` caps, each
+# floated off the eyeball by a SHRINKWRAP in PROJECT / ABOVE_SURFACE mode. A shrinkwrap
+# has its own `subsurf_levels` field: extra Catmull-Clark subdivision applied TO THE
+# TARGET, for projection purposes only. The highlights use 0. **The iris uses 2** -- so
+# it is placed its 0.0015 above a level-FOUR eyeball, while the eyeball that ships is the
+# level-two one. Catmull-Clark converges inward on a convex cage, and between level 2 and
+# level 4 that inward step is larger than 0.0015, so the iris rim lands level with or
+# BELOW the exported sclera. Measured on the shipped .glb (nearest-vertex signed distance
+# along the sclera normal): the iris ran from -0.00037 m to +0.005 m with 14 of 337
+# vertices inside the white, while the highlights -- identical modifier, subsurf_levels=0
+# -- ran +0.0008 m to +0.0042 m with none inside. That contrast is the control: the field
+# that differs is the field that breaks it.
+#
+# Fix, generically and for any future pack: make every shrinkwrap conform to the surface
+# that is actually being exported (`subsurf_levels = 0`), and give it a floor on the
+# clearance. The floor is expressed as a fraction of the target's own size rather than as
+# an absolute length so it survives --scale and any pack authored at another scale; it
+# only ever RAISES an offset, so an artist's larger value is left alone.
+#
+# Deliberately not fixed by simply exporting the eyeball at a higher subsurf level: that
+# would multiply the vertex count of a part nobody looks at closely, would still leave the
+# two surfaces conformed to different things (level 4 vs "level 4 plus 2"), and would do
+# nothing for a pack that used some other subsurf_levels value.
+
+## Minimum clearance a shrinkwrapped decal cap gets, as a fraction of the largest
+## dimension of its target's bounding box -- a fraction and not an absolute length so it
+## means the same thing at any --scale and on a pack authored at some other size. 0.5% of
+## the ~1-unit eyeball is 0.005, about 3x what the packs ship: still far too small to read
+## as a gap between the iris and the eye, and an order of magnitude clear of the
+## subdivision-level disagreement above.
+_SHRINKWRAP_MIN_CLEARANCE = 0.005
+
+
+def conform_shrinkwraps_to_exported_surface(objects):
+    """Retarget SHRINKWRAP modifiers onto the mesh we actually export, with clearance.
+
+    The clearance is applied as ONE common multiplier across every shrinkwrap in the
+    export, not per modifier. These caps are stacked -- the iris sits 0.0015 off the
+    eyeball and the highlights 0.0020, i.e. the highlights are meant to float 0.0005
+    above the iris -- and raising each one to the same floor would flatten that ordering
+    and start the whole argument again one layer up, with the highlights tearing through
+    the iris instead. A single factor preserves every gap's proportion, and it also keeps
+    the left and right eye identical even though the two eyeball meshes' bounding boxes
+    differ by ~10%.
+    """
+    mods = [(obj, mod) for obj in sorted(objects, key=lambda o: o.name)
+            for mod in getattr(obj, "modifiers", [])
+            if mod.type == "SHRINKWRAP" and mod.target is not None and mod.offset > 0.0]
+    if not mods:
+        return
+    factor = 1.0
+    for obj, mod in mods:
+        size = max(mod.target.dimensions) if mod.target.type == "MESH" else 0.0
+        factor = max(factor, size * _SHRINKWRAP_MIN_CLEARANCE / mod.offset)
+    for obj, mod in mods:
+        was_levels, was_offset = mod.subsurf_levels, mod.offset
+        mod.subsurf_levels = 0
+        mod.offset = was_offset * factor
+        print(f"SHRINKWRAP {obj.name} -> {mod.target.name}: subsurf_levels "
+              f"{was_levels}->0 offset {was_offset:.5f}->{mod.offset:.5f} "
+              f"(x{factor:.3f})")
+
+
 # --- Normalizing model scale (Task 1, Phase 1A): 1 Godot unit = 1 metre.
 #
 # The CreatorOfPony packs are authored at roughly 2x life size (Twilight's withers --
@@ -531,6 +605,13 @@ else:
     target = None
     keep = set(bpy.data.objects)
     use_selection = False
+
+# Before anything measures or scales: point every shrinkwrapped decal cap (iris, eye
+# highlights) at the subdivision level of its target that is actually going to be
+# exported. Runs before apply_uniform_scale so the clearance it sets is scaled with
+# everything else and stays the same fraction of the model at any --scale.
+bpy.context.view_layer.update()
+conform_shrinkwraps_to_exported_surface(keep)
 
 # Rescale BEFORE authoring clips, never after: --anims solves IK against whatever the
 # rig measures at that moment and bakes the result, and author_anims.py's length
