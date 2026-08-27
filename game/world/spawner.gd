@@ -64,7 +64,22 @@ const MIN_SEPARATION := 1.4
 ## Fixed so the ranch is the same ranch every launch: same ponies, same spots, same
 ## wander targets. A collection game whose roster reshuffles every time you open it
 ## has no map to learn.
-@export var spawn_seed := 20260827
+##
+## AND SINCE THE SEED IS FIXED, WHICH HERD IT DRAWS IS A CONTENT DECISION, NOT A
+## COIN TOSS -- so it was chosen rather than left to whatever the first plausible number
+## happened to produce. The original 20260827 drew 3 Rainbow Dashes and 5 Fluttershies
+## and NO Twilight, every single launch, forever: a third of a three-pony roster that
+## the shipped build could never show you and the player could never catch. Nothing was
+## wrong with the draw -- SpawnTable gives the RARE tier 12% split two ways, so ~16% per
+## RARE pony, and missing one across 8 draws is a perfectly ordinary 25% outcome. It is
+## just an outcome nobody should be stuck with permanently.
+##
+## 20260839 draws 3 Rainbow Dash / 3 Fluttershy / 2 Twilight, so every pony in the
+## roster is somewhere on the map on the first launch. Found by replaying SpawnTable's
+## own draw against successive seeds -- the rarity weights, the tier semantics and the
+## draw code are all untouched; only which of their equally-valid outcomes is the one
+## that ships. Re-pick the same way if the roster changes.
+@export var spawn_seed := 20260839
 
 ## Node whose ZoneMarker children this spawner fills. Defaults to a sibling `Zones`.
 @export var zones_path := NodePath("../Zones")
@@ -138,7 +153,26 @@ func get_markers() -> Array[ZoneMarker]:
 	return result
 
 
+## The wild ponies that are STILL IN THE WORLD, oldest first.
+##
+## PRUNED, NOT RAW, and that is a bug fix rather than tidiness. A captured pony is freed
+## by the magic beam (magic_beam.gd's _settle_pony: her record goes in the bag and her
+## node is queue_free'd), and this array went on holding the dangling reference. Anything
+## that iterated it afterwards -- `for pony: CharacterBody3D in spawner.get_spawned()`,
+## which is how ranch.gd and the Phase 1A integration driver both read it -- hit
+## "Trying to assign invalid previously freed instance" the moment the player caught
+## anything, because GDScript performs the typed assignment BEFORE the loop body's own
+## is_instance_valid() guard can run. Found by playing the game, not by a gate: nothing
+## in the project captured a pony and then re-read this list until Task 9 did.
+##
+## Pruning here rather than making every caller defensive: "who is still out there" is
+## this node's own question to answer, and there is exactly one right answer to it.
 func get_spawned() -> Array[CharacterBody3D]:
+	var live: Array[CharacterBody3D] = []
+	for pony in _spawned:
+		if is_instance_valid(pony):
+			live.append(pony)
+	_spawned = live
 	return _spawned
 
 

@@ -335,13 +335,43 @@ func _report(pony_count: int, prop_count: int) -> void:
 	if not pen_intrusions.is_empty():
 		push_error("ranch: pen-plot clearing intruded on by: %s" % ", ".join(pen_intrusions))
 
+	# --- the HUD ---------------------------------------------------------------------
+	# A HUD that failed to find the beam looks EXACTLY like a HUD with an empty bag:
+	# "0 / 12" and a row of empty pips, drawn perfectly, meaning nothing. game/ui/hud.gd
+	# binds itself lazily (its own comment says why sibling ready order must not be
+	# depended on), so "did the binding actually take" is a real thing to assert rather
+	# than a formality -- and it is exactly the kind of failure a screenshot cannot show.
+	# `has_method` rather than a bare call: a hud.gd that failed to PARSE still leaves a
+	# CanvasLayer node in the tree with no script attached, and calling straight into it
+	# raises a runtime error that aborts this whole report mid-way -- so the gate hangs
+	# instead of printing RANCH_FAILED. (Which is exactly what a missing type hint in
+	# hud.gd did the first time this check ran.) A gate must fail, not disappear.
+	var hud := $HUD
+	var hud_scripted: bool = hud != null and hud.has_method("get_beam")
+	_set_check(checks, "the HUD is mounted and its script loaded", hud_scripted)
+	if hud_scripted:
+		_set_check(checks, "the HUD found the magic beam",
+			hud.get_beam() == player.get_magic_beam())
+		_set_check(checks, "the HUD is showing the beam's real capacity",
+			hud.get_capacity() == player.get_magic_beam().get_storage().capacity
+				and hud.get_capacity() > 0)
+
 	# --- the camera ---------------------------------------------------------------
 	_set_check(checks, "the camera probes the world, not just layer 1",
 		_spring_arm.collision_mask == LayersScript.WORLD)
 	var pull_in: Dictionary = await _probe_camera_against_building()
 	if pull_in.get("ran", false):
-		print("RANCH camera building=%s rest=%.2f hit=%.2f pull_in=%.2f"
-			% [pull_in["building"], pull_in["rest"], pull_in["hit"], pull_in["pull_in"]])
+		# `hit` is the spring arm's own bookkeeping; `actual` is where the lens really
+		# ended up, measured off its transform, and `fade` is what CameraRig does about
+		# it. All three, because the first two have already disagreed once on this rig
+		# (see CameraRig.probe_margin) and because a fade of 0.00 at 0.73 m is the whole
+		# of the fix for the camera-inside-the-pony close-up -- worth a printed number
+		# rather than only a screenshot.
+		print("RANCH camera building=%s rest=%.2f hit=%.2f actual=%.2f pull_in=%.2f subject_opacity=%.2f"
+			% [pull_in["building"], pull_in["rest"], pull_in["hit"], pull_in["actual"],
+				pull_in["pull_in"], pull_in["opacity"]])
+		_set_check(checks, "the player's body is faded out when the camera is inside her",
+			pull_in["opacity"] <= 0.01)
 		_set_check(checks, "the camera pulls in against a building",
 			pull_in["pull_in"] >= MIN_CAMERA_PULL_IN)
 	elif assets_state == "present":
@@ -495,6 +525,8 @@ func _probe_camera_against_building() -> Dictionary:
 		"building": building.name,
 		"rest": rest,
 		"hit": hit,
+		"actual": _rig.get_camera_distance(),
+		"opacity": _rig.get_subject_opacity(),
 		"pull_in": rest - hit,
 		"stand": stand,
 	}
@@ -596,11 +628,13 @@ func _capture_all() -> void:
 		await _capture("04a_camera_pressed_to_wall")
 
 		# ...and again from 1.2 m further out. Both shots are worth keeping: 04a is
-		# the strict pose the check measures and it is an unreadable macro close-up
-		# of the pony's flank -- which is itself a finding, because SpringArm3D's
-		# pull-in is NOT bounded by CameraRig.SPRING_MIN and will happily put the
-		# camera inside her. 04b is the same wall from a playable distance, where you
-		# can see the arm shortening without losing the shot.
+		# the strict pose the check measures -- the arm at 0.6 m, well inside the pony
+		# -- and it is now the picture of CameraRig's subject fade doing its job (she
+		# is gone and the world is visible). Until Phase 1A Task 9 the same shot was an
+		# unreadable macro close-up of her flank, which is what the fade was written to
+		# fix; SpringArm3D's pull-in is NOT bounded by CameraRig.SPRING_MIN and will
+		# happily put the camera inside her. 04b is the same wall from a playable
+		# distance, where she is fully drawn and the arm is visibly shortened.
 		var back_off: Vector3 = pull_in["stand"] + Vector3(1.2, 0.0, 0.0)
 		back_off.y = terrain.height_at(back_off.x, back_off.z) + 0.15
 		player.global_position = back_off

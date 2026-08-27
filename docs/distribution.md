@@ -76,6 +76,12 @@ machine has no Wine and can't execute the `.exe` itself.
 and double-click it. That's the whole install — no installer, no zip to
 extract, no `.pck` to keep alongside it.
 
+**Send [`docs/phase1a-playtest.md`](phase1a-playtest.md) with the build.** It is
+the player-facing half of this doc: the controls for both keyboard and gamepad,
+what there is to do, what is deliberately not in the build yet (pens, food, the
+economy, saves), and the known rough edges — so the first ten minutes are spent
+playing rather than guessing which button fires the magic beam.
+
 ## 3. Publishing a release
 
 ```

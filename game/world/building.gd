@@ -168,6 +168,46 @@ func build() -> void:
 	gable_node.mesh = gable
 	add_child(gable_node)
 
+	_add_interior_light()
+
+
+## A warm fill light inside the shell.
+##
+## WHY A BUILDING NEEDS ITS OWN LIGHT. Phase 1A Task 9's integration pass walked the
+## player in through the barn door and the render came back a black box: floor, walls
+## and roof all at effectively zero luminance, with the pony a silhouette. The ranch is
+## lit by one directional sun plus a low sky-ambient term (ranch.tscn's Environment:
+## ambient_light_energy 0.32, 85% sky contribution), and there is no global illumination
+## in a Forward+ scene without SDFGI -- so a closed box gets the ambient term and nothing
+## else. That is physically reasonable and it is a bad room to walk into.
+##
+## FIXED HERE RATHER THAN BY RAISING THE ENVIRONMENT'S AMBIENT, deliberately: the
+## exterior is already lit the way it should be (the establishing renders read well),
+## and turning ambient up to rescue two interiors would flatten every outdoor shadow on
+## the map to do it. A light that belongs to the building only affects the building.
+##
+## SHADOWS ARE ON, AND THAT IS NOT OPTIONAL. An OmniLight3D without shadows passes
+## straight through geometry, so a shadowless fill inside the barn would light the
+## OUTSIDE of its own walls and the grass around it -- a glowing barn in daylight. Two
+## shadow-casting omnis on a low-poly map is a cost worth paying to avoid that.
+func _add_interior_light() -> void:
+	var light := OmniLight3D.new()
+	light.name = "InteriorFill"
+	# Just under the eaves and slightly back from the door, so the brightest part of the
+	# room is the far end you are walking toward rather than the threshold.
+	light.position = Vector3(0.0, wall_height * 0.78, -depth * 0.12)
+	# Enough to reach every corner of the shell and no further -- the shadow map does the
+	# real containment, but a range that stops near the walls also keeps the cost down.
+	light.omni_range = maxf(width, depth) * 0.95
+	light.light_color = Color(1.0, 0.92, 0.80)
+	light.light_energy = 1.6
+	# Straw and lamplight, not a spotlight: the falloff is deliberately soft so the room
+	# reads as generally lit rather than as having a bulb hanging in it.
+	light.omni_attenuation = 0.6
+	light.shadow_enabled = true
+	light.shadow_bias = 0.04
+	add_child(light)
+
 
 func _material(colour: Color) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()

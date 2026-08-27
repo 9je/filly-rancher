@@ -8,6 +8,33 @@ config/features=PackedStringArray("4.5", "Forward Plus")
 [rendering]
 renderer/rendering_method="forward_plus"
 
+; The HUD (game/ui/hud.gd) is authored in 1920x1080 units -- crosshair radii, pip
+; sizes, font sizes -- and `canvas_items` stretch is what makes those units mean the
+; same thing on a 1366x768 laptop and a 4K monitor instead of shrinking to a smear on
+; one and ballooning on the other. Without it a Control's offsets are raw device
+; pixels, which is the default and is wrong for anything shipped to a second machine
+; whose resolution nobody here knows.
+;
+; `expand` rather than `keep`: letterboxing a 16:10 or ultrawide screen to hold a
+; 16:9 base is worse than simply revealing more world at the sides, and every HUD
+; element is anchored to a corner or to the centre, so none of them care how wide the
+; canvas ends up. The 3D view is unaffected either way -- a Camera3D's projection is
+; driven by its own FOV and the real viewport aspect, not by this setting.
+;
+; The window itself is 1600x900 (a size that fits on a 1080p laptop screen with room
+; for the taskbar) while the BASE viewport stays 1920x1080; canvas_items scales the
+; difference. Deliberately not fullscreen: the mouse is captured on start
+; (game/actors/player/camera_rig.gd), so a player who cannot find Escape needs a
+; window they can still get away from.
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/size/window_width_override=1600
+window/size/window_height_override=900
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
 ; glTF carries no loop flag, so Godot imports every clip as LOOP_NONE and a pony
 ; plays her 0.875 s walk once and then slides around frozen. The usual per-file fix
 ; lives in the .glb's .import sidecar, but everything under game/assets/converted/ is
@@ -80,6 +107,14 @@ scene={
 ;                              step (game/actors/player/camera_rig.gd's ZOOM_STEP),
 ;                              same "held modifier, no analog keyboard equivalent"
 ;                              reasoning `gallop` documents above.
+;
+; HUD input map (Phase 1A task 9, game/ui/hud.gd).
+;   toggle_hints             : H + gamepad Back (button 4). An ACTION rather than a
+;                              raw keycode check in hud.gd, for the same reason every
+;                              other control here is one: the gamepad player has to be
+;                              able to bring the control card back up too, and a
+;                              `event.keycode == KEY_H` in a script is a keyboard-only
+;                              binding by construction.
 
 [input]
 
@@ -127,6 +162,12 @@ beam={
 "deadzone": 0.2,
 "events": [Object(InputEventMouseButton,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"button_mask":0,"position":Vector2(0, 0),"global_position":Vector2(0, 0),"factor":1.0,"button_index":2,"canceled":false,"pressed":false,"double_click":false,"script":null)
 , Object(InputEventJoypadMotion,"resource_local_to_scene":false,"resource_name":"","device":-1,"axis":5,"axis_value":1.0,"script":null)
+]
+}
+toggle_hints={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":72,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventJoypadButton,"resource_local_to_scene":false,"resource_name":"","device":-1,"button_index":4,"pressure":0.0,"pressed":false,"script":null)
 ]
 }
 look_left={

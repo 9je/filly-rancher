@@ -139,3 +139,54 @@ func test_look_and_zoom_actions_have_a_keyboard_or_mouse_and_a_gamepad_binding()
 				has_pad = true
 		assert_true(has_desktop, "'%s' needs a keyboard/mouse binding" % action)
 		assert_true(has_pad, "'%s' needs a gamepad binding" % action)
+
+
+# --- subject fade -----------------------------------------------------------------
+# The fix for the camera-inside-the-pony close-up (CameraRig's FADE_START comment). The
+# ramp is a pure static function precisely so the RULE can be pinned here without a
+# spring arm, a wall or a rendered frame; whether it actually looks right against the
+# barn is checked by game/world/ranch.gd's camera probe, which measures the opacity at a
+# real pull-in, and by the render it saves.
+
+func test_the_subject_is_fully_drawn_at_a_normal_camera_distance() -> void:
+	assert_almost_eq(CameraRigScript.subject_opacity_for_distance(
+		CameraRigScript.SPRING_DEFAULT), 1.0, 0.0001,
+		"at the default distance the player must be drawn normally")
+	assert_almost_eq(CameraRigScript.subject_opacity_for_distance(
+		CameraRigScript.SPRING_MAX), 1.0, 0.0001,
+		"zoomed out, the player must be drawn normally")
+
+
+func test_the_subject_is_gone_once_the_camera_is_inside_her() -> void:
+	# 0.73 m is the pull-in game/world/ranch.gd actually measures with the player's back
+	# against the barn -- the exact case this ramp exists for.
+	assert_almost_eq(CameraRigScript.subject_opacity_for_distance(0.73), 0.0, 0.0001,
+		"pressed against a wall the player must not be drawn at all")
+	assert_almost_eq(CameraRigScript.subject_opacity_for_distance(0.0), 0.0, 0.0001,
+		"a camera at the pivot must not be looking at the inside of the subject")
+
+
+func test_the_fade_is_complete_by_the_tightest_zoom_the_player_can_choose() -> void:
+	# FADE_END is SPRING_MIN by construction: anything closer than the player's own
+	# tightest zoom is geometry shoving the camera, and must end with her not drawn. A
+	# half-transparent subject is the one state worth avoiding.
+	assert_eq(CameraRigScript.FADE_END, CameraRigScript.SPRING_MIN,
+		"the fade must complete exactly at the tightest selectable zoom")
+	assert_almost_eq(CameraRigScript.subject_opacity_for_distance(
+		CameraRigScript.SPRING_MIN), 0.0, 0.0001,
+		"maximum zoom-in is a first-person view, not a ghost")
+
+
+func test_the_fade_is_gradual_rather_than_a_pop() -> void:
+	var mid: float = (CameraRigScript.FADE_END + CameraRigScript.FADE_START) * 0.5
+	var opacity: float = CameraRigScript.subject_opacity_for_distance(mid)
+	assert_gt(opacity, 0.05, "mid-band must be partially visible, not snapped off")
+	assert_lt(opacity, 0.95, "mid-band must be partially faded, not snapped on")
+	# Monotonic: closer is never MORE opaque.
+	var previous := 0.0
+	for i in range(21):
+		var d: float = CameraRigScript.FADE_END - 0.2 + 0.05 * float(i)
+		var here: float = CameraRigScript.subject_opacity_for_distance(d)
+		assert_true(here >= previous - 0.0001,
+			"opacity must never decrease as the camera backs away (at %.2f m)" % d)
+		previous = here

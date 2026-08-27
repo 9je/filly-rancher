@@ -1030,11 +1030,31 @@ both invisible to every gate that ran the project from source with `--path game`
    test whenever the main scene starts depending on something new**, because
    `--path game` and the `.pck` are not the same filesystem.
 
-**Windows verification is remote.** Godot cross-exports the `.exe` + `.pck`
-from Linux with no Wine involved — this machine can confirm the file is a
+**Windows verification is remote.** Godot cross-exports the `.exe` from Linux
+with no Wine involved — this machine can confirm the file is a
 real PE32+ Windows executable (`file build/filly-rancher-windows.exe`) but
-cannot run it. The friend on the Windows machine smoke-tests it there (or,
-if Wine is ever installed on this machine, that becomes an option too).
+cannot run it. `windows-latest` in `.github/workflows/build-and-smoke.yml`
+runs it for real on every push; the friend on the Windows machine is the
+second check, not the only one.
+
+**`RANCH_OK` is necessary and not sufficient — render the exported binary too.**
+The export smoke test above proves the packed game boots and passes every
+structural check. It cannot see whether anything is on screen. This project has
+shipped a build that loaded zero characters while printing a green marker (the
+`.tres`-to-`.res` bug two paragraphs up), so since Phase 1A Task 9 the export
+step also runs the shipped binary under a virtual display and looks at the frames:
+
+```bash
+xvfb-run -a ./build/filly-rancher-linux.x86_64 -- --screenshot-dir=/tmp/shots
+```
+
+(`--`, then `--screenshot-dir=`; `game/world/ranch.gd` reads it out of
+`OS.get_cmdline_user_args()`.) That saves the same five shots the scene run
+saves — establishing, player's-eye, a spawn zone, the camera against a wall, and
+the barn at eye level — **from inside the `.pck`**, so a missing model, a missing
+material or a HUD whose script failed to pack shows up as a picture rather than
+as nothing at all. Note that it is `xvfb-run` **without** `--headless`: headless
+uses the dummy rasteriser and renders nothing.
 
 ---
 

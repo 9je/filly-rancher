@@ -1,0 +1,170 @@
+extends GutTest
+## Tests for the ranch HUD (game/ui/hud.gd).
+##
+## WHAT IS WORTH TESTING HERE AND WHAT IS NOT. Whether the crosshair is legible over
+## grass, whether the saddlebag is unobtrusive, whether the struggle ring reads at a
+## glance -- none of that is a number, and all of it was judged from rendered frames
+## during Phase 1A Task 9's integration pass instead. What IS a number, and what a
+## rendered frame is actively bad at showing, is whether the HUD is displaying the
+## PLAYER'S ACTUAL STATE or a plausible-looking default: an unbound HUD draws "0 / 12"
+## and twelve empty pips, perfectly, forever, and looks exactly like a bound one over an
+## empty bag. So these tests are about the binding and the data, and game/world/ranch.gd
+## asserts the same thing again against the real Player in the real scene.
+##
+## Preloads by path rather than by the global class_name, per the convention at the top
+## of game/scripts/pony_rig.gd.
+
+const HudScene := preload("res://ui/hud.tscn")
+const StorageScript := preload("res://systems/storage.gd")
+const PonyDataScript := preload("res://systems/pony_data.gd")
+
+var _hud: CanvasLayer
+## The HUD's own parent. It looks for a sibling named "Player" (that is how it is
+## mounted in ranch.tscn), so the tests that exercise the binding drop a stand-in Player
+## in here alongside it rather than re-parenting the HUD, which would leave it running
+## with a stale parent for a frame.
+var _world: Node
+
+
+func before_each() -> void:
+	_world = Node.new()
+	add_child_autofree(_world)
+	_hud = HudScene.instantiate()
+	_world.add_child(_hud)
+
+
+func _data(id: String, rarity: int) -> PonyData:
+	var data: PonyData = PonyDataScript.new()
+	data.id = StringName(id)
+	data.display_name = id.capitalize()
+	data.rarity = rarity
+	return data
+
+
+func test_the_hud_scene_loads_and_carries_its_script() -> void:
+	assert_true(_hud.has_method("get_beam"),
+		"hud.tscn must have hud.gd attached -- a parse error leaves a bare CanvasLayer")
+
+
+func test_an_unbound_hud_reports_that_it_is_unbound() -> void:
+	# The important one. Standalone -- no Player anywhere -- the HUD must not pretend.
+	assert_null(_hud.get_beam(), "a HUD that found no beam must say so, not show a default")
+	assert_eq(_hud.get_capacity(), 0, "capacity must be 0 until a real Storage is found")
+	assert_eq(_hud.get_shown_rarities(), [] as Array[int])
+
+
+func test_the_hints_action_is_bound_for_both_keyboard_and_gamepad() -> void:
+	assert_true(InputMap.has_action("toggle_hints"),
+		"project.godot must define 'toggle_hints'")
+	var has_desktop := false
+	var has_pad := false
+	for event in InputMap.action_get_events("toggle_hints"):
+		if event is InputEventKey or event is InputEventMouseButton:
+			has_desktop = true
+		elif event is InputEventJoypadButton or event is InputEventJoypadMotion:
+			has_pad = true
+	assert_true(has_desktop, "'toggle_hints' needs a keyboard binding")
+	assert_true(has_pad, "'toggle_hints' needs a gamepad binding -- the build is played "
+		+ "on a pad too, and a keyboard-only toggle strands that player with the card up")
+
+
+func test_every_rarity_tier_has_a_pip_colour() -> void:
+	# A tier with no colour falls back to COMMON, so a new rarity would silently draw as
+	# the most common thing in the game -- exactly backwards for a collection HUD.
+	for tier in [PonyDataScript.Rarity.COMMON, PonyDataScript.Rarity.UNCOMMON,
+			PonyDataScript.Rarity.RARE, PonyDataScript.Rarity.LEGENDARY]:
+		assert_true(_hud.RARITY_COLORS.has(tier),
+			"HUD.RARITY_COLORS is missing rarity tier %d" % tier)
+
+
+func test_the_control_hints_cover_every_action_the_player_needs() -> void:
+	var listed := ""
+	for row: Array in _hud.HINTS:
+		listed += String(row[0]).to_lower() + " "
+	for needed in ["move", "gallop", "jump", "look", "zoom", "magic beam"]:
+		assert_true(listed.find(needed) >= 0,
+			"the hints card must mention '%s'" % needed)
+
+
+# --- the binding, against a real Storage ------------------------------------------
+# A stand-in for the Player: the one thing the HUD needs of her is get_magic_beam(),
+# and the one thing it needs of the beam is get_storage() plus the three signals. Built
+# here rather than instancing player.tscn so the test does not drag in a pony model, a
+# camera rig and a capture of the mouse.
+
+class FakeBeam:
+	extends Node3D
+	signal captured(data: PonyData)
+	signal escaped(body: Node3D)
+	signal capture_refused(body: Node3D)
+
+	var storage: Storage
+
+	func get_storage() -> Storage:
+		return storage
+
+	func is_active() -> bool:
+		return false
+
+	func is_holding() -> bool:
+		return false
+
+
+class FakePlayer:
+	extends Node3D
+	var beam: Node3D
+
+	func get_magic_beam() -> Node3D:
+		return beam
+
+
+func _bind_to_a_fake_player(capacity: int) -> FakeBeam:
+	var beam := FakeBeam.new()
+	beam.storage = StorageScript.new(capacity)
+	var player := FakePlayer.new()
+	player.name = "Player"
+	player.beam = beam
+	player.add_child(beam)
+
+	# The HUD looks for a sibling named "Player", so both go under one parent.
+	_world.add_child(player)
+	return beam
+
+
+func test_the_hud_binds_to_a_sibling_players_beam_and_shows_its_capacity() -> void:
+	var beam := _bind_to_a_fake_player(7)
+	# Binding is retried from _process() rather than done in _ready(), because sibling
+	# ready order is not something to depend on -- so give it a frame.
+	await wait_process_frames(3)
+	assert_eq(_hud.get_beam(), beam, "the HUD must find the Player's beam")
+	assert_eq(_hud.get_capacity(), 7, "the HUD must show the beam's real capacity")
+
+
+func test_storing_a_pony_updates_the_pips_without_the_hud_polling() -> void:
+	var beam := _bind_to_a_fake_player(4)
+	await wait_process_frames(3)
+	assert_eq(_hud.get_shown_rarities().size(), 0, "the bag starts empty")
+
+	# store() emits Storage.changed; nothing else is called, so if the pips update it is
+	# because the HUD is connected to that signal and not because it re-reads every frame.
+	beam.storage.store(_data("fluttershy", PonyDataScript.Rarity.UNCOMMON))
+	beam.storage.store(_data("twilight", PonyDataScript.Rarity.RARE))
+	assert_eq(_hud.get_shown_rarities(),
+		[PonyDataScript.Rarity.UNCOMMON, PonyDataScript.Rarity.RARE] as Array[int],
+		"the pips must show what is in the bag, oldest first, by rarity tier")
+
+	beam.storage.release()
+	assert_eq(_hud.get_shown_rarities(),
+		[PonyDataScript.Rarity.UNCOMMON] as Array[int],
+		"letting one out must take a pip back off")
+
+
+func test_a_refused_store_does_not_change_what_the_hud_shows() -> void:
+	var beam := _bind_to_a_fake_player(1)
+	await wait_process_frames(3)
+	beam.storage.store(_data("twilight", PonyDataScript.Rarity.RARE))
+	var before: Array[int] = _hud.get_shown_rarities()
+	assert_false(beam.storage.store(_data("fluttershy", PonyDataScript.Rarity.UNCOMMON)),
+		"the bag is full, so this store must be refused")
+	assert_eq(_hud.get_shown_rarities(), before,
+		"a refused capture must leave the pips exactly as they were")

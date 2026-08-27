@@ -101,16 +101,30 @@ const HOLD_LEAD := 2.2
 ## the gate was green: she was at the hold point, at a sensible distance, not clipping the
 ## near plane. The picture showed a pony holding still and nothing else happening.
 ##
-## The offsets are sized against the occlusion they exist to break. The player's 0.42 m
-## capsule at the camera's 3.9 m default subtends about 6 degrees, which is 0.63 m wide at
-## the hold point's 5.9 m; add a pony's own half-length (she turns while she floats, so
-## worst case is her ~0.7 m nose-to-centre) and 1.4 m is the first offset that clears her
-## silhouette outright rather than peeking around it. The 0.5 m lift then puts her above
-## the player's back rather than level with it, which is also simply what "held up in a
-## magic field" looks like. Both are perpendicular to the RAY, not to the world, so they
-## stay screen-right and screen-up at any pitch.
-const HOLD_SIDE := 1.4
-const HOLD_LIFT := 0.5
+## THE FIRST SIZING OF THESE OFFSETS WAS DERIVED FROM THE COLLISION CAPSULE AND WAS TOO
+## SMALL. It reasoned: the player's 0.42 m capsule at 3.5 m subtends about 6 degrees, so
+## 1.4 m across at the hold point's ~5.6 m clears it. Phase 1A Task 9's integration pass
+## rendered an actual capture in the actual ranch and the picture disagreed -- a held
+## Fluttershy sat with only her ears and mane showing above Twilight's head, and a held
+## Rainbow Dash was a coloured smudge behind Twilight's neck. Two things the capsule
+## arithmetic left out: the capsule is not the SILHOUETTE (the mane, the ears and the
+## horn are all outside it, and her head is what the offset has to clear, not her
+## barrel), and the vertical lift was small enough that the held pony landed ON her head
+## rather than above it.
+##
+## The numbers below are sized off the RENDERED frame instead. At the default zoom the
+## hold point sits ~5.6 m from the lens, and with a 16:9 viewport (half-width
+## tan(hfov/2) = 1.34) 2.4 m across projects to ~256 px of a 800 px half-screen -- about
+## two and a half times the player's own on-screen half-width, so the held pony is fully
+## in the clear at every zoom the player can select (at SPRING_MIN she is 428 px out,
+## still well inside the frame; at SPRING_MAX, 167 px, still clear). The 1.0 m lift puts
+## her above the player's back rather than on her head.
+##
+## Both are perpendicular to the RAY, not to the world, so they stay screen-right and
+## screen-up at any pitch. And a bigger offset makes the BEAM more legible too, for free:
+## the ribbon from the horn to the held body is longer on screen and less foreshortened.
+const HOLD_SIDE := 2.4
+const HOLD_LIFT := 1.0
 
 ## Floor on the hold distance measured from the CAMERA, in metres. Only bites when the
 ## player has zoomed all the way in (CameraRig.SPRING_MIN is 1.2 m): without it, a fully

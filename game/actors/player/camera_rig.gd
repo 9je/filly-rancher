@@ -93,9 +93,11 @@ const PITCH_MAX_DEG := 30.0
 ## the spring arm is fully pulled in against a wall" -- that was false; do not
 ## reintroduce it. Do NOT "fix" this by clamping the pull-in to SPRING_MIN either: at
 ## the barn that would put the camera 0.47 m INSIDE the wall, which is strictly worse
-## than the current close-up. TODO(camera): the real fix is fading/hiding the player
-## mesh below some distance threshold so a close pull-in reads as intentional instead
-## of as clipping -- a separate camera task, not a one-line change here.
+## than the current close-up.
+##
+## The real fix landed in Phase 1A Task 9 and is the FADE_* block below: the pony's
+## mesh dissolves out as the arm shortens, so a hard pull-in reads as the camera
+## stepping past her rather than as clipping through her. See _update_subject_fade().
 const SPRING_MIN := 1.2
 const SPRING_MAX := 6.5
 ## Default distance: roughly 2.5x her withers height, framing her whole body plus a
@@ -141,6 +143,66 @@ const ZOOM_STEP := 0.5
 ## predates the ranch and builds its ground on the default layer still works.
 @export_flags_3d_physics var probe_mask := CollisionLayersScript.WORLD
 
+# SPRINGARM3D.MARGIN IS NOT USED HERE, AND THAT IS A MEASURED DECISION, NOT AN
+# OVERSIGHT. The obvious companion to the subject fade below is to also hold the
+# camera a little off whatever it hit, so its near plane cannot end up inside a barn
+# wall -- and `SpringArm3D.margin` reads exactly like the property for that.
+#
+# It does nothing on this rig. Measured, twice, against the ranch's own camera probe
+# (game/world/ranch.gd, which prints both the arm's `get_hit_length()` and the camera's
+# real distance from the pivot): with `margin = 0.01` the numbers are `hit=0.73
+# actual=0.73`, and with `margin = 1.0` -- a value that could not possibly be subtle --
+# they are still `hit=0.73 actual=0.73`. Not a rounding effect, not a smaller effect
+# than expected: no effect at all.
+#
+# The reason is that this arm has no `shape` assigned, so it probes with a RAY (see the
+# node-structure note at the top of this file), and margin only participates in the
+# shape-cast branch. Setting it here would have been a knob that looked like it was
+# doing something and was not -- the exact failure mode this project keeps finding in
+# its own gates. If a future task genuinely needs wall clearance, the way to get it is
+# to give the arm a small SphereShape3D and re-measure, not to set this property and
+# assume.
+
+## THE FIX FOR THE CLOSE-UP-INSIDE-THE-PONY BUG, and the reason SPRING_MIN's comment
+## above says not to clamp the pull-in.
+##
+## What the bug looks like: back the player against the ranch's barn and the arm pulls
+## in from its 3.5 m rest to 0.73 m (measured -- game/world/ranch.gd's camera probe
+## prints it every run, and its `04a_camera_pressed_to_wall` render is the picture).
+## 0.73 m from a pivot at her withers is INSIDE her body, so the shot is an unreadable
+## wall of flank with the world completely hidden behind it. Clamping the arm was
+## considered and rejected: SPRING_MIN (1.2 m) against that same wall would put the
+## camera 0.47 m inside the BARN instead, which is strictly worse -- you would be
+## looking at the inside of a wall rather than at the inside of a pony.
+##
+## What happens instead: the subject fades out as the arm shortens, and is gone before
+## the camera reaches her. FADE_START is the distance at which she begins to dissolve
+## and FADE_END the distance at which she is fully hidden.
+##
+## FADE_END IS SPRING_MIN, DELIBERATELY, and that is the whole design of this ramp. The
+## arm can only get closer than the player's tightest chosen zoom by being SHOVED there
+## by geometry -- which is exactly the case that has to end with her not drawn. Tying
+## the two together means the rule reads as one sentence: she is fully drawn at any
+## normal distance, fades out over the last half-metre of zoom, and is gone at maximum
+## zoom-in and at anything closer than that. It also gives the zoom a genuinely useful
+## bottom end -- maximum zoom-in is now a clean near-first-person aiming view for the
+## magic beam instead of a close-up of her mane, which is worth having because the beam
+## aims at the SCREEN CENTRE and her body is what normally sits there.
+##
+## A first cut used 1.5 / 0.85, which left her a 56%-opaque ghost at maximum zoom-in --
+## measured, not guessed (game/world/ranch.gd prints the opacity, and the integration
+## pass's zoom render showed it). Half-transparent is the one state worth avoiding: you
+## can see neither her nor cleanly past her.
+##
+## APPLIED VIA GeometryInstance3D.transparency, per MeshInstance3D, not by touching
+## the materials: the pony's materials come out of the glTF import and are shared
+## between every instance built from the same model (the player and any wild pony of
+## the same species), so writing `albedo_color.a` on them would fade the whole herd
+## whenever the player backed into a wall. `transparency` is a per-instance render
+## property and cannot leak that way.
+const FADE_START := 1.7
+const FADE_END := SPRING_MIN
+
 @onready var _spring_arm: SpringArm3D = $SpringArm3D
 @onready var _camera: Camera3D = $SpringArm3D/Camera3D
 
@@ -148,6 +210,13 @@ const ZOOM_STEP := 0.5
 ## instead of reading it back out of `rotation.x` so the clamp is applied in exactly
 ## one place.
 var _look_pitch := 0.0
+
+## Every MeshInstance3D belonging to the body this rig is mounted on, collected once in
+## _ready(). See FADE_START.
+var _subject_meshes: Array[MeshInstance3D] = []
+## Last fade value written, so _process() does not touch every mesh every frame when
+## nothing has moved.
+var _subject_fade := -1.0
 
 
 func _ready() -> void:
@@ -165,6 +234,12 @@ func _ready() -> void:
 	var body := _find_collision_ancestor()
 	if body != null:
 		_spring_arm.add_excluded_object(body.get_rid())
+
+	# The subject's body is built at runtime (PonyVisuals), so its meshes do not exist
+	# during anyone's _ready(). Collect them on the next frame instead of assuming a
+	# ready order -- the same lesson magic_beam.gd's _anchor_node() records after the
+	# beam spent a task being drawn out of the player's hooves.
+	_collect_subject_meshes.call_deferred()
 
 	if DisplayServer.get_name() != "headless":
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -191,6 +266,8 @@ func _process(delta: float) -> void:
 		add_zoom_delta(-ZOOM_STEP)
 	if Input.is_action_just_pressed("zoom_out"):
 		add_zoom_delta(ZOOM_STEP)
+
+	_update_subject_fade()
 
 
 ## Applies a yaw/pitch input in radians. `delta_yaw` positive turns the view right.
@@ -265,6 +342,88 @@ func get_aim_ray() -> AimRay:
 	var vp := get_viewport()
 	var center := vp.get_visible_rect().size * 0.5
 	return AimRay.new(_camera.project_ray_origin(center), _camera.project_ray_normal(center))
+
+
+## How opaque the subject should be right now, given how far the arm is actually
+## sitting from the pivot: 1.0 out at a normal distance, 0.0 once the camera is close
+## enough that she would fill the frame. Static and pure so the ramp itself is testable
+## without a scene, a spring arm or a rendered frame (game/test/test_camera_rig.gd).
+##
+## Reads FADE_END <= distance <= FADE_START; outside that range it saturates. Written
+## as a smoothstep rather than a hard cut so the transition is not a pop when the arm
+## is jittering across the threshold along a wall.
+static func subject_opacity_for_distance(distance: float) -> float:
+	return smoothstep(FADE_END, FADE_START, distance)
+
+
+## The distance the camera is ACTUALLY at from the pivot, in metres. This is the number
+## the fade is driven by, and the number that is 0.73 m with the player's back against
+## the ranch's barn.
+##
+## MEASURED OFF THE CAMERA'S OWN TRANSFORM, not read from `spring_length` (which is only
+## the distance the player ASKED for and says nothing about a wall) and not from
+## `get_hit_length()` either. The second is nearly right and was this function's first
+## draft; it is avoided because it is the arm's own bookkeeping rather than where the
+## lens ended up, and this rig has already been bitten once by trusting a spring-arm
+## property that did not mean what it read as -- see the `margin` note above.
+func get_camera_distance() -> float:
+	return _camera.global_position.distance_to(global_position)
+
+
+## How opaque the subject is being drawn right now, 1.0 (fully drawn) to 0.0 (hidden).
+## Exposed so a gate can assert the fade actually fired at a measured close pull-in,
+## rather than only that a screenshot looked right.
+func get_subject_opacity() -> float:
+	return subject_opacity_for_distance(get_camera_distance())
+
+
+## Fade the subject in or out to match how close the camera has been pulled. See
+## FADE_START for the whole reasoning; this is the three lines that apply it.
+##
+## `visible` is switched off outright at zero opacity rather than left at
+## `transparency = 1.0`: a fully transparent mesh still costs a draw call and still
+## writes into the depth prepass on some drivers, and "she is not drawn" is a stronger
+## guarantee than "she is drawn with no alpha" for the thing this exists to prevent.
+func _update_subject_fade() -> void:
+	if _subject_meshes.is_empty():
+		_collect_subject_meshes()
+		if _subject_meshes.is_empty():
+			return
+
+	var opacity := subject_opacity_for_distance(get_camera_distance())
+	if is_equal_approx(opacity, _subject_fade):
+		return
+	_subject_fade = opacity
+
+	for mesh in _subject_meshes:
+		if not is_instance_valid(mesh):
+			# A rebuilt body (a different pony wearing this rig) invalidates the cache.
+			_subject_meshes.clear()
+			_subject_fade = -1.0
+			return
+		mesh.transparency = 1.0 - opacity
+		mesh.visible = opacity > 0.001
+
+
+## Collect the subject's own meshes -- and ONLY those.
+##
+## Scoped to the mount's `Visuals` child rather than to the whole body, which is not a
+## nicety: the magic beam is also a child of the Player (player.gd explains why it is a
+## sibling of `Visuals` and not under it), and it builds its ribbon and glow as
+## MeshInstance3Ds of its own. Fading "every mesh under the player" would therefore
+## make the beam vanish exactly when the player zooms in to aim with it, and would also
+## fight magic_beam.gd for ownership of those nodes' `visible` flag, which it writes
+## every frame. Falls back to the whole body only for a mount with no `Visuals` at all.
+func _collect_subject_meshes() -> void:
+	_subject_meshes.clear()
+	var body := _find_collision_ancestor()
+	if body == null:
+		return
+	var root: Node = body.get_node_or_null("Visuals")
+	if root == null:
+		root = body
+	for mesh: MeshInstance3D in root.find_children("*", "MeshInstance3D", true, false):
+		_subject_meshes.append(mesh)
 
 
 ## The ancestor CollisionObject3D this rig is mounted under (the Player body), or null
