@@ -6,6 +6,8 @@ extends CharacterBody3D
 ##
 ## Interface other tasks depend on -- do not rename:
 ##   setup(data: PonyData)   -- build the body and adopt the record's stats/personality.
+##   adopt(inst: PonyInstance) -- the same, for an INDIVIDUAL out of storage or a pen.
+##   get_instance()          -- the individual she is, or null while she is still wild.
 ##   state: int              -- current State enum value (read it; do not assign it).
 ##   captured() / escaped()  -- emitted around a beam hold, see SIGNALS below.
 ##   set_held(is_held: bool) -- the beam takes / releases physics control.
@@ -297,6 +299,9 @@ var state: int = State.IDLE
 @onready var detection_area: Area3D = $DetectionArea
 
 var _data: PonyData
+## Set only for a pony who has been OWNED -- see adopt() / get_instance(). Null for a wild
+## pony the spawner put on the map, which is every pony until the beam catches one.
+var _instance: PonyInstance
 var _anim: AnimationPlayer
 var _rng := RandomNumberGenerator.new()
 
@@ -348,6 +353,38 @@ func setup(data: PonyData) -> void:
 	_data = data
 	if is_node_ready():
 		_apply_data()
+
+
+## Adopt an INDIVIDUAL: a PonyInstance (game/systems/pony_instance.gd) carrying her uid
+## and her own happiness/hunger, whose `data_id` resolves to the PonyData her body is
+## built from. The instance-aware sibling of setup(), and the path a pony taken back OUT of
+## storage comes through -- MagicBeam.release_stored(), and Task 3's pens.
+##
+## SHE KEEPS THE INSTANCE, which is the whole point. A pony let out of the bag and caught
+## again is the SAME pony -- same uid, same happiness, same however-long she has been
+## hungry -- because magic_beam.gd's capture path asks get_instance() first and only mints
+## a new one for a pony who has never been owned. Without that, a release-and-recapture
+## would quietly reset her to a stranger with the same face, which is exactly the class of
+## bug PonyInstance exists to stop.
+##
+## Same placement rule as setup(): position her BEFORE add_child().
+##
+## An instance whose data_id this build's roster does not carry resolves to null; she is
+## adopted anyway, minus a body, and PonyVisuals push_errors the specific reason. That is
+## deliberate -- see setup()'s note on a build failure being loud but not fatal.
+func adopt(instance: PonyInstance) -> void:
+	_instance = instance
+	if instance == null:
+		return
+	setup(instance.data())
+
+
+## The individual this pony IS, or null if she is an unowned wild pony who has never been
+## caught. Wild ponies deliberately have no instance until the beam mints one for them:
+## an individual identity is a thing you acquire by being caught, and minting one for every
+## pony the spawner drops on the map would burn uids on ponies nobody will ever own.
+func get_instance() -> PonyInstance:
+	return _instance
 
 
 ## Give this pony a seeded RNG so a scene's whole herd is reproducible. Call before the

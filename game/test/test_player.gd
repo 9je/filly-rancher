@@ -223,9 +223,24 @@ func test_plays_idle_at_rest_and_walk_when_sneaking() -> void:
 	Input.action_press("move_forward")
 	await wait_physics_frames(RUN_FRAMES)
 	assert_eq(anim.current_animation, "walk", "a sneaking player plays 'walk'")
-	assert_almost_eq(anim.speed_scale,
-		GaitScript.playback_scale_for_speed(_player.get_ground_speed()), 0.001,
-		"playback must be scaled to ground speed so the gait matches the ground")
+	# PINNED TO LITERALS, NOT TO GaitScript. This assertion used to compare anim.speed_scale
+	# against playback_scale_for_speed(_player.get_ground_speed()) -- the engine's answer
+	# measured against the very function that produced it, so stubbing that function to
+	# return a flat 1.0 made both sides 1.0 and the test still passed. Phase 1A's final
+	# review found it (and the two siblings in game/scenes/test/playground.gd and
+	# game/test/test_pony.gd); all three are fixed the same way.
+	#
+	# The numbers are derived once, by hand, from the authoring constants rather than from
+	# the function under test: sneaking holds player.gd's SNEAK_SPEED, defined as exactly
+	# 2.0x the `walk` clip's own 0.66 m/s = 1.32 m/s, and a clip driven at twice the speed it
+	# depicts plays at 2.0x -- zero skate by construction, well inside gait.gd's 0.5..3.0
+	# walk window. test_gait.gd pins 0.66 against the exporter's printed WALK_IMPLIED_SPEED,
+	# so a retuned stride goes red THERE and points at these.
+	assert_almost_eq(_player.get_ground_speed(), 1.32, 0.01,
+		"holding 'sneak' must settle her at SNEAK_SPEED, 1.32 m/s")
+	assert_almost_eq(anim.speed_scale, 2.0, 0.01,
+		"...and 1.32 m/s of a 0.66 m/s clip is exactly 2.0x playback -- a literal, because "
+		+ "asking Gait for the expected value is what made this check a tautology")
 
 
 func test_plays_gallop_by_default_and_drops_to_walk_when_sneaking() -> void:
@@ -243,9 +258,19 @@ func test_plays_gallop_by_default_and_drops_to_walk_when_sneaking() -> void:
 	assert_gt(speed, GaitScript.GALLOP_HANDOVER_SPEED,
 		"the default gait must be past the speed the walk clip can depict")
 	assert_eq(anim.current_animation, "gallop", "above the walk band she plays 'gallop'")
-	assert_almost_eq(anim.speed_scale,
-		GaitScript.gallop_playback_scale_for_speed(speed), 0.001,
-		"gallop playback must be scaled to ground speed too, not left at 1.0")
+	# Same tautology, same fix, one band up. The second playtest bought running its speed-up
+	# (4.8 -> 5.2 m/s) at the cost of headroom: 5.2 / 3.3 = 1.576x would be the honest rate,
+	# but gait.gd's gallop window tops out at GALLOP_MAX_PLAYBACK (1.3x) before the legs
+	# start reading as a blur, and player.gd's own comment is explicit that RUN_SPEED is
+	# DEFINED as the clip saturated at that bound, not merely clamped incidentally. The
+	# expected playback is therefore that bound itself -- still a literal, not a call to the
+	# gallop playback helper, so a build that broke the clamp (or unclamped it) cannot mark
+	# its own homework here.
+	assert_almost_eq(speed, 5.2, 0.01,
+		"moving with nothing held must settle her at RUN_SPEED, 5.2 m/s")
+	assert_almost_eq(anim.speed_scale, 1.3, 0.01,
+		"gallop playback must be scaled to ground speed too, not left at 1.0 -- and the "
+		+ "expected rate is a literal (GALLOP_MAX_PLAYBACK), not the helper itself")
 
 	# ...and down to the walk clip when she creeps. A handover that only worked upwards
 	# would leave her galloping on the spot at 1.32 m/s, which no headless distance check

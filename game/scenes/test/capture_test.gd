@@ -3,7 +3,7 @@ extends Node3D
 ## (game/actors/player/magic_beam.gd, game/systems/storage.gd).
 ##
 ## A ground plane, a real Player (real camera rig, real horn marker, real beam), one
-## pony at a time at a KNOWN spot, and a crate. Seven phases, each of which is a separate
+## pony at a time at a KNOWN spot, and a crate. Eight phases, each of which is a separate
 ## claim about the mechanic and each of which is failed by a different bug:
 ##
 ##   WARNING  the invariant the first playtest was lost to, plus the one sanctioned way
@@ -33,6 +33,13 @@ extends Node3D
 ##            Storage (count 1) and her NODE must be gone. Checked through a WeakRef, not
 ##            through is_instance_valid on a variable we are still holding -- the second
 ##            would keep the reference alive.
+##   DISTINCT catch a second pony of the SAME CHARACTER and prove the bag holds two
+##            INDIVIDUALS with different uids and independently movable state, not two
+##            pointers to one shared PonyData record. Then let one back out through
+##            MagicBeam.release_stored() and catch her again, and check she comes back as
+##            the very same individual, with the state she went in with -- a recapture
+##            that quietly reset her would be exactly the amnesia PonyInstance exists to
+##            prevent.
 ##   SLIP     the other half of the capture contest: let go of a pony BEFORE the beam has
 ##            secured her and she must NOT go in the bag -- she is reported as escaped(),
 ##            with Loss.SLIPPED, and left alive in the world. This is the check with the
@@ -92,7 +99,7 @@ extends Node3D
 ##
 ## OFFSCREEN RENDERING (`xvfb-run -a tools/bin/godot --path game --audio-driver Dummy
 ## scenes/test/capture_test.tscn -- --screenshot-dir=<path>`, NOT `--headless`): runs the
-## same seven phases and additionally saves PNGs THROUGH THE PLAYER'S OWN CAMERA, which is
+## same eight phases and additionally saves PNGs THROUGH THE PLAYER'S OWN CAMERA, which is
 ## the only way to answer the questions no number here can: is the beam legible, and does
 ## a held pony sit at a sensible distance in front of the camera rather than clipping into
 ## it? Structural gates in this project have been green through an invisible character
@@ -113,6 +120,7 @@ extends Node3D
 const PonyScene := preload("res://actors/pony/pony.tscn")
 const PonyScript := preload("res://actors/pony/pony.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
+const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 const MagicBeamScript := preload("res://actors/player/magic_beam.gd")
 const PlayerScript := preload("res://actors/player/player.gd")
@@ -282,6 +290,7 @@ func _ready() -> void:
 
 	await _phase_warning()
 	await _phase_grab_and_capture()
+	await _phase_distinct_and_release()
 	await _phase_slip()
 	await _phase_contest()
 	await _phase_full_storage()
@@ -531,13 +540,19 @@ func _phase_grab_and_capture() -> void:
 
 	# The capture itself. WeakRef, so this variable cannot be what keeps her alive.
 	var ghost: WeakRef = weakref(pony)
-	var captured_data: Array = []
-	_beam.captured.connect(func(data: PonyData) -> void: captured_data.append(data))
+	var captured_instances: Array = []
+	_beam.captured.connect(func(inst: PonyInstance) -> void: captured_instances.append(inst))
 
 	_beam.release()
 	_record("releasing over an empty bag stores her", _storage.count() == 1)
-	_record("...and reports it", captured_data.size() == 1
-		and captured_data[0] != null and captured_data[0].id == &"rainbowdash")
+	_record("...and reports it", captured_instances.size() == 1
+		and captured_instances[0] != null and captured_instances[0].data_id == &"rainbowdash")
+	# Phase 1B Task 1: what goes in the bag is an INDIVIDUAL, not the shared character
+	# record. The DISTINCT phase below is what proves two of them stay apart; this is the
+	# narrower claim that one of them has an identity at all.
+	_record("...as an individual with her own uid, not as the shared character record",
+		captured_instances.size() == 1 and captured_instances[0] != null
+		and PonyInstanceScript.serial_of(captured_instances[0].uid) > 0)
 	_record("...and the beam is empty afterwards", not _beam.is_holding())
 
 	await _frames(3)
@@ -546,6 +561,121 @@ func _phase_grab_and_capture() -> void:
 		_storage.count(), _storage.capacity, ghost.get_ref() == null])
 
 	await _shot("03_release_captured")
+
+
+## DISTINCT + RELEASE. Phase 1B Task 1's whole reason for existing, driven end to end
+## through the real beam rather than asserted about a container in isolation.
+##
+## Two catches of the SAME CHARACTER used to put two pointers to one shared PonyData in the
+## bag -- a reviewer inspected it and saw `contents=[twilight, twilight]`. So: catch a
+## second rainbowdash on top of the first and check the bag holds two INDIVIDUALS with
+## different uids and independently movable state.
+##
+## Then let one back out. `Storage.release()` shipped with ZERO CALLERS -- the bag was a
+## one-way trip -- and MagicBeam.release_stored() is the caller that retires that finding.
+## The claim with teeth is not "a pony appeared" but "the pony who appeared is the SAME
+## individual, with the state she went in with", so her happiness and nickname are set to
+## values nothing else in this scene uses and read back off the live node. And then she is
+## caught AGAIN, which must reuse her existing instance rather than mint a fresh one: a
+## recapture that quietly reset her would be exactly the amnesia PonyInstance exists to
+## prevent, and it is invisible to every other check here.
+func _phase_distinct_and_release() -> void:
+	var pony := _spawn_pony(&"rainbowdash", PONY_SPOT)
+	await _aim_at_pony(pony, "second catch")
+	_beam.grab()
+	_record("a second pony of the same character can be caught too",
+		await _wait_until_holding())
+	await _frames(PULL_FRAMES)
+	# The capture contest (see _phase_grab_and_capture) applies here too: PULL_FRAMES is
+	# deliberately shorter than SECURE_SECONDS now, so releasing right after the pull-in
+	# would be a SLIP, not a capture, and this phase would spend the rest of itself
+	# asserting things about a pony who was never actually stored.
+	_record("holding her long enough secures her too", await _wait_until_secured())
+	_beam.release()
+
+	var bag: Array = _storage.contents()
+	var uid_a := String(bag[0].uid) if bag.size() > 1 else ""
+	var uid_b := String(bag[1].uid) if bag.size() > 1 else ""
+	print("CAPTURE distinct count=%d uids=[%s, %s] data_ids=[%s, %s]" % [
+		_storage.count(), uid_a, uid_b,
+		String(bag[0].data_id) if bag.size() > 1 else "-",
+		String(bag[1].data_id) if bag.size() > 1 else "-"])
+
+	_record("two catches of one character are two records, not one", _storage.count() == 2)
+	_record("...of the same character", bag.size() == 2
+		and bag[0].data_id == &"rainbowdash" and bag[1].data_id == &"rainbowdash")
+	# Compared as String, never as StringName: Godot orders StringName by interned POINTER,
+	# a footgun this project has already shipped once (game/world/spawner.gd's DETERMINISM
+	# note). Equality is safe either way; doing it one way everywhere is what stops the next
+	# reader reaching for sort() on a pile of uids.
+	_record("...telling the two individuals apart by uid",
+		bag.size() == 2 and not uid_a.is_empty() and uid_a != uid_b)
+
+	# The state that had nowhere to live before this task.
+	bag[0].happiness = 0.9
+	bag[1].happiness = 0.1
+	_record("...with state that moves independently",
+		absf(_storage.contents()[0].happiness - 0.9) < 0.0001
+		and absf(_storage.contents()[1].happiness - 0.1) < 0.0001)
+
+	# --- and back out again ---------------------------------------------------------
+	var stored: PonyInstance = _storage.peek()
+	stored.happiness = 0.42
+	stored.nickname = "Dashie"
+	var stored_uid := String(stored.uid)
+
+	var back: Node3D = _beam.release_stored()
+	var alive: bool = back != null and is_instance_valid(back) and back.is_inside_tree()
+	_record("a stored pony can be let back out into the world", alive)
+	_record("...and is gone from the bag when she is", _storage.count() == 1)
+
+	var out: PonyInstance = back.get_instance() if alive else null
+	print("CAPTURE release uid=%s happiness=%s nickname=%s at=(%.2f, %.2f, %.2f)" % [
+		String(out.uid) if out != null else "-",
+		("%.3f" % out.happiness) if out != null else "-",
+		out.nickname if out != null else "-",
+		back.global_position.x if alive else 0.0,
+		back.global_position.y if alive else 0.0,
+		back.global_position.z if alive else 0.0])
+
+	_record("...as the very same individual she went in as",
+		out != null and String(out.uid) == stored_uid)
+	_record("...carrying the state she went in with",
+		out != null and absf(out.happiness - 0.42) < 0.0001 and out.nickname == "Dashie")
+	# The mane/tail spring simulation is the whole reason PonyVisuals.build() is the only
+	# sanctioned spawn path (docs/notes-hair-sim.md). A release that loaded the .glb some
+	# other way would still produce a pony-shaped thing, and this is what tells them apart.
+	_record("...rebuilt through the sanctioned visuals path, not a bare model load",
+		alive and back.get_animation_player() != null)
+
+	# She was set down slightly above the ground and has her own gravity back, so she comes
+	# down and stands on it -- the same "not stranded mid-air" claim the teardown phase makes.
+	await _frames(60)
+	alive = back != null and is_instance_valid(back) and back.is_inside_tree()
+	_record("...standing on the ground on her own hooves afterwards",
+		alive and absf(back.global_position.y) < 0.05)
+
+	await _shot("08_released_from_storage")
+
+	# --- caught again: the same pony, not a fresh copy of her character ---------------
+	if alive:
+		back.global_position = PONY_SPOT
+		await _aim_at_pony(back, "recapture")
+		_beam.grab()
+		_record("a released pony can be caught again", await _wait_until_holding())
+		await _frames(PULL_FRAMES)
+		# Same capture-contest requirement as the first catch above -- see the comment there.
+		_record("...and securing her again takes the same SECURE_SECONDS",
+			await _wait_until_secured())
+		_beam.release()
+		var again: PonyInstance = _storage.peek()
+		print("CAPTURE recapture uid=%s happiness=%s count=%d" % [
+			String(again.uid) if again != null else "-",
+			("%.3f" % again.happiness) if again != null else "-", _storage.count()])
+		_record("...and re-catching her reuses her identity rather than minting a new one",
+			again != null and String(again.uid) == stored_uid)
+		_record("...so her state survives the round trip out and back",
+			again != null and absf(again.happiness - 0.42) < 0.0001)
 
 
 ## SLIP. The failure mode the capture contest is made of: let go before the beam has
@@ -756,9 +886,7 @@ func _phase_full_storage() -> void:
 	for i in range(_storage.capacity + 4):
 		if _storage.is_full():
 			break
-		var data: PonyData = PonyDataScript.new()
-		data.id = StringName("filler%d" % filler)
-		if not _storage.store(data):
+		if not _storage.store(PonyInstanceScript.create(StringName("filler%d" % filler))):
 			break
 		filler += 1
 	_record("the bag can actually be filled", _storage.is_full())

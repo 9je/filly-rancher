@@ -13,9 +13,21 @@ config/features=PackedStringArray("4.5", "Forward Plus")
 ; call AudioStreamPlayer.play() -- see the script's own header comment for the
 ; incident this backstops and why the trigger condition is what it is. Does nothing
 ; during genuine interactive play (no --screenshot* arg, not headless).
+;
+; GameState (game/systems/game_state.gd): the savable world -- owned ponies, wallet,
+; plots, unlocks, world seed -- plus the save/load calls that put it on disk through
+; game/systems/save_io.gd. An AUTOLOAD rather than a node in ranch.tscn because the state
+; has to outlive the scene: the first time there is a barn interior or a shop, a state
+; owned by the ranch would be destroyed by walking through a door. Its _ready() also loads
+; res://data/ponies ONCE and injects it into PonyInstance's resolver, so nothing lazily
+; loads a second copy of the same authored roster behind it.
+; It does NOT write anything by itself: autosave is off until a scene turns it on (see
+; game/world/ranch.gd), so gates, the exported smoke run and `bash tools/run_tests.sh`
+; cannot overwrite a real save just by booting the main scene.
 [autoload]
 
 AudioSafety="*res://systems/audio_safety.gd"
+GameState="*res://systems/game_state.gd"
 
 [rendering]
 renderer/rendering_method="forward_plus"
@@ -181,6 +193,26 @@ beam={
 "deadzone": 0.2,
 "events": [Object(InputEventMouseButton,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"button_mask":0,"position":Vector2(0, 0),"global_position":Vector2(0, 0),"factor":1.0,"button_index":2,"canceled":false,"pressed":false,"double_click":false,"script":null)
 , Object(InputEventJoypadMotion,"resource_local_to_scene":false,"resource_name":"","device":-1,"axis":5,"axis_value":1.0,"script":null)
+]
+}
+; Build/interact input map (Phase 1B task 3, game/world/ranch.gd + game/ui/build_menu.gd).
+;   interact                 : E + gamepad X (button 2). The verb for "do the thing this
+;                              place offers" -- today that is opening the build menu on an
+;                              empty plot slot; a later task's market stall and pen gate
+;                              reuse the same button rather than each claiming their own.
+;                              PHYSICAL keycode, like the movement keys, so it stays under
+;                              the same finger on AZERTY/Dvorak. Gamepad button 2 rather
+;                              than 0: 0 is already `jump`, and a player who walks onto a
+;                              plot and taps A should jump, not open a shop.
+;                              The build menu's own NAVIGATION is on Godot's built-in
+;                              ui_up/ui_down/ui_accept/ui_cancel, which the engine already
+;                              binds to both keyboard and gamepad -- see build_menu.gd's
+;                              class comment for why those four are deliberately not
+;                              redeclared here.
+interact={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":69,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventJoypadButton,"resource_local_to_scene":false,"resource_name":"","device":-1,"button_index":2,"pressure":0.0,"pressed":false,"script":null)
 ]
 }
 toggle_hints={

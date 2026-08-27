@@ -16,6 +16,7 @@ extends GutTest
 
 const HudScene := preload("res://ui/hud.tscn")
 const StorageScript := preload("res://systems/storage.gd")
+const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const MagicBeamScript := preload("res://actors/player/magic_beam.gd")
 
@@ -34,12 +35,12 @@ func before_each() -> void:
 	_world.add_child(_hud)
 
 
-func _data(id: String, rarity: int) -> PonyData:
-	var data: PonyData = PonyDataScript.new()
-	data.id = StringName(id)
-	data.display_name = id.capitalize()
-	data.rarity = rarity
-	return data
+## One caught pony of the named ROSTER character. Real roster ids on purpose: the pip
+## colour now comes from `instance.data().rarity`, resolved through PonyRegistry, so a
+## made-up id would resolve to null and every pip would draw as the COMMON fallback --
+## which would make this file pass whether or not the resolution worked at all.
+func _instance(id: String) -> PonyInstance:
+	return PonyInstanceScript.create(StringName(id))
 
 
 func test_the_hud_scene_loads_and_carries_its_script() -> void:
@@ -198,11 +199,12 @@ func test_storing_a_pony_updates_the_pips_without_the_hud_polling() -> void:
 
 	# store() emits Storage.changed; nothing else is called, so if the pips update it is
 	# because the HUD is connected to that signal and not because it re-reads every frame.
-	beam.storage.store(_data("fluttershy", PonyDataScript.Rarity.UNCOMMON))
-	beam.storage.store(_data("twilight", PonyDataScript.Rarity.RARE))
+	beam.storage.store(_instance("fluttershy"))
+	beam.storage.store(_instance("twilight"))
 	assert_eq(_hud.get_shown_rarities(),
 		[PonyDataScript.Rarity.UNCOMMON, PonyDataScript.Rarity.RARE] as Array[int],
-		"the pips must show what is in the bag, oldest first, by rarity tier")
+		"the pips must show what is in the bag, oldest first, by rarity tier -- resolved "
+		+ "from each individual's data_id, since rarity lives on the character not the pony")
 
 	beam.storage.release()
 	assert_eq(_hud.get_shown_rarities(),
@@ -213,9 +215,9 @@ func test_storing_a_pony_updates_the_pips_without_the_hud_polling() -> void:
 func test_a_refused_store_does_not_change_what_the_hud_shows() -> void:
 	var beam := _bind_to_a_fake_player(1)
 	await wait_process_frames(3)
-	beam.storage.store(_data("twilight", PonyDataScript.Rarity.RARE))
+	beam.storage.store(_instance("twilight"))
 	var before: Array[int] = _hud.get_shown_rarities()
-	assert_false(beam.storage.store(_data("fluttershy", PonyDataScript.Rarity.UNCOMMON)),
+	assert_false(beam.storage.store(_instance("fluttershy")),
 		"the bag is full, so this store must be refused")
 	assert_eq(_hud.get_shown_rarities(), before,
 		"a refused capture must leave the pips exactly as they were")

@@ -11,6 +11,7 @@ extends Node3D
 ##   is_holding() -> bool   -- whether something is currently in the beam.
 ##   is_secured() -> bool   -- whether releasing right now would KEEP her (see below).
 ##   get_storage() -> Storage -- what has been caught so far.
+##   release_stored()       -- let the last one caught back out into the world.
 ##
 ## A CAPTURE IS A CONTEST WITH TWO CLOCKS, which is the shape the first playtest asked
 ## for. The beam needs SECURE_SECONDS of unbroken hold to subdue a pony; she has
@@ -60,12 +61,25 @@ extends Node3D
 ## game/scripts/pony_rig.gd: the class cache lives in the gitignored game/.godot/ and a
 ## fresh clone has not built it yet.
 
+const LayersScript := preload("res://world/collision_layers.gd")
+const PonyScene := preload("res://actors/pony/pony.tscn")
 const PonyScript := preload("res://actors/pony/pony.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
+const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const StorageScript := preload("res://systems/storage.gd")
 
 ## Emitted after a pony's record has gone into storage and her node has been freed.
-signal captured(data: PonyData)
+##
+## Carries the PonyInstance -- the INDIVIDUAL who was caught, with her own uid and state --
+## not the shared PonyData. It used to carry the PonyData, which meant a listener could not
+## tell the second Twilight from the first (Phase 1B Task 1's whole reason for existing).
+## Her character record is one `instance.data()` away for anything that needs it.
+signal captured(instance: PonyInstance)
+
+## Emitted after a stored pony has been put back into the world as a live Pony node --
+## see release_stored(). Carries both halves because both are useful: the node to look at,
+## and the instance whose state she came back with.
+signal released(pony: Node3D, instance: PonyInstance)
 ## Emitted when a held body wins its struggle and is handed back to the world. The body
 ## is still alive and still in the scene -- that is the point.
 signal escaped(body: Node3D)
@@ -220,6 +234,16 @@ const PONY_HOLD_LIFT := 0.65
 ## keeps a fixed yaw looks like a bug (a mesh nailed to a point in space), and a slow
 ## rotation reads as "something else is moving her". ~52 deg/s is one turn every 7 s.
 const HELD_SPIN_RATE := 0.9
+
+## Metres in front of the player a released pony is set down, and metres above the
+## player's own feet she starts from. RELEASE_LEAD is a little under HOLD_LEAD (2.2 m), so
+## she appears roughly where a held pony floats -- the player's mental "in front of me"
+## spot -- but clear of the player's own 0.42 m capsule plus her own, so the two do not
+## spawn interpenetrating and shove each other apart. RELEASE_LIFT is deliberately small:
+## enough that a slight rise in the ground under her does not bury her hooves, little
+## enough that the drop reads as her landing rather than as her falling.
+const RELEASE_LEAD := 2.0
+const RELEASE_LIFT := 0.15
 
 ## Seconds after a body wins its struggle during which the beam refuses to acquire
 ## anything. Without it, the beam is still on when she breaks free, so it re-grabs her on
@@ -576,6 +600,113 @@ func get_held_body() -> Node3D:
 ## later inventory/barn system should read it from here rather than making a second one.
 func get_storage() -> Storage:
 	return _storage
+
+
+## Let the most recently caught pony back OUT of the bag and into the world, as a live
+## Pony node carrying the state she went in with. Returns her, or null if the bag was empty
+## or her `data_id` does not resolve on this build's roster.
+##
+## THIS RETIRES A REAL FINDING. `Storage.release()` shipped with ZERO CALLERS -- the bag
+## was a one-way trip and nothing in the game could open it. That was flagged in Phase 1A's
+## review and carried into Phase 1B's plan as a named carried fact; this is the caller.
+##
+## SHE IS THE SAME PONY, NOT A NEW COPY OF HER CHARACTER. The PonyInstance comes out of
+## storage intact -- uid, happiness, hunger, caught_at_ms -- and is handed to Pony.adopt(),
+## which keeps it. So letting her out and catching her again does not reset her, and the
+## beam's capture path (see _settle_pony) reuses the instance she is already carrying.
+## Rebuilding from her `data_id` rather than from a cached node is also what keeps the
+## mane/tail spring simulation attached: PonyRegistry -> PonyVisuals is the only sanctioned
+## spawn path (docs/notes-hair-sim.md), and adopt() -> setup() goes through it.
+##
+## `parent` defaults to whatever the Player is parented to (the world root in ranch.tscn),
+## so a released pony ends up a sibling of the spawner's herd rather than a child of the
+## player who would then drag her around. `at` defaults to RELEASE_LEAD metres in front of
+## the player, lifted RELEASE_LIFT so she falls the last few centimetres onto the ground
+## under her own gravity instead of being born inside it.
+##
+## COLLISION LAYERS ARE ASSIGNED HERE, exactly as game/world/spawner.gd assigns them to a
+## freshly spawned wild pony and for the same reason: pony.tscn is shared with Phase 0-era
+## test scenes built entirely on the default layer 1, so the world's layer policy is
+## applied per instance rather than baked into the scene. Keeping the two in step matters
+## -- a released pony on the wrong layer would walk through the barn that a spawned one
+## bumps into.
+##
+## Task 3's pens will do the same three things (take an instance, instantiate pony.tscn,
+## adopt) with their own placement and leash, so this is the player's door out of the bag
+## rather than a general-purpose spawner they should be routed through.
+func release_stored(parent: Node = null, at: Vector3 = Vector3.INF) -> Node3D:
+	var instance: PonyInstance = _storage.peek()
+	if instance == null:
+		return null
+	if instance.data() == null:
+		# Refused BEFORE the pop, so a pony whose character this build cannot build stays
+		# in the bag rather than being destroyed by trying to let her out. She is still
+		# there, and still hers, when a build that has her record loads the save.
+		push_error("MagicBeam.release_stored: '%s' has no PonyData on this build's roster ('%s')"
+			% [String(instance.uid), String(instance.data_id)])
+		return null
+
+	var host := parent
+	if host == null:
+		host = _player.get_parent() if _player != null else null
+	if host == null:
+		host = get_tree().current_scene if get_tree() != null else null
+	if host == null:
+		host = self
+
+	instance = _storage.release()
+
+	var pony: Node3D = PonyScene.instantiate()
+	pony.name = "Pony_%s" % String(instance.uid).replace(PonyInstanceScript.UID_SEPARATOR, "_")
+	pony.collision_layer = LayersScript.PONY
+	pony.collision_mask = LayersScript.WALKABLE
+	var detection := pony.get_node_or_null("DetectionArea") as Area3D
+	if detection != null:
+		detection.collision_layer = LayersScript.INTERACTION
+		detection.collision_mask = LayersScript.PLAYER
+
+	# Positioned BEFORE add_child(): Pony._ready() records wherever she is standing at that
+	# moment as her roam anchor, and a pony added at the origin and moved afterwards spends
+	# the rest of her life being leashed back to the origin (pony.gd's setup() says so).
+	#
+	# Written as a LOCAL position converted through the host, not as global_position: a node
+	# that is not in the tree yet has no global transform to write to, so assigning
+	# global_position here would silently mean "local" and put her in the wrong place under
+	# any host that is not sitting at the world origin. spawner.gd does the same conversion
+	# for the same reason.
+	var point: Vector3 = at if at != Vector3.INF else _release_point()
+	pony.position = (host as Node3D).to_local(point) if host is Node3D else point
+	host.add_child(pony)
+	pony.adopt(instance)
+
+	released.emit(pony, instance)
+	return pony
+
+
+## Where a released pony is set down when the caller does not say: in front of the player,
+## slightly above the ground so she lands rather than spawns inside it. Flattened to the
+## horizontal, so letting one out while looking at the sky does not launch her.
+##
+## The aim is REFRESHED first rather than read off `_aim_direction` as it stands.
+## _physics_process only updates that while the beam is switched ON, and letting a pony out
+## of the bag is something you do with the beam off -- so the stored value would be whatever
+## the last grab was aimed along, or the initial Vector3.FORWARD if the player has never
+## beamed at all. Either way she would appear somewhere the player is not looking, and the
+## FORWARD case is the nasty one: it is a perfectly valid direction, so no degenerate-vector
+## guard below would ever notice it was stale.
+func _release_point() -> Vector3:
+	_update_aim()
+	var anchor := _anchor_node()
+	var forward := Vector3(_aim_direction.x, 0.0, _aim_direction.z)
+	if forward.length_squared() < 0.000001:
+		forward = -anchor.global_transform.basis.z
+		forward.y = 0.0
+	if forward.length_squared() < 0.000001:
+		forward = Vector3.FORWARD
+	forward = forward.normalized()
+
+	var base: Vector3 = _player.global_position if _player != null else anchor.global_position
+	return base + forward * RELEASE_LEAD + Vector3.UP * RELEASE_LIFT
 
 
 ## Seconds the current hold has lasted (0 when nothing is held).
@@ -982,13 +1113,35 @@ func _take_back_physics(body: Node3D) -> void:
 
 
 ## A released pony: into the bag if there is room, back onto the grass if there is not.
+##
+## THE INSTANCE IS MINTED HERE, and only for a pony who does not already have one. A wild
+## pony has no PonyInstance -- an individual identity is something she acquires by being
+## caught -- so this is where she gets her uid. But a pony who was let back out of the bag
+## and re-caught DOES have one, and re-using it is what makes her the same pony rather than
+## a fresh copy of her character: same uid, same happiness, same hunger. Minting
+## unconditionally here was the obvious version and it would have made release() a quiet
+## amnesia machine.
 func _settle_pony(pony: Node3D) -> void:
 	var data: PonyData = pony.get_data()
-	if data != null and _storage.store(data):
+	var instance: PonyInstance = pony.get_instance()
+	# `not is_full()` guards the MINT, not the store -- store() is still the authority on
+	# whether there is room. Without it, a capture into a full bag burns a uid on a pony who
+	# was then set back down, and the serials in a save file would have gaps for every failed
+	# grab the player ever made. Harmless, but a save file that reads like a ledger should
+	# not have phantom entries in it.
+	if instance == null and data != null and not _storage.is_full():
+		# Time is read HERE, by the caller, and never inside PonyInstance -- that class has
+		# to stay a pure function of its inputs so uids and seeded gates stay reproducible
+		# (see its class comment). Unix time rather than get_ticks_msec(), because this
+		# value goes into a save file and process uptime means nothing after a restart.
+		instance = PonyInstanceScript.create(
+			data.id, int(Time.get_unix_time_from_system() * 1000.0))
+
+	if instance != null and _storage.store(instance):
 		pony.notify_captured()
 		pony.queue_free()
 		_play_first_capture_voice()
-		captured.emit(data)
+		captured.emit(instance)
 		return
 
 	# Full bag (or a pony with no record behind her, which is a setup bug rather than a

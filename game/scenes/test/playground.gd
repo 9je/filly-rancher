@@ -38,7 +38,10 @@ extends Node3D
 ## additionally covered by the GUT test in game/test/test_player.gd against a rotated
 ## camera.
 
-const GaitScript := preload("res://systems/gait.gd")
+# game/systems/gait.gd is deliberately NOT preloaded here any more. This gate's clip and
+# playback checks used to call into it for their own expected values, which made them
+# tautologies (see EXPECTED_DRIVE_SCALE below); the expected values are literals now, so a
+# gate that cannot reach Gait at all is exactly the property that keeps them honest.
 const PlayerScript := preload("res://actors/player/player.gd")
 const GateWatchdogScript := preload("res://scripts/gate_watchdog.gd")
 
@@ -72,6 +75,33 @@ const COAST_FRAMES := 60
 ## is nowhere near 0.60), and one in freefall.
 const MIN_DRIVE_FRACTION := 0.60
 const MAX_DRIVE_FRACTION := 1.06
+
+## THE CLIP AND PLAYBACK RATE THIS GATE IS PINNED AGAINST -- LITERALS, AND THAT MATTERS.
+##
+## These checks used to ask gait.gd itself for the clip and the rate they then compared the
+## engine's answer against -- the answer measured against the very functions that produced
+## it. Stub the playback helper to return a flat 1.0 and BOTH sides become 1.0 and the gate
+## still printed PLAYER_OK: a tautology, and the sixth gate in this project found measuring
+## nothing (Phase 1A's final review found this one and its two siblings in
+## game/test/test_player.gd and game/test/test_pony.gd; all three are fixed the same way).
+##
+## The numbers below are derived by hand, once, here, and never from the function under
+## test. Running is the DEFAULT gait since the second playtest, so this phase drives at
+## player.gd's RUN_SPEED = 5.2 m/s. That is past the gallop handover, so Gait's ladder picks
+## `gallop`, whose clip depicts 3.30 m/s. The honest rate would be 5.2 / 3.3 = 1.576x, but
+## the gallop window tops out at GALLOP_MAX_PLAYBACK (1.3x) before the legs read as a blur
+## -- and player.gd's own comment is explicit that RUN_SPEED is DEFINED as that clip
+## saturated at the bound, not merely clamped incidentally. So 1.3 is the expected rate, as
+## a literal. game/test/test_gait.gd pins the clip speeds themselves against the exporter's
+## printed GALLOP_IMPLIED_SPEED, so a retuned stride goes red THERE first and tells you to
+## change these.
+const EXPECTED_DRIVE_CLIP := "gallop"
+const EXPECTED_DRIVE_SPEED := 5.2
+const EXPECTED_DRIVE_SCALE := 1.3
+## Tolerances: she reaches RUN_SPEED exactly (move_toward clamps to the target) and holds
+## it, so these only have to absorb float noise, not a ramp.
+const DRIVE_SPEED_TOLERANCE := 0.01
+const DRIVE_SCALE_TOLERANCE := 0.01
 
 ## How far off the commanded axis she may drift over phase 1.
 const MAX_LATERAL_DRIFT := 0.1
@@ -133,8 +163,10 @@ func _finish() -> void:
 	var residual := player.get_ground_speed()
 	var anim: AnimationPlayer = player.get_animation_player()
 	var rest_clip: String = anim.current_animation if anim != null else ""
-	var expected_clip := GaitScript.clip_for_speed(_drive_speed)
-	var expected_scale := GaitScript.playback_scale_for_clip(expected_clip, _drive_speed)
+	# The expected clip and rate were computed from gait.gd right here -- that was the
+	# tautology (see EXPECTED_DRIVE_SCALE above): the engine's answer compared against the
+	# very functions that produced it. They are literals now, and Gait is unreachable from
+	# this gate at all, which is what keeps them honest.
 	# Braking distance for the speed she was ACTUALLY at, using her OWN deceleration --
 	# both of which changed under this check once without it noticing (see the constants).
 	var coast_budget: float = pow(_drive_speed, 2.0) / (2.0 * player.deceleration) + COAST_TOLERANCE
@@ -159,8 +191,14 @@ func _finish() -> void:
 		"was on the floor while driving": _drive_on_floor,
 		"stayed at ground level": absf(player.global_position.y) <= MAX_GROUND_OFFSET,
 		"is on the floor at rest": player.is_on_floor(),
-		"played the clip Gait picks for her ground speed": _drive_clip == String(expected_clip),
-		"scaled that clip's playback to its ground speed": is_equal_approx(_drive_scale, expected_scale),
+		"played the clip her default running speed calls for": _drive_clip == EXPECTED_DRIVE_CLIP,
+		# Two halves, and both are needed. The speed check is what gives the scale check its
+		# teeth: pinning the rate alone would still pass if she were ambling at some other
+		# speed and the rate happened to saturate at 1.3 anyway.
+		"held exactly RUN_SPEED while driving":
+			absf(_drive_speed - EXPECTED_DRIVE_SPEED) <= DRIVE_SPEED_TOLERANCE,
+		"scaled gallop playback to the rate 5.2 m/s saturates at":
+			absf(_drive_scale - EXPECTED_DRIVE_SCALE) <= DRIVE_SCALE_TOLERANCE,
 		"stopped instead of drifting": coast_dist <= coast_budget,
 		"has no residual velocity": residual <= MAX_RESIDUAL_SPEED,
 		"returned to 'idle' at rest": rest_clip == "idle",

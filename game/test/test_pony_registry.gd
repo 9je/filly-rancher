@@ -63,6 +63,26 @@ func test_unknown_id_returns_null_not_a_crash() -> void:
 	assert_null(ponies.get(&"totally_not_a_real_pony"))
 
 
+func test_by_id_looks_a_character_up_and_answers_null_for_a_stranger() -> void:
+	# The accessor a PonyInstance resolves its data_id through
+	# (game/systems/pony_instance.gd). Null for an unknown id is a SUPPORTED answer, not an
+	# error path: a save file, or a traded pony blob, can name a character this build does
+	# not carry, and the caller has to show a default rather than crash.
+	registry.load_all(PONY_DIR)
+	var twilight: PonyData = registry.by_id(&"twilight")
+	assert_not_null(twilight, "a character on the roster must be findable by id")
+	assert_eq(twilight.id, &"twilight", "...and it must be the one that was asked for")
+	assert_null(registry.by_id(&"totally_not_a_real_pony"),
+		"a character this build has never heard of resolves to null")
+
+
+func test_by_id_on_a_registry_that_has_loaded_nothing_is_null_not_a_crash() -> void:
+	# No load_all() at all -- the state a registry is in between construction and its first
+	# scan, and the state it is left in if the roster directory could not be opened.
+	assert_null(registry.by_id(&"twilight"),
+		"an unloaded registry knows nobody, and must say so rather than crash")
+
+
 func test_malformed_model_path_is_reported_not_swallowed() -> void:
 	var ponies := registry.load_all(MALFORMED_DIR)
 	# Reported: load_all must surface the bad model_path via push_error

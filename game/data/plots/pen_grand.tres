@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="PlotData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/plot_data.gd" id="1_pen03"]
+
+[resource]
+script = ExtResource("1_pen03")
+id = &"pen_grand"
+display_name = "Grand Pen"
+cost = 480
+scene_path = "res://world/pen.tscn"
+description = "Eight ponies, and every one of them still has somewhere to graze."
+capacity = 8
