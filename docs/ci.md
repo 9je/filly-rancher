@@ -126,11 +126,12 @@ gh run watch                                   # follow the latest run
 
 Or in the browser: **Actions → build-and-smoke → Run workflow**.
 
-**Caveat:** GitHub only offers `workflow_dispatch` for workflows that exist on the
-**default branch** (`master`). Until this file is merged to `master`, `gh workflow
-run` returns *"Workflow does not have 'workflow_dispatch' trigger"* — before the
-merge, use the pull-request trigger (push to the PR branch) instead. That is how
-the verified run in §7 was produced.
+`gh workflow run --ref <branch>` was tested against this branch **before** the
+workflow existed on `master`, and it worked (§7). The commonly-cited rule that
+`workflow_dispatch` requires the workflow to be on the default branch turns out to
+govern the **Run workflow** button in the web UI, not the API — so if the button
+isn't there yet, use the CLI, or push to the PR branch and let the `pull_request`
+trigger fire.
 
 ---
 
@@ -277,12 +278,43 @@ asymmetry is the reason this workflow exists.
 ## 7. Verified run
 
 CI that has never been observed working has the same credibility problem as an
-unrun `.exe`, so the workflow was run for real before being written up:
+unrun `.exe`, so the workflow was run for real before being written up.
 
-* **Green run:** <!--VERIFIED_RUN_URL-->
-* **Deliberately-broken run** (marker list changed to a string the game never
-  prints, to prove the assertion can fail on Windows too):
-  <!--BROKEN_RUN_URL-->
+**Green run — <https://github.com/9je/filly-rancher/actions/runs/33040201478>**
+(PR #1, commit `57e725a`). Both jobs passed. The `windows-smoke` job's log shows
+the exported `.exe` executing on `windows-latest`:
+
+```
+== running: ./build/filly-rancher-windows.exe --headless --quit-after 600 ==
+== exit code: 0 ==
+Godot Engine v4.5.2.stable.official.6ce3de25a - https://godotengine.org
+SMOKE_OK renderer=forward_plus
+PASS: startup marker matched (SMOKE_OK|RANCH_OK)
+```
+
+That line is the thing Phase 0 never had. The Linux job printed the same. The
+marker turned up in *both* capture channels on both platforms, so stdout
+redirection does work through Git Bash for the GUI-subsystem `.exe` — the
+`--log-file` belt-and-braces wasn't needed here, but it costs nothing and removes
+a dependency on that behaviour continuing to hold.
+
+**Deliberately-broken run — <https://github.com/9je/filly-rancher/actions/runs/33040359736>.**
+`MARKERS` was changed to `THIS_MARKER_IS_NEVER_PRINTED` on a throwaway branch (so
+the shared branch's history stayed clean; the branch has since been deleted, the
+run log has not). **Both** jobs went red with
+`FAIL: no startup marker matching 'THIS_MARKER_IS_NEVER_PRINTED'` — including the
+Windows one, which is the specific job whose ability to fail could not be checked
+locally. That throwaway branch also temporarily gave `windows-smoke` an
+`if: always()`, so it would run rather than be skipped by its failed `needs:`.
+
+**Manual-dispatch run — <https://github.com/9je/filly-rancher/actions/runs/33040532862>.**
+Also green, and it confirms `gh workflow run --ref phase0-asset-pipeline` triggers
+this workflow from a non-default branch (see §2).
+
+Total cost of a full run: roughly 1.5–3 minutes of Linux time and well under a
+minute of Windows time, *including* the first-run 1.3GB template download — the
+Windows job only downloads an artifact and runs one binary, which is the whole
+point of exporting on the Linux runner.
 
 ---
 
@@ -296,6 +328,17 @@ unrun `.exe`, so the workflow was run for real before being written up:
   rather than silently exporting with the wrong engine.
 * **Bump the cache key** (`godot-…-linux-v1`) whenever what's *inside* the cache
   changes shape; changing `GODOT_VERSION` already changes the key by itself.
+* **Cache scope is not global, and the first run on `master` matters.** GitHub
+  scopes a cache to the ref that wrote it: a cache saved by a PR run is visible to
+  later runs *of that same PR*, and a cache saved on the default branch is visible
+  to everything. Observed live during §7 — two of the three verification runs, each
+  on a different ref, reported `Cache not found for input keys:
+  godot-4.5.2-stable-linux-v1` despite an earlier run having saved exactly that key.
+  So expect one full ~1.3GB download per new ref until this lands on `master`, and
+  don't read a cache miss on a new branch as a broken cache configuration.
+* **`actions/*` are pinned at `@v4`** and GitHub currently annotates every run with
+  a Node 20 deprecation warning. It's a warning, not a failure; bump the action
+  majors when convenient (that's also a good moment to bump the cache key).
 * **GUT unit tests are not run in CI.** `game/addons/gut/` is gitignored (it's a
   fetched dependency), so a CI checkout has no test runner. Adding a test job means
   first fetching GUT in the workflow the way `setup_env.sh` does. Note that
