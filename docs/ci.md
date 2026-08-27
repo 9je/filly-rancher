@@ -311,6 +311,11 @@ locally. That throwaway branch also temporarily gave `windows-smoke` an
 Also green, and it confirms `gh workflow run --ref phase0-asset-pipeline` triggers
 this workflow from a non-default branch (see §2).
 
+**Warm-cache run — <https://github.com/9je/filly-rancher/actions/runs/33040681055>.**
+Green, and the one that proves the caching is worth having: `Cache restored from
+key: godot-4.5.2-stable-linux-v1`, no download step at all, and about 14 seconds
+from cache restore to `PASS` on the Linux smoke test.
+
 Total cost of a full run: roughly 1.5–3 minutes of Linux time and well under a
 minute of Windows time, *including* the first-run 1.3GB template download — the
 Windows job only downloads an artifact and runs one binary, which is the whole
