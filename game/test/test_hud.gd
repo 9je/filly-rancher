@@ -104,7 +104,9 @@ func test_the_control_hints_cover_every_action_the_player_needs() -> void:
 	var listed := ""
 	for row: Array in _hud.HINTS:
 		listed += String(row[0]).to_lower() + " "
-	for needed in ["move", "gallop", "jump", "look", "zoom", "magic beam"]:
+	# "sneak" rather than "gallop" since the second playtest turned the modifier round --
+	# running is the default now and Shift is the hold-to-walk stealth option.
+	for needed in ["move", "sneak", "jump", "look", "zoom", "magic beam"]:
 		assert_true(listed.find(needed) >= 0,
 			"the hints card must mention '%s'" % needed)
 

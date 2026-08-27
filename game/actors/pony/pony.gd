@@ -24,9 +24,10 @@ extends CharacterBody3D
 ##   WANDER   walk to a random point near home, playing `walk`. -> IDLE on arrival.
 ##   GRAZE    stand still playing `idle` for a few seconds. -> IDLE.
 ##   FLEE     SHY only: run directly away from the player, at a gallop. -> IDLE when
-##            the player is no longer inside DetectionArea.
+##            she can no longer see him (see _sees_player -- which is a live distance
+##            test against her notice radius, not an area enter/exit event).
 ##   APPROACH CURIOUS only: walk toward the player and stop APPROACH_STOP_DISTANCE
-##            short, watching her. -> IDLE when the player leaves DetectionArea.
+##            short, watching her. -> IDLE when she can no longer see him.
 ##   HELD     the beam owns the transform: no gravity, no move_and_slide, no steering.
 ##
 ## The routine states are interruptible and the situational ones are not: every frame a
@@ -35,6 +36,24 @@ extends CharacterBody3D
 ## no reaction state (reaction_state() returns NO_REACTION) so they simply never leave
 ## the routine -- which is the whole of "BOLD ignores the player", with no per-state
 ## special-casing anywhere below.
+##
+## HOW HARD SHE IS TO REACH, AND HOW HARD SHE IS TO HOLD, RUN IN OPPOSITE DIRECTIONS.
+## That is a design decision the owner made in the second playtest ("it makes sense
+## Fluttershy runs but freezes"), and it is split across two files, so it is written down
+## in both:
+##
+##   SHY      hardest to REACH  -- notices from 14 m and bolts on sight (this file)
+##            easiest to HOLD   -- she freezes; 4.6 s of struggle (magic_beam.gd)
+##   CURIOUS  in between, and walks TOWARD you
+##   BOLD     trivial to REACH  -- no reaction at all, walk right up to her
+##            hardest to HOLD   -- she is not scared, she is just not having it: 2.3 s
+##
+## Before it, both dials pointed the same way: SHY was the hardest to catch AND the
+## easiest to reach, and BOLD -- who is the RARE pony -- was a free catch. The rarest pony
+## in a collection game was the least work to collect. Now reaching and holding are two
+## different skills and rarity lines up with difficulty. Assertions in
+## game/test/test_magic_beam.gd pin the ORDERING, in both directions, so an accidental
+## re-inversion goes red rather than shipping.
 ##
 ## SPEEDS COME FROM Gait, SCALED BY base_speed. game/systems/gait.gd owns which clip
 ## honestly depicts a given ground speed and at what playback rate; this file must not
@@ -100,9 +119,9 @@ enum State { IDLE, WANDER, GRAZE, FLEE, APPROACH, HELD }
 ## as a real transition somewhere down the line.
 const NO_REACTION := -1
 
-## Radius of the DetectionArea sphere, in metres. Applied to the shape in _ready() so
-## this constant, which is what the rest of the code reasons about, cannot drift from
-## what pony.tscn ships.
+## Base notice radius, in metres: how far off a RUNNING player has to be before a pony of
+## ordinary nerve notices him. The floor across every personality (SHY adds to it, nobody
+## subtracts), and therefore the number the beam's invariant is stated against.
 ##
 ## THIS NUMBER MUST COMFORTABLY EXCEED MagicBeam.REACH, AND IT IS THE WHOLE OF THE FIX
 ## FOR THE WORST BUG THE FIRST PLAYTEST FOUND. It was 5.0 while the beam reached 8.5 m,
@@ -115,19 +134,64 @@ const NO_REACTION := -1
 ## ever see it.
 ##
 ## 12.0 m is 3.5 m of clear warning past MagicBeam.REACH. Sized against the chase that
-## has to follow: the player closes that gap at (GALLOP_SPEED - her flee speed), which
-## for the slowest bolt on the roster (Fluttershy, 2.48 m/s) is 2.3 m/s -- about a second
-## and a half of committed galloping, long enough that the chase is a thing that happened
+## has to follow: the player closes that gap at (RUN_SPEED - her flee speed), which
+## for the slowest bolt on the roster (Fluttershy, 2.48 m/s) is 2.7 m/s -- about two
+## seconds of committed running, long enough that the chase is a thing that happened
 ## and short enough that it is not a commute. Widening it further is not free: a CURIOUS
 ## pony starts walking over from here too, and a SHY one this far out spends the whole
 ## approach fleeing rather than grazing, so the world stops looking inhabited and starts
 ## looking alarmed.
 ##
-## The invariant (detection > reach, with margin) is asserted in game/test/
-## test_magic_beam.gd and again as a live check in scenes/test/capture_test.gd, because
-## it is a relationship between two constants in two files and nothing but an assertion
-## can stop it silently inverting again.
+## The invariant (notice radius > reach, with margin, for EVERY personality, against a
+## RUNNING player) is asserted in game/test/test_magic_beam.gd and again as a live check
+## in scenes/test/capture_test.gd, because it is a relationship between constants in two
+## files and nothing but an assertion can stop it silently inverting again.
 const DETECTION_RADIUS := 12.0
+
+## Extra metres a SHY pony notices from, on top of DETECTION_RADIUS: 14.0 m in total.
+##
+## THE SECOND PLAYTEST INVERTED WHICH PERSONALITY IS HARD, AND THIS IS THE HALF OF THAT
+## INVERSION THAT LIVES OUT IN THE WORLD. The owner's report was "Fluttershy always breaks
+## out -- impossible to catch", followed by the design call that fixes it: "it makes sense
+## Fluttershy runs but freezes". So SHY is now hard to REACH and easy to HOLD, and BOLD is
+## the other way round (see MagicBeam.STRUGGLE_*). Reaching and holding became two
+## different skills instead of one difficulty dial applied twice -- and the rarest pony on
+## the roster stopped being the easiest one to collect, which was a real design inversion
+## the first playtest round flagged and did not fix.
+##
+## 2.0 m rather than more: it has to be enough that a SHY pony is measurably jumpier than
+## the others (she starts running 2 m before anyone else would, which at her 2.48 m/s bolt
+## is nearly a second of head start on top of the 3.5 m everyone gets), and small enough
+## that the chase still closes. At RUN_SPEED she is caught after ~2 s of running, not ~1.3.
+## The lever deliberately used here is her EYESIGHT rather than her flee SPEED: speed is
+## clamped by what the gallop clip can depict (flee_speed_for), so pushing difficulty
+## through it would saturate at 4.29 m/s and leave a chase that closes at 0.9 m/s -- which
+## is not "difficult", it is "long".
+const SHY_NOTICE_BONUS := 2.0
+
+## What a pony's notice radius is MULTIPLIED BY while the player is sneaking (holding
+## Player.SNEAK_ACTION). SHY 14.0 -> 7.0 m, everyone else 12.0 -> 6.0 m.
+##
+## THIS IS WHAT THE SLOW GAIT BUYS, and it is deliberately generous enough to matter: both
+## of those are INSIDE MagicBeam.REACH (8.5 m), so a player willing to creep can get the
+## crosshair on a pony who has not noticed him at all and take her without a chase. That
+## inverts the invariant above ON PURPOSE and only for a sneaking player -- the invariant
+## is a promise about the player who is RUNNING, which is the default and is what every
+## player does by reflex. Halving it is not subtle enough to be missed and not so deep
+## that ponies stop reacting to the game; the numbers are asserted, in both directions, in
+## game/test/test_pony.gd and demonstrated behaviourally in scenes/test/capture_test.gd.
+const SNEAK_NOTICE_FACTOR := 0.5
+
+## Radius of the DetectionArea sphere, in metres. Applied to the shape in _ready() so this
+## constant cannot drift from what pony.tscn ships.
+##
+## THE AREA IS ONLY THE BROAD PHASE NOW. It has to be as wide as the widest notice radius
+## any personality can have, because a body it never reports cannot be noticed at all; the
+## real, per-personality, per-gait test is notice_radius_for() applied in _sees_player().
+## Doing it that way round rather than resizing the sphere per pony (and re-resizing it
+## every time the player presses Shift) keeps one cheap physics query and puts the whole
+## rule in one pure function that a unit test can read.
+const DETECTION_AREA_RADIUS := DETECTION_RADIUS + SHY_NOTICE_BONUS
 
 ## `base_speed` value that maps to exactly the nominal speeds below. Sits in the middle
 ## of the current roster (3.0 / 3.4 / 6.5) so a typical pony moves at the nominal rate
@@ -144,33 +208,36 @@ const NOMINAL_WANDER_SPEED := GaitScript.WALK_CLIP_SPEED
 ## Deliberately NOT Gait.SKATE_FREE_TOP_SPEED (3.0x, 1.98 m/s): that is the exact speed
 ## at which Gait hands over to the `gallop` clip, so clamping there would produce a
 ## "wandering" pony that Gait then asks to gallop. A pony pottering about her field
-## should not be moving faster than the player WALKS (player.gd's WALK_SPEED, 1.65 m/s
-## since the playtest retune) anyway; anything faster is a flee, and flee_speed_for()
-## handles that. This used to be pinned to the player's walk speed exactly; it is a
-## plain 2.0x now, because the two numbers answer different questions and tying them
-## together meant every retune of how the PLAYER handles silently retuned how a grazing
-## animal ambles.
+## should not be moving faster than the player SNEAKS (player.gd's SNEAK_SPEED, also
+## 1.32 m/s) anyway; anything faster is a flee, and flee_speed_for() handles that. This
+## used to be pinned to the player's walk speed exactly; it is a plain 2.0x now, because
+## the two numbers answer different questions and tying them together meant every retune
+## of how the PLAYER handles silently retuned how a grazing animal ambles. (They have
+## since come back to the same value from opposite directions, which is a coincidence and
+## must not become a dependency again.)
 const MAX_WANDER_PLAYBACK := 2.0
 
 ## Bolting speed for a REFERENCE_BASE_SPEED pony: exactly the `gallop` clip's own speed,
-## 3.30 m/s, played at 1.0x. Faster than the player's walk (1.65 m/s) and slower than her
-## gallop (4.80 m/s), so a spooked pony has to be chased but can be caught.
+## 3.30 m/s, played at 1.0x. Faster than the player's sneak (1.32 m/s) and slower than her
+## run (5.20 m/s), so a spooked pony outruns anyone creeping and is caught by anyone who
+## commits to the chase.
 ##
 ## The CEILING is the interesting number, and it is not set here -- flee_speed_for()
 ## clamps to Gait.TOP_SKATE_FREE_SPEED (4.29 m/s), the fastest any authored clip can
-## honestly depict. That clamp is what makes the player's 4.80 m/s gallop strictly faster
+## honestly depict. That clamp is what makes the player's 5.20 m/s run strictly faster
 ## than ANY wild pony can flee, whatever a roster edit puts in `base_speed`: a SHY Rainbow
 ## Dash (base_speed 6.5, which scales to 5.36 m/s) is pinned back to 4.29 and is therefore
-## still catchable. Before the playtest retune the player's gallop was 4.0 m/s and that
-## same pony would have been 7% FASTER than the player and literally uncatchable in a
+## still catchable. Before the first playtest retune the player's gallop was 4.0 m/s and
+## that same pony would have been 7% FASTER than the player and literally uncatchable in a
 ## straight line. She is BOLD on today's roster, so nobody ever hit it -- it was a
 ## landmine waiting for a personality edit, not a live bug.
 const NOMINAL_FLEE_SPEED := GaitScript.GALLOP_CLIP_SPEED
 
 ## How close a CURIOUS pony comes before stopping to watch, in metres. Comfortably
-## inside DETECTION_RADIUS (or she would walk out of her own detection area and lose
-## sight of the player mid-approach) and comfortably outside the two 0.42 m capsules,
-## so she stops at conversational distance rather than shoving the player.
+## inside her own notice radius even when the player is sneaking (6.0 m -- she would
+## otherwise walk out of her own eyesight mid-approach and forget what she was doing)
+## and comfortably outside the two 0.42 m capsules, so she stops at conversational
+## distance rather than shoving the player.
 const APPROACH_STOP_DISTANCE := 2.0
 
 ## Metres from the wander target at which she counts as arrived.
@@ -261,7 +328,7 @@ func _ready() -> void:
 		# Shapes are shared resources between instances of the same scene; make this
 		# one local before writing to it or every pony in the herd shares one radius.
 		shape.shape = shape.shape.duplicate()
-		(shape.shape as SphereShape3D).radius = DETECTION_RADIUS
+		(shape.shape as SphereShape3D).radius = DETECTION_AREA_RADIUS
 
 	detection_area.body_entered.connect(_on_detection_body_entered)
 	detection_area.body_exited.connect(_on_detection_body_exited)
@@ -330,6 +397,22 @@ static func reaction_state(personality: int) -> int:
 		_:
 			# BOLD, and anything a future roster adds without a reaction of its own.
 			return NO_REACTION
+
+
+## How far away this `personality` notices a player who is (or is not) sneaking, in metres.
+## Pure and static, like reaction_state() above and for the same reason: this and that
+## function are between them the WHOLE of what a personality means out in the world, so
+## they are checkable without a scene tree (game/test/test_pony.gd).
+##
+## The two axes are deliberately independent. Personality says how jumpy she is; the
+## player's gait says how much of a target he is making of himself. Multiplying rather
+## than subtracting means the sneak is worth the same FRACTION to everyone -- a flat
+## "-6 m" would make the jumpiest pony the one it helped least, which is backwards.
+static func notice_radius_for(personality: int, sneaking: bool) -> float:
+	var radius := DETECTION_RADIUS
+	if personality == PonyDataScript.Personality.SHY:
+		radius += SHY_NOTICE_BONUS
+	return radius * (SNEAK_NOTICE_FACTOR if sneaking else 1.0)
 
 
 ## Ambling speed for a pony with this `base_speed`, in m/s. Clamped so it always sits
@@ -612,14 +695,37 @@ func _on_detection_body_exited(body: Node3D) -> void:
 		_player = null
 
 
-## Whether there is a live player inside DetectionArea right now. Re-checks validity
-## every call, so a player freed while inside the area cannot leave a dangling reference
-## that the flee/approach states would then dereference.
+## Whether she can see a player right now. Re-checks validity every call, so a player
+## freed while inside the area cannot leave a dangling reference that the flee/approach
+## states would then dereference.
+##
+## TWO STAGES, AND THE SECOND ONE IS THE GAMEPLAY. DetectionArea answers "is there a player
+## within DETECTION_AREA_RADIUS", which is the widest anyone can see and is therefore only
+## a broad phase; the real question is whether he is inside THIS pony's notice radius, which
+## depends on her personality and on whether he is sneaking, and both of those can change
+## between one frame and the next. So the distance is measured here rather than inferred
+## from an area enter/exit event.
+##
+## Everything downstream gets the new behaviour for free, because everything downstream
+## already went through this function: _react_to_player() only spooks her if she can see
+## him, and FLEE/APPROACH both END the moment she cannot -- so a player who drops to a
+## sneak inside a fleeing pony's old radius watches her calm down and go back to grazing,
+## which is exactly what the sneak is supposed to feel like.
 func _sees_player() -> bool:
 	if _player == null or not is_instance_valid(_player):
 		_player = null
 		return false
-	return true
+	var radius := notice_radius_for(_personality(), _player_is_sneaking())
+	return global_position.distance_to(_player.global_position) <= radius
+
+
+## Whether the body in her detection area is moving quietly. Asked of the body through
+## has_method() rather than by type: PLAYER_GROUP exists precisely so a test stand-in (or
+## a Phase 2 decoy) can be a player to a pony without being a Player, and such a thing has
+## no gait to report. Anything that cannot answer counts as NOT sneaking, which is the
+## conservative reading -- the fallback is the shorter-sighted pony, never the blinder one.
+func _player_is_sneaking() -> bool:
+	return _player.has_method("is_sneaking") and _player.is_sneaking()
 
 
 static func _is_routine_state(value: int) -> bool:

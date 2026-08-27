@@ -104,6 +104,7 @@ const PropsScript := preload("res://world/props.gd")
 const GateWatchdogScript := preload("res://scripts/gate_watchdog.gd")
 const PonyScript := preload("res://actors/pony/pony.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
+const PlayerScript := preload("res://actors/player/player.gd")
 
 ## Headless watchdog ceiling. A normal run (assets present) finishes in under 2s on
 ## this machine; 30s leaves a wide margin for a slower box while still failing in
@@ -760,9 +761,41 @@ func _capture_the_mechanic() -> void:
 	# is already leaving.
 	var shy := _find_pony_by_personality(PonyDataScript.Personality.SHY)
 	if shy != null:
+		# ...and 06a first: the SAME pony, the SAME distance, with the player creeping.
+		# The second playtest's sneak in one comparison -- two frames that differ only in
+		# whether Shift is held, one of which has a pony running out of it and one of which
+		# has a pony still grazing. Nothing else in the project photographs a NON-event, and
+		# "she did not notice me" is exactly the sort of claim a number can assert and only a
+		# picture can make believable.
+		var sneak_reach: float = beam.REACH
+		var sneak_notice: float = PonyScript.notice_radius_for(
+			PonyDataScript.Personality.SHY, false)
+		Input.action_press(PlayerScript.SNEAK_ACTION)
+		await _stand_player_near(shy, (sneak_reach + sneak_notice) * 0.5)
+		await _aim_rig_at(shy.global_position + Vector3(0.0, 0.65, 0.0))
+		for i in range(18):
+			await get_tree().physics_frame
+		await _aim_rig_at(shy.global_position + Vector3(0.0, 0.65, 0.0))
+		print("RANCH mechanic sneak pony=%s state=%s gap=%.2f sneaking=%s notice_running=%.2f notice_sneaking=%.2f speed=%.2f"
+			% [shy.name, PonyScript.state_name(shy.state),
+				_ground_gap(player.global_position, shy.global_position),
+				player.is_sneaking(), sneak_notice,
+				PonyScript.notice_radius_for(PonyDataScript.Personality.SHY, true),
+				shy.get_ground_speed()])
+		_rig.get_camera().make_current()
+		await _capture("06a_she_has_not_noticed_you_creeping")
+		Input.action_release(PlayerScript.SNEAK_ACTION)
+		for i in range(4):
+			await get_tree().physics_frame
+
 		var reach: float = beam.REACH
-		# Stood at the midpoint of the warning band -- outside REACH, inside detection.
-		var stand_off: float = (reach + PonyScript.DETECTION_RADIUS) * 0.5
+		# Stood at the midpoint of the warning band -- outside REACH, inside HER notice
+		# radius, which since the second playtest is a SHY pony's own wider one (14 m) and
+		# not the shared base. The player is not sneaking here, which is the whole point of
+		# the shot: this is what a pony does when you come at her at a run.
+		var notice: float = PonyScript.notice_radius_for(
+			PonyDataScript.Personality.SHY, false)
+		var stand_off: float = (reach + notice) * 0.5
 		await _stand_player_near(shy, stand_off)
 		await _aim_rig_at(shy.global_position + Vector3(0.0, 0.65, 0.0))
 		for i in range(18):
@@ -773,7 +806,7 @@ func _capture_the_mechanic() -> void:
 		var gap: float = _ground_gap(player.global_position, shy.global_position)
 		print("RANCH mechanic flee pony=%s state=%s gap=%.2f reach=%.2f detection=%.2f speed=%.2f"
 			% [shy.name, PonyScript.state_name(shy.state), gap, reach,
-				PonyScript.DETECTION_RADIUS, shy.get_ground_speed()])
+				notice, shy.get_ground_speed()])
 		_rig.get_camera().make_current()
 		await _capture("06_she_bolts_before_you_are_in_range")
 

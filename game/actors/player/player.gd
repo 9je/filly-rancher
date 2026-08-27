@@ -29,34 +29,49 @@ extends CharacterBody3D
 ## owns the whole ladder: which one to play at a given ground speed, and what playback
 ## rate keeps its hooves planted. This script must not re-derive any of that. The two
 ## speeds below are the only gameplay choices:
-##   WALK_SPEED  = 1.65 m/s = 2.5x playback of `walk`. Zero skate.
-##   GALLOP_SPEED = 4.80 m/s = the `gallop` clip saturated at Gait.GALLOP_MAX_PLAYBACK.
-##      Skate ratio 1.12 -- a BUDGETED deviation, see below.
-## The `gallop` clip is what made the second of those nearly honest. Before it existed
-## this controller galloped on the walk clip at Gait.MAX_PLAYBACK and skated by ~2.02x --
-## unmistakable moonwalking.
+##   RUN_SPEED   = 5.20 m/s = the `gallop` clip saturated at Gait.GALLOP_MAX_PLAYBACK and
+##      then some. Skate ratio 1.21 -- a BUDGETED deviation, see below. THE DEFAULT.
+##   SNEAK_SPEED = 1.32 m/s = 2.0x playback of `walk`. Zero skate. Held modifier.
 ##
-## THE PLAYTEST RAISED BOTH, AND THE GALLOP NOW SPENDS A LITTLE SKATE. The owner's first
-## real session said "move speed a bit slow for my liking", so:
-##   WALK_SPEED  1.32 -> 1.65 m/s (+25%). Still inside the `walk` clip's playback window
-##      (2.5x of a 3.0x ceiling), so this costs nothing at all -- and it is the speed the
-##      player is actually at most of the time, lining a pony up in the crosshair.
-##   GALLOP_SPEED 4.00 -> 4.80 m/s (+20%). This one is bought, not free: Gait.
-##      TOP_SKATE_FREE_SPEED -- the fastest speed ANY authored clip can depict with the
-##      hooves planted -- is 4.29 m/s, so 4.80 asks the saturated `gallop` clip to carry
-##      12% more ground than it depicts. Gait.skate_ratio() calls 1.12 "not perceptible in
-##      motion" (its perceptibility ladder starts noticing at ~1.25 and calls 2.0
-##      unmistakable moonwalking), and it is spent ONLY while the gallop button is held.
-##      Verified by rendering: see the playtest report.
+## RUNNING IS NOW THE DEFAULT AND `sneak` (Shift/LB) IS A HOLD-TO-WALK MODIFIER. That is
+## the inversion the SECOND playtest asked for, in the owner's own words: "walk speed is
+## painfully slow still; running feels good, maybe a tad too slow" plus "make running the
+## default and Shift a hold-to-walk-slowly modifier, framed as a stealth option". Both
+## halves of that are one change, and the second half is what makes it more than a
+## convenience: Pony.notice_radius_for() halves a pony's notice radius against a SNEAKING
+## player, so the slow gait BUYS something (see the sneak section in pony.gd). A modifier
+## that only ever costs you speed is a modifier nobody holds; a modifier that trades speed
+## for not being seen is a decision.
+##
+## The history, since two rounds of retuning have now passed over these numbers:
+##   walk   1.32 -> 1.65 (playtest 1: "move speed a bit slow") -> 1.32 as the SNEAK speed
+##          (playtest 2: it is no longer the speed you travel at, it is the speed you
+##          creep at, and creeping is supposed to be slow). Exactly 2.0x of the `walk`
+##          clip, so it still costs nothing at all.
+##   gallop 4.00 -> 4.80 (playtest 1) -> 5.20 as RUN_SPEED (playtest 2: "running feels
+##          good, maybe a tad too slow still").
+##
+## THE RUN SPENDS FOOT SKATE, ON PURPOSE. Gait.TOP_SKATE_FREE_SPEED -- the fastest speed
+## ANY authored clip can depict with the hooves planted -- is 4.29 m/s, so 5.20 asks the
+## saturated `gallop` clip to carry 21% more ground than it depicts. Gait.skate_ratio()'s
+## perceptibility ladder starts noticing at ~1.25 and calls 2.0 unmistakable moonwalking,
+## so 1.21 is at the top of the "not perceptible in motion" band rather than past it, and
+## game/test/test_player.gd pins that budget at 1.25 so the next "it still feels a bit
+## slow" goes red instead of shipping.
 ##
 ##      It buys two things a skate-free 4.29 could not. First, 4.29 is only 7% up on the
-##      old number and a player cannot feel 7%. Second and more important, 4.29 is exactly
-##      the ceiling Pony.flee_speed_for() clamps a fleeing pony to -- so at 4.29 the
-##      fastest possible bolt TIES the player and a chase never closes. At 4.80 the player
-##      is strictly faster than anything that can run from her, by construction, for any
-##      base_speed a future roster invents. The honest fix for the whole band is a faster
-##      authored gallop cycle (tools/author_anims.py), which is an animation task, not a
-##      tuning one.
+##      ORIGINAL number and a player cannot feel 7%. Second and more important, 4.29 is
+##      exactly the ceiling Pony.flee_speed_for() clamps a fleeing pony to -- so at 4.29
+##      the fastest possible bolt TIES the player and a chase never closes. At 5.20 the
+##      player is strictly faster than anything that can run from her, by construction,
+##      for any base_speed a future roster invents, with 0.9 m/s of closing speed even in
+##      the worst case. The honest fix for the whole band is a faster authored gallop
+##      cycle (tools/author_anims.py), which is an animation task, not a tuning one.
+##
+##      Now that running is the DEFAULT, this skate is also what the player sees most of
+##      the time rather than only while a button is held. That is a real cost and it was
+##      weighed: the alternative is a default travel speed of 4.29 m/s, which is the exact
+##      speed the owner has already called too slow twice.
 ##
 ## COLLISION CAPSULE (numbers live in player.tscn, which cannot carry comments).
 ## Twilight measures 1.163 m at the withers and 2.138 m to the tip of her horn --
@@ -82,19 +97,16 @@ const GaitScript := preload("res://systems/gait.gd")
 const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 const PonyVisualsScript := preload("res://actors/pony/pony_visuals.gd")
 
-## Ground speed at full stick / any WASD key with `gallop` released. Exactly
-## 2.5x Gait.WALK_CLIP_SPEED, so the walk clip plays at 2.5x with the hooves planted.
-## Written as a multiple of the clip speed rather than as 1.65 so it cannot drift out of
-## the walk band if the clip is ever re-authored; the band's ceiling is Gait.MAX_PLAYBACK
-## (3.0x), and staying strictly under it is what keeps clip_for_speed() answering `walk`
-## rather than handing a walking player over to the gallop clip.
-const WALK_SPEED := 2.5 * GaitScript.WALK_CLIP_SPEED
+## The input action held to WALK instead of running. Named `sneak` rather than `walk`
+## because slowness is not what it is FOR -- see is_sneaking() and Pony.SNEAK_NOTICE_FACTOR.
+## It was called `gallop` and meant the opposite until the second playtest.
+const SNEAK_ACTION := &"sneak"
 
-## Ground speed with `gallop` held. Sits 12% past what the `gallop` clip can honestly
-## depict (Gait.TOP_SKATE_FREE_SPEED is 4.29 m/s) -- a deliberate, budgeted amount of foot
-## skate, bought for the two reasons the class comment sets out. game/test/test_player.gd
-## pins the size of that budget, so it is a number somebody chose and not a number that
-## drifted.
+## Ground speed at full stick / any WASD key, with nothing held. THE DEFAULT. Sits 21%
+## past what the `gallop` clip can honestly depict (Gait.TOP_SKATE_FREE_SPEED is 4.29 m/s)
+## -- a deliberate, budgeted amount of foot skate, bought for the reasons the class comment
+## sets out. game/test/test_player.gd pins the size of that budget, so it is a number
+## somebody chose and not a number that drifted.
 ##
 ## Deliberately NOT read from PonyData.base_speed (Twilight's is 3.4). That field is
 ## documented as a race stat used from Phase 3 (docs/.../design.md), so its numbers
@@ -104,7 +116,22 @@ const WALK_SPEED := 2.5 * GaitScript.WALK_CLIP_SPEED
 ## moment anyone made her playable. If a later phase decides base_speed really is
 ## m/s, this is a one-line change with a test to update, which is the cheap direction
 ## for that decision to go.
-const GALLOP_SPEED := 4.8
+const RUN_SPEED := 5.2
+
+## Ground speed with `sneak` held: a slow, quiet walk. Exactly 2.0x Gait.WALK_CLIP_SPEED,
+## so the walk clip plays at 2.0x with the hooves planted and this costs nothing at all.
+## Written as a multiple of the clip speed rather than as 1.32 so it cannot drift out of
+## the walk band if the clip is ever re-authored; the band's ceiling is Gait.MAX_PLAYBACK
+## (3.0x), and staying strictly under it is what keeps clip_for_speed() answering `walk`
+## rather than handing a sneaking player over to the gallop clip.
+##
+## SLOWER THAN THE OLD DEFAULT WALK (1.65 m/s), WHICH IS NOT AN OVERSIGHT. The owner called
+## 1.65 "painfully slow" as a TRAVEL speed and he was right -- so it stopped being the
+## travel speed. What is left here is a creep you choose, and a creep that moved at three
+## quarters of a running pace would not read as quiet. The price is the point: at 1.32 m/s
+## you cannot close on a fleeing pony at all (Fluttershy bolts at 2.48), so sneaking is
+## strictly a way of not making her flee in the first place.
+const SNEAK_SPEED := 2.0 * GaitScript.WALK_CLIP_SPEED
 
 ## Peak of a standing jump, in metres. 0.9 m is about three quarters of her withers
 ## height (1.163 m) -- a pony-sized hop rather than a platformer leap.
@@ -186,6 +213,20 @@ func get_ground_speed() -> float:
 	return Vector2(velocity.x, velocity.z).length()
 
 
+## Whether the player is choosing to move quietly -- i.e. holding `sneak`.
+##
+## READ BY THE PONIES, not just by this controller. Pony._sees_player() calls this through
+## a has_method() check (a test stand-in in the `player` group is not a Player and does not
+## have to grow one), and Pony.notice_radius_for() halves her notice radius when it is
+## true. So this is a gameplay interface, not an input detail, and it deliberately answers
+## the question about INTENT rather than about velocity: it is true while standing still
+## with Shift held, which is what lets a player stop dead and let a spooked pony settle.
+## Keying it off `get_ground_speed() < something` instead would make "am I being quiet"
+## unanswerable at a standstill and would flicker across the threshold while accelerating.
+func is_sneaking() -> bool:
+	return Input.is_action_pressed(SNEAK_ACTION)
+
+
 ## The body's AnimationPlayer, or null if the visuals failed to build. Exposed so
 ## scenes and tests can assert which clip is playing and at what rate without
 ## re-deriving PonyVisuals.ANIMATION_PLAYER_PATH against the model tree.
@@ -226,7 +267,7 @@ func _physics_process(delta: float) -> void:
 
 	# Analog magnitude scales the target speed, so a gamepad gets the whole range
 	# between a standstill and the top speed rather than an on/off dash.
-	var top_speed := GALLOP_SPEED if Input.is_action_pressed("gallop") else WALK_SPEED
+	var top_speed := SNEAK_SPEED if is_sneaking() else RUN_SPEED
 	var target_velocity := direction * (top_speed * wish_magnitude)
 
 	var rate := acceleration if wish_magnitude > 0.0 else deceleration
