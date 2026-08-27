@@ -34,11 +34,48 @@ ORIENTATION. The rig faces -Y in Blender (head at y=-1.05, rump at y=+0.97), whi
 unrotated export moonwalks. `export_blend.py --rotate-z 180` is the fix; it lives
 there rather than here because it is an export-orientation concern, not an animation
 concern.
+
+SECONDARY MOTION IS NOT AUTHORED HERE. Mane/tail/forelock chains are deliberately
+left out of every clip and out of the export bake -- see SECONDARY_MOTION_PATTERNS
+below and docs/pipeline.md section 6.
 """
 import math
 
 import bpy
 from mathutils import Quaternion, Vector
+
+# --- Secondary-motion (hair) bone chains ------------------------------------
+# Bones matching any of these substrings must carry NO keyframes in the exported
+# clips. They are driven at runtime instead, by a Godot SpringBoneSimulator3D that
+# `game/scripts/pony_rig.gd` attaches to every pony -- that is what makes the mane
+# and tail lag the body's bob (follow-through/overlap) instead of snapping with it.
+#
+# This exclusion is load-bearing, not cosmetic: an AnimationPlayer track and a
+# SkeletonModifier3D both write the same bone pose, and the animation is applied
+# after the modifier's input is captured, so ANY keyframe on these bones -- even a
+# constant one holding the rest pose, which is exactly what the exporter's
+# "bake every bone every frame" mode emits -- overwrites the simulation every frame
+# and makes the spring bones look like they do nothing at all.
+#
+# Matched case-insensitively as substrings of the whole bone name, so it catches
+# every rig layer at once (`DEF_Mane1-3`, `CON_Tail2`, `FK_Hair4-1`, ...).
+# Deliberately a name-pattern list and NOT a per-character bone list: the whole
+# tier-a family (Twilight, Rainbow Dash, Fluttershy, plus the downloaded-but-not-yet
+# -converted Applejack and Rarity) shares the same DEF_Mane*/DEF_Tail*/DEF_Hair*
+# naming, and so will any future pack from it. Adding a character needs no edit
+# here; adding a rig family with different hair naming needs one new substring.
+SECONDARY_MOTION_PATTERNS = ("mane", "tail", "hair", "forelock", "fringe")
+
+
+def is_secondary_motion_bone(name):
+    """True if `name` is a mane/tail/hair bone that must stay out of the bake."""
+    lowered = name.lower()
+    return any(pattern in lowered for pattern in SECONDARY_MOTION_PATTERNS)
+
+
+def secondary_motion_bones(arm):
+    """Every bone on `arm` excluded from the animation bake, sorted by name."""
+    return sorted(b.name for b in arm.data.bones if is_secondary_motion_bone(b.name))
 
 # --- Canonical bone names. Verified (task-7 Step 1) to be present and identically
 # named on all three tier-a rigs -- twilight/rainbowdash/fluttershy share a 93-bone
@@ -262,7 +299,37 @@ def author(arm):
     """Create both clips. Returns them in export order."""
     if arm is None or arm.type != "ARMATURE":
         raise SystemExit(f"--anims needs an armature object, got {arm!r}")
+    # --- Determinism: force the LEGACY IK solver for the bake.
+    #
+    # These packs ship `pose.ik_solver = 'ITASC'` (iterative damped least squares,
+    # precision 0.005, SDLS). The front IK chain is 1.0668 long against a 1.0537 rest
+    # reach -- 98.8% extended, only 0.0131 of slack -- so the knee's bend direction is
+    # very nearly under-determined and iTaSC's damping picks whichever solution it
+    # lands in first. That was a sleeping problem until export_blend.py started
+    # rebinding the hair mesh onto this rig, which perturbed depsgraph evaluation
+    # enough to wake it: Fluttershy's idle then flipped a front knee in roughly one
+    # export in six (33 degrees on DEF_LowerFrontLeg), i.e. the same .blend produced
+    # different .glb files run to run. A pipeline whose whole premise is "assets are
+    # regenerated per machine from tracked scripts" cannot have that.
+    #
+    # LEGACY is Blender's non-iterative solver and is reproducible. It is not a
+    # compromise on quality here: every baked channel agrees with the iTaSC solve to
+    # within 0.0028 of a quaternion component (~0.3 degrees), front legs included --
+    # measured, not assumed -- and 4/4 then 3x3 consecutive exports came out
+    # byte-identical. The .blend is never saved back, so this only affects our bake.
+    arm.pose.ik_solver = "LEGACY"
+    # Guard the exclusion from the *authoring* side too: if a future clip ever keys a
+    # mane/tail bone directly, say so here rather than letting the export-side filter
+    # quietly throw the keys away and leave the author wondering why nothing moved.
+    clashes = [n for n in ANIMATED if is_secondary_motion_bone(n)]
+    if clashes:
+        raise SystemExit(
+            f"ANIMATED includes secondary-motion bones {clashes}; those are simulated "
+            f"in Godot (SpringBoneSimulator3D) and must not be keyframed here"
+        )
     actions = [build_idle(arm), build_walk(arm)]
+    excluded = secondary_motion_bones(arm)
+    print(f"SECONDARY_MOTION_BONES {len(excluded)} excluded from bake: {excluded}")
     fps = bpy.context.scene.render.fps
     print(f"WALK_IMPLIED_SPEED {implied_ground_speed(fps):.4f} units/s "
           f"(stride={STRIDE} frames={WALK_FRAMES} fps={fps})")

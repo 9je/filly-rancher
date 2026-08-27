@@ -8,7 +8,7 @@ run with no .blend argument and pass --fbx-in:
 This imports the FBX into the (empty) default scene before the rest of the
 pipeline below runs unchanged -- material rebuild, pack_all, export.
 """
-import argparse, os, sys
+import argparse, json, os, struct, sys
 import bpy
 
 argv = sys.argv[sys.argv.index("--") + 1:]
@@ -227,6 +227,143 @@ def rebuild_materials_for_gltf():
 
 rebuild_materials_for_gltf()
 
+
+# --- Quirk (hair defect, Task 10): the mane/tail mesh is skinned to a SECOND,
+# viewport-DISABLED armature, and was silently exporting unskinned.
+#
+# Every CreatorOfPony pack ships two armatures: the character rig (`TS_Rig`) and a
+# hair-physics rig (`TS_RigPhysics`, a child object of it) that carries duplicate,
+# identically-named copies of the DEF_Mane*/DEF_Hair*/DEF_Tail* chains plus SPLINE_IK
+# constraints driven by curve objects. The hair mesh (`TS_Hair`, and on Rainbow Dash
+# also a separate `Tail`) binds its ARMATURE modifier to that physics rig, not to the
+# character rig. The physics rig has `hide_viewport=True`, so it is absent from the
+# evaluated depsgraph -- and `export_apply=True` exports *against the depsgraph*, so
+# the exporter never saw it. The result passed every structural gate (`meshes=17
+# skins=1 textured=True`) while the mane and tail exported with **no skin at all**,
+# rigidly parented to the rig root: the body bobbed and the head nodded and the hair
+# just sat there. That is the "hair bobbing out of sync with the pony" defect.
+#
+# Fix generically rather than per-character: for any mesh we intend to export whose
+# armature is not the primary rig, rebind it onto the primary rig -- but only when
+# every one of its vertex groups names a bone that actually exists there. Vertex
+# groups bind by name, and the duplicated hair bones' rest matrices agree with the
+# primary rig's to <5e-5 on all three packs (checked before relying on it), so the
+# rebind is exact, not an approximation. If a vertex group has no counterpart, leave
+# the mesh alone and say so loudly -- a half-rebound mesh would collapse to the origin.
+#
+# Deliberately NOT fixed by clearing `hide_viewport` on the physics rig: that would
+# export a second skeleton with duplicate bone names (Godot would get two Skeleton3Ds
+# for one character) and would also drag in every other hidden object in these packs
+# (`Base_Wings`, `TS_MeshCageWings`, the `*Physics` curve helpers), changing the
+# documented mesh counts.
+def rebind_secondary_armatures(primary, meshes):
+    """Point meshes skinned to a non-primary armature at `primary` instead."""
+    rebound = []
+    for obj in sorted(meshes, key=lambda o: o.name):
+        if obj.type != "MESH":
+            continue
+        for mod in obj.modifiers:
+            if mod.type != "ARMATURE" or mod.object is None or mod.object is primary:
+                continue
+            missing = [g.name for g in obj.vertex_groups if g.name not in primary.data.bones]
+            if missing:
+                print(f"WARNING: not rebinding {obj.name!r} from {mod.object.name!r} to "
+                      f"{primary.name!r} -- vertex groups absent there: {missing}",
+                      file=sys.stderr)
+                continue
+            secondary = mod.object
+            mod.object = primary
+            # Reparent to the primary rig while preserving world placement:
+            # world = parent.matrix_world @ matrix_parent_inverse @ matrix_basis.
+            world = obj.matrix_world.copy()
+            obj.parent = primary
+            obj.matrix_parent_inverse = primary.matrix_world.inverted()
+            obj.matrix_basis = world
+            rebound.append(obj.name)
+            print(f"REBIND {obj.name} armature {secondary.name} -> {primary.name} "
+                  f"(vertex_groups={len(obj.vertex_groups)})")
+    return rebound
+
+
+# --- Keeping mane/tail bones OUT of the baked clips.
+#
+# `export_bake_animation=True` means "sample every bone of the armature on every
+# frame", which is what makes the IK hoof solve ship (see the note further down) --
+# but it also emits a constant, rest-pose track for every cosmetic hair bone. Those
+# constant tracks are not harmless: in Godot an AnimationPlayer track and a
+# SkeletonModifier3D both write the same bone pose, so a rest-pose track on
+# DEF_Mane1-3 overwrites the SpringBoneSimulator3D's output every single frame and
+# the hair simulation appears to do nothing whatsoever.
+#
+# The exporter offers no per-bone animation filter (`export_def_bones` filters bones
+# out of the *skeleton*, which would break skinning, and the optimizer's
+# `export_optimize_animation_keep_anim_armature=False` only drops channels that
+# happen to be constant -- an accident of the data, not a stated rule). So filter at
+# the one place the exporter decides whether a bone gets a channel:
+# `gather_sampled_bone_channel` already returns None for "no need to animate this
+# node", and its caller already handles that, so returning None early is on a
+# supported path rather than a structural hack. Which bones are excluded comes from
+# author_anims.SECONDARY_MOTION_PATTERNS -- one name-pattern list, no per-character
+# data. The post-export check below turns this into a hard contract: if a future
+# Blender version renames the hook, the import fails loudly here, and if a channel
+# ever slips through anyway the export fails after writing.
+def exclude_secondary_motion_from_bake(is_excluded):
+    """Patch the glTF exporter to emit no animation channel for excluded bones."""
+    try:
+        from io_scene_gltf2.blender.exp.animation.sampled.armature import armature_channels
+    except ImportError as exc:  # pragma: no cover - version guard
+        raise SystemExit(
+            "cannot install the secondary-motion animation filter: the glTF exporter's "
+            f"armature_channels module moved in this Blender build ({exc}). Without it "
+            "the mane/tail bones would ship rest-pose tracks that override Godot's "
+            "SpringBoneSimulator3D -- see docs/pipeline.md section 6."
+        )
+    original = armature_channels.gather_sampled_bone_channel
+    filtered_bones = set()
+
+    def gather_sampled_bone_channel(armature_uuid, bone, channel, *rest, **kwargs):
+        if is_excluded(bone):
+            filtered_bones.add(bone)
+            return None
+        return original(armature_uuid, bone, channel, *rest, **kwargs)
+
+    armature_channels.gather_sampled_bone_channel = gather_sampled_bone_channel
+    return filtered_bones
+
+
+def gltf_json(path):
+    """The JSON chunk of a .glb, as a dict."""
+    with open(path, "rb") as fh:
+        blob = fh.read()
+    offset = 12  # magic, version, length
+    while offset < len(blob):
+        length, kind = struct.unpack_from("<II", blob, offset)
+        offset += 8
+        if kind == 0x4E4F534A:  # 'JSON'
+            return json.loads(blob[offset:offset + length])
+        offset += length
+    raise SystemExit(f"{path}: no JSON chunk")
+
+
+def assert_no_secondary_motion_tracks(path, is_excluded):
+    """Fail the export if any clip keyframes a bone Godot is meant to simulate."""
+    doc = gltf_json(path)
+    names = [n.get("name", "") for n in doc.get("nodes", [])]
+    leaked = sorted({names[c["target"]["node"]]
+                     for anim in doc.get("animations", [])
+                     for c in anim["channels"]
+                     if "node" in c["target"] and is_excluded(names[c["target"]["node"]])})
+    if leaked:
+        raise SystemExit(
+            f"{path}: {len(leaked)} secondary-motion bones still carry animation "
+            f"tracks {leaked[:8]}... -- they would override Godot's spring bones"
+        )
+    animated = {c["target"]["node"] for anim in doc.get("animations", [])
+                for c in anim["channels"] if "node" in c["target"]}
+    print(f"SECONDARY_MOTION_UNKEYED animated_nodes={len(animated)} "
+          f"clips={[a.get('name') for a in doc.get('animations', [])]}")
+
+
 # --- Quirk: textures ship as loose PNGs next to the .blend (not packed into it).
 # Blender resolves those relative paths fine regardless of our cwd, but packing
 # them in-memory before export removes any ambiguity and matches the brief's
@@ -242,6 +379,12 @@ if args.object:
     for mod in getattr(target, "modifiers", []):
         if mod.type == "ARMATURE" and mod.object:
             keep |= {mod.object} | set(mod.object.children_recursive)
+    # Rebind the hair mesh off the hidden physics rig before anything selects or
+    # exports it -- see rebind_secondary_armatures() for why it would otherwise
+    # export unskinned. `keep` is already computed, so the reparent it performs
+    # cannot change what gets exported, only what the hair is bound to.
+    if target.type == "ARMATURE":
+        rebind_secondary_armatures(target, keep)
     # --- Quirk: these rigged character files lock the body meshes' viewport
     # selectability (outliner's "Disable Selection" toggle / hide_select=True) so
     # animators can't accidentally drag a mesh instead of a bone. obj.select_set()
@@ -272,6 +415,7 @@ if args.anims:
     armature = next((o for o in ([target] if target else []) + sorted(keep, key=lambda o: o.name)
                      if o is not None and o.type == "ARMATURE"), None)
     author_anims.author(armature)
+    filtered_bones = exclude_secondary_motion_from_bake(author_anims.is_secondary_motion_bone)
 
 # --- Quirk: the rig faces -Y in Blender, which `export_yup` maps to +Z in glTF --
 # the glTF "front" convention. Godot keeps glTF's axes but its Node3D.look_at() aims
@@ -311,4 +455,8 @@ if args.anims:
     )
 
 bpy.ops.export_scene.gltf(**export_kwargs)
+if args.anims:
+    print(f"SECONDARY_MOTION_FILTERED {len(filtered_bones)} bones: "
+          f"{sorted(filtered_bones)}")
+    assert_no_secondary_motion_tracks(args.out, author_anims.is_secondary_motion_bone)
 print(f"EXPORT_OK {args.out}")
