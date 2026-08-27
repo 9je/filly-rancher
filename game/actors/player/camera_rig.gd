@@ -80,9 +80,22 @@ const PITCH_MAX_DEG := 30.0
 ## Spring-arm length limits, in metres, sized against Twilight's own scale rather than
 ## a generic human-sized default (docs/pipeline.md section 3: she is 1.163 m at the
 ## withers, 2.138 m to the horn tip; her body is ~1.41 m nose-to-tail per player.gd).
-## MIN keeps the camera outside her ~0.84 m shoulder width with margin even when the
-## spring arm is fully pulled in against a wall; MAX is a wide "establishing" shot that
-## still keeps her recognisable rather than a speck.
+## MAX is a wide "establishing" shot that still keeps her recognisable rather than a
+## speck.
+##
+## MIN DOES NOT BOUND HOW CLOSE THE CAMERA CAN ACTUALLY GET. It is used ONLY by
+## add_zoom_delta()'s clampf() below, on the arm's REST length (the distance the
+## player asked for). SpringArm3D's own collision pull-in -- what actually happens
+## when something is in the way -- is a separate mechanism this constant plays no
+## part in, and measured against the ranch's barn (game/world/ranch.gd's
+## camera-vs-building probe) the arm pulls in to 0.73 m, inside SPRING_MIN and inside
+## the pony. A previous version of this comment claimed SPRING_MIN held "even when
+## the spring arm is fully pulled in against a wall" -- that was false; do not
+## reintroduce it. Do NOT "fix" this by clamping the pull-in to SPRING_MIN either: at
+## the barn that would put the camera 0.47 m INSIDE the wall, which is strictly worse
+## than the current close-up. TODO(camera): the real fix is fading/hiding the player
+## mesh below some distance threshold so a close pull-in reads as intentional instead
+## of as clipping -- a separate camera task, not a one-line change here.
 const SPRING_MIN := 1.2
 const SPRING_MAX := 6.5
 ## Default distance: roughly 2.5x her withers height, framing her whole body plus a

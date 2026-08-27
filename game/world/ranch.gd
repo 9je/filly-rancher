@@ -38,6 +38,14 @@ extends Node3D
 ##     above from going hollow.
 ##   * "the pen-plot clearing is clear" fails if a prop or a pony ends up in the
 ##     ground reserved for Phase 1B's plots.
+##   * "no pony is standing inside a prop" fails if a pony's own collision capsule
+##     overlaps any prop's collider RIGHT NOW, checked by shape query rather than by
+##     distance to a marker or a reroll history. The spawner's own prop-rejection
+##     reroll (spawner.gd) only fires when the ground raycast that placed her hits a
+##     PROPS-layer collider -- and on this exact layout no prop's footprint overlaps
+##     any zone disc, so that reroll never fires here. This check exists so a pony
+##     ending up inside the barn is caught independently of whether the reroll that
+##     was supposed to prevent it was ever reachable.
 ##
 ## ASSETLESS CHECKOUTS ARE A DECLARED STATE, NOT A SILENT PASS. game/assets/converted/
 ## is gitignored, so CI and a fresh clone have no ponies and no props (docs/ci.md
@@ -108,6 +116,15 @@ var _screenshot_dir := ""
 var _rig: Node3D
 var _spring_arm: SpringArm3D
 
+## Labels that were assigned to `checks` more than once. A Dictionary silently
+## overwrites on a repeated key -- that is exactly the bug a reviewer proved live in
+## `game/scenes/test/capture_test.gd` (two checks shared a label, one silently
+## overwrote the other, and a whole requirement went ungated while the gate still
+## printed green). `_set_check()` below is the only place `checks` may be written, and
+## it records a collision here instead of only push_error'ing it, so a duplicate label
+## fails the gate itself rather than merely logging a warning nobody reads.
+var _duplicate_check_labels: Array[String] = []
+
 
 func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
@@ -141,6 +158,21 @@ func _ready() -> void:
 
 # --- the gate -----------------------------------------------------------------------
 
+## The only place `checks` may be written. Guards against the exact bug a reviewer
+## found live in `game/scenes/test/capture_test.gd`: a label reused for a second check
+## silently discards the first one, and the gate keeps printing green with a whole
+## requirement no longer gated. A Dictionary itself will not tell you that happened --
+## `checks[label] = x` just overwrites -- so the guard has to live here, not in the
+## Dictionary.
+func _set_check(checks: Dictionary, label: String, ok: bool) -> void:
+	if checks.has(label):
+		push_error(("ranch: DUPLICATE CHECK LABEL -- '%s' was assigned twice; the first " +
+			"assignment was silently discarded and its requirement went ungated.") % label)
+		if not label in _duplicate_check_labels:
+			_duplicate_check_labels.append(label)
+	checks[label] = ok
+
+
 func _report(pony_count: int, prop_count: int) -> void:
 	var checks := {}
 
@@ -161,7 +193,7 @@ func _report(pony_count: int, prop_count: int) -> void:
 	# game/data/ponies/*.tres is committed, so it is present on every machine and in
 	# every export. (It read as empty in the first exported build of this scene --
 	# see PonyRegistry._resource_path for why.)
-	checks["the pony roster loaded at all"] = roster_size > 0
+	_set_check(checks, "the pony roster loaded at all", roster_size > 0)
 
 	var assets_state := "present"
 	if not props_present and not ponies_present:
@@ -178,9 +210,10 @@ func _report(pony_count: int, prop_count: int) -> void:
 
 	# --- terrain ---------------------------------------------------------------
 	var terrain_shape := terrain.get_node_or_null("CollisionShape3D") as CollisionShape3D
-	checks["the terrain has a collider"] = terrain_shape != null and terrain_shape.shape != null
-	checks["the terrain is on the TERRAIN layer"] = \
-		terrain.collision_layer == LayersScript.TERRAIN
+	_set_check(checks, "the terrain has a collider",
+		terrain_shape != null and terrain_shape.shape != null)
+	_set_check(checks, "the terrain is on the TERRAIN layer",
+		terrain.collision_layer == LayersScript.TERRAIN)
 
 	# --- the player is somewhere real ------------------------------------------
 	var p := player.global_position
@@ -188,14 +221,14 @@ func _report(pony_count: int, prop_count: int) -> void:
 	var player_offset: float = absf(p.y - ground_y)
 	print("RANCH player pos=(%.2f, %.3f, %.2f) ground=%.3f offset=%.3f on_floor=%s"
 		% [p.x, p.y, p.z, ground_y, player_offset, player.is_on_floor()])
-	checks["the player is standing on the ground"] = player_offset <= GROUND_TOLERANCE
-	checks["the player reports a floor under her"] = player.is_on_floor()
-	checks["the player's mask includes the terrain"] = \
-		player.collision_mask & LayersScript.TERRAIN != 0
-	checks["the player's mask includes the props"] = \
-		player.collision_mask & LayersScript.PROPS != 0
-	checks["the player is on the PLAYER layer"] = \
-		player.collision_layer == LayersScript.PLAYER
+	_set_check(checks, "the player is standing on the ground", player_offset <= GROUND_TOLERANCE)
+	_set_check(checks, "the player reports a floor under her", player.is_on_floor())
+	_set_check(checks, "the player's mask includes the terrain",
+		player.collision_mask & LayersScript.TERRAIN != 0)
+	_set_check(checks, "the player's mask includes the props",
+		player.collision_mask & LayersScript.PROPS != 0)
+	_set_check(checks, "the player is on the PLAYER layer",
+		player.collision_layer == LayersScript.PLAYER)
 
 	# --- props ------------------------------------------------------------------
 	var all_props := _all_props()
@@ -230,18 +263,20 @@ func _report(pony_count: int, prop_count: int) -> void:
 	print("RANCH props placed=%d expected=%d shapes=%d missing=%s"
 		% [prop_count, expected_props, total_shapes,
 			", ".join(props.get_missing()) if not props.get_missing().is_empty() else "-"])
-	checks["every layout entry with an asset was placed"] = prop_count == expected_props
-	checks["every prop got at least one collision shape"] = uncollided.is_empty()
+	_set_check(checks, "every layout entry with an asset was placed", prop_count == expected_props)
+	_set_check(checks, "every prop got at least one collision shape", uncollided.is_empty())
 	if not uncollided.is_empty():
 		push_error("ranch: props with NO collision shape: %s" % ", ".join(uncollided))
-	checks["every prop collider is on the PROPS layer"] = prop_layers_ok
-	checks["every prop is seated on the ground (none floats or sinks)"] = props_seated
+	_set_check(checks, "every prop collider is on the PROPS layer", prop_layers_ok)
+	_set_check(checks, "every prop is seated on the ground (none floats or sinks)", props_seated)
 
 	# --- ponies -----------------------------------------------------------------
 	var ponies: Array[CharacterBody3D] = spawner.get_spawned()
 	var on_ground := true
 	var in_zone := true
 	var max_relief := 0.0
+	var prop_overlaps: Array[String] = []
+	var space := get_world_3d().direct_space_state
 	for pony in ponies:
 		var pos: Vector3 = pony.global_position
 		var home: Vector3 = pony.get_home()
@@ -259,46 +294,79 @@ func _report(pony_count: int, prop_count: int) -> void:
 		max_relief = maxf(max_relief, absf(terrain.height_at(home.x, home.z)))
 		if PropsScript.is_in_pen_plots(home.x, home.z):
 			pen_intrusions.append(pony.name)
+		# The spawner's own reroll (game/world/spawner.gd, "inside a building or a tree
+		# canopy, try somewhere else") only fires when the RAYCAST that first found her
+		# ground point hits a PROPS-layer collider. Measured against this exact map, no
+		# prop's footprint overlaps any zone disc (nearest is ~13.5 m outside
+		# EastField), so that branch never fires here and a pony standing inside the
+		# barn at ground level -- the raycast finding the barn's own floor, not
+		# rejecting it -- would pass every check above. This is an independent,
+		# after-the-fact geometric check: does the pony's ACTUAL capsule overlap ANY
+		# prop's collider, right now, regardless of how she got there.
+		if _pony_overlaps_prop(pony, space):
+			prop_overlaps.append(pony.name)
 		print("RANCH pony %-22s home=(%6.1f, %5.2f, %6.1f) now=(%6.1f, %5.2f, %6.1f) ground_offset=%.3f zone=%s r=%.1f state=%s"
 			% [pony.name, home.x, home.y, home.z, pos.x, pos.y, pos.z, offset,
 				marker.zone_id if marker != null else "<none>", from_marker,
 				pony.state_name(pony.state)])
-	checks["every pony spawned"] = ponies.size() == expected_ponies
-	checks["every pony is standing on the ground"] = on_ground
-	checks["every pony was spawned inside her zone"] = in_zone
-	checks["no pony needed a fallback placement"] = spawner.get_fallback_placements() == 0
-	checks["no zone came back with an empty roster"] = spawner.get_empty_zones().is_empty()
+	_set_check(checks, "every pony spawned", ponies.size() == expected_ponies)
+	_set_check(checks, "every pony is standing on the ground", on_ground)
+	_set_check(checks, "every pony was spawned inside her zone", in_zone)
+	_set_check(checks, "no pony needed a fallback placement",
+		spawner.get_fallback_placements() == 0)
+	_set_check(checks, "no zone came back with an empty roster",
+		spawner.get_empty_zones().is_empty())
 	# See the class comment: this is what stops the raycast check above going hollow.
-	checks["the spawn zones sit on sloped ground"] = \
-		max_relief >= MIN_ZONE_RELIEF if ponies.size() > 0 else true
+	_set_check(checks, "the spawn zones sit on sloped ground",
+		max_relief >= MIN_ZONE_RELIEF if ponies.size() > 0 else true)
+	_set_check(checks, "no pony is standing inside a prop", prop_overlaps.is_empty())
+	if not prop_overlaps.is_empty():
+		push_error("ranch: pony overlapping a prop's collider: %s" % ", ".join(prop_overlaps))
 
-	checks["the pen-plot clearing is clear"] = pen_intrusions.is_empty()
+	_set_check(checks, "the pen-plot clearing is clear", pen_intrusions.is_empty())
 	# The PenPlots marker in ranch.tscn is what a human sees when they open the
 	# scene; PropsScript.PEN_PLOTS_CENTRE is what the layout and these checks
 	# actually use. Assert they agree, or the visible marker becomes a lie the first
 	# time one of them is nudged.
 	var pen_marker := $PenPlots as Marker3D
-	checks["the PenPlots marker agrees with the reserved area"] = \
-		Vector2(pen_marker.global_position.x, pen_marker.global_position.z) \
-			.distance_to(PropsScript.PEN_PLOTS_CENTRE) < 0.01
+	_set_check(checks, "the PenPlots marker agrees with the reserved area",
+		Vector2(pen_marker.global_position.x, pen_marker.global_position.z)
+			.distance_to(PropsScript.PEN_PLOTS_CENTRE) < 0.01)
 	if not pen_intrusions.is_empty():
 		push_error("ranch: pen-plot clearing intruded on by: %s" % ", ".join(pen_intrusions))
 
 	# --- the camera ---------------------------------------------------------------
-	checks["the camera probes the world, not just layer 1"] = \
-		_spring_arm.collision_mask == LayersScript.WORLD
+	_set_check(checks, "the camera probes the world, not just layer 1",
+		_spring_arm.collision_mask == LayersScript.WORLD)
 	var pull_in: Dictionary = await _probe_camera_against_building()
 	if pull_in.get("ran", false):
 		print("RANCH camera building=%s rest=%.2f hit=%.2f pull_in=%.2f"
 			% [pull_in["building"], pull_in["rest"], pull_in["hit"], pull_in["pull_in"]])
-		checks["the camera pulls in against a building"] = \
-			pull_in["pull_in"] >= MIN_CAMERA_PULL_IN
+		_set_check(checks, "the camera pulls in against a building",
+			pull_in["pull_in"] >= MIN_CAMERA_PULL_IN)
+	elif assets_state == "present":
+		# The barn and farmhouse are hand-built in building.gd and exist on EVERY
+		# checkout, assetless or not -- they are not gated on assets_state. So a probe
+		# that comes back empty while assets=present means _find_wall_stand_point()'s
+		# raycast found no wall on a map that unquestionably has one: a real regression
+		# (wrong layer, wrong mask, a building that failed to build), not an assetless
+		# checkout with nothing to probe. A silent SKIP here would let exactly that
+		# regression pass as green -- so it is a FAILED check, not a log line.
+		print("RANCH camera check FAILED -- no building found to probe, but assets=present")
+		_set_check(checks, "the camera pulls in against a building", false)
 	else:
 		print("RANCH camera check SKIPPED -- no building on this checkout (assets=%s)"
 			% assets_state)
 
 	# --- verdict -------------------------------------------------------------------
-	var all_ok := true
+	# A duplicate label is not a check that failed -- it is a check that never ran. It
+	# fails the gate here, unconditionally, rather than only being logged by
+	# _set_check() above, so it cannot start being broken without anyone noticing.
+	if not _duplicate_check_labels.is_empty():
+		push_error("ranch: %d check label(s) were assigned more than once: %s"
+			% [_duplicate_check_labels.size(), ", ".join(_duplicate_check_labels)])
+
+	var all_ok := _duplicate_check_labels.is_empty()
 	for label in checks:
 		if not checks[label]:
 			push_error("ranch: FAILED check -- %s" % label)
@@ -342,6 +410,31 @@ func _bodies_of(prop: Node3D) -> Array[StaticBody3D]:
 	for body: StaticBody3D in prop.find_children("*", "StaticBody3D", true, false):
 		result.append(body)
 	return result
+
+
+## True if `pony`'s own collision capsule, at its CURRENT global transform, overlaps
+## ANY prop's collider (buildings included -- see _all_props()/_bodies_of()).
+##
+## This is checked BY SHAPE QUERY, not by distance to a marker or a prop's centre,
+## for the same reason the ground placement itself is a raycast (see spawner.gd's
+## class comment): the pony's actual capsule is what a player would see standing
+## inside a wall, and nothing about her `home`/`zone` bookkeeping can tell you that.
+## See the class comment above and the call site in _report() for why this check
+## exists independently of the spawner's own prop-rejection reroll.
+func _pony_overlaps_prop(pony: CharacterBody3D, space: PhysicsDirectSpaceState3D) -> bool:
+	var shape_node := pony.get_node_or_null("CollisionShape3D") as CollisionShape3D
+	if shape_node == null or shape_node.shape == null:
+		# No shape to query with is itself a different, already-covered problem (a
+		# pony whose body is malformed would fail other checks); do not fabricate an
+		# overlap that was never measured.
+		return false
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = shape_node.shape
+	query.transform = shape_node.global_transform
+	query.collision_mask = LayersScript.PROPS
+	query.collide_with_bodies = true
+	query.collide_with_areas = false
+	return not space.intersect_shape(query, 1).is_empty()
 
 
 func _nearest_marker(point: Vector3) -> ZoneMarker:

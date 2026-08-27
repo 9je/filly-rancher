@@ -23,6 +23,14 @@ extends Node3D
 ## withers -- sizing anything pass-through off the withers figure produces doorways
 ## she cannot walk through).
 ##
+## TREES ARE THE ONE CATEGORY-WIDE EXCEPTION, via TREE_SCALE below. Task 7's own
+## renders showed the Nature Kit trees at BASE_SCALE alone standing 1.7-3.2 m --
+## several of them visibly SHORTER than a 1.16 m pony, and next to the ranch's 5 m
+## barn every one of them reads as a shrub. docs/pipeline.md section 4 recommended
+## "roughly 2x" on top of BASE_SCALE as a starting point, not a settled answer; a 2x
+## tree still tops out below the barn's eave. TREE_SCALE is 3x, confirmed from a
+## render against both the barn and a pony -- see the fix report for what it showed.
+##
 ## ...WITH ONE PER-PROP EXCEPTION, and it is a documented defect, not a fudge.
 ## kenney_survival_structure.glb came through the FBX branch of the pipeline, and
 ## Blender's automatic FBX unit conversion is not reliable for this pack: the same
@@ -67,6 +75,13 @@ const SINK_BIAS := 0.05
 const SCALE_FIX := {
 	"kenney_survival_structure.glb": 4.0,  # FBX unit-conversion defect, quirk 4.
 }
+
+## Category-wide multiplier ON TOP of BASE_SCALE, applied to every "kenney_tree_*"
+## entry in LAYOUT. Not a per-prop scale defect like SCALE_FIX above -- the Nature
+## Kit trees are shipped at their intended scale, they are just stylised too small to
+## read as trees once ponies and a real barn are standing next to them. See the class
+## comment.
+const TREE_SCALE := 3.0
 
 ## THE OPEN GROUND, reserved for Phase 1B's pen plots. Centre and half-extent in
 ## metres, on XZ. Nothing is placed here, no pony spawns here, and ranch.gd asserts
@@ -188,6 +203,8 @@ func build() -> int:
 		var at: Vector2 = entry["at"]
 		var scale_factor: float = BASE_SCALE * float(SCALE_FIX.get(file, 1.0)) \
 			* float(entry.get("s", 1.0))
+		if file.begins_with("kenney_tree"):
+			scale_factor *= TREE_SCALE
 
 		inst.name = "%s_%d" % [file.get_basename(), _placed.size()]
 		inst.scale = Vector3.ONE * scale_factor

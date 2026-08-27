@@ -370,6 +370,7 @@ pack ships flat named materials (`leafsGreen`, `woodBark`, solid
 | 3 | **`blender -b` with no `.blend` argument opens Blender's default startup scene** (a Cube + Camera + Light), not an empty one — relevant only to the new `--fbx-in` path, which by design runs with no `.blend`. Exporting afterward with no `--object` filter (`use_selection=False`) included that leftover default Cube alongside the real imported prop. | `kenney_survival_structure.glb` silently came out with **two** meshes: an untextured 2×2×2 "Cube" plus the real "structure" mesh. This passed `validate_gltf.py --props` (`meshes>=1`) without complaint — only a rendered frame showed a flat grey box sitting on top of the real prop. | `export_blend.py`'s `--fbx-in` handling now snapshots `bpy.data.objects` before import and deletes exactly that snapshot's objects afterward, so only what the FBX import actually added survives to export. Safe because this `.blend` is never saved back to disk. |
 | 4 | **FBX unit conversion is not reliable for this pack.** The same `structure` model exists as both a Kenney-authored `.glb` (already correctly scaled to the pack's 2-unit module grid: `2×2×2`) and an `.fbx` (imported via Blender's automatic cm→m unit conversion). After quirk 3's fix, the FBX path's `structure` mesh measures **0.5 units tall in Godot — 4× smaller** than the GLB sibling's 2.0. | A prop converted via the FBX path can silently land at the wrong scale relative to the same pack's other (GLB-sourced) props, with no validator check catching it (structural gates don't know what size is "correct"). | Not fixed in-place (documented, not patched, per this doc's own "record quirks, don't paper over them" convention) — kept as `kenney_survival_structure.glb` at its native (undersized) scale. **Recommendation:** prefer the direct-GLB path whenever a pack offers one; if only FBX is available, sanity-check the imported scale against a known reference (another model from the same pack, or the pack's own stated grid unit) rather than trusting Blender's automatic FBX unit conversion. |
 | 5 | **Three of the four "buildings" in this set are not buildings.** Discovered in Phase 1A task 7, the first time any of them was rendered from ground level rather than measured. `kenney_windmill.glb` is the Fantasy Town Kit's SAILS module -- a bare X of blades, no tower behind it. `kenney_watermill.glb` is a bare waterwheel, no mill. `kenney_survival_structure.glb` is an open timber frame. Only `kenney_market_stall.glb` is a complete object. These kits are MODULAR: their houses are assembled from wall/roof/door pieces, and the files whose names sound like buildings are the decorative attachments. | A homestead composed from them reads as farm equipment abandoned in a field. Nothing structural notices: they import, they validate (`meshes>=1`), they measure a plausible height, and they collide. The §4 scale table above lists windmill and watermill under "buildings/structures" purely on the strength of those numbers. | Not fixed at the asset level (task 7 was scoped away from `game/assets/`). The ranch's actual barn and farmhouse are assembled from primitives in `game/world/building.gd`, and the Kenney pieces are placed as yard fixtures. **The real fix is an asset task:** convert the Fantasy Town Kit's wall / roof / door / window modules and assemble a house from them, or find a pack that ships whole buildings. Until then, look at a prop before trusting its filename. |
+| 6 | **The Nature Kit trees render cyan/mint, not green — and it is NOT the terrain's `vertex_color_is_srgb` bug repeating.** Checked in the Task 7 fix round after a reviewer flagged the colour from a render. The trees carry no vertex colours at all (`COLOR_0` absent from every mesh primitive) — their colour comes entirely from each material's glTF `baseColorFactor`, a completely different code path from `terrain.gd`'s hand-rolled vertex-colour mesh. `leafsGreen`'s factor is `[0.161, 0.788, 0.671]`: byte-identical, confirmed by diffing the converted `.glb` against the untouched file straight out of Kenney's own `kenney_nature-kit.zip` (`assets_raw/props/kenney-nature-kit/`) — nothing in this project's pipeline altered it. That RGB triple's hue is ~169° (cyan/teal) whether read as linear (glTF's own convention) or converted to sRGB for display (~172°) — it is a teal swatch by construction, not an artefact of which colour space you read it in. | None — a render shows real cyan/mint foliage, exactly as a reviewer described it, but it is Kenney's authored "leafsGreen"/"leafsDark" swatch, not a bug. | **Not fixed — this is Kenney's shipped palette, left as-is per this doc's "record quirks, don't paper over them" convention.** Confirmed visually in the same `xvfb-run` + llvmpipe render pass used for the tree-scale fix above (`05_scale_at_the_barn.png` and the establishing shot). If a future task wants true green foliage, the fix is sourcing a different tree pack or hand-editing the material colour at map-build time (`game/world/props.gd`), not chasing a colour-space bug that was checked for and ruled out here. |
 
 ### Scale finding — props vs. the converted ponies
 
@@ -437,6 +438,19 @@ re-derive one. The recommendation for whoever picks this up: keep 1.5× as the
 kit-wide factor and add a **tree-category multiplier of roughly 2×** on top
 (giving 3.5–6.5 m trees), or source a taller tree model. Either way it is a
 decision to make from the pictures, deliberately, and to record here.
+
+**RESOLVED, in the Task 7 fix round: `TREE_SCALE = 3.0`, not 2×.** Rendered
+against a render at 2× first (on paper, from the numbers above): a 2× oak still
+tops out around 4.3 m, below the barn's 4.9 m ridge and not far above its 3.4 m
+eave, i.e. still reads as undersized next to the building even though it now
+clears a pony. 3× was rendered instead (`xvfb-run` + llvmpipe,
+`05_scale_at_the_barn.png`) and reads correctly: the oak beside the barn now
+rises well past the ridge line, and every tree in the establishing/eye-level
+shots stands taller than the buildings and multiple pony-heights tall rather
+than level with one. See `game/world/props.gd`'s `TREE_SCALE` constant, applied
+on top of `BASE_SCALE` for every `kenney_tree_*` layout entry only — the
+yard fixtures and buildings are unaffected and still read correctly at 1.5×
+alone.
 
 **Kenney prop origins are not consistent, so seat props by their bounding box.**
 `kenney_survival_structure` and `kenney_market_stall` have their origin at the
@@ -595,11 +609,21 @@ horse's limb gets) and depicts exactly 5x the speed.
 
 `gallop` is a **transverse gallop on the left lead**, not a fast walk: four
 separate beats (right-hind, left-hind, right-fore, left-fore, the leading
-foreleg landing last and reaching furthest forward) and two airborne phases —
-a short gathered suspension after the hinds leave, a long extended one after
-the leading fore does, 42% of the cycle with nothing on the ground. The walk's
-symmetric diagonal pairs are gone entirely. Two rig-specific accommodations
-make it fit:
+foreleg landing last) and two airborne phases — a short gathered suspension
+after the hinds leave, a long extended one after the leading fore does,
+**50% of the cycle with nothing on the ground** (an 8.3% gathered suspension
+from `t=0.250` to `t=0.333`, plus a 41.7% extended one from `t=0.583` to
+`t=1.000` — `tools/author_anims.py`'s own `GALLOP_FEET` comment gives that
+exact split; a previous version of this doc quoted 42%, which is the extended
+phase alone, not the total airborne fraction). The walk's symmetric diagonal
+pairs are gone entirely. **"Leading" here is timing only, not reach**: the
+left and right forelegs both run through the identical
+`_gallop_foot_offset()` function against the same `GALLOP_STRIDE` — the only
+difference between them is that `GALLOP_FEET` schedules the left foreleg's
+contact 1/12 of a cycle after the right's, so it lands last. Nothing in the
+clip makes it reach further forward than its counterpart; a previous version
+of this doc claimed it did, which was not implemented and has been corrected
+here. Two rig-specific accommodations make it fit:
 
 - **A deeper body crouch** (`GALLOP_CROUCH` 0.055 m against the walk's 0.045),
   with one bob per cycle instead of two, timed so the body rides lowest through

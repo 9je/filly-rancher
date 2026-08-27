@@ -56,18 +56,27 @@ func load_all(dir: String) -> Dictionary:
 ##
 ## WHY THIS IS NOT JUST `extension == "tres"`. It was, and that made the SHIPPED GAME
 ## load zero ponies. Godot's exporter converts text resources to binary by default
-## (`editor/export/convert_text_resources_to_binary`), so `twilight.tres` is stored in
-## the .pck as `twilight.res`. Scanning for the `.tres` extension therefore matched
-## nothing at all inside an exported build: the registry came back empty, the player
+## (`editor/export/convert_text_resources_to_binary`), and the actual exported .pck
+## for this project was instrumented to see what that produces: `twilight.tres`,
+## `fluttershy.tres` and `rainbowdash.tres` -- there is no bare `.res` file for any of
+## them. What ships instead is a `.remap` stub per resource (`twilight.tres.remap`
+## etc.) pointing at the converted binary; the path to actually LOAD is the ORIGINAL
+## `foo.tres` name (the engine follows the remap itself), which is exactly what the
+## `.remap` branch below strips down to. Scanning for the bare `.tres` extension
+## matched nothing inside an exported build -- there is no `twilight.tres` file
+## entry, only `twilight.tres.remap` -- so the registry came back empty, the player
 ## spawned with no body, and no wild pony spawned anywhere. Nothing caught it for
 ## three tasks because every gate so far ran the project from source via `--path
-## game`, where the files really are `.tres` -- it only surfaced the first time the
-## exported binary was asked to boot a scene that needed the roster (Phase 1A Task
-## 7's ranch, the first main scene that does).
+## game`, where the files really are `.tres` with no remap involved -- it only
+## surfaced the first time the exported binary was asked to boot a scene that needed
+## the roster (Phase 1A Task 7's ranch, the first main scene that does).
 ##
-## `.remap` is handled for the same class of reason: some export configurations leave
-## a `foo.tres.remap` stub pointing at the converted file, and the path to load in
-## that case is the ORIGINAL `foo.tres` (the engine follows the remap), not the stub.
+## The `ext == "res"` arm below is therefore defensive, not the fix: it exists in
+## case some export configuration other than the one actually measured here ships a
+## bare binary `.res` with no remap stub, but on this project's real exported .pck
+## the `.remap` branch is the one doing the work, and the `.res` branch is dead code
+## that has never been observed to fire. Left in place because it is harmless and
+## costs nothing to keep as a hedge.
 func _resource_path(dir: String, file_name: String) -> String:
 	var name := file_name
 	if name.get_extension() == "remap":
