@@ -84,9 +84,12 @@ const SPAWN_COUNT := 6
 ## The herd is deliberately tight, and the numbers below are load-bearing rather than
 ## decorative: a pony spawns SPAWN_RING_RADIUS from the origin and strays at most
 ## ROAM_RADIUS from her spawn point, so nobody is ever further than 4.5 m from the
-## origin -- comfortably inside Pony.DETECTION_RADIUS (5 m) of a player standing there.
-## That is what makes "every pony can see him in the reaction phase" true by
-## construction rather than by luck; the run asserts it anyway.
+## origin -- comfortably inside Pony.DETECTION_RADIUS (12 m since the playtest retune, 5 m
+## when these were chosen) of a player standing there. That is what makes "every pony can
+## see him in the reaction phase" true by construction rather than by luck; the run asserts
+## it anyway. Left at 2.0 m rather than widened with the detection radius: the point of the
+## tight ring is that the herd is legible in one screenshot, and the detection check below
+## has more slack now, not less.
 const SPAWN_RING_RADIUS := 2.0
 const ROAM_RADIUS := 2.0
 
@@ -94,7 +97,12 @@ const TOTAL_FRAMES := 300
 const REACTION_FRAME := 180
 
 ## Where the stand-in player waits during the routine phase: far enough that no pony's
-## 5 m detection sphere can reach him, near enough to stay on the ground plane.
+## detection sphere can reach him, near enough to stay on the ground plane. The margin is
+## thinner than it was -- the radius went from 5 m to 12 m in the playtest retune, and the
+## furthest a pony can be from the origin is 4.5 m, so the closest any of them can get to
+## him here is 15.5 m against a 12 m radius. Three and a half metres of slack, and the
+## "nobody reacted before he arrived" check per pony below is what goes red if a future
+## retune eats the rest of it.
 ##
 ## wild_ponies.tscn ALSO places him here, and that is load-bearing rather than
 ## redundant. He originally sat at the origin in the scene and was moved out here in

@@ -43,17 +43,27 @@ const DRIVE_FRAMES := 60
 ## A second of no input at all, to prove she stops rather than drifts.
 const COAST_FRAMES := 60
 
-## Bounds on the distance covered during phase 1. At WALK_SPEED (1.32 m/s) with an
-## acceleration of 12 m/s^2 the ramp costs ~0.073 m, so one second covers ~1.25 m.
-## The window is wide enough not to be brittle and narrow enough that a stationary
-## player, a galloping one, or one in freefall all fail it.
-const MIN_DRIVE_DISTANCE := 1.0
-const MAX_DRIVE_DISTANCE := 1.6
+## Bounds on the distance covered during phase 1, as fractions of one second at
+## Player.WALK_SPEED.
+##
+## DERIVED RATHER THAN TYPED, and that is a fix rather than a flourish: they were hard
+## numbers (1.0 and 1.6) sized against a 1.32 m/s walk, and when the playtest raised the
+## walk to 1.65 m/s they survived only because the new distance happened to land inside
+## the old window with 0.2 m to spare. A check that keeps passing by luck through a retune
+## it was not updated for is one retune away from passing through a real regression. The
+## band is what has to hold: she covers most of a second's travel (the acceleration ramp
+## from a standstill eats the rest) and cannot cover more than all of it.
+##
+## Still narrow enough to fail on everything it was written to fail on: a stationary
+## player, a galloping one (Player.GALLOP_SPEED is nearly 3x the walk), and one in
+## freefall.
+const MIN_DRIVE_FRACTION := 0.70
+const MAX_DRIVE_FRACTION := 1.06
 
 ## How far off the commanded axis she may drift over phase 1.
 const MAX_LATERAL_DRIFT := 0.1
-## How far she may coast after input stops (deceleration 18 m/s^2 from 1.32 m/s
-## needs ~0.048 m), and the residual speed allowed once stopped.
+## How far she may coast after input stops (deceleration 18 m/s^2 from 1.65 m/s
+## needs ~0.076 m), and the residual speed allowed once stopped.
 const MAX_COAST_DISTANCE := 0.15
 const MAX_RESIDUAL_SPEED := 0.02
 ## The capsule's bottom sits at the player's origin, so a player standing on the
@@ -109,16 +119,22 @@ func _finish() -> void:
 	var rest_clip: String = anim.current_animation if anim != null else ""
 	var expected_scale := GaitScript.playback_scale_for_speed(_drive_speed)
 
-	print("PLAYER drive dist=%.3f travel=(%.3f, %.3f, %.3f) speed=%.3f on_floor=%s clip=%s scale=%.3f" % [
-		dist, travel.x, travel.y, travel.z, _drive_speed, _drive_on_floor, _drive_clip, _drive_scale
+	print("PLAYER drive dist=%.3f window=[%.3f, %.3f] travel=(%.3f, %.3f, %.3f) speed=%.3f on_floor=%s clip=%s scale=%.3f" % [
+		dist, PlayerScript.WALK_SPEED * MIN_DRIVE_FRACTION,
+		PlayerScript.WALK_SPEED * MAX_DRIVE_FRACTION,
+		travel.x, travel.y, travel.z, _drive_speed, _drive_on_floor, _drive_clip, _drive_scale
 	])
 	print("PLAYER coast dist=%.4f residual_speed=%.4f y=%.4f clip=%s" % [
 		coast_dist, residual, player.global_position.y, rest_clip
 	])
 
+	# One second of walking, bounded as a fraction of the walk speed -- see the constants.
+	var min_dist: float = PlayerScript.WALK_SPEED * MIN_DRIVE_FRACTION
+	var max_dist: float = PlayerScript.WALK_SPEED * MAX_DRIVE_FRACTION
+
 	var checks := {
-		"moved a plausible distance": dist >= MIN_DRIVE_DISTANCE and dist <= MAX_DRIVE_DISTANCE,
-		"moved along the camera's forward axis (-Z)": travel.z <= -MIN_DRIVE_DISTANCE,
+		"moved a plausible distance": dist >= min_dist and dist <= max_dist,
+		"moved along the camera's forward axis (-Z)": travel.z <= -min_dist,
 		"did not drift sideways": absf(travel.x) <= MAX_LATERAL_DRIFT,
 		"was on the floor while driving": _drive_on_floor,
 		"stayed at ground level": absf(player.global_position.y) <= MAX_GROUND_OFFSET,

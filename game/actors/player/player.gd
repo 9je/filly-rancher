@@ -28,15 +28,35 @@ extends CharacterBody3D
 ## There are two locomotion clips, `walk` (0.66 m/s) and `gallop` (3.30 m/s), and Gait
 ## owns the whole ladder: which one to play at a given ground speed, and what playback
 ## rate keeps its hooves planted. This script must not re-derive any of that. The two
-## speeds below are the only gameplay choices, and both are now inside the honest band:
-##   WALK_SPEED  = 1.32 m/s = 2.0x playback of `walk`. Zero skate; a brisk amble.
-##   GALLOP_SPEED = 4.0 m/s = 1.21x playback of `gallop`. Zero skate. Crosses the 60 m
-##      ranch in 15 s, which is the speed the map actually needs.
-## The `gallop` clip is what made the second of those honest. Before it existed this
-## controller galloped on the walk clip at Gait.MAX_PLAYBACK and skated by ~2.02x --
-## unmistakable moonwalking, documented at the time as a deliberate trade. It is gone:
-## every speed this controller can reach now has skate_ratio() == 1.0, and the ceiling
-## before skate returns is Gait.TOP_SKATE_FREE_SPEED (4.29 m/s).
+## speeds below are the only gameplay choices:
+##   WALK_SPEED  = 1.65 m/s = 2.5x playback of `walk`. Zero skate.
+##   GALLOP_SPEED = 4.80 m/s = the `gallop` clip saturated at Gait.GALLOP_MAX_PLAYBACK.
+##      Skate ratio 1.12 -- a BUDGETED deviation, see below.
+## The `gallop` clip is what made the second of those nearly honest. Before it existed
+## this controller galloped on the walk clip at Gait.MAX_PLAYBACK and skated by ~2.02x --
+## unmistakable moonwalking.
+##
+## THE PLAYTEST RAISED BOTH, AND THE GALLOP NOW SPENDS A LITTLE SKATE. The owner's first
+## real session said "move speed a bit slow for my liking", so:
+##   WALK_SPEED  1.32 -> 1.65 m/s (+25%). Still inside the `walk` clip's playback window
+##      (2.5x of a 3.0x ceiling), so this costs nothing at all -- and it is the speed the
+##      player is actually at most of the time, lining a pony up in the crosshair.
+##   GALLOP_SPEED 4.00 -> 4.80 m/s (+20%). This one is bought, not free: Gait.
+##      TOP_SKATE_FREE_SPEED -- the fastest speed ANY authored clip can depict with the
+##      hooves planted -- is 4.29 m/s, so 4.80 asks the saturated `gallop` clip to carry
+##      12% more ground than it depicts. Gait.skate_ratio() calls 1.12 "not perceptible in
+##      motion" (its perceptibility ladder starts noticing at ~1.25 and calls 2.0
+##      unmistakable moonwalking), and it is spent ONLY while the gallop button is held.
+##      Verified by rendering: see the playtest report.
+##
+##      It buys two things a skate-free 4.29 could not. First, 4.29 is only 7% up on the
+##      old number and a player cannot feel 7%. Second and more important, 4.29 is exactly
+##      the ceiling Pony.flee_speed_for() clamps a fleeing pony to -- so at 4.29 the
+##      fastest possible bolt TIES the player and a chase never closes. At 4.80 the player
+##      is strictly faster than anything that can run from her, by construction, for any
+##      base_speed a future roster invents. The honest fix for the whole band is a faster
+##      authored gallop cycle (tools/author_anims.py), which is an animation task, not a
+##      tuning one.
 ##
 ## COLLISION CAPSULE (numbers live in player.tscn, which cannot carry comments).
 ## Twilight measures 1.163 m at the withers and 2.138 m to the tip of her horn --
@@ -63,13 +83,18 @@ const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 const PonyVisualsScript := preload("res://actors/pony/pony_visuals.gd")
 
 ## Ground speed at full stick / any WASD key with `gallop` released. Exactly
-## 2.0x Gait.WALK_CLIP_SPEED, so the walk clip plays at 2.0x with the hooves planted.
-const WALK_SPEED := 2.0 * GaitScript.WALK_CLIP_SPEED
+## 2.5x Gait.WALK_CLIP_SPEED, so the walk clip plays at 2.5x with the hooves planted.
+## Written as a multiple of the clip speed rather than as 1.65 so it cannot drift out of
+## the walk band if the clip is ever re-authored; the band's ceiling is Gait.MAX_PLAYBACK
+## (3.0x), and staying strictly under it is what keeps clip_for_speed() answering `walk`
+## rather than handing a walking player over to the gallop clip.
+const WALK_SPEED := 2.5 * GaitScript.WALK_CLIP_SPEED
 
-## Ground speed with `gallop` held. Chosen for the 60x60 m ranch; it now also sits
-## inside what the `gallop` clip can honestly depict (Gait.TOP_SKATE_FREE_SPEED is
-## 4.29 m/s), so unlike its first incarnation it costs no foot skate at all. Raising it
-## past 4.29 would start buying speed with skate again.
+## Ground speed with `gallop` held. Sits 12% past what the `gallop` clip can honestly
+## depict (Gait.TOP_SKATE_FREE_SPEED is 4.29 m/s) -- a deliberate, budgeted amount of foot
+## skate, bought for the two reasons the class comment sets out. game/test/test_player.gd
+## pins the size of that budget, so it is a number somebody chose and not a number that
+## drifted.
 ##
 ## Deliberately NOT read from PonyData.base_speed (Twilight's is 3.4). That field is
 ## documented as a race stat used from Phase 3 (docs/.../design.md), so its numbers
@@ -79,7 +104,7 @@ const WALK_SPEED := 2.0 * GaitScript.WALK_CLIP_SPEED
 ## moment anyone made her playable. If a later phase decides base_speed really is
 ## m/s, this is a one-line change with a test to update, which is the cheap direction
 ## for that decision to go.
-const GALLOP_SPEED := 4.0
+const GALLOP_SPEED := 4.8
 
 ## Peak of a standing jump, in metres. 0.9 m is about three quarters of her withers
 ## height (1.163 m) -- a pony-sized hop rather than a platformer leap.

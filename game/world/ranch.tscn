@@ -90,7 +90,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, -42)
 script = ExtResource("4")
 zone_id = &"ranch"
 spawn_radius = 11.0
-spawn_count = 3
+spawn_count = 2
 roam_radius = 6.0
 
 [node name="EastField" type="Area3D" parent="Zones"]
@@ -98,7 +98,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40, 0, 8)
 script = ExtResource("4")
 zone_id = &"ranch"
 spawn_radius = 11.0
-spawn_count = 3
+spawn_count = 2
 roam_radius = 6.0
 
 [node name="SouthOrchard" type="Area3D" parent="Zones"]
@@ -106,6 +106,22 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -30, 0, 38)
 script = ExtResource("4")
 zone_id = &"ranch"
 spawn_radius = 9.0
+spawn_count = 2
+roam_radius = 5.0
+
+[node name="HomePasture" type="Area3D" parent="Zones"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, 19)
+script = ExtResource("4")
+zone_id = &"ranch"
+spawn_radius = 6.5
+spawn_count = 2
+roam_radius = 4.5
+
+[node name="WestHollow" type="Area3D" parent="Zones"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -42, 0, -20)
+script = ExtResource("4")
+zone_id = &"ranch"
+spawn_radius = 8.0
 spawn_count = 2
 roam_radius = 5.0
 
