@@ -388,9 +388,15 @@ func _report(pony_count: int, prop_count: int) -> void:
 		# `hit` is the spring arm's own bookkeeping; `actual` is where the lens really
 		# ended up, measured off its transform, and `fade` is what CameraRig does about
 		# it. All three, because the first two have already disagreed once on this rig
-		# (see CameraRig.probe_margin) and because a fade of 0.00 at 0.73 m is the whole
-		# of the fix for the camera-inside-the-pony close-up -- worth a printed number
-		# rather than only a screenshot.
+		# (see CameraRig's note on SpringArm3D.margin) and because a fade of 0.00 at
+		# 0.55 m is the whole of the fix for the camera-inside-the-pony close-up --
+		# worth a printed number rather than only a screenshot.
+		#
+		# `actual` is now the LENS -- shoulder offset and all -- while the fade is driven
+		# by where the ARM left the mount (CameraRig.get_arm_distance()), so at a normal
+		# distance the two are allowed to differ by the offset. At this pose they agree,
+		# because the ramp has eased the offset to nothing by the time the arm is this
+		# short.
 		print("RANCH camera building=%s rest=%.2f hit=%.2f actual=%.2f pull_in=%.2f subject_opacity=%.2f"
 			% [pull_in["building"], pull_in["rest"], pull_in["hit"], pull_in["actual"],
 				pull_in["pull_in"], pull_in["opacity"]])
@@ -629,7 +635,7 @@ func _capture_all() -> void:
 	await _capture("01_establishing")
 
 	# 02 -- what the owner actually sees the instant the game boots.
-	_rig.get_node("SpringArm3D/Camera3D").make_current()
+	_rig.get_camera().make_current()
 	await _capture("02_player_eye_at_spawn")
 
 	# 03 -- a spawn zone with ponies in it, framed from the herd's own centre of mass
@@ -660,11 +666,11 @@ func _capture_all() -> void:
 		_rig.add_look_delta(0.0, deg_to_rad(_rig.get_look_pitch_degrees()))
 		for i in range(CAMERA_SETTLE_FRAMES):
 			await get_tree().physics_frame
-		_rig.get_node("SpringArm3D/Camera3D").make_current()
+		_rig.get_camera().make_current()
 		await _capture("04a_camera_pressed_to_wall")
 
 		# ...and again from 1.2 m further out. Both shots are worth keeping: 04a is
-		# the strict pose the check measures -- the arm at 0.6 m, well inside the pony
+		# the strict pose the check measures -- the arm at 0.55 m, well inside the pony
 		# -- and it is now the picture of CameraRig's subject fade doing its job (she
 		# is gone and the world is visible). Until Phase 1A Task 9 the same shot was an
 		# unreadable macro close-up of her flank, which is what the fade was written to

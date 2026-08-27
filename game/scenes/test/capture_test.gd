@@ -494,7 +494,7 @@ func _frames(count: int) -> void:
 
 
 func _camera() -> Camera3D:
-	return _rig.get_node("SpringArm3D/Camera3D")
+	return _rig.get_camera()
 
 
 ## Record one check's verdict under `label`.
