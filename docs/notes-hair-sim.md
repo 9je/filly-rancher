@@ -386,9 +386,19 @@ HAIRLAG_OK leaf_chains=6 moving=6 lagging=6 worst_wobble=0.032
 Reading it:
 
 - **Trail.** All six leaf chains trail, none leads, none is rigid. Tail tips
-  **+83 to +150 ms**, forelock **+317 ms**, mane tips **≥ +667 ms** (they
-  saturate the ±40-tick search window). The rigid baseline is 0 ms by
-  construction — a rigid bone *is* the body's motion.
+  **+83 to +150 ms** and forelock **+317 ms** are real argmaxes with the
+  correlation falling away on both sides. The mane's "**+667 ms**" is **not a
+  measurement and must not be quoted as one** — it is the ±40-tick search
+  boundary, and those chains' correlation rises monotonically all the way across
+  the window (0.28 → 0.93) without a maximum anywhere inside it. Widening the
+  window just moves the number. §10 replaces this gate with one that rejects a
+  boundary hit, and retunes until the mane produces a genuine interior peak.
+  The rigid baseline is 0 ms by construction — a rigid bone *is* the body's
+  motion.
+- **Bob retention** — the metric this section should have led with and did not.
+  How much of the body's vertical bob each tip still carries. A tip keeping 14%
+  of the head's bob is a detached wig no matter how good its correlation looks,
+  and at these settings the mane root keeps exactly that. See §10.
 - **Not lockstep.** `dyn_deviation` is the mean distance between the simulated
   tip and where a rigid bone would have put it, after re-centring both traces so
   a static droop cannot inflate it: **0.099 to 0.402 units** on a 4.28-unit-tall
@@ -459,13 +469,10 @@ validate_gltf.py twilight.glb --require-anims
    plane — so it proved nothing and was not committed. `docs/pipeline.md`
    §"Deferred to Phase 1" item 2 already lists the owner's visual verdict as
    outstanding; hair now belongs on that list too.
-2. **Twilight's mane trails longer than ideal** — ≥667 ms, saturating the
-   measurement window, versus 83–150 ms for the tail. It is her longest chain
-   (5 joints) and it inherits the interior chain's lag on top of its own. It
-   trails smoothly (wobble 0.017–0.021) rather than flapping, but "long flowing
-   mane" and "detached from the head" are only a tuning step apart and this
-   wants an eye on it. A per-chain-length stiffness term (rather than the
-   per-segment-length one in §4) is the obvious next lever.
+2. **Twilight's mane trails longer than ideal** — "≥667 ms" is the search
+   window boundary rather than a value (see §10), and the mane root keeps only
+   14% of the body's bob, which is decoupling rather than follow-through.
+   **Fixed in §10.**
 3. **Rainbow Dash has 3 non-trailing leaf chains** out of 14. They are one-bone
    locks in her fanned tail whose extended tip length is guessed from the bone's
    parent offset (§3 item 3) — the guess is worst exactly for single-bone
@@ -530,7 +537,8 @@ with the segment lengths (e.g. `DEF_Tail4` 9.01/0.32 → 4.51/0.16), which is th
 mechanism, not a regression. `PROFILES` is unchanged, and re-tuning it for
 scale would have been wrong.
 
-**Still open, unchanged by any of this:** §8 item 2 — the mane's ≥667 ms trail
+**Superseded by §10** (the mane retune) but recorded as measured at the time:
+§8 item 2 — the mane's ≥667 ms trail
 saturates the ±40-tick correlation window and is suspected too floaty. Widening
 `LAG_WINDOW` does not resolve it into a trustworthy number: the window is
 subtracted from both ends of a 210-sample trace, so at 60 ticks the correlation
@@ -539,3 +547,186 @@ forelock jumps from +19 to +47). Read "≥667 ms" as "saturates", not as a value
 Diagnosing the mane properly wants a longer manoeuvre, and re-tuning it is a
 judgement call about how a mane should look, which belongs with the owner's
 outstanding visual verdict rather than with a scale change.
+
+---
+
+## 10. Runtime-half fix round (review response)
+
+The export half of this work was approved and independently reproduced. The
+runtime half was rejected on five findings. This section records what was wrong,
+what the evidence actually said — twice it did not say what anyone expected —
+and what the numbers are now.
+
+### 10.1 The gate was rubber-stamping (HIGH)
+
+`hair_lag_test.gd` passed a chain on `lag > 0` and nothing else. A correlation
+argmax is meaningless unless it lies *inside* the search window and stands out
+from its neighbours, and for all three mane chains it did neither: correlation
+rose monotonically from 0.28 at −40 ticks to 0.93 at +40 with no interior
+maximum. "+40 ticks (+666.7 ms)" was the search giving up. §6 reported it as a
+measurement, §8 hedged it, and the number appears throughout §§6–9 — treat every
+"≥667 ms" in this document as "never caught up".
+
+Two conditions now gate each chain:
+
+- `interior` — the peak must be strictly inside ±`LAG_WINDOW`.
+- `prominence` — topographic prominence of the peak within the window,
+  `corr_peak − max(min_left, min_right)`, must clear `MIN_PROMINENCE = 0.10`.
+  A plateau or a monotone drift scores ~0; a real trail scores 0.2–1.4.
+
+**Proof the gate is honest:** run against the *old* tuning it certified, it
+fails, naming exactly the chains the reviewer identified:
+
+```
+DEF_Mane1-5  trail=+40 interior=NO  prom=0.000 edges=0.42/0.93 keep= 14% | peak-at-window-edge,no-peak-prominence,decoupled
+DEF_Mane1-6  trail=+40 interior=NO  prom=0.000 edges=0.28/0.93 keep= 63% | peak-at-window-edge,no-peak-prominence
+DEF_Mane3-2  trail=+40 interior=NO  prom=0.000 edges=0.29/0.93 keep=128% | peak-at-window-edge,no-peak-prominence,amplifies
+DEF_Tail1-7  trail= +9 interior=yes prom=0.384              keep= 32% | decoupled
+HAIRLAG_FAIL leaf_chains=6 passing=3
+```
+
+Bob retention is now a gate criterion too, and it is the one that matters most:
+`MIN_BOB_RETENTION = 0.40`. A tip carrying 14% of the head's bob reads as a
+detached wig however good its correlation lag looks.
+
+### 10.2 The measurement sampled a point the simulation cannot move
+
+Found while fixing the above, and it invalidated part of the old evidence.
+The scene sampled `get_bone_global_pose(tip).origin`. A bone's origin is placed
+entirely by its **ancestors**; its own rotation moves only what hangs off it,
+and a chain's end bone has nothing hanging off it. For a one-bone chain that
+means the sampled point cannot move at all in response to that chain: changing
+`DEF_Tail4`'s stiffness by 3.3× left its trace **byte-identical**. It now samples
+the far end of the last bone (`PonyRig.tip_offset()`), which every joint moves.
+
+### 10.3 `_tip_length` measured where a bone starts, not how long it is (MEDIUM)
+
+For a chain of two or more bones the end bone's rest offset is genuinely the last
+segment's length. For a **one-bone** chain it is the gap from the anchor to that
+bone's head — for a branch, a detour across to a separate lock of hair.
+Twilight's `DEF_Tail4` read 0.564 m against real tail segments of ~0.21 m and so
+got 2.7× its neighbours' stiffness. It now falls back to the character's median
+hair segment. The old docstring claimed this left one-bone chains with the same
+mean segment as long ones; that was false and is corrected.
+
+**And the direction was wrong too.** `BONE_DIRECTION_FROM_PARENT` aims the
+extended tip — and, for a one-bone chain, the *entire simulated axis* — along the
+rest offset. Measured across all three packs, every genuine hair segment has
+`dot(offset, +Y) = 1.0000` exactly (13 segments on Twilight, 15 on Rainbow Dash,
+23 on Fluttershy): Blender's bone-axis convention survived the glTF export. The
+branch bones are where the two disagree, by up to 46° (Rainbow Dash's
+`DEF_Tail2`, dot 0.691). Switched to `BONE_DIRECTION_PLUS_Y`, which is exactly
+right for every segment and for branch roots as well. 10 of Twilight's and
+Rainbow Dash's 27 chains are one-bone, so this is the difference between those
+chains working and not.
+
+### 10.4 The mane was under-stiff — and the "amplifying chain" was not amplifying
+
+Retuned, on bob retention rather than correlation lag. The forelock also got its
+own profile: `DEF_Hair*` is a different bone-name pattern from `DEF_Mane*`, so
+splitting them costs no per-character data, and bangs are short and light where
+the mane is a long fall — at the mane's stiffness the forelock goes rigid.
+
+| profile | before | after |
+|---|---|---|
+| mane | 8.0 / drag 0.78 | **22.0 / drag 0.96** |
+| forelock (`hair`) | 8.0 / drag 0.78 | **10.0 / drag 0.86** |
+| tail | 8.0 / drag 0.78 | **14.0 / drag 0.88** |
+
+High drag, not high stiffness, is what suppressed the 5-joint mane chain's
+resonance: at stiffness 16–32 with drag 0.78–0.80 it peaked at 112–147%
+retention, and drag 0.96 brings it to 105% without stiffening it into rigidity.
+
+**The `DEF_Mane3-2` amplification was diagnosed as a short 2-joint chain
+resonating. It is not.** Re-running the manoeuvre with every branch chain pinned
+at 100000× stiffness — unable to flex at all relative to its anchor — leaves
+`DEF_Mane1-6` at 186% and `DEF_Mane3-2` at 204%, essentially unchanged from
+their springy values. The swing is **lever geometry**: the mane's follow-through
+is a *rotation* of `DEF_Mane1-5`, and a point further out along the strand traces
+a proportionally bigger arc. A rigid extension does it too. No stiffness or drag
+can remove it without removing the follow-through itself.
+
+So the gate gained a third pass and a metric that can tell the two apart:
+
+- **PASS_RIGID** — `influence = 0`, the pre-fix baseline.
+- **PASS_SIMULATED** — what ships.
+- **PASS_PINNED** — every chain hanging off another chain forced rigid.
+
+`self_gain = bob(SIMULATED) / bob(PINNED)` is how much swing a chain adds beyond
+a rigid extension riding the same anchor — lever-invariant by construction. For
+the two accused chains it is **0.91 and 0.95**: they add nothing of their own.
+The retention *upper* bound is therefore applied only at depth 0, where
+amplification can only be resonance, and `self_gain ≤ 1.25` gates every chain.
+
+A consequence: `STACKED_CHAIN_STIFFNESS`, added during this round to stiffen
+stacked chains out of their supposed resonance, is set to **1.0** — no
+correction. It is kept as a named constant with the experiment written down, so
+the next person to look at those 200% numbers finds the answer rather than
+repeating the search. `hair_lag_test.gd`'s `stacked=<x>` override re-runs the
+pinning experiment on demand.
+
+### 10.5 Results — Twilight, and reproducible
+
+```
+HAIRLAG DEF_Mane1-5  interior d0 trail=+15 (+250.0 ms) corr=0.984 interior=yes prom=0.508 | bob 0.0505->0.0532 keep=105% self_gain=1.00 | wobble=0.024 | ok
+HAIRLAG DEF_Mane1-6  leaf     d1 trail=+18 (+300.0 ms) corr=0.983 interior=yes prom=0.427 | bob 0.0505->0.0881 keep=175% self_gain=0.91 | wobble=0.023 | ok
+HAIRLAG DEF_Mane3-2  leaf     d1 trail=+20 (+333.3 ms) corr=0.958 interior=yes prom=0.289 | bob 0.0505->0.1014 keep=201% self_gain=0.95 | wobble=0.023 | ok
+HAIRLAG DEF_Hair2-3  leaf     d0 trail=+22 (+366.7 ms) corr=0.985 interior=yes prom=0.470 | bob 0.0505->0.0277 keep= 55% self_gain=1.00 | wobble=0.035 | ok
+HAIRLAG DEF_Hair4-3  leaf     d0 trail=+22 (+366.7 ms) corr=0.986 interior=yes prom=0.501 | bob 0.0505->0.0295 keep= 58% self_gain=1.00 | wobble=0.035 | ok
+HAIRLAG DEF_Tail1-5  interior d0 trail= +4 ( +66.7 ms) corr=0.945 interior=yes prom=0.228 | bob 0.0847->0.0344 keep= 41% self_gain=1.00 | wobble=0.024 | ok
+HAIRLAG DEF_Tail1-7  leaf     d1 trail= +7 (+116.7 ms) corr=0.913 interior=yes prom=0.430 | bob 0.0840->0.0500 keep= 59% self_gain=1.17 | wobble=0.024 | ok
+HAIRLAG DEF_Tail4    leaf     d1 trail= +4 ( +66.7 ms) corr=0.896 interior=yes prom=0.282 | bob 0.1056->0.0645 keep= 61% self_gain=1.16 | wobble=0.024 | ok
+HAIRLAG_OK leaf_chains=6 passing=6 bob_retention=55%..201% worst_self_gain=1.17 worst_wobble=0.035
+```
+
+Every peak interior, minimum prominence 0.228 against a 0.10 threshold, bob
+retention 55–61% on the forelock and tail (the mane leaves' 175–201% is the
+lever, `self_gain` 0.91/0.95), worst `self_gain` 1.17 against 1.25, worst wobble
+0.035 against 0.060 and against the animation's own 0.031. Two consecutive runs
+produce identical output.
+
+**Before → after, the numbers that matter:**
+
+| | before | after |
+|---|---|---|
+| mane root bob retention | 14% | **105%** |
+| mane leaf trail | window boundary (unmeasurable) | **+300 / +333 ms**, interior, prom 0.43 / 0.29 |
+| forelock trail | +317 ms | **+367 ms**, prom 0.47 / 0.50 |
+| tail leaf retention | 32% / 40% | **59% / 61%** |
+| leaf chains passing an honest gate | 3 of 6 | **6 of 6** |
+
+### 10.6 Collision radius was never scale-invariant (LOW, folded in)
+
+`radius` was passed to Godot as a raw absolute length while the comment above it
+claimed the whole profile was scale-invariant. Godot applies it with no
+normalisation, so Phase 1A's halving of every model left it 2× too fat, silently,
+in a field nothing reads yet. It is now scaled by the chain's mean segment length
+like the other three, and the profile values mean "strand radius per unit segment
+length" — about 0.020 m for a mane lock and 0.031 m for a tail lock on the
+shipped ponies. Still unverified against actual collision, and the comment now
+says so: whoever attaches `SpringBoneCollision3D` shapes must check it.
+
+### 10.7 Direct-load pattern in `terrain_probe.gd` (LOW)
+
+Left as a direct `load().instantiate()` — that scene measures a bounding box, and
+a simulated mane would make the box depend on which tick it is sampled on — but
+it now carries an explicit comment saying it is a deliberate exemption and not
+the pattern to copy.
+
+### 10.8 What this round did NOT fix
+
+- **Rainbow Dash: 10 of 14 leaf chains pass**, Fluttershy **1 of 3**. The gate
+  runs Twilight; these are diagnostic. The old "3 of 14" and "3 of 3" figures
+  were produced by the gate this round proved was rubber-stamping and by the
+  broken tip sampling of §10.2, so they are not a baseline to compare against.
+- **The retention upper bound is confounded by lever arm at depth 0 too.**
+  Fluttershy's chains are 8–10 joints, so their tips sit far out and swing
+  141–206% of the body's bob for the same geometric reason the mane branches do —
+  but at depth 0 the PINNED pass equals the SIMULATED pass, so `self_gain` is 1.0
+  by construction and cannot discriminate. Stiffening her mane 2× fixed one chain
+  (`DEF_Hair8`: window boundary → interior +500 ms, 105% retention) and flipped
+  her tail to leading. **The clean fix is a per-chain pinned reference** — pin
+  only the chain under test, leave its ancestors simulated — which makes the
+  amplification test lever-invariant at every depth. It costs one extra pass per
+  chain, which is why it is not in this round.
+- **Still no human has looked at any of it.** §8 item 1 stands.
