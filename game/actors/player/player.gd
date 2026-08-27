@@ -24,19 +24,18 @@ extends CharacterBody3D
 ## as she turns.
 ##
 ## GAIT, SPEED AND FOOT SKATE -- read game/systems/gait.gd before changing any speed.
-## There is exactly one locomotion clip, `walk`, and it depicts 0.66 m/s (Gait.
-## WALK_CLIP_SPEED). Playback speed is scaled with ground speed so the hooves stay
-## planted, but that only works up to Gait.MAX_PLAYBACK. The two speeds below are
-## chosen against that ceiling:
-##   WALK_SPEED  = 1.32 m/s = 2.0x playback. Fully honest, zero skate; a brisk amble.
-##   GALLOP_SPEED = 4.0 m/s. Crosses the 60 m ranch in 15 s, which is the speed the
-##      map actually needs. The clip saturates at Gait.MAX_PLAYBACK (3.0x, i.e.
-##      1.98 m/s of honest ground speed), so top gallop skates by ~2.02x -- visible
-##      moonwalking, and a deliberate, documented trade rather than an oversight.
-##      Everything up to 1.98 m/s is skate-free.
-## The real fix is a `gallop` clip authored as its own faster cycle; see this task's
-## report. When one exists, add it to the `[importer_defaults]` loop list in
-## project.godot, give Gait a GALLOP_CLIP_SPEED, and branch in _update_animation().
+## There are two locomotion clips, `walk` (0.66 m/s) and `gallop` (3.30 m/s), and Gait
+## owns the whole ladder: which one to play at a given ground speed, and what playback
+## rate keeps its hooves planted. This script must not re-derive any of that. The two
+## speeds below are the only gameplay choices, and both are now inside the honest band:
+##   WALK_SPEED  = 1.32 m/s = 2.0x playback of `walk`. Zero skate; a brisk amble.
+##   GALLOP_SPEED = 4.0 m/s = 1.21x playback of `gallop`. Zero skate. Crosses the 60 m
+##      ranch in 15 s, which is the speed the map actually needs.
+## The `gallop` clip is what made the second of those honest. Before it existed this
+## controller galloped on the walk clip at Gait.MAX_PLAYBACK and skated by ~2.02x --
+## unmistakable moonwalking, documented at the time as a deliberate trade. It is gone:
+## every speed this controller can reach now has skate_ratio() == 1.0, and the ceiling
+## before skate returns is Gait.TOP_SKATE_FREE_SPEED (4.29 m/s).
 ##
 ## COLLISION CAPSULE (numbers live in player.tscn, which cannot carry comments).
 ## Twilight measures 1.163 m at the withers and 2.138 m to the tip of her horn --
@@ -66,8 +65,10 @@ const PonyVisualsScript := preload("res://actors/pony/pony_visuals.gd")
 ## 2.0x Gait.WALK_CLIP_SPEED, so the walk clip plays at 2.0x with the hooves planted.
 const WALK_SPEED := 2.0 * GaitScript.WALK_CLIP_SPEED
 
-## Ground speed with `gallop` held. Chosen for the 60x60 m ranch, not for the clip --
-## see the class comment for the skate this buys.
+## Ground speed with `gallop` held. Chosen for the 60x60 m ranch; it now also sits
+## inside what the `gallop` clip can honestly depict (Gait.TOP_SKATE_FREE_SPEED is
+## 4.29 m/s), so unlike its first incarnation it costs no foot skate at all. Raising it
+## past 4.29 would start buying speed with skate again.
 ##
 ## Deliberately NOT read from PonyData.base_speed (Twilight's is 3.4). That field is
 ## documented as a race stat used from Phase 3 (docs/.../design.md), so its numbers
@@ -83,7 +84,10 @@ const GALLOP_SPEED := 4.0
 ## height (1.163 m) -- a pony-sized hop rather than a platformer leap.
 const JUMP_HEIGHT := 0.9
 
-## Crossfade seconds between `idle` and `walk`.
+## Crossfade seconds between locomotion clips. One value for every transition: the
+## walk/gallop handover happens at a speed both clips depict exactly (Gait.
+## GALLOP_HANDOVER_SPEED), so there is nothing to hide and no reason for it to be
+## faster or slower than the idle/walk one.
 const ANIM_BLEND := 0.2
 
 @export_group("Movement")
@@ -240,18 +244,17 @@ func _update_facing(direction: Vector3, delta: float) -> void:
 	visuals.rotation.y = lerp_angle(visuals.rotation.y, _visual_yaw, weight)
 
 
-## Pick `idle` vs `walk` and, for `walk`, scale playback so the gait matches the
-## ground. All the reasoning about the ceiling and the resulting skate lives in
+## Pick `idle` / `walk` / `gallop` and scale playback so the gait matches the ground.
+## Both decisions are Gait's -- deliberately not an if-ladder over speed constants here,
+## because this is the third scene that would have needed editing when the gallop clip
+## was added. All the reasoning about the bands and the resulting skate lives in
 ## game/systems/gait.gd; this function must not grow its own speed constants.
 func _update_animation(speed: float) -> void:
 	if _anim == null:
 		return
-	if speed < GaitScript.IDLE_SPEED:
-		_play("idle")
-		_anim.speed_scale = 1.0
-	else:
-		_play("walk")
-		_anim.speed_scale = GaitScript.playback_scale_for_speed(speed)
+	var clip := GaitScript.clip_for_speed(speed)
+	_play(clip)
+	_anim.speed_scale = GaitScript.playback_scale_for_clip(clip, speed)
 
 
 ## play() only when the clip actually changes -- calling it every frame would restart

@@ -1,4 +1,4 @@
-"""Author `idle` + `walk` Actions onto a CreatorOfPony-family pony rig, headlessly.
+"""Author `idle` + `walk` + `gallop` Actions onto a CreatorOfPony-family pony rig.
 
 Imported by `tools/export_blend.py --anims`; also runnable standalone for debugging:
 
@@ -10,6 +10,13 @@ orbit helper), and no community Action library for this rig family survives on a
 loginless, curl-reachable host. So the walk/idle clips are authored here, in script,
 so they are reproducible and re-runnable against every pack rather than being a
 hand-posed .blend nobody can regenerate.
+
+WHY THERE IS A SECOND LOCOMOTION CLIP. `walk` depicts 0.66 m/s and cannot be made
+to depict more: its STRIDE is already near the front chain's geometric ceiling
+(see BODY_CROUCH below), so the only lever left is the CYCLE. `gallop` is that
+lever -- the same 0.275 m stride ridden through a stance six times shorter, which
+is 3.30 m/s, and which is a genuinely different gait (asymmetric four-beat with a
+suspension phase) rather than a walk played fast. See build_gallop().
 
 WHY IK TARGETS AND NOT DEF_/FK_ BONES. On this rig every `DEF_*Leg*`/`DEF_*Hoof*`
 bone carries two `COPY_TRANSFORMS` constraints -- from its `FK_` twin and then from
@@ -146,6 +153,88 @@ IDLE_FRAMES = 48        # 2 s at 24 fps
 IDLE_BOB = 0.009
 IDLE_CROUCH = 0.015     # same reason: keeps the idle bob's high point off full extension
 IDLE_HEAD_NOD = math.radians(1.8)
+
+# --- GALLOP -----------------------------------------------------------------------
+# A gallop is not a fast walk, and on THIS rig it cannot be one. The front IK chain is
+# 0.5334 long against a 0.5269 rest reach (98.77% extended, measured -- see author()),
+# so the stride cannot grow: the walk's 0.275 m is already close to what the geometry
+# allows once the body bob is accounted for. The lever that IS available is the cycle.
+#
+#   speed = stride / (cycle_seconds * stance_fraction)
+#
+# `gallop` keeps the walk's 0.275 m stride and cuts the *stance* from half a 0.833 s
+# cycle (0.417 s) to one sixth of a 0.5 s cycle (0.083 s). Same ground covered per
+# footfall, five times less time to cover it: 0.66 -> 3.30 m/s. 0.083 s of contact is
+# also about what a real galloping horse's limb actually gets, so this is the honest
+# way round rather than a trick.
+#
+# GAIT AUTHORED: a transverse gallop on the LEFT lead -- four separate beats in the
+# order right-hind, left-hind, right-fore, left-fore, with the leading (left) foreleg
+# landing last and reaching furthest forward, and TWO airborne phases: a short
+# "gathered" one after the hinds leave and before the fores land, and a long
+# "extended" one after the leading fore leaves. That is a real quadruped gallop's
+# footfall pattern, and it is what makes this clip read as a different gait rather
+# than a sped-up walk: the walk's two diagonal pairs are gone, replaced by four
+# asymmetric beats and 42% of the cycle with nothing on the ground.
+GALLOP_FRAMES = 12          # 0.5 s at 24 fps -> a 2 Hz stride rate, which is what a
+                            # real horse gallops at. Twelve frames is also the
+                            # smallest cycle that still puts every footfall and
+                            # lift-off event exactly on a sampled frame (see
+                            # GALLOP_FEET), so the exporter's per-frame bake captures
+                            # the contacts instead of interpolating past them.
+GALLOP_STRIDE = 0.275       # deliberately identical to STRIDE: the whole point is
+                            # that the cycle changed, not the reach.
+GALLOP_STANCE_FRACTION = 1.0 / 6.0   # two of the twelve frames planted per hoof
+GALLOP_SWING_FRACTION = 1.0 - GALLOP_STANCE_FRACTION
+
+# Swing shaping. A galloping limb snaps forward (protraction) and then hangs, reaching,
+# waiting for the ground -- it does not drift forward at a constant rate for the whole
+# 5/6 of the cycle it is airborne, which is what a linear return would look like and
+# which reads as floating. So the fore/aft return is a smoothstep compressed into the
+# first GALLOP_PROTRACTION of the swing, and the hoof then holds its forward position
+# while it descends onto the ground.
+GALLOP_PROTRACTION = 0.75
+GALLOP_LIFT = 0.11          # swing clearance; higher than the walk's 0.08 because the
+                            # legs fold up under the body during suspension
+
+# Body. One oscillation per cycle (a gallop has one suspension, unlike the walk's two
+# diagonal footfalls), highest during the extended suspension and lowest through the
+# forelimb stance -- which is both what the animal does and what keeps the near-
+# singular front chain furthest from full extension exactly when its hoof is most
+# fore/aft. GALLOP_CROUCH is bigger than the walk's for the same reason it exists
+# there: bend margin in the front legs.
+GALLOP_CROUCH = 0.055
+GALLOP_BOB = 0.035
+GALLOP_BOB_PEAK = 0.80      # cycle fraction at which the body rides highest
+                            # (mid-way through the extended suspension)
+# Pitch. Positive rotation about +X is rump-up/nose-down for this rig (the rig faces
+# -Y). Peak nose-down is timed to the forelimb stance, nose-up to the hind drive and
+# the gathered suspension -- the pitching a gallop is read by.
+GALLOP_PITCH = math.radians(5.0)
+GALLOP_PITCH_PHASE = 0.21   # sin() peaks a quarter cycle later, i.e. at t=0.46,
+                            # the middle of the two forelimb stances
+GALLOP_HEAD_NOD = math.radians(4.0)
+GALLOP_HEAD_LAG = 0.08      # the head follows the body's pitch a beat late
+
+# Hind hooves sit 0.2075 m BEHIND the hip joint at rest (the hock's zig-zag), so unlike
+# the front legs -- whose hoof hangs almost straight down -- the rear chain runs out of
+# reach asymmetrically: swinging a hind hoof backwards costs far more extension than
+# swinging it forwards. Planting the hind feet further under the body for the whole
+# clip re-centres their excursion inside the chain's comfortable range, and is also
+# exactly what a galloping quadruped does with its hindquarters.
+GALLOP_REAR_REACH = 0.06
+
+# (bone, cycle fraction at which this hoof touches down). Transverse gallop, left lead:
+# right-hind, left-hind, right-fore, left-fore. Every value is a multiple of 1/12 so it
+# lands on a sampled frame. With a 1/6 stance the ground-contact map is
+#   RH [0.000, 0.167]  LH [0.083, 0.250] | gathered suspension [0.250, 0.333]
+#   RF [0.333, 0.500]  LF [0.417, 0.583] | extended suspension [0.583, 1.000]
+GALLOP_FEET = [
+    ("IK_RearHoof.R", 0.0 / 12.0),
+    ("IK_RearHoof.L", 1.0 / 12.0),
+    ("IK_FrontHoof.R", 4.0 / 12.0),
+    ("IK_FrontHoof.L", 5.0 / 12.0),
+]
 
 # --- Metric-rig guard. The tier-a packs measure 4.10 units from hoof plane to horn
 # tip in their own units and 2.05 after --scale 0.5; the window is wide enough for any
@@ -311,6 +400,75 @@ def build_walk(arm):
     return action
 
 
+def _smoothstep(x):
+    x = min(max(x, 0.0), 1.0)
+    return x * x * (3.0 - 2.0 * x)
+
+
+def _gallop_foot_offset(since_contact, rear):
+    """Hoof offset (armature space) `since_contact` of a cycle after touchdown."""
+    u = since_contact % 1.0
+    if u < GALLOP_STANCE_FRACTION:
+        # Stance: planted, so it must travel backwards at EXACTLY the ground speed the
+        # clip claims. Linear, and keyed on every frame, so the bake samples it exactly
+        # -- any curvature here is in-clip foot skate no consumer can compensate for.
+        s = u / GALLOP_STANCE_FRACTION
+        ahead = GALLOP_STRIDE * (0.5 - s)
+        lift = 0.0
+    else:
+        s = (u - GALLOP_STANCE_FRACTION) / GALLOP_SWING_FRACTION
+        # Protract fast, then hang and reach (see GALLOP_PROTRACTION).
+        ahead = GALLOP_STRIDE * (_smoothstep(s / GALLOP_PROTRACTION) - 0.5)
+        # Same raised cosine as the walk: leaves and re-meets the ground with zero
+        # vertical velocity, so touchdown puts no corner in the knee-bend curve.
+        lift = GALLOP_LIFT * 0.5 * (1.0 - math.cos(2.0 * math.pi * s))
+    offset = FORWARD * ahead + UP * lift
+    if rear:
+        offset += FORWARD * GALLOP_REAR_REACH
+    return offset
+
+
+def build_gallop(arm):
+    """12-frame asymmetric four-beat gallop with two suspension phases.
+
+    Read the GALLOP_* constant block above first -- it carries the gait's design and
+    the geometry that forces it. The short version: same stride as the walk, one sixth
+    of the stance, 3.30 m/s instead of 0.66.
+    """
+    _require(arm, ANIMATED)
+    _rest(arm, ANIMATED)
+    action = _new_action(arm, "gallop")
+
+    for i in range(GALLOP_FRAMES + 1):      # inclusive: last frame repeats the first
+        frame = i                           # start at 0, same reason as build_walk
+        t = (i % GALLOP_FRAMES) / GALLOP_FRAMES
+
+        for name, contact in GALLOP_FEET:
+            pbone = arm.pose.bones[name]
+            _set_offset(pbone, _gallop_foot_offset(t - contact, name.startswith("IK_Rear")))
+            pbone.keyframe_insert("location", frame=frame, group=name)
+
+        belly = arm.pose.bones[BELLY]
+        _set_offset(belly, UP * (
+            GALLOP_BOB * math.cos(2.0 * math.pi * (t - GALLOP_BOB_PEAK)) - GALLOP_CROUCH))
+        _set_rotation(belly, SIDE,
+                      GALLOP_PITCH * math.sin(2.0 * math.pi * (t - GALLOP_PITCH_PHASE)))
+        belly.keyframe_insert("location", frame=frame, group=BELLY)
+        belly.keyframe_insert("rotation_quaternion", frame=frame, group=BELLY)
+
+        # DEF_Head is CHILD_OF CON_Root at influence 1.0, so it is held level against
+        # the body unless keyed. Give it the body's own pitch, a beat late, so she
+        # drives her head into the stride instead of gliding along on a gyro-stabilised
+        # neck -- the single most obvious tell that a run cycle is faked.
+        head = arm.pose.bones[HEAD]
+        _set_rotation(head, SIDE, GALLOP_HEAD_NOD * math.sin(
+            2.0 * math.pi * (t - GALLOP_PITCH_PHASE - GALLOP_HEAD_LAG)))
+        head.keyframe_insert("rotation_quaternion", frame=frame, group=HEAD)
+
+    _rest(arm, ANIMATED)
+    return action
+
+
 def build_idle(arm):
     """Slow breathing sway: body rise/fall plus a barely-there head nod."""
     _require(arm, ANIMATED)
@@ -349,18 +507,22 @@ def build_idle(arm):
 STANCE_FRACTION = 0.5   # half the cycle planted, half swinging (see _foot_offset)
 
 
-def implied_ground_speed(fps):
-    """Ground speed in metres/second that the walk clip depicts.
+def implied_ground_speed(fps, stride=STRIDE, frames=WALK_FRAMES,
+                         stance_fraction=STANCE_FRACTION):
+    """Ground speed in metres/second that a locomotion clip depicts.
 
-    A planted hoof travels STRIDE backwards relative to the body over the stance
+    A planted hoof travels `stride` backwards relative to the body over the stance
     phase, so a body moving at exactly this speed keeps its hooves stuck to the
-    ground. Note the divisor is the *stance* duration, not the full cycle: with
-    diagonal pairs, each hoof is only planted for half the cycle, and dividing by
-    the whole cycle understates the depicted speed by 2x. Any consumer scene that
-    translates a pony while playing `walk` must use this speed or she will skate.
+    ground. Note the divisor is the *stance* duration, not the full cycle: with the
+    walk's diagonal pairs each hoof is only planted for half the cycle, and dividing
+    by the whole cycle understates the depicted speed by 2x. Any consumer scene that
+    translates a pony while playing a locomotion clip must use this speed or she will
+    skate; game/systems/gait.gd is the runtime home for both numbers.
+
+    Defaults describe `walk`; pass the GALLOP_* constants for `gallop`.
     """
-    cycle_seconds = WALK_FRAMES / float(fps)
-    return STRIDE / (cycle_seconds * STANCE_FRACTION)
+    cycle_seconds = frames / float(fps)
+    return stride / (cycle_seconds * stance_fraction)
 
 
 def author(arm):
@@ -396,13 +558,17 @@ def author(arm):
             f"ANIMATED includes secondary-motion bones {clashes}; those are simulated "
             f"in Godot (SpringBoneSimulator3D) and must not be keyframed here"
         )
-    actions = [build_idle(arm), build_walk(arm)]
+    actions = [build_idle(arm), build_walk(arm), build_gallop(arm)]
     excluded = secondary_motion_bones(arm)
     print(f"SECONDARY_MOTION_BONES {len(excluded)} excluded from bake: {excluded}")
     fps = bpy.context.scene.render.fps
     print(f"WALK_IMPLIED_SPEED {implied_ground_speed(fps):.4f} m/s "
           f"(stride={STRIDE} frames={WALK_FRAMES} fps={fps})")
-    # Leaving `walk` as the active action is deliberate: Blender's glTF exporter in
+    print(f"GALLOP_IMPLIED_SPEED "
+          f"{implied_ground_speed(fps, GALLOP_STRIDE, GALLOP_FRAMES, GALLOP_STANCE_FRACTION):.4f}"
+          f" m/s (stride={GALLOP_STRIDE} frames={GALLOP_FRAMES} "
+          f"stance={GALLOP_STANCE_FRACTION:.4f} fps={fps})")
+    # Leaving the last-built action as the active one is deliberate: Blender's exporter
     # its default ACTIONS mode still needs a bound animation_data block on the object
     # to consider it animatable at all.
     print("ANIMS_AUTHORED", [a.name for a in actions])

@@ -2,35 +2,30 @@ extends Node3D
 ## Twilight walks a square path using her 'walk' animation.
 
 ## Ground speed matched to the 'walk' clip so her hooves stay planted instead of
-## skating. A hoof is planted for half of the 20-frame @ 24 fps cycle and travels
-## STRIDE backwards relative to the body during that stance, so the body has to
-## cover STRIDE in half a cycle. Note the divisor is the stance half, not the whole
-## cycle -- dividing by the full cycle understates the clip's speed by 2x.
-## These constants must track tools/author_anims.py, which prints the same number as
-## WALK_IMPLIED_SPEED on every export; compare them if you retune the clip.
-## FOUR values are duplicated here with no automatic sync: STRIDE (0.275), WALK_FRAMES
-## (20), STANCE_FRACTION (the 0.5 divisor) and -- the easiest one to miss -- the frame
-## rate. 24 is hardcoded below, whereas author_anims.py reads it from
-## bpy.context.scene.render.fps, i.e. from whatever the source .blend happens to be
-## set to. A pack authored at any other fps silently desyncs this scene's WALK_SPEED
-## while every structural gate still passes; the only symptom is foot skate. Compare
-## against the WALK_IMPLIED_SPEED line the export prints before trusting this number.
+## skating. The derivation (stride / stance-duration, where the divisor is the stance
+## HALF of the cycle and not the whole cycle) used to be copy-pasted here from
+## tools/author_anims.py, four separate constants deep; it now lives once in
+## game/systems/gait.gd, which is also where the same numbers for the `gallop` clip and
+## the playback-scaling rules live. Compare Gait.WALK_CLIP_SPEED against the
+## WALK_IMPLIED_SPEED line every export prints before trusting either.
+##
+## This scene deliberately still plays `walk` at 1.0x and travels at exactly the clip's
+## own speed: it is the reference for what zero foot skate looks like, so it must not
+## go through Gait.clip_for_speed() (which would pick a clip) or the playback scaler.
+##
 ## Spawn through PonyRig, not `load(...).instantiate()`: that is what attaches the
 ## mane/tail SpringBoneSimulator3D, and this scene is where the missing follow-through
 ## was first noticed ("hair bobbing out of sync with the pony"). See
 ## scripts/pony_rig.gd and docs/notes-hair-sim.md.
 const PonyRigScript := preload("res://scripts/pony_rig.gd")
+const GaitScript := preload("res://systems/gait.gd")
 
-const WALK_STRIDE := 0.275
-const WALK_FRAMES := 20.0
-const WALK_FPS := 24.0            # must match the source .blend's scene.render.fps
-const WALK_CYCLE_SECONDS := WALK_FRAMES / WALK_FPS
-const WALK_SPEED := WALK_STRIDE / (WALK_CYCLE_SECONDS * 0.5)  # 0.66 m/s
+const WALK_SPEED := GaitScript.WALK_CLIP_SPEED  # 0.66 m/s
 
 ## Everything below is metres, like everything else in the project (1 unit = 1 metre,
 ## docs/pipeline.md section 3). The square path and the arrival radius are half what
 ## they were before the ponies were normalised to metric scale, for the same reason
-## WALK_STRIDE is: the pony now covers half the ground per second, and this scene's
+## the clip's stride is: the pony now covers half the ground per second, and this scene's
 ## gate (WALK_OK at frame 300, i.e. 5 s) budgets no extra time. At 0.66 m/s she needs
 ## ~4.1 s to reach the first waypoint, which leaves a ~0.9 s margin; a full-size path
 ## would leave her still walking toward waypoint 1 when the gate fires.

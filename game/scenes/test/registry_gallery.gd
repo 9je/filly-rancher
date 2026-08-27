@@ -8,9 +8,10 @@ extends Node3D
 ## code will use, and a directory scan can't stand in for going through PonyData.
 ##
 ## Per instance this asserts more than "the node loaded": that the AnimationPlayer
-## is reachable at PonyVisuals.ANIMATION_PLAYER_PATH and has both 'idle' and
-## 'walk', and that a live SpringBoneSimulator3D actually sits under the
-## Skeleton3D (not just that attach_hair_simulation() was called).
+## is reachable at PonyVisuals.ANIMATION_PLAYER_PATH and carries every clip
+## tools/author_anims.py authors (AUTHORED_CLIPS below), and that a live
+## SpringBoneSimulator3D actually sits under the Skeleton3D (not just that
+## attach_hair_simulation() was called).
 ##
 ## Prints REGISTRY_OK count=3 and quits 0 under headless iff all three ponies
 ## built and passed both checks.
@@ -20,6 +21,11 @@ const PonyVisualsScript := preload("res://actors/pony/pony_visuals.gd")
 const PonyRigScript := preload("res://scripts/pony_rig.gd")
 
 const PONY_DIR := "res://data/ponies/"
+
+## Every Action tools/author_anims.py's author() builds, which is therefore every clip
+## a correctly exported tier-a pony must carry. Keep in step with that function; a clip
+## added there and forgotten here is a gate that stopped checking the new thing.
+const AUTHORED_CLIPS := ["idle", "walk", "gallop"]
 
 
 func _ready() -> void:
@@ -46,10 +52,18 @@ func _ready() -> void:
 		add_child(pony)
 
 		var anim: AnimationPlayer = pony.get_node_or_null(PonyVisualsScript.ANIMATION_PLAYER_PATH)
-		var has_idle_walk := anim != null and anim.has_animation("idle") and anim.has_animation("walk")
-		if not has_idle_walk:
-			push_error("registry_gallery: '%s' has no AnimationPlayer with idle+walk at %s" % [
-				id, PonyVisualsScript.ANIMATION_PLAYER_PATH
+		# Every clip tools/author_anims.py authors, checked by name on every character:
+		# the export is per-pack, so a pack that silently missed one (a rig whose bone
+		# naming diverged, an --anims flag dropped from one of the three commands) shows
+		# up here rather than as a pony freezing mid-canter in some later scene.
+		var missing := PackedStringArray()
+		for clip in AUTHORED_CLIPS:
+			if anim == null or not anim.has_animation(clip):
+				missing.append(clip)
+		var has_clips := missing.is_empty()
+		if not has_clips:
+			push_error("registry_gallery: '%s' has no AnimationPlayer with %s at %s" % [
+				id, ", ".join(missing), PonyVisualsScript.ANIMATION_PLAYER_PATH
 			])
 
 		var skeleton: Skeleton3D = pony.find_child("Skeleton3D", true, false)
@@ -58,9 +72,9 @@ func _ready() -> void:
 		if not has_hair:
 			push_error("registry_gallery: '%s' has no live SpringBoneSimulator3D under its Skeleton3D" % id)
 
-		print("BUILT ", id, " anim_ok=", has_idle_walk, " hair_ok=", has_hair)
+		print("BUILT ", id, " anim_ok=", has_clips, " hair_ok=", has_hair)
 
-		if not (has_idle_walk and has_hair):
+		if not (has_clips and has_hair):
 			all_ok = false
 		else:
 			built += 1

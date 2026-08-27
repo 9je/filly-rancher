@@ -14,15 +14,35 @@ renderer/rendering_method="forward_plus"
 ; generated and gitignored, so that setting would vanish on a fresh clone. Declaring
 ; it as a scene-importer default keeps it in tracked config and applies to every pony
 ; .glb the pipeline produces. loop_mode 1 = LOOP_LINEAR.
+; EVERY new clip authored in tools/author_anims.py needs its own entry here, keyed by
+; the Action's name -- there is no wildcard. A clip that is missing from this list
+; imports LOOP_NONE and freezes on its last frame after one play, which no structural
+; gate can see. `gallop` (Phase 1A) was the third.
+;
+; `animation/fps` is the other half of this block, and it is the one that has teeth.
+; Godot RESAMPLES every imported animation onto its own uniform grid at this rate; the
+; default is 30, the clips are authored at the source .blend's 24, and 30 does not
+; divide 24 -- so out of a 20-frame walk cycle only frames 0, 5, 10, 15 and 20 survive
+; unmoved and every other authored pose is replaced by an interpolation between two
+; neighbours. Measured on the `walk` clip, that quietly shortened the hoof's stance
+; travel from 0.275 m to 0.264 (4% of permanent foot skate nobody could see the cause
+; of), and on the 12-frame `gallop` -- whose whole stance is two frames -- it rounded
+; the stance corners off badly enough to cost 16%. Setting it to the authoring rate
+; makes the resample an identity. If author_anims.py is ever run against a pack whose
+; scene.render.fps is not 24, this number has to follow it.
 [importer_defaults]
 
 scene={
+"animation/fps": 24,
 "_subresources": {
 "animations": {
 "idle": {
 "settings/loop_mode": 1
 },
 "walk": {
+"settings/loop_mode": 1
+},
+"gallop": {
 "settings/loop_mode": 1
 }
 }

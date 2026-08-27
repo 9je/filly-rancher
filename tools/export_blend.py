@@ -18,8 +18,9 @@ p = argparse.ArgumentParser()
 p.add_argument("--out", required=True)
 p.add_argument("--object", default=None, help="only export this object + its armature/children")
 p.add_argument("--anims", action="store_true",
-               help="author 'idle' + 'walk' Actions onto the rig before exporting "
-                    "(see tools/author_anims.py); the packs ship none of their own")
+               help="author the 'idle' + 'walk' + 'gallop' Actions onto the rig before "
+                    "exporting (see tools/author_anims.py); the packs ship none of "
+                    "their own")
 p.add_argument("--rotate-z", type=float, default=0.0, metavar="DEG",
                help="yaw the exported root this many degrees about +Z before export")
 p.add_argument("--scale", type=float, default=1.0, metavar="FACTOR",
@@ -541,7 +542,7 @@ if args.scale != 1.0:
 
 # --- These packs ship zero character Actions (only a `CameraAxisAction` camera-orbit
 # helper), so there is nothing for `export_animations` to emit unless we author clips
-# first. --anims builds a walk loop + idle sway on the rig in-script; see
+# first. --anims builds an idle sway plus the walk and gallop loops in-script; see
 # tools/author_anims.py for why it drives the IK hoof targets rather than the DEF_ or
 # FK_ bones, and why authoring beats hand-posing a .blend.
 if args.anims:

@@ -437,6 +437,15 @@ validate_gltf.py twilight.glb --require-anims
   -> meshes=17 skins=1 materials=13 textured=True animations=['idle', 'walk']
 ```
 
+> **Clip list, updated.** Every `['idle', 'walk']` in this document is the record
+> of the run that was current when it was written. A third clip, `gallop`, was
+> authored in Phase 1A (`docs/pipeline.md` §6), so a re-run today reports
+> `['gallop', 'idle', 'walk']` and `SECONDARY_MOTION_UNKEYED ... clips=` lists
+> three. Nothing else here changes: `gallop` keyframes the same `ANIMATED` bone
+> set the other two do, so the same 29/44/39 hair bones are filtered out of its
+> bake and the post-export assertion covers it identically. The exclusion is
+> per-bone, not per-clip — it cannot be forgotten for a new clip.
+
 ---
 
 ## 7. What a future session must do when adding a character

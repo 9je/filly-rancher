@@ -52,7 +52,7 @@ func test_build_model_path_pointing_at_wrong_resource_type_returns_null_and_repo
 	assert_push_error(1, "a model_path resolving to a non-PackedScene resource should push_error")
 
 
-func test_build_real_pony_has_animation_player_with_idle_and_walk() -> void:
+func test_build_real_pony_has_animation_player_with_every_authored_clip() -> void:
 	var registry := PonyRegistryScript.new()
 	var ponies := registry.load_all(PONY_DIR)
 	var data: PonyData = ponies[&"twilight"]
@@ -63,8 +63,16 @@ func test_build_real_pony_has_animation_player_with_idle_and_walk() -> void:
 	assert_not_null(pony, "build() should succeed for a real, valid pony")
 	var anim: AnimationPlayer = pony.get_node_or_null(PonyVisualsScript.ANIMATION_PLAYER_PATH)
 	assert_not_null(anim, "AnimationPlayer should be reachable at the documented ANIMATION_PLAYER_PATH")
-	assert_true(anim.has_animation("idle"), "twilight's AnimationPlayer should have an 'idle' clip")
-	assert_true(anim.has_animation("walk"), "twilight's AnimationPlayer should have a 'walk' clip")
+	# Every Action tools/author_anims.py's author() builds. A clip added there and not
+	# here is a clip nothing checks reached the .glb.
+	for clip in ["idle", "walk", "gallop"]:
+		assert_true(anim.has_animation(clip),
+			"twilight's AnimationPlayer should have a '%s' clip" % clip)
+		var animation: Animation = anim.get_animation(clip)
+		assert_eq(animation.loop_mode, Animation.LOOP_LINEAR,
+			("'%s' must import looping -- glTF carries no loop flag, so this comes from " +
+			"the [importer_defaults] block in project.godot, which needs one entry per " +
+			"clip NAME and silently leaves any clip it does not list playing once") % clip)
 
 
 func test_build_real_pony_has_live_spring_bone_simulation() -> void:

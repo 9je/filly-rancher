@@ -1,15 +1,16 @@
 extends GutTest
-## Tests for Gait (game/systems/gait.gd) -- the single runtime home for the `walk`
-## clip's implied ground speed and the playback-scaling rules built on it. Pure
-## arithmetic with no scene dependency, so these run headlessly with nothing built.
+## Tests for Gait (game/systems/gait.gd) -- the single runtime home for the implied
+## ground speed of each locomotion clip and the playback-scaling rules built on them.
+## Pure arithmetic with no scene dependency, so these run headlessly with nothing built.
 ## Preloads by path rather than the global class_name, matching the convention
 ## documented at the top of game/scripts/pony_rig.gd.
 ##
-## The point of these tests is not that division works. It is that the ONE number
-## every consumer scales its animation against (0.66 m/s) is pinned to the value
-## tools/author_anims.py prints as WALK_IMPLIED_SPEED, and that the walk band really
-## is continuous and skate-free the way player.gd's comments claim -- both things a
-## future retune could silently break while every scene gate still passed.
+## The point of these tests is not that division works. It is that the numbers every
+## consumer scales its animation against (0.66 m/s for `walk`, 3.30 for `gallop`) stay
+## pinned to what tools/author_anims.py prints as WALK_IMPLIED_SPEED and
+## GALLOP_IMPLIED_SPEED, and that the speed ladder really is continuous and skate-free
+## the way player.gd's comments claim -- all things a future retune could silently
+## break on the far side of a language boundary while every scene gate still passed.
 
 const GaitScript := preload("res://systems/gait.gd")
 
@@ -56,13 +57,78 @@ func test_no_skate_anywhere_in_the_honest_band() -> void:
 
 func test_skate_appears_only_above_the_honest_ceiling() -> void:
 	assert_almost_eq(GaitScript.SKATE_FREE_TOP_SPEED, 1.98, 0.005,
-		"the skate-free ceiling is MAX_PLAYBACK x the clip speed")
-	# player.gd's GALLOP_SPEED. This is the documented cost of galloping on a walk
-	# clip; if it ever drifts far from ~2x, the speeds and this comment disagree.
-	assert_almost_eq(GaitScript.skate_ratio(4.0), 2.02, 0.02,
-		"top gallop on the walk clip should skate by about 2x")
+		"the walk clip's own ceiling is MAX_PLAYBACK x its clip speed")
+	assert_almost_eq(GaitScript.TOP_SKATE_FREE_SPEED, 4.29, 0.005,
+		"the ladder's ceiling is GALLOP_MAX_PLAYBACK x the gallop clip speed")
+	# player.gd's GALLOP_SPEED. Before the `gallop` clip existed this was 2.02 -- the
+	# documented cost of galloping on a walk clip. It is the whole reason that clip was
+	# authored, so it is worth a test rather than a comment.
+	assert_almost_eq(GaitScript.skate_ratio(4.0), 1.0, 0.0001,
+		"the player's 4.0 m/s gallop must be inside what the gallop clip can depict")
+	assert_gt(GaitScript.skate_ratio(GaitScript.TOP_SKATE_FREE_SPEED * 1.5), 1.4,
+		"past the ladder's ceiling the gallop clip saturates and skate returns")
 
 
 func test_skate_ratio_is_one_for_a_stationary_character() -> void:
 	assert_eq(GaitScript.skate_ratio(0.0), 1.0,
 		"a character who is not moving cannot be skating")
+
+
+# --- `gallop` ----------------------------------------------------------------------
+
+func test_gallop_clip_speed_matches_the_exporters_implied_speed() -> void:
+	# tools/author_anims.py prints "GALLOP_IMPLIED_SPEED 3.3000 m/s" on every export.
+	assert_almost_eq(GaitScript.GALLOP_CLIP_SPEED, 3.30, 0.005,
+		"the derived gallop speed must stay pinned to what the exporter reports")
+
+
+func test_gallop_buys_its_speed_from_the_cycle_not_the_stride() -> void:
+	# The rig's front leg chain is 98.8% extended at rest, so the stride CANNOT grow.
+	# If a future retune lengthens it, that assumption needs re-measuring in Blender
+	# before this test is relaxed -- see the GALLOP_* block in tools/author_anims.py.
+	assert_eq(GaitScript.GALLOP_STRIDE, GaitScript.WALK_STRIDE,
+		"the gallop deliberately reuses the walk's stride; only the cycle differs")
+	assert_almost_eq(GaitScript.GALLOP_CLIP_SPEED / GaitScript.WALK_CLIP_SPEED, 5.0, 0.0001,
+		"a 1/6 stance over a 0.5 s cycle against a 1/2 stance over a 0.833 s one is 5x")
+
+
+func test_the_two_locomotion_bands_meet_exactly() -> void:
+	# Not "roughly meet". If these two ever disagree there is a speed range in which
+	# neither clip is honest, and a character accelerating through it skates for a
+	# moment -- the kind of defect that is invisible in a still and obvious in motion.
+	assert_almost_eq(GaitScript.GALLOP_HANDOVER_SPEED, GaitScript.SKATE_FREE_TOP_SPEED, 0.0001,
+		"the gallop must take over exactly where the walk clip runs out of honesty")
+	assert_almost_eq(GaitScript.gallop_playback_scale_for_speed(GaitScript.GALLOP_HANDOVER_SPEED),
+		GaitScript.GALLOP_MIN_PLAYBACK, 0.0001,
+		"the handover speed must land exactly on the gallop's playback floor")
+
+
+func test_clip_for_speed_walks_the_whole_ladder() -> void:
+	assert_eq(GaitScript.clip_for_speed(0.0), &"idle")
+	assert_eq(GaitScript.clip_for_speed(GaitScript.IDLE_SPEED - 0.01), &"idle")
+	assert_eq(GaitScript.clip_for_speed(GaitScript.IDLE_SPEED), &"walk")
+	assert_eq(GaitScript.clip_for_speed(1.32), &"walk")
+	assert_eq(GaitScript.clip_for_speed(GaitScript.GALLOP_HANDOVER_SPEED - 0.01), &"walk")
+	assert_eq(GaitScript.clip_for_speed(GaitScript.GALLOP_HANDOVER_SPEED), &"gallop")
+	assert_eq(GaitScript.clip_for_speed(4.0), &"gallop")
+	assert_eq(GaitScript.clip_for_speed(-4.0), &"gallop",
+		"speed is a magnitude here; a negative one must not fall off the ladder")
+
+
+func test_nothing_skates_anywhere_on_the_ladder() -> void:
+	# Sweep the whole honest range rather than sampling the corners, so a future retune
+	# that opens a gap in the middle of a band is caught wherever it opens.
+	var speed := GaitScript.IDLE_SPEED
+	while speed <= GaitScript.TOP_SKATE_FREE_SPEED:
+		assert_almost_eq(GaitScript.skate_ratio(speed), 1.0, 0.0001,
+			"speed %.3f is inside the honest ladder and must not skate" % speed)
+		speed += 0.05
+
+
+func test_playback_scale_for_clip_dispatches_to_the_right_band() -> void:
+	assert_almost_eq(GaitScript.playback_scale_for_clip(&"walk", 1.32), 2.0, 0.0001)
+	assert_almost_eq(GaitScript.playback_scale_for_clip(&"gallop", 4.0), 4.0 / 3.3, 0.0001)
+	assert_eq(GaitScript.playback_scale_for_clip(&"idle", 0.0), 1.0,
+		"`idle` depicts no ground motion, so it always plays at its authored rate")
+	assert_eq(GaitScript.clip_speed(&"idle"), 0.0,
+		"`idle` has no implied ground speed to scale against")

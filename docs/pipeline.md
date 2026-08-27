@@ -181,8 +181,8 @@ tools/bin/blender/blender -b assets_raw/blender-native/Fluttershy_1-0/Fluttershy
 `--object <Rig>` selects exactly the character (the script walks
 `children_recursive`, which naturally pulls in the hair mesh hanging off a
 secondary `*_RigPhysics` armature and naturally excludes the camera,
-background planes, and unparented `BS_*` helpers). `--anims` authors `idle`
-+ `walk` clips onto the rig before export (§5). `--rotate-z 180` fixes a
+background planes, and unparented `BS_*` helpers). `--anims` authors the
+`idle` + `walk` + `gallop` clips onto the rig before export (§5). `--rotate-z 180` fixes a
 facing-direction quirk (§5). `--scale 0.5` normalizes the model to metric
 scale — see immediately below; it is **mandatory for every new character**.
 Omit `--anims`/`--rotate-z` for a static, unanimated export (e.g. for a prop
@@ -190,7 +190,11 @@ or a quick structural check) — but keep `--scale`.
 
 Each invocation prints a per-material resolution log line, then
 `SCALED factor=0.5 …`, `METRIC_RIG_OK height=2.0525`,
-`ANIMS_AUTHORED ['idle', 'walk']` (if `--anims`), then `EXPORT_OK <path>`.
+`WALK_IMPLIED_SPEED 0.6600 m/s …`, `GALLOP_IMPLIED_SPEED 3.3000 m/s …`,
+`ANIMS_AUTHORED ['idle', 'walk', 'gallop']` (all four only if `--anims`), then
+`EXPORT_OK <path>`. The two `*_IMPLIED_SPEED` lines are the authoritative values
+for `game/systems/gait.gd`'s `WALK_CLIP_SPEED` / `GALLOP_CLIP_SPEED` — compare
+them whenever a clip is retuned.
 
 ### Model scale — 1 unit = 1 metre, and `--scale` is how you get there
 
@@ -285,9 +289,9 @@ done
 Expected, one line per pony:
 
 ```
-meshes=17 skins=1 materials=13 textured=True animations=['idle', 'walk']   # twilight
-meshes=16 skins=1 materials=16 textured=True animations=['idle', 'walk']   # rainbowdash
-meshes=15 skins=1 materials=11 textured=True animations=['idle', 'walk']   # fluttershy
+meshes=17 skins=1 materials=13 textured=True animations=['gallop', 'idle', 'walk']   # twilight
+meshes=16 skins=1 materials=16 textured=True animations=['gallop', 'idle', 'walk']   # rainbowdash
+meshes=15 skins=1 materials=11 textured=True animations=['gallop', 'idle', 'walk']   # fluttershy
 ```
 
 (Drop `--require-anims` for a plain structural export with no `--anims`
@@ -524,11 +528,13 @@ family. All three converted tier-a rigs (Twilight, Rainbow Dash, Fluttershy)
 share a **byte-identical 93-bone core skeleton** — a 100% intersection, zero
 core-unique bones on any model — once cosmetic hair/mane/tail/wing chains
 (which differ per hairstyle, not per rig design) are excluded. One
-`idle`+`walk` clip set, authored once against the shared core bone names,
-retargets to every tier-a pack by name alone — **no per-model authoring, no
-retargeting step.** This was proven, not just inferred from bone-name
-overlap: the identical, unmodified `tools/author_anims.py` was run against
-all three rigs and produced valid `idle`+`walk` on each.
+`idle`+`walk`+`gallop` clip set, authored once against the shared core bone
+names, retargets to every tier-a pack by name alone — **no per-model
+authoring, no retargeting step.** This was proven, not just inferred from
+bone-name overlap: the identical, unmodified `tools/author_anims.py` was run
+against all three rigs and produced valid clips on each (and, for the
+locomotion clips, IK solutions that agree to four decimal places — the three
+packs' leg geometry is the same rig).
 
 The tier-c SFM probe shares **zero** bone names with tier a (`Pelvis`,
 `Chest1`, `Head`, `Javv`, ... vs `DEF_Chest1`, `DEF_Head`, ...) — a
@@ -543,6 +549,50 @@ manifest, MythicSpeed's post, CreatorOfPony's dead Mediafire links, EqD
 showcase posts, general searches) found nothing loginless/curl-reachable
 with matching bone names. **Animations are authored in-script, not
 downloaded or hand-keyed in the `.blend`.**
+
+### The locomotion clips, and why there are two of them
+
+| clip | frames @ 24 fps | stance | stride | implied ground speed |
+|---|---|---|---|---|
+| `walk` | 20 (0.833 s) | 1/2 of the cycle | 0.275 m | **0.66 m/s** |
+| `gallop` | 12 (0.500 s) | 1/6 of the cycle | 0.275 m | **3.30 m/s** |
+
+The strides are identical on purpose, and that is the whole design. The front
+IK chain is 0.5334 m long against a 0.5269 m rest reach — **98.8% extended
+standing still**, with 6.5 mm of bend to play with — so a hoof cannot be swung
+further fore or aft without the solver hitting full extension and the knee
+popping. `STRIDE` was already at that ceiling. The only remaining lever for
+speed is the **cycle**, so `gallop` rides the same stride through a stance six
+times shorter (0.083 s of ground contact, which is about what a real galloping
+horse's limb gets) and depicts exactly 5x the speed.
+
+`gallop` is a **transverse gallop on the left lead**, not a fast walk: four
+separate beats (right-hind, left-hind, right-fore, left-fore, the leading
+foreleg landing last and reaching furthest forward) and two airborne phases —
+a short gathered suspension after the hinds leave, a long extended one after
+the leading fore does, 42% of the cycle with nothing on the ground. The walk's
+symmetric diagonal pairs are gone entirely. Two rig-specific accommodations
+make it fit:
+
+- **A deeper body crouch** (`GALLOP_CROUCH` 0.055 m against the walk's 0.045),
+  with one bob per cycle instead of two, timed so the body rides lowest through
+  the forelimb stance — exactly when the front hooves are furthest fore/aft.
+  Measured over the cycle the front chain peaks at **93.0%** extension against
+  the walk's 95.1% and the idle's 101%, and the knee's bend direction never
+  changes sign on any of the three packs. This clip is *further* from the
+  singularity than the ones that came before it.
+- **`GALLOP_REAR_REACH`** plants the hind hooves 0.06 m further under the body
+  for the whole clip. The hind hoof sits 0.21 m *behind* its hip at rest (the
+  hock's zig-zag), so unlike the front leg — which hangs almost straight down —
+  the rear chain runs out of reach asymmetrically and swinging a hind hoof
+  backwards costs far more extension than swinging it forwards. Re-centring
+  the excursion is both the cheap fix and what a galloping quadruped actually
+  does with its hindquarters.
+
+Consumers must not pick or scale these clips by hand: `game/systems/gait.gd`
+owns the speed ladder (which clip at which ground speed, at what playback
+rate), and the two bands are arranged to meet *exactly* at 1.98 m/s so no
+speed between a standstill and 4.29 m/s has to skate.
 
 ### Hair is NOT animated — it is simulated, and that takes two halves
 
@@ -649,8 +699,8 @@ substring to **both** lists, they must agree.
 
 To add a **new clip** (trot, graze, sleep, ...) that every tier-a pony
 should gain simultaneously, add a `build_<clipname>()` function to
-`tools/author_anims.py` alongside `build_walk`/`build_idle` and register it
-in `author()`. Load-bearing things to know before touching it:
+`tools/author_anims.py` alongside `build_walk`/`build_idle`/`build_gallop`
+and register it in `author()`. Load-bearing things to know before touching it:
 
 - **The rig is permanently in IK mode.** Every `DEF_*Leg*`/`DEF_*Hoof*` bone
   carries two `COPY_TRANSFORMS` constraints (from its `FK_` then `IK_`
@@ -676,27 +726,41 @@ in `author()`. Load-bearing things to know before touching it:
   `validate_gltf.py --require-anims` pass vacuously on an unanimated model.
   This was caught and fixed in review; the gating is load-bearing, don't
   remove it.
-- **`WALK_STRIDE` is duplicated** between `tools/author_anims.py` (the
-  authoring constant, `0.275` m) and `game/scenes/test/walk_test.gd` (the
-  scene's ground-speed constant, derived as
-  `STRIDE / (cycle_seconds * 0.5)` = `0.66 m/s`; `hair_lag_test.gd`'s
-  `TRAVEL_SPEED` is a third copy) — cross-check comments sit
-  at both sites, but they are not automatically kept in sync. If you retune
-  `STRIDE`, update both, or the walk-test pony's feet will skate. See §8 for
-  why the divisor is *half* the cycle, not the whole cycle. **Four values are
-  duplicated, not one**: `STRIDE`, `WALK_FRAMES`, `STANCE_FRACTION`, and the
-  frame rate — and the frame rate is the sneaky one, because `author_anims.py`
-  reads it from `bpy.context.scene.render.fps` (i.e. from whatever the source
-  `.blend` is set to) while `walk_test.gd` hardcodes `24.0`. A pack authored
-  at a different fps desyncs the two with no gate failing. Always compare
-  against the `WALK_IMPLIED_SPEED` line the export prints.
+- **A clip's implied ground speed is duplicated across the Python/GDScript
+  boundary, and `game/systems/gait.gd` is the single place the engine side of
+  it may live.** Four values make up each derivation — the stride, the cycle
+  length, the stance fraction, and the frame rate — and the frame rate is the
+  sneaky one, because `author_anims.py` reads it from
+  `bpy.context.scene.render.fps` (i.e. from whatever the source `.blend` is
+  set to) while GDScript hardcodes `24.0`. A pack authored at a different fps
+  desyncs the two with no gate failing and no symptom but foot skate. Nothing
+  can check this automatically, so: **always compare against the
+  `WALK_IMPLIED_SPEED` / `GALLOP_IMPLIED_SPEED` lines the export prints**, and
+  `game/test/test_gait.gd` pins both numbers so a retune on one side fails a
+  test rather than shipping. See §8 for why the divisor is the *stance*
+  duration, not the whole cycle. `hair_lag_test.gd`'s `TRAVEL_SPEED` is the
+  one remaining hand-copied derivation (walk_test.gd's was migrated onto Gait
+  when `gallop` was added).
 - **Loop mode is a tracked project default, not a per-asset setting.** glTF
   carries no loop flag, so Godot imports every animation as `LOOP_NONE` —
   since `game/assets/converted/` (and its `.import` sidecars) is gitignored,
   a per-file fix would evaporate on a fresh clone. `game/project.godot`
   carries `[importer_defaults]` forcing `loop_mode=1` (`LOOP_LINEAR`) for
-  any animation literally named `idle` or `walk`. **A new clip name needs a
-  new entry added to that block**, or it will import non-looping.
+  any animation literally named `idle`, `walk` or `gallop`. **A new clip name
+  needs a new entry added to that block**, or it will import non-looping.
+- **`animation/fps` in that same `[importer_defaults]` block is set to 24, and
+  it must match the source `.blend`'s frame rate.** Godot does not import
+  animation keys as authored: it *resamples* every clip onto a uniform grid at
+  this rate, and its default is 30. Thirty does not divide twenty-four, so at
+  the default only every fifth authored pose of a 24 fps clip survives
+  unmoved and the rest are replaced by interpolations between neighbours. That
+  is invisible in a still and cheap-looking in motion: measured on `walk` it
+  shortened a planted hoof's stance travel from 0.275 m to 0.264 (4% of
+  permanent foot skate), and on the 12-frame `gallop`, whose entire stance is
+  two frames, it rounded the stance corners off for 16%. Setting it to the
+  authoring rate makes the resample an identity. Verify after any re-export
+  with `Animation.track_get_key_time()` — the imported key times should be
+  exact multiples of 1/24.
 - **`export_blend.py --rotate-z 180`** exists because the rig faces −Y in
   Blender, which `export_yup` maps to +Z in glTF, but Godot's
   `Node3D.look_at()` aims −Z — an unrotated pony moonwalks down her own
@@ -723,7 +787,7 @@ tools/bin/godot --headless --path game scenes/test/model_gallery.tscn
 
 # Animated walk test: Twilight walks a 4-waypoint square using the 'walk' clip
 tools/bin/godot --headless --path game scenes/test/walk_test.tscn
-# -> ANIMS ["idle", "walk"]
+# -> ANIMS ["gallop", "idle", "walk"]
 # -> WALK_OK laps_progress=<n>   exit 0
 
 # Baseline smoke test (also the export smoke test's main scene, §8)

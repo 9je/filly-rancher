@@ -139,6 +139,12 @@ func test_gallop_modifier_raises_the_top_speed() -> void:
 	assert_almost_eq(walk_speed, 2.0 * GaitScript.WALK_CLIP_SPEED, 0.01,
 		"walking must settle on exactly 2x the clip's own speed, so the hooves stay planted")
 	assert_gt(gallop_speed, walk_speed * 2.0, "gallop must be substantially faster than walk")
+	# The reason the `gallop` clip was authored at all: this speed used to sit above
+	# everything the walk clip could depict and moonwalked by ~2x to get there.
+	assert_lt(gallop_speed, GaitScript.TOP_SKATE_FREE_SPEED,
+		"the player's top speed must stay inside what an authored clip can depict")
+	assert_almost_eq(GaitScript.skate_ratio(gallop_speed), 1.0, 0.0001,
+		"galloping at top speed must not skate")
 
 
 func test_stands_still_and_stays_on_the_floor_with_no_input() -> void:
@@ -164,3 +170,30 @@ func test_plays_idle_at_rest_and_walk_when_moving() -> void:
 	assert_almost_eq(anim.speed_scale,
 		GaitScript.playback_scale_for_speed(_player.get_ground_speed()), 0.001,
 		"playback must be scaled to ground speed so the gait matches the ground")
+
+
+func test_plays_gallop_above_the_walk_band() -> void:
+	# The clip choice is Gait's, not this controller's, but the wiring between them is
+	# exactly what a future edit to _update_animation() would break -- so assert the
+	# observable end of it: hold the gallop modifier, get the gallop clip, at the rate
+	# that keeps its hooves planted.
+	_aim_camera(Vector3.FORWARD)
+	var anim: AnimationPlayer = _player.get_animation_player()
+	assert_not_null(anim, "the player's body must build with a reachable AnimationPlayer")
+	Input.action_press("move_forward")
+	Input.action_press("gallop")
+	await wait_physics_frames(RUN_FRAMES)
+
+	var speed: float = _player.get_ground_speed()
+	assert_gt(speed, GaitScript.GALLOP_HANDOVER_SPEED,
+		"holding 'gallop' must take her past the speed the walk clip can depict")
+	assert_eq(anim.current_animation, "gallop", "above the walk band she plays 'gallop'")
+	assert_almost_eq(anim.speed_scale,
+		GaitScript.gallop_playback_scale_for_speed(speed), 0.001,
+		"gallop playback must be scaled to ground speed too, not left at 1.0")
+
+	# ...and back down again. A one-way handover would leave her galloping on the spot
+	# after the modifier is released, which no headless distance check would notice.
+	Input.action_release("gallop")
+	await wait_physics_frames(RUN_FRAMES)
+	assert_eq(anim.current_animation, "walk", "releasing 'gallop' must drop her to 'walk'")
