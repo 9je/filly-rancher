@@ -461,6 +461,66 @@ showcase posts, general searches) found nothing loginless/curl-reachable
 with matching bone names. **Animations are authored in-script, not
 downloaded or hand-keyed in the `.blend`.**
 
+### Hair is NOT animated — it is simulated, and that takes two halves
+
+Mane, tail and forelock chains are deliberately excluded from the clips and
+driven at runtime by a Godot `SpringBoneSimulator3D`, so they lag the body's
+bob instead of snapping with it. **Both halves are required**, and doing only
+one of them looks exactly like doing neither. Full write-up, tuning values and
+the measured evidence live in **`docs/notes-hair-sim.md`**; the rules a future
+session must not break are:
+
+1. **Export side (`tools/author_anims.py` → `SECONDARY_MOTION_PATTERNS`).** Any
+   bone whose name contains `mane`, `tail`, `hair`, `forelock` or `fringe`
+   (case-insensitive, any rig layer — `DEF_`, `CON_`, `FK_`, ...) ships with
+   **zero animation channels**. `tools/export_blend.py` enforces this by
+   filtering the glTF exporter's per-bone channel gather and then re-opening
+   the written `.glb` to assert no such channel survived — a leak fails the
+   export. This is load-bearing: in Godot an `AnimationPlayer` track and a
+   `SkeletonModifier3D` write the same bone pose and the animation wins, so
+   even a *constant* rest-pose track (which is exactly what
+   `export_bake_animation` emits for every idle bone) silently overwrites the
+   simulation and the spring bones appear to do nothing at all.
+2. **Runtime side (`game/scripts/pony_rig.gd`).** `PonyRig.spawn("<name>")`
+   loads the `.glb`, finds the hair chains by the same name patterns, and
+   attaches a configured `SpringBoneSimulator3D` under the `Skeleton3D`.
+   `game/scenes/characters/pony.tscn` is the editor-facing wrapper. **Never
+   instance a pony `.glb` directly** — a bare instance has no hair simulation.
+   The simulator cannot be saved inside the `.glb` or its `.import` sidecar:
+   `game/assets/converted/` is gitignored and regenerated per machine (§2), so
+   anything hand-added there evaporates. It lives in tracked script instead.
+
+Two rig facts behind those rules, both verified rather than assumed:
+
+- **The hair mesh binds to a second, hidden armature.** Every pack ships a
+  `<X>_RigPhysics` armature (a child of the main rig) carrying duplicate,
+  identically-named copies of the `DEF_Mane*`/`DEF_Hair*`/`DEF_Tail*` chains
+  plus spline-IK constraints; the hair mesh's Armature modifier points at
+  *that*, and it is flagged `hide_viewport`, so it is absent from the
+  evaluated depsgraph and `export_apply=True` exported against the depsgraph.
+  Result before this was fixed: the mane and tail exported **unskinned**,
+  rigidly parented to the rig root, not following the head or body at all —
+  while `meshes=17 skins=1 textured=True` and `WALK_OK` all still passed.
+  `export_blend.py`'s `rebind_secondary_armatures()` now retargets such meshes
+  onto the primary rig (only when every vertex group names a bone that exists
+  there; the duplicated rest matrices agree to <5e-5 on all three packs). It
+  prints one `REBIND <mesh> armature <secondary> -> <primary>` line per mesh.
+- **`DEF_` deforms, `CON_` does not.** Decoding the exported mesh's
+  `JOINTS_0`/`WEIGHTS_0` shows 100% of the hair mesh's weight on `DEF_Head`
+  plus `DEF_Mane*`/`DEF_Hair*`/`DEF_Tail*`, and exactly 0% on any `CON_` bone —
+  the `CON_` layer drove spline-IK curves that do not survive glTF. So the
+  exclusion covers both layers (a keyframe on either is pointless), but only
+  the `DEF_` chains are simulated.
+
+**The IK solver is forced to `LEGACY` for the bake** (`author_anims.py`,
+`author()`). The packs ship iTaSC, whose damped-least-squares solve is not
+reproducible when the front chain sits at 98.8% extension as this rig's does:
+once the hair rebind perturbed depsgraph evaluation, Fluttershy's idle started
+flipping a front knee in roughly one export in six, i.e. the same `.blend`
+produced different `.glb` files. `LEGACY` agrees with the iTaSC solve to within
+0.0028 of a quaternion component (~0.3°) on every channel and is byte-stable
+across repeated exports. Do not remove it.
+
 ### How to add animations to a new character
 
 If the new character is a **tier-a** (CreatorOfPony/MythicSpeed-family)
@@ -475,6 +535,22 @@ No changes to `tools/author_anims.py` are needed as long as the pack shares
 the 93-bone core naming convention (`DEF_*`, `FK_*`, `IK_*`, `CON_*`
 prefixes) — Applejack and Rarity are already downloaded and expected to work
 unchanged, just not yet run.
+
+**Then check the hair actually works, because nothing above will fail if it
+doesn't.** Confirm the export printed a `REBIND` line for the pack's hair mesh
+(no line = the hair mesh is not skinned to the main rig and will sit rigid at
+the model root) and a `SECONDARY_MOTION_FILTERED n` line with a plausible bone
+count. Then run the lag scene against the new character:
+
+```bash
+tools/bin/godot --headless --path game scenes/test/hair_lag_test.tscn -- character=<name>
+```
+
+Every hair chain it finds should appear in the `CHAIN` listing and every leaf
+chain should trail (see `docs/notes-hair-sim.md` for how to read the numbers).
+If a chain is missing, the pack names its hair bones something
+`SECONDARY_MOTION_PATTERNS` / `PonyRig.HAIR_PATTERNS` do not match — add the
+substring to **both** lists, they must agree.
 
 To add a **new clip** (trot, graze, sleep, ...) that every tier-a pony
 should gain simultaneously, add a `build_<clipname>()` function to
@@ -557,6 +633,14 @@ tools/bin/godot --headless --path game scenes/test/walk_test.tscn
 # Baseline smoke test (also the export smoke test's main scene, §8)
 tools/bin/godot --headless --path game scenes/test/smoke.tscn
 # -> SMOKE_OK renderer=forward_plus   exit 0
+
+# Hair follow-through: measures how far the mane/tail trail the body, against a
+# rigid-hair baseline, over a scripted start-and-stop (see docs/notes-hair-sim.md)
+tools/bin/godot --headless --path game scenes/test/hair_lag_test.tscn
+# -> CHAIN <tip> root=<..> joints=<n> leaf=<bool> stiffness=.. drag=.. gravity=..
+# -> HAIRLAG <tip> leaf trails body by +N ticks (+M ms) ...   (one line per chain)
+# -> HAIRLAG_OK leaf_chains=6 moving=6 lagging=6 worst_wobble=0.032   exit 0
+# Add `-- character=rainbowdash` to point it at another pack.
 
 # Map-props probe (Task 8, §4): scatters every converted prop plus Twilight
 # on a grass ground plane
