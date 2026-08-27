@@ -56,6 +56,12 @@ func _ready() -> void:
         loaded += 1
 
     # Twilight, for scale reference (Phase-1 decision point: see task-8 report).
+    # Loaded directly rather than through PonyRig.spawn(), which docs/pipeline.md section
+    # 6 otherwise requires: this scene only measures a bounding box, and the mane/tail
+    # spring simulation would make that box depend on which physics tick it is sampled
+    # on. A deliberate exemption, not the pattern to copy -- anything that puts a pony on
+    # screen must use PonyRig.spawn() or scenes/characters/pony.tscn, or it renders with
+    # its hair welded to its skull.
     var pony_scene: PackedScene = load(PONY_PATH)
     var pony := pony_scene.instantiate()
     pony.position = Vector3(0, 0, 0)

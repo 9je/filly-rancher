@@ -69,19 +69,69 @@ const TRAVEL_DIRECTION := Vector3(0, 0, -1)
 ## before a lag number means anything. Halved along with the models when they were
 ## normalised to metric scale, so it stays the same fraction of body height.
 const MIN_DEVIATION := 0.0025
+## How far the correlation must fall away from its peak, on the peak's shallower side,
+## before the window ends. Rejects a nominal argmax on a plateau or a monotone drift.
+## Real trails clear this by a wide margin (tail chains score ~1.4); the mane's old
+## boundary "peaks" scored under 0.02.
+const MIN_PROMINENCE := 0.10
+## Fraction of the body's bob the tip must still carry. This is the number that actually
+## says whether the hair reads as attached: a tip retaining 14% of the head's bob is a
+## detached wig, not follow-through, no matter how good its correlation lag looks.
+##
+## The UPPER bound only applies to chains anchored directly on an animated body bone
+## (depth 0), where swinging further than the body that drives it can only be resonance.
+## It is meaningless further out along the hair, and applying it there was a real mistake
+## worth recording: Twilight's DEF_Mane1-6 and DEF_Mane3-2 keep ~190% and ~205% of the
+## body's bob, which looks damning until you pin them rigid. Re-running the manoeuvre
+## with those chains given 100000x stiffness -- unable to flex at all relative to their
+## anchor -- leaves them at 186% and 204%. The swing is not theirs. It is lever geometry:
+## the mane's follow-through is a ROTATION of DEF_Mane1-5, and a point further out along
+## the strand traces a proportionally bigger arc. No stiffness or drag can remove it
+## without removing the follow-through itself, which is the whole feature. `self_gain`
+## below is the metric that actually isolates a chain's own springiness.
+const MIN_BOB_RETENTION := 0.40
+const MAX_BOB_RETENTION := 1.10
+## Ceiling on a chain's swing divided by the swing the PINNED pass gives it -- i.e. how
+## much motion the chain adds beyond a rigid extension riding the same simulated anchor.
+## Lever-invariant by construction, so unlike the retention bound it means the same thing
+## at any depth. 1.0 is a chain that only inherits; well above 1 is a chain resonating on
+## its own.
+const MAX_SELF_GAIN := 1.25
+## Ceiling on per-tick vertical acceleration relative to swing. The rigid hair -- i.e.
+## the authored animation itself -- scores about 0.031, so this allows roughly double
+## the animation's own roughness before calling a chain jittery.
+const MAX_WOBBLE := 0.060
 
 var pony: Node3D
 var skeleton: Skeleton3D
 var simulator: SpringBoneSimulator3D
 var animation: AnimationPlayer
 var tip_bones: Array[int] = []
+## Local offset from each end bone to the end of that lock of hair -- see
+## PonyRig.tip_offset() for why sampling the bone's own origin instead measures a point
+## a one-bone chain's simulation cannot move.
+var tip_offsets: Array[Vector3] = []
 var chain_names: Array[String] = []
 var leaf_chain: Array[bool] = []
 
+## The three passes, in order. RIGID is the pre-fix baseline. SIMULATED is what ships.
+## PINNED re-runs the simulation with every chain that hangs off ANOTHER chain forced
+## effectively rigid, which isolates lever geometry from a chain's own springiness --
+## see `self_gain` in _report().
+enum { PASS_RIGID, PASS_SIMULATED, PASS_PINNED }
+const PINNED_STIFFNESS_FACTOR := 100000.0
+
+var chains: Array = []
+var depths: PackedInt32Array = PackedInt32Array()
+var profiles: Array[Dictionary] = []
+var stacked_factor := 0.0
+
 var ticks := 0
+var pass_index := PASS_RIGID
 var samples: Array = []         # per chain: Array[Vector3], current pass
-var rigid: Array = []           # per chain: Array[Vector3], pass 1
-var simulator_on := false
+var rigid: Array = []           # per chain: Array[Vector3], PASS_RIGID
+var simulated: Array = []       # per chain: Array[Vector3], PASS_SIMULATED
+var pinned: Array = []          # per chain: Array[Vector3], PASS_PINNED
 var finished := false
 
 
@@ -105,8 +155,9 @@ func _ready() -> void:
 	skeleton.modifier_callback_mode_process = Skeleton3D.MODIFIER_CALLBACK_MODE_PROCESS_PHYSICS
 	animation.play("walk")
 
+	chains = PonyRigScript.hair_chains(skeleton)
+	depths = PonyRigScript.chain_depths(skeleton, chains)
 	_apply_overrides()
-	var chains := PonyRigScript.hair_chains(skeleton)
 	var branch_points := {}
 	for chain in chains:
 		branch_points[skeleton.get_bone_parent(chain[0])] = true
@@ -125,12 +176,13 @@ func _ready() -> void:
 		# printed anyway because they drive the leaves -- when a leaf misbehaves, the
 		# interior chain feeding it is usually why.
 		tip_bones.append(tip)
+		tip_offsets.append(PonyRigScript.tip_offset(skeleton, chain))
 		chain_names.append(skeleton.get_bone_name(tip))
 		leaf_chain.append(leaf)
-	print("CHAINS ", chains.size())
+	print("CHAINS ", chains.size(), " depths=", depths, " stacked_factor=", stacked_factor)
 
 	skeleton.skeleton_updated.connect(_on_skeleton_updated)
-	_begin_pass(false)
+	_begin_pass(PASS_RIGID)
 
 
 ## Walk up the skeleton until we leave the hair, i.e. reach a bone the clips still
@@ -149,10 +201,17 @@ func _body_anchor(bone: int) -> int:
 ##       mane=18,0.6,0.25 hair=18,0.6,0.25 tail=18,0.6,0.25
 ## `character=<name>` is handled separately, in _ready().
 func _apply_overrides() -> void:
-	var chains := PonyRigScript.hair_chains(skeleton)
+	stacked_factor = PonyRigScript.STACKED_CHAIN_STIFFNESS
+	profiles = []
+	for i in simulator.setting_count:
+		profiles.append(PonyRigScript.profile_for(simulator.get_root_bone_name(i)))
 	for arg in OS.get_cmdline_user_args():
 		var parts := arg.split("=")
 		if parts.size() != 2:
+			continue
+		if parts[0] == "stacked":
+			stacked_factor = float(parts[1])
+			print("OVERRIDE ", arg)
 			continue
 		var values := parts[1].split(",")
 		if values.size() != 3:
@@ -161,21 +220,29 @@ func _apply_overrides() -> void:
 		for i in simulator.setting_count:
 			if not simulator.get_root_bone_name(i).to_lower().contains(parts[0]):
 				continue
-			# Route through PonyRig so the sweep exercises the same per-unit-length
-			# conversion the shipped profiles get, rather than a second code path.
-			PonyRigScript.configure_setting(simulator, skeleton, i, chains[i], {
+			profiles[i] = {
 				"stiffness": float(values[0]),
 				"drag": float(values[1]),
 				"gravity": float(values[2]),
-				"radius": simulator.get_radius(i),
-			})
+				"radius": profiles[i]["radius"],
+			}
 			hits += 1
 		print("OVERRIDE ", arg, " chains=", hits)
 
 
-func _begin_pass(with_simulator: bool) -> void:
-	simulator_on = with_simulator
-	simulator.influence = 1.0 if with_simulator else 0.0
+## Push the current profiles onto the simulator. Always routed through PonyRig so a
+## sweep exercises the same per-unit-length conversion the shipped profiles get, rather
+## than a second code path that could measure something the game never runs.
+func _configure(stacked: float) -> void:
+	for i in simulator.setting_count:
+		PonyRigScript.configure_setting(
+			simulator, skeleton, i, chains[i], profiles[i], depths[i], stacked)
+
+
+func _begin_pass(which: int) -> void:
+	pass_index = which
+	simulator.influence = 0.0 if which == PASS_RIGID else 1.0
+	_configure(PINNED_STIFFNESS_FACTOR if which == PASS_PINNED else stacked_factor)
 	simulator.reset()
 	pony.position = Vector3.ZERO
 	# Restart the clip so both passes see an identical drive, sample for sample.
@@ -203,42 +270,88 @@ func _on_skeleton_updated() -> void:
 	if ticks <= SETTLE_TICKS:
 		return
 	for i in tip_bones.size():
-		samples[i].append(_bone_origin(tip_bones[i]))
+		samples[i].append(_chain_tip(i))
 	if samples[0].size() >= SAMPLE_TICKS:
 		_finish_pass()
 
 
-func _bone_origin(bone: int) -> Vector3:
-	return (skeleton.global_transform * skeleton.get_bone_global_pose(bone)).origin
+## World position of the far end of chain `i`'s last bone -- the visible tip of that
+## lock of hair, and the only point on it that every joint in the chain, including the
+## last, actually moves.
+func _chain_tip(i: int) -> Vector3:
+	var bone := skeleton.global_transform * skeleton.get_bone_global_pose(tip_bones[i])
+	return bone * tip_offsets[i]
 
 
 func _finish_pass() -> void:
-	if not simulator_on:
-		rigid = samples
-		_begin_pass(true)
-		return
-	finished = true
-	_report()
+	match pass_index:
+		PASS_RIGID:
+			rigid = samples
+			_begin_pass(PASS_SIMULATED)
+		PASS_SIMULATED:
+			simulated = samples
+			_begin_pass(PASS_PINNED)
+		_:
+			pinned = samples
+			finished = true
+			_report()
 
 
 ## Normalised cross-correlation of two equal-length traces over a signed tick window,
 ## projected onto `axis`. Both are mean-subtracted first, so a constant offset -- the
 ## hair hanging lower once gravity is simulated, say -- costs nothing; only timing counts.
+##
+## Returns the argmax AND two numbers without which the argmax is worthless:
+##
+##  - `interior`: whether the peak lies strictly inside the search window. An argmax
+##    sitting ON the boundary is not a measurement, it is the search giving up. This
+##    scene shipped with exactly that bug: the mane chains reported "+40 ticks
+##    (+666.7 ms)" when their correlation actually rose monotonically from 0.28 at -40
+##    to 0.93 at +40 with no maximum anywhere in between. Widening the window moved the
+##    "answer" to thousands of milliseconds. A boundary hit means the two traces are not
+##    a delayed copy of each other at all -- typically because the hair never caught up
+##    within the manoeuvre -- and must fail, not be reported as an excellent trail.
+##  - `prominence`: topographic prominence of the peak within the window, i.e. how far
+##    the correlation falls on its *worse* side before the window ends
+##    (`corr_peak - max(min_left, min_right)`). A real trail is a resonance-free bump:
+##    the tail chains peak at +5 and decay to -0.44 by +40, prominence ~1.4. A drifting
+##    or monotone surface has a nominal argmax with essentially no prominence, so a
+##    threshold on this rejects "peaks" that are really plateaus.
 func _best_lag(reference: Array, delayed: Array, axis: Vector3) -> Dictionary:
-	var best_lag := 0
-	var best_corr := -2.0
 	var count := reference.size() - 2 * LAG_WINDOW
+	var curve: Array[float] = []
 	for lag in range(-LAG_WINDOW, LAG_WINDOW + 1):
 		var a: Array[float] = []
 		var b: Array[float] = []
 		for i in count:
 			a.append(reference[i + LAG_WINDOW].dot(axis))
 			b.append(delayed[i + LAG_WINDOW + lag].dot(axis))
-		var corr := _correlation(a, b)
-		if corr > best_corr:
-			best_corr = corr
-			best_lag = lag
-	return {"lag": best_lag, "corr": best_corr}
+		curve.append(_correlation(a, b))
+
+	var peak := 0
+	for i in curve.size():
+		if curve[i] > curve[peak]:
+			peak = i
+	var left_min := INF
+	for i in peak:
+		left_min = minf(left_min, curve[i])
+	var right_min := INF
+	for i in range(peak + 1, curve.size()):
+		right_min = minf(right_min, curve[i])
+	# A peak with no room on one side has no prominence to speak of; report 0 rather
+	# than INF-arithmetic, and let the `interior` flag be the thing that fails it.
+	var prominence := 0.0
+	if is_finite(left_min) and is_finite(right_min):
+		prominence = curve[peak] - maxf(left_min, right_min)
+
+	return {
+		"lag": peak - LAG_WINDOW,
+		"corr": curve[peak],
+		"interior": peak > 0 and peak < curve.size() - 1,
+		"prominence": prominence,
+		"edge_low": curve[0],
+		"edge_high": curve[curve.size() - 1],
+	}
 
 
 func _correlation(a: Array[float], b: Array[float]) -> float:
@@ -317,32 +430,71 @@ func _wobble(values: Array) -> float:
 
 
 func _report() -> void:
-	var moving := 0
-	var lagging := 0
 	var leaves := 0
+	var passing := 0
 	var worst_wobble := 0.0
+	var worst_retention := INF
+	var best_retention := 0.0
+	var worst_self_gain := 0.0
 	for i in tip_bones.size():
-		var lag := _best_lag(rigid[i], samples[i], TRAVEL_DIRECTION)
-		var deviation := _deviation(rigid[i], samples[i])
-		var sag := _sag(rigid[i], samples[i])
-		var moves: bool = deviation >= MIN_DEVIATION
+		var lag := _best_lag(rigid[i], simulated[i], TRAVEL_DIRECTION)
+		var deviation := _deviation(rigid[i], simulated[i])
+		var sag := _sag(rigid[i], simulated[i])
+		var rigid_bob := _bob_span(rigid[i])
+		var sim_bob := _bob_span(simulated[i])
+		var pinned_bob := _bob_span(pinned[i])
+		var retention := sim_bob / rigid_bob if rigid_bob > 0.0 else 0.0
+		# How much swing this chain adds ON TOP OF what a rigid extension riding the same
+		# (simulated) anchor would already have. Depth-0 chains anchor on an animated body
+		# bone, so their pinned pass is identical to the simulated one and this is exactly
+		# 1.0 -- for them `retention` is the amplification test. For a chain hanging off
+		# another chain it is the only honest one: see the block comment below.
+		var self_gain := sim_bob / pinned_bob if pinned_bob > 0.0 else 0.0
+		var wobble := _wobble(simulated[i])
+
+		# Every one of these has to hold for a chain to count as fixed. They are separate
+		# failure modes, so the report names which one bit rather than just saying no.
+		var faults: Array[String] = []
+		if deviation < MIN_DEVIATION:
+			faults.append("static")
+		if lag["lag"] <= 0:
+			faults.append("leads")
+		if not lag["interior"]:
+			faults.append("peak-at-window-edge")
+		if lag["prominence"] < MIN_PROMINENCE:
+			faults.append("no-peak-prominence")
+		if retention < MIN_BOB_RETENTION:
+			faults.append("decoupled")
+		if depths[i] == 0 and retention > MAX_BOB_RETENTION:
+			faults.append("amplifies")
+		if self_gain > MAX_SELF_GAIN:
+			faults.append("springs-beyond-its-anchor")
+		if wobble > MAX_WOBBLE:
+			faults.append("jitter")
+
 		if leaf_chain[i]:
 			leaves += 1
-			worst_wobble = maxf(worst_wobble, _wobble(samples[i]))
-			if moves:
-				moving += 1
-				if lag["lag"] > 0:
-					lagging += 1
-		print("HAIRLAG %-12s %s trails body by %+3d ticks (%+6.1f ms) corr=%.3f | dyn_deviation=%.4f offset=%.4f | bob rigid=%.4f sim=%.4f | wobble rigid=%.3f sim=%.3f%s"
-			% [chain_names[i], "leaf    " if leaf_chain[i] else "interior",
+			worst_wobble = maxf(worst_wobble, wobble)
+			worst_retention = minf(worst_retention, retention)
+			best_retention = maxf(best_retention, retention)
+			worst_self_gain = maxf(worst_self_gain, self_gain)
+			if faults.is_empty():
+				passing += 1
+		print("HAIRLAG %-12s %s d%d trail=%+3d ticks (%+6.1f ms) corr=%.3f interior=%s prom=%.3f | bob %.4f->%.4f keep=%3.0f%% self_gain=%.2f | dyn_dev=%.4f offset=%.4f wobble=%.3f | %s"
+			% [chain_names[i], "leaf    " if leaf_chain[i] else "interior", depths[i],
 			   lag["lag"], lag["lag"] * TICK_SECONDS * 1000.0, lag["corr"],
-			   deviation, sag, _bob_span(rigid[i]), _bob_span(samples[i]),
-			   _wobble(rigid[i]), _wobble(samples[i]),
-			   "" if moves else "  [static]"])
+			   "yes" if lag["interior"] else "NO ", lag["prominence"],
+			   rigid_bob, sim_bob, retention * 100.0, self_gain,
+			   deviation, sag, wobble,
+			   "ok" if faults.is_empty() else ",".join(faults)])
 	print("MANOEUVRE settle=%d ticks, travel=%d ticks at %.2f m/s along %v, then %d ticks stationary"
 		% [SETTLE_TICKS, TRAVEL_TICKS, TRAVEL_SPEED, TRAVEL_DIRECTION, COAST_TICKS])
-	var ok := leaves > 0 and moving == leaves and lagging == leaves
-	print("HAIRLAG_%s leaf_chains=%d moving=%d lagging=%d worst_wobble=%.3f"
-		% ["OK" if ok else "FAIL", leaves, moving, lagging, worst_wobble])
+	print("THRESHOLDS min_deviation=%.4f min_prominence=%.2f bob_retention>=%.2f (<=%.2f at depth 0) max_self_gain=%.2f max_wobble=%.3f lag_window=%d"
+		% [MIN_DEVIATION, MIN_PROMINENCE, MIN_BOB_RETENTION, MAX_BOB_RETENTION,
+		   MAX_SELF_GAIN, MAX_WOBBLE, LAG_WINDOW])
+	var ok := leaves > 0 and passing == leaves
+	print("HAIRLAG_%s leaf_chains=%d passing=%d bob_retention=%.0f%%..%.0f%% worst_self_gain=%.2f worst_wobble=%.3f"
+		% ["OK" if ok else "FAIL", leaves, passing,
+		   worst_retention * 100.0, best_retention * 100.0, worst_self_gain, worst_wobble])
 	if DisplayServer.get_name() == "headless":
 		get_tree().quit(0 if ok else 1)
