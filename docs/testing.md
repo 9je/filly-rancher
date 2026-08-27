@@ -93,43 +93,79 @@ it at all) and observing tests execute and report correctly.
 
 ---
 
-## Quirk: GUT's classes need one Godot import pass after being installed
+## Quirk / invariant: GUT can exit 0 having run zero tests
 
-**Symptom:** immediately after `tools/setup_env.sh` installs/updates GUT
-(or on a fresh checkout with no `game/.godot/` import cache yet — that
-directory is gitignored, same as the `.glb` import-cache quirk documented
-in `docs/pipeline.md` §7), running `tools/run_tests.sh` prints:
+**GUT's own process exit code is not trustworthy on its own.** Its CLI
+entry script calls `quit(0)` — success — in more than one situation where
+it actually executed zero tests. Two confirmed:
 
-```
-ERROR: Some GUT class_names have not been imported.  Please restart the Editor or run godot --headless --import
-Missing class_names:  ["GutErrorTracker", "GutHookScript", ... "GutTest", ...]
-```
+1. **Import cache not populated yet.** Immediately after
+   `tools/setup_env.sh` installs/updates GUT (or on a fresh checkout with
+   no `game/.godot/` import cache yet — that directory is gitignored, same
+   root cause as the `.glb` import-cache quirk documented in
+   `docs/pipeline.md` §7), running the suite prints:
 
-**The dangerous part:** GUT's own entry script calls `quit(0)` in this
-exact branch — i.e. Godot's process exit code is **0**, indistinguishable
-from "all tests passed," even though zero tests actually ran. A naive
-`bash tools/run_tests.sh && echo tests passed` would lie.
+   ```
+   ERROR: Some GUT class_names have not been imported.  Please restart the Editor or run godot --headless --import
+   Missing class_names:  ["GutErrorTracker", "GutHookScript", ... "GutTest", ...]
+   ```
+   and still exits 0.
 
-**Fix, one-time per fresh checkout / per GUT install:**
+   **Fix, one-time per fresh checkout / per GUT install:**
+   ```bash
+   tools/bin/godot --headless --path game --import
+   ```
+   (~5-6s; safe to re-run, and harmless/idempotent afterward — it also
+   reimports any converted `.glb` assets present, same command the
+   `--editor --quit-after 60` workaround in `docs/pipeline.md` §7 is an
+   alternative to.)
+
+2. **No test scripts matched.** `-gdir` pointing at an empty or
+   nonexistent directory — a future path typo, an emptied `game/test/`, a
+   renamed test file — prints:
+   ```
+   ERROR: Nothing was run.
+   On the one hand nothing failed, on the other hand nothing did anything.
+   ```
+   and still exits 0.
+
+Enumerating each such message as it's discovered is a losing game — the
+next unknown variant that produces zero executed tests would slip through
+the same way a bare `bash tools/run_tests.sh && echo tests passed` did for
+both cases above. Instead, **`tools/run_tests.sh` enforces the invariant
+directly: a real GUT run always ends with a `Totals` summary block
+containing a `Tests   <N>` line, the count of tests it actually executed
+(pass or fail). The script parses that count out of GUT's captured output
+and hard-fails — regardless of GUT's own exit code — if it is zero or the
+line can't be found at all.** This subsumes both cases above and any other
+zero-tests-executed failure mode, known or not, in one check. The known
+causes above are still grepped for afterward, but only to attach a better
+diagnostic message to the failure — that string-matching is no longer what
+stands between a real problem and a false pass.
+
+This is the same "never let a success claim outrun what was actually
+verified" discipline `tools/setup_env.sh`'s `SOURCEIO_OK`/`GUT_INSTALL_OK`
+marker gates follow (see `docs/pipeline.md` §1) — a previous review caught
+this codebase's setup script claiming success on an unverified step, and a
+later review caught this harness doing the same thing (grepping for one
+known failure string instead of asserting the actual invariant), so this
+harness does not repeat either mistake.
+
+**Testing the guard itself, safely.** `tools/run_tests.sh` reads a
+`GUT_TEST_DIR` env var (default `res://test`) so the zero-tests-ran guard
+can be exercised against a bogus directory without touching the real
+`game/test/`:
 
 ```bash
-tools/bin/godot --headless --path game --import
+GUT_TEST_DIR="res://nonexistent_test_dir_xyz" bash tools/run_tests.sh
 ```
-
-(~5-6s; safe to re-run, and harmless/idempotent afterward — it also
-reimports any converted `.glb` assets present, same command the `--editor
---quit-after 60` workaround in `docs/pipeline.md` §7 is an alternative to.)
-
-**`tools/run_tests.sh` does not trust GUT's exit code blindly for this
-specific case** — it captures GUT's combined output and greps it for the
-`have not been imported` marker, hard-failing with a clear message and
-non-zero exit even though GUT itself reported `0`, rather than silently
-reporting success with zero tests run. This is the same "never let a
-success claim outrun what was actually verified" discipline
-`tools/setup_env.sh`'s `SOURCEIO_OK`/`GUT_INSTALL_OK` marker gates follow
-(see `docs/pipeline.md` §1) — a previous review caught this codebase's
-setup script claiming success on an unverified step, so this harness does
-not repeat that mistake.
+exits 1 with `Likely cause: no test scripts matched in
+'res://nonexistent_test_dir_xyz' ...` even though GUT itself reported exit
+0. The import-cache case (cause 1 above) was reproduced the same way but
+needs a *whole separate Godot project* with no import cache at all — an
+addon copied into a throwaway temp directory with a minimal
+`project.godot` and no prior `--import` pass — since the real project's
+`game/.godot/` is already populated and shared with other in-flight work.
 
 ---
 
