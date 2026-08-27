@@ -64,6 +64,12 @@ const CROSSHAIR_TOLERANCE_PX := 1.0
 ## Where the test wall is parked when it is meant to be out of the way.
 const WALL_AWAY := 200.0
 
+## Minimum pull-in, in metres, the headless collision check requires against the BEHIND
+## wall before it will call the probe "working". Same threshold and reasoning as
+## game/world/ranch.gd's MIN_CAMERA_PULL_IN: 0.5 m cannot be produced by float noise or a
+## grazing near-miss, only by the arm actually shortening itself against real geometry.
+const MIN_COLLISION_PULL_IN := 0.5
+
 ## Wall placements a pose can ask for.
 enum WallAt {
 	AWAY,    ## 200 m away: an open field.
@@ -140,6 +146,7 @@ func _ready() -> void:
 		await _settle()
 		_check_crosshair("headless")
 		_check_shoulder("headless")
+		await _check_collision_avoidance()
 		_finish()
 		return
 
@@ -253,6 +260,36 @@ func _check_shoulder(pose: String, obstructed: bool = false) -> void:
 	if arm_distance >= CameraRigScript.FADE_START:
 		_check("the aim ray clears the player's own body in pose '%s'" % pose,
 			clearance > PLAYER_CAPSULE_RADIUS)
+
+
+## THE CHECK THE HEADLESS RUN WAS MISSING: every check above it is agnostic to whether
+## the spring arm's own collision probe is even switched on. Confirmed directly --
+## setting CameraRig.probe_mask to 0 on this same scene still printed CAMERA_OK, exit 0,
+## because nothing headless ever asked the arm to prove it can pull itself in. The
+## offscreen `04_obstacle` render and game/world/ranch.gd's building probe both exercise
+## the real thing, but neither runs in the headless tier this project's CI-shaped gate
+## actually is.
+##
+## Parks the wall exactly where the offscreen `04_obstacle` pose does (WallAt.BEHIND) and
+## requires the arm to have pulled in well short of its rest length -- MIN_COLLISION_PULL_IN
+## cannot be produced by a probe that is disabled, masked wrong, or otherwise not firing;
+## a disabled probe leaves the arm sitting at exactly its rest length (hit == rest, pull_in
+## == 0), which is what the negative control (probe_mask = 0) actually measures. Restores
+## the wall to AWAY afterward so a check added below this one is not run against a stale
+## obstacle.
+func _check_collision_avoidance() -> void:
+	_place_wall(WallAt.BEHIND)
+	await _settle()
+	var arm: SpringArm3D = _rig.get_node("SpringArm3D")
+	var hit: float = arm.get_hit_length()
+	var rest: float = _rig.get_zoom_distance()
+	var pull_in: float = rest - hit
+	print("COLLISION hit=%.3f rest=%.3f pull_in=%.3f mask=%d min_required=%.2f"
+		% [hit, rest, pull_in, arm.collision_mask, MIN_COLLISION_PULL_IN])
+	_check("the spring arm's collision probe pulls it in against an obstacle",
+		pull_in >= MIN_COLLISION_PULL_IN)
+	_place_wall(WallAt.AWAY)
+	await _settle()
 
 
 ## Perpendicular distance from an infinite line to the player's vertical centre axis, in

@@ -46,6 +46,28 @@ func test_the_hud_scene_loads_and_carries_its_script() -> void:
 		"hud.tscn must have hud.gd attached -- a parse error leaves a bare CanvasLayer")
 
 
+## NOTHING ELSE IN THE PROJECT GATES THIS. The magic beam aims along
+## CameraRig.get_aim_ray() (game/actors/player/camera_rig.gd), which is projected
+## through the camera's SCREEN CENTRE -- and hud.gd draws the reticle at
+## `_crosshair.size * 0.5` (its `_draw_crosshair()`), the centre of the "Crosshair"
+## Control. Those two only agree because that Control is anchored to fill the whole
+## viewport (hud.tscn: anchors_preset=15, offsets zero) so ITS centre lands on the
+## viewport's. Nothing ties the two centres together at runtime; a single anchor/offset
+## edit on that one node would silently move the reticle off the aim ray while
+## game/scenes/test/camera_test.gd's own crosshair round-trip -- which only ever checks
+## the camera/projection half of that agreement, never the HUD's node layout -- stayed
+## green throughout. This is the other half.
+func test_the_crosshair_control_is_centred_on_the_viewport() -> void:
+	var crosshair: Control = _hud.get_node("Crosshair")
+	await wait_process_frames(1)
+	var viewport_centre: Vector2 = _hud.get_viewport().get_visible_rect().size * 0.5
+	var crosshair_centre: Vector2 = crosshair.global_position + crosshair.size * 0.5
+	assert_almost_eq(crosshair_centre.x, viewport_centre.x, 0.5,
+		"the crosshair control's centre must land on the viewport's horizontal centre")
+	assert_almost_eq(crosshair_centre.y, viewport_centre.y, 0.5,
+		"the crosshair control's centre must land on the viewport's vertical centre")
+
+
 func test_an_unbound_hud_reports_that_it_is_unbound() -> void:
 	# The important one. Standalone -- no Player anywhere -- the HUD must not pretend.
 	assert_null(_hud.get_beam(), "a HUD that found no beam must say so, not show a default")

@@ -313,3 +313,45 @@ func test_the_lens_sits_further_out_than_the_arm_in_open_space() -> void:
 	assert_gt(lens, arm, "the offset lens must be further from the pivot than the mount is")
 	assert_almost_eq(lens, sqrt(arm * arm + offset * offset), 0.01,
 		"the lens is the arm plus a perpendicular offset, so the three form a right angle")
+
+
+# --- SpringArm3D margin flip (MOUNT_MIN_Z) -------------------------------------------
+# The follow-up fix for a flip SpringArm3D's own margin math can cause: when it has a
+# hit nearer than SPRING_ARM_MARGIN (0.2 m), the arm leaves the mount at local z = (hit
+# distance - margin), which goes NEGATIVE -- through the pivot, to the FRONT of the
+# player, looking back through her own body. See camera_rig.gd's MOUNT_MIN_Z comment for
+# the full derivation and the throwaway scene (_proof_margin.gd, not kept in the tree)
+# that measured it: hit=0.05/0.10/0.15 m against margin=0.2 m left the mount at local z
+# -0.15/-0.10/-0.05 before this fix.
+
+func test_the_mount_never_flips_in_front_of_the_pivot_on_a_close_hit() -> void:
+	var rig := CameraRigScene.instantiate()
+	rig.default_pitch_deg = 0.0  # straight-on ray -- keeps the geometry simple
+	add_child_autofree(rig)
+
+	# A wall placed well inside SPRING_ARM_MARGIN (0.2 m) of the pivot -- the exact regime
+	# the reviewer measured the flip in (hit=0.05 m). Box is thin in Z, like
+	# game/scenes/test/camera_test.gd's own wall; its near face lands at exactly 0.05 m.
+	var wall := StaticBody3D.new()
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(12.0, 3.0, 0.3)
+	shape.shape = box
+	wall.add_child(shape)
+	add_child_autofree(wall)
+	wall.position = Vector3(0.0, 0.0, 0.05 + 0.15)
+
+	# Alternated rather than "N physics frames then 2 idle frames": SpringArm3D can run
+	# more than one physics tick per rendered frame (see camera_test.gd's _settle() doc,
+	# which was bitten by exactly this once already), so a fixed physics/idle split can
+	# land the read between the arm's last tick and this rig's next _process() clamp.
+	# Alternating guarantees an idle frame follows every physics tick actually taken.
+	var mount: Node3D = rig.get_node("SpringArm3D/CameraMount")
+	for i in range(10):
+		await wait_physics_frames(1)
+		await wait_process_frames(1)
+
+	assert_gt(mount.position.z, 0.0,
+		"the mount must never end up in front of the pivot (a negative local z)")
+	assert_almost_eq(mount.position.z, CameraRigScript.MOUNT_MIN_Z, 0.0001,
+		"a hit well inside the margin must clamp to exactly MOUNT_MIN_Z, not float past it")

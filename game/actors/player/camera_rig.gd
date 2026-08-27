@@ -157,8 +157,8 @@ const ZOOM_STEP := 0.5
 ## predates the ranch and builds its ground on the default layer still works.
 @export_flags_3d_physics var probe_mask := CollisionLayersScript.WORLD
 
-# SPRINGARM3D.MARGIN (0.2 m, set in camera_rig.tscn) IS LIVE, AND IT BECAME LIVE AS A
-# SIDE EFFECT OF THE SHOULDER OFFSET. Read this before touching either.
+# SPRINGARM3D.MARGIN IS LIVE, AND IT BECAME LIVE AS A SIDE EFFECT OF THE SHOULDER
+# OFFSET. Read this before touching either.
 #
 # It used to do nothing at all, and this comment used to say so at length: measured
 # against the ranch's own camera probe, `margin = 0.01` and `margin = 1.0` -- a value
@@ -184,6 +184,47 @@ const ZOOM_STEP := 0.5
 # it read 1.27 m. Same wall, same arm, same mask -- 0.2 m of margin that is now applied.
 # If a future change ever parents a Camera3D straight to this arm again, expect every one
 # of those numbers to jump back up, and expect no warning of any kind.
+#
+# NOW SCRIPT-OWNED (SPRING_ARM_MARGIN below), NOT LEFT IN camera_rig.tscn, and not just
+# for tidiness: it used to be the only collision-relevant property on this rig that
+# _ready() did not assign from a script-owned value (collision_mask does, from
+# `probe_mask`), which meant it was editable in the scene file with no gate watching it.
+# Worse, game/world/ranch.gd's own camera check (`pull_in >= MIN_CAMERA_PULL_IN`) can only
+# get GREENER as margin grows -- margin subtracts directly from where the arm leaves the
+# mount, so a margin regression (someone shrinking or dropping it) would never fail that
+# assertion; it would only ever make the barn shot creep back toward the pre-margin
+# close-up with nothing red anywhere. Reread as a constant here at least gives a future
+# editor one place that says "this number is load-bearing," even though no gate currently
+# asserts its value directly -- see MOUNT_MIN_Z below for the one thing that IS asserted
+# about its consequences.
+const SPRING_ARM_MARGIN := 0.2
+
+## THE FLIP THIS MARGIN CAN CAUSE, AND THE CLAMP THAT STOPS IT.
+##
+## SpringArm3D's own math, confirmed against the engine and not just reasoned about: when
+## it has a hit, it leaves the mount at local z = (hit distance - margin), not at the hit
+## distance itself. That is fine right up until something is nearer than `margin` -- an
+## overhang, an eave, a steep bank within SPRING_ARM_MARGIN (0.2 m) of the 1.45 m pivot --
+## at which point the subtraction goes NEGATIVE and drives the mount THROUGH the pivot to
+## the FRONT of the player, looking back through her own body. Measured directly with a
+## throwaway scene (game/scenes/test/_proof_margin.gd, not kept in the tree): hit distances
+## of 0.05 / 0.10 / 0.15 m against SPRING_ARM_MARGIN's 0.2 m left the mount at local z
+## -0.15 / -0.10 / -0.05 -- exactly the flip, and silent: nothing else in this rig or in
+## game/world/ranch.gd's camera probe would have noticed, because get_arm_distance() reads
+## a DISTANCE (`global_position.distance_to`), which is the same magnitude whether the
+## mount is 0.15 m behind the pivot or 0.15 m in front of it.
+##
+## It is narrow in every scene this project currently ships (the ranch's barn pulls the arm
+## in only to 0.55 m, nowhere near 0.2 m), which is exactly why it is the kind of bug that
+## survives review and then goes off in someone's hands months later. Clamped every frame,
+## right after the arm's own physics step positions the mount (see _process()) -- the same
+## timing _update_shoulder_offset() already depends on, for the same reason.
+##
+## 0.10 m, not 0.0 m: zero would stop the through-the-pivot flip but would still let the
+## near plane straddle or sit behind the pivot at the clamp boundary. 0.10 m is twice the
+## camera's default near-plane distance (0.05 m), the same "twice the near plane" reasoning
+## SHOULDER_SKIN below uses for the same reason.
+const MOUNT_MIN_Z := 0.10
 
 ## THE FIX FOR THE CLOSE-UP-INSIDE-THE-PONY BUG, and the reason SPRING_MIN's comment
 ## above says not to clamp the pull-in.
@@ -307,6 +348,22 @@ const SHOULDER_LIFT := 0.22
 ##
 ## 0.10 m is twice the camera's default near-plane distance, so the near plane clears the
 ## surface rather than straddling it.
+##
+## KNOWN LIMITATION, DOCUMENTED RATHER THAN FIXED: hugging a wall FLANK-ON collapses the
+## offset back to zero, and the "offset of zero" this file's design leans on so heavily
+## elsewhere (see the paragraph above, and FADE_START) is not free here the way it is at
+## a pull-in. At a pull-in the subject is fading or gone, so a centred camera has nothing
+## to aim through. Pressed flank-on against a wall, she is still fully drawn -- so a
+## collapsed offset restores exactly the bug this whole feature exists to fix: the
+## crosshair rests on her own body again, for as long as the flank-hug lasts. Measured,
+## not assumed -- the centre pixel in that pose is her body.
+##
+## The standard fix is mirroring to the free shoulder (probe the LEFT offset too when the
+## right one is blocked, and vice versa) so the camera only ever collapses when BOTH sides
+## are obstructed. It is deliberately deferred: it is a second probe and a side-selection
+## policy, not a one-line change, and "no shoulder swap" was already a considered decision
+## for the beam side (see SHOULDER_SIDE's comment) that a mirror would have to be threaded
+## through carefully rather than bolted on.
 const SHOULDER_SKIN := 0.10
 
 @onready var _spring_arm: SpringArm3D = $SpringArm3D
@@ -336,6 +393,7 @@ func _ready() -> void:
 	_spring_arm.rotation.x = deg_to_rad(_look_pitch)
 	_spring_arm.spring_length = SPRING_DEFAULT
 	_spring_arm.collision_mask = probe_mask
+	_spring_arm.margin = SPRING_ARM_MARGIN
 
 	# The shoulder probe reaches the full offset plus its clearance, and sees exactly what
 	# the arm sees: one exported mask decides what this whole rig can look through, so a
@@ -387,6 +445,9 @@ func _process(delta: float) -> void:
 		add_zoom_delta(-ZOOM_STEP)
 	if Input.is_action_just_pressed("zoom_out"):
 		add_zoom_delta(ZOOM_STEP)
+
+	# Corrects the arm's own placement BEFORE anything below reads it -- see MOUNT_MIN_Z.
+	_clamp_mount_margin()
 
 	# Both of these read where the spring arm ACTUALLY put the mount, which it decides in
 	# the physics step. Godot's main loop runs its physics ticks, then _process, then
@@ -556,6 +617,17 @@ func get_camera_distance() -> float:
 ## is actually beside the camera, and a gate wanting to prove the probe fired wants both.
 func get_shoulder_offset() -> Vector3:
 	return _camera.position
+
+
+## Stops SpringArm3D's own margin math from driving the mount through the pivot to the
+## front of the player. See MOUNT_MIN_Z for the full derivation and the measured numbers.
+##
+## SpringArm3D writes only `position.z` on its direct Node3D child every physics step (see
+## the class comment); `position.x`/`position.y` are never touched, so there is nothing
+## else here to clamp.
+func _clamp_mount_margin() -> void:
+	if _mount.position.z < MOUNT_MIN_Z:
+		_mount.position.z = MOUNT_MIN_Z
 
 
 ## Slide the lens off the pony's centre line by however much the current arm distance has
