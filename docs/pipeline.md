@@ -744,6 +744,21 @@ tools/bin/godot --headless --path game scenes/test/terrain_probe.tscn
 # -> LOADED <name>.glb pos=<Vector3> native_height=<n>   (one line per prop)
 # -> PONY twilight height=<n>
 # -> PROBE_OK count=<n>   exit 0
+
+# Registry/visuals path (Phase 1A task 3): builds all three ponies through
+# PonyRegistry -> PonyVisuals, the only sanctioned way to spawn one
+tools/bin/godot --headless --path game scenes/test/registry_gallery.tscn
+# -> BUILT <id> anim_ok=true hair_ok=true   (one line per pony)
+# -> REGISTRY_OK count=3   exit 0
+
+# Player controller (Phase 1A task 4): drives the player one second forward and
+# one second with no input at all, then gates on distance, heading, floor contact
+# and the animation state. Windowed, this is the scene you play to judge feel.
+tools/bin/godot --headless --path game scenes/test/playground.tscn
+# -> PLAYER drive dist=<m> travel=(x, y, z) speed=<m/s> on_floor=true clip=walk scale=<n>
+# -> PLAYER coast dist=<m> residual_speed=<m/s> y=<m> clip=idle
+# -> PLAYER_OK dist=<m>   exit 0
+# (a failing run prints PLAYER_FAILED plus one line naming each broken check)
 ```
 
 **Quirk: the first `.glb` import needs an editor pass before headless runs
