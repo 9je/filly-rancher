@@ -106,7 +106,15 @@ trap 'rm -rf "$WORKDIR"' EXIT
 ENGINE_LOG_UNIX="$WORKDIR/ranch_windows_run.log"
 ENGINE_LOG_WIN="Z:$(printf '%s' "$ENGINE_LOG_UNIX" | tr '/' '\\')"
 
-RUN_ARGS=(--log-file "$ENGINE_LOG_WIN")
+# --audio-driver Dummy unconditionally: this is a scripted, non-interactive run and
+# must never make noise on whatever machine runs it. --headless mode already implies
+# a dummy audio driver on its own, but --render mode does NOT pass --headless (it
+# needs a real display driver under xvfb-run to render anything) -- so without an
+# explicit flag here, --render would open a real audio device and play whatever the
+# scene plays (this is exactly how a Proton verification run once played Twilight's
+# capture voice line through real speakers/headphones unannounced). Placed before the
+# `--` separator below so it reaches the engine, not the game's own argv.
+RUN_ARGS=(--log-file "$ENGINE_LOG_WIN" --audio-driver Dummy)
 if [ "$MODE" = "headless" ]; then
   RUN_ARGS+=(--headless)
 else

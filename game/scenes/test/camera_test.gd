@@ -9,10 +9,13 @@ extends Node3D
 ## expected, not a bug -- see the task report for the same caveat's earlier appearance
 ## with terrain_probe.gd/model_gallery.gd).
 ##
-## Offscreen (`xvfb-run tools/bin/godot --path game scenes/test/camera_test.tscn`,
-## NOT `--headless`): runs the same assertions, then additionally drives the rig
-## through four named poses and saves one PNG per pose so the framing can actually be
-## looked at, not just asserted about:
+## Offscreen (`xvfb-run tools/bin/godot --path game --audio-driver Dummy
+## scenes/test/camera_test.tscn`, NOT `--headless` -- `--audio-driver Dummy` is
+## required here explicitly since --headless's usual dummy-audio side effect does not
+## apply without --headless itself; game/systems/audio_safety.gd mutes the Master bus
+## on its own as a backstop if it's ever left off): runs the same assertions, then
+## additionally drives the rig through four named poses and saves one PNG per pose so
+## the framing can actually be looked at, not just asserted about:
 ##   01_rest.png      -- default state: yaw 0, default pitch, default zoom, open field.
 ##   02_pitch_up.png  -- pitch driven to PITCH_MAX_DEG, the "looking up" clamp.
 ##   03_pitch_down.png-- pitch driven to the -60 degree clamp (looking down).

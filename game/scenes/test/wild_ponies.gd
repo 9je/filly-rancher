@@ -50,9 +50,10 @@ extends Node3D
 ##     arrives, every pony must actually be inside Pony.DETECTION_RADIUS of him. Without
 ##     that, "no BOLD pony reacted" could be passing because no pony could see anything.
 ##
-## OFFSCREEN RENDERING (`xvfb-run tools/bin/godot --path game
-## scenes/test/wild_ponies.tscn -- --screenshot-dir=<path>`, NOT `--headless`): runs the
-## same two phases and additionally saves PNGs of the herd wandering, a SHY pony
+## OFFSCREEN RENDERING (`xvfb-run tools/bin/godot --path game --audio-driver Dummy
+## scenes/test/wild_ponies.tscn -- --screenshot-dir=<path>`, NOT `--headless` --
+## `--audio-driver Dummy` is required explicitly here, see capture_test.gd's header for
+## why): runs the same two phases and additionally saves PNGs of the herd wandering, a SHY pony
 ## mid-gallop away from the player, and a CURIOUS pony walking up to him. Every
 ## assertion above is about numbers; whether she is facing the way she is running, and
 ## whether her hooves are on the ground rather than through it, is not something a

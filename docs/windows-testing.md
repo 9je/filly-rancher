@@ -163,6 +163,19 @@ tools/run_windows_build.sh --render
 tools/run_windows_build.sh --rebuild
 ```
 
+**This is always silent, in both modes.** The script passes `--audio-driver Dummy`
+to every run unconditionally, not just the headless one -- `--render` cannot use
+`--headless` (it needs a real display driver under `xvfb-run` to render anything),
+so unlike the headless case Godot's own `--headless`→dummy-audio-driver mapping does
+not cover it, and without an explicit flag `--render` would open a real audio
+device. This script is a scripted, non-interactive invocation and must never make
+noise on whatever machine runs it -- concretely, this scene plays Twilight's capture
+voice line the first time a pony is captured, and an earlier Proton verification run
+played it out loud through real speakers/headphones before this flag existed.
+`game/systems/audio_safety.gd` (an autoload) also mutes the Master bus on its own
+whenever it sees a `--screenshot...` arg, as a backstop in case a future invocation
+forgets the flag.
+
 The script:
 
 1. Installs Proton if it isn't already present (calls `tools/install_proton.sh`).

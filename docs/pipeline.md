@@ -739,7 +739,7 @@ the model root) and a `SECONDARY_MOTION_FILTERED n` line with a plausible bone
 count. Then run the lag scene against the new character:
 
 ```bash
-tools/bin/godot --headless --path game scenes/test/hair_lag_test.tscn -- character=<name>
+tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/hair_lag_test.tscn -- character=<name>
 ```
 
 Every hair chain it finds should appear in the `CHAIN` listing and every leaf
@@ -831,33 +831,33 @@ python3 tools/validate_gltf.py game/assets/converted/ponies/twilight.glb
 python3 tools/validate_gltf.py game/assets/converted/ponies/twilight.glb --require-anims
 
 # Gallery: loads every pony .glb in the folder, verifies skeleton + bone count
-tools/bin/godot --headless --path game scenes/test/model_gallery.tscn
+tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/model_gallery.tscn
 # -> LOADED <name>.glb skeleton=true bones=<n>   (one line per pony)
 # -> GALLERY_OK count=3   exit 0   (the three converted tier-a characters;
 #    the tier-c probe lives in probe/, not ponies/, so it is not counted)
 
 # Animated walk test: Twilight walks a 4-waypoint square using the 'walk' clip
-tools/bin/godot --headless --path game scenes/test/walk_test.tscn
+tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/walk_test.tscn
 # -> ANIMS ["gallop", "idle", "walk"]
 # -> WALK_OK laps_progress=<n>   exit 0
 
 # Baseline smoke test. NO LONGER the main scene -- since Phase 1A task 7 that is
 # world/ranch.tscn (§9). Still kept and still run: it is the one gate that proves the
 # engine boots with no content at all involved.
-tools/bin/godot --headless --path game scenes/test/smoke.tscn
+tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/smoke.tscn
 # -> SMOKE_OK renderer=forward_plus   exit 0
 
 # The ranch: the game's main scene. Terrain + homestead + herd, and every check
 # game/world/ranch.gd runs (player on the ground, props seated and collided, ponies
 # raycast onto real ground inside their zones, camera spring arm pulling in against
 # an actual building). Prints the marker ONLY if all of them held.
-tools/bin/godot --headless --path game world/ranch.tscn
+tools/bin/godot --headless --audio-driver Dummy --path game world/ranch.tscn
 # -> RANCH_OK ponies=8 props=33 assets=present   exit 0
 # (assets=absent + zero counts on a checkout that has not run the asset pipeline)
 
 # Hair follow-through: measures how far the mane/tail trail the body, against a
 # rigid-hair baseline, over a scripted start-and-stop (see docs/notes-hair-sim.md)
-tools/bin/godot --headless --path game scenes/test/hair_lag_test.tscn
+tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/hair_lag_test.tscn
 # -> CHAIN <tip> root=<..> joints=<n> leaf=<bool> stiffness=.. drag=.. gravity=..
 # -> HAIRLAG <tip> leaf trails body by +N ticks (+M ms) ...   (one line per chain)
 # -> HAIRLAG_OK leaf_chains=6 moving=6 lagging=6 worst_wobble=0.032   exit 0
@@ -865,21 +865,21 @@ tools/bin/godot --headless --path game scenes/test/hair_lag_test.tscn
 
 # Map-props probe (Task 8, §4): scatters every converted prop plus Twilight
 # on a grass ground plane
-tools/bin/godot --headless --path game scenes/test/terrain_probe.tscn
+tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/terrain_probe.tscn
 # -> LOADED <name>.glb pos=<Vector3> native_height=<n>   (one line per prop)
 # -> PONY twilight height=<n>
 # -> PROBE_OK count=<n>   exit 0
 
 # Registry/visuals path (Phase 1A task 3): builds all three ponies through
 # PonyRegistry -> PonyVisuals, the only sanctioned way to spawn one
-tools/bin/godot --headless --path game scenes/test/registry_gallery.tscn
+tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/registry_gallery.tscn
 # -> BUILT <id> anim_ok=true hair_ok=true   (one line per pony)
 # -> REGISTRY_OK count=3   exit 0
 
 # Player controller (Phase 1A task 4): drives the player one second forward and
 # one second with no input at all, then gates on distance, heading, floor contact
 # and the animation state. Windowed, this is the scene you play to judge feel.
-tools/bin/godot --headless --path game scenes/test/playground.tscn
+tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/playground.tscn
 # -> PLAYER drive dist=<m> travel=(x, y, z) speed=<m/s> on_floor=true clip=walk scale=<n>
 # -> PLAYER coast dist=<m> residual_speed=<m/s> y=<m> clip=idle
 # -> PLAYER_OK dist=<m>   exit 0
@@ -985,7 +985,7 @@ from where it left off rather than restarting.
 mkdir -p build
 tools/bin/godot --headless --path game --export-release "Linux"   ../build/filly-rancher-linux.x86_64
 tools/bin/godot --headless --path game --export-release "Windows" ../build/filly-rancher-windows.exe
-./build/filly-rancher-linux.x86_64 --headless
+./build/filly-rancher-linux.x86_64 --headless --audio-driver Dummy
 ls -la build/
 ```
 
@@ -1045,7 +1045,7 @@ shipped a build that loaded zero characters while printing a green marker (the
 step also runs the shipped binary under a virtual display and looks at the frames:
 
 ```bash
-xvfb-run -a ./build/filly-rancher-linux.x86_64 -- --screenshot-dir=/tmp/shots
+xvfb-run -a ./build/filly-rancher-linux.x86_64 --audio-driver Dummy -- --screenshot-dir=/tmp/shots
 ```
 
 (`--`, then `--screenshot-dir=`; `game/world/ranch.gd` reads it out of
@@ -1055,7 +1055,14 @@ wall (`04a`) and backed off from it (`04b`), and the barn at eye level —
 **from inside the `.pck`**, so a missing model, a missing
 material or a HUD whose script failed to pack shows up as a picture rather than
 as nothing at all. Note that it is `xvfb-run` **without** `--headless`: headless
-uses the dummy rasteriser and renders nothing.
+uses the dummy rasteriser and renders nothing. Because of that, `--headless`'s
+usual side effect of forcing the dummy *audio* driver does not apply here either —
+`--audio-driver Dummy` has to be passed explicitly, or this run (like every other
+non-interactive/scripted run of this game) would open a real audio device and,
+on this scene, could play Twilight's capture voice line out loud. (Belt-and-braces:
+`game/systems/audio_safety.gd`, an autoload, also mutes the Master bus on its own
+whenever it sees a `--screenshot...` arg, so forgetting this flag here no longer
+means an audible run.)
 
 ---
 

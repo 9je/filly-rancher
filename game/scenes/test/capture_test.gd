@@ -49,13 +49,25 @@ extends Node3D
 ## Verified against a deliberately broken build before it was trusted -- see the failure
 ## proof in the task report.
 ##
-## OFFSCREEN RENDERING (`xvfb-run -a tools/bin/godot --path game
+## OFFSCREEN RENDERING (`xvfb-run -a tools/bin/godot --path game --audio-driver Dummy
 ## scenes/test/capture_test.tscn -- --screenshot-dir=<path>`, NOT `--headless`): runs the
 ## same five phases and additionally saves PNGs THROUGH THE PLAYER'S OWN CAMERA, which is
 ## the only way to answer the questions no number here can: is the beam legible, and does
 ## a held pony sit at a sensible distance in front of the camera rather than clipping into
 ## it? Structural gates in this project have been green through an invisible character
 ## before (docs/pipeline.md section 7).
+##
+## `--audio-driver Dummy` is REQUIRED here, explicitly, and not merely implied by
+## `--headless` the way it is on every other gate: this scene is windowed/offscreen, not
+## headless (headless renders nothing to screenshot), so Godot's own
+## `--headless`->dummy-audio-driver mapping does not apply, and without this flag a run
+## opens a real audio device. This is the exact scene whose CAPTURE phase fires
+## game/actors/player/magic_beam.gd's first-capture voice line
+## (assets/audio/voice/twilight/greeting_01.wav) -- an automated Proton verification run
+## of this same mechanic once played that line out loud through real speakers/
+## headphones before this flag existed. game/systems/audio_safety.gd (an autoload) mutes
+## the Master bus on its own as a backstop whenever it sees a `--screenshot...` arg, in
+## case a future invocation forgets this flag.
 
 const PonyScene := preload("res://actors/pony/pony.tscn")
 const PonyScript := preload("res://actors/pony/pony.gd")

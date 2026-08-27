@@ -57,12 +57,17 @@ extends Node3D
 ## markers say they should be, so the strict version of the gate is the one that
 ## runs on the machine that can actually run it.
 ##
-## OFFSCREEN RENDERING. `xvfb-run tools/bin/godot --path game world/ranch.tscn --
-## --screenshot-dir=<path>` (NOT --headless) runs the same checks and then saves five
-## PNGs: the establishing shot, the view from the player's own eyes at spawn, a
-## spawn zone with ponies in it, the camera pressed against a building, and an
-## eye-level look at the barn for scale. Every check in this file is a number;
-## whether the place READS as a place is not something a number can answer.
+## OFFSCREEN RENDERING. `xvfb-run tools/bin/godot --path game --audio-driver Dummy
+## world/ranch.tscn -- --screenshot-dir=<path>` (NOT --headless) runs the same checks
+## and then saves five PNGs: the establishing shot, the view from the player's own
+## eyes at spawn, a spawn zone with ponies in it, the camera pressed against a
+## building, and an eye-level look at the barn for scale. Every check in this file is
+## a number; whether the place READS as a place is not something a number can answer.
+## `--audio-driver Dummy` is required explicitly here (not implied, since this run is
+## NOT --headless) -- this is the main scene, a captured pony here can fire the same
+## first-capture voice line scenes/test/capture_test.gd's header describes, and
+## game/systems/audio_safety.gd's Master-bus mute is a backstop, not a reason to skip
+## the flag.
 
 const LayersScript := preload("res://world/collision_layers.gd")
 const PropsScript := preload("res://world/props.gd")

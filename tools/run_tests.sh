@@ -8,6 +8,11 @@
 # res://test) -- exists mainly so this script's zero-tests-ran guard below
 # can be exercised against an empty/nonexistent directory without having to
 # touch the real game/test/ to prove it.
+#
+# --audio-driver Dummy is explicit and not just implied by --headless (which already
+# maps to it) so this stays quiet even if that mapping ever changes -- this is an
+# automated, non-interactive run and must never make noise on whatever machine runs
+# it. See docs/pipeline.md and the incident note in game/systems/audio_safety.gd.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
@@ -21,7 +26,7 @@ fi
 out="$(mktemp)"
 trap 'rm -f "$out"' EXIT
 
-tools/bin/godot --headless --path game \
+tools/bin/godot --headless --audio-driver Dummy --path game \
   -s addons/gut/gut_cmdln.gd \
   -gdir="$GUT_TEST_DIR" -gprefix=test_ -gsuffix=.gd \
   -gexit 2>&1 | tee "$out"

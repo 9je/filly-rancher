@@ -48,8 +48,14 @@ the `.exe`.
 `smoke_run.sh` launches the binary as:
 
 ```
-<binary> --headless --quit-after 600 --log-file ci_smoke_engine.log
+<binary> --headless --audio-driver Dummy --quit-after 600 --log-file ci_smoke_engine.log
 ```
+
+(`--audio-driver Dummy` is redundant here — `--headless` already forces it — kept
+explicit anyway so this line stays the "quiet form" to copy even in a context that
+doesn't use `--headless`. Every non-interactive/scripted invocation of this game is
+meant to be silent on principle, not just on CI runners that happen to have no audio
+hardware to be silent on.)
 
 and requires **both**:
 

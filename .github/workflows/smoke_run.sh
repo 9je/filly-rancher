@@ -62,7 +62,11 @@ echo "== running: $BIN --headless --quit-after 600 =="
 #                   stdout capture depends on handle inheritance from the parent shell;
 #                   the engine-written log does not. Both files are searched below, so
 #                   the marker is found if EITHER channel carries it.
-RUN=("$BIN" --headless --quit-after 600 --log-file "$ENGINE_LOG")
+# --audio-driver Dummy  Explicit and not just implied by --headless (which already maps
+#                   to it): CI runners are headless anyway so this is belt-and-braces,
+#                   but every non-interactive invocation of this game is meant to be
+#                   quiet on principle, and this script is the one both platforms share.
+RUN=("$BIN" --headless --audio-driver Dummy --quit-after 600 --log-file "$ENGINE_LOG")
 
 # `timeout` is coreutils; present on ubuntu-latest and in Git Bash on windows-latest.
 # Guarded rather than assumed -- if it is missing, --quit-after plus the job's
