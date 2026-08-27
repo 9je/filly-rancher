@@ -9,6 +9,8 @@ extends CharacterBody3D
 ##   state: int              -- current State enum value (read it; do not assign it).
 ##   captured() / escaped()  -- emitted around a beam hold, see SIGNALS below.
 ##   set_held(is_held: bool) -- the beam takes / releases physics control.
+##   get_held_seconds()      -- how long the current hold has lasted.
+##   notify_captured() / break_free() -- the beam telling her how the hold ended.
 ##
 ## NOTHING IN HERE KNOWS A CHARACTER'S NAME. Every behavioural difference between one
 ## pony and another comes out of the PonyData record handed to setup(): `personality`
@@ -49,11 +51,23 @@ extends CharacterBody3D
 ## roster edit and no Phase 3 rebalance can push a wild pony outside what an authored
 ## clip can depict -- the worst a wild `base_speed` can do is saturate a clamp.
 ##
-## SIGNALS. `captured()` fires when the beam has held this pony continuously for
-## `capture_seconds`; `escaped()` fires if the hold is released before that. Both are
-## emitted from set_held()/_state_held() rather than from Task 8's beam, so a pony's own
-## resistance stays a property of the pony. Task 8 owns what a capture then *does*
-## (inventory, effects, despawn); this file only reports that the hold lasted.
+## SIGNALS, AND WHO DECIDES A CAPTURE. `captured()` fires when a beam hold has become a
+## capture; `escaped()` fires when a held pony has broken free of one. Both are still
+## declared and emitted HERE -- they are statements about this pony, and a listener that
+## wants to react to one of them (an effect, a HUD, a later quest system) connects to the
+## pony, not to whatever grabbed her.
+##
+## What this file deliberately does NOT own is the DECISION. It used to: it ran its own
+## beam-hold timer against an exported `capture_seconds` and fired `captured()` itself
+## once the hold outlasted it. That was a second capture state machine sitting underneath
+## Task 8's, with a landmine default (`capture_seconds = 0` fired a capture on the first
+## held frame), and the two would have fought over what a hold means the first time the
+## beam wanted to tune it. It is gone. This file now only REPORTS -- that she is HELD,
+## and for how long (get_held_seconds()) -- and the magic beam
+## (game/actors/player/magic_beam.gd) decides when that hold becomes a capture or a
+## break-free, then says so through notify_captured() / break_free(). Note that
+## set_held(false) on its own is therefore silent: "the beam let go" is not by itself
+## either outcome, and the beam calls the matching method for the outcome it chose.
 ##
 ## COLLISION CAPSULE. Identical to the player's -- radius 0.42 m, height 1.30 m, centred
 ## at y=0.65 so the bottom sits on the hoof plane -- for the reasons written out in
@@ -71,9 +85,11 @@ const PonyDataScript := preload("res://systems/pony_data.gd")
 const PonyVisualsScript := preload("res://actors/pony/pony_visuals.gd")
 const PlayerScript := preload("res://actors/player/player.gd")
 
-## Emitted once the beam has held this pony for `capture_seconds` without letting go.
+## Emitted when a beam hold has become a capture -- i.e. when the beam calls
+## notify_captured(), immediately before it stores her record and frees this node.
 signal captured()
-## Emitted when a beam hold ends before `capture_seconds` has elapsed.
+## Emitted when a held pony breaks free -- i.e. when the beam calls break_free() because
+## she outlasted its struggle timer.
 signal escaped()
 
 enum State { IDLE, WANDER, GRAZE, FLEE, APPROACH, HELD }
@@ -167,11 +183,6 @@ const PLAYER_GROUP := &"player"
 ## instead (see _leash), so a herd stays where the map put it and no pony walks off the
 ## edge of the world while running away.
 @export var roam_radius := 8.0
-
-@export_group("Capture")
-## Seconds of unbroken beam hold before `captured()` fires. Exported so Task 8 can tune
-## the beam's feel (or set it to 0 for an instant capture) without editing this file.
-@export var capture_seconds := 2.0
 
 ## Current State. READ ONLY from outside -- transitions go through _transition_to(),
 ## which resets the state timer and runs the on-enter work for the new state. Assigning
@@ -306,11 +317,14 @@ static func flee_speed_for(base_speed: float) -> float:
 	return clampf(scaled, GaitScript.GALLOP_HANDOVER_SPEED, GaitScript.TOP_SKATE_FREE_SPEED)
 
 
-## The magic beam (Task 8) taking or releasing physics control of this pony. While held
-## she runs no steering, no gravity and no move_and_slide -- the beam writes her
-## transform directly. Releasing a hold that has not lasted `capture_seconds` emits
-## `escaped()` and drops her back into her routine (where she will immediately react to
-## a player still standing in her detection area).
+## The magic beam taking or releasing physics control of this pony. While held she runs
+## no steering, no gravity and no move_and_slide -- the beam writes her transform
+## directly. Releasing drops her back into her routine (where she will immediately react
+## to a player still standing in her detection area).
+##
+## SILENT ON PURPOSE, in both directions. "The beam let go" is not by itself a capture or
+## an escape -- the beam knows which of those just happened and says so with
+## notify_captured() / break_free(). See the SIGNALS section of the class comment.
 func set_held(is_held: bool) -> void:
 	if is_held:
 		if state == State.HELD:
@@ -322,10 +336,33 @@ func set_held(is_held: bool) -> void:
 
 	if state != State.HELD:
 		return
-	var got_away := _held_seconds < capture_seconds
 	_transition_to(State.IDLE)
-	if got_away:
-		escaped.emit()
+
+
+## How long the current (or most recent) beam hold has lasted, in seconds. Reset to zero
+## at the start of each hold. This is the whole of what this pony reports about a hold --
+## the beam reads it to run its struggle timer, and what counts as "too long" is the
+## beam's number, not hers, because it is a tuning knob for how the beam feels.
+func get_held_seconds() -> float:
+	return _held_seconds
+
+
+## The beam telling her the hold ended in a capture. Emits `captured()`; the beam then
+## stores her PonyData and frees this node, so this signal is a pony's last word.
+## Deliberately does NOT itself release the hold or free anything -- what a capture DOES
+## is the beam's business (see magic_beam.gd), this only reports that it happened.
+func notify_captured() -> void:
+	captured.emit()
+
+
+## The beam telling her she outlasted its struggle timer: she wins, physics control comes
+## back to her, and `escaped()` fires. A no-op if she is not currently held, so a beam
+## that has already let go for another reason cannot double-report an escape.
+func break_free() -> void:
+	if state != State.HELD:
+		return
+	set_held(false)
+	escaped.emit()
 
 
 func _physics_process(delta: float) -> void:
@@ -429,13 +466,11 @@ func _state_approach() -> Vector3:
 	return _leash(toward.normalized()) * _wander_speed
 
 
-## The beam owns her transform. All this does is count how long the hold has lasted and
-## fire `captured()` once, when it has lasted long enough.
+## The beam owns her transform. All this does is count how long the hold has lasted, for
+## get_held_seconds() to report. No threshold, no signal, no second capture rule: the one
+## that decides what a hold of this length means lives in the beam.
 func _state_held(delta: float) -> void:
-	var was_short := _held_seconds < capture_seconds
 	_held_seconds += delta
-	if was_short and _held_seconds >= capture_seconds:
-		captured.emit()
 
 
 # --- transitions ------------------------------------------------------------------

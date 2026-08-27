@@ -12,8 +12,15 @@ extends GutTest
 ## Division of labour with wild_ponies.tscn: that scene is the integration gate (a real
 ## seeded herd, real detection areas, real animation clips, checked in bulk); this file
 ## covers the rules underneath it plus the two things the scene cannot reach -- GRAZE,
-## which a three-second routine window cannot be relied on to contain, and the
-## captured()/escaped() signals, which need a beam and there is not one until Task 8.
+## which a three-second routine window cannot be relied on to contain, and the hold
+## reporting, which no wandering herd ever exercises.
+##
+## The hold tests below are written against the Task 8 ownership split: a pony REPORTS a
+## hold (State.HELD, get_held_seconds()) and the magic beam DECIDES what it means, saying
+## so with notify_captured() / break_free(). They are deliberately paranoid about the
+## thing this file used to do instead -- fire captured() off its own capture_seconds
+## timer -- because that was a second capture state machine underneath the beam's, and
+## the check that it is really gone is a check that nothing happens.
 ##
 ## Preloads by path rather than the global class_name, matching the convention
 ## documented at the top of game/scripts/pony_rig.gd.
@@ -271,34 +278,86 @@ func test_being_held_turns_her_physics_off_so_the_beam_owns_her() -> void:
 	assert_almost_eq(pony.get_ground_speed(), 0.0, 0.001, "and must not steer herself")
 
 
-func test_releasing_a_short_hold_lets_her_escape() -> void:
+func test_a_held_pony_reports_how_long_the_hold_has_lasted() -> void:
+	# This is now the WHOLE of what she contributes to a capture: a clock the beam reads.
+	# Pinned because the beam's struggle timer is built on it -- a get_held_seconds()
+	# stuck at zero would make every pony unescapable and no other check would notice.
 	var pony := _spawn(PonyDataScript.Personality.SHY, 3.0, Vector3.ZERO)
-	pony.capture_seconds = 10.0
+	assert_almost_eq(pony.get_held_seconds(), 0.0, 0.0001, "nobody is holding her yet")
+
+	pony.set_held(true)
+	await wait_physics_frames(30)
+	var elapsed: float = pony.get_held_seconds()
+	assert_almost_eq(elapsed, 0.5, 0.1,
+		"30 physics frames of hold is about half a second (got %.3f)" % elapsed)
+
+	# A fresh grab is a fresh hold, or the second pony you pick up would inherit the
+	# first one's struggle clock and break free instantly.
+	pony.set_held(false)
+	pony.set_held(true)
+	assert_almost_eq(pony.get_held_seconds(), 0.0, 0.0001, "a new hold restarts the clock")
+
+
+func test_letting_go_of_a_held_pony_is_silent() -> void:
+	# The capture-ownership split: set_held(false) means only "the beam stopped writing
+	# her transform". Whether that was a capture or an escape is the beam's call, made
+	# through notify_captured()/break_free(), and this file must not guess at it -- it
+	# used to, via a capture_seconds timer of its own, and that was a second capture
+	# state machine underneath the beam's.
+	var pony := _spawn(PonyDataScript.Personality.SHY, 3.0, Vector3.ZERO)
 	watch_signals(pony)
 	pony.set_held(true)
 	await wait_physics_frames(10)
 	pony.set_held(false)
 
-	assert_signal_emitted(pony, "escaped", "a hold broken early must report an escape")
-	assert_signal_not_emitted(pony, "captured", "...and must not report a capture")
+	assert_signal_not_emitted(pony, "escaped", "letting go is not by itself an escape")
+	assert_signal_not_emitted(pony, "captured", "...nor by itself a capture")
 	assert_eq(pony.state, PonyScript.State.IDLE, "she drops back into her routine")
 
 
-func test_holding_her_long_enough_captures_her_exactly_once() -> void:
+func test_break_free_reports_an_escape_and_hands_her_physics_back() -> void:
 	var pony := _spawn(PonyDataScript.Personality.SHY, 3.0, Vector3.ZERO)
-	pony.capture_seconds = 0.1
 	watch_signals(pony)
 	pony.set_held(true)
-	await wait_physics_frames(40)
+	await wait_physics_frames(10)
+	pony.break_free()
 
-	assert_signal_emit_count(pony, "captured", 1,
-		"captured() fires once when the hold outlasts capture_seconds, not once per frame")
+	assert_signal_emit_count(pony, "escaped", 1, "breaking free reports exactly one escape")
+	assert_signal_not_emitted(pony, "captured")
+	assert_eq(pony.state, PonyScript.State.IDLE, "and she is steering herself again")
+
+	# A beam that has already let go for another reason must not be able to report a
+	# second escape for the same pony.
+	pony.break_free()
+	assert_signal_emit_count(pony, "escaped", 1, "break_free() on a free pony is a no-op")
+
+
+func test_notify_captured_reports_a_capture_and_nothing_else() -> void:
+	var pony := _spawn(PonyDataScript.Personality.SHY, 3.0, Vector3.ZERO)
+	watch_signals(pony)
+	pony.set_held(true)
+	await wait_physics_frames(5)
+	pony.notify_captured()
+
+	assert_signal_emit_count(pony, "captured", 1, "the beam's capture is reported once")
 	assert_signal_not_emitted(pony, "escaped")
+	assert_eq(pony.state, PonyScript.State.HELD,
+		"notify_captured() reports; the beam is still holding her until it frees her")
 
-	# Releasing after a capture is not an escape.
-	pony.set_held(false)
-	assert_signal_not_emitted(pony, "escaped",
-		"letting go of an already-captured pony must not report an escape")
+
+func test_no_capture_fires_on_its_own_however_long_the_hold_lasts() -> void:
+	# The landmine this refactor removed: an exported capture_seconds defaulting low (or
+	# to 0) fired captured() from the pony's own _physics_process, so a beam that merely
+	# picked her up had already "captured" her before it decided anything.
+	var pony := _spawn(PonyDataScript.Personality.SHY, 3.0, Vector3.ZERO)
+	watch_signals(pony)
+	pony.set_held(true)
+	await wait_physics_frames(120)
+
+	assert_signal_not_emitted(pony, "captured",
+		"a pony must never declare her own capture, no matter how long the hold runs")
+	assert_signal_not_emitted(pony, "escaped")
+	assert_gt(pony.get_held_seconds(), 1.5, "...while still reporting the hold honestly")
 
 
 # --- helpers ------------------------------------------------------------------------

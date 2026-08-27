@@ -8,6 +8,7 @@ extends CharacterBody3D
 ## Scene contract other tasks depend on -- do not rename these:
 ##   `CameraPivot` (Node3D)  -- Task 5 mounts the SpringArm3D camera rig here.
 ##   `get_beam_origin()`     -- Task 8 anchors the magic beam at the returned node.
+##   `get_magic_beam()`      -- Task 8's beam, and through it the capture storage.
 ##   `Player` / `player.tscn` -- instanced by the ranch map in Task 7.
 ##
 ## WHY THE BODY NEVER ROTATES AND THE VISUALS DO.
@@ -120,6 +121,7 @@ const ANIM_BLEND := 0.2
 @onready var camera_pivot: Node3D = $CameraPivot
 @onready var visuals: Node3D = $Visuals
 @onready var beam_origin: Node3D = $Visuals/BeamOrigin
+@onready var magic_beam: Node3D = $MagicBeam
 
 var _anim: AnimationPlayer
 var _visual_yaw := 0.0
@@ -142,6 +144,15 @@ func get_beam_origin() -> Node3D:
 ## character's facing -- see the class comment.
 func get_camera_pivot() -> Node3D:
 	return camera_pivot
+
+
+## The magic beam (Task 8), and through `get_storage()` on it, everything the player has
+## caught. A sibling of `Visuals` rather than a child of it: the beam AIMS along the
+## camera's crosshair, never along her facing (see magic_beam.gd), so hanging it off the
+## yawing node would be actively misleading about where it points. Only `BeamOrigin` --
+## the horn the effect is DRAWN from -- lives under `Visuals`.
+func get_magic_beam() -> Node3D:
+	return magic_beam
 
 
 ## Ground speed right now, in m/s, ignoring vertical motion.
