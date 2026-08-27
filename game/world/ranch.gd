@@ -38,6 +38,13 @@ extends Node3D
 ##     above from going hollow.
 ##   * "the pen-plot clearing is clear" fails if a prop or a pony ends up in the
 ##     ground reserved for Phase 1B's plots.
+##   * "a save round-trips through the user:// filesystem" fails if a save cannot be
+##     written or cannot be read back with every field intact. It is here rather than only
+##     in the unit suite because this gate is the thing CI runs on real Windows and
+##     tools/run_windows_build.sh runs under Proton, and `user://` resolves to a completely
+##     different place on Windows (docs/windows-testing.md) through a differently
+##     implemented rename. The gate also PRINTS where the file landed, which is how that
+##     question gets an empirical answer on a machine nobody here can log into.
 ##   * "no pony is standing inside a prop" fails if a pony's own collision capsule
 ##     overlaps any prop's collider RIGHT NOW, checked by shape query rather than by
 ##     distance to a marker or a reroll history. The spawner's own prop-rejection
@@ -72,6 +79,9 @@ extends Node3D
 const LayersScript := preload("res://world/collision_layers.gd")
 const PropsScript := preload("res://world/props.gd")
 const GateWatchdogScript := preload("res://scripts/gate_watchdog.gd")
+const GameStateScript := preload("res://systems/game_state.gd")
+const SaveIOScript := preload("res://systems/save_io.gd")
+const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 
 ## Headless watchdog ceiling. A normal run (assets present) finishes in under 2s on
 ## this machine; 30s leaves a wide margin for a slower box while still failing in
@@ -116,6 +126,29 @@ const SEATING_TOLERANCE := 0.02
 ## pony by raycast is measurably different from placing her at y=0.
 const MIN_ZONE_RELIEF := 0.25
 
+## The save slot the GATE writes its round-trip probe into -- never the slot the game
+## plays in (GameState.DEFAULT_SLOT, 0), so running the gate can never touch a real ranch.
+##
+## The probe file is deliberately LEFT ON DISK afterwards rather than cleaned up. It is the
+## artefact that answers "where did `user://` actually resolve on this machine?", which is
+## the single highest-value cross-platform question in this phase: on Windows `user://`
+## lands in `%APPDATA%\Godot\app_userdata\Filly Rancher\`, a completely different place
+## from Linux's `~/.local/share/godot/app_userdata/Filly Rancher/`
+## (docs/windows-testing.md). The gate prints the globalized path of this file, so a
+## Proton or CI log says exactly where the engine put it, and the file itself can then be
+## found and read on the host filesystem.
+const GATE_SAVE_SLOT := 9
+
+## How close to the farmhouse door the player has to walk for the ranch to save, in
+## metres, and how far she has to walk back off before it will save again. The gap between
+## them is hysteresis: without it, standing in the doorway would save on every physics
+## frame -- 60 file writes a second, each one copying the previous save to a backup.
+##
+## 6 m is a little wider than the farmhouse's own footprint (6.6 x 5.6 m), so "go home" is
+## satisfied by walking up to the building rather than by finding an exact spot.
+const HOUSE_SAVE_RADIUS := 6.0
+const HOUSE_SAVE_REARM := 9.0
+
 @onready var terrain: StaticBody3D = $Terrain
 @onready var props: Node3D = $Props
 @onready var buildings: Node3D = $Buildings
@@ -127,6 +160,28 @@ const MIN_ZONE_RELIEF := 0.25
 var _screenshot_dir := ""
 var _rig: Node3D
 var _spring_arm: SpringArm3D
+
+## The GameState autoload (game/systems/game_state.gd), or null if it is not registered --
+## which is a failed check below, not something to crash on.
+var _game_state: Node
+
+## Whether a person is playing, as opposed to a gate/CI/screenshot run. Autosave and the
+## save-at-the-house trigger are enabled ONLY for this case: every automated run boots this
+## same main scene with the same autoloads, and a save on quit that did not ask this
+## question would end `bash tools/run_tests.sh` by overwriting the developer's ranch.
+var _interactive := false
+
+## Whether a save was found and loaded at boot. Printed, so a log says which world this is.
+var _save_loaded := false
+
+## How many owned ponies were put back into the saddlebag at boot. Printed rather than
+## only counted: "the save loaded" and "the ponies in it reached the bag" are two different
+## claims, and a restore that silently dropped them would satisfy the first one.
+var _restored_ponies := 0
+
+## False while the player is standing at the house, so the autosave fires once per visit
+## instead of once per physics frame. Re-armed when she walks HOUSE_SAVE_REARM away.
+var _house_armed := true
 
 ## Labels that were assigned to `checks` more than once. A Dictionary silently
 ## overwrites on a repeated key -- that is exactly the bug a reviewer proved live in
@@ -147,10 +202,17 @@ func _ready() -> void:
 		if arg.begins_with("--screenshot-dir="):
 			_screenshot_dir = arg.split("=")[1]
 
+	_interactive = DisplayServer.get_name() != "headless" and _screenshot_dir == ""
+
 	_rig = player.get_camera_pivot().get_node("CameraRig")
 	_spring_arm = _rig.get_node("SpringArm3D")
 
 	player.global_position = player_spawn.global_position
+
+	# BEFORE the spawner runs: a loaded save carries the seed the wild world was generated
+	# from, and applying it afterwards would mean the herd you come back to is not the herd
+	# you left.
+	_bind_game_state()
 
 	# The hand-built barn and farmhouse first: they are the map's only real buildings
 	# (game/world/building.gd says why), they exist on every checkout including CI,
@@ -169,7 +231,129 @@ func _ready() -> void:
 	for i in range(SETTLE_FRAMES):
 		await get_tree().physics_frame
 
+	# After the beam exists and the world has settled: put the ponies the player owned when
+	# she quit back into her saddlebag.
+	_restored_ponies = _restore_owned_ponies()
+
 	await _report(pony_count, prop_count)
+
+
+# --- saving and loading ----------------------------------------------------------------
+
+## Find the GameState autoload, load the play slot if there is one, and decide whether this
+## run is allowed to write anything.
+##
+## THE SEED IS PUSHED BOTH WAYS. A loaded save hands its `world_seed` to the spawner, so
+## coming back gives you the ranch you left. A run with NO save takes the spawner's own
+## exported default INTO the state, so the very first save records the seed the world was
+## actually generated with rather than a default that a later edit to spawner.tscn could
+## silently change out from under it.
+func _bind_game_state() -> void:
+	_game_state = get_node_or_null(^"/root/GameState")
+	if _game_state == null:
+		# Not fatal here -- it is a FAILED check in _report(), which is a better place for
+		# it than a crash during boot.
+		push_error("ranch: the GameState autoload is not registered; this session cannot save.")
+		return
+
+	_save_loaded = _game_state.load_from_slot()
+	if _save_loaded:
+		spawner.spawn_seed = _game_state.world_seed
+	else:
+		_game_state.world_seed = spawner.spawn_seed
+
+	# Every write -- the one at the house AND the one on quit -- pulls the live world in
+	# through this first. Without it, quitting would save whatever the state last happened
+	# to hold, which for a session that never walked home is an empty saddlebag.
+	_game_state.world_sync = Callable(self, "_sync_game_state")
+
+	# Only a person playing may write. See _interactive's comment.
+	_game_state.autosave_enabled = _interactive
+
+
+## Put the owned ponies back in the player's saddlebag after a load.
+##
+## Storage is fixed-capacity, so a save holding more ponies than the bag can carry cannot
+## be fully restored into it -- and that is exactly why _sync_game_state() below merges
+## rather than overwrites: a pony who did not fit must not be dropped from the save the
+## next time it is written. (Task 3's pens are where the ones that do not fit will
+## actually live; until there is somewhere else to put her, she stays in the file.)
+func _restore_owned_ponies() -> int:
+	if _game_state == null:
+		return 0
+	var beam: Node3D = player.get_magic_beam()
+	if beam == null:
+		return 0
+	var storage: Storage = beam.get_storage()
+	var restored := 0
+	for instance: PonyInstance in _game_state.get_ponies():
+		if not storage.store(instance):
+			break
+		restored += 1
+	return restored
+
+
+## Copy the live world back into the savable state, immediately before a write.
+##
+## MERGES rather than replaces the owned list: what is in the saddlebag right now, plus any
+## pony the state already knew about who is not in it (see _restore_owned_ponies). Replacing
+## outright would mean a save silently deleting every pony the bag could not hold.
+func _sync_game_state() -> void:
+	if _game_state == null:
+		return
+	var owned: Array[PonyInstance] = []
+	var seen := {}
+	var beam: Node3D = player.get_magic_beam()
+	if beam != null:
+		for instance: PonyInstance in beam.get_storage().contents():
+			owned.append(instance)
+			seen[instance.uid] = true
+	for instance: PonyInstance in _game_state.get_ponies():
+		if not seen.has(instance.uid):
+			owned.append(instance)
+	_game_state.set_ponies(owned)
+	_game_state.world_seed = spawner.spawn_seed
+
+
+## Save the ranch. Returns whether it landed. The live world is copied in by
+## GameState.save_to_slot() itself, through the `world_sync` Callable registered above --
+## deliberately not called here, so that this path and the save-on-quit path cannot drift
+## apart into "one of them syncs and the other does not".
+func save_game() -> bool:
+	if _game_state == null:
+		return false
+	return _game_state.save_to_slot()
+
+
+## Save when the player comes home, and on nothing else.
+##
+## THE HOUSE IS THE SAVE POINT because it is the one place on this map that already means
+## "you". Hysteresis (HOUSE_SAVE_RADIUS vs HOUSE_SAVE_REARM) is what makes it one save per
+## visit instead of one per frame -- standing in the doorway at 60 fps would otherwise
+## rewrite the file, and its backup, sixty times a second.
+##
+## Gated on `_interactive` twice over (here and in GameState.autosave_enabled): a gate run
+## teleports the player around the map to probe the camera, and one of those poses is a
+## metre from a building. An autosave that fired on that would be a gate overwriting a real
+## save.
+func _physics_process(_delta: float) -> void:
+	if not _interactive or _game_state == null:
+		return
+	var house := get_node_or_null(^"Buildings/Farmhouse") as Node3D
+	if house == null:
+		return
+	var gap := Vector2(player.global_position.x - house.global_position.x,
+		player.global_position.z - house.global_position.z).length()
+	if gap > HOUSE_SAVE_REARM:
+		_house_armed = true
+		return
+	if gap > HOUSE_SAVE_RADIUS or not _house_armed:
+		return
+	_house_armed = false
+	var ok := save_game()
+	var hud := get_node_or_null(^"HUD")
+	if hud != null and hud.has_method("toast"):
+		hud.toast("Ranch saved" if ok else "SAVE FAILED -- see the log")
 
 
 # --- the gate -----------------------------------------------------------------------
@@ -380,6 +564,23 @@ func _report(pony_count: int, prop_count: int) -> void:
 			beam != null and hud.get_capacity() == beam.get_storage().capacity
 				and hud.get_capacity() > 0)
 
+	# --- saving --------------------------------------------------------------------
+	# THE CHECK THAT EARNS ITS PLACE IN THIS GATE. `user://` resolves somewhere completely
+	# different on Windows than on Linux (docs/windows-testing.md), the directory does not
+	# pre-exist, and the rename that publishes a save is implemented differently on the two
+	# platforms. None of that is visible in a unit test on the developer's machine -- but
+	# this gate is ALSO run by CI on real Windows and by tools/run_windows_build.sh under
+	# Proton, and this check is what makes those runs answer "can this build actually write
+	# and re-read a save on that platform, in that filesystem" rather than only "does the
+	# scene graph build".
+	_set_check(checks, "the GameState autoload is mounted", _game_state != null)
+	var save_probe := _probe_save_round_trip()
+	print("RANCH save user_dir=%s file=%s wrote=%s reloaded=%s loaded_at_boot=%s owned=%d restored=%d"
+		% [OS.get_user_data_dir(), save_probe["path"], save_probe["wrote"],
+			save_probe["reloaded"], _save_loaded,
+			_game_state.pony_count() if _game_state != null else -1, _restored_ponies])
+	_set_check(checks, "a save round-trips through the user:// filesystem", save_probe["ok"])
+
 	# --- the camera ---------------------------------------------------------------
 	_set_check(checks, "the camera probes the world, not just layer 1",
 		_spring_arm.collision_mask == LayersScript.WORLD)
@@ -453,6 +654,52 @@ func _report(pony_count: int, prop_count: int) -> void:
 	# Windowed, no screenshot directory: this is somebody playing the game. Leave it
 	# running. (An exported build launched by CI passes --headless and quits above;
 	# --quit-after bounds it either way.)
+
+
+## Write a save into the gate's own scratch slot, read it back with a SECOND, independent
+## GameState, and report whether every field came back.
+##
+## {ok, wrote, reloaded, path}. Never touches the slot the game plays in.
+##
+## A SEPARATE GameState ON EACH SIDE, not the autoload: reading back into the live state
+## would overwrite whatever the player just loaded, and reading back into the SAME object
+## that wrote it would pass even if the file on disk were empty -- the values would still
+## be sitting in memory. Two objects and one file is what makes this measure the
+## filesystem instead of measuring a dictionary.
+##
+## The probe pony is a real PonyInstance round-tripped through PonyInstance.to_dict(), so
+## this exercises the actual serialisation path the player's ponies use, not a toy payload.
+func _probe_save_round_trip() -> Dictionary:
+	var path: String = ProjectSettings.globalize_path(SaveIOScript.slot_path(GATE_SAVE_SLOT))
+	var result := {"ok": false, "wrote": false, "reloaded": false, "path": path}
+
+	var writer: Node = GameStateScript.new()
+	writer.bits = 1234
+	writer.world_seed = spawner.spawn_seed
+	writer.plots = {"0": "gate_probe"}
+	writer.unlocks = ["gate_probe"]
+	writer.add_pony(PonyInstanceScript.from_dict({
+		"uid": "gate_probe#000001", "data_id": "twilight",
+		"nickname": "Probe", "happiness": 0.625, "hunger": 0.375, "caught_at_ms": 1772150400000,
+	}))
+	result["wrote"] = writer.save_to_slot(GATE_SAVE_SLOT)
+	writer.free()
+
+	var reader: Node = GameStateScript.new()
+	result["reloaded"] = reader.load_from_slot(GATE_SAVE_SLOT)
+	if result["reloaded"]:
+		var ponies: Array = reader.get_ponies()
+		result["ok"] = bool(result["wrote"]) \
+			and reader.bits == 1234 \
+			and reader.world_seed == spawner.spawn_seed \
+			and String(reader.plots.get("0", "")) == "gate_probe" \
+			and ponies.size() == 1 \
+			and String(ponies[0].uid) == "gate_probe#000001" \
+			and ponies[0].nickname == "Probe" \
+			and absf(ponies[0].happiness - 0.625) < 0.0001 \
+			and ponies[0].caught_at_ms == 1772150400000
+	reader.free()
+	return result
 
 
 ## Everything solid the layout put on the map: the Kenney props and the two

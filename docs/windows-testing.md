@@ -42,7 +42,10 @@ on the owner's machine, on demand, and needs Proton installed once
    black, or mistextured.
 3. **Where Godot's `user://` resolves on Windows**, which nothing before this
    tier had ever actually checked (see below) — the single highest-value
-   thing to nail down before Phase 1B adds save files.
+   thing to nail down before Phase 1B adds save files. As of Phase 1B Task 2
+   this is no longer inferred from a log file that happened to be there: the
+   ranch gate itself now writes a real save, reads it back, and prints where it
+   landed, so every run of this tier answers the question directly.
 
 ## What this tier does NOT prove
 
@@ -248,3 +251,54 @@ i.e. inside the Wine prefix, `%APPDATA%` resolved (verified directly via
   a bug report from the friend** without first asking them to paste the
   output of a `%APPDATA%`-based path, or have the game print
   `OS.get_user_data_dir()` somewhere visible/logged.
+
+## Confirmed with an actual save file (Phase 1B Task 2)
+
+The section above worked out where `user://` goes by finding Godot's own engine
+log inside the prefix. Saves are now checked directly, by the game, on every run
+of this tier: `game/world/ranch.gd`'s gate writes a save into a reserved scratch
+slot (slot 9 — never the slot the game plays in), reads it back with a second,
+independent `GameState`, compares every field, and prints the resolved path.
+`bash tools/run_windows_build.sh` printed, from the exported `.exe` running
+under Proton:
+
+```
+RANCH save user_dir=C:/users/steamuser/AppData/Roaming/Godot/app_userdata/Filly Rancher
+  file=C:/users/steamuser/AppData/Roaming/Godot/app_userdata/Filly Rancher/saves/slot_9.json
+  wrote=true reloaded=true loaded_at_boot=false owned=0
+RANCH_OK ponies=8 props=33 assets=present
+```
+
+and the file was there on the host filesystem afterwards, at exactly the path
+this doc predicted:
+
+```
+~/.cache/filly-rancher-protonprefix/pfx/drive_c/users/steamuser/AppData/Roaming/
+  Godot/app_userdata/Filly Rancher/saves/slot_9.json
+```
+
+with the same human-readable, sorted, `"version": 1` JSON the Linux build
+writes — the save format is byte-for-byte the same shape on both platforms,
+which is what makes the spec's "trade a pony by sending each other a blob" work
+between the Linux owner and the Windows friend.
+
+**The second run is the interesting one.** Running it again exercises the path
+Windows and Linux genuinely differ on: publishing a save over one that already
+exists. Godot's `DirAccess.rename` is an atomic `rename()` on POSIX, but on
+Windows it *removes* the destination first and then renames. The second Proton
+run left both files in place —
+
+```
+slot_9.json        344 bytes
+slot_9.json.bak    344 bytes
+```
+
+— i.e. the overwrite worked and `SaveIO`'s backup (which exists specifically to
+cover that Windows remove-then-rename window, see the class comment in
+`game/systems/save_io.gd`) was written where it should be.
+
+**Still true, and worth repeating:** the path is per-user and per-machine.
+`steamuser` is Proton's fixed in-prefix username; the friend's machine will use
+their own. Nothing in save/load code constructs this path — everything goes
+through `user://`, and the gate prints `OS.get_user_data_dir()` so a bug report
+can just quote the log.

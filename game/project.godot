@@ -13,9 +13,21 @@ config/features=PackedStringArray("4.5", "Forward Plus")
 ; call AudioStreamPlayer.play() -- see the script's own header comment for the
 ; incident this backstops and why the trigger condition is what it is. Does nothing
 ; during genuine interactive play (no --screenshot* arg, not headless).
+;
+; GameState (game/systems/game_state.gd): the savable world -- owned ponies, wallet,
+; plots, unlocks, world seed -- plus the save/load calls that put it on disk through
+; game/systems/save_io.gd. An AUTOLOAD rather than a node in ranch.tscn because the state
+; has to outlive the scene: the first time there is a barn interior or a shop, a state
+; owned by the ranch would be destroyed by walking through a door. Its _ready() also loads
+; res://data/ponies ONCE and injects it into PonyInstance's resolver, so nothing lazily
+; loads a second copy of the same authored roster behind it.
+; It does NOT write anything by itself: autosave is off until a scene turns it on (see
+; game/world/ranch.gd), so gates, the exported smoke run and `bash tools/run_tests.sh`
+; cannot overwrite a real save just by booting the main scene.
 [autoload]
 
 AudioSafety="*res://systems/audio_safety.gd"
+GameState="*res://systems/game_state.gd"
 
 [rendering]
 renderer/rendering_method="forward_plus"

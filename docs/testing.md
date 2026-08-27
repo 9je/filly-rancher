@@ -16,10 +16,15 @@ Headless GDScript unit testing for this project, via
 bash tools/run_tests.sh
 ```
 
-Runs every `game/test/test_*.gd` script headlessly through GUT's CLI runner
-and exits with GUT's own exit code: **0** if every test passed, **non-zero**
-if any test failed (or if GUT itself errored). Output names every failing
-test and the line it failed at. This is the one command every later
+Runs every `game/test/test_*.gd` script headlessly through GUT's CLI runner:
+**0** if every test passed, **non-zero** if any test failed (or if GUT itself
+errored). Output names every failing test and the line it failed at.
+
+**Exit 0 means more than GUT's own exit code**, which has twice now reported
+success for a run that verified far less than it claimed. On top of GUT's
+result the script hard-fails if zero tests ran, if any `test_*.gd` file on disk
+was not executed, or if the test count fell below a floor — see the three
+invariant sections below. This is the one command every later
 gameplay task's tests run through — add new test files under `game/test/`
 following GUT's default naming convention (`test_*.gd`, one `test_*()`
 method per case) and they are picked up automatically, no registration
@@ -169,7 +174,87 @@ addon copied into a throwaway temp directory with a minimal
 
 ---
 
-## Quirk / gotcha 2: ~19 failing tests (not zero) after a fresh checkout or an asset regen
+## Quirk / invariant 2: GUT silently SKIPS a test script that fails to parse
+
+**This is the same family of hole as the one above and it is not covered by it,
+because the number of tests that ran is not zero.** A test script with a parse
+error — a `preload` of a file that does not exist yet, a syntax error, a bad
+merge — never loads, so GUT never sees a `GutTest` in it. It logs a warning,
+runs the *other* scripts, and reports a clean sweep. Observed, verbatim, while
+writing Phase 1B Task 2 (two new test files, their implementations not written
+yet):
+
+```
+[WARNING]:  Ignoring script res://test/test_save_io.gd because it does not extend GutTest
+...
+Scripts              13
+Tests               149
+Passing Tests       149
+---- All tests passed! ----
+```
+
+exit code `0`. Twelve tests and two whole scripts had vanished from the suite
+while it claimed success.
+
+**The invariant with teeth is counting the files on disk.** Every
+`test_*.gd` in the test directory is a script GUT is supposed to run, so the
+`Scripts <N>` count in its Totals block must equal the number of files sitting
+there. `tools/run_tests.sh` compares the two and hard-fails on any shortfall,
+regardless of GUT's exit code, printing the `Ignoring script` / `Parse Error`
+lines as a diagnostic. This number maintains itself — adding a test file raises
+both sides at once — and it subsumes every skip cause, known or not, the same
+way the zero-tests guard subsumes every zero cause. (`-maxdepth 1`, matching
+GUT's own default of not descending into subdirectories without
+`-ginclude_subdirs`, which this script does not pass.)
+
+**And a floor on the test count**, for the half the script count cannot see: a
+file that still parses but has lost most of its tests (a mass rename, a bad
+merge, a `func test_x` that became `func x`). `MIN_TESTS` in
+`tools/run_tests.sh` — currently **194** — is a deliberate FLOOR rather than an
+exact count, so adding tests never breaks the build. Raise it when the suite
+grows; never lower it without saying in the same commit which tests went away
+and why.
+
+**Proving both guards, safely:**
+
+```bash
+# 1. Skipped-script guard: break a test script's syntax, then run the suite.
+printf '\nfunc test_broken() -> void:\n\tvar x = = 3\n' >> game/test/test_gait.gd
+bash tools/run_tests.sh    # exit 1
+git checkout game/test/test_gait.gd
+
+# 2. Test-count floor: FILLY_MIN_TESTS overrides it, so the guard can be
+#    exercised without deleting real tests.
+FILLY_MIN_TESTS=99999 bash tools/run_tests.sh   # exit 1
+```
+
+Both were run. Guard 1 printed, over the top of GUT's own
+`---- All tests passed! ----` and exit 0:
+
+```
+Scripts              14
+Tests               176
+---- All tests passed! ----
+ERROR: GUT ran 14 test script(s) but 15 test_*.gd file(s) exist in game/test/ --
+  1 script(s) were SILENTLY SKIPPED and their tests did not run. Failing
+  regardless of GUT's own exit code (0).
+  [WARNING]:  Ignoring script res://test/test_gait.gd because it does not extend GutTest
+```
+
+Guard 2 was proved the harder way as well, by renaming one real test method out
+of `test_gait.gd` so the file still parsed with one test fewer (the floor stood
+at 190 when this was run; four tests were added afterwards, hence 194 today):
+
+```
+Tests               189
+---- All tests passed! ----
+ERROR: GUT ran 189 tests, below this suite's floor of 190 -- tests have gone
+  missing. Failing regardless of GUT's own exit code (0).
+```
+
+---
+
+## Quirk / gotcha 3: ~19 failing tests (not zero) after a fresh checkout or an asset regen
 
 **This is the same root cause as cause 1 above (a Godot import cache that
 hasn't caught up), but it does NOT go through the zero-tests guard, because
@@ -225,4 +310,48 @@ restoring the cache) turns the suite green again.
 | `game/addons/gut/` | The GUT addon itself (gitignored, fetched by `tools/setup_env.sh`) |
 | `game/test/test_smoke.gd` | Harness smoke test — proves GUT reports failures with a non-zero exit, not just passes |
 | `tools/run_tests.sh` | Entry point: `bash tools/run_tests.sh` |
+| `tools/prove_atomic_save.sh` | Out-of-band proof that an interrupted save cannot destroy the previous one — see below |
+| `game/scripts/prove_atomic_save.gd` | The phases that script drives (seed / SIGKILL mid-write / verify) |
 | `tools/setup_env.sh` | Installs/pins GUT (`GUT_VER`/`GUT_SHA256`, near the SourceIO block) |
+
+---
+
+## Proving the atomic save (a thing a unit test cannot do)
+
+`game/systems/save_io.gd` promises that a save interrupted part-way through
+leaves the previous save intact, because the new state is written to a temp
+file and published with a rename. That promise is about what happens when the
+**process dies**, and a unit test cannot die — it can only decline to call
+`commit()`, which demonstrates the shape of the code rather than the behaviour
+of the filesystem. Both halves exist:
+
+* `game/test/test_save_io.gd` covers the in-process half (a staged write that
+  never commits; the live file byte-identical while a write is in flight; a
+  leftover temp file being inert; the backup holding the previous save).
+* `bash tools/prove_atomic_save.sh` covers the real half. It seeds a save,
+  starts writing a new one, and **SIGKILLs a real Godot process between
+  `stage()` and `commit()`** (`OS.kill(OS.get_process_id())` — no cleanup, no
+  destructors, no buffer flush), then loads the slot in a *third* process:
+
+  ```
+  PROOF kill staged=true -- SIGKILLing this process before commit()
+     (process died with rc=137 == 128+SIGKILL, as intended)
+  PROOF verify marker='OLD_SAVE' loaded_keys=7 intact=true temp_left=true backup_left=false
+  ATOMIC_SAVE_PROOF_OK
+  ```
+
+* `bash tools/prove_atomic_save.sh --negative-control` proves that proof can
+  fail. It applies the same interruption to a **naive** write — open the live
+  file (which truncates it on the spot), write half the new state, SIGKILL —
+  and requires the verify phase to catch it:
+
+  ```
+  ERROR: SaveIO.load: '...slot_0.json' is not a readable save file -- corrupt or
+    truncated (Unterminated string at line 2). It has been left on disk exactly as it is.
+  PROOF verify marker='' loaded_keys=0 intact=false
+  ATOMIC_SAVE_PROOF_NEGATIVE_CONTROL_OK
+  ```
+
+Everything it writes goes to `user://atomic_write_proof/`, never to the slot the
+game plays in. Both scripts pass `--audio-driver Dummy`, like every other
+automated run in this project.
