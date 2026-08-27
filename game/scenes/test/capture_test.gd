@@ -122,6 +122,8 @@ var _storage: Storage
 var _roster: Dictionary = {}
 var _screenshot_dir := ""
 var _checks: Dictionary = {}
+## Labels recorded more than once. Any entry here fails the whole gate -- see _record().
+var _duplicate_labels: Array[String] = []
 var _shot_index := 0
 
 
@@ -163,6 +165,7 @@ func _ready() -> void:
 	await _phase_escape()
 	await _phase_full_storage()
 	await _phase_prop()
+	await _phase_teardown()
 
 	_finish()
 
@@ -254,7 +257,7 @@ func _phase_escape() -> void:
 	_record("a held pony eventually wins her struggle", held_for > 0.0)
 	_record("...on her own personality's clock, not another's",
 		absf(held_for - expected) <= STRUGGLE_WINDOW)
-	_record("...and says so", escaped_reported[0])
+	_record("...and reports it as escaped()", escaped_reported[0])
 	_record("...and gets her physics back", pony.state != PonyScript.State.HELD)
 	_record("...and is still alive in the world (no pony ever dies)",
 		is_instance_valid(pony) and pony.is_inside_tree())
@@ -306,21 +309,29 @@ func _phase_full_storage() -> void:
 	var ghost: WeakRef = weakref(pony)
 	_beam.release()
 	_record("a full bag refuses the store", _storage.count() == count_before)
-	_record("...and says so", refused[0])
+	_record("...and reports it as capture_refused()", refused[0])
 	await _frames(3)
-	_record("...and the pony is still in the world", ghost.get_ref() != null
-		and is_instance_valid(pony) and pony.is_inside_tree())
-	_record("...and out of HELD, steering herself again", pony.state != PonyScript.State.HELD)
+	# `alive` is computed once and every later clause is guarded by it. On a build that
+	# WRONGLY freed her -- the exact bug this phase exists to catch -- the unguarded
+	# version crashed on the next line instead of reporting, so a broken build produced a
+	# short, confusing check list rather than a clear red one.
+	var alive: bool = ghost.get_ref() != null and is_instance_valid(pony) and pony.is_inside_tree()
+	_record("...and the pony is still in the world", alive)
+	_record("...and out of HELD, steering herself again",
+		alive and pony.state != PonyScript.State.HELD)
 
 	# She was floating when she was let go; gravity is hers again, so she comes down.
 	await _frames(45)
-	print("CAPTURE full_bag count=%d/%d refused=%s pony_alive=%s landed_y=%.3f" % [
-		_storage.count(), _storage.capacity, refused[0], is_instance_valid(pony),
-		pony.global_position.y])
-	_record("...and lands on the ground unharmed", absf(pony.global_position.y) < 0.05)
+	alive = ghost.get_ref() != null and is_instance_valid(pony) and pony.is_inside_tree()
+	print("CAPTURE full_bag count=%d/%d refused=%s pony_alive=%s landed_y=%s" % [
+		_storage.count(), _storage.capacity, refused[0], alive,
+		("%.3f" % pony.global_position.y) if alive else "<freed>"])
+	_record("...and lands on the ground unharmed",
+		alive and absf(pony.global_position.y) < 0.05)
 
 	await _shot("06_full_storage_dropped")
-	_park(pony)
+	if alive:
+		_park(pony)
 
 
 ## PROP. The part of the mechanic people play with for its own sake.
@@ -344,6 +355,43 @@ func _phase_prop() -> void:
 	await _frames(30)
 	_record("a released prop gets its physics back", not crate.freeze)
 	_record("...and is still in the world", is_instance_valid(crate) and crate.is_inside_tree())
+
+
+## TEARDOWN. The one exit from a hold that no other phase reaches: the beam going away
+## while it still has hold of somebody. A pony in HELD runs no gravity and no steering, so
+## a beam freed mid-hold leaves her suspended in the air with nothing left to release her.
+## Runs last, because it removes the beam from the tree.
+func _phase_teardown() -> void:
+	var pony := _spawn_pony(&"rainbowdash", PONY_SPOT)
+	await _aim_at_pony(pony, "teardown")
+	_beam.grab()
+	var acquired := await _wait_until_holding()
+	_record("the beam has hold of her before the tree comes apart", acquired)
+	await _frames(PULL_FRAMES)
+	var held_at: Vector3 = pony.global_position
+
+	# The beam vanishes out from under the hold -- a scene change, a despawned player.
+	var parent := _beam.get_parent()
+	parent.remove_child(_beam)
+	await _frames(3)
+
+	var alive: bool = is_instance_valid(pony) and pony.is_inside_tree()
+	_record("a beam removed mid-hold lets go of her", alive and pony.state != PonyScript.State.HELD)
+	_record("...leaving her alive in the world", alive)
+
+	# The check with the teeth: HELD is precisely the state in which she does not fall, so
+	# "she came down" is the difference between released and stranded.
+	await _frames(60)
+	alive = is_instance_valid(pony) and pony.is_inside_tree()
+	print("CAPTURE teardown held_at_y=%.3f state=%s alive=%s now_y=%s" % [
+		held_at.y, PonyScript.state_name(pony.state) if alive else "-", alive,
+		("%.3f" % pony.global_position.y) if alive else "<freed>"])
+	_record("...and falling under her own gravity again, not stranded mid-air",
+		alive and held_at.y > 0.5 and absf(pony.global_position.y) < 0.05)
+
+	# Put it back so the scene is not left with an orphaned node at quit. Re-entering the
+	# tree does not re-run _ready(), so the storage and its contents survive.
+	parent.add_child(_beam)
 
 
 # --- aiming ---------------------------------------------------------------------------
@@ -435,7 +483,30 @@ func _camera() -> Camera3D:
 	return _rig.get_node("SpringArm3D/Camera3D")
 
 
+## Record one check's verdict under `label`.
+##
+## THE DUPLICATE GUARD IS NOT DEFENSIVE PROGRAMMING, IT IS A BUG FIX. `_checks` is keyed by
+## label, so two checks sharing one meant the second silently OVERWROTE the first's verdict
+## and the total count came out one short. It happened: the ESCAPE phase's "did escaped()
+## fire?" and the FULL phase's "did capture_refused() fire?" were both labelled
+## "...and says so", so deleting `escaped.emit()` from pony.gd outright left this gate
+## printing CAPTURE_OK -- a green gate not measuring the thing it claimed to. Distinct
+## labels fix that instance; this guard is what stops the next one, because the next
+## "...and " continuation line is one copy-paste away and nothing else in the file would
+## notice.
+##
+## A collision is recorded as a FAILURE in its own right (and the loser is kept under a
+## suffixed key rather than dropped, so a run with a duplicate still reports both verdicts
+## instead of hiding one).
 func _record(label: String, passed: bool) -> void:
+	if _checks.has(label):
+		push_error("capture_test: DUPLICATE check label -- '%s'" % label)
+		_duplicate_labels.append(label)
+		var suffix := 2
+		while _checks.has("%s [dup %d]" % [label, suffix]):
+			suffix += 1
+		_checks["%s [dup %d]" % [label, suffix]] = passed
+		return
 	_checks[label] = passed
 
 
@@ -465,7 +536,16 @@ func _finish() -> void:
 			push_error("capture_test: FAILED check -- %s" % label)
 			all_ok = false
 
-	print("CAPTURE checks=%d shots=%d storage=%d/%d" % [
-		_checks.size(), _shot_index, _storage.count(), _storage.capacity])
+	# A duplicate label fails the gate outright, even if every verdict happened to be
+	# true: a gate that cannot say how many checks it ran, or which result belongs to
+	# which claim, is not reporting. See _record().
+	if not _duplicate_labels.is_empty():
+		push_error("capture_test: check labels must be unique -- duplicated: %s"
+			% ", ".join(_duplicate_labels))
+		all_ok = false
+
+	print("CAPTURE checks=%d shots=%d duplicates=%d storage=%d/%d" % [
+		_checks.size(), _shot_index, _duplicate_labels.size(), _storage.count(),
+		_storage.capacity])
 	print(("CAPTURE_OK " if all_ok else "CAPTURE_FAILED ") + "checks=%d" % _checks.size())
 	get_tree().quit(0 if all_ok else 1)

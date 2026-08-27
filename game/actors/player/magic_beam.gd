@@ -264,6 +264,31 @@ func _ready() -> void:
 	_hide_effect()
 
 
+## Hand back anything still in the beam when the beam itself goes away.
+##
+## THE ONE HOLD-EXIT NOTHING ELSE COVERED. A pony in State.HELD runs no gravity, no
+## steering and no move_and_slide -- pony.gd's HELD branch returns before all of it,
+## deliberately, so the beam can own her transform. If the beam (or the Player it hangs
+## off) is freed mid-hold -- a scene change, a despawn, a level reload -- nothing is left
+## to let go of her and she hangs in the air in HELD forever. She does not die, so the
+## project rule holds, but "stranded mid-air until the process ends" is not a state any
+## pony should be able to reach.
+##
+## Deliberately NOT release(): a tree being torn down is not the player deciding to
+## capture something, and quietly storing a record into a Storage that is about to be
+## collected would be a capture nobody asked for and nobody could see. She is simply
+## handed back to herself, wherever she was floating.
+func _exit_tree() -> void:
+	var body := _held
+	_held = null
+	_beaming = false
+	if body == null or not is_instance_valid(body):
+		return
+	_take_back_physics(body)
+	if body is PonyScript:
+		body.set_held(false)
+
+
 # --- public interface -----------------------------------------------------------------
 
 ## Switch the beam on. Acquisition happens on the next physics frame (the space-state
