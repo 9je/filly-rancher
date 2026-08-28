@@ -29,6 +29,7 @@ const ProductionScript := preload("res://systems/production.gd")
 const NeedsScript := preload("res://systems/needs.gd")
 const GameStateScript := preload("res://systems/game_state.gd")
 const SaveIOScript := preload("res://systems/save_io.gd")
+const StorageScript := preload("res://systems/storage.gd")
 const ZoneMarkerScript := preload("res://world/zone_marker.gd")
 const LayersScript := preload("res://world/collision_layers.gd")
 
@@ -366,6 +367,217 @@ func test_a_removed_resident_loses_her_body() -> void:
 	assert_not_null(pen.body_for(her.uid), "precondition: she has a body")
 	pen.remove_pony(her.uid)
 	assert_null(pen.body_for(her.uid), "a pony who moved out is not still standing there")
+
+
+# --- being caught is how a pony moves out ---------------------------------------------------
+#
+# THE SECOND PLAYTEST'S BUG, AND EVERY ASSERTION IT WOULD HAVE NEEDED. The owner beamed
+# ponies out of a pen and then could not put them back: "after i removed them they wouldnt
+# go back in", with a screenshot of ranch.gd's "She would not go in." toast. The cause was
+# that nothing evicted her. MagicBeam stored her record and freed her body; the pen kept her
+# on its roster with her home_slot still stamped, so the slot was spent forever, has_pony()
+# stayed true, and add_pony() refused her for the rest of the session.
+#
+# WHY THESE TESTS DRIVE `Pony.notify_captured()` RATHER THAN A REAL BEAM. That method IS the
+# beam's side of the contract -- magic_beam.gd's _settle_pony() stores her record, calls it,
+# and frees the body, in that order -- and it is the only part of a capture the pen is
+# entitled to know about. Driving a real beam would need a camera, a physics space and a
+# couple of hundred frames of aiming (that is what scenes/test/capture_test.tscn is for) and
+# would pin the beam's aiming rather than the pen's bookkeeping.
+
+
+func _penned(id: String, capacity := 2) -> Pen:
+	# IN TREE, unlike _pen(): the eviction rides on a resident BODY's own captured() signal,
+	# so it only exists where a body does.
+	var pen: Pen = PenScript.new()
+	pen.capacity = capacity
+	pen.slot_id = StringName(id)
+	add_child_autofree(pen)
+	return pen
+
+
+func _resident_body(pen: Pen, inst: PonyInstance) -> Node3D:
+	var body: Node3D = pen.body_for(inst.uid)
+	assert_not_null(body, "precondition: a resident of a pen on the map has a body")
+	return body
+
+
+## Do to the pen exactly what MagicBeam._settle_pony() does when a hold becomes a capture:
+## her record goes into the bag FIRST, then she reports the capture, then her body is freed.
+func _beam_her_out(pen: Pen, inst: PonyInstance, bag: Storage) -> void:
+	var body: Node3D = _resident_body(pen, inst)
+	assert_true(bag.store(inst), "precondition: the saddlebag has room for her")
+	body.notify_captured()
+	body.queue_free()
+
+
+func test_a_resident_caught_by_the_beam_stops_living_here() -> void:
+	var pen := _penned("slot_caught", 3)
+	var her := _instance("twilight")
+	assert_true(pen.add_pony(her), "precondition: she moved in")
+
+	_beam_her_out(pen, her, StorageScript.new(4))
+
+	assert_eq(pen.count(), 0, "catching her takes her off the roster")
+	assert_false(pen.has_pony(her.uid), "...there is no ghost of her left in the pen")
+	assert_null(pen.find_pony(her.uid), "...by any of the roster's own questions")
+	assert_eq(pen.ponies().size(), 0, "...including the copy a pen UI would be handed")
+	assert_null(pen.body_for(her.uid), "...and she is not still standing in the paddock")
+	assert_eq(String(her.home_slot), "",
+		"...and her address is cleared, so a save files her in the saddlebag")
+
+
+func test_a_caught_resident_can_be_penned_again_and_again() -> void:
+	# THE OWNER'S BUG, END TO END. Twice round the loop rather than once: a fix that cleared
+	# the roster but left something else behind -- a spent slot, a stale body, a production
+	# ledger entry -- can still pass a single lap.
+	var pen := _penned("slot_loop")
+	var her := _instance("twilight")
+	var bag := StorageScript.new(4)
+
+	for lap in range(2):
+		assert_true(pen.add_pony(her), "lap %d: she moves in" % lap)
+		assert_eq(pen.count(), 1, "lap %d: ...and the pen holds exactly her" % lap)
+		assert_eq(her.home_slot, &"slot_loop", "lap %d: ...at this address" % lap)
+		assert_not_null(pen.body_for(her.uid), "lap %d: ...with a body in the paddock" % lap)
+
+		_beam_her_out(pen, her, bag)
+		assert_eq(pen.count(), 0, "lap %d: catching her empties the pen" % lap)
+		assert_eq(bag.count(), 1, "lap %d: ...and she is in the saddlebag" % lap)
+		assert_eq(bag.release(), her, "lap %d: ...and out of it she comes again" % lap)
+
+
+func test_catching_a_resident_gives_her_slot_back_to_the_pen() -> void:
+	# THE OCCUPANCY HALF. The leak's most visible symptom was a pen that stayed full after
+	# you had emptied it -- a one-pony pen you could never use again.
+	var pen := _penned("slot_full", 1)
+	var her := _instance("twilight")
+	assert_true(pen.add_pony(her), "precondition")
+	assert_true(pen.is_full(), "precondition: one of one is full")
+
+	_beam_her_out(pen, her, StorageScript.new(4))
+
+	assert_false(pen.is_full(), "the slot she was using is free again")
+	assert_eq(pen.count(), 0, "...and the occupancy count is back where it started")
+	var somebody_else := _instance("fluttershy")
+	assert_true(pen.add_pony(somebody_else), "...so somebody else can have it")
+	assert_eq(pen.count(), 1, "...and exactly one pony lives here")
+
+
+func test_catching_a_resident_forgets_her_banked_gem_progress() -> void:
+	# Production's fractional-gem ledger is a process-wide static keyed by uid -- see
+	# test_a_pen_forgets_a_departed_ponys_production_progress. EVERY route out of the pen has
+	# to clear it, not only the one that calls remove_pony() by name, or the ledger leaks one
+	# entry per pony ever caught and a re-penned pony resumes a stranger's part-finished gem.
+	var pen := _penned("slot_ledger")
+	var her := _instance("twilight")
+	her.happiness = 1.0
+	pen.add_pony(her)
+	pen.tick(ProductionScript.PRODUCTION_PERIOD_SECONDS * 0.5)
+	assert_gt(ProductionScript.progress_of(her.uid), 0.0, "precondition: half a gem banked")
+
+	_beam_her_out(pen, her, StorageScript.new(4))
+
+	assert_eq(ProductionScript.progress_of(her.uid), 0.0,
+		"being caught clears her ledger entry, exactly as walking out does")
+
+
+func test_a_pen_stops_ticking_a_resident_the_beam_took() -> void:
+	# The roster is what tick() walks, so a ghost would go on getting hungry and go on
+	# producing gems into this pen's tray while sitting in the player's saddlebag.
+	var pen := _penned("slot_tick")
+	var her := _instance("twilight")
+	her.happiness = 1.0
+	pen.add_pony(her)
+
+	_beam_her_out(pen, her, StorageScript.new(4))
+
+	var hunger_before: float = her.hunger
+	assert_eq(pen.tick(ProductionScript.PRODUCTION_PERIOD_SECONDS * 4.0), 0,
+		"a pony who has been caught produces nothing for the pen she left")
+	assert_almost_eq(her.hunger, hunger_before, 0.0001,
+		"...and does not get hungry on its clock either")
+
+
+func test_a_caught_resident_survives_a_save_and_load_as_a_pony_in_the_saddlebag() -> void:
+	# HER ADDRESS HAS TO BE COHERENT ACROSS THE WRITE, not merely in memory. Her record is
+	# the only place that address lives, and it is the SAME object that is now in the bag --
+	# so an eviction that had not cleared home_slot would have the next load post a pony who
+	# is in the saddlebag into a pen with no record of her.
+	var pen := _penned("slot_rt")
+	var her := _instance("twilight")
+	her.happiness = 0.8
+	pen.add_pony(her)
+	var bag := StorageScript.new(4)
+	_beam_her_out(pen, her, bag)
+
+	var writer: Node = autofree(GameStateScript.new())
+	writer.plots = {"slot_rt": "pen_small"}
+	for inst in bag.contents():
+		writer.add_pony(inst)
+	assert_true(writer.save_to_slot(SCRATCH_SLOT), "the save must land")
+
+	var reader: Node = autofree(GameStateScript.new())
+	assert_true(reader.load_from_slot(SCRATCH_SLOT), "...and load back")
+	var loaded: Array[PonyInstance] = reader.get_ponies()
+	assert_eq(loaded.size(), 1, "one pony came back")
+	assert_eq(loaded[0].uid, her.uid, "...and she is the same individual")
+	assert_eq(String(loaded[0].home_slot), "",
+		"...with no address, which is how ranch.gd knows to put her in the saddlebag")
+	assert_almost_eq(loaded[0].happiness, 0.8, 0.0001, "...in the state she was caught in")
+
+	# And the pen she was caught out of takes her back. That is the loop closing.
+	var rebuilt := _pen(2, "slot_rt")
+	assert_true(rebuilt.add_pony(loaded[0]), "she can move back into her old pen")
+	assert_eq(rebuilt.find_pony(her.uid).home_slot, &"slot_rt", "...at its address")
+
+	SaveIOScript.delete_slot(SCRATCH_SLOT)
+
+
+func test_a_resident_who_wriggles_out_of_the_beam_is_put_back_on_her_spot() -> void:
+	# THE OTHER HALF OF THE PLAYTEST NOTE -- "you can also catch things in there and have
+	# them wiggle out in there maiknng it unclear". A hold that does not end in a capture
+	# must change NOTHING: she is still a resident, and her body is back on her standing spot
+	# rather than left wherever the beam had floated her to -- which is in front of the
+	# player, and so usually outside her own fence, on the wrong side of a solid barrier and
+	# leashed to the middle of a pen she can no longer walk back into.
+	var pen := _penned("slot_wriggle")
+	var her := _instance("twilight")
+	pen.add_pony(her)
+	var body: Node3D = _resident_body(pen, her)
+	var spot: Vector3 = PenScript.resident_spot(0)
+
+	body.set_held(true)
+	await wait_physics_frames(2)
+	# Where a beam leaves her: floating well outside the fence, in front of the player.
+	body.position = Vector3(PenScript.HALF_EXTENT + 3.0, 1.6, 0.0)
+	body.break_free()
+	await wait_physics_frames(2)
+
+	assert_true(pen.has_pony(her.uid), "wriggling free does not move her out")
+	assert_eq(her.home_slot, &"slot_wriggle", "...and does not change her address")
+	assert_eq(pen.count(), 1, "...nor the pen's occupancy")
+	assert_almost_eq(Vector2(body.position.x, body.position.z).distance_to(
+		Vector2(spot.x, spot.z)), 0.0, 0.35,
+		"...and she is standing back on her own spot, inside her own fence")
+
+
+func test_a_resident_who_merely_wandered_is_left_where_she_wandered_to() -> void:
+	# THE GUARD ON THE TEST ABOVE. Putting a released pony back is deliberately NOT a
+	# containment net: a pen that teleported any stray resident home would make
+	# game/world/ranch.gd's boot-time containment probe green by lying to it, and that probe
+	# is what caught the leash-anchor bug this file's body tests now pin. Only a body this
+	# pen actually watched go INTO a beam is ever moved.
+	var pen := _penned("slot_wander")
+	var her := _instance("twilight")
+	pen.add_pony(her)
+	var body: Node3D = _resident_body(pen, her)
+
+	body.position = Vector3(PenScript.HALF_EXTENT + 3.0, 0.05, 0.0)
+	await wait_physics_frames(2)
+
+	assert_gt(Vector2(body.position.x, body.position.z).length(), PenScript.HALF_EXTENT,
+		"a resident who was never in a beam is left exactly where she got to")
 
 
 # --- persistence ------------------------------------------------------------------------

@@ -631,8 +631,14 @@ func _move_pony_into_pen(slot: PlotSlot) -> bool:
 
 	var instance: PonyInstance = storage.release()
 	if not pen.add_pony(instance):
-		# Belt and braces: the checks above should make this unreachable. If it ever is
-		# reached, she goes straight back in the bag rather than being dropped on the floor.
+		# Belt and braces -- and this branch was NOT unreachable, whatever this comment used
+		# to claim. Beaming a pony OUT of a pen left her on that pen's roster: the slot
+		# stayed spent, has_pony() stayed true, and every attempt to move her back in landed
+		# here, which is the "She would not go in." the second playtest reported. That leak
+		# is fixed at its source (game/world/pen.gd evicts a resident off her own captured()
+		# signal), so this is once again the guard it was meant to be rather than a symptom.
+		# It stays, because a pony taken out of the bag and refused with nowhere to go is a
+		# pony deleted by bookkeeping, and NO PONY EVER DIES covers that too.
 		storage.store(instance)
 		_toast("She would not go in.")
 		return false
