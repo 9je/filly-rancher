@@ -200,6 +200,114 @@ def _mix_base_socket(node):
     return (named or rgba or [None])[0]
 
 
+def _mix_top_socket(node):
+    """The 'on top' input of a Mix node -- the decal layer itself."""
+    rgba = [i for i in node.inputs if i.type == "RGBA"]
+    named = [i for i in rgba if i.name in ("B", "Color2")]
+    if named:
+        return named[0]
+    return rgba[1] if len(rgba) > 1 else None
+
+
+def _mix_factor_socket(node):
+    for name in ("Factor", "Fac"):
+        if name in node.inputs:
+            return node.inputs[name]
+    return None
+
+
+def _bake_decal_over_solid(nt, mix_node, base_rgba, decal_tex):
+    """Flatten `Mix(solid, decal_image)` into one opaque image, or None if it is not
+    that shape.
+
+    WHY THIS EXISTS: THE CUTIE MARKS WERE MISSING. Twilight, Rainbow Dash and
+    Fluttershy have no body texture at all -- the pack ships only Eye.png and
+    <XX>_CutieMark.png, and the body is a solid RGB with the mark alpha-composited on
+    top through a Mix node. glTF has no way to express colour-plus-decal in one
+    material, so _resolve_color() takes the underneath layer and the mark is simply
+    lost. docs/pipeline.md carried that as a known fidelity regression, to be fixed one
+    day by a Cycles bake.
+
+    It does not need a Cycles bake. The decal is sampled through the mesh's own active
+    UV map, exactly as a body texture would be, so compositing the two layers in UV
+    space is the identical operation Blender's shader performs per pixel, done once and
+    stored. No render, no bake settings, no lighting to get wrong: this is
+    `dst = base*(1-a) + decal*a`, in linear float, which is what a Mix node is.
+
+    Generic, not per-character: any material in any pack shaped as "flat colour with an
+    alpha decal over it" flattens the same way. The SFM packs need none of this, as
+    their marks are already painted into the body texture.
+
+    Returns a new TEX_IMAGE node, or None to leave the caller's behaviour unchanged.
+    """
+    import numpy as np
+
+    image = getattr(decal_tex, "image", None)
+    if image is None:
+        return None
+    width, height = image.size
+    if width <= 0 or height <= 0:
+        return None
+
+    # The mask. Two shapes are accepted and anything else bails out rather than
+    # guessing: the factor driven by the decal's own alpha (what these packs do), or a
+    # plain constant. A factor wired to something else is a material this function does
+    # not understand, and a wrong guess here repaints an entire pony.
+    factor_socket = _mix_factor_socket(mix_node)
+    factor_is_decal_alpha = False
+    constant_factor = 1.0
+    if factor_socket is None:
+        return None
+    if factor_socket.links:
+        from_node = factor_socket.links[0].from_node
+        from_socket = factor_socket.links[0].from_socket
+        # as_pointer(), NOT `is`. Every attribute access on a bpy collection builds a
+        # FRESH Python wrapper around the same underlying RNA data, so `from_node is
+        # decal_tex` is False even when both name the identical node -- which is exactly
+        # what it did here, silently sending every cutie mark down the bail-out path.
+        # Comparing the RNA pointers compares the things themselves.
+        if (from_node.as_pointer() == decal_tex.as_pointer()
+                and from_socket.name == "Alpha"):
+            factor_is_decal_alpha = True
+        else:
+            return None
+    else:
+        try:
+            constant_factor = float(factor_socket.default_value)
+        except (TypeError, ValueError):
+            return None
+
+    try:
+        src = np.empty(width * height * 4, dtype=np.float32)
+        image.pixels.foreach_get(src)
+    except (RuntimeError, ReferenceError, AttributeError):
+        return None  # image not loadable; caller keeps the flat colour
+    src = src.reshape(-1, 4)
+
+    mask = src[:, 3:4] if factor_is_decal_alpha else np.full((src.shape[0], 1),
+                                                             constant_factor,
+                                                             dtype=np.float32)
+    base = np.array(tuple(base_rgba)[:3], dtype=np.float32)
+    out = np.empty((src.shape[0], 4), dtype=np.float32)
+    out[:, :3] = base * (1.0 - mask) + src[:, :3] * mask
+    # Opaque by construction. The decal's alpha was a MASK for where the mark sits, not
+    # surface transparency, and letting it reach material alpha is the exact bug that
+    # once exported these ponies as a floating cutie mark and nothing else.
+    out[:, 3] = 1.0
+
+    baked = bpy.data.images.new("%s_baked" % image.name, width, height, alpha=False)
+    baked.colorspace_settings.name = image.colorspace_settings.name
+    baked.pixels.foreach_set(out.reshape(-1))
+    baked.pack()
+
+    node = nt.nodes.new("ShaderNodeTexImage")
+    node.image = baked
+    print("MAT bake %s: %dx%d decal '%s' over %s"
+          % (baked.name, width, height, image.name,
+             tuple(round(float(c), 3) for c in tuple(base_rgba)[:3])))
+    return node
+
+
 def _resolve_color(socket, depth=0):
     """Resolve a color socket to ('image', tex_node) or ('solid', rgba).
 
@@ -220,6 +328,16 @@ def _resolve_color(socket, depth=0):
         return "solid", tuple(src.outputs[0].default_value), False
     if src.type in ("MIX", "MIX_RGB"):
         kind, value, _ = _resolve_color(_mix_base_socket(src), depth + 1)
+        # A flat colour with an image decal over it is the cutie-mark case: flatten the
+        # two into one texture rather than dropping the decal. Anything else (a decal
+        # over a real body texture, a factor this cannot read) falls through to the
+        # underneath layer exactly as before.
+        if kind == "solid":
+            top_kind, top_value, _ = _resolve_color(_mix_top_socket(src), depth + 1)
+            if top_kind == "image":
+                baked = _bake_decal_over_solid(src.id_data, src, value, top_value)
+                if baked is not None:
+                    return "image", baked, True
         return kind, value, True
     if src.type in _COLOR_FILTERS and "Color" in src.inputs:
         return _resolve_color(src.inputs["Color"], depth + 1)
