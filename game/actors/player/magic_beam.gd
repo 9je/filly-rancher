@@ -791,9 +791,15 @@ func reach() -> float:
 ##
 ## Idempotent by being ABSOLUTE rather than incremental: each gear id sets its effect to
 ## the value that owning it means, so calling this twice (which Ranch does, once on boot
-## and again after every purchase) cannot stack a bonus or grow a bag twice. It also
-## means an unlock that somehow disappeared from the array takes its effect away with it,
-## which is what makes this safe to call with whatever GameState currently holds.
+## and again after every purchase) cannot stack a bonus or grow a bag twice.
+##
+## For THE REACH, absolute also means reversible: an unlock that disappeared from the array
+## takes its bonus away with it, so this is safe to call with whatever GameState currently
+## holds. The SADDLEBAG does not come back down, and deliberately: Storage.set_capacity()
+## refuses to shrink below the ponies already in the bag, because a capacity under the
+## contents would refuse every future store() while the bag sat over its own limit. A
+## revoked saddlebag would therefore have to decide which ponies to drop, and no pony ever
+## dies.
 func apply_unlocks(unlocks: Array) -> void:
 	if unlocks.has(String(GEAR_BIGGER_SADDLEBAG)):
 		_storage.set_capacity(BIGGER_SADDLEBAG_CAPACITY)

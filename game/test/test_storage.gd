@@ -180,3 +180,33 @@ func test_capacity_can_grow_but_never_below_what_is_held() -> void:
 	bag.set_capacity(1)
 	assert_eq(bag.capacity, 2, "shrinking below the contents is clamped to the contents")
 	assert_true(bag.is_full())
+
+
+
+## The HUD caches the capacity it bound to and rebuilds only on `changed`, so a bag that
+## grew in silence would print "n / 12" over an eighteen-slot saddlebag forever. The
+## no-op half is asserted just as hard, for the same reason the refused-store case above
+## is: a signal that fires when nothing moved is as useless to a listener as one that
+## does not fire when something did.
+func test_set_capacity_announces_a_real_change_and_only_a_real_change() -> void:
+	var bag = StorageScript.new(12)
+	watch_signals(bag)
+
+	bag.set_capacity(18)
+	assert_signal_emit_count(bag, "changed", 1, "growing the bag must announce itself once")
+
+	bag.set_capacity(18)
+	assert_signal_emit_count(bag, "changed", 1, "setting the capacity it already has is a no-op")
+
+	bag.store(_instance("twilight"))
+	assert_signal_emit_count(bag, "changed", 2, "...and a store still announces itself")
+
+	# One pony is in the bag now, so 1 is a legal capacity and the shrink to it is real.
+	# 0 is not: the clamp lifts it back to the 1 the bag already has, so nothing moves.
+	bag.set_capacity(1)
+	assert_eq(bag.capacity, 1)
+	assert_signal_emit_count(bag, "changed", 3, "shrinking to a REAL new value announces too")
+	bag.set_capacity(0)
+	assert_eq(bag.capacity, 1, "the clamp holds at the contents")
+	assert_signal_emit_count(bag, "changed", 3,
+		"a shrink the clamp swallowed moved nothing, so it must stay silent")

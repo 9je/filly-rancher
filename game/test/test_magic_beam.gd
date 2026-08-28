@@ -754,6 +754,9 @@ func test_unlocks_grow_the_saddlebag_and_the_reach() -> void:
 	assert_eq(beam.get_storage().capacity, MagicBeamScript.BIGGER_SADDLEBAG_CAPACITY)
 	assert_gt(beam.get_storage().capacity, base_capacity)
 	assert_almost_eq(beam.reach(), base_reach + MagicBeamScript.LONG_BEAM_BONUS, 0.0001)
+	# Without this the whole file passes on LONG_BEAM_BONUS := 0.0, which is a shop item that
+	# takes the player's money and does nothing.
+	assert_gt(MagicBeamScript.LONG_BEAM_BONUS, 0.0, "the upgrade must be felt")
 
 
 func test_unlocks_are_idempotent_and_unknown_ids_are_ignored() -> void:

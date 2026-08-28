@@ -224,3 +224,28 @@ func test_a_refused_store_does_not_change_what_the_hud_shows() -> void:
 		"the bag is full, so this store must be refused")
 	assert_eq(_hud.get_shown_rarities(), before,
 		"a refused capture must leave the pips exactly as they were")
+
+
+
+## THE BUG THIS PINS IS A LIE ON SCREEN, NOT A CRASH. The HUD caches its capacity at bind
+## time and rebuilds only on Storage.changed, and until the shop existed nothing could ever
+## change a bag's capacity after binding, so the cache was correct by construction. Buying
+## the saddlebag (MagicBeam.apply_unlocks) breaks that assumption: it grows the very
+## Storage this HUD is already holding. A HUD that kept the bound value would print
+## "n / 12" and draw twelve pips over an eighteen-slot bag, and game/world/ranch.gd's own
+## self check that the HUD shows the beam's real capacity would fail with it.
+func test_the_hud_follows_a_saddlebag_that_grew_after_binding() -> void:
+	var beam := _bind_to_a_fake_player(12)
+	await wait_process_frames(3)
+	assert_eq(_hud.get_capacity(), 12, "the HUD starts on the capacity it bound to")
+
+	# Exactly what buying the gear does to this object, and nothing else. No frame is
+	# awaited on purpose: set_capacity emits Storage.changed synchronously, so if the HUD
+	# has caught up by the next line it is because it is listening.
+	beam.storage.set_capacity(MagicBeamScript.BIGGER_SADDLEBAG_CAPACITY)
+	assert_eq(_hud.get_capacity(), MagicBeamScript.BIGGER_SADDLEBAG_CAPACITY,
+		"the HUD must follow a bag that grew, or ranch.gd's capacity self check fails")
+
+	var count: Label = _hud.get_node("Bag/Count")
+	assert_true(count.text.ends_with("/ %d" % MagicBeamScript.BIGGER_SADDLEBAG_CAPACITY),
+		"the readout must say the new capacity, not the bound one (it says '%s')" % count.text)

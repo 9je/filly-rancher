@@ -37,14 +37,26 @@ extends RefCounted
 ## pony it is responsible for putting back in the world. A store() that "failed" after
 ## already dropping the record on the floor would be exactly the leak the rule forbids.
 
-## Emitted whenever the contents actually change -- once per successful store(), once per
-## release() that returned a pony. Deliberately NOT emitted for a refused store or a
-## release from an empty bag: a listener redrawing a HUD on every call would otherwise
-## repaint on events where nothing moved, and "changed" would stop meaning changed.
+## Emitted whenever what a display of this bag would show actually changes: once per
+## successful store(), once per release() that returned a pony, and once per set_capacity()
+## that actually moved the capacity. Deliberately NOT emitted for a refused store, a
+## release from an empty bag, or a set_capacity() that resolved to the value already held:
+## a listener redrawing a HUD on every call would otherwise repaint on events where nothing
+## moved, and "changed" would stop meaning changed.
+##
+## CAPACITY IS PART OF THE ANNOUNCEMENT, not just the contents, and that is a fix rather
+## than a nicety. game/ui/hud.gd caches the capacity it binds to and rebuilds only on this
+## signal, so a saddlebag that grew silently would leave the HUD printing "n / 12" and
+## drawing twelve pips over a bag that holds eighteen, and game/world/ranch.gd's self check
+## that the HUD shows the beam's real capacity would fail.
 signal changed()
 
-## How many ponies fit. Read-only in practice; clamped at construction so a nonsense
-## value cannot make is_full() lie. Not `const` only because it is per-instance.
+## How many ponies fit. Clamped at construction so a nonsense value cannot make is_full()
+## lie. Not `const` only because it is per-instance, and no longer read-only either: the
+## shop's saddlebag gear grows a bag that is already in use, through set_capacity(), which
+## clamps in ONE direction only (never below the contents) and announces a real move on
+## `changed`. Write it through that function rather than assigning it, or every listener
+## keeps showing the old number.
 var capacity: int = 0
 
 ## Newest last. Never handed out directly -- see contents().
@@ -58,8 +70,17 @@ func _init(p_capacity: int) -> void:
 ## Grow (or shrink) the bag. Never below what it already holds: a capacity that dropped
 ## under the contents would make the next store() refuse while count() > capacity, a
 ## state no store ever produced. The saddlebag gear calls this.
+##
+## Emits `changed` when the capacity actually moves, and only then. A HUD that caches the
+## capacity has no other way to hear about a bag that grew mid-game; a no-op call (the
+## same number again, or a shrink the clamp swallowed) stays silent, for the same reason a
+## refused store() does.
 func set_capacity(new_capacity: int) -> void:
-	capacity = maxi(_items.size(), maxi(0, new_capacity))
+	var clamped := maxi(_items.size(), maxi(0, new_capacity))
+	if clamped == capacity:
+		return
+	capacity = clamped
+	changed.emit()
 
 
 ## Put `instance` in the bag. Returns false -- and changes nothing at all -- if the bag is

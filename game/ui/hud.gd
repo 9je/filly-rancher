@@ -279,6 +279,9 @@ func _bind() -> void:
 
 	_beam = beam
 	_storage = storage
+	# Seeded here and refreshed on every Storage.changed below, because the bag can GROW
+	# after binding: buying the shop's saddlebag calls Storage.set_capacity() on the very
+	# object this HUD is already holding.
 	_capacity = storage.capacity
 
 	# THE BINDING THE BRIEF ASKS FOR: the bag redraws when the bag changes, not once per
@@ -294,6 +297,10 @@ func _bind() -> void:
 
 
 func _on_storage_changed() -> void:
+	# Capacity first, and re-read rather than trusted from bind time: Storage.changed now
+	# fires for a bag that grew as well as for a bag that filled, and a stale _capacity
+	# would print "n / 12" and draw twelve pips over an eighteen-slot saddlebag.
+	_capacity = _storage.capacity
 	_rarities.clear()
 	for instance: PonyInstance in _storage.contents():
 		# Two separate nulls to survive, both reachable: a hole in the bag (which
