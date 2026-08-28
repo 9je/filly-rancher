@@ -277,6 +277,16 @@ const ANIM_BLEND := 0.2
 ## Downward speed cap, so a long fall cannot accumulate absurd velocity.
 const TERMINAL_VELOCITY := 25.0
 
+## Width of the band, in metres, over which the leash takes hold -- see _leash(), which
+## is where the reasoning lives. Derived from `roam_radius` rather than fixed, because a
+## penned pony's territory is about 2 m across and a wild one's is 8 m, and a band sized
+## for one is either useless or most of the other. Clamped at both ends: the floor keeps
+## it wide enough to be a ramp rather than a step for the smallest territory anyone might
+## author, and the ceiling stops a big territory from spending metres of itself braking.
+const LEASH_BAND_FRACTION := 0.15
+const LEASH_BAND_MIN := 0.25
+const LEASH_BAND_MAX := 0.80
+
 ## Nodes in a group with this name count as "the player" to DetectionArea, in addition
 ## to anything running player.gd. The group exists so a test scene (or a Phase 2 decoy)
 ## can stand in for the player without dragging the whole player.tscn -- camera rig and
@@ -688,28 +698,79 @@ func _pick_wander_target() -> Vector3:
 	return target
 
 
-## Keep `direction` from taking her further outside her roam circle. Inside the circle
-## it is returned untouched. Outside it, the outward component is removed, so she runs
-## along the boundary instead of over it -- and if the direction was straight out, with
-## nothing tangential left, she turns straight back toward home. This is what stops a
-## fleeing pony from running off the edge of the map: the leash bends her escape into an
-## arc around her territory rather than a straight line out of it.
+## Keep `direction` from taking her further outside her roam circle: the outward part of
+## where she wants to go is faded out as she nears the edge of her territory, removed
+## entirely at `roam_radius`, and reversed into a pull home once she is a band past it.
+## Whatever was tangential survives untouched and at its own length, so a direction with
+## any sideways component to it is bent into an arc around her territory rather than
+## reversed out of it. This is what keeps a fleeing pony from running off the map, and
+## what keeps a penned one inside her paddock.
+##
+## THE RETURNED VECTOR IS A STEERING VECTOR, NOT A HEADING: its length is between 0 and 1
+## and the callers multiply it by her speed, so shortening it is how she slows down. A
+## pony whose entire desire points straight out of her territory gets back a vector near
+## zero and simply stops at her boundary.
+##
+## --- WHY THIS IS A RAMP AND NOT A TEST ------------------------------------------------
+##
+## This is the fix for the third playtest's "as i type this ponies are standing in place
+## spazzing out", and the whole of the bug was that this function used to be
+## DISCONTINUOUS -- twice.
+##
+## It used to do nothing at all inside `roam_radius` and, one centimetre outside it, turn
+## a straight-out direction into `-outward`: a 180-degree reversal at full speed between
+## one frame and the next. A CURIOUS pony walking toward a player standing outside her
+## territory therefore drove at full speed into her own boundary, was flung back inside,
+## walked out again, and never stopped. Measured, before the fix, with the player parked
+## still: her velocity reversed 25 times in 240 physics frames while she covered a few
+## centimetres of ground, and her model whipped back and forth through most of a half-turn
+## about three times a second. That is precisely what "standing in place spazzing out"
+## looks like. A SHY pony fleeing a player who stood on her home did the same in mirror
+## image (30 reversals in 240 frames).
+##
+## It also used to NORMALIZE the leftover tangential component, which is the second
+## discontinuity and the reason the judder was not confined to the exactly-radial case:
+## a full-magnitude tangential push that flips sign as the wanted direction sweeps through
+## the outward ray makes that ray an attractor she can only oscillate about. Keeping the
+## component at its own length instead means the push fades smoothly to nothing as she
+## lines up with it, and she settles on it.
+##
+## So the property to preserve here is CONTINUITY: no hair's-breadth change in where she
+## stands, or in where she wants to go, may reverse where this sends her. A `distance >
+## roam_radius` test cannot have that property no matter what it returns, which is why the
+## radial term is a ramp across a band. game/test/test_pony_leash.gd measures both
+## continuities directly and fails on a jump of more than 0.05.
+##
+## SHE IS ALLOWED TO STOP, and that is a deliberate behaviour choice rather than a
+## side-effect. A pony whose only wish is to leave her territory now stands at the edge of
+## it -- a curious one watching the player from as close as she is willing to come, a
+## fleeing one cornered at the far side of her range -- instead of charging home and back
+## forever. Anything with a sideways component to it still arcs, which is the case that
+## reads as "she ran around rather than stopping" and is pinned by its own test.
 func _leash(direction: Vector3) -> Vector3:
 	var from_home := global_position - _home
 	from_home.y = 0.0
 	var distance := from_home.length()
-	if distance <= roam_radius or distance < 0.0001:
+	var band := _leash_band()
+	if distance <= roam_radius - band or distance < 0.0001:
 		return direction
 
 	var outward := from_home / distance
 	var outward_amount := direction.dot(outward)
 	if outward_amount <= 0.0:
+		# Already heading inward: the leash has no opinion about that, at any distance.
 		return direction
 
-	var tangential := direction - outward * outward_amount
-	if tangential.length_squared() < 0.0001:
-		return -outward
-	return tangential.normalized()
+	# 1.0 a full band inside the boundary (outward motion untouched), 0.0 at the boundary
+	# (outward motion removed), -1.0 a full band outside it (outward motion reversed into
+	# a pull home). Linear in between, so the field is continuous everywhere.
+	var allowed := clampf((roam_radius - distance) / band, -1.0, 1.0)
+	return direction - outward * (outward_amount * (1.0 - allowed))
+
+
+## Width of the leash's ramp, in metres, for this pony's territory. See LEASH_BAND_*.
+func _leash_band() -> float:
+	return clampf(roam_radius * LEASH_BAND_FRACTION, LEASH_BAND_MIN, LEASH_BAND_MAX)
 
 
 # --- detection --------------------------------------------------------------------
