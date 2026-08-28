@@ -45,10 +45,11 @@ extends CharacterBody3D
 ## in both:
 ##
 ##   SHY      hardest to REACH  -- notices from 14 m and bolts on sight (this file)
-##            easiest to HOLD   -- she freezes; 4.6 s of struggle (magic_beam.gd)
-##   CURIOUS  in between, and walks TOWARD you
+##            easiest to HOLD   -- she freezes; MagicBeam grades her EASY, a 1.0 s window
+##   CURIOUS  in between, and walks TOWARD you; graded MEDIUM, a 0.5 s window
 ##   BOLD     trivial to REACH  -- no reaction at all, walk right up to her
-##            hardest to HOLD   -- she is not scared, she is just not having it: 2.3 s
+##            hardest to HOLD   -- graded HARD: a 0.35 s window, and she is the only grade
+##            that can tear out of the beam BEFORE it secures her (see `beam_holds` below)
 ##
 ## Before it, both dials pointed the same way: SHY was the hardest to catch AND the
 ## easiest to reach, and BOLD -- who is the RARE pony -- was a free catch. The rarest pony
@@ -294,6 +295,27 @@ const PLAYER_GROUP := &"player"
 ## which resets the state timer and runs the on-enter work for the new state. Assigning
 ## to it directly would skip both.
 var state: int = State.IDLE
+
+## HOW MANY TIMES THE BEAM HAS HAD HOLD OF HER, counted for her whole life as a node.
+##
+## Owned here rather than in a dictionary inside the beam for one blunt reason: it dies
+## when she does. A per-pony counter kept on the grabber would have to be swept for freed
+## nodes, and the sweep is the bug. It is a plain public var rather than a setter pair
+## because it carries no rule of its own -- the rule that reads it is
+## MagicBeam.wrench_chance_for(), which is where "one place decides what a hold means"
+## still lives.
+##
+## WHAT IT IS FOR: a HARD pony (a BOLD one -- see the grading note above) has a chance to
+## tear out of the beam before it can secure her, and that chance falls off with every
+## previous grab until it reaches zero. She tires. This is the count that makes "she will
+## eventually let you catch her" a guarantee instead of a hope, so a gate that needs a hold
+## which CANNOT wrench sets this past MagicBeam.WRENCH_GRACE_HOLDS rather than reaching for
+## a test-only bypass.
+##
+## Deliberately NOT part of PonyInstance and NOT saved: it is fatigue inside one encounter,
+## not a fact about who she is. A pony let out of the bag comes back as a fresh node and
+## fights the beam like she did the first time.
+var beam_holds := 0
 
 @onready var visuals: Node3D = $Visuals
 @onready var detection_area: Area3D = $DetectionArea

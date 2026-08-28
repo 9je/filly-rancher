@@ -14,21 +14,38 @@ extends CanvasLayer
 ##     guess -- the centre of the SCREEN is several degrees off the centre of the
 ##     character. A reticle is the whole of the fix.
 ##
-##   THE STRUGGLE RING, AND THE SECURE ARC INSIDE IT. A capture is a contest between two
-##     clocks (magic_beam.gd's SECURE_SECONDS and STRUGGLE_*): the beam needs 1.15 s to
-##     subdue her, and she has 2.3 s (BOLD) / 3.0 s (CURIOUS) / 4.6 s (SHY) of fight in
-##     her. Let go inside the first and she slips out; hold past the second and she wins.
-##     BOTH of those have to be on screen or the mechanic is a coin toss:
-##       - the OUTER ring drains clockwise from full over her struggle time, green to red,
-##         so "she is about to win" is a shape rather than a number;
-##       - the INNER arc FILLS over the secure time, and the whole reticle snaps to a
-##         distinct colour and grows the instant it completes. That snap is the "let go
-##         NOW" cue, and it is deliberately a discontinuous change rather than a gradual
-##         one -- a player watching it in peripheral vision while a pony thrashes about in
-##         front of them needs an event, not a gradient.
-##     Before the ring was made to mean this, the outer countdown was drawn over a
-##     decision that had already been made: releasing at any moment stored her, so the
-##     timer was information about nothing.
+##   THE CATCH RING, AND THE WRIGGLE RING INSIDE IT. A capture is a race between two
+##     clocks (magic_beam.gd): the beam needs its subdue time to take her, and she has a
+##     struggle time of fight in her. Let go before the first and she slips out; let the
+##     second run out and she wins. BOTH have to be on screen or the mechanic is a coin
+##     toss, and which is which was rebuilt at the owner's direction after the third
+##     playtest -- "outer green circle should be your catch (release click when full) and
+##     maybe have the inside circle be red and be the wiggle out circle". It had been the
+##     other way round, with the countdown on the outside, and it read backwards: the ring
+##     you are trying to COMPLETE is the one your eye goes to first, and the eye goes to
+##     the big one.
+##       - the OUTER ring is GREEN and FILLS clockwise over the subdue time. It is the one
+##         you act on: let go when it closes. It is the thickest thing on the reticle.
+##       - the INNER ring is RED and DRAINS anticlockwise over her struggle time. It is
+##         the one you are racing. Thinner, and smaller, so it never competes with the
+##         ring the player is actually timing.
+##     The reticle also snaps to a distinct colour AND grows the instant the outer ring
+##     closes. That snap is the "let go NOW" cue, and it is deliberately a discontinuous
+##     change rather than a gradual one -- a player watching it in peripheral vision while
+##     a pony thrashes in front of them needs an event, not a gradient.
+##
+##     NOTHING HERE LEANS ON HUE ALONE, which matters because green-versus-red is exactly
+##     the pair a red-green colourblind player cannot separate. Three other channels carry
+##     the same distinction independently: radius (outer versus inner), thickness (7 px
+##     versus 4 px), and direction of travel (one grows clockwise, the other shrinks
+##     anticlockwise). Any one of them is enough to tell the two rings apart.
+##
+##     IT ALSO MAKES THE WRENCH LEGIBLE FOR FREE. A HARD pony can tear out of the beam
+##     before it secures her (magic_beam.gd's WRENCH_CHANCE_HARD), which is implemented as
+##     a struggle time rolled shorter than that attempt's subdue time -- so on screen the
+##     red ring visibly outruns the green one and empties first. The player sees the catch
+##     being taken away rather than being told about it afterwards, which is the whole
+##     difference between a mechanic and a bug.
 ##
 ##   THE IN-RANGE RETICLE. "Hard to gauge distance of beam" was the owner's report, and
 ##     half the answer is in the world (magic_beam.gd's landing ring) and half is here:
@@ -65,19 +82,24 @@ const CROSSHAIR_RADIUS := 13.0
 ## Gap between the ring and the four ticks, and how long the ticks are.
 const TICK_GAP := 5.0
 const TICK_LENGTH := 7.0
-## Radius of the struggle ring, outside the reticle so the two never overlap. Sized up
-## from a first pass at 21 x 4: rendered at 1600x900 that was a barely-legible sliver
-## next to a held pony's own aura, and this ring is the only thing on screen telling the
-## player how long she has left before the catch fails.
-const STRUGGLE_RADIUS := 32.0
-const STRUGGLE_WIDTH := 6.0
+## The CATCH ring: the outermost thing on the reticle, and the thickest. It is the meter
+## the player is filling and the one they release on, so it gets the outside -- the eye
+## reaches the biggest ring first -- and the extra weight, so "which ring do I act on?"
+## is answered by shape before it is answered by colour.
+##
+## 32 px was sized up from a first pass at 21: rendered at 1600x900 that was a
+## barely-legible sliver next to a held pony's own magic aura. 7 px of stroke is a
+## deliberate 3 px more than the ring inside it, which is a ratio that survives both
+## peripheral vision and a monochrome screenshot.
+const CATCH_RADIUS := 32.0
+const CATCH_WIDTH := 7.0
 
-## The secure arc sits INSIDE the struggle ring, in the gap between it and the reticle,
-## and is thinner: the two are different claims (how far the beam has got, versus how
-## long she will last) and drawing them at the same weight makes one ring with two
-## colours instead of two readings.
-const SECURE_RADIUS := 24.0
-const SECURE_WIDTH := 4.0
+## The WRIGGLE ring: her fight, draining. Sits INSIDE the catch ring, in the gap between
+## it and the reticle, and is drawn thinner. The two are different claims -- what you are
+## building versus what you are racing -- and drawing them at the same weight makes one
+## ring with two colours instead of two readings.
+const WRIGGLE_RADIUS := 22.0
+const WRIGGLE_WIDTH := 4.0
 
 ## The reticle's states. White at rest, so it reads against grass and sky alike;
 ## Twilight's own aura colour while the beam is on, so "the beam is live" is visible
@@ -89,8 +111,19 @@ const COLOR_BEAMING := Color(0.98, 0.55, 0.95, 0.95)
 const COLOR_IN_RANGE := Color(1.0, 0.86, 0.42, 1.0)
 const COLOR_HOLDING := Color(1.0, 0.82, 0.35, 1.0)
 const COLOR_SECURED := Color(0.42, 1.0, 0.52, 1.0)
-## The secure arc while it is still filling. Cool, so it is clearly not the "go" colour.
-const COLOR_SECURING := Color(0.55, 0.80, 1.0, 0.95)
+## The catch ring. It is GREEN THE WHOLE WAY ROUND, at the owner's direction -- "outer
+## green circle should be your catch" -- rather than shading from one hue to another as it
+## fills: a ring that changes colour as it grows is telling you two things with one
+## channel, and the thing it needs to say is simply "this is the one you complete". What
+## changes at completion is BRIGHTNESS and the reticle snap, not hue, so the cue survives
+## for a player who cannot separate the two rings by colour at all.
+const COLOR_CATCH := Color(0.34, 0.78, 0.44, 0.90)
+const COLOR_CATCH_FULL := COLOR_SECURED
+
+## The wriggle ring: her fight draining away. Red throughout, and brighter as it empties,
+## so "she is about to win" is a brightness AND a length, never a hue shift.
+const COLOR_WRIGGLE := Color(0.95, 0.28, 0.24, 0.85)
+const COLOR_WRIGGLE_LOW := Color(1.0, 0.42, 0.32, 1.0)
 ## Every stroke is drawn twice, this colour first and one pixel wider. Without it the
 ## white reticle disappears against a bright sky and the pink one against the pink beam.
 const COLOR_OUTLINE := Color(0.0, 0.0, 0.0, 0.55)
@@ -176,8 +209,8 @@ func _process(delta: float) -> void:
 		_toast_left -= delta
 		_toast.modulate.a = clampf(_toast_left / TOAST_FADE, 0.0, 1.0)
 
-	# The reticle animates (the beam pulse, the struggle ring draining, the secure arc
-	# filling) so it is redrawn every frame the beam is on. It ALSO has to redraw when the
+	# The reticle animates (the beam pulse, the catch ring filling, the wriggle ring
+	# draining) so it is redrawn every frame the beam is on. It ALSO has to redraw when the
 	# in-range state flips with the beam off, which is a thing the player causes by turning
 	# on the spot -- so that transition is tracked rather than polled into a repaint every
 	# frame for the whole session.
@@ -280,15 +313,28 @@ func _on_capture_refused(_body: Node3D) -> void:
 	toast("Saddlebag full!")
 
 
-## Two very different mistakes reach this signal (MagicBeam.Loss), and saying which one
-## just happened is the only teaching the capture window ever gets. "She wriggled free"
-## on a hold the player abandoned after half a second would be a straight lie, and would
-## teach exactly the wrong lesson -- let go SOONER next time.
+## Three very different endings reach this signal (MagicBeam.Loss), and saying which one
+## just happened is the only teaching the capture window ever gets. "She wriggled free" on
+## a hold the player abandoned after half a second would be a straight lie, and would teach
+## exactly the wrong lesson -- let go SOONER next time.
+##
+## WRENCHED IS THE ONE THAT IS NOT A MISTAKE AT ALL. A HARD pony can tear out before the
+## beam has secured her (magic_beam.gd's WRENCH_CHANCE_HARD) and there was nothing the
+## player could have done differently -- so the line says so, and promises the thing the
+## code actually guarantees: she tires, and the next attempt is easier. Telling a player
+## "hold her longer" for a hold that was never winnable is how a fair mechanic acquires a
+## reputation for cheating.
 func _on_escaped(_body: Node3D) -> void:
-	if _beam != null and _beam.get_last_loss() == MagicBeamScript.Loss.SLIPPED:
-		toast("She slipped out -- hold her longer!")
+	if _beam == null:
+		toast("She wriggled free!")
 		return
-	toast("She wriggled free!")
+	match _beam.get_last_loss():
+		MagicBeamScript.Loss.SLIPPED:
+			toast("She slipped out -- hold her longer!")
+		MagicBeamScript.Loss.WRENCHED:
+			toast("She wrenched free! She will tire -- try again.")
+		_:
+			toast("She wriggled free -- let go sooner!")
 
 
 # --- drawing ---------------------------------------------------------------------
@@ -336,50 +382,71 @@ func _draw_crosshair() -> void:
 	_crosshair.draw_circle(centre, 2.0, color)
 
 	if holding:
-		_draw_struggle_ring(centre)
-		_draw_secure_arc(centre)
+		# Outer first, inner second: the inner ring is the smaller of the two and drawing
+		# it last keeps it on top where the two outlines meet.
+		_draw_catch_ring(centre)
+		_draw_wriggle_ring(centre)
 
 
-## The countdown on the current hold, drawn as a ring that drains clockwise from the
-## top. Time REMAINING rather than elapsed, so "the ring is nearly gone" means "let go".
-## A body with no struggle time at all (a loose prop -- magic_beam.gd's STRUGGLE_NEVER
-## is INF) gets a complete, static ring: it is never going anywhere.
-func _draw_struggle_ring(centre: Vector2) -> void:
+## THE CATCH METER: how far the beam has got toward subduing her, drawn as the OUTER ring
+## FILLING CLOCKWISE from the top. "Release click when full" is the whole instruction, and
+## a meter that fills toward a closed circle is the one shape that says it without words.
+##
+## Drawn from the beam's ROLLED subdue time (get_secure_progress), not from the nominal
+## constant, which is what makes the per-attempt jitter fair rather than random: the ring
+## closes exactly when this particular hold is ready, so a player who watches it is never
+## wrong and a player who counts always is.
+##
+## Once it completes it is drawn as a full ring in the "she is yours" colour rather than
+## being hidden -- a control that disappears at the moment of truth teaches the player
+## nothing about why. The empty track behind it is drawn whatever the progress, so the
+## circle the player is trying to close is visible from the first frame of the hold.
+func _draw_catch_ring(centre: Vector2) -> void:
+	var progress: float = _beam.get_secure_progress()
+	_crosshair.draw_arc(centre, CATCH_RADIUS, 0.0, TAU, 64,
+		COLOR_OUTLINE, CATCH_WIDTH + 2.0, true)
+	if progress <= 0.0:
+		return
+	var color: Color = COLOR_CATCH_FULL if progress >= 1.0 else COLOR_CATCH
+	var start := -PI * 0.5
+	_crosshair.draw_arc(centre, CATCH_RADIUS, start, start + TAU * progress, 64,
+		color, CATCH_WIDTH, true)
+
+
+## HER FIGHT, DRAINING: the INNER ring, emptying ANTICLOCKWISE from the top over her
+## struggle time. Time REMAINING rather than elapsed, so "the ring is nearly gone" means
+## "she is nearly gone".
+##
+## THE DIRECTION IS LOAD-BEARING, not decoration. It runs the opposite way round the dial
+## to the catch ring outside it, so the two are distinguishable in motion by a player who
+## cannot separate them by hue -- which is the whole reason a green ring and a red ring
+## are allowed to sit two millimetres apart on the same reticle at all.
+##
+## A body with no struggle time at all (a loose prop -- magic_beam.gd's STRUGGLE_NEVER is
+## INF) gets a complete, static ring: it is never going anywhere.
+##
+## WHEN A HARD PONY WRENCHES (magic_beam.gd's WRENCH_CHANCE_HARD) THIS IS WHERE THE PLAYER
+## SEES IT: her struggle time was rolled shorter than the subdue time, so this ring simply
+## empties while the green one outside it is still two thirds of the way round. No special
+## case here, and none wanted -- the drawing is honest about the clocks and the clocks are
+## where the design lives.
+func _draw_wriggle_ring(centre: Vector2) -> void:
 	var total: float = _beam.get_struggle_seconds()
 	var remaining := 1.0
 	if is_finite(total) and total > 0.0:
 		remaining = clampf(1.0 - _beam.get_hold_seconds() / total, 0.0, 1.0)
 
-	# Green with time in hand, red when it is nearly out -- the same reading as the
-	# ring's length, in a channel that survives peripheral vision.
-	var color := Color(0.45, 0.90, 0.45).lerp(Color(1.0, 0.35, 0.30), 1.0 - remaining)
+	# Brighter as it runs out, so "she is about to win" is legible in the corner of the
+	# eye as well as in the ring's length.
+	var color: Color = COLOR_WRIGGLE.lerp(COLOR_WRIGGLE_LOW, 1.0 - remaining)
 	var start := -PI * 0.5
-	_crosshair.draw_arc(centre, STRUGGLE_RADIUS, 0.0, TAU, 64,
-		COLOR_OUTLINE, STRUGGLE_WIDTH + 2.0, true)
+	_crosshair.draw_arc(centre, WRIGGLE_RADIUS, 0.0, TAU, 48,
+		COLOR_OUTLINE, WRIGGLE_WIDTH + 2.0, true)
 	if remaining > 0.0:
-		_crosshair.draw_arc(centre, STRUGGLE_RADIUS, start, start + TAU * remaining, 64,
-			color, STRUGGLE_WIDTH, true)
-
-
-## How far the beam has got toward subduing her, drawn as an arc FILLING clockwise from
-## the top inside the struggle ring. Filling rather than draining, and in the opposite
-## sense to the ring outside it, precisely so the two cannot be mistaken for each other:
-## one is growing toward the moment you may let go, the other is shrinking toward the
-## moment she leaves.
-##
-## Once it completes it is drawn as a full ring in the "she is yours" colour rather than
-## being hidden -- a control that disappears at the moment of truth teaches the player
-## nothing about why.
-func _draw_secure_arc(centre: Vector2) -> void:
-	var progress: float = _beam.get_secure_progress()
-	_crosshair.draw_arc(centre, SECURE_RADIUS, 0.0, TAU, 48,
-		COLOR_OUTLINE, SECURE_WIDTH + 2.0, true)
-	if progress <= 0.0:
-		return
-	var color := COLOR_SECURED if progress >= 1.0 else COLOR_SECURING
-	var start := -PI * 0.5
-	_crosshair.draw_arc(centre, SECURE_RADIUS, start, start + TAU * progress, 48,
-		color, SECURE_WIDTH, true)
+		# start - TAU * remaining .. start: an arc that ENDS at the top and whose tail
+		# retreats anticlockwise as she runs out.
+		_crosshair.draw_arc(centre, WRIGGLE_RADIUS, start - TAU * remaining, start, 48,
+			color, WRIGGLE_WIDTH, true)
 
 
 func _draw_pips() -> void:
@@ -432,8 +499,8 @@ const HINTS := [
 	["LOOK", "Mouse", "Right stick"],
 	["ZOOM", "Scroll / = -", "D-pad up/down"],
 	["MAGIC BEAM", "Right mouse (hold)", "Right trigger (hold)"],
-	["", "hold until the inner ring fills, then let go to stow her", ""],
-	["", "let go too soon and she slips out; too late and she wriggles free", ""],
+	["", "hold until the OUTER GREEN ring fills, then let go to stow her", ""],
+	["", "the INNER RED ring is her fight -- let it empty and she wriggles free", ""],
 	["FREE CURSOR", "Esc", ""],
 	["THIS CARD", "H", "Back"],
 ]

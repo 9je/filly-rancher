@@ -2,7 +2,7 @@ extends GutTest
 ## Tests for the ranch HUD (game/ui/hud.gd).
 ##
 ## WHAT IS WORTH TESTING HERE AND WHAT IS NOT. Whether the crosshair is legible over
-## grass, whether the saddlebag is unobtrusive, whether the struggle ring reads at a
+## grass, whether the saddlebag is unobtrusive, whether the capture rings read at a
 ## glance -- none of that is a number, and all of it was judged from rendered frames
 ## during Phase 1A Task 9's integration pass instead. What IS a number, and what a
 ## rendered frame is actively bad at showing, is whether the HUD is displaying the
@@ -160,6 +160,9 @@ class FakeBeam:
 
 	func get_last_loss() -> int:
 		return MagicBeamScript.Loss.NONE
+
+	func is_wrenching() -> bool:
+		return false
 
 
 class FakePlayer:

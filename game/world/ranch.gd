@@ -1912,6 +1912,19 @@ func _capture_the_mechanic() -> void:
 	if target == null:
 		return
 
+	# A BOLD pony is graded HARD, and a HARD hold can be TORN OUT OF before it secures her
+	# (magic_beam.gd's WRENCH_CHANCE_HARD) -- which would leave the shots below photographing
+	# an empty beam roughly half the time. So she is handed to the beam already past
+	# WRENCH_GRACE_HOLDS grabs, which by the published rule means her wrench chance is
+	# exactly zero.
+	#
+	# SAID OUT LOUD RATHER THAN SWITCHED OFF, exactly as this file's mechanic pass already
+	# does for a pony's own detection: this is the real rule being used, not a test-only
+	# bypass, so a build where the falloff stopped reaching zero would make these shots
+	# flaky here instead of quietly passing. The wrench has its own home -- it is driven,
+	# and its convergence proved, in scenes/test/capture_test.gd's WRENCH phase.
+	target.beam_holds = beam.WRENCH_GRACE_HOLDS
+
 	# 07 -- the beam sweeping empty ground at full stretch: the arc, and the ring lying on
 	# the grass under where it runs out. This is the shot for "hard to gauge distance of
 	# beam" -- the ring is on a surface the eye is already reading perspective off, and it
@@ -1974,15 +1987,18 @@ func _capture_the_mechanic() -> void:
 		% [beam.is_holding(), beam.get_secure_progress(), beam.has_mark()])
 	await _capture("08_beam_reaching")
 
-	# 09 -- mid-struggle: the outer ring part-drained, the inner secure arc part-filled.
-	# Waited to a FRACTION of the secure time rather than a fixed frame count, so this
-	# stays the mid-struggle shot whatever SECURE_SECONDS becomes.
+	# 09 -- mid-hold: the OUTER GREEN catch ring part-filled and the INNER RED wriggle ring
+	# part-drained. (Which ring means what was swapped at the owner's direction after the
+	# third playtest -- see the ring note at the top of game/ui/hud.gd.) Waited to a
+	# FRACTION of the secure time rather than a fixed frame count, so this stays the
+	# mid-hold shot whatever the subdue time is retuned to, and whatever this attempt's
+	# jitter rolled it at.
 	while beam.is_holding() and beam.get_secure_progress() < 0.55:
 		await get_tree().physics_frame
 	print("RANCH mechanic struggle hold=%.2fs secure=%.2fs struggle=%.2fs progress=%.2f secured=%s"
 		% [beam.get_hold_seconds(), beam.get_secure_seconds(), beam.get_struggle_seconds(),
 			beam.get_secure_progress(), beam.is_secured()])
-	await _capture("09_struggle_ring_half_drained")
+	await _capture("09_catch_ring_half_filled")
 
 	# 10 -- secured: let go NOW.
 	while beam.is_holding() and not beam.is_secured():

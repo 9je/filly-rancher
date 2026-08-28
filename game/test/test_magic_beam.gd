@@ -22,6 +22,33 @@ extends GutTest
 const MagicBeamScript := preload("res://actors/player/magic_beam.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 
+## A full, un-anticipated visual reaction time -- press-and-release to a flash, with no
+## warning that it is coming. The bar the capture windows are held to below, and it is
+## deliberately HARSHER than what the mechanic actually asks of a player: the catch ring
+## fills toward a visible finish line, so a real release is anticipated rather than
+## reacted to, and anticipated timing lands inside about a tenth of a second. Clearing the
+## harsher bar on every grade's WORST roll is the margin that stops "tight" turning into
+## "unfair" -- which is the acceptance criterion the owner put above every number here
+## ("i dont want the mechanic to get annoying").
+const REACTION_TIME := 0.25
+
+## How many independent seeded streams the wrench sweeps below run. Large enough that a
+## first-attempt wrench chance of 0.5 cannot go unobserved by luck (the chance of that is
+## 2^-1000), small enough to stay a millisecond-scale unit test.
+const SEED_SWEEP := 1000
+
+## The most grabs a design may ask of a player before a wrenching pony has to be catchable,
+## asserted independently of what MagicBeam.WRENCH_GRACE_HOLDS happens to say.
+##
+## THE FAILURE PROOF EARNED THIS CONSTANT. Breaking MagicBeam.WRENCH_CHANCE_FALLOFF to a
+## millionth leaves the wrench chance still reaching zero -- after five million grabs -- and
+## WRENCH_GRACE_HOLDS is DERIVED from the falloff, so every test phrased as "she is caught
+## inside WRENCH_GRACE_HOLDS attempts" stayed green while a pony could in practice fight the
+## player off indefinitely. A bound that is computed from the thing it is bounding is not a
+## bound. This is the outside opinion, and the loops below are capped by it so a broken
+## falloff fails in milliseconds instead of hanging the suite.
+const MAX_HONEST_ATTEMPTS := 3
+
 
 func test_bold_ponies_struggle_sooner_than_curious_ones_and_shy_ones() -> void:
 	# INVERTED BY THE SECOND PLAYTEST, and the direction is the whole point -- this test
@@ -40,28 +67,48 @@ func test_every_struggle_time_outlasts_the_pull_in() -> void:
 	# The floor that makes the mechanic playable at all: a pony who breaks free before she
 	# has even reached the hold point is one the player never got to see. The pull closes
 	# 90% of the gap in ln(10)/PULL_RESPONSE seconds; a struggle time under that would
-	# make her personality unobservable rather than merely difficult.
+	# make her grade unobservable rather than merely difficult.
+	#
+	# QUANTIFIED OVER THE WORST ROLL OF EVERY GRADE, and over a WRENCHING attempt too --
+	# which is the one that could plausibly break it, since a wrench deliberately rolls a
+	# struggle time SHORTER than its own subdue clock. A wrench that landed inside the reel
+	# would read as the beam failing to pick her up rather than as her winning, and it is
+	# the one place in this design where "she escaped" and "it is broken" look alike.
 	var pull_in: float = log(10.0) / MagicBeamScript.PULL_RESPONSE
 	for personality in PonyDataScript.Personality.values():
-		var seconds: float = MagicBeamScript.struggle_seconds_for(personality)
-		assert_gt(seconds, pull_in * 2.0,
+		var who: String = PonyDataScript.Personality.keys()[personality]
+		var worst: float = MagicBeamScript.secure_bounds().x \
+			+ MagicBeamScript.window_bounds_for(personality).x
+		assert_gt(worst, pull_in * 2.0,
 			"%s must resist for longer than the beam takes to reel her in (%.3f s)" % [
-				PonyDataScript.Personality.keys()[personality], pull_in])
+				who, pull_in])
+	var earliest_wrench: float = MagicBeamScript.secure_bounds().x * MagicBeamScript.WRENCH_AT_MIN
+	assert_gt(earliest_wrench, pull_in,
+		("the EARLIEST a wrench can land (%.3f s) must be past the reel (%.3f s), or she " +
+		"tears free before the player has seen what they grabbed") % [earliest_wrench, pull_in])
 
 
-func test_an_unknown_personality_gets_the_bold_default_rather_than_zero() -> void:
+func test_an_unknown_personality_gets_the_hard_grade_rather_than_a_broken_one() -> void:
 	# A roster addition with a personality this file has not heard of must not become an
 	# uncatchable (or instantly-escaping) pony.
-	var fallback: float = MagicBeamScript.struggle_seconds_for(99)
-	assert_eq(fallback, MagicBeamScript.STRUGGLE_BOLD,
-		"an unknown personality falls back to BOLD's struggle time")
-	assert_gt(fallback, 0.0)
-	# BOLD is the STRICTEST hold since the second playtest's inversion, so this fallback
-	# stopped being the forgiving one. It still has to leave a window a human can hit, or a
-	# roster addition with an unrecognised personality would be flatly uncatchable.
-	assert_gt(fallback - MagicBeamScript.SECURE_SECONDS, 0.4,
-		"the fallback must still leave a hittable window (%.2f s of struggle against " % fallback +
-		"%.2f s of securing)" % MagicBeamScript.SECURE_SECONDS)
+	assert_eq(MagicBeamScript.grade_for(99), MagicBeamScript.Grade.HARD,
+		"an unknown personality falls back to the HARD grade")
+	var fallback: float = MagicBeamScript.capture_window_for(99)
+	assert_eq(fallback, MagicBeamScript.WINDOW_HARD,
+		"...and therefore to the HARD window")
+	# HARD is the STRICTEST hold since the second playtest's inversion, so this fallback
+	# stopped being the forgiving one. It still has to leave a window a human can hit --
+	# checked against the WORST roll, not the nominal one -- or a roster addition with an
+	# unrecognised personality would be flatly uncatchable on a bad day.
+	var floor_seconds: float = MagicBeamScript.window_bounds_for(99).x
+	assert_gt(floor_seconds, REACTION_TIME,
+		("the fallback's WORST roll must still leave more than a reaction time (%.3f s " +
+		"against %.2f s)") % [floor_seconds, REACTION_TIME])
+	# ...and it must be able to wrench, because the fallback grade is the wrenching one:
+	# a fallback that quietly lost the wrench would make an unknown personality EASIER
+	# than the grade it claims to be.
+	assert_gt(MagicBeamScript.wrench_chance_for(99, 0), 0.0,
+		"an unknown personality is graded HARD, so she can wrench like any other HARD pony")
 
 
 func test_the_hold_point_sits_hold_lead_metres_past_the_player() -> void:
@@ -262,19 +309,81 @@ func test_the_capture_needs_a_real_hold_rather_than_a_click() -> void:
 		"...and not so long that the twelfth catch of a session is a chore")
 
 
-func test_every_personality_has_a_window_wide_enough_to_hit() -> void:
+func test_the_windows_are_the_ones_the_owner_asked_for() -> void:
+	# THE THIRD PLAYTEST'S BRIEF, WRITTEN DOWN AS AN ASSERTION. "Medium ones only have like
+	# a half sec window and easy have the full second window something like that", with the
+	# hardest grade tighter still -- against a build that shipped 3.45 / 1.85 / 1.15 s and
+	# was reported as "all the character super easy to catch too, no real challenge with
+	# the wiggling out".
+	#
+	# Pinned as the actual numbers rather than only as an ordering, because an ordering
+	# test stays green through a retune that drifts all three back up together, which is
+	# exactly the direction they drifted from last time.
+	assert_almost_eq(MagicBeamScript.capture_window_for(PonyDataScript.Personality.SHY),
+		1.0, 0.0001, "the EASY grade gets the full second the owner asked for")
+	assert_almost_eq(MagicBeamScript.capture_window_for(PonyDataScript.Personality.CURIOUS),
+		0.5, 0.0001, "the MEDIUM grade gets the half second the owner asked for")
+	assert_lt(MagicBeamScript.capture_window_for(PonyDataScript.Personality.BOLD), 0.5,
+		"and the HARD grade is tighter still")
+	# Every one of them SHRANK. The old build's tightest window (1.15 s) was wider than
+	# this build's most forgiving one, which is the whole of what "super easy" meant.
+	assert_lt(MagicBeamScript.capture_window_for(PonyDataScript.Personality.SHY), 1.15,
+		"even the EASY grade must now be tighter than the OLD build's HARDEST one")
+
+
+func test_every_grade_leaves_a_window_a_human_can_actually_hit() -> void:
 	# The two clocks only produce a mechanic if the second is comfortably past the first.
-	# A struggle time at or under SECURE_SECONDS would make that personality flatly
-	# UNCATCHABLE -- and nothing else in the project would say so, because both numbers
-	# would still look individually reasonable and every other test would still pass.
+	# A struggle time at or under the subdue time would make that grade flatly UNCATCHABLE
+	# -- and nothing else in the project would say so, because both numbers would still
+	# look individually reasonable and every other test would still pass.
+	#
+	# CHECKED AT THE WORST ROLL, not at the nominal value. Now that both clocks are
+	# jittered per attempt (SECURE_JITTER, WINDOW_JITTER), a floor asserted on the average
+	# is a floor asserted on an attempt that mostly does not happen -- and the attempt that
+	# matters is the unlucky one. REACTION_TIME is a full un-anticipated visual reaction,
+	# which is deliberately harsher than what the mechanic actually asks of the player: the
+	# catch ring fills toward a visible finish line, so a release is anticipated rather than
+	# reacted to. Clearing the harsher bar on every grade's worst roll is the margin.
 	for personality in PonyDataScript.Personality.values():
-		var window: float = MagicBeamScript.capture_window_for(personality)
-		assert_gt(window, 0.4,
-			("%s must leave a window a human can act inside (got %.2f s: struggle %.2f s " +
-			"minus secure %.2f s)") % [
-				PonyDataScript.Personality.keys()[personality], window,
-				MagicBeamScript.struggle_seconds_for(personality),
-				MagicBeamScript.SECURE_SECONDS])
+		var bounds: Vector2 = MagicBeamScript.window_bounds_for(personality)
+		var who: String = PonyDataScript.Personality.keys()[personality]
+		var grade: String = MagicBeamScript.grade_name(MagicBeamScript.grade_for(personality))
+		assert_gt(bounds.x, REACTION_TIME,
+			("%s (%s) must leave more than a reaction time even on her WORST roll " +
+			"(%.3f s against %.2f s)") % [who, grade, bounds.x, REACTION_TIME])
+		assert_lt(bounds.y, 2.0,
+			"%s (%s) must not be able to roll a window so wide it stops being a window " % [
+				who, grade] + "(%.3f s)" % bounds.y)
+
+
+func test_a_correct_release_always_wins_on_the_easy_grade() -> void:
+	# "EASY" has to mean something specific or it is just a smaller number: a player who
+	# lets go when the ring closes wins, every time, however the dice fell. Stated as the
+	# margin a player has after the cue rather than as the window itself, and swept over
+	# the whole rolled range rather than checked at the middle of it.
+	var bounds: Vector2 = MagicBeamScript.window_bounds_for(PonyDataScript.Personality.SHY)
+	assert_gt(bounds.x, REACTION_TIME * 3.0,
+		("the EASY grade must survive a badly late release on its worst roll -- three " +
+		"whole reaction times (%.2f s) inside %.3f s") % [REACTION_TIME * 3.0, bounds.x])
+	# Driven through roll_clocks over the actual roll space, so this is a claim about what
+	# the mechanic DOES rather than about two constants that feed it. A hundred and twenty
+	# one combinations of the two jitters, and the player is late by a full reaction time
+	# on every one of them.
+	var worst := INF
+	for secure_step in range(11):
+		for window_step in range(11):
+			var clocks: Dictionary = MagicBeamScript.roll_clocks(
+				PonyDataScript.Personality.SHY, 0,
+				1.0, float(secure_step) / 10.0, float(window_step) / 10.0)
+			assert_false(clocks["wrenches"], "an EASY pony can never wrench free")
+			var release_at: float = float(clocks["secure"]) + REACTION_TIME
+			worst = minf(worst, float(clocks["struggle"]) - release_at)
+			assert_lt(release_at, float(clocks["struggle"]),
+				("a release a whole reaction time late must still land her: secured at " +
+				"%.3f s, released at %.3f s, she leaves at %.3f s") % [
+					clocks["secure"], release_at, clocks["struggle"]])
+	assert_gt(worst, 0.4,
+		"...and not by a hair: the tightest of those had %.3f s still to spare" % worst)
 
 
 func test_a_bold_pony_is_the_hardest_hold_and_a_shy_one_the_easiest() -> void:
@@ -297,3 +406,298 @@ func test_losing_her_costs_the_player_the_re_grab() -> void:
 	# player's face, so a cooldown much under a second hands her straight back.
 	assert_gt(MagicBeamScript.ESCAPE_COOLDOWN, 1.0,
 		"a lost pony must get long enough to become a moving target again")
+
+
+func test_a_wrench_costs_the_player_less_than_a_mistake_does() -> void:
+	# THE ACCEPTANCE CRITERION THAT OUTRANKS THE NUMBERS: "i dont want the mechanic to get
+	# annoying". ESCAPE_COOLDOWN is the price of a MISTAKE -- you let go too soon, or you
+	# held too long -- and a wrench is the one loss the player did not make. Charging full
+	# price for it is how a fair mechanic gets a reputation for cheating.
+	assert_lt(MagicBeamScript.WRENCH_COOLDOWN, MagicBeamScript.ESCAPE_COOLDOWN,
+		"a loss the player did not cause must cost less than one they did")
+	# ...but it is still an escape, not a stumble: the beam has to visibly let go of her,
+	# or a wrench at 60% of the ring would be undone before the player's finger moved and
+	# would read as a flicker rather than as her winning.
+	assert_gt(MagicBeamScript.WRENCH_COOLDOWN, 0.4,
+		"...and must still be long enough to read as her getting away")
+
+
+# --- the grading -----------------------------------------------------------------------
+
+func test_the_grade_is_a_reading_of_the_personality_she_already_has() -> void:
+	# THE BRIEF SAID "tag them with different difficulties", AND THE TAG IS NOT A NEW FIELD.
+	# PonyData.personality is the tier this mechanic has always been keyed on, and inventing
+	# a parallel `difficulty` on the same resource would give the project two sources of
+	# truth about one pony, kept in step by hand, diverging the first time somebody authors
+	# a .tres and fills in only one of them. Grade is a pure function of personality, and
+	# this is the test that says so.
+	assert_eq(MagicBeamScript.grade_for(PonyDataScript.Personality.SHY),
+		MagicBeamScript.Grade.EASY, "a SHY pony has frozen: she is the EASY hold")
+	assert_eq(MagicBeamScript.grade_for(PonyDataScript.Personality.CURIOUS),
+		MagicBeamScript.Grade.MEDIUM, "a CURIOUS pony is the MEDIUM hold")
+	assert_eq(MagicBeamScript.grade_for(PonyDataScript.Personality.BOLD),
+		MagicBeamScript.Grade.HARD, "a BOLD pony fights: she is the HARD hold")
+
+	# Every personality on the enum has to land on a grade, or a roster addition would be
+	# graded by the fallback while looking like it had been graded on purpose.
+	var seen := {}
+	for personality in PonyDataScript.Personality.values():
+		var grade: int = MagicBeamScript.grade_for(personality)
+		assert_between(grade, 0, MagicBeamScript.Grade.size() - 1,
+			"%s must map to a real grade" % PonyDataScript.Personality.keys()[personality])
+		seen[grade] = true
+	assert_eq(seen.size(), MagicBeamScript.Grade.size(),
+		"all three grades must be reachable from the roster's personalities -- a grade no " +
+		"pony can have is a difficulty setting nobody can play")
+
+
+func test_the_grades_are_ordered_and_separated_enough_to_feel() -> void:
+	# An ordering alone is satisfied by 0.51 / 0.50 / 0.49, which is three names for one
+	# difficulty. The SEPARATION is what makes a player able to tell, without being told,
+	# that the pony in their beam is a different kind of problem from the last one.
+	var easy: float = MagicBeamScript.capture_window_for(PonyDataScript.Personality.SHY)
+	var medium: float = MagicBeamScript.capture_window_for(PonyDataScript.Personality.CURIOUS)
+	var hard: float = MagicBeamScript.capture_window_for(PonyDataScript.Personality.BOLD)
+	assert_gt(easy, medium, "EASY must be a wider window than MEDIUM")
+	assert_gt(medium, hard, "...and MEDIUM than HARD")
+	assert_gt(easy, medium * 1.5, "EASY must be a different EXPERIENCE from MEDIUM, not a nudge")
+	assert_gt(medium, hard * 1.25, "...and MEDIUM from HARD")
+
+	# AND THE GRADES MUST NOT OVERLAP ONCE THE JITTER IS APPLIED. This is the check that
+	# actually has teeth: a jitter wide enough that an unlucky EASY roll is tighter than a
+	# lucky MEDIUM one would make the grading unlearnable, because the same pony would
+	# sometimes be harder than a pony of a harder grade. It is also the failure mode a
+	# "just add more randomness" retune reaches first.
+	var easy_bounds: Vector2 = MagicBeamScript.window_bounds_for(PonyDataScript.Personality.SHY)
+	var medium_bounds: Vector2 = MagicBeamScript.window_bounds_for(PonyDataScript.Personality.CURIOUS)
+	var hard_bounds: Vector2 = MagicBeamScript.window_bounds_for(PonyDataScript.Personality.BOLD)
+	assert_gt(easy_bounds.x, medium_bounds.y,
+		("the WORST EASY roll (%.3f s) must still beat the BEST MEDIUM one (%.3f s), or " +
+		"the grades overlap and nothing is learnable") % [easy_bounds.x, medium_bounds.y])
+	assert_gt(medium_bounds.x, hard_bounds.y,
+		"...and the worst MEDIUM roll (%.3f s) the best HARD one (%.3f s)" % [
+			medium_bounds.x, hard_bounds.y])
+
+
+# --- the randomness --------------------------------------------------------------------
+
+func test_the_jitter_stays_inside_the_bounds_the_file_publishes() -> void:
+	# "Bounded, seeded per attempt, and never so wide that a good release loses" is the
+	# brief, and the bounds are published (secure_bounds, window_bounds_for) precisely so
+	# they can be checked rather than trusted. Driven through a REAL generator rather than
+	# through hand-picked rolls, because the thing being pinned is the arithmetic in
+	# roll_clocks, not the arithmetic in this file.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 20260828
+	var secure_bounds: Vector2 = MagicBeamScript.secure_bounds()
+	var lowest := INF
+	var highest := -INF
+	for personality in PonyDataScript.Personality.values():
+		var window_bounds: Vector2 = MagicBeamScript.window_bounds_for(personality)
+		var who: String = PonyDataScript.Personality.keys()[personality]
+		for i in range(4000):
+			# prior_holds past the grace, so nothing here wrenches: this test is about the
+			# jitter on an ordinary attempt. The wrench has its own tests below.
+			var clocks: Dictionary = MagicBeamScript.roll_clocks(personality,
+				MagicBeamScript.WRENCH_GRACE_HOLDS, rng.randf(), rng.randf(), rng.randf())
+			var secure: float = clocks["secure"]
+			var window: float = float(clocks["struggle"]) - secure
+			assert_between(secure, secure_bounds.x - 0.0001, secure_bounds.y + 0.0001,
+				"a rolled subdue time for %s left its published bounds" % who)
+			assert_between(window, window_bounds.x - 0.0001, window_bounds.y + 0.0001,
+				"a rolled window for %s left its published bounds" % who)
+			lowest = minf(lowest, window / MagicBeamScript.capture_window_for(personality))
+			highest = maxf(highest, window / MagicBeamScript.capture_window_for(personality))
+
+	# NOT VACUOUS: the sweep has to actually visit most of the range, or a roll_clocks that
+	# ignored its jitter arguments entirely would pass every assertion above.
+	assert_lt(lowest, 1.0 - MagicBeamScript.WINDOW_JITTER * 0.9,
+		"the sweep must actually reach the bottom of the range (got %.3f)" % lowest)
+	assert_gt(highest, 1.0 + MagicBeamScript.WINDOW_JITTER * 0.9,
+		"...and the top of it (got %.3f)" % highest)
+
+
+func test_the_subdue_clock_is_jittered_but_never_into_a_click_or_a_chore() -> void:
+	# The variance the owner asked for lives on BOTH clocks -- jittering only the struggle
+	# time leaves the ring completing on a metronome, which is the exact habit ("one... and
+	# let go") that stops a player looking at the screen. Both ends of it are load-bearing.
+	var bounds: Vector2 = MagicBeamScript.secure_bounds()
+	var pull_in: float = log(10.0) / MagicBeamScript.PULL_RESPONSE
+	assert_gt(MagicBeamScript.SECURE_JITTER, 0.05,
+		"a jitter too small to notice is a metronome with extra steps")
+	assert_gt(bounds.x, pull_in * 2.0,
+		("even the LUCKIEST subdue roll (%.3f s) must outlast the reel (%.3f s), or the " +
+		"contest completes while she is still in transit and is invisible again") % [
+			bounds.x, pull_in])
+	assert_lt(bounds.y, 2.0,
+		"even the UNLUCKIEST subdue roll (%.3f s) must not make the twelfth catch of a " % bounds.y +
+		"session a chore")
+	# And the third playtest's actual instruction -- "id decrease the current fvalues" --
+	# against the build he played, which subdued in a flat 1.15 s.
+	assert_lt(MagicBeamScript.SECURE_SECONDS, 1.15,
+		"the subdue time was asked to come DOWN from the 1.15 s of the build he played")
+
+
+func test_the_same_rolls_always_produce_the_same_attempt() -> void:
+	# roll_clocks is pure, and that is not a stylistic claim -- it is what makes a seeded
+	# gate reproducible and what lets the sweeps in this file stand in for thousands of
+	# live captures. A stray Time or randf() inside it would break both silently.
+	var first: Dictionary = MagicBeamScript.roll_clocks(
+		PonyDataScript.Personality.BOLD, 0, 0.11, 0.73, 0.29)
+	var second: Dictionary = MagicBeamScript.roll_clocks(
+		PonyDataScript.Personality.BOLD, 0, 0.11, 0.73, 0.29)
+	assert_eq(first, second, "the same rolls must produce the same attempt, exactly")
+
+
+# --- the wrench, and why it cannot trap the player -------------------------------------
+
+func test_only_the_hard_grade_can_wrench_free_before_you_land_her() -> void:
+	# "The hardest ones have a chance to wiggle out before you catch." Only the hardest
+	# ones -- a wrench on an EASY pony would take away the one grade that exists to be the
+	# exhale after a chase.
+	for personality in PonyDataScript.Personality.values():
+		var who: String = PonyDataScript.Personality.keys()[personality]
+		var hard: bool = MagicBeamScript.grade_for(personality) == MagicBeamScript.Grade.HARD
+		var chance: float = MagicBeamScript.wrench_chance_for(personality, 0)
+		if hard:
+			assert_gt(chance, 0.0, "a HARD pony (%s) must be able to wrench free" % who)
+		else:
+			assert_eq(chance, 0.0, "a %s pony must never wrench free" % who)
+
+
+func test_a_wrench_lands_before_the_catch_ring_closes_and_can_be_seen_coming() -> void:
+	# A wrench IS a struggle time rolled shorter than that attempt's own subdue time -- that
+	# is the entire implementation, and it is what makes the HUD show the loss honestly
+	# (the red ring visibly outruns the green one). If a "wrench" could ever roll a struggle
+	# time LONGER than the subdue, it would silently become an ordinary catch and the
+	# hardest grade would quietly lose its teeth.
+	for step in range(21):
+		var roll: float = float(step) / 20.0
+		var clocks: Dictionary = MagicBeamScript.roll_clocks(
+			PonyDataScript.Personality.BOLD, 0, 0.0, roll, roll)
+		assert_true(clocks["wrenches"], "a zero wrench roll on a fresh HARD pony must wrench")
+		assert_lt(float(clocks["struggle"]), float(clocks["secure"]),
+			("a wrench must land BEFORE the catch ring closes (struggle %.3f s against " +
+			"subdue %.3f s)") % [clocks["struggle"], clocks["secure"]])
+		var fraction: float = float(clocks["struggle"]) / float(clocks["secure"])
+		assert_between(fraction,
+			MagicBeamScript.WRENCH_AT_MIN - 0.0001, MagicBeamScript.WRENCH_AT_MAX + 0.0001,
+			"a wrench must land in the published stretch of the ring (%.3f)" % fraction)
+	# The late end matters as much as the early one: a wrench at 97% of the ring is
+	# indistinguishable from the player's own mistimed release, which would teach exactly
+	# the wrong lesson about a loss that was never their fault.
+	assert_lt(MagicBeamScript.WRENCH_AT_MAX, 0.95,
+		"a wrench must not land so close to the ring closing that it reads as the " +
+		"player's own mistake")
+
+
+func test_the_wrench_chance_falls_to_zero_and_stays_there() -> void:
+	# THE LOAD-BEARING "but" IN THE OWNER'S BRIEF: "(but will eventaully let you catch)".
+	# The falloff is not a pity timer sitting next to a dice roll, it is the dice being
+	# taken away -- so this asserts the chance actually REACHES zero, at a stated grab, and
+	# never comes back for any number of grabs after it.
+	assert_between(MagicBeamScript.WRENCH_GRACE_HOLDS, 1, MAX_HONEST_ATTEMPTS - 1,
+		("the bound must be small enough to BE a promise -- a chance that reaches zero " +
+		"after %d grabs is not one") % MagicBeamScript.WRENCH_GRACE_HOLDS)
+	var previous: float = INF
+	for prior_holds in range(mini(MagicBeamScript.WRENCH_GRACE_HOLDS, MAX_HONEST_ATTEMPTS)):
+		var chance: float = MagicBeamScript.wrench_chance_for(
+			PonyDataScript.Personality.BOLD, prior_holds)
+		assert_gt(chance, 0.0,
+			"she must still have some fight in her after %d grabs" % prior_holds)
+		assert_lt(chance, previous, "...but less than she had after %d" % (prior_holds - 1))
+		previous = chance
+	for prior_holds in range(mini(MagicBeamScript.WRENCH_GRACE_HOLDS, MAX_HONEST_ATTEMPTS), 40):
+		assert_eq(MagicBeamScript.wrench_chance_for(
+				PonyDataScript.Personality.BOLD, prior_holds), 0.0,
+			("after %d grabs she must be out of fight ENTIRELY -- a chance that merely " +
+			"got small is a loop the player can still be stuck in") % prior_holds)
+	# Negative or absurd counts must not resurrect it either: the counter is a plain public
+	# var on the pony, so it is exactly the kind of thing a future caller can hand rubbish.
+	assert_eq(MagicBeamScript.wrench_chance_for(PonyDataScript.Personality.BOLD, -5),
+		MagicBeamScript.wrench_chance_for(PonyDataScript.Personality.BOLD, 0),
+		"a nonsense hold count must not be MORE forgiving than a fresh pony")
+
+
+func test_a_player_who_keeps_doing_it_right_always_lands_her() -> void:
+	# THE CONVERGENCE PROPERTY, PROVED RATHER THAN ASSERTED -- the brief's own instruction.
+	# A thousand independent seeded streams, each one a player who plays a fresh HARD pony
+	# correctly (releases the instant the catch ring closes) and keeps going until she is
+	# caught. Not one of them may be held off past the published bound, and the bound is
+	# small.
+	#
+	# This is the test that fails if the falloff is ever softened into "the chance gets
+	# smaller", which is the natural-looking retune that reintroduces the unbounded loop.
+	var rng := RandomNumberGenerator.new()
+	var attempts_needed := {}
+	var worst_run := 0
+	var first_attempt_wrenches := 0
+	for stream in range(SEED_SWEEP):
+		rng.seed = stream
+		var holds := 0
+		var wrenches := 0
+		var caught := false
+		# One more attempt than the bound allows, and never more than MAX_HONEST_ATTEMPTS
+		# whatever the build claims its bound is -- so a design that needs MORE attempts
+		# than a player would sit through fails here rather than being accommodated by its
+		# own generous arithmetic.
+		for attempt in range(mini(MagicBeamScript.WRENCH_GRACE_HOLDS + 1, MAX_HONEST_ATTEMPTS)):
+			var clocks: Dictionary = MagicBeamScript.roll_clocks(
+				PonyDataScript.Personality.BOLD, holds,
+				rng.randf(), rng.randf(), rng.randf())
+			holds += 1
+			if clocks["wrenches"]:
+				wrenches += 1
+				if attempt == 0:
+					first_attempt_wrenches += 1
+				continue
+			# She did not wrench, so the contest is the ordinary one -- and the player
+			# plays it correctly, letting go a reaction time after the ring closes.
+			assert_lt(float(clocks["secure"]) + REACTION_TIME, float(clocks["struggle"]),
+				"a correct release must land a HARD pony who did not wrench")
+			caught = true
+			break
+		assert_true(caught,
+			("seed %d held the player off for all %d attempts -- the mechanic can trap a " +
+			"player who is doing everything right") % [
+				stream, MagicBeamScript.WRENCH_GRACE_HOLDS + 1])
+		worst_run = maxi(worst_run, wrenches)
+		attempts_needed[wrenches + 1] = int(attempts_needed.get(wrenches + 1, 0)) + 1
+
+	assert_lt(MagicBeamScript.WRENCH_GRACE_HOLDS, MAX_HONEST_ATTEMPTS,
+		("a player may lose at most %d catches to the dice before the pony has to become " +
+		"catchable; this build says %d") % [
+			MAX_HONEST_ATTEMPTS - 1, MagicBeamScript.WRENCH_GRACE_HOLDS])
+	assert_lte(worst_run, MagicBeamScript.WRENCH_GRACE_HOLDS,
+		("no pony may wrench more than %d times in a row (worst seen: %d)") % [
+			MagicBeamScript.WRENCH_GRACE_HOLDS, worst_run])
+	# NOT VACUOUS. If the wrench never fired, every assertion above would pass on a
+	# mechanic that does not exist -- which is precisely the shape of green-but-empty gate
+	# this project has shipped before.
+	assert_gt(first_attempt_wrenches, SEED_SWEEP / 4,
+		("the wrench must actually fire: only %d of %d fresh HARD ponies wrenched on the " +
+		"first grab") % [first_attempt_wrenches, SEED_SWEEP])
+	# AND IT MUST NOT BE THE NORM EITHER. "I don't want the mechanic to get annoying" is the
+	# criterion that outranks the numbers, and a hard pony who usually costs three tries is
+	# annoying however well-bounded the three is.
+	var one_shot: int = int(attempts_needed.get(1, 0))
+	assert_gt(one_shot, SEED_SWEEP / 3,
+		("a decent share of HARD ponies must go in on the first honest attempt (%d of " +
+		"%d did)") % [one_shot, SEED_SWEEP])
+	gut.p("wrench convergence over %d seeds: attempts->count %s, worst run %d" % [
+		SEED_SWEEP, attempts_needed, worst_run])
+
+
+func test_an_easy_or_medium_pony_is_caught_on_the_first_honest_attempt_every_time() -> void:
+	# The other half of the grading: only the hardest grade may ever take an attempt away.
+	# A player working through a field of Fluttershys must never lose one to the dice.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 4242
+	for personality in [PonyDataScript.Personality.SHY, PonyDataScript.Personality.CURIOUS]:
+		var who: String = PonyDataScript.Personality.keys()[personality]
+		for i in range(SEED_SWEEP):
+			var clocks: Dictionary = MagicBeamScript.roll_clocks(personality, 0,
+				rng.randf(), rng.randf(), rng.randf())
+			assert_false(clocks["wrenches"], "a %s pony must never wrench" % who)
+			assert_lt(float(clocks["secure"]) + REACTION_TIME, float(clocks["struggle"]),
+				"a correct release must always land a %s pony" % who)
