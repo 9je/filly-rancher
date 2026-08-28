@@ -249,7 +249,7 @@ func test_a_save_from_a_newer_build_refuses_to_load_rather_than_be_misread() -> 
 
 
 func test_the_version_policy_is_stated_and_pinned() -> void:
-	assert_eq(SaveIOScript.FORMAT_VERSION, 1, "the current format version")
+	assert_eq(SaveIOScript.FORMAT_VERSION, 2, "the current format version")
 	assert_true(SaveIOScript.can_load_version(SaveIOScript.FORMAT_VERSION),
 		"this build's own version loads")
 	assert_false(SaveIOScript.can_load_version(SaveIOScript.FORMAT_VERSION + 1),
@@ -258,6 +258,16 @@ func test_the_version_policy_is_stated_and_pinned() -> void:
 	for v in range(1, SaveIOScript.FORMAT_VERSION + 1):
 		assert_true(SaveIOScript.can_load_version(v),
 			"every version this build has ever written stays loadable (v%d)" % v)
+
+
+func test_a_version_1_file_loads_and_gains_empty_gems_and_inventory() -> void:
+	var v1 := {"version": 1, "bits": 12, "ponies": [], "plots": {}, "unlocks": [], "world_seed": 5}
+	var migrated := SaveIOScript.migrate(v1, 1)
+	assert_eq(migrated.get("bits"), 12, "existing fields survive")
+	assert_true(migrated.has("gems"), "migration adds the gems key")
+	assert_true(migrated.has("inventory"), "migration adds the inventory key")
+	assert_eq(migrated["gems"], {})
+	assert_eq(migrated["inventory"], {})
 
 
 # --- atomicity: an interrupted write must not cost the previous save ------------------

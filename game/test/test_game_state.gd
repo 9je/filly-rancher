@@ -26,6 +26,9 @@ const GameStateScript := preload("res://systems/game_state.gd")
 const SaveIOScript := preload("res://systems/save_io.gd")
 const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const PonyRegistryScript := preload("res://systems/pony_registry.gd")
+const PonyDataScript := preload("res://systems/pony_data.gd")
+const GemPouchScript := preload("res://systems/gem_pouch.gd")
+const InventoryScript := preload("res://systems/inventory.gd")
 
 const SCRATCH_DIR := "user://test_scratch/game_state"
 const SLOT := 3
@@ -80,6 +83,8 @@ func _populated():
 	state.plots = {"0": "pen", "2": "garden"}
 	state.unlocks = ["beam_range_1"]
 	state.world_seed = 12345
+	state.gems.add(PonyDataScript.Rarity.RARE, 3)
+	state.inventory.add(&"hay", 4)
 	return state
 
 
@@ -103,6 +108,8 @@ func test_to_dict_and_from_dict_round_trip_every_field() -> void:
 	assert_almost_eq(first.happiness, 0.75, 0.0001, "happiness survives")
 	assert_almost_eq(first.hunger, 0.25, 0.0001, "hunger survives")
 	assert_eq(first.caught_at_ms, 1772150400000, "caught_at_ms survives")
+	assert_eq(copy.gems.count(PonyDataScript.Rarity.RARE), 3, "gems survive")
+	assert_eq(copy.inventory.count(&"hay"), 4, "inventory survives")
 
 
 func test_two_ponies_of_the_same_character_stay_two_ponies_across_a_round_trip() -> void:
@@ -160,6 +167,37 @@ func test_a_pony_whose_character_this_build_does_not_have_still_loads() -> void:
 	state.from_dict({"ponies": [{"uid": "nopony#000001", "data_id": "nopony"}]})
 	assert_eq(state.pony_count(), 1, "she is kept")
 	assert_null(state.get_ponies()[0].data(), "...even though nothing resolves her")
+
+
+func test_gems_and_inventory_round_trip() -> void:
+	var state = _state()
+	state.gems.add(PonyDataScript.Rarity.RARE, 3)
+	state.inventory.add(&"hay", 4)
+	var d := state.to_dict()
+	assert_true(d.has("gems"))
+	assert_true(d.has("inventory"))
+	var back = _state()
+	back.from_dict(d)
+	assert_eq(back.gems.count(PonyDataScript.Rarity.RARE), 3)
+	assert_eq(back.inventory.count(&"hay"), 4)
+
+
+func test_a_save_without_gems_or_inventory_loads_with_empty_ones() -> void:
+	var state = _state()
+	state.gems.add(PonyDataScript.Rarity.COMMON, 1)
+	state.from_dict({"bits": 7})
+	assert_eq(state.bits, 7)
+	assert_true(state.gems.is_empty(), "a version 1 save has no gems key")
+	assert_eq(state.inventory.ids().size(), 0)
+
+
+func test_reset_empties_gems_and_inventory() -> void:
+	var state = _state()
+	state.gems.add(PonyDataScript.Rarity.COMMON, 2)
+	state.inventory.add(&"hay", 1)
+	state.reset()
+	assert_true(state.gems.is_empty())
+	assert_eq(state.inventory.ids().size(), 0)
 
 
 # --- the disk round trip ----------------------------------------------------------------
