@@ -1,0 +1,173 @@
+extends GutTest
+## Tests for game/systems/shop.gd: the transaction between the pouch, the wallet and the
+## inventory. Every refusal is re-checked afterwards for "nothing moved", the same way
+## test_economy.gd does for spend().
+
+const ShopScript := preload("res://systems/shop.gd")
+const EconomyScript := preload("res://systems/economy.gd")
+const GemPouchScript := preload("res://systems/gem_pouch.gd")
+const InventoryScript := preload("res://systems/inventory.gd")
+const ShopItemScript := preload("res://systems/shop_item.gd")
+const PonyDataScript := preload("res://systems/pony_data.gd")
+
+var _econ: Economy
+var _pouch: GemPouch
+var _inv: Inventory
+var _unlocks: Array
+var _shop: Shop
+
+
+func before_each() -> void:
+	_econ = EconomyScript.new(0)
+	_pouch = GemPouchScript.new()
+	_inv = InventoryScript.new()
+	_unlocks = []
+	_shop = ShopScript.new(_econ, _pouch, _inv, _unlocks)
+
+
+func _care(id: String, cost: int, food: String, qty: int = 1) -> ShopItem:
+	var item: ShopItem = ShopItemScript.new()
+	item.id = StringName(id)
+	item.display_name = id.capitalize()
+	item.cost = cost
+	item.kind = ShopItemScript.Kind.CARE
+	item.food_id = StringName(food)
+	item.quantity = qty
+	return item
+
+
+func _gear(id: String, cost: int) -> ShopItem:
+	var item: ShopItem = ShopItemScript.new()
+	item.id = StringName(id)
+	item.display_name = id.capitalize()
+	item.cost = cost
+	item.kind = ShopItemScript.Kind.GEAR
+	item.gear_id = StringName(id)
+	return item
+
+
+# --- selling ------------------------------------------------------------------------------
+
+func test_selling_gems_pays_the_rarity_price_and_empties_that_tier() -> void:
+	_pouch.add(PonyDataScript.Rarity.RARE, 2)
+	watch_signals(_shop)
+	var earned := _shop.sell(PonyDataScript.Rarity.RARE, 2)
+	assert_eq(earned, 2 * EconomyScript.GEM_VALUE_BY_RARITY[PonyDataScript.Rarity.RARE])
+	assert_eq(_econ.bits, earned)
+	assert_eq(_pouch.count(PonyDataScript.Rarity.RARE), 0)
+	assert_signal_emitted_with_parameters(_shop, "sold", [PonyDataScript.Rarity.RARE, 2, earned])
+
+
+func test_selling_more_than_held_sells_only_what_is_held() -> void:
+	_pouch.add(PonyDataScript.Rarity.COMMON, 1)
+	var earned := _shop.sell(PonyDataScript.Rarity.COMMON, 10)
+	assert_eq(earned, EconomyScript.GEM_VALUE_BY_RARITY[PonyDataScript.Rarity.COMMON])
+	assert_eq(_pouch.total(), 0)
+
+
+func test_selling_from_an_empty_tier_earns_nothing_and_does_not_signal() -> void:
+	watch_signals(_shop)
+	assert_eq(_shop.sell(PonyDataScript.Rarity.LEGENDARY, 1), 0)
+	assert_eq(_econ.bits, 0)
+	assert_signal_not_emitted(_shop, "sold")
+
+
+func test_sell_all_sums_every_tier() -> void:
+	_pouch.add(PonyDataScript.Rarity.COMMON, 2)
+	_pouch.add(PonyDataScript.Rarity.LEGENDARY, 1)
+	var expected: int = 2 * EconomyScript.GEM_VALUE_BY_RARITY[PonyDataScript.Rarity.COMMON] \
+		+ EconomyScript.GEM_VALUE_BY_RARITY[PonyDataScript.Rarity.LEGENDARY]
+	assert_eq(_shop.sell_all(), expected)
+	assert_true(_pouch.is_empty())
+	assert_eq(_econ.bits, expected)
+
+
+func test_gem_price_reads_the_economy_table() -> void:
+	for rarity in EconomyScript.GEM_VALUE_BY_RARITY.keys():
+		assert_eq(_shop.gem_price(rarity), EconomyScript.GEM_VALUE_BY_RARITY[rarity])
+
+
+# --- buying care --------------------------------------------------------------------------
+
+func test_buying_care_spends_bits_and_adds_the_food() -> void:
+	_econ.sell(PonyDataScript.Rarity.COMMON, 4)  # 20 bits
+	var hay := _care("hay", 5, "hay", 2)
+	assert_true(_shop.can_buy(hay))
+	watch_signals(_shop)
+	assert_true(_shop.buy(hay))
+	assert_eq(_econ.bits, 15)
+	assert_eq(_shop.bits(), _econ.bits)
+	assert_eq(_inv.count(&"hay"), 2)
+	assert_signal_emitted(_shop, "bought")
+
+
+func test_buying_what_you_cannot_afford_is_refused_and_nothing_moves() -> void:
+	var hay := _care("hay", 5, "hay")
+	assert_false(_shop.can_buy(hay))
+	assert_false(_shop.buy(hay))
+	assert_eq(_econ.bits, 0)
+	assert_eq(_inv.count(&"hay"), 0)
+	assert_false(_shop.refusal(hay).is_empty(), "the menu needs a reason to show")
+
+
+func test_care_can_be_bought_repeatedly() -> void:
+	_econ.sell(PonyDataScript.Rarity.RARE, 1)  # 30 bits
+	var hay := _care("hay", 5, "hay")
+	assert_true(_shop.buy(hay))
+	assert_true(_shop.buy(hay))
+	assert_eq(_inv.count(&"hay"), 2)
+	assert_eq(_econ.bits, 20)
+
+
+# --- buying gear --------------------------------------------------------------------------
+
+func test_buying_gear_records_the_unlock_once() -> void:
+	_econ.sell(PonyDataScript.Rarity.LEGENDARY, 3)  # 300 bits
+	var bag := _gear("bigger_saddlebag", 120)
+	assert_false(_shop.owns_gear(&"bigger_saddlebag"))
+	assert_true(_shop.buy(bag))
+	assert_true(_shop.owns_gear(&"bigger_saddlebag"))
+	assert_eq(_unlocks, ["bigger_saddlebag"], "the live unlocks array is what changed")
+	assert_eq(_econ.bits, 180)
+
+
+func test_gear_already_owned_cannot_be_bought_again() -> void:
+	_unlocks.append("long_beam")
+	_econ.sell(PonyDataScript.Rarity.LEGENDARY, 5)
+	var beam := _gear("long_beam", 200)
+	assert_true(_shop.owns_gear(&"long_beam"))
+	assert_false(_shop.can_buy(beam))
+	assert_false(_shop.buy(beam))
+	assert_eq(_econ.bits, 500, "a refused purchase costs nothing")
+	assert_eq(_unlocks.size(), 1)
+
+
+func test_a_care_item_with_no_food_is_refused_before_any_bits_move() -> void:
+	_econ.sell(PonyDataScript.Rarity.RARE, 1)
+	var broken := _care("broken", 5, "")
+	assert_false(_shop.can_buy(broken))
+	assert_false(_shop.buy(broken))
+	assert_eq(_econ.bits, 30)
+
+
+func test_permit_and_build_kinds_are_refused_in_this_slice() -> void:
+	_econ.sell(PonyDataScript.Rarity.LEGENDARY, 5)
+	var permit: ShopItem = ShopItemScript.new()
+	permit.id = &"pass"
+	permit.cost = 1
+	permit.kind = ShopItemScript.Kind.PERMIT
+	permit.permit_zone = &"lake"
+	assert_false(_shop.buy(permit))
+	var build: ShopItem = ShopItemScript.new()
+	build.id = &"pen"
+	build.cost = 1
+	build.kind = ShopItemScript.Kind.BUILD
+	build.plot_id = &"pen_small"
+	assert_false(_shop.buy(build))
+	assert_eq(_econ.bits, 500)
+	assert_eq(_unlocks.size(), 0)
+
+
+func test_buying_null_is_refused() -> void:
+	assert_false(_shop.can_buy(null))
+	assert_false(_shop.buy(null))
