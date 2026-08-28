@@ -122,7 +122,7 @@ fi
 # is a hand-maintained number, deliberately a FLOOR rather than an exact count so adding
 # tests never breaks the build -- raise it when the suite grows, and never lower it
 # without saying in a commit message which tests went away and why.
-MIN_TESTS="${FILLY_MIN_TESTS:-344}"
+MIN_TESTS="${FILLY_MIN_TESTS:-350}"
 if [ "$tests_run" -lt "$MIN_TESTS" ]; then
   echo "ERROR: GUT ran $tests_run tests, below this suite's floor of $MIN_TESTS -- tests have gone missing. Failing regardless of GUT's own exit code ($gut_exit)." >&2
   echo "  If tests were deliberately removed, lower MIN_TESTS in tools/run_tests.sh in the same commit and say why." >&2
