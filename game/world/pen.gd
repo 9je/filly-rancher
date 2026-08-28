@@ -115,6 +115,7 @@ extends StaticBody3D
 const LayersScript := preload("res://world/collision_layers.gd")
 const NeedsScript := preload("res://systems/needs.gd")
 const ProductionScript := preload("res://systems/production.gd")
+const PonyDataScript := preload("res://systems/pony_data.gd")
 const ZoneMarkerScript := preload("res://world/zone_marker.gd")
 const PonyScene := preload("res://actors/pony/pony.tscn")
 ## Needed for `State.HELD` alone -- see _reseat_released_residents(). pony.tscn already
@@ -233,6 +234,9 @@ signal roster_changed(count: int)
 ## accumulate and take_gems() hands them over.
 signal gems_produced(total: int)
 
+## A resident ate. Carries who and what, for a toast or a test.
+signal fed(uid: StringName, food_id: StringName)
+
 # --- state ---------------------------------------------------------------------------------
 
 ## The pen. Move-in order, so a future pen UI is not reshuffled by a feeding.
@@ -246,8 +250,15 @@ var _bodies: Dictionary = {}
 ## _reseat_released_residents(), which is the whole of what it is for.
 var _held_bodies: Dictionary = {}
 
-## Gems produced here and not yet collected.
-var _gems := 0
+## The tray: gems by the rarity of the pony who made them (int rarity to int count). A
+## transient staging area; game/world/ranch.gd folds it into GameState.gems before a save
+## and when the Market opens, because Economy prices a gem by rarity and a plain total
+## would throw that information away at the moment it was made.
+var _gems_by_rarity: Dictionary = {}
+
+## `func() -> Inventory`, the shared pantry the residents eat from. Injected by ranch.gd.
+## Left invalid, nobody eats, which is what a test pen with no ranch wants.
+var inventory_provider := Callable()
 
 var _shell_built := false
 
@@ -378,17 +389,57 @@ func body_for(uid: StringName) -> Node3D:
 ## Needs first, then Production, in that order and not the other way round: Production gates
 ## on hunger, and a pony who tipped over the starving threshold during THIS tick should stop
 ## producing on this tick, not on the next one.
+##
+## Feeding sits BETWEEN the two, for the same reason read the other way: a resident the
+## pantry can feed this tick is fed before Production looks at her hunger, so a stocked
+## ranch never loses a gem to a pony who was hungry for a fraction of one frame.
 func tick(delta: float) -> int:
 	if delta <= 0.0 or _residents.is_empty():
 		return 0
 	var produced := 0
 	for inst in _residents:
 		NeedsScript.tick(inst, delta)
-		produced += ProductionScript.tick(inst, delta)
+		_feed_if_hungry(inst)
+		var made := ProductionScript.tick(inst, delta)
+		if made > 0:
+			var data: PonyData = inst.data()
+			var rarity: int = data.rarity if data != null else PonyDataScript.Rarity.COMMON
+			_gems_by_rarity[rarity] = int(_gems_by_rarity.get(rarity, 0)) + made
+			produced += made
 	if produced > 0:
-		_gems += produced
-		gems_produced.emit(_gems)
+		gems_produced.emit(gems())
 	return produced
+
+
+## Feed `inst` one item from the pantry if she is hungry and something is stocked. Her
+## favourite first, then whatever is there. Hunger is checked AFTER Needs.tick() above so
+## a pony who crossed the threshold this tick eats this tick.
+func _feed_if_hungry(inst: PonyInstance) -> void:
+	if inst.hunger < NeedsScript.HUNGRY_THRESHOLD:
+		return
+	if not inventory_provider.is_valid():
+		return
+	var pantry: Inventory = inventory_provider.call()
+	if pantry == null:
+		return
+	var choice: StringName = &""
+	for food_id in pantry.ids():
+		if NeedsScript.is_favorite(inst, food_id):
+			choice = food_id
+			break
+	if String(choice).is_empty():
+		var stocked := pantry.ids()
+		if stocked.is_empty():
+			return
+		choice = stocked[0]
+	# Take first, feed second: a feed that fails (an id Needs cannot resolve) puts the
+	# item back rather than leaving it consumed for nothing.
+	if not pantry.remove(choice, 1):
+		return
+	if not NeedsScript.feed(inst, choice):
+		pantry.add(choice, 1)
+		return
+	fed.emit(inst.uid, choice)
 
 
 func _physics_process(delta: float) -> void:
@@ -421,16 +472,31 @@ func _swing_gate(delta: float) -> void:
 	_gate_hinge.rotation.y = deg_to_rad(-_gate_angle)
 
 
-## Gems sitting in the tray, uncollected.
+## Gems sitting in the tray, uncollected, all rarities together.
 func gems() -> int:
-	return _gems
+	var sum := 0
+	for value in _gems_by_rarity.values():
+		sum += int(value)
+	return sum
 
 
-## Empty the tray and hand its contents over.
-func take_gems() -> int:
-	var got := _gems
-	_gems = 0
+## The tray by rarity. A copy.
+func gems_by_rarity() -> Dictionary:
+	return _gems_by_rarity.duplicate()
+
+
+## Empty the tray and hand its contents over, by rarity.
+func take_gems_by_rarity() -> Dictionary:
+	var got := _gems_by_rarity
+	_gems_by_rarity = {}
 	return got
+
+
+## Empty the tray and hand over the total. Kept for callers that only count.
+func take_gems() -> int:
+	var total := gems()
+	_gems_by_rarity = {}
+	return total
 
 
 # --- geometry helpers ------------------------------------------------------------------------
