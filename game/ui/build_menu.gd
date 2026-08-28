@@ -202,7 +202,7 @@ func confirm() -> bool:
 	if plot == null or _slot == null:
 		return false
 	if not can_afford(plot):
-		_footer.text = "  %s costs %d bits -- you have %d." % [plot.display_name, plot.cost,
+		_footer.text = "  %s costs %d bits. You have %d." % [plot.display_name, plot.cost,
 			bits()]
 		_style_label(_footer, 20, COLOR_UNAFFORDABLE)
 		return false

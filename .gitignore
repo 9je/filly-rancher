@@ -15,3 +15,7 @@ game/addons/gut/
 # (broken/duplicated references in scenes that point at them).
 game/assets/converted/**/*.import
 __pycache__/
+
+# Logs written into the repo root by .github/workflows/smoke_run.sh when it is run
+# locally (CI runs it in a throwaway checkout, so it never noticed).
+ci_smoke_*.log

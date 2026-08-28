@@ -105,25 +105,32 @@ const WRIGGLE_WIDTH := 4.0
 ## Twilight's own aura colour while the beam is on, so "the beam is live" is visible
 ## even when it is pointed at empty sky; a brighter lock colour when the crosshair has
 ## something grabbable within reach; amber while something is in the beam but not yet
-## subdued; and green the moment letting go would actually keep her.
+## subdued; and a bright bloom of the beam's own pink the moment letting go would
+## actually keep her.
 const COLOR_IDLE := Color(1.0, 1.0, 1.0, 0.82)
 const COLOR_BEAMING := Color(0.98, 0.55, 0.95, 0.95)
 const COLOR_IN_RANGE := Color(1.0, 0.86, 0.42, 1.0)
 const COLOR_HOLDING := Color(1.0, 0.82, 0.35, 1.0)
-const COLOR_SECURED := Color(0.42, 1.0, 0.52, 1.0)
-## The catch ring. It is GREEN THE WHOLE WAY ROUND, at the owner's direction -- "outer
-## green circle should be your catch" -- rather than shading from one hue to another as it
-## fills: a ring that changes colour as it grows is telling you two things with one
-## channel, and the thing it needs to say is simply "this is the one you complete". What
-## changes at completion is BRIGHTNESS and the reticle snap, not hue, so the cue survives
-## for a player who cannot separate the two rings by colour at all.
-const COLOR_CATCH := Color(0.34, 0.78, 0.44, 0.90)
+const COLOR_SECURED := Color(1.0, 0.86, 0.99, 1.0)
+## The catch ring. It carries the MAGIC BEAM'S OWN PINK, one hue the whole way round,
+## at the owner's direction. It was green, and green sat badly on a green field: the
+## meter competed with the grass behind it. The beam's pink says whose magic is
+## filling the ring, and nothing else in the world is that colour.
+##
+## One hue throughout rather than shading as it fills: a ring that changes colour as it
+## grows is telling you two things with one channel, and the thing it needs to say is
+## simply "this is the one you complete". What changes at completion is BRIGHTNESS and
+## the reticle snap, not hue, so the cue survives for a player who cannot separate the
+## two rings by colour at all.
+const COLOR_CATCH := Color(0.98, 0.55, 0.95, 0.90)
 const COLOR_CATCH_FULL := COLOR_SECURED
 
-## The wriggle ring: her fight draining away. Red throughout, and brighter as it empties,
-## so "she is about to win" is a brightness AND a length, never a hue shift.
-const COLOR_WRIGGLE := Color(0.95, 0.28, 0.24, 0.85)
-const COLOR_WRIGGLE_LOW := Color(1.0, 0.42, 0.32, 1.0)
+## The wriggle ring: her fight draining away. It warms from amber to red as it empties,
+## so "she is about to win" is a colour AND a length AND a brightness, never one alone.
+## Amber against the catch ring's pink, because the pair it replaced (green against red)
+## is both the worst pair for a colour-blind player and the one that fought the grass.
+const COLOR_WRIGGLE := Color(1.0, 0.66, 0.20, 0.85)
+const COLOR_WRIGGLE_LOW := Color(0.95, 0.28, 0.24, 1.0)
 ## Every stroke is drawn twice, this colour first and one pixel wider. Without it the
 ## white reticle disappears against a bright sky and the pink one against the pink beam.
 const COLOR_OUTLINE := Color(0.0, 0.0, 0.0, 0.55)
@@ -330,11 +337,11 @@ func _on_escaped(_body: Node3D) -> void:
 		return
 	match _beam.get_last_loss():
 		MagicBeamScript.Loss.SLIPPED:
-			toast("She slipped out -- hold her longer!")
+			toast("She slipped out! Hold her a little longer.")
 		MagicBeamScript.Loss.WRENCHED:
-			toast("She wrenched free! She will tire -- try again.")
+			toast("She wrenched free! She will tire, so try again.")
 		_:
-			toast("She wriggled free -- let go sooner!")
+			toast("She wriggled free! Let go sooner.")
 
 
 # --- drawing ---------------------------------------------------------------------
@@ -494,15 +501,15 @@ func _style_label(label: Label, size: int, color: Color) -> void:
 const HINTS := [
 	["MOVE (run)", "W A S D", "Left stick"],
 	["WALK / SNEAK", "Shift (hold)", "LB (hold)"],
-	["", "creep quietly -- ponies notice you from half as far", ""],
+	["", "creep quietly, and ponies notice you from half as far", ""],
 	["JUMP", "Space", "A"],
 	["INTERACT", "E", "X"],
 	["", "build on an empty plot, move a pony in", ""],
 	["LOOK", "Mouse", "Right stick"],
 	["ZOOM", "Scroll / = -", "D-pad up/down"],
 	["MAGIC BEAM", "Right mouse (hold)", "Right trigger (hold)"],
-	["", "hold until the OUTER GREEN ring fills, then let go to stow her", ""],
-	["", "the INNER RED ring is her fight -- let it empty and she wriggles free", ""],
+	["", "hold until the OUTER PINK ring fills, then let go to stow her", ""],
+	["", "the INNER AMBER ring is her fight. Let it empty and she wriggles free", ""],
 	["FREE CURSOR", "Esc", ""],
 	["THIS CARD", "H", "Back"],
 ]
