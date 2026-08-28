@@ -82,6 +82,28 @@ func _ready() -> void:
 			built += 1
 		idx += 1
 
-	print("REGISTRY_OK count=", built)
+	# EVERY PONY ON THE ROSTER, NOT A TYPED THREE. This read `built == 3` and went red the
+	# moment the roster grew past the original trio -- the SFM rig adapter added Pinkie,
+	# Derpy and Starlight and this gate started exiting 1 on a perfectly good build. The
+	# roster is the thing being checked, so the roster is what the count is compared to; a
+	# character added to game/data/ponies/ is now covered here automatically, which is what
+	# this file's own header comment ("added there and forgotten here is a gate that stopped
+	# checking the new thing") was already asking for.
+	#
+	# `> 0` because an empty PONY_DIR would otherwise satisfy `built == ponies.size()` as
+	# 0 == 0 and pass a gate that verified nothing at all.
+	var expected := ponies.size()
+	var passed := built == expected and expected > 0 and all_ok
+
+	# The marker follows the verdict rather than preceding it. This printed REGISTRY_OK
+	# unconditionally and THEN decided the exit code, so a failing run announced success and
+	# only the exit status disagreed -- which is exactly the "success claim outrunning what
+	# was verified" failure docs/testing.md exists to stop, and it hid this very bug from a
+	# sweep that grepped for the marker. game/scenes/test/playground.gd has always done it
+	# this way round; this now matches.
+	if passed:
+		print("REGISTRY_OK count=", built)
+	else:
+		print("REGISTRY_FAILED count=", built, " expected=", expected)
 	if DisplayServer.get_name() == "headless":
-		get_tree().quit(0 if (built == 3 and all_ok) else 1)
+		get_tree().quit(0 if passed else 1)
