@@ -275,10 +275,33 @@ scale by exactly the requested factor.
 
 | 7 | **The iris is shrinkwrapped onto an eyeball that is not the one we export.** Each eye is four objects — `Base_Eye.*` (the white, SUBSURF 2), `Base_Iris.*` and two `Base_EyeHighlight*.*` — with the caps floated off the white by a SHRINKWRAP in PROJECT/ABOVE_SURFACE mode. The iris's shrinkwrap carries `subsurf_levels=2`, i.e. it conforms to a level-**four** eyeball while the level-two one is what ships. | The sclera tears through the upper rim of every iris: a stable, sawtoothed white/colour boundary, worst on Fluttershy, present on all three packs. This is what the owner's first playtest called "eyes weird" / "eyes also a bit funny?". Nothing structural sees it — `materials=13 textured=True` is as green as ever. | `conform_shrinkwraps_to_exported_surface()` forces every shrinkwrap's `subsurf_levels` to 0 and multiplies **all** of the export's shrinkwrap offsets by one common factor, enough that the smallest clears 0.5% of its target's size. One factor rather than a per-modifier floor, because the caps are stacked (iris 0.0015, highlights 0.0020) and flattening them to the same value just moves the tearing up a layer. Measured on the shipped `.glb`, nearest-vertex signed distance along the sclera normal: iris `-0.00037 → +0.00161 m` minimum, `14 → 0` vertices inside the white; highlight-vs-iris `-0.00002 → +0.00060 m`, `3 → 0` inside. |
 
-**Known limitation carried forward:** glTF cannot express a color-plus-decal
-mix in one material, so the exported body keeps its flat base color and
-**loses the cutie mark**. This is a real fidelity regression, deferred to
-Phase 1 (§9 below — Cycles bake).
+**Fixed (was: known limitation).** glTF cannot express a color-plus-decal mix in
+one material, so the exported body used to keep its flat base color and **lose the
+cutie mark**. That was carried as a fidelity regression awaiting a Cycles bake.
+
+It never needed a bake. The decal is sampled through the mesh's own active UV map,
+exactly as a body texture would be, so compositing the two layers in UV space is the
+same operation the shader performs per pixel, done once and stored:
+`_bake_decal_over_solid()` in `tools/export_blend.py` flattens
+`Mix(Factor=Decal.Alpha, A=solid RGB, B=Decal.Color)` into a single opaque image and
+wires that in as base color. No render, no bake settings, no lighting to get wrong.
+
+It is generic rather than per character: any material shaped as a flat color with an
+alpha decal over it flattens the same way, and a material of any other shape falls
+through to the previous behaviour untouched. The decal's alpha stays a MASK and is
+never wired to material alpha, which is the distinction that once exported these
+ponies as a floating cutie mark and nothing else. Verified by rendering all three
+flanks: Twilight's starburst, Rainbow Dash's lightning bolt and Fluttershy's
+butterflies are all present, with the SFM ponies (whose marks are painted into the
+body texture) unaffected as a control. Baked sizes are 3000x3850, 1600x2343 and
+1024x1024 respectively, and `validate_gltf.py` reports the same
+`meshes/skins/materials` counts as before.
+
+One trap worth recording, because it cost a debugging round. The factor check compares
+`from_node.as_pointer() == decal_tex.as_pointer()`, not `from_node is decal_tex`. Every
+attribute access on a bpy collection builds a fresh Python wrapper around the same
+underlying RNA data, so `is` is False even when both names refer to the identical node,
+and the bake silently took its bail-out path on every character.
 
 ### Validation
 
