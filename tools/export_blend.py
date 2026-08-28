@@ -33,6 +33,14 @@ p.add_argument("--fbx-in", default=None, metavar="PATH",
                help="import this FBX into the current (normally empty) scene before "
                     "doing anything else -- lets this script convert a standalone FBX "
                     "prop without a pre-authored .blend to open it from")
+p.add_argument("--mdl-in", default=None, metavar="PATH",
+               help="import this Source-engine .mdl (SourceIO) into an empty scene, "
+                    "prune its bodygroup variants and build the canonical animation "
+                    "interface onto its rig (tools/sfm_rig.py) before the rest of this "
+                    "script runs unchanged -- so a tier-c SFM pony gets the SAME "
+                    "authored idle/walk/gallop the tier-a packs get. Implies the "
+                    "material rebuild is skipped (SourceIO already emits Principled "
+                    "BSDFs). See docs/pipeline.md section 5b")
 args = p.parse_args(argv)
 
 if args.fbx_in:
@@ -52,6 +60,45 @@ if args.fbx_in:
     bpy.ops.import_scene.fbx(filepath=args.fbx_in)
     for obj in _pre_import_objects:
         bpy.data.objects.remove(obj, do_unlink=True)
+
+if args.mdl_in:
+    # --- Tier c, promoted from probe to character (Phase 1B, docs/pipeline.md 5b).
+    # `tools/convert_mdl.py` remains the thin structural probe it always was; this is
+    # the path that produces a playable pony, and it is inside export_blend.py rather
+    # than beside it so that everything downstream -- --scale's bake and its hard
+    # bounding-box check, --anims, the secondary-motion bake filter and its post-export
+    # assertion, --rotate-z, the export flags -- applies to an SFM pony identically and
+    # cannot drift from the tier-a path.
+    #
+    # `read_homefile(use_empty=True)` for the same reason --fbx-in deletes its snapshot:
+    # `blender -b` with no .blend argument opens the startup scene's Cube/Camera/Light,
+    # and a stray Cube welded to a pony passes every structural gate.
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import sfm_rig
+
+    _mdl = os.path.abspath(args.mdl_in)
+    bpy.ops.wm.read_homefile(use_empty=True)
+    _result = bpy.ops.sourceio.mdl(directory=os.path.dirname(_mdl) + os.sep,
+                                   files=[{"name": os.path.basename(_mdl)}])
+    if _result != {"FINISHED"}:
+        sys.exit(f"MDL_IMPORT_FAILED {_result} for {args.mdl_in}")
+    for _img in bpy.data.images:      # VTF-decoded textures are loose until packed
+        if _img.source == "FILE":
+            _img.pack()
+    sfm_rig.prune_bodygroups()
+    _sfm_arm = sfm_rig.adapt()
+    # Every model in the pack names its armature after the character
+    # (`ReVAmped_PinkiePie_ARM`), so requiring --object would make the command line
+    # per-character for no reason. There is exactly one armature in a .mdl import --
+    # sfm_rig._armature() fails loudly otherwise -- so default to it and keep the
+    # invocation identical for all 47 models.
+    if not args.object:
+        args.object = _sfm_arm.name
+    _suggested = sfm_rig.withers_scale(_sfm_arm)
+    if _suggested is not None:
+        print(f"SFM_RIG_WITHERS_SCALE {_suggested:.4f} "
+              f"(factor that would put this rig at tier a's 1.163 m withers; "
+              f"the shipped --scale is the rounded power of two, see docs/pipeline.md 5b)")
 
 # --- Quirk: CreatorOfPony / MythicSpeed reupload packs (2015-era Blender Internal
 # files opened in Blender 4.2) never got their materials migrated to Principled BSDF.
@@ -194,47 +241,65 @@ def _set_opaque(mat, opaque):
 
 def rebuild_materials_for_gltf():
     for mat in bpy.data.materials:
-        if not mat.use_nodes or mat.node_tree is None:
-            continue
-        nt = mat.node_tree
-        out = next((n for n in nt.nodes if n.type == "OUTPUT_MATERIAL"), None)
-        if out is None or "Surface" not in out.inputs:
-            continue
-
-        shader, saw_transparent = _principal_shader(out)
-        kind, value, via_mix = _resolve_color(_color_socket(shader))
-        principled = nt.nodes.new("ShaderNodeBsdfPrincipled")
-        wired_alpha = False
-
-        if kind == "image":
-            nt.links.new(value.outputs["Color"], principled.inputs["Base Color"])
-            if not via_mix:
-                try:
-                    if value.image.depth in (32, 128) and "Alpha" in value.outputs:
-                        nt.links.new(value.outputs["Alpha"], principled.inputs["Alpha"])
-                        wired_alpha = True
-                except (RuntimeError, ReferenceError):
-                    pass  # image not loadable (missing file) -- base color is enough
-        else:
-            color = tuple(value)[:4]
-            if len(color) == 3:
-                color += (1.0,)
-            principled.inputs["Base Color"].default_value = color
-
-        # A material built purely from a Transparent BSDF (e.g. "Base_Transparent")
-        # is deliberately invisible -- don't resurrect it as opaque grey.
-        if shader is None and saw_transparent:
-            principled.inputs["Alpha"].default_value = 0.0
-            wired_alpha = True
-
-        nt.links.new(principled.outputs["BSDF"], out.inputs["Surface"])
-        _set_opaque(mat, not wired_alpha)
-        print(f"MAT {mat.name}: shader={shader.type if shader else None} "
-              f"color={'texture:' + value.image.name if kind == 'image' else kind} "
-              f"decal_mix={via_mix} alpha={'wired' if wired_alpha else 'opaque'}")
+        rebuild_material_for_gltf(mat)
 
 
-rebuild_materials_for_gltf()
+# Split out of the loop above so `--mdl-in`'s Source-aware pass (tools/sfm_rig.py) can
+# fall back to it for the one material family it cannot handle in place -- SourceIO's
+# procedural eye shaders -- without duplicating any of this. A pure extraction: the loop
+# body is unchanged, so tier-a exports stay byte-identical.
+def rebuild_material_for_gltf(mat):
+    if not mat.use_nodes or mat.node_tree is None:
+        return
+    nt = mat.node_tree
+    out = next((n for n in nt.nodes if n.type == "OUTPUT_MATERIAL"), None)
+    if out is None or "Surface" not in out.inputs:
+        return
+
+    shader, saw_transparent = _principal_shader(out)
+    kind, value, via_mix = _resolve_color(_color_socket(shader))
+    principled = nt.nodes.new("ShaderNodeBsdfPrincipled")
+    wired_alpha = False
+
+    if kind == "image":
+        nt.links.new(value.outputs["Color"], principled.inputs["Base Color"])
+        if not via_mix:
+            try:
+                if value.image.depth in (32, 128) and "Alpha" in value.outputs:
+                    nt.links.new(value.outputs["Alpha"], principled.inputs["Alpha"])
+                    wired_alpha = True
+            except (RuntimeError, ReferenceError):
+                pass  # image not loadable (missing file) -- base color is enough
+    else:
+        color = tuple(value)[:4]
+        if len(color) == 3:
+            color += (1.0,)
+        principled.inputs["Base Color"].default_value = color
+
+    # A material built purely from a Transparent BSDF (e.g. "Base_Transparent")
+    # is deliberately invisible -- don't resurrect it as opaque grey.
+    if shader is None and saw_transparent:
+        principled.inputs["Alpha"].default_value = 0.0
+        wired_alpha = True
+
+    nt.links.new(principled.outputs["BSDF"], out.inputs["Surface"])
+    _set_opaque(mat, not wired_alpha)
+    print(f"MAT {mat.name}: shader={shader.type if shader else None} "
+          f"color={'texture:' + value.image.name if kind == 'image' else kind} "
+          f"decal_mix={via_mix} alpha={'wired' if wired_alpha else 'opaque'}")
+
+
+# The tier-a rebuild above fixes 2015-era Blender-Internal quirks a Source import does
+# not have -- SourceIO really does emit a Principled BSDF wired straight into Material
+# Output, which is why tools/convert_mdl.py never needed any of this. What it emits
+# instead is its own quirk (a phong-exponent map wired into METALLIC), so --mdl-in gets
+# a Source-aware pass that repairs the Principled in place and keeps its normal map,
+# falling back to the function above only for the procedural eye shaders. See
+# tools/sfm_rig.py's flatten_source_materials().
+if args.mdl_in:
+    sfm_rig.flatten_source_materials(rebuild_material_for_gltf)
+else:
+    rebuild_materials_for_gltf()
 
 
 # --- Quirk (hair defect, Task 10): the mane/tail mesh is skinned to a SECOND,
@@ -671,6 +736,19 @@ if args.anims:
         export_animation_mode="ACTIONS",  # one glTF animation per Action, named after it
         export_bake_animation=True,       # bake the IK solve into the DEF_ bone tracks
     )
+# --- Quirk (--mdl-in): the same "bake every object" flag that makes the IK solve ship
+# also emits ONE BAKED CLIP PER SHAPE-KEYED MESH, named after the mesh. The tier-a packs
+# never showed it because their exported meshes carry no shape keys; a Source .mdl's do
+# -- every facial flex is one -- so `revamped_rarity` came out with SEVEN clips:
+# idle/walk/gallop plus `bodyparts/feral/bodies/reVAmped_body_regular.dmx` and three
+# more, each a constant morph track. They would sit in the AnimationPlayer next to the
+# real ones and `Gait`/`PonyVisuals` pick clips by name, so nothing would play them --
+# but they inflate the file and make `validate_gltf.py`'s animation list unreadable.
+# Dropping morph targets entirely is the honest fix rather than dropping their
+# animation: nothing in this game drives a flex, and there is no facial-expression
+# system for them to feed. Re-enable both flags together if one is ever added.
+if args.mdl_in:
+    export_kwargs.update(export_morph=False)
 
 bpy.ops.export_scene.gltf(**export_kwargs)
 if args.anims:

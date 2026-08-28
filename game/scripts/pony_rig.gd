@@ -36,9 +36,23 @@ const HAIR_PATTERNS: Array[String] = ["mane", "tail", "hair", "forelock", "fring
 ## survive glTF, so after export the CON_ bones deform nothing at all -- verified by
 ## decoding the exported mesh's JOINTS_0/WEIGHTS_0: 100% of TS_Hair's weight sits on
 ## DEF_Head plus DEF_Mane*/DEF_Hair*/DEF_Tail*, and exactly 0% on any CON_ bone.
-## Simulating them would burn time and produce nothing visible, so prefer the deform
-## layer when it exists and fall back to whatever matched if a future rig has no DEF_.
-const DEFORM_PREFIX := "DEF_"
+## Simulating them would burn time and produce nothing visible, so the control layer is
+## skipped.
+##
+## STATED AS "SKIP THE CONTROL LAYER", NOT "PREFER `DEF_`", AND THAT IS THE FIX, NOT A
+## REWORDING. This used to read `deform if any hair bone begins_with("DEF_") else
+## everything`, which is the same thing on a tier-a rig -- its hair bones are exactly
+## `CON_*` plus `DEF_*`, so both rules select the identical set and Twilight's certified
+## tuning is untouched -- but it inverts on a rig where a `DEF_`-prefixed chain is the
+## MINORITY. The reVAmped SFM pack (docs/pipeline.md 5b) is exactly that: most of its
+## hair bones are `jiggle_hair*` / `HairBack*` / `Tail*`, but Starlight Glimmer's
+## alternate mane brings fourteen `DEF_HairStray*`/`DEF_HairBack*` bones along with it,
+## and the old rule would have simulated ONLY those fourteen -- the chains belonging to
+## a hairstyle that is not even exported -- and left her real mane and tail welded to
+## her skull, while every gate stayed green. The rule that generalises is the one this
+## file's evidence actually supports: a bone on a KNOWN ANIMATOR-CONTROL LAYER deforms
+## nothing, everything else might. A rig family with a new control prefix adds it here.
+const CONTROL_PREFIXES: Array[String] = ["CON_", "FK_", "IK_", "MCH_", "ORG_"]
 
 ## Per-chain tuning, first matching entry wins on the chain root's bone name. Cartoon-
 ## pony brief: the hair should visibly trail the body's bob, and settle without wobbling
@@ -406,9 +420,20 @@ static func _hair_bones(skeleton: Skeleton3D) -> PackedInt32Array:
 		if not is_hair_bone(bone_name):
 			continue
 		matched.append(bone)
-		if bone_name.begins_with(DEFORM_PREFIX):
+		if not is_control_bone(bone_name):
 			deform.append(bone)
+	# Fall back to everything matched if a rig is somehow ALL control layer -- better to
+	# simulate something inert than to silently attach no simulator at all.
 	return deform if not deform.is_empty() else matched
+
+
+## True for a bone on an animator-control layer, which by convention deforms nothing.
+## See CONTROL_PREFIXES. Case-sensitive: these are prefix conventions, not words.
+static func is_control_bone(bone_name: String) -> bool:
+	for prefix in CONTROL_PREFIXES:
+		if bone_name.begins_with(prefix):
+			return true
+	return false
 
 
 ## Length of the virtual joint appended past the chain's end bone. glTF bones carry no

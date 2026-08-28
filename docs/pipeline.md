@@ -510,10 +510,11 @@ python3 tools/validate_gltf.py game/assets/converted/probe/sfm_probe.glb
 # -> meshes=14 skins=1 materials=12 textured=True animations=[]
 ```
 
-**Output goes to `probe/`, not `ponies/`** (§2). Tier c ships no animations,
-so a tier-c `.glb` sitting in `ponies/` makes §3's `--require-anims`
-validation loop print `VALIDATION FAILED` when run verbatim, and inflates
-`model_gallery.tscn`'s `GALLERY_OK count=` past the three real characters.
+**This probe's output goes to `probe/`, not `ponies/`** (§2): `convert_mdl.py`
+authors no animations, so its `.glb` sitting in `ponies/` makes §3's
+`--require-anims` validation loop print `VALIDATION FAILED` when run verbatim,
+and inflates `model_gallery.tscn`'s `GALLERY_OK count=`. A tier-c model
+promoted through **§5b** does ship clips and does belong in `ponies/`.
 Note also that `convert_mdl.py` applies neither `rebuild_materials_for_gltf()`
 (unneeded — SourceIO already emits Principled BSDFs) nor `--rotate-z 180`, so
 the probe faces backwards relative to the tier-a ponies; harmless for a
@@ -557,10 +558,131 @@ use tier c opportunistically for specific well-packaged SFM downloads (like
 this reVAmped set) when a needed character isn't available in a/b.** Do not
 plan roster breadth on the unaudited PonySFM catalog sight-unseen.
 
-Like tier a, tier c ships zero baked animations — any tier-c model needs
-either its own authored clip set or a bone-name remap onto the tier-a
-canonical rig (it shares zero bone names with tier a: `Pelvis`, `Chest1`,
-`Head`, ... vs `DEF_Chest1`, `DEF_Head`, ...).
+Like tier a, tier c ships zero baked animations, and it shares zero bone names
+with tier a (`Pelvis`, `Chest1`, `Head`, ... vs `DEF_Chest1`, `DEF_Head`, ...).
+Neither of those turned out to require a bone-name remap: **§5b** is the path
+that promotes a tier-c model to a playable, animated character, and it takes
+the third option — build tier a's animation interface onto the Source rig and
+let the existing clip authoring solve against it.
+
+---
+
+## 5b. Tier c, promoted — an SFM pony that walks
+
+§5 converts a Source `.mdl` to a structural probe. This section is how one
+becomes a playable character, and it is the path
+`game/data/ponies/{pinkiepie,derpyhooves,starlightglimmer}.tres` point at.
+
+```bash
+SRC="assets_raw/sfm/SFM Ready Compiled Files/Models/reVAmped_ponies"
+
+tools/bin/blender/blender -b -P tools/export_blend.py -- \
+  --mdl-in "$SRC/revamped_pinkiepie.mdl" \
+  --out game/assets/converted/ponies/pinkiepie.glb \
+  --anims --rotate-z 180 --scale 2.0
+
+python3 tools/validate_gltf.py game/assets/converted/ponies/pinkiepie.glb --require-anims
+# -> meshes=8 skins=1 materials=9 textured=True animations=['gallop', 'idle', 'walk']
+```
+
+The character name is the only thing that changes between models. `--scale
+2.0` (not tier a's 0.5 — the SFM pack is authored at roughly half life size,
+§3), and `--rotate-z 180` for the same reason tier a needs it.
+
+### Why this is not retargeting
+
+The reVAmped skeleton shares **zero** bone names with tier a and, more to the
+point, is not the same animal underneath: tier a's front leg splits 0.229 m /
+0.305 m across two IK-chain bones, the SFM pony's splits 0.114 / 0.198 / 0.074
+across three. Copying tier a's baked per-bone rotations onto those bones moves
+the hoof somewhere else, and specifically changes how far a planted hoof
+travels per stride — which is the one number `game/systems/gait.gd` matches to
+stop the pony skating.
+
+So `tools/sfm_rig.py` does the opposite. It **builds the tier-a animation
+interface onto the imported Source rig** — `CON_Root`, `CON_Belly`, a
+`DEF_Head` alias, and four `IK_*Hoof.*` world-space foot targets with real IK
+chains behind them — and then `tools/author_anims.py` runs **completely
+unchanged** and solves the same gait against the SFM pony's own leg geometry.
+There is one copy of the gait code and no per-family branch in it.
+
+Measured on the exported clips, sampling the hoof contact point at 60 steps
+per cycle (`STRIDE` and `GALLOP_STRIDE` are both 0.275 m):
+
+| | walk | gallop | IK error |
+|---|---|---|---|
+| Twilight (tier a) | 0.2659 m | 0.2729 m | — |
+| Pinkie / Derpy / Starlight (tier c) | 0.2661–0.2667 m | 0.2717–0.2730 m | ≤ 0.009 m |
+
+Same stride, same clip, two unrelated skeletons. That is the whole argument
+for authoring against target geometry rather than transferring clips.
+
+### What is and is not per character
+
+Nothing in `sfm_rig.py` is. Verified across six models (Pinkie Pie, Rarity,
+Maud Pie, Derpy Hooves, Applebloom, Shining Armor): the pack shares a 70-bone
+core skeleton whose body and leg bones sit at identical rest positions to four
+decimal places on every character — `Chest2` at z=0.4676, `LeftShoulder` at
+z=0.4314, front leg span 0.3650, rear 0.4161 — filly and stallion alike. Only
+hair/tail/wing/accessory chains and the head mesh differ. One authored clip
+set covers all 47 models in the pack.
+
+### Two defects that every structural gate was green through
+
+Both were found by rendering a frame and looking at it
+(`scenes/test/visual_review.tscn`, §7), not by a validator.
+
+**The head cranked back over the shoulders**, in every clip, on every
+character. A Blender bone's orientation is (head, tail, **roll**), and
+`sfm_rig.py`'s bone-builder was zeroing roll. That is harmless for the control
+bones that are nobody's twin — `CON_Root`, `CON_Belly`, the four IK
+end-effectors and the four IK targets are all read for their position — but
+`DEF_Head` is a twin of `Head` by construction: SourceIO gives every bone on these rigs the same 19 mm stub tail
+and encodes the Source bone's real rotation in the roll, so `Head` imports at
+roll −89.9994°, and an alias built from its head and tail alone sat a quarter
+turn off it. The `COPY_TRANSFORMS` that drives the alias onto the head then
+handed that quarter turn to the head on every evaluated frame.
+
+The fix is one parameter; the guard is `sfm_rig.check_rest_pose_preserved()`,
+which now runs at the end of every `adapt()` and asserts the thing that was
+actually violated — **with no Action assigned, a pony that has been through
+`adapt()` stands exactly where the `.mdl` put her.** It prints
+`SFM_RIG_REST_DRIFT moved=<m> (<bone>) turned=<deg> (<bone>)` — the two maxima
+tracked separately, because a pure twist about a bone's own head displaces it
+by nothing and would hide behind any bone that had drifted a fraction of a
+millimetre — and fails the export above 1 mm / 0.25°. Current drift on all
+three shipped characters: 0.000000 m / 0.0000°.
+
+**Every coat rendered as wet plastic** — most visible on Pinkie Pie, whose
+pale pink coat washed out toward white. SourceIO wires the Source
+`$phongexponenttexture` into Principled's Roughness, and glTF's
+metallicRoughness texture is a fixed channel packing whose **green** channel
+is roughness. Green in a Source exponent map is the albedo-tint mask (red is
+the exponent), and on this pack it is 15/255 everywhere — roughness 0.06, a
+mirror. Measured on the shipped `common/body_exponent`: min 15, max 89, mean
+15.2, identical on all three characters, so there was also no hoof/coat
+distinction to preserve. Source confines that specular lobe with
+`$phongfresnelranges`/`$phongboost`; glTF carries no equivalent and Godot
+ignores the `KHR_materials_specular` factor the exporter writes. So
+`flatten_source_materials()` now drops the map and sets `ROUGHNESS_FLAT = 0.5`
+— the same value every tier-a material already ships, so a Source pony and a
+Blender pony standing in the same field are lit alike.
+
+### Known fidelity losses
+
+- **Flat irises.** SourceIO's eye materials are procedural `ADD_SHADER`/
+  `MIX_SHADER` stacks doing parallax refraction from `!EYE_LOC` attributes.
+  glTF cannot express that, so the iris texture is pulled out as a flat base
+  colour.
+- **Eyebrow and eyelash materials bind a `missing_white` placeholder** (a
+  solid `#4D004D`), because the pack ships no VMT for them. It reads as dark
+  lashes and nobody has objected, but it is a substitution, not the art.
+- **Bodygroups are chosen here, not by the `.mdl`.** A Source model carries
+  every ear/hoof/mane/tail variant as a separate mesh and the default index is
+  data SourceIO does not apply, so `sfm_rig.BODYGROUPS` picks one of each and
+  drops accessories and the eye-lens refraction shell. That last one is a
+  judgement call and is flagged as such in the code.
+
 
 ---
 
