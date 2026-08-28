@@ -429,6 +429,8 @@ const HINTS := [
 	["WALK / SNEAK", "Shift (hold)", "LB (hold)"],
 	["", "creep quietly -- ponies notice you from half as far", ""],
 	["JUMP", "Space", "A"],
+	["INTERACT", "E", "X"],
+	["", "build on an empty plot, move a pony in", ""],
 	["LOOK", "Mouse", "Right stick"],
 	["ZOOM", "Scroll / = -", "D-pad up/down"],
 	["MAGIC BEAM", "Right mouse (hold)", "Right trigger (hold)"],

@@ -202,3 +202,27 @@ func test_an_unwired_menu_can_afford_nothing_but_the_free_plot() -> void:
 	for plot in bare.entries():
 		assert_eq(bare.can_afford(plot), plot.cost == 0,
 			"'%s' is affordable only if it is free" % String(plot.id))
+
+
+func test_menu_navigation_actions_have_a_keyboard_and_a_gamepad_binding() -> void:
+	# A gamepad playtester reported "I was pressing A and nothing happened, I needed to
+	# hit Enter to build the paddock". Root cause: `ui_accept`/`ui_cancel` were NOT
+	# overridden in project.godot, and this Godot version's built-in defaults for those
+	# two are keyboard-only (Enter/Kp Enter/Space, Escape) with no joypad event -- unlike
+	# `ui_up`/`ui_down`, which really do ship both schemes out of the box. The footer this
+	# menu draws ("Enter / A  build", "Esc / B  back") was promising a binding that did
+	# not exist. Same shape as test_player.gd's
+	# test_every_movement_action_has_a_keyboard_and_a_gamepad_binding(), extended to the
+	# menu's own navigation actions rather than the movement ones.
+	var expectations := {"ui_accept": true, "ui_cancel": true, "ui_up": true, "ui_down": true}
+	for action in expectations:
+		var has_desktop := false
+		var has_pad := false
+		for event in InputMap.action_get_events(action):
+			if event is InputEventKey or event is InputEventMouseButton:
+				has_desktop = true
+			elif event is InputEventJoypadButton or event is InputEventJoypadMotion:
+				has_pad = true
+		assert_true(has_desktop, "'%s' needs a keyboard binding" % action)
+		assert_true(has_pad, ("'%s' needs a gamepad binding -- the build is played on a "
+			+ "pad too, and a keyboard-only menu action strands that player mid-menu") % action)

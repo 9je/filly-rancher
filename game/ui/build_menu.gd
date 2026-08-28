@@ -16,12 +16,17 @@ extends CanvasLayer
 ## Navigation is on Godot's BUILT-IN `ui_up` / `ui_down` / `ui_accept` / `ui_cancel` actions
 ## rather than on new project-specific ones. That is a deliberate exception to this
 ## project's "every control is a named action in game/project.godot" convention, and the
-## reason is that those four are already bound to BOTH schemes by the engine's own defaults
-## -- arrows and the d-pad and the left stick; Enter/Space and the gamepad's south face
-## button; Escape and the east face button -- so re-declaring them would be copying the
-## engine's bindings into our file where they could then drift out of step with every other
-## Godot menu the player has ever used. `interact` (the button that OPENS this) is a real
-## game verb and is declared in project.godot with the rest of them.
+## reason is that all four are meant to stay in step with every other Godot menu the player
+## has ever used, keyboard and d-pad alike -- `ui_up`/`ui_down` get that for free from the
+## engine's own defaults (arrows, d-pad, left stick) and are correctly NOT redeclared.
+## `ui_accept`/`ui_cancel` looked like they would too, but a headless InputMap dump caught
+## them shipping keyboard-only (Enter/Kp Enter/Space, Escape) with no gamepad event at all
+## -- a gamepad player could steer this menu with the d-pad and then had no button that
+## would ever confirm or back out of it. So project.godot now carries an EXPLICIT override
+## for those two (keyboard defaults preserved verbatim, plus south face button 0 for accept
+## and east face button 1 for cancel) right next to `interact` -- see the comment there for
+## the full story. `interact` (the button that OPENS this) is a real game verb and is
+## declared in project.godot with the rest of them.
 ##
 ## --- THE WORLD HAS TO STOP WHILE IT IS UP, AND THIS FILE DOES NOT STOP IT ------------------
 ##
