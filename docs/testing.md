@@ -319,6 +319,29 @@ restoring the cache) turns the suite green again.
 
 ---
 
+## The market gate
+
+`scenes/test/market_test.tscn` proves the loop a unit test cannot: a gem a
+pony produces, sold for bits, bits spent on hay, a hungry pony fed, the save
+reloaded with the same gems and inventory intact, and the pause menu opened
+and closed without leaving the tree paused.
+
+It instances `world/ranch.tscn` in hosted mode rather than launching it: the
+hosted ranch arms no watchdog of its own, hands its verdict over as
+`gate_report_finished` instead of quitting the process, and the gate calls
+`GameState.reset()` for a known empty pouch and inventory instead of loading
+the player's own save slot.
+
+Run it with:
+
+```
+tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/market_test.tscn
+```
+
+Expect `MARKET_OK checks=43`; the exit code is the verdict.
+
+---
+
 ## Proving the atomic save (a thing a unit test cannot do)
 
 `game/systems/save_io.gd` promises that a save interrupted part-way through
