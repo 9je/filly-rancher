@@ -192,6 +192,9 @@ var _was_in_range := false
 
 
 func _ready() -> void:
+	# Toasts fired from the Market and pause menus must keep fading while the world
+	# is paused; the crosshair redraw is harmless while paused, so run always.
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	_crosshair.draw.connect(_draw_crosshair)
 	_pips.draw.connect(_draw_pips)
 

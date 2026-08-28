@@ -267,3 +267,14 @@ func test_the_hints_card_names_pause_and_trade_and_never_free_cursor() -> void:
 	assert_false(joined.contains("FREE CURSOR"), "Escape pauses now; it does not free the cursor")
 	assert_false(joined.contains("--"), "no double hyphen on the card")
 	assert_false(joined.contains("—"), "no em dash on the card")
+
+
+## A menu handler can fire a toast (for example the Market's "Sold 12 gems for 60
+## bits.") and then pause the tree. If the HUD stopped processing along with everything
+## else, that toast would freeze at full alpha instead of fading, and stay frozen until
+## the menu closed. PROCESS_MODE_ALWAYS is what keeps the HUD's own _process ticking
+## while the world is paused, so this pins the mode rather than the paused behaviour
+## itself, since a GUT test should not pause the shared scene tree.
+func test_the_hud_keeps_processing_while_the_tree_is_paused() -> void:
+	assert_eq(_hud.process_mode, Node.PROCESS_MODE_ALWAYS,
+		"the HUD must keep processing while the world is paused, or toasts freeze")
