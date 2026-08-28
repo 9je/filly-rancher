@@ -214,7 +214,8 @@ func test_menu_navigation_actions_have_a_keyboard_and_a_gamepad_binding() -> voi
 	# not exist. Same shape as test_player.gd's
 	# test_every_movement_action_has_a_keyboard_and_a_gamepad_binding(), extended to the
 	# menu's own navigation actions rather than the movement ones.
-	var expectations := {"ui_accept": true, "ui_cancel": true, "ui_up": true, "ui_down": true}
+	var expectations := {"ui_accept": true, "ui_cancel": true, "ui_up": true, "ui_down": true,
+		"ui_left": true, "ui_right": true}
 	for action in expectations:
 		var has_desktop := false
 		var has_pad := false
