@@ -166,18 +166,27 @@ const GEAR_BIGGER_SADDLEBAG := &"bigger_saddlebag"
 const GEAR_LONG_BEAM := &"long_beam"
 const BIGGER_SADDLEBAG_CAPACITY := 18
 ## Metres added to REACH by the long beam, and the whole of what the shop has left to sell.
-## MIN_DETECTION_MARGIN below is a floor of 3.0 m under a pony's warning, and the tightest
-## warning any personality gets today is 3.5 m (Pony.DETECTION_RADIUS 12.0 against REACH
-## 8.5), so there are exactly 0.5 m between the beam and the invariant. Selling all of them
-## is deliberate, because the upgrade is meant to be felt and a fraction of a metre nobody
-## notices is not worth a shop slot. It does mean a LONGER beam is not a number that can be
-## tuned here on its own: it needs Pony.DETECTION_RADIUS to move first.
+##
+## THE ARITHMETIC, IN FULL, BECAUSE IT IS THE ONLY THING SIZING THIS NUMBER. The least
+## sighted personality is a CURIOUS or BOLD pony, who notices a running player from
+## Pony.DETECTION_RADIUS (12.0 m); that exceeds REACH (8.5 m) by 3.5 m. MIN_DETECTION_MARGIN
+## below is a hard floor of 3.0 m under that warning. 3.5 minus 3.0 leaves 0.5 m, and this
+## constant is all 0.5 of it: the long beam reaches 9.0 m and a CURIOUS or BOLD pony is left
+## with exactly the floor. There is no slack behind it. Any FURTHER reach the shop wants to
+## sell needs Pony.DETECTION_RADIUS raised first; it cannot be bought by tuning this number
+## on its own, and raising it alone would sell the invariant rather than an upgrade.
+##
+## Selling the whole 0.5 m rather than a cautious fraction is deliberate: the upgrade is
+## meant to be felt, and a tenth of a metre nobody notices is not worth a shop slot.
+## game/data/shop/long_beam.tres promises the player half a metre, and that promise is this
+## constant.
 ##
 ## 1.0 m WAS TRIED FIRST AND DOES NOT FIT, which is worth recording because it is the
-## obvious number: it leaves 2.5 m of warning, half a metre under the floor, and that is
-## the invariant the first playtest was lost to being sold back to the player one upgrade
-## at a time. It was caught by test_magic_beam.gd, which checks this arithmetic against
-## the real per-personality notice radii rather than trusting a comment like this one.
+## obvious number: it reaches 9.5 m, leaving a CURIOUS or BOLD pony 2.5 m of warning, half a
+## metre under the floor. That is the invariant the first playtest was lost to being sold
+## back to the player one upgrade at a time. It was caught by test_magic_beam.gd, which
+## checks this arithmetic against the real per-personality notice radii rather than trusting
+## a comment like this one.
 const LONG_BEAM_BONUS := 0.5
 
 ## Metres by which a pony's notice radius must exceed REACH FOR A RUNNING PLAYER: the head

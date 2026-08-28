@@ -6,7 +6,7 @@
 script = ExtResource("1_shop")
 id = &"long_beam"
 display_name = "Long Beam"
-description = "A steadier horn. Your magic reaches a full metre further."
+description = "A steadier horn. Your magic reaches half a metre further."
 cost = 200
 kind = 0
 gear_id = &"long_beam"
