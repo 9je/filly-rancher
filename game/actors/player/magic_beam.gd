@@ -659,7 +659,10 @@ func release_stored(parent: Node = null, at: Vector3 = Vector3.INF) -> Node3D:
 	var pony: Node3D = PonyScene.instantiate()
 	pony.name = "Pony_%s" % String(instance.uid).replace(PonyInstanceScript.UID_SEPARATOR, "_")
 	pony.collision_layer = LayersScript.PONY
-	pony.collision_mask = LayersScript.WALKABLE
+	# PONY_WALKABLE, not WALKABLE: WALKABLE plus the PEN_GATE bit a pen's gate leaf sits on.
+	# Every pony carries it whether or not she has ever seen a pen -- a pony who acquired it
+	# only on moving into one would walk out of the first pen she was ever put in.
+	pony.collision_mask = LayersScript.PONY_WALKABLE
 	var detection := pony.get_node_or_null("DetectionArea") as Area3D
 	if detection != null:
 		detection.collision_layer = LayersScript.INTERACTION

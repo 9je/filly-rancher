@@ -258,7 +258,10 @@ func _spawn_one(data: PonyData, marker: ZoneMarker, slot: int) -> CharacterBody3
 	pony.set_rng(pony_rng)
 
 	pony.collision_layer = LayersScript.PONY
-	pony.collision_mask = LayersScript.WALKABLE
+	# PONY_WALKABLE, not WALKABLE: WALKABLE plus the PEN_GATE bit a pen's gate leaf sits on.
+	# Every pony carries it whether or not she has ever seen a pen -- a pony who acquired it
+	# only on moving into one would walk out of the first pen she was ever put in.
+	pony.collision_mask = LayersScript.PONY_WALKABLE
 	var detection := pony.get_node_or_null("DetectionArea") as Area3D
 	if detection != null:
 		detection.collision_layer = LayersScript.INTERACTION

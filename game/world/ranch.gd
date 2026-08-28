@@ -240,6 +240,24 @@ const PEN_PROBE_MIN_TRAVEL := 0.30
 ## check she cannot fail is not a check.
 const PEN_PROBE_PONIES := 3
 
+## The player's own capsule radius, from game/actors/player/player.tscn. Used by
+## _player_stands_on_footprint(): a fence may not go up on a plot she is standing on, and
+## "standing on" has to include the 0.42 m of her that reaches past her own centre.
+const PLAYER_BODY_RADIUS := 0.42
+
+## How far the gateway probe sweeps a capsule out from the middle of the pen, in metres from
+## the pen's centre. 4.40 puts the trailing edge of a 0.42 m capsule at 3.98 -- clear of the
+## 3.90 fence line, so reaching it means the body is genuinely OUTSIDE -- while staying
+## inside the reserved clearing, whose edge is 4.50 m from a slot centre (props.gd's
+## PEN_PLOTS_*). Sweeping further would run the probe out over ground where a tree is allowed
+## to be, and a check that fails because of a tree is a check nobody trusts.
+const GATE_PROBE_REACH := 4.40
+
+## Height of the gateway probe's capsule centre above the pen's ground plane. Its 1.30 m body
+## then spans 0.20 m to 1.50 m: high enough to clear the 0.07 m the clearing is out of level
+## by, low enough to cut through the gate leaf's collider, which tops out at 1.45 m.
+const GATE_PROBE_CENTRE_Y := 0.85
+
 @onready var terrain: StaticBody3D = $Terrain
 @onready var props: Node3D = $Props
 @onready var buildings: Node3D = $Buildings
@@ -594,6 +612,13 @@ func _on_plot_chosen(plot: PlotData, slot: PlotSlot) -> void:
 	if _economy != null and not _economy.can_afford(plot.cost):
 		_toast("You cannot afford a %s yet." % plot.display_name)
 		return
+	# THE SECOND HALF OF THE PLAYTEST REPORT THE GATE FIXES THE FIRST HALF OF. Checked HERE
+	# as well as at the prompt, because this is the last point before a fence exists and the
+	# prompt is only the last point before a MENU does -- and nothing stops a future caller
+	# reaching _on_plot_chosen by another route.
+	if _player_stands_on_footprint(slot):
+		_toast("Step outside the plot markers first -- you would be fenced in.")
+		return
 	if not slot.build(plot):
 		_toast("Nothing can go up on that plot.")
 		return
@@ -644,6 +669,32 @@ func _move_pony_into_pen(slot: PlotSlot) -> bool:
 		return false
 	_toast("%s moved into the pen." % instance.display_name())
 	return true
+
+
+## IS THE PLAYER STANDING WHERE THE FENCE IS ABOUT TO GO UP?
+##
+## THE OTHER HALF OF "i also trapped myself inside the pen and couldnt leave": he built the
+## paddock while standing on the plot, and it closed around him. The gate now means being
+## inside a pen is survivable, but a fence materialising through the body of the person who
+## ordered it is a bug of its own -- she is left overlapping a slab, to be shoved out of it on
+## whichever side the depenetration picks, on the frame after she pressed a button in a menu.
+##
+## REFUSED WITH A REASON, rather than moving her outside as the pen completes. Being
+## teleported is the one outcome that can surprise her: she is looking at a menu, and the
+## world she looks back at is not the one she left. "Step outside the plot markers" is a
+## sentence she can act on -- and those markers are drawn on EXACTLY this footprint by
+## game/world/plot_slot.gd's _refresh_stakes(), so the line she is being asked to step over is
+## already on the ground in front of her. There is room to stand: a slot's trigger reaches
+## 4.35 m and holds her while her capsule is inside it, so the legal band runs from 4.32 m out
+## (this function's own limit) to about 4.77 m.
+##
+## THE GEOMETRY ITSELF LIVES ON THE SLOT (PlotSlot.is_on_footprint), because the slot is what
+## draws the marked square and knows its own frame -- two of ranch.tscn's four are turned 180
+## degrees. This function is only "which body, and how wide is she".
+func _player_stands_on_footprint(slot: PlotSlot) -> bool:
+	if slot == null or player == null:
+		return false
+	return slot.is_on_footprint(player.global_position, PLAYER_BODY_RADIUS)
 
 
 func _toast(text: String) -> void:
@@ -767,6 +818,12 @@ func _update_plot_interaction() -> void:
 	if here == null or not Input.is_action_just_pressed(&"interact"):
 		return
 	if here.is_empty():
+		# Told BEFORE the menu rather than after she has picked something: being made to
+		# choose a pen and only then being sent to stand somewhere else is a worse version
+		# of the same refusal.
+		if _player_stands_on_footprint(here):
+			_toast("Step outside the plot markers to build here.")
+			return
 		if build_menu != null and build_menu.has_method("open"):
 			build_menu.open(here)
 	else:
@@ -1073,6 +1130,25 @@ func _report(pony_count: int, prop_count: int) -> void:
 		bool(_pen_probe.get("solid", false)))
 	_set_check(checks, "the probe pen was taken back down",
 		bool(_pen_probe.get("torn_down", false)))
+
+	# --- THE GATE IS A GATE -----------------------------------------------------------------
+	# "i also trapped myself inside the pen and couldnt leave" (owner playtest). The gateway
+	# has to be a doorway to the player and a wall to a pony, and since the two are the same
+	# capsule at the same height that can only be true by layer. Four checks, because any one
+	# of them alone can pass while the feature is broken: a gateway open to BOTH is a leaky
+	# pen, a gateway shut to both is the cage that was reported, and either of the two mask
+	# facts on its own is a policy nobody applied.
+	print("RANCH pen gate player_reached=%.3f pony_reached=%.3f player_mask=%d pony_mask=%d"
+		% [_pen_probe.get("gate_player", 0.0), _pen_probe.get("gate_pony", 1.0),
+			player.collision_mask, _pen_probe.get("pony_mask", 0)])
+	_set_check(checks, "a player-sized body can walk out through a pen's gateway",
+		float(_pen_probe.get("gate_player", 0.0)) >= 0.999)
+	_set_check(checks, "a pony-sized body is stopped in the same gateway",
+		float(_pen_probe.get("gate_pony", 1.0)) < 0.999)
+	_set_check(checks, "the player's mask does not include a pen's gate leaf",
+		player.collision_mask & LayersScript.PEN_GATE == 0)
+	_set_check(checks, "a penned pony's mask does include a pen's gate leaf",
+		int(_pen_probe.get("pony_mask", 0)) & LayersScript.PEN_GATE != 0)
 
 	# --- the build menu ------------------------------------------------------------------
 	# Same argument as the HUD block below: a build menu that failed to load its script is
@@ -1398,6 +1474,18 @@ func _probe_pen_containment() -> Dictionary:
 	# world for the rest of the session.
 	decoy.queue_free()
 	result["solid"] = _fence_is_solid(pen, space)
+	# Measured with the player back home, so her own body is nowhere near the gateway.
+	var gateway: Dictionary = _probe_gateway(pen, space)
+	result["gate_player"] = float(gateway.get("player", 0.0))
+	result["gate_pony"] = float(gateway.get("pony", 1.0))
+	# A REAL resident's mask, read off a body the pen actually spawned, rather than the
+	# constant it was assigned from: this is the half of the claim that says the policy in
+	# collision_layers.gd reached the ponies standing in the paddock.
+	for inst in probes:
+		var body := pen.body_for(inst.uid) as CharacterBody3D
+		if body != null:
+			result["pony_mask"] = body.collision_mask
+			break
 	result["travelled"] = travelled
 	result["stressed"] = travelled >= PEN_PROBE_MIN_TRAVEL
 
@@ -1440,6 +1528,14 @@ func _probe_pen_containment() -> Dictionary:
 ## leaf and is meant to be -- that is the 2.25 m of framed clear air a pony will walk
 ## through when gates open. What must be solid is the band a pony capsule occupies, and that
 ## is what is measured.
+##
+## FIRED WITH A PONY'S MASK, NOT WITH PROPS. Since the gate leaf became a gate it sits on its
+## own layer (CollisionLayers.PEN_GATE) so that the player can walk out of a pen she built
+## around herself; PONY_BARRIER is PROPS plus that bit, which is what the fence looks like to
+## the animal it is there to hold. Asking this question with PROPS alone would report the
+## gateway as a GAP in a fence that is, to a pony, completely solid -- a false red, and one
+## that would tempt somebody into "fixing" it by putting the leaf back on PROPS and shutting
+## the player in again.
 func _fence_is_solid(pen: Pen, space: PhysicsDirectSpaceState3D) -> bool:
 	var half: float = PenScript.HALF_EXTENT
 	var solid := true
@@ -1453,14 +1549,75 @@ func _fence_is_solid(pen: Pen, space: PhysicsDirectSpaceState3D) -> bool:
 				var to_local: Vector3 = from_local + outward * 2.0
 				var query := PhysicsRayQueryParameters3D.create(
 					pen.to_global(from_local), pen.to_global(to_local),
-					LayersScript.PROPS)
+					LayersScript.PONY_BARRIER)
 				var hit := space.intersect_ray(query)
-				if hit.is_empty() or hit.get("collider") != pen:
+				if hit.is_empty() or not _is_pen_part(hit.get("collider"), pen):
 					solid = false
 					print(("RANCH pen fence GAP side=%d along=%+.2f height=%.2f -- a ray " +
 						"fired outward from inside the pen did not hit its own fence")
 						% [side, offset * half, height])
 	return solid
+
+
+## Is `collider` part of `pen` -- either the pen's own body or the separate one its gate leaf
+## hangs its collider on?
+##
+## A PEN IS TWO BODIES NOW. The fence proper is the Pen StaticBody3D on PROPS; the gate leaf
+## is its own StaticBody3D on PEN_GATE, which is what lets a pony be held by a gateway the
+## player walks through (see game/world/pen.gd). Every check below that used to compare a hit
+## against `pen` by identity would call the gateway a hole in the fence without this.
+func _is_pen_part(collider: Variant, pen: Node) -> bool:
+	if pen == null or collider == null:
+		return false
+	if collider == pen:
+		return true
+	var as_pen := pen as Pen
+	return as_pen != null and as_pen.gate_body() != null and collider == as_pen.gate_body()
+
+
+## CAN THE FARMER GET OUT, AND CAN THE LIVESTOCK NOT? Returns {player, pony}, each the
+## fraction of the way out through the gateway that a capsule of that kind gets.
+##
+## THE OWNER'S PLAYTEST NOTE THIS ANSWERS: "i also trapped myself inside the pen and couldnt
+## leave". Both halves are measured in the same place, through the same hole, with the same
+## capsule -- the player's and a pony's are IDENTICAL (r = 0.42, h = 1.30; player.tscn and
+## pony.tscn agree to the centimetre), which is precisely why the answer cannot come from
+## geometry and has to come from layers. What differs between the two sweeps is only the
+## mask, so a difference in the result IS the layer policy working.
+##
+## SWEPT, NOT TELEPORTED-AND-CHECKED. Putting a body down outside the fence and finding it
+## outside proves nothing about whether it could have got there.
+##
+## The masks are the STATIC halves of each character's real mask -- PROPS for the player
+## (everything solid she collides with that a pen is built from) and PONY_BARRIER for a pony
+## (that plus the gate leaf's PEN_GATE). Characters are left out on purpose: the probe's own
+## three ponies are standing against the fence at the time, one of them very possibly right
+## in the gateway, and this question is about the fence and not about the traffic. That the
+## PLAYER's real mask contains PROPS and does not contain PEN_GATE, and that a real penned
+## pony's contains both, are asserted separately in _report() -- together those two facts and
+## this measurement are the whole claim.
+func _probe_gateway(pen: Pen, space: PhysicsDirectSpaceState3D) -> Dictionary:
+	var capsule := CapsuleShape3D.new()
+	capsule.radius = PLAYER_BODY_RADIUS
+	capsule.height = 1.30
+	var from: Vector3 = pen.to_global(Vector3(0.0, GATE_PROBE_CENTRE_Y, 0.0))
+	var motion: Vector3 = pen.to_global(
+		Vector3(GATE_PROBE_REACH, GATE_PROBE_CENTRE_Y, 0.0)) - from
+	var result := {}
+	for who: Array in [["player", LayersScript.PROPS], ["pony", LayersScript.PONY_BARRIER]]:
+		var query := PhysicsShapeQueryParameters3D.new()
+		query.shape = capsule
+		query.transform = Transform3D(Basis.IDENTITY, from)
+		query.collision_mask = int(who[1])
+		query.motion = motion
+		# cast_motion returns [safe fraction, unsafe fraction]. The safe one is how far the
+		# capsule gets before it touches anything: 1.0 is "walked all the way out".
+		var travel: Array = space.cast_motion(query)
+		var reached: float = float(travel[0]) if travel.size() > 0 else 0.0
+		result[who[0]] = reached
+		print("RANCH pen gateway %-6s mask=%2d reached=%.3f of %.2f m -> %.2f m from centre"
+			% [who[0], int(who[1]), reached, GATE_PROBE_REACH, reached * GATE_PROBE_REACH])
+	return result
 
 
 ## Whether `body`'s capsule is intersecting any of `owner_node`'s collision shapes right
@@ -1477,11 +1634,14 @@ func _body_overlaps(body: CharacterBody3D, owner_node: CollisionObject3D,
 	var query := PhysicsShapeQueryParameters3D.new()
 	query.shape = shape.shape
 	query.transform = shape.global_transform
-	query.collision_mask = LayersScript.PROPS
+	# PONY_BARRIER rather than PROPS, and _is_pen_part rather than an identity test, for the
+	# same reason _fence_is_solid() uses them: a pen's gate leaf is a second body on a second
+	# layer, and a pony standing inside it is exactly as clipped as one standing inside a rail.
+	query.collision_mask = LayersScript.PONY_BARRIER
 	query.exclude = [body.get_rid()]
 	query.margin = 0.0
 	for hit in space.intersect_shape(query, 8):
-		if hit.get("collider") == owner_node:
+		if _is_pen_part(hit.get("collider"), owner_node):
 			return true
 	return false
 

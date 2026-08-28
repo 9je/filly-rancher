@@ -83,15 +83,34 @@ extends StaticBody3D
 ##    still solid underneath, because "never has to" and "cannot" are different promises
 ##    and this file makes both.
 ##
-## --- WHY THE GATE IS SHUT ------------------------------------------------------------------
+## --- A FARM GATE IS A GATE: SHUT TO A PONY, OPEN TO WHOEVER WORKS THE LATCH ----------------
 ##
-## The gateway is framed for a 2.138 m pony to walk through (GATE_CLEARANCE), and today it
-## has a gate leaf across it with a collider on it. A pen with a pony-sized hole in one side
-## is not a pen. This does NOT foreclose Task 5's escape-on-neglect: a pony escaping is a
-## state change -- remove_pony() and a respawn out in the wild with her state intact -- not
-## a pathfinding exercise through a gap in the fence. NO PONY EVER DIES; a neglected one
-## leaves, and leaving is something the pen does TO its roster, not something she squeezes
-## through.
+## THIS SECTION IS THE FIX FOR A PLAYTEST REPORT: "i also trapped myself inside the pen and
+## couldnt leave". The gate leaf used to be one more slab on THIS StaticBody3D, on
+## CollisionLayers.PROPS, and the player's mask contains PROPS -- so a paddock built while
+## standing on the plot sealed its own builder in with no way out at all. A pen with a
+## pony-sized hole in one side is not a pen; a pen with no way out for the farmer is not a
+## pen either, it is a cage.
+##
+## BOTH PROMISES ARE KEPT BY WHO IS ASKING, NOT BY GEOMETRY, and they have to be: the player
+## and a pony are the SAME 0.42 m radius, 1.30 m capsule (player.tscn and pony.tscn are
+## identical in collision terms), so no gap, height or clearance can admit one and refuse the
+## other. The leaf therefore gets its own body on its own layer, CollisionLayers.PEN_GATE. A
+## pony's mask is PONY_WALKABLE and contains that bit; the player's is WALKABLE and does not.
+## The rest of the fence is untouched PROPS and still stops everybody, which is why only the
+## GATEWAY became passable and not one centimetre of the fence.
+##
+## THE LEAF SWINGS, AND THE SWING IS COSMETIC ONLY. _gate_body's collider does not move --
+## it stands across the gateway whether the mesh is drawn open or shut -- so containment is
+## the same at every instant regardless of what the animation is doing, and ranch.gd's
+## containment probe cannot be fooled by one. What the swing buys is honesty the other way:
+## without it the player walks through a visibly closed gate, which is the next line of the
+## same playtest report.
+##
+## None of this forecloses Task 5's escape-on-neglect: a pony escaping is a state change --
+## remove_pony() and a respawn out in the wild with her state intact -- not a pathfinding
+## exercise through a gap in the fence. NO PONY EVER DIES; a neglected one leaves, and
+## leaving is something the pen does TO its roster, not something she squeezes through.
 
 const LayersScript := preload("res://world/collision_layers.gd")
 const NeedsScript := preload("res://systems/needs.gd")
@@ -148,8 +167,21 @@ const POST_BURY := 0.30
 const GATE_WIDTH := 3.0
 ## Height of the gate leaf itself. Shorter than the fence on purpose: a farm gate is a gate,
 ## not a wall, and the space above it is above a pony capsule (which tops out at 1.30 m plus
-## its cap) so nothing can use it. See the class comment's last section.
+## its cap) so nothing can use it. See the class comment's gate section.
 const GATE_LEAF_HEIGHT := 1.45
+
+## How far the leaf swings when somebody walks up to it, and how fast it gets there.
+##
+## INWARD, into the paddock. A 2.9 m leaf swung the other way would reach 6.8 m from the
+## pen's centre -- past the 4.35 m plot it was built on and into whatever is standing next
+## to it -- while the paddock is 7.8 m across and always has room for it.
+const GATE_OPEN_DEGREES := 80.0
+const GATE_SWING_DEGREES_PER_SECOND := 220.0
+
+## How close the player has to get to the middle of the GATEWAY before the leaf swings.
+## Measured from the gateway rather than from the pen, so standing in the middle of your own
+## paddock (3.9 m away) leaves the gate shut behind you -- which is what a shut gate is for.
+const GATE_SENSOR_RADIUS := 3.0
 
 ## Standing spots, as a golden-angle spiral out from the middle of the pen. A spiral rather
 ## than a row: ponies arranged on a grid read as a car park, which is the same note
@@ -218,6 +250,17 @@ var _held_bodies: Dictionary = {}
 var _gems := 0
 
 var _shell_built := false
+
+## The gate leaf's own StaticBody3D, on CollisionLayers.PEN_GATE: the one part of this fence
+## a pony cannot pass and the player can. Null until build_shell() has run. See gate_body().
+var _gate_body: StaticBody3D = null
+
+## The leaf's visual hinge and the Area3D that notices the player at the gateway. BOTH ARE
+## COSMETIC. See the class comment on why _gate_body above is deliberately NOT parented to
+## the hinge: a swing that could move a collider is a fence you cannot test.
+var _gate_hinge: Node3D = null
+var _gate_sensor: Area3D = null
+var _gate_angle := 0.0
 
 
 func _ready() -> void:
@@ -350,7 +393,32 @@ func tick(delta: float) -> int:
 
 func _physics_process(delta: float) -> void:
 	tick(delta)
+	# Both, and the order does not matter: one is roster bookkeeping (a resident who broke
+	# out of a beam goes back on her spot), the other is cosmetic (the leaf eases open for a
+	# player standing at the gateway). Neither reads the other's state.
 	_reseat_released_residents()
+	_swing_gate(delta)
+
+
+## Ease the leaf toward open or shut, depending on whether the player is at the gateway.
+##
+## PURELY VISUAL. The collider this is drawn over never moves, so nothing about containment
+## depends on this function having run, or on it having run at the right time, or on it
+## having run at all -- which is exactly the property that lets the ranch's containment probe
+## measure a fence rather than an animation. See the class comment.
+func _swing_gate(delta: float) -> void:
+	if _gate_hinge == null or not is_instance_valid(_gate_hinge):
+		return
+	var wants_open: bool = _gate_sensor != null and is_instance_valid(_gate_sensor) \
+		and not _gate_sensor.get_overlapping_bodies().is_empty()
+	var target: float = GATE_OPEN_DEGREES if wants_open else 0.0
+	if is_equal_approx(_gate_angle, target):
+		return
+	_gate_angle = move_toward(_gate_angle, target, GATE_SWING_DEGREES_PER_SECOND * delta)
+	# NEGATIVE so the leaf swings INTO the paddock -- see GATE_OPEN_DEGREES. A +90 degree turn
+	# about Y maps `along` onto `outward` for all four sides (check it: side 0's along is +Z
+	# and its outward is +X), so a negative angle is always the inward one.
+	_gate_hinge.rotation.y = deg_to_rad(-_gate_angle)
 
 
 ## Gems sitting in the tray, uncollected.
@@ -393,6 +461,22 @@ func _ground(x: float, z: float) -> float:
 	return 0.0
 
 
+## The gate leaf's collider body, or null if this pen has not built its shell yet.
+##
+## PUBLIC BECAUSE A PEN'S FENCE IS NOW TWO BODIES, and every check that asks "did my ray hit
+## MY pen?" has to know it. game/world/ranch.gd's fence-solidity ray and its pony-clipping
+## shape query both compare what they hit against the pen; without this a ray fired across
+## the gateway comes back holding a body that is not `pen` and the check reads as a GAP in a
+## fence that is, to a pony, entirely solid. See ranch.gd's _is_pen_part().
+##
+## Re-validated on every call, exactly as body_for() is, so a freed node cannot be handed
+## back as a dangling reference.
+func gate_body() -> StaticBody3D:
+	if _gate_body != null and not is_instance_valid(_gate_body):
+		_gate_body = null
+	return _gate_body
+
+
 # --- bodies -----------------------------------------------------------------------------------
 
 ## Put a live Pony in the paddock for `inst`, leashed to the pen.
@@ -412,7 +496,10 @@ func _spawn_body(inst: PonyInstance) -> void:
 	# layer policy is applied here rather than baked into the scene. A penned pony on the
 	# wrong layer would walk through her own fence.
 	pony.collision_layer = LayersScript.PONY
-	pony.collision_mask = LayersScript.WALKABLE
+	# PONY_WALKABLE, not WALKABLE: it is WALKABLE plus the gate leaf's own PEN_GATE bit, and
+	# that bit is the entire reason a pony stays in a paddock the player can walk out of. A
+	# resident spawned with plain WALKABLE walks straight through her own gate.
+	pony.collision_mask = LayersScript.PONY_WALKABLE
 	var detection := pony.get_node_or_null("DetectionArea") as Area3D
 	if detection != null:
 		detection.collision_layer = LayersScript.INTERACTION
@@ -626,10 +713,25 @@ func _build_side(side_name: String, outward: Vector3, along: Vector3, is_gate: b
 			Vector3(header_at.x, GATE_CLEARANCE + 0.11, header_at.z), post_mat, false)
 		# The leaf. Two bars and a diagonal would be prettier; two bars is what reads at
 		# this scale and it is one shape instead of five.
+		#
+		# HUNG ON A HINGE at the low jamb so it can swing open for the player. The bars are
+		# children of the hinge rather than of the pen -- that is the only reason a rotation
+		# moves them -- and the leaf's COLLIDER is deliberately not (see _add_barrier).
+		_gate_hinge = Node3D.new()
+		_gate_hinge.name = "%sGateHinge" % side_name
+		var hinge_at := line + along * -half_gate
+		_gate_hinge.position = Vector3(hinge_at.x, 0.0, hinge_at.z)
+		add_child(_gate_hinge)
 		for bar_h in [0.45, 1.25]:
-			_slab("%sGateBar%d" % [side_name, roundi(bar_h * 100.0)],
-				_side_size(along, GATE_WIDTH - 0.10, 0.16, 0.08),
-				Vector3(header_at.x, bar_h, header_at.z), gate_mat, false)
+			var bar_mesh := BoxMesh.new()
+			bar_mesh.size = _side_size(along, GATE_WIDTH - 0.10, 0.16, 0.08)
+			bar_mesh.material = gate_mat
+			var bar := MeshInstance3D.new()
+			bar.name = "%sGateBar%d" % [side_name, roundi(bar_h * 100.0)]
+			bar.mesh = bar_mesh
+			bar.position = along * half_gate + Vector3.UP * bar_h
+			_gate_hinge.add_child(bar)
+		_gate_sensor = _build_gate_sensor(side_name, line)
 
 	# --- the barrier ------------------------------------------------------------------------
 	_add_barrier(side_name, outward, along, is_gate)
@@ -666,9 +768,49 @@ func _add_barrier(side_name: String, outward: Vector3, along: Vector3, is_gate: 
 			_collider("%sBarrier%s" % [side_name, "Lo" if sign_ < 0.0 else "Hi"],
 				_side_size(along, panel, height, POST_SIZE),
 				Vector3(at.x, centre_y, at.z))
-	_collider("%sGateBarrier" % side_name,
-		_side_size(along, GATE_WIDTH, GATE_LEAF_HEIGHT + POST_BURY, POST_SIZE),
-		Vector3(line.x, GATE_LEAF_HEIGHT * 0.5 - POST_BURY * 0.5, line.z))
+	# THE GATE LEAF'S COLLIDER -- the one piece of this fence that is NOT on PROPS.
+	#
+	# Its own StaticBody3D so it can be on its own layer: PEN_GATE is in a pony's mask and is
+	# not in the player's, and that is the whole of what makes this a gate instead of a wall.
+	# See the class comment. A CHILD OF THE PEN, NOT OF THE VISUAL HINGE, so no amount of
+	# swinging can move it: the gateway is shut to a pony at every instant, including the
+	# frames where the leaf is drawn wide open for the farmer walking through it.
+	_gate_body = StaticBody3D.new()
+	_gate_body.name = "%sGateLeafBody" % side_name
+	_gate_body.collision_layer = LayersScript.PEN_GATE
+	_gate_body.collision_mask = 0
+	add_child(_gate_body)
+	var leaf_shape := BoxShape3D.new()
+	leaf_shape.size = _side_size(along, GATE_WIDTH, GATE_LEAF_HEIGHT + POST_BURY, POST_SIZE)
+	var leaf_col := CollisionShape3D.new()
+	leaf_col.name = "%sGateBarrier" % side_name
+	leaf_col.shape = leaf_shape
+	leaf_col.position = Vector3(line.x, GATE_LEAF_HEIGHT * 0.5 - POST_BURY * 0.5, line.z)
+	_gate_body.add_child(leaf_col)
+
+
+## The Area3D that notices the player standing at the gateway. It drives the swing and
+## NOTHING else -- see _swing_gate().
+##
+## Layered exactly as game/world/plot_slot.gd layers its trigger: on INTERACTION so nothing
+## mistakes it for something solid, masking PLAYER so a pony leaning on her own gate does not
+## open it, and monitorable = false so it never turns up in a pony's DetectionArea results.
+func _build_gate_sensor(side_name: String, line: Vector3) -> Area3D:
+	var area := Area3D.new()
+	area.name = "%sGateSensor" % side_name
+	area.collision_layer = LayersScript.INTERACTION
+	area.collision_mask = LayersScript.PLAYER
+	area.monitoring = true
+	area.monitorable = false
+	area.position = Vector3(line.x, GATE_LEAF_HEIGHT * 0.5, line.z)
+	var sphere := SphereShape3D.new()
+	sphere.radius = GATE_SENSOR_RADIUS
+	var col := CollisionShape3D.new()
+	col.name = "Trigger"
+	col.shape = sphere
+	area.add_child(col)
+	add_child(area)
+	return area
 
 
 ## A box size for something running ALONG a fence side: `span` along the side, `height` up,
