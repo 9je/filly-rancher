@@ -617,7 +617,7 @@ func _on_plot_chosen(plot: PlotData, slot: PlotSlot) -> void:
 	# prompt is only the last point before a MENU does -- and nothing stops a future caller
 	# reaching _on_plot_chosen by another route.
 	if _player_stands_on_footprint(slot):
-		_toast("Step outside the plot markers first -- you would be fenced in.")
+		_toast("Step outside the plot markers first, or you would be fenced in.")
 		return
 	if not slot.build(plot):
 		_toast("Nothing can go up on that plot.")
@@ -778,7 +778,7 @@ func _physics_process(_delta: float) -> void:
 	var ok := save_game()
 	var hud := get_node_or_null(^"HUD")
 	if hud != null and hud.has_method("toast"):
-		hud.toast("Ranch saved" if ok else "SAVE FAILED -- see the log")
+		hud.toast("Ranch saved" if ok else "SAVE FAILED. See the log.")
 
 
 ## THE ONE INTERACT BUTTON, and what it means depends on where you are standing.
