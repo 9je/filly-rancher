@@ -32,6 +32,12 @@ func test_it_will_not_open_without_a_shop() -> void:
 	assert_false(_menu.is_open())
 
 
+func test_can_open_callable_can_refuse() -> void:
+	_menu.can_open = func() -> bool: return false
+	assert_false(_menu.open())
+	assert_false(_menu.is_open())
+
+
 func test_open_and_close_signal_and_start_on_the_sell_tab() -> void:
 	watch_signals(_menu)
 	assert_true(_menu.open())

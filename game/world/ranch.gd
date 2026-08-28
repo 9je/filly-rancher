@@ -450,7 +450,15 @@ func _bind_game_state() -> void:
 		push_error("ranch: the GameState autoload is not registered; this session cannot save.")
 		return
 
-	_save_loaded = _game_state.load_from_slot()
+	# A HOSTED RANCH NEVER READS THE PLAYER'S SAVE. A gate has to reach the same verdict on
+	# every machine, and whatever slot 0 happens to hold on this one is not that; nor is a
+	# gate entitled to a real save file. Nothing is written back either: autosave is off for
+	# every non-interactive run (see _interactive below).
+	if _hosted:
+		_game_state.reset()
+		_save_loaded = false
+	else:
+		_save_loaded = _game_state.load_from_slot()
 	if _save_loaded:
 		spawner.spawn_seed = _game_state.world_seed
 	else:
@@ -703,6 +711,7 @@ func _bind_market_menu() -> void:
 	if market_menu == null or not market_menu.has_method("open") or _shop == null:
 		return
 	market_menu.set("shop", _shop)
+	market_menu.set("can_open", func() -> bool: return _no_menu_but(market_menu))
 	for pair in [["opened", _on_market_opened], ["closed", _on_menu_closed],
 			["sell_requested", _on_sell_requested], ["sell_all_requested", _on_sell_all_requested],
 			["buy_requested", _on_buy_requested]]:
@@ -717,7 +726,7 @@ func _bind_pause_menu() -> void:
 	_settings.load_from()
 	_apply_settings()
 	pause_menu.set("settings", _settings)
-	pause_menu.set("can_open", Callable(self, "_no_other_menu_open"))
+	pause_menu.set("can_open", func() -> bool: return _no_menu_but(pause_menu))
 	for pair in [["opened", _on_pause_opened], ["closed", _on_menu_closed],
 			["save_requested", _on_pause_save], ["quit_requested", _on_pause_quit],
 			["settings_changed", _on_settings_changed]]:
@@ -725,14 +734,29 @@ func _bind_pause_menu() -> void:
 			pause_menu.connect(pair[0], pair[1])
 
 
-## Nothing else is up. Escape must not stack a pause menu on top of the build menu or the
-## Market, because both of those already paused the tree and closing one of two stacked
-## menus would unpause the world under the other.
-func _no_other_menu_open() -> bool:
-	for menu in [build_menu, market_menu]:
-		if menu != null and menu.has_method("is_open") and menu.is_open():
+## Is every menu EXCEPT `menu` closed? Pass null to ask about all three.
+##
+## THE ONE PREDICATE, ASKED FROM BOTH SIDES. Every menu here pauses the tree on open and
+## unpauses it on close, so two of them stacked means closing the top one unpauses the
+## world under the one still on screen. Escape must not stack a pause menu on the build
+## menu or the Market; E must not stack the Market on a pause menu. That used to be two
+## different rules in two different places, one of them (the Market's) enforced only at the
+## call site that happened to remember it, so MarketMenu.open() would cheerfully open over
+## an open pause menu. Asking one question, excluding only the menu doing the asking, is
+## what keeps the two directions from drifting apart again.
+func _no_menu_but(menu: CanvasLayer) -> bool:
+	for other in [build_menu, market_menu, pause_menu]:
+		if other == menu or other == null:
+			continue
+		if other.has_method("is_open") and other.is_open():
 			return false
 	return true
+
+
+## Nothing at all is up. The build prompt and the market prompt both ask this before they
+## react to a keypress.
+func _no_other_menu_open() -> bool:
+	return _no_menu_but(null)
 
 
 func _on_market_opened() -> void:
@@ -863,9 +887,9 @@ func is_near_market() -> bool:
 ## plot slot that overlapped the market's radius would otherwise build a pen AND open the
 ## shop off the same frame.
 func _update_market_interaction() -> void:
+	# The pause menu used to be tested separately on the next line. It is inside
+	# _no_other_menu_open() now, which is the whole point of _no_menu_but().
 	if not _no_other_menu_open():
-		return
-	if pause_menu != null and pause_menu.has_method("is_open") and pause_menu.is_open():
 		return
 	var near := is_near_market()
 	if near != _market_prompted:

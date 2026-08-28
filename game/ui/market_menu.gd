@@ -51,6 +51,16 @@ signal buy_requested(item: ShopItem)
 ## The Shop this menu reads from. Set by ranch.gd before open(); never mutated here.
 var shop: Shop = null
 
+## `func() -> bool`. Invalid means "always allowed".
+##
+## How the ranch says "another menu is up", the same guard pause_menu.gd carries and for
+## the same reason: every menu here pauses the tree and unpauses it on close, so a Market
+## opened over an already-open pause menu would unpause the world underneath it the moment
+## the Market closed. ranch.gd's _update_market_interaction() checks before it presses E,
+## but a call-site guard only protects the call sites that remember it; this is the one the
+## contract lives in.
+var can_open := Callable()
+
 var _catalogue: Array[ShopItem] = []
 var _tab: int = Tab.SELL
 var _selected := 0
@@ -78,6 +88,8 @@ func _ready() -> void:
 
 func open() -> bool:
 	if shop == null:
+		return false
+	if can_open.is_valid() and not bool(can_open.call()):
 		return false
 	_tab = Tab.SELL
 	_selected = 0
