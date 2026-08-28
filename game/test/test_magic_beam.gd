@@ -21,6 +21,15 @@ extends GutTest
 
 const MagicBeamScript := preload("res://actors/player/magic_beam.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
+## The gear tests below need a LIVE beam rather than the static rules, so they need the
+## player it hangs off; the notice-invariant test needs Pony.notice_radius_for(), which is
+## static and pure and wants no pony in the world at all.
+const PlayerScene := preload("res://actors/player/player.tscn")
+const PonyScript := preload("res://actors/pony/pony.gd")
+
+## Floor for the beam fixture, matching game/test/test_player.gd: big enough that nothing
+## here can walk off it.
+const FIXTURE_FLOOR_SIZE := Vector3(40.0, 1.0, 40.0)
 
 ## A full, un-anticipated visual reaction time -- press-and-release to a flash, with no
 ## warning that it is coming. The bar the capture windows are held to below, and it is
@@ -701,3 +710,67 @@ func test_an_easy_or_medium_pony_is_caught_on_the_first_honest_attempt_every_tim
 			assert_false(clocks["wrenches"], "a %s pony must never wrench" % who)
 			assert_lt(float(clocks["secure"]) + REACTION_TIME, float(clocks["struggle"]),
 				"a correct release must always land a %s pony" % who)
+
+
+# --- gear (Phase 2's shop) --------------------------------------------------------------
+
+## A live MagicBeam, hanging off a real Player in a minimal world.
+##
+## THE ONLY FIXTURE IN THIS FILE, and it exists reluctantly: everything above is static and
+## pure precisely so it needs no tree. The gear does not get that luxury. MagicBeam._ready()
+## is what mints the Storage the saddlebag resizes, and _ready() only runs once the node is
+## in a tree, so a beam built with `.new()` has no bag to grow.
+##
+## Built exactly the way game/test/test_player.gd's before_each builds one, with a floor
+## under her and a camera for the aim ray, so the two fixtures cannot drift into disagreeing
+## about what a player needs. The world is autofreed, so a test that takes a beam does not
+## have to give it back.
+func _beam() -> MagicBeamScript:
+	var world := Node3D.new()
+	add_child_autofree(world)
+
+	var floor_body := StaticBody3D.new()
+	var floor_shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = FIXTURE_FLOOR_SIZE
+	floor_shape.shape = box
+	floor_shape.position = Vector3(0.0, -FIXTURE_FLOOR_SIZE.y * 0.5, 0.0)
+	floor_body.add_child(floor_shape)
+	world.add_child(floor_body)
+
+	var camera := Camera3D.new()
+	world.add_child(camera)
+
+	var player: CharacterBody3D = PlayerScene.instantiate()
+	world.add_child(player)
+	return player.get_magic_beam() as MagicBeamScript
+
+
+func test_unlocks_grow_the_saddlebag_and_the_reach() -> void:
+	var beam := _beam()
+	var base_reach := beam.reach()
+	var base_capacity: int = beam.get_storage().capacity
+	beam.apply_unlocks(["bigger_saddlebag", "long_beam"])
+	assert_eq(beam.get_storage().capacity, MagicBeamScript.BIGGER_SADDLEBAG_CAPACITY)
+	assert_gt(beam.get_storage().capacity, base_capacity)
+	assert_almost_eq(beam.reach(), base_reach + MagicBeamScript.LONG_BEAM_BONUS, 0.0001)
+
+
+func test_unlocks_are_idempotent_and_unknown_ids_are_ignored() -> void:
+	var beam := _beam()
+	beam.apply_unlocks(["long_beam"])
+	var once := beam.reach()
+	beam.apply_unlocks(["long_beam", "long_beam", "hat_of_wonders"])
+	assert_almost_eq(beam.reach(), once, 0.0001, "applying twice does not stack")
+
+
+func test_reach_stays_under_the_notice_invariant_even_with_the_long_beam() -> void:
+	# magic_beam.gd's own invariant: every personality notices a running player from
+	# further than the beam reaches, by MIN_DETECTION_MARGIN. The long beam must not eat
+	# through that margin or a pony can be taken without a chase.
+	var beam := _beam()
+	beam.apply_unlocks(["long_beam"])
+	for personality in PonyDataScript.Personality.values():
+		var notice: float = PonyScript.notice_radius_for(personality, false)
+		assert_gte(notice - beam.reach(), MagicBeamScript.MIN_DETECTION_MARGIN,
+			"personality %d notices from %.1f, long beam reaches %.1f" % [personality, notice, beam.reach()])

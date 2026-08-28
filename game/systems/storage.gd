@@ -55,6 +55,13 @@ func _init(p_capacity: int) -> void:
 	capacity = maxi(0, p_capacity)
 
 
+## Grow (or shrink) the bag. Never below what it already holds: a capacity that dropped
+## under the contents would make the next store() refuse while count() > capacity, a
+## state no store ever produced. The saddlebag gear calls this.
+func set_capacity(new_capacity: int) -> void:
+	capacity = maxi(_items.size(), maxi(0, new_capacity))
+
+
 ## Put `instance` in the bag. Returns false -- and changes nothing at all -- if the bag is
 ## full or `instance` is null; the caller is then still responsible for the pony it was
 ## holding (the beam drops her back into the world unharmed).

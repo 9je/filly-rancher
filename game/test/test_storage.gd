@@ -163,3 +163,20 @@ func test_a_negative_capacity_is_clamped_rather_than_trusted() -> void:
 	assert_eq(storage.capacity, 0, "a negative capacity is nonsense; clamp it to empty")
 	assert_true(storage.is_full())
 	assert_false(storage.store(_instance("a")))
+
+
+## The saddlebag gear (game/data/shop/bigger_saddlebag.tres) grows a bag that is already in
+## use and already has ponies in it, so capacity has to be settable after construction,
+## and settable in only one safe direction. A bag holding more than its capacity would make
+## is_full() true with room on the shelf and refuse the next store() forever, a state no
+## constructor could ever produce, so shrinking stops at the contents.
+func test_capacity_can_grow_but_never_below_what_is_held() -> void:
+	var bag = StorageScript.new(2)
+	bag.store(_instance("twilight"))
+	bag.store(_instance("twilight"))
+	bag.set_capacity(5)
+	assert_eq(bag.capacity, 5)
+	assert_false(bag.is_full())
+	bag.set_capacity(1)
+	assert_eq(bag.capacity, 2, "shrinking below the contents is clamped to the contents")
+	assert_true(bag.is_full())
