@@ -329,7 +329,7 @@ git commit -m "docs: the roster manifest, how to regenerate it, and what is excl
 extends GutTest
 ## The roster's SHAPE, pinned. Phase 2 slice 2 took it from 6 to 45 characters, and
 ## every one of them is a .tres under game/data/ponies/; these tests are what stop a
-## typo in one of fifty files from being a character who never spawns, sells for the
+## typo in one of forty-five files from being a character who never spawns, sells for the
 ## wrong price, or shows a dash on screen.
 
 const PonyRegistryScript := preload("res://systems/pony_registry.gd")
