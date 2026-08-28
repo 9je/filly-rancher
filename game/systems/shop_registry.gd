@@ -33,18 +33,15 @@ var _sorted: Array[ShopItem] = []
 ## by_id() to read.
 ##
 ## A resource that fails to load as ShopItem is REPORTED via push_error() rather than
-## silently dropped: a bad row in the shipped catalogue is a bug worth failing loudly on.
-## A directory that cannot be opened at all is only printed, not push_error'd or
-## push_warning'd, and returns an empty dictionary rather than crashing: an empty shop is
-## a state a caller can legitimately probe for (see
-## test_a_missing_directory_loads_nothing_and_does_not_crash), not the sign of a broken
-## catalogue file that a missing row would be.
+## silently dropped, and a directory that cannot be opened at all is also reported and
+## returns an empty dictionary rather than crashing: same contract as the other
+## registries.
 func load_all(dir: String = SHOP_DIR) -> Dictionary:
 	_by_id.clear()
 	_sorted.clear()
 	var da := DirAccess.open(dir)
 	if da == null:
-		print("ShopRegistry.load_all: cannot open directory '%s' (%s)" % [
+		push_error("ShopRegistry.load_all: cannot open directory '%s' (%s)" % [
 			dir, error_string(DirAccess.get_open_error())
 		])
 		return _by_id

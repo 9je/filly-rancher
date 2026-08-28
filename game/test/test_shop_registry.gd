@@ -74,3 +74,4 @@ func test_a_missing_directory_loads_nothing_and_does_not_crash() -> void:
 	var loaded := reg.load_all("res://data/no_such_dir")
 	assert_eq(loaded.size(), 0)
 	assert_eq(reg.all().size(), 0)
+	assert_push_error(1, "a missing shop directory is reported loudly, not swallowed")
