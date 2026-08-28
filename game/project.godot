@@ -85,6 +85,7 @@ window/stretch/aspect="expand"
 
 scene={
 "animation/fps": 24,
+"meshes/generate_lods": false,
 "_subresources": {
 "animations": {
 "idle": {
