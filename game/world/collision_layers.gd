@@ -44,6 +44,21 @@ const PONY := 1 << 3
 ## a body in a mask.
 const INTERACTION := 1 << 4
 
+## The leaf across a PEN's gateway. Bit 6, and the only layer in this file that exists so
+## that one kind of character's mask can contain it and another's cannot.
+##
+## WHY IT IS NOT SIMPLY PROPS. It was, and the paddock sealed its own builder in -- "i also
+## trapped myself inside the pen and couldnt leave" (owner playtest). A pen has to stop a
+## pony AND let a farmer through the gate, and in collision terms the two are the same
+## object: game/actors/player/player.tscn and game/actors/pony/pony.tscn carry an IDENTICAL
+## 0.42 m radius, 1.30 m capsule at an identical height. Nothing about geometry can tell
+## them apart, so the difference has to be a layer, and this is it.
+##
+## ONLY THE GATEWAY IS ON THIS LAYER. Every other slab of a pen's fence is still PROPS and
+## still stops everybody -- see game/world/pen.gd's _add_barrier(). This does not make pens
+## generally leaky; it makes the gate a gate.
+const PEN_GATE := 1 << 5
+
 ## Solid, immovable world. What the camera's spring arm probes, and the floor
 ## everything walks on.
 ##
@@ -57,3 +72,16 @@ const WORLD := TERRAIN | PROPS
 ## (so ponies jostle each other and the player instead of interpenetrating).
 const CHARACTERS := PLAYER | PONY
 const WALKABLE := WORLD | CHARACTERS
+
+## What a PONY collides with: everything a walking character does, plus the gate leaf that
+## keeps her in her paddock. The player's mask stays WALKABLE and that difference IS the
+## gate -- see PEN_GATE. Every place that spawns a pony body (game/world/spawner.gd,
+## game/world/pen.gd, game/actors/player/magic_beam.gd) uses this, and a pony spawned with
+## plain WALKABLE would walk straight out of her own pen.
+const PONY_WALKABLE := WALKABLE | PEN_GATE
+
+## Every STATIC thing that has to hold a penned pony in: the fence proper (PROPS) and the
+## gate leaf (PEN_GATE). This is what game/world/ranch.gd's containment probe fires its
+## fence-solidity rays with -- asking that question with PROPS alone would report the
+## gateway as a GAP in a fence that is, to a pony, completely solid.
+const PONY_BARRIER := PROPS | PEN_GATE

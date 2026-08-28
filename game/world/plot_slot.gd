@@ -205,6 +205,31 @@ func demolish() -> bool:
 	return true
 
 
+## WOULD A BODY OF `radius` STANDING AT WORLD `point` BE INSIDE THE FENCE THIS PLOT IS ABOUT
+## TO GROW? True if any part of it overlaps the marked footprint.
+##
+## THE RULE THIS EXISTS FOR: YOU MUST NOT BE ABLE TO SEAL YOURSELF IN BY BUILDING. From the
+## owner's playtest -- "i also trapped myself inside the pen and couldnt leave" -- he built a
+## paddock while standing on the plot and the finished pen closed around him. A pen's gateway
+## is a gate now (game/world/pen.gd) so that is survivable, but a fence that materialises
+## through the body of the person who ordered it is still a bug: she is left overlapping a
+## slab, to be shoved out of it on whichever side the depenetration picks.
+##
+## MEASURED AGAINST THE MARKED SQUARE, not against some separate safety radius, and that is
+## the point of putting it here rather than in the caller: STAKE_INSET is the boundary this
+## slot has been DRAWING ON THE GROUND since before anything was built on it, and it is the
+## same 3.9 m game/world/pen.gd stands its fence on. So the line a player is asked to step
+## outside of is a line she can already see -- which is what makes a refusal actionable
+## instead of mysterious. game/test/test_pen_gate.gd pins those two numbers together.
+##
+## IN THIS SLOT'S OWN FRAME. Two of ranch.tscn's four slots are turned 180 degrees so their
+## gates face open ground, and a world-space comparison would silently be measuring the wrong
+## axis for them -- the same trap game/world/ranch.gd's containment probe documents.
+func is_on_footprint(point: Vector3, radius: float) -> bool:
+	var local: Vector3 = to_local(point)
+	return absf(local.x) <= STAKE_INSET + radius and absf(local.z) <= STAKE_INSET + radius
+
+
 ## The plot id stored for this slot in a save, or "" when the slot is empty. The exact
 ## String GameState.plots wants -- see the class comment on why both halves are Strings.
 func saved_plot_id() -> String:
