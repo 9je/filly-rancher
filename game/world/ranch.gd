@@ -1324,8 +1324,36 @@ func _probe_pen_containment() -> Dictionary:
 		body.global_position = pen.to_global(spot)
 		started[probes[i].uid] = body.global_position
 
-	var player_home: Vector3 = player.global_position
-	player.global_position = pen.to_global(Vector3(0.0, 0.4, 0.0))
+	# A STAND-IN, NOT THE PLAYER HIMSELF. This used to teleport the real player into the
+	# middle of the pen and put him back sixty frames later. In a gate run nobody saw it; in
+	# a real play session the owner did -- "it does a thing where it temporarily teleports me
+	# to the paddock at the start, but it's only a second, a bit confusing" -- because
+	# _report() is awaited inside _ready() and those frames still RENDER. The probe has to
+	# keep running in every mode (see the block comment above: a check that skips the run the
+	# player actually makes is the failure this codebase has already shipped once), so the
+	# fix is to spook the ponies with something that is a player to a pony without being THE
+	# player. Pony._is_player() accepts anything in PLAYER_GROUP, and Pony._player_is_sneaking()
+	# asks through has_method() precisely so a stand-in with no gait can answer -- the file
+	# says so: "PLAYER_GROUP exists precisely so a test stand-in (or a Phase 2 decoy) can be a
+	# player to a pony without being a Player". Not answering counts as NOT sneaking, i.e. the
+	# full notice radius, which is the harsher case and the one worth probing.
+	#
+	# It carries a real capsule on the real PLAYER layer, matching player.tscn's 0.42/1.3, so
+	# the residents are shoved by a body exactly as they were before rather than merely
+	# noticing a ghost.
+	var decoy := CharacterBody3D.new()
+	decoy.name = "PenProbeDecoy"
+	decoy.collision_layer = LayersScript.PLAYER
+	decoy.collision_mask = 0
+	var decoy_shape := CollisionShape3D.new()
+	var decoy_capsule := CapsuleShape3D.new()
+	decoy_capsule.radius = 0.42
+	decoy_capsule.height = 1.3
+	decoy_shape.shape = decoy_capsule
+	decoy.add_child(decoy_shape)
+	decoy.add_to_group(PonyScript.PLAYER_GROUP)
+	add_child(decoy)
+	decoy.global_position = pen.to_global(Vector3(0.0, 0.4, 0.0))
 	for i in range(PEN_PROBE_FLEE_FRAMES):
 		await get_tree().physics_frame
 
@@ -1359,7 +1387,10 @@ func _probe_pen_containment() -> Dictionary:
 		print("RANCH pen probe %-22s local=(%6.2f, %6.2f) edge=(%.2f, %.2f) state=%s"
 			% [body.name, local.x, local.z, edge_x, edge_z, body.state_name(body.state)])
 
-	player.global_position = player_home
+	# The decoy goes before the pen does, so nothing outlives the probe. Freed rather than
+	# hidden: a body left on the PLAYER layer would go on being noticed by every pony in the
+	# world for the rest of the session.
+	decoy.queue_free()
 	result["solid"] = _fence_is_solid(pen, space)
 	result["travelled"] = travelled
 	result["stressed"] = travelled >= PEN_PROBE_MIN_TRAVEL
