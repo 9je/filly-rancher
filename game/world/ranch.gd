@@ -106,6 +106,11 @@ extends Node3D
 ## game/systems/audio_safety.gd's Master-bus mute is a backstop, not a reason to skip
 ## the flag.
 
+## Emitted instead of quitting when this ranch is HOSTED: instanced under another
+## scene (scenes/test/market_test.tscn does exactly that) rather than run as the main
+## scene. See _hosted below for why the quit cannot simply stay unconditional.
+signal gate_report_finished(all_ok: bool)
+
 const LayersScript := preload("res://world/collision_layers.gd")
 const PropsScript := preload("res://world/props.gd")
 const GateWatchdogScript := preload("res://scripts/gate_watchdog.gd")
@@ -116,6 +121,8 @@ const PlotSlotScript := preload("res://world/plot_slot.gd")
 const PlotRegistryScript := preload("res://systems/plot_registry.gd")
 const PenScript := preload("res://world/pen.gd")
 const EconomyScript := preload("res://systems/economy.gd")
+const ShopScript := preload("res://systems/shop.gd")
+const SettingsScript := preload("res://systems/settings.gd")
 const ZoneMarkerScript := preload("res://world/zone_marker.gd")
 const PonyScript := preload("res://actors/pony/pony.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
@@ -186,6 +193,11 @@ const GATE_SAVE_SLOT := 9
 ## satisfied by walking up to the building rather than by finding an exact spot.
 const HOUSE_SAVE_RADIUS := 6.0
 const HOUSE_SAVE_REARM := 9.0
+
+## How close to the Market's origin counts as "at the market", in metres. A little wider
+## than the building's own half-diagonal (5.5 x 4.5 m, so 3.55 m corner to centre), so
+## "go to the market" is satisfied by walking up to the door rather than into the wall.
+const MARKET_RADIUS := 4.5
 
 ## Plot slots the map must carry -- the plan asks for four to six, and the reserved
 ## clearing (PropsScript.PEN_PLOTS_*) is an 18 m square, which fits four 7.8 m pens on a
@@ -267,6 +279,8 @@ const GATE_PROBE_CENTRE_Y := 0.85
 @onready var capture_camera: Camera3D = $CaptureCamera
 @onready var plots_root: Node3D = $Plots
 @onready var build_menu: CanvasLayer = $BuildMenu
+@onready var market_menu: CanvasLayer = $MarketMenu
+@onready var pause_menu: CanvasLayer = $PauseMenu
 
 var _screenshot_dir := ""
 var _rig: Node3D
@@ -324,11 +338,43 @@ var _penned_ponies := 0
 ## Results of the boot-time pen-containment probe -- see _probe_pen_containment().
 var _pen_probe: Dictionary = {}
 
+## The counter the Market menu transacts against. Rebuilt by rebind_economy() rather than
+## built once, because GameState REPLACES its `gems` and `inventory` objects on every load
+## and reset (game_state.gd's from_dict/reset), and a Shop still holding the pouch from
+## boot would be selling gems nobody owns any more.
+var _shop: Shop = null
+
+## Player preferences, owned here because this is where the things they control live: the
+## camera rig and the audio bus.
+var _settings: Settings = null
+
+## Whether the market prompt has been shown for this approach. Same hysteresis as the plot
+## prompt: once on entering the radius, not once per frame.
+var _market_prompted := false
+
+## Is this ranch the scene the process was launched with, or is it INSTANCED UNDER another
+## scene that owns the process?
+##
+## _report() below ends a headless run with get_tree().quit(), and _ready() arms a
+## GateWatchdog on the same assumption, both correct when world/ranch.tscn IS the run.
+## A test scene that instances the ranch to drive it (scenes/test/market_test.tscn) would
+## have the process shut down underneath it before its own driver got a frame, and would
+## be racing a second watchdog it did not arm. Hosted, the verdict is EMITTED
+## (gate_report_finished) and the host decides what to do with it.
+var _hosted := false
+
 
 func _ready() -> void:
+	# Asked before anything else, because the very next line depends on the answer: a
+	# hosted ranch neither arms the watchdog nor quits the process. See _hosted.
+	_hosted = get_tree().current_scene != self
+
 	# Armed FIRST, before anything below has a chance to raise mid-function -- see
-	# GateWatchdogScript's doc comment for the exact hang this guards against.
-	GateWatchdogScript.arm(self, "RANCH", WATCHDOG_TIMEOUT_SEC)
+	# GateWatchdogScript's doc comment for the exact hang this guards against. Not armed
+	# when hosted: the host owns the process, and its own watchdog is the one that should
+	# be allowed to kill it.
+	if not _hosted:
+		GateWatchdogScript.arm(self, "RANCH", WATCHDOG_TIMEOUT_SEC)
 
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--screenshot-dir="):
@@ -417,6 +463,13 @@ func _bind_game_state() -> void:
 
 	# Only a person playing may write. See _interactive's comment.
 	_game_state.autosave_enabled = _interactive
+
+	# CONNECTED AFTER load_from_slot() above, on purpose: that call emits state_loaded
+	# itself, and rebuilding the economy from inside boot would only be undone by
+	# _bind_build_menu() a moment later. This is for the loads that come AFTER boot, each
+	# of which hands GameState a brand new GemPouch and a brand new Inventory.
+	if not _game_state.state_loaded.is_connected(rebind_economy):
+		_game_state.state_loaded.connect(rebind_economy)
 
 
 ## Put the owned ponies back where they live after a load.
@@ -546,6 +599,9 @@ func _on_plot_built(_plot: PlotData, node: Node) -> void:
 	var pen := node as Pen
 	if pen != null:
 		pen.ground_sampler = Callable(terrain, "height_at")
+		# The pantry a pen feeds from is GameState's, read fresh on every call rather than
+		# captured here. See _current_inventory().
+		pen.inventory_provider = Callable(self, "_current_inventory")
 
 
 ## Wire the build menu to the wallet and to the thing that actually builds.
@@ -555,10 +611,15 @@ func _on_plot_built(_plot: PlotData, node: Node) -> void:
 ## the build would need a refund path for a build that failed, and a refund path is a place
 ## for bits to be created out of nothing.
 func _bind_build_menu() -> void:
+	# The wallet, the shop and the other two menus FIRST, and outside the guard below: a
+	# build menu whose script failed to parse is a FAILED check, not a reason for the
+	# Market and the pause menu to go unwired with it.
+	rebind_economy()
+	_bind_market_menu()
+	_bind_pause_menu()
+
 	if build_menu == null or not build_menu.has_method("open"):
 		return
-	_economy = EconomyScript.new(_game_state.bits if _game_state != null else 0)
-	_economy.bits_changed.connect(_on_bits_changed)
 	# set()/connect()-by-name rather than direct property access and `.plot_chosen.connect`,
 	# because `build_menu` is typed as the CanvasLayer that ranch.tscn declares. A build menu
 	# whose SCRIPT failed to parse is still exactly that -- a CanvasLayer with no script --
@@ -604,6 +665,246 @@ func _current_bits() -> int:
 func _on_bits_changed(new_total: int) -> void:
 	if _game_state != null:
 		_game_state.bits = new_total
+	var hud := get_node_or_null(^"HUD")
+	if hud != null and hud.has_method("set_bits"):
+		hud.set_bits(new_total)
+
+
+## REBUILD THE WALLET AND THE SHOP FROM WHATEVER GameState HOLDS RIGHT NOW.
+##
+## Public, and connected to GameState.state_loaded, because a load does not mutate the
+## pouch and the pantry: it REPLACES them (game_state.gd's from_dict(), and reset() the
+## same way). A Shop built once at boot would go on selling out of the GemPouch object the
+## title screen made, while the game credited gems to a different one, and nothing would
+## look wrong until the numbers stopped matching.
+##
+## Pens need no equivalent: _current_inventory() below is a Callable that reads
+## _game_state.inventory on every call, so a pen always feeds from the live pantry.
+func rebind_economy() -> void:
+	if _economy != null and _economy.bits_changed.is_connected(_on_bits_changed):
+		_economy.bits_changed.disconnect(_on_bits_changed)
+	_economy = EconomyScript.new(_game_state.bits if _game_state != null else 0)
+	_economy.bits_changed.connect(_on_bits_changed)
+
+	_shop = ShopScript.new(_economy, _game_state.gems, _game_state.inventory,
+		_game_state.unlocks) if _game_state != null else null
+	if market_menu != null:
+		market_menu.set("shop", _shop)
+
+	_apply_unlocks()
+	var hud := get_node_or_null(^"HUD")
+	if hud != null and hud.has_method("set_bits"):
+		hud.set_bits(_economy.bits)
+
+
+## The Market and the pause menu follow the build menu's contract: they emit, this
+## transacts and pauses. See _bind_build_menu() for why the wiring is by name.
+func _bind_market_menu() -> void:
+	if market_menu == null or not market_menu.has_method("open") or _shop == null:
+		return
+	market_menu.set("shop", _shop)
+	for pair in [["opened", _on_market_opened], ["closed", _on_menu_closed],
+			["sell_requested", _on_sell_requested], ["sell_all_requested", _on_sell_all_requested],
+			["buy_requested", _on_buy_requested]]:
+		if not market_menu.is_connected(pair[0], pair[1]):
+			market_menu.connect(pair[0], pair[1])
+
+
+func _bind_pause_menu() -> void:
+	if pause_menu == null or not pause_menu.has_method("open"):
+		return
+	_settings = SettingsScript.new()
+	_settings.load_from()
+	_apply_settings()
+	pause_menu.set("settings", _settings)
+	pause_menu.set("can_open", Callable(self, "_no_other_menu_open"))
+	for pair in [["opened", _on_pause_opened], ["closed", _on_menu_closed],
+			["save_requested", _on_pause_save], ["quit_requested", _on_pause_quit],
+			["settings_changed", _on_settings_changed]]:
+		if not pause_menu.is_connected(pair[0], pair[1]):
+			pause_menu.connect(pair[0], pair[1])
+
+
+## Nothing else is up. Escape must not stack a pause menu on top of the build menu or the
+## Market, because both of those already paused the tree and closing one of two stacked
+## menus would unpause the world under the other.
+func _no_other_menu_open() -> bool:
+	for menu in [build_menu, market_menu]:
+		if menu != null and menu.has_method("is_open") and menu.is_open():
+			return false
+	return true
+
+
+func _on_market_opened() -> void:
+	# Swept BEFORE the shelves are drawn, so the Market sells what the pens made a second
+	# ago rather than what they had made by the last save.
+	collect_gems()
+	if market_menu.has_method("refresh"):
+		market_menu.refresh()
+	_on_menu_opened(null)
+
+
+func _on_pause_opened() -> void:
+	_on_menu_opened(null)
+
+
+func _on_sell_requested(rarity: int, count: int) -> void:
+	if _shop == null:
+		return
+	var earned: int = _shop.sell(rarity, count)
+	if earned > 0:
+		_toast("Sold %d gems for %d bits." % [count, earned])
+	if market_menu.has_method("refresh"):
+		market_menu.refresh()
+
+
+func _on_sell_all_requested() -> void:
+	if _shop == null:
+		return
+	var earned: int = _shop.sell_all()
+	if earned > 0:
+		_toast("Sold everything for %d bits." % earned)
+	if market_menu.has_method("refresh"):
+		market_menu.refresh()
+
+
+func _on_buy_requested(item: ShopItem) -> void:
+	if _shop == null or item == null:
+		return
+	if _shop.buy(item):
+		_toast("Bought %s." % item.display_name)
+		# Gear takes effect the moment it is bought, not on the next load.
+		_apply_unlocks()
+	if market_menu.has_method("refresh"):
+		market_menu.refresh()
+
+
+func _on_pause_save() -> void:
+	var ok := save_game()
+	_toast("Ranch saved" if ok else "SAVE FAILED. See the log.")
+
+
+func _on_pause_quit() -> void:
+	# GameState's quit-time autosave is what writes on the way out (see game_state.gd);
+	# this only asks the tree to close. Unpaused first, because a paused tree is not a
+	# state anything downstream of here should have to reason about.
+	get_tree().paused = false
+	get_tree().quit()
+
+
+func _on_settings_changed() -> void:
+	_apply_settings()
+	if _settings != null:
+		_settings.save_to()
+
+
+## Push the settings into the things they control. The camera rig owns sensitivity and
+## invert; the audio bus owns volume.
+func _apply_settings() -> void:
+	if _settings == null:
+		return
+	if _rig != null:
+		_rig.mouse_sensitivity = _settings.mouse_sensitivity
+		_rig.invert_look = _settings.invert_look
+	if _interactive:
+		_settings.apply_audio()
+
+
+## Read GameState.unlocks into the things that honour them. On boot and after every
+## purchase. MagicBeam.apply_unlocks() is absolute rather than incremental, so calling this
+## twice cannot stack a bonus.
+func _apply_unlocks() -> void:
+	if _game_state == null:
+		return
+	var beam: Node3D = player.get_magic_beam()
+	if beam != null and beam.has_method("apply_unlocks"):
+		beam.apply_unlocks(_game_state.unlocks)
+
+
+## The pantry a pen feeds from, read live rather than captured.
+##
+## GameState REPLACES its Inventory on every load and reset, so a Callable that returns the
+## CURRENT one is the only binding that survives a load. This is why pens are absent from
+## rebind_economy() above.
+func _current_inventory() -> Inventory:
+	return _game_state.inventory if _game_state != null else null
+
+
+## Fold every pen's tray into the pouch. Before a save (so the gems survive quitting) and
+## when the Market opens (so it sells what the pens made a second ago). Returns how many
+## gems moved.
+func collect_gems() -> int:
+	if _game_state == null:
+		return 0
+	var moved := 0
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen == null:
+			continue
+		var tray: Dictionary = pen.take_gems_by_rarity()
+		for rarity in tray.keys():
+			_game_state.gems.add(int(rarity), int(tray[rarity]))
+			moved += int(tray[rarity])
+	return moved
+
+
+func is_near_market() -> bool:
+	var market := get_node_or_null(^"Buildings/Market") as Node3D
+	if market == null:
+		return false
+	var gap := Vector2(player.global_position.x - market.global_position.x,
+		player.global_position.z - market.global_position.z).length()
+	return gap <= MARKET_RADIUS
+
+
+## E at the market opens it. The prompt shows once per approach, like the plot prompt.
+##
+## `_prompt_slot == null` in the press test is what stops one E press doing two things: a
+## plot slot that overlapped the market's radius would otherwise build a pen AND open the
+## shop off the same frame.
+func _update_market_interaction() -> void:
+	if not _no_other_menu_open():
+		return
+	if pause_menu != null and pause_menu.has_method("is_open") and pause_menu.is_open():
+		return
+	var near := is_near_market()
+	if near != _market_prompted:
+		_market_prompted = near
+		if near:
+			_toast("Press E / X to trade.")
+	if near and Input.is_action_just_pressed(&"interact") and _prompt_slot == null:
+		if market_menu != null and market_menu.has_method("open"):
+			market_menu.open()
+
+
+func get_shop() -> Shop:
+	return _shop
+
+
+func get_market_menu() -> CanvasLayer:
+	return market_menu
+
+
+func get_pause_menu() -> CanvasLayer:
+	return pause_menu
+
+
+func get_economy() -> Economy:
+	return _economy
+
+
+func plot_slots() -> Array[PlotSlot]:
+	return _plot_slots()
+
+
+func plots_catalogue() -> PlotRegistry:
+	return _plots_catalogue()
+
+
+## Is this ranch instanced under another scene rather than run as the main scene? See
+## _hosted for what changes when it is.
+func is_hosted() -> bool:
+	return _hosted
 
 
 func _on_plot_chosen(plot: PlotData, slot: PlotSlot) -> void:
@@ -711,6 +1012,9 @@ func _toast(text: String) -> void:
 func _sync_game_state() -> void:
 	if _game_state == null:
 		return
+	# The trays first: gems left sitting in a pen at quit time are gems the save never
+	# hears about, and this is the one funnel every write goes through.
+	collect_gems()
 	var owned: Array[PonyInstance] = []
 	var seen := {}
 	var beam: Node3D = player.get_magic_beam()
@@ -762,6 +1066,7 @@ func _physics_process(_delta: float) -> void:
 	if not _interactive:
 		return
 	_update_plot_interaction()
+	_update_market_interaction()
 	if _game_state == null:
 		return
 	var house := get_node_or_null(^"Buildings/Farmhouse") as Node3D
@@ -1131,6 +1436,26 @@ func _report(pony_count: int, prop_count: int) -> void:
 	_set_check(checks, "the probe pen was taken back down",
 		bool(_pen_probe.get("torn_down", false)))
 
+	# --- the market ----------------------------------------------------------------------
+	# The building is hand-built like the barn and the farmhouse, so it stands on an
+	# assetless checkout too and these checks are not gated on assets_state.
+	_set_check(checks, "the market building stands", get_node_or_null(^"Buildings/Market") != null)
+	_set_check(checks, "the shop is wired", _shop != null)
+	# `== _shop` rather than `!= null`: the menu holding SOME shop is not the requirement,
+	# the menu holding the shop that spends this ranch's wallet is.
+	_set_check(checks, "the market menu is wired",
+		market_menu != null and market_menu.has_method("open") and market_menu.get("shop") == _shop)
+	_set_check(checks, "the pause menu is wired",
+		pause_menu != null and pause_menu.has_method("open") and pause_menu.get("settings") == _settings)
+	var catalogue_count: int = market_menu.buy_rows().size() if market_menu != null \
+		and market_menu.has_method("buy_rows") else 0
+	_set_check(checks, "the shop catalogue loaded", catalogue_count > 0)
+	print("RANCH market shop=%s catalogue=%d gems=%d inventory=%d unlocks=%d"
+		% [_shop != null, catalogue_count,
+			_game_state.gems.total() if _game_state != null else 0,
+			_game_state.inventory.ids().size() if _game_state != null else 0,
+			_game_state.unlocks.size() if _game_state != null else 0])
+
 	# --- THE GATE IS A GATE -----------------------------------------------------------------
 	# "i also trapped myself inside the pen and couldnt leave" (owner playtest). The gateway
 	# has to be a doorway to the player and a wall to a pony, and since the two are the same
@@ -1301,7 +1626,14 @@ func _report(pony_count: int, prop_count: int) -> void:
 			all_ok = false
 
 	var summary := "ponies=%d props=%d assets=%s" % [ponies.size(), prop_count, assets_state]
+	print("RANCH hosted=%s" % _hosted)
 	print(("RANCH_OK " if all_ok else "RANCH_FAILED ") + summary)
+
+	if _hosted:
+		# Somebody else owns this process. Hand them the verdict and let them decide. See
+		# _hosted for the shutdown race this avoids.
+		gate_report_finished.emit(all_ok)
+		return
 
 	if DisplayServer.get_name() == "headless":
 		get_tree().quit(0 if all_ok else 1)
@@ -2056,7 +2388,7 @@ func _capture_the_mechanic() -> void:
 		# has a pony still grazing. Nothing else in the project photographs a NON-event, and
 		# "she did not notice me" is exactly the sort of claim a number can assert and only a
 		# picture can make believable.
-		var sneak_reach: float = beam.REACH
+		var sneak_reach: float = beam.reach()
 		var sneak_notice: float = PonyScript.notice_radius_for(
 			PonyDataScript.Personality.SHY, false)
 		Input.action_press(PlayerScript.SNEAK_ACTION)
@@ -2077,7 +2409,7 @@ func _capture_the_mechanic() -> void:
 		for i in range(4):
 			await get_tree().physics_frame
 
-		var reach: float = beam.REACH
+		var reach: float = beam.reach()
 		# Stood at the midpoint of the warning band -- outside REACH, inside HER notice
 		# radius, which since the second playtest is a SHY pony's own wider one (14 m) and
 		# not the shared base. The player is not sneaking here, which is the whole point of
@@ -2128,7 +2460,7 @@ func _capture_the_mechanic() -> void:
 	# is drawn even when the beam has hit nothing, so sweeping for range is something the
 	# player can DO rather than guess at. Aimed 15 degrees off the pony so nothing gets
 	# grabbed and the beam stays empty.
-	await _stand_player_near(target, beam.REACH - 0.6)
+	await _stand_player_near(target, beam.reach() - 0.6)
 	var aside := (target.global_position - player.global_position).rotated(Vector3.UP, deg_to_rad(28.0))
 	await _aim_rig_at(player.global_position + aside + Vector3(0.0, 0.4, 0.0))
 	beam.grab()
