@@ -14,14 +14,35 @@ extends Node3D
 ##   release_stored()       -- let the last one caught back out into the world.
 ##
 ## A CAPTURE IS A CONTEST WITH TWO CLOCKS, which is the shape the first playtest asked
-## for. The beam needs SECURE_SECONDS of unbroken hold to subdue a pony; she has
-## STRUGGLE_* seconds of fight in her. Let go too early and she slips out; hold too long
-## and she wins. Everything between is the window you are aiming for, and how wide it is
-## is the whole of what her personality means under the beam. Before this, release()
-## stored whatever was in the beam the instant it was called and the struggle timers were
+## for. The beam needs a subdue time of unbroken hold to take a pony; she has a struggle
+## time of fight in her. Let go too early and she slips out; hold too long and she wins.
+## Everything between is the WINDOW you are aiming for. Before this, release() stored
+## whatever was in the beam the instant it was called and the struggle timers were
 ## decorations on a decision already made -- the owner's report was "catching is really
 ## quick", and it was: point, click, done, in about a third of a second. The full
-## reasoning and the numbers are on SECURE_SECONDS.
+## reasoning is on SECURE_SECONDS.
+##
+## THE WINDOW IS GRADED, JITTERED, AND ON THE HARD GRADE IT CAN BE TAKEN AWAY FROM YOU.
+## That is the third playtest's brief -- "all the character super easy to catch too, no
+## real challenge with the wiggling out" -- answered in four parts, and each part has its
+## own constant block below:
+##
+##   GRADED    every pony is EASY / MEDIUM / HARD, read off the `personality` she already
+##             carries (Grade, grade_for). 1.00 / 0.50 / 0.35 s of window, down from
+##             3.45 / 1.85 / 1.15.
+##   JITTERED  both clocks are rolled per attempt inside published bounds (SECURE_JITTER,
+##             WINDOW_JITTER), so the mechanic cannot be played by counting.
+##   WRENCHED  a HARD hold can tear free BEFORE it secures her (WRENCH_CHANCE_HARD),
+##             implemented as nothing more than a struggle time rolled shorter than that
+##             attempt's own subdue time -- so the same two clocks resolve it and the HUD
+##             shows it happening.
+##   BOUNDED   the wrench chance falls to zero by WRENCH_GRACE_HOLDS grabs on the same
+##             pony, so repeated correct play always wins. "But will eventaully let you
+##             catch" is a guarantee here, not a probability.
+##
+## roll_clocks() is the one function that does all four, it is static and pure with its
+## randomness passed in, and every property above is swept exhaustively in
+## game/test/test_magic_beam.gd rather than sampled from a few live captures.
 ##
 ## WHO OWNS A CAPTURE. This node does, outright. pony.gd used to run a beam-hold timer of
 ## its own and fire captured() off an exported capture_seconds -- a second capture state
@@ -96,8 +117,9 @@ const BEAM_ACTION := &"beam"
 ## mysterious. Read through get_last_loss().
 enum Loss {
 	NONE,       ## Nothing has been lost yet this session.
-	SLIPPED,    ## Let go before SECURE_SECONDS: the beam never subdued her.
+	SLIPPED,    ## Let go before the beam had secured her: it never subdued her.
 	STRUGGLED,  ## Held past her struggle time: she won on her own.
+	WRENCHED,   ## She tore out of a HARD hold BEFORE it could secure her -- see WRENCH_CHANCE_HARD.
 }
 
 ## Twilight's greeting line, played once on the FIRST successful capture as a placeholder
@@ -257,76 +279,165 @@ const RELEASE_LIFT := 0.15
 ## second attempt is a moving target at the edge of the beam and you have to work for it.
 const ESCAPE_COOLDOWN := 1.25
 
-## Seconds the beam must have a pony in it before she can be stowed. THE FIX FOR THE
-## OWNER'S FIRST COMPLAINT: "catching is really quick -- it took me several tries to get a
-## screenshot of one."
+## The same cooldown after a WRENCH -- the one loss the player did not cause (see
+## WRENCH_CHANCE_HARD). Deliberately shorter, and the reasoning is the acceptance criterion
+## the owner put above every number here: "i dont want the mechanic to get annoying".
+## ESCAPE_COOLDOWN is a PRICE for a mistake -- you let go too soon, or you held too long --
+## and a price for a mistake nobody made is just dead time. It is also dead time that buys
+## nothing on the grade it can actually happen to: a BOLD pony has no reaction to the player
+## at all (Pony.reaction_state -> NO_REACTION), so she does not use the head start to become
+## a moving target the way a fleeing pony would; she stands there while you wait. Long
+## enough to read as a real escape and to let the beam visibly let go of her, short enough
+## that "she got me that time" is a beat rather than a punishment.
+const WRENCH_COOLDOWN := 0.55
+
+## Seconds the beam must have a pony in it before she can be stowed -- the NOMINAL value,
+## before the per-attempt jitter below. THE FIX FOR THE OWNER'S FIRST COMPLAINT: "catching
+## is really quick -- it took me several tries to get a screenshot of one."
 ##
 ## Before this constant existed, release() stored whatever was in the beam, unconditionally
 ## and instantly. The pull-in finishes in ~0.3 s, so the entire mechanic was: point,
 ## click, done. The per-personality struggle timers below were real, ran correctly, and
 ## were tuned with care -- and no player would ever have discovered any of it, because
-## nobody has a reason to hold a button down when letting go already won. The HUD's
-## struggle ring was drawing a countdown on a decision that had already been made.
+## nobody has a reason to hold a button down when letting go already won.
 ##
-## So a capture is now a two-sided clock. The beam needs SECURE_SECONDS of unbroken hold
-## to subdue her; she has STRUGGLE_* seconds of fight in her. Let go inside the first and
-## she slips out of the field and drops back into the world -- alive, and now spooked. Hold
-## past the second and she wins outright. Between them is a window whose WIDTH is the
-## difference of the two numbers, and that window is the mechanic:
+## So a capture is a two-sided clock. The beam needs this long to subdue her; she has a
+## struggle time of her own. Let go inside the first and she slips out of the field and
+## drops back into the world -- alive, and now spooked. Hold past the second and she wins
+## outright. Between them is the WINDOW, and the window is the mechanic.
 ##
-##   BOLD     2.30 - 1.15 = 1.15 s   a real fight; you must be watching the ring
-##   CURIOUS  3.00 - 1.15 = 1.85 s   comfortable if you are paying attention
-##   SHY      4.60 - 1.15 = 3.45 s   she has frozen; effectively a free hold
+## LOWERED FROM 1.15 s BY THE THIRD PLAYTEST, along with every window (see WINDOW_EASY).
+## The owner's report was "all the character super easy to catch too, no real challenge
+## with the wiggling out", and the shape of the fix he asked for was "graded, id decrease
+## the current values". Shrinking the windows without also shortening the subdue would have
+## made every catch a longer wait for a tighter target, which is the one combination that
+## turns a mechanic into a chore. 1.0 s is still comfortably past the 0.38 s pull-in, so
+## the whole of the secure phase is spent watching a pony who has actually arrived and is
+## visibly fighting -- see the floor asserted in game/test/test_magic_beam.gd.
 ##
 ## WHY THE SUBDUE TIME IS THE SAME FOR EVERYONE and only the resistance varies: it keeps
-## one number as "what the beam does" and one as "who she is", so the personalities stay
-## legible. A player learns "Fluttershy is a handful" from the ring draining fast, not
-## from the beam behaving differently.
-##
-## 1.15 s specifically: comfortably past the 0.38 s pull-in, so the whole of the secure
-## phase is spent watching a pony who has actually arrived and is visibly fighting; and
-## short enough that the twelfth catch of a session is a second-and-a-bit of commitment
-## rather than a chore. The floor on it is the pull-in (a secure time under ~0.5 s would
-## complete while she was still in transit and the contest would be invisible again); the
-## ceiling is the SHORTEST struggle time -- STRUGGLE_BOLD since the inversion below -- and
-## test_magic_beam.gd asserts a real margin under it, because a secure time that met or
-## passed a personality's struggle time would make that personality flatly uncatchable.
-const SECURE_SECONDS := 1.15
+## one number as "what the beam does" and one as "who she is", so the grades stay legible.
+## A player learns "Rainbow Dash is a handful" from her ring draining fast, not from the
+## beam behaving differently in her hooves.
+const SECURE_SECONDS := 1.0
 
-## Seconds a held pony resists before she breaks free, by personality. Together with
-## SECURE_SECONDS above these are the whole of the mechanic's tension: how long you have
-## to act, and how long it is tells you something about who you caught.
+## Seconds of jitter either side of SECURE_SECONDS, rolled once per attempt (0.85 - 1.15 s).
 ##
-## THE SECOND PLAYTEST TURNED THIS ORDERING UPSIDE DOWN, AT THE OWNER'S CALL. The report
-## was "Fluttershy always breaks out -- impossible to catch; the fix needs to be better",
-## and the fix he asked for was not a wider window for the same design, it was a different
-## design: "it makes sense Fluttershy runs but freezes." So:
+## THIS IS THE "MORE VARIANCE AND RANDOMNESS TO KEEP IT FUN" HALF OF THE OWNER'S BRIEF, and
+## it is on the SUBDUE clock rather than only on the struggle clock for a specific reason:
+## with a fixed subdue time a player stops watching the ring after about six catches and
+## starts counting "one... and let go", which is a rhythm game, not a contest. Jittering
+## when the ring completes makes WATCHING the ring the only way to play it -- and watching
+## is not punished, because the ring is drawn from the rolled value, so it always tells the
+## truth about this particular attempt (game/ui/hud.gd's outer catch ring).
 ##
-##   SHY (4.60 s) is now the LONG one. She is terrified, and a terrified prey animal in a
-##     magic field does not fight it -- she goes rigid. The difficulty of a Fluttershy has
-##     moved entirely out into the world (Pony.SHY_NOTICE_BONUS: she sees you from 14 m and
-##     is gone before you are close), where the player can do something about it with a
-##     chase or a sneak. It was previously in a 0.75 s reaction window that arrived after a
-##     chase the player had already had to win, which is how "impossible" happens: two hard
-##     things in series, with the second one unwinnable if you were even slightly late.
-##   BOLD (2.30 s) is now the SHORT one. She never ran from you and she is not frightened
-##     of you now; she is simply not having it, and she thrashes. She is trivial to REACH
-##     -- no reaction state at all, walk right up to her -- so the whole of her difficulty
-##     sits here, in a 1.15 s window that a distracted player will miss.
-##   CURIOUS (3.00 s) sits between them, as she does everywhere else.
+## Bounded on purpose, and the bound is what stops this being a slot machine: the low end
+## must stay clear of the pull-in (a subdue that completed while she was still in transit
+## would put the contest back where it was, invisible), and the high end must stay short
+## enough that the twelfth catch of a session is a second of commitment rather than a
+## chore. Both ends are asserted in game/test/test_magic_beam.gd.
+const SECURE_JITTER := 0.15
+
+## THE DIFFICULTY GRADE OF A HOLD. Not a new field on anything -- it is a READING of the
+## personality a pony already carries (PonyData.personality), which is the tier this
+## mechanic has always been keyed on. The owner asked to "tag them with different
+## difficulties"; this is that tag, named, so the rest of the file can talk about EASY /
+## MEDIUM / HARD instead of restating which personality happens to be which this month.
 ##
-## The old ordering also had a structural problem the first playtest round flagged and did
-## not fix: BOLD is Rainbow Dash, who is RARE, so the rarest pony in the game was both the
-## easiest to walk up to AND the easiest to hold. Difficulty and rarity now agree.
+## SHY IS THE EASY ONE AND BOLD THE HARD ONE, and that ordering was inverted deliberately
+## by the second playtest -- do not "fix" it back. "It makes sense Fluttershy runs but
+## freezes": a terrified prey animal in a magic field goes rigid, so a SHY pony is the
+## hardest to REACH (Pony.SHY_NOTICE_BONUS -- she sees you from 14 m and she is the only
+## personality that runs) and the easiest to HOLD. A BOLD pony has no reaction to the
+## player at all, so you walk straight up to her, and the whole of her difficulty is here.
+## It also puts difficulty and rarity in agreement: BOLD is Rainbow Dash, who is RARE.
+enum Grade {
+	EASY,    ## SHY. She has frozen. The exhale after the chase.
+	MEDIUM,  ## CURIOUS. Comfortable if you are paying attention.
+	HARD,    ## BOLD. A scramble -- and the one grade that can tear free before you land her.
+}
+
+## The capture window each grade gets, in seconds: the slack between "the beam has subdued
+## her" and "she has won". This is the number that says how hard she is to catch.
 ##
-## Sized against the window, not typed: STRUGGLE_BOLD - SECURE_SECONDS = 1.15 s is about
-## three reaction times, which is a fight you can lose without it being a coin toss, and
-## it is bought against a target who is standing still and did not have to be chased.
-## STRUGGLE_SHY - SECURE_SECONDS = 3.45 s is not meant to be a challenge at all; it is the
-## exhale after the chase.
-const STRUGGLE_SHY := 4.6
-const STRUGGLE_CURIOUS := 3.0
-const STRUGGLE_BOLD := 2.3
+## STRAIGHT OUT OF THE THIRD PLAYTEST, in the owner's own words: "medium ones only have
+## like a half sec window and easy have the full second window something like that", with
+## the hard grade tighter still. The build he played gave 3.45 / 1.85 / 1.15 s, and this
+## file's own comment conceded the easy case "is not meant to be a challenge at all" --
+## which is exactly what he found: "all the character super easy to catch too, no real
+## challenge with the wiggling out".
+##
+##   EASY    1.00 s   you have to be looking at the screen, and that is all
+##   MEDIUM  0.50 s   about two reaction times: you must be watching the ring
+##   HARD    0.35 s   one deliberate release -- plus WRENCH_CHANCE_HARD on top
+##
+## 0.35 s IS NOT A REACTION TEST, and the difference matters for whether this is fun.
+## Reacting to an unheralded flash takes ~0.25 s, which would make the hard grade a coin
+## toss; but the outer ring fills toward a visible finish line, so the player is
+## ANTICIPATING a converging target rather than reacting to a surprise, and anticipatory
+## timing lands inside ~0.1 s. The jitter is what keeps the anticipation honest: you can
+## see when the ring will close, but you cannot know it in advance.
+const WINDOW_EASY := 1.00
+const WINDOW_MEDIUM := 0.50
+const WINDOW_HARD := 0.35
+
+## Fraction of its own width a window is jittered by, rolled once per attempt. 0.15 gives
+## 0.85-1.15 s easy, 0.43-0.58 s medium, 0.30-0.40 s hard.
+##
+## Applied to the WINDOW rather than to the struggle time, which is the part that keeps
+## this bounded: the struggle clock is then computed as the rolled subdue plus the rolled
+## window, so the two jitters cannot stack into a hold that is over before it starts. The
+## worst roll on the hardest grade still leaves 0.30 s, which is longer than an
+## un-anticipated visual reaction, and game/test/test_magic_beam.gd asserts that floor over
+## every grade rather than trusting the arithmetic here.
+##
+## 0.15 IS NOT A TASTE CALL -- IT IS THE WIDEST JITTER THE GRADING PERMITS, and the first
+## draft got it wrong at 0.20, which is why the constraint is written down. The grades only
+## teach a player anything if a harder grade is ALWAYS harder: the worst EASY roll has to
+## beat the best MEDIUM one and the worst MEDIUM roll the best HARD one, or the same pony
+## is sometimes a tougher hold than a pony of a tougher grade and there is nothing to
+## learn. MEDIUM and HARD are 0.50 against 0.35, so that ceiling is 0.50(1-j) > 0.35(1+j),
+## i.e. j < 0.176 -- and the test that pins it went red on 0.20 rather than this being
+## noticed by eye. Widening the variance any further means moving the grades apart first.
+const WINDOW_JITTER := 0.15
+
+## Chance that a HARD hold is torn out of before it can secure her -- "the hardest ones
+## have a chance to wiggle out before you catch (but will eventaully let you catch)".
+##
+## HOW IT IS IMPLEMENTED IS THE POINT: there is no second state machine. A wrenching
+## attempt simply rolls a struggle time SHORTER than its own subdue time (see
+## WRENCH_AT_MIN), so the existing two clocks resolve it, and -- crucially -- the HUD shows
+## the truth for free: the inner red ring visibly outruns the outer green one, and the
+## player can SEE that this one is lost rather than being told so after the fact. A
+## mechanic that takes a catch away has to show its working or it reads as a bug.
+##
+## AND IT CANNOT LOOP, WHICH IS THE HALF THE OWNER'S "but" WAS CARRYING. The chance falls
+## by WRENCH_CHANCE_FALLOFF for every previous time the beam has had hold of THIS pony
+## (Pony.beam_holds), so it reaches exactly zero on her third grab and stays there: she
+## tires. 0.50 then 0.25 then 0.00 means the expected cost of taking a hard pony is about
+## 0.6 wrenches -- usually one, never more than two, and never a dice roll you can lose
+## indefinitely. That guarantee is proved rather than asserted, twice: as a sweep over
+## every seed in game/test/test_magic_beam.gd, and live, by playing a wrenching pony
+## correctly until she is caught, in game/scenes/test/capture_test.gd's WRENCH phase.
+const WRENCH_CHANCE_HARD := 0.50
+const WRENCH_CHANCE_FALLOFF := 0.25
+
+## Prior holds after which a pony can no longer wrench free, whatever her grade -- derived
+## from the two constants above rather than typed, so a retune of either cannot leave a
+## pony who fights forever. Read by the gates, which lean on the guarantee.
+const WRENCH_GRACE_HOLDS := int(ceil(WRENCH_CHANCE_HARD / WRENCH_CHANCE_FALLOFF))
+
+## When a wrench lands, as a fraction of that attempt's own subdue time: she tears out
+## between 60% and 90% of the way to being secured.
+##
+## Both ends are sized off what the player SEES. Earlier than 0.6 and she is barely out of
+## the pull-in when she goes, which reads as the beam failing to pick her up rather than as
+## her winning; later than 0.9 and the outer ring is close enough to full that a player
+## letting go on instinct cannot tell a wrench from their own mistimed release, which would
+## teach exactly the wrong lesson. Between them she gets most of the way round the ring and
+## then takes it back, which is the beat this is for.
+const WRENCH_AT_MIN := 0.60
+const WRENCH_AT_MAX := 0.90
 
 ## Struggle time for anything that is not a pony, in seconds. Props do not resist; a crate
 ## stays in the beam until the player lets go.
@@ -474,13 +585,28 @@ var _beaming := false
 
 var _held: Node3D
 var _hold_seconds := 0.0
+## The two clocks THIS hold is running on, rolled once at _begin_hold() -- not the nominal
+## constants. Read back through get_struggle_seconds() / get_secure_seconds(), which is
+## what the HUD draws its two rings from, so what is on screen is always the truth about
+## the attempt in progress rather than an average of attempts in general.
 var _struggle_seconds := STRUGGLE_NEVER
 var _secure_seconds := SECURE_NEVER
+## Whether this hold is one she is going to tear out of before it can secure her. Decided
+## at acquisition, never mid-hold: the outcome is fixed the moment the beam takes her, and
+## the two rings then play it out honestly. Nothing the player does after the grab can
+## change it, which is exactly why the falloff in wrench_chance_for() has to be the thing
+## that guarantees they eventually win.
+var _wrenching := false
 ## Offset from the hold point to the held body's ORIGIN -- see PONY_HOLD_LIFT.
 var _hold_offset := Vector3.ZERO
 ## RigidBody3D state borrowed at grab time and handed back on release.
 var _prev_freeze := false
 var _prev_freeze_mode := RigidBody3D.FREEZE_MODE_STATIC
+
+## The generator behind every per-attempt roll -- the jitter on both clocks, and whether a
+## HARD hold wrenches. Entropy-seeded in _ready() so two players do not get the same run of
+## luck; replaceable through set_capture_rng() so a gate can have a reproducible one.
+var _rng := RandomNumberGenerator.new()
 
 var _cooldown := 0.0
 ## Why the most recent lost hold was lost -- see the Loss enum.
@@ -513,6 +639,9 @@ var _assist_shape: SphereShape3D
 
 func _ready() -> void:
 	_storage = StorageScript.new(storage_capacity)
+	# Entropy, not a fixed seed: a capture that played out identically for every player on
+	# their first Rainbow Dash would make the variance pointless. Gates override it.
+	_rng.randomize()
 	_assist_shape = SphereShape3D.new()
 	_assist_shape.radius = GRAB_ASSIST_RADIUS
 	_resolve_mount()
@@ -547,6 +676,19 @@ func _exit_tree() -> void:
 
 
 # --- public interface -----------------------------------------------------------------
+
+## Hand the beam a seeded generator so a scene's captures are reproducible -- the same
+## affordance Pony.set_rng() gives the herd, and for the same reason. Call before the first
+## grab. Without it the beam rolls off its own entropy-seeded generator and no gate can pin
+## which attempt wrenched.
+##
+## NOT A BYPASS. A seeded generator still rolls the real rules; a gate that wants a hold
+## which cannot wrench says so through the published rule instead, by handing the beam a
+## pony whose `beam_holds` is already past WRENCH_GRACE_HOLDS.
+func set_capture_rng(rng: RandomNumberGenerator) -> void:
+	if rng != null:
+		_rng = rng
+
 
 ## Switch the beam on. Acquisition happens on the next physics frame (the space-state
 ## query has to run inside the physics step), so is_holding() is still false immediately
@@ -744,6 +886,14 @@ func is_secured() -> bool:
 	return is_holding() and _hold_seconds >= _secure_seconds
 
 
+## Whether the hold in progress is one she will tear out of before it can secure her (see
+## WRENCH_CHANCE_HARD). Exposed for the gates, which have to be able to say "this attempt
+## was a wrench" without inferring it from a timer that has already run out. The HUD does
+## NOT read this -- it does not need to, because the two rings already show it happening.
+func is_wrenching() -> bool:
+	return is_holding() and _wrenching
+
+
 ## Why the most recent `escaped()` happened: Loss.SLIPPED (let go too early) or
 ## Loss.STRUGGLED (held too long). Loss.NONE until one has.
 func get_last_loss() -> int:
@@ -776,35 +926,113 @@ func get_hold_point() -> Vector3:
 	return hold_point(_aim_origin, _aim_direction, _anchor_position())
 
 
-## How long a pony with this `personality` resists the beam, in seconds. Static and pure,
-## so the one rule that makes the three personalities feel different under the beam is
-## pinned by a unit test rather than only by a scene (game/test/test_magic_beam.gd).
-static func struggle_seconds_for(personality: int) -> float:
+## The difficulty GRADE of a hold, read off the personality a pony already carries. A
+## pure view of PonyData.personality, not a second field to keep in step with it -- see
+## the Grade enum for why the ordering is the way round it is.
+##
+## Anything a future roster adds without a grade of its own is HARD, which is the same
+## fallback Pony.reaction_state() takes: a roster addition that behaved like a BOLD pony on
+## the ground and like a CURIOUS one in the beam would be more confusing than one that is
+## simply a handful. game/test/test_magic_beam.gd pins that the fallback still leaves a
+## hittable window.
+static func grade_for(personality: int) -> int:
 	match personality:
 		PonyDataScript.Personality.SHY:
-			return STRUGGLE_SHY
+			return Grade.EASY
 		PonyDataScript.Personality.CURIOUS:
-			return STRUGGLE_CURIOUS
+			return Grade.MEDIUM
 		_:
-			# BOLD, and anything a future roster adds without a struggle time of its own.
-			# Note that since the second playtest's inversion this is the STRICTEST of the
-			# three rather than the most forgiving -- an unknown personality now defaults to
-			# the hardest hold. Kept as BOLD anyway, because it is the same fallback
-			# Pony.reaction_state() uses, and a roster addition that behaves like a BOLD pony
-			# on the ground and like a CURIOUS one in the beam would be worse than one that
-			# is simply a bit of a handful. test_magic_beam.gd pins that the fallback still
-			# leaves a hittable window.
-			return STRUGGLE_BOLD
+			return Grade.HARD
 
 
-## The seconds of slack a player has to let go in, for a pony with this `personality`:
-## everything between "the beam has subdued her" and "she has won". This is the number
-## that says how hard she is to catch, and it is the difference of two other numbers --
-## which is exactly why it gets a name, because neither of them means anything on its own
-## and a retune of either silently changes it. Static and pure; pinned by
-## game/test/test_magic_beam.gd.
+## The name of a grade, for gate output and error messages.
+static func grade_name(grade: int) -> String:
+	return Grade.keys()[grade] if grade >= 0 and grade < Grade.size() else "INVALID(%d)" % grade
+
+
+## The seconds of slack a player has to let go in, for a pony with this `personality`,
+## BEFORE the per-attempt jitter: everything between "the beam has subdued her" and "she
+## has won". This is the number that says how hard she is to catch. Static and pure, so
+## the one rule that grades the personalities is pinned by a unit test rather than only by
+## a scene (game/test/test_magic_beam.gd).
 static func capture_window_for(personality: int) -> float:
-	return struggle_seconds_for(personality) - SECURE_SECONDS
+	match grade_for(personality):
+		Grade.EASY:
+			return WINDOW_EASY
+		Grade.MEDIUM:
+			return WINDOW_MEDIUM
+		_:
+			return WINDOW_HARD
+
+
+## The narrowest and widest that window can actually be rolled at, as (min, max). The
+## bound on the randomness, exposed rather than left implicit in the arithmetic, because
+## "bounded" is the property that separates variance from a slot machine and the floor is
+## the number a human should be able to check at a glance.
+static func window_bounds_for(personality: int) -> Vector2:
+	var base: float = capture_window_for(personality)
+	return Vector2(base * (1.0 - WINDOW_JITTER), base * (1.0 + WINDOW_JITTER))
+
+
+## The narrowest and widest the subdue clock can be rolled at, as (min, max).
+static func secure_bounds() -> Vector2:
+	return Vector2(SECURE_SECONDS - SECURE_JITTER, SECURE_SECONDS + SECURE_JITTER)
+
+
+## How long a pony with this `personality` resists the beam, in seconds, on a NOMINAL
+## attempt -- the middle of the distribution, with no jitter and no wrench. What a gate or
+## a design note should quote when it wants to say "roughly this long"; what an actual hold
+## runs on is rolled per attempt by roll_clocks() and read back through
+## get_struggle_seconds().
+static func struggle_seconds_for(personality: int) -> float:
+	return SECURE_SECONDS + capture_window_for(personality)
+
+
+## The chance that a hold on this `personality` is torn out of before it can secure her,
+## given how many times the beam has ALREADY had hold of this particular pony.
+##
+## THE FALLOFF IS THE WHOLE ANSWER TO "but will eventaully let you catch". It is not a pity
+## timer bolted on beside a dice roll -- it is the dice themselves being taken away, one
+## face at a time, until by WRENCH_GRACE_HOLDS prior grabs there is nothing left to roll.
+## So a player who keeps doing it right cannot be held off indefinitely, and the bound is
+## small: at most WRENCH_GRACE_HOLDS wrenches from any one pony, ever.
+static func wrench_chance_for(personality: int, prior_holds: int) -> float:
+	if grade_for(personality) != Grade.HARD:
+		return 0.0
+	return maxf(0.0,
+		WRENCH_CHANCE_HARD - WRENCH_CHANCE_FALLOFF * float(maxi(prior_holds, 0)))
+
+
+## The two clocks ONE attempt runs on, plus whether this is a wrenching attempt, as
+## {"secure": float, "struggle": float, "wrenches": bool}.
+##
+## PURE, WITH THE RANDOMNESS PASSED IN. The three rolls are unit floats the caller draws
+## (see _begin_hold, which draws them from the beam's own RandomNumberGenerator); nothing
+## in here touches a generator or a clock. That is what lets every property this mechanic
+## claims -- the bounds, the grading, the wrench falloff, the convergence -- be swept
+## exhaustively in milliseconds by game/test/test_magic_beam.gd instead of inferred from a
+## handful of live captures.
+##
+## EXACTLY THREE ROLLS ARE DRAWN, WHATEVER HAPPENS, and that is deliberate rather than
+## incidental: a draw count that depended on the outcome would make a seeded run's whole
+## future sequence depend on how the last attempt went, and every seeded gate downstream
+## would shift the moment any of this was retuned. So the window roll doubles as the roll
+## for WHEN a wrench lands -- on a wrenching attempt the window is not used for anything
+## else, and on any other attempt the wrench moment is not.
+static func roll_clocks(personality: int, prior_holds: int,
+		wrench_roll: float, secure_roll: float, window_roll: float) -> Dictionary:
+	var secure: float = SECURE_SECONDS \
+		+ lerpf(-SECURE_JITTER, SECURE_JITTER, clampf(secure_roll, 0.0, 1.0))
+	var wrenches: bool = wrench_roll < wrench_chance_for(personality, prior_holds)
+	var bounds: Vector2 = window_bounds_for(personality)
+	var struggle: float = secure + lerpf(bounds.x, bounds.y, clampf(window_roll, 0.0, 1.0))
+	if wrenches:
+		# SHORTER than the subdue clock she is racing, which is the whole of the
+		# implementation: the existing struggle timer fires first, _run_struggle sees the
+		# hold had not secured her yet, and reports Loss.WRENCHED.
+		struggle = secure * lerpf(WRENCH_AT_MIN, WRENCH_AT_MAX,
+			clampf(window_roll, 0.0, 1.0))
+	return {"secure": secure, "struggle": struggle, "wrenches": wrenches}
 
 
 ## The point a held body floats at: `anchor` projected onto the aim ray, plus HOLD_LEAD
@@ -1027,14 +1255,26 @@ func _begin_hold(body: Node3D) -> void:
 	_held = body
 	_hold_seconds = 0.0
 	_hold_offset = Vector3.ZERO
+	_wrenching = false
 
 	if body is PonyScript:
 		body.set_held(true)
 		_hold_offset = Vector3(0.0, -PONY_HOLD_LIFT, 0.0)
 		var data: PonyData = body.get_data()
-		_struggle_seconds = struggle_seconds_for(
-			data.personality if data != null else PonyDataScript.Personality.BOLD)
-		_secure_seconds = SECURE_SECONDS
+		var personality: int = data.personality if data != null \
+			else PonyDataScript.Personality.BOLD
+		# COUNTED BEFORE THIS HOLD, and counted on HER, which is what makes the wrench
+		# falloff a promise about one particular pony rather than about the session. The
+		# counter lives on the pony (Pony.beam_holds) so it dies with her and cannot leak
+		# into a dictionary of freed nodes; the RULE it feeds stays here, in
+		# wrench_chance_for(), so there is still one place that decides what a hold means.
+		var prior_holds: int = body.beam_holds
+		body.beam_holds += 1
+		var clocks := roll_clocks(personality, prior_holds,
+			_rng.randf(), _rng.randf(), _rng.randf())
+		_secure_seconds = clocks["secure"]
+		_struggle_seconds = clocks["struggle"]
+		_wrenching = clocks["wrenches"]
 		return
 
 	if body is RigidBody3D:
@@ -1048,6 +1288,7 @@ func _begin_hold(body: Node3D) -> void:
 		rigid.freeze = true
 		_struggle_seconds = STRUGGLE_NEVER
 		_secure_seconds = SECURE_NEVER
+		_wrenching = false
 
 
 ## Reel the held body toward the hold point and turn it slowly while it floats.
@@ -1067,9 +1308,14 @@ func _run_struggle(delta: float) -> void:
 		return
 
 	var body := _held
+	# WHICH KIND OF LOSS THIS WAS IS DERIVED, NOT STORED. A struggle time that runs out
+	# before the subdue clock has finished can only be a wrench -- every non-wrenching
+	# attempt rolls its struggle as (subdue + a positive window), so the comparison is
+	# exact rather than approximate, and there is no second flag to fall out of step.
+	var reason: int = Loss.WRENCHED if _hold_seconds < _secure_seconds else Loss.STRUGGLED
 	_take_back_physics(body)
 	_held = null
-	_lose(body, Loss.STRUGGLED)
+	_lose(body, reason)
 
 
 ## The one exit from a hold that is not a capture, used by BOTH ways of failing one: she
@@ -1085,7 +1331,10 @@ func _run_struggle(delta: float) -> void:
 ## difference between a mechanic a player learns and one they think is random.
 func _lose(body: Node3D, reason: int) -> void:
 	_last_loss = reason
-	_cooldown = ESCAPE_COOLDOWN
+	_wrenching = false
+	# A wrench is the one loss the player did not cause, so it costs less -- see
+	# WRENCH_COOLDOWN.
+	_cooldown = WRENCH_COOLDOWN if reason == Loss.WRENCHED else ESCAPE_COOLDOWN
 	if body == null or not is_instance_valid(body):
 		return
 	if body is PonyScript:

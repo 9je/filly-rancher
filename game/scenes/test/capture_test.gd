@@ -40,6 +40,15 @@ extends Node3D
 ##            the very same individual, with the state she went in with -- a recapture
 ##            that quietly reset her would be exactly the amnesia PonyInstance exists to
 ##            prevent.
+##   WRENCH   the third playtest's addition, and the one phase that PROVES a property
+##            rather than asserting it. A HARD pony can tear out of the beam BEFORE it
+##            secures her (MagicBeam.WRENCH_CHANCE_HARD) -- so a fresh one is played
+##            CORRECTLY, over and over, until she is caught, and the run is bounded: the
+##            wrench chance falls to zero by MagicBeam.WRENCH_GRACE_HOLDS grabs, so a
+##            player doing everything right cannot be held off. The phase forces the first
+##            grab to wrench (by seeding the beam's generator, not by bypassing the rule),
+##            checks the loss is reported as Loss.WRENCHED with the catch ring still
+##            unfilled, and then keeps playing until she is in the bag.
 ##   SLIP     the other half of the capture contest: let go of a pony BEFORE the beam has
 ##            secured her and she must NOT go in the bag -- she is reported as escaped(),
 ##            with Loss.SLIPPED, and left alive in the world. This is the check with the
@@ -51,6 +60,17 @@ extends Node3D
 ##            implementation drops one.
 ##   PROP     a loose RigidBody3D must be draggable too, and must get its physics back
 ##            (freeze cleared) when it is let go.
+##
+## THE MECHANICS PHASES ALSO HAND THE BEAM A PONY WHO IS ALREADY TIRED, for the same class
+## of reason and stated with the same bluntness. A BOLD pony is graded HARD, and a HARD hold
+## can be torn out of before it secures her -- so roughly half the grabs in this scene would
+## end in a wrench and every phase downstream of one would be measuring an escape it did not
+## ask for. _spawn_pony therefore sets `beam_holds` past MagicBeam.WRENCH_GRACE_HOLDS unless
+## a phase asks for a `fresh` pony. THAT IS THE PUBLISHED RULE, NOT A BYPASS: the beam is
+## still rolling the real wrench chance, it is simply rolling it for a pony who has run out
+## of fight, which is the same guarantee the WRENCH phase proves a player can always reach.
+## A build where the falloff stopped reaching zero would make this whole scene flaky rather
+## than quietly passing.
 ##
 ## THE MECHANICS PHASES SWITCH THE PONY'S OWN DETECTION OFF, and that is a consequence of
 ## the fix rather than a convenience. Detection now EXCEEDS reach by construction, so any
@@ -144,10 +164,19 @@ const AIM_TOLERANCE_DEG := 1.0
 ## frames (0.75 s) is well past settled -- and still under every struggle time, so this
 ## wait cannot itself cause an escape.
 ##
-## Deliberately still SHORTER than MagicBeam.SECURE_SECONDS (1.15 s): the reel finishing
-## before the beam has secured her is exactly the property the capture contest is built on,
-## and the GRAB phase asserts it at this frame rather than assuming it.
-const PULL_FRAMES := 45
+## Deliberately still SHORTER than the SHORTEST subdue time the beam can roll: the reel
+## finishing before the beam has secured her is exactly the property the capture contest is
+## built on, and the GRAB phase asserts it at this frame rather than assuming it.
+##
+## LOWERED FROM 45 WHEN THE SUBDUE CLOCK BECAME JITTERED. The old value left 50 frames of
+## elapsed hold (one to acquire, four to settle, forty-five here) against a flat 1.15 s
+## subdue -- 19 frames of headroom. Against a subdue that can now roll as low as
+## MagicBeam.secure_bounds().x (0.85 s, 51 frames) that headroom was ONE FRAME, and the
+## check would have failed on an unlucky roll rather than on a bug. At 32 the accounting is
+## 37 frames used of 51 available, and the reel has still closed ~97.5% of the gap by then
+## (the pull is exponential at PULL_RESPONSE, so 0.617 s is 3.7 time constants). The
+## relationship itself is asserted in the GRAB phase rather than left to this comment.
+const PULL_FRAMES := 32
 
 ## Longest a phase will wait for the beam to report the hold secured, in frames. Derived
 ## from the constant rather than typed, so a retune of SECURE_SECONDS cannot leave this
@@ -195,27 +224,52 @@ const PONY_SPOT := Vector3(1.5, 0.0, -6.0)
 ## never freed -- the phase that cares has already asserted she is alive.
 const PARK_SPOT := Vector3(0.0, 0.0, -40.0)
 
-## Seconds of slack on top of a personality's own struggle time before a contest gives up
-## waiting for her to break free. DERIVED PER PERSONALITY at the call site rather than
-## typed as one number: the struggle times now span 2.3 s to 4.6 s, and a single typed
-## timeout sized for the short one would report a hang for the long one on a build that was
-## behaving perfectly. (It was 3.5 s, and STRUGGLE_SHY passing it is exactly the trap.)
+## Seconds of slack on top of THIS ATTEMPT'S OWN ROLLED struggle time before a contest
+## gives up waiting for her to break free. Derived at the call site from what the beam
+## actually rolled, never typed as one number: a single timeout sized for the shortest grade
+## would report a hang for the longest one on a build that was behaving perfectly, and a
+## jittered clock means even one grade has no single right answer. (It was once a flat
+## 3.5 s, and the EASY grade passing it is exactly the trap.)
 const STRUGGLE_SLACK := 1.5
 
-## Acceptance window around a personality's struggle time, in seconds. Wide enough for
-## frame quantisation, narrow enough that handing a pony a NEIGHBOURING personality's
-## number would fail it -- the closest pair is BOLD's 2.30 and CURIOUS's 3.00, 0.7 s apart.
-const STRUGGLE_WINDOW := 0.4
-
 ## Acceptance window around MagicBeam.SECURE_SECONDS for the moment the beam reports the
-## hold secured. Tighter than the struggle window because there is only one number to hit
-## and every personality shares it.
+## hold secured. Sized against the NOMINAL subdue time, so it has to swallow the whole of
+## MagicBeam.SECURE_JITTER as well as frame quantisation.
 const SECURE_WINDOW := 0.25
 
-## ...and around the window a personality's two clocks are supposed to leave between them.
-## Both endpoints are timed off the same clock in the same loop, so the error here is
-## quantisation only.
-const WINDOW_TOLERANCE := 0.2
+## Acceptance window, in seconds, when a measured time is checked against the clock THIS
+## ATTEMPT ACTUALLY ROLLED (MagicBeam.get_secure_seconds / get_struggle_seconds) rather
+## than against a nominal constant. Tight, because there is no jitter left in it: the only
+## error is frame quantisation, and both clocks accumulate the same physics delta the loop
+## below counts. This is the check with the teeth -- a build whose rings drew one number
+## while its timers ran another would still pass a looser nominal check.
+const ROLLED_TOLERANCE := 0.1
+
+## Frame quantisation on a measured interval, in seconds: both ends are read on a physics
+## frame boundary, so an interval can be up to two ticks out. Used where a MEASURED time is
+## checked against a published BOUND rather than against another measurement.
+##
+## THIS REPLACED A PAIR OF FLAT TOLERANCES AROUND THE NOMINAL TIMES, and the reason is worth
+## keeping: those tolerances were sized when the closest two struggle times were 0.7 s apart
+## (BOLD's 2.30 against CURIOUS's 3.00). The grades are now 0.15 s apart at the nominal, so
+## a 0.2 s tolerance around the nominal would happily accept a pony handed the NEIGHBOURING
+## grade's clock -- the exact substitution those checks existed to catch. Checking the
+## measurement against the grade's own published bounds discriminates instead, because the
+## bounds are asserted not to overlap (see _check_the_window_ordering).
+const QUANTISATION := 0.05
+
+## The most attempts the WRENCH phase will ever make, and the most a design is allowed to
+## ask a player for.
+##
+## THIS EXISTS BECAUSE THE FAILURE PROOF FOUND THE GATE ACCEPTING NONSENSE. Breaking
+## MagicBeam.WRENCH_CHANCE_FALLOFF to a millionth left the chance still technically
+## reaching zero -- after five million grabs -- and MagicBeam.WRENCH_GRACE_HOLDS is derived
+## from the falloff, so "she was caught inside the bound the design promises" was satisfied
+## by a bound of five million and the gate stayed green on a build where a pony could fight
+## you off all afternoon. A bound is only a promise if it is SMALL, so the size of it is
+## asserted here rather than trusted, and this phase refuses to run a loop longer than a
+## player would sit through. Three attempts is already generous: it is two lost catches.
+const MAX_WRENCH_ATTEMPTS := 3
 
 ## The sneak measurement: where the pony stands (metres in front of the player, comfortably
 ## past the widest notice radius there is), how big a step the player takes toward her, and
@@ -232,6 +286,14 @@ const SNEAK_MEASURE_SETTLE := 2
 ## One step of the walk-in, plus the pony's own drift while she is being approached.
 const SNEAK_MEASURE_TOLERANCE := 0.6
 
+## Seed for the beam's capture generator -- the jitter on both clocks and every wrench roll.
+## Fixed so this gate is reproducible in every process (headless CI, the offscreen render,
+## and a developer's machine all have to agree), exactly as scenes/test/wild_ponies.gd fixes
+## its herd. The WRENCH phase does NOT depend on it: it reseeds deliberately, so that the
+## one phase whose whole point is that a wrench happened cannot be at the mercy of which
+## draws the phases before it consumed.
+const CAPTURE_SEED := 20260828
+
 @onready var player: Node3D = $Player
 @onready var crate: RigidBody3D = $Crate
 
@@ -247,12 +309,13 @@ var _shot_index := 0
 
 
 func _ready() -> void:
-	# 60 -> 90 s with the CONTEST phase. That phase spends real seconds on purpose: it lets
-	# each personality run her struggle timer out (up to MagicBeam.STRUGGLE_SHY, 4.6 s) and
-	# then waits out an ESCAPE_COOLDOWN before the second attempt, six times over. Measured
-	# runtime is ~35 s headless, so this is still a hang guard with well over the run's own
-	# length in slack, not a budget the gate is up against.
-	GateWatchdogScript.arm(self, "CAPTURE", 90.0)
+	# 60 -> 100 s with the CONTEST and WRENCH phases. Both spend real seconds on purpose:
+	# CONTEST lets each grade run its struggle timer out and then waits an ESCAPE_COOLDOWN
+	# before the second attempt, six times over, and WRENCH plays one pony up to three times.
+	# The third playtest's retune shortened every struggle time, so this is more slack than
+	# it looks. Still a hang guard with well over the run's own length to spare, not a budget
+	# the gate is up against.
+	GateWatchdogScript.arm(self, "CAPTURE", 100.0)
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--screenshot-dir="):
 			_screenshot_dir = arg.split("=")[1]
@@ -262,6 +325,13 @@ func _ready() -> void:
 	_rig = player.get_camera_pivot().get_node("CameraRig")
 	_beam = player.get_magic_beam()
 	_storage = _beam.get_storage()
+
+	# SEEDED, so the jitter on both clocks and every wrench roll is the same on every run
+	# and in every process. The beam is entropy-seeded in play (see MagicBeam._ready), which
+	# is right for a player and useless for a gate: an unlucky roll would be an intermittent
+	# red with nothing in the output to tell it from a regression. Same reasoning, and the
+	# same fixed-seed idiom, as scenes/test/wild_ponies.gd's herd.
+	_beam.set_capture_rng(_seeded_rng(CAPTURE_SEED))
 
 	for i in range(SETTLE_FRAMES):
 		await get_tree().physics_frame
@@ -287,17 +357,56 @@ func _ready() -> void:
 	_record("a bold pony struggles sooner than a shy one",
 		MagicBeamScript.struggle_seconds_for(PonyDataScript.Personality.BOLD)
 		< MagicBeamScript.struggle_seconds_for(PonyDataScript.Personality.SHY))
+	_print_grading_table()
 
 	await _phase_warning()
 	await _phase_grab_and_capture()
 	await _phase_distinct_and_release()
 	await _phase_slip()
 	await _phase_contest()
+	await _phase_wrench()
 	await _phase_full_storage()
 	await _phase_prop()
 	await _phase_teardown()
 
 	_finish()
+
+
+## THE TUNING, IN ONE READABLE BLOCK AT THE TOP OF EVERY RUN. Not decoration: the third
+## playtest's brief was given in seconds ("medium ones only have like a half sec window and
+## easy have the full second window"), the answer is spread over eight constants and three
+## functions, and the only person who can say whether it FEELS right cannot read GDScript.
+## A table he can check at a glance is the shortest path between the two, and it is printed
+## from the live functions rather than from a hand-written string, so it cannot drift away
+## from what the build actually does.
+func _print_grading_table() -> void:
+	var secure: Vector2 = MagicBeamScript.secure_bounds()
+	print("CAPTURE tuning ------------------------------------------------------------------")
+	print("CAPTURE tuning  grade   who      subdue s     window s     total s      wrench chance by grab")
+	# Walked in GRADE order rather than in personality-enum order. The enum happens to run
+	# SHY, BOLD, CURIOUS, which prints the hardest grade in the middle of the table -- and
+	# the whole reason this block exists is that somebody who cannot read GDScript has to be
+	# able to check the difficulty curve at a glance.
+	for grade in MagicBeamScript.Grade.values():
+		for personality in PonyDataScript.Personality.values():
+			if MagicBeamScript.grade_for(personality) != grade:
+				continue
+			var window: Vector2 = MagicBeamScript.window_bounds_for(personality)
+			var chances := PackedStringArray()
+			for grab in range(MagicBeamScript.WRENCH_GRACE_HOLDS + 1):
+				chances.append("%d%%" % int(round(
+					MagicBeamScript.wrench_chance_for(personality, grab) * 100.0)))
+			print("CAPTURE tuning  %-7s %-8s %.2f-%.2f    %.2f-%.2f    %.2f-%.2f    %s" % [
+				MagicBeamScript.grade_name(grade),
+				PonyDataScript.Personality.keys()[personality],
+				secure.x, secure.y, window.x, window.y,
+				secure.x + window.x, secure.y + window.y,
+				" / ".join(chances)])
+	print("CAPTURE tuning  a wrench lands at %d-%d%% of the catch ring and costs %.2fs; " % [
+		int(MagicBeamScript.WRENCH_AT_MIN * 100.0), int(MagicBeamScript.WRENCH_AT_MAX * 100.0),
+		MagicBeamScript.WRENCH_COOLDOWN]
+		+ "a mistake costs %.2fs" % MagicBeamScript.ESCAPE_COOLDOWN)
+	print("CAPTURE tuning ------------------------------------------------------------------")
 
 
 # --- phases ---------------------------------------------------------------------------
@@ -527,10 +636,26 @@ func _phase_grab_and_capture() -> void:
 	# the pre-playtest build this was false: the pull-in WAS the capture, and letting go
 	# here stored her. If SECURE_SECONDS were ever set below the pull-in, or the secure
 	# gate removed from release(), this check goes red while every other one stays green.
-	print("CAPTURE secure after_pull=%.2fs secure_needs=%.2fs secured=%s progress=%.2f" % [
-		_beam.get_hold_seconds(), _beam.get_secure_seconds(), _beam.is_secured(),
-		_beam.get_secure_progress()])
+	print("CAPTURE secure after_pull=%.2fs secure_needs=%.2fs (rolled, bounds %.2f-%.2f) secured=%s progress=%.2f" % [
+		_beam.get_hold_seconds(), _beam.get_secure_seconds(),
+		MagicBeamScript.secure_bounds().x, MagicBeamScript.secure_bounds().y,
+		_beam.is_secured(), _beam.get_secure_progress()])
 	_record("the reel finishing is not by itself a capture", not _beam.is_secured())
+	# ASSERTED AS A RELATIONSHIP AS WELL AS OBSERVED AT ONE FRAME, because the observation
+	# above is only meaningful if PULL_FRAMES lands in the gap between the two -- and now
+	# that the subdue clock is jittered, "the gap" has a worst case that a single frame
+	# count cannot see. The reel closes 97.5% of the way in 3.7 time constants; that has to
+	# finish before the SHORTEST subdue the beam can roll, or an unlucky attempt would
+	# secure a pony who is still visibly flying toward the hold point.
+	var reel_settle: float = 3.7 / MagicBeamScript.PULL_RESPONSE
+	_record("...and the reel always finishes before the SHORTEST subdue the beam can roll",
+		reel_settle < MagicBeamScript.secure_bounds().x)
+	# The rolled clock is inside the bounds this build publishes. Checked live rather than
+	# only in the unit sweep, because the bounds are what the HUD's rings are scaled by and
+	# a beam that rolled outside them would draw a ring that never closes.
+	_record("...and this attempt's subdue clock is inside the published bounds",
+		_beam.get_secure_seconds() >= MagicBeamScript.secure_bounds().x - 0.0001
+		and _beam.get_secure_seconds() <= MagicBeamScript.secure_bounds().y + 0.0001)
 
 	await _shot("02_held_at_hold_point")
 
@@ -627,6 +752,16 @@ func _phase_distinct_and_release() -> void:
 	var back: Node3D = _beam.release_stored()
 	var alive: bool = back != null and is_instance_valid(back) and back.is_inside_tree()
 	_record("a stored pony can be let back out into the world", alive)
+	if alive:
+		# SHE COMES BACK WITH HER FIGHT BACK, and that is the design rather than an
+		# oversight: release_stored() builds a fresh Pony node, so `beam_holds` starts at
+		# zero and a BOLD pony let out of the bag can wrench out of the beam exactly like a
+		# wild one (MagicBeam.WRENCH_CHANCE_HARD -- fatigue is inside one encounter, not a
+		# fact about who she is; see the note on Pony.beam_holds). This gate found that out
+		# the hard way: the recapture below is about IDENTITY, and it spent one run
+		# measuring a wrench instead. So she is tired again here for the same reason every
+		# other pony in this scene is -- see the file header.
+		back.beam_holds = MagicBeamScript.WRENCH_GRACE_HOLDS
 	_record("...and is gone from the bag when she is", _storage.count() == 1)
 
 	var out: PonyInstance = back.get_instance() if alive else null
@@ -762,8 +897,9 @@ func _contest_one(id: StringName) -> int:
 	var pony := _spawn_pony(id, PONY_SPOT)
 	var personality: int = pony.get_data().personality
 	var who: String = PonyDataScript.Personality.keys()[personality]
-	var struggle: float = MagicBeamScript.struggle_seconds_for(personality)
+	var grade: String = MagicBeamScript.grade_name(MagicBeamScript.grade_for(personality))
 	var promised: float = MagicBeamScript.capture_window_for(personality)
+	var window_bounds: Vector2 = MagicBeamScript.window_bounds_for(personality)
 	var label := who.to_lower()
 
 	# --- she wins -------------------------------------------------------------------
@@ -775,6 +911,22 @@ func _contest_one(id: StringName) -> int:
 	_record("%s: the beam picks her up" % who, acquired)
 
 	var count_before: int = _storage.count()
+	# THE CLOCKS THIS ATTEMPT ACTUALLY ROLLED, read off the beam the moment it has her.
+	# Both jitter per attempt now, so the nominal constants are no longer the thing to
+	# measure against -- they are the thing to measure the ROLL against. Checked both ways
+	# below: the measured times against the rolled clocks (tight -- quantisation only), and
+	# the rolled clocks against the published bounds (which is what "bounded randomness"
+	# means when it is a claim rather than a comment).
+	var rolled_secure: float = _beam.get_secure_seconds()
+	var rolled_struggle: float = _beam.get_struggle_seconds()
+	var rolled_window: float = rolled_struggle - rolled_secure
+	_record("%s: her clocks are rolled inside the published bounds" % who,
+		rolled_secure >= MagicBeamScript.secure_bounds().x - 0.0001
+		and rolled_secure <= MagicBeamScript.secure_bounds().y + 0.0001
+		and rolled_window >= window_bounds.x - 0.0001
+		and rolled_window <= window_bounds.y + 0.0001)
+	_record("%s: ...and a pony of her grade never wrenches out of a tired hold" % who,
+		not _beam.is_wrenching())
 	# TIMED IN PHYSICS FRAMES, NOT ON THE WALL CLOCK, and that is a bug fix rather than a
 	# style choice. Both of the beam's clocks accumulate the PHYSICS delta
 	# (MagicBeam._run_struggle), so a physics-frame count is the same clock they run on and
@@ -788,7 +940,7 @@ func _contest_one(id: StringName) -> int:
 	var tick := 1.0 / float(Engine.physics_ticks_per_second)
 	var secured_at := -1.0
 	var freed_at := -1.0
-	for i in range(int((struggle + STRUGGLE_SLACK) / tick)):
+	for i in range(int((rolled_struggle + STRUGGLE_SLACK) / tick)):
 		await get_tree().physics_frame
 		frames += 1
 		var now := float(frames) * tick
@@ -801,19 +953,25 @@ func _contest_one(id: StringName) -> int:
 	if secured_at >= 0.0 and freed_at >= 0.0:
 		measured = freed_at - secured_at
 	var alive: bool = is_instance_valid(pony) and pony.is_inside_tree()
-	print("CAPTURE contest %s outcome=%s secured_at=%.2fs (needs %.2f) broke_free_at=%.2fs (struggle %.2f) window=%.2fs (promised %.2f)" % [
-		who, "BROKE_FREE" if freed_at >= 0.0 else "STILL_HELD", secured_at,
-		MagicBeamScript.SECURE_SECONDS, freed_at, struggle, measured, promised])
+	print("CAPTURE contest %s grade=%s outcome=%s secured_at=%.2fs (rolled %.2f) broke_free_at=%.2fs (rolled %.2f) window=%.2fs (rolled %.2f, %s nominal %.2f, bounds %.2f-%.2f)" % [
+		who, grade, "BROKE_FREE" if freed_at >= 0.0 else "STILL_HELD", secured_at,
+		rolled_secure, freed_at, rolled_struggle, measured, rolled_window, grade, promised,
+		window_bounds.x, window_bounds.y])
 
 	_record("%s: the beam secures her" % who, secured_at >= 0.0)
-	_record("%s: ...on the same secure clock as everyone else" % who,
+	_record("%s: ...on the subdue clock THIS attempt rolled, to the frame" % who,
+		secured_at >= 0.0 and absf(secured_at - rolled_secure) <= ROLLED_TOLERANCE)
+	_record("%s: ...on the same subdue clock as everyone else" % who,
 		secured_at >= 0.0
 		and absf(secured_at - MagicBeamScript.SECURE_SECONDS) <= SECURE_WINDOW)
 	_record("%s: ...and she wins if you keep holding" % who, freed_at >= 0.0)
-	_record("%s: ...on her own personality's clock, not another's" % who,
-		freed_at >= 0.0 and absf(freed_at - struggle) <= STRUGGLE_WINDOW)
-	_record("%s: ...leaving the window her personality promises" % who,
-		measured >= 0.0 and absf(measured - promised) <= WINDOW_TOLERANCE)
+	_record("%s: ...on the struggle clock THIS attempt rolled, to the frame" % who,
+		freed_at >= 0.0 and absf(freed_at - rolled_struggle) <= ROLLED_TOLERANCE)
+	_record("%s: ...leaving exactly the window those two clocks promised" % who,
+		measured >= 0.0 and absf(measured - rolled_window) <= ROLLED_TOLERANCE)
+	_record("%s: ...which lands inside HER GRADE's published window bounds" % who,
+		measured >= 0.0 and measured >= window_bounds.x - QUANTISATION
+		and measured <= window_bounds.y + QUANTISATION)
 	_record("%s: ...reported as escaped()" % who, escaped_reported[0])
 	_record("%s: ...alive and steering herself again (no pony ever dies)" % who,
 		alive and pony.state != PonyScript.State.HELD)
@@ -835,6 +993,7 @@ func _contest_one(id: StringName) -> int:
 	_beam.grab()
 	acquired = await _wait_until_holding()
 	_record("%s: a second one can be picked up too" % who, acquired)
+	var second_struggle: float = _beam.get_struggle_seconds()
 	var secured := await _wait_until_secured()
 	var held_for: float = _beam.get_hold_seconds()
 	_beam.release()
@@ -843,9 +1002,9 @@ func _contest_one(id: StringName) -> int:
 		who, "SECURED" if _storage.count() > before else "LOST", held_for, promised,
 		_storage.count(), _storage.capacity, ghost.get_ref() == null])
 
-	_record("%s: holding to the green ring secures her" % who, secured)
-	_record("%s: ...well inside the window her struggle allows" % who,
-		held_for < struggle - 0.05)
+	_record("%s: letting go the moment the green ring closes secures her" % who, secured)
+	_record("%s: ...well inside the struggle clock she rolled for it" % who,
+		held_for < second_struggle - 0.05)
 	_record("%s: ...and letting go there stores her" % who, _storage.count() == before + 1)
 	_record("%s: ...and her node leaves the world" % who, ghost.get_ref() == null)
 
@@ -859,20 +1018,210 @@ func _check_the_window_ordering(windows: Dictionary) -> void:
 	var shy: float = MagicBeamScript.capture_window_for(PonyDataScript.Personality.SHY)
 	var curious: float = MagicBeamScript.capture_window_for(PonyDataScript.Personality.CURIOUS)
 	var bold: float = MagicBeamScript.capture_window_for(PonyDataScript.Personality.BOLD)
-	print("CAPTURE contest ordering measured_personalities=%d bold=%.2fs curious=%.2fs shy=%.2fs" % [
-		windows.size(), bold, curious, shy])
+	var shy_bounds: Vector2 = MagicBeamScript.window_bounds_for(PonyDataScript.Personality.SHY)
+	var curious_bounds: Vector2 = MagicBeamScript.window_bounds_for(
+		PonyDataScript.Personality.CURIOUS)
+	var bold_bounds: Vector2 = MagicBeamScript.window_bounds_for(PonyDataScript.Personality.BOLD)
+	print("CAPTURE contest ordering measured_personalities=%d HARD=%.2fs (%.2f-%.2f) MEDIUM=%.2fs (%.2f-%.2f) EASY=%.2fs (%.2f-%.2f)" % [
+		windows.size(), bold, bold_bounds.x, bold_bounds.y,
+		curious, curious_bounds.x, curious_bounds.y, shy, shy_bounds.x, shy_bounds.y])
 	_record("all three personalities were actually contested",
 		windows.size() == PonyDataScript.Personality.size())
 	_record("a BOLD pony is the tightest hold and a SHY one the most comfortable",
 		bold < curious and curious < shy)
+	# THE GRADES MUST NOT OVERLAP ONCE THE JITTER IS APPLIED, or a harder grade is only
+	# USUALLY harder and there is nothing for a player to learn. This is the constraint the
+	# jitter is sized by (MagicBeam.WINDOW_JITTER), and the first draft of that number broke
+	# it -- so it is asserted here as well as in the unit sweep.
+	_record("...and the grades do not overlap even at their unluckiest",
+		shy_bounds.x > curious_bounds.y and curious_bounds.x > bold_bounds.y)
 	_record("...and she is the harder one to REACH in exchange",
 		PonyScript.notice_radius_for(PonyDataScript.Personality.SHY, false)
 		> PonyScript.notice_radius_for(PonyDataScript.Personality.BOLD, false))
 	# NO SCREENSHOT HERE, deliberately. This scene has no HUD, so the two rings the contest
 	# is about are not drawn in it -- the first draft took one and it was a photograph of a
 	# pony standing next to a crate, which is a shot that proves nothing and costs a reader
-	# the trouble of working out that it proves nothing. The struggle ring and the secure arc
+	# the trouble of working out that it proves nothing. The catch ring and the wriggle ring
 	# are photographed where they actually exist, in game/world/ranch.gd's mechanic pass.
+
+
+## WRENCH. The third playtest's addition, and the only phase here that PROVES a property
+## instead of asserting one.
+##
+## The owner asked for "a chance to wiggle out before you catch (but will eventaully let you
+## catch)", and the parenthesis is the hard half: a mechanic that takes a catch away is one
+## dice roll from being a mechanic that can take every catch away, and no constant can
+## demonstrate that it does not. So this phase PLAYS one. A fresh BOLD pony -- graded HARD,
+## the only grade that can wrench -- is beamed, correctly, over and over, releasing the
+## instant the catch ring closes, until she is in the bag. She has to end up in the bag, and
+## she has to get there inside the bound the design publishes.
+##
+## THE FIRST GRAB IS FORCED TO WRENCH, AND NOT BY CHEATING. The beam's generator is reseeded
+## with a seed whose very next draw is under the wrench chance -- found by search rather
+## than typed, so it cannot silently stop working after a retune -- and then the phase
+## ASSERTS that the beam really did take a wrenching hold. Every rule is the shipping rule;
+## only the dice are known in advance. A build that had quietly dropped the wrench would
+## fail that assertion instead of sailing through a phase that never exercised it.
+##
+## WHAT WOULD FAIL HERE, which is the part worth writing down:
+##   * a wrench that never fires        -> the forced first grab is not wrenching
+##   * a wrench that fires AFTER the beam has secured her (so it is really just a struggle
+##     loss wearing a different name)   -> the "still unsecured" check, and the loss reason
+##   * a wrench reported as STRUGGLED   -> the loss-reason check, which is what the HUD
+##                                         hangs "she will tire, try again" off
+##   * a falloff that never reaches zero, or reaches it too late
+##                                      -> she is not caught inside the bound
+##   * a wrench that eats the pony      -> she is alive, out of HELD, at every step
+func _phase_wrench() -> void:
+	var pony := _spawn_pony(&"rainbowdash", PONY_SPOT, false, true)
+	var personality: int = pony.get_data().personality
+	_record("the wrench phase is driven against a HARD pony",
+		MagicBeamScript.grade_for(personality) == MagicBeamScript.Grade.HARD)
+	_record("...who arrives with all her fight intact", pony.beam_holds == 0)
+
+	var seed_value := _seed_that_wrenches(personality)
+	_record("a seed that makes her wrench on the first grab exists", seed_value >= 0)
+	if seed_value < 0:
+		# Parked on the way out. Every early exit from a phase has to leave the scene the
+		# way it found it, or the NEXT phase spawns its pony on top of this one and reports
+		# a cascade of failures that have nothing to do with what it checks -- which is
+		# exactly what the failure proof for this phase produced before this line existed.
+		_park(pony)
+		return
+	_beam.set_capture_rng(_seeded_rng(seed_value))
+
+	var escapes: Array = []
+	var handler := func(_body: Node3D) -> void: escapes.append(_beam.get_last_loss())
+	_beam.escaped.connect(handler)
+
+	var before: int = _storage.count()
+	var ghost: WeakRef = weakref(pony)
+	var wrenches := 0
+	var attempts := 0
+	var caught := false
+	# ONE MORE ATTEMPT THAN THE BOUND ALLOWS, so a build that needs more than the promised
+	# number of tries runs out of loop and fails the "she goes in the bag" check below,
+	# rather than being quietly accommodated by a generous cap.
+	# CAPPED INDEPENDENTLY of what the design claims its bound is -- see MAX_WRENCH_ATTEMPTS.
+	# A build whose falloff no longer converges quickly runs out of loop here and fails "she
+	# goes in the bag" below, instead of quietly looping until the watchdog fires.
+	var allowed: int = mini(MagicBeamScript.WRENCH_GRACE_HOLDS + 1, MAX_WRENCH_ATTEMPTS)
+	for attempt in range(allowed):
+		attempts += 1
+		await _aim_at_pony(pony, "wrench attempt %d" % attempts)
+		var prior_holds: int = pony.beam_holds
+		_beam.grab()
+		if not await _wait_until_holding():
+			_record("the beam picks her up on attempt %d" % attempts, false)
+			break
+		_record("the beam picks her up on attempt %d" % attempts, true)
+
+		var wrenching: bool = _beam.is_wrenching()
+		var rolled_secure: float = _beam.get_secure_seconds()
+		var rolled_struggle: float = _beam.get_struggle_seconds()
+		var chance: float = MagicBeamScript.wrench_chance_for(personality, prior_holds)
+		print("CAPTURE wrench attempt=%d prior_holds=%d chance=%.0f%% wrenching=%s subdue=%.2fs struggle=%.2fs" % [
+			attempts, prior_holds, chance * 100.0, wrenching, rolled_secure, rolled_struggle])
+
+		if attempt == 0:
+			# The forced roll. If this is ever false the seed search below has drifted out
+			# of step with MagicBeam.roll_clocks' draw order -- which is a real regression
+			# in a documented property, not a flaky gate, so it goes red rather than being
+			# retried.
+			_record("the forced first grab really is a wrenching hold", wrenching)
+
+		if wrenching:
+			wrenches += 1
+			_record("a wrenching hold is rolled to end before it can secure her (%d)" % wrenches,
+				rolled_struggle < rolled_secure)
+			# Let it play out: she tears free on her own, with the button still down.
+			var freed := false
+			for i in range(int((rolled_struggle + STRUGGLE_SLACK) * 60.0)):
+				await get_tree().physics_frame
+				if not _beam.is_holding():
+					freed = true
+					break
+			_record("...and she really does tear free of it (%d)" % wrenches, freed)
+			_record("...before the beam ever reported her secured (%d)" % wrenches,
+				not _beam.is_secured())
+			_record("...reported as WRENCHED, not as the player's mistake (%d)" % wrenches,
+				_beam.get_last_loss() == MagicBeamScript.Loss.WRENCHED)
+			_record("...leaving her alive and steering herself again (%d)" % wrenches,
+				is_instance_valid(pony) and pony.is_inside_tree()
+				and pony.state != PonyScript.State.HELD)
+			_record("...and not in the bag (%d)" % wrenches, _storage.count() == before)
+			_beam.release()
+			# A wrench costs the player LESS than a mistake does (MagicBeam.WRENCH_COOLDOWN),
+			# but it is still a cooldown and the next attempt has to wait it out.
+			await _frames(int(MagicBeamScript.ESCAPE_COOLDOWN * 60.0) + 6)
+			continue
+
+		# She did not wrench, so this is the ordinary contest -- and the player plays it
+		# correctly: let go the instant the catch ring closes.
+		var secured := await _wait_until_secured()
+		_record("the honest attempt that finally sticks secures her", secured)
+		_beam.release()
+		await _frames(3)
+		caught = _storage.count() == before + 1
+		break
+
+	_beam.escaped.disconnect(handler)
+	print("CAPTURE wrench attempts=%d wrenches=%d bound=%d caught=%s freed=%s losses=%s" % [
+		attempts, wrenches, MagicBeamScript.WRENCH_GRACE_HOLDS, caught,
+		ghost.get_ref() == null,
+		", ".join(escapes.map(func(l: int) -> String: return _loss_name(l)))])
+
+	# THE CONVERGENCE PROPERTY, DEMONSTRATED. Not "the chance got smaller" -- she is in the
+	# bag, and it took no more attempts than the design promises.
+	_record("a player who keeps doing it right eventually lands a wrenching pony", caught)
+	_record("...inside the bound the falloff promises",
+		attempts <= MagicBeamScript.WRENCH_GRACE_HOLDS + 1)
+	# ...AND THE BOUND IS ITSELF SMALL ENOUGH TO BE A PROMISE. Checked separately from the
+	# run above, because "she was caught inside the bound" is trivially true for any bound.
+	_record("...and the bound is a number a player would actually sit through",
+		MagicBeamScript.WRENCH_GRACE_HOLDS >= 1
+		and MagicBeamScript.WRENCH_GRACE_HOLDS < MAX_WRENCH_ATTEMPTS)
+	_record("...and her node leaves the world when she finally goes in",
+		caught and ghost.get_ref() == null)
+	# NOT VACUOUS: if no wrench ever happened, everything above is a description of an
+	# ordinary capture and this phase proved nothing at all.
+	_record("...having actually been wrenched out of at least once on the way",
+		wrenches >= 1)
+	_record("...and every escape on the way was reported as a wrench, not as a mistake",
+		not escapes.is_empty()
+		and escapes.all(func(l: int) -> bool: return l == MagicBeamScript.Loss.WRENCHED))
+	# The arithmetic behind the demonstration, stated so a reader of the log can see WHY the
+	# run above was bounded rather than merely observing that it was.
+	_record("...because her fight really does run out, rather than merely thinning",
+		MagicBeamScript.wrench_chance_for(personality, MagicBeamScript.WRENCH_GRACE_HOLDS)
+		== 0.0)
+
+	await _shot("07_wrenched_free")
+	# On the winning path her node is gone (she is in the bag); on any losing path she is
+	# still standing on PONY_SPOT, where the FULL phase is about to put its own pony. Parked
+	# unconditionally for the same reason as the early exit above.
+	_park(pony)
+	await _frames(int(MagicBeamScript.ESCAPE_COOLDOWN * 60.0) + 6)
+
+
+## The lowest seed whose FIRST draw fires a fresh wrench roll, or -1 if there is none in
+## range.
+##
+## A MIRROR OF ONE DOCUMENTED PROPERTY, and deliberately no more than that:
+## MagicBeam.roll_clocks draws the wrench roll FIRST, always, and draws exactly three rolls
+## whatever happens. So "the next randf() decides the wrench" is the whole of what this
+## knows, and the phase above asserts the mirror still holds rather than assuming it. Found
+## by search rather than typed as a magic number so that a retune of WRENCH_CHANCE_HARD
+## cannot leave a stale seed silently no longer producing a wrench -- which is exactly how
+## a gate ends up green while measuring nothing.
+func _seed_that_wrenches(personality: int) -> int:
+	var chance: float = MagicBeamScript.wrench_chance_for(personality, 0)
+	var probe := RandomNumberGenerator.new()
+	for candidate in range(4096):
+		probe.seed = candidate
+		if probe.randf() < chance:
+			return candidate
+	return -1
 
 
 ## FULL. With the bag full, a released pony is set down rather than stored -- or lost.
@@ -1053,7 +1402,13 @@ func _chest(pony: Node3D) -> Vector3:
 ## the aim loop and the grab, and a CURIOUS one would walk toward the player mid-aim, both
 ## making this gate flaky for reasons that have nothing to do with what it checks.
 ## Switching her senses off says so out loud, in one place, instead.
-func _spawn_pony(id: StringName, at: Vector3, reacts := false) -> CharacterBody3D:
+## `fresh` decides whether she arrives with any fight left in her -- see the note in the
+## file header. Left false, she is handed to the beam already past
+## MagicBeam.WRENCH_GRACE_HOLDS grabs, so her wrench chance is exactly zero by the
+## published rule and the phase measuring her is measuring the thing it asked about. The
+## WRENCH phase is the one caller that wants a pony who can still fight.
+func _spawn_pony(id: StringName, at: Vector3, reacts := false,
+		fresh := false) -> CharacterBody3D:
 	var ponies: Dictionary = _roster
 	if not ponies.has(id):
 		push_error("capture_test: no PonyData with id '%s'" % id)
@@ -1078,9 +1433,21 @@ func _spawn_pony(id: StringName, at: Vector3, reacts := false) -> CharacterBody3
 		# an outright wrong answer in the WARNING phase, where "the beam could not reach
 		# her" is only meaningful if she is still standing where she was measured.
 		pony.roam_radius = 0.0
+	if not fresh:
+		# The published rule, used rather than bypassed -- see the file header. Set before
+		# setup() only for tidiness; nothing in setup() reads it.
+		pony.beam_holds = MagicBeamScript.WRENCH_GRACE_HOLDS
 	add_child(pony)
 	pony.setup(ponies[id])
 	return pony
+
+
+## A generator seeded to `seed_value`. One helper so every seeded thing in this scene is
+## seeded the same way and a reader can see at a glance that nothing here runs on entropy.
+func _seeded_rng(seed_value: int) -> RandomNumberGenerator:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value
+	return rng
 
 
 ## Park a finished pony well out of the next phase's way. Scene housekeeping only -- see
