@@ -33,6 +33,31 @@ extends StaticBody3D
 ## where she lived with her. game/world/ranch.gd reads it back on load and posts each pony
 ## either to her pen or to the saddlebag.
 ##
+## --- BEING CAUGHT IS HOW A PONY MOVES OUT ------------------------------------------------
+##
+## The magic beam can pick a resident up, and doing so EVICTS her. That is a decision, and
+## the playtest that forced it is worth writing down: catching a penned pony USED to appear
+## to work -- she went in the saddlebag, her body vanished -- while this pen quietly kept
+## her on its roster. The slot stayed consumed, has_pony() stayed true, and moving her back
+## in was refused with "She would not go in." for the rest of the session. She was filed in
+## two places at once, which is the exact desync the save-file section above exists to make
+## impossible; nothing was enforcing it on the way OUT.
+##
+## The alternative -- make a resident an invalid beam target, "she already lives here" --
+## was rejected. The beam is the only verb this game has for moving a pony, and there is no
+## pen UI to move her with instead: a pony you can put in a pen and never take out again
+## reads far worse than one you catch the same way you caught her in the first place, and it
+## would have made the thing the owner had already successfully done impossible rather than
+## reliable.
+##
+## So residency is single-sourced HERE, and it changes at exactly one instant: the one where
+## her record enters the saddlebag. _on_resident_captured() is subscribed to each resident
+## body's own `captured` signal, so the eviction cannot be forgotten by a caller -- the beam
+## does not know pens exist and does not have to. A hold that ends any OTHER way changes
+## nothing at all: _reseat_released_residents() puts her back on her standing spot, so a
+## pony who wriggles out of the beam is visibly still yours and still living here, rather
+## than dumped on the far side of her own fence with a leash pointing through it.
+##
 ## --- THE SAME `Pony` ACTOR, ON A SHORTER LEASH -------------------------------------------
 ##
 ## A penned pony is game/actors/pony/pony.tscn -- the identical actor the spawner drops in
@@ -73,6 +98,9 @@ const NeedsScript := preload("res://systems/needs.gd")
 const ProductionScript := preload("res://systems/production.gd")
 const ZoneMarkerScript := preload("res://world/zone_marker.gd")
 const PonyScene := preload("res://actors/pony/pony.tscn")
+## Needed for `State.HELD` alone -- see _reseat_released_residents(). pony.tscn already
+## pulls this script in, so this preload adds a name, not a dependency.
+const PonyScript := preload("res://actors/pony/pony.gd")
 
 # --- geometry ------------------------------------------------------------------------------
 
@@ -182,6 +210,10 @@ var _residents: Array[PonyInstance] = []
 ## is in the tree; a pen built in a unit test has a roster and no bodies.
 var _bodies: Dictionary = {}
 
+## uids whose body was in a beam when this pen last looked. Read and cleared by
+## _reseat_released_residents(), which is the whole of what it is for.
+var _held_bodies: Dictionary = {}
+
 ## Gems produced here and not yet collected.
 var _gems := 0
 
@@ -231,6 +263,10 @@ func add_pony(inst: PonyInstance) -> bool:
 
 
 ## Take the pony with `uid` out and hand her back, or null if she does not live here.
+##
+## THE ONE WAY A PONY STOPS LIVING HERE. Called by a pen UI, by Task 5's escape-on-neglect,
+## and -- via _on_resident_captured() -- by a beam catching her, so that every route out of
+## the pen does the same four things and none of them can do three of them.
 ##
 ## Her body goes, her address is cleared, and her banked fractional gem progress is
 ## FORGOTTEN -- Production keeps that in a process-wide static Dictionary keyed by uid, so
@@ -314,6 +350,7 @@ func tick(delta: float) -> int:
 
 func _physics_process(delta: float) -> void:
 	tick(delta)
+	_reseat_released_residents()
 
 
 ## Gems sitting in the tray, uncollected.
@@ -407,11 +444,13 @@ func _spawn_body(inst: PonyInstance) -> void:
 	pony.position = Vector3.ZERO
 	add_child(pony)
 
-	var spot: Vector3 = resident_spot(_residents.find(inst))
-	var world := global_transform * spot
-	spot.y = _ground(world.x, world.z) - global_position.y + 0.05
-	pony.position = spot
+	_seat_body(pony, _residents.find(inst))
 	pony.adopt(inst)
+
+	# SHE REPORTS HER OWN CAPTURE, and this pen acts on it. One line, and it is the whole
+	# of why the ghost-resident leak in the class comment cannot come back: nothing that
+	# catches a pony has to remember that pens exist. See _on_resident_captured().
+	pony.captured.connect(_on_resident_captured.bind(inst.uid))
 
 	_bodies[inst.uid] = pony
 
@@ -419,8 +458,78 @@ func _spawn_body(inst: PonyInstance) -> void:
 func _despawn_body(uid: StringName) -> void:
 	var body: Node3D = body_for(uid)
 	_bodies.erase(uid)
+	_held_bodies.erase(uid)
 	if body != null:
 		body.queue_free()
+
+
+## Set `body` down on standing spot `index`, in pen-local space, on the ground beneath it.
+##
+## Shared by the first spawn and by _reseat_released_residents(), so a resident put back
+## after a beam hold stands exactly where she stood before it rather than approximately
+## where she stood before it. Her velocity is cleared with her position: a body carrying the
+## fall it had picked up while the beam let go would slide off the spot it was just put on.
+func _seat_body(body: Node3D, index: int) -> void:
+	var spot: Vector3 = resident_spot(index)
+	var world := global_transform * spot
+	spot.y = _ground(world.x, world.z) - global_position.y + 0.05
+	body.position = spot
+	if body is CharacterBody3D:
+		(body as CharacterBody3D).velocity = Vector3.ZERO
+
+
+## A resident reported that a beam hold on her became a capture. She stops living here.
+##
+## `Pony.captured` is emitted from notify_captured(), which the beam calls at exactly one
+## moment: after her record has gone into the saddlebag and immediately before it frees her
+## body (see game/actors/player/magic_beam.gd's _settle_pony). So by the time this runs she
+## is already inventory, and remove_pony() makes the pen agree -- roster, slot, home_slot,
+## body and production ledger, all four in the one place they have always been done.
+##
+## CONNECTED FROM THIS SIDE ON PURPOSE. The beam is in game/actors/player/ and knows nothing
+## about pens; teaching it would put a second authority on residency in the file least
+## likely to be kept in step with this one. Anything that ever takes a resident out of the
+## world through a capture -- a market stall, a trade, a future pen UI -- gets the eviction
+## for free by going through the same signal.
+func _on_resident_captured(uid: StringName) -> void:
+	remove_pony(uid)
+
+
+## Put a resident back on her spot when a beam let go of her WITHOUT taking her.
+##
+## The other half of the class comment's decision. A hold that ends in a capture is
+## _on_resident_captured()'s business; a hold that ends any other way -- she outlasted the
+## struggle timer (Pony.break_free()), or the saddlebag was full and the beam set her back
+## down (MagicBeam's capture_refused path) -- leaves her a resident whose BODY is wherever
+## she was floating, which is in front of the player and therefore usually OUTSIDE her own
+## fence. She would be a pony who lives in this pen, is leashed to its centre, and is
+## standing on the wrong side of a solid barrier: stuck against it for good. That is the
+## "wiggle out in there making it unclear" half of the playtest note.
+##
+## WATCHED RATHER THAN SIGNALLED, because the two ways a hold can end without a capture do
+## not share one: pony.gd is deliberately silent on set_held(false), and only break_free()
+## reports. What they do share is the transition OUT of State.HELD, which is what this
+## reads.
+##
+## THIS IS NOT A CONTAINMENT NET, and it must never become one. Only a body this pen
+## actually watched go INTO a beam is moved; a resident who merely wandered is left exactly
+## where she wandered to, because game/world/ranch.gd's boot-time containment probe measures
+## precisely that and a pen that quietly teleported strays home would make the probe green
+## by lying to it.
+func _reseat_released_residents() -> void:
+	if _held_bodies.is_empty() and _bodies.is_empty():
+		return
+	for i in range(_residents.size()):
+		var uid: StringName = _residents[i].uid
+		var body: Node3D = body_for(uid)
+		if body == null:
+			_held_bodies.erase(uid)
+			continue
+		if body.state == PonyScript.State.HELD:
+			_held_bodies[uid] = true
+			continue
+		if _held_bodies.erase(uid):
+			_seat_body(body, i)
 
 
 # --- carpentry -------------------------------------------------------------------------------

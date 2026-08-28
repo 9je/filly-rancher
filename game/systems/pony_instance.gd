@@ -130,7 +130,10 @@ var caught_at_ms := 0
 ## lived with her, which is strictly more information than a bare pony.
 ##
 ## Set and cleared ONLY by game/world/pen.gd's add_pony()/remove_pony(). A pony refused by a
-## full pen keeps her old address, because a refusal must change nothing.
+## full pen keeps her old address, because a refusal must change nothing. Being CAUGHT by
+## the magic beam clears it too, but still through remove_pony() -- the pen hears about the
+## capture from the pony's own `captured` signal and evicts her; nothing else anywhere is
+## allowed to write this field, or there would be two authorities on where she lives.
 var home_slot: StringName = &""
 
 
