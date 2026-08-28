@@ -249,3 +249,21 @@ func test_the_hud_follows_a_saddlebag_that_grew_after_binding() -> void:
 	var count: Label = _hud.get_node("Bag/Count")
 	assert_true(count.text.ends_with("/ %d" % MagicBeamScript.BIGGER_SADDLEBAG_CAPACITY),
 		"the readout must say the new capacity, not the bound one (it says '%s')" % count.text)
+
+
+func test_the_bits_line_shows_the_wallet() -> void:
+	_hud.set_bits(0)
+	assert_eq(_hud.get_bits_text(), "0 bits")
+	_hud.set_bits(1234)
+	assert_eq(_hud.get_bits_text(), "1234 bits")
+
+
+func test_the_hints_card_names_pause_and_trade_and_never_free_cursor() -> void:
+	var joined := ""
+	for row in _hud.HINTS:
+		joined += " ".join(row) + "\n"
+	assert_string_contains(joined, "PAUSE")
+	assert_string_contains(joined, "TRADE")
+	assert_false(joined.contains("FREE CURSOR"), "Escape pauses now; it does not free the cursor")
+	assert_false(joined.contains("--"), "no double hyphen on the card")
+	assert_false(joined.contains("—"), "no em dash on the card")

@@ -168,6 +168,7 @@ const HINTS_ACTION := &"toggle_hints"
 @onready var _crosshair: Control = $Crosshair
 @onready var _pips: Control = $Bag/Pips
 @onready var _bag_count: Label = $Bag/Count
+@onready var _bits: Label = $Bag/Bits
 @onready var _bag_title: Label = $Bag/Title
 @onready var _toast: Label = $Toast
 @onready var _hints: PanelContainer = $Hints
@@ -196,6 +197,8 @@ func _ready() -> void:
 
 	_style_label(_bag_title, 20, Color(1.0, 1.0, 1.0, 0.62))
 	_style_label(_bag_count, 26, Color(1.0, 1.0, 1.0, 0.92))
+	_style_label(_bits, 22, Color(1.00, 0.80, 0.25, 1.0))
+	_bits.text = "0 bits"
 	_style_label(_toast, 40, Color(1.0, 0.96, 0.86, 1.0))
 
 	_bag_title.text = "SADDLEBAG"
@@ -493,6 +496,16 @@ func _style_label(label: Label, size: int, color: Color) -> void:
 	label.add_theme_constant_override(&"outline_size", 6)
 
 
+## The wallet line under the saddlebag. Driven by ranch.gd off Economy.bits_changed, so
+## it repaints on a change and never per frame.
+func set_bits(total: int) -> void:
+	_bits.text = "%d bits" % maxi(0, total)
+
+
+func get_bits_text() -> String:
+	return _bits.text
+
+
 ## Both control schemes, side by side, because the build is handed to two people and
 ## only one of them is going to be at the keyboard. Every row here mirrors an action in
 ## game/project.godot's `[input]` block -- a binding that changes there and not here is
@@ -517,7 +530,9 @@ const HINTS := [
 	["MAGIC BEAM", "Right mouse (hold)", "Right trigger (hold)"],
 	["", "hold until the OUTER PINK ring fills, then let go to stow her", ""],
 	["", "the INNER AMBER ring is her fight. Let it empty and she wriggles free", ""],
-	["FREE CURSOR", "Esc", ""],
+	["TRADE", "E at the market", "X at the market"],
+	["", "sell gems for bits, buy food and gear", ""],
+	["PAUSE", "Esc", "Start"],
 	["THIS CARD", "H", "Back"],
 ]
 
