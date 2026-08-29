@@ -140,7 +140,7 @@ var world_time: float = 0.0
 ## as `gems` above and for the same reason.
 var compendium: Compendium = CompendiumScript.new()
 
-## Pending requests, as plain Dictionaries whose shape this file does not know or check --
+## Pending requests, as plain Dictionaries whose shape this file does not know or check;
 ## a later task defines it and reads/writes it. Untyped for the same reason `unlocks` is:
 ## a dynamic `GameState.requests = [...]` assignment from a shop or a test must not fail at
 ## runtime against a typed Array.

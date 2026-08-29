@@ -108,17 +108,27 @@ func to_dict() -> Dictionary:
 	return out
 
 
-## Junk is dropped rather than kept: a non-numeric value, or a number that is not SEEN or
-## CAUGHT (including an explicit 0, and anything out of range), is skipped entirely rather
-## than stored; so a hand-edited or corrupted entry cannot fabricate a state this class
-## never produces on its own.
+## Junk is dropped rather than kept: a non-numeric value, a FRACTIONAL number, or a whole
+## number that is not SEEN or CAUGHT (including an explicit 0, and anything out of range),
+## is skipped entirely rather than stored; so a hand-edited or corrupted entry cannot
+## fabricate a state this class never produces on its own.
+##
+## THE FRACTIONAL CHECK IS FOR THE ROUND TRIP THROUGH JSON, not for hand-typed floats. JSON
+## has no integer type (see SaveIO's class comment), so a state this class itself wrote as
+## the int 2 comes back through SaveIO.load() as the float 2.0; that is accepted, `int()`
+## recovers it exactly. What must NOT be accepted is 1.5 or 2.7: silently truncating one of
+## those to a real state would be fabricating a state that was never actually written,
+## which is exactly the failure this whole function exists to refuse.
 static func from_dict(d: Dictionary) -> Compendium:
 	var c := Compendium.new()
 	for key in d.keys():
 		var raw: Variant = d[key]
 		if typeof(raw) != TYPE_INT and typeof(raw) != TYPE_FLOAT:
 			continue
-		var state := int(raw)
+		var raw_number: float = float(raw)
+		if raw_number != floor(raw_number):
+			continue
+		var state := int(raw_number)
 		if state != State.SEEN and state != State.CAUGHT:
 			continue
 		c._states[StringName(str(key))] = state

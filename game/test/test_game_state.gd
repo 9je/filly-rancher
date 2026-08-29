@@ -257,6 +257,11 @@ func test_reset_gives_a_fresh_compendium_and_empty_requests() -> void:
 
 # --- the disk round trip ----------------------------------------------------------------
 
+## THE REAL FILE, NOT JUST to_dict()/from_dict(). This is the path that actually round-trips
+## through JSON.stringify() and JSON.parse() (SaveIO.save()/load()), which is where a whole
+## number turns into a JSON float on the way back; to_dict()/from_dict() alone would pass
+## even if from_dict() only ever saw real ints. The compendium and requests assertions below
+## are what prove marks and requests survive THAT path, not just an in-memory copy.
 func test_a_full_save_and_load_through_a_real_file_preserves_the_ranch() -> void:
 	var original = _populated()
 	assert_true(original.save_to_slot(SLOT), "the save reports success")
@@ -268,6 +273,11 @@ func test_a_full_save_and_load_through_a_real_file_preserves_the_ranch() -> void
 	assert_eq(reloaded.pony_count(), 2)
 	assert_eq(String(reloaded.get_ponies()[0].uid), String(original.get_ponies()[0].uid))
 	assert_almost_eq(reloaded.get_ponies()[0].happiness, 0.75, 0.0001)
+	assert_eq(reloaded.compendium.state_of(&"twilight"), CompendiumScript.State.CAUGHT,
+		"a caught mark survives a real save file, JSON float and all")
+	assert_eq(reloaded.compendium.state_of(&"rainbowdash"), CompendiumScript.State.SEEN,
+		"...and so does a seen mark")
+	assert_eq_deep(reloaded.requests, [{"id": "sample_request", "done": false}])
 
 
 func test_a_uid_reloaded_from_disk_cannot_be_minted_again() -> void:

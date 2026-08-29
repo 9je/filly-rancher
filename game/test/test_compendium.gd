@@ -176,3 +176,24 @@ func test_from_dict_drops_junk() -> void:
 	assert_eq(c.state_of(&"pinkiepie"), CompendiumScript.State.CAUGHT, "...but the good one survives")
 	assert_false(c.to_dict().has("fluttershy"),
 		"a dropped explicit-zero entry must not round trip back out either")
+
+
+## JSON HAS NO INTEGER TYPE: a state this class itself wrote as the int 2 comes back through
+## a real SaveIO round trip as the float 2.0, so from_dict() must accept a WHOLE-number float
+## exactly the way it accepts an int. What it must NOT do is silently truncate a fractional
+## float into a state that was never actually written; 1.5 is not SEEN, and 2.7 is not
+## CAUGHT, and treating either as one would be fabricating an entry from noise.
+func test_from_dict_accepts_whole_number_floats_and_rejects_fractional_ones() -> void:
+	var c = CompendiumScript.from_dict({
+		"twilight": 2.0,        # CAUGHT, arrived as a JSON float
+		"rarity": 1.0,          # SEEN, same story
+		"rainbowdash": 1.5,     # fractional; must be rejected, not truncated to SEEN
+		"fluttershy": 2.7,      # fractional; must be rejected, not truncated to CAUGHT
+	})
+	assert_eq(c.state_of(&"twilight"), CompendiumScript.State.CAUGHT,
+		"a whole-number float is accepted exactly like the int it represents")
+	assert_eq(c.state_of(&"rarity"), CompendiumScript.State.SEEN)
+	assert_eq(c.state_of(&"rainbowdash"), CompendiumScript.State.UNSEEN,
+		"a fractional value is rejected outright, not truncated into a state")
+	assert_eq(c.state_of(&"fluttershy"), CompendiumScript.State.UNSEEN,
+		"...same for a fractional value that would truncate into CAUGHT")
