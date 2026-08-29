@@ -92,11 +92,13 @@ func _populated():
 
 func test_to_dict_and_from_dict_round_trip_every_field() -> void:
 	var original = _populated()
+	original.world_time = 733.5
 	var copy = _state()
 	copy.from_dict(original.to_dict())
 
 	assert_eq(copy.bits, 4321, "the wallet survives")
 	assert_eq(copy.world_seed, 12345, "the world seed survives")
+	assert_almost_eq(copy.world_time, 733.5, 0.001, "the world clock survives")
 	assert_eq_deep(copy.plots, {"0": "pen", "2": "garden"})
 	assert_eq_deep(copy.unlocks, ["beam_range_1"])
 	assert_eq(copy.pony_count(), 2, "both ponies came back")
@@ -141,6 +143,18 @@ func test_from_dict_fills_in_a_missing_field_rather_than_crashing() -> void:
 	assert_eq(state.pony_count(), 0, "an empty dict is an empty ranch, not a crash")
 	assert_eq(state.bits, GameStateScript.STARTING_BITS)
 	assert_eq(state.world_seed, GameStateScript.DEFAULT_WORLD_SEED)
+
+
+func test_a_save_without_world_time_starts_at_dawn() -> void:
+	var state = _state()
+	state.from_dict({"bits": 1})
+	assert_eq(state.world_time, 0.0, "a save from before the clock existed opens at dawn")
+
+
+func test_from_dict_clamps_a_negative_world_time_to_zero() -> void:
+	var state = _state()
+	state.from_dict({"world_time": -5.0})
+	assert_eq(state.world_time, 0.0, "a hand-edited negative clock cannot go below dawn")
 
 
 func test_from_dict_skips_a_junk_pony_entry_and_keeps_the_good_ones() -> void:

@@ -155,7 +155,8 @@ func _ready() -> void:
 	state.gems.add(PonyDataScript.Rarity.LEGENDARY, 2)
 	_set_check("the save lands", state.save_to_slot(SLOT))
 	var raw := SaveIOScript.load(SLOT)
-	_set_check("the file is version 2", int(raw.get("version", 0)) == 2)
+	_set_check("the file is the current version",
+		int(raw.get("version", 0)) == SaveIOScript.FORMAT_VERSION)
 	_set_check("gems are in the file", raw.has("gems") and raw["gems"].get("3", 0) == 2)
 	_set_check("inventory is in the file", raw.has("inventory"))
 	_set_check("unlocks are in the file", raw.get("unlocks", []).has("bigger_saddlebag"))
