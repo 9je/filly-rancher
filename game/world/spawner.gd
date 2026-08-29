@@ -41,6 +41,7 @@ const PonyScene := preload("res://actors/pony/pony.tscn")
 const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 const SpawnTableScript := preload("res://systems/spawn_table.gd")
 const ZoneMarkerScript := preload("res://world/zone_marker.gd")
+const WorldStateScript := preload("res://systems/world_state.gd")
 
 ## How far above and below a candidate point the ground ray is cast. Generous
 ## against terrain.gd's ~+/-2.4 m of relief, and cheap.
@@ -78,39 +79,55 @@ const MIN_SEPARATION := 1.4
 ## among that tier's members, so a repeat is an ordinary outcome. It is just an outcome
 ## nobody should be stuck with permanently.
 ##
-## 20295486 DRAWS TWENTY-TWO DISTINCT CHARACTERS INTO TWENTY-TWO SLOTS, which is the
-## ceiling: nobody is standing in the field twice. ranch.tscn holds nine ZoneMarkers now,
-## five on the homestead at spawn_count 2 and one in each region at 3.
+## 20721716 DRAWS TWENTY-TWO DISTINCT CHARACTERS INTO TWENTY-TWO SLOTS at the hour the
+## world boots into, which is the ceiling: nobody is standing in the field twice.
+## ranch.tscn holds nine ZoneMarkers, five on the homestead at spawn_count 2 and one in
+## each region at 3.
 ##
-##   ranch (10)       Nurse Redheart, Lotus, Aloe, Derpy Hooves, Fluttershy, Scootaloo,
-##                    Sweetie Belle, Starlight Glimmer, Pinkie Pie, Rainbow Dash
-##   orchard (3)      Carrot Top, Caramel, Berry Punch
-##   everfree (3)     Sunset Shimmer, Doctor Whooves, Trixie
-##   lake (3)         Milky Way, Soarin, Spitfire
-##   nightmeadow (3)  Marble Pie, Mane Allgood, Coco Pommel
+##   ranch (10)       Lotus, Rarity, Sweetie Belle, Twilight Sparkle, Fluttershy,
+##                    Derpy Hooves, Starlight Glimmer, Pinkie Pie, Nurse Redheart,
+##                    Scootaloo
+##   orchard (3)      Carrot Top, Berry Punch, Caramel
+##   everfree (3)     Doctor Whooves, Pokey Pierce, Kerfuffle
+##   lake (3)         Milky Way, Flitter, Minuette
+##   nightmeadow (3)  Mane Allgood, Limestone Pie, Marble Pie
 ##
-## All four rarity tiers are drawn (9 COMMON, 8 UNCOMMON, 3 RARE, and both Sunset Shimmer
-## and Trixie for LEGENDARY), and the two legendaries are behind the Everfree Edge's
-## 400-bit permit, which is where a legendary ought to be standing.
+## "AT THE HOUR THE WORLD BOOTS INTO" IS NEW, AND IT IS WHY THIS SEED REPLACED 20295486.
+## Slice 5 gave PonyData `phases` and `weathers`, so populate() no longer draws from a
+## zone's whole roster: it draws from the characters available at the phase and weather it
+## is handed. That is a smaller pool at every hour (the everfree edge and the night meadow
+## are down to three each at DAWN under a clear sky), and 20295486 was searched against
+## pools that no longer exist. The search below therefore had a second condition on it:
+## the seed must also ROLL A CLEAR DAWN for cycle 0 (WorldState.weather_for(seed, 0,
+## DAWN) == CLEAR), so the sky the player actually boots into is the sky the herd was
+## drawn for. 20295486 rolls rain at that hour and always did; nothing noticed while the
+## draw ignored weather.
+##
+## NO LEGENDARY IS DRAWN AT DAWN, and no seed can change that: all three legendaries keep
+## other hours now (Sunset Shimmer at dusk, Trixie and Shining Armor at night), so at DAWN
+## the tier is empty everywhere on the map. The old seed's "all four tiers in one draw"
+## property has become impossible rather than unlucky, and losing it is the point of the
+## feature: the rarest characters are things you go out at the right hour to find, not
+## things standing in the first field you walk into. This draw is 12 COMMON, 7 UNCOMMON
+## and 3 RARE, and the legendaries arrive through refresh() when the sky comes round.
 ##
 ## FOUND BY SEARCH, not by taste. A throwaway script replayed SpawnTable's own draw
-## against every seed from 20260600 to 20460000 with the real roster, the real zones and
-## the markers read out of ranch.tscn in scene order, and scored each seed by how many
-## distinct characters its 22 draws contain: 22 of those 199,401 seeds reach 22, five of
-## those 22 also cover all four tiers, and 20295486 is the lowest of the five. The rarity
-## weights, the tier semantics and the draw code are all untouched; only which of their
-## equally valid outcomes is the one that ships. Re-pick the same way if the roster or the
-## zoning changes, because the draw depends on both.
+## against every seed from 20260600 upward with the real roster, the real zones, the real
+## conditions at DAWN and CLEAR, and the markers read out of ranch.tscn in scene order,
+## scoring each seed by how many distinct characters its 22 draws contain. 461,117 seeds
+## were tried. Exactly one before 20721716 reaches 22 at all (20357460), and that one
+## rolls rain at dawn, so it fails the second condition. Re-pick the same way if the
+## roster, the zoning or the conditions change, because the draw depends on all three.
 ##
-## TWENTY-TWO SLOTS CANNOT SHOW 43 CHARACTERS, and no seed will change that. Nothing
-## respawns once a pony is caught, so the other 21 are the business of slice 5, which
-## brings respawn and refreshes the herd over a session instead of leaving it the same
-## twenty-two ponies until the save is deleted.
+## TWENTY-TWO SLOTS CANNOT SHOW 43 CHARACTERS, and no seed will change that either. What
+## changed in slice 5 is that they no longer have to: refresh() below sends the ponies
+## whose hour has passed off the map and draws whoever the new hour belongs to, so the
+## other 21 arrive over a session rather than waiting for the save to be deleted.
 ##
 ## KEEP THIS IN STEP WITH GameState.DEFAULT_WORLD_SEED. A save carries the seed its world
 ## was generated from, and a run with no save takes this one into the state; the two are
 ## asserted equal in game/test/test_spawner_seed.gd.
-@export var spawn_seed := 20295486
+@export var spawn_seed := 20721716
 
 ## Node whose ZoneMarker children this spawner fills. Defaults to a sibling `Zones`.
 @export var zones_path := NodePath("../Zones")
@@ -124,11 +141,38 @@ var _fallback_placements := 0
 var _empty_zones: Array[StringName] = []
 var _unspawnable: Array[StringName] = []
 
+## Which ZoneMarker each live pony was drawn for, keyed by her instance id. refresh()
+## needs it to answer "how many of this marker's ponies are still staying", and there is
+## nowhere else to keep it: a Pony knows her PonyData and her home POINT, not the marker
+## the point came out of. Pruned in step with _spawned, in get_spawned().
+var _marker_by_pony: Dictionary = {}
+
+## Slot numbers are handed out once and never reused, across populate() AND every later
+## refresh(). They feed the per pony wander RNG and the ground placement RNG (see
+## _spawn_one and _ground_point), so reusing them would stand every replacement on the
+## exact spot the pony she replaced was drawn onto, refresh after refresh.
+var _next_slot := 0
+
+## The registry, read once. _spawnable_entries() walks a directory and loads forty three
+## resources; populate() does that at boot and refresh() would do it again on every phase
+## and every weather change for the rest of the session. Cached here rather than inside
+## PonyRegistry because the sort and the assetless filter are this node's own, and
+## because _roster and _unspawnable are reported and must not re-accumulate.
+var _entries: Array[PonyData] = []
+var _entries_loaded := false
+
 
 ## Draw and place every zone's ponies. Returns how many actually reached the tree.
 ##
 ## Call after at least one physics frame -- see the class comment.
-func populate() -> int:
+##
+## `phase` and `weather` are WorldState enum ints and are the sky the world boots into: a
+## character whose PonyData.available() says no for that pair is not in the pool at all,
+## so the herd the player walks out into already keeps the hours it is meant to keep.
+## They default to DAWN and CLEAR, which is what a fresh clock reads at elapsed zero, so
+## every existing caller keeps exactly the draw it had.
+func populate(phase: int = WorldStateScript.Phase.DAWN,
+		weather: int = WorldStateScript.Weather.CLEAR) -> int:
 	var markers := get_markers()
 	if markers.is_empty():
 		push_error("Spawner: no ZoneMarker found under '%s' -- nothing to populate" % zones_path)
@@ -141,10 +185,7 @@ func populate() -> int:
 
 	var slot := 0
 	for marker: ZoneMarker in markers:
-		var pool: Array[PonyData] = []
-		for data: PonyData in entries:
-			if marker.zone_id in data.spawn_zones:
-				pool.append(data)
+		var pool := _pool_for(marker, entries, phase, weather)
 
 		# TWO DIFFERENT FAILURES, KEPT APART ON PURPOSE. "This zone_id matches no
 		# pony in the roster at all" is a content bug -- a typo'd zone name -- and
@@ -168,9 +209,110 @@ func populate() -> int:
 			var pony := _spawn_one(data, marker, slot)
 			if pony != null:
 				_spawned.append(pony)
+				_marker_by_pony[pony.get_instance_id()] = marker
 			slot += 1
 
+	_next_slot = slot
 	return _spawned.size()
+
+
+## THE SKY CHANGED, so the herd changes with it. Every wild pony whose conditions no
+## longer hold is told to leave() (she walks off and frees herself out of sight, see
+## Pony.leave(); nothing owned is reachable from here, and nothing dies), and every marker
+## left short is topped back up out of the pool that matches the new hour. Returns
+## `{"left": n, "arrived": n}`, which is what the caller puts on screen.
+##
+## DETERMINISTIC PER HOUR, NOT PER CALL. The draw RNG is seeded from the world seed, the
+## cycle index and the phase, so the same save at the same hour of the same day draws the
+## same replacements however often it is reloaded. `cycle * 4 + phase` is the phase
+## counted from the start of play, which is the exact granularity weather is rolled at
+## (game/systems/world_state.gd), so a phase and its weather always arrive together and
+## the pair of them is one number.
+##
+## A LEAVING PONY DOES NOT COUNT toward her marker's tally, so her replacement is drawn in
+## the same breath and the two of them are briefly both on the map. That overlap is what
+## "one wanders off as another arrives" is supposed to look like.
+##
+## IDEMPOTENT for a given (phase, weather, cycle): the second call finds every marker full
+## of ponies who are all still available, and draws nothing.
+func refresh(phase: int, weather: int, cycle: int, player_position: Vector3) -> Dictionary:
+	var left := 0
+	for pony in get_spawned():
+		if pony.is_leaving():
+			continue
+		var data: PonyData = pony.get_data()
+		if data != null and data.available(phase, weather):
+			continue
+		if pony.leave():
+			left += 1
+
+	var markers := get_markers()
+	if markers.is_empty():
+		return {"left": left, "arrived": 0}
+
+	var entries := _spawnable_entries()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = spawn_seed + cycle * 4 + phase
+
+	var staying := _staying_by_marker()
+	var arrived := 0
+	var slot := _next_slot
+	for marker: ZoneMarker in markers:
+		var pool := _pool_for(marker, entries, phase, weather)
+		if pool.is_empty():
+			continue
+		var wanted: int = marker.spawn_count - int(staying.get(marker.get_instance_id(), 0))
+		if wanted <= 0:
+			continue
+		var table := SpawnTableScript.new(pool, rng)
+		for i in range(wanted):
+			var data: PonyData = table.draw()
+			if data == null:
+				push_error("Spawner: SpawnTable.draw() returned null for zone '%s' slot %d"
+					% [marker.zone_id, i])
+				continue
+			var pony := _spawn_one(data, marker, slot)
+			if pony != null:
+				_spawned.append(pony)
+				_marker_by_pony[pony.get_instance_id()] = marker
+				arrived += 1
+			slot += 1
+
+	_next_slot = slot
+	# `player_position` is deliberately not read. Where a departing pony is discarded is her
+	# own business: Pony.leave() measures the distance to the player she can actually see,
+	# which is the same test her notice radius is stated against, and second-guessing it
+	# from here would give two answers to one question. It is in the signature because the
+	# caller has the position to hand and because a future "do not stand a replacement in
+	# his face" rule belongs in this function and nowhere else.
+	return {"left": left, "arrived": arrived}
+
+
+## The entries zoned for `marker` who can be drawn at this hour and in this weather.
+func _pool_for(marker: ZoneMarker, entries: Array[PonyData], phase: int,
+		weather: int) -> Array[PonyData]:
+	var pool: Array[PonyData] = []
+	for data: PonyData in entries:
+		if not marker.zone_id in data.spawn_zones:
+			continue
+		if not data.available(phase, weather):
+			continue
+		pool.append(data)
+	return pool
+
+
+## {marker instance id: how many of its ponies are alive and NOT on their way out}.
+func _staying_by_marker() -> Dictionary:
+	var counts := {}
+	for pony in get_spawned():
+		if pony.is_leaving():
+			continue
+		var marker: ZoneMarker = _marker_by_pony.get(pony.get_instance_id())
+		if marker == null or not is_instance_valid(marker):
+			continue
+		var key := marker.get_instance_id()
+		counts[key] = int(counts.get(key, 0)) + 1
+	return counts
 
 
 func get_markers() -> Array[ZoneMarker]:
@@ -206,10 +348,19 @@ func get_markers() -> Array[ZoneMarker]:
 ## real pony nodes), only the array container is independent.
 func get_spawned() -> Array[CharacterBody3D]:
 	var live: Array[CharacterBody3D] = []
+	var live_markers := {}
 	for pony in _spawned:
-		if is_instance_valid(pony):
-			live.append(pony)
+		if not is_instance_valid(pony):
+			continue
+		live.append(pony)
+		var key := pony.get_instance_id()
+		if _marker_by_pony.has(key):
+			live_markers[key] = _marker_by_pony[key]
 	_spawned = live
+	# Rebuilt rather than erased from, and in step with _spawned, so no stale entry can
+	# outlive the pony it describes and hand refresh() a marker tally counting somebody who
+	# is not out there any more.
+	_marker_by_pony = live_markers
 	return _spawned.duplicate()
 
 
@@ -257,6 +408,9 @@ func _zoned_in_roster(zone: StringName) -> int:
 ## rather than a push_error per pony per zone, which is what keeps the ranch's
 ## degraded mode legible in a CI log.
 func _spawnable_entries() -> Array[PonyData]:
+	if _entries_loaded:
+		return _entries
+
 	var registry := PonyRegistryScript.new()
 	var by_id: Dictionary = registry.load_all(pony_dir)
 	_roster = by_id.values()
@@ -273,7 +427,9 @@ func _spawnable_entries() -> Array[PonyData]:
 	# real nondeterminism bug, not a redundant cast.
 	result.sort_custom(func(a: PonyData, b: PonyData) -> bool:
 		return String(a.id) < String(b.id))
-	return result
+	_entries = result
+	_entries_loaded = true
+	return _entries
 
 
 ## One pony: drawn record, ground-found position, seeded RNG, layered collision.

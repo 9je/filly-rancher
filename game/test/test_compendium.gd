@@ -111,8 +111,11 @@ func test_counts_reflect_a_hand_marked_set() -> void:
 
 
 func test_count_in_zone_filters_to_that_zones_characters() -> void:
-	# twilight and rainbowdash both spawn in "ranch" (13 ponies do); a lake pony is marked
-	# too, and must not show up in the ranch tally.
+	# twilight and rainbowdash both spawn in "ranch"; a lake pony is marked too, and must
+	# not show up in the ranch tally. How many characters the ranch zone holds is asked of
+	# the registry rather than written down: slice 5 re-zoned Pokey Pierce to the everfree
+	# edge, and a hand-counted 13 here failed for a reason that had nothing to do with the
+	# compendium.
 	var c = CompendiumScript.new()
 	c.mark_caught(&"twilight")
 	c.mark_seen(&"rainbowdash")
@@ -120,7 +123,9 @@ func test_count_in_zone_filters_to_that_zones_characters() -> void:
 
 	assert_eq(c.count_in_zone(&"ranch", CompendiumScript.State.CAUGHT, registry), 1)
 	assert_eq(c.count_in_zone(&"ranch", CompendiumScript.State.SEEN, registry), 1)
-	assert_eq(c.count_in_zone(&"ranch", CompendiumScript.State.UNSEEN, registry), 13 - 2,
+	var in_ranch: int = registry.by_zone(&"ranch").size()
+	assert_gt(in_ranch, 2, "the ranch zone has to have somebody in it for this to mean anything")
+	assert_eq(c.count_in_zone(&"ranch", CompendiumScript.State.UNSEEN, registry), in_ranch - 2,
 		"the rest of the ranch zone's ponies are untouched")
 	assert_eq(c.count_in_zone(&"lake", CompendiumScript.State.CAUGHT, registry), 1,
 		"the lake mark does not leak into the ranch tally")
