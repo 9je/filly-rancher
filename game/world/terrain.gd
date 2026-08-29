@@ -8,10 +8,11 @@ extends StaticBody3D
 ## (docs/ci.md section 4), so a terrain shipped as a .glb would be missing from a
 ## fresh clone and from every CI checkout -- and the ranch is the MAIN SCENE, so a
 ## missing terrain is a game that boots into the void. A few dozen lines of
-## deterministic arithmetic are in git, are identical on every machine, and cost
-## about a millisecond at startup. It also means height_at() is available as a
-## plain function, which is what lets props sit exactly on the ground instead of
-## being nudged by hand until they stop floating.
+## deterministic arithmetic are in git, are identical on every machine, and cost about a
+## quarter of a second at startup on this machine, nearly all of it in create_trimesh_shape()
+## rather than in the arithmetic, paid once while the main scene loads. It also means
+## height_at() is available as a plain function, which is what lets props sit exactly on
+## the ground instead of being nudged by hand until they stop floating.
 ##
 ## SCULPTED, NOT FLAT, ON PURPOSE. A flat plane would have made the spawner's
 ## raycast-down placement (game/world/spawner.gd) vacuous: every random point would
@@ -26,10 +27,18 @@ extends StaticBody3D
 ## place to walk a 1.16 m pony around, not a mountain.
 
 const LayersScript := preload("res://world/collision_layers.gd")
+const RegionRegistryScript := preload("res://systems/region_registry.gd")
+const RegionDataScript := preload("res://systems/region_data.gd")
 
 ## Half-width of the map, in metres. The ground spans [-HALF, HALF] on both X and Z.
-const HALF := 70.0
-## Metres per grid cell. 2 m gives a 70x70 quad grid (9800 triangles) -- fine enough
+##
+## 110 rather than the original 70 because the four regions (game/data/regions/) live out
+## past the homestead, the furthest of them reaching z = 93 with its fence ring on. The
+## apron constants below are deliberately NOT retuned with it: the homestead, its props,
+## its plots and the five ranch zone markers all sit inside 44 m of the middle and keep
+## exactly the ground they had.
+const HALF := 110.0
+## Metres per grid cell. 2 m gives a 110x110 quad grid (24,200 triangles), fine enough
 ## that the relief reads as smooth, coarse enough to build and collide against
 ## cheaply.
 const CELL := 2.0
@@ -58,8 +67,40 @@ const BOUNDARY_THICKNESS := 2.0
 const GRASS_LOW := Color(0.239, 0.408, 0.196)
 const GRASS_HIGH := Color(0.443, 0.541, 0.271)
 
+## When true this node builds NOTHING in _ready() beyond its collision layers, and the
+## ground is shaped by an explicit build() instead.
+##
+## WHY IT EXISTS. The regions have to be known before the first vertex is placed: the lake
+## is a hole in the heightfield, so a terrain that shaped itself and was told about the
+## lake afterwards would have a mesh and a collider that disagree with height_at(), which
+## is the one thing this file exists to prevent. A child readies before its parent, so
+## Ranch._ready() has no moment early enough to hand the registry over. ranch.tscn
+## therefore sets this, and ranch.gd assigns `regions` and calls build() as its first act.
+## Every other scene, and every test that wants the plain map, leaves it false.
+@export var defer_build := false
+
+## The region catalogue this map is shaped and painted by, or NULL for the plain map (no
+## tints, no basin), which is what scenes/test/ and the unit suite get. Set by the owner
+## BEFORE build() runs; see defer_build.
+##
+## Assigning it caches the lake regions, because height_at() is called about 62,000 times
+## while the mesh is built (once per vertex, four more per vertex for the analytic normal)
+## and asking the registry for a fresh copy of its catalogue each time would turn a
+## millisecond of arithmetic into tens of them.
+var regions: RegionRegistryScript = null:
+	set(value):
+		regions = value
+		_lakes.clear()
+		if value != null:
+			for region in value.all():
+				if region.has_lake:
+					_lakes.append(region)
+
 var _mesh_instance: MeshInstance3D
 var _collision: CollisionShape3D
+
+## The subset of `regions` that carries a lake, in registry order. See the setter above.
+var _lakes: Array[RegionDataScript] = []
 
 
 func _ready() -> void:
@@ -67,6 +108,19 @@ func _ready() -> void:
 	# A StaticBody3D never initiates a collision query of its own; leaving a mask on
 	# it costs broadphase work and buys nothing.
 	collision_mask = 0
+
+	if not defer_build:
+		build()
+
+
+## Shapes the ground: the mesh, its trimesh collider, and the four boundary walls. Called
+## by _ready() unless defer_build is set, in which case the owner calls it once `regions`
+## has been handed over. A second call is ignored rather than building a second mesh on top
+## of the first.
+func build() -> void:
+	if _mesh_instance != null:
+		push_error("Terrain.build() called twice")
+		return
 
 	var mesh := _build_mesh()
 
@@ -88,9 +142,22 @@ func _ready() -> void:
 ## actually on the ground" checks all read this same function, so they cannot drift
 ## apart from each other.
 ##
-## Deterministic and stateless: no RNG, no noise texture, no per-machine anything.
+## Deterministic: no RNG, no noise texture, no per-machine anything. The only input beyond
+## XZ is `regions`, which is assigned once, before the ground is built, and never again.
+##
+## A region with a lake in it is a BASIN sunk into the relief: a smooth bowl reaching full
+## depth in the middle and nothing at all by the rim, feathered over the OUTER half of the
+## radius (from half radius out to the rim) so the ground walks down into the water instead
+## of stepping off a shelf. It is
+## subtracted here, in the one function everything else reads, so the mesh, the collider,
+## the props and the water disc all agree about where the bottom is.
 func height_at(x: float, z: float) -> float:
-	return _raw_height(x, z) * _relief_weight(x, z)
+	var h := _raw_height(x, z) * _relief_weight(x, z)
+	if not _lakes.is_empty():
+		var point := Vector2(x, z)
+		for region in _lakes:
+			h -= region.lake_depth * region.weight_at(point, region.radius * 0.5)
+	return h
 
 
 ## The relief before the homestead apron flattens it. Used for the grass tinting, so
@@ -123,6 +190,65 @@ func is_flat_at(x: float, z: float) -> bool:
 func _relief_weight(x: float, z: float) -> float:
 	var d := Vector2(x, z).distance_to(HOMESTEAD_CENTRE)
 	return smoothstep(FLAT_RADIUS, BLEND_RADIUS, d)
+
+
+## The colour of the grass at world XZ, one vertex of the mesh's worth.
+##
+## Higher, drier ground reads a shade lighter and yellower; hollows stay a deeper green,
+## and a fine patchwork on top keeps even the perfectly flat homestead apron from
+## rendering as one uniform sheet. Deliberately driven by the UNflattened relief, so the
+## yard is tinted like the land it was levelled out of.
+##
+## Inside a region the same tone is taken through THAT region's palette instead, faded in
+## by the region's own edge weight so the orchard's green and the night meadow's silver
+## arrive over a few metres rather than at a hard circle. This is the only thing that tells
+## a player, from across the map, that the far side of the fence is somewhere else.
+func grass_at(x: float, z: float) -> Color:
+	var tone := clampf(0.5 + _raw_height(x, z) * 0.16
+		+ sin(x * 0.31) * cos(z * 0.27) * 0.11
+		+ sin((x - z) * 0.13 + 2.1) * 0.07, 0.0, 1.0)
+	var color := GRASS_LOW.lerp(GRASS_HIGH, tone)
+	if regions == null:
+		return color
+	var point := Vector2(x, z)
+	var region: RegionDataScript = regions.region_at(point)
+	if region == null:
+		return color
+	return color.lerp(region.grass_low.lerp(region.grass_high, tone), region.weight_at(point))
+
+
+## A flat, translucent disc of water for a region that has a lake, ready for the caller to
+## parent wherever it keeps its regional scenery (ranch.gd puts it under $Regions).
+##
+## NO COLLISION, deliberately: the ground under it is the terrain's own basin, which is
+## walkable, so a pony or a player wading in is standing on real ground the whole way.
+## Water that pushed bodies around would be a swimming mechanic, and there is not one.
+func build_water(region: RegionDataScript) -> MeshInstance3D:
+	var mesh := CylinderMesh.new()
+	# The inner 70 percent of the region, so the shore is bare basin rather than the water
+	# running straight up to the fence.
+	mesh.top_radius = region.radius * 0.7
+	mesh.bottom_radius = region.radius * 0.7
+	mesh.height = 0.05
+
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.20, 0.42, 0.62, 0.85)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.roughness = 0.15
+	mat.metallic = 0.1
+	mesh.material = mat
+
+	var node := MeshInstance3D.new()
+	node.name = "Water_" + String(region.id)
+	node.mesh = mesh
+	# height_at() in the middle is the BOTTOM of the basin, so the surface is put back most
+	# of the way up toward the rim: deep enough to read as water, shallow enough that the
+	# basin's own shore is still visible around it.
+	node.position = Vector3(
+		region.centre.x,
+		height_at(region.centre.x, region.centre.y) + region.lake_depth * 0.55 - 0.4,
+		region.centre.y)
+	return node
 
 
 ## The heightfield as an ArrayMesh.
@@ -159,17 +285,12 @@ func _build_mesh() -> ArrayMesh:
 			verts.append(Vector3(x, y, z))
 			normals.append(normal_at(x, z))
 			# 1 UV tile per 4 m, so a future grass texture repeats at a believable
-			# size rather than being stretched across 140 m.
+			# size rather than being stretched across the whole 220 m.
 			uvs.append(Vector2(x, z) * 0.25)
-			# Higher, drier ground reads a shade lighter and yellower; hollows stay
-			# a deeper green, and a fine patchwork on top keeps even the perfectly
-			# flat homestead apron from rendering as one uniform sheet. Deliberately
-			# driven by the UNflattened relief, so the yard is tinted like the land it
-			# was levelled out of.
-			var tone := 0.5 + _raw_height(x, z) * 0.16 \
-				+ sin(x * 0.31) * cos(z * 0.27) * 0.11 \
-				+ sin((x - z) * 0.13 + 2.1) * 0.07
-			colors.append(GRASS_LOW.lerp(GRASS_HIGH, clampf(tone, 0.0, 1.0)))
+			# The tint, and inside a region its regional palette, live in grass_at()
+			# so a caller can ask what colour the ground is at a point without
+			# rebuilding the mesh to find out.
+			colors.append(grass_at(x, z))
 
 	var row := steps + 1
 	for iz in range(steps):

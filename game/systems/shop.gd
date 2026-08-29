@@ -11,7 +11,8 @@ extends RefCounted
 ## on refusal so even that leaves the wallet as it was.
 ##
 ## `unlocks` is GameState's live Array, mutated in place: appending here is what makes the
-## purchase survive quitting. Owning gear is the only thing that stops it being sold twice.
+## purchase survive quitting. Owning gear or holding a permit is the only thing that stops
+## either being sold twice.
 
 const EconomyScript := preload("res://systems/economy.gd")
 const ShopItemScript := preload("res://systems/shop_item.gd")
@@ -71,6 +72,16 @@ func owns_gear(gear_id: StringName) -> bool:
 	return _unlocks.has(String(gear_id))
 
 
+## The unlock string a region's permit is recorded under. One place, so the fence and
+## the shop cannot disagree about it.
+static func permit_id_for(zone: StringName) -> StringName:
+	return StringName("permit_" + String(zone))
+
+
+func owns_permit(zone: StringName) -> bool:
+	return _unlocks.has(String(permit_id_for(zone)))
+
+
 ## Why `item` cannot be bought right now, as a line for the menu footer, or "" if it can.
 func refusal(item: ShopItem) -> String:
 	if item == null:
@@ -84,6 +95,11 @@ func refusal(item: ShopItem) -> String:
 				return "That is not for sale."
 			if owns_gear(item.gear_id):
 				return "You already have that."
+		ShopItemScript.Kind.PERMIT:
+			if String(item.permit_zone).is_empty():
+				return "That is not for sale."
+			if owns_permit(item.permit_zone):
+				return "You already hold that permit."
 		_:
 			return "Not for sale yet."
 	if not _economy.can_afford(item.cost):
@@ -105,5 +121,7 @@ func buy(item: ShopItem) -> bool:
 			_inventory.add(item.food_id, item.quantity)
 		ShopItemScript.Kind.GEAR:
 			_unlocks.append(String(item.gear_id))
+		ShopItemScript.Kind.PERMIT:
+			_unlocks.append(String(permit_id_for(item.permit_zone)))
 	bought.emit(item)
 	return true

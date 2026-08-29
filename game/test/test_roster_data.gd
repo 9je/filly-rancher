@@ -88,10 +88,33 @@ func test_every_personality_is_used_in_every_tier_that_has_more_than_three_membe
 			"tier %s should use every personality" % PonyDataScript.Rarity.keys()[tier])
 
 
-func test_every_character_is_zoned_ranch_for_now() -> void:
-	# Slice 3 splits the map into regions; until then every character must be reachable.
+## THE ROSTER AND THE MAP HAVE TO NAME THE SAME PLACES, in both directions.
+##
+## Slice 3 moved 30 of the 43 characters off the ranch and into four regions, and a zone id
+## is a StringName typed into a .tres by hand on one side and into ranch.tscn by hand on
+## the other. A typo on the roster's side is a character nobody can ever meet: the spawner
+## reports the zone as empty, and she is simply not in the game. A marker with no residents
+## is the reverse, a place behind a permit with nothing in it. Neither is visible in any
+## other test here, because each half is internally consistent on its own.
+func test_every_zone_a_character_names_has_a_marker_and_every_marker_has_residents() -> void:
+	var scene: PackedScene = load("res://world/ranch.tscn")
+	var ranch: Node = scene.instantiate()
+	var marker_zones := {}
+	for marker in ranch.get_node("Zones").get_children():
+		marker_zones[marker.zone_id] = true
+	ranch.free()
+	assert_gt(marker_zones.size(), 1, "the map has more than one kind of place on it")
+	var used := {}
 	for id in _roster():
-		assert_true(_roster()[id].spawn_zones.has(&"ranch"), "%s must spawn on the ranch" % id)
+		# An empty list would sail through the loop below without asserting anything, and
+		# is the same bug as a typo: a character with nowhere to spawn.
+		assert_false(_roster()[id].spawn_zones.is_empty(), "%s must live somewhere" % id)
+		for zone in _roster()[id].spawn_zones:
+			assert_true(marker_zones.has(zone), "%s spawns in '%s', which has no ZoneMarker"
+				% [id, zone])
+			used[zone] = true
+	for zone in marker_zones:
+		assert_true(used.has(zone), "zone '%s' has a marker but nobody lives there" % zone)
 
 
 func test_every_character_likes_at_least_one_food_the_market_sells() -> void:

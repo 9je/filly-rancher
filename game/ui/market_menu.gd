@@ -152,6 +152,23 @@ func buy_rows() -> Array[ShopItem]:
 	return _catalogue.duplicate()
 
 
+## The price drawn on row `index` of whichever tab is up, or "" for a row that is not
+## there.
+##
+## READ OFF THE LIVE LABEL, not recomputed. What a row COSTS is already answerable from the
+## Shop; the only thing worth asserting from outside is what this screen actually put in
+## front of the player, and a helper that recalculated the string would agree with itself
+## while the panel drew something else.
+func row_price_text(index: int) -> String:
+	if index < 0 or index >= _rows.get_child_count():
+		return ""
+	var heads: Array = _rows.get_child(index).find_children("*", "HBoxContainer", true, false)
+	if heads.is_empty() or (heads[0] as HBoxContainer).get_child_count() < 2:
+		return ""
+	var cost := (heads[0] as HBoxContainer).get_child(1) as Label
+	return cost.text if cost != null else ""
+
+
 func _row_count() -> int:
 	# Parenthesised because the +1 belongs to the SELL branch (the "Sell everything" row),
 	# not to the whole ternary, and GDScript's precedence here is worth nobody's second
@@ -294,7 +311,16 @@ func refresh() -> void:
 	else:
 		for i in range(_catalogue.size()):
 			var item := _catalogue[i]
-			var owned := item.kind == ShopItemScript.Kind.GEAR and shop.owns_gear(item.gear_id)
+			# A PERMIT ALREADY IN THE UNLOCKS READS OWNED, exactly as held gear does. Shop
+			# refuses to sell either of them twice (shop.gd's refusal()), so a permit row
+			# still showing its price was a row offering something that could not be
+			# bought, on the most expensive line on the screen: 1200 bits displayed next
+			# to a gate that is already standing open.
+			var owned := false
+			if item.kind == ShopItemScript.Kind.GEAR:
+				owned = shop.owns_gear(item.gear_id)
+			elif item.kind == ShopItemScript.Kind.PERMIT:
+				owned = shop.owns_permit(item.permit_zone)
 			var price := "OWNED" if owned else ("FREE" if item.cost == 0 else "%d bits" % item.cost)
 			_add_row(i, item.display_name, item.description, price, shop.can_buy(item))
 

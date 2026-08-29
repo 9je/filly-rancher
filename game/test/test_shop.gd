@@ -150,14 +150,38 @@ func test_a_care_item_with_no_food_is_refused_before_any_bits_move() -> void:
 	assert_eq(_econ.bits, 30)
 
 
-func test_permit_and_build_kinds_are_refused_in_this_slice() -> void:
-	_econ.sell(PonyDataScript.Rarity.LEGENDARY, 5)
+func test_buying_a_permit_records_it_once_and_never_twice() -> void:
+	_econ.sell(PonyDataScript.Rarity.LEGENDARY, 5)  # 500 bits
 	var permit: ShopItem = ShopItemScript.new()
-	permit.id = &"pass"
-	permit.cost = 1
+	permit.id = &"permit_lake"
+	permit.display_name = "Permit: The Lake"
+	permit.cost = 150
 	permit.kind = ShopItemScript.Kind.PERMIT
 	permit.permit_zone = &"lake"
+	assert_false(_shop.owns_permit(&"lake"))
+	assert_true(_shop.can_buy(permit))
+	assert_true(_shop.buy(permit))
+	assert_true(_shop.owns_permit(&"lake"))
+	assert_eq(_unlocks, ["permit_lake"])
+	assert_eq(_econ.bits, 350)
+	assert_false(_shop.can_buy(permit), "a held permit is not sold again")
+	assert_false(_shop.refusal(permit).is_empty())
 	assert_false(_shop.buy(permit))
+	assert_eq(_econ.bits, 350)
+
+
+func test_a_permit_with_no_zone_is_refused() -> void:
+	_econ.sell(PonyDataScript.Rarity.LEGENDARY, 5)
+	var broken: ShopItem = ShopItemScript.new()
+	broken.id = &"permit_nowhere"
+	broken.cost = 1
+	broken.kind = ShopItemScript.Kind.PERMIT
+	assert_false(_shop.buy(broken))
+	assert_eq(_econ.bits, 500)
+
+
+func test_the_build_kind_is_still_refused() -> void:
+	_econ.sell(PonyDataScript.Rarity.LEGENDARY, 5)
 	var build: ShopItem = ShopItemScript.new()
 	build.id = &"pen"
 	build.cost = 1
@@ -165,7 +189,6 @@ func test_permit_and_build_kinds_are_refused_in_this_slice() -> void:
 	build.plot_id = &"pen_small"
 	assert_false(_shop.buy(build))
 	assert_eq(_econ.bits, 500)
-	assert_eq(_unlocks.size(), 0)
 
 
 func test_buying_null_is_refused() -> void:

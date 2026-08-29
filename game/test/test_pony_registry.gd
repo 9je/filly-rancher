@@ -48,11 +48,30 @@ func test_load_all_returns_every_pony_file_on_disk() -> void:
 		assert_true(ponies.has(id), "roster is missing " + str(id))
 
 
-func test_by_zone_filters_to_ranch_zoned_ponies() -> void:
+## by_zone() USED TO BE ASKED WHETHER IT RETURNED THE WHOLE ROSTER, because until slice 3
+## every character was zoned `ranch` and "filters correctly" and "returns everything" were
+## the same answer. Now that the roster lives in five places, the question worth asking is
+## that the zones PARTITION it: every character is somewhere, no character is counted
+## twice, and every zone the roster names has somebody in it.
+func test_by_zone_partitions_the_roster_across_the_places_it_names() -> void:
 	var ponies := registry.load_all(PONY_DIR)
-	var ranch_ponies := registry.by_zone(&"ranch")
-	assert_eq(ranch_ponies.size(), ponies.size(),
-		"every pony currently on the roster is zoned to ranch")
+	var expected := {}
+	for id in ponies:
+		for zone in ponies[id].spawn_zones:
+			expected[zone] = int(expected.get(zone, 0)) + 1
+	assert_gt(expected.size(), 1, "the roster names more than one place to live")
+	var total := 0
+	for zone in expected:
+		var found: Array[PonyData] = registry.by_zone(zone)
+		assert_eq(found.size(), int(expected[zone]), "by_zone('%s') must find them all" % zone)
+		assert_gt(found.size(), 0, "zone '%s' has nobody in it" % zone)
+		total += found.size()
+	# Equal only while nobody is zoned to two places at once, which is the arrangement the
+	# .tres files carry: one zone each. A character in two zones would make this a sum
+	# larger than the roster, and that is the point at which this assertion should be
+	# rewritten rather than deleted.
+	assert_eq(total, ponies.size(), "every pony is zoned to exactly one place")
+	assert_gt(registry.by_zone(&"ranch").size(), 0, "the homestead still has residents")
 	# Prove by_zone actually filters (not just returning everything): a zone
 	# nothing is assigned to must come back empty.
 	var nowhere_ponies := registry.by_zone(&"nonexistent_zone")
