@@ -55,6 +55,7 @@ directional_shadow_max_distance = 140.0
 
 [node name="Terrain" type="StaticBody3D" parent="."]
 script = ExtResource("2")
+defer_build = true
 
 [node name="Props" type="Node3D" parent="."]
 script = ExtResource("3")
@@ -99,6 +100,8 @@ door_height = 2.6
 wall_color = Color(0.858824, 0.607843, 0.32549, 1)
 roof_color = Color(0.556863, 0.231373, 0.192157, 1)
 trim_color = Color(0.435294, 0.32549, 0.243137, 1)
+
+[node name="Regions" type="Node3D" parent="."]
 
 [node name="Zones" type="Node3D" parent="."]
 

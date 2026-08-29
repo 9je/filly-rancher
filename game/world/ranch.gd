@@ -119,6 +119,7 @@ const SaveIOScript := preload("res://systems/save_io.gd")
 const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const PlotSlotScript := preload("res://world/plot_slot.gd")
 const PlotRegistryScript := preload("res://systems/plot_registry.gd")
+const RegionRegistryScript := preload("res://systems/region_registry.gd")
 const PenScript := preload("res://world/pen.gd")
 const EconomyScript := preload("res://systems/economy.gd")
 const ShopScript := preload("res://systems/shop.gd")
@@ -278,6 +279,9 @@ const GATE_PROBE_CENTRE_Y := 0.85
 @onready var player_spawn: Marker3D = $PlayerSpawn
 @onready var capture_camera: Camera3D = $CaptureCamera
 @onready var plots_root: Node3D = $Plots
+## Everything that belongs to a region rather than to the homestead: the lake's water
+## disc now, and Task 4's fence rings alongside it.
+@onready var regions_root: Node3D = $Regions
 @onready var build_menu: CanvasLayer = $BuildMenu
 @onready var market_menu: CanvasLayer = $MarketMenu
 @onready var pause_menu: CanvasLayer = $PauseMenu
@@ -319,6 +323,10 @@ var _duplicate_check_labels: Array[String] = []
 
 ## The buildable catalogue (game/systems/plot_registry.gd), loaded once at boot.
 var _plot_registry: PlotRegistry = null
+
+## The regions of the map (game/systems/region_registry.gd), loaded once at boot and handed
+## to the terrain before it shapes itself. See the top of _ready().
+var _region_registry: RegionRegistry = null
 
 ## The wallet, seeded from the loaded save and written straight back into GameState.bits
 ## on every change. Task 6 gives this prices and a shop; here it is what the build menu
@@ -375,6 +383,19 @@ func _ready() -> void:
 	# be allowed to kill it.
 	if not _hosted:
 		GateWatchdogScript.arm(self, "RANCH", WATCHDOG_TIMEOUT_SEC)
+
+	# THE GROUND, BEFORE ANYTHING ASKS WHERE IT IS. The Terrain node readies before this
+	# function runs (children ready first) and, because ranch.tscn sets defer_build on it,
+	# deliberately built nothing: the lake is a hole in the heightfield, so the terrain has
+	# to know which regions are on it before the first vertex is placed. Every later line
+	# here reads terrain.height_at() to seat a building, a plot, a prop or a pony, so the
+	# handover and the build happen here, at the very top, or all of them are seated against
+	# a map that does not exist yet.
+	terrain.regions = _regions_registry()
+	terrain.build()
+	for region: RegionData in _regions_registry().all():
+		if region.has_lake:
+			regions_root.add_child(terrain.build_water(region))
 
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--screenshot-dir="):
@@ -613,6 +634,14 @@ func _plots_catalogue() -> PlotRegistry:
 		_plot_registry = PlotRegistryScript.new()
 		_plot_registry.load_all(PlotRegistryScript.PLOT_DIR)
 	return _plot_registry
+
+
+## The regions, loaded once. Same shape as _plots_catalogue() above.
+func _regions_registry() -> RegionRegistry:
+	if _region_registry == null:
+		_region_registry = RegionRegistryScript.new()
+		_region_registry.load_all(RegionRegistryScript.REGION_DIR)
+	return _region_registry
 
 
 ## Replay `GameState.plots` onto the slots. Returns how many went back up.
