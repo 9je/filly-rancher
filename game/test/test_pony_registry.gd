@@ -82,10 +82,14 @@ func test_by_rarity_partitions_the_roster() -> void:
 	var legendary_ids: Array = []
 	for p in buckets[PonyDataScript.Rarity.LEGENDARY]:
 		legendary_ids.append(p.id)
-	assert_true(legendary_ids.has(&"sunsetshimmer"), "sunsetshimmer is LEGENDARY")
-	# LEGENDARY is a one member tier: songbirdserenade was the second and is excluded
-	# (docs/pipeline.md, "What converted but is not in the roster").
-	assert_eq(legendary_ids.size(), 1, "sunsetshimmer is the only LEGENDARY")
+	for legendary in [&"sunsetshimmer", &"trixie", &"shiningarmor"]:
+		assert_true(legendary_ids.has(legendary), "%s is LEGENDARY" % legendary)
+	# Three, and the number is load bearing rather than incidental: SpawnTable splits a
+	# tier's weight among its members, so the size of this tier IS the per pony rarity of
+	# everyone in it. At one member a legendary was drawn more often than any individual
+	# RARE pony; at three the ordering comes out right. See the ordering test in
+	# game/test/test_spawn_table.gd.
+	assert_eq(legendary_ids.size(), 3, "the LEGENDARY tier is exactly these three")
 
 
 func test_load_all_entries_are_pony_data() -> void:

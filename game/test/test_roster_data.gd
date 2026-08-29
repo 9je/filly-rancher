@@ -12,8 +12,8 @@ const MIN_ROSTER := 43
 const EXPECTED_TIERS := {
 	PonyDataScript.Rarity.COMMON: 17,
 	PonyDataScript.Rarity.UNCOMMON: 15,
-	PonyDataScript.Rarity.RARE: 10,
-	PonyDataScript.Rarity.LEGENDARY: 1,
+	PonyDataScript.Rarity.RARE: 8,
+	PonyDataScript.Rarity.LEGENDARY: 3,
 }
 
 
@@ -61,7 +61,15 @@ func test_every_rarity_tier_has_members_in_the_expected_numbers() -> void:
 			"tier %s should have %d members" % [PonyDataScript.Rarity.keys()[tier], EXPECTED_TIERS[tier]])
 
 
-func test_every_personality_is_used_in_every_tier_that_has_more_than_two_members() -> void:
+## Tiers of four or more members must use every personality; smaller ones are exempt.
+##
+## THE THRESHOLD IS THREE FOR A REASON. LEGENDARY is exactly three characters (Sunset
+## Shimmer, Trixie, Shining Armor) and all three are BOLD, because that is who they are;
+## a tier whose size equals the personality count could only satisfy a coverage rule by
+## having a personality assigned to fit the test rather than the character. The check
+## keeps its teeth where it was aimed: COMMON, UNCOMMON and RARE are 17, 15 and 8
+## members, and any of them collapsing onto one temperament is a real content bug.
+func test_every_personality_is_used_in_every_tier_that_has_more_than_three_members() -> void:
 	var by_tier := {}
 	for id in _roster():
 		var data: PonyData = _roster()[id]
@@ -69,7 +77,7 @@ func test_every_personality_is_used_in_every_tier_that_has_more_than_two_members
 			by_tier[data.rarity] = {}
 		by_tier[data.rarity][data.personality] = true
 	for tier in by_tier:
-		if int(EXPECTED_TIERS.get(tier, 0)) <= 2:
+		if int(EXPECTED_TIERS.get(tier, 0)) <= 3:
 			continue
 		assert_eq(by_tier[tier].size(), PonyDataScript.Personality.size(),
 			"tier %s should use every personality" % PonyDataScript.Rarity.keys()[tier])

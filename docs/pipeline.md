@@ -739,10 +739,18 @@ textures resolving normally.
 Both export `textured=True`.
 
 **The roster.** 43 characters: 5 tier a (`twilight`, `rainbowdash`, `fluttershy`,
-`applejack`, `rarity`) and 38 tier c. By rarity that is COMMON 17, UNCOMMON 15, RARE 10
-and LEGENDARY 1. RARE is 10 rather than the 11 the slice plan projected because
-`changelingdrone` was a RARE and is excluded, and LEGENDARY is 1 rather than 2 because
-`songbirdserenade` was the second and is excluded too.
+`applejack`, `rarity`) and 38 tier c. By rarity that is COMMON 17, UNCOMMON 15, RARE 8
+and LEGENDARY 3 (`sunsetshimmer`, `trixie`, `shiningarmor`). Those tier sizes are not
+bookkeeping: `game/systems/spawn_table.gd` gives each TIER a fixed share of the draw and
+splits it among that tier's members, so a member's own rarity is the tier weight divided
+by the tier size. The slice plan's projected 11 RARE and 2 LEGENDARY lost
+`changelingdrone` and `songbirdserenade` to the exclusions above, which left LEGENDARY
+at one member holding the whole 3% share: a single legendary was 3.00% per draw against
+a RARE pony's 1.20%, i.e. the rarest tier was the easiest individual to meet. Promoting
+`trixie` and `shiningarmor` restores the ordering the tier names promise, per individual
+per draw: COMMON 3.53%, UNCOMMON 1.67%, RARE 1.50%, LEGENDARY 1.00%. That ordering is
+asserted against the real roster in `game/test/test_spawn_table.gd`, so the next roster
+change that inverts it fails a test instead of shipping.
 
 **Reviewing the roster at a glance.** `bash tools/roster_sheet.sh` renders a face shot
 of every character (about 15 to 20 minutes under xvfb) and tiles them, with each
