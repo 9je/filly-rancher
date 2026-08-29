@@ -78,6 +78,14 @@ const PHASE_SKY_TOP: Array[Color] = [
 	Color(0.58, 0.40, 0.55),
 	Color(0.06, 0.08, 0.18),
 ]
+## HOW MUCH OF THE FINISHED AMBIENT IS SAMPLED OFF THE SKY, the rest coming off
+## ambient_light_color. Every energy number below is arithmetic done against THIS split, so
+## it is not the scene's to choose: _write_to_scene() writes it, and AMBIENT_SOURCE_SKY with
+## it, onto whatever Environment it is pointed at. A scene saved with the engine default
+## (1.0, all of it off the sky) would take the whole ambient off a night zenith of luminance
+## 0.04 and black the ranch out, and nothing in a headless gate can see that happen.
+const AMBIENT_SKY_CONTRIBUTION := 0.35
+
 ## DAY's 0.32 is likewise ranch.tscn's own ambient_light_energy. NIGHT's 0.70 is not an art
 ## number at all, it is the answer to an arithmetic one. Ambient is what fills the shadows
 ## the moon does not reach, and the Environment mixes its ambient from two sources: 35% off
@@ -203,6 +211,13 @@ const NIGHT_WEATHER_FLOOR := 0.7
 
 ## The rain column: a 14 by 14 metre box of emitters one metre thick, RAIN_HEIGHT above
 ## whoever follow() was given, falling at RAIN_GRAVITY for RAIN_LIFETIME seconds.
+##
+## THE 7 m HALF EXTENT IS THE CAMERA'S NUMBER, not a look. game/actors/player/camera_rig.gd
+## pulls its spring arm out to SPRING_MAX, 6.5 m behind the player, so a column any narrower
+## than that would have its upwind edge inside the frame at full zoom: the player would be
+## looking at the seam where the rain starts. 7 m clears the fully zoomed out camera with
+## half a metre to spare and costs nothing else, since the drop count is fixed and a wider
+## box only spreads the same drops thinner.
 const RAIN_HEIGHT := 9.0
 const RAIN_BOX_EXTENTS := Vector3(7.0, 0.5, 7.0)
 const RAIN_GRAVITY := Vector3(0.0, -18.0, 0.0)
@@ -249,8 +264,20 @@ var _has_targets := false
 ## because a rig nobody has applied anything to has nowhere to be going.
 var _t := 1.0
 ## The last count actually written to the emitter, so an unchanged sky does not restart the
-## particle system every frame (setting `amount` reallocates it).
+## particle system every frame (setting `amount` reallocates it). It is also the answer to
+## "is it raining right now", which is what decides whether the cloud has to be carried
+## around and therefore whether the rig has any reason to tick once its ramp has arrived.
 var _rain_written := -1
+## Whether AMBIENT_SKY_CONTRIBUTION and AMBIENT_SOURCE_SKY have been put on the Environment.
+## Both are constants, so they are written on the first write that actually finds an
+## Environment and never again: re-asserting them every frame is a setter call that can
+## never change anything.
+var _ambient_contract_written := false
+## Whether _write_to_scene() has already re-searched the scene for a sun and an Environment
+## it could not find at _ready(). ONE retry, not one per frame: the search walks the parent's
+## children, and a rig whose scene has neither would otherwise re-walk it and re-complain
+## sixty times a second for the rest of the session.
+var _resolve_retried := false
 
 
 func _ready() -> void:
@@ -422,8 +449,13 @@ func apply(state: WorldState) -> void:
 	set_process(true)
 
 
-## The same, with no transition. For boot, where there is no previous sky to ease from, and
-## for gates, which must not have to spin frames to see the answer.
+## The same, with no transition. Three callers, and the third is the one that is easy to
+## forget: boot, where there is no previous sky to ease from; gates, which must not have to
+## spin frames to see the answer; and A MID-SESSION LOAD. game/world/ranch.gd calls this from
+## _rebuild_world_state(), which is connected to GameState.state_loaded, because a load
+## REPLACES the clock rather than moving it. The hour on the other side of it is not
+## somewhere the sky was travelling to, it is a different save; ramping eight seconds into
+## it would show the player the hour they just left.
 func apply_immediately(state: WorldState) -> void:
 	if state == null:
 		return
@@ -432,9 +464,10 @@ func apply_immediately(state: WorldState) -> void:
 	_current = _targets.duplicate(true)
 	_t = 1.0
 	_write_to_scene()
+	_track_follow()
 	# Already arrived, so the only reason left to tick is a rain cloud with somebody to
-	# follow.
-	set_process(_follow_target != null)
+	# follow. A load into a clear sky leaves the rig as furniture until the next apply().
+	set_process(_needs_ticks())
 
 
 ## What the rig is walking toward, for gates and for the HUD. A copy; editing it changes
@@ -468,11 +501,22 @@ func _process(delta: float) -> void:
 ## The clock only ever moves forward and stops dead at 1, where the sky is snapped exactly
 ## onto its targets rather than left a rounding error short of them. Once it has arrived
 ## there is nothing left to interpolate, so the rig stops processing unless it still has a
-## rain cloud to carry around.
+## rain cloud to carry around. A CLEAR sky counts as nothing to carry: see _needs_ticks().
+## The next apply() or follow() turns processing back on.
 func step(delta: float) -> void:
+	if _has_targets and _t < 1.0:
+		_advance(delta)
+	# AFTER the write, not before it: the frame a shower starts is the frame _write_rain()
+	# first raises the drop count, and a follow asked for ahead of that would leave the
+	# cloud one frame behind the player it just started raining on.
 	_track_follow()
-	if not _has_targets or _t >= 1.0:
-		return
+	if (not _has_targets or _t >= 1.0) and not _needs_ticks():
+		set_process(false)
+
+
+## One step of the ramp itself, split out of step() so that step()'s own job (carry the
+## cloud, decide whether there is another frame's work) reads as the three lines it is.
+func _advance(delta: float) -> void:
 	_t = minf(_t + maxf(0.0, delta) / TRANSITION_SECONDS, 1.0)
 	if _t >= 1.0:
 		_current = _targets.duplicate(true)
@@ -494,8 +538,6 @@ func step(delta: float) -> void:
 			else:
 				_current[key] = lerpf(float(from_value), float(target_value), eased)
 	_write_to_scene()
-	if _t >= 1.0 and _follow_target == null:
-		set_process(false)
 
 
 func _set_targets_from(state: WorldState) -> void:
@@ -522,8 +564,19 @@ func _set_targets_from(state: WorldState) -> void:
 
 
 func _write_to_scene() -> void:
-	if _sun == null or _environment == null:
+	if (_sun == null or _environment == null) and not _resolve_retried:
+		# A rig can be built in code and wired to its siblings AFTER _ready() has run, so
+		# the search is worth one more go the first time somebody actually asks for a sky.
+		# It is not worth a third: past that the scene has no lighting for this rig to
+		# drive, which is a wiring mistake and is said once, here, rather than per frame.
+		_resolve_retried = true
 		_resolve_nodes()
+		if _sun == null:
+			push_error("SkyRig '%s' found no DirectionalLight3D; the sun will not move."
+				% [name])
+		if _environment == null:
+			push_error(("SkyRig '%s' found no WorldEnvironment; the sky, the ambient fill "
+				+ "and the fog will not be written.") % [name])
 	if _sun != null:
 		_sun.rotation_degrees = Vector3(
 			-float(_current.get(KEY_SUN_ELEVATION, ELEVATION_DAY_EDGE)),
@@ -533,6 +586,13 @@ func _write_to_scene() -> void:
 		_sun.light_color = _current.get(KEY_LIGHT_COLOR, _sun.light_color)
 	var horizon: Color = _current.get(KEY_SKY_HORIZON, Color.WHITE)
 	if _environment != null:
+		if not _ambient_contract_written:
+			# THE SPLIT THE ENERGY NUMBERS WERE COMPUTED AGAINST, pinned here rather than
+			# trusted to whoever saved the scene. Written once, on the first write that
+			# found an Environment; see AMBIENT_SKY_CONTRIBUTION and _ambient_contract_written.
+			_ambient_contract_written = true
+			_environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+			_environment.ambient_light_sky_contribution = AMBIENT_SKY_CONTRIBUTION
 		_environment.ambient_light_energy = float(_current.get(KEY_AMBIENT_ENERGY, 0.32))
 		# The fill light's own colour, which is most of the ambient: the scene asks the sky
 		# for only 35% of it, so a night sky at luminance 0.04 can no longer black the ranch
@@ -566,15 +626,36 @@ func _write_rain() -> void:
 		# GPUParticles3D refuses an amount of zero, so a dry sky keeps one unused drop and
 		# is switched off by `emitting` instead.
 		_rain.amount = maxi(1, wanted)
-	_rain.emitting = wanted > 0
+	# Guarded the same way `amount` is, and for a smaller version of the same reason:
+	# assigning `emitting` restarts the emission, so a clear sky that reassigned false every
+	# frame would be doing a pointless server call sixty times a second forever.
+	var falling := wanted > 0
+	if _rain.emitting != falling:
+		_rain.emitting = falling
 
 
+## Carry the rain cloud over whoever follow() was given. Does nothing at all while the sky
+## is dry: an emitter holding its one unused drop with `emitting` false has nothing on
+## screen to keep overhead, so moving it every frame of every clear day is a global_position
+## write (and the transform propagation under it) bought for nothing. The write comes back
+## the moment the drop count does, because _write_rain() raises _rain_written before the
+## follow is asked for again.
 func _track_follow() -> void:
-	if _rain == null or _follow_target == null or not is_instance_valid(_follow_target):
+	if _rain == null or _rain_written <= 0:
+		return
+	if _follow_target == null or not is_instance_valid(_follow_target):
 		return
 	if not _follow_target.is_inside_tree() or not _rain.is_inside_tree():
 		return
 	_rain.global_position = _follow_target.global_position + Vector3(0.0, RAIN_HEIGHT, 0.0)
+
+
+## Has this rig any reason to be handed another frame? Only two: a ramp still walking, and
+## a cloud that is actually raining on somebody it has to stay above. A clear sky with a
+## follow target arrived at its targets is furniture again until the next apply() or
+## follow(), both of which turn processing back on.
+func _needs_ticks() -> bool:
+	return _follow_target != null and is_instance_valid(_follow_target) and _rain_written > 0
 
 
 ## READ THE SKY THE SCENE WAS HAND LIT WITH, so the very first apply() has somewhere to
@@ -587,7 +668,17 @@ func _track_follow() -> void:
 func _seed_from_scene() -> void:
 	if _sun != null:
 		_current[KEY_SUN_ELEVATION] = -_sun.rotation_degrees.x
-		_current[KEY_SUN_AZIMUTH] = _sun.rotation_degrees.y
+		# THE SEEDED BEARING IS WRAPPED FIRST AND THEN CLAMPED, in that order and for two
+		# different reasons. Wrapped, because rotation_degrees is not normalised and a sun
+		# saved at 315 deg means the same direction as one saved at -45 but would ramp the
+		# long way round the compass to reach it. Clamped, because the rig's own arc never
+		# leaves [AZIMUTH_WEST, AZIMUTH_EAST]: a hand authored yaw outside that range is a
+		# bearing no phase of this sky ever asks for, so the first transition of the session
+		# would open by sweeping further than any sun in this game moves in a whole day.
+		# Clamping loses a little of the authored angle; sweeping 180 deg through dawn loses
+		# the shot. (ranch.tscn's own sun seeds at about -49 deg and is untouched by both.)
+		_current[KEY_SUN_AZIMUTH] = clampf(
+			wrapf(_sun.rotation_degrees.y, -180.0, 180.0), AZIMUTH_WEST, AZIMUTH_EAST)
 		_current[KEY_LIGHT_ENERGY] = _sun.light_energy
 		_current[KEY_LIGHT_COLOR] = _sun.light_color
 	if _environment != null:
@@ -602,6 +693,9 @@ func _seed_from_scene() -> void:
 	_current[KEY_RAIN_AMOUNT] = 0
 
 
+## Find the scene's sun, Environment and sky material. Called once at _ready() and at most
+## once more, from the first _write_to_scene() that needs something _ready() did not find;
+## _resolve_retried is what stops it becoming a per frame scene search.
 func _resolve_nodes() -> void:
 	_sun = get_node_or_null(sun_path) as DirectionalLight3D
 	if _sun == null:

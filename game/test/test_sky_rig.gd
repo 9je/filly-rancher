@@ -104,6 +104,19 @@ func test_every_phase_and_weather_keeps_some_light() -> void:
 				"ambient for phase %d weather %d went pitch black" % [phase, weather])
 
 
+func test_a_stormy_night_keeps_the_ambient_that_makes_it_playable() -> void:
+	# 0.70 base x 0.7 night-only floor = 0.49, and both terms are load bearing. The 0.70 is
+	# PHASE_AMBIENT_ENERGY[NIGHT]; the 0.7 is NIGHT_WEATHER_FLOOR standing in for a storm's
+	# own 0.45, which applied on top of the darkest phase takes the fill past the point
+	# where the ranch is legible. 0.49 lands on about 0.122 of effective ambient luminance
+	# and the ranch stops being playable below roughly 0.12, so this is the darkest a night
+	# is allowed to get. It is a ruling, not a taste, and nothing else in the suite pins it:
+	# the ordering tests are about light_energy and sky luminance, and both hold at any
+	# ambient at all.
+	assert_almost_eq(SkyRigScript.ambient_energy(NIGHT, STORM), 0.49, 0.001,
+		"a stormy night's ambient is 0.70 base x 0.7 night-only floor = 0.49")
+
+
 func test_the_night_sky_is_darker_than_the_day_sky() -> void:
 	var night: Color = SkyRigScript.sky_top(NIGHT, CLEAR)
 	var day: Color = SkyRigScript.sky_top(DAY, CLEAR)
@@ -319,8 +332,11 @@ func _build_world() -> void:
 	_environment.sky = sky
 	_environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	# ranch.tscn's own split and its own hand authored fill colour, so a test that says the
-	# rig repaints the ambient is repainting the same daylight blue the ranch ships.
-	_environment.ambient_light_sky_contribution = 0.35
+	# rig repaints the ambient is repainting the same daylight blue the ranch ships. Read
+	# off the rig's own constant rather than typed again: the split is the rig's contract
+	# (see AMBIENT_SKY_CONTRIBUTION), and a copy of it here would quietly disagree the day
+	# somebody retuned it.
+	_environment.ambient_light_sky_contribution = SkyRigScript.AMBIENT_SKY_CONTRIBUTION
 	_environment.ambient_light_color = Color(0.729412, 0.803922, 0.878431)
 	_environment.ambient_light_energy = 0.32
 	_environment.fog_enabled = true
@@ -391,6 +407,26 @@ func test_the_rig_paints_the_ground_half_of_the_sky_too() -> void:
 	assert_almost_eq(_environment.ambient_light_energy,
 		SkyRigScript.ambient_energy(NIGHT, CLEAR), 0.001,
 		"and the energy it is multiplied by")
+
+
+func test_the_rig_pins_the_ambient_split_its_own_energies_assume() -> void:
+	# Every number in PHASE_AMBIENT_ENERGY is arithmetic done against a 35/65 split between
+	# the sky and the fill colour, so the split is the rig's to write and not the scene's to
+	# choose. This Environment is put back to the engine's own defaults first (all of the
+	# ambient sampled off the sky) because that is the failure worth catching: at NIGHT the
+	# sky is a zenith of luminance 0.04, so a scene saved that way blacks the ranch out
+	# while every pure test in this file goes on passing.
+	_build_world()
+	_environment.ambient_light_source = Environment.AMBIENT_SOURCE_BG
+	_environment.ambient_light_sky_contribution = 1.0
+
+	_rig.apply_immediately(_pinned_state(NIGHT, CLEAR))
+
+	assert_eq(_environment.ambient_light_source, Environment.AMBIENT_SOURCE_SKY,
+		"the ambient is mixed from the sky and the fill colour, which is what the split means")
+	assert_almost_eq(_environment.ambient_light_sky_contribution,
+		SkyRigScript.AMBIENT_SKY_CONTRIBUTION, 0.0001,
+		"and only AMBIENT_SKY_CONTRIBUTION of it comes off the sky")
 
 
 func test_a_pinned_clear_day_puts_the_sun_up_and_the_rain_away() -> void:
