@@ -612,6 +612,87 @@ The character name is the only thing that changes between models. `--scale
 2.0` (not tier a's 0.5 — the SFM pack is authored at roughly half life size,
 §3), and `--rotate-z 180` for the same reason tier a needs it.
 
+#### The roster manifest
+
+The two commands above convert **one** character. `tools/roster_manifest.txt` names
+every character in the game, one line of `id|kind|source|rig`, and
+`tools/convert_roster.sh` runs exactly those two commands over the list:
+`tools/export_blend.py` for the export, `tools/validate_gltf.py --require-anims` for
+the check. `kind` selects the invocation, `blend` (tier a: `--object <rig>`,
+`--scale 0.5`, §3) or `sfm` (tier c: `--mdl-in`, `--scale 2.0`, above), so adding a
+character is one manifest line and nothing else. The six already shipped characters
+are listed too, so the manifest describes the whole game and not just the newest
+batch.
+
+One character failing does not stop the others. Each export's Blender output goes to
+`${TMPDIR:-/tmp}/convert_<id>.log`, a failure prints `FAILED <id>` naming that log and
+removes the half written `.glb`, and the last line is the tally, which is also the
+exit code:
+
+```bash
+bash tools/convert_roster.sh
+# -> CONVERTED applejack
+# ...one line per character...
+# -> ROSTER_CONVERT ok=39 failed=0 skipped=6   exit 0
+```
+
+That is the whole regeneration step on a fresh clone: once `tools/setup_env.sh` has
+fetched Blender and the asset packs (§1), one run rebuilds every `.glb` under
+`game/assets/converted/ponies/`. It takes about 14 minutes for the 39 characters that
+were not already on disk. A character that already has a `.glb` is skipped, so a
+re-run is cheap; `--force` rebuilds anyway, `--only id[,id...]` restricts the run to
+named characters (which is how you re-run after fixing a pipeline bug), and
+`--dry-run` prints what would be exported without opening Blender.
+`tools/test_convert_roster.sh` exercises the script's own logic in seconds against
+`FILLY_EXPORTER` / `FILLY_VALIDATOR` / `FILLY_OUT_DIR` stubs, with no Blender
+involved.
+
+**What the manifest leaves out.** The reVAmped SFM pack ships 46 `.mdl` files and the
+manifest lists 40 of them. The six it does not list are `twilightsparkle`,
+`rainbowdash`, `fluttershy`, `applejack` and `rarity`, which the Blender native tier-a
+packs cover at higher fidelity (§3), plus `raricow`, a joke variant rather than a
+character. Three of the 40 it does list, `pinkiepie`, `derpyhooves` and
+`starlightglimmer`, were already shipped before this batch; they stay in the manifest
+so a fresh clone regenerates them, but they are not new characters. That leaves 37 new
+tier-c characters plus the 2 new tier-a ones, `applejack` and `rarity`.
+
+**What converted but is not in the roster.** `changelingdrone` exports and passes the
+structural gate, and is still excluded, with no `PonyData` resource pointing at it.
+Its `.mdl` was compiled against a material path this download does not contain: all 16
+of the materials it references fail to resolve, so the export carries **zero images and
+zero textures** and every surface falls back to a random pastel base colour.
+
+```
+[INFO]--[Source1::ModelLoader:import_materials]: Material body not found
+[INFO]--[Source1::ModelLoader:import_materials]: Material hair not found
+[INFO]--[Source1::ModelLoader:import_materials]: Material wings_changeling not found
+...16 of 16, from ${TMPDIR:-/tmp}/convert_changelingdrone.log
+
+meshes=11 skins=1 materials=10 textured=False animations=['gallop', 'idle', 'walk']
+```
+
+The model asks for `materials/models/VA_mlp_v4/changeling/` and
+`materials/models/VA_mlp_v4/common/`. The pack files every other character's materials
+under `Materials/Models/VA_MLP/<character>/` with shared maps in `VA_MLP/Common/`, and
+ships no `VA_mlp_v4` tree at all. This is specific to this one model, not a pipeline
+bug: `wings_changeling.vmt` and `Earlighter.vmt` exist nowhere in the download, and
+`body.vmt` exists 45 times over, once in nearly every character's folder, so there is
+no name that could be searched for generically without dressing the changeling in some
+other pony's coat.
+The line stays in the manifest, and the untextured `.glb` it produces is simply unused.
+
+For contrast, a handful of missing materials is normal and does not disqualify anyone:
+`applebloom` is missing only her `-alt` eyeball variants and `milkyway` her teeth,
+tongue, eyelashes, eyelens and eyebrow, all of which land on the `missing_white`
+substitution documented under "Known fidelity losses" below, with body and hair
+textures resolving normally.
+Both export `textured=True`.
+
+**The roster.** 44 characters: 5 tier a (`twilight`, `rainbowdash`, `fluttershy`,
+`applejack`, `rarity`) and 39 tier c. By rarity that is COMMON 17, UNCOMMON 15, RARE 10
+and LEGENDARY 2. RARE is 10 rather than the 11 the slice plan projected because
+`changelingdrone` was a RARE and is excluded.
+
 ### Why this is not retargeting
 
 The reVAmped skeleton shares **zero** bone names with tier a and, more to the
