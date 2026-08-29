@@ -753,6 +753,49 @@ per draw: COMMON 3.53%, UNCOMMON 1.67%, RARE 1.50%, LEGENDARY 1.00%. That orderi
 asserted against the real roster in `game/test/test_spawn_table.gd`, so the next roster
 change that inverts it fails a test instead of shipping.
 
+**When each character is out.** Slice 5 gave `PonyData` two more fields,
+`phases` and `weathers`, both arrays of `WorldState` enum values, and one
+function that interprets them: `available(phase, weather)`. An **empty array
+means any**, in each list independently, and both non-empty is an AND, so
+`[NIGHT], []` is a pony who keeps night hours in any weather and `[], [FOG]` is
+one who wants fog at any hour. A `.tres` with neither line in it (most of them,
+`kerfuffle.tres` for one) is unconditional and can be drawn at any hour in any
+weather; adding the fields therefore broke no roster file. `game/world/spawner.gd`
+asks `available()` on every draw and again on every change of sky, so a
+character whose hours have ended walks off the map (`Pony.leave()`, never a
+free in front of the player) and whoever the new hour allows walks on.
+
+**17 of the 43 are conditional**, and this table is generated from the `.tres`
+files rather than written by hand, so it is what the shipped roster actually
+says:
+
+| Character | id | Phases | Weathers | Zone |
+|---|---|---|---|---|
+| Carrot Top | `carrottop` | DAWN, DAY | any | `orchard` |
+| Cloudchaser | `cloudchaser` | any | CLEAR, FOG | `lake` |
+| Coco Pommel | `cocopommel` | DAY | any | `nightmeadow` |
+| Flitter | `flitter` | any | CLEAR, RAIN | `lake` |
+| Lightning Dust | `lightningdust` | any | STORM | `everfree` |
+| Marble Pie | `marblepie` | DAWN, DUSK | any | `nightmeadow` |
+| Maud Pie | `maudpie` | any | FOG, RAIN | `nightmeadow` |
+| Milky Way | `milkyway` | NIGHT, DAWN | any | `lake` |
+| Night Light | `nightlight` | NIGHT | any | `nightmeadow` |
+| Octavia | `octavia` | DUSK, NIGHT | any | `nightmeadow` |
+| Pinkamena | `pinkamena` | NIGHT, DUSK | RAIN, STORM | `everfree` |
+| Shining Armor | `shiningarmor` | NIGHT | CLEAR | `nightmeadow` |
+| Soarin | `soarin` | DAY, DAWN | CLEAR | `lake` |
+| Spitfire | `spitfire` | DAY | CLEAR | `lake` |
+| Sunset Shimmer | `sunsetshimmer` | DUSK | CLEAR | `everfree` |
+| Trixie | `trixie` | NIGHT | any | `everfree` |
+| Vinyl Scratch | `vinylscratch` | NIGHT | any | `nightmeadow` |
+
+Four of those come out at **night and at no other hour** (Night Light, Shining
+Armor, Trixie, Vinyl Scratch) and two only in the **day** (Coco Pommel,
+Spitfire); the rest are open at two or three phases, or at any phase in
+particular weather. That spread is what `scenes/test/collection_test.tscn`
+classifies at run time rather than by name, and what it walks the clock through
+a night at a time to exercise. See docs/testing.md, "The collection gate".
+
 **Reviewing the roster at a glance.** `bash tools/roster_sheet.sh` renders a face shot
 of every character (about 15 to 20 minutes under xvfb) and tiles them, with each
 character's display name, into `build/roster_sheet.png` and a larger four column

@@ -21,8 +21,10 @@ Runs every `game/test/test_*.gd` script headlessly through GUT's CLI runner:
 errored). Output names every failing test and the line it failed at.
 
 **Exit 0 means more than GUT's own exit code**, which has twice now reported
-success for a run that verified far less than it claimed. On top of GUT's
-result the script hard-fails if zero tests ran, if any `test_*.gd` file on disk
+success for a run that verified far less than it claimed. Before GUT is invoked
+at all the script parse-sweeps every `game/**/*.gd` outside `addons/` (see "The
+parse sweep" below). On top of GUT's
+result it then hard-fails if zero tests ran, if any `test_*.gd` file on disk
 was not executed, or if the test count fell below a floor — see the three
 invariant sections below. This is the one command every later
 gameplay task's tests run through — add new test files under `game/test/`
@@ -52,6 +54,49 @@ res://test/test_smoke.gd
 ---- All tests passed! ----
 ```
 exit code `0`.
+
+---
+
+## The parse sweep (runs before GUT)
+
+`tools/run_tests.sh` hands **every** `game/**/*.gd` outside `game/addons/` to
+the engine's own front end before a single test runs:
+
+```
+tools/bin/godot --headless --audio-driver Dummy --path game --check-only --script <res://path>
+```
+
+Any file the engine refuses fails the run, all of them are named, and GUT is
+never reached.
+
+**Why this is not something GUT already does.** GUT loads *test* scripts, and
+the two guards further down this file catch a test script that failed to load.
+Neither says anything about the other hundred-odd scripts in the project, and
+those are loaded by *scenes*, not by GUT. The failure that motivated this
+shipped on the slice 5 branch: `var x := <something statically typed Variant>`
+compiles far enough for GUT to run the whole suite green, and then Godot's
+analyzer, which the editor and every scene load **do** run, promotes
+`INFERENCE_ON_VARIANT` from a warning to an **error**, so the scene that
+preloads that script will not open. Green suite, broken game, and nothing
+anywhere said so. `--check-only --script` is the same front end a scene load
+goes through, which is exactly why it catches this and GUT does not.
+
+**Cost.** One engine process per file, about 0.7 s each: a little over a minute
+for this project's ~108 scripts, against ~2.5 minutes for the GUT run itself.
+Paid up front on purpose. Batching several files into one process would be
+faster and would lose the property that makes the output useful, which is that
+a failure names one path.
+
+**Proving the guard.** Drop a file into `game/systems/` containing
+`var x := {"a": 1}.get("a")` and run `bash tools/run_tests.sh`: it exits 1 with
+
+```
+ERROR: 1 of 109 GDScript file(s) do not parse; the suite was NOT run.
+  res://systems/zz_sweep_probe.gd
+```
+
+and no tests run. Delete the file and the suite is green again. That exact
+script passes GUT untouched, which is the point.
 
 ---
 
@@ -315,6 +360,7 @@ restoring the cache) turns the suite green again.
 | `tools/run_tests.sh` | Entry point: `bash tools/run_tests.sh` |
 | `tools/prove_atomic_save.sh` | Out-of-band proof that an interrupted save cannot destroy the previous one — see below |
 | `game/scripts/prove_atomic_save.gd` | The phases that script drives (seed / SIGKILL mid-write / verify) |
+| `game/scenes/test/collection_test.gd` | The collection gate (see below) |
 | `tools/setup_env.sh` | Installs/pins GUT (`GUT_VER`/`GUT_SHA256`, near the SourceIO block) |
 
 ---
@@ -451,6 +497,89 @@ than `rendered=`. `--only=<phase>_<weather>`
 what to use after tuning a single number. Unlike the gates above it **is** a
 pass or fail: a failed render or a missing cell exits 1, so a sheet with a hole
 in it cannot be mistaken for a sheet. Not committed; `build/` is gitignored.
+
+---
+
+## The collection gate
+
+`scenes/test/collection_test.tscn` proves slice 5's collection loop a unit test
+cannot: a herd whose membership answers to the hour, a compendium that fills
+itself from what the player actually does, a request board that pays for it, a
+pause menu page repeating the counts, and a save that brings all of it back.
+
+In one run, on the real ranch: a fresh dawn with nobody out who keeps night
+hours; a pony who marks herself **SEEN** the moment the player is inside her
+notice radius; a second pony caught with the real magic beam (aimed through the
+same `CameraRig.get_aim_ray()` the beam casts along, held until the beam reports
+her secured, released into the saddlebag) who marks **CAUGHT** and finishes the
+tutorial's "catch a pony" for 20 bits; moved into a pen for the tutorial's 30;
+a gem sold at the Market for the tutorial's 50 plus the gem's own price; three
+fresh favours standing on the board afterwards and not one of them a tutorial
+one; the COMPENDIUM page's header reading the book's own counts; the clock
+walked one phase at a time through dawn, day, dusk and night with a
+`Spawner.refresh()` on each change; and a save, reset, rebind and load bringing
+the whole book and the whole board back.
+
+It hosts `world/ranch.tscn` exactly the way the market, region and world gates
+do, and for the same reasons.
+
+Four things about how it reads are worth knowing before editing it.
+
+**It names no character.** Which characters keep night hours is a property of
+the `.tres` files on disk, and a gate with `nightlight` typed into it would go
+green on a roster that had stopped being conditional at all. "NIGHT-only",
+"DAY-only" and "her hours have ended" are computed at run time by asking every
+character's own `PonyData.available()` about all sixteen (phase, weather)
+pairs. The two ponies it walks up to are picked out of the live herd the same
+way, in the spawner's own seeded placement order, so the same run picks the
+same ponies every time.
+
+**It asks about the night pool over several nights, not one.**
+`Spawner.refresh()` only fills the slots a departure freed, out of that
+marker's own zone; four NIGHT-only characters in a roster of forty-three need
+not all be reachable from the three slots one night happens to open. The claim
+with teeth is that they are reachable **at all**. A build where the conditional
+half of the roster could never be drawn is a build where a third of the
+compendium is uncompletable. The loop stops at the first night that
+answers and prints how many it took, so a change in the draw shows up as a
+number rather than as a red.
+
+**It watches one departure from three metres away.** A pony whose hours end
+with nobody near her is discarded on the first frame of her departure, and
+correctly so: her own `DetectionArea` has no player in it, so
+`Pony._leave_distance()` answers `INF`. Timing that would be timing nothing.
+So the player is stood inside the notice radius of somebody the coming phase is
+about to close on, and only then does the hour turn; now the departure has to
+carry her out of his sight before she may be freed. Which pony that is cannot
+be decided in advance (a phase change need not end anybody's hours), so every
+advance offers and the first one with a candidate takes it.
+
+**It compares the board as a rendered signature, not `to_array()` against
+`to_array()`.** A save is JSON and JSON has no integer type, so every count and
+every enum comes back off disk as a float; a board written with ints does not
+compare equal to the same board read back. The signature renders both sides
+through `int()`, which says what "the board came back" actually means.
+
+The gate calls `ranch._move_pony_into_pen()` directly, which is the one place
+it reaches past a public method. It has to: the whole of `ranch.gd`'s
+`_physics_process` input handling is gated on `_interactive`, false in a
+headless run precisely so that a gate teleporting the player about cannot trip
+a build menu or an autosave, so the E prompt that normally calls it cannot be
+driven from here.
+
+Run it with:
+
+```
+tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/collection_test.tscn
+```
+
+Expect `COLLECTION_OK checks=73`; the exit code is the verdict. Every line it
+prints is prefixed `COLLECTION`, and two runs print byte-identical lines: the
+beam's capture generator is seeded, the herd and the weather come out of the
+world seed, and nothing it prints is a raw physics quantity that a reordered
+frame could move. Diffing two runs is therefore a real check on the whole
+chain, and worth doing after touching the spawner, the beam or the board.
+
 
 ---
 
