@@ -126,11 +126,98 @@ func test_the_agreed_palette_is_the_one_that_shipped() -> void:
 	assert_eq(SkyRigScript.light_color(DAWN, CLEAR), Color(1.0, 0.78, 0.60))
 	assert_eq(SkyRigScript.light_color(DUSK, CLEAR), Color(1.0, 0.62, 0.45))
 	assert_eq(SkyRigScript.light_color(NIGHT, CLEAR), Color(0.55, 0.62, 0.85))
-	assert_almost_eq(SkyRigScript.light_energy(NIGHT, CLEAR), 0.25, 0.0001)
+	assert_almost_eq(SkyRigScript.light_energy(NIGHT, CLEAR), 0.38, 0.0001)
 	assert_eq(SkyRigScript.sky_top(DAY, CLEAR), Color(0.31, 0.51, 0.76))
 	assert_eq(SkyRigScript.sky_top(DAWN, CLEAR), Color(0.62, 0.55, 0.70))
 	assert_eq(SkyRigScript.sky_top(DUSK, CLEAR), Color(0.58, 0.40, 0.55))
-	assert_eq(SkyRigScript.sky_top(NIGHT, CLEAR), Color(0.05, 0.07, 0.15))
+	assert_eq(SkyRigScript.sky_top(NIGHT, CLEAR), Color(0.06, 0.08, 0.18))
+
+
+func test_rain_and_a_storm_are_greyer_and_darker_than_the_clear_sky_of_the_same_hour() -> void:
+	# The defect this is here for: the horizon used to be the zenith times a per channel
+	# ratio, which CLAMPED for a clear sky and did not for a wet one, so a rainy dawn came
+	# back more colourful than a clear dawn and the weather read backwards. Both halves are
+	# asserted, at every hour, because either one alone can hold while the sky still looks
+	# wrong: paler but not duller is haze, duller but not paler is nightfall.
+	for phase in [DAWN, DAY, DUSK, NIGHT]:
+		var clear_top: Color = SkyRigScript.sky_top(phase, CLEAR)
+		var clear_horizon: Color = SkyRigScript.sky_horizon(phase, CLEAR)
+		for weather in [RAIN, STORM]:
+			var top: Color = SkyRigScript.sky_top(phase, weather)
+			var horizon: Color = SkyRigScript.sky_horizon(phase, weather)
+			assert_lt(top.get_luminance(), clear_top.get_luminance(),
+				"phase %d weather %d: the zenith must darken, not brighten" % [phase, weather])
+			assert_lt(horizon.get_luminance(), clear_horizon.get_luminance(),
+				"phase %d weather %d: the horizon must darken too" % [phase, weather])
+			assert_lt(top.s, clear_top.s,
+				"phase %d weather %d: the zenith must lose colour" % [phase, weather])
+			assert_lt(horizon.s, clear_horizon.s,
+				"phase %d weather %d: the horizon must lose colour" % [phase, weather])
+
+
+func test_the_blue_hours_never_turn_warm_under_weather() -> void:
+	# "A rainy sky must read cooler, never warmer." Stated as a comparison against the same
+	# hour's clear sky, that claim cannot be made to hold and should not be asserted: any
+	# desaturation of a BLUE sky raises red relative to blue by arithmetic, so a grey rainy
+	# noon is always warmer THAN A CLEAR NOON on a red minus blue reading, whatever greys
+	# are chosen. What can be asserted, and what actually broke, is the absolute version:
+	# DAY and NIGHT are the blue hours, and no weather may tip them over into red. The old
+	# ratio did exactly that (a rainy day's horizon came out (0.71, 0.59, 0.52), a sunset in
+	# the middle of the afternoon), and this fails on it.
+	for phase in [DAY, NIGHT]:
+		for weather in [CLEAR, RAIN, FOG, STORM]:
+			var top: Color = SkyRigScript.sky_top(phase, weather)
+			var horizon: Color = SkyRigScript.sky_horizon(phase, weather)
+			assert_lt(top.r, top.b,
+				"phase %d weather %d: the zenith went warm" % [phase, weather])
+			assert_lt(horizon.r, horizon.b,
+				"phase %d weather %d: the horizon went warm" % [phase, weather])
+
+
+func test_the_horizon_never_clamps_a_channel() -> void:
+	# A channel sitting at exactly 1.0 is the fingerprint of the ratio this replaced: the
+	# value ran off the top of the gamut and was cut off there, which is what flattened a
+	# clear dawn into a white wash and what made CLEAR the only weather that clipped.
+	for phase in [DAWN, DAY, DUSK, NIGHT]:
+		for weather in [CLEAR, RAIN, FOG, STORM]:
+			var horizon: Color = SkyRigScript.sky_horizon(phase, weather)
+			for channel in [horizon.r, horizon.g, horizon.b]:
+				assert_lt(channel, 1.0,
+					"phase %d weather %d clamped a channel at white" % [phase, weather])
+
+
+func test_the_ground_half_of_the_sky_goes_dark_at_night() -> void:
+	# ProceduralSkyMaterial paints below the skyline as well as above it, and the rig used
+	# to drive only the half above. ranch.tscn authors the half below as daylight grass, so
+	# every night shot had a bright green band running the whole way round the horizon under
+	# a near black zenith.
+	var night: Color = SkyRigScript.ground_horizon(NIGHT, CLEAR)
+	assert_lt(night.get_luminance(), 0.1, "a night ground band must be genuinely dark")
+	assert_lt(night.get_luminance(), SkyRigScript.ground_horizon(DAY, CLEAR).get_luminance(),
+		"and darker than the same band by day")
+	assert_gt(night.b, night.g, "and blue, which is what moonlight on grass looks like")
+	assert_lt(SkyRigScript.ground_bottom(NIGHT, CLEAR).get_luminance(),
+		night.get_luminance(), "straight down is darker still than the band at the rim")
+
+
+func test_the_night_is_strictly_darker_than_the_day_in_every_driven_value() -> void:
+	# Weather scales both hours by the same factor, so this has to hold in all four of them
+	# or one of the weather tables has quietly stood the clock on its head.
+	for weather in [CLEAR, RAIN, FOG, STORM]:
+		assert_lt(SkyRigScript.light_energy(NIGHT, weather),
+			SkyRigScript.light_energy(DAY, weather), "sunlight, weather %d" % weather)
+		assert_lt(SkyRigScript.ambient_energy(NIGHT, weather),
+			SkyRigScript.ambient_energy(DAY, weather), "ambient, weather %d" % weather)
+		assert_lt(SkyRigScript.sky_top(NIGHT, weather).get_luminance(),
+			SkyRigScript.sky_top(DAY, weather).get_luminance(), "zenith, weather %d" % weather)
+		assert_lt(SkyRigScript.sky_horizon(NIGHT, weather).get_luminance(),
+			SkyRigScript.sky_horizon(DAY, weather).get_luminance(), "horizon, weather %d" % weather)
+		assert_lt(SkyRigScript.ground_horizon(NIGHT, weather).get_luminance(),
+			SkyRigScript.ground_horizon(DAY, weather).get_luminance(),
+			"ground band, weather %d" % weather)
+		assert_lt(SkyRigScript.ground_bottom(NIGHT, weather).get_luminance(),
+			SkyRigScript.ground_bottom(DAY, weather).get_luminance(),
+			"ground below, weather %d" % weather)
 
 
 func test_the_weather_multipliers_are_the_agreed_ones() -> void:
@@ -156,7 +243,7 @@ func test_fog_is_the_thickest_weather_there_is() -> void:
 			"%s must be thinner than fog" % label)
 	assert_almost_eq(SkyRigScript.fog_density(CLEAR), 0.0011, 0.000001)
 	assert_almost_eq(SkyRigScript.fog_density(RAIN), 0.004, 0.000001)
-	assert_almost_eq(SkyRigScript.fog_density(FOG), 0.018, 0.000001)
+	assert_almost_eq(SkyRigScript.fog_density(FOG), 0.010, 0.000001)
 	assert_almost_eq(SkyRigScript.fog_density(STORM), 0.008, 0.000001)
 
 
@@ -195,6 +282,10 @@ func _build_world() -> void:
 	_sky_material = ProceduralSkyMaterial.new()
 	_sky_material.sky_top_color = Color(0.309804, 0.505882, 0.760784)
 	_sky_material.sky_horizon_color = Color(0.717647, 0.803922, 0.870588)
+	# ranch.tscn's own daylight grass, so a test that says the rig repaints the ground half
+	# is repainting the same green the ranch actually ships.
+	_sky_material.ground_bottom_color = Color(0.219608, 0.294118, 0.196078)
+	_sky_material.ground_horizon_color = Color(0.415686, 0.529412, 0.34902)
 	var sky := Sky.new()
 	sky.sky_material = _sky_material
 	_environment = Environment.new()
@@ -237,6 +328,25 @@ func test_a_pinned_night_storm_puts_the_sun_down_and_the_rain_up() -> void:
 	var rain: GPUParticles3D = _rig.get_node("Rain")
 	assert_eq(rain.amount, SkyRigScript.rain_amount(STORM), "the storm's drop count")
 	assert_true(rain.emitting, "and it is actually falling")
+
+
+func test_the_rig_paints_the_ground_half_of_the_sky_too() -> void:
+	# The pure test above says what the colours should be; this says they actually reach the
+	# material. A rig that computed a dark blue ground band and never wrote it would pass
+	# every arithmetic test in this file and still leave the green band on screen.
+	_build_world()
+	var daylight_grass: Color = _sky_material.ground_horizon_color
+	_rig.apply_immediately(_pinned_state(NIGHT, CLEAR))
+
+	assert_almost_eq(_sky_material.ground_horizon_color.get_luminance(),
+		SkyRigScript.ground_horizon(NIGHT, CLEAR).get_luminance(), 0.001,
+		"the band under the skyline is the rig's, not the scene's")
+	assert_almost_eq(_sky_material.ground_bottom_color.get_luminance(),
+		SkyRigScript.ground_bottom(NIGHT, CLEAR).get_luminance(), 0.001,
+		"and so is the colour straight down")
+	assert_lt(_sky_material.ground_horizon_color.get_luminance(),
+		daylight_grass.get_luminance() * 0.5,
+		"a night ground band must be nothing like the daylight grass it replaced")
 
 
 func test_a_pinned_clear_day_puts_the_sun_up_and_the_rain_away() -> void:

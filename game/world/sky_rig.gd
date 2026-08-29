@@ -2,9 +2,10 @@ class_name SkyRig
 extends Node3D
 ## THE SKY, DRIVEN BY THE CLOCK. game/systems/world_state.gd says what time it is and what
 ## the weather is doing; this node is the only thing that turns that answer into photons.
-## It moves the ranch's DirectionalLight3D along an arc, retints its light, repaints the
-## ProceduralSkyMaterial's two colours, thickens the WorldEnvironment's fog and turns a
-## GPUParticles3D of falling streaks on and off.
+## It moves the ranch's DirectionalLight3D along an arc, retints its light, repaints all
+## four of the ProceduralSkyMaterial's colours (both halves of the sky, not just the half
+## above the skyline), thickens the WorldEnvironment's fog and turns a GPUParticles3D of
+## falling streaks on and off.
 ##
 ## THE MAPPING IS PURE AND STATIC, the scene writing is not. Every question of the form
 ## "what colour is a stormy dusk" is a static function of (phase, weather) with no node in
@@ -67,23 +68,55 @@ const PHASE_LIGHT_COLORS: Array[Color] = [
 ]
 ## DAY's 1.15 is the value game/world/ranch.tscn was hand lit at, so a clear noon looks
 ## exactly like the ranch always has and every other hour is measured against it.
-const PHASE_LIGHT_ENERGY: Array[float] = [0.62, 1.15, 0.58, 0.25]
+## NIGHT's 0.38 is a playability number, not an art one. At 0.25 a stormy night scaled
+## down to 0.11 and the ranch stopped being legible: a player who cannot see a pony cannot
+## catch one. It stays far under every lit phase, which is what the ordering tests assert.
+const PHASE_LIGHT_ENERGY: Array[float] = [0.62, 1.15, 0.58, 0.38]
 const PHASE_SKY_TOP: Array[Color] = [
 	Color(0.62, 0.55, 0.70),
 	Color(0.31, 0.51, 0.76),
 	Color(0.58, 0.40, 0.55),
-	Color(0.05, 0.07, 0.15),
+	Color(0.06, 0.08, 0.18),
 ]
-## DAY's 0.32 is likewise ranch.tscn's own ambient_light_energy.
-const PHASE_AMBIENT_ENERGY: Array[float] = [0.24, 0.32, 0.22, 0.10]
+## DAY's 0.32 is likewise ranch.tscn's own ambient_light_energy. NIGHT's 0.22 is the other
+## half of the playability fix above: ambient is what fills the shadows the moon does not
+## reach, and at 0.10 the ground under a night sky was a silhouette with ponies lost in it.
+##
+## IT IS THE NIGHT'S BASE, NOT A FLOOR UNDER IT. Applying 0.22 as a hard minimum on the
+## finished value would put a stormy night (0.22) above a stormy day (0.32 x 0.45 = 0.144)
+## and stand the phases on their heads; weather still scales the night down from here, to
+## 0.099 at its very worst, which is twice what the old clear night got.
+const PHASE_AMBIENT_ENERGY: Array[float] = [0.24, 0.32, 0.22, 0.22]
 
-## THE HORIZON IS THE ZENITH, PALED. ranch.tscn's hand picked pair (top 0.309804,
-## 0.505882, 0.760784 against horizon 0.717647, 0.803922, 0.870588) is a per channel ratio,
-## not an offset: the red end lifts more than twice as much as the blue end, which is what
-## makes the band near the ground read as haze instead of as a lighter shade of the same
-## sky. Every other phase's horizon is that same ratio applied to its own zenith, so DAWN
-## and DUSK inherit the ranch's atmosphere for free.
-const HORIZON_RATIO := Vector3(2.31649, 1.58913, 1.14433)
+## THE HORIZON IS THE ZENITH, TINTED TOWARD ITS OWN HOUR. Each phase names the colour its
+## band near the ground is pulled toward and HORIZON_BLEND says how far.
+##
+## WHY NOT A RATIO. This used to be the zenith multiplied by a per channel ratio taken off
+## ranch.tscn's hand picked pair (2.32, 1.59, 1.14), and that ratio CLAMPED: a clear dawn's
+## 0.62 red multiplied to 1.44, came back as 1.0, and the whole sky flattened to a near
+## white wash. Worse, only CLEAR clamped, because rain and fog shrink the zenith first, so
+## a rainy dawn came out more colourful than a clear one and the weather read backwards.
+## A tint the sky is LERPED toward cannot leave the gamut, so nothing clamps, every phase
+## keeps its own hour at the horizon, and CLEAR stays the cleanest sky there is.
+const HORIZON_TINT: Array[Color] = [
+	Color(0.96, 0.80, 0.66),
+	Color(0.78, 0.87, 0.95),
+	Color(0.92, 0.62, 0.50),
+	Color(0.10, 0.12, 0.22),
+]
+const HORIZON_BLEND := 0.65
+
+## THE GROUND HALF OF THE SKY, which is the horizon band darkened twice over: once for the
+## band just under the skyline and again for straight down.
+##
+## IT HAS TO BE DRIVEN OR NIGHT GLOWS GREEN. ProceduralSkyMaterial paints a lower
+## hemisphere as well as an upper one, ranch.tscn authors it as daylight grass
+## (0.416, 0.529, 0.349), and a rig that wrote only the two sky colours left that green at
+## full daylight brightness under a near black zenith: a bright green band ran the whole way
+## round the horizon of every night shot. It leaked into the lighting too, since the scene's
+## ambient takes 85% of its colour from the sky.
+const GROUND_HORIZON_DARKEN := 0.55
+const GROUND_BOTTOM_DARKEN := 0.30
 
 ## Indexed by WorldState.Weather. Energy is multiplied, so the phase decides the hour and
 ## the weather decides how much of that hour gets through the cloud.
@@ -96,13 +129,30 @@ const WEATHER_TINTS: Array[Color] = [
 	Color(0.82, 0.85, 0.88),
 	Color(0.62, 0.66, 0.78),
 ]
-## Weather flattens the sky toward its own grey and then darkens it. Working from the
-## zenith's OWN luminance rather than from a fixed grey is what keeps a foggy midnight
-## dark: a fixed pale grey would have lit the night sky up brighter than a clear noon.
-const WEATHER_SKY_DESATURATION: Array[float] = [0.0, 0.55, 0.75, 0.60]
+## Weather mixes the sky toward its own grey and then darkens what is left. Both halves
+## matter and they do different jobs: the mix drains the hour's colour out, the darken is
+## what keeps rain and storm strictly dimmer than the clear sky of the same phase (the mix
+## alone would have brightened a blue noon, because its grey is lighter than the sky it
+## replaces).
+##
+## MIXING TOWARD A FIXED GREY, not toward the colour's own luminance. A luminance flatten
+## keeps the hue and only drains it, which is why a rainy day used to come back pink rather
+## than grey. The greys are cool on purpose: RAIN and STORM are cold weather and must never
+## read warmer than the hour they fell on. CLEAR's entry is never used (its weight is zero)
+## and is white only so the array has no hole in it.
+const WEATHER_SKY_GREY: Array[Color] = [
+	Color(1.0, 1.0, 1.0),
+	Color(0.52, 0.56, 0.62),
+	Color(0.72, 0.74, 0.77),
+	Color(0.36, 0.38, 0.43),
+]
+const WEATHER_SKY_MIX: Array[float] = [0.0, 0.55, 0.60, 0.70]
 const WEATHER_SKY_DARKEN: Array[float] = [1.0, 0.75, 0.85, 0.55]
 
-const WEATHER_FOG_DENSITY: Array[float] = [0.0011, 0.004, 0.018, 0.008]
+## FOG's 0.010 is what a fog is FOR: the ranch reduced to a silhouette, not deleted. At
+## 0.018 the barn, the fences and every tree past the yard were gone from a shot taken 45 m
+## out, which is not weather, it is a wall.
+const WEATHER_FOG_DENSITY: Array[float] = [0.0011, 0.004, 0.010, 0.008]
 ## Drops alive at once. Rain is a wash of streaks around the player, not a simulation of a
 ## storm front, so these are tuned to read from the camera's usual distance and no further.
 const WEATHER_RAIN_AMOUNT: Array[int] = [0, 600, 0, 1400]
@@ -126,6 +176,8 @@ const KEY_LIGHT_ENERGY := "light_energy"
 const KEY_LIGHT_COLOR := "light_color"
 const KEY_SKY_TOP := "sky_top"
 const KEY_SKY_HORIZON := "sky_horizon"
+const KEY_GROUND_HORIZON := "ground_horizon"
+const KEY_GROUND_BOTTOM := "ground_bottom"
 const KEY_AMBIENT_ENERGY := "ambient_energy"
 const KEY_FOG_DENSITY := "fog_density"
 const KEY_RAIN_AMOUNT := "rain_amount"
@@ -209,20 +261,59 @@ static func light_color(phase: int, weather: int) -> Color:
 
 
 static func sky_top(phase: int, weather: int) -> Color:
-	var base: Color = PHASE_SKY_TOP[_phase_index(phase)]
-	var w := _weather_index(weather)
-	var grey := base.get_luminance()
-	var flattened := base.lerp(Color(grey, grey, grey), WEATHER_SKY_DESATURATION[w])
-	var darken: float = WEATHER_SKY_DARKEN[w]
-	return Color(flattened.r * darken, flattened.g * darken, flattened.b * darken)
+	return _weathered(PHASE_SKY_TOP[_phase_index(phase)], phase, weather)
 
 
 static func sky_horizon(phase: int, weather: int) -> Color:
-	var top := sky_top(phase, weather)
-	return Color(
-		minf(1.0, top.r * HORIZON_RATIO.x),
-		minf(1.0, top.g * HORIZON_RATIO.y),
-		minf(1.0, top.b * HORIZON_RATIO.z))
+	var p := _phase_index(phase)
+	return _weathered(PHASE_SKY_TOP[p].lerp(HORIZON_TINT[p], HORIZON_BLEND), phase, weather)
+
+
+## The band of the sky's LOWER hemisphere just under the skyline. Read off the horizon so
+## the two sides of the rim are the same weather, then darkened, because ground is ground
+## whatever hour it is.
+static func ground_horizon(phase: int, weather: int) -> Color:
+	return _scaled(sky_horizon(phase, weather), GROUND_HORIZON_DARKEN)
+
+
+## And straight down, darker still.
+static func ground_bottom(phase: int, weather: int) -> Color:
+	return _scaled(sky_horizon(phase, weather), GROUND_BOTTOM_DARKEN)
+
+
+## One base colour put through one weather: mixed toward that weather's cloud, then dimmed.
+static func _weathered(base: Color, phase: int, weather: int) -> Color:
+	var w := _weather_index(weather)
+	return _scaled(base.lerp(cloud_colour(phase, weather), WEATHER_SKY_MIX[w]),
+		WEATHER_SKY_DARKEN[w])
+
+
+## THE CLOUD THIS WEATHER HANGS IN THIS HOUR. WEATHER_SKY_GREY is a daylight cloud, and a
+## daylight cloud pasted over a midnight zenith LIFTS it: mixing 0.55 of a 0.56 luminance
+## grey into a 0.08 luminance night sky made a rainy midnight three times brighter than a
+## clear one, which is the wrong way round and is not what any of these numbers mean. So
+## the grey is lit by the hour it is hanging in, measured against noon, which leaves DAWN
+## and DAY on exactly the authored grey and darkens the cloud as the light goes.
+##
+## FOG IS ALLOWED TO BE THE PALE ONE. Rain and storm come out strictly darker than the
+## clear sky of the same phase at every hour; fog is a whiteout by definition and only has
+## to stay the thickest, which is a fog DENSITY claim and is asserted separately.
+static func cloud_colour(phase: int, weather: int) -> Color:
+	return _scaled(WEATHER_SKY_GREY[_weather_index(weather)], _cloud_light(phase))
+
+
+## How much of noon's light reaches this phase's cloud, as a fraction of noon's own zenith
+## brightness, never more than all of it.
+static func _cloud_light(phase: int) -> float:
+	var noon: float = PHASE_SKY_TOP[WorldStateScript.Phase.DAY].get_luminance()
+	if noon <= 0.0:
+		return 1.0
+	return minf(1.0, PHASE_SKY_TOP[_phase_index(phase)].get_luminance() / noon)
+
+
+## Multiply the three channels and leave alpha alone.
+static func _scaled(colour: Color, factor: float) -> Color:
+	return Color(colour.r * factor, colour.g * factor, colour.b * factor)
 
 
 static func ambient_energy(phase: int, weather: int) -> float:
@@ -365,6 +456,8 @@ func _set_targets_from(state: WorldState) -> void:
 		KEY_LIGHT_COLOR: light_color(phase, weather),
 		KEY_SKY_TOP: sky_top(phase, weather),
 		KEY_SKY_HORIZON: sky_horizon(phase, weather),
+		KEY_GROUND_HORIZON: ground_horizon(phase, weather),
+		KEY_GROUND_BOTTOM: ground_bottom(phase, weather),
 		KEY_AMBIENT_ENERGY: ambient_energy(phase, weather),
 		KEY_FOG_DENSITY: fog_density(weather),
 		KEY_RAIN_AMOUNT: rain_amount(weather),
@@ -392,6 +485,12 @@ func _write_to_scene() -> void:
 	if _sky_material != null:
 		_sky_material.sky_top_color = _current.get(KEY_SKY_TOP, _sky_material.sky_top_color)
 		_sky_material.sky_horizon_color = horizon
+		# The lower hemisphere as well. See GROUND_HORIZON_DARKEN for the green band this
+		# is here to stop.
+		_sky_material.ground_horizon_color = _current.get(
+			KEY_GROUND_HORIZON, _sky_material.ground_horizon_color)
+		_sky_material.ground_bottom_color = _current.get(
+			KEY_GROUND_BOTTOM, _sky_material.ground_bottom_color)
 	_write_rain()
 
 
@@ -436,6 +535,8 @@ func _seed_from_scene() -> void:
 	if _sky_material != null:
 		_current[KEY_SKY_TOP] = _sky_material.sky_top_color
 		_current[KEY_SKY_HORIZON] = _sky_material.sky_horizon_color
+		_current[KEY_GROUND_HORIZON] = _sky_material.ground_horizon_color
+		_current[KEY_GROUND_BOTTOM] = _sky_material.ground_bottom_color
 	_current[KEY_RAIN_AMOUNT] = 0
 
 
