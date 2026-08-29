@@ -3,23 +3,67 @@ extends CanvasLayer
 ## ESCAPE OPENS THIS. It used to free the cursor and nothing else; the owner: "i also
 ## want pause menu instead of losing mouse control with escape". Phase 2 slice 1.
 ##
-## Resume, Save, Settings, Quit. The rules are game/ui/build_menu.gd's: navigable without
-## a mouse on ui_*, PROCESS_MODE_ALWAYS while ranch.gd pauses the tree, and it only emits.
-## ranch.gd saves, quits, applies settings, and pauses or unpauses.
+## Resume, Compendium, Requests, Save, Settings, Quit. The rules are game/ui/build_menu.gd's:
+## navigable without a mouse on ui_*, PROCESS_MODE_ALWAYS while ranch.gd pauses the tree, and
+## it only emits. ranch.gd saves, quits, applies settings, and pauses or unpauses.
 ##
 ## `can_open` is how the ranch says "another menu is up": the build and market menus
 ## close on ui_cancel and this opens on `pause`, both of which are Escape, so without the
 ## guard one keypress would close one menu and open this one in the same frame.
 ##
-## Phase 2 slice 5 adds Compendium and Requests pages here; the Page enum is where they go.
+## THE TWO READING PAGES (phase 2 slice 5). COMPENDIUM is what the player knows of the
+## roster; REQUESTS is what the board is asking for. Both are READ ONLY: ui_accept does
+## nothing on either, because neither is a transaction. A request is paid by ranch.gd the
+## moment its progress completes (game/world/ranch.gd's _pay_out), never by hand from here,
+## so a "claim" row would be a button for something that has already happened.
+##
+## EVERYTHING THESE PAGES DRAW IS INJECTED AND MAY BE NULL. ranch.gd sets `compendium`,
+## `registry`, `regions`, `board` and `world_state` when it binds this menu
+## (game/world/ranch.gd, _bind_pause_menu). Nothing here ever loads a registry or reaches
+## for GameState itself: this menu is instantiated bare by its own tests and by the boot
+## shutter, neither of which has a ranch behind it, and a page that loaded the roster off
+## disk to draw itself would make those two pay for a ranch they do not have. A page whose
+## sources are missing says EMPTY_TEXT and nothing else.
+##
+## THE ROSTER ORDER IS THE RARITY TIERS IN ENUM ORDER, which is the only total order
+## PonyRegistry offers (it has no all() accessor) and is exactly how Compendium walks the
+## roster to count it (game/systems/compendium.gd, _all_data). Using the same walk here is
+## what makes the header's counts and the list below it agree row for row.
 
 const SettingsScript := preload("res://systems/settings.gd")
+const CompendiumScript := preload("res://systems/compendium.gd")
+const PonyDataScript := preload("res://systems/pony_data.gd")
+const WorldStateScript := preload("res://systems/world_state.gd")
+const RequestBoardScript := preload("res://systems/request_board.gd")
+const HudScript := preload("res://ui/hud.gd")
 
-enum Page { MAIN, SETTINGS }
-enum Row { RESUME, SAVE, SETTINGS, QUIT }
+enum Page { MAIN, SETTINGS, COMPENDIUM, REQUESTS }
+enum Row { RESUME, COMPENDIUM, REQUESTS, SAVE, SETTINGS, QUIT }
 enum SettingRow { VOLUME, SENSITIVITY, INVERT }
 
-const MAIN_ROWS := ["Resume", "Save the ranch", "Settings", "Quit to desktop"]
+const MAIN_ROWS := ["Resume", "Compendium", "Requests", "Save the ranch", "Settings",
+	"Quit to desktop"]
+
+## How many character rows of the compendium are on screen at once. The roster is 43 long
+## and the panel is not, so the list is a window over it rather than the whole thing.
+const PAGE_ROWS := 10
+
+## The homestead is a zone every bit as much as the four regions are, but it is not a
+## RegionData (RegionRegistry only carries the places you buy a permit for), so its row is
+## built by hand and goes first: it is where the player starts and where she spends most of
+## her time. See game/systems/region_registry.gd.
+const RANCH_ZONE := &"ranch"
+const RANCH_NAME := "Ranch"
+
+## What a page says when the thing it draws was never injected, or is empty. Not an error:
+## this menu is instantiated without a ranch by its own tests and by the boot shutter.
+const EMPTY_TEXT := "Nothing to show yet."
+
+## Both halves of a character's "when" line when she has no restriction on that half.
+## PonyData carries an EMPTY array to mean "any" in each of `phases` and `weathers`
+## independently (game/systems/pony_data.gd), so the two are answered separately.
+const ANY_TEXT := "any"
+
 const COLOR_TITLE := Color(1.0, 0.96, 0.86, 1.0)
 const COLOR_NAME := Color(1.0, 1.0, 1.0, 0.94)
 const COLOR_DIM := Color(1.0, 1.0, 1.0, 0.58)
@@ -30,6 +74,8 @@ const ROW_IDLE_BG := Color(1.0, 1.0, 1.0, 0.04)
 const ROW_IDLE_BORDER := Color(1.0, 1.0, 1.0, 0.10)
 const FOOTER_MAIN := "  ↑ ↓  choose      Enter / A  select      Esc / B  resume"
 const FOOTER_SETTINGS := "  ↑ ↓  choose      ← →  adjust      Esc / B  back"
+const FOOTER_COMPENDIUM := "  ↑ ↓  scroll      Esc / B  back"
+const FOOTER_REQUESTS := "  Finish one to get a new one.      Esc / B  back"
 
 @onready var _title: Label = $Centre/Panel/Margin/Column/Title
 @onready var _rows: VBoxContainer = $Centre/Panel/Margin/Column/Rows
@@ -45,8 +91,18 @@ var settings: Settings = null
 ## `func() -> bool`. Invalid means "always allowed".
 var can_open := Callable()
 
+## The five things the two reading pages draw, all injected by ranch.gd and all allowed to
+## stay null forever. See the class comment.
+var compendium: Compendium = null
+var registry: PonyRegistry = null
+var regions: RegionRegistry = null
+var board: RequestBoard = null
+var world_state: WorldState = null
+
 var _page: int = Page.MAIN
 var _selected := 0
+## First roster index drawn on the COMPENDIUM page. Follows `_selected`; see _sync_scroll().
+var _scroll := 0
 var _open := false
 
 
@@ -67,10 +123,30 @@ func open() -> bool:
 		settings = SettingsScript.new()
 	_page = Page.MAIN
 	_selected = Row.RESUME
+	_scroll = 0
 	_open = true
 	visible = true
 	_refresh()
 	opened.emit()
+	return true
+
+
+## Open (if it is not open already) and land straight on `page`. This is how the request
+## board's E prompt reaches the REQUESTS page without walking the player through the main
+## menu: ranch.gd looks the page number up out of this script's own constant map and calls
+## here (game/world/ranch.gd, _open_request_page).
+##
+## Returns false, and changes nothing, if `can_open` refuses or `page` is not a real Page;
+## an unknown page number must not leave the menu on a blank it cannot draw.
+func open_page(page: int) -> bool:
+	if not (page in Page.values()):
+		return false
+	if not _open and not open():
+		return false
+	_page = page
+	_selected = 0
+	_scroll = 0
+	_refresh()
 	return true
 
 
@@ -95,15 +171,24 @@ func selected_index() -> int:
 
 
 func _row_count() -> int:
-	return MAIN_ROWS.size() if _page == Page.MAIN else SettingRow.size()
+	match _page:
+		Page.SETTINGS:
+			return SettingRow.size()
+		Page.COMPENDIUM:
+			return maxi(1, roster().size())
+		Page.REQUESTS:
+			return maxi(1, request_rows().size())
+	return MAIN_ROWS.size()
 
 
 func move_selection(step: int) -> void:
 	_selected = posmod(_selected + step, _row_count())
+	_sync_scroll()
 	_refresh()
 
 
-## Left or right on a settings row. Nothing on the main page.
+## Left or right on a settings row. Nothing on any other page: the compendium and the
+## request board have no adjustable anything, and this is the one place that decides so.
 func adjust(direction: int) -> void:
 	if _page != Page.SETTINGS or settings == null:
 		return
@@ -124,9 +209,16 @@ func confirm() -> bool:
 			adjust(1)
 			return true
 		return false
+	if _page == Page.COMPENDIUM or _page == Page.REQUESTS:
+		# Read only pages; see the class comment.
+		return false
 	match _selected:
 		Row.RESUME:
 			close()
+		Row.COMPENDIUM:
+			open_page(Page.COMPENDIUM)
+		Row.REQUESTS:
+			open_page(Page.REQUESTS)
 		Row.SAVE:
 			save_requested.emit()
 		Row.SETTINGS:
@@ -138,14 +230,25 @@ func confirm() -> bool:
 	return true
 
 
-## Cancel: settings goes back to main; main closes.
+## Cancel: a sub page goes back to main WITH ITS OWN ROW SELECTED, so cancelling out of the
+## compendium leaves the cursor on "Compendium" rather than back at the top; main closes.
 func back() -> void:
-	if _page == Page.SETTINGS:
-		_page = Page.MAIN
-		_selected = Row.SETTINGS
-		_refresh()
-		return
-	close()
+	match _page:
+		Page.SETTINGS:
+			_return_to_main(Row.SETTINGS)
+		Page.COMPENDIUM:
+			_return_to_main(Row.COMPENDIUM)
+		Page.REQUESTS:
+			_return_to_main(Row.REQUESTS)
+		_:
+			close()
+
+
+func _return_to_main(row: int) -> void:
+	_page = Page.MAIN
+	_selected = row
+	_scroll = 0
+	_refresh()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -174,6 +277,187 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
+# --- the compendium ------------------------------------------------------------------------
+
+## Every character in `registry`, in roster order. Empty (never null) when no registry was
+## injected, so every caller can iterate the result unconditionally. See the class comment
+## on why this is the rarity tiers in enum order.
+func roster() -> Array[PonyData]:
+	var out: Array[PonyData] = []
+	if registry == null:
+		return out
+	for rarity in PonyDataScript.Rarity.values():
+		out.append_array(registry.by_rarity(rarity))
+	return out
+
+
+## Whether the COMPENDIUM page has enough injected to draw anything at all.
+func has_book() -> bool:
+	return compendium != null and registry != null and not roster().is_empty()
+
+
+## "12 of 43 caught, 5 seen". Empty when there is nothing to count.
+func compendium_header() -> String:
+	if not has_book():
+		return ""
+	return "%d of %d caught, %d seen" % [
+		compendium.count(CompendiumScript.State.CAUGHT, registry),
+		compendium.total(registry),
+		compendium.count(CompendiumScript.State.SEEN, registry),
+	]
+
+
+## The header's second line: which conditions hold right now, so the "when:" lines below it
+## can be read against something. Empty string when no clock was injected.
+func compendium_now() -> String:
+	if world_state == null:
+		return ""
+	return "Now: %s" % world_state.describe()
+
+
+## One "%s: %d of %d" line per zone, the homestead first and then the regions in
+## RegionRegistry order (cheapest permit first). Counts are CAUGHT of the zone's whole
+## spawn list, which is what makes a region worth going back to.
+func compendium_region_rows() -> Array[String]:
+	var out: Array[String] = []
+	if not has_book():
+		return out
+	out.append(_zone_row(RANCH_NAME, RANCH_ZONE))
+	if regions != null:
+		for region: RegionData in regions.all():
+			out.append(_zone_row(region.display_name, region.id))
+	return out
+
+
+func _zone_row(zone_name: String, zone: StringName) -> String:
+	return "%s: %d of %d" % [
+		zone_name,
+		compendium.count_in_zone(zone, CompendiumScript.State.CAUGHT, registry),
+		registry.by_zone(zone).size(),
+	]
+
+
+## The whole character list, roster order, one string per character: "???" while she is
+## UNSEEN, her name once SEEN, and her name plus her conditions once CAUGHT. What is drawn
+## splits each of these into a name column and a dim value column; the string here is the
+## two joined, which is the row as the player reads it.
+func compendium_rows() -> Array[String]:
+	var out: Array[String] = []
+	for data: PonyData in roster():
+		var value := _entry_value(data)
+		if value.is_empty():
+			out.append(_entry_name(data))
+		else:
+			out.append("%s  %s" % [_entry_name(data), value])
+	return out
+
+
+## The roster indices currently on screen, in order. At most PAGE_ROWS of them.
+func compendium_window() -> Array[int]:
+	var out: Array[int] = []
+	var n := roster().size()
+	if n == 0:
+		return out
+	var start := clampi(_scroll, 0, maxi(0, n - PAGE_ROWS))
+	for i in range(start, mini(n, start + PAGE_ROWS)):
+		out.append(i)
+	return out
+
+
+## Keep the window under the cursor. Wrapping from the last row to the first snaps it back
+## to the top rather than scrolling all the way there, which is the whole point of a wrap.
+func _sync_scroll() -> void:
+	var n := roster().size()
+	if _page != Page.COMPENDIUM or n <= PAGE_ROWS:
+		_scroll = 0
+		return
+	if _selected < _scroll:
+		_scroll = _selected
+	elif _selected >= _scroll + PAGE_ROWS:
+		_scroll = _selected - PAGE_ROWS + 1
+	_scroll = clampi(_scroll, 0, n - PAGE_ROWS)
+
+
+## A character you have never laid eyes on is a blank with a rarity colour: the tier is the
+## one thing the book tells you for free, because it is what makes an empty slot worth
+## chasing.
+func _entry_name(data: PonyData) -> String:
+	if compendium == null or compendium.state_of(data.id) == CompendiumScript.State.UNSEEN:
+		return "???"
+	return data.display_name
+
+
+## "when: dawn/day, any" once she is CAUGHT, and nothing before that. Catching her is what
+## buys the schedule; seeing her once only proves she exists.
+func _entry_value(data: PonyData) -> String:
+	if compendium == null or compendium.state_of(data.id) != CompendiumScript.State.CAUGHT:
+		return ""
+	return "when: %s, %s" % [_phases_text(data), _weathers_text(data)]
+
+
+func _phases_text(data: PonyData) -> String:
+	if data.phases.is_empty():
+		return ANY_TEXT
+	var parts: Array[String] = []
+	for p: int in data.phases:
+		parts.append(WorldStateScript.phase_name(p).to_lower())
+	return "/".join(parts)
+
+
+func _weathers_text(data: PonyData) -> String:
+	if data.weathers.is_empty():
+		return ANY_TEXT
+	var parts: Array[String] = []
+	for w: int in data.weathers:
+		parts.append(WorldStateScript.weather_name(w).to_lower())
+	return "/".join(parts)
+
+
+func _rarity_color(rarity: int) -> Color:
+	var fallback: Color = HudScript.RARITY_COLORS[PonyDataScript.Rarity.COMMON]
+	var picked: Color = HudScript.RARITY_COLORS.get(rarity, fallback)
+	return picked
+
+
+# --- the request board ---------------------------------------------------------------------
+
+## One entry per ACTIVE request, in board order, as {"text": String, "value": String}: the
+## request as the board words it (with its progress appended when it takes more than one of
+## anything) and what finishing it pays. Empty when no board was injected.
+##
+## active() rather than requests(): a finished request has already been paid by ranch.gd and
+## is on its way off the board, so showing it would be asking for something twice.
+func request_rows() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if board == null:
+		return out
+	for entry in board.active():
+		var req: Dictionary = entry
+		var text: String = String(req.get("text", ""))
+		var count: int = int(req.get("count", 1))
+		if count > 1:
+			text = "%s  %d / %d" % [text, int(req.get("progress", 0)), count]
+		out.append({"text": text, "value": _reward_text(req)})
+	return out
+
+
+## "80 bits", or "40 bits and 2 hay" for the one kind that pays food as well. The amount is
+## RequestBoard's own constant rather than a field, because the request dictionary carries
+## the item id and not a count; see game/systems/request_board.gd's class comment.
+func _reward_text(req: Dictionary) -> String:
+	var bits: int = int(req.get("reward_bits", 0))
+	var food: String = String(req.get("reward_food", ""))
+	if food.is_empty():
+		return "%d bits" % bits
+	return "%d bits and %d %s" % [bits, RequestBoardScript.SEE_CHARACTER_FOOD_COUNT, food]
+
+
+func footer_text() -> String:
+	return _footer.text if _footer != null else ""
+
+
+# --- drawing -------------------------------------------------------------------------------
+
 func _refresh() -> void:
 	# remove_child BEFORE queue_free: a queued node is still a child until the end of the
 	# frame, so freeing alone would leave the old rows laid out underneath the new ones for
@@ -181,39 +465,94 @@ func _refresh() -> void:
 	for child in _rows.get_children():
 		_rows.remove_child(child)
 		child.queue_free()
-	if _page == Page.MAIN:
-		_title.text = "PAUSED"
-		_footer.text = FOOTER_MAIN
-		for i in range(MAIN_ROWS.size()):
-			_add_row(i, MAIN_ROWS[i], "")
-	else:
-		_title.text = "SETTINGS"
-		_footer.text = FOOTER_SETTINGS
-		_add_row(0, "Master volume", "%d%%" % int(round(settings.master_volume * 100.0)))
-		_add_row(1, "Mouse sensitivity", "%.1f" % (settings.mouse_sensitivity * 1000.0))
-		_add_row(2, "Invert look", "On" if settings.invert_look else "Off")
+	match _page:
+		Page.SETTINGS:
+			_draw_settings()
+		Page.COMPENDIUM:
+			_draw_compendium()
+		Page.REQUESTS:
+			_draw_requests()
+		_:
+			_draw_main()
 
 
-func _add_row(index: int, row_name: String, value: String) -> void:
+func _draw_main() -> void:
+	_title.text = "PAUSED"
+	_footer.text = FOOTER_MAIN
+	for i in range(MAIN_ROWS.size()):
+		_add_row(i, MAIN_ROWS[i], "")
+
+
+func _draw_settings() -> void:
+	_title.text = "SETTINGS"
+	_footer.text = FOOTER_SETTINGS
+	_add_row(0, "Master volume", "%d%%" % int(round(settings.master_volume * 100.0)))
+	_add_row(1, "Mouse sensitivity", "%.1f" % (settings.mouse_sensitivity * 1000.0))
+	_add_row(2, "Invert look", "On" if settings.invert_look else "Off")
+
+
+func _draw_compendium() -> void:
+	_title.text = "COMPENDIUM"
+	_footer.text = FOOTER_COMPENDIUM
+	if not has_book():
+		_add_note(EMPTY_TEXT)
+		return
+	_add_note(compendium_header())
+	var now := compendium_now()
+	if not now.is_empty():
+		_add_note(now)
+	for line in compendium_region_rows():
+		_add_note(line)
+	var entries := roster()
+	for i in compendium_window():
+		var data: PonyData = entries[i]
+		_add_row(i, _entry_name(data), _entry_value(data), _rarity_color(data.rarity),
+			COLOR_DIM, true)
+
+
+func _draw_requests() -> void:
+	_title.text = "REQUESTS"
+	_footer.text = FOOTER_REQUESTS
+	var rows := request_rows()
+	if rows.is_empty():
+		_add_note(EMPTY_TEXT)
+		return
+	for i in range(rows.size()):
+		var row: Dictionary = rows[i]
+		_add_row(i, String(row.get("text", "")), String(row.get("value", "")))
+
+
+## A line of text that is not a row: no panel, no border, never selected. The compendium's
+## header and its per zone tallies are these.
+func _add_note(text: String) -> void:
+	var label := Label.new()
+	label.text = text
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_style_label(label, 22, COLOR_DIM)
+	_rows.add_child(label)
+
+
+func _add_row(index: int, row_name: String, value: String, name_color: Color = COLOR_NAME,
+		value_color: Color = COLOR_VALUE, compact: bool = false) -> void:
 	var row := PanelContainer.new()
 	row.add_theme_stylebox_override(&"panel", _row_style(index == _selected))
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override(&"margin_left", 18)
 	margin.add_theme_constant_override(&"margin_right", 18)
-	margin.add_theme_constant_override(&"margin_top", 10)
-	margin.add_theme_constant_override(&"margin_bottom", 10)
+	margin.add_theme_constant_override(&"margin_top", 4 if compact else 10)
+	margin.add_theme_constant_override(&"margin_bottom", 4 if compact else 10)
 	row.add_child(margin)
 	var head := HBoxContainer.new()
 	margin.add_child(head)
 	var title := Label.new()
 	title.text = row_name
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_style_label(title, 26, COLOR_NAME)
+	_style_label(title, 22 if compact else 26, name_color)
 	head.add_child(title)
 	if not value.is_empty():
 		var val := Label.new()
 		val.text = value
-		_style_label(val, 24, COLOR_VALUE)
+		_style_label(val, 20 if compact else 24, value_color)
 		head.add_child(val)
 	_rows.add_child(row)
 

@@ -1192,6 +1192,26 @@ func _bind_pause_menu() -> void:
 	_apply_settings()
 	pause_menu.set("settings", _settings)
 	pause_menu.set("can_open", func() -> bool: return _no_menu_but(pause_menu))
+	# WHAT THE COMPENDIUM AND REQUESTS PAGES DRAW (game/ui/pause_menu.gd). Pushed in rather
+	# than pulled by the menu, exactly like `settings` above: the menu is instantiated bare
+	# by its own tests and by the boot shutter, and a page that loaded the roster off disk
+	# for itself would make both of those pay for a ranch they do not have.
+	#
+	# RE PUSHED ON EVERY LOAD, because three of the five are REPLACED by one: rebind_economy()
+	# builds a new RequestBoard and a load hands GameState a new Compendium, while
+	# _rebuild_world_state() builds a new clock. Injecting once at boot would leave the pause
+	# menu reading the board, the book and the hour of the session that was just replaced.
+	# The registry and the region catalogue are cached for the life of the process and are
+	# re-pushed only because they ride along in the same call.
+	var inject_pages := func() -> void:
+		pause_menu.set("compendium", get_compendium())
+		pause_menu.set("registry", _pony_roster())
+		pause_menu.set("regions", _regions_registry())
+		pause_menu.set("board", get_request_board())
+		pause_menu.set("world_state", get_world_state())
+	inject_pages.call()
+	if _game_state != null and not _game_state.state_loaded.is_connected(inject_pages):
+		_game_state.state_loaded.connect(inject_pages)
 	for pair in [["opened", _on_pause_opened], ["closed", _on_menu_closed],
 			["save_requested", _on_pause_save], ["quit_requested", _on_pause_quit],
 			["settings_changed", _on_settings_changed]]:
