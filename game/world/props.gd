@@ -143,6 +143,52 @@ const LAYOUT := [
 	# Two inside the clearing, for shade and to break up the yard.
 	{"file": "kenney_tree_fat.glb", "at": Vector2(17.0, 7.5), "yaw": 35.0, "s": 1.05},
 	{"file": "kenney_tree_oak.glb", "at": Vector2(-20.0, 1.0), "yaw": 165.0, "s": 1.10},
+	# --- the regions -------------------------------------------------------------
+	# Slice 3's four regions (game/data/regions/*.tres) are 60 m and more from the
+	# homestead, and the treeline above stops at about 45 m: without these, a region
+	# read as a coloured patch of grass with a fence round it and nothing else on the
+	# horizon. Each region gets the planting its name promises, and each species is the
+	# one whose silhouette says the name: orchard oaks and fats, everfree pines, willowy
+	# defaults by the lake, a thin line of pines along the night meadow.
+	#
+	# EVERY ONE OF THEM STANDS OUTSIDE ITS REGION'S FENCE, by at least 4 m past the ring
+	# (RegionFence.RING_MARGIN puts that at radius + 3), and outside every ZoneMarker
+	# disc on the map. Both matter: a trunk inside the ring is a trunk a resident can
+	# spawn inside of (the spawner's prop reroll only fires when her ground ray HITS the
+	# prop, which a canopy edge does not), and a trunk ON the ring is a tree growing
+	# through a fence rail. Planted outside, they read as the country the fence is the
+	# edge of, which is the whole job a boundary fence has on a map this size.
+	# The Orchard, (62, 30) r 22: apples on the high ground, none across the west gate.
+	{"file": "kenney_tree_oak.glb", "at": Vector2(91.1, 40.6), "yaw": 25.0, "s": 1.20},
+	{"file": "kenney_tree_fat.glb", "at": Vector2(77.5, 56.8), "yaw": 140.0, "s": 1.10},
+	{"file": "kenney_tree_oak.glb", "at": Vector2(56.6, 60.5), "yaw": 265.0, "s": 1.25},
+	{"file": "kenney_tree_fat.glb", "at": Vector2(38.3, 49.9), "yaw": 60.0, "s": 1.05},
+	{"file": "kenney_tree_oak.glb", "at": Vector2(77.5, 3.2), "yaw": 195.0, "s": 1.15},
+	{"file": "kenney_tree_fat.glb", "at": Vector2(88.8, 14.5), "yaw": 310.0, "s": 1.20},
+	# The Everfree Edge, (-64, -40) r 24: the densest planting on the map, and the
+	# darkest, so the corner of the world the palette already made gloomy also LOOKS
+	# like woodland rather than like a lawn at dusk.
+	{"file": "kenney_tree_pine.glb", "at": Vector2(-52.7, -9.0), "yaw": 15.0, "s": 1.30},
+	{"file": "kenney_tree_pine.glb", "at": Vector2(-69.7, -7.5), "yaw": 105.0, "s": 1.20},
+	{"file": "kenney_tree_pine.glb", "at": Vector2(-85.2, -14.7), "yaw": 200.0, "s": 1.35},
+	{"file": "kenney_tree_pine.glb", "at": Vector2(-95.0, -28.7), "yaw": 285.0, "s": 1.15},
+	{"file": "kenney_tree_pine.glb", "at": Vector2(-95.9, -48.5), "yaw": 40.0, "s": 1.30},
+	{"file": "kenney_tree_pine.glb", "at": Vector2(-85.2, -65.3), "yaw": 150.0, "s": 1.25},
+	{"file": "kenney_tree_pine.glb", "at": Vector2(-66.9, -72.9), "yaw": 230.0, "s": 1.35},
+	{"file": "kenney_tree_pine.glb", "at": Vector2(-47.5, -68.6), "yaw": 320.0, "s": 1.20},
+	# The Lake, (60, -62) r 24: four only, and spread wide. The water is the thing to
+	# look at there, and a ring of trunks around it would be a hedge round a pond.
+	{"file": "kenney_tree_default.glb", "at": Vector2(90.1, -51.1), "yaw": 70.0, "s": 1.15},
+	{"file": "kenney_tree_default.glb", "at": Vector2(29.9, -72.9), "yaw": 185.0, "s": 1.25},
+	{"file": "kenney_tree_default.glb", "at": Vector2(49.1, -92.1), "yaw": 250.0, "s": 1.10},
+	{"file": "kenney_tree_default.glb", "at": Vector2(76.0, -89.7), "yaw": 330.0, "s": 1.20},
+	# The Night Meadow, (-58, 66) r 24: a windbreak along the far side, leaving the
+	# south-east open toward the homestead so the walk out to it has a view.
+	{"file": "kenney_tree_pine.glb", "at": Vector2(-30.3, 82.0), "yaw": 50.0, "s": 1.15},
+	{"file": "kenney_tree_pine.glb", "at": Vector2(-52.4, 97.5), "yaw": 125.0, "s": 1.30},
+	{"file": "kenney_tree_pine.glb", "at": Vector2(-78.6, 90.5), "yaw": 210.0, "s": 1.20},
+	{"file": "kenney_tree_pine.glb", "at": Vector2(-90.0, 66.0), "yaw": 285.0, "s": 1.25},
+	{"file": "kenney_tree_pine.glb", "at": Vector2(-78.6, 41.5), "yaw": 355.0, "s": 1.15},
 ]
 
 var _placed: Array[Node3D] = []

@@ -24,6 +24,20 @@ extends Node3D
 ## largest continuously empty quarter of the map. Ten ponies over five places rather than
 ## eight over three.
 ##
+## AND FOUR MORE, OUT IN THE REGIONS, as of Phase 2 slice 3. The map is 220 m across now
+## and carries four regions as data (game/data/regions/*.tres): the orchard, the everfree
+## edge, the lake and the night meadow. Each one gets a ZoneMarker at its centre carrying
+## its own zone_id, so 30 of the 43 characters are zoned somewhere other than `ranch` and
+## the ten slots on the homestead stop being the whole roster's only address. Each one is
+## also ringed by a RegionFence built below, shut until its permit is in GameState.unlocks:
+## the ponies who live out there are visible across a fence you have not paid to cross,
+## which is the entire point of a permit and the reason the fence is a ring rather than a
+## wall you cannot see past.
+##
+## Their spawn radii are NOT the plan's "region radius minus 6" for the orchard and the
+## everfree edge, and the reason is the check named "no spawn disc reaches more than
+## halfway to another marker" in _report(): see the comment there.
+##
 ## Sizing all five is bounded by things this file's own checks care about: no disc may
 ## overlap the pen-plot clearing (game/world/props.gd's PEN_PLOTS_*), no disc may sit on
 ## a prop's footprint, and no two markers may be close enough that a pony spawned in one
@@ -120,6 +134,9 @@ const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const PlotSlotScript := preload("res://world/plot_slot.gd")
 const PlotRegistryScript := preload("res://systems/plot_registry.gd")
 const RegionRegistryScript := preload("res://systems/region_registry.gd")
+const RegionFenceScript := preload("res://world/region_fence.gd")
+const ShopItemScript := preload("res://systems/shop_item.gd")
+const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 const PenScript := preload("res://world/pen.gd")
 const EconomyScript := preload("res://systems/economy.gd")
 const ShopScript := preload("res://systems/shop.gd")
@@ -271,6 +288,17 @@ const GATE_PROBE_REACH := 4.40
 ## by, low enough to cut through the gate leaf's collider, which tops out at 1.45 m.
 const GATE_PROBE_CENTRE_Y := 0.85
 
+## How near a locked region's gateway the player has to be for the permit prompt, in
+## metres. Wider than the plot slots' own triggers because a region gate is approached
+## across open country rather than stepped onto: she should be told what the fence is
+## while the fence is still what she is walking at, not once she is nosing the rails.
+const GATE_PROMPT_RADIUS := 6.0
+
+## How far out from the gateway the "a locked gate is solid" ray starts and ends, in
+## metres. Short enough that a horizontal ray cannot reach up into rising ground before
+## it reaches the leaf, long enough to start clear of the leaf's own depth.
+const GATE_RAY_REACH := 2.0
+
 @onready var terrain: StaticBody3D = $Terrain
 @onready var props: Node3D = $Props
 @onready var buildings: Node3D = $Buildings
@@ -360,6 +388,11 @@ var _settings: Settings = null
 ## prompt: once on entering the radius, not once per frame.
 var _market_prompted := false
 
+## Which locked region's gateway the player is currently standing at, or &"" for none.
+## The region id rather than a bool because there are four gates: walking from one to
+## another must produce a second prompt, and a bool would swallow it.
+var _gate_prompted: StringName = &""
+
 ## Is this ranch the scene the process was launched with, or is it INSTANCED UNDER another
 ## scene that owns the process?
 ##
@@ -396,6 +429,24 @@ func _ready() -> void:
 	for region: RegionData in _regions_registry().all():
 		if region.has_lake:
 			regions_root.add_child(terrain.build_water(region))
+
+	# THE FENCES, HERE AND NOT IN THE SCENE FILE. A ring of rails has to be seated on the
+	# ground post by post, and the ground does not exist until the two lines above have
+	# run; a fence built in ranch.tscn would be a ring of timber hanging at y = 0 over a
+	# map with two and a half metres of relief in it. The scene holds four empty nodes
+	# with the script on them and nothing else, which is also what keeps them findable by
+	# name here rather than conjured out of the registry.
+	#
+	# They all come up SHUT. _apply_permits() opens the ones the save paid for, and it
+	# cannot be called from here: the save has not been read yet. It is read by
+	# _bind_game_state() a few dozen lines down, and the call follows it.
+	for region: RegionData in _regions_registry().all():
+		var fence := regions_root.get_node_or_null("Fence_" + String(region.id)) as RegionFence
+		if fence == null:
+			push_error("ranch: no RegionFence for region '%s' in ranch.tscn" % region.id)
+			continue
+		fence.configure(region, Callable(terrain, "height_at"))
+		fence.build()
 
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--screenshot-dir="):
@@ -437,6 +488,11 @@ func _ready() -> void:
 	# MagicBeam.apply_unlocks() is absolute rather than incremental, so rebind_economy()'s
 	# own call later is a harmless no-op.
 	_apply_unlocks()
+
+	# And the permits the same save carries, on the fences built at the top of this
+	# function. A region she has already paid for must be open before she can reach it,
+	# and "before" here means before the first frame, not after the first walk out there.
+	_apply_permits()
 
 	# The hand-built barn and farmhouse first: they are the map's only real buildings
 	# (game/world/building.gd says why), they exist on every checkout including CI,
@@ -781,6 +837,11 @@ func rebind_economy() -> void:
 		market_menu.set("shop", _shop)
 
 	_apply_unlocks()
+	# The permits ride in the same replaced `unlocks` array as the gear, so the fences
+	# have to be re-read from it here too. This is what makes a mid-session load put the
+	# regions back the way the loaded save left them rather than the way the session that
+	# is being replaced left them.
+	_apply_permits()
 	var hud := get_node_or_null(^"HUD")
 	if hud != null and hud.has_method("set_bits"):
 		hud.set_bits(_economy.bits)
@@ -889,9 +950,21 @@ func _on_buy_requested(item: ShopItem) -> void:
 	if _shop == null or item == null:
 		return
 	if _shop.buy(item):
-		_toast("Bought %s." % item.display_name)
-		# Gear takes effect the moment it is bought, not on the next load.
+		# Gear takes effect the moment it is bought, not on the next load. So does a
+		# permit: the gate she is standing at swings open while she is still standing at
+		# it, which is the only moment the purchase can be SEEN to have done anything.
 		_apply_unlocks()
+		_apply_permits()
+		# ONE TOAST, NOT TWO. "Bought Permit: The Orchard." followed by "The Orchard is
+		# open." is the same sentence twice, and the second one is the one that says what
+		# changed out in the world.
+		var region: RegionData = null
+		if item.kind == ShopItemScript.Kind.PERMIT:
+			region = _regions_registry().by_id(item.permit_zone)
+		if region != null:
+			_toast("%s is open." % region.display_name)
+		else:
+			_toast("Bought %s." % item.display_name)
 	if market_menu.has_method("refresh"):
 		market_menu.refresh()
 
@@ -936,6 +1009,62 @@ func _apply_unlocks() -> void:
 	var beam: Node3D = player.get_magic_beam()
 	if beam != null and beam.has_method("apply_unlocks"):
 		beam.apply_unlocks(_game_state.unlocks)
+
+
+## Open every fence whose permit is in the unlocks, and shut every fence whose permit is
+## not. On boot and after every purchase, the same way _apply_unlocks() reads the gear.
+##
+## ABSOLUTE, NOT INCREMENTAL, and for the reason MagicBeam.apply_unlocks() is: this runs
+## again after every load, and a load REPLACES GameState's arrays. A version that only ever
+## opened gates would leave the previous save's regions standing open behind a state that
+## never paid for them.
+func _apply_permits() -> void:
+	if _game_state == null:
+		return
+	for fence in get_region_fences():
+		if fence.region() == null:
+			continue
+		fence.set_open(_game_state.unlocks.has(String(fence.region().permit_id())))
+
+
+## Every RegionFence under $Regions, in scene order. Empty before _ready() has built them.
+func get_region_fences() -> Array[RegionFence]:
+	var found: Array[RegionFence] = []
+	if regions_root == null:
+		return found
+	for child in regions_root.get_children():
+		if child is RegionFenceScript:
+			found.append(child)
+	return found
+
+
+## Whether the region called `zone` is unfenced to the player right now. An unknown zone
+## is closed rather than open: nothing should be able to walk into a region this map does
+## not have by naming it.
+func is_region_open(zone: StringName) -> bool:
+	for fence in get_region_fences():
+		if fence.region() != null and fence.region().id == zone:
+			return fence.is_open()
+	return false
+
+
+## The nearest LOCKED gateway within GATE_PROMPT_RADIUS of the player, or null. What the
+## permit prompt hangs off, and measured to the gateway rather than to the region's centre:
+## the fence is 25 m or more from that centre, so a prompt keyed to the middle of the
+## region would either never fire or fire across the whole meadow.
+func nearest_locked_gate() -> RegionFence:
+	var best: RegionFence = null
+	var best_d := GATE_PROMPT_RADIUS
+	for fence in get_region_fences():
+		if fence.is_open() or fence.region() == null:
+			continue
+		var gate: Vector3 = fence.gate_position()
+		var d := Vector2(player.global_position.x - gate.x,
+			player.global_position.z - gate.z).length()
+		if d <= best_d:
+			best_d = d
+			best = fence
+	return best
 
 
 ## The pantry a pen feeds from, read live rather than captured.
@@ -992,6 +1121,27 @@ func _update_market_interaction() -> void:
 	if near and Input.is_action_just_pressed(&"interact") and _prompt_slot == null:
 		if market_menu != null and market_menu.has_method("open"):
 			market_menu.open()
+
+
+## WALK UP TO A LOCKED FENCE AND BE TOLD WHAT IT IS AND WHAT IT COSTS. Once per approach,
+## the plot prompt's and the market prompt's rule, for the reason _update_plot_interaction()
+## gives: a toast reprinted at 60 Hz never fades and never stops covering the screen.
+##
+## THERE IS NO BUTTON HERE, deliberately. A gate is not a thing you interact with; it is a
+## thing you are refused by, and the refusal has to name the shop that lifts it. Pressing E
+## at the rails and being told "you cannot afford this" would be a purchase screen at the
+## far end of the map, 120 m from the wallet and the gems it spends.
+func _update_gate_prompt() -> void:
+	if not _no_other_menu_open():
+		return
+	var fence := nearest_locked_gate()
+	var here: StringName = fence.region().id if fence != null else &""
+	if here == _gate_prompted:
+		return
+	_gate_prompted = here
+	if fence != null:
+		_toast("This is %s. The permit costs %d bits at the market."
+			% [fence.region().display_name, fence.region().permit_cost])
 
 
 func get_shop() -> Shop:
@@ -1184,6 +1334,7 @@ func _physics_process(_delta: float) -> void:
 		return
 	_update_plot_interaction()
 	_update_market_interaction()
+	_update_gate_prompt()
 	if _game_state == null:
 		return
 	var house := get_node_or_null(^"Buildings/Farmhouse") as Node3D
@@ -1418,6 +1569,30 @@ func _report(pony_count: int, prop_count: int) -> void:
 	# See the class comment: this is what stops the raycast check above going hollow.
 	_set_check(checks, "the spawn zones sit on sloped ground",
 		max_relief >= MIN_ZONE_RELIEF if ponies.size() > 0 else true)
+	# THE GEOMETRY THAT MAKES THE CHECK ABOVE MEAN WHAT IT SAYS. "Inside her zone" is
+	# asked of her NEAREST marker, not of the marker she was drawn for, because a pony
+	# does not carry her marker around with her. That is only the same question while no
+	# marker's spawn disc reaches more than halfway to another marker: put two discs any
+	# closer and a pony spawned legitimately on the far rim of hers is nearer the other
+	# one, and a correct spawn fails the gate. Slice 3's regions walked straight into it:
+	# the orchard at (62, 30) is 31 m from EastField, so its spawn disc cannot be the
+	# radius minus 6 the plan asked for without the two overlapping in this sense.
+	var discs_own_their_ponies := true
+	var markers: Array[ZoneMarker] = spawner.get_markers()
+	for i in range(markers.size()):
+		for j in range(markers.size()):
+			if i == j:
+				continue
+			var apart := Vector2(markers[i].global_position.x - markers[j].global_position.x,
+				markers[i].global_position.z - markers[j].global_position.z).length()
+			if markers[i].spawn_radius >= apart * 0.5:
+				discs_own_their_ponies = false
+				push_error(("ranch: zone '%s' spawns up to %.1f m out, which is nearer " +
+					"marker '%s' (%.1f m away) than its own.")
+					% [markers[i].zone_id, markers[i].spawn_radius, markers[j].name, apart])
+	_set_check(checks, "no spawn disc reaches more than halfway to another marker",
+		discs_own_their_ponies)
+
 	_set_check(checks, "no pony is standing inside a prop", prop_overlaps.is_empty())
 	if not prop_overlaps.is_empty():
 		push_error("ranch: pony overlapping a prop's collider: %s" % ", ".join(prop_overlaps))
@@ -1575,6 +1750,49 @@ func _report(pony_count: int, prop_count: int) -> void:
 			_game_state.gems.total() if _game_state != null else 0,
 			_game_state.inventory.ids().size() if _game_state != null else 0,
 			_game_state.unlocks.size() if _game_state != null else 0])
+
+	# --- the regions ------------------------------------------------------------------
+	# Four data files, four rings of timber, four zones with residents in them. The three
+	# facts that can each be true while the other two are broken: a region with no fence
+	# is an unlocked region nobody paid for, a fence that stops nobody is the same thing
+	# more expensively, and a zone with a marker but no ponies zoned to it is a meadow
+	# behind a 1200-bit gate with nothing in it.
+	var regions: Array[RegionData] = _regions_registry().all()
+	var fences := get_region_fences()
+	var fenced := {}
+	var open_gates := 0
+	for fence in fences:
+		if fence.region() != null:
+			fenced[fence.region().id] = true
+		if fence.is_open():
+			open_gates += 1
+	var roster: PonyRegistry = PonyRegistryScript.new()
+	roster.load_all(spawner.pony_dir)
+	var every_region_fenced := regions.size() > 0 and fences.size() == regions.size()
+	var residents_everywhere := regions.size() > 0
+	for region: RegionData in regions:
+		if not fenced.has(region.id):
+			every_region_fenced = false
+			push_error("ranch: region '%s' has no fence" % region.id)
+		if roster.by_zone(region.id).is_empty():
+			residents_everywhere = false
+			push_error("ranch: region '%s' has no residents in the roster" % region.id)
+	print("RANCH regions=%d fences=%d open=%d" % [regions.size(), fences.size(), open_gates])
+	_set_check(checks, "every region has a fence", every_region_fenced)
+	_set_check(checks, "every region zone has residents in the roster", residents_everywhere)
+
+	var gate_probe: Dictionary = await _probe_region_gate()
+	print("RANCH region gate ran=%s solid=%s opened=%s hit=%s"
+		% [gate_probe.get("ran", false), gate_probe.get("solid", false),
+			gate_probe.get("opened", false), gate_probe.get("hit", "<none>")])
+	# An empty probe is a FAILED check and not a skip, for the reason the camera block
+	# below spells out at length: the regions and their fences exist on every checkout,
+	# assetless or not, so "there was nothing to probe" can only mean the thing that was
+	# supposed to be probed is not there.
+	_set_check(checks, "a locked region's gate is solid to the player",
+		bool(gate_probe.get("solid", false)))
+	_set_check(checks, "a permit in the unlocks opens its gate",
+		bool(gate_probe.get("opened", false)))
 
 	# --- THE GATE IS A GATE -----------------------------------------------------------------
 	# "i also trapped myself inside the pen and couldnt leave" (owner playtest). The gateway
@@ -2096,6 +2314,64 @@ func _body_overlaps(body: CharacterBody3D, owner_node: CollisionObject3D,
 		if _is_pen_part(hit.get("collider"), owner_node):
 			return true
 	return false
+
+
+## SHUT THE ORCHARD GATE, WALK A RAY INTO IT, AND THEN BUY THE PERMIT ON PAPER.
+##
+## Two facts, measured on the real ring in the real world rather than in a unit test,
+## because both of them have already been true of a fence that did not work: that a locked
+## leaf is solid to a body carrying the PLAYER's own mask (WALKABLE, which deliberately
+## excludes PEN_GATE), and that putting the permit in `unlocks` and re-applying is all it
+## takes to open it. game/test/test_region_fence.gd can prove set_open() flips a layer; it
+## cannot prove that the layer it flips is one the player's mask is looking at.
+##
+## IT PUTS EVERYTHING BACK. The gate is shut for the ray whether or not the loaded save had
+## already bought it, and the permit is appended and then erased IN PLACE (the Shop holds a
+## reference to that same array, so replacing it would leave the shop selling into an array
+## nothing reads). The final _apply_permits() therefore restores exactly the state boot
+## reached, and a developer whose save owns the orchard does not lose it by running a gate.
+##
+## Returns {ran, solid, opened, hit}.
+func _probe_region_gate() -> Dictionary:
+	var result := {"ran": false, "solid": false, "opened": false, "hit": "<none>"}
+	if _game_state == null:
+		return result
+	var fence: RegionFence = null
+	for f in get_region_fences():
+		if f.region() != null and f.region().id == &"orchard":
+			fence = f
+	if fence == null or fence.gate_body() == null:
+		push_error("ranch: no orchard fence to probe")
+		return result
+	result["ran"] = true
+
+	fence.set_open(false)
+	# The layer written above is a physics server property, and the query below reads the
+	# server. One step, so the write has landed before the ray is cast.
+	await get_tree().physics_frame
+
+	var region: RegionData = fence.region()
+	var gate: Vector3 = fence.gate_position()
+	var outward := Vector3(gate.x - region.centre.x, 0.0, gate.z - region.centre.y).normalized()
+	var eye := gate + Vector3(0.0, GATE_PROBE_CENTRE_Y, 0.0)
+	var query := PhysicsRayQueryParameters3D.create(eye + outward * GATE_RAY_REACH,
+		eye - outward * GATE_RAY_REACH, LayersScript.WALKABLE)
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	var collider: Object = hit.get("collider")
+	if collider is Node:
+		result["hit"] = (collider as Node).name
+	result["solid"] = collider == fence.gate_body()
+
+	var permit := String(region.permit_id())
+	var had: bool = _game_state.unlocks.has(permit)
+	if not had:
+		_game_state.unlocks.append(permit)
+	_apply_permits()
+	result["opened"] = fence.is_open()
+	if not had:
+		_game_state.unlocks.erase(permit)
+	_apply_permits()
+	return result
 
 
 ## Write a save into the gate's own scratch slot, read it back with a SECOND, independent
