@@ -87,6 +87,19 @@ Paid up front on purpose. Batching several files into one process would be
 faster and would lose the property that makes the output useful, which is that
 a failure names one path.
 
+**The local iteration hatch.** `FILLY_SKIP_SWEEP=1 bash tools/run_tests.sh`
+skips the sweep and goes straight to GUT:
+
+```
+Parse sweep: SKIPPED (FILLY_SKIP_SWEEP=1). Local iteration only; CI always runs it.
+```
+
+It is for the fifth re-run of a test you are in the middle of writing, where the
+minute buys nothing you did not learn on the first run. **CI never sets it and
+no gate sets it**, so nothing merges on a run that skipped it; and a run that did
+skip it says so on its own line, so a log cannot be mistaken for one that passed
+the sweep. Run the suite once without it before calling anything finished.
+
 **Proving the guard.** Drop a file into `game/systems/` containing
 `var x := {"a": 1}.get("a")` and run `bash tools/run_tests.sh`: it exits 1 with
 

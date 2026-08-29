@@ -13,6 +13,13 @@
 # below, kept at the suite's current size). Same purpose: it lets the floor
 # guard be exercised without removing real tests.
 #
+# FILLY_SKIP_SWEEP=1 skips the parse sweep. A LOCAL ITERATION HATCH ONLY, documented in
+# docs/testing.md: the sweep is about 75 s of the roughly four minutes this script takes,
+# and paying it on every re-run of a test you are in the middle of writing is the kind of
+# tax that ends with people not running the suite at all. CI NEVER SETS IT, and neither
+# does any gate; a run with it set says so on its own line so a log that skipped the sweep
+# cannot be mistaken for one that passed it.
+#
 # A PARSE SWEEP RUNS FIRST, BEFORE GUT IS INVOKED AT ALL; see the block below the GUT
 # addon check. GUT's loader does not run the analyzer pass that promotes some GDScript
 # diagnostics (INFERENCE_ON_VARIANT is the one that bit this project) from a warning to an
@@ -60,28 +67,32 @@ fi
 #
 # EVERY failing path is printed, not just the first: a bad merge tends to break several
 # files at once and stopping at one turns that into a queue of one-line fixes.
-sweep_failures=""
-sweep_count=0
-while IFS= read -r gd; do
-  sweep_count=$((sweep_count + 1))
-  res="res://${gd#game/}"
-  if ! tools/bin/godot --headless --audio-driver Dummy --path game \
-      --check-only --script "$res" >/dev/null 2>&1; then
-    sweep_failures="$sweep_failures  $res"$'\n'
-  fi
-done < <(find game -name '*.gd' -not -path 'game/addons/*' | sort)
+if [ "${FILLY_SKIP_SWEEP:-0}" = "1" ]; then
+  echo "Parse sweep: SKIPPED (FILLY_SKIP_SWEEP=1). Local iteration only; CI always runs it."
+else
+  sweep_failures=""
+  sweep_count=0
+  while IFS= read -r gd; do
+    sweep_count=$((sweep_count + 1))
+    res="res://${gd#game/}"
+    if ! tools/bin/godot --headless --audio-driver Dummy --path game \
+        --check-only --script "$res" >/dev/null 2>&1; then
+      sweep_failures="$sweep_failures  $res"$'\n'
+    fi
+  done < <(find game -name '*.gd' -not -path 'game/addons/*' | sort)
 
-if [ -n "$sweep_failures" ]; then
-  echo "ERROR: $(printf '%s' "$sweep_failures" | grep -c .) of $sweep_count GDScript file(s) do not parse; the suite was NOT run." >&2
-  printf '%s' "$sweep_failures" >&2
-  echo "  Re-run one of them on its own to see the engine's own message:" >&2
-  echo "    tools/bin/godot --headless --audio-driver Dummy --path game --check-only --script <res://path>" >&2
-  echo "  NOTE: GUT would not have caught this. Its loader does not run the analyzer pass" >&2
-  echo "  that turns INFERENCE_ON_VARIANT and friends into errors, so a script can pass the" >&2
-  echo "  suite and still break the scene that preloads it. See docs/testing.md." >&2
-  exit 1
+  if [ -n "$sweep_failures" ]; then
+    echo "ERROR: $(printf '%s' "$sweep_failures" | grep -c .) of $sweep_count GDScript file(s) do not parse; the suite was NOT run." >&2
+    printf '%s' "$sweep_failures" >&2
+    echo "  Re-run one of them on its own to see the engine's own message:" >&2
+    echo "    tools/bin/godot --headless --audio-driver Dummy --path game --check-only --script <res://path>" >&2
+    echo "  NOTE: GUT would not have caught this. Its loader does not run the analyzer pass" >&2
+    echo "  that turns INFERENCE_ON_VARIANT and friends into errors, so a script can pass the" >&2
+    echo "  suite and still break the scene that preloads it. See docs/testing.md." >&2
+    exit 1
+  fi
+  echo "Parse sweep: $sweep_count GDScript file(s) parse cleanly."
 fi
-echo "Parse sweep: $sweep_count GDScript file(s) parse cleanly."
 
 out="$(mktemp)"
 trap 'rm -f "$out"' EXIT
