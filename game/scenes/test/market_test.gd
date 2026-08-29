@@ -140,6 +140,7 @@ func _ready() -> void:
 	for i in range(rows.size()):
 		if rows[i].id == &"bigger_saddlebag":
 			bag_index = i
+	_set_check("the saddlebag is in the catalogue", bag_index >= 0)
 	menu.set_tab(MarketMenuScript.Tab.BUY)
 	menu.move_selection(bag_index)
 	_set_check("the saddlebag is buyable when funded", menu.confirm())
@@ -210,6 +211,26 @@ func _ready() -> void:
 	_set_check("a second restore places nobody twice", ranch.restore_owned_ponies() == 0)
 	_set_check("and the bag still holds the herd exactly once", storage.count() == herd)
 
+	# The load above ran with rebind_economy disconnected, exactly as boot's does, so the
+	# Shop is still holding the pouch from before it. Put that back the way an ordinary
+	# mid-session load leaves it.
+	ranch.rebind_economy()
+	var shop_now: Shop = ranch.get_shop()
+
+	# --- what the player is told ----------------------------------------------------------
+	# The sale toast is measured across the sale rather than read off the request, and one
+	# gem is a gem. Both halves are only visible from here: nothing else drives ranch.gd's
+	# _on_sell_requested() with a real Shop behind it.
+	state.gems.add(PonyDataScript.Rarity.COMMON, 1)
+	menu.set_tab(MarketMenuScript.Tab.SELL)
+	menu.move_selection(1 + PonyDataScript.Rarity.COMMON)
+	var one_gem_bits: int = shop_now.gem_price(PonyDataScript.Rarity.COMMON)
+	_set_check("a single common gem sells", menu.confirm())
+	_set_check("the toast counts one gem as a gem",
+		hud.toast_text() == "Sold 1 gem for %d bits." % one_gem_bits)
+	_set_check("the pouch is empty after the single sale",
+		shop_now.gem_count(PonyDataScript.Rarity.COMMON) == 0)
+
 	# --- pause menu ---------------------------------------------------------------------
 	var pause = ranch.get_pause_menu()
 	_set_check("the pause menu opens", pause.open())
@@ -220,6 +241,16 @@ func _ready() -> void:
 	pause.open()
 	_set_check("the market refuses while paused", not menu.open())
 	pause.close()
+	# And the interlock read the other way round, through the ranch's own wiring rather
+	# than through a lambda a test wrote: with the Market up, Escape must not stack a pause
+	# menu on it. Both directions ask ranch.gd's one predicate (_no_menu_but), and the way
+	# that used to go wrong was one direction being enforced only at the call site that
+	# happened to remember it.
+	_set_check("the market opens again", menu.open())
+	_set_check("the pause menu refuses while the market is up", not pause.open())
+	_set_check("...and the refusal did not open it", not pause.is_open())
+	menu.close()
+	_set_check("closing the market unpauses again", not get_tree().paused)
 
 	# --- cleanup ------------------------------------------------------------------------
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(SaveIOScript.slot_path(SLOT)))

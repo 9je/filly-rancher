@@ -182,7 +182,6 @@ func test_capacity_can_grow_but_never_below_what_is_held() -> void:
 	assert_true(bag.is_full())
 
 
-
 ## The HUD caches the capacity it bound to and rebuilds only on `changed`, so a bag that
 ## grew in silence would print "n / 12" over an eighteen-slot saddlebag forever. The
 ## no-op half is asserted just as hard, for the same reason the refused-store case above

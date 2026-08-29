@@ -49,7 +49,7 @@ func ids() -> Array[StringName]:
 	# sort_custom rather than plain sort(): StringName's default comparator is not
 	# reliably lexicographic once other scripts have interned the same names first
 	# (observed only under the full suite, never in isolation), so compare as String.
-	out.sort_custom(func(a, b): return String(a) < String(b))
+	out.sort_custom(func(a: StringName, b: StringName) -> bool: return String(a) < String(b))
 	return out
 
 

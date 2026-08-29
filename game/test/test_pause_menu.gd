@@ -81,7 +81,25 @@ func test_cancel_on_settings_returns_to_main_and_on_main_closes() -> void:
 	assert_false(_menu.is_open())
 
 
+## Both pages, as the name promises. The two have DIFFERENT row counts (four on MAIN,
+## three on SETTINGS) and _row_count() is the one thing that knows which, so a wrap that is
+## only exercised on MAIN would let the settings page wrap past its last row into a fourth
+## that is not drawn.
 func test_selection_wraps_on_both_pages() -> void:
 	_menu.open()
 	_menu.move_selection(-1)
-	assert_eq(_menu.selected_index(), PauseMenu.Row.QUIT)
+	assert_eq(_menu.selected_index(), PauseMenu.Row.QUIT,
+		"up from the first row lands on the last one on MAIN")
+	_menu.move_selection(1)
+	assert_eq(_menu.selected_index(), PauseMenu.Row.RESUME, "...and down comes back round")
+
+	_menu.move_selection(PauseMenu.Row.SETTINGS)
+	assert_true(_menu.confirm(), "the settings page opens")
+	assert_eq(_menu.page(), PauseMenu.Page.SETTINGS)
+	assert_eq(_menu.selected_index(), 0, "on its first row")
+	_menu.move_selection(-1)
+	assert_eq(_menu.selected_index(), PauseMenu.SettingRow.INVERT,
+		"up from the first row lands on the last of the THREE settings rows")
+	_menu.move_selection(1)
+	assert_eq(_menu.selected_index(), PauseMenu.SettingRow.VOLUME,
+		"...and down comes back round to the first")

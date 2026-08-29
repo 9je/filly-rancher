@@ -30,7 +30,8 @@ const ROW_SELECTED_BORDER := Color(1.0, 0.86, 0.55, 0.75)
 const ROW_IDLE_BG := Color(1.0, 1.0, 1.0, 0.04)
 const ROW_IDLE_BORDER := Color(1.0, 1.0, 1.0, 0.10)
 
-## Rarity names for the Sell tab, in enum order.
+## Rarity names for the Sell tab, in enum order. Prose, and PonyData.Rarity is the list it
+## is prose about: see _rarity_name() for what happens when the two disagree.
 const RARITY_NAMES := ["Common", "Uncommon", "Rare", "Legendary"]
 const FOOTER_DEFAULT := "  ← → / D-pad  tab      ↑ ↓  choose      Enter / A  confirm      Esc / B  back"
 
@@ -86,7 +87,13 @@ func _ready() -> void:
 
 # --- opening and closing ------------------------------------------------------------------
 
+## Returns whether the Market came up. Already open is a refusal, PauseMenu.open()'s rule
+## and for the same reason: an open() that "succeeded" on a menu that was already up would
+## announce a second `opened`, and ranch.gd pauses the tree on that signal and unpauses on
+## the single `closed` that follows.
 func open() -> bool:
+	if _open:
+		return false
 	if shop == null:
 		return false
 	if can_open.is_valid() and not bool(can_open.call()):
@@ -146,7 +153,10 @@ func buy_rows() -> Array[ShopItem]:
 
 
 func _row_count() -> int:
-	return sell_rows().size() + 1 if _tab == Tab.SELL else _catalogue.size()
+	# Parenthesised because the +1 belongs to the SELL branch (the "Sell everything" row),
+	# not to the whole ternary, and GDScript's precedence here is worth nobody's second
+	# reading.
+	return (sell_rows().size() + 1) if _tab == Tab.SELL else _catalogue.size()
 
 
 # --- input ----------------------------------------------------------------------------------
@@ -175,13 +185,18 @@ func confirm() -> bool:
 		var rarity: int = sell_rows()[_selected - 1]
 		var count := shop.gem_count(rarity)
 		if count <= 0:
-			_refuse("No %s gems to sell." % RARITY_NAMES[rarity].to_lower())
+			_refuse("No %s gems to sell." % _rarity_name(rarity).to_lower())
 			return false
 		sell_requested.emit(rarity, count)
 		refresh()
 		return true
 	var item := _selected_item()
 	if item == null:
+		# An empty BUY catalogue, or a cursor that has fallen off the end of one. Every
+		# other dead end on this screen explains itself in the footer; a keypress that
+		# vanished without a word would read as a broken button. Shop owns the wording of
+		# every refusal, this one included.
+		_refuse(shop.refusal(null))
 		return false
 	var why := shop.refusal(item)
 	if not why.is_empty():
@@ -198,6 +213,22 @@ func sell_everything() -> bool:
 	sell_all_requested.emit()
 	refresh()
 	return true
+
+
+## The label for one PonyData.Rarity.
+##
+## RARITY_NAMES is hand-written and the enum is what it describes, so a fifth rarity added
+## to PonyData would index past the end of the array and take the whole Sell tab down with
+## it. Anything the array does not cover is named from the enum's own key instead: uglier
+## than the written word, which is the point, because ugly is a reminder and a crash is a
+## lost afternoon.
+func _rarity_name(rarity: int) -> String:
+	if rarity >= 0 and rarity < RARITY_NAMES.size():
+		return String(RARITY_NAMES[rarity])
+	var keys: Array = PonyDataScript.Rarity.keys()
+	if rarity >= 0 and rarity < keys.size():
+		return String(keys[rarity]).capitalize()
+	return "Unknown"
 
 
 func _selected_item() -> ShopItem:
@@ -258,7 +289,7 @@ func refresh() -> void:
 		for i in range(sell_rows().size()):
 			var rarity: int = sell_rows()[i]
 			var count := shop.gem_count(rarity)
-			_add_row(i + 1, "%s gems" % RARITY_NAMES[rarity], "you have %d" % count,
+			_add_row(i + 1, "%s gems" % _rarity_name(rarity), "you have %d" % count,
 				"%d bits each" % shop.gem_price(rarity), count > 0)
 	else:
 		for i in range(_catalogue.size()):

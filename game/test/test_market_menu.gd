@@ -121,6 +121,43 @@ func test_confirm_on_an_unaffordable_item_is_refused_with_a_reason() -> void:
 	assert_string_contains(_menu.footer_text(), "bits")
 
 
+func test_the_market_refuses_to_open_twice() -> void:
+	# PauseMenu's rule. ranch.gd pauses the tree on `opened` and unpauses on the one
+	# `closed` that follows, so a second `opened` would leave the world stopped behind a
+	# menu that had already been shut.
+	assert_true(_menu.open())
+	watch_signals(_menu)
+	assert_false(_menu.open(), "it is already up")
+	assert_signal_not_emitted(_menu, "opened", "and it did not announce itself again")
+	assert_true(_menu.is_open(), "...nor did the refusal close it")
+
+
+func test_confirm_on_a_buy_tab_with_nothing_under_the_cursor_says_so() -> void:
+	# Reachable with an empty catalogue, or a cursor left past the end of one. A keypress
+	# that vanished without a word reads as a broken button, so this refuses out loud like
+	# every other dead end on this screen. The wording is Shop's, not the menu's.
+	_menu.open()
+	_menu.set_tab(MarketMenu.Tab.BUY)
+	_menu._selected = _menu.buy_rows().size() + 5
+	watch_signals(_menu)
+	assert_false(_menu.confirm())
+	assert_signal_not_emitted(_menu, "buy_requested")
+	assert_string_contains(_menu.footer_text(), _shop.refusal(null),
+		"the footer carries Shop's own wording for it")
+
+
+func test_every_rarity_the_enum_carries_has_a_name_and_an_unknown_one_still_has_a_label() -> void:
+	# RARITY_NAMES is hand-written prose about PonyData.Rarity. While they agree, the prose
+	# is used; when a fifth rarity is added and this assertion goes red, the fallback below
+	# is what keeps the Sell tab drawing instead of indexing off the end of the array.
+	assert_eq(MarketMenu.RARITY_NAMES.size(), PonyDataScript.Rarity.size(),
+		"every rarity in the enum has a written name")
+	for rarity in PonyDataScript.Rarity.values():
+		assert_eq(_menu._rarity_name(rarity), MarketMenu.RARITY_NAMES[rarity])
+	assert_false(_menu._rarity_name(PonyDataScript.Rarity.size() + 3).is_empty(),
+		"a rarity nobody has written a word for still gets a label rather than a crash")
+
+
 func test_selection_wraps() -> void:
 	_menu.open()
 	_menu.move_selection(-1)

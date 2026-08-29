@@ -59,6 +59,16 @@ func test_the_hud_scene_loads_and_carries_its_script() -> void:
 ## game/scenes/test/camera_test.gd's own crosshair round-trip -- which only ever checks
 ## the camera/projection half of that agreement, never the HUD's node layout -- stayed
 ## green throughout. This is the other half.
+func test_a_toast_is_readable_back_after_it_is_shown() -> void:
+	# game/world/ranch.gd says everything it says to the player through HUD.toast(), and
+	# what it says is a requirement in its own right (the market gate reads the sale line
+	# back to check that one gem is called a gem). A toast nothing can read again is a
+	# requirement nothing can check.
+	await wait_process_frames(1)
+	_hud.toast("Sold 1 gem for 5 bits.")
+	assert_eq(_hud.toast_text(), "Sold 1 gem for 5 bits.")
+
+
 func test_the_crosshair_control_is_centred_on_the_viewport() -> void:
 	var crosshair: Control = _hud.get_node("Crosshair")
 	await wait_process_frames(1)
@@ -224,7 +234,6 @@ func test_a_refused_store_does_not_change_what_the_hud_shows() -> void:
 		"the bag is full, so this store must be refused")
 	assert_eq(_hud.get_shown_rarities(), before,
 		"a refused capture must leave the pips exactly as they were")
-
 
 
 ## THE BUG THIS PINS IS A LIE ON SCREEN, NOT A CRASH. The HUD caches its capacity at bind

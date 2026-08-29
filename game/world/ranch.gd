@@ -832,9 +832,16 @@ func _on_pause_opened() -> void:
 func _on_sell_requested(rarity: int, count: int) -> void:
 	if _shop == null:
 		return
+	# MEASURED ACROSS THE SALE, not taken from the request. Shop.sell() takes as many as the
+	# pouch actually holds and answers in BITS, so `count` is what the menu asked for and
+	# says nothing about what was found: a request that outran the pouch used to toast
+	# "Sold 3 gems" over a sale of one. And one gem is a gem, not a gems.
+	var held_before: int = _shop.gem_count(rarity)
 	var earned: int = _shop.sell(rarity, count)
+	var sold_count: int = held_before - _shop.gem_count(rarity)
 	if earned > 0:
-		_toast("Sold %d gems for %d bits." % [count, earned])
+		_toast("Sold %d %s for %d bits." % [
+			sold_count, "gem" if sold_count == 1 else "gems", earned])
 	if market_menu.has_method("refresh"):
 		market_menu.refresh()
 
@@ -2075,6 +2082,11 @@ func _body_overlaps(body: CharacterBody3D, owner_node: CollisionObject3D,
 ##
 ## The probe pony is a real PonyInstance round-tripped through PonyInstance.to_dict(), so
 ## this exercises the actual serialisation path the player's ponies use, not a toy payload.
+##
+## THE POUCH AND THE PANTRY ARE IN HERE for the same reason the pony is. They are the two
+## fields slice 1 added to the save, they are the two the format version was bumped for,
+## and a probe that wrote every OTHER field would have gone on printing a green
+## save_round_trip on a build that had quietly stopped writing either of them.
 func _probe_save_round_trip() -> Dictionary:
 	var path: String = ProjectSettings.globalize_path(SaveIOScript.slot_path(GATE_SAVE_SLOT))
 	var result := {"ok": false, "wrote": false, "reloaded": false, "path": path}
@@ -2084,6 +2096,8 @@ func _probe_save_round_trip() -> Dictionary:
 	writer.world_seed = spawner.spawn_seed
 	writer.plots = {"0": "gate_probe"}
 	writer.unlocks = ["gate_probe"]
+	writer.gems.add(PonyDataScript.Rarity.RARE, 3)
+	writer.inventory.add(&"hay", 5)
 	writer.add_pony(PonyInstanceScript.from_dict({
 		"uid": "gate_probe#000001", "data_id": "twilight",
 		"nickname": "Probe", "happiness": 0.625, "hunger": 0.375, "caught_at_ms": 1772150400000,
@@ -2103,7 +2117,9 @@ func _probe_save_round_trip() -> Dictionary:
 			and String(ponies[0].uid) == "gate_probe#000001" \
 			and ponies[0].nickname == "Probe" \
 			and absf(ponies[0].happiness - 0.625) < 0.0001 \
-			and ponies[0].caught_at_ms == 1772150400000
+			and ponies[0].caught_at_ms == 1772150400000 \
+			and reader.gems.count(PonyDataScript.Rarity.RARE) == 3 \
+			and reader.inventory.count(&"hay") == 5
 	reader.free()
 	return result
 

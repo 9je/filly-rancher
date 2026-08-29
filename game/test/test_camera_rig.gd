@@ -362,9 +362,15 @@ func test_invert_look_flips_pitch_and_leaves_yaw_alone() -> void:
 	# resolved dynamically; explicit type annotations keep GDScript from refusing to
 	# infer a type for the result the way `:=` would.
 	var pitch_before: float = _rig.get_look_pitch_degrees()
+	var yaw_before: float = _rig.rotation.y
 	_rig.add_look_delta(0.0, 0.1)
 	var normal_pitch: float = _rig.get_look_pitch_degrees()
 	assert_lt(normal_pitch, pitch_before, "positive delta looks down when not inverted")
 	_rig.invert_look = true
 	_rig.add_look_delta(0.0, 0.1)
 	assert_gt(_rig.get_look_pitch_degrees(), normal_pitch, "and up when inverted")
+	# The second half of the name, which nothing used to check. The setting is called
+	# INVERT LOOK and players read that as "invert the vertical axis"; a build that also
+	# flipped horizontal would make every one of them think the option was broken.
+	assert_almost_eq(_rig.rotation.y, yaw_before, 0.000001,
+		"neither look, inverted or not, may move the yaw the caller passed zero for")

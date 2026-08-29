@@ -250,6 +250,13 @@ func toast(text: String) -> void:
 	_toast.modulate.a = 1.0
 
 
+## The line the last toast() put on screen, whether or not it has faded. Exposed for the
+## same reason get_bits_text() is: what the player is told is a real requirement (the
+## market gate reads the sale line back), and a gate has no other way to see it.
+func toast_text() -> String:
+	return _toast.text
+
+
 ## The magic beam this HUD is reading, or null if it has not been found yet. Exposed for
 ## gates and tests, which otherwise have no way to tell "bound and idle" apart from
 ## "never bound at all" -- the two look identical on screen.

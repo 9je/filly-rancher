@@ -230,9 +230,8 @@ func test_a_running_player_is_noticed_before_the_beam_can_reach_her() -> void:
 	# personality with a NEGATIVE bonus able to slip under the invariant unseen, which is
 	# exactly the class of bug this test exists for. Sneaking is deliberately excluded --
 	# see test_sneaking_is_allowed_to_beat_the_head_start_and_only_sneaking.
-	var pony_script := load("res://actors/pony/pony.gd")
 	for personality in PonyDataScript.Personality.values():
-		var radius: float = pony_script.notice_radius_for(personality, false)
+		var radius: float = PonyScript.notice_radius_for(personality, false)
 		var margin: float = radius - MagicBeamScript.REACH
 		assert_gte(margin, MagicBeamScript.MIN_DETECTION_MARGIN,
 			("a %s pony must notice a RUNNING player at least MIN_DETECTION_MARGIN " +
