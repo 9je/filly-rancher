@@ -36,7 +36,7 @@ func test_mark_seen_a_second_time_changes_nothing() -> void:
 	var c = CompendiumScript.new()
 	c.mark_seen(&"twilight")
 	watch_signals(c)
-	assert_false(c.mark_seen(&"twilight"), "already seen -- nothing moved")
+	assert_false(c.mark_seen(&"twilight"), "already seen; nothing moved")
 	assert_signal_not_emitted(c, "changed")
 
 
@@ -165,9 +165,9 @@ func test_from_dict_of_an_empty_dictionary_is_a_fresh_compendium() -> void:
 
 func test_from_dict_drops_junk() -> void:
 	var c = CompendiumScript.from_dict({
-		"twilight": 99,       # out of range -- not a real State
+		"twilight": 99,       # out of range; not a real State
 		"rainbowdash": "seen",  # not a number at all
-		"fluttershy": 0,       # explicit UNSEEN -- must not fabricate an entry
+		"fluttershy": 0,       # explicit UNSEEN; must not fabricate an entry
 		"pinkiepie": 2,        # the only well-formed entry
 	})
 	assert_eq(c.state_of(&"twilight"), CompendiumScript.State.UNSEEN, "out-of-range dropped")

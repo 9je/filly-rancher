@@ -345,7 +345,7 @@ func test_a_version_1_file_on_disk_loads_all_the_way_into_a_game_state() -> void
 		"a save from before the clock existed comes back at dawn, not broken")
 	assert_eq(state.compendium.state_of(&"twilight"), CompendiumScript.State.UNSEEN,
 		"a save from before the compendium existed comes back with nobody marked, " +
-		"even for a pony she owns -- a later task's ranch code backfills owned ponies on load")
+		"even for a pony she owns; a later task's ranch code backfills owned ponies on load")
 	assert_true(state.requests.is_empty(), "and with no requests pending")
 
 
@@ -426,7 +426,7 @@ func test_a_version_3_file_on_disk_loads_all_the_way_into_a_game_state() -> void
 	assert_almost_eq(state.world_time, 733.5, 0.001, "the world clock survives")
 	assert_eq(state.compendium.state_of(&"twilight"), CompendiumScript.State.UNSEEN,
 		"a save from before the compendium existed comes back with nobody marked, " +
-		"even for a pony she owns -- a later task's ranch code backfills owned ponies on load")
+		"even for a pony she owns; a later task's ranch code backfills owned ponies on load")
 	assert_true(state.requests.is_empty(), "and with no requests pending")
 
 

@@ -7,7 +7,7 @@ extends RefCounted
 ## something like "12 / 43 seen".
 ##
 ## STATE ONLY EVER MOVES FORWARD. mark_seen()/mark_caught() never downgrade a character who
-## is already further along -- catching a pony you never noticed first still counts as
+## is already further along; catching a pony you never noticed first still counts as
 ## having seen her, and re-marking a caught pony as merely seen would erase real progress
 ## over a UI ordering bug or a duplicated call. Both return whether anything actually
 ## changed, so a caller can tell "this raised her state" from "she was already there"
@@ -15,7 +15,7 @@ extends RefCounted
 ##
 ## UNSEEN IS THE ABSENCE OF AN ENTRY, not a stored value: a fresh Compendium has nothing in
 ## `_states` at all, and state_of() answers UNSEEN for any id it has never heard of.
-## to_dict() keeps that compact on disk -- only SEEN and CAUGHT entries are written -- which
+## to_dict() keeps that compact on disk; only SEEN and CAUGHT entries are written; which
 ## is what makes an old save missing the `compendium` key entirely (SaveIO.migrate() adds
 ## `compendium: {}`) indistinguishable from a save that has the key and nobody has been
 ## marked in it yet.
@@ -44,7 +44,7 @@ func state_of(id: StringName) -> int:
 	return int(_states.get(id, State.UNSEEN))
 
 
-## Raise `id` to SEEN if she is currently UNSEEN. Returns whether that happened -- false if
+## Raise `id` to SEEN if she is currently UNSEEN. Returns whether that happened; false if
 ## she was already SEEN or CAUGHT, because this never downgrades.
 func mark_seen(id: StringName) -> bool:
 	return _raise(id, State.SEEN)
@@ -89,7 +89,7 @@ func total(registry: PonyRegistry) -> int:
 ## Every PonyData in `registry`, gathered by walking the rarity tiers rather than by
 ## reaching into the registry's private index. Safe because `rarity` is a single enum field
 ## on PonyData (not a list, unlike `spawn_zones`), so by_rarity() PARTITIONS the whole
-## roster exactly once per character -- see test_pony_registry.gd's note on that same
+## roster exactly once per character; see test_pony_registry.gd's note on that same
 ## property.
 static func _all_data(registry: PonyRegistry) -> Array[PonyData]:
 	var out: Array[PonyData] = []
@@ -98,7 +98,7 @@ static func _all_data(registry: PonyRegistry) -> Array[PonyData]:
 	return out
 
 
-## String keys, int values, UNSEEN entries omitted -- see the class comment.
+## String keys, int values, UNSEEN entries omitted; see the class comment.
 func to_dict() -> Dictionary:
 	var out := {}
 	for id in _states.keys():
@@ -110,7 +110,7 @@ func to_dict() -> Dictionary:
 
 ## Junk is dropped rather than kept: a non-numeric value, or a number that is not SEEN or
 ## CAUGHT (including an explicit 0, and anything out of range), is skipped entirely rather
-## than stored -- so a hand-edited or corrupted entry cannot fabricate a state this class
+## than stored; so a hand-edited or corrupted entry cannot fabricate a state this class
 ## never produces on its own.
 static func from_dict(d: Dictionary) -> Compendium:
 	var c := Compendium.new()
