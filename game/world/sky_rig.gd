@@ -4,8 +4,8 @@ extends Node3D
 ## the weather is doing; this node is the only thing that turns that answer into photons.
 ## It moves the ranch's DirectionalLight3D along an arc, retints its light, repaints all
 ## four of the ProceduralSkyMaterial's colours (both halves of the sky, not just the half
-## above the skyline), thickens the WorldEnvironment's fog and turns a GPUParticles3D of
-## falling streaks on and off.
+## above the skyline), sets the WorldEnvironment's ambient fill colour and energy, thickens
+## its fog and turns a GPUParticles3D of falling streaks on and off.
 ##
 ## THE MAPPING IS PURE AND STATIC, the scene writing is not. Every question of the form
 ## "what colour is a stormy dusk" is a static function of (phase, weather) with no node in
@@ -78,15 +78,41 @@ const PHASE_SKY_TOP: Array[Color] = [
 	Color(0.58, 0.40, 0.55),
 	Color(0.06, 0.08, 0.18),
 ]
-## DAY's 0.32 is likewise ranch.tscn's own ambient_light_energy. NIGHT's 0.22 is the other
-## half of the playability fix above: ambient is what fills the shadows the moon does not
-## reach, and at 0.10 the ground under a night sky was a silhouette with ponies lost in it.
+## DAY's 0.32 is likewise ranch.tscn's own ambient_light_energy. NIGHT's 0.70 is not an art
+## number at all, it is the answer to an arithmetic one. Ambient is what fills the shadows
+## the moon does not reach, and the Environment mixes its ambient from two sources: 35% off
+## the sky (which at night is a zenith of luminance 0.04) and 65% off ambient_light_color
+## (the moonlight below, luminance 0.36 once a storm has greyed it). The effective ambient
+## luminance is therefore about 0.249 per unit of energy at NIGHT/STORM, and the ranch stops
+## being playable below roughly 0.12 of it. 0.70 x 0.70 = 0.49 lands on 0.122. Anything
+## smaller is a night a player cannot catch a pony in.
 ##
-## IT IS THE NIGHT'S BASE, NOT A FLOOR UNDER IT. Applying 0.22 as a hard minimum on the
-## finished value would put a stormy night (0.22) above a stormy day (0.32 x 0.45 = 0.144)
-## and stand the phases on their heads; weather still scales the night down from here, to
-## 0.099 at its very worst, which is twice what the old clear night got.
-const PHASE_AMBIENT_ENERGY: Array[float] = [0.24, 0.32, 0.22, 0.22]
+## IT IS THE NIGHT'S BASE, NOT A FLOOR UNDER IT, and the night is the one phase whose
+## ordering against the day is NOT defined here: see the note on NIGHT_WEATHER_FLOOR.
+const PHASE_AMBIENT_ENERGY: Array[float] = [0.24, 0.32, 0.22, 0.70]
+
+## THE COLOUR OF THE FILL LIGHT, which is a separate question from how much of it there is.
+## ranch.tscn's Environment now takes only 35% of its ambient colour off the sky and 65% off
+## this, so these four are what actually lifts the shadows: a warm low sun at DAWN and DUSK,
+## a cool skylight at DAY, and at NIGHT a moonlight that is deliberately blue, because a
+## night lit by a neutral grey reads as an underexposed day rather than as moonlight.
+##
+## WHY THE SPLIT MOVED. It used to be 85% sky, which was fine only while the sky's lower
+## hemisphere was accidentally daylight grass. Driving that half correctly (see
+## GROUND_HORIZON_DARKEN) removed the accidental fill and left all four NIGHT cells of the
+## sky sheet too dark to play in. The fix is to stop asking a night sky to be a lamp.
+const PHASE_AMBIENT_COLORS: Array[Color] = [
+	Color(0.86, 0.78, 0.74),
+	Color(0.80, 0.86, 0.94),
+	Color(0.82, 0.68, 0.64),
+	Color(0.48, 0.56, 0.80),
+]
+## How far the fill light is dragged toward the same cloud the sky is mixed with, so an
+## overcast hour fills its shadows with cloud light rather than with its own clear sky. It is
+## the sky's cloud, phase scaled by _cloud_light(), not the raw grey. CLEAR is zero for the
+## same reason WEATHER_SKY_MIX's is: its entry in WEATHER_SKY_GREY is a white placeholder
+## that no weather ever actually hangs in the air.
+const WEATHER_AMBIENT_MIX: Array[float] = [0.0, 0.4, 0.4, 0.4]
 
 ## THE HORIZON IS THE ZENITH, TINTED TOWARD ITS OWN HOUR. Each phase names the colour its
 ## band near the ground is pulled toward and HORIZON_BLEND says how far.
@@ -114,7 +140,8 @@ const HORIZON_BLEND := 0.65
 ## (0.416, 0.529, 0.349), and a rig that wrote only the two sky colours left that green at
 ## full daylight brightness under a near black zenith: a bright green band ran the whole way
 ## round the horizon of every night shot. It leaked into the lighting too, since the scene's
-## ambient takes 85% of its colour from the sky.
+## ambient used to take 85% of its colour from the sky. That share is now 35%, and the rest
+## is PHASE_AMBIENT_COLORS below.
 const GROUND_HORIZON_DARKEN := 0.55
 const GROUND_BOTTOM_DARKEN := 0.30
 
@@ -161,6 +188,19 @@ const WEATHER_RAIN_AMOUNT: Array[int] = [0, 600, 0, 1400]
 const MIN_LIGHT_ENERGY := 0.06
 const MIN_AMBIENT_ENERGY := 0.05
 
+## HOW MUCH OF THE NIGHT'S AMBIENT A STORM IS ALLOWED TO TAKE. Weather scales ambient the
+## same way it scales sunlight, but a storm's 0.45 applied on top of a night that is already
+## the darkest phase takes the fill light past the point where the ranch is legible. At
+## night, and only at night, the multiplier is floored here: a stormy night gets 0.70 of its
+## base rather than 0.45.
+##
+## THIS IS WHY "NIGHT IS DARKER THAN DAY" IS NOT AN AMBIENT CLAIM. With this floor a stormy
+## night's ambient energy (0.49) is above a stormy day's (0.144), and that is correct and
+## intended: ambient energy multiplies a colour, and the night's fill colour is a dim blue
+## moonlight while the day's is a bright skylight. The ordering that means anything on
+## screen is asserted on light_energy and on sky_top luminance, which hold in every weather.
+const NIGHT_WEATHER_FLOOR := 0.7
+
 ## The rain column: a 14 by 14 metre box of emitters one metre thick, RAIN_HEIGHT above
 ## whoever follow() was given, falling at RAIN_GRAVITY for RAIN_LIFETIME seconds.
 const RAIN_HEIGHT := 9.0
@@ -179,6 +219,7 @@ const KEY_SKY_HORIZON := "sky_horizon"
 const KEY_GROUND_HORIZON := "ground_horizon"
 const KEY_GROUND_BOTTOM := "ground_bottom"
 const KEY_AMBIENT_ENERGY := "ambient_energy"
+const KEY_AMBIENT_COLOR := "ambient_color"
 const KEY_FOG_DENSITY := "fog_density"
 const KEY_RAIN_AMOUNT := "rain_amount"
 
@@ -317,8 +358,22 @@ static func _scaled(colour: Color, factor: float) -> Color:
 
 
 static func ambient_energy(phase: int, weather: int) -> float:
-	var base: float = PHASE_AMBIENT_ENERGY[_phase_index(phase)]
-	return maxf(MIN_AMBIENT_ENERGY, base * WEATHER_ENERGY_SCALE[_weather_index(weather)])
+	var p := _phase_index(phase)
+	var base: float = PHASE_AMBIENT_ENERGY[p]
+	var scale: float = WEATHER_ENERGY_SCALE[_weather_index(weather)]
+	if p == WorldStateScript.Phase.NIGHT:
+		scale = maxf(scale, NIGHT_WEATHER_FLOOR)
+	return maxf(MIN_AMBIENT_ENERGY, base * scale)
+
+
+## THE COLOUR THE SHADOWS ARE FILLED WITH. The hour picks it and the weather drags it toward
+## whatever cloud is hanging in that hour, so a rainy dusk fills with grey rather than with
+## its own salmon sky. Written to Environment.ambient_light_color, which is 65% of the
+## finished ambient; the other 35% the Environment samples off the sky itself.
+static func ambient_light_color(phase: int, weather: int) -> Color:
+	var p := _phase_index(phase)
+	var w := _weather_index(weather)
+	return PHASE_AMBIENT_COLORS[p].lerp(cloud_colour(phase, weather), WEATHER_AMBIENT_MIX[w])
 
 
 static func fog_density(weather: int) -> float:
@@ -459,6 +514,7 @@ func _set_targets_from(state: WorldState) -> void:
 		KEY_GROUND_HORIZON: ground_horizon(phase, weather),
 		KEY_GROUND_BOTTOM: ground_bottom(phase, weather),
 		KEY_AMBIENT_ENERGY: ambient_energy(phase, weather),
+		KEY_AMBIENT_COLOR: ambient_light_color(phase, weather),
 		KEY_FOG_DENSITY: fog_density(weather),
 		KEY_RAIN_AMOUNT: rain_amount(weather),
 	}
@@ -478,6 +534,11 @@ func _write_to_scene() -> void:
 	var horizon: Color = _current.get(KEY_SKY_HORIZON, Color.WHITE)
 	if _environment != null:
 		_environment.ambient_light_energy = float(_current.get(KEY_AMBIENT_ENERGY, 0.32))
+		# The fill light's own colour, which is most of the ambient: the scene asks the sky
+		# for only 35% of it, so a night sky at luminance 0.04 can no longer black the ranch
+		# out on its own.
+		_environment.ambient_light_color = _current.get(
+			KEY_AMBIENT_COLOR, _environment.ambient_light_color)
 		_environment.fog_density = float(_current.get(KEY_FOG_DENSITY, WEATHER_FOG_DENSITY[0]))
 		# The fog is lit by the same air the horizon band is, so it takes that colour and
 		# a night fog goes dark instead of glowing white in the dark.
@@ -531,6 +592,7 @@ func _seed_from_scene() -> void:
 		_current[KEY_LIGHT_COLOR] = _sun.light_color
 	if _environment != null:
 		_current[KEY_AMBIENT_ENERGY] = _environment.ambient_light_energy
+		_current[KEY_AMBIENT_COLOR] = _environment.ambient_light_color
 		_current[KEY_FOG_DENSITY] = _environment.fog_density
 	if _sky_material != null:
 		_current[KEY_SKY_TOP] = _sky_material.sky_top_color

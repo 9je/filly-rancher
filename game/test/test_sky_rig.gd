@@ -203,11 +203,20 @@ func test_the_ground_half_of_the_sky_goes_dark_at_night() -> void:
 func test_the_night_is_strictly_darker_than_the_day_in_every_driven_value() -> void:
 	# Weather scales both hours by the same factor, so this has to hold in all four of them
 	# or one of the weather tables has quietly stood the clock on its head.
+	#
+	# AMBIENT ENERGY IS DELIBERATELY NOT ON THIS LIST, and used to be. Energy is only half of
+	# an ambient: the Environment multiplies it by ambient_light_color, and since ruling 18
+	# the rig drives that colour too. The night's fill colour is a dim blue moonlight and the
+	# day's is a bright skylight, so the same amount of light on screen needs a much larger
+	# number at night. With NIGHT_WEATHER_FLOOR holding a stormy night at 0.49 against a
+	# stormy day's 0.144, asserting an ordering on the multiplier alone would be asserting
+	# that a night is darker by comparing two numbers that are not in the same units. What
+	# reaches the eye is asserted here on light_energy and on sky_top luminance instead, and
+	# the fill light's own colour is ordered in
+	# test_the_night_fills_its_shadows_with_blue_moonlight below.
 	for weather in [CLEAR, RAIN, FOG, STORM]:
 		assert_lt(SkyRigScript.light_energy(NIGHT, weather),
 			SkyRigScript.light_energy(DAY, weather), "sunlight, weather %d" % weather)
-		assert_lt(SkyRigScript.ambient_energy(NIGHT, weather),
-			SkyRigScript.ambient_energy(DAY, weather), "ambient, weather %d" % weather)
 		assert_lt(SkyRigScript.sky_top(NIGHT, weather).get_luminance(),
 			SkyRigScript.sky_top(DAY, weather).get_luminance(), "zenith, weather %d" % weather)
 		assert_lt(SkyRigScript.sky_horizon(NIGHT, weather).get_luminance(),
@@ -218,6 +227,23 @@ func test_the_night_is_strictly_darker_than_the_day_in_every_driven_value() -> v
 		assert_lt(SkyRigScript.ground_bottom(NIGHT, weather).get_luminance(),
 			SkyRigScript.ground_bottom(DAY, weather).get_luminance(),
 			"ground below, weather %d" % weather)
+
+
+func test_the_night_fills_its_shadows_with_blue_moonlight() -> void:
+	# The Environment takes 65% of its ambient colour from this and only 35% from the sky, so
+	# this is the colour a player actually sees in the shadows. It has to be blue, or a night
+	# reads as an underexposed day, and it has to be darker than the day's or the phases are
+	# the wrong way round in the one value that is not the energy.
+	var night: Color = SkyRigScript.ambient_light_color(NIGHT, CLEAR)
+	var day: Color = SkyRigScript.ambient_light_color(DAY, CLEAR)
+	assert_gt(night.b, night.r,
+		"moonlight is blue: got r %.3f b %.3f" % [night.r, night.b])
+	assert_lt(night.get_luminance(), day.get_luminance(),
+		"and dimmer than the daylight skylight it replaces")
+	for weather in [CLEAR, RAIN, FOG, STORM]:
+		assert_lt(SkyRigScript.ambient_light_color(NIGHT, weather).get_luminance(),
+			SkyRigScript.ambient_light_color(DAY, weather).get_luminance(),
+			"fill colour, weather %d" % weather)
 
 
 func test_the_weather_multipliers_are_the_agreed_ones() -> void:
@@ -292,6 +318,10 @@ func _build_world() -> void:
 	_environment.background_mode = Environment.BG_SKY
 	_environment.sky = sky
 	_environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	# ranch.tscn's own split and its own hand authored fill colour, so a test that says the
+	# rig repaints the ambient is repainting the same daylight blue the ranch ships.
+	_environment.ambient_light_sky_contribution = 0.35
+	_environment.ambient_light_color = Color(0.729412, 0.803922, 0.878431)
 	_environment.ambient_light_energy = 0.32
 	_environment.fog_enabled = true
 	_environment.fog_density = 0.0011
@@ -347,6 +377,20 @@ func test_the_rig_paints_the_ground_half_of_the_sky_too() -> void:
 	assert_lt(_sky_material.ground_horizon_color.get_luminance(),
 		daylight_grass.get_luminance() * 0.5,
 		"a night ground band must be nothing like the daylight grass it replaced")
+
+	# And the fill light, which is the other half of the same fix: a rig that darkened the
+	# ground half of the sky without also writing a moonlight ambient would leave exactly the
+	# unplayable night this ruling exists to undo.
+	var wanted: Color = SkyRigScript.ambient_light_color(NIGHT, CLEAR)
+	assert_almost_eq(_environment.ambient_light_color.r, wanted.r, 0.001,
+		"the fill light's red reached the Environment")
+	assert_almost_eq(_environment.ambient_light_color.g, wanted.g, 0.001,
+		"and its green")
+	assert_almost_eq(_environment.ambient_light_color.b, wanted.b, 0.001,
+		"and its blue, which is the one that makes it moonlight")
+	assert_almost_eq(_environment.ambient_light_energy,
+		SkyRigScript.ambient_energy(NIGHT, CLEAR), 0.001,
+		"and the energy it is multiplied by")
 
 
 func test_a_pinned_clear_day_puts_the_sun_up_and_the_rain_away() -> void:
