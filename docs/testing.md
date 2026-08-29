@@ -401,9 +401,13 @@ the state, a HUD label nobody pushes to, or a load that restores
 unit test in the suite and all leave the player with a sky that stopped.
 
 Two things about how it reads the clock are worth knowing before editing it.
-It reads the state through `ranch.get_world_state()`, never by parsing the
-`RANCH world` line the hosted ranch prints: a gate that scrapes a print is a
-gate that a reworded print breaks. And it asks the rig what it is walking
+It reads the state through `ranch.get_world_state()` **after** the hosted
+ranch's report has finished, never by parsing the `RANCH world` line that
+report prints: a gate that scrapes a print is a gate that a reworded print
+breaks, and the report rebuilds the world state part way through on purpose
+(that rebuild is how it proves a mid-session load re-aims the sky), so the
+object to drive is the one that exists at the end. The printed line is the
+run's own clock, held before that probe. And it asks the rig what it is walking
 toward with `current_targets()`, comparing those numbers against `SkyRig`'s own
 pure mapping for the phase and weather the clock says it is on, because a rig
 holding a stale state produces a consistent set of wrong numbers rather than an

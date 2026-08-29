@@ -544,6 +544,71 @@ func test_a_rig_nobody_ever_applied_leaves_the_scene_exactly_as_it_found_it() ->
 	assert_false(_rig.is_processing(), "an unwired rig does not even tick")
 
 
+# === sleeping and waking ===
+#
+# The rig turns its own _process off once its ramp has arrived and there is nothing left to
+# carry, which is worth a third of a frame on a ranch that spends most of its cycle in a
+# clear sky. It is also the kind of optimisation that quietly breaks a feature: a rig that
+# went to sleep and did not wake up is a sky that stopped, and it looks exactly like a sky
+# that had nothing to do. These three say when it sleeps and that both ways back up work.
+
+func test_a_clear_sky_stops_ticking_even_with_somebody_to_follow() -> void:
+	_build_world()
+	var walker := Node3D.new()
+	walker.name = "Walker"
+	_world.add_child(walker)
+	_rig.apply_immediately(_pinned_state(DAY, CLEAR))
+	_rig.follow(walker)
+	assert_true(_rig.is_processing(), "follow() turns the rig on to place the cloud")
+
+	_rig.step(0.016)
+	assert_false(_rig.is_processing(),
+		"but a clear sky has no cloud to carry, so an arrived rig goes back to furniture")
+
+
+func test_apply_wakes_a_sleeping_rig_and_the_ramp_actually_runs() -> void:
+	_build_world()
+	_rig.apply_immediately(_pinned_state(DAY, CLEAR))
+	assert_false(_rig.is_processing(), "an arrived rig with nobody to follow is asleep")
+	var day_energy: float = _sun.light_energy
+
+	_rig.apply(_pinned_state(NIGHT, STORM))
+	assert_true(_rig.is_processing(), "apply() is one of the two things that wake it")
+
+	_rig.step(SkyRigScript.TRANSITION_SECONDS * 0.5)
+	assert_lt(_sun.light_energy, day_energy,
+		"and the ramp runs; a rig that woke without ramping is a sky that still stopped")
+
+
+func test_a_shower_starting_on_a_sleeping_rig_puts_the_cloud_overhead_at_once() -> void:
+	# The worst version of the sleep bug: the rig is asleep under a clear sky, the weather
+	# turns, and the cloud spends the eight second ramp sitting wherever the player was
+	# standing when it last rained. It cannot, because the drop count is the one target that
+	# SNAPS at the start of a ramp rather than crawling, so the emitter is live on frame one
+	# and step() asks for the follow AFTER the write that raised it.
+	_build_world()
+	var walker := Node3D.new()
+	walker.name = "Walker"
+	_world.add_child(walker)
+	walker.global_position = Vector3(12.0, 0.0, -30.0)
+	_rig.apply_immediately(_pinned_state(DAY, CLEAR))
+	_rig.follow(walker)
+	_rig.step(0.016)
+	assert_false(_rig.is_processing(), "asleep under a clear sky, with a walker to follow")
+
+	_rig.apply(_pinned_state(DAY, RAIN))
+	assert_true(_rig.is_processing(), "a shower wakes it")
+	_rig.step(0.016)
+
+	var rain: GPUParticles3D = _rig.get_node("Rain")
+	assert_eq(rain.amount, SkyRigScript.rain_amount(RAIN),
+		"the drop count snaps on the first frame of the ramp rather than crawling")
+	assert_true(rain.emitting, "so the shower is falling from that same frame")
+	assert_almost_eq(rain.global_position.x, 12.0, 0.001,
+		"and the very first step has the cloud over her head, not one frame behind her")
+	assert_almost_eq(rain.global_position.z, -30.0, 0.001)
+
+
 func test_the_rain_follows_whoever_it_was_told_to() -> void:
 	_build_world()
 	_rig.apply_immediately(_pinned_state(DAY, RAIN))

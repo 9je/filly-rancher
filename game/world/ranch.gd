@@ -974,18 +974,16 @@ func _rebuild_world_state() -> void:
 	_show_world_line()
 
 
-## A CLOCK BUILT FROM GameState'S OWN NUMBERS, WIRED TO NOTHING. What _rebuild_world_state()
-## installs as the live clock, and what a save loaded at this instant would restore; the
-## same seed, the same elapsed seconds and the same --phase=/--weather=/--world-time=
-## overrides, every time, because there is one construction here rather than one per caller.
+## A CLOCK BUILT FROM GameState'S OWN NUMBERS, WIRED TO NOTHING. What a save loaded at this
+## instant would restore: the same seed, the same elapsed seconds and the same
+## --phase=/--weather=/--world-time= overrides.
 ##
-## SEPARATE FROM _rebuild_world_state() SO THE GATE CAN ASK FOR ONE WITHOUT TAKING ONE.
-## _report()'s "the sky rig is wired to the state" check needs to know what a reload would
-## produce, and used to find out by performing the reload. That replaced the running
-## session's clock as a side effect of reporting on it, and left the `RANCH world` line
-## printing a clock the run had never been on. This hands back a throwaway instead: nothing
-## is connected to its signals, nothing holds it after the caller drops it, and the live
-## _world is untouched.
+## SEPARATE FROM _rebuild_world_state() BECAUSE CONSTRUCTING A CLOCK AND INSTALLING ONE ARE
+## TWO JOBS. Installing is the delicate half (disconnect the old state's signals, connect
+## the new one's, re-aim the sky, repush the HUD label) and reads as itself only once the
+## eight lines of "which seed, which second, pinned to what" are somewhere else. Nothing
+## here is connected to anything or held by anybody; the caller decides what the clock
+## becomes.
 ##
 ## PINNED BEFORE ANYTHING IS LISTENING, on purpose: pin() emits phase_changed and
 ## weather_changed for whichever half it moved, and a rig connected first would start an
@@ -2168,27 +2166,53 @@ func _report(pony_count: int, prop_count: int) -> void:
 	# WALKING TOWARD and compares it against what the clock says the hour and the weather
 	# are, which is a number on both sides.
 	_set_check(checks, "the world state exists", _world != null)
+	# THE CLOCK THIS RUN WAS ACTUALLY ON, held before the reload probe below replaces it, so
+	# that the `RANCH world` line at the end of this section reports the run rather than the
+	# probe. It is the same object as _world until that probe runs.
+	var run_clock: WorldState = _world
 	var world_wired := _sky_rig_matches_state(_world)
-	if not _interactive:
-		# ASKED AGAIN AGAINST THE CLOCK A RELOAD WOULD BUILD. A load REPLACES what GameState
-		# holds and ranch.gd builds a fresh WorldState out of it (see _rebuild_world_state,
-		# and rebind_economy for the same problem in the economy), so the question the line
-		# above cannot answer is whether the rig is aimed at an hour the SAVE agrees with or
-		# only at one some in-memory object happens to hold. _build_world_state() hands back
-		# exactly what that reload would produce, off GameState's own seed and world_time
-		# and the same --phase=/--weather=/--world-time= overrides.
+	if not _interactive and _world != null:
+		# THE RELOAD IS PERFORMED, NOT IMITATED. A load REPLACES what GameState holds and
+		# ranch.gd builds a whole new WorldState out of it (see _rebuild_world_state, and
+		# rebind_economy for the same problem in the economy). A rig still holding boot's
+		# state passes the line above and is wrong the moment the player loads a save, and
+		# nothing else in this project would catch it.
 		#
-		# A SCRATCH CLOCK, NOT THE LIVE ONE. This check used to call _rebuild_world_state()
-		# and then re-ask, which REPLACED the session's clock in the middle of reporting on
-		# it: the `RANCH world` line below then printed an hour the run had never been on,
-		# and docs/testing.md had to warn gates off reading it. Nothing is connected to the
-		# scratch state, nothing keeps it, and _world is not touched.
+		# ASKING A SCRATCH COPY WOULD BE ASKING NOTHING. A WorldState rebuilt from the same
+		# seed and the same elapsed seconds is equal to the live one by construction, so
+		# comparing the rig against it is the first check written twice: `x and x`, which
+		# cannot fail and so measures nothing. What has to be exercised is the rebuild
+		# ITSELF, and every part of it that a mid-session load depends on.
 		#
-		# STILL ONLY OUTSIDE AN INTERACTIVE SESSION, for a smaller reason than before: a
-		# session somebody is playing has a clock that is RUNNING, and GameState.world_time
-		# lags it until the next sync, so the two could disagree for reasons that have
-		# nothing to do with whether the rig is wired.
-		world_wired = world_wired and _sky_rig_matches_state(_build_world_state())
+		# SAFE HERE AND ONLY HERE. This branch is closed to interactive sessions, where the
+		# clock is RUNNING and a rebuild would set it back to whatever GameState last
+		# synced. Outside one, nothing has advanced the clock since boot, which is why the
+		# probe can assert the rebuilt hour and weather are the ones it replaced: if they
+		# ever differ, the rebuild is not reproducing the session and that is a failure.
+		var before_state: WorldState = _world
+		var before_phase: int = _world.phase()
+		var before_weather: int = _world.weather()
+
+		_rebuild_world_state()
+
+		# Every clause is a way the reload path has actually been broken or could be. A
+		# rebuild that returned the same object would mean the load never replaced anything;
+		# a different hour would mean it is not reproducing this session; a second listener
+		# on either signal is the two-clocks-one-sky bug _rebuild_world_state's disconnect
+		# exists to stop, and a listener left on the OLD state is the same bug from the
+		# other end; an unmatched rig would mean the rebuild forgot to re-aim the sky; and a
+		# stale HUD line would mean it forgot the label.
+		var reload_ok: bool = _world != before_state \
+			and _world.phase() == before_phase \
+			and _world.weather() == before_weather \
+			and _world.phase_changed.get_connections().size() == 1 \
+			and _world.weather_changed.get_connections().size() == 1 \
+			and before_state.phase_changed.get_connections().size() == 0 \
+			and before_state.weather_changed.get_connections().size() == 0 \
+			and _sky_rig_matches_state(_world)
+		if hud_scripted and hud.has_method("get_world_line"):
+			reload_ok = reload_ok and hud.get_world_line() == _world.describe()
+		world_wired = world_wired and reload_ok
 	_set_check(checks, "the sky rig is wired to the state", world_wired)
 
 	if _world != null and _world.is_pinned():
@@ -2196,6 +2220,14 @@ func _report(pony_count: int, prop_count: int) -> void:
 		# screenshot or a gate can have a stormy night on demand, and the promise attached
 		# to them is that such a run never writes a moved clock into anybody's save. The
 		# clock is asked to move a full minute here and must refuse.
+		#
+		# YES, THIS REPORT MOVES THE LIVE CLOCK, and so does the reload probe above; both on
+		# purpose, and neither is incidental. Asking a pinned clock to advance IS the
+		# assertion: a probe that only read is a probe that cannot tell "held" from "never
+		# asked". What is guarded is the reverse, that a gate never leaves a MOVED clock
+		# behind: this branch is entered only when the clock is pinned and refusing, the
+		# `RANCH world` line prints run_clock rather than either result, and no
+		# non-interactive run autosaves anything (see _interactive).
 		var before: float = _world.elapsed()
 		_world.advance(60.0)
 		_set_check(checks, "a pinned run does not move the clock",
@@ -2214,11 +2246,16 @@ func _report(pony_count: int, prop_count: int) -> void:
 	_set_check(checks, "the HUD is saying what hour it is",
 		_world != null and hud_line == _world.describe())
 
-	if _world != null:
+	# PRINTED OFF run_clock, WHICH IS THE HOUR THE SESSION WAS ON. The reload probe above
+	# replaced _world with an equal but different object, and the pinned check just asked
+	# the live clock to move; this line is a report on the run, so it reads the clock the
+	# run had. (The probe asserts the two agree on phase and weather, so a disagreement here
+	# would already have failed a check rather than quietly printed the wrong hour.)
+	if run_clock != null:
 		print("RANCH world elapsed=%.1f phase=%s weather=%s pinned=%s"
-			% [_world.elapsed(), WorldStateScript.phase_name(_world.phase()).to_upper(),
-				WorldStateScript.weather_name(_world.weather()).to_upper(),
-				_world.is_pinned()])
+			% [run_clock.elapsed(), WorldStateScript.phase_name(run_clock.phase()).to_upper(),
+				WorldStateScript.weather_name(run_clock.weather()).to_upper(),
+				run_clock.is_pinned()])
 	else:
 		print("RANCH world MISSING; no clock was built")
 

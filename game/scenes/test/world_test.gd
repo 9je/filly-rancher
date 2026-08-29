@@ -24,9 +24,11 @@ extends Node
 ##
 ## THE CLOCK IS READ THROUGH ranch.get_world_state(), NEVER OFF THE `RANCH world` LINE.
 ## That line is a print, and a gate that scrapes a print is a gate that a reworded print
-## breaks; the state object is the thing that is actually true. (It also used to be a
-## clock the run had never been on: ranch.gd's report REBUILT the world state part way
-## through printing, and no longer does. See the scratch clock in its _report().)
+## breaks; the state object is the thing that is actually true. ranch.gd's report also
+## REBUILDS the world state part way through, on purpose, to prove that the rebuild a
+## mid-session load performs actually re-aims the sky; so the object this gate drives is
+## the one that exists AFTER that report has finished. (The printed line is the run's own
+## clock, held before the probe, but that is a courtesy to a reader and not a contract.)
 ##
 ## Marker after verdict, exit code is the verdict. See docs/testing.md.
 

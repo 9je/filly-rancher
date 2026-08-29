@@ -149,8 +149,19 @@ for row, phase in enumerate(phases):
         path = os.path.join(out, cell + ".png")
         label = "%s / %s" % (phase.upper(), weather.upper())
         ink = INK
+        # A CELL ON DISK IS NOT YET A CELL. A render killed by the timeout part way through
+        # its write leaves a truncated png, and an unguarded Image.open on one takes the
+        # whole tiler down with a traceback: sixteen good cells and no sheet, and an exit
+        # code that says "the tiler is broken" rather than "one cell needs re-rendering".
+        # An unreadable cell is a hole, and is treated as exactly that.
+        shot = None
         if os.path.exists(path):
-            shot = Image.open(path).convert("RGB").resize((TILE_W, TILE_H - LABEL_H))
+            try:
+                shot = Image.open(path).convert("RGB").resize((TILE_W, TILE_H - LABEL_H))
+            except Exception as exc:
+                sys.stderr.write("sky_sheet: %s is on disk but is not a readable png (%s); "
+                                 "counted as missing, re-render that cell\n" % (path, exc))
+        if shot is not None:
             sheet.paste(shot, (x, y))
             present += 1
         else:
@@ -169,8 +180,12 @@ print("SKY_SHEET cells=%d of %d missing=[%s] file=%s"
 # good cells and one red MISSING box learns more than a person looking at nothing. But the
 # script must not exit 0 on it, or a CI run or a busy reader takes a partial sheet for a
 # whole one.
+#
+# 3 RATHER THAN 1, so the shell below can tell "the sheet was drawn and has holes in it"
+# from "the tiler never got as far as drawing one", which are different problems with
+# different fixes and used to arrive as the same exit code.
 if missing:
-    sys.exit(1)
+    sys.exit(3)
 PY
 sheet_status=$?
 
@@ -182,8 +197,12 @@ if [ "$failed" -gt 0 ]; then
   echo "sky_sheet: $failed of the cells failed to render; the sheet is not a whole sheet." >&2
   exit 1
 fi
+if [ "$sheet_status" -eq 3 ]; then
+  echo "sky_sheet: the sheet was drawn but has missing or unreadable cells; the SKY_SHEET line above names them." >&2
+  exit 1
+fi
 if [ "$sheet_status" -ne 0 ]; then
-  echo "sky_sheet: the sheet has missing cells." >&2
+  echo "sky_sheet: the tiler itself failed (exit $sheet_status) and NO sheet was written. It needs python3 with Pillow; the renders in $OUT are fine, and a rerun with --keep will tile them once that is fixed." >&2
   exit 1
 fi
 exit 0
