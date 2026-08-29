@@ -42,10 +42,15 @@ extends Node3D
 ##   * PERSONALITY COVERAGE is itself a check. Everything in the reaction phase is
 ##     quantified over "every SHY pony", "every CURIOUS pony", "every BOLD pony"; if the
 ##     seeded draw happened to contain none of one kind, those clauses would be
-##     vacuously true and this gate would pass while measuring nothing. So the roster is
-##     asserted to contain all three before any of them is trusted. If a future roster
-##     or seed change breaks coverage, the gate goes red and asks for a new seed rather
-##     than quietly going hollow.
+##     vacuously true and this gate would pass while measuring nothing. So the draw is
+##     asserted to contain all three before any of them is trusted. The seed those draws
+##     come from is SEARCHED FOR rather than fixed (see SEED below), because a fixed seed
+##     rots: every character added to the roster reshuffles the draw, and a seed that
+##     covered all three personalities last month covers two this month. The coverage
+##     checks stayed; what changed is what they catch. They no longer go red every time
+##     somebody adds a pony, which was a chore rather than a bug. They go red if NO seed
+##     in the search window covers all three, which would mean the roster itself had lost
+##     a personality.
 ##   * DETECTION GEOMETRY is asserted too, for the same reason: at the moment the player
 ##     arrives, every pony must actually be inside HER OWN notice radius of him
 ##     (Pony.notice_radius_for, which since the second playtest differs by personality --
@@ -71,31 +76,56 @@ const SpawnTableScript := preload("res://systems/spawn_table.gd")
 const GaitScript := preload("res://systems/gait.gd")
 const GateWatchdogScript := preload("res://scripts/gate_watchdog.gd")
 
-## Fixed seed so the herd, and every wander target it picks, is identical on every run.
+## Base of the seed SEARCH, not the seed the herd is drawn from.
 ##
-## Chosen, not arbitrary: it is the nearest seed whose six draws contain all three
-## personalities (twilight, fluttershy, rainbowdash, twilight, fluttershy, fluttershy).
-## Only about a third of seeds do -- Fluttershy's UNCOMMON tier takes 25/37 of the draw
-## probability against 6/37 each for the two RARE ponies -- so the coverage check in
-## _finish() is doing real work, not rubber-stamping. Changing the seed, or the roster,
-## will tell you immediately if the new combination stops covering all three.
+## FOUND RATHER THAN CHOSEN, because a fixed seed rots. _spawn_herd() tries SEED,
+## SEED + 1, ... up to SEED_SEARCH_LIMIT candidates and keeps the first whose SPAWN_COUNT
+## draws contain all three personalities; whichever it settles on is printed as
+## `WILD seed=<n> tried=<k>` and is what every wander target in the run derives from, so
+## the herd is still byte-identical between two runs on the same roster.
+##
+## This constant used to name the seed itself: the nearest one whose six draws covered all
+## three personalities against a seven-character roster. Then the roster went to
+## forty-four characters, the same number drew four SHY ponies and two BOLD ones, and the
+## CURIOUS clauses in _finish() had nothing to quantify over. That is the shape of the
+## problem: the draw depends on the whole roster, so ANY character added anywhere invalidates
+## the choice, and pinning a number here just schedules a red gate for whoever adds the next
+## pony. Searching costs a few thousand arithmetic operations at spawn time and cannot rot.
 const SEED := 20260802
+
+## How many consecutive seeds the search will try before giving up. Deliberately far past
+## the point of futility: covering draws are common (the printed `tried=` says how many
+## this roster actually needed), so exhausting this window would not mean bad luck, it
+## would mean the roster no longer contains one of the three personalities at all. That is
+## a data bug, and the check in _finish() names it as one rather than looping forever.
+const SEED_SEARCH_LIMIT := 500
 
 ## Ponies drawn from the table. Enough for the draw to plausibly cover three
 ## personalities, few enough that they are not permanently shoulder to shoulder.
 const SPAWN_COUNT := 6
 
-## The herd is deliberately tight, and the numbers below are load-bearing rather than
-## decorative: a pony spawns SPAWN_RING_RADIUS from the origin and strays at most
-## ROAM_RADIUS from her spawn point, so nobody is ever further than 4.5 m from the
-## origin -- comfortably inside every personality's notice radius (12 m, or 14 m for a SHY
-## pony, against 5 m when these were chosen) of a player standing there. That is what makes
-## "every pony can see him in the reaction phase" true by construction rather than by luck;
-## the run asserts it anyway. Left at 2.0 m rather than widened with the notice radius: the
-## point of the tight ring is that the herd is legible in one screenshot, and the detection
-## check below has more slack now, not less.
+## The numbers below are load-bearing rather than decorative: a pony spawns
+## SPAWN_RING_RADIUS from the origin and strays at most ROAM_RADIUS from her spawn point,
+## so nobody is ever further than 6.5 m from the origin (2.0 + 4.0, plus half a metre of
+## braking overshoot past the leash), comfortably inside every personality's notice radius
+## (12 m, or 14 m for a SHY pony, against 5 m when these were chosen) of a player standing
+## there. That is what makes "every pony can see him in the reaction phase" true by
+## construction rather than by luck; the run asserts it anyway.
+##
+## ROAM_RADIUS WENT 2.0 -> 4.0, and the reason is the leash rather than the roster. The
+## leash ramps outward motion down to nothing across the last Pony.LEASH_BAND_* metres of a
+## territory, which on a 2 m territory is the outer 0.3 m, and a pony spooked out near her
+## own boundary spends the WHOLE flee inside that ramp. Sweetie Belle did exactly that: she
+## fled at 1.98 m/s against a 2.72 m/s flee speed, played `walk` the entire time, and took
+## this gate red on an engine behaving exactly as designed. The fix belongs to the scene,
+## not to the leash, whose continuity is pinned by its own tests: give her somewhere to
+## run. Four metres of territory leaves 3.4 m of undamped ground between her spawn point
+## and the ramp, and at the pony's 8 m/s^2 acceleration she needs about 0.46 m of it to
+## reach full flee speed. The tight ring was originally justified by wanting the herd
+## legible in one screenshot; SPAWN_RING_RADIUS is what actually controls that and is
+## unchanged, and the two shots that matter for gait are framed on a single pony anyway.
 const SPAWN_RING_RADIUS := 2.0
-const ROAM_RADIUS := 2.0
+const ROAM_RADIUS := 4.0
 
 const TOTAL_FRAMES := 300
 const REACTION_FRAME := 180
@@ -103,15 +133,19 @@ const REACTION_FRAME := 180
 ## Where the stand-in player waits during the routine phase: far enough that no pony can
 ## notice him, near enough to stay on the ground plane.
 ##
-## MOVED OUT FROM 20 m TO 22 m BY THE SECOND PLAYTEST, and the arithmetic is why rather
-## than taste. The widest notice radius went 5 -> 12 (first retune) -> 14 for a SHY pony
-## (Pony.SHY_NOTICE_BONUS, second retune), while the furthest a pony can be from the origin
-## is 4.5 m. At 20 m the closest any of them could get to him was 15.5 m against a 14 m
-## radius: one and a half metres of slack, thin enough that a wander target near the edge
-## plus a braking overshoot could spook a pony this scene asserts is unspooked, and the
-## gate would go red on a build behaving perfectly. At 22 m the closest approach is 17.5 m
-## and the slack is back to three and a half. wild_ponies.tscn carries the same number --
-## see below.
+## MOVED OUT TWICE NOW, and the arithmetic is why rather than taste. What is being held
+## constant across both moves is THREE AND A HALF METRES of slack between the closest a
+## pony can get to him and the radius at which she would notice him. Two things eat that
+## slack: the widest notice radius, which went 5 -> 12 (first retune) -> 14 for a SHY pony
+## (Pony.SHY_NOTICE_BONUS, second retune), and the furthest a pony can be from the origin,
+## which went 4.5 m -> 6.5 m when ROAM_RADIUS was widened above.
+##
+## At 20 m against a 4.5 m reach the closest approach was 15.5 m against a 14 m radius:
+## one and a half metres, thin enough that a wander target near the edge plus a braking
+## overshoot could spook a pony this scene asserts is unspooked, and the gate would go red
+## on a build behaving perfectly. 22 m bought the slack back; the wider territory spent it
+## again, so he waits at 24 m, where the closest approach is 17.5 m once more.
+## wild_ponies.tscn carries the same number, see below.
 ##
 ## wild_ponies.tscn ALSO places him here, and that is load-bearing rather than
 ## redundant. He originally sat at the origin in the scene and was moved out here in
@@ -121,7 +155,7 @@ const REACTION_FRAME := 180
 ## wanders first" guarantee was spent on a wander that lasted one frame. Ponies that then
 ## drew GRAZE stood still for the entire routine phase and the gate went red. Starting
 ## him out here means there is never an overlap to mis-report.
-const PLAYER_FAR := Vector3(0.0, 0.1, 22.0)
+const PLAYER_FAR := Vector3(0.0, 0.1, 24.0)
 
 ## Where he stands for the reaction phase.
 const PLAYER_NEAR := Vector3(0.0, 0.1, 0.0)
@@ -180,6 +214,12 @@ var _all_states: Dictionary = {}
 var _invalid_states: Array[int] = []
 var _detection_distance_at_arrival: Array[float] = []
 
+# What the seed search settled on. Printed as `WILD seed=<n> tried=<k>` and, when the
+# search failed, checked in _finish().
+var _seed_used: int = SEED
+var _seed_tried: int = 0
+var _seed_found: bool = false
+
 
 func _ready() -> void:
 	GateWatchdogScript.arm(self, "WILD", 60.0)
@@ -200,7 +240,13 @@ func _ready() -> void:
 
 
 ## Draw SPAWN_COUNT ponies from a seeded SpawnTable over the ranch roster and place them
-## on a ring around the origin.
+## on a ring around the origin, using the first seed at or after SEED whose draws cover
+## all three personalities.
+##
+## The search is a loop over _draw_herd(), which is the whole of the drawing: the herd
+## that spawns is literally the array the search approved, not a re-derivation from the
+## winning seed that could drift away from what was tested. See SEED for why the seed is
+## searched for rather than written down.
 ##
 ## The registry's dictionary order comes from DirAccess, i.e. from the filesystem, which
 ## is not guaranteed to be stable across machines -- and SpawnTable walks its entries in
@@ -222,12 +268,25 @@ func _spawn_herd() -> void:
 	entries.sort_custom(func(a: PonyData, b: PonyData) -> bool:
 		return String(a.id) < String(b.id))
 
-	var rng := RandomNumberGenerator.new()
-	rng.seed = SEED
-	var table := SpawnTableScript.new(entries, rng)
+	var draws: Array[PonyData] = []
+	for offset in range(SEED_SEARCH_LIMIT):
+		_seed_tried = offset + 1
+		_seed_used = SEED + offset
+		draws = _draw_herd(entries, _seed_used)
+		if _covers_all_personalities(draws):
+			_seed_found = true
+			break
+
+	print("WILD seed=%d tried=%d" % [_seed_used, _seed_tried])
+	if not _seed_found:
+		# Spawn the last draw anyway and let _finish() report the failure. Quitting here
+		# would throw away every other measurement in the run, and the coverage checks
+		# below already say precisely what went wrong.
+		push_error("wild_ponies: no seed in [%d, %d] drew all three personalities" % [
+			SEED, SEED + SEED_SEARCH_LIMIT - 1])
 
 	for i in range(SPAWN_COUNT):
-		var data: PonyData = table.draw()
+		var data: PonyData = draws[i]
 		if data == null:
 			push_error("wild_ponies: SpawnTable.draw() returned null for slot %d" % i)
 			continue
@@ -242,7 +301,7 @@ func _spawn_herd() -> void:
 		# the whole scene is reproducible AND no two ponies pick the same wander targets
 		# in lockstep.
 		var pony_rng := RandomNumberGenerator.new()
-		pony_rng.seed = SEED + i * 7919
+		pony_rng.seed = _seed_used + i * 7919
 		pony.set_rng(pony_rng)
 
 		add_child(pony)
@@ -259,6 +318,31 @@ func _spawn_herd() -> void:
 		_flee_clips.append({})
 		_flee_max_speed.append(0.0)
 		_detection_distance_at_arrival.append(INF)
+
+
+## The SPAWN_COUNT draws `herd_seed` produces against `entries`, in order, nulls included
+## so the caller can report a broken table the same way it always did.
+func _draw_herd(entries: Array[PonyData], herd_seed: int) -> Array[PonyData]:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = herd_seed
+	var table := SpawnTableScript.new(entries, rng)
+	var drawn: Array[PonyData] = []
+	for i in range(SPAWN_COUNT):
+		drawn.append(table.draw())
+	return drawn
+
+
+## True when `drawn` contains at least one SHY, one BOLD and one CURIOUS pony. This is
+## exactly the condition _finish() checks per personality, which is the point: a draw that
+## fails it makes every per-personality clause in this gate vacuous.
+func _covers_all_personalities(drawn: Array[PonyData]) -> bool:
+	var seen: Dictionary = {}
+	for data: PonyData in drawn:
+		if data != null:
+			seen[data.personality] = true
+	return (seen.has(PonyDataScript.Personality.SHY)
+		and seen.has(PonyDataScript.Personality.BOLD)
+		and seen.has(PonyDataScript.Personality.CURIOUS))
 
 
 func _run() -> void:
@@ -375,9 +459,12 @@ func _finish() -> void:
 					and not _reaction_states[i].has(PonyScript.State.APPROACH)
 				)
 
-	# Without all three personalities on the roster, the per-personality clauses above
-	# are quantified over an empty set and this gate measures nothing. See the class
-	# comment.
+	# Without all three personalities in the draw, the per-personality clauses above are
+	# quantified over an empty set and this gate measures nothing. See the class comment.
+	# The seed search exists to make these hold; these checks are what says it worked, and
+	# they are kept separate from the search's own check because they are testing the
+	# ponies that actually spawned rather than the array the search approved.
+	checks["the seed search found a covering draw"] = _seed_found
 	for personality in [PonyDataScript.Personality.SHY, PonyDataScript.Personality.BOLD,
 			PonyDataScript.Personality.CURIOUS]:
 		checks["the seeded draw covers %s" % _personality_name(personality)] = personalities.has(personality)
