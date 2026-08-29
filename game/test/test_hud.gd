@@ -70,6 +70,31 @@ func test_a_toast_is_readable_back_after_it_is_shown() -> void:
 	assert_eq(_hud.toast_text(), "Sold 1 gem for 5 bits.")
 
 
+func test_two_toasts_in_one_frame_are_both_shown_in_the_order_they_were_raised() -> void:
+	# ONE ACTION, TWO THINGS TO SAY. Selling a gem that finishes a favour raises "Sold ..."
+	# and "Request done: ..." in the same frame, and the second used to overwrite the first
+	# before a single word of it could be read. Both are the player's, so both are shown,
+	# oldest first.
+	await wait_process_frames(1)
+	_hud.toast("Sold 1 gem for 5 bits.")
+	_hud.toast("Request done: Catch a pony (+20 bits)")
+
+	assert_eq(_hud.toast_text(), "Sold 1 gem for 5 bits.",
+		"the line already on screen is not written over")
+	assert_eq(_hud.pending_toasts(), ["Request done: Catch a pony (+20 bits)"],
+		"and the second one is waiting its turn rather than lost")
+
+	# The whole life of the first toast handed over in one step, rather than sat through:
+	# what is being measured is the handover, not the frame rate it happens at.
+	_hud._process(_hud.TOAST_HOLD + _hud.TOAST_FADE)
+
+	assert_eq(_hud.toast_text(), "Request done: Catch a pony (+20 bits)",
+		"the queued toast takes the screen the moment the first is finished")
+	assert_true(_hud.pending_toasts().is_empty(), "and nothing is left waiting")
+	assert_almost_eq(_hud.get_node("Toast").modulate.a, 1.0, 0.001,
+		"...at full opacity, not part way through the first toast's fade")
+
+
 func test_the_crosshair_control_is_centred_on_the_viewport() -> void:
 	var crosshair: Control = _hud.get_node("Crosshair")
 	await wait_process_frames(1)

@@ -1125,10 +1125,21 @@ func _on_world_changed() -> void:
 ## everybody whose hours have begun walks on; see Spawner.refresh() for the draw and for
 ## why nothing here can delete a pony.
 ##
-## SAID OUT LOUD ONLY WHEN SOMETHING MOVED. A phase that changes nothing about who is out
-## (DAWN to DAY, for most of the roster) would otherwise print "0 ponies wandered off, 0
-## arrived." over the middle of the screen every few minutes, which is a notification that
-## nothing happened.
+## SAID OUT LOUD ONLY WHEN SOMETHING MOVED, AND ONLY THE HALF THAT MOVED. A phase that
+## changes nothing about who is out (DAWN to DAY, for most of the roster) would otherwise
+## print "0 ponies wandered off, 0 arrived." over the middle of the screen every few
+## minutes, which is a notification that nothing happened; and a phase where two walked off
+## and nobody came would say "and 0 arrived", which is a notification of an absence. So each
+## clause is emitted only when its own count is non zero, and the counts are pluralised:
+## "2 ponies wandered off.", "1 pony arrived.", "2 ponies wandered off, 1 pony arrived."
+##
+## A FUTURE LOAD PAGE MUST CLEAR THE HERD BEFORE THIS RUNS AGAIN. Everything here assumes
+## the ponies standing on the map belong to the world the clock is running; a load that
+## swapped the save out from under a live ranch without emptying the spawner first would
+## leave the previous world's herd standing in the new one, and the first phase change would
+## report their departures as if they had been drawn for this save. There is no in game Load
+## today (a save is loaded before the ranch builds its herd), which is why this is a note
+## rather than a guard.
 ##
 ## THE CYCLE INDEX IS READ LIVE off the clock rather than counted here, because
 ## Spawner.refresh() seeds its draw from `cycle * 4 + phase` and a cycle number kept in a
@@ -1140,8 +1151,20 @@ func _refresh_herd() -> void:
 		_world.cycle_index(), player.global_position)
 	var left := int(moved.get("left", 0))
 	var arrived := int(moved.get("arrived", 0))
-	if left != 0 or arrived != 0:
-		_toast("%d ponies wandered off, %d arrived." % [left, arrived])
+	var clauses: Array[String] = []
+	if left != 0:
+		clauses.append("%s wandered off" % _pony_count_phrase(left))
+	if arrived != 0:
+		clauses.append("%s arrived" % _pony_count_phrase(arrived))
+	if not clauses.is_empty():
+		_toast("%s." % ", ".join(clauses))
+
+
+## "1 pony" or "2 ponies". The herd toast is the only line in the game that counts ponies
+## out loud, and "1 ponies wandered off" is the kind of thing a player reads as a bug in
+## everything else too.
+func _pony_count_phrase(count: int) -> String:
+	return "1 pony" if count == 1 else "%d ponies" % count
 
 
 ## Said in words as well as in light. Repainted on a change and at boot, never per frame;
