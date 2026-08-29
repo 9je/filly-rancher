@@ -653,7 +653,7 @@ func _bind_game_state() -> void:
 	# for exactly the reason the line above rebuilds the economy: a load REPLACES what
 	# GameState holds, and a WorldState still counting from the world_time of the session
 	# being replaced is the clock of a ranch nobody is playing any more. Connected after
-	# load_from_slot() above for the same reason too -- that call emits state_loaded itself,
+	# load_from_slot() above for the same reason too; that call emits state_loaded itself,
 	# and the build immediately below is the one boot wants.
 	_rebuild_world_state()
 	if not _game_state.state_loaded.is_connected(_rebuild_world_state):
@@ -935,7 +935,7 @@ func get_world_state() -> WorldState:
 
 
 ## MOVE THE CLOCK BY HAND. The public way for a gate or a test to reach an hour without
-## sitting through it -- _physics_process() below ticks only for somebody actually playing,
+## sitting through it; _physics_process() below ticks only for somebody actually playing,
 ## precisely so that a gate, a screenshot run or a headless test never moves the world's
 ## time as a side effect of existing.
 ##
@@ -952,7 +952,7 @@ func advance_world(seconds: float) -> void:
 ## Connected to GameState.state_loaded, and the reason is rebind_economy()'s: a load does
 ## not mutate the numbers, it replaces the object holding them. The old WorldState is
 ## disconnected here rather than left to be freed quietly, so a mid-session load cannot
-## leave two clocks driving one sky -- which would look like a sky that ramps twice as fast
+## leave two clocks driving one sky; which would look like a sky that ramps twice as fast
 ## and only on saves that were loaded rather than booted into.
 ##
 ## THE OVERRIDES ARE RE-APPLIED ON EVERY REBUILD, not only at boot. A screenshot run pinned
@@ -977,7 +977,7 @@ func _rebuild_world_state() -> void:
 	# at the bottom of this function is the one that puts the pinned sky up, in one frame.
 	if _arg_phase >= 0 or _arg_weather >= 0:
 		# Only one of the two given means the other is taken from the UNPINNED world at
-		# this moment -- the weather this seed and this hour would really have had -- and
+		# this moment; the weather this seed and this hour would really have had; and
 		# then both are held.
 		var phase: int = _arg_phase if _arg_phase >= 0 else _world.phase()
 		var weather: int = _arg_weather if _arg_weather >= 0 else _world.weather()
@@ -1009,7 +1009,7 @@ func _on_world_changed() -> void:
 	_show_world_line()
 
 
-## Said in words as well as in light. Repainted on a change and at boot, never per frame --
+## Said in words as well as in light. Repainted on a change and at boot, never per frame;
 ## the same contract HUD.set_bits() has.
 func _show_world_line() -> void:
 	var hud := get_node_or_null(^"HUD")
@@ -1018,7 +1018,7 @@ func _show_world_line() -> void:
 
 
 ## Match `--name=value` against a list of display names, case-insensitively, and return the
-## index -- which IS the enum value, since WorldState's PHASE_NAMES and WEATHER_NAMES are
+## index; which IS the enum value, since WorldState's PHASE_NAMES and WEATHER_NAMES are
 ## indexed by their enums. -1 for anything unrecognised, with a push_error: a typo in a
 ## screenshot script has to be loud, because the alternative is a run that quietly
 ## photographs a different hour than the one that was asked for and looks perfectly fine.
@@ -1498,7 +1498,7 @@ func _sync_game_state() -> void:
 	# nobody played to, and writing that back would hand the player a ranch stopped at
 	# whatever a screenshot run happened to ask for. WorldState.advance() already refuses
 	# to move a pinned clock, so the value here could only ever be the one the save was
-	# opened with -- but the whole point of the flag is that a pinned run touches nothing,
+	# opened with; but the whole point of the flag is that a pinned run touches nothing,
 	# and "it would have written the same number" is not the same promise.
 	if _world != null and not _world.is_pinned():
 		_game_state.world_time = _world.elapsed()
@@ -2157,7 +2157,7 @@ func _report(pony_count: int, prop_count: int) -> void:
 		# rebuild re-reads GameState.world_time and would set a playing session's clock back
 		# to the value it booted with. A load REPLACES what GameState holds and ranch.gd
 		# builds a fresh WorldState from it (see _rebuild_world_state, and rebind_economy
-		# for the same problem in the economy) -- so a rig still holding the state boot made
+		# for the same problem in the economy); so a rig still holding the state boot made
 		# would pass the line above and be wrong the moment the player loaded a save. That
 		# is the failure this half catches, and nothing else in the project would.
 		_rebuild_world_state()
@@ -2176,7 +2176,7 @@ func _report(pony_count: int, prop_count: int) -> void:
 
 	# THE HUD HALF OF THE SAME CLAIM, and nothing else in the project gates it. An unwired
 	# world line is a blank line at the bottom of the Bag box, which looks exactly like a
-	# HUD that simply has nothing to say -- so "the ranch actually pushed the hour to it"
+	# HUD that simply has nothing to say; so "the ranch actually pushed the hour to it"
 	# has to be asked rather than assumed, and asked of the LABEL, which is what
 	# HUD.get_world_line() reads. NOT one of the three labels task 4's brief lists: it is
 	# added because the task's other half is "the HUD says what hour it is" and a
@@ -2193,7 +2193,7 @@ func _report(pony_count: int, prop_count: int) -> void:
 				WorldStateScript.weather_name(_world.weather()).to_upper(),
 				_world.is_pinned()])
 	else:
-		print("RANCH world MISSING -- no clock was built")
+		print("RANCH world MISSING; no clock was built")
 
 	# --- saving --------------------------------------------------------------------
 	# THE CHECK THAT EARNS ITS PLACE IN THIS GATE. `user://` resolves somewhere completely
@@ -2696,7 +2696,7 @@ func _probe_region_gate() -> Dictionary:
 ## COMPARED ON THE PHASE-AND-WEATHER QUANTITIES ONLY, never on the sun's position. The
 ## sun's elevation and bearing are continuous functions of phase_progress(), so in a session
 ## where the clock is running they drift away from the target the last apply() set, every
-## frame, by design -- comparing them would make this check fail simply because time
+## frame, by design; comparing them would make this check fail simply because time
 ## passed. Light energy, light colour, sky top and fog density are step functions of
 ## (phase, weather): they change only when the phase or the weather changes, which is
 ## exactly when apply() is called. So they agree if and only if the rig is wired.

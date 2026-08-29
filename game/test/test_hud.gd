@@ -301,7 +301,7 @@ func test_the_world_line_never_carries_a_dash() -> void:
 ## THE BOX HAS TO GROW WITH THE LINES IN IT. The Bag is a VBoxContainer with a hand-set
 ## height, and slice 1 already had to raise it by a label once (the Bits line, which
 ## otherwise hung 31 px below the box). A fifth line does it again, and a box that is too
-## short does not clip visibly in the editor -- the labels simply overflow past the bottom
+## short does not clip visibly in the editor; the labels simply overflow past the bottom
 ## anchor and off the screen, which is a thing a rendered frame shows and nothing else does.
 func test_the_bag_box_is_tall_enough_for_every_line_in_it() -> void:
 	await wait_process_frames(2)

@@ -527,11 +527,11 @@ func get_bits_text() -> String:
 
 ## THE HOUR AND THE SKY, IN WORDS. Set by game/world/ranch.gd from WorldState.describe()
 ## ("Dusk, rain") at boot and again on every phase or weather change, so it repaints on a
-## change and never per frame -- the same contract set_bits() above has.
+## change and never per frame; the same contract set_bits() above has.
 ##
 ## SAYING IT IN WORDS IS NOT REDUNDANT WITH THE SKY ITSELF. A player who has just walked
 ## into a barn, or who is looking at the ground, or who is playing on a screen with the
-## brightness down, cannot read a phase off the light -- and the weather is what decides
+## brightness down, cannot read a phase off the light; and the weather is what decides
 ## how far a pony notices her from. The one line is the only place the world's own state is
 ## ever stated rather than implied.
 ##
