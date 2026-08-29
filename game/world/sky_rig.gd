@@ -13,9 +13,10 @@ extends Node3D
 ## apply() only decides which answers to walk toward.
 ##
 ## NOTHING SNAPS. A phase flip is a discontinuity in the clock but must not be one on
-## screen, so apply() sets a target and step() eases every value toward it at
-## delta / TRANSITION_SECONDS per frame. apply_immediately() is the exception, for boot and
-## for gates, where there is no previous sky to ease away from.
+## screen, so apply() photographs the sky as it stands, sets a target, and step() walks a
+## ramp from the one to the other in exactly TRANSITION_SECONDS of delta.
+## apply_immediately() is the exception, for boot and for gates, where there is no previous
+## sky to ease away from.
 ##
 ## AN UNWIRED RIG IS FURNITURE. This node sits in game/world/ranch.tscn from the moment it
 ## exists, but processing is off until somebody calls apply(), apply_immediately() or
@@ -27,10 +28,19 @@ extends Node3D
 
 const WorldStateScript := preload("res://systems/world_state.gd")
 
-## How long a full sky change takes. Long enough that a phase flip reads as the light
+## How long a full sky change takes, and it means it: the transition is a ramp on a 0 to 1
+## clock advanced by delta / TRANSITION_SECONDS, so after this many seconds of step() the
+## sky is exactly on its target and stops. (Lerping the CURRENT value toward the target by
+## that same fraction every frame, which is what this used to do, is exponential decay: it
+## is 63% of the way after eight seconds and never actually arrives. The name promised a
+## duration, so the code now owes one.) Long enough that a phase flip reads as the light
 ## changing rather than as a cut, short enough that a player who pins the weather from a
 ## debug gate is not left waiting.
 const TRANSITION_SECONDS := 8.0
+
+## The ramp is smoothstepped rather than linear, so the sky leaves and arrives gently and
+## the two ends of a transition do not read as corners.
+const USE_SMOOTHSTEP := true
 
 ## THE ARC, IN DEGREES ABOVE THE HORIZON. DAWN lifts the sun out of the ground, DAY carries
 ## it up to ELEVATION_NOON and back down, DUSK drops it, NIGHT parks it well under so the
@@ -131,11 +141,20 @@ var _sky_material: ProceduralSkyMaterial
 var _rain: GPUParticles3D
 var _follow_target: Node3D
 
-## What the sky is being asked to become, and where it has actually got to. Both are keyed
-## by the KEY_* constants above; floats are eased with lerpf and Colors with Color.lerp.
+## Where the sky was when the transition started, what it is being asked to become, and
+## where it has actually got to. All three are keyed by the KEY_* constants above; floats
+## are ramped with lerpf and Colors with Color.lerp.
+##
+## _from IS SNAPSHOTTED, not recomputed. That is what makes a second apply() in the middle
+## of a transition continuous: it rephotographs wherever the sky has actually reached and
+## ramps on from there, so the light never jumps back to a phase it already left.
+var _from := {}
 var _targets := {}
 var _current := {}
 var _has_targets := false
+## The transition clock, 0 at the start of a ramp and 1 when it has arrived. Starts at 1
+## because a rig nobody has applied anything to has nowhere to be going.
+var _t := 1.0
 ## The last count actually written to the emitter, so an unchanged sky does not restart the
 ## particle system every frame (setting `amount` reallocates it).
 var _rain_written := -1
@@ -144,6 +163,7 @@ var _rain_written := -1
 func _ready() -> void:
 	_resolve_nodes()
 	_ensure_rain()
+	_seed_from_scene()
 	set_process(false)
 
 
@@ -229,7 +249,15 @@ static func _weather_index(weather: int) -> int:
 
 # === driving a scene ===
 
-## Ease the sky toward whatever `state` currently says, over TRANSITION_SECONDS.
+## RAMP THE SKY TOWARD WHATEVER `state` SAYS, ARRIVING IN EXACTLY TRANSITION_SECONDS.
+## Photographs the sky as it currently stands into _from, records the target, and restarts
+## the transition clock at zero; step() then walks a smoothstepped ramp between the two and
+## lands exactly on the target, at which point the rig stops processing. Writes nothing
+## itself, so the sky does not move until the first step().
+##
+## CALLING THIS AGAIN MID RAMP IS CONTINUOUS: the new _from is wherever the sky has actually
+## reached, not where the last transition started, so a weather flip during a phase flip
+## bends the light rather than snapping it back.
 ##
 ## A PINNED STATE HAS NO MEANINGFUL phase_progress(): pin() sets the phase without moving
 ## the clock, so its progress still reads wherever the clock happened to be. A pinned
@@ -237,7 +265,14 @@ static func _weather_index(weather: int) -> int:
 func apply(state: WorldState) -> void:
 	if state == null:
 		return
+	_from = _current.duplicate(true)
 	_set_targets_from(state)
+	# A rig whose scene had nothing to photograph (no sun, no environment) starts the ramp
+	# already at the target for those keys rather than ramping from a made up value.
+	for key in _targets:
+		if not _from.has(key):
+			_from[key] = _targets[key]
+	_t = 0.0
 	set_process(true)
 
 
@@ -247,15 +282,26 @@ func apply_immediately(state: WorldState) -> void:
 	if state == null:
 		return
 	_set_targets_from(state)
+	_from = _targets.duplicate(true)
 	_current = _targets.duplicate(true)
+	_t = 1.0
 	_write_to_scene()
-	set_process(true)
+	# Already arrived, so the only reason left to tick is a rain cloud with somebody to
+	# follow.
+	set_process(_follow_target != null)
 
 
 ## What the rig is walking toward, for gates and for the HUD. A copy; editing it changes
 ## nothing.
 func current_targets() -> Dictionary:
 	return _targets.duplicate(true)
+
+
+## Where the ramp has actually got to, at full double precision. The scene's own properties
+## are the truth for rendering but they are 32 bit floats, so a gate that needs to prove the
+## ramp landed EXACTLY on its target has to read it here rather than off the light.
+func current_values() -> Dictionary:
+	return _current.duplicate(true)
 
 
 ## The rain follows one node, normally the player: the emitter is a small box overhead, not
@@ -270,30 +316,40 @@ func _process(delta: float) -> void:
 	step(delta)
 
 
-## Advance the eased transition by `delta`. _process() calls this every frame; tests and
-## gates call it directly rather than waiting on real frames.
+## Advance the transition by `delta` and write the result to the scene. _process() calls
+## this every frame; tests and gates call it directly rather than waiting on real frames.
+##
+## The clock only ever moves forward and stops dead at 1, where the sky is snapped exactly
+## onto its targets rather than left a rounding error short of them. Once it has arrived
+## there is nothing left to interpolate, so the rig stops processing unless it still has a
+## rain cloud to carry around.
 func step(delta: float) -> void:
 	_track_follow()
-	if not _has_targets:
+	if not _has_targets or _t >= 1.0:
 		return
-	var weight := clampf(delta / TRANSITION_SECONDS, 0.0, 1.0)
-	for key in _targets:
-		var target_value: Variant = _targets[key]
-		if not _current.has(key):
-			_current[key] = target_value
-			continue
-		if key == KEY_RAIN_AMOUNT:
-			# A drop count cannot be half changed: the emitter reallocates on any change,
-			# so it switches at the start of the transition rather than crawling.
-			_current[key] = target_value
-			continue
-		if target_value is Color:
-			var from_color: Color = _current[key]
-			_current[key] = from_color.lerp(target_value, weight)
-		else:
-			var from_value: float = float(_current[key])
-			_current[key] = lerpf(from_value, float(target_value), weight)
+	_t = minf(_t + maxf(0.0, delta) / TRANSITION_SECONDS, 1.0)
+	if _t >= 1.0:
+		_current = _targets.duplicate(true)
+	else:
+		var eased := _t
+		if USE_SMOOTHSTEP:
+			eased = _t * _t * (3.0 - 2.0 * _t)
+		for key in _targets:
+			var target_value: Variant = _targets[key]
+			var from_value: Variant = _from.get(key, target_value)
+			if key == KEY_RAIN_AMOUNT:
+				# A drop count cannot be half changed: the emitter reallocates on any
+				# change, so it switches at the start of the ramp rather than crawling.
+				_current[key] = target_value
+				continue
+			if target_value is Color:
+				var from_color: Color = from_value
+				_current[key] = from_color.lerp(target_value, eased)
+			else:
+				_current[key] = lerpf(float(from_value), float(target_value), eased)
 	_write_to_scene()
+	if _t >= 1.0 and _follow_target == null:
+		set_process(false)
 
 
 func _set_targets_from(state: WorldState) -> void:
@@ -359,6 +415,28 @@ func _track_follow() -> void:
 	if not _follow_target.is_inside_tree() or not _rain.is_inside_tree():
 		return
 	_rain.global_position = _follow_target.global_position + Vector3(0.0, RAIN_HEIGHT, 0.0)
+
+
+## READ THE SKY THE SCENE WAS HAND LIT WITH, so the very first apply() has somewhere to
+## ramp FROM. Without this, _current is empty on a fresh rig and the first transition has no
+## start point, which made the opening phase of a session snap instead of dawning.
+##
+## This READS the scene and never writes to it: an unwired rig that nobody ever applies
+## anything to still leaves the hand authored sun, sky and fog exactly as they were saved.
+## Rain is seeded at zero because the emitter ships silent.
+func _seed_from_scene() -> void:
+	if _sun != null:
+		_current[KEY_SUN_ELEVATION] = -_sun.rotation_degrees.x
+		_current[KEY_SUN_AZIMUTH] = _sun.rotation_degrees.y
+		_current[KEY_LIGHT_ENERGY] = _sun.light_energy
+		_current[KEY_LIGHT_COLOR] = _sun.light_color
+	if _environment != null:
+		_current[KEY_AMBIENT_ENERGY] = _environment.ambient_light_energy
+		_current[KEY_FOG_DENSITY] = _environment.fog_density
+	if _sky_material != null:
+		_current[KEY_SKY_TOP] = _sky_material.sky_top_color
+		_current[KEY_SKY_HORIZON] = _sky_material.sky_horizon_color
+	_current[KEY_RAIN_AMOUNT] = 0
 
 
 func _resolve_nodes() -> void:

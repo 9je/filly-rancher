@@ -252,22 +252,84 @@ func test_a_pinned_clear_day_puts_the_sun_up_and_the_rain_away() -> void:
 	assert_false(rain.emitting, "nothing falls out of a clear sky")
 
 
-func test_apply_eases_instead_of_snapping() -> void:
+func test_a_transition_is_a_ramp_that_actually_arrives() -> void:
+	# TRANSITION_SECONDS is a duration, not a decay constant: half of it must land strictly
+	# between the two skies and all of it must land EXACTLY on the target, not merely near
+	# it. Lerping the current value toward the target every frame passes the "near it" test
+	# and fails this one, which is the whole point of asserting equality here.
 	_build_world()
 	_rig.apply_immediately(_pinned_state(DAY, CLEAR))
 	var clear_density: float = _environment.fog_density
 
 	_rig.apply(_pinned_state(NIGHT, STORM))
-	_rig.step(1.0)
-	var stepped: float = _environment.fog_density
-	assert_gt(stepped, clear_density, "one eighth of a second's worth of transition moved it")
-	assert_lt(stepped, SkyRigScript.fog_density(STORM),
-		"but it must not have arrived yet; TRANSITION_SECONDS is %.1f" % SkyRigScript.TRANSITION_SECONDS)
+	assert_eq(_environment.fog_density, clear_density,
+		"apply() only aims the rig; nothing moves until the first step()")
 
-	for i in range(400):
-		_rig.step(0.5)
-	assert_almost_eq(_environment.fog_density, SkyRigScript.fog_density(STORM), 0.0001,
-		"and it does arrive if you wait")
+	_rig.step(SkyRigScript.TRANSITION_SECONDS * 0.5)
+	var halfway: float = _environment.fog_density
+	assert_gt(halfway, clear_density, "half a ramp has left the clear sky behind")
+	assert_lt(halfway, SkyRigScript.fog_density(STORM), "and has not arrived at the storm")
+
+	_rig.step(SkyRigScript.TRANSITION_SECONDS * 0.5)
+	# Read the arrival off the rig, not off the light: Environment.fog_density and
+	# DirectionalLight3D.light_energy are 32 bit float properties, so a value that IS exact
+	# comes back off them a rounding error away from the double it went in as.
+	var arrived: Dictionary = _rig.current_values()
+	assert_eq(float(arrived["fog_density"]), SkyRigScript.fog_density(STORM),
+		"a full TRANSITION_SECONDS of steps lands exactly on the target")
+	assert_eq(float(arrived["light_energy"]), SkyRigScript.light_energy(NIGHT, STORM),
+		"and lands the light exactly too, not a rounding error short")
+	assert_almost_eq(_environment.fog_density, SkyRigScript.fog_density(STORM), 0.0000001,
+		"and the scene has it, to whatever precision a float property can hold")
+
+
+func test_an_arrived_transition_stops_ticking() -> void:
+	_build_world()
+	_rig.apply(_pinned_state(NIGHT, STORM))
+	assert_true(_rig.is_processing(), "a rig mid ramp has work to do")
+	_rig.step(SkyRigScript.TRANSITION_SECONDS)
+	assert_false(_rig.is_processing(),
+		"once it has arrived and nothing is being followed there is nothing left to do")
+
+
+func test_reapplying_mid_ramp_carries_on_from_where_the_sky_actually_is() -> void:
+	# The failure this guards against: re-photographing _from from the OLD transition's
+	# start (or not re-photographing at all) makes the light jump backward to a phase it
+	# has already left, which reads as a flicker.
+	_build_world()
+	_rig.apply_immediately(_pinned_state(DAY, CLEAR))
+	_rig.apply(_pinned_state(NIGHT, STORM))
+	_rig.step(SkyRigScript.TRANSITION_SECONDS * 0.5)
+	var before: float = _sun.light_energy
+	var before_color: Color = _sun.light_color
+
+	_rig.apply(_pinned_state(DUSK, RAIN))
+	assert_eq(_sun.light_energy, before, "the second apply must not move the light at all")
+	assert_eq(_sun.light_color, before_color, "nor its colour")
+
+	_rig.step(0.001)
+	assert_almost_eq(_sun.light_energy, before, 0.01,
+		"and the first step of the new ramp must leave from where the sky actually was")
+
+	_rig.step(SkyRigScript.TRANSITION_SECONDS)
+	assert_eq(float(_rig.current_values()["light_energy"]),
+		SkyRigScript.light_energy(DUSK, RAIN), "the restarted ramp still arrives exactly")
+
+
+func test_the_first_apply_eases_out_of_the_scenes_own_sky() -> void:
+	# A fresh rig has never been told what the sky looks like, so without reading the
+	# scene's hand lit values at _ready() the first transition of a session has no start
+	# point and snaps. It must ramp out of the sun the scene was saved with.
+	_build_world()
+	var scene_energy: float = _sun.light_energy
+	var night_energy: float = SkyRigScript.light_energy(NIGHT, STORM)
+
+	_rig.apply(_pinned_state(NIGHT, STORM))
+	_rig.step(0.5)
+	assert_lt(_sun.light_energy, scene_energy,
+		"half a second in, the light has started to fall away from the scene's own 1.15")
+	assert_gt(_sun.light_energy, night_energy,
+		"but it is nowhere near the stormy night yet; it must not have snapped")
 
 
 func test_current_targets_reports_what_was_asked_for() -> void:
