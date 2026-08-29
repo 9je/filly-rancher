@@ -72,6 +72,9 @@ extends RefCounted
 ##
 ## Version 3 (Phase 2 slice 4) adds "world_time"; defaults to 0.0 (dawn).
 ##
+## Version 4 (Phase 2 slice 5) adds "compendium" and "requests"; compendium defaults to {}
+## (nobody marked seen or caught) and requests defaults to [] (none pending).
+##
 ## --- JSON HAS NO INTEGER TYPE ---------------------------------------------------------
 ##
 ## Every number in a dictionary that came back from load() is a FLOAT, including the ones
@@ -96,7 +99,7 @@ extends RefCounted
 
 ## The format this build writes, and the highest it will read. See the version policy in
 ## the class comment before changing it.
-const FORMAT_VERSION := 3
+const FORMAT_VERSION := 4
 
 ## The key the version is stamped under. Reserved: a caller's payload must not use it --
 ## save() overwrites it, and load() reads it back out.
@@ -335,6 +338,11 @@ static func migrate(data: Dictionary, from_version: int) -> Dictionary:
 	if from_version < 3:
 		if not out.has("world_time"):
 			out["world_time"] = 0.0
+	if from_version < 4:
+		if not out.has("compendium"):
+			out["compendium"] = {}
+		if not out.has("requests"):
+			out["requests"] = []
 	return out
 
 

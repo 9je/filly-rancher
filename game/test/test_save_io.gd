@@ -30,6 +30,7 @@ extends GutTest
 const SaveIOScript := preload("res://systems/save_io.gd")
 const GameStateScript := preload("res://systems/game_state.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
+const CompendiumScript := preload("res://systems/compendium.gd")
 
 ## Where these tests write. Deliberately NOT SaveIO's default directory.
 const SCRATCH_DIR := "user://test_scratch/save_io"
@@ -251,7 +252,7 @@ func test_a_save_from_a_newer_build_refuses_to_load_rather_than_be_misread() -> 
 
 
 func test_the_version_policy_is_stated_and_pinned() -> void:
-	assert_eq(SaveIOScript.FORMAT_VERSION, 3, "the current format version")
+	assert_eq(SaveIOScript.FORMAT_VERSION, 4, "the current format version")
 	assert_true(SaveIOScript.can_load_version(SaveIOScript.FORMAT_VERSION),
 		"this build's own version loads")
 	assert_false(SaveIOScript.can_load_version(SaveIOScript.FORMAT_VERSION + 1),
@@ -272,6 +273,27 @@ func test_a_version_1_file_loads_and_gains_empty_gems_and_inventory() -> void:
 	assert_eq(migrated["inventory"], {})
 	assert_true(migrated.has("world_time"), "migration adds the world_time key")
 	assert_eq(migrated["world_time"], 0.0)
+	assert_true(migrated.has("compendium"), "migration adds the compendium key")
+	assert_eq(migrated["compendium"], {})
+	assert_true(migrated.has("requests"), "migration adds the requests key")
+	assert_eq(migrated["requests"], [])
+
+
+## A dedicated direct-migrate test for the branch THIS task adds, mirroring the v1 one
+## above but starting one version later (gems, inventory and world_time already present)
+## so it proves the new branch on its own rather than only as a side effect of the older
+## one's cumulative `from_version < 4` check.
+func test_a_version_3_file_gains_empty_compendium_and_requests() -> void:
+	var v3 := {
+		"version": 3, "bits": 12, "ponies": [], "plots": {}, "unlocks": [],
+		"world_seed": 5, "gems": {}, "inventory": {}, "world_time": 0.0,
+	}
+	var migrated := SaveIOScript.migrate(v3, 3)
+	assert_eq(migrated.get("bits"), 12, "existing fields survive")
+	assert_true(migrated.has("compendium"), "migration adds the compendium key")
+	assert_eq(migrated["compendium"], {})
+	assert_true(migrated.has("requests"), "migration adds the requests key")
+	assert_eq(migrated["requests"], [])
 
 
 ## THE WHOLE PATH, NOT THE MIGRATION ON ITS OWN. The test above calls migrate() directly,
@@ -301,7 +323,7 @@ func test_a_version_1_file_on_disk_loads_all_the_way_into_a_game_state() -> void
 
 	var loaded := SaveIOScript.load(SLOT)
 	assert_false(loaded.is_empty(), "a version-1 save still loads on this build")
-	assert_eq(int(loaded["version"]), 3,
+	assert_eq(int(loaded["version"]), 4,
 		"...and arrives stamped with the version it was migrated to, not the one on disk")
 
 	var state = GameStateScript.new()
@@ -321,6 +343,10 @@ func test_a_version_1_file_on_disk_loads_all_the_way_into_a_game_state() -> void
 	assert_true(state.inventory.ids().is_empty(), "and with an empty pantry")
 	assert_eq(state.world_time, 0.0,
 		"a save from before the clock existed comes back at dawn, not broken")
+	assert_eq(state.compendium.state_of(&"twilight"), CompendiumScript.State.UNSEEN,
+		"a save from before the compendium existed comes back with nobody marked, " +
+		"even for a pony she owns -- a later task's ranch code backfills owned ponies on load")
+	assert_true(state.requests.is_empty(), "and with no requests pending")
 
 
 ## The same composed proof, one version later: a version-2 file (gems and inventory exist,
@@ -345,7 +371,7 @@ func test_a_version_2_file_on_disk_loads_all_the_way_into_a_game_state() -> void
 
 	var loaded := SaveIOScript.load(SLOT)
 	assert_false(loaded.is_empty(), "a version-2 save still loads on this build")
-	assert_eq(int(loaded["version"]), 3,
+	assert_eq(int(loaded["version"]), 4,
 		"...and arrives stamped with the version it was migrated to, not the one on disk")
 
 	var state = GameStateScript.new()
@@ -358,6 +384,50 @@ func test_a_version_2_file_on_disk_loads_all_the_way_into_a_game_state() -> void
 	assert_eq(state.inventory.count(&"hay"), 4, "so did the pantry")
 	assert_eq(state.world_time, 0.0,
 		"a save from before the clock existed comes back at dawn, not broken")
+	assert_eq(state.compendium.state_of(&"twilight"), CompendiumScript.State.UNSEEN,
+		"a save from before the compendium existed comes back with nobody marked")
+	assert_true(state.requests.is_empty(), "and with no requests pending")
+
+
+## The same composed proof, one version later still: a version-3 file (gems, inventory and
+## the world clock all exist; the compendium and requests do not) read through
+## SaveIO.load() and poured into a GameState. Hand-written for the same reason the v1 and v2
+## fixtures are: a v3 file is exactly what this build can no longer write on its own.
+func test_a_version_3_file_on_disk_loads_all_the_way_into_a_game_state() -> void:
+	var v3 := {
+		"version": 3,
+		"bits": 640,
+		"ponies": [
+			{"uid": "twilight#000001", "data_id": "twilight", "nickname": "Sparkle",
+				"happiness": 0.75, "hunger": 0.25, "caught_at_ms": 1772150400000},
+		],
+		"plots": {"0": "pen"},
+		"unlocks": ["bigger_saddlebag"],
+		"world_seed": 20260839,
+		"gems": {"2": 3},
+		"inventory": {"hay": 4},
+		"world_time": 733.5,
+	}
+	_write_raw(SaveIOScript.slot_path(SLOT), JSON.stringify(v3, "  ", true))
+
+	var loaded := SaveIOScript.load(SLOT)
+	assert_false(loaded.is_empty(), "a version-3 save still loads on this build")
+	assert_eq(int(loaded["version"]), 4,
+		"...and arrives stamped with the version it was migrated to, not the one on disk")
+
+	var state = GameStateScript.new()
+	autofree(state)
+	state.from_dict(loaded)
+
+	assert_eq(state.bits, 640, "the wallet survived the trip")
+	assert_eq(state.pony_count(), 1, "the pony came back")
+	assert_eq(state.gems.count(PonyDataScript.Rarity.RARE), 3, "the gems survive")
+	assert_eq(state.inventory.count(&"hay"), 4, "so did the pantry")
+	assert_almost_eq(state.world_time, 733.5, 0.001, "the world clock survives")
+	assert_eq(state.compendium.state_of(&"twilight"), CompendiumScript.State.UNSEEN,
+		"a save from before the compendium existed comes back with nobody marked, " +
+		"even for a pony she owns -- a later task's ranch code backfills owned ponies on load")
+	assert_true(state.requests.is_empty(), "and with no requests pending")
 
 
 # --- atomicity: an interrupted write must not cost the previous save ------------------

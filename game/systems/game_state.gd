@@ -48,6 +48,7 @@ const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 const GemPouchScript := preload("res://systems/gem_pouch.gd")
 const InventoryScript := preload("res://systems/inventory.gd")
+const CompendiumScript := preload("res://systems/compendium.gd")
 
 ## Where the authored character roster is read from. The same directory the spawner and
 ## PonyInstance use; named here because this is now the one place it is loaded.
@@ -78,6 +79,8 @@ const KEY_WORLD_SEED := "world_seed"
 const KEY_GEMS := "gems"
 const KEY_INVENTORY := "inventory"
 const KEY_WORLD_TIME := "world_time"
+const KEY_COMPENDIUM := "compendium"
+const KEY_REQUESTS := "requests"
 
 ## Emitted after from_dict() or load_from_slot() has replaced the world. A HUD or a pen
 ## that cached anything out of here has to rebuild on this.
@@ -131,6 +134,17 @@ var inventory: Inventory = InventoryScript.new()
 ## not reset the sky back to dawn. 0.0 is dawn, which is also where a save that predates
 ## the clock, or a hand-edited negative value, falls back to; see from_dict().
 var world_time: float = 0.0
+
+## What the player knows of the 43-character roster: unseen, seen or caught, per
+## game/systems/compendium.gd. REPLACED, NOT MUTATED, by from_dict() and reset(), same rule
+## as `gems` above and for the same reason.
+var compendium: Compendium = CompendiumScript.new()
+
+## Pending requests, as plain Dictionaries whose shape this file does not know or check --
+## a later task defines it and reads/writes it. Untyped for the same reason `unlocks` is:
+## a dynamic `GameState.requests = [...]` assignment from a shop or a test must not fail at
+## runtime against a typed Array.
+var requests: Array = []
 
 ## Whether quitting writes a save. See the class comment -- off by default on purpose.
 var autosave_enabled := false
@@ -256,6 +270,8 @@ func to_dict() -> Dictionary:
 		KEY_GEMS: gems.to_dict(),
 		KEY_INVENTORY: inventory.to_dict(),
 		KEY_WORLD_TIME: world_time,
+		KEY_COMPENDIUM: compendium.to_dict(),
+		KEY_REQUESTS: requests.duplicate(true),
 	}
 
 
@@ -305,6 +321,13 @@ func from_dict(data: Dictionary) -> void:
 	else:
 		world_time = 0.0
 
+	var saved_compendium: Variant = data.get(KEY_COMPENDIUM, {})
+	compendium = CompendiumScript.from_dict(
+		saved_compendium if typeof(saved_compendium) == TYPE_DICTIONARY else {})
+
+	var saved_requests: Variant = data.get(KEY_REQUESTS, [])
+	requests = saved_requests.duplicate(true) if typeof(saved_requests) == TYPE_ARRAY else []
+
 	state_loaded.emit()
 
 
@@ -318,6 +341,8 @@ func reset() -> void:
 	gems = GemPouchScript.new()
 	inventory = InventoryScript.new()
 	world_time = 0.0
+	compendium = CompendiumScript.new()
+	requests = []
 
 
 # --- disk ---------------------------------------------------------------------------------
