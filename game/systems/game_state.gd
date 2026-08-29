@@ -65,7 +65,7 @@ const STARTING_BITS := 0
 ## The seed a new world is generated from. Matches game/world/spawner.gd's exported
 ## default so that a brand-new game and an un-saved gate run produce the SAME world -- if
 ## these two numbers drift apart, the gates stop measuring the map the player gets.
-const DEFAULT_WORLD_SEED := 20260874
+const DEFAULT_WORLD_SEED := 20295486
 
 ## Keys in the save file. Named constants rather than inline strings because the loader
 ## and the writer must agree, and a typo in one of them is a field that silently stops

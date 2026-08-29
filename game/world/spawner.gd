@@ -67,36 +67,50 @@ const MIN_SEPARATION := 1.4
 ##
 ## AND SINCE THE SEED IS FIXED, WHICH HERD IT DRAWS IS A CONTENT DECISION, NOT A
 ## COIN TOSS, so it is searched for rather than left to whatever the first plausible
-## number happened to produce. Two seeds have been retired that way. 20260827 drew 3
+## number happened to produce. Three seeds have been retired that way. 20260827 drew 3
 ## Rainbow Dashes and 5 Fluttershies and NO Twilight, every launch, forever, back when
 ## the whole roster was three ponies. 20260839 replaced it; then slice 2 took the roster
-## to 43 characters, and that number now draws only 8 distinct ponies with Nurse
-## Redheart standing in the field three times over. Neither draw was wrong. SpawnTable
-## splits each tier's weight among that tier's members, so a repeat inside ten draws is
-## an ordinary outcome. It is just an outcome nobody should be stuck with permanently.
+## to 43 characters, and that number drew only 8 distinct ponies with Nurse Redheart
+## standing in the field three times over. 20260874 replaced THAT, and drew ten distinct
+## characters out of a 43-strong ranch pool. Slice 3 then re-zoned 30 of those 43 into
+## four regions, which left 20260874 drawing from a 13-pony ranch pool it was never
+## searched against. None of those draws was wrong. SpawnTable splits each tier's weight
+## among that tier's members, so a repeat is an ordinary outcome. It is just an outcome
+## nobody should be stuck with permanently.
 ##
-## 20260874 DRAWS TEN DISTINCT CHARACTERS across the ranch's ten slots: Twilight
-## Sparkle, Trixie, Bon Bon, Milky Way, Applejack, Pinkie Pie, Caramel, Doctor Whooves,
-## Lotus and Spitfire. All four rarity tiers are represented (4 COMMON, 2 UNCOMMON,
-## 3 RARE, and Trixie for LEGENDARY), which is what makes it a better first launch than
-## the ten-distinct seeds that happen to draw no legendary at all.
+## 20295486 DRAWS TWENTY-TWO DISTINCT CHARACTERS INTO TWENTY-TWO SLOTS, which is the
+## ceiling: nobody is standing in the field twice. ranch.tscn holds nine ZoneMarkers now,
+## five on the homestead at spawn_count 2 and one in each region at 3.
+##
+##   ranch (10)       Nurse Redheart, Lotus, Aloe, Derpy Hooves, Fluttershy, Scootaloo,
+##                    Sweetie Belle, Starlight Glimmer, Pinkie Pie, Rainbow Dash
+##   orchard (3)      Carrot Top, Caramel, Berry Punch
+##   everfree (3)     Sunset Shimmer, Doctor Whooves, Trixie
+##   lake (3)         Milky Way, Soarin, Spitfire
+##   nightmeadow (3)  Marble Pie, Mane Allgood, Coco Pommel
+##
+## All four rarity tiers are drawn (9 COMMON, 8 UNCOMMON, 3 RARE, and both Sunset Shimmer
+## and Trixie for LEGENDARY), and the two legendaries are behind the Everfree Edge's
+## 400-bit permit, which is where a legendary ought to be standing.
 ##
 ## FOUND BY SEARCH, not by taste. A throwaway script replayed SpawnTable's own draw
-## against every seed from 20260600 to 20261400 with the real roster and the real zone
-## markers, and scored each seed by how many distinct characters its ten draws contain:
-## 203 of those 801 seeds reach ten, 20260874 is one of them, and the tier spread above
-## is the tie-break. The rarity weights, the tier semantics and the draw code are all
-## untouched; only which of their equally valid outcomes is the one that ships. Re-pick
-## the same way if the roster changes, because the draw depends on the whole roster.
+## against every seed from 20260600 to 20460000 with the real roster, the real zones and
+## the markers read out of ranch.tscn in scene order, and scored each seed by how many
+## distinct characters its 22 draws contain: 22 of those 199,401 seeds reach 22, five of
+## those 22 also cover all four tiers, and 20295486 is the lowest of the five. The rarity
+## weights, the tier semantics and the draw code are all untouched; only which of their
+## equally valid outcomes is the one that ships. Re-pick the same way if the roster or the
+## zoning changes, because the draw depends on both.
 ##
-## TEN SLOTS CANNOT SHOW 43 CHARACTERS, and no seed will change that. ranch.tscn holds
-## five ZoneMarkers of spawn_count 2, and nothing respawns once a pony is caught, so ten
-## distinct characters is the ceiling and this seed already sits on it. The other 33 are
-## the business of the slices that own them: slice 3 splits the map into regions, so a
-## character can be zoned somewhere other than "ranch" and the ten slots stop being the
-## whole world; slice 5 brings respawn, so the herd refreshes over a session instead of
-## being the same ten ponies until the save is deleted.
-@export var spawn_seed := 20260874
+## TWENTY-TWO SLOTS CANNOT SHOW 43 CHARACTERS, and no seed will change that. Nothing
+## respawns once a pony is caught, so the other 21 are the business of slice 5, which
+## brings respawn and refreshes the herd over a session instead of leaving it the same
+## twenty-two ponies until the save is deleted.
+##
+## KEEP THIS IN STEP WITH GameState.DEFAULT_WORLD_SEED. A save carries the seed its world
+## was generated from, and a run with no save takes this one into the state; the two are
+## asserted equal in game/test/test_spawner_seed.gd.
+@export var spawn_seed := 20295486
 
 ## Node whose ZoneMarker children this spawner fills. Defaults to a sibling `Zones`.
 @export var zones_path := NodePath("../Zones")
