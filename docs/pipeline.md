@@ -323,9 +323,9 @@ meshes=15 skins=1 materials=11 textured=True animations=['gallop', 'idle', 'walk
 flag — those correctly report `animations=[]` and still pass the base
 `meshes>=1 skins>=1` gate.)
 
-The loop above sweeps `ponies/*.glb` and expects **exactly the three tier-a
-characters** — keep tier-b props in `props/` and the tier-c probe in `probe/`
-(§2), or this loop fails on them. `validate_gltf.py` parses its arguments with
+The loop above sweeps `ponies/*.glb` and expects **every character named in
+`tools/roster_manifest.txt`**: keep tier-b props in `props/` and the tier-c
+probe in `probe/` (§2), or this loop fails on them. `validate_gltf.py` parses its arguments with
 argparse: a mistyped flag (e.g. `--require-anim`, singular) is a hard error
 rather than being silently ignored, which used to turn the animation gate off
 without any visible sign.
@@ -611,6 +611,171 @@ python3 tools/validate_gltf.py game/assets/converted/ponies/pinkiepie.glb --requ
 The character name is the only thing that changes between models. `--scale
 2.0` (not tier a's 0.5 — the SFM pack is authored at roughly half life size,
 §3), and `--rotate-z 180` for the same reason tier a needs it.
+
+#### The roster manifest
+
+The two commands above convert **one** character. `tools/roster_manifest.txt` names
+every character in the game, one line of `id|kind|source|rig`, and
+`tools/convert_roster.sh` runs exactly those two commands over the list:
+`tools/export_blend.py` for the export, `tools/validate_gltf.py --require-anims` for
+the check. `kind` selects the invocation, `blend` (tier a: `--object <rig>`,
+`--scale 0.5`, §3) or `sfm` (tier c: `--mdl-in`, `--scale 2.0`, above), so adding a
+character is one manifest line and nothing else. The six already shipped characters
+are listed too, so the manifest describes the whole game and not just the newest
+batch.
+
+One character failing does not stop the others. Each export's Blender output goes to
+`${TMPDIR:-/tmp}/convert_<id>.log`, a failure prints `FAILED <id>` naming that log and
+removes the half written `.glb`, and the last line is the tally, which is also the
+exit code:
+
+```bash
+bash tools/convert_roster.sh
+# -> CONVERTED applejack
+# ...one line per character...
+# -> ROSTER_CONVERT ok=37 failed=0 skipped=6   exit 0
+```
+
+That is the whole regeneration step: once `tools/setup_env.sh` has fetched Blender and
+the asset packs (§1), one run rebuilds every `.glb` under
+`game/assets/converted/ponies/`. `game/assets/converted/` is entirely gitignored, so on
+an actual fresh clone none of the manifest's 43 entries has a `.glb` yet: all 43
+convert, and the tally reads `ROSTER_CONVERT ok=43 failed=0 skipped=0`, proportionally
+longer than the run measured below (roughly 16 minutes at the same per-character rate,
+not separately timed). The tally shown above was measured in a worktree that already
+held the six previously shipped characters' `.glb` files, hence `ok=37 failed=0
+skipped=6`, about 14 minutes for the 37 newly-converted characters. Either way, a
+character that already has a `.glb` is skipped, so a re-run once everything exists is
+cheap; `--force` rebuilds anyway, `--only id[,id...]` restricts the run to named
+characters (which is how you re-run after fixing a pipeline bug), and `--dry-run`
+prints what would be exported without opening Blender.
+`tools/test_convert_roster.sh` exercises the script's own logic in seconds against
+`FILLY_EXPORTER` / `FILLY_VALIDATOR` / `FILLY_OUT_DIR` stubs, with no Blender
+involved.
+
+**What the manifest leaves out.** The reVAmped SFM pack ships 46 `.mdl` files and the
+manifest lists 38 of them. The eight it does not list are `twilightsparkle`,
+`rainbowdash`, `fluttershy`, `applejack` and `rarity`, which the Blender native tier-a
+packs cover at higher fidelity (§3), `raricow`, a joke variant rather than a
+character, `changelingdrone`, whose export has no usable textures (see below), and
+`songbirdserenade`, whose mane mesh is modelled over her whole face (see below); both
+of the last two are left out of the manifest entirely rather than converted and then
+unused.
+Three of the 38 it does list, `pinkiepie`, `derpyhooves` and
+`starlightglimmer`, were already shipped before this batch; they stay in the manifest
+so a fresh clone regenerates them, but they are not new characters. That leaves 35 new
+tier-c characters plus the 2 new tier-a ones, `applejack` and `rarity`.
+
+**What converted but is not in the roster.** `changelingdrone` exports and passes the
+structural gate when run directly (it is no longer in the manifest, so a fresh clone
+does not spend a Blender run on her), and is excluded, with no `PonyData` resource
+pointing at it. Its `.mdl` was compiled against a material path this download does not contain: all 16
+of the materials it references fail to resolve, so the export carries **zero images and
+zero textures** and every surface falls back to a random pastel base colour.
+
+```
+[INFO]--[Source1::ModelLoader:import_materials]: Material body not found
+[INFO]--[Source1::ModelLoader:import_materials]: Material hair not found
+[INFO]--[Source1::ModelLoader:import_materials]: Material wings_changeling not found
+...16 of 16, from ${TMPDIR:-/tmp}/convert_changelingdrone.log
+
+meshes=11 skins=1 materials=10 textured=False animations=['gallop', 'idle', 'walk']
+```
+
+The model asks for `materials/models/VA_mlp_v4/changeling/` and
+`materials/models/VA_mlp_v4/common/`. The pack files every other character's materials
+under `Materials/Models/VA_MLP/<character>/` with shared maps in `VA_MLP/Common/`, and
+ships no `VA_mlp_v4` tree at all. This is specific to this one model, not a pipeline
+bug: `wings_changeling.vmt` and `Earlighter.vmt` exist nowhere in the download, and
+`body.vmt` exists 45 times over, once in nearly every character's folder, so there is
+no name that could be searched for generically without dressing the changeling in some
+other pony's coat.
+The line was removed from `tools/roster_manifest.txt` rather than left in with an
+unused `.glb`, so a fresh clone does not spend a Blender export on a character nobody
+sees; her export command above still works if this is ever revisited, once a matching
+material tree can be sourced.
+
+`songbirdserenade` exports cleanly and passes every gate (`textured=True`,
+`hair_ok=true`, a `SpringBoneSimulator3D` on twelve mane chains) and renders with her
+mane hanging over her entire face, both eyes covered, from the front and from
+three-quarter. She is excluded for the same reason as the changeling: the defect is in
+the model, not in the pipeline. Measured, in the order the hypotheses were worth
+testing:
+
+- **Not a rest-pose or roll defect.** `sfm_rig.check_rest_pose_preserved()` reports
+  `SFM_RIG_REST_DRIFT moved=0.000000m turned=0.0000deg` on her export, so `adapt()`
+  leaves every bone the `.mdl` shipped exactly where it put it.
+- **Not the spring simulation.** Rendering her face with the simulator's `influence`
+  pinned to 0, i.e. hair welded to the skull, is pixel for pixel the same curtain
+  (`scenes/test/visual_review.tscn`, `mode=face tag=rigid`; the handling lives in
+  `scenes/test/visual_review.gd`, which now honours `rigid` outside `mode=motion` for
+  exactly this test). Nothing the springs do is involved.
+- **Not a chain-length or gravity tuning problem.** Her mane is twelve chains of two
+  joints each (`LeftHair1-6` and `RightHair1-6`, each with one `*_jiggle_hair*` child),
+  well under `PonyRig.SPAN_REFERENCE_JOINTS`, so the long-chain stiffening never
+  engages.
+- **Not a misclassified accessory.** The kept bodygroup is `manes/VA_Mane_Sia.dmx`, her
+  own mane and not a hat; her hat is in `accessories/`, which is dropped.
+- **The mesh itself covers the face.** Decoding the exported `.glb`, every mesh's
+  skinned rest pose equals its authored pose to `maxdisp=0.000000` (the rig deforms
+  nothing at rest), and 429 of the mane's 21300 vertices sit inside a 0.18 m box
+  centred on each eye and in front of it, symmetrically, on both sides. The same
+  measurement straight out of SourceIO, before any of this repository's code runs, puts
+  the raw `manes/VA_Mane_Sia.dmx` vertices at `y[-0.5301 -0.1072]` against the head
+  mesh's `y[-0.4744 -0.0715]`, i.e. 0.056 units in front of the muzzle and below eye
+  level. For contrast the same measurement finds 0 of `sunsetshimmer`'s and 0 of
+  `octavia`'s in front of either eye, and `trixie`'s canon one-eye swoop is 108 verts
+  in front of ONE eye and 0 in front of the other.
+
+The mane is a deliberate face-covering bob (the model is the pony of Sia, whose
+trademark wig covers her eyes), so there is no generic rule that could uncover them
+without moving another character's hair. Nothing was changed in `sfm_rig.py`,
+`export_blend.py` or `pony_rig.gd` for her.
+
+For contrast, a handful of missing materials is normal and does not disqualify anyone:
+`applebloom` is missing only her `-alt` eyeball variants and `milkyway` her teeth,
+tongue, eyelashes, eyelens and eyebrow, all of which land on the `missing_white`
+substitution documented under "Known fidelity losses" below, with body and hair
+textures resolving normally.
+Both export `textured=True`.
+
+**The roster.** 43 characters: 5 tier a (`twilight`, `rainbowdash`, `fluttershy`,
+`applejack`, `rarity`) and 38 tier c. By rarity that is COMMON 17, UNCOMMON 15, RARE 8
+and LEGENDARY 3 (`sunsetshimmer`, `trixie`, `shiningarmor`). Those tier sizes are not
+bookkeeping: `game/systems/spawn_table.gd` gives each TIER a fixed share of the draw and
+splits it among that tier's members, so a member's own rarity is the tier weight divided
+by the tier size. The slice plan's projected 11 RARE and 2 LEGENDARY lost
+`changelingdrone` and `songbirdserenade` to the exclusions above, which left LEGENDARY
+at one member holding the whole 3% share: a single legendary was 3.00% per draw against
+a RARE pony's 1.20%, i.e. the rarest tier was the easiest individual to meet. Promoting
+`trixie` and `shiningarmor` restores the ordering the tier names promise, per individual
+per draw: COMMON 3.53%, UNCOMMON 1.67%, RARE 1.50%, LEGENDARY 1.00%. That ordering is
+asserted against the real roster in `game/test/test_spawn_table.gd`, so the next roster
+change that inverts it fails a test instead of shipping.
+
+**Reviewing the roster at a glance.** `bash tools/roster_sheet.sh` renders a face shot
+of every character (about 15 to 20 minutes under xvfb) and tiles them, with each
+character's display name, into `build/roster_sheet.png` and a larger four column
+`build/roster_sheet_large.png`; neither PNG is committed.
+
+**Known follow-ups.** Two things this batch measured, did not fix, and should not lose.
+Neither is breaking a shipped character today; both are gaps between what the pipeline
+says it does and what it does on this pack, and both need a re-export and a look at the
+renders, which is why they were out of scope of the batch that found them.
+
+1. **`prune_bodygroups()` groups by the `manes/` path fragment, so a `_back` mane piece
+   can be dropped.** `songbirdserenade`'s `.mdl` ships both `manes/VA_Mane_Sia.dmx`
+   (21300 verts) and `manes/VA_Mane_Sia_back.dmx` (1770 verts, entirely behind the
+   head). The rule sees two names containing `mane`, treats them as alternative STYLES,
+   and keeps the first alphabetically. A `_back` suffix is a second PIECE of one hairdo,
+   not a style, and the current rule cannot tell them apart. It cost nothing on her (she
+   is excluded, and a piece behind the head could never have covered her eyes); whether
+   any character who ships is missing the back of her mane has not been checked.
+2. **Mane bones named `*Hair*` get the forelock stiffness profile.** `PROFILES` picks
+   the mane profile by bone name, and the reVAmped rig spells its mane bones `Hair`, so
+   `sunsetshimmer`, `trixie` and `pinkamena` run their manes at stiffness 10 rather than
+   22. Their renders look right, so this may be the better number for them, but it is
+   being applied by accident rather than by choice.
 
 ### Why this is not retargeting
 

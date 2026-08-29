@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="PonyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/pony_data.gd" id="1_sspitf"]
+
+[resource]
+script = ExtResource("1_sspitf")
+id = &"spitfire"
+display_name = "Spitfire"
+model_path = "res://assets/converted/ponies/spitfire.glb"
+rarity = 2
+spawn_zones = Array[StringName]([&"ranch"])
+favorite_foods = Array[StringName]([&"carrot", &"hay"])
+personality = 1
+voice_bank = ""
+base_speed = 6.2
+base_stamina = 6.5
+base_spirit = 6.0

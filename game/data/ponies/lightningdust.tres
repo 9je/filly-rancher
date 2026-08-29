@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="PonyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/pony_data.gd" id="1_slight"]
+
+[resource]
+script = ExtResource("1_slight")
+id = &"lightningdust"
+display_name = "Lightning Dust"
+model_path = "res://assets/converted/ponies/lightningdust.glb"
+rarity = 1
+spawn_zones = Array[StringName]([&"ranch"])
+favorite_foods = Array[StringName]([&"carrot", &"hay"])
+personality = 1
+voice_bank = ""
+base_speed = 6.3
+base_stamina = 5.5
+base_spirit = 5.0
