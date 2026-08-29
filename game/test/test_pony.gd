@@ -146,15 +146,19 @@ func test_flee_speed_always_lands_in_the_gallop_band_with_no_skate() -> void:
 
 
 func test_flee_speed_clears_the_gallop_handover_rather_than_sitting_on_it() -> void:
-	# The clamp above does not merely reach the gallop band, it clears its lower edge.
-	# clip_for_speed() resolves the handover downwards (`speed < GALLOP_HANDOVER_SPEED`
-	# plays `walk`), and a fleeing pony approaches her requested speed from below, so a
-	# floor set AT the handover leaves her playing `walk` for the whole flee whenever
-	# anything damps her the last hair of a metre per second. The five per cent of headroom
-	# is what this pins; drop it back to the bare handover and the first assertion goes red.
+	# The clamp above does not merely reach the gallop band, it clears its lower edge by a
+	# stated margin. clip_for_speed() resolves the handover downwards (`speed <
+	# GALLOP_HANDOVER_SPEED` plays `walk`), so a floor set AT the handover asks for exactly
+	# the speed where the walk band ends and reads as `walk` on any frame that lands a hair
+	# short of the request.
+	#
+	# The assertion is against the FULL five per cent rather than "greater than the
+	# handover", because the second form is satisfied by a floor one nanometre per second
+	# above it, which would pin nothing and would pass a change that reintroduced the bug.
+	# The margin is the property; assert the margin.
 	var floored: float = PonyScript.flee_speed_for(0.0)
-	assert_gt(floored, GaitScript.GALLOP_HANDOVER_SPEED,
-		"the flee floor must sit strictly above the gallop handover, not on it")
+	assert_gte(floored, GaitScript.GALLOP_HANDOVER_SPEED * 1.05 - 0.000001,
+		"the flee floor must clear the gallop handover by the stated five per cent")
 
 	# The slowest base_speed on the roster, which is where the honest gallop has to start.
 	var slowest: float = PonyScript.flee_speed_for(3.0)

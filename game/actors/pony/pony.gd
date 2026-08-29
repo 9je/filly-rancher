@@ -503,13 +503,22 @@ static func wander_speed_for(base_speed: float) -> float:
 ## foot skate no matter how fast.
 ##
 ## The floor is Gait.GALLOP_HANDOVER_SPEED PLUS FIVE PER CENT, for exactly the reason
-## wander_speed_for() above sits five per cent over Gait.IDLE_SPEED: the handover is a
-## boundary and clip_for_speed() resolves it downwards, answering `walk` for anything
-## strictly below it. Asking for the boundary itself therefore buys no gallop at all,
-## because a fleeing pony reaches her requested speed from below and can sit just under it
-## indefinitely if anything damps her (the leash ramp near the edge of a small territory
-## does precisely that). Five per cent of headroom means the whole top of her approach is
-## inside the gallop band rather than balanced on its edge.
+## wander_speed_for() above sits five per cent over Gait.IDLE_SPEED: the boundary is
+## inclusive on the wrong side. clip_for_speed() answers `walk` for anything strictly
+## below the handover, so a floor set AT the handover asks the most timid pony on the
+## roster to flee at precisely the speed where the walk band ends, and any frame whose
+## realized speed lands a hair short of that request reads as `walk`. Five per cent of
+## headroom puts the request inside the gallop band instead of balanced on its edge.
+##
+## THAT INCLUSIVE BOUNDARY IS THE WHOLE OF WHAT THIS FLOOR FIXES, and it is worth being
+## exact about the case it does NOT fix, because the two look alike from the outside. This
+## clamp is applied to the REQUEST; _state_flee() then multiplies the result by _leash(),
+## so damping happens downstream of the clamp and no floor here can raise a pony the leash
+## has slowed. A pony asking for 2.72 m/s and running at 1.98 because she was spooked at
+## the edge of a two metre territory is that case, and the fix for it is to give her a
+## territory big enough to run in, not a bigger number here: see ROAM_RADIUS in
+## game/scenes/test/wild_ponies.gd. The floor below only binds at all under base_speed
+## 2.52, which no character on the current roster has.
 static func flee_speed_for(base_speed: float) -> float:
 	var scaled := NOMINAL_FLEE_SPEED * (base_speed / REFERENCE_BASE_SPEED)
 	return clampf(scaled, GaitScript.GALLOP_HANDOVER_SPEED * 1.05,
