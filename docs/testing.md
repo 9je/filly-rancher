@@ -378,6 +378,54 @@ Expect `REGION_OK checks=47`; the exit code is the verdict.
 
 ---
 
+## The world gate
+
+`scenes/test/world_test.tscn` proves the clock a unit test cannot: a fresh
+ranch opening at dawn with the clock on zero, two minutes of play carrying it
+into day and nine more into dusk, the sky rig aimed at whichever hour the clock
+is actually on, the weather at every phase of a full cycle equal to what
+`WorldState.weather_for(seed, cycle, phase)` says that seed rolls, the HUD line
+repeating the clock's own `describe()`, a save writing `world_time` into the
+file on disk and a reload resuming the same second in the same phase and the
+same weather, and a pinned stormy night thickening the fog to the storm's
+density and turning the rain on.
+
+It hosts `world/ranch.tscn` exactly the way the market and region gates do, and
+for the same reasons.
+
+`game/test/test_world_state.gd` proves the arithmetic and
+`game/test/test_sky_rig.gd` proves the palette, both without a scene. Neither
+can see the wire between them, and the wire is what breaks: a rig never handed
+the state, a HUD label nobody pushes to, or a load that restores
+`GameState.world_time` into an object no longer driving the sky all pass every
+unit test in the suite and all leave the player with a sky that stopped.
+
+Two things about how it reads the clock are worth knowing before editing it.
+It reads the state through `ranch.get_world_state()` **after** the hosted
+ranch's report has finished, never by parsing the `RANCH world` line that
+report prints: `ranch.gd` rebuilds the world state part way through reporting
+(on purpose), so that printed line is a clock that has since been replaced. And
+it asks the rig what it is walking toward with `current_targets()`, comparing
+those numbers against `SkyRig`'s own pure mapping for the phase and weather the
+clock says it is on, because a rig holding a stale state produces a consistent
+set of wrong numbers rather than an obviously broken sky.
+
+Run it with:
+
+```
+tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/world_test.tscn
+```
+
+Expect `WORLD_OK checks=32`; the exit code is the verdict.
+
+**Looking at the sky.** The gate checks numbers; only a person can say whether a
+stormy dusk *looks* like one. `bash tools/sky_sheet.sh` renders the ranch once
+for each of the sixteen (phase, weather) pairs and tiles them into
+`build/sky_sheet.png`, rows for the phases and columns for the weathers (about
+twenty minutes under xvfb). Not committed; `build/` is gitignored.
+
+---
+
 ## Proving the atomic save (a thing a unit test cannot do)
 
 `game/systems/save_io.gd` promises that a save interrupted part-way through

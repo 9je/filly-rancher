@@ -758,6 +758,14 @@ of every character (about 15 to 20 minutes under xvfb) and tiles them, with each
 character's display name, into `build/roster_sheet.png` and a larger four column
 `build/roster_sheet_large.png`; neither PNG is committed.
 
+**Reviewing the sky at a glance.** The same idea for slice 4's time and weather:
+`bash tools/sky_sheet.sh` renders `world/ranch.tscn` once per (phase, weather)
+pair, pinned with `--phase=` and `--weather=` and pointed at a screenshot
+directory, keeps the wide `01_establishing` shot of each run and tiles the
+sixteen into `build/sky_sheet.png` (about twenty minutes under xvfb, not
+committed). It is not a gate: `game/scenes/test/world_test.tscn` is what asserts
+the sky rig is wired to the clock, in numbers; this is for the pair of eyes.
+
 **Known follow-ups.** Two things this batch measured, did not fix, and should not lose.
 Neither is breaking a shipped character today; both are gaps between what the pipeline
 says it does and what it does on this pack, and both need a re-export and a look at the
