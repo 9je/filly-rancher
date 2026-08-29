@@ -705,6 +705,11 @@ Both export `textured=True`.
 and LEGENDARY 2. RARE is 10 rather than the 11 the slice plan projected because
 `changelingdrone` was a RARE and is excluded.
 
+**Reviewing the roster at a glance.** `bash tools/roster_sheet.sh` renders a face shot
+of every character (about 15 to 20 minutes under xvfb) and tiles them, with each
+character's display name, into `build/roster_sheet.png` and a larger four column
+`build/roster_sheet_large.png`; neither PNG is committed.
+
 ### Why this is not retargeting
 
 The reVAmped skeleton shares **zero** bone names with tier a and, more to the
