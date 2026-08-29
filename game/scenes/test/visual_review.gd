@@ -228,13 +228,17 @@ func _run_face() -> void:
 ## iris texture's alpha: with the iris hidden the white of the eye is a clean oval, and
 ## with the iris material forced fully opaque the tear was still exactly there.
 ##
-## `tag=rigid` (motion mode) pins the hair to the skull, which is the reference every
+## `tag=rigid` pins the hair to the skull, which is the reference every
 ## judgement about the springs is made against -- the shape the model and the clip
-## actually intend. Handled in _run_motion.
+## actually intend. Motion mode handles it in _run_motion; face mode handles it here,
+## which is how "her mane covers her whole face" gets separated into "the springs
+## collapsed it" and "the pack modelled it there" without touching the exporter.
 ##
 ## Anything else in `tag=` is just a filename suffix, so a sweep can write several
 ## variants into one directory.
 func _experiment(pony: Node3D) -> void:
+	if _tag == "rigid":
+		_pin_hair_to_skull(pony)
 	for group in [["Base_Iris.L", "Base_Iris.R"], ["Base_Eye.L", "Base_Eye.R"]]:
 		if _tag != ("noiris" if group[0].begins_with("Base_Iris") else "noeye"):
 			continue
@@ -242,6 +246,16 @@ func _experiment(pony: Node3D) -> void:
 			var node := _find(pony, node_name)
 			if node is MeshInstance3D:
 				(node as MeshInstance3D).visible = false
+
+
+## Hair welded to the skull: influence 0, so the mane sits exactly where the model and the
+## clip put it. THE REFERENCE EVERY JUDGEMENT ABOUT THE SPRINGS IS MADE AGAINST, which is
+## why both modes honour `tag=rigid` and why it is one function rather than two copies:
+## the two shots are only comparable if they pin the hair the same way.
+func _pin_hair_to_skull(pony: Node3D) -> void:
+	var sim := pony.find_child("HairSpring", true, false)
+	if sim is SpringBoneSimulator3D:
+		(sim as SpringBoneSimulator3D).influence = 0.0
 
 
 func _run_motion() -> void:
@@ -256,12 +270,7 @@ func _run_motion() -> void:
 	player.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_PHYSICS
 	player.play(_clip)
 	if _tag == "rigid":
-		# The reference shot: hair welded to the skull, i.e. exactly the pose the clip
-		# and the model put it in. Whatever the springs do has to stay recognisably
-		# this shape, only late and swinging.
-		var sim := pony.find_child("HairSpring", true, false)
-		if sim is SpringBoneSimulator3D:
-			(sim as SpringBoneSimulator3D).influence = 0.0
+		_pin_hair_to_skull(pony)
 	# The ground speed the clip depicts, so a planted hoof does not skate in the shot.
 	# `idle` depicts standing still and must travel at zero -- before this was spelled
 	# out, `clip=idle` fell through to the gallop's 3.30 m/s and slid a standing pony

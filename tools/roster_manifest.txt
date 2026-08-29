@@ -1,0 +1,53 @@
+# Roster manifest for tools/convert_roster.sh.
+# One line per character: id|kind|source|rig
+#   id     the character's data id, matching game/data/ponies/<id>.tres
+#   kind   sfm or blend, selecting which export_blend.py invocation to use
+#   source path relative to assets_raw/
+#   rig    the armature object name, for blend only; empty for sfm
+# The six already shipped characters are listed too, so a fresh clone can regenerate
+# every character in the game, not just the new ones.
+# Characters left out of the SFM pack (duplicates of the blend tier and joke variants)
+# are documented in docs/pipeline.md, not listed here.
+twilight|blend|blender-native/TwilightSparkle_1-0/TwilightSparkle_1-0.blend|TS_Rig
+rainbowdash|blend|blender-native/RainbowDash_1-1/RainbowDash4.blend|RD_Rig
+fluttershy|blend|blender-native/Fluttershy_1-0/Fluttershy_1-0.blend|FS_Rig
+pinkiepie|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_pinkiepie.mdl|
+derpyhooves|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_derpyhooves.mdl|
+starlightglimmer|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_starlightglimmer.mdl|
+applejack|blend|blender-native/Applejack_1-0/Applejack_1-0.blend|AJ_Rig
+rarity|blend|blender-native/Rarity_1-0/Rarity_1-0.blend|R_Rig
+sunsetshimmer|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_sunsetshimmer.mdl|
+pinkamena|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_pinkamena.mdl|
+trixie|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_trixie.mdl|
+shiningarmor|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_shiningarmor.mdl|
+spitfire|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_spitfire.mdl|
+maudpie|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_maudpie.mdl|
+applebloom|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_applebloom.mdl|
+sweetiebelle|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_sweetiebelle.mdl|
+scootaloo|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_scootaloo.mdl|
+soarin|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_soarin.mdl|
+lightningdust|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_lightningdust.mdl|
+cocopommel|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_cocopommel.mdl|
+limestonepie|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_limestonepie.mdl|
+marblepie|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_marblepie.mdl|
+octavia|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_octavia.mdl|
+vinylscratch|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_vinylscratch.mdl|
+cheerilee|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_cheerilee.mdl|
+braeburn|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_braeburn.mdl|
+drwhooves|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_drwhooves.mdl|
+lyra|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_lyra.mdl|
+bonbon|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_bonbon.mdl|
+minuette|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_minuette.mdl|
+carrottop|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_carrottop.mdl|
+berrypunch|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_berrypunch.mdl|
+caramel|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_caramel.mdl|
+cloudchaser|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_cloudchaser.mdl|
+flitter|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_flitter.mdl|
+milkyway|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_milkyway.mdl|
+kerfuffle|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_kerfuffle.mdl|
+pokeypierce|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_pokeypierce.mdl|
+redheart|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_redheart.mdl|
+aloeblossom|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_aloeblossom.mdl|
+lotusblossom|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_lotusblossom.mdl|
+mane_allgood|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_mane_allgood.mdl|
+nightlight|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_nightlight.mdl|

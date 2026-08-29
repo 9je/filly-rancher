@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="PonyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/pony_data.gd" id="1_skerfu"]
+
+[resource]
+script = ExtResource("1_skerfu")
+id = &"kerfuffle"
+display_name = "Kerfuffle"
+model_path = "res://assets/converted/ponies/kerfuffle.glb"
+rarity = 0
+spawn_zones = Array[StringName]([&"ranch"])
+favorite_foods = Array[StringName]([&"daffodil", &"hay"])
+personality = 2
+voice_bank = ""
+base_speed = 3.4
+base_stamina = 4.0
+base_spirit = 6.5

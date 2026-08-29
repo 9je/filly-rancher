@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="PonyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/pony_data.gd" id="1_sshini"]
+
+[resource]
+script = ExtResource("1_sshini")
+id = &"shiningarmor"
+display_name = "Shining Armor"
+model_path = "res://assets/converted/ponies/shiningarmor.glb"
+rarity = 3
+spawn_zones = Array[StringName]([&"ranch"])
+favorite_foods = Array[StringName]([&"apple", &"hay"])
+personality = 1
+voice_bank = ""
+base_speed = 4.5
+base_stamina = 7.0
+base_spirit = 6.5

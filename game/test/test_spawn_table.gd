@@ -6,6 +6,20 @@ extends GutTest
 
 const SpawnTableScript := preload("res://systems/spawn_table.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
+const PonyRegistryScript := preload("res://systems/pony_registry.gd")
+
+## Where the shipped roster lives. The ordering test below is deliberately about THESE
+## files rather than about inline fixtures: the property it checks is a fact about the
+## roster's tier sizes, and inline entries cannot go wrong the way a real roster can.
+const ROSTER_DIR := "res://data/ponies"
+
+## COMMON to LEGENDARY, the order a member of each tier must get rarer in.
+const RARITY_ORDER: Array = [
+	PonyDataScript.Rarity.COMMON,
+	PonyDataScript.Rarity.UNCOMMON,
+	PonyDataScript.Rarity.RARE,
+	PonyDataScript.Rarity.LEGENDARY,
+]
 
 
 ## Builds an inline PonyData with the given id/rarity -- inline is preferred
@@ -194,3 +208,58 @@ func test_single_entry_table_always_returns_it() -> void:
 	for i in range(50):
 		var drawn: PonyData = table.draw()
 		assert_eq(drawn, only, "single-entry table must always return that entry")
+
+
+## THE RARITY NAMES HAVE TO MEAN SOMETHING TO THE PLAYER, AND WHAT SHE MEETS IS AN
+## INDIVIDUAL PONY, NOT A TIER. WEIGHTS is per tier (see the class comment on
+## spawn_table.gd, which explains why it must be), and each tier's share is split evenly
+## among its members, so one pony's odds of being drawn are her tier's weight divided by
+## her tier's size. That makes the TIER SIZES part of the rarity design whether anyone
+## intends them to be or not: a LEGENDARY tier with one member held the whole 3% share
+## and was drawn 2.5 times more often than any individual RARE pony out of a ten-member
+## RARE tier. Nothing in the weights was wrong, and no test could see it, because every
+## other test in this file builds its own fixture and none of them look at the roster
+## that ships.
+##
+## So this one does. It loads the real .tres files, counts the members of each tier, and
+## asserts that per individual per draw the odds fall from COMMON to LEGENDARY. Empty
+## tiers are skipped rather than failed: a tier with no members contributes nothing to
+## the draw (draw() renormalises over the tiers present), so it cannot invert anything.
+##
+## WHEN THIS GOES RED it is almost never SpawnTable that broke. It is a roster edit that
+## made a tier too small or too large for its weight, and the fix is either the tier
+## membership or WEIGHTS, decided together.
+func test_the_real_roster_makes_each_tier_rarer_per_individual() -> void:
+	var registry: PonyRegistry = PonyRegistryScript.new()
+	var roster: Dictionary = registry.load_all(ROSTER_DIR)
+	assert_gt(roster.size(), 0, "the roster must load, or this test measures nothing")
+
+	var members := {}
+	for id in roster:
+		var data: PonyData = roster[id]
+		members[data.rarity] = int(members.get(data.rarity, 0)) + 1
+
+	# Normalise over the tiers actually present, exactly as draw() does.
+	var total_weight := 0.0
+	for tier in members:
+		total_weight += float(SpawnTableScript.WEIGHTS.get(tier, 0))
+	assert_gt(total_weight, 0.0, "the tiers present must carry some weight between them")
+
+	var previous_pct: float = 100.0
+	var previous_name := "nothing"
+	for tier in RARITY_ORDER:
+		var count := int(members.get(tier, 0))
+		var tier_name: String = PonyDataScript.Rarity.keys()[tier]
+		if count == 0:
+			continue
+		var tier_weight: float = float(SpawnTableScript.WEIGHTS.get(tier, 0))
+		var per_individual_pct := (tier_weight / float(count)) / total_weight * 100.0
+		gut.p("%s: %d members, %.2f%% per pony per draw" % [tier_name, count, per_individual_pct])
+		assert_lt(per_individual_pct, previous_pct,
+			("one %s pony is drawn %.2f%% of the time against one %s pony's %.2f%%: " +
+			"%d members share the %s tier's weight of %d, which makes the rarer tier " +
+			"the commoner pony") % [
+				tier_name, per_individual_pct, previous_name, previous_pct,
+				count, tier_name, int(tier_weight)])
+		previous_pct = per_individual_pct
+		previous_name = tier_name

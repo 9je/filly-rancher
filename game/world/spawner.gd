@@ -66,20 +66,37 @@ const MIN_SEPARATION := 1.4
 ## has no map to learn.
 ##
 ## AND SINCE THE SEED IS FIXED, WHICH HERD IT DRAWS IS A CONTENT DECISION, NOT A
-## COIN TOSS -- so it was chosen rather than left to whatever the first plausible number
-## happened to produce. The original 20260827 drew 3 Rainbow Dashes and 5 Fluttershies
-## and NO Twilight, every single launch, forever: a third of a three-pony roster that
-## the shipped build could never show you and the player could never catch. Nothing was
-## wrong with the draw -- SpawnTable gives the RARE tier 12% split two ways, so ~16% per
-## RARE pony, and missing one across 8 draws is a perfectly ordinary 25% outcome. It is
-## just an outcome nobody should be stuck with permanently.
+## COIN TOSS, so it is searched for rather than left to whatever the first plausible
+## number happened to produce. Two seeds have been retired that way. 20260827 drew 3
+## Rainbow Dashes and 5 Fluttershies and NO Twilight, every launch, forever, back when
+## the whole roster was three ponies. 20260839 replaced it; then slice 2 took the roster
+## to 43 characters, and that number now draws only 8 distinct ponies with Nurse
+## Redheart standing in the field three times over. Neither draw was wrong. SpawnTable
+## splits each tier's weight among that tier's members, so a repeat inside ten draws is
+## an ordinary outcome. It is just an outcome nobody should be stuck with permanently.
 ##
-## 20260839 draws 3 Rainbow Dash / 3 Fluttershy / 2 Twilight, so every pony in the
-## roster is somewhere on the map on the first launch. Found by replaying SpawnTable's
-## own draw against successive seeds -- the rarity weights, the tier semantics and the
-## draw code are all untouched; only which of their equally-valid outcomes is the one
-## that ships. Re-pick the same way if the roster changes.
-@export var spawn_seed := 20260839
+## 20260874 DRAWS TEN DISTINCT CHARACTERS across the ranch's ten slots: Twilight
+## Sparkle, Trixie, Bon Bon, Milky Way, Applejack, Pinkie Pie, Caramel, Doctor Whooves,
+## Lotus and Spitfire. All four rarity tiers are represented (4 COMMON, 2 UNCOMMON,
+## 3 RARE, and Trixie for LEGENDARY), which is what makes it a better first launch than
+## the ten-distinct seeds that happen to draw no legendary at all.
+##
+## FOUND BY SEARCH, not by taste. A throwaway script replayed SpawnTable's own draw
+## against every seed from 20260600 to 20261400 with the real roster and the real zone
+## markers, and scored each seed by how many distinct characters its ten draws contain:
+## 203 of those 801 seeds reach ten, 20260874 is one of them, and the tier spread above
+## is the tie-break. The rarity weights, the tier semantics and the draw code are all
+## untouched; only which of their equally valid outcomes is the one that ships. Re-pick
+## the same way if the roster changes, because the draw depends on the whole roster.
+##
+## TEN SLOTS CANNOT SHOW 43 CHARACTERS, and no seed will change that. ranch.tscn holds
+## five ZoneMarkers of spawn_count 2, and nothing respawns once a pony is caught, so ten
+## distinct characters is the ceiling and this seed already sits on it. The other 33 are
+## the business of the slices that own them: slice 3 splits the map into regions, so a
+## character can be zoned somewhere other than "ranch" and the ten slots stop being the
+## whole world; slice 5 brings respawn, so the herd refreshes over a session instead of
+## being the same ten ponies until the save is deleted.
+@export var spawn_seed := 20260874
 
 ## Node whose ZoneMarker children this spawner fills. Defaults to a sibling `Zones`.
 @export var zones_path := NodePath("../Zones")
