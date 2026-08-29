@@ -1,7 +1,7 @@
 extends GutTest
 ## Tests for game/systems/request_board.gd: the three-at-a-time board of favours the ranch
 ## asks of the player. Pure logic, no scene, same discipline as test_compendium.gd and
-## test_economy.gd -- built against the REAL shipped roster (game/data/ponies/) so the
+## test_economy.gd; built against the REAL shipped roster (game/data/ponies/) so the
 ## counting and drawing tests are measured against the actual game, not a fixture that
 ## could drift from it.
 

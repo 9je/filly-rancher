@@ -2,20 +2,20 @@ class_name RequestBoard
 extends RefCounted
 ## THREE STANDING FAVOURS the ranch can ask of the player, refreshed as they are finished.
 ## GameState carries whatever this class hands back as `requests` (game/systems/game_state.gd,
-## Task 2) -- an opaque Array of Dictionaries as far as that file is concerned; this file is
+## Task 2); an opaque Array of Dictionaries as far as that file is concerned; this file is
 ## the only place that shape is defined and read. A later task wires this board to the ranch
 ## (catching, penning, selling, spotting a pony) and pays the rewards it reports; this file
-## only tracks progress and produces the text -- it never touches Economy, GemPouch or
+## only tracks progress and produces the text; it never touches Economy, GemPouch or
 ## Inventory directly.
 ##
-## RefCounted, no scene tree -- same discipline as Compendium (game/systems/compendium.gd)
+## RefCounted, no scene tree; same discipline as Compendium (game/systems/compendium.gd)
 ## and Economy (game/systems/economy.gd), so the whole thing is GUT-testable headlessly
 ## (game/test/test_request_board.gd).
 ##
 ## --- THE FIRST THREE ARE A TUTORIAL, NOT A DRAW -------------------------------------------
 ##
 ## seed_tutorial() hands out exactly CATCH_ANY, PEN_ANY, SELL_ANY, in that order, with fixed
-## text and fixed rewards -- these three teach the three verbs the ranch is built on before
+## text and fixed rewards; these three teach the three verbs the ranch is built on before
 ## the board starts asking for anything specific. fill() never produces these kinds; once
 ## they are claimed they are gone for good ("the tutorial three are not refilled" is simply
 ## fill() only ever drawing from the three TEMPLATE kinds below).
@@ -26,7 +26,7 @@ extends RefCounted
 ## `hash(Vector2i(_seed, _draw_counter))`, and `_draw_counter` advances by exactly one per
 ## draw attempt (successful or not) before that RNG is used. Two boards constructed with the
 ## same seed that receive the same sequence of fill()/on_*() calls therefore produce
-## bit-identical requests() -- nothing here ever reads the global RNG. `_draw_counter` is
+## bit-identical requests(); nothing here ever reads the global RNG. `_draw_counter` is
 ## part of the board's persisted state (see to_array() below) specifically so a reloaded
 ## board picks up the SAME sequence a save/quit/reload must not restart from scratch.
 ##
@@ -37,7 +37,7 @@ extends RefCounted
 ## `{"seed": int, "draw_counter": int}` and every element after that is one request
 ## Dictionary. from_array() cannot re-seed the board any other way: its signature is fixed
 ## by the brief to `(a, registry, regions)` with no separate seed parameter, and without the
-## seed a reloaded board could not continue drawing the same sequence at all -- only the
+## seed a reloaded board could not continue drawing the same sequence at all; only the
 ## draw_counter would be recoverable (from surviving "req_N" ids), and even that breaks once
 ## a draw fails without producing a request (a real, if rare, possibility once every
 ## character has been seen and the region list is short). Storing both explicitly, once,
@@ -53,7 +53,7 @@ extends RefCounted
 ## --- SEE_CHARACTER's FOOD REWARD IS A FIXED AMOUNT, NOT A DICTIONARY FIELD ----------------
 ##
 ## The brief's request shape has `reward_food: String` (an item id, e.g. "hay") but no count
-## field, and the brief's own template text says "reward 40 bits plus 2 hay" -- a fixed
+## field, and the brief's own template text says "reward 40 bits plus 2 hay"; a fixed
 ## amount, not one that varies per request. SEE_CHARACTER_FOOD_COUNT below is that fixed
 ## amount; the later task that pays rewards multiplies reward_food (if non-empty) by that
 ## constant instead of an unnamed field. Every other kind leaves reward_food as "".
@@ -78,7 +78,7 @@ const SELL_GEMS_COUNT_MIN := 3
 const SELL_GEMS_COUNT_MAX := 6
 
 ## Bits per gem sold above the gem's own sale value (EconomyScript.GEM_VALUE_BY_RARITY,
-## game/systems/economy.gd) -- a completed SELL_GEMS_OF_RARITY request pays out MORE than
+## game/systems/economy.gd); a completed SELL_GEMS_OF_RARITY request pays out MORE than
 ## just selling the gems at the market would, which is the whole point of asking for them.
 const SELL_GEMS_BONUS_PER_GEM := 15
 
@@ -93,7 +93,7 @@ var _draw_counter: int = 0
 
 
 ## `region_names` is an optional {id -> display name} lookup used to build
-## BRING_PERSONALITY_FROM_ZONE's text without touching disk -- see the class comment. When a
+## BRING_PERSONALITY_FROM_ZONE's text without touching disk; see the class comment. When a
 ## region's id is missing from it, RegionRegistry (game/systems/region_registry.gd) is
 ## loaded lazily, once, and consulted instead; a region unknown to BOTH falls back to its
 ## bare id so a request never carries broken text.
@@ -106,7 +106,7 @@ func _init(seed: int, registry: PonyRegistry, regions: Array[StringName], region
 
 # --- reading -------------------------------------------------------------------------------
 
-## Every request on the board, done or not, as copies -- mutating the result never touches
+## Every request on the board, done or not, as copies; mutating the result never touches
 ## the board's own state.
 func requests() -> Array:
 	var out: Array = []
@@ -127,7 +127,7 @@ func active() -> Array:
 # --- the tutorial three ---------------------------------------------------------------------
 
 ## Appends CATCH_ANY, PEN_ANY, SELL_ANY, in that exact order, with fixed text and fixed
-## rewards. Does not consume the draw sequence and is not idempotent -- call it once, at the
+## rewards. Does not consume the draw sequence and is not idempotent; call it once, at the
 ## start of a fresh ranch.
 func seed_tutorial() -> void:
 	_requests.append(_tutorial_request("tutorial_catch", Kind.CATCH_ANY, 20,
@@ -163,9 +163,9 @@ func _blank_request(id: String, kind: int, reward_bits: int, reward_food: String
 # --- filling the board from templates -------------------------------------------------------
 
 ## Draws new requests (BRING_PERSONALITY_FROM_ZONE, SELL_GEMS_OF_RARITY, SEE_CHARACTER only
-## -- never a tutorial kind) until `active()` has ACTIVE entries, deterministic from the seed
+##; never a tutorial kind) until `active()` has ACTIVE entries, deterministic from the seed
 ## and the draw counter. `seen` is the ids (StringName or String, either works) already SEEN
-## or CAUGHT in the player's Compendium (game/systems/compendium.gd) -- the board has no
+## or CAUGHT in the player's Compendium (game/systems/compendium.gd); the board has no
 ## compendium of its own, so the caller supplies this each time. A character already
 ## targeted by another active SEE_CHARACTER request is excluded too, so the board never asks
 ## twice for the same face at once. When every character is excluded, SEE_CHARACTER simply
@@ -283,7 +283,7 @@ func _draw_see_character(rng: RandomNumberGenerator, this_draw: int, excluded_ch
 
 
 ## Every PonyData in the registry not in `excluded` (ids as String keys). Walks the roster by
-## rarity tier, the same technique Compendium._all_data() uses -- PonyRegistry has no plain
+## rarity tier, the same technique Compendium._all_data() uses; PonyRegistry has no plain
 ## all() accessor, and by_rarity() partitions the whole roster exactly once per character.
 func _unseen_ponies(excluded: Dictionary) -> Array[PonyData]:
 	var out: Array[PonyData] = []
@@ -351,7 +351,7 @@ func on_penned(data: PonyData) -> Array:
 
 ## `count` gems of `rarity` (a PonyData.Rarity value) were just sold. Bumps every not-done
 ## SELL_ANY by one (any sale at all completes it), and every not-done SELL_GEMS_OF_RARITY of
-## the matching rarity by `count` -- this is the one kind whose progress accumulates across
+## the matching rarity by `count`; this is the one kind whose progress accumulates across
 ## several calls rather than completing on the first.
 func on_sold(rarity: int, count: int) -> Array:
 	if count <= 0:
@@ -404,7 +404,7 @@ func _bump(req: Dictionary, amount: int) -> bool:
 
 ## Marks the done, unpaid request `id` as paid and returns a copy of it (reward fields and
 ## all) for the caller to actually pay out. Returns an empty Dictionary if `id` is unknown,
-## not yet done, or already paid -- claiming twice never pays twice.
+## not yet done, or already paid; claiming twice never pays twice.
 func claim(id: String) -> Dictionary:
 	for r in _requests:
 		var req: Dictionary = r
@@ -431,7 +431,7 @@ func to_array() -> Array:
 
 ## Rebuilds a board from to_array()'s output. A request whose SEE_CHARACTER character (or
 ## BRING_PERSONALITY_FROM_ZONE zone) is not known to `registry` (or not in `regions`) is
-## dropped -- reported with push_warning(), not a crash -- and every other request is kept.
+## dropped; reported with push_warning(), not a crash; and every other request is kept.
 static func from_array(a: Array, registry: PonyRegistry, regions: Array[StringName],
 		region_names: Dictionary = {}) -> RequestBoard:
 	var seed_val := 0
@@ -456,7 +456,7 @@ static func from_array(a: Array, registry: PonyRegistry, regions: Array[StringNa
 		if kind == Kind.SEE_CHARACTER:
 			var char_id := StringName(String(rec.get("character", "")))
 			if String(char_id).is_empty() or registry.by_id(char_id) == null:
-				push_warning("RequestBoard.from_array: dropping request '%s' -- unknown character '%s'" % [
+				push_warning("RequestBoard.from_array: dropping request '%s'; unknown character '%s'" % [
 					rec.get("id", ""), char_id
 				])
 				continue
@@ -464,7 +464,7 @@ static func from_array(a: Array, registry: PonyRegistry, regions: Array[StringNa
 		if kind == Kind.BRING_PERSONALITY_FROM_ZONE:
 			var zone_id := StringName(String(rec.get("zone", "")))
 			if String(zone_id).is_empty() or not (zone_id in regions):
-				push_warning("RequestBoard.from_array: dropping request '%s' -- unknown zone '%s'" % [
+				push_warning("RequestBoard.from_array: dropping request '%s'; unknown zone '%s'" % [
 					rec.get("id", ""), zone_id
 				])
 				continue
