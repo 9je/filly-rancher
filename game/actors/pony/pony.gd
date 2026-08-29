@@ -629,9 +629,12 @@ func break_free() -> void:
 ## touched by anything in this file. She has gone home for the night, and the spawner will
 ## draw her again at an hour she keeps.
 ##
-## AND SHE IS NEVER DISCARDED IN FRONT OF THE PLAYER. The free happens in _state_leaving()
-## and only once she is further away than the widest notice radius on the roster (see
-## LEAVE_DISTANCE) or once LEAVE_SECONDS of walking has run out.
+## AND SHE IS NEVER FREED IN FRONT OF THE PLAYER UNLESS SHE CANNOT GET AWAY AT ALL. The
+## free happens in _state_leaving(), and only once she is further away than the widest
+## notice radius on the roster (see LEAVE_DISTANCE). LEAVE_SECONDS is the other way out of
+## that state and the reason for the "unless": a pony walled in, or followed step for step,
+## would otherwise walk forever, so the timer frees her where she stands. Everything the
+## player can do about it is on the player's side of the bargain.
 ##
 ## REFUSED WHILE HELD, because the beam is writing her transform and owns what happens to
 ## her next; a hold that turns into a capture must be allowed to finish as a capture. The

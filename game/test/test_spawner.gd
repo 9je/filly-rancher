@@ -13,12 +13,31 @@ extends GutTest
 ##   fixture_meadow   fixture_any_a, fixture_any_b                  no conditions at all
 ##   fixture_hollow   fixture_night_a, fixture_night_b,
 ##                    fixture_night_c (NIGHT), fixture_storm (STORM)
+##   fixture_yard     fixture_yard_any (none, UNCOMMON),
+##                    fixture_yard_dusk (DUSK, COMMON),
+##                    fixture_yard_night (NIGHT, LEGENDARY)
 ##
 ## The hollow is the interesting half: it is EMPTY at DAY under a clear sky, holds only
 ## the storm pony at DAY/STORM, and holds exactly the three night ponies at NIGHT/CLEAR.
 ## So "the sky changed and the herd changed with it" is a fact about who is standing
 ## there, with no draw luck in it; and three candidates for two slots is what makes the
 ## draw sensitive to the cycle, and for four slots what makes a slot go unfilled.
+##
+## THE YARD IS THE PRIORITY FILL'S OWN TRUTH TABLE, and its three rarities are load
+## bearing rather than decoration. One slot, and at every hour exactly one or two
+## characters can stand in it:
+##
+##   DAY, clear     fixture_yard_any alone            (the boot draw has no choice)
+##   DUSK, clear    fixture_yard_any, _dusk           (COMMON beats UNCOMMON, so _dusk)
+##   NIGHT, clear   fixture_yard_any, _night          (the newcomer against the ordinary)
+##
+## which makes both halves of Ruling 26 measurable with no draw luck in them: from DUSK the
+## slot is FREE (the dusk pony walks off) and the night pony has to be preferred to the
+## unconditional one who is already eligible; from DAY the slot is FULL of that same
+## unconditional pony, and she has to be sent home to let the night pony in. Rarity is what
+## makes the second line of the table deterministic: SpawnTable weights COMMON far above
+## UNCOMMON, and the LEGENDARY night pony is the character the old weighted draw would have
+## kept out of the field the longest, which is the whole complaint the fill answers.
 ##
 ## THE PONIES ARE REAL PONY BODIES on a real floor, because the thing being measured
 ## includes a departure: Pony.leave() walks her away and frees her, and none of that can
@@ -35,6 +54,7 @@ const FIXTURE_DIR := "res://test/fixtures/ponies_conditional"
 
 const MEADOW := &"fixture_meadow"
 const HOLLOW := &"fixture_hollow"
+const YARD := &"fixture_yard"
 
 ## The default map these tests build: one marker per zone, two ponies each.
 const BOTH_ZONES := [[MEADOW, 2], [HOLLOW, 2]]
@@ -216,6 +236,109 @@ func test_a_marker_with_nobody_left_to_draw_leaves_the_slot_empty() -> void:
 	_assert_no_duplicates(spawner, "with more slots than candidates")
 
 
+# --- whoever the hour has just opened for goes first ----------------------------------
+
+func test_a_free_slot_goes_first_to_whoever_the_hour_has_just_opened_for() -> void:
+	# THE MEASUREMENT THIS EXISTS FOR: one free slot, two characters who could fill it, and
+	# the one whose hours have just begun takes it. The other candidate is fixture_yard_any,
+	# who was standing-eligible an hour ago and lost nothing by not being drawn; she is what
+	# a freed slot used to go back into the rarity weighted draw against, and against a
+	# LEGENDARY she won it nearly every time. Asserted as "the night pony IS standing there",
+	# not as "she might be": the yard holds one slot, so naming who is in it is the whole
+	# claim.
+	var spawner := _spawner([[YARD, 1]])
+	await wait_physics_frames(2)
+	spawner.populate(WorldStateScript.Phase.DUSK, WorldStateScript.Weather.CLEAR)
+	assert_eq(_ids(spawner), [&"fixture_yard_dusk"],
+		"the boot draw takes the COMMON dusk pony, so the slot is hers to vacate")
+
+	var result: Dictionary = spawner.refresh(WorldStateScript.Phase.NIGHT,
+		WorldStateScript.Weather.CLEAR, 0, _far_away())
+
+	assert_eq(result["left"], 1, "the dusk pony's hours ended, so she walks off")
+	assert_eq(result["arrived"], 1, "and one pony walks in behind her")
+	assert_eq(result["made_room"], 0, "nobody had to be moved along: the slot was free")
+	assert_eq(_staying_ids(spawner), [&"fixture_yard_night"],
+		"the slot goes to the character whose hours have just opened, not to the "
+		+ "unconditional one who was already eligible")
+
+
+func test_a_full_marker_sends_one_unconditional_resident_home_to_make_room() -> void:
+	# The other half of Ruling 26. Nobody's hours ended at this marker, so no slot frees
+	# itself and the night pony would wait for a departure that a yard full of
+	# unconditional residents is never going to produce.
+	var spawner := _spawner([[YARD, 1]])
+	await wait_physics_frames(2)
+	spawner.populate(WorldStateScript.Phase.DAY, WorldStateScript.Weather.CLEAR)
+	assert_eq(_ids(spawner), [&"fixture_yard_any"],
+		"by day the yard holds exactly one candidate, so the boot draw has no choice")
+
+	var result: Dictionary = spawner.refresh(WorldStateScript.Phase.NIGHT,
+		WorldStateScript.Weather.CLEAR, 0, _far_away())
+
+	assert_eq(result["made_room"], 1, "one resident was moved along to free a slot")
+	assert_eq(result["left"], 1, "which is a departure like any other, and counted as one")
+	assert_eq(result["arrived"], 1, "and the newcomer takes the slot in the same refresh")
+	assert_eq(_staying_ids(spawner), [&"fixture_yard_night"],
+		"the night pony is the one standing there afterwards")
+
+	# SHE LEFT, SHE DID NOT DIE. Her body is still on the map walking off, and her record is
+	# still on disk to be drawn again at the next hour with room in it.
+	var walking_off: Array = []
+	for pony in spawner.get_spawned():
+		if pony.is_leaving():
+			walking_off.append(pony.get_data().id)
+	assert_eq(walking_off, [&"fixture_yard_any"],
+		"the evicted resident is walking off, not gone")
+
+	var again: Dictionary = spawner.refresh(WorldStateScript.Phase.NIGHT,
+		WorldStateScript.Weather.CLEAR, 0, _far_away())
+	assert_eq(again["made_room"], 0,
+		"and the same hour asked twice does not empty the marker a pony at a time")
+
+
+func test_a_pony_who_keeps_hours_of_her_own_is_never_the_one_moved_along() -> void:
+	# The hollow at night is three characters who all keep NIGHT hours, and the storm pony
+	# is a newcomer the moment the weather turns. Nobody is evicted for her: sending a
+	# conditional character home might cost the player the only sighting of her this
+	# session, which is the opposite of what the fill is for. She waits for a real departure.
+	var spawner := _spawner([[HOLLOW, 2]])
+	await wait_physics_frames(2)
+	spawner.populate(WorldStateScript.Phase.NIGHT, WorldStateScript.Weather.CLEAR)
+
+	var result: Dictionary = spawner.refresh(WorldStateScript.Phase.NIGHT,
+		WorldStateScript.Weather.STORM, 0, _far_away())
+
+	assert_eq(result["made_room"], 0, "no night pony is sent home for the storm pony")
+	assert_eq(result["left"], 0, "and none of them is leaving of her own accord either")
+	assert_eq(result["arrived"], 0, "so the marker is as full as it was")
+	assert_does_not_have(_staying_ids(spawner), &"fixture_storm",
+		"the storm pony is still waiting for a slot")
+
+
+# --- the roster is read once ----------------------------------------------------------
+
+func test_repointing_the_pony_dir_after_the_roster_is_read_is_refused_and_reported() -> void:
+	var spawner := _spawner()
+	await wait_physics_frames(2)
+	spawner.populate(WorldStateScript.Phase.DAY, WorldStateScript.Weather.CLEAR)
+
+	spawner.pony_dir = "res://test/fixtures/ponies_malformed"
+
+	assert_push_error("pony_dir cannot be changed",
+		"the entries cache is built once, so a later re-point has to be loud")
+	assert_eq(spawner.pony_dir, FIXTURE_DIR,
+		"and the spawner keeps saying which directory it is actually drawing from")
+
+
+func test_the_pony_dir_can_still_be_set_before_the_first_populate() -> void:
+	var spawner := _spawner()
+	spawner.pony_dir = "res://test/fixtures/ponies_malformed"
+	assert_eq(spawner.pony_dir, "res://test/fixtures/ponies_malformed",
+		"nothing has been read yet, so re-pointing it is ordinary configuration")
+	assert_push_error(0, "and nothing is reported")
+
+
 # --- determinism ---------------------------------------------------------------------
 
 func test_the_refresh_draw_is_the_same_for_the_same_seed_cycle_and_phase() -> void:
@@ -313,6 +436,20 @@ func _marker(zone: StringName, count: int, position: Vector3) -> ZoneMarker:
 func _ids(spawner: Spawner) -> Array:
 	var ids: Array = []
 	for pony in spawner.get_spawned():
+		var data: PonyData = pony.get_data()
+		if data != null:
+			ids.append(data.id)
+	ids.sort()
+	return ids
+
+
+## The ids of everyone standing on the map who is NOT on her way off it, sorted. What
+## "who is out there now" means once a departure and its replacement overlap.
+func _staying_ids(spawner: Spawner) -> Array:
+	var ids: Array = []
+	for pony in spawner.get_spawned():
+		if pony.is_leaving():
+			continue
 		var data: PonyData = pony.get_data()
 		if data != null:
 			ids.append(data.id)

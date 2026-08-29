@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="PonyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/pony_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"fixture_yard_night"
+display_name = "Fixture Yard Night"
+model_path = "res://assets/converted/ponies/twilight.glb"
+rarity = 3
+spawn_zones = Array[StringName]([&"fixture_yard"])
+favorite_foods = Array[StringName]([&"hay"])
+personality = 1
+voice_bank = ""
+base_speed = 3.0
+base_stamina = 4.0
+base_spirit = 4.0
+phases = Array[int]([3])
+weathers = Array[int]([])

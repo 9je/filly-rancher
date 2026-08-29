@@ -68,7 +68,20 @@ const MIN_SEPARATION := 1.4
 
 @export_group("Spawning")
 ## Directory of PonyData .tres records.
-@export_dir var pony_dir := "res://data/ponies"
+##
+## READ EXACTLY ONCE, at the first _spawnable_entries() (which is populate()'s first act),
+## and cached in `_entries` for every later refresh(). Re-pointing it after that would be a
+## lie: the cache is not rebuilt, so the spawner would go on drawing out of the old
+## directory while its inspector said otherwise. The setter therefore REFUSES the new value
+## and says so, rather than accepting an assignment that does nothing.
+@export_dir var pony_dir := "res://data/ponies":
+	set(value):
+		if _entries_loaded and value != pony_dir:
+			push_error(("Spawner: pony_dir cannot be changed to '%s' after the roster has " +
+				"been read (it is cached at the first populate()); the spawner is still " +
+				"drawing from '%s'.") % [value, pony_dir])
+			return
+		pony_dir = value
 
 ## Fixed so the ranch is the same ranch every launch: same ponies, same spots, same
 ## wander targets. A collection game whose roster reshuffles every time you open it
@@ -169,6 +182,22 @@ var _next_slot := 0
 var _entries: Array[PonyData] = []
 var _entries_loaded := false
 
+## THE SKY THE HERD WAS LAST DRAWN FOR: the (phase, weather) pair the last populate() or
+## refresh() was handed, as WorldState enum ints. refresh() compares each candidate against
+## it to tell a character whose hours have JUST OPENED apart from one who was already
+## available at the previous hour and simply lost the draw. That distinction is the whole of
+## the priority fill below: without it a freed slot went back into the rarity weighted draw,
+## and a night only character could stand three cycles' worth of nights behind an
+## unconditional common who was already eligible.
+##
+## NOT PERSISTED, on purpose. populate() sets the pair at boot, so a fresh run is honest
+## from its first refresh. After a mid session load the remembered pair is the PRE LOAD
+## hour, which is acceptable while there is no in game Load page (the only load a session
+## does happens before the ranch builds its herd). The worst that mismatch can do is spend
+## ONE refresh treating a newcomer as an old face, and the next hour puts it right.
+var _last_phase: int = WorldStateScript.Phase.DAWN
+var _last_weather: int = WorldStateScript.Weather.CLEAR
+
 
 ## Draw and place every zone's ponies. Returns how many actually reached the tree.
 ##
@@ -181,6 +210,11 @@ var _entries_loaded := false
 ## every existing caller keeps exactly the draw it had.
 func populate(phase: int = WorldStateScript.Phase.DAWN,
 		weather: int = WorldStateScript.Weather.CLEAR) -> int:
+	# Before the early return below, so a spawner with no markers still remembers the hour
+	# it was booted into rather than claiming DAWN forever.
+	_last_phase = phase
+	_last_weather = weather
+
 	var markers := get_markers()
 	if markers.is_empty():
 		push_error("Spawner: no ZoneMarker found under '%s' -- nothing to populate" % zones_path)
@@ -228,7 +262,31 @@ func populate(phase: int = WorldStateScript.Phase.DAWN,
 ## longer hold is told to leave() (she walks off and frees herself out of sight, see
 ## Pony.leave(); nothing owned is reachable from here, and nothing dies), and every marker
 ## left short is topped back up out of the pool that matches the new hour. Returns
-## `{"left": n, "arrived": n}`, which is what the caller puts on screen.
+## `{"left": n, "arrived": n, "unfilled": n, "made_room": n}`, the first two of which are
+## what the caller puts on screen.
+##
+## WHOEVER THE HOUR HAS JUST OPENED FOR GOES FIRST, ahead of the weighted draw. A freed slot
+## used to go straight back into SpawnTable, where a night only legendary competed on rarity
+## weight against every unconditional common in the zone who was standing there a minute ago
+## and is eligible again now; a measurement on this branch had a night only character take
+## three extra cycles to appear that way. So each marker's free slots are offered first to
+## its NEWCOMERS: the characters whose conditions hold now, did NOT hold at the pair this
+## spawner last drew for (`_last_phase`, `_last_weather`), and who are standing nowhere on
+## the map. Which newcomer takes which slot is still the seeded per refresh RNG's to say, so
+## the draw is as deterministic as it ever was; what has changed is who is in the running.
+## Only once the newcomers run out do the remaining slots go to the ordinary weighted draw.
+##
+## AND IF A MARKER IS FULL, ONE RESIDENT MAKES ROOM. A newcomer with nowhere to stand would
+## otherwise wait for a departure that a full marker of unconditional residents will never
+## produce, because the night only pool is exactly the pool with nobody to displace. So a
+## marker with no free slot and nobody already on their way out sends ONE staying resident
+## home (Pony.leave(), the same walk off any other departure makes; nothing dies, nothing
+## owned is reachable from here) and gives the freed slot to the newcomer in the same
+## refresh. The resident chosen is always an UNCONDITIONAL one (empty `phases` AND empty
+## `weathers`), because she is the one character who can come back at any hour, so nothing
+## is lost by sending her home. At most one eviction per marker per refresh, counted in
+## "made_room"; she is counted in "left" as well, because from the player's side she
+## wandered off like anybody else.
 ##
 ## DETERMINISTIC PER HOUR, NOT PER CALL. The draw RNG is seeded from the world seed, the
 ## cycle index and the phase, so the same save at the same hour of the same day draws the
@@ -255,7 +313,10 @@ func populate(phase: int = WorldStateScript.Phase.DAWN,
 ## that true as the roster changes.
 ##
 ## IDEMPOTENT for a given (phase, weather, cycle): the second call finds every marker full
-## of ponies who are all still available, and draws nothing.
+## of ponies who are all still available, and draws nothing. The priority fill does not
+## break that and cannot: the remembered pair is set to (phase, weather) at the end of every
+## refresh, so on the second call every candidate that is available now was available then
+## too, the newcomer list is empty everywhere, and with it the eviction.
 ##
 ## AT (cycle 0, DAWN) THE REFRESH SEED IS THE PLAIN WORLD SEED, because `0 * 4 + 0` is
 ## zero, so the first refresh of a brand new save replays populate()'s own RNG stream. It
@@ -275,35 +336,63 @@ func refresh(phase: int, weather: int, cycle: int, player_position: Vector3) -> 
 
 	var markers := get_markers()
 	if markers.is_empty():
-		return {"left": left, "arrived": 0, "unfilled": 0}
+		_last_phase = phase
+		_last_weather = weather
+		return {"left": left, "arrived": 0, "unfilled": 0, "made_room": 0}
 
 	var entries := _spawnable_entries()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = spawn_seed + cycle * 4 + phase
 
 	var staying := _staying_by_marker()
+	var leaving := _leaving_by_marker()
 	var taken := _standing_ids()
 	var arrived := 0
 	var unfilled := 0
+	var made_room := 0
 	var slot := _next_slot
 	for marker: ZoneMarker in markers:
 		var pool := _pool_for(marker, entries, phase, weather)
+		# Built once per marker and drained as it is drawn from, so a newcomer handed one
+		# slot cannot be handed the next one as well.
+		var newcomers := _newcomers(pool, taken)
 		var wanted: int = marker.spawn_count - int(staying.get(marker.get_instance_id(), 0))
+
 		if wanted <= 0:
-			continue
+			# THE ONE EVICTION. Only for a marker that is genuinely stuck: full, with nobody
+			# already walking off it (a departure this same refresh is about to free a slot
+			# on its own, and taking a second pony off the map for the same arrival would
+			# empty the field), and with a newcomer who has nowhere else to go.
+			if newcomers.is_empty() or int(leaving.get(marker.get_instance_id(), 0)) > 0:
+				continue
+			var resident := _evictable(marker, rng)
+			if resident == null or not resident.leave():
+				continue
+			left += 1
+			made_room += 1
+			wanted = 1
+
 		for i in range(wanted):
-			# Rebuilt per slot rather than once per marker, because the previous slot's
-			# arrival is struck out of it. SpawnTable spends exactly one number from `rng`
-			# per draw whatever it is handed, so the stream stays deterministic.
-			var choices := _without(pool, taken)
-			if choices.is_empty():
-				unfilled += 1
-				continue
-			var data: PonyData = SpawnTableScript.new(choices, rng).draw()
-			if data == null:
-				push_error("Spawner: SpawnTable.draw() returned null for zone '%s' slot %d"
-					% [marker.zone_id, i])
-				continue
+			var data: PonyData = null
+			if not newcomers.is_empty():
+				# One number off `rng` per pick, the same as a SpawnTable draw spends, so
+				# which characters a slot is offered does not shift the rest of the stream.
+				var pick := rng.randi_range(0, newcomers.size() - 1)
+				data = newcomers[pick]
+				newcomers.remove_at(pick)
+			else:
+				# Rebuilt per slot rather than once per marker, because the previous slot's
+				# arrival is struck out of it. SpawnTable spends exactly one number from
+				# `rng` per draw whatever it is handed, so the stream stays deterministic.
+				var choices := _without(pool, taken)
+				if choices.is_empty():
+					unfilled += 1
+					continue
+				data = SpawnTableScript.new(choices, rng).draw()
+				if data == null:
+					push_error("Spawner: SpawnTable.draw() returned null for zone '%s' slot %d"
+						% [marker.zone_id, i])
+					continue
 			taken[data.id] = true
 			var pony := _spawn_one(data, marker, slot)
 			if pony != null:
@@ -313,13 +402,15 @@ func refresh(phase: int, weather: int, cycle: int, player_position: Vector3) -> 
 			slot += 1
 
 	_next_slot = slot
+	_last_phase = phase
+	_last_weather = weather
 	# `player_position` is deliberately not read. Where a departing pony is discarded is her
 	# own business: Pony.leave() measures the distance to the player she can actually see,
 	# which is the same test her notice radius is stated against, and second-guessing it
 	# from here would give two answers to one question. It is in the signature because the
 	# caller has the position to hand and because a future "do not stand a replacement in
 	# his face" rule belongs in this function and nowhere else.
-	return {"left": left, "arrived": arrived, "unfilled": unfilled}
+	return {"left": left, "arrived": arrived, "unfilled": unfilled, "made_room": made_room}
 
 
 ## {id: true} for every pony standing on the map who is STAYING there. The set refresh()
@@ -333,6 +424,50 @@ func _standing_ids() -> Dictionary:
 		if data != null:
 			ids[data.id] = true
 	return ids
+
+
+## The characters in `pool`, already cut down to this marker's zone and to the hour being
+## drawn for, whose hours have JUST OPENED: not available at the pair this spawner last
+## drew for, and standing nowhere on the map. The list the priority fill offers slots to
+## before anybody else. Empty whenever the sky has not actually changed, which is what makes
+## a repeated refresh do nothing.
+func _newcomers(pool: Array[PonyData], taken: Dictionary) -> Array[PonyData]:
+	var out: Array[PonyData] = []
+	for data: PonyData in pool:
+		if taken.has(data.id):
+			continue
+		if data.available(_last_phase, _last_weather):
+			continue
+		out.append(data)
+	return out
+
+
+## The staying resident of `marker` to send home so a newcomer can have her slot, or null if
+## this marker has nobody it would be honest to move.
+##
+## UNCONDITIONAL RESIDENTS ONLY: empty `phases` and empty `weathers`, so she is drawable at
+## every hour in every weather and can walk back in on the next refresh that has room. A
+## pony who keeps hours of her own might not get another chance this session, and the point
+## of the whole feature is to show MORE of the roster, not to trade one rare sighting for
+## another.
+##
+## Picked off `rng` rather than taking the first, so which of an interchangeable few goes
+## home is the hour's own decision and is stable for a given save, cycle and phase.
+func _evictable(marker: ZoneMarker, rng: RandomNumberGenerator) -> CharacterBody3D:
+	var candidates: Array[CharacterBody3D] = []
+	for pony in get_spawned():
+		if pony.is_leaving():
+			continue
+		var home: ZoneMarker = _marker_by_pony.get(pony.get_instance_id())
+		if home != marker:
+			continue
+		var data: PonyData = pony.get_data()
+		if data == null or not data.phases.is_empty() or not data.weathers.is_empty():
+			continue
+		candidates.append(pony)
+	if candidates.is_empty():
+		return null
+	return candidates[rng.randi_range(0, candidates.size() - 1)]
 
 
 ## `pool` without the entries whose id is a key of `taken`.
@@ -355,6 +490,22 @@ func _pool_for(marker: ZoneMarker, entries: Array[PonyData], phase: int,
 			continue
 		pool.append(data)
 	return pool
+
+
+## {marker instance id: how many of its ponies are ALREADY on their way out}. The eviction
+## fallback reads it: a marker with a departure in flight is about to have a free slot of its
+## own, so it is not stuck and nobody there needs to be moved along.
+func _leaving_by_marker() -> Dictionary:
+	var counts := {}
+	for pony in get_spawned():
+		if not pony.is_leaving():
+			continue
+		var marker: ZoneMarker = _marker_by_pony.get(pony.get_instance_id())
+		if marker == null or not is_instance_valid(marker):
+			continue
+		var key := marker.get_instance_id()
+		counts[key] = int(counts.get(key, 0)) + 1
+	return counts
 
 
 ## {marker instance id: how many of its ponies are alive and NOT on their way out}.

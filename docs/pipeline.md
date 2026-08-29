@@ -762,8 +762,22 @@ one who wants fog at any hour. A `.tres` with neither line in it (most of them,
 `kerfuffle.tres` for one) is unconditional and can be drawn at any hour in any
 weather; adding the fields therefore broke no roster file. `game/world/spawner.gd`
 asks `available()` on every draw and again on every change of sky, so a
-character whose hours have ended walks off the map (`Pony.leave()`, never a
-free in front of the player) and whoever the new hour allows walks on.
+character whose hours have ended walks off the map (`Pony.leave()`, never
+freed in front of the player unless she cannot get away at all) and whoever
+the new hour allows walks on.
+
+**And the new hour's characters go first.** A slot freed by a departure used to
+go straight back into the rarity weighted draw, where a night only legendary
+competed against every unconditional common in the zone who was standing there
+an hour ago and is eligible again now; measured on the real ranch, that cost a
+night only character three extra cycles before she appeared. `refresh()` now
+offers each marker's free slots first to its **newcomers** (the characters who
+can be drawn now, could not be drawn at the pair the spawner last drew for, and
+are standing nowhere on the map), and only then falls back to the weighted
+draw. A marker with no free slot and no departure in flight sends **one**
+unconditional resident home (empty `phases` and empty `weathers`, so she can
+walk back in at any hour) to let a newcomer in, at most one per marker per
+refresh, counted as `made_room` in what `refresh()` returns.
 
 **17 of the 43 are conditional**, and this table is generated from the `.tres`
 files rather than written by hand, so it is what the shipped roster actually
