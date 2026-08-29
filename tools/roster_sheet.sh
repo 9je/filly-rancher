@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Render every registered character's face and tile them into build/roster_sheet.png,
-# so the owner can review the whole roster in one image rather than opening 44 files.
+# so the owner can review the whole roster in one image rather than opening one file per
+# character. The roster is game/data/ponies/*.tres, which is what "registered" means
+# here: a shot left over from a character who has since been dropped is not in it.
 # Slow (about 20 s per character under xvfb, so roughly 15 to 20 minutes total). Not a
 # gate: it renders, a person looks. Use `tools/bin/godot`, xvfb-run and the exact
 # `mode=face` invocation documented at the top of game/scenes/test/visual_review.gd.
@@ -14,7 +16,7 @@ OUT="${1:-build/roster_shots}"
 mkdir -p "$OUT" build
 # Resolve to an absolute path: Godot runs with --path game, so a relative out= would
 # land under game/build instead of this script's own build/ directory.
-OUT="$(cd "$OUT" && pwd)"
+OUT="$(cd "$OUT" && pwd)" || { echo "cannot enter shots directory '${1:-build/roster_shots}'" >&2; exit 1; }
 
 rendered=0
 failed=0
@@ -25,13 +27,18 @@ for f in game/data/ponies/*.tres; do
     rendered=$((rendered + 1))
     continue
   fi
-  if timeout 300 xvfb-run -a tools/bin/godot --path game --audio-driver Dummy \
+  timeout 300 xvfb-run -a tools/bin/godot --path game --audio-driver Dummy \
       --resolution 1280x720 scenes/test/visual_review.tscn -- \
-      mode=face character="$id" out="$OUT" > /dev/null 2>&1; then
+      mode=face character="$id" out="$OUT" > /dev/null 2>&1
+  # THE VERDICT IS THE PNG, NOT THE EXIT CODE. Godot returns 0 from plenty of runs that
+  # rendered nothing (a scene that pushed an error and quit) and non-zero from runs that
+  # wrote every shot before something unrelated complained on the way out. The file
+  # either exists or the sheet has a hole in it, and that is the only question here.
+  if [ -f "$OUT/${id}_face_front.png" ]; then
     rendered=$((rendered + 1))
   else
     failed=$((failed + 1))
-    failed_ids="$failed_ids $id"
+    if [ -z "$failed_ids" ]; then failed_ids="$id"; else failed_ids="$failed_ids $id"; fi
     echo "render failed: $id"
   fi
 done
@@ -48,7 +55,22 @@ from PIL import Image, ImageDraw
 out = sys.argv[1]
 data_dir = "game/data/ponies"
 
-files = sorted(glob.glob(os.path.join(out, "*_face_front.png")))
+# THE ROSTER DRIVES THE SHEET, NOT THE SHOTS DIRECTORY. Globbing the shots would tile
+# whatever happens to be lying in it, which is how a character dropped from the roster
+# (songbirdserenade) went on appearing in a sheet that is supposed to be a picture of
+# what ships. Missing shots are counted and named instead of quietly changing the sheet.
+ids = sorted(
+    os.path.basename(p)[: -len(".tres")]
+    for p in glob.glob(os.path.join(data_dir, "*.tres"))
+)
+files = []
+missing = []
+for char_id in ids:
+    shot = os.path.join(out, char_id + "_face_front.png")
+    if os.path.exists(shot):
+        files.append(shot)
+    else:
+        missing.append(char_id)
 
 
 def display_name(char_id: str) -> str:
@@ -79,5 +101,8 @@ def build_sheet(files, cols, tile_w, tile_h, label_h, sheet_path):
 small_path = build_sheet(files, cols=8, tile_w=320, tile_h=200, label_h=20, sheet_path="build/roster_sheet.png")
 large_path = build_sheet(files, cols=4, tile_w=560, tile_h=350, label_h=30, sheet_path="build/roster_sheet_large.png")
 
-print("ROSTER_SHEET characters=%d file=%s large_file=%s" % (len(files), small_path, large_path))
+print(
+    "ROSTER_SHEET characters=%d of %d missing=[%s] file=%s large_file=%s"
+    % (len(files), len(ids), " ".join(missing), small_path, large_path)
+)
 PY

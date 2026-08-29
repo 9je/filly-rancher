@@ -707,8 +707,9 @@ testing:
   leaves every bone the `.mdl` shipped exactly where it put it.
 - **Not the spring simulation.** Rendering her face with the simulator's `influence`
   pinned to 0, i.e. hair welded to the skull, is pixel for pixel the same curtain
-  (`scenes/test/visual_review.tscn`, `mode=face tag=rigid`, which now honours `rigid`
-  outside `mode=motion` for exactly this test). Nothing the springs do is involved.
+  (`scenes/test/visual_review.tscn`, `mode=face tag=rigid`; the handling lives in
+  `scenes/test/visual_review.gd`, which now honours `rigid` outside `mode=motion` for
+  exactly this test). Nothing the springs do is involved.
 - **Not a chain-length or gravity tuning problem.** Her mane is twelve chains of two
   joints each (`LeftHair1-6` and `RightHair1-6`, each with one `*_jiggle_hair*` child),
   well under `PonyRig.SPAN_REFERENCE_JOINTS`, so the long-chain stiffening never
@@ -756,6 +757,25 @@ change that inverts it fails a test instead of shipping.
 of every character (about 15 to 20 minutes under xvfb) and tiles them, with each
 character's display name, into `build/roster_sheet.png` and a larger four column
 `build/roster_sheet_large.png`; neither PNG is committed.
+
+**Known follow-ups.** Two things this batch measured, did not fix, and should not lose.
+Neither is breaking a shipped character today; both are gaps between what the pipeline
+says it does and what it does on this pack, and both need a re-export and a look at the
+renders, which is why they were out of scope of the batch that found them.
+
+1. **`prune_bodygroups()` groups by the `manes/` path fragment, so a `_back` mane piece
+   can be dropped.** `songbirdserenade`'s `.mdl` ships both `manes/VA_Mane_Sia.dmx`
+   (21300 verts) and `manes/VA_Mane_Sia_back.dmx` (1770 verts, entirely behind the
+   head). The rule sees two names containing `mane`, treats them as alternative STYLES,
+   and keeps the first alphabetically. A `_back` suffix is a second PIECE of one hairdo,
+   not a style, and the current rule cannot tell them apart. It cost nothing on her (she
+   is excluded, and a piece behind the head could never have covered her eyes); whether
+   any character who ships is missing the back of her mane has not been checked.
+2. **Mane bones named `*Hair*` get the forelock stiffness profile.** `PROFILES` picks
+   the mane profile by bone name, and the reVAmped rig spells its mane bones `Hair`, so
+   `sunsetshimmer`, `trixie` and `pinkamena` run their manes at stiffness 10 rather than
+   22. Their renders look right, so this may be the better number for them, but it is
+   being applied by accident rather than by choice.
 
 ### Why this is not retargeting
 

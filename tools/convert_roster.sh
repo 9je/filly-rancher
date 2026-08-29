@@ -57,7 +57,9 @@ export_one() {
 }
 
 ok=0; failed=0; skipped=0
-mkdir -p "$OUT_DIR"
+# Only when something might actually be written. --dry-run reports what it WOULD export
+# and must not leave an output directory behind as a side effect of being asked.
+[ "$DRY" -eq 1 ] || mkdir -p "$OUT_DIR"
 while IFS='|' read -r id kind source rig; do
   case "$id" in ''|\#*) continue ;; esac
   selected "$id" || continue
@@ -69,10 +71,13 @@ while IFS='|' read -r id kind source rig; do
     echo "WOULD $id ($kind, $source)"; continue
   fi
   log="${TMPDIR:-/tmp}/convert_${id}.log"
-  if ! export_one "$id" "$kind" "$source" "$rig" "$out" > "$log" 2>&1; then
+  # < /dev/null on both tools below: this loop reads the manifest ON STDIN, so anything
+  # they read from stdin is eaten out of the roster and the characters after it are
+  # never converted at all. Blender reads stdin.
+  if ! export_one "$id" "$kind" "$source" "$rig" "$out" > "$log" 2>&1 < /dev/null; then
     echo "FAILED $id: export failed, see $log"; failed=$((failed + 1)); rm -f "$out"; continue
   fi
-  if ! $VALIDATOR "$out" --require-anims >> "$log" 2>&1; then
+  if ! $VALIDATOR "$out" --require-anims >> "$log" 2>&1 < /dev/null; then
     echo "FAILED $id: validation failed, see $log"; failed=$((failed + 1)); rm -f "$out"; continue
   fi
   echo "CONVERTED $id"; ok=$((ok + 1))

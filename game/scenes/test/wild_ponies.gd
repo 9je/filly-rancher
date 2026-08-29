@@ -85,8 +85,8 @@ const GateWatchdogScript := preload("res://scripts/gate_watchdog.gd")
 ## the herd is still byte-identical between two runs on the same roster.
 ##
 ## This constant used to name the seed itself: the nearest one whose six draws covered all
-## three personalities against a seven-character roster. Then the roster went to
-## forty-four characters, the same number drew four SHY ponies and two BOLD ones, and the
+## three personalities against a seven-character roster. Then the roster grew past six,
+## the same number drew four SHY ponies and two BOLD ones, and the
 ## CURIOUS clauses in _finish() had nothing to quantify over. That is the shape of the
 ## problem: the draw depends on the whole roster, so ANY character added anywhere invalidates
 ## the choice, and pinning a number here just schedules a red gate for whoever adds the next

@@ -48,7 +48,12 @@ func test_display_names_are_unique_and_carry_no_dashes() -> void:
 		assert_false(name.is_empty(), "%s needs a display name" % id)
 		assert_false(seen.has(name), "duplicate display name '%s'" % name)
 		seen[name] = true
-		assert_false(name.contains("--") or name.contains("—"), "'%s' must not contain a dash" % name)
+		# Written as escapes rather than as the characters themselves so the rule is
+		# legible in a diff: a double hyphen, an em dash (U+2014) and an en dash
+		# (U+2013). A display name is drawn in the HUD and spoken about in the docs, and
+		# all three of these are banned in this project's prose for the same reason.
+		for dash in ["--", "\u2014", "\u2013"]:
+			assert_false(name.contains(dash), "'%s' must not contain a dash" % name)
 
 
 func test_every_rarity_tier_has_members_in_the_expected_numbers() -> void:
