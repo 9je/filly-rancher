@@ -21,6 +21,7 @@ const ProductionScript := preload("res://systems/production.gd")
 const NeedsScript := preload("res://systems/needs.gd")
 const MarketMenuScript := preload("res://ui/market_menu.gd")
 const SaveIOScript := preload("res://systems/save_io.gd")
+const MagicBeamScript := preload("res://actors/player/magic_beam.gd")
 
 const SLOT := 8  # a scratch slot; a hosted ranch reads no slot at all, so nothing collides
 
@@ -162,6 +163,52 @@ func _ready() -> void:
 	_set_check("the slot loads back", state.load_from_slot(SLOT))
 	_set_check("gems came back", state.gems.count(PonyDataScript.Rarity.LEGENDARY) == 2)
 	_set_check("unlocks came back", state.unlocks.has("bigger_saddlebag"))
+
+	# --- a bought saddlebag full of ponies survives a load --------------------------------
+	# THE ORDERING THIS PINS: the gear a save records has to be honoured BEFORE the ponies
+	# in it are poured back, or the herd is restored into a bag that is still the size it
+	# was before the player bought a bigger one. Fifteen ponies is deliberately more than
+	# the base bag holds and fewer than the bought one does, so a bag that was not grown in
+	# time loses exactly the ones in between -- to neither the bag nor a pen.
+	var storage: Storage = beam.get_storage()
+	_set_check("the saddlebag is empty before the herd goes in", storage.count() == 0)
+	var herd := 15
+	var stowed := 0
+	for i in range(herd):
+		if storage.store(PonyInstanceScript.create(&"twilight")):
+			stowed += 1
+	_set_check("fifteen ponies fit in the bought saddlebag", stowed == herd)
+	_set_check("the herd saves", state.save_to_slot(SLOT))
+	_set_check("the whole herd reached the save", state.pony_count() >= herd)
+
+	state.reset()
+	ranch.rebind_economy()
+	# The bag a fresh boot starts with: empty, and back at the capacity it has before any
+	# gear is applied. set_capacity() refuses to shrink under the contents, so the emptying
+	# comes first.
+	while storage.release() != null:
+		pass
+	storage.set_capacity(capacity_before)
+	_set_check("the bag is back to its base capacity", storage.capacity == capacity_before)
+	# Boot reads the save BEFORE anything is connected to state_loaded -- ranch.gd's
+	# _bind_game_state() connects rebind_economy only after its own load, on purpose -- so
+	# at boot the load itself applies no gear. The connection comes off for this one call to
+	# reproduce that; leaving it on would grow the bag on the way through and the ordering
+	# under test would never run.
+	state.state_loaded.disconnect(ranch.rebind_economy)
+	var herd_loaded: bool = state.load_from_slot(SLOT)
+	state.state_loaded.connect(ranch.rebind_economy)
+	_set_check("the herd's save loads back", herd_loaded)
+	var restored: int = ranch.restore_owned_ponies()
+	_set_check("the bag was grown before the herd went back into it",
+		storage.capacity == MagicBeamScript.BIGGER_SADDLEBAG_CAPACITY)
+	_set_check("every bagged pony came back", storage.count() == herd)
+	_set_check("the restore reports what it put back", restored == herd)
+	_set_check("the resident already in her pen stayed in it", pen.count() == 1)
+	# A load mid-session can reach this twice. It must place what is missing and nothing
+	# else -- no pony filed in a pen and in the bag at once.
+	_set_check("a second restore places nobody twice", ranch.restore_owned_ponies() == 0)
+	_set_check("and the bag still holds the herd exactly once", storage.count() == herd)
 
 	# --- pause menu ---------------------------------------------------------------------
 	var pause = ranch.get_pause_menu()

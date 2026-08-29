@@ -392,6 +392,17 @@ func _ready() -> void:
 	# you left.
 	_bind_game_state()
 
+	# IMMEDIATELY AFTER the save is read, and long before the ponies in it are put back.
+	# The gear a save records changes how much the world can hold -- the saddlebag the
+	# player bought is what says whether her herd fits in it -- so it is applied here, at
+	# the top of boot, rather than in _bind_build_menu()'s rebind_economy() at the bottom.
+	# It used to run at the bottom, which meant _restore_owned_ponies() below poured a
+	# 15-pony save into a bag still at its base 12 and left three ponies in neither the bag
+	# nor a pen. The beam exists by now (it is a child of the player scene), and
+	# MagicBeam.apply_unlocks() is absolute rather than incremental, so rebind_economy()'s
+	# own call later is a harmless no-op.
+	_apply_unlocks()
+
 	# The hand-built barn and farmhouse first: they are the map's only real buildings
 	# (game/world/building.gd says why), they exist on every checkout including CI,
 	# and they are seated by exactly the rule props.gd seats the Kenney props with.
@@ -425,7 +436,7 @@ func _ready() -> void:
 
 	# After the beam exists and the world has settled: put the ponies the player owned when
 	# she quit back where they live -- pens first, saddlebag for everyone else.
-	_restored_ponies = _restore_owned_ponies()
+	_restored_ponies = restore_owned_ponies()
 
 	_bind_build_menu()
 
@@ -499,23 +510,49 @@ func _bind_game_state() -> void:
 ## Storage is still fixed-capacity, so a save holding more ponies than pens-plus-bag can
 ## carry cannot be fully restored -- which is why _sync_game_state() below still MERGES
 ## rather than overwrites. A pony who did not fit anywhere stays in the file.
-func _restore_owned_ponies() -> int:
+##
+## THE GEAR IS APPLIED FIRST, HERE, and not only by _ready()'s call above. How many ponies
+## fit in the bag is the whole subject of this function's second half, and the answer is
+## bought in the Market: a save carrying `bigger_saddlebag` restores into a bag of 18, and
+## the same save restored into a bag of 12 silently strands the difference. Putting the
+## call inside the function that depends on it means no caller can reintroduce the ordering
+## bug by calling this one line too early. apply_unlocks() is absolute, so the repeat costs
+## nothing.
+##
+## CALLING THIS TWICE IN ONE SESSION IS SAFE. Every pony already living in a pen or already
+## in the bag is skipped by uid, so a second call after a mid-session load places only what
+## is actually missing. Without that skip a second call was destructive rather than merely
+## wasteful: a resident whose pen already holds her fails add_pony() (it refuses a duplicate
+## uid), which used to fall through to the `else` below, clear her address and file her in
+## the bag as well -- one pony, two homes.
+##
+## Returns how many ponies THIS call placed. On boot, when nothing is placed yet, that is
+## the whole restored herd.
+func restore_owned_ponies() -> int:
 	if _game_state == null:
 		return 0
 	var beam: Node3D = player.get_magic_beam()
 	if beam == null:
 		return 0
+	_apply_unlocks()
 	var storage: Storage = beam.get_storage()
 
 	var pens := {}
+	var already_home := {}
 	for slot in _plot_slots():
 		var pen := slot.get_built() as Pen
 		if pen != null:
 			pens[String(slot.slot_id)] = pen
+			for resident: PonyInstance in pen.ponies():
+				already_home[resident.uid] = true
+	for carried: PonyInstance in storage.contents():
+		already_home[carried.uid] = true
 
 	var restored := 0
 	var to_the_bag: Array[PonyInstance] = []
 	for instance: PonyInstance in _game_state.get_ponies():
+		if already_home.has(instance.uid):
+			continue
 		var pen: Pen = pens.get(String(instance.home_slot), null)
 		if pen != null and pen.add_pony(instance):
 			restored += 1
@@ -1031,7 +1068,7 @@ func _toast(text: String) -> void:
 ## Copy the live world back into the savable state, immediately before a write.
 ##
 ## MERGES rather than replaces the owned list: what is in the saddlebag right now, plus any
-## pony the state already knew about who is not in it (see _restore_owned_ponies). Replacing
+## pony the state already knew about who is not in it (see restore_owned_ponies). Replacing
 ## outright would mean a save silently deleting every pony the bag could not hold.
 func _sync_game_state() -> void:
 	if _game_state == null:
