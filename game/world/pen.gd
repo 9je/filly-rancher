@@ -908,6 +908,14 @@ func _side_size(along: Vector3, span: float, height: float, depth: float) -> Vec
 
 
 func _material(colour: Color) -> StandardMaterial3D:
+	return _material_static(colour)
+
+
+## The same recipe, callable without a Pen. game/world/region_fence.gd builds its ring out
+## of the same primitives this file builds a paddock out of, and a region border that shaded
+## differently from the fence twenty metres away would read as a different material rather
+## than as the same timber further off.
+static func _material_static(colour: Color) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = colour
 	mat.roughness = 0.92
