@@ -245,7 +245,7 @@ func _ready() -> void:
 	var one_gem_bits: int = shop_now.gem_price(PonyDataScript.Rarity.COMMON)
 	_set_check("a single common gem sells", menu.confirm())
 	_set_check("the toast counts one gem as a gem",
-		hud.toast_text() == "Sold 1 gem for %d bits." % one_gem_bits)
+		_hud_says(hud, "Sold 1 gem for %d bits." % one_gem_bits))
 	_set_check("the pouch is empty after the single sale",
 		shop_now.gem_count(PonyDataScript.Rarity.COMMON) == 0)
 
@@ -311,3 +311,18 @@ func _finish() -> void:
 		push_error("market_test: DUPLICATE CHECK LABEL: %s" % label)
 	print(("MARKET_OK " if all_ok else "MARKET_FAILED ") + "checks=%d" % _checks.size())
 	get_tree().quit(0 if all_ok else 1)
+
+
+## Whether the HUD has said `text` to the player: the line on screen, or anything queued
+## behind it.
+##
+## THE WHOLE QUEUE, NOT THE LABEL ALONE. A toast raised while another one is still up waits
+## its turn now instead of overwriting it (game/ui/hud.gd, toast()), which is the fix for a
+## sale line the "Request done" line used to wipe out before it could be read. This gate
+## drives several toast raising actions in a handful of frames, so the sentence it is
+## checking for is routinely two or three behind the label; asking the label alone would be
+## asking which of the player's messages happened to be first, not whether she was told.
+func _hud_says(hud, text: String) -> bool:
+	if hud.toast_text() == text:
+		return true
+	return hud.pending_toasts().has(text)

@@ -548,14 +548,22 @@ way, in the spawner's own seeded placement order, so the same run picks the
 same ponies every time.
 
 **It asks about the night pool over several nights, not one.**
-`Spawner.refresh()` only fills the slots a departure freed, out of that
-marker's own zone; four NIGHT-only characters in a roster of forty-three need
-not all be reachable from the three slots one night happens to open. The claim
-with teeth is that they are reachable **at all**. A build where the conditional
-half of the roster could never be drawn is a build where a third of the
-compendium is uncompletable. The loop stops at the first night that
-answers and prints how many it took, so a change in the draw shows up as a
-number rather than as a red.
+`Spawner.refresh()` fills a marker out of its own zone's pool and only into the
+slots it has; four NIGHT-only characters in a roster of forty-three need not all
+be reachable from the three slots one night happens to open. The claim with
+teeth is that they are reachable **at all**. A build where the conditional half
+of the roster could never be drawn is a build where a third of the compendium is
+uncompletable. The loop stops at the first night that answers and prints how
+many it took against the measured `expected=`, so a change in the draw shows up
+as a number rather than as a red.
+
+That number is **`extra=0`** now: the first night answers, because a freed slot
+goes to the characters whose hours have just opened before it goes back into the
+rarity weighted draw (`game/world/spawner.gd`). It was `extra=3` while a night
+only legendary had to out roll every unconditional common in her zone for the
+slot, which is the measurement that bought the priority fill. The loop is kept
+anyway; an unspun loop costs no frames, and the alternative is a gate that goes
+red the next time somebody re-zones a night pony.
 
 **It watches one departure from three metres away.** A pony whose hours end
 with nobody near her is discarded on the first frame of her departure, and
@@ -586,7 +594,7 @@ Run it with:
 tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/collection_test.tscn
 ```
 
-Expect `COLLECTION_OK checks=73`; the exit code is the verdict. Every line it
+Expect `COLLECTION_OK checks=72`; the exit code is the verdict. Every line it
 prints is prefixed `COLLECTION`, and two runs print byte-identical lines: the
 beam's capture generator is seeded, the herd and the weather come out of the
 world seed, and nothing it prints is a raw physics quantity that a reordered

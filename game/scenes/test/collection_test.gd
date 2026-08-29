@@ -104,6 +104,16 @@ const LEAVE_MIN_TRAVEL := 4.0
 ## block that uses it: each one is four advance_world() calls and costs no wall time.
 const EXTRA_NIGHTS := 12
 
+## How many of those extra nights the shipped draw actually needs, MEASURED, not required.
+## It was 3 while a freed slot went back into the rarity weighted draw and a night only
+## character had to out roll every unconditional common in her zone; Spawner.refresh() now
+## offers a freed slot to the characters whose hours have just opened before anybody else,
+## and the first night answers. Printed beside the real count rather than asserted on: the
+## claim with teeth is that the night pool is reachable AT ALL (see the block that spins the
+## loop), and a re-zoning that puts the number back up to 1 or 2 is a fact about the roster
+## worth seeing in a diff, not a build worth failing.
+const EXPECTED_EXTRA_NIGHTS := 0
+
 ## Metres two ponies have to be apart for this gate to use one for the SEEN check and the
 ## other for the capture. Comfortably more than the widest notice radius on the roster, so
 ## walking up to the first cannot be what makes the second react.
@@ -118,6 +128,11 @@ var _watch_id: StringName = &""
 var _watch_gap_before := 0.0
 var _watch_gap_last := 0.0
 var _watch_gone := false
+## Physics frames between the hour turning and her body being freed. Printed rather than
+## asserted on: the ceiling she has to be gone inside is LEAVE_WAIT_FRAMES, which _watch_gone
+## already answers, and what this adds is a number that MOVES when the walk changes, so a
+## departure that started taking twice as long shows up in a diff of two runs.
+var _watch_frames := 0
 
 
 ## Record one check's verdict under `label`. A repeated label is a check that never ran:
@@ -235,9 +250,11 @@ func _ready() -> void:
 		await get_tree().physics_frame
 	print("COLLECTION seen id=%s state=%s" % [String(notice_id),
 		_state_name(compendium.state_of(notice_id))])
-	_set_check("standing inside her notice radius gets the player noticed", noticed)
-	_set_check("...and the compendium writes her down as SEEN",
-		compendium.state_of(notice_id) == CompendiumScript.State.SEEN)
+	# ONE CHECK, NOT TWO. "she noticed him" and "the book says SEEN" were separate labels
+	# reading the same field a line apart: `noticed` is set by watching for exactly the
+	# state change the second one then asserts, so neither could fail without the other.
+	_set_check("standing inside her notice radius gets her written down as SEEN",
+		noticed and compendium.state_of(notice_id) == CompendiumScript.State.SEEN)
 
 	# --- she is caught ----------------------------------------------------------------------
 	var beam: Node3D = ranch.player.get_magic_beam()
@@ -378,7 +395,11 @@ func _ready() -> void:
 	_set_check("...and it is the page that is up", pause.page() == PauseMenu.Page.COMPENDIUM)
 	var header: String = pause.compendium_header()
 	var caught_now: int = compendium.count(CompendiumScript.State.CAUGHT, registry)
-	var seen_now: int = compendium.count(CompendiumScript.State.SEEN, registry)
+	# SEEN PLUS CAUGHT, which is the page's own definition of the word (game/ui/pause_menu.gd,
+	# compendium_header) and the ranch report's too: a caught pony has been laid eyes on.
+	# Recomputed here rather than read off the page, so this compares two answers to one
+	# question instead of printing one answer twice.
+	var seen_now: int = compendium.count(CompendiumScript.State.SEEN, registry) + caught_now
 	var want_header := "%d of %d caught, %d seen"\
 		% [caught_now, compendium.total(registry), seen_now]
 	print("COLLECTION page header='%s' expected='%s'" % [header, want_header])
@@ -466,15 +487,21 @@ func _ready() -> void:
 
 	# --- the night pool is reachable ----------------------------------------------------------
 	# ASKED OVER SEVERAL NIGHTS RATHER THAN ONE, and this is a statement about the draw, not
-	# a hedge. Spawner.refresh() only fills the slots a departure freed, out of the pool of
-	# that marker's own zone; four NIGHT-only characters in a roster of forty-three need not
-	# all be reachable from the three slots one night happens to open. What must be true is
-	# that they are reachable AT ALL. A build where the conditional half of the roster could
+	# a hedge. Spawner.refresh() fills a marker out of its own zone's pool and only into the
+	# slots it has; four NIGHT-only characters in a roster of forty-three need not all be
+	# reachable from the three slots one night happens to open. What must be true is that
+	# they are reachable AT ALL. A build where the conditional half of the roster could
 	# never be drawn would be a build where a third of the compendium is uncompletable, and
-	# that is the failure this is here for. Each extra night is four
-	# advance_world() calls and a handful of frames; the loop stops at the first one that
-	# answers, and its count is printed so a change in the draw shows up as a number rather
-	# than as a red.
+	# that is the failure this is here for. Each extra night is four advance_world() calls
+	# and a handful of frames; the loop stops at the first one that answers, and its count is
+	# printed against EXPECTED_EXTRA_NIGHTS so a change in the draw shows up as a number
+	# rather than as a red.
+	#
+	# THE LOOP STAYS THOUGH IT NO LONGER SPINS. The first night answers now that a freed slot
+	# goes to the characters whose hours have just opened before it goes to the weighted
+	# draw, and the measured count is zero. Deleting the loop would buy nothing (an unspun
+	# loop costs no frames) and would trade a number that moves for a gate that goes red the
+	# next time somebody re-zones a night pony.
 	var nights_spun := 0
 	while arrived_night_only.is_empty() and nights_spun < EXTRA_NIGHTS:
 		nights_spun += 1
@@ -483,17 +510,18 @@ func _ready() -> void:
 		for id in _standing_ids(ranch):
 			if night_only.has(id):
 				arrived_night_only.append(String(id))
-	print("COLLECTION nights extra=%d night_only_arrived=%s cycle=%d"
-		% [nights_spun, _string_list(arrived_night_only), world.cycle_index()])
+	print("COLLECTION nights extra=%d expected=%d night_only_arrived=%s cycle=%d"
+		% [nights_spun, EXPECTED_EXTRA_NIGHTS, _string_list(arrived_night_only),
+			world.cycle_index()])
 	_set_check("a character who only comes out at night does arrive at night",
 		not arrived_night_only.is_empty())
 	_set_check("...and the clock was at night when she was counted",
 		world.phase() == WorldStateScript.Phase.NIGHT)
 
 	# --- and the pony whose hours ended really walked off -------------------------------------
-	print("COLLECTION leave id=%s watched_from=%.1f walked=%.1f gone=%s"
+	print("COLLECTION leave id=%s watched_from=%.1f walked=%.1f gone=%s frames=%d of %d"
 		% [String(_watch_id), _watch_gap_before, _watch_gap_last - _watch_gap_before,
-			_watch_gone])
+			_watch_gone, _watch_frames, LEAVE_WAIT_FRAMES])
 	_set_check("one departure was watched from inside the player's own notice radius",
 		_watched and _watch_gap_before <= PonyScript.LEAVE_DISTANCE)
 	_set_check("...and she walked clear of him rather than vanishing where she stood",
@@ -551,7 +579,7 @@ func _ready() -> void:
 	ranch.rebind_economy()
 	print("COLLECTION owned owned=%d state=%s"
 		% [state.pony_count(), _state_name(ranch.get_compendium().state_of(catch_id))])
-	_set_check("every owned pony is caught in the compendium after a load",
+	_set_check("every owned pony is caught again after the book is blanked and rebound",
 		ranch.get_compendium().state_of(catch_id) == CompendiumScript.State.CAUGHT)
 
 	# --- cleanup ---------------------------------------------------------------------------
@@ -682,6 +710,7 @@ func _advance_one_phase(ranch: Ranch, world: WorldState, state) -> void:
 	var ghost: WeakRef = weakref(doomed)
 	for i in range(LEAVE_WAIT_FRAMES):
 		await get_tree().physics_frame
+		_watch_frames = i + 1
 		if ghost.get_ref() == null:
 			_watch_gone = true
 			break
@@ -714,22 +743,6 @@ func _standing_ids(ranch: Ranch) -> Dictionary:
 		if data != null:
 			out[data.id] = true
 	return out
-
-
-## The pony on her way off the map who is furthest from the player, or null if nobody is
-## leaving. Furthest, so "she was well clear of him" is a property of the pony this gate
-## actually times rather than of the one it happened to find first.
-func _farthest_leaver(ranch: Ranch) -> Pony:
-	var best: Pony = null
-	var best_gap := -1.0
-	for pony: Pony in ranch.spawner.get_spawned():
-		if not pony.is_leaving() or pony.get_data() == null:
-			continue
-		var gap: float = pony.global_position.distance_to(ranch.player.global_position)
-		if gap > best_gap:
-			best_gap = gap
-			best = pony
-	return best
 
 
 # --- driving the player ---------------------------------------------------------------------
@@ -800,7 +813,10 @@ func _is_done(board: RequestBoard, id: String) -> bool:
 # --- printing ---------------------------------------------------------------------------------
 
 ## One line naming everything about a board that a save is supposed to carry: its seed, its
-## draw counter, and every request\'s id, kind, progress, target, reward and claim state.
+## draw counter, and every request\'s id, kind, progress, target, reward and claim state,
+## and the SENTENCE the player reads. The text is a saved field like any other and the only
+## one the player actually sees; a reload that brought back three correct rewards attached
+## to three blank lines would have been a green save with an unreadable board on it.
 ##
 ## COMPARED AS A STRING RATHER THAN AS to_array() AGAINST to_array(). A save is JSON, and
 ## JSON has no integer type, so every count and every enum comes back off disk as a float
@@ -818,13 +834,15 @@ func _board_signature(board: RequestBoard) -> String:
 			parts.append("seed=%d/draw=%d"
 				% [int(rec.get("seed", 0)), int(rec.get("draw_counter", 0))])
 			continue
-		parts.append("%s:%d:%d/%d:%s:%s:%d:%s:%d:%d:%s" % [
+		parts.append("%s:%d:%d/%d:%s:%s:%d:%s x%d:%d:%d:%s:'%s'" % [
 			String(rec.get("id", "")), int(rec.get("kind", -1)),
 			int(rec.get("progress", 0)), int(rec.get("count", 0)),
 			bool(rec.get("done", false)), bool(rec.get("paid", false)),
 			int(rec.get("reward_bits", 0)), String(rec.get("reward_food", "")),
+			int(rec.get("reward_food_count", 0)),
 			int(rec.get("personality", -1)), int(rec.get("rarity", -1)),
-			String(rec.get("character", "")) + "@" + String(rec.get("zone", ""))])
+			String(rec.get("character", "")) + "@" + String(rec.get("zone", "")),
+			String(rec.get("text", ""))])
 	return " | ".join(parts)
 
 
