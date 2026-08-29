@@ -75,7 +75,16 @@ func _y(x: float, z: float) -> float:
 
 ## Build the ring. The gate goes on the segment whose midpoint bearing is closest to the
 ## region's gate_yaw_degrees, so a region can point its entrance at the road.
+##
+## A REBUILD DOES NOT RE-LOCK A BOUGHT REGION. Whether the gate is open is a fact about the
+## save file, not about the geometry, so it is captured here and restored at the end; a ring
+## rebuilt because the terrain under it changed would otherwise take the player's permit
+## away, and the toast that sells it would be the only clue.
 func build() -> void:
+	var was_open := _open
+	# Not move_toward()'s starting point but its finishing one: a gate that was already open
+	# must come back open, not play a closing swing it never earned.
+	_angle = GATE_OPEN_DEGREES if was_open else 0.0
 	for child in get_children():
 		remove_child(child)
 		child.queue_free()
@@ -115,9 +124,10 @@ func build() -> void:
 		p1.y = _y(p1.x, p1.z)
 		_post(p0, post_mat)
 		if i == gate_index:
-			_gate_segment(p0, p1, rail_mat)
+			_gate_segment(p0, p1, rail_mat, post_mat)
 		else:
 			_rail_segment(p0, p1, rail_mat)
+	set_open(was_open)
 
 
 ## One post, sunk POST_BURY into the ground so a slope never shows daylight under it, the
@@ -169,14 +179,17 @@ func _rail_segment(p0: Vector3, p1: Vector3, mat: StandardMaterial3D) -> void:
 ## The gateway. The leaf hangs on the hinge at `p0` and is GATE_WIDTH wide at most; whatever
 ## is left of the segment beyond it is ordinary rail, so the doorway is the same size at
 ## every region however big the ring around it is.
-func _gate_segment(p0: Vector3, p1: Vector3, mat: StandardMaterial3D) -> void:
+func _gate_segment(p0: Vector3, p1: Vector3, mat: StandardMaterial3D,
+		post_mat: StandardMaterial3D) -> void:
 	var span := p1 - p0
 	var length := span.length()
 	var leaf: float = minf(GATE_WIDTH, length)
 	var yaw := atan2(-span.z, span.x)
 	_gate_yaw = yaw
 	_hinge.position = p0
-	_hinge.rotation.y = yaw
+	# Not simply `yaw`: build() may be restoring a gate that was already standing open, and
+	# a leaf that snapped shut for one frame would read as the permit lapsing.
+	_hinge.rotation.y = yaw + deg_to_rad(-_angle)
 
 	var leaf_mat := PenScript._material_static(PenScript.GATE_COLOR)
 	for h: float in PenScript.RAIL_HEIGHTS:
@@ -198,10 +211,14 @@ func _gate_segment(p0: Vector3, p1: Vector3, mat: StandardMaterial3D) -> void:
 	shape.position = _gate_local + Vector3(0.0, PenScript.FENCE_HEIGHT * 0.5, 0.0)
 	shape.rotation.y = yaw
 	_gate.add_child(shape)
-	set_open(false)
 
 	if length - leaf > 0.01:
-		_rail_segment(p0 + span.normalized() * leaf, p1, mat)
+		# The cap applied, so this segment is part gate and part fence. The junction gets a
+		# post of its own: without one the leftover rail starts in mid-air, and the leaf has
+		# nothing to shut against.
+		var junction := p0 + span.normalized() * leaf
+		_post(junction, post_mat)
+		_rail_segment(junction, p1, mat)
 
 
 ## Unlock or lock the border. The layer IS the lock: see the header on why the collider does
