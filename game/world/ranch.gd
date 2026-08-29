@@ -12,7 +12,7 @@ extends Node3D
 ## was "ponies were only around the perimeter", and it was right: the three original
 ## markers sat at (2, -42), (40, 8) and (-30, 38), all of them 40 m or more from the
 ## player's spawn and none of them anywhere a player crossing the middle of the map would
-## meet one. Eight ponies on a 140 x 140 m map is not many to begin with, and putting all
+## meet one. Eight ponies on a 220 x 220 m map is not many to begin with, and putting all
 ## eight around the rim meant the entire middle of the ranch -- the part you actually walk
 ## through -- was empty.
 ##
@@ -361,6 +361,12 @@ var _plot_registry: PlotRegistry = null
 ## to the terrain before it shapes itself. See the top of _ready().
 var _region_registry: RegionRegistry = null
 
+## get_region_fences() read once, right after the fences are built in _ready(), for
+## nearest_locked_gate() to walk every physics frame without a get_children() scan and a
+## fresh Array each time. get_region_fences() itself stays a live query: tests call it
+## directly and a live query is the honest answer there.
+var _region_fence_cache: Array[RegionFence] = []
+
 ## The wallet, seeded from the loaded save and written straight back into GameState.bits
 ## on every change. Task 6 gives this prices and a shop; here it is what the build menu
 ## charges against, so that "you cannot build what you cannot afford" is enforced by the
@@ -452,6 +458,7 @@ func _ready() -> void:
 			continue
 		fence.configure(region, Callable(terrain, "height_at"))
 		fence.build()
+	_region_fence_cache = get_region_fences()
 
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--screenshot-dir="):
@@ -1060,7 +1067,7 @@ func is_region_open(zone: StringName) -> bool:
 func nearest_locked_gate() -> RegionFence:
 	var best: RegionFence = null
 	var best_d := GATE_PROMPT_RADIUS
-	for fence in get_region_fences():
+	for fence in _region_fence_cache:
 		if fence.is_open() or fence.region() == null:
 			continue
 		var gate: Vector3 = fence.gate_position()
@@ -1806,22 +1813,35 @@ func _report(pony_count: int, prop_count: int) -> void:
 	# ASKED OF THE LIVE MARKERS AND THE LIVE REGIONS, not of a table of numbers: this has to
 	# fail when somebody nudges a marker in ranch.tscn or a centre in a .tres, which is
 	# exactly how it got in.
+	# A REGION'S OWN MARKER MUST ALSO STAY INSIDE ITS OWN RING, with a metre to spare
+	# (REGION_CLEARANCE). A resident's roam disc is drawn from her ZoneMarker; if that disc
+	# reaches past the timber, she is a pony the fence cannot hold, on the shipped map, no
+	# playtest required.
 	var regions_stand_clear := true
 	for marker: ZoneMarker in spawner.get_markers():
-		if marker.zone_id != &"ranch":
-			continue
-		var at := Vector2(marker.global_position.x, marker.global_position.z)
-		for region: RegionData in regions:
-			var apart := at.distance_to(region.centre)
-			var needed: float = (region.radius + RegionFenceScript.RING_MARGIN
-				+ marker.outer_bound() + REGION_CLEARANCE)
-			if apart < needed:
-				regions_stand_clear = false
-				push_error(("ranch: homestead zone '%s' reaches to within %.1f m of region " +
-					"'%s', whose fence ring needs %.1f m of room.")
-					% [marker.name, apart, region.id, needed])
-	_set_check(checks, "no homestead roam disc reaches a region's fence ring",
-		regions_stand_clear)
+		if marker.zone_id == &"ranch":
+			var at := Vector2(marker.global_position.x, marker.global_position.z)
+			for region: RegionData in regions:
+				var apart := at.distance_to(region.centre)
+				var needed: float = (region.radius + RegionFenceScript.RING_MARGIN
+					+ marker.outer_bound() + REGION_CLEARANCE)
+				if apart < needed:
+					regions_stand_clear = false
+					push_error(("ranch: homestead zone '%s' reaches to within %.1f m of region " +
+						"'%s', whose fence ring needs %.1f m of room.")
+						% [marker.name, apart, region.id, needed])
+		else:
+			var own_region: RegionData = _regions_registry().by_id(marker.zone_id)
+			if own_region != null:
+				var own_limit: float = own_region.radius + RegionFenceScript.RING_MARGIN
+				var own_reach: float = marker.outer_bound() + REGION_CLEARANCE
+				if own_reach > own_limit:
+					regions_stand_clear = false
+					push_error(("ranch: region '%s' marker '%s' reaches %.1f m with clearance, " +
+						"past its own fence ring at %.1f m.")
+						% [own_region.id, marker.name, own_reach, own_limit])
+	_set_check(checks, "no homestead roam disc reaches a region's fence ring, and every " +
+		"region's own residents stay inside their own ring", regions_stand_clear)
 
 	var gate_probe: Dictionary = await _probe_region_gate()
 	print("RANCH region gate ran=%s solid=%s opened=%s hit=%s"
@@ -2368,10 +2388,12 @@ func _body_overlaps(body: CharacterBody3D, owner_node: CollisionObject3D,
 ## cannot prove that the layer it flips is one the player's mask is looking at.
 ##
 ## IT PUTS EVERYTHING BACK. The gate is shut for the ray whether or not the loaded save had
-## already bought it, and the permit is appended and then erased IN PLACE (the Shop holds a
-## reference to that same array, so replacing it would leave the shop selling into an array
-## nothing reads). The final _apply_permits() therefore restores exactly the state boot
-## reached, and a developer whose save owns the orchard does not lose it by running a gate.
+## already bought it, and the "opened" check never edits `_game_state.unlocks` itself: it
+## swaps in a duplicated array with the permit added, calls _apply_permits(), reads the
+## fence, then swaps the ORIGINAL array back in and calls _apply_permits() again. The whole
+## exchange is synchronous, no await between the swap and the restore, so nothing else
+## (the Shop holds the original array by reference) ever observes the duplicate. A
+## developer whose save owns the orchard does not lose it by running a gate.
 ##
 ## Returns {ran, solid, opened, hit}.
 func _probe_region_gate() -> Dictionary:
@@ -2406,12 +2428,14 @@ func _probe_region_gate() -> Dictionary:
 
 	var permit := String(region.permit_id())
 	var had: bool = _game_state.unlocks.has(permit)
+	var live: Array = _game_state.unlocks
+	var scratch: Array = live.duplicate()
 	if not had:
-		_game_state.unlocks.append(permit)
+		scratch.append(permit)
+	_game_state.unlocks = scratch
 	_apply_permits()
 	result["opened"] = fence.is_open()
-	if not had:
-		_game_state.unlocks.erase(permit)
+	_game_state.unlocks = live
 	_apply_permits()
 	return result
 

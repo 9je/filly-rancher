@@ -25,8 +25,8 @@ func before_each() -> void:
 	add_child_autofree(_world)
 
 
-## A Terrain that builds itself in _ready(), exactly as every scene other than the ranch
-## uses it: no registry, so the plain map.
+## A Terrain that builds itself in _ready(), the default when nothing sets defer_build
+## (ranch.tscn is the only scene that does): no registry, so the plain map.
 func _bare_terrain() -> Terrain:
 	var terrain: Terrain = TerrainScript.new()
 	terrain.defer_build = false

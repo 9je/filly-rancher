@@ -5,6 +5,7 @@ extends GutTest
 const RegionRegistryScript := preload("res://systems/region_registry.gd")
 const RegionDataScript := preload("res://systems/region_data.gd")
 const TerrainScript := preload("res://world/terrain.gd")
+const RegionFenceScript := preload("res://world/region_fence.gd")
 
 
 func _registry() -> RegionRegistry:
@@ -35,8 +36,8 @@ func test_every_region_sits_outside_the_homestead_apron_and_inside_the_map() -> 
 	for r in _registry().all():
 		var d: float = r.centre.distance_to(TerrainScript.HOMESTEAD_CENTRE)
 		assert_gt(d - r.radius, TerrainScript.BLEND_RADIUS, "%s must be clear of the apron" % r.id)
-		var reach: float = maxf(absf(r.centre.x), absf(r.centre.y)) + r.radius + 3.0
-		assert_lt(reach, TerrainScript.HALF - TerrainScript.BOUNDARY_THICKNESS, "%s must fit inside the boundary wall" % r.id)
+		var reach: float = maxf(absf(r.centre.x), absf(r.centre.y)) + r.radius + RegionFenceScript.RING_MARGIN
+		assert_lt(reach, TerrainScript.HALF - 5.0, "%s must fit inside the boundary wall" % r.id)
 
 
 func test_regions_do_not_overlap_each_other() -> void:

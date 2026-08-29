@@ -52,7 +52,7 @@ light_color = Color(1, 0.968627, 0.905882, 1)
 light_energy = 1.15
 shadow_enabled = true
 shadow_bias = 0.05
-directional_shadow_max_distance = 140.0
+directional_shadow_max_distance = 240.0
 
 [node name="Terrain" type="StaticBody3D" parent="."]
 script = ExtResource("2")

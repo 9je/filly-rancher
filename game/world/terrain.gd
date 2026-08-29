@@ -10,9 +10,9 @@ extends StaticBody3D
 ## missing terrain is a game that boots into the void. A few dozen lines of
 ## deterministic arithmetic are in git, are identical on every machine, and cost about a
 ## quarter of a second at startup on this machine, nearly all of it in create_trimesh_shape()
-## rather than in the arithmetic, paid once while the main scene loads. It also means height_at() is available as a
-## plain function, which is what lets props sit exactly on the ground instead of
-## being nudged by hand until they stop floating.
+## rather than in the arithmetic, paid once while the main scene loads. It also means
+## height_at() is available as a plain function, which is what lets props sit exactly on
+## the ground instead of being nudged by hand until they stop floating.
 ##
 ## SCULPTED, NOT FLAT, ON PURPOSE. A flat plane would have made the spawner's
 ## raycast-down placement (game/world/spawner.gd) vacuous: every random point would
@@ -119,6 +119,7 @@ func _ready() -> void:
 ## of the first.
 func build() -> void:
 	if _mesh_instance != null:
+		push_error("Terrain.build() called twice")
 		return
 
 	var mesh := _build_mesh()
@@ -145,8 +146,9 @@ func build() -> void:
 ## XZ is `regions`, which is assigned once, before the ground is built, and never again.
 ##
 ## A region with a lake in it is a BASIN sunk into the relief: a smooth bowl reaching full
-## depth in the middle and nothing at all by the rim, feathered over the inner half of the
-## radius so the ground walks down into the water instead of stepping off a shelf. It is
+## depth in the middle and nothing at all by the rim, feathered over the OUTER half of the
+## radius (from half radius out to the rim) so the ground walks down into the water instead
+## of stepping off a shelf. It is
 ## subtracted here, in the one function everything else reads, so the mesh, the collider,
 ## the props and the water disc all agree about where the bottom is.
 func height_at(x: float, z: float) -> float:

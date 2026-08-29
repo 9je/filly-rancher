@@ -21,10 +21,12 @@ extends Resource
 @export var has_lake := false
 @export var lake_depth := 0.0
 
+const ShopScript := preload("res://systems/shop.gd")
 
-## The unlock string the Market writes and the fence reads.
+
+## The unlock string the Market writes and the fence reads. One spelling, owned by Shop.
 func permit_id() -> StringName:
-	return StringName("permit_" + String(id))
+	return ShopScript.permit_id_for(id)
 
 
 func contains(point: Vector2) -> bool:

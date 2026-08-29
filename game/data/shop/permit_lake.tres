@@ -7,6 +7,6 @@ script = ExtResource("1_shop")
 id = &"permit_lake"
 display_name = "Permit: The Lake"
 description = "Opens the gate down to the water. Pegasi drink here, and nobody hurries."
-cost = 700
+cost = 300
 kind = 1
 permit_zone = &"lake"

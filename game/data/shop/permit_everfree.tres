@@ -7,6 +7,6 @@ script = ExtResource("1_shop")
 id = &"permit_everfree"
 display_name = "Permit: The Everfree Edge"
 description = "Opens the gate to the dark woods in the west. Strange ponies keep to the trees."
-cost = 400
+cost = 1200
 kind = 1
 permit_zone = &"everfree"

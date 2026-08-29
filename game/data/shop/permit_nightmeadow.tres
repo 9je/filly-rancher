@@ -6,7 +6,7 @@
 script = ExtResource("1_shop")
 id = &"permit_nightmeadow"
 display_name = "Permit: The Night Meadow"
-description = "Opens the far gate in the north. Quiet ponies, pale grass, and a rare song."
-cost = 1200
+description = "Opens the far gate in the south. Quiet ponies, pale grass, and a rare song."
+cost = 700
 kind = 1
 permit_zone = &"nightmeadow"

@@ -169,7 +169,7 @@ func _ready() -> void:
 					% [pony.name, away, fence.region().id, fence.region().radius, ring])
 		else:
 			var hers: RegionData = _region_for(her_zone, fences)
-			if hers == null or not hers.contains(at):
+			if hers == null or at.distance_to(hers.centre) > hers.radius + RegionFenceScript.RING_MARGIN:
 				strays_out += 1
 	print("REGION residents orchard=%d out_of_region=%d ranch_ponies_in_a_region=%d"
 		% [zoned_here, strays_out, strays_in.size()])

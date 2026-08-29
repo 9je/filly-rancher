@@ -227,6 +227,11 @@ func set_open(open: bool) -> void:
 	_open = open
 	if _gate != null:
 		_gate.collision_layer = 0 if open else (LayersScript.PEN_GATE | LayersScript.PROPS)
+	# A swing just started (or the target moved out from under a finished one): wake
+	# _process() back up. It puts itself back to sleep once the leaf settles.
+	var target: float = GATE_OPEN_DEGREES if _open else 0.0
+	if not is_equal_approx(_angle, target):
+		set_process(true)
 
 
 func is_open() -> bool:
@@ -248,6 +253,9 @@ func _process(delta: float) -> void:
 		return
 	var target: float = GATE_OPEN_DEGREES if _open else 0.0
 	if is_equal_approx(_angle, target):
+		# Settled: nothing left to animate, so stop paying for a per-frame callback on a
+		# ring that just stands there most of the game. set_open() wakes this back up.
+		set_process(false)
 		return
 	_angle = move_toward(_angle, target, GATE_SWING_DEGREES_PER_SECOND * delta)
 	_hinge.rotation.y = _gate_yaw + deg_to_rad(-_angle)

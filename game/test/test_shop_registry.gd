@@ -4,6 +4,7 @@ extends GutTest
 
 const ShopRegistryScript := preload("res://systems/shop_registry.gd")
 const ShopItemScript := preload("res://systems/shop_item.gd")
+const ShopScript := preload("res://systems/shop.gd")
 const FoodRegistryScript := preload("res://systems/food_registry.gd")
 const RegionRegistryScript := preload("res://systems/region_registry.gd")
 
@@ -79,7 +80,15 @@ func test_every_permit_names_a_region_that_exists_and_matches_its_price() -> voi
 		var region: RegionData = regions.by_id(item.permit_zone)
 		assert_not_null(region, "%s names zone '%s', which is not a region" % [item.id, item.permit_zone])
 		assert_eq(item.cost, region.permit_cost, "%s must cost what the region says" % item.id)
-		assert_eq(String(item.id), "permit_" + String(item.permit_zone))
+		assert_eq(item.id, ShopScript.permit_id_for(item.permit_zone))
+
+
+func test_every_region_permit_id_matches_shop_permit_id_for() -> void:
+	var regions: RegionRegistry = RegionRegistryScript.new()
+	regions.load_all(RegionRegistryScript.REGION_DIR)
+	for region in regions.all():
+		assert_eq(region.permit_id(), ShopScript.permit_id_for(region.id),
+			"%s's permit_id must be the one spelling Shop owns" % region.id)
 
 
 func test_a_missing_directory_loads_nothing_and_does_not_crash() -> void:
