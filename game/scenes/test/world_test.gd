@@ -23,11 +23,10 @@ extends Node
 ## scaffold as scenes/test/market_test.gd and scenes/test/region_test.gd.
 ##
 ## THE CLOCK IS READ THROUGH ranch.get_world_state(), NEVER OFF THE `RANCH world` LINE.
-## ranch.gd's own report REBUILDS the world state part way through printing, on purpose (a
-## rig still holding boot's state would pass a naive check and be wrong the moment a save
-## loaded), so the object this gate drives is the one that exists AFTER the report has
-## finished. Parsing that printed line would be reading a clock that has since been
-## replaced.
+## That line is a print, and a gate that scrapes a print is a gate that a reworded print
+## breaks; the state object is the thing that is actually true. (It also used to be a
+## clock the run had never been on: ranch.gd's report REBUILT the world state part way
+## through printing, and no longer does. See the scratch clock in its _report().)
 ##
 ## Marker after verdict, exit code is the verdict. See docs/testing.md.
 
@@ -96,8 +95,9 @@ func _ready() -> void:
 	var world_seed: int = state.world_seed
 
 	# --- the hour a fresh ranch opens on -------------------------------------------------
-	# ranch.gd's report rebuilt the state from GameState.world_time a moment ago, so this
-	# is a genuinely fresh clock and not the one boot happened to leave lying about.
+	# The ranch's report has already compared this rig against a clock rebuilt from
+	# GameState.world_time (see its _report()), so a rig aimed at an hour the save does not
+	# hold has failed the hosted ranch's own verdict before this line runs.
 	_set_check("a fresh clock reads zero", absf(world.elapsed()) < TIME_EPSILON)
 	_set_check("a fresh clock reads dawn", world.phase() == WorldStateScript.Phase.DAWN)
 	_set_check("the sky is aimed at dawn's own light",
@@ -276,10 +276,10 @@ func _phase_length(phase: int) -> float:
 ## checking the numbers rather than a name is also what makes a rig that was handed a stale
 ## state fail, since a stale state produces a consistent set of wrong numbers.
 ##
-## NOT `current_targets()["phase"]`: SkyRig's target dictionary is exactly the nine KEY_*
+## NOT `current_targets()["phase"]`: SkyRig's target dictionary is exactly the twelve KEY_*
 ## values it interpolates between frames and carries no phase of its own, deliberately, so
 ## that step() can lerp every entry in it without special cases. ranch.gd's own
-## _sky_rig_matches_world() asks the same question the same way.
+## _sky_rig_matches_state() asks the same question the same way.
 func _targets_match(phase: int, weather: int) -> bool:
 	var targets: Dictionary = _ranch.sky_rig.call("current_targets")
 	if targets.is_empty():

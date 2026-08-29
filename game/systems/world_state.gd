@@ -49,12 +49,18 @@ static func phase_at(elapsed: float) -> int:
 ## A hash of (seed, cycle, phase) folded onto the weights. Deterministic and cheap; a
 ## RandomNumberGenerator would be seeded the same way and give the same answer with more
 ## ceremony.
+##
+## NOT ABSOLUTE VALUED. hash() returns a 32 bit digest widened into a 64 bit int, so it is
+## never negative and the abs this used to take could not fire. An absi() that can never do
+## anything reads as a guard against a negative roll and is not one, which is worse than no
+## guard at all: it would have hidden the day somebody swapped in a hash that CAN go
+## negative.
 static func weather_for(seed: int, cycle: int, phase: int) -> int:
 	var h := hash(Vector3i(seed, cycle, phase))
 	var total := 0
 	for w in WEATHER_WEIGHTS:
 		total += w
-	var roll := int(absi(h) % total)
+	var roll := h % total
 	for i in range(WEATHER_WEIGHTS.size()):
 		if roll < WEATHER_WEIGHTS[i]:
 			return i
