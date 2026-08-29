@@ -1,4 +1,4 @@
-[gd_scene load_steps=17 format=3]
+[gd_scene load_steps=18 format=3]
 
 [ext_resource type="Script" path="res://world/ranch.gd" id="1"]
 [ext_resource type="Script" path="res://world/terrain.gd" id="2"]
@@ -13,6 +13,7 @@
 [ext_resource type="PackedScene" path="res://ui/market_menu.tscn" id="11"]
 [ext_resource type="PackedScene" path="res://ui/pause_menu.tscn" id="12"]
 [ext_resource type="Script" path="res://world/region_fence.gd" id="13"]
+[ext_resource type="Script" path="res://world/sky_rig.gd" id="14"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
 sky_top_color = Color(0.309804, 0.505882, 0.760784, 1)
@@ -53,6 +54,15 @@ light_energy = 1.15
 shadow_enabled = true
 shadow_bias = 0.05
 directional_shadow_max_distance = 240.0
+
+[node name="SkyRig" type="Node3D" parent="."]
+script = ExtResource("14")
+sun_path = NodePath("../Sun")
+environment_path = NodePath("../WorldEnvironment")
+
+[node name="Rain" type="GPUParticles3D" parent="SkyRig"]
+emitting = false
+amount = 1
 
 [node name="Terrain" type="StaticBody3D" parent="."]
 script = ExtResource("2")
