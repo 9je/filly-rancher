@@ -163,7 +163,7 @@ func _blank_request(id: String, kind: int, reward_bits: int, reward_food: String
 # --- filling the board from templates -------------------------------------------------------
 
 ## Draws new requests (BRING_PERSONALITY_FROM_ZONE, SELL_GEMS_OF_RARITY, SEE_CHARACTER only
-##; never a tutorial kind) until `active()` has ACTIVE entries, deterministic from the seed
+## (never a tutorial kind) until `active()` has ACTIVE entries, deterministic from the seed
 ## and the draw counter. `seen` is the ids (StringName or String, either works) already SEEN
 ## or CAUGHT in the player's Compendium (game/systems/compendium.gd); the board has no
 ## compendium of its own, so the caller supplies this each time. A character already
