@@ -66,8 +66,8 @@ func _region_ids() -> Array[StringName]:
 
 
 ## The compendium row for `id`, found by walking the roster the menu itself reports rather
-## than by hard coding a position: the list is the rarity tiers in enum order and a roster
-## edit moves everybody.
+## than by hard coding a position: the list is PonyRegistry.all()'s order and a roster edit
+## moves everybody.
 func _row_for(id: StringName) -> String:
 	var entries: Array[PonyData] = _menu.roster()
 	var rows: Array[String] = _menu.compendium_rows()
@@ -205,6 +205,11 @@ func test_the_compendium_row_on_main_opens_the_page() -> void:
 ## The header is measured against the REAL roster, so the total is whatever ships; what this
 ## pins is that the three numbers are caught, total and seen, in that order, and that they
 ## are the same numbers Compendium itself reports.
+##
+## AND THAT "seen" COUNTS THE CAUGHT ONES. Two caught and one seen is THREE seen: the player
+## has laid eyes on every pony she has ever caught, and a header whose seen count fell as
+## she caught more of them read as the book forgetting. Compendium.count(SEEN) on its own is
+## "seen and not yet caught", which is why the sum is done here rather than left to it.
 func test_the_header_counts_match_a_hand_marked_compendium() -> void:
 	_wire_book()
 	_compendium.mark_caught(&"twilight")
@@ -213,8 +218,10 @@ func test_the_header_counts_match_a_hand_marked_compendium() -> void:
 	_menu.open_page(PauseMenu.Page.COMPENDIUM)
 	var total := _menu.roster().size()
 	assert_eq(total, 43, "the shipped roster")
-	assert_eq(_menu.compendium_header(), "2 of %d caught, 1 seen" % total)
+	assert_eq(_menu.compendium_header(), "2 of %d caught, 3 seen" % total)
 	assert_eq(_compendium.count(CompendiumScript.State.CAUGHT, _registry), 2)
+	assert_eq(_compendium.count(CompendiumScript.State.SEEN, _registry), 1,
+		"the book itself still counts SEEN as the rung of the ladder she is on")
 
 
 func test_the_header_second_line_is_the_hour_and_the_weather() -> void:
@@ -385,6 +392,29 @@ func test_cancel_from_each_reading_page_returns_to_its_own_row_on_main() -> void
 	assert_eq(_menu.selected_index(), PauseMenu.Row.REQUESTS)
 	_menu.back()
 	assert_false(_menu.is_open(), "and main still closes")
+
+
+## HALF WIRED IS NOT WIRED. A registry with no compendium behind it is the shape a partial
+## injection leaves (ranch.gd sets all five, but the boot shutter and these tests set what
+## they need), and it is the one arrangement where the page could draw a full roster of
+## "???" and look like a player who had seen nobody. has_book() already decides what is
+## drawn; the row list and the cursor now follow the same decision instead of counting the
+## roster on their own.
+func test_a_registry_with_no_book_behind_it_draws_nothing_rather_than_a_page_of_blanks()\
+		-> void:
+	_wire_book()
+	_menu.compendium = null
+	_menu.open_page(PauseMenu.Page.COMPENDIUM)
+
+	assert_false(_menu.has_book(), "no compendium, no book")
+	assert_false(_menu.roster().is_empty(), "the registry is still there to be counted")
+	assert_true(_menu.compendium_rows().is_empty(),
+		"43 rows of ??? would be a claim about the player rather than an empty page")
+	assert_eq(_menu.compendium_header(), "")
+
+	_menu.move_selection(1)
+	assert_eq(_menu.selected_index(), 0,
+		"one line of EMPTY_TEXT is one row, and the cursor stays on it")
 
 
 ## The menu is instantiated bare by these tests and by the boot shutter, neither of which

@@ -565,13 +565,10 @@ func _ready() -> void:
 
 # --- the roster, classified by its own available() -----------------------------------------
 
-## Every character on the roster, rarity order: the same walk game/ui/pause_menu.gd's
-## roster() makes, because PonyRegistry has no "all of them" of its own.
+## Every character on the roster: PonyRegistry.all(), which is the same walk
+## game/ui/pause_menu.gd's roster() and Compendium's counting both make.
 func _roster(registry: PonyRegistry) -> Array[PonyData]:
-	var out: Array[PonyData] = []
-	for rarity in PonyDataScript.Rarity.values():
-		out.append_array(registry.by_rarity(rarity))
-	return out
+	return registry.all()
 
 
 ## {id: true} for every character who can be out at `phase` and at NO OTHER phase, in any

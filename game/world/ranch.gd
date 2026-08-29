@@ -2484,9 +2484,19 @@ func _report(pony_count: int, prop_count: int) -> void:
 	# `requests` is the ACTIVE count, the same number the check above reads. requests() also
 	# returns every claimed request the board has ever carried, so printing that would have
 	# made a healthy board's number climb forever while the three on offer never changed.
+	#
+	# `seen` IS SEEN PLUS CAUGHT, the same definition the COMPENDIUM page's header uses
+	# (game/ui/pause_menu.gd, compendium_header): every pony the player has caught is a pony
+	# she has laid eyes on, and two lines about one book that count it differently are two
+	# lines nobody can compare.
+	var book_seen: int = 0
+	var book_caught: int = 0
+	if book != null:
+		book_caught = book.count(CompendiumScript.State.CAUGHT, book_registry)
+		book_seen = book.count(CompendiumScript.State.SEEN, book_registry) + book_caught
 	print("RANCH collection seen=%d caught=%d of %d requests=%d" % [
-		book.count(CompendiumScript.State.SEEN, book_registry) if book != null else 0,
-		book.count(CompendiumScript.State.CAUGHT, book_registry) if book != null else 0,
+		book_seen,
+		book_caught,
 		book.total(book_registry) if book != null else 0,
 		active_requests])
 

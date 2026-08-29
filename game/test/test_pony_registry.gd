@@ -78,6 +78,56 @@ func test_by_zone_partitions_the_roster_across_the_places_it_names() -> void:
 	assert_eq(nowhere_ponies.size(), 0, "an unused zone should filter out every pony")
 
 
+func test_ids_are_every_id_on_disk_sorted_by_their_text() -> void:
+	# WHAT all() AND ids() REPLACED: four by_rarity() calls unioned by hand, written out in
+	# the compendium, in the pause menu and in the collection gate, each relying on the
+	# accident that rarity partitions the roster and each leaving the order inside a tier to
+	# whatever DirAccess handed back. This is the one order the book, the page and the gate
+	# now share.
+	var ponies := registry.load_all(PONY_DIR)
+	var ids: Array[StringName] = registry.ids()
+
+	assert_eq(ids.size(), ponies.size(), "every character on disk, exactly once")
+	assert_eq(ids.size(), 43, "the shipped roster, per docs/pipeline.md")
+
+	var as_text: Array[String] = []
+	for id: StringName in ids:
+		as_text.append(String(id))
+	var sorted := as_text.duplicate()
+	sorted.sort()
+	# SORTED BY TEXT, not by StringName. StringName orders by interned pointer, which is
+	# stable inside one process and different between two, so a raw sort would pass this
+	# test and still shuffle the compendium between launches; comparing against a String
+	# sort is what makes the cast in ids() load bearing.
+	assert_eq(as_text, sorted, "the ids come back in text order")
+
+	var uniq := {}
+	for id: StringName in ids:
+		uniq[id] = true
+	assert_eq(uniq.size(), ids.size(), "and nobody is in the list twice")
+
+
+func test_all_is_the_same_roster_in_the_same_order_as_ids() -> void:
+	registry.load_all(PONY_DIR)
+	var data: Array[PonyData] = registry.all()
+	var ids: Array[StringName] = registry.ids()
+
+	assert_eq(data.size(), ids.size(), "one record per id")
+	var from_data: Array[StringName] = []
+	for entry: PonyData in data:
+		from_data.append(entry.id)
+	assert_eq(from_data, ids, "all() walks the roster in ids() order")
+	assert_eq(registry.by_id(ids[0]), data[0], "and hands back the registry's own records")
+
+
+func test_an_unloaded_registry_answers_both_with_an_empty_list() -> void:
+	# The state a registry is in between construction and its first scan, and the state a
+	# directory that could not be opened leaves it in. Every caller iterates these results
+	# unconditionally, so neither may be null.
+	assert_eq(registry.ids(), [] as Array[StringName])
+	assert_eq(registry.all(), [] as Array[PonyData])
+
+
 func test_by_rarity_partitions_the_roster() -> void:
 	var ponies := registry.load_all(PONY_DIR)
 	var buckets := {}

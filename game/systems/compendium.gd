@@ -28,8 +28,6 @@ extends RefCounted
 ## RefCounted, no scene, GUT-tested in isolation (game/test/test_compendium.gd), the same
 ## discipline as GemPouch and Inventory (game/systems/gem_pouch.gd, game/systems/inventory.gd).
 
-const PonyDataScript := preload("res://systems/pony_data.gd")
-
 enum State { UNSEEN, SEEN, CAUGHT }
 
 ## Emitted once per real change, with the id that moved and the state it moved TO. Not for
@@ -86,16 +84,13 @@ func total(registry: PonyRegistry) -> int:
 	return _all_data(registry).size()
 
 
-## Every PonyData in `registry`, gathered by walking the rarity tiers rather than by
-## reaching into the registry's private index. Safe because `rarity` is a single enum field
-## on PonyData (not a list, unlike `spawn_zones`), so by_rarity() PARTITIONS the whole
-## roster exactly once per character; see test_pony_registry.gd's note on that same
-## property.
+## Every PonyData in `registry`, which is PonyRegistry.all()'s own job. This used to union
+## by_rarity() over the four tiers, which returns everybody exactly once only because
+## `rarity` is a single enum field and the tiers therefore partition the roster; the
+## registry now answers the question directly, in one stated order, for every caller at
+## once.
 static func _all_data(registry: PonyRegistry) -> Array[PonyData]:
-	var out: Array[PonyData] = []
-	for rarity in PonyDataScript.Rarity.values():
-		out.append_array(registry.by_rarity(rarity))
-	return out
+	return registry.all()
 
 
 ## String keys, int values, UNSEEN entries omitted; see the class comment.

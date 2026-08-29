@@ -25,10 +25,12 @@ extends CanvasLayer
 ## disk to draw itself would make those two pay for a ranch they do not have. A page whose
 ## sources are missing says EMPTY_TEXT and nothing else.
 ##
-## THE ROSTER ORDER IS THE RARITY TIERS IN ENUM ORDER, which is the only total order
-## PonyRegistry offers (it has no all() accessor) and is exactly how Compendium walks the
-## roster to count it (game/systems/compendium.gd, _all_data). Using the same walk here is
-## what makes the header's counts and the list below it agree row for row.
+## THE ROSTER ORDER IS PonyRegistry.all()'s, which is the roster sorted by id text. It is
+## the registry's one stated total order, and it is the same walk Compendium makes to count
+## the book (game/systems/compendium.gd, _all_data), which is what makes the header's counts
+## and the list below it agree row for row. It used to be the rarity tiers in enum order,
+## unioned by hand here and again in two other files; the tier a character belongs to is
+## still on screen, in the colour of her row.
 
 const SettingsScript := preload("res://systems/settings.gd")
 const CompendiumScript := preload("res://systems/compendium.gd")
@@ -175,7 +177,11 @@ func _row_count() -> int:
 		Page.SETTINGS:
 			return SettingRow.size()
 		Page.COMPENDIUM:
-			return maxi(1, roster().size())
+			# compendium_rows(), not roster(): a page that cannot draw shows one line of
+			# EMPTY_TEXT, and the cursor has to have exactly that one row to sit on. The two
+			# were separately derived and could disagree the moment a registry arrived
+			# without a compendium behind it.
+			return maxi(1, compendium_rows().size())
 		Page.REQUESTS:
 			return maxi(1, request_rows().size())
 	return MAIN_ROWS.size()
@@ -281,14 +287,11 @@ func _unhandled_input(event: InputEvent) -> void:
 
 ## Every character in `registry`, in roster order. Empty (never null) when no registry was
 ## injected, so every caller can iterate the result unconditionally. See the class comment
-## on why this is the rarity tiers in enum order.
+## on what that order is.
 func roster() -> Array[PonyData]:
-	var out: Array[PonyData] = []
 	if registry == null:
-		return out
-	for rarity in PonyDataScript.Rarity.values():
-		out.append_array(registry.by_rarity(rarity))
-	return out
+		return [] as Array[PonyData]
+	return registry.all()
 
 
 ## Whether the COMPENDIUM page has enough injected to draw anything at all.
@@ -296,14 +299,22 @@ func has_book() -> bool:
 	return compendium != null and registry != null and not roster().is_empty()
 
 
-## "12 of 43 caught, 5 seen". Empty when there is nothing to count.
+## "12 of 43 caught, 17 seen". Empty when there is nothing to count.
+##
+## SEEN COUNTS THE CAUGHT ONES TOO, because that is what the word means to the player: she
+## has laid eyes on every pony she has ever caught, and a header whose "seen" fell as she
+## caught more of them read as the book forgetting. Compendium.State is a ladder, not a set
+## of labels (UNSEEN, then SEEN, then CAUGHT), so `count(SEEN)` alone is the number of
+## characters seen AND NOT YET CAUGHT, which is a useful number for nothing on this page.
+## game/world/ranch.gd's RANCH collection line adds the two the same way.
 func compendium_header() -> String:
 	if not has_book():
 		return ""
 	return "%d of %d caught, %d seen" % [
 		compendium.count(CompendiumScript.State.CAUGHT, registry),
 		compendium.total(registry),
-		compendium.count(CompendiumScript.State.SEEN, registry),
+		compendium.count(CompendiumScript.State.SEEN, registry)
+			+ compendium.count(CompendiumScript.State.CAUGHT, registry),
 	]
 
 
@@ -341,8 +352,14 @@ func _zone_row(zone_name: String, zone: StringName) -> String:
 ## UNSEEN, her name once SEEN, and her name plus her conditions once CAUGHT. What is drawn
 ## splits each of these into a name column and a dim value column; the string here is the
 ## two joined, which is the row as the player reads it.
+##
+## EMPTY UNLESS has_book(), which is what _draw_compendium() already decides by: with a
+## registry injected but no compendium, every row here would read "???" and the page would
+## be claiming the player has seen nobody rather than admitting it cannot say.
 func compendium_rows() -> Array[String]:
 	var out: Array[String] = []
+	if not has_book():
+		return out
 	for data: PonyData in roster():
 		var value := _entry_value(data)
 		if value.is_empty():
