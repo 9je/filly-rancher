@@ -186,6 +186,8 @@ var _beam: Node3D
 var _storage: Storage
 
 var _toast_left := 0.0
+## Toasts raised while another one is on screen, oldest first. See toast().
+var _toast_queue: Array[String] = []
 var _rarities: Array[int] = []
 var _capacity := 0
 var _elapsed := 0.0
@@ -230,6 +232,10 @@ func _process(delta: float) -> void:
 	if _toast_left > 0.0:
 		_toast_left -= delta
 		_toast.modulate.a = clampf(_toast_left / TOAST_FADE, 0.0, 1.0)
+		# The queue is drained here rather than on a timer, so a toast raised while the
+		# world is paused still waits its turn: this _process runs always (see _ready).
+		if _toast_left <= 0.0 and not _toast_queue.is_empty():
+			_show_toast(_toast_queue.pop_front())
 
 	# The reticle animates (the beam pulse, the catch ring filling, the wriggle ring
 	# draining) so it is redrawn every frame the beam is on. It ALSO has to redraw when the
@@ -253,17 +259,43 @@ func _unhandled_input(event: InputEvent) -> void:
 ## Show `text` as a toast for TOAST_HOLD + TOAST_FADE seconds. Public so anything else
 ## that wants to say something to the player (a later quest, a tutorial prompt) has one
 ## place to say it through.
+##
+## A SECOND TOAST RAISED WHILE THE FIRST IS STILL UP IS QUEUED, NOT WRITTEN OVER IT. One
+## action routinely says two things: selling a gem is "Sold 1 gem for 5 bits." and then
+## "Request done: ...", both inside the same frame, and the sale line used to be replaced
+## before anybody could read a word of it. So the line on screen is left alone to live out
+## its hold and its fade, and the next one starts the moment it is finished. Nothing is
+## dropped and nothing jumps the line: the queue is first in, first out.
+##
+## The wait is bounded by what raises the toasts, not by a cap here. The ranch only ever
+## says one or two things per action, and a cap would have to choose between throwing away
+## the newest message and throwing away the one already promised to the player.
 func toast(text: String) -> void:
+	if _toast_left > 0.0:
+		_toast_queue.append(text)
+		return
+	_show_toast(text)
+
+
+func _show_toast(text: String) -> void:
 	_toast.text = text
 	_toast_left = TOAST_HOLD + TOAST_FADE
 	_toast.modulate.a = 1.0
 
 
-## The line the last toast() put on screen, whether or not it has faded. Exposed for the
+## The line that is ON SCREEN now, whether or not it has faded, which since the queue above
+## is the OLDEST toast still unspoken rather than the newest one raised. Exposed for the
 ## same reason get_bits_text() is: what the player is told is a real requirement (the
 ## market gate reads the sale line back), and a gate has no other way to see it.
 func toast_text() -> String:
 	return _toast.text
+
+
+## The toasts raised but not yet shown, oldest first. A copy: a caller that emptied this
+## would be silently swallowing something the player was promised. For the tests and gates
+## that have to tell "queued behind the line on screen" from "never said at all".
+func pending_toasts() -> Array[String]:
+	return _toast_queue.duplicate()
 
 
 ## The magic beam this HUD is reading, or null if it has not been found yet. Exposed for

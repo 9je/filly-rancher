@@ -29,6 +29,7 @@ const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const GemPouchScript := preload("res://systems/gem_pouch.gd")
 const InventoryScript := preload("res://systems/inventory.gd")
+const CompendiumScript := preload("res://systems/compendium.gd")
 
 const SCRATCH_DIR := "user://test_scratch/game_state"
 const SLOT := 3
@@ -85,6 +86,9 @@ func _populated():
 	state.world_seed = 12345
 	state.gems.add(PonyDataScript.Rarity.RARE, 3)
 	state.inventory.add(&"hay", 4)
+	state.compendium.mark_seen(&"rainbowdash")
+	state.compendium.mark_caught(&"twilight")
+	state.requests = [{"id": "sample_request", "done": false}]
 	return state
 
 
@@ -112,6 +116,10 @@ func test_to_dict_and_from_dict_round_trip_every_field() -> void:
 	assert_eq(first.caught_at_ms, 1772150400000, "caught_at_ms survives")
 	assert_eq(copy.gems.count(PonyDataScript.Rarity.RARE), 3, "gems survive")
 	assert_eq(copy.inventory.count(&"hay"), 4, "inventory survives")
+	assert_eq(copy.compendium.state_of(&"twilight"), CompendiumScript.State.CAUGHT,
+		"the compendium survives")
+	assert_eq(copy.compendium.state_of(&"rainbowdash"), CompendiumScript.State.SEEN)
+	assert_eq_deep(copy.requests, [{"id": "sample_request", "done": false}])
 
 
 func test_two_ponies_of_the_same_character_stay_two_ponies_across_a_round_trip() -> void:
@@ -214,8 +222,46 @@ func test_reset_empties_gems_and_inventory() -> void:
 	assert_eq(state.inventory.ids().size(), 0)
 
 
+func test_compendium_and_requests_round_trip() -> void:
+	var state = _state()
+	state.compendium.mark_seen(&"fluttershy")
+	state.requests = [{"id": "req_1", "reward_bits": 10}]
+	var d := state.to_dict()
+	assert_true(d.has("compendium"))
+	assert_true(d.has("requests"))
+	var back = _state()
+	back.from_dict(d)
+	assert_eq(back.compendium.state_of(&"fluttershy"), CompendiumScript.State.SEEN)
+	assert_eq_deep(back.requests, [{"id": "req_1", "reward_bits": 10}])
+
+
+func test_a_save_without_compendium_or_requests_loads_with_empty_ones() -> void:
+	var state = _state()
+	state.compendium.mark_caught(&"twilight")
+	state.requests = [{"id": "leftover"}]
+	state.from_dict({"bits": 7})
+	assert_eq(state.bits, 7)
+	assert_eq(state.compendium.state_of(&"twilight"), CompendiumScript.State.UNSEEN,
+		"a version 3 save has no compendium key")
+	assert_true(state.requests.is_empty(), "...nor a requests key")
+
+
+func test_reset_gives_a_fresh_compendium_and_empty_requests() -> void:
+	var state = _state()
+	state.compendium.mark_caught(&"twilight")
+	state.requests = [{"id": "leftover"}]
+	state.reset()
+	assert_eq(state.compendium.state_of(&"twilight"), CompendiumScript.State.UNSEEN)
+	assert_true(state.requests.is_empty())
+
+
 # --- the disk round trip ----------------------------------------------------------------
 
+## THE REAL FILE, NOT JUST to_dict()/from_dict(). This is the path that actually round-trips
+## through JSON.stringify() and JSON.parse() (SaveIO.save()/load()), which is where a whole
+## number turns into a JSON float on the way back; to_dict()/from_dict() alone would pass
+## even if from_dict() only ever saw real ints. The compendium and requests assertions below
+## are what prove marks and requests survive THAT path, not just an in-memory copy.
 func test_a_full_save_and_load_through_a_real_file_preserves_the_ranch() -> void:
 	var original = _populated()
 	assert_true(original.save_to_slot(SLOT), "the save reports success")
@@ -227,6 +273,11 @@ func test_a_full_save_and_load_through_a_real_file_preserves_the_ranch() -> void
 	assert_eq(reloaded.pony_count(), 2)
 	assert_eq(String(reloaded.get_ponies()[0].uid), String(original.get_ponies()[0].uid))
 	assert_almost_eq(reloaded.get_ponies()[0].happiness, 0.75, 0.0001)
+	assert_eq(reloaded.compendium.state_of(&"twilight"), CompendiumScript.State.CAUGHT,
+		"a caught mark survives a real save file, JSON float and all")
+	assert_eq(reloaded.compendium.state_of(&"rainbowdash"), CompendiumScript.State.SEEN,
+		"...and so does a seen mark")
+	assert_eq_deep(reloaded.requests, [{"id": "sample_request", "done": false}])
 
 
 func test_a_uid_reloaded_from_disk_cannot_be_minted_again() -> void:

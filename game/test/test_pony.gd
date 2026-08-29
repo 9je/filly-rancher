@@ -30,6 +30,7 @@ const PonyScript := preload("res://actors/pony/pony.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const PonyRigScript := preload("res://scripts/pony_rig.gd")
 const GaitScript := preload("res://systems/gait.gd")
+const WorldStateScript := preload("res://systems/world_state.gd")
 
 ## Any real pony record, cloned and overridden per test so each case states the
 ## personality and speed it is about instead of depending on who is on the roster today.
@@ -41,6 +42,10 @@ const TEMPLATE := preload("res://data/ponies/twilight.tres")
 const FLOOR_SIZE := Vector3(60.0, 1.0, 60.0)
 ## Long enough for the 8 m/s^2 acceleration ramp to finish and produce clear travel.
 const RUN_FRAMES := 60
+
+## Physics frames a departure is watched for: 8 s at 60 Hz, roughly twice the time a
+## 3.3 m/s exit needs to clear Pony.LEAVE_DISTANCE, and far short of LEAVE_SECONDS.
+const LEAVE_WATCH_FRAMES := 480
 
 var _world: Node3D
 
@@ -490,6 +495,211 @@ func test_no_capture_fires_on_its_own_however_long_the_hold_lasts() -> void:
 		"a pony must never declare her own capture, no matter how long the hold runs")
 	assert_signal_not_emitted(pony, "escaped")
 	assert_gt(pony.get_held_seconds(), 1.5, "...while still reporting the hold honestly")
+
+
+# --- being noticed by the player ------------------------------------------------------
+#
+# noticed_player is what puts a character into the compendium as SEEN (the ranch's
+# _on_pony_noticed, game/world/ranch.gd). SEEN happens once per character and never
+# unhappens, so the signal is a latch rather than an event stream; both halves of that are
+# pinned here.
+
+func test_a_pony_who_can_see_the_player_says_so_exactly_once() -> void:
+	var pony := _spawn(PonyDataScript.Personality.BOLD, 3.0, Vector3.ZERO)
+	watch_signals(pony)
+	# BOLD on purpose: she has no reaction to the player at all, so nothing about her state
+	# machine can be what makes this pass. A latch that fired only for a pony who fled or
+	# approached would leave every bold character permanently out of the book.
+	_add_player(Vector3(1.0, 0.0, 0.0))
+	await wait_physics_frames(RUN_FRAMES)
+	assert_signal_emit_count(pony, "noticed_player", 1,
+		"she is well inside every notice radius, and being noticed happens once")
+
+
+func test_a_player_who_leaves_and_comes_back_does_not_notice_her_twice() -> void:
+	var pony := _spawn(PonyDataScript.Personality.BOLD, 3.0, Vector3.ZERO)
+	watch_signals(pony)
+	var body := _add_player(Vector3(1.0, 0.0, 0.0))
+	await wait_physics_frames(RUN_FRAMES)
+	assert_signal_emit_count(pony, "noticed_player", 1, "the first sight of her")
+
+	body.position = Vector3(PonyScript.DETECTION_AREA_RADIUS + 10.0, 0.0, 0.0)
+	await wait_physics_frames(RUN_FRAMES)
+	body.position = Vector3(1.0, 0.0, 0.0)
+	await wait_physics_frames(RUN_FRAMES)
+	assert_signal_emit_count(pony, "noticed_player", 1,
+		"walking away and back is not a second discovery; the compendium would throw it away")
+
+
+func test_a_pony_nobody_has_come_near_is_never_noticed() -> void:
+	var pony := _spawn(PonyDataScript.Personality.BOLD, 3.0, Vector3.ZERO)
+	watch_signals(pony)
+	_add_player(Vector3(PonyScript.DETECTION_AREA_RADIUS + 10.0, 0.0, 0.0))
+	await wait_physics_frames(RUN_FRAMES)
+	assert_signal_emit_count(pony, "noticed_player", 0,
+		"a character the player has never laid eyes on stays UNSEEN")
+
+
+# --- when she appears, and when she goes home ----------------------------------------
+# PonyData.available() is the whole of "this character only turns up at night, in fog,
+# by the lake", and Pony.leave() is what the world does about it when the sky changes
+# under a pony already standing in it. See game/test/test_spawner.gd for the two of them
+# working together against a fixture roster.
+
+func test_a_character_with_no_conditions_is_available_at_every_hour_and_sky() -> void:
+	var data: PonyData = TEMPLATE.duplicate()
+	data.phases = []
+	data.weathers = []
+	for phase in range(4):
+		for weather in range(4):
+			assert_true(data.available(phase, weather),
+				"an unconditioned character must be drawable at phase %d weather %d"
+				% [phase, weather])
+
+
+func test_a_listed_phase_with_an_unlisted_weather_is_refused() -> void:
+	# The AND, which is the half of the truth table an "empty means any" reading gets
+	# wrong: two non empty lists are both conditions, not alternatives.
+	var data: PonyData = TEMPLATE.duplicate()
+	data.phases = [WorldStateScript.Phase.NIGHT]
+	data.weathers = [WorldStateScript.Weather.STORM]
+
+	assert_true(data.available(WorldStateScript.Phase.NIGHT, WorldStateScript.Weather.STORM),
+		"her hour and her weather together")
+	assert_false(data.available(WorldStateScript.Phase.NIGHT, WorldStateScript.Weather.CLEAR),
+		"her hour, somebody else's weather")
+	assert_false(data.available(WorldStateScript.Phase.DAY, WorldStateScript.Weather.STORM),
+		"her weather, somebody else's hour")
+	assert_false(data.available(WorldStateScript.Phase.DAY, WorldStateScript.Weather.CLEAR),
+		"neither")
+
+
+func test_an_empty_list_on_one_axis_still_means_any_on_that_axis() -> void:
+	var nocturnal: PonyData = TEMPLATE.duplicate()
+	nocturnal.phases = [WorldStateScript.Phase.NIGHT]
+	nocturnal.weathers = []
+	for weather in range(4):
+		assert_true(nocturnal.available(WorldStateScript.Phase.NIGHT, weather),
+			"a night pony keeps night hours in any weather")
+		assert_false(nocturnal.available(WorldStateScript.Phase.DAY, weather),
+			"and no weather makes it daytime for her")
+
+	var foggy: PonyData = TEMPLATE.duplicate()
+	foggy.phases = []
+	foggy.weathers = [WorldStateScript.Weather.FOG]
+	for phase in range(4):
+		assert_true(foggy.available(phase, WorldStateScript.Weather.FOG),
+			"a fog pony wants fog at any hour")
+		assert_false(foggy.available(phase, WorldStateScript.Weather.CLEAR),
+			"and will not come out under a clear sky at any hour")
+
+
+func test_leave_puts_her_in_leaving_and_is_leaving_reads_back() -> void:
+	var pony := _spawn(PonyDataScript.Personality.BOLD, 4.0, Vector3.ZERO)
+	_add_player(Vector3(0.0, 0.0, -2.0))
+	await wait_physics_frames(5)
+
+	assert_false(pony.is_leaving(), "she is not going anywhere until she is asked to")
+	assert_true(pony.leave(), "and she agrees when she is")
+	assert_eq(pony.state, PonyScript.State.LEAVING)
+	assert_true(pony.is_leaving())
+
+
+func test_a_held_pony_refuses_to_leave() -> void:
+	# The beam owns her transform and owns what happens to her next. A pony who walked out
+	# of a hold would be a pony the beam could capture into the bag after she had already
+	# freed her own body.
+	var pony := _spawn(PonyDataScript.Personality.BOLD, 4.0, Vector3.ZERO)
+	await wait_physics_frames(2)
+	pony.set_held(true)
+
+	assert_false(pony.leave(), "leave() must refuse while the beam has her")
+	assert_eq(pony.state, PonyScript.State.HELD, "and must not have moved her out of HELD")
+	assert_false(pony.is_leaving())
+
+
+func test_a_grab_during_a_departure_wins_and_the_departure_is_cancelled() -> void:
+	var pony := _spawn(PonyDataScript.Personality.BOLD, 4.0, Vector3.ZERO)
+	_add_player(Vector3(0.0, 0.0, -2.0))
+	await wait_physics_frames(5)
+	pony.leave()
+	assert_true(pony.is_leaving(), "she has set off")
+
+	pony.set_held(true)
+	assert_eq(pony.state, PonyScript.State.HELD, "the beam takes her mid departure")
+	assert_false(pony.is_leaving(), "which cancels the departure")
+	await wait_physics_frames(60)
+	assert_true(is_instance_valid(pony),
+		"and the departure must not free a pony the beam is holding")
+
+	pony.set_held(false)
+	assert_eq(pony.state, PonyScript.State.IDLE,
+		"letting go drops her back into her routine, not back into the departure")
+
+
+func test_a_leaving_pony_nobody_can_see_goes_at_once() -> void:
+	# No player anywhere in this world, so she is already further off than the widest
+	# notice radius on the roster and nothing pops out of anybody's view.
+	var pony := _spawn(PonyDataScript.Personality.BOLD, 4.0, Vector3.ZERO)
+	await wait_physics_frames(2)
+	pony.leave()
+	await wait_physics_frames(4)
+
+	assert_false(is_instance_valid(pony),
+		"a wild body with nobody watching is discarded on her next frame")
+
+
+func test_a_leaving_pony_the_player_is_watching_walks_rather_than_vanishing() -> void:
+	# The guarantee LEAVE_DISTANCE exists for: while she is still inside her own detection
+	# area there is somebody close enough to be looking at her, so she is not allowed to
+	# stop existing. A player standing 3 m off is as close as that gets.
+	var pony := _spawn(PonyDataScript.Personality.BOLD, 4.0, Vector3.ZERO)
+	pony.roam_radius = 2.0
+	var player := _add_player(Vector3(0.0, 0.0, -3.0))
+	await wait_physics_frames(5)
+	var start: Vector3 = pony.global_position
+	pony.leave()
+	await wait_physics_frames(60)
+
+	assert_true(is_instance_valid(pony), "she is still well inside the detection area")
+	assert_true(pony.is_leaving(), "and still on her way out")
+	assert_lt(pony.global_position.distance_to(player.global_position),
+		PonyScript.LEAVE_DISTANCE,
+		"...which is the premise of this test rather than a claim about it")
+	assert_gt(pony.global_position.z, start.z + 1.0,
+		"she heads directly away from the player, who is standing behind her")
+	var from_home: float = Vector2(pony.global_position.x - start.x,
+		pony.global_position.z - start.z).length()
+	assert_gt(from_home, pony.roam_radius,
+		"and she is off her leash: no other state may leave her roam circle")
+
+
+func test_a_leaving_pony_is_freed_once_she_is_out_of_the_detection_area() -> void:
+	# The other half of the same guarantee, and the ordinary way a departure ends. She sets
+	# off 3 m from a player who does not move, and the last distance measured before she
+	# goes says she covered the ground rather than being written off where she stood.
+	var pony := _spawn(PonyDataScript.Personality.BOLD, 4.0, Vector3.ZERO)
+	var player := _add_player(Vector3(0.0, 0.0, -3.0))
+	await wait_physics_frames(5)
+	pony.leave()
+
+	var last_distance := 0.0
+	var frames := 0
+	# 8 s at 60 Hz: about twice what 3.3 m/s needs to clear the 14 m, and a small
+	# fraction of LEAVE_SECONDS, so this cannot pass by way of the safety ceiling.
+	for i in range(LEAVE_WATCH_FRAMES):
+		await wait_physics_frames(1)
+		frames += 1
+		if not is_instance_valid(pony):
+			break
+		last_distance = pony.global_position.distance_to(player.global_position)
+
+	assert_false(is_instance_valid(pony),
+		"a pony past her detection radius is out of sight, and goes")
+	assert_gt(last_distance, 10.0,
+		"and she walked there: the last look at her had her most of the way out")
+	assert_lt(float(frames) / 60.0, PonyScript.LEAVE_SECONDS,
+		"the departure ended on the distance, not on the safety ceiling")
 
 
 # --- helpers ------------------------------------------------------------------------

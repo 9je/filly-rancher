@@ -22,6 +22,7 @@ const NeedsScript := preload("res://systems/needs.gd")
 const MarketMenuScript := preload("res://ui/market_menu.gd")
 const SaveIOScript := preload("res://systems/save_io.gd")
 const MagicBeamScript := preload("res://actors/player/magic_beam.gd")
+const RequestBoardScript := preload("res://systems/request_board.gd")
 
 const SLOT := 8  # a scratch slot; a hosted ranch reads no slot at all, so nothing collides
 
@@ -97,7 +98,23 @@ func _ready() -> void:
 	_set_check("opening collected the tray into the pouch",
 		shop.gem_count(rarity) == 3 and pen.gems() == 0)
 	_set_check("the tree is paused while the market is up", get_tree().paused)
-	var expected_bits: int = 3 * shop.gem_price(rarity)
+	# THE BOARD IS PART OF THE PRICE NOW. A sale also pays out whatever request it just
+	# finished (ranch.gd's _pay_out), and on a state that was reset a moment ago that is
+	# the tutorial "Sell a gem at the market." So the expectation is read off the board
+	# rather than written here as a number: a gate that hard-coded 50 would go red the day
+	# somebody retunes the tutorial's reward, which is not a bug in the market loop.
+	var board: RequestBoard = ranch.get_request_board()
+	_set_check("the board is standing before the sale", board != null)
+	var request_bits := 0
+	for entry in (board.active() if board != null else []):
+		var kind := int((entry as Dictionary).get("kind", -1))
+		if kind == RequestBoardScript.Kind.SELL_ANY:
+			request_bits += int((entry as Dictionary).get("reward_bits", 0))
+		elif kind == RequestBoardScript.Kind.SELL_GEMS_OF_RARITY \
+				and int((entry as Dictionary).get("rarity", -1)) == rarity \
+				and int((entry as Dictionary).get("count", 0)) <= 3:
+			request_bits += int((entry as Dictionary).get("reward_bits", 0))
+	var expected_bits: int = 3 * shop.gem_price(rarity) + request_bits
 	_set_check("sell everything is confirmable", menu.confirm())
 	_set_check("selling paid the rarity price", shop.bits() == expected_bits)
 	_set_check("the pouch is empty after selling", shop.gem_count(rarity) == 0)
@@ -228,9 +245,35 @@ func _ready() -> void:
 	var one_gem_bits: int = shop_now.gem_price(PonyDataScript.Rarity.COMMON)
 	_set_check("a single common gem sells", menu.confirm())
 	_set_check("the toast counts one gem as a gem",
-		hud.toast_text() == "Sold 1 gem for %d bits." % one_gem_bits)
+		_hud_says(hud, "Sold 1 gem for %d bits." % one_gem_bits))
 	_set_check("the pouch is empty after the single sale",
 		shop_now.gem_count(PonyDataScript.Rarity.COMMON) == 0)
+
+	# --- the world seed follows the save --------------------------------------------------
+	# THE HERD AND THE BOARD HAVE TO BE DRAWN FROM ONE NUMBER, AND THE SAVE OWNS IT.
+	# ranch.gd pushed the loaded save's world_seed into the spawner at boot and never again,
+	# so a load made mid-session left the spawner still drawing from the seed of the session
+	# it had just replaced, while the request board beside it was rebuilt from the loaded
+	# one; and then the next save stamped the stale spawner seed back over the loaded save.
+	# The symptom is not an error, it is a herd that quietly rearranges itself and a seed
+	# that drifts a little further every time she loads.
+	#
+	# ONLY ASKABLE FROM HERE. It takes a real load through the live GameState autoload with
+	# a real spawner attached to it; the ranch's own save round trip probes throwaway
+	# GameState instances on purpose, and no GUT test has a ranch.
+	var boot_seed: int = ranch.spawner.spawn_seed
+	var other_seed: int = boot_seed + 4242
+	state.world_seed = other_seed
+	_set_check("the save under test lands, with a seed the boot did not have",
+		other_seed != boot_seed and state.save_to_slot(SLOT))
+	state.reset()
+	_set_check("the slot with the other seed loads back", state.load_from_slot(SLOT))
+	_set_check("a load hands the spawner the seed it just loaded",
+		ranch.spawner.spawn_seed == state.world_seed and state.world_seed == other_seed)
+	_set_check("the save lands again after that load", state.save_to_slot(SLOT))
+	var reseeded := SaveIOScript.load(SLOT)
+	_set_check("and the file still holds the loaded seed, not the boot seed",
+		int(reseeded.get("world_seed", 0)) == other_seed)
 
 	# --- pause menu ---------------------------------------------------------------------
 	var pause = ranch.get_pause_menu()
@@ -268,3 +311,18 @@ func _finish() -> void:
 		push_error("market_test: DUPLICATE CHECK LABEL: %s" % label)
 	print(("MARKET_OK " if all_ok else "MARKET_FAILED ") + "checks=%d" % _checks.size())
 	get_tree().quit(0 if all_ok else 1)
+
+
+## Whether the HUD has said `text` to the player: the line on screen, or anything queued
+## behind it.
+##
+## THE WHOLE QUEUE, NOT THE LABEL ALONE. A toast raised while another one is still up waits
+## its turn now instead of overwriting it (game/ui/hud.gd, toast()), which is the fix for a
+## sale line the "Request done" line used to wipe out before it could be read. This gate
+## drives several toast raising actions in a handful of frames, so the sentence it is
+## checking for is routinely two or three behind the label; asking the label alone would be
+## asking which of the player's messages happened to be first, not whether she was told.
+func _hud_says(hud, text: String) -> bool:
+	if hud.toast_text() == text:
+		return true
+	return hud.pending_toasts().has(text)

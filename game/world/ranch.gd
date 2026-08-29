@@ -147,6 +147,8 @@ const PonyDataScript := preload("res://systems/pony_data.gd")
 const PlayerScript := preload("res://actors/player/player.gd")
 const WorldStateScript := preload("res://systems/world_state.gd")
 const SkyRigScript := preload("res://world/sky_rig.gd")
+const RequestBoardScript := preload("res://systems/request_board.gd")
+const CompendiumScript := preload("res://systems/compendium.gd")
 
 ## Headless watchdog ceiling. A normal run (assets present) finishes in under 2s on
 ## this machine; 30s leaves a wide margin for a slower box while still failing in
@@ -218,6 +220,12 @@ const HOUSE_SAVE_REARM := 9.0
 ## than the building's own half-diagonal (5.5 x 4.5 m, so 3.55 m corner to centre), so
 ## "go to the market" is satisfied by walking up to the door rather than into the wall.
 const MARKET_RADIUS := 4.5
+
+## How close to the request board's post counts as "at the board", in metres. Narrower than
+## MARKET_RADIUS because the board is a small thing (3.0 x 1.2 m) five metres from the
+## Market's door, and two prompts that both fire in the gap between them would be two
+## toasts fighting over one patch of grass.
+const BOARD_RADIUS := 3.0
 
 ## Plot slots the map must carry -- the plan asks for four to six, and the reserved
 ## clearing (PropsScript.PEN_PLOTS_*) is an 18 m square, which fits four 7.8 m pens on a
@@ -434,6 +442,28 @@ var _settings: Settings = null
 ## prompt: once on entering the radius, not once per frame.
 var _market_prompted := false
 
+## Whether the request board's prompt has been shown for this approach. The market
+## prompt's rule; see _market_prompted.
+var _board_prompted := false
+
+## The three standing favours (game/systems/request_board.gd). REBUILT rather than mutated
+## on every load, for exactly the reason rebind_economy() rebuilds the wallet: a load
+## replaces GameState.requests wholesale, and a board still holding the previous session's
+## Dictionaries would be paying out requests nobody on this save was ever given.
+var _board: RequestBoard = null
+
+## The whole character roster, loaded once and kept, because the board is rebuilt on every
+## load and re-reading 45 .tres files each time would be a disk scan per load. _report()
+## still loads its own copy; that one is a gate deliberately re-measuring rather than
+## trusting a cache.
+var _roster: PonyRegistry = null
+
+## Whether the spawner has actually populated yet. The sky's phase and weather signals can
+## in principle land before that (a run that pins the clock from the command line, or a
+## load fired while boot is still walking down _ready()), and refreshing a herd that does
+## not exist yet would spawn the boot herd twice.
+var _herd_ready := false
+
 ## Which locked region's gateway the player is currently standing at, or &"" for none.
 ## The region id rather than a bool because there are four gates: walking from one to
 ## another must produce a second prompt, and a bool would swallow it.
@@ -494,6 +524,17 @@ func _ready() -> void:
 		fence.configure(region, Callable(terrain, "height_at"))
 		fence.build()
 	_region_fence_cache = get_region_fences()
+
+	# EVERY PONY WHO EVER REACHES THE MAP, at boot and at every later change of sky (see
+	# Spawner.pony_spawned). Connected at the top of boot rather than beside the populate()
+	# call below because populate() emits it from inside itself: a connect made after that
+	# call would miss the entire boot herd and only ever see the arrivals.
+	#
+	# connect()-by-name, matching _bind_build_menu(): `spawner` is typed as the Node3D
+	# ranch.tscn declares, and the string form is how the rest of this file reaches a
+	# script member through a node typed by its scene rather than by its script.
+	if not spawner.is_connected("pony_spawned", _on_pony_spawned):
+		spawner.connect("pony_spawned", _on_pony_spawned)
 
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--screenshot-dir="):
@@ -568,10 +609,22 @@ func _ready() -> void:
 
 	var prop_count: int = props.build() + buildings.get_child_count()
 
+	# THE BEAM'S CATCHES, BEFORE THERE IS ANYTHING ON THE MAP TO CATCH. The beam is a child
+	# of the player scene and so has existed since the first line of this function; the
+	# connection is made here, immediately above populate(), because everything a capture
+	# records (the compendium, the board) is about the ponies populate() is about to place.
+	_bind_capture()
+
 	for i in range(PHYSICS_WARMUP_FRAMES):
 		await get_tree().physics_frame
 
-	var pony_count: int = spawner.populate()
+	# THE HERD KEEPS THE HOUR THE SAVE WAS QUIT AT. populate() takes the sky it is drawing
+	# for (slice 5 task 1), and _world is already built by _bind_game_state() above, so a
+	# save quit at midnight boots into the ponies who are actually out at midnight rather
+	# than into the DAWN default and then a correction on the next phase flip.
+	var pony_count: int = spawner.populate(_world.phase(), _world.weather()) if _world != null \
+		else spawner.populate()
+	_herd_ready = true
 
 	# The plot slots are seated on the terrain before anything is built on them, so a pen
 	# inherits a slot that is already standing on the ground rather than having to find it
@@ -604,11 +657,15 @@ func _ready() -> void:
 ## Find the GameState autoload, load the play slot if there is one, and decide whether this
 ## run is allowed to write anything.
 ##
-## THE SEED IS PUSHED BOTH WAYS. A loaded save hands its `world_seed` to the spawner, so
-## coming back gives you the ranch you left. A run with NO save takes the spawner's own
-## exported default INTO the state, so the very first save records the seed the world was
-## actually generated with rather than a default that a later edit to spawner.tscn could
-## silently change out from under it.
+## THE SEED IS PUSHED BOTH WAYS, ONCE, AND ONLY HERE. A loaded save hands its `world_seed`
+## to the spawner, so coming back gives you the ranch you left. A run with NO save takes the
+## spawner's own exported default INTO the state, so the very first save records the seed the
+## world was actually generated with rather than a default that a later edit to spawner.tscn
+## could silently change out from under it.
+##
+## AFTER THIS THE STATE OWNS THE NUMBER AND THE SPAWNER READS IT. Every later load re-reads
+## it into the spawner from _rebuild_world_state(), and _sync_game_state() never writes it
+## back; the two directions used to fight, and the loser was the loaded save.
 func _bind_game_state() -> void:
 	_game_state = get_node_or_null(^"/root/GameState")
 	if _game_state == null:
@@ -658,6 +715,15 @@ func _bind_game_state() -> void:
 	_rebuild_world_state()
 	if not _game_state.state_loaded.is_connected(_rebuild_world_state):
 		_game_state.state_loaded.connect(_rebuild_world_state)
+
+	# AND THE HERD THAT CLOCK IMPLIES, LAST OF THE THREE. Connected after the rebuild above
+	# so it runs after it: a save loaded at midnight has to have its WorldState in place
+	# before anything asks what hour to draw ponies for. Deliberately NOT folded into
+	# _rebuild_world_state() itself, because that function is also called by _report()'s
+	# reload probe, which is measuring the sky and has no business shuffling the herd while
+	# it does. Nothing happens on the boot load: this connect comes after load_from_slot().
+	if not _game_state.state_loaded.is_connected(_refresh_herd):
+		_game_state.state_loaded.connect(_refresh_herd)
 
 
 ## Put the owned ponies back where they live after a load.
@@ -920,6 +986,19 @@ func rebind_economy() -> void:
 	# regions back the way the loaded save left them rather than the way the session that
 	# is being replaced left them.
 	_apply_permits()
+
+	# EVERY PONY THE PLAYER OWNS IS A PONY SHE HAS CAUGHT, and the compendium has to be
+	# told so on every load, not only on a fresh one. A save written before slice 5
+	# carries a full paddock and an empty compendium (SaveIO.migrate() adds the key, not
+	# its contents), and a player who has to re-catch her own herd to fill the book in
+	# would rightly call that a bug. Before the board is rebuilt, because the board's fill()
+	# reads the compendium to decide who it may ask her to go and find.
+	_mark_owned_caught()
+
+	# The board, from whatever GameState holds right now, for rebind_economy()'s own reason:
+	# a load REPLACES `requests` rather than mutating it.
+	_rebuild_request_board()
+
 	var hud := get_node_or_null(^"HUD")
 	if hud != null and hud.has_method("set_bits"):
 		hud.set_bits(_economy.bits)
@@ -959,6 +1038,19 @@ func advance_world(seconds: float) -> void:
 ## to a stormy night that loaded a save halfway through would otherwise photograph whatever
 ## hour the save happened to hold.
 func _rebuild_world_state() -> void:
+	# THE SPAWNER'S SEED, RE-READ FROM THE STATE FIRST. _bind_game_state() pushes the loaded
+	# save's world_seed into the spawner at boot and never again, so before this line a
+	# mid-session load left the herd being drawn from the seed of the session that had just
+	# been replaced, while the board beside it was rebuilt from the loaded one. The state
+	# OWNS the number and the spawner reads it; here, at the one place a load's numbers are
+	# taken up, and before the post-load refresh draws anything with it.
+	#
+	# A no-op at boot in both directions: _bind_game_state() has already made the two agree
+	# by then, whichever of them was the source. A no-op in _report()'s reload probe too,
+	# which does not touch world_seed.
+	if _game_state != null:
+		spawner.spawn_seed = _game_state.world_seed
+
 	if _world != null:
 		if _world.phase_changed.is_connected(_on_world_phase_changed):
 			_world.phase_changed.disconnect(_on_world_phase_changed)
@@ -1022,6 +1114,57 @@ func _on_world_changed() -> void:
 	if sky_rig != null and sky_rig.has_method("apply"):
 		sky_rig.apply(_world)
 	_show_world_line()
+	# CALLED FROM IN HERE RATHER THAN FROM A SECOND LISTENER ON THE SAME TWO SIGNALS. The
+	# reload probe in _report() asserts phase_changed and weather_changed carry EXACTLY one
+	# connection each (a second clock driving one sky is the bug that check exists for), so
+	# "the herd changes with the hour" has to ride the connection that is already there.
+	_refresh_herd()
+
+
+## THE SKY TURNED OVER, SO THE HERD DOES TOO. Everybody whose hours have ended walks off,
+## everybody whose hours have begun walks on; see Spawner.refresh() for the draw and for
+## why nothing here can delete a pony.
+##
+## SAID OUT LOUD ONLY WHEN SOMETHING MOVED, AND ONLY THE HALF THAT MOVED. A phase that
+## changes nothing about who is out (DAWN to DAY, for most of the roster) would otherwise
+## print "0 ponies wandered off, 0 arrived." over the middle of the screen every few
+## minutes, which is a notification that nothing happened; and a phase where two walked off
+## and nobody came would say "and 0 arrived", which is a notification of an absence. So each
+## clause is emitted only when its own count is non zero, and the counts are pluralised:
+## "2 ponies wandered off.", "1 pony arrived.", "2 ponies wandered off, 1 pony arrived."
+##
+## A FUTURE LOAD PAGE MUST CLEAR THE HERD BEFORE THIS RUNS AGAIN. Everything here assumes
+## the ponies standing on the map belong to the world the clock is running; a load that
+## swapped the save out from under a live ranch without emptying the spawner first would
+## leave the previous world's herd standing in the new one, and the first phase change would
+## report their departures as if they had been drawn for this save. There is no in game Load
+## today (a save is loaded before the ranch builds its herd), which is why this is a note
+## rather than a guard.
+##
+## THE CYCLE INDEX IS READ LIVE off the clock rather than counted here, because
+## Spawner.refresh() seeds its draw from `cycle * 4 + phase` and a cycle number kept in a
+## second place would eventually disagree with the one the player's save is actually on.
+func _refresh_herd() -> void:
+	if _world == null or not _herd_ready:
+		return
+	var moved: Dictionary = spawner.refresh(_world.phase(), _world.weather(),
+		_world.cycle_index(), player.global_position)
+	var left := int(moved.get("left", 0))
+	var arrived := int(moved.get("arrived", 0))
+	var clauses: Array[String] = []
+	if left != 0:
+		clauses.append("%s wandered off" % _pony_count_phrase(left))
+	if arrived != 0:
+		clauses.append("%s arrived" % _pony_count_phrase(arrived))
+	if not clauses.is_empty():
+		_toast("%s." % ", ".join(clauses))
+
+
+## "1 pony" or "2 ponies". The herd toast is the only line in the game that counts ponies
+## out loud, and "1 ponies wandered off" is the kind of thing a player reads as a bug in
+## everything else too.
+func _pony_count_phrase(count: int) -> String:
+	return "1 pony" if count == 1 else "%d ponies" % count
 
 
 ## Said in words as well as in light. Repainted on a change and at boot, never per frame;
@@ -1072,6 +1215,26 @@ func _bind_pause_menu() -> void:
 	_apply_settings()
 	pause_menu.set("settings", _settings)
 	pause_menu.set("can_open", func() -> bool: return _no_menu_but(pause_menu))
+	# WHAT THE COMPENDIUM AND REQUESTS PAGES DRAW (game/ui/pause_menu.gd). Pushed in rather
+	# than pulled by the menu, exactly like `settings` above: the menu is instantiated bare
+	# by its own tests and by the boot shutter, and a page that loaded the roster off disk
+	# for itself would make both of those pay for a ranch they do not have.
+	#
+	# RE PUSHED ON EVERY LOAD, because three of the five are REPLACED by one: rebind_economy()
+	# builds a new RequestBoard and a load hands GameState a new Compendium, while
+	# _rebuild_world_state() builds a new clock. Injecting once at boot would leave the pause
+	# menu reading the board, the book and the hour of the session that was just replaced.
+	# The registry and the region catalogue are cached for the life of the process and are
+	# re-pushed only because they ride along in the same call.
+	var inject_pages := func() -> void:
+		pause_menu.set("compendium", get_compendium())
+		pause_menu.set("registry", _pony_roster())
+		pause_menu.set("regions", _regions_registry())
+		pause_menu.set("board", get_request_board())
+		pause_menu.set("world_state", get_world_state())
+	inject_pages.call()
+	if _game_state != null and not _game_state.state_loaded.is_connected(inject_pages):
+		_game_state.state_loaded.connect(inject_pages)
 	for pair in [["opened", _on_pause_opened], ["closed", _on_menu_closed],
 			["save_requested", _on_pause_save], ["quit_requested", _on_pause_quit],
 			["settings_changed", _on_settings_changed]]:
@@ -1135,6 +1298,11 @@ func _on_sell_requested(rarity: int, count: int) -> void:
 	if earned > 0:
 		_toast("Sold %d %s for %d bits." % [
 			sold_count, "gem" if sold_count == 1 else "gems", earned])
+	# The board is told what LEFT THE POUCH, the same number the toast reports, for the
+	# same reason: `count` is what the menu asked for and a request that outran the pouch
+	# would otherwise credit her for gems she never had.
+	if _board != null and sold_count > 0:
+		_pay_out(_board.on_sold(rarity, sold_count))
 	if market_menu.has_method("refresh"):
 		market_menu.refresh()
 
@@ -1142,9 +1310,22 @@ func _on_sell_requested(rarity: int, count: int) -> void:
 func _on_sell_all_requested() -> void:
 	if _shop == null:
 		return
+	# COUNTED PER RARITY ACROSS THE SALE. sell_all() answers in bits and says nothing about
+	# what it emptied, and the board's SELL_GEMS_OF_RARITY request is about a tier, so
+	# "sell everything" has to be reported to it as one on_sold() per tier rather than as
+	# one lump. Measured before and after rather than taken from sell_all()'s return for
+	# _on_sell_requested()'s reason: the pouch is the authority on what was in it.
+	var held_before := {}
+	for rarity in PonyDataScript.Rarity.values():
+		held_before[rarity] = _shop.gem_count(rarity)
 	var earned: int = _shop.sell_all()
 	if earned > 0:
 		_toast("Sold everything for %d bits." % earned)
+	if _board != null:
+		for rarity in held_before.keys():
+			var sold_count: int = int(held_before[rarity]) - _shop.gem_count(rarity)
+			if sold_count > 0:
+				_pay_out(_board.on_sold(rarity, sold_count))
 	if market_menu.has_method("refresh"):
 		market_menu.refresh()
 
@@ -1347,6 +1528,275 @@ func _update_gate_prompt() -> void:
 			% [fence.region().display_name, fence.region().permit_cost])
 
 
+# --- the compendium, the board and the payouts -------------------------------------------
+
+## Subscribe to the beam's catches. ONE CONNECTION, made once at boot, rather than a hook
+## per pony: the beam is what turns a hold into a capture (see magic_beam.gd), and it
+## already carries the PonyInstance the compendium and the board both need.
+##
+## connect()-by-name for _bind_build_menu()'s reason: `beam` is reached through the player
+## scene and is typed as a Node3D here.
+func _bind_capture() -> void:
+	var beam: Node3D = player.get_magic_beam()
+	if beam == null:
+		# A FAILED check in _report() ("the HUD found the magic beam"), not a crash in boot.
+		return
+	if not beam.is_connected("captured", _on_pony_captured):
+		beam.connect("captured", _on_pony_captured)
+
+
+## A wild pony has just reached the map, from populate() at boot or from refresh() at a
+## change of sky. Her PonyData is bound into the handler rather than looked up again later,
+## because by the time she is noticed she may well be the only thing that still knows who
+## she was.
+func _on_pony_spawned(pony: Node3D) -> void:
+	if pony == null:
+		return
+	var data: PonyData = pony.get_data()
+	if data == null:
+		return
+	# Unconditionally, with no is_connected() guard: every pony arriving here is a node
+	# that was instantiated a moment ago, so there is nothing for a second connection to
+	# be made on top of. (A bound Callable does not compare equal to the same handler bound
+	# to a different argument anyway, so the guard would not have worked.)
+	pony.connect("noticed_player", _on_pony_noticed.bind(data))
+
+
+## The player has laid eyes on her for the first time. SEEN in the compendium, and progress
+## on the board's "find her and get a good look" request if one is asking for this face.
+func _on_pony_noticed(data: PonyData) -> void:
+	if data == null or _game_state == null:
+		return
+	_game_state.compendium.mark_seen(data.id)
+	if _board != null:
+		_pay_out(_board.on_seen(data))
+
+
+## The beam turned a hold into a capture. CAUGHT in the compendium (which never downgrades,
+## so catching a pony nobody ever noticed still records having seen her), and progress on
+## the board.
+##
+## THE ZONE IS WHERE THE PLAYER IS STANDING, not where the pony was standing. A pony beamed
+## across a fence line from outside it was not brought FROM the region she happened to be
+## grazing in, and the board's BRING_PERSONALITY_FROM_ZONE request is about the trip.
+## &"ranch" is the answer for the open homestead, which is what RegionRegistry.region_at()
+## returning null means.
+func _on_pony_captured(instance: PonyInstance) -> void:
+	if instance == null or _game_state == null:
+		return
+	_game_state.compendium.mark_caught(instance.data_id)
+	if _board == null:
+		return
+	var here: RegionData = _regions_registry().region_at(
+		Vector2(player.global_position.x, player.global_position.z))
+	var zone: StringName = here.id if here != null else &"ranch"
+	_pay_out(_board.on_caught(instance.data(), zone))
+
+
+## Mark every pony the player owns CAUGHT. The three places one can be: the save's own
+## roster, a pen's residents, and the saddlebag. All three, because they do not agree at
+## every moment: a pony penned since the last write is in a pen and not in
+## GameState.ponies, and _sync_game_state() is what reconciles them, at save time, not now.
+##
+## Returns how many entries this call actually raised, which is zero on the second call and
+## on any load of a save whose compendium was already complete. NOTHING IS EVER REMOVED
+## here or anywhere else; the compendium only moves forward.
+func _mark_owned_caught() -> int:
+	if _game_state == null:
+		return 0
+	var raised := 0
+	for instance: PonyInstance in _game_state.get_ponies():
+		if _game_state.compendium.mark_caught(instance.data_id):
+			raised += 1
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen == null:
+			continue
+		for resident: PonyInstance in pen.ponies():
+			if _game_state.compendium.mark_caught(resident.data_id):
+				raised += 1
+	var beam: Node3D = player.get_magic_beam()
+	if beam != null:
+		for carried: PonyInstance in beam.get_storage().contents():
+			if _game_state.compendium.mark_caught(carried.data_id):
+				raised += 1
+	return raised
+
+
+## The character roster, loaded once per session. See _roster.
+func _pony_roster() -> PonyRegistry:
+	if _roster == null:
+		_roster = PonyRegistryScript.new()
+		_roster.load_all(spawner.pony_dir)
+	return _roster
+
+
+## Every character id the compendium has heard of, SEEN or CAUGHT, as the board's fill()
+## wants them. Read off to_dict(), which is exactly "the entries that are not UNSEEN"
+## (game/systems/compendium.gd) rather than a second walk of the roster that would have to
+## be kept in step with that rule by hand.
+func _seen_ids() -> Array:
+	if _game_state == null:
+		return []
+	return _game_state.compendium.to_dict().keys()
+
+
+## BUILD (OR REBUILD) THE BOARD FROM WHATEVER GameState HOLDS RIGHT NOW.
+##
+## An EMPTY `requests` array is a ranch that has never had a board: the tutorial three go
+## up (catch one, pen one, sell a gem), and fill() tops the board back to three as they are
+## claimed. A non-empty one is restored as it stands, seed and draw counter included, so a
+## save resumed at request four does not start the sequence over.
+##
+## THE SEED IS THE WORLD SEED, the same number the herd was drawn from. It has to come out
+## of the save rather than out of a fresh roll, or reloading would hand the player a
+## different set of favours than the ones she quit looking at.
+func _rebuild_request_board() -> void:
+	if _game_state == null:
+		_board = null
+		return
+	var region_ids: Array[StringName] = []
+	var region_names := {}
+	for region: RegionData in _regions_registry().all():
+		region_ids.append(region.id)
+		region_names[region.id] = region.display_name
+
+	var seed_value: int = _game_state.world_seed
+	var saved: Array = _game_state.requests
+	if saved.is_empty():
+		_board = RequestBoardScript.new(seed_value, _pony_roster(), region_ids, region_names)
+		_board.seed_tutorial()
+	else:
+		_board = RequestBoardScript.from_array(saved, _pony_roster(), region_ids, region_names)
+	_board.fill(_seen_ids())
+
+
+## PAY FOR EVERY REQUEST THIS EVENT JUST COMPLETED. `completed` is what an on_*() call
+## handed back: copies of the requests that flipped to done on THIS call and no others, so
+## nothing here can pay twice for one favour.
+##
+## CLAIM FIRST, AND PAY OUT OF WHAT THE CLAIM HANDED BACK. claim() is the board's own
+## authority on whether this request is done and not yet paid, and it answers with an empty
+## Dictionary when it is neither (game/systems/request_board.gd); paying first and claiming
+## afterwards threw that answer away, which made `paid` a field nothing consulted and left
+## the door open for one favour to be paid twice by two events that both thought they had
+## finished it. A refused claim is reported and skipped rather than paid on the strength of
+## the copy that was handed in.
+##
+## THEN BITS, THEN FOOD, THEN THE TOAST, THEN THE REFILL, PER REQUEST. The refill sits inside
+## the loop rather than after it so that a rare event finishing two requests at once still
+## leaves three offers standing between the two toasts; fill() draws nothing when the board
+## is already full, so the repeat costs nothing.
+func _pay_out(completed: Array) -> void:
+	if _board == null:
+		return
+	for entry in completed:
+		var request_id := String((entry as Dictionary).get("id", ""))
+		var claimed: Dictionary = _board.claim(request_id)
+		if claimed.is_empty():
+			push_warning(("ranch: request '%s' was reported complete but the board refused " +
+				"to claim it (unknown, not done, or already paid); nothing was paid.")
+				% request_id)
+			continue
+		var reward_bits := int(claimed.get("reward_bits", 0))
+		var reward_food := String(claimed.get("reward_food", ""))
+		# OFF THE REQUEST, NOT OFF THE BOARD'S CONSTANT. The request carries its own
+		# reward_food_count now (game/systems/request_board.gd), which is what lets the
+		# toast below name what was actually handed over.
+		var reward_food_count := int(claimed.get("reward_food_count", 0))
+		if _economy != null and reward_bits > 0:
+			_economy.grant(reward_bits)
+		if _game_state != null and not reward_food.is_empty() and reward_food_count > 0:
+			_game_state.inventory.add(StringName(reward_food), reward_food_count)
+		# THE TOAST NAMES THE FOOD. "+40 bits" for a favour that also handed over two hay is
+		# a receipt that does not match what went into the saddlebag, and the player has no
+		# other way to find out that it did.
+		var reward_text := "+%d bits" % reward_bits
+		if not reward_food.is_empty() and reward_food_count > 0:
+			reward_text += " and %d %s" % [reward_food_count, reward_food]
+		_toast("Request done: %s (%s)" % [String(claimed.get("text", "")), reward_text])
+		_board.fill(_seen_ids())
+
+
+## The board this ranch is running, or null only if there is no GameState to hold it.
+## Exposed for the gates, which otherwise cannot tell a board with nothing on it from a
+## board that was never built.
+func get_request_board() -> RequestBoard:
+	return _board
+
+
+## The player's compendium, or null when there is no GameState. Read straight off the state
+## rather than cached here, for rebind_economy()'s reason: a load replaces it.
+func get_compendium() -> Compendium:
+	return _game_state.compendium if _game_state != null else null
+
+
+## Is the player standing at the request board?
+##
+## THE MARKET WINS THE OVERLAP. The board stands five metres from the Market's origin and
+## the two radii meet in the middle, so without the second clause walking up to the stall
+## would print two prompts and E would be ambiguous between them. The Market is the older
+## and the busier of the two, so it keeps the ground.
+func is_near_board() -> bool:
+	var board := get_node_or_null(^"Buildings/Board") as Node3D
+	if board == null:
+		return false
+	var gap := Vector2(player.global_position.x - board.global_position.x,
+		player.global_position.z - board.global_position.z).length()
+	return gap <= BOARD_RADIUS and not is_near_market()
+
+
+## E at the board reads it. The prompt shows once per approach, like the market's.
+func _update_board_interaction() -> void:
+	if not _no_other_menu_open():
+		return
+	var near := is_near_board()
+	if near != _board_prompted:
+		_board_prompted = near
+		if near:
+			_toast("Press E / X to read the board.")
+	if near and Input.is_action_just_pressed(&"interact") and _prompt_slot == null:
+		_open_request_page()
+
+
+## Show her what the board is asking for.
+##
+## TASK 5 IS THE PAGE. Until the pause menu grows one, the board opens the pause menu the
+## way the PAUSE action does and says the three active requests in a toast; readable, and
+## enough to play the loop with, but not the thing this is meant to be.
+##
+## The page number is fetched out of PauseMenu's own constant map rather than written here
+## as `PauseMenu.Page.REQUESTS`, because that enum entry does not exist yet and a source
+## file that names it would not compile. The lookup answers -1 today and the real page
+## number the moment Task 5 adds it, with no edit here.
+func _open_request_page() -> void:
+	if pause_menu == null or not pause_menu.has_method("open"):
+		return
+	var page_id := _pause_menu_page("REQUESTS")
+	if page_id >= 0 and pause_menu.has_method("open_page"):
+		pause_menu.call("open_page", page_id)
+		return
+	pause_menu.open()
+	var lines: Array[String] = []
+	for entry in (_board.active() if _board != null else []):
+		lines.append(String((entry as Dictionary).get("text", "")))
+	if not lines.is_empty():
+		_toast(" / ".join(lines))
+
+
+## The value of PauseMenu.Page.`page_name`, or -1 if this build's pause menu has no such
+## page (or no script at all). See _open_request_page().
+func _pause_menu_page(page_name: String) -> int:
+	if pause_menu == null or pause_menu.get_script() == null:
+		return -1
+	var constants: Dictionary = pause_menu.get_script().get_script_constant_map()
+	var pages: Variant = constants.get("Page", null)
+	if typeof(pages) != TYPE_DICTIONARY:
+		return -1
+	var page_map: Dictionary = pages
+	return int(page_map[page_name]) if page_map.has(page_name) else -1
+
+
 func get_shop() -> Shop:
 	return _shop
 
@@ -1439,6 +1889,11 @@ func _move_pony_into_pen(slot: PlotSlot) -> bool:
 		_toast("She would not go in.")
 		return false
 	_toast("%s moved into the pen." % instance.display_name())
+	# AFTER the add succeeded and not before: the two branches above both end with her back
+	# in the saddlebag, and a board credited on the attempt would pay for a penning that
+	# never happened.
+	if _board != null:
+		_pay_out(_board.on_penned(instance.data()))
 	return true
 
 
@@ -1508,7 +1963,11 @@ func _sync_game_state() -> void:
 			owned.append(instance)
 	_game_state.set_ponies(owned)
 	_game_state.plots = _live_plots()
-	_game_state.world_seed = spawner.spawn_seed
+	# THE WORLD SEED IS NOT WRITTEN HERE. The state owns it and the spawner reads it (see
+	# _rebuild_world_state); a write in this direction meant that a save loaded mid-session
+	# had the seed of the session it replaced stamped back over it on the next save, because
+	# the spawner's copy was the stale one. _bind_game_state() is what gives a brand new
+	# ranch its seed, once, so the first save still records the map it was generated from.
 	# THE CLOCK, UNLESS IT WAS PINNED. --phase=/--weather= freeze the world at an hour
 	# nobody played to, and writing that back would hand the player a ranch stopped at
 	# whatever a screenshot run happened to ask for. WorldState.advance() already refuses
@@ -1517,6 +1976,11 @@ func _sync_game_state() -> void:
 	# and "it would have written the same number" is not the same promise.
 	if _world != null and not _world.is_pinned():
 		_game_state.world_time = _world.elapsed()
+	# THE BOARD, WHOLE: its seed, its draw counter and every request on it (see
+	# RequestBoard.to_array()). The compendium needs no line here, because GameState owns
+	# that object outright and this ranch only ever marks entries on it in place.
+	if _board != null:
+		_game_state.requests = _board.to_array()
 
 
 ## Save the ranch. Returns whether it landed. The live world is copied in by
@@ -1555,6 +2019,9 @@ func _physics_process(delta: float) -> void:
 		return
 	_update_plot_interaction()
 	_update_market_interaction()
+	# After the market's, so that an E press which just opened the Market is already behind
+	# a menu by the time this asks; see is_near_board() on the overlap of the two radii.
+	_update_board_interaction()
 	_update_gate_prompt()
 	if _game_state == null:
 		return
@@ -1974,6 +2441,73 @@ func _report(pony_count: int, prop_count: int) -> void:
 			_game_state.gems.total() if _game_state != null else 0,
 			_game_state.inventory.ids().size() if _game_state != null else 0,
 			_game_state.unlocks.size() if _game_state != null else 0])
+
+	# --- the collection --------------------------------------------------------------------
+	# THE BOOK AND THE BOARD, WHICH ARE BOTH INVISIBLE UNTIL SOMEBODY ASKS. A compendium
+	# that was never wired and a compendium nobody has filled in yet read identically from
+	# the outside (both say "0 seen"), and a board with no requests on it looks exactly like
+	# a board whose page has not been written. So each of the three is asked as a number
+	# here rather than inferred from the fact that the classes exist.
+	var book: Compendium = get_compendium()
+	_set_check(checks, "the compendium exists", book != null)
+
+	# EVERY OWNED PONY IS A CAUGHT PONY, re-derived here rather than trusted: this is the
+	# check that would catch rebind_economy()'s _mark_owned_caught() being dropped, or being
+	# called before the pens are restored. It counts the ones that are NOT recorded, so the
+	# failure names a real number instead of a bare false.
+	var uncaught: Array[String] = []
+	if book != null and _game_state != null:
+		for instance: PonyInstance in _game_state.get_ponies():
+			if book.state_of(instance.data_id) != CompendiumScript.State.CAUGHT:
+				uncaught.append(String(instance.data_id))
+		for slot in _plot_slots():
+			var pen := slot.get_built() as Pen
+			if pen == null:
+				continue
+			for resident: PonyInstance in pen.ponies():
+				if book.state_of(resident.data_id) != CompendiumScript.State.CAUGHT:
+					uncaught.append(String(resident.data_id))
+		var owner_beam: Node3D = player.get_magic_beam()
+		if owner_beam != null:
+			for carried: PonyInstance in owner_beam.get_storage().contents():
+				if book.state_of(carried.data_id) != CompendiumScript.State.CAUGHT:
+					uncaught.append(String(carried.data_id))
+	if not uncaught.is_empty():
+		push_error("ranch: %d owned pony/ponies are not CAUGHT in the compendium: %s"
+			% [uncaught.size(), ", ".join(uncaught)])
+	_set_check(checks, "every owned pony is caught in the compendium",
+		book != null and uncaught.is_empty())
+
+	# THREE OFFERS, ALWAYS. fill() tops the board back up to RequestBoard.ACTIVE after every
+	# claim, and SELL_GEMS_OF_RARITY has no precondition at all, so a board showing fewer
+	# than three means the refill is not running rather than that the well ran dry.
+	var active_requests: int = _board.active().size() if _board != null else 0
+	_set_check(checks, "three requests are active on a fresh state",
+		_board != null and active_requests == RequestBoardScript.ACTIVE)
+
+	# Hand-built like the Market, so it stands on an assetless checkout too and this is not
+	# gated on assets_state.
+	_set_check(checks, "the board stands", get_node_or_null(^"Buildings/Board") != null)
+
+	var book_registry: PonyRegistry = _pony_roster()
+	# `requests` is the ACTIVE count, the same number the check above reads. requests() also
+	# returns every claimed request the board has ever carried, so printing that would have
+	# made a healthy board's number climb forever while the three on offer never changed.
+	#
+	# `seen` IS SEEN PLUS CAUGHT, the same definition the COMPENDIUM page's header uses
+	# (game/ui/pause_menu.gd, compendium_header): every pony the player has caught is a pony
+	# she has laid eyes on, and two lines about one book that count it differently are two
+	# lines nobody can compare.
+	var book_seen: int = 0
+	var book_caught: int = 0
+	if book != null:
+		book_caught = book.count(CompendiumScript.State.CAUGHT, book_registry)
+		book_seen = book.count(CompendiumScript.State.SEEN, book_registry) + book_caught
+	print("RANCH collection seen=%d caught=%d of %d requests=%d" % [
+		book_seen,
+		book_caught,
+		book.total(book_registry) if book != null else 0,
+		active_requests])
 
 	# --- the regions ------------------------------------------------------------------
 	# Four data files, four rings of timber, four zones with residents in them. The three

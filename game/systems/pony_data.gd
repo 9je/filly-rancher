@@ -28,3 +28,31 @@ enum Personality { SHY, BOLD, CURIOUS }
 @export var base_speed: float = 0.0
 @export var base_stamina: float = 0.0
 @export var base_spirit: float = 0.0
+
+## WHEN she appears, as the companion of `spawn_zones`, which says where.
+##
+## Both are WorldState enum ints (game/systems/world_state.gd): `phases` holds
+## Phase values (DAWN 0, DAY 1, DUSK 2, NIGHT 3) and `weathers` holds Weather
+## values (CLEAR 0, RAIN 1, FOG 2, STORM 3). AN EMPTY ARRAY MEANS ANY, which is
+## what every unconditional character carries and what an older .tres that
+## predates these fields loads as, so adding them broke no roster file.
+##
+## Typed Array[int] rather than the enums themselves because Godot exports an
+## enum-typed array as a plain int array anyway; the enum lives in WorldState and
+## PonyData deliberately does not import it, so a data record stays readable
+## without dragging the world clock in behind it. available() below is the only
+## place the two arrays are ever interpreted.
+@export var phases: Array[int] = []
+@export var weathers: Array[int] = []
+
+
+## Whether this character can be drawn right now. Empty means any, in each list
+## independently, so "[NIGHT], []" is a pony who keeps night hours in any weather
+## and "[], [FOG]" is a pony who wants fog at any hour. Both non empty is an AND:
+## a listed phase with an unlisted weather is false.
+func available(phase: int, weather: int) -> bool:
+	if not phases.is_empty() and not phase in phases:
+		return false
+	if not weathers.is_empty() and not weather in weathers:
+		return false
+	return true

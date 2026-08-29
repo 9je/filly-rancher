@@ -5,9 +5,24 @@ extends GutTest
 
 const PauseMenuScene := preload("res://ui/pause_menu.tscn")
 const SettingsScript := preload("res://systems/settings.gd")
+const CompendiumScript := preload("res://systems/compendium.gd")
+const PonyRegistryScript := preload("res://systems/pony_registry.gd")
+const RegionRegistryScript := preload("res://systems/region_registry.gd")
+const RequestBoardScript := preload("res://systems/request_board.gd")
+const WorldStateScript := preload("res://systems/world_state.gd")
+
+const PONY_DIR := "res://data/ponies"
 
 var _menu: PauseMenu
 var _settings: Settings
+
+## The five things ranch.gd injects, built from the SHIPPED data by _wire_book() below and
+## left null by the tests that check a bare menu still draws. See _wire_book().
+var _compendium: Compendium
+var _registry: PonyRegistry
+var _regions: RegionRegistry
+var _board: RequestBoard
+var _world: WorldState
 
 
 func before_each() -> void:
@@ -15,6 +30,51 @@ func before_each() -> void:
 	_menu = PauseMenuScene.instantiate()
 	add_child_autofree(_menu)
 	_menu.settings = _settings
+
+
+## Everything the two reading pages draw, wired the way ranch.gd wires it
+## (game/world/ranch.gd, _bind_pause_menu). THE REGISTRY AND THE REGIONS ARE THE REAL ONES
+## OFF DISK, not a fixture: the counting and ordering tests below are about this game's
+## roster, and a hand-rolled stand in would go on passing after the roster changed under it.
+## test_compendium.gd loads the roster the same way and for the same reason.
+##
+## The compendium starts EMPTY and each test marks what it needs by hand; the board is the
+## tutorial three, which are fixed text and fixed rewards rather than a seeded draw.
+## The clock is PINNED, so "Now:" cannot move between the assertion and the draw.
+func _wire_book() -> void:
+	_registry = PonyRegistryScript.new()
+	_registry.load_all(PONY_DIR)
+	_compendium = CompendiumScript.new()
+	_regions = RegionRegistryScript.new()
+	_regions.load_all(RegionRegistryScript.REGION_DIR)
+	_board = RequestBoardScript.new(7, _registry, _region_ids())
+	_board.seed_tutorial()
+	_world = WorldStateScript.new(7)
+	_world.pin(WorldStateScript.Phase.DAY, WorldStateScript.Weather.CLEAR)
+	_menu.compendium = _compendium
+	_menu.registry = _registry
+	_menu.regions = _regions
+	_menu.board = _board
+	_menu.world_state = _world
+
+
+func _region_ids() -> Array[StringName]:
+	var out: Array[StringName] = []
+	for region: RegionData in _regions.all():
+		out.append(region.id)
+	return out
+
+
+## The compendium row for `id`, found by walking the roster the menu itself reports rather
+## than by hard coding a position: the list is PonyRegistry.all()'s order and a roster edit
+## moves everybody.
+func _row_for(id: StringName) -> String:
+	var entries: Array[PonyData] = _menu.roster()
+	var rows: Array[String] = _menu.compendium_rows()
+	for i in range(entries.size()):
+		if entries[i].id == id:
+			return rows[i]
+	return "<%s is not in the roster>" % id
 
 
 func test_opens_on_main_with_resume_selected() -> void:
@@ -81,7 +141,7 @@ func test_cancel_on_settings_returns_to_main_and_on_main_closes() -> void:
 	assert_false(_menu.is_open())
 
 
-## Both pages, as the name promises. The two have DIFFERENT row counts (four on MAIN,
+## Both pages, as the name promises. The two have DIFFERENT row counts (six on MAIN,
 ## three on SETTINGS) and _row_count() is the one thing that knows which, so a wrap that is
 ## only exercised on MAIN would let the settings page wrap past its last row into a fourth
 ## that is not drawn.
@@ -103,3 +163,322 @@ func test_selection_wraps_on_both_pages() -> void:
 	_menu.move_selection(1)
 	assert_eq(_menu.selected_index(), PauseMenu.SettingRow.VOLUME,
 		"...and down comes back round to the first")
+
+
+# --- the compendium page ---------------------------------------------------------------
+
+func test_open_page_lands_straight_on_the_compendium() -> void:
+	_wire_book()
+	watch_signals(_menu)
+	assert_true(_menu.open_page(PauseMenu.Page.COMPENDIUM))
+	assert_true(_menu.is_open())
+	assert_eq(_menu.page(), PauseMenu.Page.COMPENDIUM)
+	assert_eq(_menu.selected_index(), 0, "on the first character")
+	assert_signal_emitted(_menu, "opened")
+
+
+func test_open_page_refuses_a_page_number_this_menu_does_not_have() -> void:
+	_wire_book()
+	assert_false(_menu.open_page(99), "an unknown page must not leave the menu on a blank")
+	assert_false(_menu.is_open())
+
+
+func test_open_page_obeys_can_open() -> void:
+	_wire_book()
+	_menu.can_open = func() -> bool: return false
+	assert_false(_menu.open_page(PauseMenu.Page.REQUESTS))
+	assert_false(_menu.is_open())
+
+
+func test_the_compendium_row_on_main_opens_the_page() -> void:
+	_wire_book()
+	_menu.open()
+	_menu.move_selection(PauseMenu.Row.COMPENDIUM)
+	assert_true(_menu.confirm())
+	assert_eq(_menu.page(), PauseMenu.Page.COMPENDIUM)
+	_menu.back()
+	_menu.move_selection(PauseMenu.Row.REQUESTS - PauseMenu.Row.COMPENDIUM)
+	assert_true(_menu.confirm())
+	assert_eq(_menu.page(), PauseMenu.Page.REQUESTS)
+
+
+## The header is measured against the REAL roster, so the total is whatever ships; what this
+## pins is that the three numbers are caught, total and seen, in that order, and that they
+## are the same numbers Compendium itself reports.
+##
+## AND THAT "seen" COUNTS THE CAUGHT ONES. Two caught and one seen is THREE seen: the player
+## has laid eyes on every pony she has ever caught, and a header whose seen count fell as
+## she caught more of them read as the book forgetting. Compendium.count(SEEN) on its own is
+## "seen and not yet caught", which is why the sum is done here rather than left to it.
+func test_the_header_counts_match_a_hand_marked_compendium() -> void:
+	_wire_book()
+	_compendium.mark_caught(&"twilight")
+	_compendium.mark_caught(&"carrottop")
+	_compendium.mark_seen(&"applejack")
+	_menu.open_page(PauseMenu.Page.COMPENDIUM)
+	var total := _menu.roster().size()
+	assert_eq(total, 43, "the shipped roster")
+	assert_eq(_menu.compendium_header(), "2 of %d caught, 3 seen" % total)
+	assert_eq(_compendium.count(CompendiumScript.State.CAUGHT, _registry), 2)
+	assert_eq(_compendium.count(CompendiumScript.State.SEEN, _registry), 1,
+		"the book itself still counts SEEN as the rung of the ladder she is on")
+
+
+func test_the_header_second_line_is_the_hour_and_the_weather() -> void:
+	_wire_book()
+	_menu.open_page(PauseMenu.Page.COMPENDIUM)
+	assert_eq(_menu.compendium_now(), "Now: Day, clear")
+	_menu.world_state = null
+	assert_eq(_menu.compendium_now(), "", "no clock, no line")
+
+
+## The homestead is not a RegionData, so its row is built by hand and has to come first.
+func test_the_zone_tallies_put_the_ranch_before_the_regions() -> void:
+	_wire_book()
+	_compendium.mark_caught(&"twilight")
+	_menu.open_page(PauseMenu.Page.COMPENDIUM)
+	var rows: Array[String] = _menu.compendium_region_rows()
+	assert_eq(rows.size(), 1 + _regions.all().size(), "the ranch plus every region")
+	assert_eq(rows[0], "Ranch: 1 of %d" % _registry.by_zone(&"ranch").size())
+	assert_eq(rows[1], "%s: 0 of %d" % [
+		_regions.all()[0].display_name, _registry.by_zone(_regions.all()[0].id).size(),
+	])
+
+
+func test_the_character_list_scrolls_a_window_and_wraps_round_the_whole_roster() -> void:
+	_wire_book()
+	_menu.open_page(PauseMenu.Page.COMPENDIUM)
+	var last := _menu.roster().size() - 1
+	assert_eq(last, 42, "43 characters, indices 0 to 42")
+
+	var window: Array[int] = _menu.compendium_window()
+	assert_eq(window.size(), PauseMenu.PAGE_ROWS)
+	assert_eq(window[0], 0)
+	assert_eq(window[window.size() - 1], PauseMenu.PAGE_ROWS - 1)
+
+	_menu.move_selection(-1)
+	assert_eq(_menu.selected_index(), last, "up from the top wraps to the last character")
+	window = _menu.compendium_window()
+	assert_eq(window.size(), PauseMenu.PAGE_ROWS)
+	assert_eq(window[window.size() - 1], last, "and the window followed her down")
+
+	_menu.move_selection(1)
+	assert_eq(_menu.selected_index(), 0, "...and back round to the first")
+	assert_eq(_menu.compendium_window()[0], 0, "the window snapped back to the top")
+
+
+func test_an_unseen_row_is_hidden_a_seen_row_is_a_name_and_a_caught_row_carries_her_hours() -> void:
+	_wire_book()
+	_compendium.mark_seen(&"twilight")
+	_compendium.mark_caught(&"carrottop")
+	_compendium.mark_caught(&"cloudchaser")
+	_menu.open_page(PauseMenu.Page.COMPENDIUM)
+
+	assert_eq(_row_for(&"applejack"), "???", "nobody has ever laid eyes on her")
+	assert_eq(_row_for(&"twilight"), "Twilight Sparkle", "seen buys the name and nothing else")
+	assert_eq(_row_for(&"carrottop"), "Carrot Top  when: dawn/day, any",
+		"listed phases joined by a slash; an empty weather list is any")
+	assert_eq(_row_for(&"cloudchaser"), "Cloudchaser  when: any, clear/fog",
+		"and the other way round")
+
+
+func test_left_and_right_do_nothing_on_the_compendium() -> void:
+	_wire_book()
+	_menu.open_page(PauseMenu.Page.COMPENDIUM)
+	watch_signals(_menu)
+	_menu.adjust(1)
+	_menu.adjust(-1)
+	assert_eq(_menu.selected_index(), 0)
+	assert_signal_not_emitted(_menu, "settings_changed")
+
+
+# --- the requests page -----------------------------------------------------------------
+
+func test_the_requests_page_lists_exactly_the_active_requests() -> void:
+	_wire_book()
+	_menu.open_page(PauseMenu.Page.REQUESTS)
+	var rows: Array[Dictionary] = _menu.request_rows()
+	var active: Array = _board.active()
+	assert_eq(active.size(), 3, "the tutorial three")
+	assert_eq(rows.size(), active.size())
+	for i in range(active.size()):
+		var request: Dictionary = active[i]
+		assert_eq(String(rows[i]["text"]), String(request["text"]),
+			"a request that only needs one of anything carries no progress")
+		assert_eq(String(rows[i]["value"]), "%d bits" % int(request["reward_bits"]))
+	assert_true(_menu.footer_text().contains("Finish one to get a new one."),
+		"the footer says where the next one comes from")
+
+
+## A finished request has already been paid by ranch.gd, so it drops off the page the moment
+## its progress completes rather than sitting there as something still to do.
+func test_a_finished_request_leaves_the_page() -> void:
+	_wire_book()
+	_menu.open_page(PauseMenu.Page.REQUESTS)
+	assert_eq(_menu.request_rows().size(), 3)
+	_board.on_sold(PonyData.Rarity.COMMON, 1)
+	assert_eq(_menu.request_rows().size(), 2, "Sell a gem is done and gone")
+
+
+## A board with an EMPTY registry and no regions can only draw SELL_GEMS_OF_RARITY, whose
+## count is always at least three (RequestBoard.SELL_GEMS_COUNT_MIN), which is the only way
+## to get a multi count request deterministically out of a seeded draw.
+func test_a_request_that_takes_several_shows_its_progress() -> void:
+	_wire_book()
+	var no_regions: Array[StringName] = []
+	var gems: RequestBoard = RequestBoardScript.new(11, PonyRegistryScript.new(), no_regions)
+	gems.fill([])
+	_menu.board = gems
+	_menu.open_page(PauseMenu.Page.REQUESTS)
+
+	var active: Array = gems.active()
+	assert_eq(active.size(), 3)
+	var rows: Array[Dictionary] = _menu.request_rows()
+	for i in range(active.size()):
+		var request: Dictionary = active[i]
+		assert_gt(int(request["count"]), 1, "every draw here is a sell several gems request")
+		assert_eq(String(rows[i]["text"]), "%s  %d / %d" % [
+			String(request["text"]), int(request["progress"]), int(request["count"]),
+		])
+
+
+func test_a_food_reward_is_spelled_out_with_its_amount() -> void:
+	_wire_book()
+	var one: Array[StringName] = []
+	var finder: RequestBoard = RequestBoardScript.new(5, _registry, one)
+	finder.fill([])
+	_menu.board = finder
+	_menu.open_page(PauseMenu.Page.REQUESTS)
+	var rows: Array[Dictionary] = _menu.request_rows()
+	var active: Array = finder.active()
+	var checked := 0
+	for i in range(active.size()):
+		var request: Dictionary = active[i]
+		if String(request["reward_food"]).is_empty():
+			continue
+		checked += 1
+		assert_eq(String(rows[i]["value"]), "%d bits and %d %s" % [
+			int(request["reward_bits"]), RequestBoardScript.SEE_CHARACTER_FOOD_COUNT,
+			String(request["reward_food"]),
+		])
+	assert_gt(checked, 0, "this seed draws at least one request that pays food")
+
+
+func test_accept_does_nothing_on_either_reading_page() -> void:
+	_wire_book()
+	for page in [PauseMenu.Page.COMPENDIUM, PauseMenu.Page.REQUESTS]:
+		_menu.open_page(page)
+		watch_signals(_menu)
+		assert_false(_menu.confirm(), "neither page is a transaction")
+		assert_eq(_menu.page(), page, "and it stays where it was")
+		assert_true(_menu.is_open())
+		assert_signal_not_emitted(_menu, "closed")
+		assert_signal_not_emitted(_menu, "save_requested")
+
+
+# --- back, and a menu with nothing behind it --------------------------------------------
+
+func test_cancel_from_each_reading_page_returns_to_its_own_row_on_main() -> void:
+	_wire_book()
+	_menu.open_page(PauseMenu.Page.COMPENDIUM)
+	_menu.back()
+	assert_eq(_menu.page(), PauseMenu.Page.MAIN)
+	assert_true(_menu.is_open(), "back off a sub page does not close the menu")
+	assert_eq(_menu.selected_index(), PauseMenu.Row.COMPENDIUM)
+
+	_menu.open_page(PauseMenu.Page.REQUESTS)
+	_menu.back()
+	assert_eq(_menu.page(), PauseMenu.Page.MAIN)
+	assert_eq(_menu.selected_index(), PauseMenu.Row.REQUESTS)
+	_menu.back()
+	assert_false(_menu.is_open(), "and main still closes")
+
+
+## THE ROW ORDER IS PINNED, and this is the test that pins it. It used to be the four rarity
+## tiers in enum order, unioned by hand here and in two other files; it is PonyRegistry's own
+## ids() order now (the roster sorted by id TEXT, which for this roster reads as the
+## characters' names alphabetically). Either is a defensible page; what is not defensible is
+## the order changing under the player because somebody rewired a helper, which is exactly
+## what happened once already. Asserted against registry.ids() rather than against a written
+## out list, so a roster edit needs no edit here and a re-ordering still fails.
+func test_the_character_list_is_in_the_registrys_own_order() -> void:
+	_wire_book()
+	_menu.open_page(PauseMenu.Page.COMPENDIUM)
+
+	var ids: Array[StringName] = _registry.ids()
+	var drawn: Array[StringName] = []
+	for data: PonyData in _menu.roster():
+		drawn.append(data.id)
+	assert_eq(drawn, ids, "the page draws the roster in registry.ids() order")
+	assert_eq(_menu.compendium_rows().size(), ids.size(),
+		"one row per character, so a row index IS a roster index")
+
+	# The rows themselves, not just the array behind them: compendium_rows() and the roster
+	# are read by index against each other (see _row_for() and _draw_compendium()), so a row
+	# list in some other order would put every name against somebody else's hours.
+	var rows: Array[String] = _menu.compendium_rows()
+	_compendium.mark_caught(ids[0])
+	_compendium.mark_caught(ids[ids.size() - 1])
+	rows = _menu.compendium_rows()
+	assert_true(rows[0].begins_with(_registry.by_id(ids[0]).display_name),
+		"the first row is the first id's character")
+	assert_true(rows[ids.size() - 1].begins_with(
+		_registry.by_id(ids[ids.size() - 1]).display_name),
+		"and the last row is the last id's")
+
+
+## HALF WIRED IS NOT WIRED. A registry with no compendium behind it is the shape a partial
+## injection leaves (ranch.gd sets all five, but the boot shutter and these tests set what
+## they need), and it is the one arrangement where the page could draw a full roster of
+## "???" and look like a player who had seen nobody. has_book() already decides what is
+## drawn; the row list and the cursor now follow the same decision instead of counting the
+## roster on their own.
+func test_a_registry_with_no_book_behind_it_draws_nothing_rather_than_a_page_of_blanks()\
+		-> void:
+	_wire_book()
+	_menu.compendium = null
+	_menu.open_page(PauseMenu.Page.COMPENDIUM)
+
+	assert_false(_menu.has_book(), "no compendium, no book")
+	assert_false(_menu.roster().is_empty(), "the registry is still there to be counted")
+	assert_true(_menu.compendium_rows().is_empty(),
+		"43 rows of ??? would be a claim about the player rather than an empty page")
+	assert_eq(_menu.compendium_header(), "")
+
+	_menu.move_selection(1)
+	assert_eq(_menu.selected_index(), 0,
+		"one line of EMPTY_TEXT is one row, and the cursor stays on it")
+
+
+## The menu is instantiated bare by these tests and by the boot shutter, neither of which
+## has a ranch to inject anything. Both pages have to draw, and both have to survive being
+## scrolled, with all five sources null.
+func test_both_pages_draw_with_nothing_injected() -> void:
+	assert_true(_menu.open_page(PauseMenu.Page.COMPENDIUM))
+	assert_false(_menu.has_book())
+	assert_eq(_menu.compendium_header(), "")
+	assert_eq(_menu.compendium_now(), "")
+	assert_true(_menu.compendium_region_rows().is_empty())
+	assert_true(_menu.compendium_rows().is_empty())
+	assert_true(_menu.compendium_window().is_empty())
+	_menu.move_selection(1)
+	assert_eq(_menu.selected_index(), 0, "one empty row, and it does not divide by zero")
+
+	assert_true(_menu.open_page(PauseMenu.Page.REQUESTS))
+	assert_true(_menu.request_rows().is_empty())
+	_menu.move_selection(-1)
+	assert_eq(_menu.selected_index(), 0)
+	_menu.back()
+	assert_eq(_menu.page(), PauseMenu.Page.MAIN)
+
+
+## A registry with no compendium behind it (or the other way round) is the half wired case,
+## and it must read as empty rather than as a roster of question marks.
+func test_a_half_wired_compendium_reads_as_empty() -> void:
+	_registry = PonyRegistryScript.new()
+	_registry.load_all(PONY_DIR)
+	_menu.registry = _registry
+	_menu.open_page(PauseMenu.Page.COMPENDIUM)
+	assert_false(_menu.has_book(), "a roster with no book is not a book")
+	assert_eq(_menu.compendium_header(), "")
+	assert_true(_menu.compendium_region_rows().is_empty())

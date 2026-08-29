@@ -6,7 +6,7 @@ extends RefCounted
 ## (see game/test/test_pony_registry.gd).
 ##
 ## Instance-based rather than static: load_all() populates the registry's own
-## index, and by_zone()/by_rarity() read that cached index, so callers do a
+## index, and ids()/all()/by_zone()/by_rarity() read that cached index, so callers do a
 ## single load_all() and then query freely without re-scanning disk.
 
 const PonyDataScript := preload("res://systems/pony_data.gd")
@@ -118,6 +118,38 @@ func _load_one(path: String) -> void:
 ## pattern that stops being right the moment anything can reload the registry.
 func by_id(id: StringName) -> PonyData:
 	return _by_id.get(id, null)
+
+
+## Every id this registry has loaded, SORTED BY THE TEXT of the name.
+##
+## String(), not the raw StringName, and that cast is a bug fix rather than noise:
+## StringName's `<` compares interned POINTERS, so sorting the ids raw gives an order that
+## is stable within one process and different between two runs of the same build.
+## game/world/spawner.gd carries the long version of that story; the compendium has the
+## same problem for a quieter reason (the book's rows would be in a different order every
+## launch), and this is the one place either of them has to solve it.
+##
+## THE ROSTER'S ONE TOTAL ORDER. Before this existed, every caller that wanted "all of
+## them" unioned by_rarity() over the four tiers, which happens to be a partition of the
+## roster and so happens to return everybody exactly once. It is a load bearing accident,
+## it was written out three times over, and inside each tier it still fell back to the
+## filesystem's own order.
+func ids() -> Array[StringName]:
+	var out: Array[StringName] = []
+	for id: StringName in _by_id.keys():
+		out.append(id)
+	out.sort_custom(func(a: StringName, b: StringName) -> bool:
+		return String(a) < String(b))
+	return out
+
+
+## Every PonyData this registry has loaded, in ids() order. Empty (never null) on a
+## registry that has loaded nothing, so callers can iterate it unconditionally.
+func all() -> Array[PonyData]:
+	var out: Array[PonyData] = []
+	for id: StringName in ids():
+		out.append(_by_id[id])
+	return out
 
 
 ## Ponies whose spawn_zones includes `zone`. Empty array if none match --

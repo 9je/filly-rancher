@@ -13,6 +13,19 @@
 # below, kept at the suite's current size). Same purpose: it lets the floor
 # guard be exercised without removing real tests.
 #
+# FILLY_SKIP_SWEEP=1 skips the parse sweep. A LOCAL ITERATION HATCH ONLY, documented in
+# docs/testing.md: the sweep is about 75 s of the roughly four minutes this script takes,
+# and paying it on every re-run of a test you are in the middle of writing is the kind of
+# tax that ends with people not running the suite at all. CI NEVER SETS IT, and neither
+# does any gate; a run with it set says so on its own line so a log that skipped the sweep
+# cannot be mistaken for one that passed it.
+#
+# A PARSE SWEEP RUNS FIRST, BEFORE GUT IS INVOKED AT ALL; see the block below the GUT
+# addon check. GUT's loader does not run the analyzer pass that promotes some GDScript
+# diagnostics (INFERENCE_ON_VARIANT is the one that bit this project) from a warning to an
+# error, so a script can pass the whole suite and still refuse to load into the scene that
+# preloads it.
+#
 # THREE THINGS ARE CHECKED BEYOND GUT'S OWN EXIT CODE, because that exit code
 # has now twice reported success for a run that verified far less than it
 # claimed: that some tests ran at all, that EVERY test_*.gd file on disk was
@@ -31,6 +44,54 @@ GUT_TEST_DIR="${GUT_TEST_DIR:-res://test}"
 if [ ! -f game/addons/gut/plugin.cfg ]; then
   echo "ERROR: GUT addon not found at game/addons/gut/ -- run 'bash tools/setup_env.sh' first." >&2
   exit 1
+fi
+
+# --- the parse sweep --------------------------------------------------------------------
+#
+# EVERY .gd IN game/ (addons excluded: they are a vendored dependency, not ours) IS HANDED
+# TO THE ENGINE'S OWN PARSER before a single test runs, and any file it refuses fails this
+# script.
+#
+# THIS IS NOT WHAT GUT ALREADY DOES. GUT loads a test script, and the two guards further
+# down catch a TEST script that failed to load. Neither says anything about the other
+# ninety-odd scripts in the project, and those are loaded by scenes, not by GUT. The
+# failure that motivated this shipped on this branch: a `var x := <something typed
+# Variant>` compiles far enough for GUT to run the suite green, and then Godot's analyzer,
+# which the editor and every scene load DO run, promotes INFERENCE_ON_VARIANT to an ERROR,
+# so the scene preloading that script would not open. Green suite, broken game.
+#
+# --check-only --script parses and analyses one file and exits; it is the same front end a
+# scene load goes through. One engine process per file, about 0.7 s each, so a little over
+# a minute for this project's hundred-odd scripts, deliberately paid up front, because the
+# alternative is finding out from a gate ten minutes later, or from a player.
+#
+# EVERY failing path is printed, not just the first: a bad merge tends to break several
+# files at once and stopping at one turns that into a queue of one-line fixes.
+if [ "${FILLY_SKIP_SWEEP:-0}" = "1" ]; then
+  echo "Parse sweep: SKIPPED (FILLY_SKIP_SWEEP=1). Local iteration only; CI always runs it."
+else
+  sweep_failures=""
+  sweep_count=0
+  while IFS= read -r gd; do
+    sweep_count=$((sweep_count + 1))
+    res="res://${gd#game/}"
+    if ! tools/bin/godot --headless --audio-driver Dummy --path game \
+        --check-only --script "$res" >/dev/null 2>&1; then
+      sweep_failures="$sweep_failures  $res"$'\n'
+    fi
+  done < <(find game -name '*.gd' -not -path 'game/addons/*' | sort)
+
+  if [ -n "$sweep_failures" ]; then
+    echo "ERROR: $(printf '%s' "$sweep_failures" | grep -c .) of $sweep_count GDScript file(s) do not parse; the suite was NOT run." >&2
+    printf '%s' "$sweep_failures" >&2
+    echo "  Re-run one of them on its own to see the engine's own message:" >&2
+    echo "    tools/bin/godot --headless --audio-driver Dummy --path game --check-only --script <res://path>" >&2
+    echo "  NOTE: GUT would not have caught this. Its loader does not run the analyzer pass" >&2
+    echo "  that turns INFERENCE_ON_VARIANT and friends into errors, so a script can pass the" >&2
+    echo "  suite and still break the scene that preloads it. See docs/testing.md." >&2
+    exit 1
+  fi
+  echo "Parse sweep: $sweep_count GDScript file(s) parse cleanly."
 fi
 
 out="$(mktemp)"
@@ -122,7 +183,7 @@ fi
 # is a hand-maintained number, deliberately a FLOOR rather than an exact count so adding
 # tests never breaks the build -- raise it when the suite grows, and never lower it
 # without saying in a commit message which tests went away and why.
-MIN_TESTS="${FILLY_MIN_TESTS:-540}"
+MIN_TESTS="${FILLY_MIN_TESTS:-653}"
 if [ "$tests_run" -lt "$MIN_TESTS" ]; then
   echo "ERROR: GUT ran $tests_run tests, below this suite's floor of $MIN_TESTS -- tests have gone missing. Failing regardless of GUT's own exit code ($gut_exit)." >&2
   echo "  If tests were deliberately removed, lower MIN_TESTS in tools/run_tests.sh in the same commit and say why." >&2

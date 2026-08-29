@@ -31,6 +31,9 @@ extends CharacterBody3D
 ##   APPROACH CURIOUS only: walk toward the player and stop APPROACH_STOP_DISTANCE
 ##            short, watching her. -> IDLE when she can no longer see him.
 ##   HELD     the beam owns the transform: no gravity, no move_and_slide, no steering.
+##   LEAVING  her spawn conditions stopped holding: she leaves at her flee speed, off
+##            her leash, and frees herself once she is out of the detection area. See
+##            leave() for why that is not a death.
 ##
 ## The routine states are interruptible and the situational ones are not: every frame a
 ## pony in IDLE/WANDER/GRAZE that can see the player switches to her reaction state, and
@@ -113,8 +116,15 @@ signal captured()
 ## Emitted when a held pony breaks free -- i.e. when the beam calls break_free() because
 ## she outlasted its struggle timer.
 signal escaped()
+## Emitted the FIRST time this pony can see the player and never again, however far he
+## wanders off and comes back. "The player got a good look at her" is the compendium's
+## SEEN, and SEEN only ever happens once per character (game/systems/compendium.gd), so a
+## signal that re-fired every time she noticed him again would be a signal whose every
+## emission after the first one is thrown away by its only listener. The flag behind it is
+## never reset; see _noticed.
+signal noticed_player()
 
-enum State { IDLE, WANDER, GRAZE, FLEE, APPROACH, HELD }
+enum State { IDLE, WANDER, GRAZE, FLEE, APPROACH, HELD, LEAVING }
 
 ## reaction_state() returns this for a personality that has no reaction to the player
 ## (BOLD). Deliberately not one of the State values: "no reaction" is the absence of a
@@ -278,6 +288,28 @@ const ANIM_BLEND := 0.2
 ## Downward speed cap, so a long fall cannot accumulate absurd velocity.
 const TERMINAL_VELOCITY := 25.0
 
+## How far from the player a LEAVING pony has to get before she may free herself, in
+## metres. DELIBERATELY EQUAL TO DETECTION_AREA_RADIUS, which is DETECTION_RADIUS plus
+## SHY_NOTICE_BONUS and therefore the widest anybody on the roster can see: at exactly
+## this distance the DetectionArea drops the player, _leave_distance() starts answering
+## INF, and she goes. One number, one meaning, and it is the game's own definition of out
+## of sight rather than a second opinion about it.
+##
+## AN EARLIER 16.0 WAS UNREACHABLE and is the reason this is written down. It sat 2 m
+## outside the area that reports the player at all, so the distance test could never see a
+## value between 14 and 16: the player vanished from her at 14 m and the INF branch fired
+## anyway. It was a promise the code could not keep, which is worse than a smaller promise
+## it can.
+const LEAVE_DISTANCE := DETECTION_AREA_RADIUS
+
+## Safety ceiling on a departure, in seconds. NOT the ordinary way a departure ends: at
+## flee speed she clears LEAVE_DISTANCE in a few seconds from anywhere on the map, so this
+## only fires for a pony who cannot get away at all (wedged against a fence, walled into a
+## pen's corner by terrain). Forty five seconds is long enough that it never pre-empts a
+## real walk and short enough that a stuck pony is not standing there for the rest of the
+## session.
+const LEAVE_SECONDS := 45.0
+
 ## Width of the band, in metres, over which the leash takes hold -- see _leash(), which
 ## is where the reasoning lives. Derived from `roam_radius` rather than fixed, because a
 ## penned pony's territory is about 2 m across and a wild one's is 8 m, and a band sized
@@ -337,6 +369,13 @@ var _instance: PonyInstance
 var _anim: AnimationPlayer
 var _rng := RandomNumberGenerator.new()
 
+## Seconds spent in LEAVING so far, and the direction chosen when she set off. Both are
+## only ever read or written while `state == State.LEAVING` (see _state_leaving), so a
+## capture that lands mid departure cannot leave a half finished walk running underneath
+## the beam.
+var _leave_elapsed := 0.0
+var _leave_direction := Vector3.ZERO
+
 var _wander_speed := NOMINAL_WANDER_SPEED
 var _flee_speed := NOMINAL_FLEE_SPEED
 
@@ -351,6 +390,12 @@ var _has_wandered := false
 ## enter/exit signals; every read goes through _sees_player() so a freed node cannot be
 ## mistaken for a visible one.
 var _player: Node3D
+
+## Whether noticed_player has already been emitted for this body. NEVER RESET, not when he
+## leaves her detection area and not when she is beamed and set back down: this is a latch,
+## and the thing it latches (the player has laid eyes on this character) does not become
+## untrue later.
+var _noticed := false
 
 
 func _ready() -> void:
@@ -573,6 +618,47 @@ func break_free() -> void:
 	escaped.emit()
 
 
+## Her spawn conditions stopped holding, so she walks off the map. Returns whether she is
+## now leaving: false only if the beam has hold of her.
+##
+## NO PONY EVER DIES. This is the one place a pony's body is discarded outside the capture
+## path, and it is discarded, never killed: the thing that goes away is a WILD, UNOWNED
+## CharacterBody3D that the spawner drew a moment ago out of a data record which is still
+## sitting on disk. Nothing owned is reachable from here. An owned pony is a PonyInstance
+## in GameState.ponies, in a pen's resident list or in the bag, and none of those three is
+## touched by anything in this file. She has gone home for the night, and the spawner will
+## draw her again at an hour she keeps.
+##
+## AND SHE IS NEVER FREED IN FRONT OF THE PLAYER UNLESS SHE CANNOT GET AWAY AT ALL. The
+## free happens in _state_leaving(), and only once she is further away than the widest
+## notice radius on the roster (see LEAVE_DISTANCE). LEAVE_SECONDS is the other way out of
+## that state and the reason for the "unless": a pony walled in, or followed step for step,
+## would otherwise walk forever, so the timer frees her where she stands. Everything the
+## player can do about it is on the player's side of the bargain.
+##
+## REFUSED WHILE HELD, because the beam is writing her transform and owns what happens to
+## her next; a hold that turns into a capture must be allowed to finish as a capture. The
+## other half of that race is handled by _state_leaving() reading the timer only while she
+## is still in LEAVING: the beam's set_held(true) takes her out of LEAVING, so the walk
+## stops the moment she is grabbed, and set_held(false) drops her back into IDLE rather
+## than back into the departure.
+func leave() -> bool:
+	if state == State.HELD:
+		return false
+	if state == State.LEAVING:
+		return true
+	_leave_elapsed = 0.0
+	_leave_direction = _away_from_player()
+	_transition_to(State.LEAVING)
+	return true
+
+
+## Whether she is on her way off the map. False for every pony the player can still catch
+## in the ordinary way, which is every pony whose conditions still hold.
+func is_leaving() -> bool:
+	return state == State.LEAVING
+
+
 func _physics_process(delta: float) -> void:
 	if state == State.HELD:
 		# Everything below -- gravity, steering, move_and_slide -- is exactly what the
@@ -595,6 +681,13 @@ func _physics_process(delta: float) -> void:
 			desired = _state_flee()
 		State.APPROACH:
 			desired = _state_approach()
+		State.LEAVING:
+			desired = _state_leaving(delta)
+			# _state_leaving() is the one state function that can end this pony, and
+			# everything below (gravity, move_and_slide, the animation blend) would be
+			# work done on a node already queued for deletion.
+			if is_queued_for_deletion():
+				return
 		_:
 			push_error("Pony '%s': invalid state %d" % [_id(), state])
 			_transition_to(State.IDLE)
@@ -681,6 +774,68 @@ func _state_held(delta: float) -> void:
 	_held_seconds += delta
 
 
+## Walk away and, once nobody can see it happen, stop existing. See leave() for why this
+## is not a death and for the two guards that keep it out of the capture path's way.
+##
+## THE TIMER IS INSIDE THIS FUNCTION, which _physics_process only reaches while `state ==
+## State.LEAVING`, so a pony grabbed mid departure stops counting the moment the beam
+## takes her rather than freeing herself out from under it.
+##
+## WHAT IS GUARANTEED, exactly: she is freed once she is outside her own DetectionArea
+## (LEAVE_DISTANCE is that radius, so nobody can be looking at her from inside the notice
+## range of any personality), or after LEAVE_SECONDS if she somehow cannot get away at
+## all. Those are the only two ways this state ends on its own; the third way it ends is
+## the beam taking her, which is a capture and not a departure.
+##
+## AT HER FLEE SPEED, not her wander speed. She is leaving, and a brisk exit reads as a
+## pony with somewhere to be rather than a pony strolling out of existence. It also makes
+## the guarantee above cheap: 3.3 m/s clears 14 m in about four seconds, so LEAVE_SECONDS
+## is a ceiling nobody normally touches instead of the thing that actually ends most
+## departures.
+##
+## NO LEASH. A leaving pony is the one pony in the game who is supposed to walk out of her
+## own territory, so _leash() is deliberately not applied to this heading; the roam circle
+## exists to hold a herd in place and she is no longer part of it.
+func _state_leaving(delta: float) -> Vector3:
+	_leave_elapsed += delta
+	if _leave_distance() > LEAVE_DISTANCE or _leave_elapsed >= LEAVE_SECONDS:
+		queue_free()
+		return Vector3.ZERO
+	if _leave_direction.length_squared() < 0.0001:
+		_leave_direction = _away_from_player()
+	return _leave_direction * _flee_speed
+
+
+## How far the player is from her right now, or INF when she cannot see one at all.
+##
+## INF RATHER THAN ZERO, and it is the ORDINARY way a departure ends rather than an edge
+## case: "no player in my detection area" means the nearest player is further off than
+## DETECTION_AREA_RADIUS, which is exactly LEAVE_DISTANCE, so the moment she crosses that
+## line the area drops him and this answers INF. Reading it as zero would strand every
+## departure in a world with no player in it for the full LEAVE_SECONDS.
+func _leave_distance() -> float:
+	if _player == null or not is_instance_valid(_player):
+		return INF
+	return global_position.distance_to(_player.global_position)
+
+
+## The direction she sets off in: straight away from the player if she can see one, else
+## straight out from home, else whichever way she is already facing. Never zero length.
+func _away_from_player() -> Vector3:
+	var away := Vector3.ZERO
+	if _player != null and is_instance_valid(_player):
+		away = global_position - _player.global_position
+	else:
+		away = global_position - _home
+	away.y = 0.0
+	if away.length_squared() < 0.0001:
+		away = -visuals.global_transform.basis.z
+		away.y = 0.0
+	if away.length_squared() < 0.0001:
+		return Vector3.FORWARD
+	return away.normalized()
+
+
 # --- transitions ------------------------------------------------------------------
 
 ## A pony in a routine state who can see the player switches to her personality's
@@ -709,7 +864,7 @@ func _transition_to(next: int) -> void:
 		State.GRAZE:
 			_state_timer = _rng.randf_range(GRAZE_SECONDS.x, GRAZE_SECONDS.y)
 		_:
-			# FLEE, APPROACH and HELD end on a condition, not on a clock.
+			# FLEE, APPROACH, HELD and LEAVING all end on a condition, not on a clock.
 			_state_timer = 0.0
 
 
@@ -855,7 +1010,15 @@ func _sees_player() -> bool:
 		_player = null
 		return false
 	var radius := notice_radius_for(_personality(), _player_is_sneaking())
-	return global_position.distance_to(_player.global_position) <= radius
+	var seen := global_position.distance_to(_player.global_position) <= radius
+	# ANNOUNCED FROM INSIDE THE PREDICATE, not from _react_to_player(). Every route that
+	# asks whether she can see him already comes through here (the class comment on this
+	# function says so), so putting the announcement anywhere else would mean one of those
+	# routes silently not counting as having been noticed by.
+	if seen and not _noticed:
+		_noticed = true
+		noticed_player.emit()
+	return seen
 
 
 ## Whether the body in her detection area is moving quietly. Asked of the body through

@@ -753,6 +753,63 @@ per draw: COMMON 3.53%, UNCOMMON 1.67%, RARE 1.50%, LEGENDARY 1.00%. That orderi
 asserted against the real roster in `game/test/test_spawn_table.gd`, so the next roster
 change that inverts it fails a test instead of shipping.
 
+**When each character is out.** Slice 5 gave `PonyData` two more fields,
+`phases` and `weathers`, both arrays of `WorldState` enum values, and one
+function that interprets them: `available(phase, weather)`. An **empty array
+means any**, in each list independently, and both non-empty is an AND, so
+`[NIGHT], []` is a pony who keeps night hours in any weather and `[], [FOG]` is
+one who wants fog at any hour. A `.tres` with neither line in it (most of them,
+`kerfuffle.tres` for one) is unconditional and can be drawn at any hour in any
+weather; adding the fields therefore broke no roster file. `game/world/spawner.gd`
+asks `available()` on every draw and again on every change of sky, so a
+character whose hours have ended walks off the map (`Pony.leave()`, never
+freed in front of the player unless she cannot get away at all) and whoever
+the new hour allows walks on.
+
+**And the new hour's characters go first.** A slot freed by a departure used to
+go straight back into the rarity weighted draw, where a night only legendary
+competed against every unconditional common in the zone who was standing there
+an hour ago and is eligible again now; measured on the real ranch, that cost a
+night only character three extra cycles before she appeared. `refresh()` now
+offers each marker's free slots first to its **newcomers** (the characters who
+can be drawn now, could not be drawn at the pair the spawner last drew for, and
+are standing nowhere on the map), and only then falls back to the weighted
+draw. A marker with no free slot and no departure in flight sends **one**
+unconditional resident home (empty `phases` and empty `weathers`, so she can
+walk back in at any hour) to let a newcomer in, at most one per marker per
+refresh, counted as `made_room` in what `refresh()` returns.
+
+**17 of the 43 are conditional**, and this table is generated from the `.tres`
+files rather than written by hand, so it is what the shipped roster actually
+says:
+
+| Character | id | Phases | Weathers | Zone |
+|---|---|---|---|---|
+| Carrot Top | `carrottop` | DAWN, DAY | any | `orchard` |
+| Cloudchaser | `cloudchaser` | any | CLEAR, FOG | `lake` |
+| Coco Pommel | `cocopommel` | DAY | any | `nightmeadow` |
+| Flitter | `flitter` | any | CLEAR, RAIN | `lake` |
+| Lightning Dust | `lightningdust` | any | STORM | `everfree` |
+| Marble Pie | `marblepie` | DAWN, DUSK | any | `nightmeadow` |
+| Maud Pie | `maudpie` | any | FOG, RAIN | `nightmeadow` |
+| Milky Way | `milkyway` | NIGHT, DAWN | any | `lake` |
+| Night Light | `nightlight` | NIGHT | any | `nightmeadow` |
+| Octavia | `octavia` | DUSK, NIGHT | any | `nightmeadow` |
+| Pinkamena | `pinkamena` | NIGHT, DUSK | RAIN, STORM | `everfree` |
+| Shining Armor | `shiningarmor` | NIGHT | CLEAR | `nightmeadow` |
+| Soarin | `soarin` | DAY, DAWN | CLEAR | `lake` |
+| Spitfire | `spitfire` | DAY | CLEAR | `lake` |
+| Sunset Shimmer | `sunsetshimmer` | DUSK | CLEAR | `everfree` |
+| Trixie | `trixie` | NIGHT | any | `everfree` |
+| Vinyl Scratch | `vinylscratch` | NIGHT | any | `nightmeadow` |
+
+Four of those come out at **night and at no other hour** (Night Light, Shining
+Armor, Trixie, Vinyl Scratch) and two only in the **day** (Coco Pommel,
+Spitfire); the rest are open at two or three phases, or at any phase in
+particular weather. That spread is what `scenes/test/collection_test.tscn`
+classifies at run time rather than by name, and what it walks the clock through
+a night at a time to exercise. See docs/testing.md, "The collection gate".
+
 **Reviewing the roster at a glance.** `bash tools/roster_sheet.sh` renders a face shot
 of every character (about 15 to 20 minutes under xvfb) and tiles them, with each
 character's display name, into `build/roster_sheet.png` and a larger four column
@@ -1172,7 +1229,7 @@ tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/smoke.ts
 # raycast onto real ground inside their zones, camera spring arm pulling in against
 # an actual building). Prints the marker ONLY if all of them held.
 tools/bin/godot --headless --audio-driver Dummy --path game world/ranch.tscn
-# -> RANCH_OK ponies=22 props=57 assets=present   exit 0
+# -> RANCH_OK ponies=22 props=58 assets=present   exit 0
 # (assets=absent + zero counts on a checkout that has not run the asset pipeline)
 
 # Hair follow-through: measures how far the mane/tail trail the body, against a
@@ -1377,7 +1434,7 @@ Task 7 the main scene is `res://world/ranch.tscn` (`game/project.godot`), not
 `res://scenes/test/smoke.tscn`. The Linux binary prints:
 
 ```
-RANCH_OK ponies=22 props=57 assets=present
+RANCH_OK ponies=22 props=58 assets=present
 ```
 
 exit 0 — the same line the headless scene run prints, confirming the exported

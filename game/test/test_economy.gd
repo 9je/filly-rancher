@@ -80,6 +80,56 @@ func test_selling_an_unrecognised_gem_type_earns_nothing_rather_than_crashing() 
 	assert_eq(econ.bits, 10)
 
 
+# --- granting: a reward, not a sale ---------------------------------------------------------
+#
+# grant() is how a completed request's reward reaches the wallet (game/systems/request_board.gd,
+# paid out by game/world/ranch.gd). It is deliberately NOT sell(): sell() prices gems, and a
+# reward is a number somebody else already decided. These tests pin the two halves of that
+# promise: the money really arrives, and a grant that is not a gift is refused.
+
+func test_granting_bits_adds_exactly_that_many() -> void:
+	var econ = EconomyScript.new(10)
+	econ.grant(40)
+	assert_eq(econ.bits, 50)
+
+
+func test_granting_announces_the_new_total() -> void:
+	var econ = EconomyScript.new(10)
+	watch_signals(econ)
+	econ.grant(40)
+	assert_signal_emitted_with_parameters(econ, "bits_changed", [50])
+
+
+func test_granting_zero_changes_nothing_and_announces_nothing() -> void:
+	# push_error is expected here and in the test below: a caller who thinks it paid a
+	# reward and paid nothing has to be loud. What is asserted is that the wallet did not
+	# move and nobody was told it had.
+	var econ = EconomyScript.new(10)
+	watch_signals(econ)
+	econ.grant(0)
+	assert_push_error(1, "a grant of nothing has to be reported, not swallowed")
+	assert_eq(econ.bits, 10, "a grant of zero is not a payment")
+	assert_signal_emit_count(econ, "bits_changed", 0)
+
+
+func test_granting_a_negative_amount_is_refused_rather_than_taken_out_of_the_wallet() -> void:
+	var econ = EconomyScript.new(10)
+	watch_signals(econ)
+	econ.grant(-40)
+	assert_push_error(1, "a negative grant has to be reported, not swallowed")
+	assert_eq(econ.bits, 10,
+		"a negative grant is a spend wearing a gift's costume and must change nothing")
+	assert_signal_emit_count(econ, "bits_changed", 0)
+
+
+func test_several_grants_accumulate() -> void:
+	var econ = EconomyScript.new()
+	econ.grant(20)
+	econ.grant(30)
+	econ.grant(50)
+	assert_eq(econ.bits, 100)
+
+
 # --- affordability and spending ---------------------------------------------------------
 
 func test_can_afford_true_at_or_below_balance_false_above_it() -> void:
