@@ -9,6 +9,7 @@ const EconomyScript := preload("res://systems/economy.gd")
 const GemPouchScript := preload("res://systems/gem_pouch.gd")
 const InventoryScript := preload("res://systems/inventory.gd")
 const ShopRegistryScript := preload("res://systems/shop_registry.gd")
+const ShopItemScript := preload("res://systems/shop_item.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 
 var _menu: MarketMenu
@@ -99,6 +100,30 @@ func test_the_buy_tab_lists_the_catalogue_cheapest_first() -> void:
 	assert_eq(rows.size(), reg.all().size())
 	for i in range(rows.size()):
 		assert_eq(rows[i].id, reg.all()[i].id)
+
+
+## A PERMIT SHE HAS ALREADY BOUGHT MUST NOT GO ON SHOWING ITS PRICE. Shop.refusal() turns
+## a second purchase down, so a row that still says "700 bits" is a row advertising a
+## refusal, and it is the most expensive row on the screen. Asserted on the drawn label
+## rather than on the flag behind it: the flag was already correct for gear and wrong for
+## permits, and only the label says which of the two the player is looking at.
+func test_a_permit_in_the_unlocks_reads_as_owned_and_the_others_still_show_a_price() -> void:
+	_menu.shop = ShopScript.new(_econ, _pouch, InventoryScript.new(), ["permit_lake"])
+	_menu.open()
+	_menu.set_tab(MarketMenu.Tab.BUY)
+	var rows := _menu.buy_rows()
+	var lake := -1
+	var unowned := -1
+	for i in range(rows.size()):
+		if rows[i].id == &"permit_lake":
+			lake = i
+		elif rows[i].kind == ShopItemScript.Kind.PERMIT:
+			unowned = i
+	assert_gt(lake, -1, "the catalogue carries a lake permit")
+	assert_gt(unowned, -1, "and at least one permit she has not bought")
+	assert_eq(_menu.row_price_text(lake), "OWNED")
+	assert_string_contains(_menu.row_price_text(unowned), "bits",
+		"a permit she does not own still costs what it costs")
 
 
 func test_confirm_on_an_affordable_item_asks_to_buy_it() -> void:

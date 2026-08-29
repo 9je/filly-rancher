@@ -338,7 +338,43 @@ Run it with:
 tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/market_test.tscn
 ```
 
-Expect `MARKET_OK checks=43`; the exit code is the verdict.
+Expect `MARKET_OK checks=63`; the exit code is the verdict.
+
+---
+
+## The region gate
+
+`scenes/test/region_test.tscn` proves the unlock loop a unit test cannot: four
+rings of timber standing shut around the four regions of the shipped map, the
+residents of each region spawned inside it, the orchard's gateway solid to the
+player, its permit priced in the Market and out of reach on an empty wallet,
+two legendary gems sold to pay for it, that one gate swinging open while the
+other three stay shut, the same walk now carrying her into the region, the
+permit refused a second time, and a save, reset and reload putting the regions
+back the way the file says rather than the way the session did.
+
+It hosts `world/ranch.tscn` exactly the way the market gate does, and for the
+same reasons.
+
+Both gate checks DRIVE the player rather than casting a ray at the leaf. A ray
+says a collider is there; only a body that tried says she cannot get past it.
+`ranch.player` is placed 4 m outside `gate_position()` on the gate's outward
+bearing and walked toward a point 4 m inside it with `move_and_slide()` over 90
+physics frames, and the verdict is her flat distance from the region's centre:
+outside the fence line with the gate shut, at least 2 m inside it with the gate
+bought. Every drive also asserts that she moved at all, because "she did not get
+in" is trivially true of a body that never moved.
+`game/test/test_region_fence.gd` asks the same question of a fence on a flat
+plane in a bare scene; this asks it of the fence the shipped map stands, on the
+shipped terrain, at the shipped radius, with the shipped permit paying for it.
+
+Run it with:
+
+```
+tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/region_test.tscn
+```
+
+Expect `REGION_OK checks=47`; the exit code is the verdict.
 
 ---
 
