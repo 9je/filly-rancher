@@ -233,8 +233,27 @@ func populate(phase: int = WorldStateScript.Phase.DAWN,
 ## the same breath and the two of them are briefly both on the map. That overlap is what
 ## "one wanders off as another arrives" is supposed to look like.
 ##
+## NOBODY STANDS IN THE FIELD TWICE, AND THE RULE IS MAP-WIDE RATHER THAN PER MARKER. The
+## characters already standing anywhere on the map and staying are struck out of every
+## marker's pool before it is drawn from, and each arrival is struck out for the rest of
+## the call. Without it a refresh could put a second Caramel in the orchard next to the
+## first one, which is the exact outcome the world seed was searched to avoid at boot; it
+## would be odd to buy that property for the boot draw and then throw it away four minutes
+## later. THE DRAW IS NOT ALLOWED TO CHEAT ITS WAY OUT: a marker whose pool empties leaves
+## the slot EMPTY for that hour and counts it in the returned `unfilled`, rather than
+## drawing a duplicate or raising an error. An unfilled slot is a legitimate reading of a
+## quiet hour; on the shipped map it never happens, and
+## game/test/test_roster_data.gd's "every zone can fill its markers" test is what keeps
+## that true as the roster changes.
+##
 ## IDEMPOTENT for a given (phase, weather, cycle): the second call finds every marker full
 ## of ponies who are all still available, and draws nothing.
+##
+## AT (cycle 0, DAWN) THE REFRESH SEED IS THE PLAIN WORLD SEED, because `0 * 4 + 0` is
+## zero, so the first refresh of a brand new save replays populate()'s own RNG stream. It
+## does not replay populate()'s draw: the pools differ (the map is already full, so most
+## markers ask for nothing) and the exclusion above is in force. Worth knowing when reading
+## a trace of a first session, and not worth perturbing the seed to avoid.
 func refresh(phase: int, weather: int, cycle: int, player_position: Vector3) -> Dictionary:
 	var left := 0
 	for pony in get_spawned():
@@ -248,29 +267,36 @@ func refresh(phase: int, weather: int, cycle: int, player_position: Vector3) -> 
 
 	var markers := get_markers()
 	if markers.is_empty():
-		return {"left": left, "arrived": 0}
+		return {"left": left, "arrived": 0, "unfilled": 0}
 
 	var entries := _spawnable_entries()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = spawn_seed + cycle * 4 + phase
 
 	var staying := _staying_by_marker()
+	var taken := _standing_ids()
 	var arrived := 0
+	var unfilled := 0
 	var slot := _next_slot
 	for marker: ZoneMarker in markers:
 		var pool := _pool_for(marker, entries, phase, weather)
-		if pool.is_empty():
-			continue
 		var wanted: int = marker.spawn_count - int(staying.get(marker.get_instance_id(), 0))
 		if wanted <= 0:
 			continue
-		var table := SpawnTableScript.new(pool, rng)
 		for i in range(wanted):
-			var data: PonyData = table.draw()
+			# Rebuilt per slot rather than once per marker, because the previous slot's
+			# arrival is struck out of it. SpawnTable spends exactly one number from `rng`
+			# per draw whatever it is handed, so the stream stays deterministic.
+			var choices := _without(pool, taken)
+			if choices.is_empty():
+				unfilled += 1
+				continue
+			var data: PonyData = SpawnTableScript.new(choices, rng).draw()
 			if data == null:
 				push_error("Spawner: SpawnTable.draw() returned null for zone '%s' slot %d"
 					% [marker.zone_id, i])
 				continue
+			taken[data.id] = true
 			var pony := _spawn_one(data, marker, slot)
 			if pony != null:
 				_spawned.append(pony)
@@ -285,7 +311,29 @@ func refresh(phase: int, weather: int, cycle: int, player_position: Vector3) -> 
 	# from here would give two answers to one question. It is in the signature because the
 	# caller has the position to hand and because a future "do not stand a replacement in
 	# his face" rule belongs in this function and nowhere else.
-	return {"left": left, "arrived": arrived}
+	return {"left": left, "arrived": arrived, "unfilled": unfilled}
+
+
+## {id: true} for every pony standing on the map who is STAYING there. The set refresh()
+## refuses to draw a second copy of.
+func _standing_ids() -> Dictionary:
+	var ids := {}
+	for pony in get_spawned():
+		if pony.is_leaving():
+			continue
+		var data: PonyData = pony.get_data()
+		if data != null:
+			ids[data.id] = true
+	return ids
+
+
+## `pool` without the entries whose id is a key of `taken`.
+func _without(pool: Array[PonyData], taken: Dictionary) -> Array[PonyData]:
+	var result: Array[PonyData] = []
+	for data: PonyData in pool:
+		if not taken.has(data.id):
+			result.append(data)
+	return result
 
 
 ## The entries zoned for `marker` who can be drawn at this hour and in this weather.

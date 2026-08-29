@@ -2,20 +2,23 @@ extends GutTest
 ## THE HERD KEEPS HOURS. game/world/spawner.gd draws a zone's ponies out of the entries
 ## whose PonyData.available() says yes for the sky the world is under, and refresh() is
 ## what happens when that sky changes: whoever no longer belongs walks off, and whoever
-## now does arrives.
+## now does arrives, with nobody standing in the field twice.
 ##
 ## Run against a FIXTURE ROSTER (game/test/fixtures/ponies_conditional/), not the real
 ## one, for the same reason game/test/fixtures/ponies_malformed/ exists: the real roster
 ## is a content decision that changes every slice, and a test that spells out which
 ## character is drawn where would be re-written every time somebody re-zones a pony. The
-## four fixtures below are the whole truth table instead, in two zones:
+## six fixtures below are the whole truth table instead, in two zones:
 ##
-##   fixture_meadow   fixture_any_a, fixture_any_b   no conditions at all
-##   fixture_hollow   fixture_night (NIGHT only), fixture_storm (STORM only)
+##   fixture_meadow   fixture_any_a, fixture_any_b                  no conditions at all
+##   fixture_hollow   fixture_night_a, fixture_night_b,
+##                    fixture_night_c (NIGHT), fixture_storm (STORM)
 ##
-## The hollow is the interesting half: it is EMPTY at DAY/CLEAR, holds only the storm
-## pony at DAY/STORM, and only the night pony at NIGHT/CLEAR. So "the sky changed and the
-## herd changed with it" is a fact about who is standing there, with no draw luck in it.
+## The hollow is the interesting half: it is EMPTY at DAY under a clear sky, holds only
+## the storm pony at DAY/STORM, and holds exactly the three night ponies at NIGHT/CLEAR.
+## So "the sky changed and the herd changed with it" is a fact about who is standing
+## there, with no draw luck in it; and three candidates for two slots is what makes the
+## draw sensitive to the cycle, and for four slots what makes a slot go unfilled.
 ##
 ## THE PONIES ARE REAL PONY BODIES on a real floor, because the thing being measured
 ## includes a departure: Pony.leave() walks her away and frees her, and none of that can
@@ -32,6 +35,9 @@ const FIXTURE_DIR := "res://test/fixtures/ponies_conditional"
 
 const MEADOW := &"fixture_meadow"
 const HOLLOW := &"fixture_hollow"
+
+## The default map these tests build: one marker per zone, two ponies each.
+const BOTH_ZONES := [[MEADOW, 2], [HOLLOW, 2]]
 
 ## Big enough that both zone discs and every roam circle sit well inside it.
 const FLOOR_SIZE := Vector3(80.0, 1.0, 80.0)
@@ -66,9 +72,11 @@ func test_populate_draws_nobody_whose_conditions_do_not_hold() -> void:
 	var n: int = spawner.populate(WorldStateScript.Phase.DAY, WorldStateScript.Weather.CLEAR)
 
 	assert_eq(n, 2, "only the meadow has anyone available at DAY and CLEAR")
-	var ids := _ids(spawner)
-	assert_does_not_have(ids, &"fixture_night", "a NIGHT pony must not spawn in the day")
-	assert_does_not_have(ids, &"fixture_storm", "a STORM pony must not spawn under a clear sky")
+	for pony in spawner.get_spawned():
+		var data: PonyData = pony.get_data()
+		assert_true(data.available(WorldStateScript.Phase.DAY,
+			WorldStateScript.Weather.CLEAR),
+			"%s was drawn, so her conditions have to hold" % data.id)
 
 
 func test_populate_draws_the_pony_whose_weather_it_is() -> void:
@@ -78,7 +86,7 @@ func test_populate_draws_the_pony_whose_weather_it_is() -> void:
 
 	var ids := _ids(spawner)
 	assert_eq(ids.count(&"fixture_storm"), 2, "the hollow is all storm pony in a storm")
-	assert_does_not_have(ids, &"fixture_night", "and still nobody who keeps night hours")
+	assert_does_not_have(ids, &"fixture_night_a", "and nobody who keeps night hours")
 
 
 # --- refresh -------------------------------------------------------------------------
@@ -92,7 +100,8 @@ func test_refresh_sends_away_whoever_no_longer_belongs_and_draws_who_does() -> v
 		WorldStateScript.Weather.CLEAR, 0, _far_away())
 
 	assert_eq(result["left"], 2, "both storm ponies are told to leave when the storm ends")
-	assert_eq(result["arrived"], 2, "and the night pony fills the hollow behind them")
+	assert_eq(result["arrived"], 2, "and two night ponies fill the hollow behind them")
+	assert_eq(result["unfilled"], 0, "the hollow has three candidates for its two slots")
 
 	for pony in spawner.get_spawned():
 		var data: PonyData = pony.get_data()
@@ -131,6 +140,7 @@ func test_refresh_is_idempotent_for_the_same_hour() -> void:
 
 	assert_eq(again["left"], 0, "nobody is asked to leave twice")
 	assert_eq(again["arrived"], 0, "and every marker is already as full as it wants to be")
+	assert_eq(again["unfilled"], 0, "a full marker asks for nothing, so nothing goes short")
 
 
 func test_a_leaving_pony_does_not_count_toward_her_marker() -> void:
@@ -145,10 +155,68 @@ func test_a_leaving_pony_does_not_count_toward_her_marker() -> void:
 
 	var staying := 0
 	for pony in spawner.get_spawned():
-		if not pony.is_leaving() and pony.get_data().id == &"fixture_night":
+		if not pony.is_leaving():
 			staying += 1
-	assert_eq(staying, 2, "the hollow's marker asked for two and got two")
+	assert_eq(staying, 4, "both markers asked for two and both got two")
 
+
+# --- nobody stands in the field twice ------------------------------------------------
+
+func test_refresh_never_draws_a_character_who_is_already_standing_there() -> void:
+	# TWO MARKERS OVER ONE ZONE, which is how the ranch's homestead is built and is the
+	# arrangement a per marker rule gets wrong: the second marker's pool still holds the
+	# three night ponies the first one just drew two of. Four slots, three candidates, so
+	# the map ends up with three ponies and one honestly empty slot rather than four ponies
+	# and a pair of twins.
+	#
+	# Walked through all four phases afterwards, because the pools change under it every
+	# time and a duplicate would be introduced by whichever refresh drew a character an
+	# earlier one had already put out there. The hollow is empty at every phase but NIGHT,
+	# so this also walks the leave-and-come-back path four times over.
+	var spawner := _spawner([[HOLLOW, 2], [HOLLOW, 2]])
+	await wait_physics_frames(2)
+	spawner.populate(WorldStateScript.Phase.DAY, WorldStateScript.Weather.CLEAR)
+	assert_eq(spawner.get_spawned().size(), 0,
+		"the hollow is empty by day, so this starts from a clean map")
+
+	for phase in [WorldStateScript.Phase.NIGHT, WorldStateScript.Phase.DAWN,
+			WorldStateScript.Phase.DAY, WorldStateScript.Phase.DUSK,
+			WorldStateScript.Phase.NIGHT]:
+		spawner.refresh(phase, WorldStateScript.Weather.CLEAR, 0, _far_away())
+		await wait_physics_frames(2)
+		_assert_no_duplicates(spawner, "after a refresh to phase %d" % phase)
+
+
+func test_two_markers_over_one_zone_do_not_draw_the_same_character_twice() -> void:
+	var spawner := _spawner([[HOLLOW, 2], [HOLLOW, 2]])
+	await wait_physics_frames(2)
+	spawner.populate(WorldStateScript.Phase.DAY, WorldStateScript.Weather.CLEAR)
+
+	var result: Dictionary = spawner.refresh(WorldStateScript.Phase.NIGHT,
+		WorldStateScript.Weather.CLEAR, 0, _far_away())
+
+	assert_eq(result["arrived"], 3, "three candidates fill three of the four slots")
+	assert_eq(result["unfilled"], 1, "and the fourth is left empty rather than doubled")
+	_assert_no_duplicates(spawner, "across two markers over one zone")
+
+
+func test_a_marker_with_nobody_left_to_draw_leaves_the_slot_empty() -> void:
+	# Four slots over a zone with three night ponies in it. The fourth is reported as
+	# unfilled rather than filled with a second copy of somebody, which is the whole of
+	# the rule: an empty slot is an honest quiet hour, a duplicate is a bug on screen.
+	var spawner := _spawner([[HOLLOW, 4]])
+	await wait_physics_frames(2)
+	spawner.populate(WorldStateScript.Phase.DAY, WorldStateScript.Weather.CLEAR)
+
+	var result: Dictionary = spawner.refresh(WorldStateScript.Phase.NIGHT,
+		WorldStateScript.Weather.CLEAR, 0, _far_away())
+
+	assert_eq(result["arrived"], 3, "the three night ponies all arrive")
+	assert_eq(result["unfilled"], 1, "and the fourth slot is left empty rather than doubled")
+	_assert_no_duplicates(spawner, "with more slots than candidates")
+
+
+# --- determinism ---------------------------------------------------------------------
 
 func test_the_refresh_draw_is_the_same_for_the_same_seed_cycle_and_phase() -> void:
 	var first := _spawner()
@@ -166,18 +234,22 @@ func test_the_refresh_draw_is_the_same_for_the_same_seed_cycle_and_phase() -> vo
 		"the same save at the same hour of the same day draws the same ponies")
 
 
-func test_a_different_cycle_reseeds_the_draw() -> void:
-	# Not an assertion about WHO is drawn, which is content: an assertion that the cycle
-	# reaches the RNG at all, because a refresh that ignored it would hand the player the
-	# same herd every night forever.
-	var spawner := _spawner()
-	await wait_physics_frames(2)
-	var rng_a := RandomNumberGenerator.new()
-	rng_a.seed = spawner.spawn_seed + 0 * 4 + WorldStateScript.Phase.NIGHT
-	var rng_b := RandomNumberGenerator.new()
-	rng_b.seed = spawner.spawn_seed + 1 * 4 + WorldStateScript.Phase.NIGHT
-	assert_ne(rng_a.randf(), rng_b.randf(),
-		"seed + cycle * 4 + phase must differ between one night and the next")
+func test_a_different_cycle_draws_a_different_night() -> void:
+	# Three night ponies for two slots, so which two turn up is the cycle's to decide. Not
+	# an assertion about WHICH pair any particular night gets, which is content: an
+	# assertion that the cycle reaches the RNG at all, because a refresh that dropped it
+	# would hand the player the same herd every night for the rest of the save.
+	var draws := {}
+	for cycle in range(6):
+		var spawner := _spawner([[HOLLOW, 2]])
+		await wait_physics_frames(2)
+		spawner.populate(WorldStateScript.Phase.DAY, WorldStateScript.Weather.CLEAR)
+		spawner.refresh(WorldStateScript.Phase.NIGHT, WorldStateScript.Weather.CLEAR,
+			cycle, _far_away())
+		draws[str(_ids(spawner))] = true
+
+	assert_gt(draws.size(), 1,
+		"six consecutive nights must not all draw the same pair out of three candidates")
 
 
 # --- the departure itself ------------------------------------------------------------
@@ -195,25 +267,28 @@ func test_a_leaving_pony_is_gone_within_leave_seconds() -> void:
 			leaving += 1
 	assert_eq(leaving, 2, "two ponies set off before the clock starts")
 
-	# Comfortably inside LEAVE_SECONDS at 60 Hz, and there is no player anywhere in this
-	# world, so every one of them is already out of sight and free to go.
+	# There is no player anywhere in this world, so every one of them is already outside
+	# her own detection area and free to go on her next frame. Well inside LEAVE_SECONDS.
 	await wait_physics_frames(30)
 
 	for pony in spawner.get_spawned():
 		assert_false(pony.is_leaving(), "%s should have gone by now" % pony.name)
 	assert_eq(_ids(spawner).count(&"fixture_storm"), 0,
-		"the storm ponies are off the map, and their record is still on disk")
+		"the storm ponies are off the map, and their records are still on disk")
 
 
 # --- helpers -------------------------------------------------------------------------
 
-## A spawner over two markers, one per fixture zone, on the floor built in before_each().
-func _spawner() -> Spawner:
+## A spawner over one marker per entry in `specs`, each `[zone_id, spawn_count]`, on the
+## floor built in before_each().
+func _spawner(specs: Array = BOTH_ZONES) -> Spawner:
 	var zones := Node3D.new()
 	zones.name = "Zones%d" % _world.get_child_count()
 	_world.add_child(zones)
-	zones.add_child(_marker(MEADOW, Vector3(-12.0, 0.0, 0.0)))
-	zones.add_child(_marker(HOLLOW, Vector3(12.0, 0.0, 0.0)))
+	var x := -12.0
+	for spec in specs:
+		zones.add_child(_marker(spec[0], spec[1], Vector3(x, 0.0, 0.0)))
+		x += 24.0
 
 	var spawner: Spawner = SpawnerScript.new()
 	spawner.pony_dir = FIXTURE_DIR
@@ -223,12 +298,12 @@ func _spawner() -> Spawner:
 	return spawner
 
 
-func _marker(zone: StringName, position: Vector3) -> ZoneMarker:
+func _marker(zone: StringName, count: int, position: Vector3) -> ZoneMarker:
 	var marker: ZoneMarker = ZoneMarkerScript.new()
 	marker.zone_id = zone
 	marker.spawn_radius = 4.0
 	marker.roam_radius = 2.0
-	marker.spawn_count = 2
+	marker.spawn_count = count
 	marker.position = position
 	return marker
 
@@ -243,6 +318,18 @@ func _ids(spawner: Spawner) -> Array:
 			ids.append(data.id)
 	ids.sort()
 	return ids
+
+
+## No character is standing on the map twice. Ponies on their way out are not counted:
+## she and her replacement are supposed to overlap for a few seconds.
+func _assert_no_duplicates(spawner: Spawner, when: String) -> void:
+	var seen := {}
+	for pony in spawner.get_spawned():
+		if pony.is_leaving():
+			continue
+		var id: StringName = pony.get_data().id
+		assert_false(seen.has(id), "%s is standing in the field twice %s" % [id, when])
+		seen[id] = true
 
 
 ## Where the player is standing, which in this world is nowhere: refresh() takes the

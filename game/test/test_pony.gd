@@ -43,6 +43,10 @@ const FLOOR_SIZE := Vector3(60.0, 1.0, 60.0)
 ## Long enough for the 8 m/s^2 acceleration ramp to finish and produce clear travel.
 const RUN_FRAMES := 60
 
+## Physics frames a departure is watched for: 8 s at 60 Hz, roughly twice the time a
+## 3.3 m/s exit needs to clear Pony.LEAVE_DISTANCE, and far short of LEAVE_SECONDS.
+const LEAVE_WATCH_FRAMES := 480
+
 var _world: Node3D
 
 
@@ -602,24 +606,57 @@ func test_a_leaving_pony_nobody_can_see_goes_at_once() -> void:
 		"a wild body with nobody watching is discarded on her next frame")
 
 
-func test_a_leaving_pony_walks_away_from_the_player_and_off_her_leash() -> void:
-	var pony := _spawn(PonyDataScript.Personality.BOLD, 6.5, Vector3.ZERO)
+func test_a_leaving_pony_the_player_is_watching_walks_rather_than_vanishing() -> void:
+	# The guarantee LEAVE_DISTANCE exists for: while she is still inside her own detection
+	# area there is somebody close enough to be looking at her, so she is not allowed to
+	# stop existing. A player standing 3 m off is as close as that gets.
+	var pony := _spawn(PonyDataScript.Personality.BOLD, 4.0, Vector3.ZERO)
 	pony.roam_radius = 2.0
-	_add_player(Vector3(0.0, 0.0, -2.0))
+	var player := _add_player(Vector3(0.0, 0.0, -3.0))
 	await wait_physics_frames(5)
 	var start: Vector3 = pony.global_position
 	pony.leave()
-	await wait_physics_frames(300)
+	await wait_physics_frames(60)
 
-	assert_true(is_instance_valid(pony),
-		"the player can see her, so she walks rather than vanishing")
+	assert_true(is_instance_valid(pony), "she is still well inside the detection area")
+	assert_true(pony.is_leaving(), "and still on her way out")
+	assert_lt(pony.global_position.distance_to(player.global_position),
+		PonyScript.LEAVE_DISTANCE,
+		"...which is the premise of this test rather than a claim about it")
 	assert_gt(pony.global_position.z, start.z + 1.0,
 		"she heads directly away from the player, who is standing behind her")
 	var from_home: float = Vector2(pony.global_position.x - start.x,
 		pony.global_position.z - start.z).length()
 	assert_gt(from_home, pony.roam_radius,
 		"and she is off her leash: no other state may leave her roam circle")
-	assert_true(pony.is_leaving(), "and she is still on her way")
+
+
+func test_a_leaving_pony_is_freed_once_she_is_out_of_the_detection_area() -> void:
+	# The other half of the same guarantee, and the ordinary way a departure ends. She sets
+	# off 3 m from a player who does not move, and the last distance measured before she
+	# goes says she covered the ground rather than being written off where she stood.
+	var pony := _spawn(PonyDataScript.Personality.BOLD, 4.0, Vector3.ZERO)
+	var player := _add_player(Vector3(0.0, 0.0, -3.0))
+	await wait_physics_frames(5)
+	pony.leave()
+
+	var last_distance := 0.0
+	var frames := 0
+	# 8 s at 60 Hz: about twice what 3.3 m/s needs to clear the 14 m, and a small
+	# fraction of LEAVE_SECONDS, so this cannot pass by way of the safety ceiling.
+	for i in range(LEAVE_WATCH_FRAMES):
+		await wait_physics_frames(1)
+		frames += 1
+		if not is_instance_valid(pony):
+			break
+		last_distance = pony.global_position.distance_to(player.global_position)
+
+	assert_false(is_instance_valid(pony),
+		"a pony past her detection radius is out of sight, and goes")
+	assert_gt(last_distance, 10.0,
+		"and she walked there: the last look at her had her most of the way out")
+	assert_lt(float(frames) / 60.0, PonyScript.LEAVE_SECONDS,
+		"the departure ended on the distance, not on the safety ceiling")
 
 
 # --- helpers ------------------------------------------------------------------------

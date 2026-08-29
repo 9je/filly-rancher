@@ -31,9 +31,9 @@ extends CharacterBody3D
 ##   APPROACH CURIOUS only: walk toward the player and stop APPROACH_STOP_DISTANCE
 ##            short, watching her. -> IDLE when she can no longer see him.
 ##   HELD     the beam owns the transform: no gravity, no move_and_slide, no steering.
-##   LEAVING  her spawn conditions stopped holding: she walks away from the player at
-##            wander speed, off her leash, and frees herself once she is out of sight.
-##            See leave() for why that is not a death.
+##   LEAVING  her spawn conditions stopped holding: she leaves at her flee speed, off
+##            her leash, and frees herself once she is out of the detection area. See
+##            leave() for why that is not a death.
 ##
 ## The routine states are interruptible and the situational ones are not: every frame a
 ## pony in IDLE/WANDER/GRAZE that can see the player switches to her reaction state, and
@@ -282,18 +282,26 @@ const ANIM_BLEND := 0.2
 const TERMINAL_VELOCITY := 25.0
 
 ## How far from the player a LEAVING pony has to get before she may free herself, in
-## metres. 16.0 is comfortably past DETECTION_RADIUS + SHY_NOTICE_BONUS (14.0 m), which
-## is the widest anybody on the roster can see, so by the time this fires she is outside
-## the notice radius of the jumpiest pony in the game and therefore out of the player's
-## own sight of her too. NOBODY VANISHES ON SCREEN: that margin is the whole point of the
-## number, and shrinking it below 14.0 would put a pop in front of the camera.
-const LEAVE_DISTANCE := 16.0
+## metres. DELIBERATELY EQUAL TO DETECTION_AREA_RADIUS, which is DETECTION_RADIUS plus
+## SHY_NOTICE_BONUS and therefore the widest anybody on the roster can see: at exactly
+## this distance the DetectionArea drops the player, _leave_distance() starts answering
+## INF, and she goes. One number, one meaning, and it is the game's own definition of out
+## of sight rather than a second opinion about it.
+##
+## AN EARLIER 16.0 WAS UNREACHABLE and is the reason this is written down. It sat 2 m
+## outside the area that reports the player at all, so the distance test could never see a
+## value between 14 and 16: the player vanished from her at 14 m and the INF branch fired
+## anyway. It was a promise the code could not keep, which is worse than a smaller promise
+## it can.
+const LEAVE_DISTANCE := DETECTION_AREA_RADIUS
 
-## Ceiling on a departure, in seconds. A pony who has walked away for this long has gone
-## as far as the map lets her (a leaving pony ignores her leash but not the terrain) and
-## is written off wherever she stands. Twenty seconds at wander speed is a long walk, and
-## the alternative to a ceiling is a pony wedged against a fence forever.
-const LEAVE_SECONDS := 20.0
+## Safety ceiling on a departure, in seconds. NOT the ordinary way a departure ends: at
+## flee speed she clears LEAVE_DISTANCE in a few seconds from anywhere on the map, so this
+## only fires for a pony who cannot get away at all (wedged against a fence, walled into a
+## pen's corner by terrain). Forty five seconds is long enough that it never pre-empts a
+## real walk and short enough that a stuck pony is not standing there for the rest of the
+## session.
+const LEAVE_SECONDS := 45.0
 
 ## Width of the band, in metres, over which the leash takes hold -- see _leash(), which
 ## is where the reasoning lives. Derived from `roam_radius` rather than fixed, because a
@@ -757,6 +765,18 @@ func _state_held(delta: float) -> void:
 ## State.LEAVING`, so a pony grabbed mid departure stops counting the moment the beam
 ## takes her rather than freeing herself out from under it.
 ##
+## WHAT IS GUARANTEED, exactly: she is freed once she is outside her own DetectionArea
+## (LEAVE_DISTANCE is that radius, so nobody can be looking at her from inside the notice
+## range of any personality), or after LEAVE_SECONDS if she somehow cannot get away at
+## all. Those are the only two ways this state ends on its own; the third way it ends is
+## the beam taking her, which is a capture and not a departure.
+##
+## AT HER FLEE SPEED, not her wander speed. She is leaving, and a brisk exit reads as a
+## pony with somewhere to be rather than a pony strolling out of existence. It also makes
+## the guarantee above cheap: 3.3 m/s clears 14 m in about four seconds, so LEAVE_SECONDS
+## is a ceiling nobody normally touches instead of the thing that actually ends most
+## departures.
+##
 ## NO LEASH. A leaving pony is the one pony in the game who is supposed to walk out of her
 ## own territory, so _leash() is deliberately not applied to this heading; the roam circle
 ## exists to hold a herd in place and she is no longer part of it.
@@ -767,16 +787,16 @@ func _state_leaving(delta: float) -> Vector3:
 		return Vector3.ZERO
 	if _leave_direction.length_squared() < 0.0001:
 		_leave_direction = _away_from_player()
-	return _leave_direction * _wander_speed
+	return _leave_direction * _flee_speed
 
 
 ## How far the player is from her right now, or INF when she cannot see one at all.
 ##
-## INF RATHER THAN ZERO, and that is the safe direction rather than the convenient one:
-## "no player in my detection area" means the nearest player is further off than
-## DETECTION_AREA_RADIUS (14.0 m), which is already outside LEAVE_DISTANCE's promise, so
-## a pony with nobody watching is free to go at once. Reading it as zero would strand
-## every departure in a world with no player in it for the full LEAVE_SECONDS.
+## INF RATHER THAN ZERO, and it is the ORDINARY way a departure ends rather than an edge
+## case: "no player in my detection area" means the nearest player is further off than
+## DETECTION_AREA_RADIUS, which is exactly LEAVE_DISTANCE, so the moment she crosses that
+## line the area drops him and this answers INF. Reading it as zero would strand every
+## departure in a world with no player in it for the full LEAVE_SECONDS.
 func _leave_distance() -> float:
 	if _player == null or not is_instance_valid(_player):
 		return INF

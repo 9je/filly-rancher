@@ -135,6 +135,8 @@ func test_stats_are_in_the_range_the_existing_six_established() -> void:
 		assert_between(data.base_speed, 2.5, 7.0, "%s speed" % id)
 		assert_between(data.base_stamina, 3.0, 8.0, "%s stamina" % id)
 		assert_between(data.base_spirit, 3.0, 9.5, "%s spirit" % id)
+
+
 # --- when they appear ----------------------------------------------------------------
 
 func test_conditional_characters_use_valid_phase_and_weather_values() -> void:
@@ -190,6 +192,36 @@ func test_every_region_has_at_least_two_residents_for_every_hour_and_weather() -
 						n += 1
 				assert_gte(n, 2, "'%s' has %d resident(s) at %s in %s" % [zone, n,
 					WorldStateScript.phase_name(phase), WorldStateScript.weather_name(weather)])
+
+
+func test_every_zone_can_fill_every_marker_it_owns_at_every_hour_and_weather() -> void:
+	# THE INVARIANT BEHIND Spawner.refresh()'s "unfilled". Nobody stands in the field twice,
+	# so a zone whose markers ask for more ponies than it has available at some hour leaves
+	# slots empty at that hour. That is a legitimate reading of a quiet hour and the spawner
+	# reports it rather than drawing a duplicate, but on the shipped map it is not supposed
+	# to happen at all, and the only thing that can keep that true as the roster changes is
+	# this. Note the sum: the five homestead markers share one zone and therefore share one
+	# pool.
+	var scene: PackedScene = load("res://world/ranch.tscn")
+	var ranch: Node = scene.instantiate()
+	var wanted := {}
+	for marker in ranch.get_node("Zones").get_children():
+		wanted[marker.zone_id] = int(wanted.get(marker.zone_id, 0)) + marker.spawn_count
+	ranch.free()
+
+	var roster := _roster()
+	for zone in wanted:
+		for phase in range(WorldStateScript.Phase.size()):
+			for weather in range(WorldStateScript.Weather.size()):
+				var n := 0
+				for id in roster:
+					var data: PonyData = roster[id]
+					if zone in data.spawn_zones and data.available(phase, weather):
+						n += 1
+				assert_gte(n, int(wanted[zone]),
+					"'%s' asks for %d ponies and has %d available at %s in %s"
+					% [zone, wanted[zone], n, WorldStateScript.phase_name(phase),
+					WorldStateScript.weather_name(weather)])
 
 
 ## The distinct members of `values`, so a repeated entry in a phases or weathers list is

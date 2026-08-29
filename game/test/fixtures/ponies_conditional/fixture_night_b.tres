@@ -4,8 +4,8 @@
 
 [resource]
 script = ExtResource("1")
-id = &"fixture_night"
-display_name = "Fixture Night"
+id = &"fixture_night_b"
+display_name = "Fixture Night B"
 model_path = "res://assets/converted/ponies/twilight.glb"
 rarity = 0
 spawn_zones = Array[StringName]([&"fixture_hollow"])
