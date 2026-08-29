@@ -338,7 +338,7 @@ Run it with:
 tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/market_test.tscn
 ```
 
-Expect `MARKET_OK checks=64`; the exit code is the verdict.
+Expect `MARKET_OK checks=69`; the exit code is the verdict.
 
 ---
 

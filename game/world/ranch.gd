@@ -657,11 +657,15 @@ func _ready() -> void:
 ## Find the GameState autoload, load the play slot if there is one, and decide whether this
 ## run is allowed to write anything.
 ##
-## THE SEED IS PUSHED BOTH WAYS. A loaded save hands its `world_seed` to the spawner, so
-## coming back gives you the ranch you left. A run with NO save takes the spawner's own
-## exported default INTO the state, so the very first save records the seed the world was
-## actually generated with rather than a default that a later edit to spawner.tscn could
-## silently change out from under it.
+## THE SEED IS PUSHED BOTH WAYS, ONCE, AND ONLY HERE. A loaded save hands its `world_seed`
+## to the spawner, so coming back gives you the ranch you left. A run with NO save takes the
+## spawner's own exported default INTO the state, so the very first save records the seed the
+## world was actually generated with rather than a default that a later edit to spawner.tscn
+## could silently change out from under it.
+##
+## AFTER THIS THE STATE OWNS THE NUMBER AND THE SPAWNER READS IT. Every later load re-reads
+## it into the spawner from _rebuild_world_state(), and _sync_game_state() never writes it
+## back; the two directions used to fight, and the loser was the loaded save.
 func _bind_game_state() -> void:
 	_game_state = get_node_or_null(^"/root/GameState")
 	if _game_state == null:
@@ -1034,6 +1038,19 @@ func advance_world(seconds: float) -> void:
 ## to a stormy night that loaded a save halfway through would otherwise photograph whatever
 ## hour the save happened to hold.
 func _rebuild_world_state() -> void:
+	# THE SPAWNER'S SEED, RE-READ FROM THE STATE FIRST. _bind_game_state() pushes the loaded
+	# save's world_seed into the spawner at boot and never again, so before this line a
+	# mid-session load left the herd being drawn from the seed of the session that had just
+	# been replaced, while the board beside it was rebuilt from the loaded one. The state
+	# OWNS the number and the spawner reads it; here, at the one place a load's numbers are
+	# taken up, and before the post-load refresh draws anything with it.
+	#
+	# A no-op at boot in both directions: _bind_game_state() has already made the two agree
+	# by then, whichever of them was the source. A no-op in _report()'s reload probe too,
+	# which does not touch world_seed.
+	if _game_state != null:
+		spawner.spawn_seed = _game_state.world_seed
+
 	if _world != null:
 		if _world.phase_changed.is_connected(_on_world_phase_changed):
 			_world.phase_changed.disconnect(_on_world_phase_changed)
@@ -1615,27 +1632,38 @@ func _rebuild_request_board() -> void:
 ## handed back: copies of the requests that flipped to done on THIS call and no others, so
 ## nothing here can pay twice for one favour.
 ##
-## THE ORDER IS BITS, THEN FOOD, THEN CLAIM, THEN REFILL, PER REQUEST. claim() after the
-## two payments because it is the board's record that this one HAS been paid, and a claim
-## written first would survive a crash between them as a request that says it paid and did
-## not. The refill sits inside the loop rather than after it so that a rare event finishing
-## two requests at once still leaves three offers standing between the two toasts; fill()
-## draws nothing when the board is already full, so the repeat costs nothing.
+## CLAIM FIRST, AND PAY OUT OF WHAT THE CLAIM HANDED BACK. claim() is the board's own
+## authority on whether this request is done and not yet paid, and it answers with an empty
+## Dictionary when it is neither (game/systems/request_board.gd); paying first and claiming
+## afterwards threw that answer away, which made `paid` a field nothing consulted and left
+## the door open for one favour to be paid twice by two events that both thought they had
+## finished it. A refused claim is reported and skipped rather than paid on the strength of
+## the copy that was handed in.
+##
+## THEN BITS, THEN FOOD, THEN THE TOAST, THEN THE REFILL, PER REQUEST. The refill sits inside
+## the loop rather than after it so that a rare event finishing two requests at once still
+## leaves three offers standing between the two toasts; fill() draws nothing when the board
+## is already full, so the repeat costs nothing.
 func _pay_out(completed: Array) -> void:
 	if _board == null:
 		return
 	for entry in completed:
-		var request: Dictionary = entry
-		var reward_bits := int(request.get("reward_bits", 0))
-		var reward_food := String(request.get("reward_food", ""))
+		var request_id := String((entry as Dictionary).get("id", ""))
+		var claimed: Dictionary = _board.claim(request_id)
+		if claimed.is_empty():
+			push_warning(("ranch: request '%s' was reported complete but the board refused " +
+				"to claim it (unknown, not done, or already paid); nothing was paid.")
+				% request_id)
+			continue
+		var reward_bits := int(claimed.get("reward_bits", 0))
+		var reward_food := String(claimed.get("reward_food", ""))
 		if _economy != null and reward_bits > 0:
 			_economy.grant(reward_bits)
 		if _game_state != null and not reward_food.is_empty():
 			_game_state.inventory.add(StringName(reward_food),
 				RequestBoardScript.SEE_CHARACTER_FOOD_COUNT)
-		_board.claim(String(request.get("id", "")))
+		_toast("Request done: %s (+%d bits)" % [String(claimed.get("text", "")), reward_bits])
 		_board.fill(_seen_ids())
-		_toast("Request done: %s (+%d bits)" % [String(request.get("text", "")), reward_bits])
 
 
 ## The board this ranch is running, or null only if there is no GameState to hold it.
@@ -1883,7 +1911,11 @@ func _sync_game_state() -> void:
 			owned.append(instance)
 	_game_state.set_ponies(owned)
 	_game_state.plots = _live_plots()
-	_game_state.world_seed = spawner.spawn_seed
+	# THE WORLD SEED IS NOT WRITTEN HERE. The state owns it and the spawner reads it (see
+	# _rebuild_world_state); a write in this direction meant that a save loaded mid-session
+	# had the seed of the session it replaced stamped back over it on the next save, because
+	# the spawner's copy was the stale one. _bind_game_state() is what gives a brand new
+	# ranch its seed, once, so the first save still records the map it was generated from.
 	# THE CLOCK, UNLESS IT WAS PINNED. --phase=/--weather= freeze the world at an hour
 	# nobody played to, and writing that back would hand the player a ranch stopped at
 	# whatever a screenshot run happened to ask for. WorldState.advance() already refuses
@@ -2406,11 +2438,14 @@ func _report(pony_count: int, prop_count: int) -> void:
 	_set_check(checks, "the board stands", get_node_or_null(^"Buildings/Board") != null)
 
 	var book_registry: PonyRegistry = _pony_roster()
+	# `requests` is the ACTIVE count, the same number the check above reads. requests() also
+	# returns every claimed request the board has ever carried, so printing that would have
+	# made a healthy board's number climb forever while the three on offer never changed.
 	print("RANCH collection seen=%d caught=%d of %d requests=%d" % [
 		book.count(CompendiumScript.State.SEEN, book_registry) if book != null else 0,
 		book.count(CompendiumScript.State.CAUGHT, book_registry) if book != null else 0,
 		book.total(book_registry) if book != null else 0,
-		_board.requests().size() if _board != null else 0])
+		active_requests])
 
 	# --- the regions ------------------------------------------------------------------
 	# Four data files, four rings of timber, four zones with residents in them. The three

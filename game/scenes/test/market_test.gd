@@ -249,6 +249,32 @@ func _ready() -> void:
 	_set_check("the pouch is empty after the single sale",
 		shop_now.gem_count(PonyDataScript.Rarity.COMMON) == 0)
 
+	# --- the world seed follows the save --------------------------------------------------
+	# THE HERD AND THE BOARD HAVE TO BE DRAWN FROM ONE NUMBER, AND THE SAVE OWNS IT.
+	# ranch.gd pushed the loaded save's world_seed into the spawner at boot and never again,
+	# so a load made mid-session left the spawner still drawing from the seed of the session
+	# it had just replaced, while the request board beside it was rebuilt from the loaded
+	# one; and then the next save stamped the stale spawner seed back over the loaded save.
+	# The symptom is not an error, it is a herd that quietly rearranges itself and a seed
+	# that drifts a little further every time she loads.
+	#
+	# ONLY ASKABLE FROM HERE. It takes a real load through the live GameState autoload with
+	# a real spawner attached to it; the ranch's own save round trip probes throwaway
+	# GameState instances on purpose, and no GUT test has a ranch.
+	var boot_seed: int = ranch.spawner.spawn_seed
+	var other_seed: int = boot_seed + 4242
+	state.world_seed = other_seed
+	_set_check("the save under test lands, with a seed the boot did not have",
+		other_seed != boot_seed and state.save_to_slot(SLOT))
+	state.reset()
+	_set_check("the slot with the other seed loads back", state.load_from_slot(SLOT))
+	_set_check("a load hands the spawner the seed it just loaded",
+		ranch.spawner.spawn_seed == state.world_seed and state.world_seed == other_seed)
+	_set_check("the save lands again after that load", state.save_to_slot(SLOT))
+	var reseeded := SaveIOScript.load(SLOT)
+	_set_check("and the file still holds the loaded seed, not the boot seed",
+		int(reseeded.get("world_seed", 0)) == other_seed)
+
 	# --- pause menu ---------------------------------------------------------------------
 	var pause = ranch.get_pause_menu()
 	_set_check("the pause menu opens", pause.open())
