@@ -6,7 +6,7 @@
 script = ExtResource("1_region")
 id = &"orchard"
 display_name = "The Orchard"
-centre = Vector2(62, 30)
+centre = Vector2(72, 40)
 radius = 22.0
 permit_cost = 150
 gate_yaw_degrees = 180.0

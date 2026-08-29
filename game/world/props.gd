@@ -158,37 +158,37 @@ const LAYOUT := [
 	# prop, which a canopy edge does not), and a trunk ON the ring is a tree growing
 	# through a fence rail. Planted outside, they read as the country the fence is the
 	# edge of, which is the whole job a boundary fence has on a map this size.
-	# The Orchard, (62, 30) r 22: apples on the high ground, none across the west gate.
-	{"file": "kenney_tree_oak.glb", "at": Vector2(91.1, 40.6), "yaw": 25.0, "s": 1.20},
-	{"file": "kenney_tree_fat.glb", "at": Vector2(77.5, 56.8), "yaw": 140.0, "s": 1.10},
-	{"file": "kenney_tree_oak.glb", "at": Vector2(56.6, 60.5), "yaw": 265.0, "s": 1.25},
-	{"file": "kenney_tree_fat.glb", "at": Vector2(38.3, 49.9), "yaw": 60.0, "s": 1.05},
-	{"file": "kenney_tree_oak.glb", "at": Vector2(77.5, 3.2), "yaw": 195.0, "s": 1.15},
-	{"file": "kenney_tree_fat.glb", "at": Vector2(88.8, 14.5), "yaw": 310.0, "s": 1.20},
-	# The Everfree Edge, (-64, -40) r 24: the densest planting on the map, and the
+	# The Orchard, (72, 40) r 22: apples on the high ground, none across the west gate.
+	{"file": "kenney_tree_oak.glb", "at": Vector2(101.1, 50.6), "yaw": 25.0, "s": 1.20},
+	{"file": "kenney_tree_fat.glb", "at": Vector2(87.5, 66.8), "yaw": 140.0, "s": 1.10},
+	{"file": "kenney_tree_oak.glb", "at": Vector2(66.6, 70.5), "yaw": 265.0, "s": 1.25},
+	{"file": "kenney_tree_fat.glb", "at": Vector2(48.3, 59.9), "yaw": 60.0, "s": 1.05},
+	{"file": "kenney_tree_oak.glb", "at": Vector2(87.5, 13.2), "yaw": 195.0, "s": 1.15},
+	{"file": "kenney_tree_fat.glb", "at": Vector2(98.8, 24.5), "yaw": 310.0, "s": 1.20},
+	# The Everfree Edge, (-74, -49) r 24: the densest planting on the map, and the
 	# darkest, so the corner of the world the palette already made gloomy also LOOKS
 	# like woodland rather than like a lawn at dusk.
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-52.7, -9.0), "yaw": 15.0, "s": 1.30},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-69.7, -7.5), "yaw": 105.0, "s": 1.20},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-85.2, -14.7), "yaw": 200.0, "s": 1.35},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-95.0, -28.7), "yaw": 285.0, "s": 1.15},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-95.9, -48.5), "yaw": 40.0, "s": 1.30},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-85.2, -65.3), "yaw": 150.0, "s": 1.25},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-66.9, -72.9), "yaw": 230.0, "s": 1.35},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-47.5, -68.6), "yaw": 320.0, "s": 1.20},
+	{"file": "kenney_tree_pine.glb", "at": Vector2(-62.7, -18.0), "yaw": 15.0, "s": 1.30},
+	{"file": "kenney_tree_pine.glb", "at": Vector2(-79.7, -16.5), "yaw": 105.0, "s": 1.20},
+	{"file": "kenney_tree_pine.glb", "at": Vector2(-95.2, -23.7), "yaw": 200.0, "s": 1.35},
+	{"file": "kenney_tree_pine.glb", "at": Vector2(-105.0, -37.7), "yaw": 285.0, "s": 1.15},
+	{"file": "kenney_tree_pine.glb", "at": Vector2(-105.9, -57.5), "yaw": 40.0, "s": 1.30},
+	{"file": "kenney_tree_pine.glb", "at": Vector2(-95.2, -74.3), "yaw": 150.0, "s": 1.25},
+	{"file": "kenney_tree_pine.glb", "at": Vector2(-76.9, -81.9), "yaw": 230.0, "s": 1.35},
+	{"file": "kenney_tree_pine.glb", "at": Vector2(-57.5, -77.6), "yaw": 320.0, "s": 1.20},
 	# The Lake, (60, -62) r 24: four only, and spread wide. The water is the thing to
 	# look at there, and a ring of trunks around it would be a hedge round a pond.
 	{"file": "kenney_tree_default.glb", "at": Vector2(90.1, -51.1), "yaw": 70.0, "s": 1.15},
 	{"file": "kenney_tree_default.glb", "at": Vector2(29.9, -72.9), "yaw": 185.0, "s": 1.25},
 	{"file": "kenney_tree_default.glb", "at": Vector2(49.1, -92.1), "yaw": 250.0, "s": 1.10},
 	{"file": "kenney_tree_default.glb", "at": Vector2(76.0, -89.7), "yaw": 330.0, "s": 1.20},
-	# The Night Meadow, (-58, 66) r 24: a windbreak along the far side, leaving the
+	# The Night Meadow, (-61, 69) r 24: a windbreak along the far side, leaving the
 	# south-east open toward the homestead so the walk out to it has a view.
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-30.3, 82.0), "yaw": 50.0, "s": 1.15},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-52.4, 97.5), "yaw": 125.0, "s": 1.30},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-78.6, 90.5), "yaw": 210.0, "s": 1.20},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-90.0, 66.0), "yaw": 285.0, "s": 1.25},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-78.6, 41.5), "yaw": 355.0, "s": 1.15},
+	{"file": "kenney_tree_pine.glb", "at": Vector2(-33.3, 85.0), "yaw": 50.0, "s": 1.15},
+	{"file": "kenney_tree_pine.glb", "at": Vector2(-55.4, 100.5), "yaw": 125.0, "s": 1.30},
+	{"file": "kenney_tree_pine.glb", "at": Vector2(-81.6, 93.5), "yaw": 210.0, "s": 1.20},
+	{"file": "kenney_tree_pine.glb", "at": Vector2(-93.0, 69.0), "yaw": 285.0, "s": 1.25},
+	{"file": "kenney_tree_pine.glb", "at": Vector2(-81.6, 44.5), "yaw": 355.0, "s": 1.15},
 ]
 
 var _placed: Array[Node3D] = []

@@ -294,6 +294,11 @@ const GATE_PROBE_CENTRE_Y := 0.85
 ## while the fence is still what she is walking at, not once she is nosing the rails.
 const GATE_PROMPT_RADIUS := 6.0
 
+## How much room a region's fence ring must leave beyond the furthest a homestead pony can
+## legitimately roam. See the check named "no homestead roam disc reaches a region's fence
+## ring" in _report() for what goes wrong at zero.
+const REGION_CLEARANCE := 1.0
+
 ## How far out from the gateway the "a locked gate is solid" ray starts and ends, in
 ## metres. Short enough that a horizontal ray cannot reach up into rising ground before
 ## it reaches the leaf, long enough to start clear of the leaf's own depth.
@@ -1575,8 +1580,11 @@ func _report(pony_count: int, prop_count: int) -> void:
 	# marker's spawn disc reaches more than halfway to another marker: put two discs any
 	# closer and a pony spawned legitimately on the far rim of hers is nearer the other
 	# one, and a correct spawn fails the gate. Slice 3's regions walked straight into it:
-	# the orchard at (62, 30) is 31 m from EastField, so its spawn disc cannot be the
-	# radius minus 6 the plan asked for without the two overlapping in this sense.
+	# the orchard's marker was 31 m from EastField when these discs were first sized, so
+	# its spawn disc could not be the radius minus 6 the plan asked for without the two
+	# overlapping in this sense. The regions have since been pushed outward (see the check
+	# below) and the orchard now sits 45 m out, but 14 m is what the map was tuned and
+	# photographed with and widening it now would re-roll every spawn for no gain.
 	var discs_own_their_ponies := true
 	var markers: Array[ZoneMarker] = spawner.get_markers()
 	for i in range(markers.size()):
@@ -1780,6 +1788,40 @@ func _report(pony_count: int, prop_count: int) -> void:
 	print("RANCH regions=%d fences=%d open=%d" % [regions.size(), fences.size(), open_gates])
 	_set_check(checks, "every region has a fence", every_region_fenced)
 	_set_check(checks, "every region zone has residents in the roster", residents_everywhere)
+
+	# NO HOMESTEAD ROAM DISC MAY REACH A REGION'S FENCE RING. The bug this exists for, found
+	# by scenes/test/region_test.tscn: a `ranch` pony drawn for WestHollow spawned 22.1 m
+	# from the everfree centre, which is 4.9 m INSIDE a ring standing at radius +
+	# RegionFence.RING_MARGIN, with the gate shut and a pony's mask containing PEN_GATE. She
+	# was walled into a region she does not belong to, behind the most expensive permit on
+	# the map, for the rest of the save. Nothing above catches it: "every pony was spawned
+	# inside her zone" asks her NEAREST marker, which was still WestHollow, and the halfway
+	# rule below compares markers to markers rather than markers to rings.
+	#
+	# ZoneMarker.outer_bound() is the honest reach, the spawn disc plus a pony's whole roam
+	# circle plus the flee overshoot, and its own doc already names it as the bound "any
+	# future fence or boundary prop for this zone must clear". REGION_CLEARANCE on top of
+	# that, so a fence line is never merely tangent to where a pony can get to.
+	#
+	# ASKED OF THE LIVE MARKERS AND THE LIVE REGIONS, not of a table of numbers: this has to
+	# fail when somebody nudges a marker in ranch.tscn or a centre in a .tres, which is
+	# exactly how it got in.
+	var regions_stand_clear := true
+	for marker: ZoneMarker in spawner.get_markers():
+		if marker.zone_id != &"ranch":
+			continue
+		var at := Vector2(marker.global_position.x, marker.global_position.z)
+		for region: RegionData in regions:
+			var apart := at.distance_to(region.centre)
+			var needed: float = (region.radius + RegionFenceScript.RING_MARGIN
+				+ marker.outer_bound() + REGION_CLEARANCE)
+			if apart < needed:
+				regions_stand_clear = false
+				push_error(("ranch: homestead zone '%s' reaches to within %.1f m of region " +
+					"'%s', whose fence ring needs %.1f m of room.")
+					% [marker.name, apart, region.id, needed])
+	_set_check(checks, "no homestead roam disc reaches a region's fence ring",
+		regions_stand_clear)
 
 	var gate_probe: Dictionary = await _probe_region_gate()
 	print("RANCH region gate ran=%s solid=%s opened=%s hit=%s"
