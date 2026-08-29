@@ -1,7 +1,8 @@
 class_name HUD
 extends CanvasLayer
-## The player-facing overlay for the ranch: a crosshair, the saddlebag, a toast when
-## something happens, and a control-hints card. Mounted in game/world/ranch.tscn.
+## The player-facing overlay for the ranch: a crosshair, the saddlebag, the wallet, the
+## hour and the weather in words, a toast when something happens, and a control-hints
+## card. Mounted in game/world/ranch.tscn.
 ##
 ## WHY EACH PIECE IS HERE. None of these is decoration -- each one answers a question a
 ## player could not otherwise answer, and three of the four came directly out of playing
@@ -135,6 +136,11 @@ const COLOR_WRIGGLE_LOW := Color(0.95, 0.28, 0.24, 1.0)
 ## white reticle disappears against a bright sky and the pink one against the pink beam.
 const COLOR_OUTLINE := Color(0.0, 0.0, 0.0, 0.55)
 
+## The world line under the wallet: the hour and the weather, in words. A cool off-white
+## rather than the Bits line's gold, because it is a statement about the world rather than
+## a number the player owns, and the two must not read as one two-line block.
+const COLOR_WORLD_LINE := Color(0.82, 0.88, 1.0, 0.92)
+
 ## Saddlebag pip geometry.
 const PIP_SIZE := Vector2(26.0, 26.0)
 const PIP_GAP := 8.0
@@ -169,6 +175,7 @@ const HINTS_ACTION := &"toggle_hints"
 @onready var _pips: Control = $Bag/Pips
 @onready var _bag_count: Label = $Bag/Count
 @onready var _bits: Label = $Bag/Bits
+@onready var _world_line: Label = $Bag/World
 @onready var _bag_title: Label = $Bag/Title
 @onready var _toast: Label = $Toast
 @onready var _hints: PanelContainer = $Hints
@@ -202,6 +209,8 @@ func _ready() -> void:
 	_style_label(_bag_count, 26, Color(1.0, 1.0, 1.0, 0.92))
 	_style_label(_bits, 22, Color(1.00, 0.80, 0.25, 1.0))
 	_bits.text = "0 bits"
+	_style_label(_world_line, 22, COLOR_WORLD_LINE)
+	_world_line.text = ""
 	_style_label(_toast, 40, Color(1.0, 0.96, 0.86, 1.0))
 
 	_bag_title.text = "SADDLEBAG"
@@ -514,6 +523,27 @@ func set_bits(total: int) -> void:
 
 func get_bits_text() -> String:
 	return _bits.text
+
+
+## THE HOUR AND THE SKY, IN WORDS. Set by game/world/ranch.gd from WorldState.describe()
+## ("Dusk, rain") at boot and again on every phase or weather change, so it repaints on a
+## change and never per frame; the same contract set_bits() above has.
+##
+## SAYING IT IN WORDS IS NOT REDUNDANT WITH THE SKY ITSELF. A player who has just walked
+## into a barn, or who is looking at the ground, or who is playing on a screen with the
+## brightness down, cannot read a phase off the light; and the weather is what decides
+## how far a pony notices her from. The one line is the only place the world's own state is
+## ever stated rather than implied.
+##
+## The text is taken verbatim, with no dash of any kind inserted: this line is read back by
+## game/test/test_hud.gd and by the ranch gate, and a decorative separator here would be a
+## house-style violation nothing else would catch.
+func set_world_line(text: String) -> void:
+	_world_line.text = text
+
+
+func get_world_line() -> String:
+	return _world_line.text
 
 
 ## Both control schemes, side by side, because the build is handed to two people and

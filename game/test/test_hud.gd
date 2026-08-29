@@ -19,6 +19,7 @@ const StorageScript := preload("res://systems/storage.gd")
 const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const MagicBeamScript := preload("res://actors/player/magic_beam.gd")
+const WorldStateScript := preload("res://systems/world_state.gd")
 
 var _hud: CanvasLayer
 ## The HUD's own parent. It looks for a sibling named "Player" (that is how it is
@@ -265,6 +266,49 @@ func test_the_bits_line_shows_the_wallet() -> void:
 	assert_eq(_hud.get_bits_text(), "0 bits")
 	_hud.set_bits(1234)
 	assert_eq(_hud.get_bits_text(), "1234 bits")
+
+
+## THE WORLD LINE IS THE ONLY PLACE THE HOUR IS EVER STATED. game/world/ranch.gd sets it
+## from WorldState.describe() at boot and again on every phase or weather change; a HUD that
+## accepted the line and dropped it would leave the player reading the hour off the light,
+## which is exactly what a barn interior or a screen with the brightness down takes away.
+func test_the_world_line_says_the_hour_and_the_weather() -> void:
+	assert_eq(_hud.get_world_line(), "", "the line starts empty until the ranch sets it")
+	_hud.set_world_line("Dusk, rain")
+	assert_eq(_hud.get_world_line(), "Dusk, rain")
+	var label: Label = _hud.get_node("Bag/World")
+	assert_eq(label.text, "Dusk, rain",
+		"the readable-back value must be the label's own text, not a private copy")
+
+
+## NO DASH OF ANY KIND, in either direction: the house style forbids an em dash and a
+## double hyphen in player-facing text, and this line is assembled from two words and a
+## comma precisely so it cannot acquire one. Every phase against every weather, because a
+## separator would most likely be added to describe() itself and would then appear in all
+## sixteen at once.
+func test_the_world_line_never_carries_a_dash() -> void:
+	for phase in range(WorldStateScript.PHASE_NAMES.size()):
+		for weather in range(WorldStateScript.WEATHER_NAMES.size()):
+			var state: WorldState = WorldStateScript.new(20260839, 0.0)
+			state.pin(phase, weather)
+			_hud.set_world_line(state.describe())
+			var line: String = _hud.get_world_line()
+			assert_false(line.contains("--"), "no double hyphen on the world line: '%s'" % line)
+			assert_false(line.contains("\u2014"), "no em dash on the world line: '%s'" % line)
+			assert_true(line.length() > 0, "every phase and weather pair must say something")
+
+
+## THE BOX HAS TO GROW WITH THE LINES IN IT. The Bag is a VBoxContainer with a hand-set
+## height, and slice 1 already had to raise it by a label once (the Bits line, which
+## otherwise hung 31 px below the box). A fifth line does it again, and a box that is too
+## short does not clip visibly in the editor; the labels simply overflow past the bottom
+## anchor and off the screen, which is a thing a rendered frame shows and nothing else does.
+func test_the_bag_box_is_tall_enough_for_every_line_in_it() -> void:
+	await wait_process_frames(2)
+	var bag: VBoxContainer = _hud.get_node("Bag")
+	assert_true(bag.size.y >= bag.get_combined_minimum_size().y,
+		"the Bag box is %.0f px tall and its contents need %.0f px"
+			% [bag.size.y, bag.get_combined_minimum_size().y])
 
 
 func test_the_hints_card_names_pause_and_trade_and_never_free_cursor() -> void:

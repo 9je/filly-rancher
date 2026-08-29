@@ -77,6 +77,7 @@ const KEY_UNLOCKS := "unlocks"
 const KEY_WORLD_SEED := "world_seed"
 const KEY_GEMS := "gems"
 const KEY_INVENTORY := "inventory"
+const KEY_WORLD_TIME := "world_time"
 
 ## Emitted after from_dict() or load_from_slot() has replaced the world. A HUD or a pen
 ## that cached anything out of here has to rebuild on this.
@@ -125,6 +126,11 @@ var gems: GemPouch = GemPouchScript.new()
 
 ## Consumables the player holds (game/systems/inventory.gd). Same replacement rule.
 var inventory: Inventory = InventoryScript.new()
+
+## Seconds into the world clock (game/systems/world_state.gd's `elapsed`), so quitting does
+## not reset the sky back to dawn. 0.0 is dawn, which is also where a save that predates
+## the clock, or a hand-edited negative value, falls back to; see from_dict().
+var world_time: float = 0.0
 
 ## Whether quitting writes a save. See the class comment -- off by default on purpose.
 var autosave_enabled := false
@@ -249,6 +255,7 @@ func to_dict() -> Dictionary:
 		KEY_WORLD_SEED: world_seed,
 		KEY_GEMS: gems.to_dict(),
 		KEY_INVENTORY: inventory.to_dict(),
+		KEY_WORLD_TIME: world_time,
 	}
 
 
@@ -292,6 +299,12 @@ func from_dict(data: Dictionary) -> void:
 	inventory = InventoryScript.from_dict(
 		saved_inventory if typeof(saved_inventory) == TYPE_DICTIONARY else {})
 
+	var saved_world_time: Variant = data.get(KEY_WORLD_TIME, 0.0)
+	if typeof(saved_world_time) == TYPE_INT or typeof(saved_world_time) == TYPE_FLOAT:
+		world_time = maxf(float(saved_world_time), 0.0)
+	else:
+		world_time = 0.0
+
 	state_loaded.emit()
 
 
@@ -304,6 +317,7 @@ func reset() -> void:
 	world_seed = DEFAULT_WORLD_SEED
 	gems = GemPouchScript.new()
 	inventory = InventoryScript.new()
+	world_time = 0.0
 
 
 # --- disk ---------------------------------------------------------------------------------

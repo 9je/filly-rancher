@@ -29,6 +29,7 @@ extends GutTest
 
 const SaveIOScript := preload("res://systems/save_io.gd")
 const GameStateScript := preload("res://systems/game_state.gd")
+const PonyDataScript := preload("res://systems/pony_data.gd")
 
 ## Where these tests write. Deliberately NOT SaveIO's default directory.
 const SCRATCH_DIR := "user://test_scratch/save_io"
@@ -250,7 +251,7 @@ func test_a_save_from_a_newer_build_refuses_to_load_rather_than_be_misread() -> 
 
 
 func test_the_version_policy_is_stated_and_pinned() -> void:
-	assert_eq(SaveIOScript.FORMAT_VERSION, 2, "the current format version")
+	assert_eq(SaveIOScript.FORMAT_VERSION, 3, "the current format version")
 	assert_true(SaveIOScript.can_load_version(SaveIOScript.FORMAT_VERSION),
 		"this build's own version loads")
 	assert_false(SaveIOScript.can_load_version(SaveIOScript.FORMAT_VERSION + 1),
@@ -269,6 +270,8 @@ func test_a_version_1_file_loads_and_gains_empty_gems_and_inventory() -> void:
 	assert_true(migrated.has("inventory"), "migration adds the inventory key")
 	assert_eq(migrated["gems"], {})
 	assert_eq(migrated["inventory"], {})
+	assert_true(migrated.has("world_time"), "migration adds the world_time key")
+	assert_eq(migrated["world_time"], 0.0)
 
 
 ## THE WHOLE PATH, NOT THE MIGRATION ON ITS OWN. The test above calls migrate() directly,
@@ -298,7 +301,7 @@ func test_a_version_1_file_on_disk_loads_all_the_way_into_a_game_state() -> void
 
 	var loaded := SaveIOScript.load(SLOT)
 	assert_false(loaded.is_empty(), "a version-1 save still loads on this build")
-	assert_eq(int(loaded["version"]), 2,
+	assert_eq(int(loaded["version"]), 3,
 		"...and arrives stamped with the version it was migrated to, not the one on disk")
 
 	var state = GameStateScript.new()
@@ -316,6 +319,45 @@ func test_a_version_1_file_on_disk_loads_all_the_way_into_a_game_state() -> void
 	assert_true(state.gems.is_empty(),
 		"a save from before gems existed comes back with an empty pouch, not a broken one")
 	assert_true(state.inventory.ids().is_empty(), "and with an empty pantry")
+	assert_eq(state.world_time, 0.0,
+		"a save from before the clock existed comes back at dawn, not broken")
+
+
+## The same composed proof, one version later: a version-2 file (gems and inventory exist,
+## the world clock does not) read through SaveIO.load() and poured into a GameState. Written
+## by hand for the same reason the v1 fixture is: a v2 file is exactly what this build can no
+## longer write on its own.
+func test_a_version_2_file_on_disk_loads_all_the_way_into_a_game_state() -> void:
+	var v2 := {
+		"version": 2,
+		"bits": 640,
+		"ponies": [
+			{"uid": "twilight#000001", "data_id": "twilight", "nickname": "Sparkle",
+				"happiness": 0.75, "hunger": 0.25, "caught_at_ms": 1772150400000},
+		],
+		"plots": {"0": "pen"},
+		"unlocks": ["bigger_saddlebag"],
+		"world_seed": 20260839,
+		"gems": {"2": 3},
+		"inventory": {"hay": 4},
+	}
+	_write_raw(SaveIOScript.slot_path(SLOT), JSON.stringify(v2, "  ", true))
+
+	var loaded := SaveIOScript.load(SLOT)
+	assert_false(loaded.is_empty(), "a version-2 save still loads on this build")
+	assert_eq(int(loaded["version"]), 3,
+		"...and arrives stamped with the version it was migrated to, not the one on disk")
+
+	var state = GameStateScript.new()
+	autofree(state)
+	state.from_dict(loaded)
+
+	assert_eq(state.bits, 640, "the wallet survived the trip")
+	assert_eq(state.pony_count(), 1, "the pony came back")
+	assert_eq(state.gems.count(PonyDataScript.Rarity.RARE), 3, "the gems survive")
+	assert_eq(state.inventory.count(&"hay"), 4, "so did the pantry")
+	assert_eq(state.world_time, 0.0,
+		"a save from before the clock existed comes back at dawn, not broken")
 
 
 # --- atomicity: an interrupted write must not cost the previous save ------------------

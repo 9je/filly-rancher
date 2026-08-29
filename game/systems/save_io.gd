@@ -70,6 +70,8 @@ extends RefCounted
 ##
 ## Version 2 (Phase 2 slice 1) adds "gems" and "inventory"; both default to {}.
 ##
+## Version 3 (Phase 2 slice 4) adds "world_time"; defaults to 0.0 (dawn).
+##
 ## --- JSON HAS NO INTEGER TYPE ---------------------------------------------------------
 ##
 ## Every number in a dictionary that came back from load() is a FLOAT, including the ones
@@ -94,7 +96,7 @@ extends RefCounted
 
 ## The format this build writes, and the highest it will read. See the version policy in
 ## the class comment before changing it.
-const FORMAT_VERSION := 2
+const FORMAT_VERSION := 3
 
 ## The key the version is stamped under. Reserved: a caller's payload must not use it --
 ## save() overwrites it, and load() reads it back out.
@@ -330,6 +332,9 @@ static func migrate(data: Dictionary, from_version: int) -> Dictionary:
 			out["gems"] = {}
 		if not out.has("inventory"):
 			out["inventory"] = {}
+	if from_version < 3:
+		if not out.has("world_time"):
+			out["world_time"] = 0.0
 	return out
 
 
