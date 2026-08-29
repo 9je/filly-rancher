@@ -323,9 +323,9 @@ meshes=15 skins=1 materials=11 textured=True animations=['gallop', 'idle', 'walk
 flag — those correctly report `animations=[]` and still pass the base
 `meshes>=1 skins>=1` gate.)
 
-The loop above sweeps `ponies/*.glb` and expects **exactly the three tier-a
-characters** — keep tier-b props in `props/` and the tier-c probe in `probe/`
-(§2), or this loop fails on them. `validate_gltf.py` parses its arguments with
+The loop above sweeps `ponies/*.glb` and expects **every character named in
+`tools/roster_manifest.txt`**: keep tier-b props in `props/` and the tier-c
+probe in `probe/` (§2), or this loop fails on them. `validate_gltf.py` parses its arguments with
 argparse: a mistyped flag (e.g. `--require-anim`, singular) is a hard error
 rather than being silently ignored, which used to turn the animation gate off
 without any visible sign.
@@ -633,32 +633,41 @@ exit code:
 bash tools/convert_roster.sh
 # -> CONVERTED applejack
 # ...one line per character...
-# -> ROSTER_CONVERT ok=39 failed=0 skipped=6   exit 0
+# -> ROSTER_CONVERT ok=38 failed=0 skipped=6   exit 0
 ```
 
-That is the whole regeneration step on a fresh clone: once `tools/setup_env.sh` has
-fetched Blender and the asset packs (§1), one run rebuilds every `.glb` under
-`game/assets/converted/ponies/`. It takes about 14 minutes for the 39 characters that
-were not already on disk. A character that already has a `.glb` is skipped, so a
-re-run is cheap; `--force` rebuilds anyway, `--only id[,id...]` restricts the run to
-named characters (which is how you re-run after fixing a pipeline bug), and
-`--dry-run` prints what would be exported without opening Blender.
+That is the whole regeneration step: once `tools/setup_env.sh` has fetched Blender and
+the asset packs (§1), one run rebuilds every `.glb` under
+`game/assets/converted/ponies/`. `game/assets/converted/` is entirely gitignored, so on
+an actual fresh clone none of the manifest's 44 entries has a `.glb` yet: all 44
+convert, and the tally reads `ROSTER_CONVERT ok=44 failed=0 skipped=0`, proportionally
+longer than the run measured below (roughly 16 minutes at the same per-character rate,
+not separately timed). The tally shown above was measured in a worktree that already
+held the six previously shipped characters' `.glb` files, hence `ok=38 failed=0
+skipped=6`, about 14 minutes for the 38 newly-converted characters. Either way, a
+character that already has a `.glb` is skipped, so a re-run once everything exists is
+cheap; `--force` rebuilds anyway, `--only id[,id...]` restricts the run to named
+characters (which is how you re-run after fixing a pipeline bug), and `--dry-run`
+prints what would be exported without opening Blender.
 `tools/test_convert_roster.sh` exercises the script's own logic in seconds against
 `FILLY_EXPORTER` / `FILLY_VALIDATOR` / `FILLY_OUT_DIR` stubs, with no Blender
 involved.
 
 **What the manifest leaves out.** The reVAmped SFM pack ships 46 `.mdl` files and the
-manifest lists 40 of them. The six it does not list are `twilightsparkle`,
+manifest lists 39 of them. The seven it does not list are `twilightsparkle`,
 `rainbowdash`, `fluttershy`, `applejack` and `rarity`, which the Blender native tier-a
-packs cover at higher fidelity (§3), plus `raricow`, a joke variant rather than a
-character. Three of the 40 it does list, `pinkiepie`, `derpyhooves` and
+packs cover at higher fidelity (§3), `raricow`, a joke variant rather than a
+character, and `changelingdrone`, whose export has no usable textures (see below) and
+is therefore left out of the manifest entirely rather than converted and then unused.
+Three of the 39 it does list, `pinkiepie`, `derpyhooves` and
 `starlightglimmer`, were already shipped before this batch; they stay in the manifest
-so a fresh clone regenerates them, but they are not new characters. That leaves 37 new
+so a fresh clone regenerates them, but they are not new characters. That leaves 36 new
 tier-c characters plus the 2 new tier-a ones, `applejack` and `rarity`.
 
 **What converted but is not in the roster.** `changelingdrone` exports and passes the
-structural gate, and is still excluded, with no `PonyData` resource pointing at it.
-Its `.mdl` was compiled against a material path this download does not contain: all 16
+structural gate when run directly (it is no longer in the manifest, so a fresh clone
+does not spend a Blender run on her), and is excluded, with no `PonyData` resource
+pointing at it. Its `.mdl` was compiled against a material path this download does not contain: all 16
 of the materials it references fail to resolve, so the export carries **zero images and
 zero textures** and every surface falls back to a random pastel base colour.
 
@@ -679,7 +688,10 @@ bug: `wings_changeling.vmt` and `Earlighter.vmt` exist nowhere in the download, 
 `body.vmt` exists 45 times over, once in nearly every character's folder, so there is
 no name that could be searched for generically without dressing the changeling in some
 other pony's coat.
-The line stays in the manifest, and the untextured `.glb` it produces is simply unused.
+The line was removed from `tools/roster_manifest.txt` rather than left in with an
+unused `.glb`, so a fresh clone does not spend a Blender export on a character nobody
+sees; her export command above still works if this is ever revisited, once a matching
+material tree can be sourced.
 
 For contrast, a handful of missing materials is normal and does not disqualify anyone:
 `applebloom` is missing only her `-alt` eyeball variants and `milkyway` her teeth,

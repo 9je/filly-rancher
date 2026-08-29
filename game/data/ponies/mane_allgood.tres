@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="PonyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/pony_data.gd" id="1_smane"]
+
+[resource]
+script = ExtResource("1_smane")
+id = &"mane_allgood"
+display_name = "Mane Allgood"
+model_path = "res://assets/converted/ponies/mane_allgood.glb"
+rarity = 0
+spawn_zones = Array[StringName]([&"ranch"])
+favorite_foods = Array[StringName]([&"apple", &"hay"])
+personality = 2
+voice_bank = ""
+base_speed = 3.4
+base_stamina = 5.0
+base_spirit = 5.5

@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="PonyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/pony_data.gd" id="1_snight"]
+
+[resource]
+script = ExtResource("1_snight")
+id = &"nightlight"
+display_name = "Night Light"
+model_path = "res://assets/converted/ponies/nightlight.glb"
+rarity = 0
+spawn_zones = Array[StringName]([&"ranch"])
+favorite_foods = Array[StringName]([&"carrot", &"hay"])
+personality = 2
+voice_bank = ""
+base_speed = 3.3
+base_stamina = 5.0
+base_spirit = 6.0

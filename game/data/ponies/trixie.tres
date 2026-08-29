@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="PonyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/pony_data.gd" id="1_strixi"]
+
+[resource]
+script = ExtResource("1_strixi")
+id = &"trixie"
+display_name = "Trixie"
+model_path = "res://assets/converted/ponies/trixie.glb"
+rarity = 2
+spawn_zones = Array[StringName]([&"ranch"])
+favorite_foods = Array[StringName]([&"carrot", &"daffodil"])
+personality = 1
+voice_bank = ""
+base_speed = 3.7
+base_stamina = 5.0
+base_spirit = 7.5

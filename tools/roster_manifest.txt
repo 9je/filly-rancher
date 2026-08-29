@@ -19,7 +19,6 @@ rarity|blend|blender-native/Rarity_1-0/Rarity_1-0.blend|R_Rig
 sunsetshimmer|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_sunsetshimmer.mdl|
 songbirdserenade|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_songbirdserenade.mdl|
 pinkamena|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_pinkamena.mdl|
-changelingdrone|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_changelingdrone.mdl|
 trixie|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_trixie.mdl|
 shiningarmor|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_shiningarmor.mdl|
 spitfire|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_spitfire.mdl|

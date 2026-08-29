@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="PonyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/pony_data.gd" id="1_sbraeb"]
+
+[resource]
+script = ExtResource("1_sbraeb")
+id = &"braeburn"
+display_name = "Braeburn"
+model_path = "res://assets/converted/ponies/braeburn.glb"
+rarity = 1
+spawn_zones = Array[StringName]([&"ranch"])
+favorite_foods = Array[StringName]([&"apple", &"hay"])
+personality = 2
+voice_bank = ""
+base_speed = 4.4
+base_stamina = 6.5
+base_spirit = 6.0

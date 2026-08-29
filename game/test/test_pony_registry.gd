@@ -79,8 +79,11 @@ func test_by_rarity_partitions_the_roster() -> void:
 		uncommon_ids.append(p.id)
 	assert_true(uncommon_ids.has(&"fluttershy"), "fluttershy is UNCOMMON")
 	assert_false(uncommon_ids.has(&"twilight"), "by_rarity must not return everything")
-	assert_eq((buckets[PonyDataScript.Rarity.LEGENDARY] as Array).size(), 0,
-		"no LEGENDARY ponies exist yet")
+	var legendary_ids: Array = []
+	for p in buckets[PonyDataScript.Rarity.LEGENDARY]:
+		legendary_ids.append(p.id)
+	assert_true(legendary_ids.has(&"sunsetshimmer"), "sunsetshimmer is LEGENDARY")
+	assert_true(legendary_ids.has(&"songbirdserenade"), "songbirdserenade is LEGENDARY")
 
 
 func test_load_all_entries_are_pony_data() -> void:
