@@ -44,6 +44,11 @@ check "$(echo "$out" | tail -1)" "ROSTER_CONVERT ok=2 failed=2 skipped=0" "the s
 check "$(echo "$out" | grep -c '^FAILED bad_export:')" "1" "an export failure is named"
 check "$(echo "$out" | grep -c '^FAILED bad_validate:')" "1" "a validation failure is named"
 check "$([ -f "$TMP/out/good_sfm.glb" ] && [ -f "$TMP/out/good_blend.glb" ] && echo yes || echo no)" "yes" "the good sfm and blend characters were written"
+# The one outcome the tally cannot show. A glb that exported but failed validation is a
+# broken file sitting at the path convert_roster.sh uses to decide a character is already
+# done, so leaving it there does not just waste a byte: the next run SKIPS her, forever,
+# and the failure disappears from the summary it was reported in.
+check "$([ -f "$TMP/out/bad_validate.glb" ] && echo present || echo removed)" "removed" "a glb that failed validation is removed, not left to be skipped forever"
 
 out=$(FILLY_EXPORTER="$TMP/exporter.sh" FILLY_VALIDATOR="$TMP/validator.sh" FILLY_OUT_DIR="$TMP/out" \
   bash tools/convert_roster.sh --manifest "$TMP/manifest.txt" --only good_sfm 2>&1); rc=$?
