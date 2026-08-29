@@ -390,8 +390,8 @@ func _ready() -> void:
 	# EVERY MENU IS SHUT UNTIL IT IS WIRED, and this is the first line of _ready() that can
 	# be reached with the tree already accepting input. Boot takes about two and a half
 	# seconds from here (the physics warmup, the pen-containment probe, the settle frames)
-	# and _bind_pause_menu() does not run until the end of it -- so Escape pressed during
-	# the wait used to raise a PAUSED panel over a world that was still running, with a
+	# and _bind_pause_menu() does not run until the end of it. Escape pressed during the
+	# wait used to raise a PAUSED panel over a world that was still running, with a
 	# Save and a Quit connected to nothing and no ranch listening for `opened` to pause the
 	# tree. The refusal is the shutter the menus already have for "another menu is up"; the
 	# bind functions below overwrite it with the real predicate once there is something
@@ -407,9 +407,9 @@ func _ready() -> void:
 	_bind_game_state()
 
 	# IMMEDIATELY AFTER the save is read, and long before the ponies in it are put back.
-	# The gear a save records changes how much the world can hold -- the saddlebag the
-	# player bought is what says whether her herd fits in it -- so it is applied here, at
-	# the top of boot, rather than in _bind_build_menu()'s rebind_economy() at the bottom.
+	# The gear a save records changes how much the world can hold: the saddlebag the player
+	# bought is what says whether her herd fits in it. So it is applied here, at the top of
+	# boot, rather than in _bind_build_menu()'s rebind_economy() at the bottom.
 	# It used to run at the bottom, which meant _restore_owned_ponies() below poured a
 	# 15-pony save into a bag still at its base 12 and left three ponies in neither the bag
 	# nor a pen. The beam exists by now (it is a child of the player scene), and
@@ -538,7 +538,7 @@ func _bind_game_state() -> void:
 ## is actually missing. Without that skip a second call was destructive rather than merely
 ## wasteful: a resident whose pen already holds her fails add_pony() (it refuses a duplicate
 ## uid), which used to fall through to the `else` below, clear her address and file her in
-## the bag as well -- one pony, two homes.
+## the bag as well: one pony, two homes.
 ##
 ## Returns how many ponies THIS call placed. On boot, when nothing is placed yet, that is
 ## the whole restored herd.
@@ -808,8 +808,8 @@ func _no_menu_but(menu: CanvasLayer) -> bool:
 ## Nothing at all is up: no build menu, no Market, no pause menu.
 ##
 ## THE BUILD PROMPT AND THE MARKET PROMPT BOTH ASK THIS before they react to a keypress.
-## The build prompt used to ask a narrower question -- whether its OWN menu was open -- so
-## E pressed while the Market or the pause menu was up still ran the build path underneath
+## The build prompt used to ask a narrower question, whether its OWN menu was open, so E
+## pressed while the Market or the pause menu was up still ran the build path underneath
 ## them. Both prompts ask the whole question now, which is what makes the sentence above
 ## true of the code rather than only of the intention.
 func _no_other_menu_open() -> bool:
@@ -1191,7 +1191,7 @@ func _physics_process(_delta: float) -> void:
 ## failure -- see PlotSlot._ensure_shape) then shows up as a prompt that never appears
 ## rather than as a distance check that quietly still works.
 func _update_plot_interaction() -> void:
-	# The same question the market prompt asks, and for the same reason -- see
+	# The same question the market prompt asks, and for the same reason: see
 	# _no_other_menu_open(). This used to ask only whether the BUILD menu was open, which
 	# let E build a pen out from under an open Market or an open pause menu.
 	if not _no_other_menu_open():

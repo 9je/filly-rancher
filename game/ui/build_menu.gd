@@ -108,7 +108,7 @@ var bits_provider := Callable()
 ## so a build menu opened over an already-open Market would unpause the world underneath it
 ## the moment it closed; and during the ranch's boot, before anything is wired, this says
 ## "not yet" rather than opening a menu whose `plot_chosen` nobody is listening for.
-## game/world/ranch.gd sets it -- the ranch is what knows which other menus exist.
+## game/world/ranch.gd sets it, being the thing that knows which other menus exist.
 var can_open := Callable()
 
 
@@ -131,9 +131,9 @@ func _ready() -> void:
 # --- opening and closing ------------------------------------------------------------------
 
 ## Show the menu for `slot`. Returns false (and shows nothing) for a null slot, a slot that
-## already has something on it, an empty catalogue, or a `can_open` that refuses -- all
-## four are states where there is no decision to offer, and popping an empty panel would be
-## worse than not popping one.
+## already has something on it, an empty catalogue, or a `can_open` that refuses. All four
+## are states where there is no decision to offer, and popping an empty panel would be worse
+## than not popping one.
 func open(slot: PlotSlot) -> bool:
 	if slot == null or not slot.is_empty() or _plots.is_empty():
 		return false

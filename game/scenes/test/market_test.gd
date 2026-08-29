@@ -170,7 +170,7 @@ func _ready() -> void:
 	# in it are poured back, or the herd is restored into a bag that is still the size it
 	# was before the player bought a bigger one. Fifteen ponies is deliberately more than
 	# the base bag holds and fewer than the bought one does, so a bag that was not grown in
-	# time loses exactly the ones in between -- to neither the bag nor a pen.
+	# time loses exactly the ones in between, to neither the bag nor a pen.
 	var storage: Storage = beam.get_storage()
 	_set_check("the saddlebag is empty before the herd goes in", storage.count() == 0)
 	var herd := 15
@@ -191,9 +191,9 @@ func _ready() -> void:
 		pass
 	storage.set_capacity(capacity_before)
 	_set_check("the bag is back to its base capacity", storage.capacity == capacity_before)
-	# Boot reads the save BEFORE anything is connected to state_loaded -- ranch.gd's
-	# _bind_game_state() connects rebind_economy only after its own load, on purpose -- so
-	# at boot the load itself applies no gear. The connection comes off for this one call to
+	# Boot reads the save BEFORE anything is connected to state_loaded, because ranch.gd's
+	# _bind_game_state() connects rebind_economy only after its own load, on purpose. So at
+	# boot the load itself applies no gear. The connection comes off for this one call to
 	# reproduce that; leaving it on would grow the bag on the way through and the ordering
 	# under test would never run.
 	state.state_loaded.disconnect(ranch.rebind_economy)
@@ -207,7 +207,7 @@ func _ready() -> void:
 	_set_check("the restore reports what it put back", restored == herd)
 	_set_check("the resident already in her pen stayed in it", pen.count() == 1)
 	# A load mid-session can reach this twice. It must place what is missing and nothing
-	# else -- no pony filed in a pen and in the bag at once.
+	# else, with no pony filed in a pen and in the bag at once.
 	_set_check("a second restore places nobody twice", ranch.restore_owned_ponies() == 0)
 	_set_check("and the bag still holds the herd exactly once", storage.count() == herd)
 
