@@ -386,13 +386,18 @@ func body_for(uid: StringName) -> Node3D:
 ## minutes into one call and so a future time-skip ("you slept until morning") has one thing
 ## to call. _physics_process below is a one-line caller of it.
 ##
-## Needs first, then Production, in that order and not the other way round: Production gates
-## on hunger, and a pony who tipped over the starving threshold during THIS tick should stop
-## producing on this tick, not on the next one.
+## Needs first, then feeding, then Production. The ordering is right, and it earns its keep
+## at exactly one line: STARVING. The two thresholds are far apart. Production pays nothing
+## only to a pony at or above Production.STARVING_HUNGER_THRESHOLD (0.95 of full hunger);
+## _feed_if_hungry() reaches for the pantry much earlier, at Needs.HUNGRY_THRESHOLD (0.5),
+## and a successful feed puts her hunger back to zero.
 ##
-## Feeding sits BETWEEN the two, for the same reason read the other way: a resident the
-## pantry can feed this tick is fed before Production looks at her hunger, so a stocked
-## ranch never loses a gem to a pony who was hungry for a fraction of one frame.
+## So: advance her hunger, feed her if the pantry can, and only then ask Production what she
+## made. A resident who crosses 0.5 during THIS tick eats on this tick rather than the next
+## one, and a resident who crosses 0.95 during this tick is fed back below it before
+## Production ever looks, so a stocked ranch never loses a gem it could have paid for with
+## one bale. Anywhere between the two thresholds the order is invisible: she is hungry, she
+## eats, and she was producing either way.
 func tick(delta: float) -> int:
 	if delta <= 0.0 or _residents.is_empty():
 		return 0
@@ -411,9 +416,21 @@ func tick(delta: float) -> int:
 	return produced
 
 
-## Feed `inst` one item from the pantry if she is hungry and something is stocked. Her
-## favourite first, then whatever is there. Hunger is checked AFTER Needs.tick() above so
-## a pony who crossed the threshold this tick eats this tick.
+## Feed `inst` one item from the pantry if she is hungry and something EDIBLE is stocked.
+## Her favourite first, then whatever else is in there. Hunger is checked AFTER Needs.tick()
+## above so a pony who crossed the threshold this tick eats this tick.
+##
+## WHAT IS IN THE PANTRY IS NOT ALL FOOD. Inventory (game/systems/inventory.gd) counts item
+## ids and does not know what one means, so the Market's non-food goods share it with the
+## hay. This used to take Inventory.ids()[0] whenever no favourite was stocked, and ids() is
+## sorted, so one brush in the pantry sorted ahead of the hay and starved the whole ranch
+## for as long as it was owned: the removal succeeded, Needs.feed() refused an id it could
+## not resolve, the brush went back, and the same brush was picked again on the next tick,
+## forever. Now the ids are walked and anything Needs.resolve_food() cannot resolve is
+## skipped, so a pantry holding a brush and a bale feeds the bale.
+##
+## ONE ids() CALL, walked once. It allocates and sorts a fresh array per call, and the
+## favourite and the fallback have to be chosen from the same reading of the shelves.
 func _feed_if_hungry(inst: PonyInstance) -> void:
 	if inst.hunger < NeedsScript.HUNGRY_THRESHOLD:
 		return
@@ -423,17 +440,19 @@ func _feed_if_hungry(inst: PonyInstance) -> void:
 	if pantry == null:
 		return
 	var choice: StringName = &""
-	for food_id in pantry.ids():
+	for food_id: StringName in pantry.ids():
+		if NeedsScript.resolve_food(food_id) == null:
+			continue
 		if NeedsScript.is_favorite(inst, food_id):
 			choice = food_id
 			break
+		if String(choice).is_empty():
+			choice = food_id
 	if String(choice).is_empty():
-		var stocked := pantry.ids()
-		if stocked.is_empty():
-			return
-		choice = stocked[0]
-	# Take first, feed second: a feed that fails (an id Needs cannot resolve) puts the
-	# item back rather than leaving it consumed for nothing.
+		return
+	# Take first, feed second: a feed that fails puts the item back rather than leaving it
+	# consumed for nothing. The walk above has already ruled out the one failure Needs.feed()
+	# reports, so this is the belt to that braces.
 	if not pantry.remove(choice, 1):
 		return
 	if not NeedsScript.feed(inst, choice):
