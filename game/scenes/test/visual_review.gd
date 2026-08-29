@@ -228,13 +228,19 @@ func _run_face() -> void:
 ## iris texture's alpha: with the iris hidden the white of the eye is a clean oval, and
 ## with the iris material forced fully opaque the tear was still exactly there.
 ##
-## `tag=rigid` (motion mode) pins the hair to the skull, which is the reference every
+## `tag=rigid` pins the hair to the skull, which is the reference every
 ## judgement about the springs is made against -- the shape the model and the clip
-## actually intend. Handled in _run_motion.
+## actually intend. Motion mode handles it in _run_motion; face mode handles it here,
+## which is how "her mane covers her whole face" gets separated into "the springs
+## collapsed it" and "the pack modelled it there" without touching the exporter.
 ##
 ## Anything else in `tag=` is just a filename suffix, so a sweep can write several
 ## variants into one directory.
 func _experiment(pony: Node3D) -> void:
+	if _tag == "rigid":
+		var sim := pony.find_child("HairSpring", true, false)
+		if sim is SpringBoneSimulator3D:
+			(sim as SpringBoneSimulator3D).influence = 0.0
 	for group in [["Base_Iris.L", "Base_Iris.R"], ["Base_Eye.L", "Base_Eye.R"]]:
 		if _tag != ("noiris" if group[0].begins_with("Base_Iris") else "noeye"):
 			continue

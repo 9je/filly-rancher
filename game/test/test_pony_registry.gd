@@ -83,7 +83,9 @@ func test_by_rarity_partitions_the_roster() -> void:
 	for p in buckets[PonyDataScript.Rarity.LEGENDARY]:
 		legendary_ids.append(p.id)
 	assert_true(legendary_ids.has(&"sunsetshimmer"), "sunsetshimmer is LEGENDARY")
-	assert_true(legendary_ids.has(&"songbirdserenade"), "songbirdserenade is LEGENDARY")
+	# LEGENDARY is a one member tier: songbirdserenade was the second and is excluded
+	# (docs/pipeline.md, "What converted but is not in the roster").
+	assert_eq(legendary_ids.size(), 1, "sunsetshimmer is the only LEGENDARY")
 
 
 func test_load_all_entries_are_pony_data() -> void:

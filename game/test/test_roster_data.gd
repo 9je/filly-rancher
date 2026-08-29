@@ -1,19 +1,19 @@
 extends GutTest
-## The roster's SHAPE, pinned. Phase 2 slice 2 took it from 6 to 44 characters, and
+## The roster's SHAPE, pinned. Phase 2 slice 2 took it from 6 to 43 characters, and
 ## every one of them is a .tres under game/data/ponies/; these tests are what stop a
-## typo in one of forty-four files from being a character who never spawns, sells for the
+## typo in one of forty-three files from being a character who never spawns, sells for the
 ## wrong price, or shows a dash on screen.
 
 const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const FoodRegistryScript := preload("res://systems/food_registry.gd")
 
-const MIN_ROSTER := 44
+const MIN_ROSTER := 43
 const EXPECTED_TIERS := {
 	PonyDataScript.Rarity.COMMON: 17,
 	PonyDataScript.Rarity.UNCOMMON: 15,
 	PonyDataScript.Rarity.RARE: 10,
-	PonyDataScript.Rarity.LEGENDARY: 2,
+	PonyDataScript.Rarity.LEGENDARY: 1,
 }
 
 
@@ -22,7 +22,7 @@ func _roster() -> Dictionary:
 	return registry.load_all("res://data/ponies")
 
 
-func test_the_roster_is_at_least_forty_four() -> void:
+func test_the_roster_is_at_least_forty_three() -> void:
 	assert_gte(_roster().size(), MIN_ROSTER)
 
 

@@ -17,7 +17,6 @@ starlightglimmer|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revampe
 applejack|blend|blender-native/Applejack_1-0/Applejack_1-0.blend|AJ_Rig
 rarity|blend|blender-native/Rarity_1-0/Rarity_1-0.blend|R_Rig
 sunsetshimmer|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_sunsetshimmer.mdl|
-songbirdserenade|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_songbirdserenade.mdl|
 pinkamena|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_pinkamena.mdl|
 trixie|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_trixie.mdl|
 shiningarmor|sfm|sfm/SFM Ready Compiled Files/Models/reVAmped_ponies/revamped_shiningarmor.mdl|
