@@ -28,6 +28,7 @@ extends GutTest
 ## documented at the top of game/scripts/pony_rig.gd.
 
 const SaveIOScript := preload("res://systems/save_io.gd")
+const GameStateScript := preload("res://systems/game_state.gd")
 
 ## Where these tests write. Deliberately NOT SaveIO's default directory.
 const SCRATCH_DIR := "user://test_scratch/save_io"
@@ -268,6 +269,53 @@ func test_a_version_1_file_loads_and_gains_empty_gems_and_inventory() -> void:
 	assert_true(migrated.has("inventory"), "migration adds the inventory key")
 	assert_eq(migrated["gems"], {})
 	assert_eq(migrated["inventory"], {})
+
+
+## THE WHOLE PATH, NOT THE MIGRATION ON ITS OWN. The test above calls migrate() directly,
+## which proves the transform and nothing about the two ends of it. This one is the composed
+## route a player on an older save actually takes: a version-1 file on disk, written by a
+## build that had never heard of gems or of an inventory, read through SaveIO.load() and
+## poured into a GameState. It is the only test that would catch a load() that forgot to
+## call migrate(), or a from_dict() that choked on the keys migration adds.
+##
+## The fixture is hand-written rather than produced by this build, on purpose: a v1 file is
+## exactly what this build can no longer write.
+func test_a_version_1_file_on_disk_loads_all_the_way_into_a_game_state() -> void:
+	var v1 := {
+		"version": 1,
+		"bits": 640,
+		"ponies": [
+			{"uid": "twilight#000001", "data_id": "twilight", "nickname": "Sparkle",
+				"happiness": 0.75, "hunger": 0.25, "caught_at_ms": 1772150400000},
+			{"uid": "fluttershy#000002", "data_id": "fluttershy", "nickname": "",
+				"happiness": 0.5, "hunger": 0.0, "caught_at_ms": 0},
+		],
+		"plots": {"0": "pen"},
+		"unlocks": ["bigger_saddlebag"],
+		"world_seed": 20260839,
+	}
+	_write_raw(SaveIOScript.slot_path(SLOT), JSON.stringify(v1, "  ", true))
+
+	var loaded := SaveIOScript.load(SLOT)
+	assert_false(loaded.is_empty(), "a version-1 save still loads on this build")
+	assert_eq(int(loaded["version"]), 2,
+		"...and arrives stamped with the version it was migrated to, not the one on disk")
+
+	var state = GameStateScript.new()
+	autofree(state)
+	state.from_dict(loaded)
+
+	assert_eq(state.bits, 640, "the wallet survived the trip")
+	assert_eq(state.world_seed, 20260839, "so did the world it was generated from")
+	assert_eq(state.pony_count(), 2, "both ponies came back")
+	assert_eq(String(state.get_ponies()[0].uid), "twilight#000001", "...with their uids")
+	assert_almost_eq(state.get_ponies()[0].happiness, 0.75, 0.0001, "...and their state")
+	assert_eq(String(state.plots.get("0", "")), "pen", "the plot she built is still built")
+	assert_true(state.unlocks.has("bigger_saddlebag"), "the gear she bought is still bought")
+
+	assert_true(state.gems.is_empty(),
+		"a save from before gems existed comes back with an empty pouch, not a broken one")
+	assert_true(state.inventory.ids().is_empty(), "and with an empty pantry")
 
 
 # --- atomicity: an interrupted write must not cost the previous save ------------------
