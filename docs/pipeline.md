@@ -1092,7 +1092,7 @@ tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/smoke.ts
 # raycast onto real ground inside their zones, camera spring arm pulling in against
 # an actual building). Prints the marker ONLY if all of them held.
 tools/bin/godot --headless --audio-driver Dummy --path game world/ranch.tscn
-# -> RANCH_OK ponies=8 props=33 assets=present   exit 0
+# -> RANCH_OK ponies=10 props=34 assets=present   exit 0
 # (assets=absent + zero counts on a checkout that has not run the asset pipeline)
 
 # Hair follow-through: measures how far the mane/tail trail the body, against a
@@ -1297,7 +1297,7 @@ Task 7 the main scene is `res://world/ranch.tscn` (`game/project.godot`), not
 `res://scenes/test/smoke.tscn`. The Linux binary prints:
 
 ```
-RANCH_OK ponies=8 props=33 assets=present
+RANCH_OK ponies=10 props=34 assets=present
 ```
 
 exit 0 — the same line the headless scene run prints, confirming the exported

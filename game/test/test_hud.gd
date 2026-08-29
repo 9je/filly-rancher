@@ -59,6 +59,16 @@ func test_the_hud_scene_loads_and_carries_its_script() -> void:
 ## game/scenes/test/camera_test.gd's own crosshair round-trip -- which only ever checks
 ## the camera/projection half of that agreement, never the HUD's node layout -- stayed
 ## green throughout. This is the other half.
+func test_a_toast_is_readable_back_after_it_is_shown() -> void:
+	# game/world/ranch.gd says everything it says to the player through HUD.toast(), and
+	# what it says is a requirement in its own right (the market gate reads the sale line
+	# back to check that one gem is called a gem). A toast nothing can read again is a
+	# requirement nothing can check.
+	await wait_process_frames(1)
+	_hud.toast("Sold 1 gem for 5 bits.")
+	assert_eq(_hud.toast_text(), "Sold 1 gem for 5 bits.")
+
+
 func test_the_crosshair_control_is_centred_on_the_viewport() -> void:
 	var crosshair: Control = _hud.get_node("Crosshair")
 	await wait_process_frames(1)
@@ -224,3 +234,56 @@ func test_a_refused_store_does_not_change_what_the_hud_shows() -> void:
 		"the bag is full, so this store must be refused")
 	assert_eq(_hud.get_shown_rarities(), before,
 		"a refused capture must leave the pips exactly as they were")
+
+
+## THE BUG THIS PINS IS A LIE ON SCREEN, NOT A CRASH. The HUD caches its capacity at bind
+## time and rebuilds only on Storage.changed, and until the shop existed nothing could ever
+## change a bag's capacity after binding, so the cache was correct by construction. Buying
+## the saddlebag (MagicBeam.apply_unlocks) breaks that assumption: it grows the very
+## Storage this HUD is already holding. A HUD that kept the bound value would print
+## "n / 12" and draw twelve pips over an eighteen-slot bag, and game/world/ranch.gd's own
+## self check that the HUD shows the beam's real capacity would fail with it.
+func test_the_hud_follows_a_saddlebag_that_grew_after_binding() -> void:
+	var beam := _bind_to_a_fake_player(12)
+	await wait_process_frames(3)
+	assert_eq(_hud.get_capacity(), 12, "the HUD starts on the capacity it bound to")
+
+	# Exactly what buying the gear does to this object, and nothing else. No frame is
+	# awaited on purpose: set_capacity emits Storage.changed synchronously, so if the HUD
+	# has caught up by the next line it is because it is listening.
+	beam.storage.set_capacity(MagicBeamScript.BIGGER_SADDLEBAG_CAPACITY)
+	assert_eq(_hud.get_capacity(), MagicBeamScript.BIGGER_SADDLEBAG_CAPACITY,
+		"the HUD must follow a bag that grew, or ranch.gd's capacity self check fails")
+
+	var count: Label = _hud.get_node("Bag/Count")
+	assert_true(count.text.ends_with("/ %d" % MagicBeamScript.BIGGER_SADDLEBAG_CAPACITY),
+		"the readout must say the new capacity, not the bound one (it says '%s')" % count.text)
+
+
+func test_the_bits_line_shows_the_wallet() -> void:
+	_hud.set_bits(0)
+	assert_eq(_hud.get_bits_text(), "0 bits")
+	_hud.set_bits(1234)
+	assert_eq(_hud.get_bits_text(), "1234 bits")
+
+
+func test_the_hints_card_names_pause_and_trade_and_never_free_cursor() -> void:
+	var joined := ""
+	for row in _hud.HINTS:
+		joined += " ".join(row) + "\n"
+	assert_string_contains(joined, "PAUSE")
+	assert_string_contains(joined, "TRADE")
+	assert_false(joined.contains("FREE CURSOR"), "Escape pauses now; it does not free the cursor")
+	assert_false(joined.contains("--"), "no double hyphen on the card")
+	assert_false(joined.contains("—"), "no em dash on the card")
+
+
+## A menu handler can fire a toast (for example the Market's "Sold 12 gems for 60
+## bits.") and then pause the tree. If the HUD stopped processing along with everything
+## else, that toast would freeze at full alpha instead of fading, and stay frozen until
+## the menu closed. PROCESS_MODE_ALWAYS is what keeps the HUD's own _process ticking
+## while the world is paused, so this pins the mode rather than the paused behaviour
+## itself, since a GUT test should not pause the shared scene tree.
+func test_the_hud_keeps_processing_while_the_tree_is_paused() -> void:
+	assert_eq(_hud.process_mode, Node.PROCESS_MODE_ALWAYS,
+		"the HUD must keep processing while the world is paused, or toasts freeze")

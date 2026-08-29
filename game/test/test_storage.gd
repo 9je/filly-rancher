@@ -163,3 +163,49 @@ func test_a_negative_capacity_is_clamped_rather_than_trusted() -> void:
 	assert_eq(storage.capacity, 0, "a negative capacity is nonsense; clamp it to empty")
 	assert_true(storage.is_full())
 	assert_false(storage.store(_instance("a")))
+
+
+## The saddlebag gear (game/data/shop/bigger_saddlebag.tres) grows a bag that is already in
+## use and already has ponies in it, so capacity has to be settable after construction,
+## and settable in only one safe direction. A bag holding more than its capacity would make
+## is_full() true with room on the shelf and refuse the next store() forever, a state no
+## constructor could ever produce, so shrinking stops at the contents.
+func test_capacity_can_grow_but_never_below_what_is_held() -> void:
+	var bag = StorageScript.new(2)
+	bag.store(_instance("twilight"))
+	bag.store(_instance("twilight"))
+	bag.set_capacity(5)
+	assert_eq(bag.capacity, 5)
+	assert_false(bag.is_full())
+	bag.set_capacity(1)
+	assert_eq(bag.capacity, 2, "shrinking below the contents is clamped to the contents")
+	assert_true(bag.is_full())
+
+
+## The HUD caches the capacity it bound to and rebuilds only on `changed`, so a bag that
+## grew in silence would print "n / 12" over an eighteen-slot saddlebag forever. The
+## no-op half is asserted just as hard, for the same reason the refused-store case above
+## is: a signal that fires when nothing moved is as useless to a listener as one that
+## does not fire when something did.
+func test_set_capacity_announces_a_real_change_and_only_a_real_change() -> void:
+	var bag = StorageScript.new(12)
+	watch_signals(bag)
+
+	bag.set_capacity(18)
+	assert_signal_emit_count(bag, "changed", 1, "growing the bag must announce itself once")
+
+	bag.set_capacity(18)
+	assert_signal_emit_count(bag, "changed", 1, "setting the capacity it already has is a no-op")
+
+	bag.store(_instance("twilight"))
+	assert_signal_emit_count(bag, "changed", 2, "...and a store still announces itself")
+
+	# One pony is in the bag now, so 1 is a legal capacity and the shrink to it is real.
+	# 0 is not: the clamp lifts it back to the 1 the bag already has, so nothing moves.
+	bag.set_capacity(1)
+	assert_eq(bag.capacity, 1)
+	assert_signal_emit_count(bag, "changed", 3, "shrinking to a REAL new value announces too")
+	bag.set_capacity(0)
+	assert_eq(bag.capacity, 1, "the clamp holds at the contents")
+	assert_signal_emit_count(bag, "changed", 3,
+		"a shrink the clamp swallowed moved nothing, so it must stay silent")

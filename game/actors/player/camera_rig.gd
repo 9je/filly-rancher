@@ -134,6 +134,8 @@ const ZOOM_STEP := 0.5
 ## level: it shows more of the ground ahead of her instead of framing empty sky at the
 ## top of the shot. Confirmed against the "at rest" screenshot in the task report.
 @export var default_pitch_deg := -12.0
+## Flip vertical look. The pause menu's settings page toggles this.
+@export var invert_look := false
 
 @export_group("Collision")
 ## What the spring arm's pull-in probe collides with. Applied to the SpringArm3D in
@@ -427,13 +429,6 @@ func _ready() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		add_look_delta(event.relative.x * mouse_sensitivity, event.relative.y * mouse_sensitivity)
-	elif event is InputEventKey and event.pressed and not event.echo \
-			and event.keycode == KEY_ESCAPE:
-		# Toggle rather than release-only: makes Escape double as "give me my cursor
-		# back" AND "I'm done, let me look around again", with no separate recapture
-		# input needed.
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE \
-			if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED else Input.MOUSE_MODE_CAPTURED
 
 
 func _process(delta: float) -> void:
@@ -469,7 +464,8 @@ func _process(delta: float) -> void:
 ## InputEventMouseMotion objects or a live viewport.
 func add_look_delta(delta_yaw: float, delta_pitch: float) -> void:
 	rotation.y -= delta_yaw
-	_look_pitch = clampf(_look_pitch - rad_to_deg(delta_pitch), PITCH_MIN_DEG, PITCH_MAX_DEG)
+	var pitch := -delta_pitch if invert_look else delta_pitch
+	_look_pitch = clampf(_look_pitch - rad_to_deg(pitch), PITCH_MIN_DEG, PITCH_MAX_DEG)
 	_spring_arm.rotation.x = deg_to_rad(_look_pitch)
 
 

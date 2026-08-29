@@ -68,6 +68,8 @@ extends RefCounted
 ## that loads a fixture written in it. Bumping the number without doing that is how a
 ## "supported" old save quietly stops being one.
 ##
+## Version 2 (Phase 2 slice 1) adds "gems" and "inventory"; both default to {}.
+##
 ## --- JSON HAS NO INTEGER TYPE ---------------------------------------------------------
 ##
 ## Every number in a dictionary that came back from load() is a FLOAT, including the ones
@@ -92,7 +94,7 @@ extends RefCounted
 
 ## The format this build writes, and the highest it will read. See the version policy in
 ## the class comment before changing it.
-const FORMAT_VERSION := 1
+const FORMAT_VERSION := 2
 
 ## The key the version is stamped under. Reserved: a caller's payload must not use it --
 ## save() overwrites it, and load() reads it back out.
@@ -310,19 +312,25 @@ static func delete_slot(slot: int) -> bool:
 
 ## Bring a save written by an older build up to the current shape.
 ##
-## Currently the identity function, because FORMAT_VERSION has only ever been 1 -- and
-## saying that out loud is the point: the seam exists, is called, and is where a version-2
-## migration goes, so the first bump is an edit to a function that is already wired in
-## rather than a new mechanism invented under time pressure.
-##
 ## The rule for what belongs here: only changes that cannot be expressed as a DEFAULT.
 ## A field that was added keeps working for free, because every from_dict() in this
 ## project fills a missing field from its default. A field that was RENAMED, split, or
 ## whose units or meaning changed is what needs a branch here.
+##
+## gems and inventory are the one exception worth writing down: GameState.from_dict()
+## already defaults a missing "gems"/"inventory" to an empty pouch/inventory on its own,
+## so this branch is not load-bearing for GameState. It exists so that migrate()'s
+## output (what a version-1 file becomes once migrated, asserted directly by
+## test_save_io.gd) states the version-2 shape explicitly, rather than leaving it to be
+## inferred from a caller elsewhere in the project.
 static func migrate(data: Dictionary, from_version: int) -> Dictionary:
-	match from_version:
-		_:
-			return data
+	var out := data.duplicate(true)
+	if from_version < 2:
+		if not out.has("gems"):
+			out["gems"] = {}
+		if not out.has("inventory"):
+			out["inventory"] = {}
+	return out
 
 
 ## The first thing in `value` that JSON cannot represent, described for an error message,

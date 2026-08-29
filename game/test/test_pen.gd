@@ -27,6 +27,7 @@ const PlotRegistryScript := preload("res://systems/plot_registry.gd")
 const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const ProductionScript := preload("res://systems/production.gd")
 const NeedsScript := preload("res://systems/needs.gd")
+const InventoryScript := preload("res://systems/inventory.gd")
 const GameStateScript := preload("res://systems/game_state.gd")
 const SaveIOScript := preload("res://systems/save_io.gd")
 const StorageScript := preload("res://systems/storage.gd")
@@ -646,3 +647,139 @@ func test_a_pony_with_no_address_loads_as_one_in_the_saddlebag() -> void:
 	var inst: PonyInstance = PonyInstanceScript.from_dict(legacy)
 	assert_not_null(inst, "an old record still loads")
 	assert_eq(String(inst.home_slot), "", "...as a pony nobody has penned")
+
+
+# --- the tray, and the pantry it feeds from ----------------------------------------------
+
+func test_the_tray_counts_gems_by_the_producing_pony_s_rarity() -> void:
+	var pen := _pen(2)
+	var her := _instance("twilight")  # RARE in game/data/ponies/twilight.tres
+	her.happiness = 1.0
+	her.hunger = 0.0
+	pen.add_pony(her)
+	pen.tick(ProductionScript.PRODUCTION_PERIOD_SECONDS)
+	var by_rarity: Dictionary = pen.gems_by_rarity()
+	assert_eq(by_rarity.get(her.data().rarity, 0), 1)
+	assert_eq(pen.gems(), 1, "the total still adds up")
+
+
+func test_take_gems_by_rarity_hands_over_the_tray_and_empties_it() -> void:
+	var pen := _pen(2)
+	var her := _instance("twilight")
+	her.happiness = 1.0
+	her.hunger = 0.0
+	pen.add_pony(her)
+	pen.tick(ProductionScript.PRODUCTION_PERIOD_SECONDS * 2.0)
+	var taken: Dictionary = pen.take_gems_by_rarity()
+	assert_eq(taken.get(her.data().rarity, 0), 2)
+	assert_eq(pen.gems(), 0)
+	assert_eq(pen.gems_by_rarity().size(), 0)
+
+
+func test_a_hungry_resident_eats_from_the_inventory() -> void:
+	var pen := _pen(2)
+	var inv = InventoryScript.new()
+	inv.add(&"hay", 1)
+	pen.inventory_provider = func() -> Inventory: return inv
+	var her := _instance("twilight")
+	her.hunger = NeedsScript.HUNGRY_THRESHOLD + 0.1
+	pen.add_pony(her)
+	watch_signals(pen)
+	pen.tick(0.1)
+	assert_eq(inv.count(&"hay"), 0, "the hay was eaten")
+	assert_lt(her.hunger, NeedsScript.HUNGRY_THRESHOLD, "and she is no longer hungry")
+	assert_signal_emitted_with_parameters(pen, "fed", [her.uid, &"hay"])
+
+
+func test_a_resident_prefers_her_favourite_when_both_are_stocked() -> void:
+	var pen := _pen(2)
+	var inv = InventoryScript.new()
+	inv.add(&"hay", 1)
+	inv.add(&"daffodil", 1)  # a Twilight favourite, see twilight.tres
+	pen.inventory_provider = func() -> Inventory: return inv
+	var her := _instance("twilight")
+	her.hunger = NeedsScript.HUNGRY_THRESHOLD + 0.1
+	pen.add_pony(her)
+	pen.tick(0.1)
+	assert_eq(inv.count(&"daffodil"), 0, "she took the daffodil")
+	assert_eq(inv.count(&"hay"), 1, "and left the hay")
+
+
+## The test above stocks two of Twilight's OWN favourites, so it pins the sorted order the
+## pantry is walked in and nothing else. This one is the favourite-versus-neutral case:
+## carrot sorts first and is not on her list, hay sorts second and is. She must reach past
+## the carrot.
+func test_a_resident_reaches_past_a_neutral_food_for_her_favourite() -> void:
+	var pen := _pen(2)
+	var inv = InventoryScript.new()
+	inv.add(&"carrot", 1)  # not a Twilight favourite, and first in sorted order
+	inv.add(&"hay", 1)     # a Twilight favourite, see twilight.tres
+	pen.inventory_provider = func() -> Inventory: return inv
+	var her := _instance("twilight")
+	her.hunger = NeedsScript.HUNGRY_THRESHOLD + 0.1
+	pen.add_pony(her)
+	pen.tick(0.1)
+	assert_eq(inv.count(&"hay"), 0, "she took the hay she likes")
+	assert_eq(inv.count(&"carrot"), 1, "and left the carrot she does not")
+
+
+## THE PANTRY IS NOT A LARDER. Inventory counts item ids and does not know what one means,
+## so anything the player owns can share it with the hay: a grooming brush from a later
+## slice, or an id from a save written by a build that carried a food this one does not.
+## `brush` sorts ahead of `carrot`, and the pen used to take Inventory.ids()[0] whenever no
+## FAVOURITE was stocked, so one brush in the pantry starved every pen on the ranch for as
+## long as it was owned: the brush was taken off the shelf, Needs.feed() refused an id it
+## could not resolve, the brush went back, and the next tick picked the same brush again.
+## Carrot rather than hay on purpose, because hay is a Twilight favourite and the favourite
+## pass would have reached past the brush on its own.
+func test_a_non_food_in_the_pantry_does_not_block_feeding() -> void:
+	var pen := _pen(2)
+	var inv = InventoryScript.new()
+	inv.add(&"brush", 1)    # not a food, and first in sorted order
+	inv.add(&"carrot", 1)   # a food, and not a Twilight favourite
+	pen.inventory_provider = func() -> Inventory: return inv
+	var her := _instance("twilight")
+	her.hunger = NeedsScript.HUNGRY_THRESHOLD + 0.1
+	pen.add_pony(her)
+	watch_signals(pen)
+	pen.tick(0.1)
+	assert_eq(inv.count(&"carrot"), 0, "she ate past the brush to the carrot")
+	assert_eq(inv.count(&"brush"), 1, "and the brush is still a brush")
+	assert_lt(her.hunger, NeedsScript.HUNGRY_THRESHOLD, "so she is no longer hungry")
+	assert_signal_emitted_with_parameters(pen, "fed", [her.uid, &"carrot"])
+
+
+func test_a_pantry_holding_nothing_edible_feeds_nobody_and_consumes_nothing() -> void:
+	var pen := _pen(2)
+	var inv = InventoryScript.new()
+	inv.add(&"brush", 2)
+	pen.inventory_provider = func() -> Inventory: return inv
+	var her := _instance("twilight")
+	her.hunger = NeedsScript.HUNGRY_THRESHOLD + 0.1
+	pen.add_pony(her)
+	watch_signals(pen)
+	pen.tick(0.1)
+	assert_eq(inv.count(&"brush"), 2, "nothing inedible is taken off the shelf")
+	assert_gte(her.hunger, NeedsScript.HUNGRY_THRESHOLD, "and she is still hungry")
+	assert_signal_not_emitted(pen, "fed", "a pen that fed nobody says nothing")
+
+
+func test_a_pen_with_no_inventory_does_not_feed_and_does_not_crash() -> void:
+	var pen := _pen(2)
+	var her := _instance("twilight")
+	her.hunger = NeedsScript.HUNGRY_THRESHOLD + 0.1
+	pen.add_pony(her)
+	pen.tick(0.1)
+	assert_gte(her.hunger, NeedsScript.HUNGRY_THRESHOLD, "nothing to eat, still hungry")
+
+
+func test_a_full_resident_does_not_eat() -> void:
+	var pen := _pen(2)
+	var inv = InventoryScript.new()
+	inv.add(&"hay", 1)
+	pen.inventory_provider = func() -> Inventory: return inv
+	var her := _instance("twilight")
+	her.hunger = 0.0
+	pen.add_pony(her)
+	pen.tick(0.1)
+	assert_eq(inv.count(&"hay"), 1, "food is not wasted on a pony who is not hungry")

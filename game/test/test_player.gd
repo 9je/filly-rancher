@@ -100,14 +100,15 @@ func test_the_two_gameplay_speeds_stay_inside_their_animation_budget() -> void:
 
 
 func test_all_required_input_actions_exist() -> void:
-	for action in ["move_forward", "move_back", "move_left", "move_right", "jump", "beam"]:
+	for action in ["move_forward", "move_back", "move_left", "move_right", "jump", "beam",
+			"pause"]:
 		assert_true(InputMap.has_action(action), "project.godot must define '%s'" % action)
 
 
 func test_every_movement_action_has_a_keyboard_and_a_gamepad_binding() -> void:
 	var expectations := {
 		"move_forward": true, "move_back": true, "move_left": true, "move_right": true,
-		"jump": true, "beam": true, "sneak": true,
+		"jump": true, "beam": true, "sneak": true, "pause": true,
 	}
 	for action in expectations:
 		var has_desktop := false
