@@ -145,6 +145,8 @@ const ZoneMarkerScript := preload("res://world/zone_marker.gd")
 const PonyScript := preload("res://actors/pony/pony.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const PlayerScript := preload("res://actors/player/player.gd")
+const WorldStateScript := preload("res://systems/world_state.gd")
+const SkyRigScript := preload("res://world/sky_rig.gd")
 
 ## Headless watchdog ceiling. A normal run (assets present) finishes in under 2s on
 ## this machine; 30s leaves a wide margin for a slower box while still failing in
@@ -318,6 +320,12 @@ const GATE_RAY_REACH := 2.0
 @onready var build_menu: CanvasLayer = $BuildMenu
 @onready var market_menu: CanvasLayer = $MarketMenu
 @onready var pause_menu: CanvasLayer = $PauseMenu
+## The sky. Typed as the plain Node3D ranch.tscn declares rather than as SkyRig, and
+## always reached through has_method(), for the reason _bind_build_menu() gives about the
+## menus: a sky_rig.gd that failed to PARSE leaves exactly this node in the tree with no
+## script on it, and reaching straight into a method it then does not have would abort boot
+## instead of showing up as a FAILED check in _report().
+@onready var sky_rig: Node3D = $SkyRig
 
 var _screenshot_dir := ""
 var _rig: Node3D
@@ -335,6 +343,33 @@ var _interactive := false
 
 ## Whether a save was found and loaded at boot. Printed, so a log says which world this is.
 var _save_loaded := false
+
+## THE CLOCK. Elapsed play time, and the phase and weather it implies
+## (game/systems/world_state.gd). Owned here rather than in an autoload because it is a
+## property of the SAVE, not of the process: it is built from GameState.world_seed and
+## GameState.world_time in _bind_game_state(), REBUILT on state_loaded for the same reason
+## rebind_economy() is (a load replaces what the state holds, and anything still pointing at
+## the old objects is pointing at a world nobody is playing), ticked in _physics_process()
+## and written back in _sync_game_state().
+var _world: WorldState = null
+
+## The command-line overrides, parsed in _ready() from OS.get_cmdline_user_args().
+##
+## `--phase=` and `--weather=` PIN the world: a screenshot run or a gate that wants a
+## stormy night must be able to have one without waiting seven minutes for it and without
+## the answer depending on which seed the save happens to carry. Giving only one of the two
+## takes the other from the unpinned world at that moment and pins both, so `--weather=fog`
+## still means "the fog that this seed and this hour would have had, held still".
+##
+## `--world-time=` only SETS the clock; it does not pin it. It is how you ask for "the ranch
+## eleven minutes in" and then let it run.
+##
+## -1 and -1.0 mean "not given". Names are matched case-insensitively; anything else is a
+## push_error and is ignored, because a typo in a screenshot script must be loud and must
+## not silently photograph a different hour than the one that was asked for.
+var _arg_phase := -1
+var _arg_weather := -1
+var _arg_world_time := -1.0
 
 ## How many owned ponies were put back into the saddlebag at boot. Printed rather than
 ## only counted: "the save loaded" and "the ponies in it reached the bag" are two different
@@ -463,6 +498,17 @@ func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--screenshot-dir="):
 			_screenshot_dir = arg.split("=")[1]
+		elif arg.begins_with("--phase="):
+			_arg_phase = _parse_named_value(arg, WorldStateScript.PHASE_NAMES, "phase")
+		elif arg.begins_with("--weather="):
+			_arg_weather = _parse_named_value(arg, WorldStateScript.WEATHER_NAMES, "weather")
+		elif arg.begins_with("--world-time="):
+			var seconds := arg.split("=", true, 1)[1]
+			if seconds.is_valid_float():
+				_arg_world_time = maxf(0.0, float(seconds))
+			else:
+				push_error("ranch: --world-time=%s is not a number of seconds; ignored."
+					% seconds)
 
 	_interactive = DisplayServer.get_name() != "headless" and _screenshot_dir == ""
 
@@ -489,6 +535,13 @@ func _ready() -> void:
 	# from, and applying it afterwards would mean the herd you come back to is not the herd
 	# you left.
 	_bind_game_state()
+
+	# THE RAIN NEEDS SOMEBODY TO FALL ON. _bind_game_state() above built the WorldState and
+	# has already handed it to the rig (apply_immediately, so boot has no eight second ramp
+	# from a sky nobody saw), which leaves only this: the rain is a small column overhead
+	# rather than a lid over 220 metres of map, so it travels with the player.
+	if sky_rig != null and sky_rig.has_method("follow"):
+		sky_rig.follow(player)
 
 	# IMMEDIATELY AFTER the save is read, and long before the ponies in it are put back.
 	# The gear a save records changes how much the world can hold: the saddlebag the player
@@ -560,8 +613,11 @@ func _bind_game_state() -> void:
 	_game_state = get_node_or_null(^"/root/GameState")
 	if _game_state == null:
 		# Not fatal here -- it is a FAILED check in _report(), which is a better place for
-		# it than a crash during boot.
+		# it than a crash during boot. The clock is still built, off the spawner's own seed:
+		# a session that cannot SAVE is still a session that has an hour in it, and
+		# get_world_state() returning null would take the sky down with the save system.
 		push_error("ranch: the GameState autoload is not registered; this session cannot save.")
+		_rebuild_world_state()
 		return
 
 	# A HOSTED RANCH NEVER READS THE PLAYER'S SAVE. A gate has to reach the same verdict on
@@ -592,6 +648,16 @@ func _bind_game_state() -> void:
 	# of which hands GameState a brand new GemPouch and a brand new Inventory.
 	if not _game_state.state_loaded.is_connected(rebind_economy):
 		_game_state.state_loaded.connect(rebind_economy)
+
+	# THE CLOCK, FROM THE SAVE THAT WAS JUST READ, and rebuilt on every load after this one
+	# for exactly the reason the line above rebuilds the economy: a load REPLACES what
+	# GameState holds, and a WorldState still counting from the world_time of the session
+	# being replaced is the clock of a ranch nobody is playing any more. Connected after
+	# load_from_slot() above for the same reason too; that call emits state_loaded itself,
+	# and the build immediately below is the one boot wants.
+	_rebuild_world_state()
+	if not _game_state.state_loaded.is_connected(_rebuild_world_state):
+		_game_state.state_loaded.connect(_rebuild_world_state)
 
 
 ## Put the owned ponies back where they live after a load.
@@ -857,6 +923,131 @@ func rebind_economy() -> void:
 	var hud := get_node_or_null(^"HUD")
 	if hud != null and hud.has_method("set_bits"):
 		hud.set_bits(_economy.bits)
+
+
+# --- the clock and the sky --------------------------------------------------------------
+
+## The world clock this ranch is running on, or null only if boot has not reached
+## _bind_game_state() yet. Exposed for gates and tests, which otherwise cannot tell a ranch
+## whose clock stopped from one that is simply in a long DAY.
+func get_world_state() -> WorldState:
+	return _world
+
+
+## MOVE THE CLOCK BY HAND. The public way for a gate or a test to reach an hour without
+## sitting through it; _physics_process() below ticks only for somebody actually playing,
+## precisely so that a gate, a screenshot run or a headless test never moves the world's
+## time as a side effect of existing.
+##
+## A pinned world ignores this, by design: pinning means "hold still", and a gate that
+## pinned an hour and then advanced past it would be asking for two different things.
+func advance_world(seconds: float) -> void:
+	if _world != null:
+		_world.advance(seconds)
+
+
+## BUILD (OR REBUILD) THE CLOCK FROM WHATEVER GameState HOLDS RIGHT NOW, apply the
+## command-line overrides to it, and point the sky and the HUD at the result.
+##
+## Connected to GameState.state_loaded, and the reason is rebind_economy()'s: a load does
+## not mutate the numbers, it replaces the object holding them. The old WorldState is
+## disconnected here rather than left to be freed quietly, so a mid-session load cannot
+## leave two clocks driving one sky; which would look like a sky that ramps twice as fast
+## and only on saves that were loaded rather than booted into.
+##
+## THE OVERRIDES ARE RE-APPLIED ON EVERY REBUILD, not only at boot. A screenshot run pinned
+## to a stormy night that loaded a save halfway through would otherwise photograph whatever
+## hour the save happened to hold.
+func _rebuild_world_state() -> void:
+	if _world != null:
+		if _world.phase_changed.is_connected(_on_world_phase_changed):
+			_world.phase_changed.disconnect(_on_world_phase_changed)
+		if _world.weather_changed.is_connected(_on_world_weather_changed):
+			_world.weather_changed.disconnect(_on_world_weather_changed)
+
+	_world = _build_world_state()
+	_world.phase_changed.connect(_on_world_phase_changed)
+	_world.weather_changed.connect(_on_world_weather_changed)
+
+	if sky_rig != null and sky_rig.has_method("apply_immediately"):
+		sky_rig.apply_immediately(_world)
+	_show_world_line()
+
+
+## A CLOCK BUILT FROM GameState'S OWN NUMBERS, WIRED TO NOTHING. What a save loaded at this
+## instant would restore: the same seed, the same elapsed seconds and the same
+## --phase=/--weather=/--world-time= overrides.
+##
+## SEPARATE FROM _rebuild_world_state() BECAUSE CONSTRUCTING A CLOCK AND INSTALLING ONE ARE
+## TWO JOBS. Installing is the delicate half (disconnect the old state's signals, connect
+## the new one's, re-aim the sky, repush the HUD label) and reads as itself only once the
+## eight lines of "which seed, which second, pinned to what" are somewhere else. Nothing
+## here is connected to anything or held by anybody; the caller decides what the clock
+## becomes.
+##
+## PINNED BEFORE ANYTHING IS LISTENING, on purpose: pin() emits phase_changed and
+## weather_changed for whichever half it moved, and a rig connected first would start an
+## eight second ramp away from a sky that was never on screen. _rebuild_world_state()
+## connects the signals AFTER this returns, and its apply_immediately() is what puts the
+## pinned sky up, in one frame.
+func _build_world_state() -> WorldState:
+	var world_seed: int = _game_state.world_seed if _game_state != null else spawner.spawn_seed
+	var elapsed: float = _game_state.world_time if _game_state != null else 0.0
+	if _arg_world_time >= 0.0:
+		elapsed = _arg_world_time
+	var built := WorldStateScript.new(world_seed, elapsed)
+	if _arg_phase >= 0 or _arg_weather >= 0:
+		# Only one of the two given means the other is taken from the UNPINNED world at
+		# this moment; the weather this seed and this hour would really have had; and
+		# then both are held.
+		var phase: int = _arg_phase if _arg_phase >= 0 else built.phase()
+		var weather: int = _arg_weather if _arg_weather >= 0 else built.weather()
+		built.pin(phase, weather)
+	return built
+
+
+## A phase flip and a weather roll are two signals that can land on the same frame, and
+## both mean the same thing to the sky and to the HUD, so both go through one place. A
+## second apply() mid ramp is continuous by construction (see SkyRig.apply), so the pair
+## bends the light rather than fighting over it.
+func _on_world_phase_changed(_phase: int) -> void:
+	_on_world_changed()
+
+
+func _on_world_weather_changed(_weather: int) -> void:
+	_on_world_changed()
+
+
+func _on_world_changed() -> void:
+	if sky_rig != null and sky_rig.has_method("apply"):
+		sky_rig.apply(_world)
+	_show_world_line()
+
+
+## Said in words as well as in light. Repainted on a change and at boot, never per frame;
+## the same contract HUD.set_bits() has.
+func _show_world_line() -> void:
+	var hud := get_node_or_null(^"HUD")
+	if hud != null and hud.has_method("set_world_line"):
+		hud.set_world_line(_world.describe() if _world != null else "")
+
+
+## Match `--name=value` against a list of display names, case-insensitively, and return the
+## index; which IS the enum value, since WorldState's PHASE_NAMES and WEATHER_NAMES are
+## indexed by their enums. -1 for anything unrecognised, with a push_error: a typo in a
+## screenshot script has to be loud, because the alternative is a run that quietly
+## photographs a different hour than the one that was asked for and looks perfectly fine.
+func _parse_named_value(arg: String, names: Array[String], what: String) -> int:
+	var value := arg.split("=", true, 1)[1].strip_edges().to_lower()
+	for i in range(names.size()):
+		if names[i].to_lower() == value:
+			return i
+	var allowed: Array[String] = []
+	for name in names:
+		allowed.append(name.to_upper())
+	push_error("ranch: unknown %s '%s'; expected one of %s. Ignored."
+		% [what, value, ", ".join(allowed)])
+	return -1
 
 
 ## The Market and the pause menu follow the build menu's contract: they emit, this
@@ -1318,6 +1509,14 @@ func _sync_game_state() -> void:
 	_game_state.set_ponies(owned)
 	_game_state.plots = _live_plots()
 	_game_state.world_seed = spawner.spawn_seed
+	# THE CLOCK, UNLESS IT WAS PINNED. --phase=/--weather= freeze the world at an hour
+	# nobody played to, and writing that back would hand the player a ranch stopped at
+	# whatever a screenshot run happened to ask for. WorldState.advance() already refuses
+	# to move a pinned clock, so the value here could only ever be the one the save was
+	# opened with; but the whole point of the flag is that a pinned run touches nothing,
+	# and "it would have written the same number" is not the same promise.
+	if _world != null and not _world.is_pinned():
+		_game_state.world_time = _world.elapsed()
 
 
 ## Save the ranch. Returns whether it landed. The live world is copied in by
@@ -1341,7 +1540,17 @@ func save_game() -> bool:
 ## teleports the player around the map to probe the camera, and one of those poses is a
 ## metre from a building. An autosave that fired on that would be a gate overwriting a real
 ## save.
-func _physics_process(_delta: float) -> void:
+func _physics_process(delta: float) -> void:
+	# THE CLOCK ONLY RUNS FOR SOMEBODY PLAYING, and it is the first thing this function
+	# does so that the guard below cannot ever be edited into swallowing it. A gate boots
+	# this same scene, teleports the player about and spins hundreds of frames; a
+	# screenshot run holds a pose. Neither is time the player lived through, and a world
+	# whose hour moved because CI ran is a world CI is allowed to change. advance_world()
+	# above is the deliberate way to move it instead. (advance() is itself a no-op on a
+	# pinned world, so --phase=/--weather= stop the clock here as well.)
+	if _interactive and _world != null:
+		_world.advance(delta)
+
 	if not _interactive:
 		return
 	_update_plot_interaction()
@@ -1949,6 +2158,107 @@ func _report(pony_count: int, prop_count: int) -> void:
 			beam != null and hud.get_capacity() == beam.get_storage().capacity
 				and hud.get_capacity() > 0)
 
+	# --- the clock and the sky ------------------------------------------------------
+	# THE SKY IS THE ONE PART OF THE WORLD A SCREENSHOT CANNOT PROVE. A rendered frame of a
+	# stormy night and a rendered frame of a rig that never got wired to the clock at all
+	# both look like "the sky ranch.tscn was hand lit with, or something near it", and the
+	# second one is a whole feature quietly not running. So the gate asks the rig what it is
+	# WALKING TOWARD and compares it against what the clock says the hour and the weather
+	# are, which is a number on both sides.
+	_set_check(checks, "the world state exists", _world != null)
+	# THE CLOCK THIS RUN WAS ACTUALLY ON, held before the reload probe below replaces it, so
+	# that the `RANCH world` line at the end of this section reports the run rather than the
+	# probe. It is the same object as _world until that probe runs.
+	var run_clock: WorldState = _world
+	var world_wired := _sky_rig_matches_state(_world)
+	if not _interactive and _world != null:
+		# THE RELOAD IS PERFORMED, NOT IMITATED. A load REPLACES what GameState holds and
+		# ranch.gd builds a whole new WorldState out of it (see _rebuild_world_state, and
+		# rebind_economy for the same problem in the economy). A rig still holding boot's
+		# state passes the line above and is wrong the moment the player loads a save, and
+		# nothing else in this project would catch it.
+		#
+		# ASKING A SCRATCH COPY WOULD BE ASKING NOTHING. A WorldState rebuilt from the same
+		# seed and the same elapsed seconds is equal to the live one by construction, so
+		# comparing the rig against it is the first check written twice: `x and x`, which
+		# cannot fail and so measures nothing. What has to be exercised is the rebuild
+		# ITSELF, and every part of it that a mid-session load depends on.
+		#
+		# SAFE HERE AND ONLY HERE. This branch is closed to interactive sessions, where the
+		# clock is RUNNING and a rebuild would set it back to whatever GameState last
+		# synced. Outside one, nothing has advanced the clock since boot, which is why the
+		# probe can assert the rebuilt hour and weather are the ones it replaced: if they
+		# ever differ, the rebuild is not reproducing the session and that is a failure.
+		var before_state: WorldState = _world
+		var before_phase: int = _world.phase()
+		var before_weather: int = _world.weather()
+
+		_rebuild_world_state()
+
+		# Every clause is a way the reload path has actually been broken or could be. A
+		# rebuild that returned the same object would mean the load never replaced anything;
+		# a different hour would mean it is not reproducing this session; a second listener
+		# on either signal is the two-clocks-one-sky bug _rebuild_world_state's disconnect
+		# exists to stop, and a listener left on the OLD state is the same bug from the
+		# other end; an unmatched rig would mean the rebuild forgot to re-aim the sky; and a
+		# stale HUD line would mean it forgot the label.
+		var reload_ok: bool = _world != before_state \
+			and _world.phase() == before_phase \
+			and _world.weather() == before_weather \
+			and _world.phase_changed.get_connections().size() == 1 \
+			and _world.weather_changed.get_connections().size() == 1 \
+			and before_state.phase_changed.get_connections().size() == 0 \
+			and before_state.weather_changed.get_connections().size() == 0 \
+			and _sky_rig_matches_state(_world)
+		if hud_scripted and hud.has_method("get_world_line"):
+			reload_ok = reload_ok and hud.get_world_line() == _world.describe()
+		world_wired = world_wired and reload_ok
+	_set_check(checks, "the sky rig is wired to the state", world_wired)
+
+	if _world != null and _world.is_pinned():
+		# A PINNED RUN IS ONLY WORTH PINNING IF IT STAYS PUT. --phase=/--weather= exist so a
+		# screenshot or a gate can have a stormy night on demand, and the promise attached
+		# to them is that such a run never writes a moved clock into anybody's save. The
+		# clock is asked to move a full minute here and must refuse.
+		#
+		# YES, THIS REPORT MOVES THE LIVE CLOCK, and so does the reload probe above; both on
+		# purpose, and neither is incidental. Asking a pinned clock to advance IS the
+		# assertion: a probe that only read is a probe that cannot tell "held" from "never
+		# asked". What is guarded is the reverse, that a gate never leaves a MOVED clock
+		# behind: this branch is entered only when the clock is pinned and refusing, the
+		# `RANCH world` line prints run_clock rather than either result, and no
+		# non-interactive run autosaves anything (see _interactive).
+		var before: float = _world.elapsed()
+		_world.advance(60.0)
+		_set_check(checks, "a pinned run does not move the clock",
+			absf(_world.elapsed() - before) < 0.0001)
+
+	# THE HUD HALF OF THE SAME CLAIM, and nothing else in the project gates it. An unwired
+	# world line is a blank line at the bottom of the Bag box, which looks exactly like a
+	# HUD that simply has nothing to say; so "the ranch actually pushed the hour to it"
+	# has to be asked rather than assumed, and asked of the LABEL, which is what
+	# HUD.get_world_line() reads. NOT one of the three labels task 4's brief lists: it is
+	# added because the task's other half is "the HUD says what hour it is" and a
+	# requirement this gate only printed would be a requirement nothing checked.
+	var hud_line := ""
+	if hud_scripted and hud.has_method("get_world_line"):
+		hud_line = hud.get_world_line()
+	_set_check(checks, "the HUD is saying what hour it is",
+		_world != null and hud_line == _world.describe())
+
+	# PRINTED OFF run_clock, WHICH IS THE HOUR THE SESSION WAS ON. The reload probe above
+	# replaced _world with an equal but different object, and the pinned check just asked
+	# the live clock to move; this line is a report on the run, so it reads the clock the
+	# run had. (The probe asserts the two agree on phase and weather, so a disagreement here
+	# would already have failed a check rather than quietly printed the wrong hour.)
+	if run_clock != null:
+		print("RANCH world elapsed=%.1f phase=%s weather=%s pinned=%s"
+			% [run_clock.elapsed(), WorldStateScript.phase_name(run_clock.phase()).to_upper(),
+				WorldStateScript.weather_name(run_clock.weather()).to_upper(),
+				run_clock.is_pinned()])
+	else:
+		print("RANCH world MISSING; no clock was built")
+
 	# --- saving --------------------------------------------------------------------
 	# THE CHECK THAT EARNS ITS PLACE IN THIS GATE. `user://` resolves somewhere completely
 	# different on Windows than on Linux (docs/windows-testing.md), the directory does not
@@ -2445,6 +2755,38 @@ func _probe_region_gate() -> Dictionary:
 	return result
 
 
+## Is the sky rig actually walking toward the hour and the weather `state` says it is?
+##
+## TAKES THE CLOCK AS AN ARGUMENT rather than reading _world, because _report() asks it
+## twice: once of the live clock, and once of a scratch clock built the way a reload would
+## build one (see _build_world_state). Both are the same question and neither is entitled to
+## replace the other.
+##
+## COMPARED ON THE PHASE-AND-WEATHER QUANTITIES ONLY, never on the sun's position. The
+## sun's elevation and bearing are continuous functions of phase_progress(), so in a session
+## where the clock is running they drift away from the target the last apply() set, every
+## frame, by design; comparing them would make this check fail simply because time
+## passed. Light energy, light colour, sky top and fog density are step functions of
+## (phase, weather): they change only when the phase or the weather changes, which is
+## exactly when apply() is called. So they agree if and only if the rig is wired.
+func _sky_rig_matches_state(state: WorldState) -> bool:
+	if state == null or sky_rig == null or not sky_rig.has_method("current_targets"):
+		return false
+	var targets: Dictionary = sky_rig.current_targets()
+	if targets.is_empty():
+		return false
+	var phase: int = state.phase()
+	var weather: int = state.weather()
+	var energy: float = targets.get(SkyRigScript.KEY_LIGHT_ENERGY, -1.0)
+	var fog: float = targets.get(SkyRigScript.KEY_FOG_DENSITY, -1.0)
+	var light: Color = targets.get(SkyRigScript.KEY_LIGHT_COLOR, Color.BLACK)
+	var top: Color = targets.get(SkyRigScript.KEY_SKY_TOP, Color.BLACK)
+	return absf(energy - SkyRigScript.light_energy(phase, weather)) < 0.0001 \
+		and absf(fog - SkyRigScript.fog_density(weather)) < 0.000001 \
+		and light.is_equal_approx(SkyRigScript.light_color(phase, weather)) \
+		and top.is_equal_approx(SkyRigScript.sky_top(phase, weather))
+
+
 ## Write a save into the gate's own scratch slot, read it back with a SECOND, independent
 ## GameState, and report whether every field came back.
 ##
@@ -2471,6 +2813,9 @@ func _probe_save_round_trip() -> Dictionary:
 	writer.bits = 1234
 	writer.world_seed = spawner.spawn_seed
 	writer.plots = {"0": "gate_probe"}
+	# The clock rides in the save now too, and a probe that wrote every OTHER field would
+	# go on printing a green save_round_trip on a build that had quietly stopped writing it.
+	writer.world_time = 754.5
 	writer.unlocks = ["gate_probe"]
 	writer.gems.add(PonyDataScript.Rarity.RARE, 3)
 	writer.inventory.add(&"hay", 5)
@@ -2488,6 +2833,7 @@ func _probe_save_round_trip() -> Dictionary:
 		result["ok"] = bool(result["wrote"]) \
 			and reader.bits == 1234 \
 			and reader.world_seed == spawner.spawn_seed \
+			and absf(reader.world_time - 754.5) < 0.0001 \
 			and String(reader.plots.get("0", "")) == "gate_probe" \
 			and ponies.size() == 1 \
 			and String(ponies[0].uid) == "gate_probe#000001" \
