@@ -101,6 +101,16 @@ var _open := false
 ## so Task 6's Economy can replace the source without this file changing.
 var bits_provider := Callable()
 
+## `func() -> bool`. Invalid means "always allowed".
+##
+## The same guard game/ui/pause_menu.gd and game/ui/market_menu.gd carry, and for the same
+## two reasons. Every menu on this ranch pauses the tree on open and unpauses it on close,
+## so a build menu opened over an already-open Market would unpause the world underneath it
+## the moment it closed; and during the ranch's boot, before anything is wired, this says
+## "not yet" rather than opening a menu whose `plot_chosen` nobody is listening for.
+## game/world/ranch.gd sets it, being the thing that knows which other menus exist.
+var can_open := Callable()
+
 
 func _ready() -> void:
 	# ALWAYS, because the ranch pauses the tree while this is up and this is the node that
@@ -121,10 +131,13 @@ func _ready() -> void:
 # --- opening and closing ------------------------------------------------------------------
 
 ## Show the menu for `slot`. Returns false (and shows nothing) for a null slot, a slot that
-## already has something on it, or an empty catalogue -- all three are states where there
-## is no decision to offer, and popping an empty panel would be worse than not popping one.
+## already has something on it, an empty catalogue, or a `can_open` that refuses. All four
+## are states where there is no decision to offer, and popping an empty panel would be worse
+## than not popping one.
 func open(slot: PlotSlot) -> bool:
 	if slot == null or not slot.is_empty() or _plots.is_empty():
+		return false
+	if can_open.is_valid() and not bool(can_open.call()):
 		return false
 	_slot = slot
 	_selected = 0

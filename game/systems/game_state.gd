@@ -46,6 +46,8 @@ extends Node
 const SaveIOScript := preload("res://systems/save_io.gd")
 const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const PonyRegistryScript := preload("res://systems/pony_registry.gd")
+const GemPouchScript := preload("res://systems/gem_pouch.gd")
+const InventoryScript := preload("res://systems/inventory.gd")
 
 ## Where the authored character roster is read from. The same directory the spawner and
 ## PonyInstance use; named here because this is now the one place it is loaded.
@@ -73,6 +75,8 @@ const KEY_BITS := "bits"
 const KEY_PLOTS := "plots"
 const KEY_UNLOCKS := "unlocks"
 const KEY_WORLD_SEED := "world_seed"
+const KEY_GEMS := "gems"
+const KEY_INVENTORY := "inventory"
 
 ## Emitted after from_dict() or load_from_slot() has replaced the world. A HUD or a pen
 ## that cached anything out of here has to rebuild on this.
@@ -110,6 +114,17 @@ var unlocks: Array = []
 ## The seed the wild world is generated from. Saved so that reloading gives you back the
 ## same ranch you left rather than a differently-shaped one.
 var world_seed := DEFAULT_WORLD_SEED
+
+## The gems the player holds, by producing rarity (game/systems/gem_pouch.gd). Pens fold
+## their trays into this before every save and when the Market opens (ranch.gd), so this
+## is the count that survives quitting and the count the Market sells from.
+##
+## REPLACED, NOT MUTATED, by from_dict() and reset(): a listener holding the old object is
+## holding a pouch nothing will fill again. Re-read after state_loaded.
+var gems: GemPouch = GemPouchScript.new()
+
+## Consumables the player holds (game/systems/inventory.gd). Same replacement rule.
+var inventory: Inventory = InventoryScript.new()
 
 ## Whether quitting writes a save. See the class comment -- off by default on purpose.
 var autosave_enabled := false
@@ -232,6 +247,8 @@ func to_dict() -> Dictionary:
 		KEY_PLOTS: plots.duplicate(true),
 		KEY_UNLOCKS: unlocks.duplicate(),
 		KEY_WORLD_SEED: world_seed,
+		KEY_GEMS: gems.to_dict(),
+		KEY_INVENTORY: inventory.to_dict(),
 	}
 
 
@@ -269,6 +286,12 @@ func from_dict(data: Dictionary) -> void:
 		for unlock in saved_unlocks:
 			unlocks.append(str(unlock))
 
+	var saved_gems: Variant = data.get(KEY_GEMS, {})
+	gems = GemPouchScript.from_dict(saved_gems if typeof(saved_gems) == TYPE_DICTIONARY else {})
+	var saved_inventory: Variant = data.get(KEY_INVENTORY, {})
+	inventory = InventoryScript.from_dict(
+		saved_inventory if typeof(saved_inventory) == TYPE_DICTIONARY else {})
+
 	state_loaded.emit()
 
 
@@ -279,6 +302,8 @@ func reset() -> void:
 	plots = {}
 	unlocks = []
 	world_seed = DEFAULT_WORLD_SEED
+	gems = GemPouchScript.new()
+	inventory = InventoryScript.new()
 
 
 # --- disk ---------------------------------------------------------------------------------

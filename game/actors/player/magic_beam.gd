@@ -158,12 +158,45 @@ const VOICE_LINE := "res://assets/audio/voice/twilight/greeting_01.wav"
 ## chosen to move at a quarter speed -- which is the entire point of a stealth option.
 const REACH := 8.5
 
+## Gear. The shop's unlock ids this beam knows how to apply (game/systems/shop_item.gd's
+## GEAR kind, game/data/shop/*.tres). apply_unlocks() reads GameState.unlocks on boot and
+## after every purchase; an id it does not know is ignored, so an unlock aimed at some
+## other system does not have to be filtered out before it gets here.
+const GEAR_BIGGER_SADDLEBAG := &"bigger_saddlebag"
+const GEAR_LONG_BEAM := &"long_beam"
+const BIGGER_SADDLEBAG_CAPACITY := 18
+## Metres added to REACH by the long beam, and the whole of what the shop has left to sell.
+##
+## THE ARITHMETIC, IN FULL, BECAUSE IT IS THE ONLY THING SIZING THIS NUMBER. The least
+## sighted personality is a CURIOUS or BOLD pony, who notices a running player from
+## Pony.DETECTION_RADIUS (12.0 m); that exceeds REACH (8.5 m) by 3.5 m. MIN_DETECTION_MARGIN
+## below is a hard floor of 3.0 m under that warning. 3.5 minus 3.0 leaves 0.5 m, and this
+## constant is all 0.5 of it: the long beam reaches 9.0 m and a CURIOUS or BOLD pony is left
+## with exactly the floor. There is no slack behind it. Any FURTHER reach the shop wants to
+## sell needs Pony.DETECTION_RADIUS raised first; it cannot be bought by tuning this number
+## on its own, and raising it alone would sell the invariant rather than an upgrade.
+##
+## Selling the whole 0.5 m rather than a cautious fraction is deliberate: the upgrade is
+## meant to be felt, and a tenth of a metre nobody notices is not worth a shop slot.
+## game/data/shop/long_beam.tres promises the player half a metre, and that promise is this
+## constant.
+##
+## 1.0 m WAS TRIED FIRST AND DOES NOT FIT, which is worth recording because it is the
+## obvious number: it reaches 9.5 m, leaving a CURIOUS or BOLD pony 2.5 m of warning, half a
+## metre under the floor. That is the invariant the first playtest was lost to being sold
+## back to the player one upgrade at a time. It was caught by test_magic_beam.gd, which
+## checks this arithmetic against the real per-personality notice radii rather than trusting
+## a comment like this one.
+const LONG_BEAM_BONUS := 0.5
+
 ## Metres by which a pony's notice radius must exceed REACH FOR A RUNNING PLAYER: the head
 ## start a pony is guaranteed even after every reach upgrade the shop can sell. 3.0 m is
 ## about six tenths of a second of the player's run, which is the least that can still read
 ## as "she saw me coming" -- and it also has to swallow GRAB_ASSIST_RADIUS, since the
 ## forgiveness pass makes the beam's EFFECTIVE grab distance half a metre longer than REACH
-## says. Today's actual margin is 3.5 m for a CURIOUS or BOLD pony and 5.5 m for a SHY one.
+## says. Today's actual margin is 3.5 m for a CURIOUS or BOLD pony and 5.5 m for a SHY
+## one, and 3.0 m / 5.0 m once the shop's long beam is bought. LONG_BEAM_BONUS above is
+## sized to land exactly on this floor and no further past it.
 ##
 ## "FOR A RUNNING PLAYER" IS LOAD-BEARING AND IS NOT A WEAKENING OF THE INVARIANT. Running
 ## is the default gait -- it is what happens when you press a movement key and nothing
@@ -608,6 +641,10 @@ var _prev_freeze_mode := RigidBody3D.FREEZE_MODE_STATIC
 ## luck; replaceable through set_capture_rng() so a gate can have a reproducible one.
 var _rng := RandomNumberGenerator.new()
 
+## Metres of extra reach bought from the shop: 0.0 or LONG_BEAM_BONUS, set by
+## apply_unlocks(). Read only through reach(); nothing should add it to REACH by hand.
+var _reach_bonus := 0.0
+
 var _cooldown := 0.0
 ## Why the most recent lost hold was lost -- see the Loss enum.
 var _last_loss := Loss.NONE
@@ -742,6 +779,31 @@ func get_held_body() -> Node3D:
 ## later inventory/barn system should read it from here rather than making a second one.
 func get_storage() -> Storage:
 	return _storage
+
+
+## How far the beam reaches right now, gear included. Every ray and hold-point
+## calculation reads this rather than REACH so an upgrade applies everywhere at once.
+func reach() -> float:
+	return REACH + _reach_bonus
+
+
+## Apply every gear unlock in `unlocks` this beam understands. Idempotent.
+##
+## Idempotent by being ABSOLUTE rather than incremental: each gear id sets its effect to
+## the value that owning it means, so calling this twice (which Ranch does, once on boot
+## and again after every purchase) cannot stack a bonus or grow a bag twice.
+##
+## For THE REACH, absolute also means reversible: an unlock that disappeared from the array
+## takes its bonus away with it, so this is safe to call with whatever GameState currently
+## holds. The SADDLEBAG does not come back down, and deliberately: Storage.set_capacity()
+## refuses to shrink below the ponies already in the bag, because a capacity under the
+## contents would refuse every future store() while the bag sat over its own limit. A
+## revoked saddlebag would therefore have to decide which ponies to drop, and no pony ever
+## dies.
+func apply_unlocks(unlocks: Array) -> void:
+	if unlocks.has(String(GEAR_BIGGER_SADDLEBAG)):
+		_storage.set_capacity(BIGGER_SADDLEBAG_CAPACITY)
+	_reach_bonus = LONG_BEAM_BONUS if unlocks.has(String(GEAR_LONG_BEAM)) else 0.0
 
 
 ## Let the most recently caught pony back OUT of the bag and into the world, as a live
@@ -1057,8 +1119,15 @@ static func hold_point(origin: Vector3, direction: Vector3, anchor: Vector3) -> 
 
 ## How far along the aim ray the beam can reach, given where the player sits on it. Same
 ## projection as hold_point(), for the same zoom-invariance reason.
-static func reach_distance(origin: Vector3, direction: Vector3, anchor: Vector3) -> float:
-	return maxf((anchor - origin).dot(direction), 0.0) + REACH
+##
+## `p_reach` is how far the beam reaches past her, and the live caller passes reach() so
+## the shop's long beam lengthens the scan ray. It stays a PARAMETER, and this function
+## stays static and pure, because the zoom invariance above it is the property worth
+## pinning and it is worth pinning without a scene; the default is the unupgraded beam,
+## which is what the tests measure.
+static func reach_distance(origin: Vector3, direction: Vector3, anchor: Vector3,
+		p_reach := REACH) -> float:
+	return maxf((anchor - origin).dot(direction), 0.0) + p_reach
 
 
 # --- frame ----------------------------------------------------------------------------
@@ -1158,7 +1227,7 @@ func _scan(can_grab: bool) -> void:
 	if space == null:
 		return
 
-	var distance := reach_distance(_aim_origin, _aim_direction, _anchor_position())
+	var distance := reach_distance(_aim_origin, _aim_direction, _anchor_position(), reach())
 	var end := _aim_origin + _aim_direction * distance
 	_ray_end = end
 

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ShopItem" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/shop_item.gd" id="1_shop"]
+
+[resource]
+script = ExtResource("1_shop")
+id = &"hay"
+display_name = "Hay"
+description = "A bale of it. Every pony will eat hay, and none of them will thank you for it."
+cost = 5
+kind = 3
+food_id = &"hay"
+quantity = 2

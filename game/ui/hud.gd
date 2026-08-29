@@ -168,6 +168,7 @@ const HINTS_ACTION := &"toggle_hints"
 @onready var _crosshair: Control = $Crosshair
 @onready var _pips: Control = $Bag/Pips
 @onready var _bag_count: Label = $Bag/Count
+@onready var _bits: Label = $Bag/Bits
 @onready var _bag_title: Label = $Bag/Title
 @onready var _toast: Label = $Toast
 @onready var _hints: PanelContainer = $Hints
@@ -191,11 +192,16 @@ var _was_in_range := false
 
 
 func _ready() -> void:
+	# Toasts fired from the Market and pause menus must keep fading while the world
+	# is paused; the crosshair redraw is harmless while paused, so run always.
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	_crosshair.draw.connect(_draw_crosshair)
 	_pips.draw.connect(_draw_pips)
 
 	_style_label(_bag_title, 20, Color(1.0, 1.0, 1.0, 0.62))
 	_style_label(_bag_count, 26, Color(1.0, 1.0, 1.0, 0.92))
+	_style_label(_bits, 22, Color(1.00, 0.80, 0.25, 1.0))
+	_bits.text = "0 bits"
 	_style_label(_toast, 40, Color(1.0, 0.96, 0.86, 1.0))
 
 	_bag_title.text = "SADDLEBAG"
@@ -244,6 +250,13 @@ func toast(text: String) -> void:
 	_toast.modulate.a = 1.0
 
 
+## The line the last toast() put on screen, whether or not it has faded. Exposed for the
+## same reason get_bits_text() is: what the player is told is a real requirement (the
+## market gate reads the sale line back), and a gate has no other way to see it.
+func toast_text() -> String:
+	return _toast.text
+
+
 ## The magic beam this HUD is reading, or null if it has not been found yet. Exposed for
 ## gates and tests, which otherwise have no way to tell "bound and idle" apart from
 ## "never bound at all" -- the two look identical on screen.
@@ -279,6 +292,9 @@ func _bind() -> void:
 
 	_beam = beam
 	_storage = storage
+	# Seeded here and refreshed on every Storage.changed below, because the bag can GROW
+	# after binding: buying the shop's saddlebag calls Storage.set_capacity() on the very
+	# object this HUD is already holding.
 	_capacity = storage.capacity
 
 	# THE BINDING THE BRIEF ASKS FOR: the bag redraws when the bag changes, not once per
@@ -294,6 +310,10 @@ func _bind() -> void:
 
 
 func _on_storage_changed() -> void:
+	# Capacity first, and re-read rather than trusted from bind time: Storage.changed now
+	# fires for a bag that grew as well as for a bag that filled, and a stale _capacity
+	# would print "n / 12" and draw twelve pips over an eighteen-slot saddlebag.
+	_capacity = _storage.capacity
 	_rarities.clear()
 	for instance: PonyInstance in _storage.contents():
 		# Two separate nulls to survive, both reachable: a hole in the bag (which
@@ -486,6 +506,16 @@ func _style_label(label: Label, size: int, color: Color) -> void:
 	label.add_theme_constant_override(&"outline_size", 6)
 
 
+## The wallet line under the saddlebag. Driven by ranch.gd off Economy.bits_changed, so
+## it repaints on a change and never per frame.
+func set_bits(total: int) -> void:
+	_bits.text = "%d bits" % maxi(0, total)
+
+
+func get_bits_text() -> String:
+	return _bits.text
+
+
 ## Both control schemes, side by side, because the build is handed to two people and
 ## only one of them is going to be at the keyboard. Every row here mirrors an action in
 ## game/project.godot's `[input]` block -- a binding that changes there and not here is
@@ -510,7 +540,9 @@ const HINTS := [
 	["MAGIC BEAM", "Right mouse (hold)", "Right trigger (hold)"],
 	["", "hold until the OUTER PINK ring fills, then let go to stow her", ""],
 	["", "the INNER AMBER ring is her fight. Let it empty and she wriggles free", ""],
-	["FREE CURSOR", "Esc", ""],
+	["TRADE", "E at the market", "X at the market"],
+	["", "sell gems for bits, buy food and gear", ""],
+	["PAUSE", "Esc", "Start"],
 	["THIS CARD", "H", "Back"],
 ]
 
