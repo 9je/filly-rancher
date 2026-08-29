@@ -12,7 +12,7 @@ extends Node3D
 ## was "ponies were only around the perimeter", and it was right: the three original
 ## markers sat at (2, -42), (40, 8) and (-30, 38), all of them 40 m or more from the
 ## player's spawn and none of them anywhere a player crossing the middle of the map would
-## meet one. Eight ponies on a 220 x 220 m map is not many to begin with, and putting all
+## meet one. Eight ponies on a 140 x 140 m map is not many to begin with, and putting all
 ## eight around the rim meant the entire middle of the ranch -- the part you actually walk
 ## through -- was empty.
 ##
