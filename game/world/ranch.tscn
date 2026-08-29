@@ -112,6 +112,19 @@ wall_color = Color(0.858824, 0.607843, 0.32549, 1)
 roof_color = Color(0.556863, 0.231373, 0.192157, 1)
 trim_color = Color(0.435294, 0.32549, 0.243137, 1)
 
+[node name="Board" type="StaticBody3D" parent="Buildings"]
+transform = Transform3D(0.9958927, 0, -0.0905387, 0, 1, 0, 0.0905387, 0, 0.9958927, 3, 0, -1)
+script = ExtResource("7")
+width = 3.0
+depth = 1.2
+wall_height = 2.4
+ridge_height = 3.0
+door_width = 0.0
+door_height = 2.4
+wall_color = Color(0.435294, 0.32549, 0.243137, 1)
+roof_color = Color(0.278431, 0.243137, 0.223529, 1)
+trim_color = Color(0.858824, 0.607843, 0.32549, 1)
+
 [node name="Regions" type="Node3D" parent="."]
 
 [node name="Fence_orchard" type="Node3D" parent="Regions"]

@@ -85,6 +85,27 @@ func sell(gem_type: int, count: int) -> int:
 	return earned
 
 
+## A PAYMENT THE WALLET DID NOT SELL ANYTHING FOR: a completed request's reward
+## (game/systems/request_board.gd), handed over by whoever is paying it out. Separate from
+## sell() because sell() is priced (it takes a rarity and a gem count and does the
+## arithmetic itself) and a reward is already a number of bits that somebody else decided.
+## Routing rewards through sell() would have meant inventing a fake rarity to price them at,
+## which is a lie about where the money came from.
+##
+## POSITIVE ONLY. Zero or negative is refused with a push_error and changes nothing: a
+## "grant" of -50 is a spend wearing a gift's costume, exactly the way spend() refuses a
+## negative cost, and a grant of 0 is a caller who thinks it paid something and did not.
+## Loud rather than silent, because a reward that quietly failed to arrive looks to the
+## player like a request that paid nothing.
+func grant(bits_earned: int) -> void:
+	if bits_earned <= 0:
+		push_error("Economy.grant(%d): a grant must be a positive number of bits; ignored."
+			% bits_earned)
+		return
+	bits += bits_earned
+	bits_changed.emit(bits)
+
+
 ## Whether spend(cost) would succeed right now. A negative cost is never affordable --
 ## see spend()'s own comment on why a negative spend is refused rather than treated as a
 ## deposit.

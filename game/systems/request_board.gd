@@ -175,7 +175,10 @@ func fill(seen: Array = []) -> void:
 	while active().size() < ACTIVE and guard < 1000:
 		guard += 1
 		var excluded := _excluded_characters(seen)
-		var drawn := _draw_one(excluded)
+		# Annotated rather than inferred: _draw_one() returns Variant (a Dictionary or
+		# null), and Godot 4.5 treats INFERENCE_ON_VARIANT as an ERROR rather than as a
+		# warning, so `var drawn := ...` here refuses to compile the whole file.
+		var drawn: Variant = _draw_one(excluded)
 		if drawn == null:
 			break
 		_requests.append(drawn)

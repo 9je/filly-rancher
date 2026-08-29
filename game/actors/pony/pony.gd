@@ -116,6 +116,13 @@ signal captured()
 ## Emitted when a held pony breaks free -- i.e. when the beam calls break_free() because
 ## she outlasted its struggle timer.
 signal escaped()
+## Emitted the FIRST time this pony can see the player and never again, however far he
+## wanders off and comes back. "The player got a good look at her" is the compendium's
+## SEEN, and SEEN only ever happens once per character (game/systems/compendium.gd), so a
+## signal that re-fired every time she noticed him again would be a signal whose every
+## emission after the first one is thrown away by its only listener. The flag behind it is
+## never reset; see _noticed.
+signal noticed_player()
 
 enum State { IDLE, WANDER, GRAZE, FLEE, APPROACH, HELD, LEAVING }
 
@@ -383,6 +390,12 @@ var _has_wandered := false
 ## enter/exit signals; every read goes through _sees_player() so a freed node cannot be
 ## mistaken for a visible one.
 var _player: Node3D
+
+## Whether noticed_player has already been emitted for this body. NEVER RESET, not when he
+## leaves her detection area and not when she is beamed and set back down: this is a latch,
+## and the thing it latches (the player has laid eyes on this character) does not become
+## untrue later.
+var _noticed := false
 
 
 func _ready() -> void:
@@ -994,7 +1007,15 @@ func _sees_player() -> bool:
 		_player = null
 		return false
 	var radius := notice_radius_for(_personality(), _player_is_sneaking())
-	return global_position.distance_to(_player.global_position) <= radius
+	var seen := global_position.distance_to(_player.global_position) <= radius
+	# ANNOUNCED FROM INSIDE THE PREDICATE, not from _react_to_player(). Every route that
+	# asks whether she can see him already comes through here (the class comment on this
+	# function says so), so putting the announcement anywhere else would mean one of those
+	# routes silently not counting as having been noticed by.
+	if seen and not _noticed:
+		_noticed = true
+		noticed_player.emit()
+	return seen
 
 
 ## Whether the body in her detection area is moving quietly. Asked of the body through

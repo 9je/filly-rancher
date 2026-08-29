@@ -36,6 +36,14 @@ extends Node3D
 ## the layers on the instance keeps that gate working untouched while the real world
 ## gets real layers.
 
+## Emitted once for every wild pony this spawner puts on the map, from populate() AND from
+## refresh(), after setup() has run so `pony.get_data()` already answers. THE ONE PLACE a
+## caller can subscribe to "a new pony exists" without having to remember that ponies now
+## arrive twice: at boot, and every time the sky turns over. ranch.gd wires each arrival's
+## `noticed_player` off this, and a wiring done at the populate() call site only would have
+## left every pony who walked in at dusk unable to enter the compendium.
+signal pony_spawned(pony: CharacterBody3D)
+
 const LayersScript := preload("res://world/collision_layers.gd")
 const PonyScene := preload("res://actors/pony/pony.tscn")
 const PonyRegistryScript := preload("res://systems/pony_registry.gd")
@@ -511,6 +519,8 @@ func _spawn_one(data: PonyData, marker: ZoneMarker, slot: int) -> CharacterBody3
 	pony.position = to_local(_ground_point(marker, slot))
 	add_child(pony)
 	pony.setup(data)
+	# AFTER setup(), so a listener may read get_data() straight off the signal's argument.
+	pony_spawned.emit(pony)
 	return pony
 
 

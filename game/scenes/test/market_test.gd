@@ -22,6 +22,7 @@ const NeedsScript := preload("res://systems/needs.gd")
 const MarketMenuScript := preload("res://ui/market_menu.gd")
 const SaveIOScript := preload("res://systems/save_io.gd")
 const MagicBeamScript := preload("res://actors/player/magic_beam.gd")
+const RequestBoardScript := preload("res://systems/request_board.gd")
 
 const SLOT := 8  # a scratch slot; a hosted ranch reads no slot at all, so nothing collides
 
@@ -97,7 +98,23 @@ func _ready() -> void:
 	_set_check("opening collected the tray into the pouch",
 		shop.gem_count(rarity) == 3 and pen.gems() == 0)
 	_set_check("the tree is paused while the market is up", get_tree().paused)
-	var expected_bits: int = 3 * shop.gem_price(rarity)
+	# THE BOARD IS PART OF THE PRICE NOW. A sale also pays out whatever request it just
+	# finished (ranch.gd's _pay_out), and on a state that was reset a moment ago that is
+	# the tutorial "Sell a gem at the market." So the expectation is read off the board
+	# rather than written here as a number: a gate that hard-coded 50 would go red the day
+	# somebody retunes the tutorial's reward, which is not a bug in the market loop.
+	var board: RequestBoard = ranch.get_request_board()
+	_set_check("the board is standing before the sale", board != null)
+	var request_bits := 0
+	for entry in (board.active() if board != null else []):
+		var kind := int((entry as Dictionary).get("kind", -1))
+		if kind == RequestBoardScript.Kind.SELL_ANY:
+			request_bits += int((entry as Dictionary).get("reward_bits", 0))
+		elif kind == RequestBoardScript.Kind.SELL_GEMS_OF_RARITY \
+				and int((entry as Dictionary).get("rarity", -1)) == rarity \
+				and int((entry as Dictionary).get("count", 0)) <= 3:
+			request_bits += int((entry as Dictionary).get("reward_bits", 0))
+	var expected_bits: int = 3 * shop.gem_price(rarity) + request_bits
 	_set_check("sell everything is confirmable", menu.confirm())
 	_set_check("selling paid the rarity price", shop.bits() == expected_bits)
 	_set_check("the pouch is empty after selling", shop.gem_count(rarity) == 0)

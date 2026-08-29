@@ -338,7 +338,7 @@ Run it with:
 tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/market_test.tscn
 ```
 
-Expect `MARKET_OK checks=63`; the exit code is the verdict.
+Expect `MARKET_OK checks=64`; the exit code is the verdict.
 
 ---
 
@@ -434,7 +434,7 @@ tools/bin/godot --headless --audio-driver Dummy --path game world/ranch.tscn -- 
 
 Phase names are `dawn`, `day`, `dusk`, `night` and weathers are `clear`,
 `rain`, `fog`, `storm`, matched case-insensitively; `--world-time=` takes
-seconds. Expect the same `RANCH_OK ponies=22 props=57 assets=present` as an
+seconds. Expect the same `RANCH_OK ponies=22 props=58 assets=present` as an
 unpinned run, with the `RANCH world` line naming the hour that was pinned.
 
 **Looking at the sky.** The gate checks numbers; only a person can say whether a

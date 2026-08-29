@@ -497,6 +497,49 @@ func test_no_capture_fires_on_its_own_however_long_the_hold_lasts() -> void:
 	assert_gt(pony.get_held_seconds(), 1.5, "...while still reporting the hold honestly")
 
 
+# --- being noticed by the player ------------------------------------------------------
+#
+# noticed_player is what puts a character into the compendium as SEEN (the ranch's
+# _on_pony_noticed, game/world/ranch.gd). SEEN happens once per character and never
+# unhappens, so the signal is a latch rather than an event stream; both halves of that are
+# pinned here.
+
+func test_a_pony_who_can_see_the_player_says_so_exactly_once() -> void:
+	var pony := _spawn(PonyDataScript.Personality.BOLD, 3.0, Vector3.ZERO)
+	watch_signals(pony)
+	# BOLD on purpose: she has no reaction to the player at all, so nothing about her state
+	# machine can be what makes this pass. A latch that fired only for a pony who fled or
+	# approached would leave every bold character permanently out of the book.
+	_add_player(Vector3(1.0, 0.0, 0.0))
+	await wait_physics_frames(RUN_FRAMES)
+	assert_signal_emit_count(pony, "noticed_player", 1,
+		"she is well inside every notice radius, and being noticed happens once")
+
+
+func test_a_player_who_leaves_and_comes_back_does_not_notice_her_twice() -> void:
+	var pony := _spawn(PonyDataScript.Personality.BOLD, 3.0, Vector3.ZERO)
+	watch_signals(pony)
+	var body := _add_player(Vector3(1.0, 0.0, 0.0))
+	await wait_physics_frames(RUN_FRAMES)
+	assert_signal_emit_count(pony, "noticed_player", 1, "the first sight of her")
+
+	body.position = Vector3(PonyScript.DETECTION_AREA_RADIUS + 10.0, 0.0, 0.0)
+	await wait_physics_frames(RUN_FRAMES)
+	body.position = Vector3(1.0, 0.0, 0.0)
+	await wait_physics_frames(RUN_FRAMES)
+	assert_signal_emit_count(pony, "noticed_player", 1,
+		"walking away and back is not a second discovery; the compendium would throw it away")
+
+
+func test_a_pony_nobody_has_come_near_is_never_noticed() -> void:
+	var pony := _spawn(PonyDataScript.Personality.BOLD, 3.0, Vector3.ZERO)
+	watch_signals(pony)
+	_add_player(Vector3(PonyScript.DETECTION_AREA_RADIUS + 10.0, 0.0, 0.0))
+	await wait_physics_frames(RUN_FRAMES)
+	assert_signal_emit_count(pony, "noticed_player", 0,
+		"a character the player has never laid eyes on stays UNSEEN")
+
+
 # --- when she appears, and when she goes home ----------------------------------------
 # PonyData.available() is the whole of "this character only turns up at night, in fog,
 # by the lake", and Pony.leave() is what the world does about it when the sky changes
