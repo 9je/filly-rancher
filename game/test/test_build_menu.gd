@@ -96,6 +96,21 @@ func test_it_refuses_to_open_on_nothing() -> void:
 	assert_false(_menu.is_open(), "...so nothing came up")
 
 
+func test_can_open_callable_can_refuse() -> void:
+	# The same shutter pause_menu.gd and market_menu.gd carry. game/world/ranch.gd holds it
+	# shut for the whole of boot -- before the menus are wired -- and afterwards uses it to
+	# say "another menu is up", so a valid slot is not on its own enough to open this.
+	_menu.can_open = func() -> bool: return false
+	assert_false(_menu.open(_slot()), "a refusing can_open outranks a perfectly good slot")
+	assert_false(_menu.is_open(), "...so nothing came up")
+
+
+func test_an_allowing_can_open_still_lets_it_open() -> void:
+	_menu.can_open = func() -> bool: return true
+	assert_true(_menu.open(_slot()))
+	assert_true(_menu.is_open())
+
+
 func test_opening_announces_itself_so_the_world_can_stop() -> void:
 	# game/world/ranch.gd pauses the tree on this signal. A menu that came up silently would
 	# leave the player walking around behind it -- and `ui_down`, which moves the cursor,

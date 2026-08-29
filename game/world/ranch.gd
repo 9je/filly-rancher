@@ -387,6 +387,20 @@ func _ready() -> void:
 
 	player.global_position = player_spawn.global_position
 
+	# EVERY MENU IS SHUT UNTIL IT IS WIRED, and this is the first line of _ready() that can
+	# be reached with the tree already accepting input. Boot takes about two and a half
+	# seconds from here (the physics warmup, the pen-containment probe, the settle frames)
+	# and _bind_pause_menu() does not run until the end of it -- so Escape pressed during
+	# the wait used to raise a PAUSED panel over a world that was still running, with a
+	# Save and a Quit connected to nothing and no ranch listening for `opened` to pause the
+	# tree. The refusal is the shutter the menus already have for "another menu is up"; the
+	# bind functions below overwrite it with the real predicate once there is something
+	# behind it. set() by name for the reason _bind_build_menu() gives: a menu whose script
+	# failed to parse is a FAILED check in _report(), not a boot that dies here.
+	for menu: CanvasLayer in [build_menu, market_menu, pause_menu]:
+		if menu != null:
+			menu.set("can_open", func() -> bool: return false)
+
 	# BEFORE the spawner runs: a loaded save carries the seed the wild world was generated
 	# from, and applying it afterwards would mean the herd you come back to is not the herd
 	# you left.
@@ -672,6 +686,7 @@ func _bind_build_menu() -> void:
 	# aborts this function. The whole point of the has_method() guard above is that a broken
 	# menu is a FAILED check in _report(), not a boot that dies before it gets there.
 	build_menu.set("bits_provider", Callable(self, "_current_bits"))
+	build_menu.set("can_open", func() -> bool: return _no_menu_but(build_menu))
 	if not build_menu.is_connected("plot_chosen", _on_plot_chosen):
 		build_menu.connect("plot_chosen", _on_plot_chosen)
 	if not build_menu.is_connected("opened", _on_menu_opened):
@@ -790,8 +805,13 @@ func _no_menu_but(menu: CanvasLayer) -> bool:
 	return true
 
 
-## Nothing at all is up. The build prompt and the market prompt both ask this before they
-## react to a keypress.
+## Nothing at all is up: no build menu, no Market, no pause menu.
+##
+## THE BUILD PROMPT AND THE MARKET PROMPT BOTH ASK THIS before they react to a keypress.
+## The build prompt used to ask a narrower question -- whether its OWN menu was open -- so
+## E pressed while the Market or the pause menu was up still ran the build path underneath
+## them. Both prompts ask the whole question now, which is what makes the sentence above
+## true of the code rather than only of the intention.
 func _no_other_menu_open() -> bool:
 	return _no_menu_but(null)
 
@@ -1164,7 +1184,10 @@ func _physics_process(_delta: float) -> void:
 ## failure -- see PlotSlot._ensure_shape) then shows up as a prompt that never appears
 ## rather than as a distance check that quietly still works.
 func _update_plot_interaction() -> void:
-	if build_menu != null and build_menu.has_method("is_open") and build_menu.is_open():
+	# The same question the market prompt asks, and for the same reason -- see
+	# _no_other_menu_open(). This used to ask only whether the BUILD menu was open, which
+	# let E build a pen out from under an open Market or an open pause menu.
+	if not _no_other_menu_open():
 		return
 
 	var here: PlotSlot = null
