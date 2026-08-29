@@ -50,13 +50,22 @@ extends RefCounted
 ## out". Keeping them separate is what makes claiming twice return {} (see claim()) while
 ## still letting requests() show a completed-but-unclaimed request as done.
 ##
-## --- SEE_CHARACTER's FOOD REWARD IS A FIXED AMOUNT, NOT A DICTIONARY FIELD ----------------
+## --- THE FOOD REWARD CARRIES ITS OWN COUNT ------------------------------------------------
 ##
-## The brief's request shape has `reward_food: String` (an item id, e.g. "hay") but no count
-## field, and the brief's own template text says "reward 40 bits plus 2 hay"; a fixed
-## amount, not one that varies per request. SEE_CHARACTER_FOOD_COUNT below is that fixed
-## amount; the later task that pays rewards multiplies reward_food (if non-empty) by that
-## constant instead of an unnamed field. Every other kind leaves reward_food as "".
+## The brief's request shape has `reward_food: String` (an item id, e.g. "hay") and no count
+## field, and its own template text says "reward 40 bits plus 2 hay"; a fixed amount, not one
+## that varies per request. That fixed amount is SEE_CHARACTER_FOOD_COUNT below, and it used
+## to be applied by the payer: ranch.gd read the constant off this class and multiplied by it.
+## Which made the request an incomplete description of its own reward, and left the ranch
+## toast unable to say what it had just handed over without reaching back in here for the
+## number. So the board now writes `reward_food_count` into every request it builds
+## (SEE_CHARACTER_FOOD_COUNT for a SEE_CHARACTER, 0 for everything else, alongside the empty
+## reward_food the others already carry), and a payer reads the request and nothing else.
+##
+## from_array() TOLERATES ITS ABSENCE, because a slice 5 save written before this field
+## existed is a real file on somebody's disk: a record with no reward_food_count gets the
+## count its kind would have been built with, so an old save pays out exactly what it
+## promised.
 
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const RegionRegistryScript := preload("res://systems/region_registry.gd")
@@ -139,10 +148,11 @@ func seed_tutorial() -> void:
 
 
 func _tutorial_request(id: String, kind: int, reward_bits: int, text: String) -> Dictionary:
-	return _blank_request(id, kind, reward_bits, "", text)
+	return _blank_request(id, kind, reward_bits, "", 0, text)
 
 
-func _blank_request(id: String, kind: int, reward_bits: int, reward_food: String, text: String) -> Dictionary:
+func _blank_request(id: String, kind: int, reward_bits: int, reward_food: String,
+		reward_food_count: int, text: String) -> Dictionary:
 	return {
 		"id": id,
 		"kind": kind,
@@ -154,6 +164,7 @@ func _blank_request(id: String, kind: int, reward_bits: int, reward_food: String
 		"character": "",
 		"reward_bits": reward_bits,
 		"reward_food": reward_food,
+		"reward_food_count": reward_food_count,
 		"done": false,
 		"paid": false,
 		"text": text,
@@ -184,13 +195,26 @@ func fill(seen: Array = []) -> void:
 		_requests.append(drawn)
 
 
+## The character ids fill() may not draw a SEE_CHARACTER request for: everybody the player
+## has already SEEN or CAUGHT, plus everybody a SEE_CHARACTER request on this board is
+## already about.
+##
+## "ALREADY ABOUT" INCLUDES A REQUEST THAT IS DONE BUT NOT YET CLAIMED. A request goes done
+## the moment the player lays eyes on her and is paid a moment later by the caller
+## (game/world/ranch.gd, _pay_out), and in the gap between those two the character is off
+## `seen` only if the caller has not refreshed its list yet. Testing `done` here let the very
+## next fill() draw a second request for the face the player is being paid for right now.
+## `paid` is the flag that says the board is finished with her, so that is the one to test.
 func _excluded_characters(seen: Array) -> Dictionary:
 	var excluded := {}
 	for s in seen:
 		excluded[String(s)] = true
 	for r in _requests:
-		if not bool(r.get("done", false)) and int(r.get("kind", -1)) == Kind.SEE_CHARACTER:
-			excluded[String(r.get("character", ""))] = true
+		if int(r.get("kind", -1)) != Kind.SEE_CHARACTER:
+			continue
+		if bool(r.get("paid", false)):
+			continue
+		excluded[String(r.get("character", ""))] = true
 	return excluded
 
 
@@ -234,7 +258,7 @@ func _draw_bring(rng: RandomNumberGenerator, this_draw: int) -> Dictionary:
 	var personality_name := String(PonyDataScript.Personality.keys()[personality]).to_lower()
 	var region_name := _region_display_name(zone_id)
 
-	var r := _blank_request("req_%d" % this_draw, Kind.BRING_PERSONALITY_FROM_ZONE, 80, "",
+	var r := _blank_request("req_%d" % this_draw, Kind.BRING_PERSONALITY_FROM_ZONE, 80, "", 0,
 		"Bring a %s pony from %s." % [personality_name, region_name])
 	r["personality"] = personality
 	r["zone"] = String(zone_id)
@@ -248,7 +272,7 @@ func _draw_sell_gems(rng: RandomNumberGenerator, this_draw: int) -> Dictionary:
 	var unit_value: int = EconomyScript.GEM_VALUE_BY_RARITY.get(rarity, 0)
 	var reward := count * (unit_value + SELL_GEMS_BONUS_PER_GEM)
 
-	var r := _blank_request("req_%d" % this_draw, Kind.SELL_GEMS_OF_RARITY, reward, "",
+	var r := _blank_request("req_%d" % this_draw, Kind.SELL_GEMS_OF_RARITY, reward, "", 0,
 		"Sell %d %s gems." % [count, rarity_name])
 	r["rarity"] = rarity
 	r["count"] = count
@@ -280,7 +304,7 @@ func _draw_see_character(rng: RandomNumberGenerator, this_draw: int, excluded_ch
 	var data: PonyData = eligible[rng.randi() % eligible.size()]
 
 	var r := _blank_request("req_%d" % this_draw, Kind.SEE_CHARACTER, 40, SEE_CHARACTER_FOOD_ID,
-		"Find %s and get a good look at her." % data.display_name)
+		SEE_CHARACTER_FOOD_COUNT, "Find %s and get a good look at her." % data.display_name)
 	r["character"] = String(data.id)
 	return r
 
@@ -455,6 +479,12 @@ static func from_array(a: Array, registry: PonyRegistry, regions: Array[StringNa
 			continue
 		var rec: Dictionary = (a[i] as Dictionary).duplicate(true)
 		var kind := int(rec.get("kind", -1))
+
+		# See the class comment: a save written before reward_food_count existed gets the
+		# count its kind would have been built with, rather than a silent zero.
+		if not rec.has("reward_food_count"):
+			rec["reward_food_count"] = (SEE_CHARACTER_FOOD_COUNT
+				if kind == Kind.SEE_CHARACTER else 0)
 
 		if kind == Kind.SEE_CHARACTER:
 			var char_id := StringName(String(rec.get("character", "")))

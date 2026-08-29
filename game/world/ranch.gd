@@ -1700,12 +1700,21 @@ func _pay_out(completed: Array) -> void:
 			continue
 		var reward_bits := int(claimed.get("reward_bits", 0))
 		var reward_food := String(claimed.get("reward_food", ""))
+		# OFF THE REQUEST, NOT OFF THE BOARD'S CONSTANT. The request carries its own
+		# reward_food_count now (game/systems/request_board.gd), which is what lets the
+		# toast below name what was actually handed over.
+		var reward_food_count := int(claimed.get("reward_food_count", 0))
 		if _economy != null and reward_bits > 0:
 			_economy.grant(reward_bits)
-		if _game_state != null and not reward_food.is_empty():
-			_game_state.inventory.add(StringName(reward_food),
-				RequestBoardScript.SEE_CHARACTER_FOOD_COUNT)
-		_toast("Request done: %s (+%d bits)" % [String(claimed.get("text", "")), reward_bits])
+		if _game_state != null and not reward_food.is_empty() and reward_food_count > 0:
+			_game_state.inventory.add(StringName(reward_food), reward_food_count)
+		# THE TOAST NAMES THE FOOD. "+40 bits" for a favour that also handed over two hay is
+		# a receipt that does not match what went into the saddlebag, and the player has no
+		# other way to find out that it did.
+		var reward_text := "+%d bits" % reward_bits
+		if not reward_food.is_empty() and reward_food_count > 0:
+			reward_text += " and %d %s" % [reward_food_count, reward_food]
+		_toast("Request done: %s (%s)" % [String(claimed.get("text", "")), reward_text])
 		_board.fill(_seen_ids())
 
 

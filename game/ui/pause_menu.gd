@@ -36,7 +36,6 @@ const SettingsScript := preload("res://systems/settings.gd")
 const CompendiumScript := preload("res://systems/compendium.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const WorldStateScript := preload("res://systems/world_state.gd")
-const RequestBoardScript := preload("res://systems/request_board.gd")
 const HudScript := preload("res://ui/hud.gd")
 
 enum Page { MAIN, SETTINGS, COMPENDIUM, REQUESTS }
@@ -458,15 +457,16 @@ func request_rows() -> Array[Dictionary]:
 	return out
 
 
-## "80 bits", or "40 bits and 2 hay" for the one kind that pays food as well. The amount is
-## RequestBoard's own constant rather than a field, because the request dictionary carries
-## the item id and not a count; see game/systems/request_board.gd's class comment.
+## "80 bits", or "40 bits and 2 hay" for the one kind that pays food as well. Both numbers
+## come off the request itself, which carries reward_food_count now; the page and the toast
+## ranch.gd shows on payout therefore read the same two fields and cannot drift apart.
 func _reward_text(req: Dictionary) -> String:
 	var bits: int = int(req.get("reward_bits", 0))
 	var food: String = String(req.get("reward_food", ""))
-	if food.is_empty():
+	var count: int = int(req.get("reward_food_count", 0))
+	if food.is_empty() or count <= 0:
 		return "%d bits" % bits
-	return "%d bits and %d %s" % [bits, RequestBoardScript.SEE_CHARACTER_FOOD_COUNT, food]
+	return "%d bits and %d %s" % [bits, count, food]
 
 
 func footer_text() -> String:

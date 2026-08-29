@@ -157,6 +157,73 @@ func test_fill_excludes_seen_characters_from_see_character_draws() -> void:
 			"no unseen characters remain; SEE_CHARACTER must not be drawable")
 
 
+func test_every_request_carries_the_count_of_the_food_it_pays() -> void:
+	# The reward has to be readable off the request alone: game/world/ranch.gd pays it and
+	# says what it paid, and game/ui/pause_menu.gd prints the same line on the REQUESTS page.
+	# A count that lived only as a constant on this class made the request an incomplete
+	# description of its own reward.
+	var found := _find_board_with_kind(RequestBoardScript.Kind.SEE_CHARACTER)
+	assert_false(found.is_empty(), "expected at least one seed to draw a SEE_CHARACTER request")
+	var see_request: Dictionary = found.request
+	assert_eq(String(see_request.reward_food), "hay")
+	assert_eq(int(see_request.reward_food_count), RequestBoardScript.SEE_CHARACTER_FOOD_COUNT,
+		"a SEE_CHARACTER request says how much hay it is offering")
+
+	var board := _board(3)
+	board.seed_tutorial()
+	board.fill()
+	for r in board.requests():
+		if int(r.kind) == RequestBoardScript.Kind.SEE_CHARACTER:
+			continue
+		assert_eq(String(r.reward_food), "", "no other kind pays food")
+		assert_eq(int(r.reward_food_count), 0, "...and every one of them says so")
+
+
+func test_from_array_fills_in_a_food_count_a_save_written_before_it_existed_lacks() -> void:
+	# A slice 5 save on somebody's disk has requests with no reward_food_count in them. The
+	# board rebuilds the count its kind would have been built with, so an old save pays out
+	# exactly what it promised rather than silently paying nothing.
+	var found := _find_board_with_kind(RequestBoardScript.Kind.SEE_CHARACTER)
+	assert_false(found.is_empty(), "expected at least one seed to draw a SEE_CHARACTER request")
+	var written: Array = (found.board as RequestBoard).to_array()
+	for entry in written:
+		(entry as Dictionary).erase("reward_food_count")
+
+	var reloaded := RequestBoardScript.from_array(written, registry, REGIONS, REGION_NAMES)
+
+	var counted := 0
+	for r in reloaded.requests():
+		if int(r.kind) == RequestBoardScript.Kind.SEE_CHARACTER:
+			counted += 1
+			assert_eq(int(r.reward_food_count),
+				RequestBoardScript.SEE_CHARACTER_FOOD_COUNT,
+				"the SEE_CHARACTER request gets its two hay back")
+		else:
+			assert_eq(int(r.reward_food_count), 0, "and nobody else is given food")
+	assert_gt(counted, 0, "there was a SEE_CHARACTER request in the file to restore")
+
+
+func test_a_finished_but_unpaid_see_character_request_is_not_drawn_again() -> void:
+	# THE GAP BETWEEN DONE AND PAID. on_seen() flips a request to done and the caller claims
+	# it a moment later (game/world/ranch.gd, _pay_out), refilling the board in between. The
+	# character is not on the `seen` list this test hands in, which is the state a caller
+	# that has not rebuilt its list yet is in; testing `done` here let the refill draw a
+	# second request for the very face the player is being paid for.
+	var found := _find_board_with_kind(RequestBoardScript.Kind.SEE_CHARACTER)
+	assert_false(found.is_empty(), "expected at least one seed to draw a SEE_CHARACTER request")
+	var board: RequestBoard = found.board
+	var char_id := StringName(String(found.request.character))
+
+	board.on_seen(registry.by_id(char_id))
+	board.fill()
+
+	for r in board.active():
+		if int(r.kind) != RequestBoardScript.Kind.SEE_CHARACTER:
+			continue
+		assert_ne(String(r.character), String(char_id),
+			"the board does not ask twice for a face it has not paid for yet")
+
+
 func test_sell_gems_of_rarity_count_is_always_between_three_and_six() -> void:
 	for s in range(30):
 		var board := _board(s)
