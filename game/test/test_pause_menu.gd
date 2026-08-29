@@ -394,6 +394,39 @@ func test_cancel_from_each_reading_page_returns_to_its_own_row_on_main() -> void
 	assert_false(_menu.is_open(), "and main still closes")
 
 
+## THE ROW ORDER IS PINNED, and this is the test that pins it. It used to be the four rarity
+## tiers in enum order, unioned by hand here and in two other files; it is PonyRegistry's own
+## ids() order now (the roster sorted by id TEXT, which for this roster reads as the
+## characters' names alphabetically). Either is a defensible page; what is not defensible is
+## the order changing under the player because somebody rewired a helper, which is exactly
+## what happened once already. Asserted against registry.ids() rather than against a written
+## out list, so a roster edit needs no edit here and a re-ordering still fails.
+func test_the_character_list_is_in_the_registrys_own_order() -> void:
+	_wire_book()
+	_menu.open_page(PauseMenu.Page.COMPENDIUM)
+
+	var ids: Array[StringName] = _registry.ids()
+	var drawn: Array[StringName] = []
+	for data: PonyData in _menu.roster():
+		drawn.append(data.id)
+	assert_eq(drawn, ids, "the page draws the roster in registry.ids() order")
+	assert_eq(_menu.compendium_rows().size(), ids.size(),
+		"one row per character, so a row index IS a roster index")
+
+	# The rows themselves, not just the array behind them: compendium_rows() and the roster
+	# are read by index against each other (see _row_for() and _draw_compendium()), so a row
+	# list in some other order would put every name against somebody else's hours.
+	var rows: Array[String] = _menu.compendium_rows()
+	_compendium.mark_caught(ids[0])
+	_compendium.mark_caught(ids[ids.size() - 1])
+	rows = _menu.compendium_rows()
+	assert_true(rows[0].begins_with(_registry.by_id(ids[0]).display_name),
+		"the first row is the first id's character")
+	assert_true(rows[ids.size() - 1].begins_with(
+		_registry.by_id(ids[ids.size() - 1]).display_name),
+		"and the last row is the last id's")
+
+
 ## HALF WIRED IS NOT WIRED. A registry with no compendium behind it is the shape a partial
 ## injection leaves (ranch.gd sets all five, but the boot shutter and these tests set what
 ## they need), and it is the one arrangement where the page could draw a full roster of

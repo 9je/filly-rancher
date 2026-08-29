@@ -249,7 +249,7 @@ func _ready() -> void:
 	_set_check("and opened NOTHING else", _open_count(fences) == 1)
 	var hud = ranch.get_node("HUD")
 	_set_check("the toast says the region is open",
-		hud.toast_text() == "%s is open." % region.display_name)
+		_hud_says(hud, "%s is open." % region.display_name))
 	_set_check("the permit cannot be bought twice", not menu.confirm())
 	_set_check("the second attempt did not charge her", shop.bits() == before - permit.cost)
 	menu.close()
@@ -389,3 +389,18 @@ func _finish() -> void:
 		push_error("region_test: DUPLICATE CHECK LABEL: %s" % label)
 	print(("REGION_OK " if all_ok else "REGION_FAILED ") + "checks=%d" % _checks.size())
 	get_tree().quit(0 if all_ok else 1)
+
+
+## Whether the HUD has said `text` to the player: the line on screen, or anything queued
+## behind it.
+##
+## THE WHOLE QUEUE, NOT THE LABEL ALONE. A toast raised while another one is still up waits
+## its turn now instead of overwriting it (game/ui/hud.gd, toast()). Reading the label alone
+## was green here only because this gate's permit toast happens to be the one on screen at
+## the moment it is asked; anything raised before it, now or later, would fail this check
+## for the queue rather than for a defect. The same helper as scenes/test/market_test.gd's,
+## and the same reason.
+func _hud_says(hud, text: String) -> bool:
+	if hud.toast_text() == text:
+		return true
+	return hud.pending_toasts().has(text)

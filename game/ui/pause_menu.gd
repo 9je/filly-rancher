@@ -287,6 +287,10 @@ func _unhandled_input(event: InputEvent) -> void:
 ## Every character in `registry`, in roster order. Empty (never null) when no registry was
 ## injected, so every caller can iterate the result unconditionally. See the class comment
 ## on what that order is.
+##
+## THE ORDER IS DELIBERATE, NOT INHERITED: it is PonyRegistry.ids()' own (the roster sorted
+## by id text, which for this roster reads as the characters' names alphabetically), and
+## test_pause_menu.gd pins it so it cannot change again without somebody saying so.
 func roster() -> Array[PonyData]:
 	if registry == null:
 		return [] as Array[PonyData]
