@@ -1819,8 +1819,8 @@ func _report(pony_count: int, prop_count: int) -> void:
 	# playtest required.
 	var regions_stand_clear := true
 	for marker: ZoneMarker in spawner.get_markers():
+		var at := Vector2(marker.global_position.x, marker.global_position.z)
 		if marker.zone_id == &"ranch":
-			var at := Vector2(marker.global_position.x, marker.global_position.z)
 			for region: RegionData in regions:
 				var apart := at.distance_to(region.centre)
 				var needed: float = (region.radius + RegionFenceScript.RING_MARGIN
@@ -1832,13 +1832,18 @@ func _report(pony_count: int, prop_count: int) -> void:
 						% [marker.name, apart, region.id, needed])
 		else:
 			var own_region: RegionData = _regions_registry().by_id(marker.zone_id)
-			if own_region != null:
+			if own_region == null:
+				regions_stand_clear = false
+				push_error("ranch: zone marker '%s' names a region this map does not have: '%s'."
+					% [marker.name, marker.zone_id])
+			else:
 				var own_limit: float = own_region.radius + RegionFenceScript.RING_MARGIN
-				var own_reach: float = marker.outer_bound() + REGION_CLEARANCE
+				var offset: float = at.distance_to(own_region.centre)
+				var own_reach: float = offset + marker.outer_bound() + REGION_CLEARANCE
 				if own_reach > own_limit:
 					regions_stand_clear = false
-					push_error(("ranch: region '%s' marker '%s' reaches %.1f m with clearance, " +
-						"past its own fence ring at %.1f m.")
+					push_error(("ranch: region '%s' marker '%s' reaches %.1f m from the centre " +
+						"with clearance, past its own fence ring at %.1f m.")
 						% [own_region.id, marker.name, own_reach, own_limit])
 	_set_check(checks, "no homestead roam disc reaches a region's fence ring, and every " +
 		"region's own residents stay inside their own ring", regions_stand_clear)

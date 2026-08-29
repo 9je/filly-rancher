@@ -32,8 +32,8 @@ Map: `Terrain.HALF` goes from 70 to 110 m (a 220 m square; `CELL` stays 2 m, 12,
 |---|---|---|---|---|---|---|---|---|
 | orchard | The Orchard | (62, 30) | 22 | 150 | west (toward the homestead) | (0.30, 0.46, 0.17) / (0.56, 0.62, 0.24) | `orchard` | applejack, applebloom, braeburn, caramel, carrottop, cheerilee, berrypunch |
 | everfree | The Everfree Edge | (-64, -40) | 24 | 1200 | east | (0.16, 0.30, 0.20) / (0.28, 0.42, 0.28) | `everfree` | trixie, pinkamena, sunsetshimmer, lightningdust, drwhooves, kerfuffle |
-| lake | The Lake | (60, -62) | 24 | 300 | north-west | (0.26, 0.44, 0.24) / (0.50, 0.60, 0.32) | `lake` | soarin, spitfire, cloudchaser, flitter, lyra, bonbon, minuette, milkyway |
-| nightmeadow | The Night Meadow | (-58, 66) | 24 | 700 | north-east | (0.36, 0.40, 0.48) / (0.58, 0.60, 0.70) | `nightmeadow` | songbirdserenade, octavia, vinylscratch, nightlight, mane_allgood, marblepie, maudpie, limestonepie, cocopommel |
+| lake | The Lake | (60, -62) | 24 | 300 | south-west | (0.26, 0.44, 0.24) / (0.50, 0.60, 0.32) | `lake` | soarin, spitfire, cloudchaser, flitter, lyra, bonbon, minuette, milkyway |
+| nightmeadow | The Night Meadow | (-61, 69) | 24 | 700 | north-east | (0.36, 0.40, 0.48) / (0.58, 0.60, 0.70) | `nightmeadow` | songbirdserenade, octavia, vinylscratch, nightlight, mane_allgood, marblepie, maudpie, limestonepie, cocopommel |
 
 Everyone else stays `ranch` (twilight, rainbowdash, fluttershy, pinkiepie, derpyhooves, starlightglimmer, rarity, shiningarmor, sweetiebelle, scootaloo, pokeypierce, redheart, aloeblossom, lotusblossom). That is 14 on the ranch and 30 out in the regions; the two LEGENDARY characters are in the two most expensive regions.
 
@@ -204,7 +204,7 @@ func region_at(point: Vector2) -> RegionData:
 	return null
 ```
 
-- [ ] **Step 5: Write the four .tres files** from the regions table. `centre = Vector2(62, 30)`, `radius = 22.0`, `permit_cost = 150`, `gate_yaw_degrees`: orchard 180 (gate on the west, toward the homestead), everfree 0 (east), lake 135 (north-west), nightmeadow 315 (north-east); colours as `Color(r, g, b, 1)`; `has_lake = true` and `lake_depth = 2.2` for lake only.
+- [ ] **Step 5: Write the four .tres files** from the regions table. `centre = Vector2(62, 30)`, `radius = 22.0`, `permit_cost = 150`, `gate_yaw_degrees`: orchard 180 (gate on the west, toward the homestead), everfree 0 (east), lake 226 (south-west), nightmeadow 48 (north-east); colours as `Color(r, g, b, 1)`; `has_lake = true` and `lake_depth = 2.2` for lake only.
 
 - [ ] **Step 6: Reimport, run the test** (expect 7 of 8 passing with only the map-bounds assertion failing until Task 3).
 
@@ -324,7 +324,7 @@ Update the class comment's PERMIT line. `RegionData.permit_id()` must produce th
 - `permit_orchard`: "Permit: The Orchard", 150, "Opens the gate east of the homestead. Apple country, and the ponies who farm it."
 - `permit_everfree`: "Permit: The Everfree Edge", 1200, "Opens the gate to the dark woods in the west. Strange ponies keep to the trees."
 - `permit_lake`: "Permit: The Lake", 300, "Opens the gate down to the water. Pegasi drink here, and nobody hurries."
-- `permit_nightmeadow`: "Permit: The Night Meadow", 700, "Opens the far gate in the north. Quiet ponies, pale grass, and a rare song."
+- `permit_nightmeadow`: "Permit: The Night Meadow", 700, "Opens the far gate in the south. Quiet ponies, pale grass, and a rare song."
 
 - [ ] **Step 5: Reimport; run both test files; run `test_market_menu.gd` too** (the Buy tab lists `registry.all()`, so the four permits appear; its catalogue-order test must still hold: permits sort by cost among the other rows).
 
