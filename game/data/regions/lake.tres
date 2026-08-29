@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="RegionData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/region_data.gd" id="1_region"]
+
+[resource]
+script = ExtResource("1_region")
+id = &"lake"
+display_name = "The Lake"
+centre = Vector2(60, -62)
+radius = 24.0
+permit_cost = 700
+gate_yaw_degrees = 135.0
+grass_low = Color(0.26, 0.44, 0.24, 1)
+grass_high = Color(0.5, 0.6, 0.32, 1)
+has_lake = true
+lake_depth = 2.2

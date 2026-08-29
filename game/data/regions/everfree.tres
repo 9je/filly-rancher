@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="RegionData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/region_data.gd" id="1_region"]
+
+[resource]
+script = ExtResource("1_region")
+id = &"everfree"
+display_name = "The Everfree Edge"
+centre = Vector2(-64, -40)
+radius = 24.0
+permit_cost = 400
+gate_yaw_degrees = 0.0
+grass_low = Color(0.16, 0.3, 0.2, 1)
+grass_high = Color(0.28, 0.42, 0.28, 1)
+has_lake = false
+lake_depth = 0.0
