@@ -498,12 +498,22 @@ static func wander_speed_for(base_speed: float) -> float:
 
 
 ## Bolting speed for a pony with this `base_speed`, in m/s. Clamped into the `gallop`
-## clip's band: the floor is Gait.GALLOP_HANDOVER_SPEED, so fleeing ALWAYS looks like a
-## gallop no matter how timid the record says she is, and the ceiling is
-## Gait.TOP_SKATE_FREE_SPEED, so it never costs foot skate no matter how fast.
+## clip's band: the floor makes fleeing ALWAYS look like a gallop no matter how timid the
+## record says she is, and the ceiling is Gait.TOP_SKATE_FREE_SPEED, so it never costs
+## foot skate no matter how fast.
+##
+## The floor is Gait.GALLOP_HANDOVER_SPEED PLUS FIVE PER CENT, for exactly the reason
+## wander_speed_for() above sits five per cent over Gait.IDLE_SPEED: the handover is a
+## boundary and clip_for_speed() resolves it downwards, answering `walk` for anything
+## strictly below it. Asking for the boundary itself therefore buys no gallop at all,
+## because a fleeing pony reaches her requested speed from below and can sit just under it
+## indefinitely if anything damps her (the leash ramp near the edge of a small territory
+## does precisely that). Five per cent of headroom means the whole top of her approach is
+## inside the gallop band rather than balanced on its edge.
 static func flee_speed_for(base_speed: float) -> float:
 	var scaled := NOMINAL_FLEE_SPEED * (base_speed / REFERENCE_BASE_SPEED)
-	return clampf(scaled, GaitScript.GALLOP_HANDOVER_SPEED, GaitScript.TOP_SKATE_FREE_SPEED)
+	return clampf(scaled, GaitScript.GALLOP_HANDOVER_SPEED * 1.05,
+		GaitScript.TOP_SKATE_FREE_SPEED)
 
 
 ## The magic beam taking or releasing physics control of this pony. While held she runs

@@ -145,6 +145,27 @@ func test_flee_speed_always_lands_in_the_gallop_band_with_no_skate() -> void:
 			"base_speed %s must flee without foot skate" % base_speed)
 
 
+func test_flee_speed_clears_the_gallop_handover_rather_than_sitting_on_it() -> void:
+	# The clamp above does not merely reach the gallop band, it clears its lower edge.
+	# clip_for_speed() resolves the handover downwards (`speed < GALLOP_HANDOVER_SPEED`
+	# plays `walk`), and a fleeing pony approaches her requested speed from below, so a
+	# floor set AT the handover leaves her playing `walk` for the whole flee whenever
+	# anything damps her the last hair of a metre per second. The five per cent of headroom
+	# is what this pins; drop it back to the bare handover and the first assertion goes red.
+	var floored: float = PonyScript.flee_speed_for(0.0)
+	assert_gt(floored, GaitScript.GALLOP_HANDOVER_SPEED,
+		"the flee floor must sit strictly above the gallop handover, not on it")
+
+	# The slowest base_speed on the roster, which is where the honest gallop has to start.
+	var slowest: float = PonyScript.flee_speed_for(3.0)
+	assert_eq(GaitScript.clip_for_speed(slowest), &"gallop",
+		"the roster's slowest pony must flee in the gallop band (got %.3f m/s)" % slowest)
+
+	# And the ceiling still holds at the other end, so no roster edit can buy foot skate.
+	assert_almost_eq(PonyScript.flee_speed_for(500.0), GaitScript.TOP_SKATE_FREE_SPEED,
+		0.0001, "an absurd base_speed must still be capped at TOP_SKATE_FREE_SPEED")
+
+
 func test_a_faster_pony_actually_moves_faster() -> void:
 	# base_speed has to still mean something after the clamps, or it would be a field the
 	# behaviour merely claims to read.
