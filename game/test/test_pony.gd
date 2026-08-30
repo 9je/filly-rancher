@@ -702,6 +702,23 @@ func test_a_leaving_pony_is_freed_once_she_is_out_of_the_detection_area() -> voi
 		"the departure ended on the distance, not on the safety ceiling")
 
 
+# --- stock ---------------------------------------------------------------------------
+
+func test_a_pony_told_she_is_stock_carries_the_triple_and_reads_back() -> void:
+	var pony: Pony = PonyScene.instantiate()
+	pony.set_stock({"coat": 2, "mane": 5, "eyes": 1})
+	assert_true(pony.is_stock())
+	assert_eq(pony.get_stock(), {"coat": 2, "mane": 5, "eyes": 1})
+	pony.free()
+
+
+func test_a_named_pony_is_not_stock() -> void:
+	var pony: Pony = PonyScene.instantiate()
+	assert_false(pony.is_stock())
+	assert_eq(pony.get_stock(), {})
+	pony.free()
+
+
 # --- helpers ------------------------------------------------------------------------
 
 ## A pony wearing a real model but the personality and base_speed this test is about.

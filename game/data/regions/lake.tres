@@ -14,3 +14,5 @@ grass_low = Color(0.26, 0.44, 0.24, 1)
 grass_high = Color(0.5, 0.6, 0.32, 1)
 has_lake = true
 lake_depth = 2.2
+stock_min = 4
+stock_max = 8

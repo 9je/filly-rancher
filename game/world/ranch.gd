@@ -2017,6 +2017,11 @@ func _physics_process(delta: float) -> void:
 
 	if not _interactive:
 		return
+	# The wild refills itself while somebody is playing. Not while a gate is driving the
+	# scene: a gate that teleports the player about for two hundred frames would otherwise
+	# stand a fresh crowd behind it, and the pony count it is asserting on would move under
+	# it. The gates call spawner.tick_stock() themselves, deliberately, where they mean to.
+	spawner.tick_stock(delta)
 	_update_plot_interaction()
 	_update_market_interaction()
 	# After the market's, so that an E press which just opened the Market is already behind
@@ -2118,7 +2123,7 @@ func _report(pony_count: int, prop_count: int) -> void:
 	var expected_props: int = PropsScript.expected_count() + buildings.get_child_count()
 	var expected_ponies := 0
 	for marker in spawner.get_markers():
-		expected_ponies += marker.spawn_count
+		expected_ponies += marker.spawn_count + spawner.stock_budget(marker)
 	# "Some pony in the roster has a model on this machine". Asked of the spawner's
 	# own roster rather than by re-scanning the directory here: one scan, one answer,
 	# and it cannot disagree with what the spawner actually drew from.
@@ -2248,6 +2253,21 @@ func _report(pony_count: int, prop_count: int) -> void:
 				marker.zone_id if marker != null else "<none>", from_marker,
 				pony.state_name(pony.state)])
 	_set_check(checks, "every pony spawned", ponies.size() == expected_ponies)
+	print("RANCH crowd named=%d stock=%d budget=%d" % [
+		spawner.named_standing(), spawner.stock_standing(), spawner.WORLD_PONY_BUDGET])
+	_set_check(checks, "the world stays inside its pony budget",
+		ponies.size() <= spawner.WORLD_PONY_BUDGET)
+	# The spec's pacing rule, asserted rather than hoped for: a named pony is at most one in
+	# five of what is standing in the homestead, so finding one takes minutes.
+	var ranch_named := 0
+	var ranch_stock := 0
+	for marker in spawner.get_markers():
+		if marker.zone_id != &"ranch":
+			continue
+		ranch_named += marker.spawn_count
+		ranch_stock += spawner.stock_budget(marker)
+	_set_check(checks, "named ponies are at most one in five of the homestead crowd",
+		ranch_stock >= ranch_named * 4)
 	_set_check(checks, "every pony is standing on the ground", on_ground)
 	_set_check(checks, "every pony was spawned inside her zone", in_zone)
 	_set_check(checks, "no pony needed a fallback placement",

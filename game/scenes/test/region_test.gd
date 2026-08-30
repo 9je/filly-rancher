@@ -143,6 +143,13 @@ func _ready() -> void:
 		var pony := body as Pony
 		if pony == null or pony.get_data() == null:
 			continue
+		# STOCK PONIES CARRY NO spawn_zones AT ALL (game/data/hidden/*.tres): the whole
+		# point of the crowd is that she belongs to whichever marker filled her, ranch or
+		# region alike, not to one authored zone the way a named character is. The check
+		# below is about a NAMED character's authored home disagreeing with where she is
+		# standing, which is not a question a stock pony's record can even answer.
+		if pony.is_stock():
+			continue
 		var data: PonyData = pony.get_data()
 		var at := Vector2(pony.global_position.x, pony.global_position.z)
 		var her_zone: StringName = &""

@@ -45,6 +45,13 @@ const ROAM_OVERSHOOT := 1.15
 ## How many ponies the spawner draws for this zone.
 @export var spawn_count := 3
 
+## How many STOCK ponies stand here, on top of `spawn_count` named ones. The crowd the
+## named characters hide in (docs/superpowers/specs/2026-08-30-phase3-rainbow-factory-design.md,
+## "Stock ponies"). Clamped into the zone's RegionData band by Spawner.stock_budget(); a
+## marker in the open homestead, which is behind no permit and inside no fence and so has no
+## RegionData, uses this number as it stands.
+@export var stock_count := 0
+
 ## roam_radius handed to each pony spawned here. Kept below spawn_radius so a pony
 ## who spawns on the rim still roams within the zone rather than out of it.
 @export var roam_radius := 6.0

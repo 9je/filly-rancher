@@ -493,7 +493,7 @@ tools/bin/godot --headless --audio-driver Dummy --path game world/ranch.tscn -- 
 
 Phase names are `dawn`, `day`, `dusk`, `night` and weathers are `clear`,
 `rain`, `fog`, `storm`, matched case-insensitively; `--world-time=` takes
-seconds. Expect the same `RANCH_OK ponies=22 props=58 assets=present` as an
+seconds. Expect the same `RANCH_OK ponies=49 props=58 assets=present` as an
 unpinned run, with the `RANCH world` line naming the hour that was pinned.
 
 **Looking at the sky.** The gate checks numbers; only a person can say whether a

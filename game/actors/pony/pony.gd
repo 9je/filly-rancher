@@ -109,6 +109,8 @@ const GaitScript := preload("res://systems/gait.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const PonyVisualsScript := preload("res://actors/pony/pony_visuals.gd")
 const PlayerScript := preload("res://actors/player/player.gd")
+const StockPaletteScript := preload("res://systems/stock_palette.gd")
+const StockTintScript := preload("res://systems/stock_tint.gd")
 
 ## Emitted when a beam hold has become a capture -- i.e. when the beam calls
 ## notify_captured(), immediately before it stores her record and frees this node.
@@ -363,6 +365,14 @@ var beam_holds := 0
 @onready var detection_area: Area3D = $DetectionArea
 
 var _data: PonyData
+## Her palette triple if she is one of the crowd, or {} if she is a named character.
+## `{"coat": int, "mane": int, "eyes": int}`, indices into game/data/stock_palette.tres.
+##
+## ON THE BODY AS WELL AS ON THE RECORD. A WILD stock pony has no PonyInstance at all (an
+## individual identity is a thing a pony acquires by being caught), so the only place her
+## look can live before she is caught is here; MagicBeam copies it onto the instance it
+## mints (see _settle_pony). A penned pony comes the other way, through adopt().
+var _stock: Dictionary = {}
 ## Set only for a pony who has been OWNED -- see adopt() / get_instance(). Null for a wild
 ## pony the spawner put on the map, which is every pony until the beam catches one.
 var _instance: PonyInstance
@@ -430,6 +440,31 @@ func setup(data: PonyData) -> void:
 	_data = data
 	if is_node_ready():
 		_apply_data()
+
+
+## Give her a stock pony's look. Call BEFORE add_child, the same rule setup() states, or
+## call it afterwards and the tint is applied to the body she already has.
+func set_stock(triple: Dictionary) -> void:
+	_stock = triple.duplicate()
+	if is_node_ready():
+		_apply_stock_tint()
+
+
+func get_stock() -> Dictionary:
+	return _stock.duplicate()
+
+
+func is_stock() -> bool:
+	return not _stock.is_empty()
+
+
+## Recolour the built body from _stock. A no op for a named character and for a body that
+## failed to build, both of which are ordinary states rather than errors.
+func _apply_stock_tint() -> void:
+	if _stock.is_empty() or visuals.get_child_count() == 0:
+		return
+	var body: Node3D = visuals.get_child(0)
+	StockTintScript.apply(body, StockPaletteScript.load_stock(), _stock)
 
 
 ## Adopt an INDIVIDUAL: a PonyInstance (game/systems/pony_instance.gd) carrying her uid
@@ -1104,6 +1139,7 @@ func _apply_data() -> void:
 		push_error("Pony: no AnimationPlayer at %s" % PonyVisualsScript.ANIMATION_PLAYER_PATH)
 		return
 	_play(&"idle")
+	_apply_stock_tint()
 
 
 func _personality() -> int:

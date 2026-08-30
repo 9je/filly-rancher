@@ -79,3 +79,12 @@ func test_exactly_one_region_has_a_lake() -> void:
 			lakes += 1
 			assert_gt(r.lake_depth, 0.0)
 	assert_eq(lakes, 1)
+
+
+func test_every_shipped_region_declares_a_stock_band() -> void:
+	var registry := RegionRegistryScript.new()
+	registry.load_all()
+	for region: RegionData in registry.all():
+		assert_gt(region.stock_max, 0, "%s must say how many stock ponies it holds" % region.id)
+		assert_true(region.stock_min <= region.stock_max,
+			"%s has an inverted stock band" % region.id)

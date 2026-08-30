@@ -50,6 +50,21 @@ const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 const SpawnTableScript := preload("res://systems/spawn_table.gd")
 const ZoneMarkerScript := preload("res://world/zone_marker.gd")
 const WorldStateScript := preload("res://systems/world_state.gd")
+const StockPaletteScript := preload("res://systems/stock_palette.gd")
+const RegionRegistryScript := preload("res://systems/region_registry.gd")
+
+## Real seconds a marker waits before standing a replacement for a stock pony who was
+## caught, delivered or otherwise left. Long enough that emptying a field feels like an
+## achievement for the length of a walk back to the pens, short enough that the field is
+## full again by the next visit. THE WILD MUST NEVER RUN DRY: this timer is the whole of
+## the spec's repeatability promise.
+const STOCK_RESPAWN_SECONDS := 45.0
+
+## The most pony bodies this spawner will ever have standing at once, named and stock
+## together. A ceiling rather than a target: it is what stops a future retune of
+## stock_count from quietly tripling the frame cost, and ranch.gd's report fails on a world
+## that exceeds it.
+const WORLD_PONY_BUDGET := 60
 
 ## How far above and below a candidate point the ground ray is cast. Generous
 ## against terrain.gd's ~+/-2.4 m of relief, and cheap.
@@ -101,9 +116,9 @@ const MIN_SEPARATION := 1.4
 ## nobody should be stuck with permanently.
 ##
 ## 20721716 DRAWS TWENTY-TWO DISTINCT CHARACTERS INTO TWENTY-TWO SLOTS at the hour the
-## world boots into, which is the ceiling: nobody is standing in the field twice.
-## ranch.tscn holds nine ZoneMarkers, five on the homestead at spawn_count 2 and one in
-## each region at 3.
+## world boots into, which is the ceiling: nobody is standing in the field twice. That was
+## true of the nine ZoneMarkers ranch.tscn held before Phase 3 slice 1 Task 2 (five on the
+## homestead at spawn_count 2, one in each region at 3, no stock crowd yet).
 ##
 ##   ranch (10)       Lotus, Rarity, Sweetie Belle, Twilight Sparkle, Fluttershy,
 ##                    Derpy Hooves, Starlight Glimmer, Pinkie Pie, Nurse Redheart,
@@ -112,6 +127,21 @@ const MIN_SEPARATION := 1.4
 ##   everfree (3)     Doctor Whooves, Pokey Pierce, Kerfuffle
 ##   lake (3)         Milky Way, Flitter, Minuette
 ##   nightmeadow (3)  Mane Allgood, Limestone Pie, Marble Pie
+##
+## TASK 2 CUT EVERY MARKER'S spawn_count TO 1 AND GAVE EACH ONE A STOCK BUDGET ON TOP: the
+## pacing rule is a named pony is at most one in five of a wild draw in the homestead and
+## rarer beyond it, and twenty two named slots on a nine marker map could not hold that
+## ratio next to a crowd. The same nine markers now draw nine named slots, and 20721716
+## was RE-MEASURED against that smaller draw rather than re-picked: it still rolls a clear
+## dawn for cycle 0 (that condition is about the sky, not the marker count, so retuning
+## spawn_count could not have moved it) and it still draws nine DISTINCT characters into
+## the nine slots, which was the whole property being asked of it.
+##
+##   ranch        Lotus, Rarity, Sweetie Belle, Twilight Sparkle, Fluttershy
+##   orchard      Berry Punch
+##   everfree     Pokey Pierce
+##   lake         Milky Way
+##   nightmeadow  Mane Allgood
 ##
 ## "AT THE HOUR THE WORLD BOOTS INTO" IS NEW, AND IT IS WHY THIS SEED REPLACED 20295486.
 ## Slice 5 gave PonyData `phases` and `weathers`, so populate() no longer draws from a
@@ -129,8 +159,10 @@ const MIN_SEPARATION := 1.4
 ## the tier is empty everywhere on the map. The old seed's "all four tiers in one draw"
 ## property has become impossible rather than unlucky, and losing it is the point of the
 ## feature: the rarest characters are things you go out at the right hour to find, not
-## things standing in the first field you walk into. This draw is 12 COMMON, 7 UNCOMMON
-## and 3 RARE, and the legendaries arrive through refresh() when the sky comes round.
+## things standing in the first field you walk into. The nine slot draw is 5 COMMON,
+## 2 UNCOMMON and 2 RARE, and the legendaries arrive through refresh() when the sky comes
+## round. The stock crowd never touches this tier count either way: her personality and
+## her colours are drawn off their own RNG, in _fill_stock(), not off this one.
 ##
 ## FOUND BY SEARCH, not by taste. A throwaway script replayed SpawnTable's own draw
 ## against every seed from 20260600 upward with the real roster, the real zones, the real
@@ -140,10 +172,13 @@ const MIN_SEPARATION := 1.4
 ## rolls rain at dawn, so it fails the second condition. Re-pick the same way if the
 ## roster, the zoning or the conditions change, because the draw depends on all three.
 ##
-## TWENTY-TWO SLOTS CANNOT SHOW 43 CHARACTERS, and no seed will change that either. What
-## changed in slice 5 is that they no longer have to: refresh() below sends the ponies
-## whose hour has passed off the map and draws whoever the new hour belongs to, so the
-## other 21 arrive over a session rather than waiting for the save to be deleted.
+## NINE SLOTS CANNOT SHOW 43 CHARACTERS, and no seed will change that either. What changed
+## in slice 5 is that they no longer have to: refresh() below sends the ponies whose hour
+## has passed off the map and draws whoever the new hour belongs to, so the rest of the
+## roster arrives over a session rather than waiting for the save to be deleted. And nine
+## slots was never meant to be the whole of what is standing in the field: Task 2's stock
+## crowd is the other forty, so a named pony now takes minutes to find rather than being
+## the first thing the boot draw puts in front of the player.
 ##
 ## KEEP THIS IN STEP WITH GameState.DEFAULT_WORLD_SEED. A save carries the seed its world
 ## was generated from, and a run with no save takes this one into the state; the two are
@@ -197,6 +232,17 @@ var _entries_loaded := false
 ## ONE refresh treating a newcomer as an old face, and the next hour puts it right.
 var _last_phase: int = WorldStateScript.Phase.DAWN
 var _last_weather: int = WorldStateScript.Weather.CLEAR
+
+## Seconds a marker has been short of its stock budget, keyed by marker instance id. Reset
+## the moment a replacement is stood.
+var _stock_wait: Dictionary = {}
+
+## Loaded once. Null only until the first stock pony is stood.
+var _palette: StockPalette = null
+var _regions: RegionRegistry = null
+
+## The registry hidden records resolve through, kept like _entries.
+var _stock_registry: PonyRegistry = null
 
 
 ## Draw and place every zone's ponies. Returns how many actually reached the tree.
@@ -254,6 +300,7 @@ func populate(phase: int = WorldStateScript.Phase.DAWN,
 				_marker_by_pony[pony.get_instance_id()] = marker
 			slot += 1
 
+	slot = _fill_stock(slot)
 	_next_slot = slot
 	return _spawned.size()
 
@@ -323,6 +370,12 @@ func populate(phase: int = WorldStateScript.Phase.DAWN,
 ## does not replay populate()'s draw: the pools differ (the map is already full, so most
 ## markers ask for nothing) and the exclusion above is in force. Worth knowing when reading
 ## a trace of a first session, and not worth perturbing the seed to avoid.
+##
+## STOCK KEEPS NO HOURS. The hidden stock records carry empty `phases` and `weathers`, so
+## `available()` answers true at every hour for every one of them; this function iterates
+## get_spawned() and checks that same condition without caring whether a pony is stock or
+## named, so a stock pony is never told to leave by a change of sky and is never touched
+## here at all. Her field refills on its own timer instead; see tick_stock().
 func refresh(phase: int, weather: int, cycle: int, player_position: Vector3) -> Dictionary:
 	var left := 0
 	for pony in get_spawned():
@@ -520,6 +573,139 @@ func _staying_by_marker() -> Dictionary:
 		var key := marker.get_instance_id()
 		counts[key] = int(counts.get(key, 0)) + 1
 	return counts
+
+
+## How many stock ponies belong at `marker`: its own `stock_count`, clamped into its
+## region's authored band. A marker whose zone has no RegionData (the open homestead) uses
+## its own number as it stands.
+func stock_budget(marker: ZoneMarker) -> int:
+	if marker == null:
+		return 0
+	if _regions == null:
+		_regions = RegionRegistryScript.new()
+		_regions.load_all()
+	var region: RegionData = _regions.by_id(marker.zone_id)
+	if region == null:
+		return maxi(0, marker.stock_count)
+	return clampi(marker.stock_count, region.stock_min, region.stock_max)
+
+
+func stock_standing() -> int:
+	var n := 0
+	for pony in get_spawned():
+		if pony.is_stock() and not pony.is_leaving():
+			n += 1
+	return n
+
+
+func named_standing() -> int:
+	var n := 0
+	for pony in get_spawned():
+		if not pony.is_stock() and not pony.is_leaving():
+			n += 1
+	return n
+
+
+## Stand one stock pony at `marker`. Her personality is one of the three hidden base
+## records and her colours are a palette triple, both drawn off `rng`, so a seed produces
+## the same crowd every time.
+func _spawn_stock(marker: ZoneMarker, slot: int, rng: RandomNumberGenerator) -> CharacterBody3D:
+	if _palette == null:
+		_palette = StockPaletteScript.load_stock()
+	var id: StringName = StockPaletteScript.IDS[rng.randi_range(0,
+		StockPaletteScript.IDS.size() - 1)]
+	var triple: Dictionary = _palette.draw_triple(rng)
+	var data: PonyData = _registry_for_stock().by_id(id)
+	if data == null or data.model_path.is_empty() or not ResourceLoader.exists(data.model_path):
+		# The assetless checkout (docs/ci.md section 4). One calm skip, not a push_error per
+		# pony per marker; ranch.gd's report already says assets=absent at the top.
+		return null
+	var pony: CharacterBody3D = _spawn_one(data, marker, slot)
+	if pony != null:
+		pony.set_stock(triple)
+	return pony
+
+
+## The registry hidden records resolve through. Loaded once and kept, like _entries.
+func _registry_for_stock() -> PonyRegistry:
+	if _stock_registry == null:
+		_stock_registry = PonyRegistryScript.new()
+		_stock_registry.load_all(pony_dir)
+	return _stock_registry
+
+
+## Top every marker up to its stock budget. Returns the next free slot number.
+##
+## THE CROWD IS ALLOWED TO REPEAT ITSELF. The map wide no duplicates rule exists so that
+## seeing a named character is an event (game/world/spawner.gd's refresh() comment); two
+## stock ponies of the same personality standing in one field is not a duplicate, it is a
+## field with two ponies in it, which is the entire point of the crowd.
+func _fill_stock(from_slot: int) -> int:
+	var slot := from_slot
+	for marker: ZoneMarker in get_markers():
+		var want: int = stock_budget(marker) - _stock_at(marker)
+		if want <= 0:
+			continue
+		var rng := RandomNumberGenerator.new()
+		rng.seed = spawn_seed * 131 + marker.get_instance_id() % 100003
+		for i in range(want):
+			if _spawned.size() >= WORLD_PONY_BUDGET:
+				break
+			var pony := _spawn_stock(marker, slot, rng)
+			if pony != null:
+				_spawned.append(pony)
+				_marker_by_pony[pony.get_instance_id()] = marker
+			slot += 1
+	return slot
+
+
+## How many stock ponies are standing at `marker` and staying.
+func _stock_at(marker: ZoneMarker) -> int:
+	var n := 0
+	for pony in get_spawned():
+		if not pony.is_stock() or pony.is_leaving():
+			continue
+		if _marker_by_pony.get(pony.get_instance_id()) == marker:
+			n += 1
+	return n
+
+
+## THE FIELD FILLS ITSELF BACK UP. Called every physics frame by ranch.gd while somebody is
+## playing, and directly by the tests and the gates. A marker that is short of its budget
+## banks `delta`; once it has banked STOCK_RESPAWN_SECONDS it stands ONE replacement and
+## starts again, so emptying a field of four takes four waits rather than one. A marker at
+## its budget banks nothing, so the timer never runs ahead of the need for it.
+##
+## Returns how many arrived, which is what a caller puts in a report line.
+func tick_stock(delta: float) -> int:
+	if delta <= 0.0:
+		return 0
+	var arrived := 0
+	var slot := _next_slot
+	for marker: ZoneMarker in get_markers():
+		var key := marker.get_instance_id()
+		if stock_budget(marker) - _stock_at(marker) <= 0:
+			_stock_wait[key] = 0.0
+			continue
+		var waited: float = float(_stock_wait.get(key, 0.0)) + delta
+		if waited < STOCK_RESPAWN_SECONDS:
+			_stock_wait[key] = waited
+			continue
+		_stock_wait[key] = 0.0
+		if _spawned.size() >= WORLD_PONY_BUDGET:
+			continue
+		var rng := RandomNumberGenerator.new()
+		# The slot number is in the seed, so consecutive replacements at one marker are not
+		# the same pony over and over.
+		rng.seed = spawn_seed * 131 + key % 100003 + slot * 7919
+		var pony := _spawn_stock(marker, slot, rng)
+		slot += 1
+		if pony != null:
+			_spawned.append(pony)
+			_marker_by_pony[pony.get_instance_id()] = marker
+			arrived += 1
+	_next_slot = slot
+	return arrived
 
 
 func get_markers() -> Array[ZoneMarker]:
