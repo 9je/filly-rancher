@@ -3,13 +3,13 @@
 **Date:** 2026-08-30
 **Status:** Design for review, pre-implementation
 **Scope:** The story layer and the economy that carries it: stock ponies, the Company ledger and quota, the casino, the story beats, the insider and the fork, and the Factory interior. Six slices; each gets its own implementation plan. This document is the shape they all fit.
-**Supersedes:** three rows of the 2026-08-26 spec. Pillar 3, "Nopony suffers", is retired. The Collectibles row ("canon characters only, no generic breeds") is amended: canon characters stay the only *collectibles*; generic stock ponies exist as the quota's supply and are not collected. The Gambling row's "Las Pegasus casino deferred to Phase 5+" is brought forward to this phase. "Pony death" stays out of the *code* (no pony ever dies on screen); it enters the *story*.
+**Supersedes:** four rows of the 2026-08-26 spec. Pillar 3, "Nopony suffers", is retired. The Player character row ("Twilight Sparkle; full pony customization is a Phase 5+ feature") is amended: the player designs and names their own unicorn at new game; race choice and per-race capture styles stay in Phase 5+. The Collectibles row ("canon characters only, no generic breeds") is amended: canon characters stay the only *collectibles*; generic stock ponies exist as the quota's supply and are not collected. The Gambling row's "Las Pegasus casino deferred to Phase 5+" is brought forward to this phase. "Pony death" stays out of the *code* (no pony ever dies on screen); it enters the *story*.
 
 ## Why this phase exists
 
 The owner has a bigger world and nothing to say in it. The words this design is held to:
 
-"The game is going to start as a cute pony collecting game but will slowly reveal something darker. We're initially led to think we're helping ponies but it is slowly revealed our ponies are provided to the Rainbow Factory. Turns out we're the bad guy." And: "economy focused, a pony quota you gotta deliver, a full on casino sponsored by the Factory." And on the shape of the arc: "you pay your first few quotas, then an NPC tells you you can not pay it and gives disruptive tasks (good route: you don't pay, there's punishments, the game is harder), or you can rat them out, they get killed, and you keep helping the company. The game keeps going forever and remains fun, like Stardew Valley." And on the tone: "implied, maybe a bit of explicit, only what we can afford to build."
+"The game is going to start as a cute pony collecting game but will slowly reveal something darker. We're initially led to think we're helping ponies but it is slowly revealed our ponies are provided to the Rainbow Factory. Turns out we're the bad guy." And: "economy focused, a pony quota you gotta deliver, a full on casino sponsored by the Factory." And on the shape of the arc: "you pay your first few quotas, then an NPC tells you you can not pay it and gives disruptive tasks (good route: you don't pay, there's punishments, the game is harder), or you can rat them out, they get killed, and you keep helping the company. The game keeps going forever and remains fun, like Stardew Valley." And on the tone: "implied, maybe a bit of explicit, only what we can afford to build." And at spec review: "I also want the start to be character customization where you design and name your character."
 
 Two constraints from the same conversation bind every section below:
 
@@ -45,6 +45,15 @@ Rejected alternatives, recorded so they stay rejected:
 - **Sanctuary** (shelter ponies instead of delivering) as the good route's spine. Passive; the owner wants the good route to be *disruption*.
 
 ## Systems
+
+### Character creation
+
+A new game opens on the creation screen before the ranch loads: the player's pony on a turntable against the dawn sky, and a name box. The player is a unicorn; the beam is the game, and other races wait for their capture styles in Phase 5+.
+
+- **Looks:** coat, mane and tail, and eye colours picked from swatch rows (the same `StockPalette` machinery as stock ponies, with a wider player palette); a mane style, if more than one sourced style retargets cleanly onto the base rig, otherwise the one; a cutie mark from a preset sheet.
+- **Name:** typed, length-capped, shown everywhere text addresses the player. Every Company letter opens with it ("Dear {name},"), the Depot statement is made out to it, NPCs use it, the casino cage knows it. The Company knowing your name is part of the register.
+- The result is saved as `player` (name, palette, mane, mark) and the player model is tinted exactly as stock ponies are: one pipeline, two users.
+- A v4 save loads with the current look and the name Twilight; no re-edit screen this phase (YAGNI). Twilight Sparkle leaves the player slot and can join the catchable roster in some later phase's authoring, not this one.
 
 ### Stock ponies
 
@@ -147,12 +156,12 @@ The numbers the plans tune to, and the reason the phase is fun rather than merel
 | `PonyData` | `npc: bool` (talk-box character, never spawned or collected). |
 | `PonyInstance` | `stock: Dictionary` (palette triple; empty for a named pony). |
 | `RegionData` | `stock_min`, `stock_max`, `pylon_position`. |
-| `StockPalette` (new) | coat, mane, eye colour arrays. |
+| `StockPalette` (new) | coat, mane, eye colour arrays; also serves character creation via a wider player palette. |
 | `StoryBeat` (new) | `id`, `chapter`, `trigger`, `sender`, `title`, `body`, `reveals`, `evidence`. |
 | `InsiderTask` (new) | `id`, `kind`, `target`, `text`, `relief`, `removes`. |
 | `Rank` (new) | `title`, `quota`, `upkeep_multiplier`, `perks`. |
 | `Compendium` | states `PROCESSED`, `RESCUED`. |
-| Save | `ledger` (balance, period counter, quota progress, punishments), `story` (chapter, flags, heat, rank, mail read state), `casino` (chips, loyalty), `tasks`. `version` becomes 5; a v4 save loads with the ledger at its starting balance and the story at `SUNNY`. |
+| Save | `player` (name, palette, mane, mark), `ledger` (balance, period counter, quota progress, punishments), `story` (chapter, flags, heat, rank, mail read state), `casino` (chips, loyalty), `tasks`. `version` becomes 5; a v4 save loads with the ledger at its starting balance, the story at `SUNNY`, and the player named Twilight with the current look. |
 
 No existing save key changes meaning.
 
@@ -166,12 +175,13 @@ The project's rule stands: a gate prints its marker after the verdict; exit code
 - `story_test`: every `StoryBeat` in `game/data/story/` has a chapter that exists, a trigger the game can emit, and no em dash or double hyphen in its text; the fork is one-shot; each route's ladder is walkable end to end by firing triggers.
 - `resistance_test`: heat rises and falls as specified; every task kind completes from its verb; a pylon cut removes `STORM` from its region's table; the shutdown leaves the world in the promised state.
 - `factory_test`: the interior scene loads, both routes' walks complete, and the exit returns to the ranch with the save intact.
+- `creation_test`: the creation screen round-trips every palette and mark choice into the save, the tint lands on the player model, and every letter template renders with a longest-legal name without overflow.
 - Save round trips for every new key, including a v4 save.
-- The visual harness for the Strip, the Town, the recolour palette, and the interior, reviewed by eye.
+- The visual harness for the creation screen, the Strip, the Town, the recolour palette, and the interior, reviewed by eye.
 
 ## Build order
 
-1. **Stock ponies and the ledger.** The renewable supply and the debt clock, with the Depot's deliver and pay. The game's spine changes here: after this slice the player has a reason to remove ponies. Letters are a stub sender with fixed text.
+1. **Character creation, stock ponies, and the ledger.** One recolour pipeline serving the player and the crowd, the renewable supply, and the debt clock, with the Depot's deliver and pay. The game's spine changes here: after this slice the player has a reason to remove ponies. Letters are a stub sender with fixed text.
 2. **The casino.** Strip region, cage, four games, racing with the player's ponies. Self-contained, and the biggest single piece of fun in the phase.
 3. **Story: paper.** `Story`, `StoryBeat`, mail, chapter-keyed Board wording, `PROCESSED`. Chapters `SUNNY` through `WEATHER`, and the Company ladder's letters. The Company route is complete after this slice except for the tour.
 4. **Story: people.** Town region, NPCs, the talk box, the insider, the fork. Ranks and their perks.
