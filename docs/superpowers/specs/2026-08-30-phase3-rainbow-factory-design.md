@@ -50,9 +50,9 @@ Rejected alternatives, recorded so they stay rejected:
 
 A new game opens on the creation screen before the ranch loads: the player's pony on a turntable against the dawn sky, and a name box. The player is a unicorn; the beam is the game, and other races wait for their capture styles in Phase 5+.
 
-- **Looks:** coat, mane and tail, and eye colours picked from swatch rows (the same `StockPalette` machinery as stock ponies, with a wider player palette); a mane style, if more than one sourced style retargets cleanly onto the base rig, otherwise the one; a cutie mark from a preset sheet.
+- **Looks:** coat, mane and tail, and eye colours picked from swatch rows (the same `StockPalette` machinery as stock ponies, with a wider player palette); a mane style, if more than one sourced style retargets cleanly onto the base rig, otherwise the one; and a cutie mark the player **draws**: a small square canvas (about 64x64) with a colour palette, brush sizes, an eraser, undo, and clear, plus a few optional stamp templates to start from. The drawing is applied to both flanks of the model.
 - **Name:** typed, length-capped, shown everywhere text addresses the player. Every Company letter opens with it ("Dear {name},"), the Depot statement is made out to it, NPCs use it, the casino cage knows it. The Company knowing your name is part of the register.
-- The result is saved as `player` (name, palette, mane, mark) and the player model is tinted exactly as stock ponies are: one pipeline, two users.
+- The result is saved as `player` (name, palette, mane, and the mark as a small base64 PNG, so the save stays one self-contained JSON blob) and the player model is tinted exactly as stock ponies are: one pipeline, two users.
 - A v4 save loads with the current look and the name Twilight; no re-edit screen this phase (YAGNI). Twilight Sparkle leaves the player slot and can join the catchable roster in some later phase's authoring, not this one.
 
 ### Stock ponies
@@ -161,7 +161,7 @@ The numbers the plans tune to, and the reason the phase is fun rather than merel
 | `InsiderTask` (new) | `id`, `kind`, `target`, `text`, `relief`, `removes`. |
 | `Rank` (new) | `title`, `quota`, `upkeep_multiplier`, `perks`. |
 | `Compendium` | states `PROCESSED`, `RESCUED`. |
-| Save | `player` (name, palette, mane, mark), `ledger` (balance, period counter, quota progress, punishments), `story` (chapter, flags, heat, rank, mail read state), `casino` (chips, loyalty), `tasks`. `version` becomes 5; a v4 save loads with the ledger at its starting balance, the story at `SUNNY`, and the player named Twilight with the current look. |
+| Save | `player` (name, palette, mane, mark PNG), `ledger` (balance, period counter, quota progress, punishments), `story` (chapter, flags, heat, rank, mail read state), `casino` (chips, loyalty), `tasks`. `version` becomes 5; a v4 save loads with the ledger at its starting balance, the story at `SUNNY`, and the player named Twilight with the current look and a blank mark. |
 
 No existing save key changes meaning.
 
@@ -175,7 +175,7 @@ The project's rule stands: a gate prints its marker after the verdict; exit code
 - `story_test`: every `StoryBeat` in `game/data/story/` has a chapter that exists, a trigger the game can emit, and no em dash or double hyphen in its text; the fork is one-shot; each route's ladder is walkable end to end by firing triggers.
 - `resistance_test`: heat rises and falls as specified; every task kind completes from its verb; a pylon cut removes `STORM` from its region's table; the shutdown leaves the world in the promised state.
 - `factory_test`: the interior scene loads, both routes' walks complete, and the exit returns to the ranch with the save intact.
-- `creation_test`: the creation screen round-trips every palette and mark choice into the save, the tint lands on the player model, and every letter template renders with a longest-legal name without overflow.
+- `creation_test`: the creation screen round-trips every palette choice and a drawn mark into the save and back pixel-identical, the tint and the mark land on the player model, and every letter template renders with a longest-legal name without overflow.
 - Save round trips for every new key, including a v4 save.
 - The visual harness for the creation screen, the Strip, the Town, the recolour palette, and the interior, reviewed by eye.
 
