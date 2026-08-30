@@ -34,6 +34,10 @@ extends RefCounted
 ## still hers, and NO PONY IS EVER TAKEN. (The one place after the fork where a collector
 ## reaches into a pen is the Resistance route, which is a later slice and is not here.)
 
+## Preloaded by path rather than referenced through the global class_name, per the
+## convention at the top of game/scripts/pony_rig.gd.
+const EconomyScript := preload("res://systems/economy.gd")
+
 enum Punishment { NONE, FEE, PERMIT_REVOKED, PEN_PADLOCKED, BEAM_RECALLED }
 
 ## The collector ladder, in the order the design doc names it. Index by `tier`, clamped at
@@ -144,7 +148,7 @@ static func is_collection_cycle(cycle: int) -> bool:
 static func delivery_credit(rarity: int, is_stock: bool) -> int:
 	if is_stock:
 		return DELIVERY_CREDIT_STOCK
-	var unit: int = int(Economy.GEM_VALUE_BY_RARITY.get(rarity, 0))
+	var unit: int = int(EconomyScript.GEM_VALUE_BY_RARITY.get(rarity, 0))
 	return unit * DELIVERY_NAMED_MULTIPLIER
 
 
