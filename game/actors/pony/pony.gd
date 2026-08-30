@@ -488,6 +488,10 @@ func adopt(instance: PonyInstance) -> void:
 	_instance = instance
 	if instance == null:
 		return
+	# Her look comes back with her record, so a pony stood up out of a pen after a reload is
+	# the same pony the player put in it rather than a stranger with the same uid.
+	if not instance.stock.is_empty():
+		_stock = instance.stock.duplicate()
 	setup(instance.data())
 
 

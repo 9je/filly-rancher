@@ -31,6 +31,7 @@ const SaveIOScript := preload("res://systems/save_io.gd")
 const GameStateScript := preload("res://systems/game_state.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const CompendiumScript := preload("res://systems/compendium.gd")
+const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 
 ## Where these tests write. Deliberately NOT SaveIO's default directory.
 const SCRATCH_DIR := "user://test_scratch/save_io"
@@ -507,3 +508,17 @@ func test_a_payload_that_is_not_json_representable_is_refused_before_anything_is
 	assert_push_error(1)
 	assert_eq(SaveIOScript.load(SLOT)["bits"], PAYLOAD["bits"],
 		"...and the previous save is still there")
+
+
+# --- a stock pony's colours in the save file ---------------------------------------------
+
+func test_a_stock_pony_survives_a_whole_save_round_trip() -> void:
+	var inst := PonyInstanceScript.create(&"stock_shy")
+	inst.stock = {"coat": 5, "mane": 2, "eyes": 4}
+	inst.home_slot = &"plot_a"
+	assert_true(SaveIOScript.save(SLOT, {"ponies": [inst.to_dict()]}))
+	var loaded := SaveIOScript.load(SLOT)
+	var back := PonyInstanceScript.from_dict(loaded["ponies"][0])
+	assert_eq(back.stock, {"coat": 5, "mane": 2, "eyes": 4})
+	assert_eq(back.data_id, &"stock_shy")
+	assert_eq(back.home_slot, &"plot_a")

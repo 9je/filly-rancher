@@ -1457,6 +1457,12 @@ func _settle_pony(pony: Node3D) -> void:
 		# value goes into a save file and process uptime means nothing after a restart.
 		instance = PonyInstanceScript.create(
 			data.id, int(Time.get_unix_time_from_system() * 1000.0))
+		# HER COLOURS COME OFF HER BODY. A wild stock pony has no record until this moment,
+		# so the body the spawner tinted is the only thing that knows what she looks like;
+		# minting without this makes every caught stock pony a differently coloured stranger
+		# the next time she is stood up out of a pen.
+		if pony.has_method("get_stock"):
+			instance.stock = pony.get_stock()
 
 	if instance != null and _storage.store(instance):
 		pony.notify_captured()

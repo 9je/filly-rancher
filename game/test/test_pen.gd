@@ -358,6 +358,23 @@ func test_a_resident_gets_a_body_leashed_to_the_pen() -> void:
 		"...on the same layer the spawner puts a wild pony on")
 
 
+func test_a_penned_stock_pony_keeps_her_colours() -> void:
+	# IN TREE, like test_a_resident_gets_a_body_leashed_to_the_pen just above: _spawn_body()
+	# does nothing outside the tree (pen.gd), so _pen()'s out-of-tree pen never grows a body
+	# to check the colours on.
+	var pen: Pen = PenScript.new()
+	pen.capacity = 3
+	pen.slot_id = &"slot_stock"
+	add_child_autofree(pen)
+	var inst := PonyInstanceScript.create(&"stock_curious")
+	inst.stock = {"coat": 4, "mane": 1, "eyes": 0}
+	assert_true(pen.add_pony(inst))
+	var body: Node3D = pen.body_for(inst.uid)
+	assert_not_null(body, "a resident has a body standing in the pen")
+	assert_eq(body.get_stock(), {"coat": 4, "mane": 1, "eyes": 0},
+		"the body wears what her record says")
+
+
 func test_a_removed_resident_loses_her_body() -> void:
 	var pen: Pen = PenScript.new()
 	pen.capacity = 2

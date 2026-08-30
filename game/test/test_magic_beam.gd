@@ -26,6 +26,9 @@ const PonyDataScript := preload("res://systems/pony_data.gd")
 ## static and pure and wants no pony in the world at all.
 const PlayerScene := preload("res://actors/player/player.tscn")
 const PonyScript := preload("res://actors/pony/pony.gd")
+## The body a stock pony's colours are minted off, and the record her instance resolves to.
+const PonyScene := preload("res://actors/pony/pony.tscn")
+const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 
 ## Floor for the beam fixture, matching game/test/test_player.gd: big enough that nothing
 ## here can walk off it.
@@ -776,3 +779,41 @@ func test_reach_stays_under_the_notice_invariant_even_with_the_long_beam() -> vo
 		var notice: float = PonyScript.notice_radius_for(personality, false)
 		assert_gte(notice - beam.reach(), MagicBeamScript.MIN_DETECTION_MARGIN,
 			"personality %d notices from %.1f, long beam reaches %.1f" % [personality, notice, beam.reach()])
+
+
+# --- a caught stock pony's colours ------------------------------------------------------
+
+func test_catching_a_stock_pony_carries_her_colours_onto_her_record() -> void:
+	var beam: MagicBeam = _beam()  # the file's existing helper
+	var pony: Pony = PonyScene.instantiate()
+	pony.set_stock({"coat": 1, "mane": 7, "eyes": 3})
+	add_child_autofree(pony)
+	pony.setup(_stock_data())  # a hidden record, resolved through PonyRegistry.by_id
+	beam._settle_pony(pony)
+	var stored: PonyInstance = beam.get_storage().contents()[0]
+	assert_eq(stored.stock, {"coat": 1, "mane": 7, "eyes": 3},
+		"her look is minted with her uid, or a caught stock pony is a stranger on reload")
+
+
+func test_catching_a_named_pony_leaves_her_stock_empty() -> void:
+	var beam: MagicBeam = _beam()
+	var pony: Pony = PonyScene.instantiate()
+	add_child_autofree(pony)
+	pony.setup(_named_data())
+	beam._settle_pony(pony)
+	assert_eq(beam.get_storage().contents()[0].stock, {})
+
+
+## A hidden stock base record, resolved the same way every real caught stock pony's
+## PonyInstance.data_id is: through the registry, not a direct path to game/data/hidden/.
+func _stock_data() -> PonyData:
+	var registry := PonyRegistryScript.new()
+	registry.load_all("res://data/ponies")
+	return registry.by_id(&"stock_shy")
+
+
+## An ordinary named character, for the contrast case.
+func _named_data() -> PonyData:
+	var registry := PonyRegistryScript.new()
+	registry.load_all("res://data/ponies")
+	return registry.by_id(&"twilight")

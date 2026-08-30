@@ -1584,6 +1584,11 @@ func _on_pony_noticed(data: PonyData) -> void:
 func _on_pony_captured(instance: PonyInstance) -> void:
 	if instance == null or _game_state == null:
 		return
+	# THE CROWD IS NOT COLLECTED. A stock pony has no Compendium entry and no request ever
+	# names one: she is supply, not a character. Marking her would put an id in the book
+	# that no page can ever show and no count can ever include.
+	if instance.is_stock():
+		return
 	_game_state.compendium.mark_caught(instance.data_id)
 	if _board == null:
 		return

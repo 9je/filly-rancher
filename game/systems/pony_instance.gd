@@ -136,6 +136,19 @@ var caught_at_ms := 0
 ## allowed to write this field, or there would be two authorities on where she lives.
 var home_slot: StringName = &""
 
+## HER LOOK, if she is one of the crowd: `{"coat": int, "mane": int, "eyes": int}`, indices
+## into game/data/stock_palette.tres. EMPTY for a named character, whose look is her model.
+##
+## ON THE INDIVIDUAL AND NOT ON THE CHARACTER, because that is the whole difference between
+## a stock pony and a named one: two ponies of the same character are the same colours, and
+## two stock ponies of the same hidden base record are not. Her three indices are the only
+## thing that makes her her, so they ride in her own record beside her uid and her hunger,
+## and a traded blob carries her colours with her.
+##
+## INDICES RATHER THAN COLOURS, for the reason StockPalette's class comment gives: a colour
+## written into a save freezes today's palette into every old file.
+var stock: Dictionary = {}
+
 
 ## Mint a brand new individual of `character_id`. Every call produces a DIFFERENT pony,
 ## even for the same character -- that is the entire point of this class.
@@ -210,6 +223,14 @@ func data() -> PonyData:
 ## raw data_id. The last fallback is deliberately the id rather than "" or "a pony": a
 ## label that says `not_a_pony_at_all` tells whoever is looking at it what went wrong,
 ## and an empty one tells them nothing.
+## Is she one of the crowd? Asked of her LOOK rather than of her data_id, because the look
+## is what the save carries and the id is what a build's roster happens to hold: a record
+## whose data_id this build has never heard of still resolves to null and still has to know
+## whether to be tinted.
+func is_stock() -> bool:
+	return not stock.is_empty()
+
+
 func display_name() -> String:
 	if not nickname.is_empty():
 		return nickname
@@ -231,6 +252,7 @@ func to_dict() -> Dictionary:
 		"hunger": hunger,
 		"caught_at_ms": caught_at_ms,
 		"home_slot": String(home_slot),
+		"stock": stock.duplicate(),
 	}
 
 
@@ -270,6 +292,25 @@ static func from_dict(d: Dictionary) -> PonyInstance:
 	# from such a build. str() of the default gives "" -- a pony in the bag -- rather than a
 	# pony penned in a slot called "<null>".
 	inst.home_slot = StringName(str(d.get("home_slot", "")))
+	# JSON has no integer type, so every index comes back as a float and is int()ed; and a
+	# value that is not a dictionary of three numbers is DROPPED rather than kept, so a hand
+	# edited blob cannot fabricate a look this class would not have written.
+	inst.stock = {}
+	var saved_stock: Variant = d.get("stock", {})
+	if typeof(saved_stock) == TYPE_DICTIONARY:
+		var triple: Dictionary = saved_stock
+		var ok := true
+		for key in ["coat", "mane", "eyes"]:
+			var raw: Variant = triple.get(key, null)
+			if typeof(raw) != TYPE_INT and typeof(raw) != TYPE_FLOAT:
+				ok = false
+				break
+		if ok:
+			inst.stock = {
+				"coat": int(triple["coat"]),
+				"mane": int(triple["mane"]),
+				"eyes": int(triple["eyes"]),
+			}
 	return inst
 
 

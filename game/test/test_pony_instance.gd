@@ -208,3 +208,40 @@ func test_the_display_name_falls_back_all_the_way_down() -> void:
 	var orphan = PonyInstanceScript.create(UNKNOWN_ID)
 	assert_eq(orphan.display_name(), String(UNKNOWN_ID),
 		"...and with no record at all, the raw id rather than an empty label")
+
+
+# --- stock ---------------------------------------------------------------------------
+
+func test_a_new_instance_is_not_stock() -> void:
+	var inst := PonyInstanceScript.create(&"twilight")
+	assert_eq(inst.stock, {})
+	assert_false(inst.is_stock())
+
+
+func test_a_palette_triple_round_trips_through_the_dictionary() -> void:
+	var inst := PonyInstanceScript.create(&"stock_shy")
+	inst.stock = {"coat": 3, "mane": 6, "eyes": 2}
+	var back := PonyInstanceScript.from_dict(inst.to_dict())
+	assert_eq(back.stock, {"coat": 3, "mane": 6, "eyes": 2})
+	assert_true(back.is_stock())
+
+
+func test_a_record_written_before_phase_three_loads_as_a_named_pony() -> void:
+	var old := {"uid": "twilight#000004", "data_id": "twilight", "nickname": "",
+		"happiness": 0.5, "hunger": 0.0, "caught_at_ms": 0, "home_slot": ""}
+	var inst := PonyInstanceScript.from_dict(old)
+	assert_eq(inst.stock, {}, "a missing stock key is a named pony, not a broken one")
+	assert_false(inst.is_stock())
+
+
+func test_a_junk_stock_value_is_dropped_rather_than_stored() -> void:
+	var inst := PonyInstanceScript.from_dict({"data_id": "stock_bold", "stock": "purple"})
+	assert_eq(inst.stock, {}, "a hand edited blob must not fabricate a look")
+
+
+func test_stock_indices_are_coerced_to_ints() -> void:
+	# JSON has no integer type: every number comes back off disk as a float.
+	var inst := PonyInstanceScript.from_dict({"data_id": "stock_bold",
+		"stock": {"coat": 2.0, "mane": 4.0, "eyes": 1.0}})
+	assert_eq(inst.stock, {"coat": 2, "mane": 4, "eyes": 1})
+	assert_eq(typeof(inst.stock["coat"]), TYPE_INT)
