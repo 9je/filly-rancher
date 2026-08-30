@@ -7,6 +7,7 @@ extends GutTest
 
 const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
+const StockPaletteScript := preload("res://systems/stock_palette.gd")
 
 const PONY_DIR := "res://data/ponies/"
 const MALFORMED_DIR := "res://test/fixtures/ponies_malformed/"
@@ -205,19 +206,19 @@ func test_malformed_model_path_is_reported_not_swallowed() -> void:
 
 
 func test_hidden_records_resolve_by_id_and_are_never_listed() -> void:
-	var registry := PonyRegistry.new()
+	var registry := PonyRegistryScript.new()
 	registry.load_all("res://data/ponies")
-	for id: StringName in StockPalette.IDS:
+	for id: StringName in StockPaletteScript.IDS:
 		assert_not_null(registry.by_id(id), "%s must resolve for pens, bags and saves" % id)
 		assert_false(id in registry.ids(), "%s must not appear in the roster listing" % id)
 	for data: PonyData in registry.all():
-		assert_false(StockPalette.is_stock_id(data.id), "all() is the collectibles, nothing else")
+		assert_false(StockPaletteScript.is_stock_id(data.id), "all() is the collectibles, nothing else")
 	assert_eq(registry.by_zone(&"ranch").filter(
-		func(d: PonyData) -> bool: return StockPalette.is_stock_id(d.id)).size(), 0,
+		func(d: PonyData) -> bool: return StockPaletteScript.is_stock_id(d.id)).size(), 0,
 		"a stock record is zoned nowhere and must never be drawn by a spawn table")
 
 
 func test_the_collectible_roster_is_still_forty_three() -> void:
-	var registry := PonyRegistry.new()
+	var registry := PonyRegistryScript.new()
 	registry.load_all("res://data/ponies")
 	assert_eq(registry.all().size(), 43, "adding hidden records must not change the Compendium")
