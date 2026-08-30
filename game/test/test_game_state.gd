@@ -255,6 +255,24 @@ func test_reset_gives_a_fresh_compendium_and_empty_requests() -> void:
 	assert_true(state.requests.is_empty())
 
 
+func test_the_ledger_round_trips_through_the_state() -> void:
+	var state = _state()
+	state.ledger.balance = 31000
+	state.ledger.quota = 4
+	var data: Dictionary = state.to_dict()
+	var back = _state()
+	back.from_dict(data)
+	assert_eq(back.ledger.balance, 31000)
+	assert_eq(back.ledger.quota, 4)
+
+
+func test_a_load_replaces_the_ledger_rather_than_mutating_it() -> void:
+	var state = _state()
+	var old: Ledger = state.ledger
+	state.from_dict({})
+	assert_ne(state.ledger, old, "a listener holding the old account must be told to re-read")
+
+
 # --- the disk round trip ----------------------------------------------------------------
 
 ## THE REAL FILE, NOT JUST to_dict()/from_dict(). This is the path that actually round-trips

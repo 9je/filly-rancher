@@ -32,6 +32,7 @@ const GameStateScript := preload("res://systems/game_state.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const CompendiumScript := preload("res://systems/compendium.gd")
 const PonyInstanceScript := preload("res://systems/pony_instance.gd")
+const LedgerScript := preload("res://systems/ledger.gd")
 
 ## Where these tests write. Deliberately NOT SaveIO's default directory.
 const SCRATCH_DIR := "user://test_scratch/save_io"
@@ -253,7 +254,7 @@ func test_a_save_from_a_newer_build_refuses_to_load_rather_than_be_misread() -> 
 
 
 func test_the_version_policy_is_stated_and_pinned() -> void:
-	assert_eq(SaveIOScript.FORMAT_VERSION, 4, "the current format version")
+	assert_eq(SaveIOScript.FORMAT_VERSION, 5, "the current format version")
 	assert_true(SaveIOScript.can_load_version(SaveIOScript.FORMAT_VERSION),
 		"this build's own version loads")
 	assert_false(SaveIOScript.can_load_version(SaveIOScript.FORMAT_VERSION + 1),
@@ -297,6 +298,35 @@ func test_a_version_3_file_gains_empty_compendium_and_requests() -> void:
 	assert_eq(migrated["requests"], [])
 
 
+func test_the_format_version_is_five() -> void:
+	assert_eq(SaveIOScript.FORMAT_VERSION, 5)
+	assert_true(SaveIOScript.can_load_version(1))
+	assert_true(SaveIOScript.can_load_version(4))
+	assert_true(SaveIOScript.can_load_version(5))
+	assert_false(SaveIOScript.can_load_version(6))
+
+
+## A dedicated direct-migrate test for the branch THIS task adds, mirroring the v1 and v3
+## ones above but starting one version later still, so it proves the new branch on its own.
+func test_migrating_a_version_four_save_gives_it_a_ledger() -> void:
+	var migrated: Dictionary = SaveIOScript.migrate(
+		{"bits": 40, "compendium": {}, "requests": []}, 4)
+	assert_eq(migrated["ledger"], {})
+	var ledger: Ledger = LedgerScript.from_dict(migrated["ledger"])
+	assert_eq(ledger.balance, LedgerScript.STARTING_BALANCE,
+		"a ranch from before the Company opens its account at the sponsorship balance")
+
+
+func test_a_version_four_file_on_disk_loads_in_this_build() -> void:
+	var path: String = SaveIOScript.slot_path(SLOT)
+	_write_raw(path, JSON.stringify({"version": 4, "bits": 77,
+		"compendium": {"twilight": 2}, "requests": []}, "  ", true))
+	var loaded: Dictionary = SaveIOScript.load(SLOT)
+	assert_eq(int(loaded["version"]), 5, "it is brought up to today's shape")
+	assert_eq(int(loaded["bits"]), 77, "and nothing it did say is lost")
+	assert_eq(loaded["ledger"], {})
+
+
 ## THE WHOLE PATH, NOT THE MIGRATION ON ITS OWN. The test above calls migrate() directly,
 ## which proves the transform and nothing about the two ends of it. This one is the composed
 ## route a player on an older save actually takes: a version-1 file on disk, written by a
@@ -324,7 +354,7 @@ func test_a_version_1_file_on_disk_loads_all_the_way_into_a_game_state() -> void
 
 	var loaded := SaveIOScript.load(SLOT)
 	assert_false(loaded.is_empty(), "a version-1 save still loads on this build")
-	assert_eq(int(loaded["version"]), 4,
+	assert_eq(int(loaded["version"]), 5,
 		"...and arrives stamped with the version it was migrated to, not the one on disk")
 
 	var state = GameStateScript.new()
@@ -348,6 +378,8 @@ func test_a_version_1_file_on_disk_loads_all_the_way_into_a_game_state() -> void
 		"a save from before the compendium existed comes back with nobody marked, " +
 		"even for a pony she owns; a later task's ranch code backfills owned ponies on load")
 	assert_true(state.requests.is_empty(), "and with no requests pending")
+	assert_eq(state.ledger.balance, Ledger.STARTING_BALANCE,
+		"a save from before the Company opens its account at the sponsorship balance")
 
 
 ## The same composed proof, one version later: a version-2 file (gems and inventory exist,
@@ -372,7 +404,7 @@ func test_a_version_2_file_on_disk_loads_all_the_way_into_a_game_state() -> void
 
 	var loaded := SaveIOScript.load(SLOT)
 	assert_false(loaded.is_empty(), "a version-2 save still loads on this build")
-	assert_eq(int(loaded["version"]), 4,
+	assert_eq(int(loaded["version"]), 5,
 		"...and arrives stamped with the version it was migrated to, not the one on disk")
 
 	var state = GameStateScript.new()
@@ -388,6 +420,8 @@ func test_a_version_2_file_on_disk_loads_all_the_way_into_a_game_state() -> void
 	assert_eq(state.compendium.state_of(&"twilight"), CompendiumScript.State.UNSEEN,
 		"a save from before the compendium existed comes back with nobody marked")
 	assert_true(state.requests.is_empty(), "and with no requests pending")
+	assert_eq(state.ledger.balance, Ledger.STARTING_BALANCE,
+		"a save from before the Company opens its account at the sponsorship balance")
 
 
 ## The same composed proof, one version later still: a version-3 file (gems, inventory and
@@ -413,7 +447,7 @@ func test_a_version_3_file_on_disk_loads_all_the_way_into_a_game_state() -> void
 
 	var loaded := SaveIOScript.load(SLOT)
 	assert_false(loaded.is_empty(), "a version-3 save still loads on this build")
-	assert_eq(int(loaded["version"]), 4,
+	assert_eq(int(loaded["version"]), 5,
 		"...and arrives stamped with the version it was migrated to, not the one on disk")
 
 	var state = GameStateScript.new()
@@ -429,6 +463,8 @@ func test_a_version_3_file_on_disk_loads_all_the_way_into_a_game_state() -> void
 		"a save from before the compendium existed comes back with nobody marked, " +
 		"even for a pony she owns; a later task's ranch code backfills owned ponies on load")
 	assert_true(state.requests.is_empty(), "and with no requests pending")
+	assert_eq(state.ledger.balance, Ledger.STARTING_BALANCE,
+		"a save from before the Company opens its account at the sponsorship balance")
 
 
 # --- atomicity: an interrupted write must not cost the previous save ------------------

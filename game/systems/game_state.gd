@@ -49,6 +49,7 @@ const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 const GemPouchScript := preload("res://systems/gem_pouch.gd")
 const InventoryScript := preload("res://systems/inventory.gd")
 const CompendiumScript := preload("res://systems/compendium.gd")
+const LedgerScript := preload("res://systems/ledger.gd")
 
 ## Where the authored character roster is read from. The same directory the spawner and
 ## PonyInstance use; named here because this is now the one place it is loaded.
@@ -81,6 +82,7 @@ const KEY_INVENTORY := "inventory"
 const KEY_WORLD_TIME := "world_time"
 const KEY_COMPENDIUM := "compendium"
 const KEY_REQUESTS := "requests"
+const KEY_LEDGER := "ledger"
 
 ## Emitted after from_dict() or load_from_slot() has replaced the world. A HUD or a pen
 ## that cached anything out of here has to rebuild on this.
@@ -139,6 +141,13 @@ var world_time: float = 0.0
 ## game/systems/compendium.gd. REPLACED, NOT MUTATED, by from_dict() and reset(), same rule
 ## as `gems` above and for the same reason.
 var compendium: Compendium = CompendiumScript.new()
+
+## The Company's account against this ranch (game/systems/ledger.gd): the balance, the
+## quota, how far up the collector ladder the last few periods have taken her, and what is
+## currently revoked or padlocked. REPLACED, NOT MUTATED, by from_dict() and reset(), the
+## same rule `gems` and `compendium` follow and for the same reason: a listener holding the
+## old object is holding the account of a ranch nobody is playing any more.
+var ledger: Ledger = LedgerScript.new()
 
 ## Pending requests, as plain Dictionaries whose shape this file does not know or check;
 ## a later task defines it and reads/writes it. Untyped for the same reason `unlocks` is:
@@ -272,6 +281,7 @@ func to_dict() -> Dictionary:
 		KEY_WORLD_TIME: world_time,
 		KEY_COMPENDIUM: compendium.to_dict(),
 		KEY_REQUESTS: requests.duplicate(true),
+		KEY_LEDGER: ledger.to_dict(),
 	}
 
 
@@ -328,6 +338,10 @@ func from_dict(data: Dictionary) -> void:
 	var saved_requests: Variant = data.get(KEY_REQUESTS, [])
 	requests = saved_requests.duplicate(true) if typeof(saved_requests) == TYPE_ARRAY else []
 
+	var saved_ledger: Variant = data.get(KEY_LEDGER, {})
+	ledger = LedgerScript.from_dict(
+		saved_ledger if typeof(saved_ledger) == TYPE_DICTIONARY else {})
+
 	state_loaded.emit()
 
 
@@ -343,6 +357,7 @@ func reset() -> void:
 	world_time = 0.0
 	compendium = CompendiumScript.new()
 	requests = []
+	ledger = LedgerScript.new()
 
 
 # --- disk ---------------------------------------------------------------------------------
