@@ -607,8 +607,10 @@ func named_standing() -> int:
 
 
 ## Stand one stock pony at `marker`. Her personality is one of the three hidden base
-## records and her colours are a palette triple, both drawn off `rng`, so a seed produces
-## the same crowd every time.
+## records and her colours are a palette triple, both drawn off `rng`. The stream mixes in
+## engine instance ids upstream (_fill_stock, tick_stock), so the crowd is stable within a
+## boot but MAY reshuffle across boots; that is fine for anonymous stock, and the named
+## draw is the one the world seed actually pins.
 func _spawn_stock(marker: ZoneMarker, slot: int, rng: RandomNumberGenerator) -> CharacterBody3D:
 	if _palette == null:
 		_palette = StockPaletteScript.load_stock()
