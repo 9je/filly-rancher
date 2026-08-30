@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="PonyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/pony_data.gd" id="1_stock_shy"]
+
+[resource]
+script = ExtResource("1_stock_shy")
+id = &"stock_shy"
+display_name = "Pony"
+model_path = "res://assets/converted/ponies/pokeypierce.glb"
+rarity = 0
+spawn_zones = Array[StringName]([])
+favorite_foods = Array[StringName]([&"hay"])
+personality = 0
+voice_bank = ""
+base_speed = 4.0
+base_stamina = 1.0
+base_spirit = 1.0
+phases = Array[int]([])
+weathers = Array[int]([])

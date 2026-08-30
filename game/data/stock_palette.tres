@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="StockPalette" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/stock_palette.gd" id="1_pal"]
+
+[resource]
+script = ExtResource("1_pal")
+coats = Array[Color]([Color(0.96, 0.86, 0.62, 1), Color(0.85, 0.62, 0.45, 1), Color(0.62, 0.78, 0.92, 1), Color(0.78, 0.72, 0.90, 1), Color(0.94, 0.74, 0.78, 1), Color(0.72, 0.88, 0.72, 1), Color(0.98, 0.94, 0.88, 1), Color(0.58, 0.56, 0.62, 1)])
+manes = Array[Color]([Color(0.32, 0.24, 0.18, 1), Color(0.16, 0.16, 0.22, 1), Color(0.86, 0.72, 0.36, 1), Color(0.68, 0.30, 0.34, 1), Color(0.34, 0.46, 0.68, 1), Color(0.46, 0.34, 0.56, 1), Color(0.90, 0.88, 0.84, 1), Color(0.30, 0.52, 0.42, 1)])
+eyes = Array[Color]([Color(0.30, 0.70, 0.85, 1), Color(0.24, 0.52, 0.72, 1), Color(0.28, 0.66, 0.58, 1), Color(0.36, 0.60, 0.44, 1), Color(0.22, 0.40, 0.60, 1), Color(0.32, 0.72, 0.72, 1)])

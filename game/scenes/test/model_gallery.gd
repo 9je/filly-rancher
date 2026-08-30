@@ -7,10 +7,17 @@ extends Node3D
 ## in game rather than with their manes welded to their skulls.
 const PonyRigScript := preload("res://scripts/pony_rig.gd")
 const GateWatchdogScript := preload("res://scripts/gate_watchdog.gd")
+const StockPaletteScript := preload("res://systems/stock_palette.gd")
+const StockTintScript := preload("res://systems/stock_tint.gd")
+const PonyRegistryScript := preload("res://systems/pony_registry.gd")
+const PonyVisualsScript := preload("res://actors/pony/pony_visuals.gd")
 
 const PONY_DIR := "res://assets/converted/ponies/"
 
 func _ready() -> void:
+    if "--stock" in OS.get_cmdline_user_args():
+        _build_stock_row()
+        return
     GateWatchdogScript.arm(self, "GALLERY")
     var loaded := 0
     var dir := DirAccess.open(PONY_DIR)
@@ -33,3 +40,30 @@ func _ready() -> void:
     print("GALLERY_OK count=", loaded)
     if DisplayServer.get_name() == "headless":
         get_tree().quit(0 if loaded >= 3 else 1)
+
+
+## Eight recoloured copies of the base model, for a person to look at. The one thing no
+## assertion in this project can answer: whether the crowd looks like ponies or like
+## paint chips.
+func _build_stock_row() -> void:
+    var palette: StockPalette = StockPaletteScript.load_stock()
+    var registry := PonyRegistryScript.new()
+    registry.load_all("res://data/ponies")
+    var data: PonyData = registry.by_id(StockPaletteScript.IDS[0])
+    var rng := RandomNumberGenerator.new()
+    rng.seed = 20260830
+    var built := 0
+    for i in 8:
+        var body: Node3D = PonyVisualsScript.build(data)
+        if body == null:
+            continue
+        var triple: Dictionary = palette.draw_triple(rng)
+        StockTintScript.apply(body, palette, triple)
+        body.position = Vector3(built * 3.0, 0.0, 0.0)
+        body.rotate_y(PI)
+        add_child(body)
+        print("STOCK ", triple)
+        built += 1
+    print("GALLERY_OK count=", built)
+    if DisplayServer.get_name() == "headless":
+        get_tree().quit(0 if built == 8 else 1)

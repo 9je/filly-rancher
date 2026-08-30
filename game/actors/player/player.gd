@@ -352,12 +352,17 @@ func _play(clip: StringName) -> void:
 ## already push_errors the specific reason.
 func _build_visuals() -> void:
 	var registry := PonyRegistryScript.new()
-	var ponies := registry.load_all(pony_dir)
-	if not ponies.has(pony_id):
-		push_error("Player: no PonyData with id '%s' in '%s'" % [pony_id, pony_dir])
+	registry.load_all(pony_dir)
+	# by_id() rather than the dictionary load_all() returns: the player's own record is a
+	# HIDDEN one (game/systems/pony_registry.gd HIDDEN_DIR), resolvable by id and absent
+	# from every listing, and the returned dictionary is the listing.
+	var data: PonyData = registry.by_id(pony_id)
+	if data == null:
+		push_error("Player: no PonyData with id '%s' in '%s' or in the hidden records"
+			% [pony_id, pony_dir])
 		return
 
-	var pony: Node3D = PonyVisualsScript.build(ponies[pony_id])
+	var pony: Node3D = PonyVisualsScript.build(data)
 	if pony == null:
 		push_error("Player: PonyVisuals.build failed for '%s'" % pony_id)
 		return
