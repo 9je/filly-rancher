@@ -202,3 +202,29 @@ func test_from_dict_accepts_whole_number_floats_and_rejects_fractional_ones() ->
 		"a fractional value is rejected outright, not truncated into a state")
 	assert_eq(c.state_of(&"fluttershy"), CompendiumScript.State.UNSEEN,
 		"...same for a fractional value that would truncate into CAUGHT")
+
+
+func test_processed_is_above_caught_and_never_falls_back() -> void:
+	var c := CompendiumScript.new()
+	c.mark_caught(&"trixie")
+	assert_true(c.mark_processed(&"trixie"))
+	assert_eq(c.state_of(&"trixie"), CompendiumScript.State.PROCESSED)
+	assert_false(c.mark_caught(&"trixie"), "a delivered pony is not un-delivered by a re-catch")
+	assert_false(c.mark_seen(&"trixie"))
+
+
+func test_a_pony_can_be_delivered_without_ever_being_marked_caught_first() -> void:
+	var c := CompendiumScript.new()
+	assert_true(c.mark_processed(&"lyra"))
+	assert_eq(c.state_of(&"lyra"), CompendiumScript.State.PROCESSED)
+
+
+func test_processed_round_trips_and_junk_still_does_not() -> void:
+	var c := CompendiumScript.new()
+	c.mark_processed(&"lyra")
+	assert_eq(CompendiumScript.from_dict(c.to_dict()).state_of(&"lyra"),
+		CompendiumScript.State.PROCESSED)
+	assert_eq(CompendiumScript.from_dict({"lyra": 4}).state_of(&"lyra"),
+		CompendiumScript.State.UNSEEN, "a state this class never writes is dropped")
+	assert_eq(CompendiumScript.from_dict({"lyra": 2.5}).state_of(&"lyra"),
+		CompendiumScript.State.UNSEEN)

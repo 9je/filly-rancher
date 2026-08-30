@@ -312,6 +312,10 @@ const LEAVE_DISTANCE := DETECTION_AREA_RADIUS
 ## session.
 const LEAVE_SECONDS := 45.0
 
+## How near a delivered pony has to get to the crate before the walk is over. Wider than a
+## pony is long, so an arrival is not a race between her steering and the frame rate.
+const LEAVE_ARRIVAL_RADIUS := 1.2
+
 ## Width of the band, in metres, over which the leash takes hold -- see _leash(), which
 ## is where the reasoning lives. Derived from `roam_radius` rather than fixed, because a
 ## penned pony's territory is about 2 m across and a wild one's is 8 m, and a band sized
@@ -385,6 +389,14 @@ var _rng := RandomNumberGenerator.new()
 ## the beam.
 var _leave_elapsed := 0.0
 var _leave_direction := Vector3.ZERO
+
+## Where she is walking TO, and whether there is anywhere in particular. An ordinary
+## departure has no target: she walks away from the player and is discarded once she is out
+## of his sight (see _state_leaving). A DELIVERY has one: the Depot crate. Same state, same
+## walk, same single place in this project where a pony is ever freed. The Depot does not
+## get a second way to remove a pony, because there must not be one.
+var _leave_target := Vector3.ZERO
+var _has_leave_target := false
 
 var _wander_speed := NOMINAL_WANDER_SPEED
 var _flee_speed := NOMINAL_FLEE_SPEED
@@ -686,9 +698,33 @@ func leave() -> bool:
 		return false
 	if state == State.LEAVING:
 		return true
+	_has_leave_target = false
 	_leave_elapsed = 0.0
 	_leave_direction = _away_from_player()
 	_transition_to(State.LEAVING)
+	return true
+
+
+## THE DELIVERY WALK. She sets off for `point` and frees herself when she gets there,
+## through exactly the same LEAVING state a runaway uses, so there is still only one way a
+## pony leaves the world.
+##
+## REFUSED WHILE HELD, like leave(), and for the same reason: capture wins. A pony the
+## player grabs on her way to the crate is taken out of LEAVING by set_held(true) and
+## dropped back into IDLE by set_held(false), so a change of heart at the Depot door gives
+## her back rather than sending her on.
+##
+## Re-targeting a pony who is ALREADY leaving is allowed and restarts her timer, so a crate
+## that moves (it does not, today) or a second delivery order cannot strand her.
+func leave_toward(point: Vector3) -> bool:
+	if state == State.HELD:
+		return false
+	_leave_target = point
+	_has_leave_target = true
+	_leave_elapsed = 0.0
+	_leave_direction = _toward_target()
+	if state != State.LEAVING:
+		_transition_to(State.LEAVING)
 	return true
 
 
@@ -837,12 +873,31 @@ func _state_held(delta: float) -> void:
 ## exists to hold a herd in place and she is no longer part of it.
 func _state_leaving(delta: float) -> Vector3:
 	_leave_elapsed += delta
+	if _has_leave_target:
+		var gap := Vector2(_leave_target.x - global_position.x,
+			_leave_target.z - global_position.z).length()
+		# The timer is still the ceiling: a pony who cannot reach the crate (a prop in the
+		# way, a stuck step) is not left walking into a wall forever.
+		if gap <= LEAVE_ARRIVAL_RADIUS or _leave_elapsed >= LEAVE_SECONDS:
+			queue_free()
+			return Vector3.ZERO
+		_leave_direction = _toward_target()
+		return _leave_direction * _flee_speed
 	if _leave_distance() > LEAVE_DISTANCE or _leave_elapsed >= LEAVE_SECONDS:
 		queue_free()
 		return Vector3.ZERO
 	if _leave_direction.length_squared() < 0.0001:
 		_leave_direction = _away_from_player()
 	return _leave_direction * _flee_speed
+
+
+## The flat direction to her destination, or her current heading if she is standing on it.
+func _toward_target() -> Vector3:
+	var to := _leave_target - global_position
+	to.y = 0.0
+	if to.length_squared() < 0.0001:
+		return _leave_direction if _leave_direction.length_squared() > 0.0001 else Vector3.FORWARD
+	return to.normalized()
 
 
 ## How far the player is from her right now, or INF when she cannot see one at all.

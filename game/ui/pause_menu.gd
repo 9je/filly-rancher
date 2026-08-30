@@ -313,11 +313,15 @@ func has_book() -> bool:
 func compendium_header() -> String:
 	if not has_book():
 		return ""
+	# A delivered pony still counts as caught, since she was, on her way to the Depot,
+	# so PROCESSED is folded into the same tally rather than kept as a fourth number
+	# nobody reads.
+	var caught: int = compendium.count(CompendiumScript.State.CAUGHT, registry) \
+		+ compendium.count(CompendiumScript.State.PROCESSED, registry)
 	return "%d of %d caught, %d seen" % [
-		compendium.count(CompendiumScript.State.CAUGHT, registry),
+		caught,
 		compendium.total(registry),
-		compendium.count(CompendiumScript.State.SEEN, registry)
-			+ compendium.count(CompendiumScript.State.CAUGHT, registry),
+		compendium.count(CompendiumScript.State.SEEN, registry) + caught,
 	]
 
 
@@ -410,7 +414,13 @@ func _entry_name(data: PonyData) -> String:
 ## "when: dawn/day, any" once she is CAUGHT, and nothing before that. Catching her is what
 ## buys the schedule; seeing her once only proves she exists.
 func _entry_value(data: PonyData) -> String:
-	if compendium == null or compendium.state_of(data.id) != CompendiumScript.State.CAUGHT:
+	if compendium == null:
+		return ""
+	if compendium.state_of(data.id) == CompendiumScript.State.PROCESSED:
+		# The Company's word for it, in the Company's tone, until the story teaches the
+		# player what it means. See game/systems/compendium.gd.
+		return "Delivered :)"
+	if compendium.state_of(data.id) != CompendiumScript.State.CAUGHT:
 		return ""
 	return "when: %s, %s" % [_phases_text(data), _weathers_text(data)]
 

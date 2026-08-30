@@ -27,8 +27,14 @@ extends RefCounted
 ##
 ## RefCounted, no scene, GUT-tested in isolation (game/test/test_compendium.gd), the same
 ## discipline as GemPouch and Inventory (game/systems/gem_pouch.gd, game/systems/inventory.gd).
+##
+## PROCESSED IS WHAT THE COMPANY CALLS IT. A character the player has delivered to the
+## Depot is PROCESSED: above CAUGHT, and reached by the same one way _raise(), so a pony
+## delivered and then somehow caught again is still delivered. Before the story's fork the
+## page renders it as "Delivered" with a smiley; after the fork the same state renders as a
+## desaturated portrait and a yield percentage. One state, and only the words change.
 
-enum State { UNSEEN, SEEN, CAUGHT }
+enum State { UNSEEN, SEEN, CAUGHT, PROCESSED }
 
 ## Emitted once per real change, with the id that moved and the state it moved TO. Not for
 ## a re-mark that changes nothing, matching GemPouch.changed's rule.
@@ -51,6 +57,12 @@ func mark_seen(id: StringName) -> bool:
 ## Raise `id` to CAUGHT if she is not already there. Returns whether that happened.
 func mark_caught(id: StringName) -> bool:
 	return _raise(id, State.CAUGHT)
+
+
+## Raise `id` to PROCESSED: she has been delivered to the Depot. Returns whether that
+## happened. Never called for a stock pony, who has no entry at all.
+func mark_processed(id: StringName) -> bool:
+	return _raise(id, State.PROCESSED)
 
 
 func _raise(id: StringName, state: int) -> bool:
@@ -124,7 +136,7 @@ static func from_dict(d: Dictionary) -> Compendium:
 		if raw_number != floor(raw_number):
 			continue
 		var state := int(raw_number)
-		if state != State.SEEN and state != State.CAUGHT:
+		if state != State.SEEN and state != State.CAUGHT and state != State.PROCESSED:
 			continue
 		c._states[StringName(str(key))] = state
 	return c

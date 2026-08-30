@@ -149,6 +149,9 @@ const WorldStateScript := preload("res://systems/world_state.gd")
 const SkyRigScript := preload("res://world/sky_rig.gd")
 const RequestBoardScript := preload("res://systems/request_board.gd")
 const CompendiumScript := preload("res://systems/compendium.gd")
+const LedgerScript := preload("res://systems/ledger.gd")
+const LettersScript := preload("res://systems/letters.gd")
+const StockPaletteScript := preload("res://systems/stock_palette.gd")
 
 ## Headless watchdog ceiling. A normal run (assets present) finishes in under 2s on
 ## this machine; 30s leaves a wide margin for a slower box while still failing in
@@ -226,6 +229,10 @@ const MARKET_RADIUS := 4.5
 ## Market's door, and two prompts that both fire in the gap between them would be two
 ## toasts fighting over one patch of grass.
 const BOARD_RADIUS := 3.0
+
+## How near the loading dock she has to be for E to open the Depot. Tighter than the
+## Market's radius because the Depot is a smaller building on a busier corner of the yard.
+const DEPOT_RADIUS := 4.0
 
 ## Plot slots the map must carry -- the plan asks for four to six, and the reserved
 ## clearing (PropsScript.PEN_PLOTS_*) is an 18 m square, which fits four 7.8 m pens on a
@@ -327,6 +334,7 @@ const GATE_RAY_REACH := 2.0
 @onready var regions_root: Node3D = $Regions
 @onready var build_menu: CanvasLayer = $BuildMenu
 @onready var market_menu: CanvasLayer = $MarketMenu
+@onready var depot_menu: CanvasLayer = $DepotMenu
 @onready var pause_menu: CanvasLayer = $PauseMenu
 ## The sky. Typed as the plain Node3D ranch.tscn declares rather than as SkyRig, and
 ## always reached through has_method(), for the reason _bind_build_menu() gives about the
@@ -441,6 +449,9 @@ var _settings: Settings = null
 ## Whether the market prompt has been shown for this approach. Same hysteresis as the plot
 ## prompt: once on entering the radius, not once per frame.
 var _market_prompted := false
+
+## Whether the Depot prompt has been shown for this approach. The market prompt's rule.
+var _depot_prompted := false
 
 ## Whether the request board's prompt has been shown for this approach. The market
 ## prompt's rule; see _market_prompted.
@@ -568,7 +579,7 @@ func _ready() -> void:
 	# bind functions below overwrite it with the real predicate once there is something
 	# behind it. set() by name for the reason _bind_build_menu() gives: a menu whose script
 	# failed to parse is a FAILED check in _report(), not a boot that dies here.
-	for menu: CanvasLayer in [build_menu, market_menu, pause_menu]:
+	for menu: CanvasLayer in [build_menu, market_menu, pause_menu, depot_menu]:
 		if menu != null:
 			menu.set("can_open", func() -> bool: return false)
 
@@ -904,6 +915,7 @@ func _bind_build_menu() -> void:
 	# Market and the pause menu to go unwired with it.
 	rebind_economy()
 	_bind_market_menu()
+	_bind_depot_menu()
 	_bind_pause_menu()
 
 	if build_menu == null or not build_menu.has_method("open"):
@@ -1207,6 +1219,110 @@ func _bind_market_menu() -> void:
 			market_menu.connect(pair[0], pair[1])
 
 
+func _bind_depot_menu() -> void:
+	if depot_menu == null or not depot_menu.has_method("open"):
+		return
+	depot_menu.set("can_open", func() -> bool: return _no_menu_but(depot_menu))
+	depot_menu.set("rows_provider", func() -> Array[Dictionary]: return _penned_rows())
+	depot_menu.set("bits_provider", func() -> int: return _current_bits())
+	depot_menu.set("statement_provider", func() -> Array[String]: return _statement())
+	for pair in [["opened", _on_menu_opened_any], ["closed", _on_menu_closed],
+			["deliver_requested", _on_deliver_requested],
+			["pay_requested", _on_pay_requested]]:
+		if not depot_menu.is_connected(pair[0], pair[1]):
+			depot_menu.connect(pair[0], pair[1])
+
+
+## `_on_menu_opened` takes a PlotSlot; the Depot's `opened` carries nothing, so it needs a
+## nullary sibling rather than a bound lambda that would not compare equal on reconnect.
+func _on_menu_opened_any() -> void:
+	_on_menu_opened(null)
+
+
+## What is standing in the pens, as the Depot lists it. Stock ponies and named ponies alike;
+## the menu sorts and prices the rows, this only says who is here.
+func _penned_rows() -> Array[Dictionary]:
+	var rows: Array[Dictionary] = []
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen == null:
+			continue
+		for inst: PonyInstance in pen.ponies():
+			var data: PonyData = inst.data()
+			var rarity: int = data.rarity if data != null else PonyDataScript.Rarity.COMMON
+			rows.append({
+				"uid": inst.uid,
+				"name": inst.display_name(),
+				"stock": inst.is_stock(),
+				"credit": LedgerScript.delivery_credit(rarity, inst.is_stock()),
+			})
+	return rows
+
+
+func _statement() -> Array[String]:
+	if _game_state == null:
+		return []
+	var cycle: int = _world.cycle_index() if _world != null else 0
+	return _game_state.ledger.statement_lines(_player_name(), _built_plot_count(),
+		_open_permit_count(), cycle)
+
+
+## What the player called herself at the creation screen. "Twilight" until Task 8 makes the
+## screen; the whole of the Company's paperwork reads it from here so there is one answer.
+func _player_name() -> String:
+	return "Twilight"
+
+
+func _built_plot_count() -> int:
+	var n := 0
+	for slot in _plot_slots():
+		if not slot.is_empty():
+			n += 1
+	return n
+
+
+func _open_permit_count() -> int:
+	var n := 0
+	for region: RegionData in _regions_registry().all():
+		if is_region_open(region.id):
+			n += 1
+	return n
+
+
+## The loading dock the delivered pony walks into, in world space, or the Depot's own origin
+## if the marker is missing.
+func crate_position() -> Vector3:
+	var crate := get_node_or_null(^"Buildings/Depot/Crate") as Node3D
+	if crate != null:
+		return crate.global_position
+	var depot := get_node_or_null(^"Buildings/Depot") as Node3D
+	return depot.global_position if depot != null else Vector3.ZERO
+
+
+func is_near_depot() -> bool:
+	var depot := get_node_or_null(^"Buildings/Depot") as Node3D
+	if depot == null:
+		return false
+	var gap := Vector2(player.global_position.x - depot.global_position.x,
+		player.global_position.z - depot.global_position.z).length()
+	return gap <= DEPOT_RADIUS
+
+
+## E at the loading dock opens the Depot. Once per approach, the Market's and the board's
+## rule, for the reason _update_plot_interaction() gives.
+func _update_depot_interaction() -> void:
+	if not _no_other_menu_open():
+		return
+	var near := is_near_depot()
+	if near != _depot_prompted:
+		_depot_prompted = near
+		if near:
+			_toast("Press E / X at the Depot.")
+	if near and Input.is_action_just_pressed(&"interact") and _prompt_slot == null:
+		if depot_menu != null and depot_menu.has_method("open"):
+			depot_menu.open()
+
+
 func _bind_pause_menu() -> void:
 	if pause_menu == null or not pause_menu.has_method("open"):
 		return
@@ -1253,7 +1369,7 @@ func _bind_pause_menu() -> void:
 ## an open pause menu. Asking one question, excluding only the menu doing the asking, is
 ## what keeps the two directions from drifting apart again.
 func _no_menu_but(menu: CanvasLayer) -> bool:
-	for other in [build_menu, market_menu, pause_menu]:
+	for other in [build_menu, market_menu, pause_menu, depot_menu]:
 		if other == menu or other == null:
 			continue
 		if other.has_method("is_open") and other.is_open():
@@ -1476,6 +1592,111 @@ func collect_gems() -> int:
 			_game_state.gems.add(int(rarity), int(tray[rarity]))
 			moved += int(tray[rarity])
 	return moved
+
+
+## The Depot menu, or null before boot has bound it. Exposed for gates and tests, matching
+## get_request_board() and get_compendium() below.
+func get_depot_menu() -> CanvasLayer:
+	return depot_menu
+
+
+## DELIVER ONE PONY. Returns `{"ok": bool, "credit": int, "named": bool, "name": String}`,
+## so a gate can assert on what happened rather than on a toast.
+##
+## THE ORDER MATTERS AND IS THE POINT. Her body comes out of the pen ALIVE
+## (Pen.release_body), her record leaves the save, the ledger is credited, the book records
+## her, the receipt is written, and only then is she pointed at the crate. She walks there
+## herself and frees herself on arrival, in Pony._state_leaving, which stays the one line in
+## this project that frees a pony. There is no branch here that removes her any other way,
+## deliberately: NO PONY EVER DIES ON SCREEN, and nothing gruesome happens at the Depot.
+func deliver_pony(uid: StringName) -> Dictionary:
+	var refused := {"ok": false, "credit": 0, "named": false, "name": ""}
+	if _game_state == null:
+		return refused
+	var pen: Pen = null
+	var inst: PonyInstance = null
+	for slot in _plot_slots():
+		var candidate := slot.get_built() as Pen
+		if candidate == null:
+			continue
+		var found: PonyInstance = candidate.find_pony(uid)
+		if found != null:
+			pen = candidate
+			inst = found
+			break
+	if pen == null or inst == null:
+		return refused
+
+	var body: Node3D = pen.release_body(uid, self)
+	if body == null:
+		return refused
+	_game_state.remove_pony(uid)
+
+	var data: PonyData = inst.data()
+	var rarity: int = data.rarity if data != null else PonyDataScript.Rarity.COMMON
+	var credit: int = _game_state.ledger.credit_delivery(rarity, inst.is_stock())
+	var named: bool = not inst.is_stock()
+	if named:
+		_game_state.compendium.mark_processed(inst.data_id)
+
+	# credit_delivery() has already counted her, so the ledger's own running total IS the
+	# number this receipt should carry.
+	var shipments: int = _game_state.ledger.shipments
+	var letter: Dictionary = LettersScript.render(
+		LettersScript.Id.RECEIPT_NAMED if named else LettersScript.Id.RECEIPT_STOCK,
+		{"name": _player_name(), "count": shipments, "credit": credit,
+			"pony": inst.display_name()})
+	_toast("%s: %s shipment received, %d bits credited."
+		% [letter["sender"], LettersScript.ordinal(shipments), credit])
+
+	body.leave_toward(crate_position())
+	if depot_menu != null and depot_menu.has_method("refresh"):
+		depot_menu.refresh()
+	return {"ok": true, "credit": credit, "named": named, "name": inst.display_name()}
+
+
+## PAY THE COMPANY. The ledger says how much it will accept (bits settle the service
+## charges, not the principal), the wallet is debited by exactly that, and the difference is
+## explained rather than silently swallowed. Returns what was actually paid.
+func _on_pay_requested(bits: int) -> void:
+	pay_the_company(bits)
+
+
+func pay_the_company(bits: int) -> int:
+	if _game_state == null or _economy == null:
+		return 0
+	var ledger: Ledger = _game_state.ledger
+	var wanted: int = mini(bits, _economy.bits)
+	var taken: int = ledger.pay(wanted)
+	if taken <= 0:
+		_toast("Bits settle the service charges. The principal is settled in stock.")
+		return 0
+	_economy.spend(taken)
+	if taken < bits:
+		_toast("Paid %d bits. That is as low as bits will take it; the rest is stock."
+			% taken)
+	else:
+		_toast("Paid %d bits. Balance: %d." % [taken, ledger.balance])
+	_relieve_if_paid_down()
+	if depot_menu != null and depot_menu.has_method("refresh"):
+		depot_menu.refresh()
+	return taken
+
+
+func _on_deliver_requested(uid: StringName) -> void:
+	deliver_pony(uid)
+
+
+## Give back whatever the balance being under the ceiling entitles her to. Task 6 adds the
+## permits, the padlocks and the beam; today the ledger's own bookkeeping is all there is,
+## and calling it here is what makes those arrive with no edit at this call site.
+func _relieve_if_paid_down() -> void:
+	if _game_state == null:
+		return
+	var given: Dictionary = _game_state.ledger.relieve()
+	if given.is_empty():
+		return
+	_toast("Your account is in good standing again. Cloudsdale thanks you!")
 
 
 func is_near_market() -> bool:
@@ -2032,6 +2253,7 @@ func _physics_process(delta: float) -> void:
 	# After the market's, so that an E press which just opened the Market is already behind
 	# a menu by the time this asks; see is_near_board() on the overlap of the two radii.
 	_update_board_interaction()
+	_update_depot_interaction()
 	_update_gate_prompt()
 	if _game_state == null:
 		return
@@ -2513,6 +2735,16 @@ func _report(pony_count: int, prop_count: int) -> void:
 	# Hand-built like the Market, so it stands on an assetless checkout too and this is not
 	# gated on assets_state.
 	_set_check(checks, "the board stands", get_node_or_null(^"Buildings/Board") != null)
+
+	_set_check(checks, "the Depot stands", get_node_or_null(^"Buildings/Depot") != null)
+	_set_check(checks, "the Depot has a crate to walk into",
+		get_node_or_null(^"Buildings/Depot/Crate") != null)
+	var ledger: Ledger = _game_state.ledger if _game_state != null else null
+	_set_check(checks, "the ranch built a ledger", ledger != null)
+	print("RANCH ledger balance=%d quota=%d delivered=%d tier=%d" % [
+		ledger.balance if ledger != null else 0, ledger.quota if ledger != null else 0,
+		ledger.delivered_this_period if ledger != null else 0,
+		ledger.tier if ledger != null else 0])
 
 	var book_registry: PonyRegistry = _pony_roster()
 	# `requests` is the ACTIVE count, the same number the check above reads. requests() also

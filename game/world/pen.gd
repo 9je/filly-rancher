@@ -262,6 +262,20 @@ var inventory_provider := Callable()
 
 var _shell_built := false
 
+## THE COLLECTOR'S PADLOCK (game/systems/ledger.gd). A padlocked pen makes no gems and
+## keeps every one of its ponies: nothing is deleted, nothing is taken, and paying the
+## balance down under the ceiling takes the lock straight back off. Needs and feeding still
+## run, so a padlocked pony is not a starved one.
+var _padlocked := false
+
+
+func set_padlocked(value: bool) -> void:
+	_padlocked = value
+
+
+func is_padlocked() -> bool:
+	return _padlocked
+
 ## The gate leaf's own StaticBody3D, on CollisionLayers.PEN_GATE: the one part of this fence
 ## a pony cannot pass and the player can. Null until build_shell() has run. See gate_body().
 var _gate_body: StaticBody3D = null
@@ -339,6 +353,41 @@ func remove_pony(uid: StringName) -> PonyInstance:
 	return null
 
 
+## THE DELIVERY DOOR. Take `uid` off the roster and hand her LIVE BODY to `new_parent`,
+## keeping her exactly where she is standing. Returns the body, or null if she does not
+## live here.
+##
+## NOTHING IS FREED. remove_pony() despawns the body, which is right for a pony who has
+## gone into the saddlebag and wrong for a pony who is about to walk to the Depot crate
+## under her own steam; this is the only other way out of a pen and it deliberately hands
+## the caller a living pony and no way to skip the walk. The one line in this project that
+## frees a pony is Pony._state_leaving.
+##
+## HER ADDRESS IS CLEARED HERE, as it is by remove_pony(), because this pen is no longer
+## where she lives and a record filed in a pen that has no record of her is the two homes
+## bug PonyInstance.home_slot's comment describes.
+func release_body(uid: StringName, new_parent: Node3D) -> Node3D:
+	var body: Node3D = _bodies.get(uid, null)
+	var inst: PonyInstance = find_pony(uid)
+	if body == null or not is_instance_valid(body) or inst == null or new_parent == null:
+		return null
+	var where: Transform3D = body.global_transform
+	for i in _residents.size():
+		if _residents[i].uid == uid:
+			_residents.remove_at(i)
+			break
+	_bodies.erase(uid)
+	_held_bodies.erase(uid)
+	inst.home_slot = &""
+	ProductionScript.forget(uid)
+	body.get_parent().remove_child(body)
+	new_parent.add_child(body)
+	body.global_transform = where
+	_reseat_released_residents()
+	roster_changed.emit(count())
+	return body
+
+
 ## The resident with `uid`, or null. Does not remove her.
 func find_pony(uid: StringName) -> PonyInstance:
 	for inst in _residents:
@@ -405,7 +454,7 @@ func tick(delta: float) -> int:
 	for inst in _residents:
 		NeedsScript.tick(inst, delta)
 		_feed_if_hungry(inst)
-		var made := ProductionScript.tick(inst, delta)
+		var made := 0 if _padlocked else ProductionScript.tick(inst, delta)
 		if made > 0:
 			var data: PonyData = inst.data()
 			var rarity: int = data.rarity if data != null else PonyDataScript.Rarity.COMMON

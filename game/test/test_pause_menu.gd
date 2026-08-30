@@ -482,3 +482,12 @@ func test_a_half_wired_compendium_reads_as_empty() -> void:
 	assert_false(_menu.has_book(), "a roster with no book is not a book")
 	assert_eq(_menu.compendium_header(), "")
 	assert_true(_menu.compendium_region_rows().is_empty())
+
+
+func test_a_delivered_character_reads_as_delivered_and_still_counts_as_caught() -> void:
+	_wire_book()
+	var first: PonyData = _registry.all()[0]
+	_compendium.mark_processed(first.id)
+	_menu.open_page(PauseMenu.Page.COMPENDIUM)
+	assert_true(_menu.compendium_header().contains("1 of"))
+	assert_true(_row_for(first.id).contains("Delivered :)"))
