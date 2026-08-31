@@ -1,4 +1,4 @@
-[gd_scene load_steps=27 format=3]
+[gd_scene load_steps=28 format=3]
 
 [ext_resource type="Script" path="res://world/ranch.gd" id="1"]
 [ext_resource type="Script" path="res://world/terrain.gd" id="2"]
@@ -23,6 +23,7 @@
 [ext_resource type="PackedScene" path="res://ui/blackjack_menu.tscn" id="21"]
 [ext_resource type="Script" path="res://world/race_track.gd" id="22"]
 [ext_resource type="PackedScene" path="res://ui/race_menu.tscn" id="23"]
+[ext_resource type="PackedScene" path="res://ui/letter_panel.tscn" id="24"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
 sky_top_color = Color(0.309804, 0.505882, 0.760784, 1)
@@ -335,6 +336,8 @@ collision_mask = 15
 [node name="BlackjackMenu" parent="." instance=ExtResource("21")]
 
 [node name="RaceMenu" parent="." instance=ExtResource("23")]
+
+[node name="LetterPanel" parent="." instance=ExtResource("24")]
 
 [node name="CaptureCamera" type="Camera3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44, 27, 46)

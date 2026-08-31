@@ -418,6 +418,12 @@ const GATE_RAY_REACH := 2.0
 ## _bind_build_menu() gives: a script that failed to parse must be a FAILED check in
 ## _report(), not a boot that dies reaching straight into a property it does not have.
 @onready var creation_screen: CanvasLayer = $CreationScreen
+## THE READER FOR THE COMPANY'S POST (Ruling 25). Read only, closes on confirm, and shown
+## exactly once: right after the creation screen is confirmed, carrying the WELCOME letter,
+## which is where the four steps of the money loop and both of the ledger's numbers are
+## written. Typed as the plain CanvasLayer ranch.tscn declares and reached through
+## has_method(), like every other menu here, for the reason _bind_build_menu() gives.
+@onready var letter_panel: CanvasLayer = $LetterPanel
 ## The sky. Typed as the plain Node3D ranch.tscn declares rather than as SkyRig, and
 ## always reached through has_method(), for the reason _bind_build_menu() gives about the
 ## menus: a sky_rig.gd that failed to PARSE leaves exactly this node in the tree with no
@@ -1102,6 +1108,7 @@ func _bind_build_menu() -> void:
 	_bind_depot_menu()
 	_bind_casino_menus()
 	_bind_pause_menu()
+	_bind_letter_panel()
 
 	if build_menu == null or not build_menu.has_method("open"):
 		return
@@ -1469,6 +1476,18 @@ func _on_menu_opened_any() -> void:
 	_on_menu_opened(null)
 
 
+## THE LETTER READER, ON THE SAME PAUSE WIRING AS EVERY OTHER PANEL (Ruling 25). It has no
+## providers and no request signals: it is handed a rendered letter by whoever is showing
+## one and hands nothing back but "I am up" and "I am gone". That is the entire binding, and
+## it is why _show_welcome_letter() can simply call open() and be finished.
+func _bind_letter_panel() -> void:
+	if letter_panel == null or not letter_panel.has_method("open"):
+		return
+	for pair in [["opened", _on_menu_opened_any], ["closed", _on_menu_closed]]:
+		if not letter_panel.is_connected(pair[0], pair[1]):
+			letter_panel.connect(pair[0], pair[1])
+
+
 ## THE PALACE. Four menus, one seeded generator, and every transaction in this file.
 ##
 ## can_open ANDs in casino_can_enter(), which is the seam the Resistance slice's ban hangs
@@ -1780,7 +1799,7 @@ func _bind_pause_menu() -> void:
 ## what keeps the two directions from drifting apart again.
 func _no_menu_but(menu: CanvasLayer) -> bool:
 	for other in [build_menu, market_menu, pause_menu, depot_menu, creation_screen,
-			casino_menu, slots_menu, wheel_menu, blackjack_menu, race_menu]:
+			casino_menu, slots_menu, wheel_menu, blackjack_menu, race_menu, letter_panel]:
 		if other == menu or other == null:
 			continue
 		if other.has_method("is_open") and other.is_open():
@@ -1820,8 +1839,37 @@ func _on_creation_confirmed(look: PlayerLook) -> void:
 	_game_state.player = look
 	_apply_player_look()
 	save_game()
+	_show_welcome_letter(look)
+
+
+## THE ONE LETTER A NEW RANCH OPENS ON, drawn rather than thrown away.
+##
+## THE QUOTA COMES OFF THE LEDGER. This call used to hand render() a name and a balance and
+## nothing else, so the template's `quota` fell through to its own default of 0 and the
+## welcome letter told every new player "We expect 0 ponies delivered to the Depot each
+## period", which is both wrong and the exact opposite of the thing that letter exists to
+## say. Ledger.quota is the number the Depot actually judges her against; there is only one
+## of it, and this is where it comes from.
+##
+## AND THE BODY IS SHOWN, NOT TOASTED. The whole of the game's onboarding is in the body of
+## this letter (catch, pen, collect, sell, then the balance and the quota in a sentence
+## each); toasting the TITLE said "Cloudsdale Weather Corporation: Welcome to the family!"
+## and dropped every word of it. game/ui/letter_panel.gd is the reader, ranch.gd does the
+## showing, and the pause comes through the same shared handlers every other panel uses.
+## Ruling 25.
+func _show_welcome_letter(look: PlayerLook) -> void:
+	if _game_state == null:
+		return
 	var letter: Dictionary = LettersScript.render(LettersScript.Id.WELCOME, {
-		"name": look.player_name, "balance": _game_state.ledger.balance})
+		"name": look.player_name,
+		"balance": _game_state.ledger.balance,
+		"quota": _game_state.ledger.quota,
+	})
+	if letter_panel != null and letter_panel.has_method("open") \
+			and bool(letter_panel.call("open", letter)):
+		return
+	# A panel that failed to parse, or a detached Ranch in a test that never wired one: say
+	# what arrived rather than saying nothing at all.
 	_toast("%s: %s" % [letter["sender"], letter["title"]])
 
 

@@ -72,6 +72,11 @@ func test_the_welcome_letter_names_every_step_of_the_money_loop() -> void:
 		assert_true(body.contains(step), "the welcome must name '%s': %s" % [step, body])
 
 
+## WHAT THIS TEST CANNOT SEE, and did not: it hands the template a quota and checks the
+## template prints it. ranch.gd's one production call passed no quota at all, so the shipped
+## letter said "0 ponies" while this passed. The CALLER seam is pinned in
+## game/test/test_ranch_creation.gd, which drives _on_creation_confirmed() and reads the
+## page the player is actually shown. Both are needed; only the second one bites.
 func test_the_welcome_letter_states_the_balance_and_the_quota_once_each() -> void:
 	var letter: Dictionary = LettersScript.render(LettersScript.Id.WELCOME,
 		{"name": "Twilight", "balance": 25000, "quota": 2})

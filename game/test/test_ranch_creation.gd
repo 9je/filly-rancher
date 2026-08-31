@@ -33,6 +33,8 @@ const RanchScript := preload("res://world/ranch.gd")
 const GameStateScript := preload("res://systems/game_state.gd")
 const SaveIOScript := preload("res://systems/save_io.gd")
 const CreationScreenScene := preload("res://ui/creation_screen.tscn")
+const LetterPanelScene := preload("res://ui/letter_panel.tscn")
+const LettersScript := preload("res://systems/letters.gd")
 
 const SCRATCH_DIR := "user://test_scratch/ranch_creation"
 
@@ -70,7 +72,14 @@ func _ranch_with_screen(interactive: bool) -> Dictionary:
 	var screen: CreationScreen = CreationScreenScene.instantiate()
 	add_child_autofree(screen)
 	ranch.creation_screen = screen
-	return {"ranch": ranch, "screen": screen}
+	# The letter reader the confirm shows (Ruling 25). Wired by hand rather than by
+	# _bind_letter_panel(), deliberately: the binding is what connects the panel's `opened`
+	# to ranch.gd's pause handler, and this Ranch is detached, so get_tree() is null and
+	# pausing would crash. What is under test here is the SHOWING, not the pausing.
+	var letters: LetterPanel = LetterPanelScene.instantiate()
+	add_child_autofree(letters)
+	ranch.letter_panel = letters
+	return {"ranch": ranch, "screen": screen, "letters": letters}
 
 
 func test_a_fresh_ranch_starts_with_the_cursor_captured() -> void:
@@ -105,3 +114,79 @@ func test_a_non_interactive_session_never_touches_the_cursor() -> void:
 		"a non-interactive session must never open the screen at all")
 	assert_true(built["ranch"]._cursor_captured,
 		"...and so must never have released the cursor either")
+
+
+# --- the welcome letter (Ruling 25, and the quota that was always 0) -----------------------
+
+## THE CALLER'S OWN PARAMS, NOT A HAND BUILT DICTIONARY. game/test/test_letters.gd proves
+## the WELCOME template prints whatever quota it is handed; what it could not see, and what
+## shipped, is that ranch.gd handed it a name and a balance and NOTHING ELSE, so the number
+## fell through to render()'s own default of 0 and every new player was told "We expect 0
+## ponies delivered to the Depot each period". A template test cannot catch that. Driving
+## _on_creation_confirmed() and reading the page the player actually sees can.
+func test_the_welcome_letter_carries_the_ledgers_real_quota_and_balance() -> void:
+	var built := _ranch_with_screen(true)
+	var ranch: RanchScript = built["ranch"]
+	var letters: LetterPanel = built["letters"]
+	var ledger = ranch._game_state.ledger
+	assert_gt(ledger.quota, 0, "sanity: a fresh ledger expects some ponies")
+	ranch._maybe_open_creation()
+	assert_true(built["screen"].confirm())
+
+	assert_true(letters.is_open(), "the welcome letter is shown, not thrown away")
+	var body: String = "\n".join(letters.drawn_lines())
+	assert_true(body.contains("%d ponies" % ledger.quota),
+		"the quota the Depot judges her against has to be the quota the letter states: %s"
+			% body)
+	assert_false(body.contains("0 ponies"),
+		"'0 ponies' is what a defaulted quota prints, and it is what shipped")
+	assert_true(body.contains(str(ledger.balance)),
+		"and the balance is her real one: %s" % body)
+
+
+## EVERY STEP OF THE LOOP REACHES HER, through the production path rather than a rendered
+## dictionary nobody draws. This is the check that Task 7's "the first two minutes say where
+## bits come from" is true of the GAME and not only of game/systems/letters.gd.
+func test_the_shown_welcome_names_every_step_of_the_money_loop() -> void:
+	var built := _ranch_with_screen(true)
+	built["ranch"]._maybe_open_creation()
+	built["screen"].confirm()
+	var body: String = "\n".join(built["letters"].drawn_lines()).to_lower()
+	for step: String in ["catch", "pen", "gem", "market", "depot"]:
+		assert_true(body.contains(step), "the shown letter must name '%s': %s" % [step, body])
+
+
+func test_the_welcome_letter_is_shown_exactly_once() -> void:
+	var built := _ranch_with_screen(true)
+	var letters: LetterPanel = built["letters"]
+	watch_signals(letters)
+	built["ranch"]._maybe_open_creation()
+	built["screen"].confirm()
+	assert_signal_emit_count(letters, "opened", 1,
+		"one new ranch, one welcome: a second would be a second pause to get out of")
+
+
+## A LOADED SAVE GETS NO LETTER. _maybe_open_creation() refuses a session that loaded one
+## (there is no re-edit screen this phase), so the confirm that shows the letter never
+## happens; a returning player being welcomed to the family every boot would be a bug the
+## first time and a joke the fifth.
+func test_loading_a_save_shows_no_letter_at_all() -> void:
+	var built := _ranch_with_screen(true)
+	built["ranch"]._save_loaded = true
+	built["ranch"]._maybe_open_creation()
+	assert_false(built["screen"].is_open(), "sanity: a loaded save opens no creation screen")
+	assert_false(built["letters"].is_open(), "and therefore no letter")
+
+
+## THE PANEL IS ON THE PAUSE PREDICATE. Every panel in this game refuses to open over
+## another one, and ranch.gd's _no_menu_but() is the single question all of them ask; a
+## reader that was not in that list would let E open the Market underneath a letter.
+func test_an_open_letter_counts_as_a_menu_being_up() -> void:
+	var built := _ranch_with_screen(true)
+	var ranch: RanchScript = built["ranch"]
+	assert_true(ranch._no_other_menu_open(), "sanity: nothing is up yet")
+	built["letters"].open(LettersScript.render(LettersScript.Id.WELCOME, {"quota": 2}))
+	assert_false(ranch._no_other_menu_open(),
+		"a letter on the screen is a menu being up, or E opens the Market under it")
+	built["letters"].close()
+	assert_true(ranch._no_other_menu_open())
