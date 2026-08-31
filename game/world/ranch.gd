@@ -156,6 +156,12 @@ const PlayerLookScript := preload("res://systems/player_look.gd")
 const StripScript := preload("res://world/strip.gd")
 const CasinoSignScript := preload("res://systems/casino_sign.gd")
 const BuildingScript := preload("res://world/building.gd")
+const CasinoScript := preload("res://systems/casino.gd")
+const SlotsScript := preload("res://systems/slots.gd")
+const WheelScript := preload("res://systems/wheel.gd")
+const BlackjackScript := preload("res://systems/blackjack.gd")
+const CasinoMenuScript := preload("res://ui/casino_menu.gd")
+const WheelMenuScript := preload("res://ui/wheel_menu.gd")
 
 ## Headless watchdog ceiling. A normal run (assets present) finishes in under 2s on
 ## this machine; 30s leaves a wide margin for a slower box while still failing in
@@ -363,6 +369,10 @@ const GATE_RAY_REACH := 2.0
 @onready var market_menu: CanvasLayer = $MarketMenu
 @onready var depot_menu: CanvasLayer = $DepotMenu
 @onready var pause_menu: CanvasLayer = $PauseMenu
+@onready var casino_menu: CanvasLayer = $CasinoMenu
+@onready var slots_menu: CanvasLayer = $SlotsMenu
+@onready var wheel_menu: CanvasLayer = $WheelMenu
+@onready var blackjack_menu: CanvasLayer = $BlackjackMenu
 ## The screen a new game opens on (Task 8): the player's own pony on a turntable, and the
 ## name the Company will know her by. Typed as the plain CanvasLayer ranch.tscn declares,
 ## reached through has_method() like every other menu here, for the same reason
@@ -495,6 +505,14 @@ var _market_prompted := false
 
 ## Whether the Depot prompt has been shown for this approach. The market prompt's rule.
 var _depot_prompted := false
+
+## Whether the Palace's prompt has already been shown for this approach.
+var _palace_prompted := false
+
+## Every roll at every table comes off this one generator, so a gate can seed it and get the
+## same night's play back. Seeded from the clock for a person actually playing; see
+## set_casino_seed().
+var _casino_rng := RandomNumberGenerator.new()
 
 ## Whether the request board's prompt has been shown for this approach. The market
 ## prompt's rule; see _market_prompted.
@@ -655,7 +673,8 @@ func _ready() -> void:
 	# bind functions below overwrite it with the real predicate once there is something
 	# behind it. set() by name for the reason _bind_build_menu() gives: a menu whose script
 	# failed to parse is a FAILED check in _report(), not a boot that dies here.
-	for menu: CanvasLayer in [build_menu, market_menu, pause_menu, depot_menu]:
+	for menu: CanvasLayer in [build_menu, market_menu, pause_menu, depot_menu, casino_menu,
+			slots_menu, wheel_menu, blackjack_menu]:
 		if menu != null:
 			menu.set("can_open", func() -> bool: return false)
 
@@ -1002,6 +1021,7 @@ func _bind_build_menu() -> void:
 	rebind_economy()
 	_bind_market_menu()
 	_bind_depot_menu()
+	_bind_casino_menus()
 	_bind_pause_menu()
 
 	if build_menu == null or not build_menu.has_method("open"):
@@ -1370,6 +1390,70 @@ func _on_menu_opened_any() -> void:
 	_on_menu_opened(null)
 
 
+## THE PALACE. Four menus, one seeded generator, and every transaction in this file.
+##
+## can_open ANDs in casino_can_enter(), which is the seam the Resistance slice's ban hangs
+## on: that slice makes casino_can_enter() answer false above its heat threshold and the
+## whole building shuts, with no other file touched.
+func _bind_casino_menus() -> void:
+	if casino_menu == null or not casino_menu.has_method("open"):
+		return
+	_casino_rng.seed = int(Time.get_unix_time_from_system()) if _interactive \
+		else _game_state.world_seed if _game_state != null else 1
+	casino_menu.set("can_open",
+		func() -> bool: return _no_menu_but(casino_menu) and casino_can_enter())
+	casino_menu.set("bits_provider", func() -> int: return _current_bits())
+	casino_menu.set("chips_provider", func() -> int: return _current_chips())
+	casino_menu.set("sign_provider", func() -> Array[String]: return CasinoSignScript.lines())
+	for pair in [["opened", _on_menu_opened_any], ["closed", _on_menu_closed],
+			["buy_chips_requested", _on_buy_chips_requested],
+			["cash_out_requested", _on_cash_out_requested],
+			["game_requested", _on_game_requested]]:
+		if not casino_menu.is_connected(pair[0], pair[1]):
+			casino_menu.connect(pair[0], pair[1])
+
+	for table: CanvasLayer in [slots_menu, wheel_menu, blackjack_menu]:
+		if table == null or not table.has_method("open"):
+			continue
+		table.set("can_open",
+			func() -> bool: return _no_menu_but(table) and casino_can_enter())
+		table.set("chips_provider", func() -> int: return _current_chips())
+		for pair in [["opened", _on_menu_opened_any], ["closed", _on_menu_closed]]:
+			if not table.is_connected(pair[0], pair[1]):
+				table.connect(pair[0], pair[1])
+	# Guarded one at a time rather than in the loop above, because each table has its own
+	# request signal. A null menu is a scene edit that dropped a node, which is a FAILED check
+	# in _report() rather than a boot that dies here; see _bind_build_menu()'s own note.
+	if slots_menu != null and not slots_menu.is_connected("spin_requested",
+			_on_spin_requested):
+		slots_menu.connect("spin_requested", _on_spin_requested)
+	if wheel_menu != null and not wheel_menu.is_connected("bet_requested",
+			_on_wheel_bet_requested):
+		wheel_menu.connect("bet_requested", _on_wheel_bet_requested)
+	if blackjack_menu != null and not blackjack_menu.is_connected("deal_requested",
+			_on_deal_requested):
+		blackjack_menu.connect("deal_requested", _on_deal_requested)
+
+
+## WHETHER THE PALACE WILL LET HER IN. Always true in this slice.
+##
+## THE BAN SEAM. The spec's Resistance route bans the player from the Strip at high heat and
+## lifts it like every other punishment. That slice changes this one function and nothing
+## else: every casino menu's can_open already asks it.
+func casino_can_enter() -> bool:
+	return true
+
+
+## Seed every roll at every table. For gates: a casino that rolls off the clock is a casino a
+## gate cannot make a claim about.
+func set_casino_seed(seed_value: int) -> void:
+	_casino_rng.seed = seed_value
+
+
+func _current_chips() -> int:
+	return _game_state.casino.chips if _game_state != null else 0
+
+
 ## What is standing in the pens, as the Depot lists it. Stock ponies and named ponies alike;
 ## the menu sorts and prices the rows, this only says who is here.
 func _penned_rows() -> Array[Dictionary]:
@@ -1496,6 +1580,20 @@ func _update_depot_interaction() -> void:
 			depot_menu.open()
 
 
+## E at the Palace door opens the lobby. Once per approach, the Depot's and the Market's rule.
+func _update_palace_interaction() -> void:
+	if not _no_other_menu_open():
+		return
+	var near := is_near_palace()
+	if near != _palace_prompted:
+		_palace_prompted = near
+		if near and casino_can_enter():
+			_toast("Press E / X at the Spectra Palace.")
+	if near and Input.is_action_just_pressed(&"interact") and _prompt_slot == null:
+		if casino_menu != null and casino_menu.has_method("open"):
+			casino_menu.open()
+
+
 func _bind_pause_menu() -> void:
 	if pause_menu == null or not pause_menu.has_method("open"):
 		return
@@ -1543,7 +1641,8 @@ func _bind_pause_menu() -> void:
 ## an open pause menu. Asking one question, excluding only the menu doing the asking, is
 ## what keeps the two directions from drifting apart again.
 func _no_menu_but(menu: CanvasLayer) -> bool:
-	for other in [build_menu, market_menu, pause_menu, depot_menu, creation_screen]:
+	for other in [build_menu, market_menu, pause_menu, depot_menu, creation_screen,
+			casino_menu, slots_menu, wheel_menu, blackjack_menu]:
 		if other == menu or other == null:
 			continue
 		if other.has_method("is_open") and other.is_open():
@@ -2156,6 +2255,177 @@ func pay_the_company(bits: int) -> int:
 	return taken
 
 
+## BUY IN AT THE CAGE. Bits out of the wallet, chips into the purse, one for one. Returns
+## what was actually bought.
+##
+## THE ORDER IS THE SAFETY. The spend happens FIRST and the chips are added only if it
+## returned true, so there is no state in which the player holds chips she was not charged
+## for; and Economy.spend() refuses as a no op, so there is no state in which she was charged
+## for chips she did not get either.
+func buy_chips(bits: int) -> int:
+	if _game_state == null or _economy == null:
+		return 0
+	var wanted: int = clampi(bits, 0, _economy.bits)
+	if wanted <= 0:
+		return 0
+	if not _economy.spend(wanted):
+		return 0
+	_game_state.casino.add_chips(wanted)
+	_toast("%d chips. Good luck!" % wanted)
+	_refresh_casino_menus()
+	return wanted
+
+
+## CASH OUT AT THE CAGE. Chips out of the purse, bits into the wallet, one for one, and the
+## removal happens FIRST for the reason buy_chips() gives.
+func cash_out(chips: int) -> int:
+	if _game_state == null or _economy == null:
+		return 0
+	var wanted: int = clampi(chips, 0, _game_state.casino.chips)
+	if wanted <= 0:
+		return 0
+	if not _game_state.casino.remove_chips(wanted):
+		return 0
+	_economy.grant(wanted)
+	_toast("%d bits. Come back soon!" % wanted)
+	_refresh_casino_menus()
+	return wanted
+
+
+## ONE SPIN. Returns {"ok": bool, "reels": Array[int], "won": int, "stake": int} so a gate can
+## assert on what happened rather than on a toast.
+##
+## THE STAKE COMES OUT BEFORE THE REELS ARE ROLLED, always, and every game below does the
+## same. A roll that happened before the chips were taken is a roll that pays out of a purse
+## that might not have covered it.
+func play_slots(stake: int) -> Dictionary:
+	var refused := {"ok": false, "reels": [], "won": 0, "stake": 0}
+	if _game_state == null or not _game_state.casino.can_stake(stake):
+		return refused
+	if not _game_state.casino.remove_chips(stake):
+		return refused
+	var reels: Array[int] = SlotsScript.spin(_casino_rng)
+	var won: int = SlotsScript.payout(reels, stake)
+	if won > 0:
+		_game_state.casino.add_chips(won)
+	if slots_menu != null and slots_menu.has_method("show_result"):
+		slots_menu.call("show_result", [SlotsScript.line_text(reels),
+			"You win %d chips." % won if won > 0 else "Nothing this time."])
+	_refresh_casino_menus()
+	return {"ok": true, "reels": reels, "won": won, "stake": stake}
+
+
+## ONE SPIN OF THE WHEEL. `kind` is a Wheel.Bet value and `guess` is a colour or a pocket
+## number; see Wheel.payout(), which is the only thing that interprets either.
+func play_wheel(kind: int, guess: int, stake: int) -> Dictionary:
+	var refused := {"ok": false, "pocket": -1, "won": 0, "stake": 0}
+	if _game_state == null or not _game_state.casino.can_stake(stake):
+		return refused
+	if not _game_state.casino.remove_chips(stake):
+		return refused
+	var pocket: int = WheelScript.spin(_casino_rng)
+	var won: int = WheelScript.payout(kind, guess, pocket, stake)
+	if won > 0:
+		_game_state.casino.add_chips(won)
+	if wheel_menu != null and wheel_menu.has_method("show_result"):
+		wheel_menu.call("show_result", [WheelScript.pocket_text(pocket),
+			"You win %d chips." % won if won > 0 else "The house takes that one."])
+	_refresh_casino_menus()
+	return {"ok": true, "pocket": pocket, "won": won, "stake": stake}
+
+
+## ONE HAND. The player plays the strategy card on the placard, so the whole hand settles in
+## one call; see BlackjackMenu's class comment.
+func play_blackjack(stake: int) -> Dictionary:
+	var refused := {"ok": false, "hand": {}, "won": 0, "stake": 0}
+	if _game_state == null or not _game_state.casino.can_stake(stake):
+		return refused
+	if not _game_state.casino.remove_chips(stake):
+		return refused
+	var hand: Dictionary = BlackjackScript.play_hand(_casino_rng)
+	var won: int = BlackjackScript.payout(int(hand["outcome"]), stake)
+	if won > 0:
+		_game_state.casino.add_chips(won)
+	if blackjack_menu != null and blackjack_menu.has_method("show_result"):
+		blackjack_menu.call("show_result", [
+			"You: " + _cards_text(hand["player"]),
+			"Dealer: " + _cards_text(hand["dealer"]),
+			BlackjackScript.outcome_text(hand),
+		])
+	_refresh_casino_menus()
+	return {"ok": true, "hand": hand, "won": won, "stake": stake}
+
+
+func _cards_text(cards: Array) -> String:
+	var names: Array[String] = []
+	for card in cards:
+		names.append(BlackjackScript.card_text(int(card)))
+	return ", ".join(names)
+
+
+func _refresh_casino_menus() -> void:
+	for menu: CanvasLayer in [casino_menu, slots_menu, wheel_menu, blackjack_menu]:
+		if menu != null and menu.has_method("refresh"):
+			menu.call("refresh")
+
+
+func _on_buy_chips_requested(bits: int) -> void:
+	buy_chips(bits)
+
+
+func _on_cash_out_requested(chips: int) -> void:
+	cash_out(chips)
+
+
+func _on_spin_requested(stake: int) -> void:
+	play_slots(stake)
+
+
+## TRANSLATES A FELT TAB INTO A Wheel.Bet VALUE before the bet ever reaches play_wheel().
+## WheelMenu.Tab is COLOUR-first because that is the felt's own reading order
+## (game/ui/wheel_menu.gd); Wheel.Bet is NUMBER-first because that is the order
+## game/systems/wheel.gd's own comment writes it out in. The menu never touches Wheel, so
+## this is the one seam where the two numberings meet, and it is here rather than folded
+## into play_wheel() so a gate calling play_wheel() directly (as test-8's does) can pass a
+## genuine Wheel.Bet value and mean it.
+func _on_wheel_bet_requested(kind: int, guess: int, stake: int) -> void:
+	var bet_kind: int = WheelScript.Bet.COLOUR if kind == WheelMenuScript.Tab.COLOUR \
+		else WheelScript.Bet.NUMBER
+	play_wheel(bet_kind, guess, stake)
+
+
+func _on_deal_requested(stake: int) -> void:
+	play_blackjack(stake)
+
+
+## WALK FROM THE LOBBY TO A TABLE. The lobby closes and the table opens; leaving the table
+## with Escape leaves the Palace, which is one press fewer than walking back out through a
+## lobby the player has already read.
+func _on_game_requested(game: int) -> void:
+	if casino_menu != null and casino_menu.has_method("close"):
+		casino_menu.close()
+	var table: CanvasLayer = get_table_menu(game)
+	if table != null and table.has_method("open"):
+		table.open()
+
+
+## The menu behind one of CasinoMenu's four doors, or null. Racing's is built in Task 7 and
+## answers null until then.
+func get_table_menu(game: int) -> CanvasLayer:
+	match game:
+		CasinoMenuScript.Game.SLOTS:
+			return slots_menu
+		CasinoMenuScript.Game.WHEEL:
+			return wheel_menu
+		CasinoMenuScript.Game.BLACKJACK:
+			return blackjack_menu
+	return null
+
+
+func get_casino_menu() -> CanvasLayer:
+	return casino_menu
+
+
 func _on_deliver_requested(uid: StringName) -> void:
 	deliver_pony(uid)
 
@@ -2741,6 +3011,7 @@ func _physics_process(delta: float) -> void:
 	# a menu by the time this asks; see is_near_board() on the overlap of the two radii.
 	_update_board_interaction()
 	_update_depot_interaction()
+	_update_palace_interaction()
 	_update_gate_prompt()
 	if _game_state == null:
 		return

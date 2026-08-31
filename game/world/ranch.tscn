@@ -1,4 +1,4 @@
-[gd_scene load_steps=21 format=3]
+[gd_scene load_steps=25 format=3]
 
 [ext_resource type="Script" path="res://world/ranch.gd" id="1"]
 [ext_resource type="Script" path="res://world/terrain.gd" id="2"]
@@ -17,6 +17,10 @@
 [ext_resource type="PackedScene" path="res://ui/depot_menu.tscn" id="15"]
 [ext_resource type="PackedScene" path="res://ui/creation_screen.tscn" id="16"]
 [ext_resource type="Script" path="res://world/strip.gd" id="17"]
+[ext_resource type="PackedScene" path="res://ui/casino_menu.tscn" id="18"]
+[ext_resource type="PackedScene" path="res://ui/slots_menu.tscn" id="19"]
+[ext_resource type="PackedScene" path="res://ui/wheel_menu.tscn" id="20"]
+[ext_resource type="PackedScene" path="res://ui/blackjack_menu.tscn" id="21"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
 sky_top_color = Color(0.309804, 0.505882, 0.760784, 1)
@@ -314,6 +318,14 @@ collision_mask = 15
 [node name="PauseMenu" parent="." instance=ExtResource("12")]
 
 [node name="CreationScreen" parent="." instance=ExtResource("16")]
+
+[node name="CasinoMenu" parent="." instance=ExtResource("18")]
+
+[node name="SlotsMenu" parent="." instance=ExtResource("19")]
+
+[node name="WheelMenu" parent="." instance=ExtResource("20")]
+
+[node name="BlackjackMenu" parent="." instance=ExtResource("21")]
 
 [node name="CaptureCamera" type="Camera3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44, 27, 46)
