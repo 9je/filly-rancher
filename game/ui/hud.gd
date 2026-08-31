@@ -370,7 +370,16 @@ func set_tasks(rows: Array) -> void:
 	if rows.is_empty():
 		return
 	_task_lines.append(TASK_TITLE)
-	for row: Dictionary in rows:
+	for entry in rows:
+		# GUARDED, NOT TRUSTED: `rows` is a plain Array (see the signature comment above),
+		# so a junk element (an int, a String, null) reaches here as Variant rather than
+		# being refused at the call boundary the way a real Array[Dictionary] would refuse
+		# it. A typed `for row: Dictionary in rows` loop over an untyped Array crashes the
+		# instant one element is not actually a Dictionary; skipping it here instead means
+		# one bad row loses itself rather than the whole checklist.
+		if typeof(entry) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = entry
 		var done: bool = bool(row.get("done", false))
 		_task_lines.append("%s%s  (%d bits)" % [TASK_DONE if done else TASK_OPEN,
 			String(row.get("text", "")), int(row.get("reward_bits", 0))])

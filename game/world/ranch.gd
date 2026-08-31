@@ -2974,7 +2974,24 @@ func _refresh_tasks() -> void:
 	var hud := get_node_or_null(^"HUD")
 	if hud == null or not hud.has_method("set_tasks"):
 		return
-	hud.set_tasks(_board.tutorial_rows() if _board != null else [] as Array[Dictionary])
+	# HOISTED INTO A TYPED LOCAL, AND ASSEMBLED WITH A PLAIN if/else RATHER THAN A
+	# TERNARY. Passing an inline `_board.tutorial_rows() if _board != null else []`
+	# straight into this dynamic call throws exactly the SCRIPT ERROR
+	# game/ui/hud.gd's set_tasks() comment describes, on the null-board branch
+	# _bind_game_state() promises is not fatal (review round 1). The seemingly obvious
+	# fix -- hoisting that same ternary into a typed local first -- is NOT enough on its
+	# own: a `var rows: Array[Dictionary] = x if cond else []` still throws "Trying to
+	# assign an array of type Array to a variable of type Array[Dictionary]" the moment
+	# the bare `[]` branch is the one actually taken (confirmed directly: the true branch,
+	# where `_board.tutorial_rows()` runs, assigns fine, and the false branch, an untyped
+	# empty literal squeezed through the ternary, does not). A plain if/else statement
+	# has no such quirk -- each assignment to `rows` is independently typed, not merged
+	# through a ternary's own type inference -- so it is what actually survives both
+	# branches, not just the one every real playthrough happens to exercise.
+	var rows: Array[Dictionary] = []
+	if _board != null:
+		rows = _board.tutorial_rows()
+	hud.set_tasks(rows)
 
 
 ## PAY FOR EVERY REQUEST THIS EVENT JUST COMPLETED. `completed` is what an on_*() call

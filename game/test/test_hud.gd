@@ -21,6 +21,8 @@ const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const MagicBeamScript := preload("res://actors/player/magic_beam.gd")
 const WorldStateScript := preload("res://systems/world_state.gd")
+const RequestBoardScript := preload("res://systems/request_board.gd")
+const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 
 var _hud: CanvasLayer
 ## The HUD's own parent. It looks for a sibling named "Player" (that is how it is
@@ -432,3 +434,60 @@ func test_nothing_the_task_list_draws_carries_a_dash() -> void:
 		"done": false, "paid": false, "reward_bits": 50}])
 	for line in _hud.task_lines():
 		assert_false(line.contains("--") or line.contains("—"), line)
+
+
+## GUARDED, NOT TRUSTED (review round 1 finding 2). `rows` is a plain Array now (see
+## set_tasks()'s own comment for why it cannot be Array[Dictionary]), so nothing at the
+## call boundary refuses a junk element the way a real typed array would. A typed
+## `for row: Dictionary in rows` loop over an untyped Array crashes the instant one element
+## is not a Dictionary; set_tasks() skips it instead, so one bad row loses itself rather
+## than the whole checklist.
+func test_a_junk_element_is_skipped_rather_than_crashing_the_whole_checklist() -> void:
+	_hud.set_tasks([
+		{"id": "tutorial_catch", "text": "Catch a pony with your magic beam.",
+			"done": false, "paid": false, "reward_bits": 20},
+		7,
+		"junk",
+	])
+	var lines: Array[String] = _hud.task_lines()
+	assert_eq(lines.size(), 2, "the title and the one valid row; the two junk entries are gone")
+	assert_eq(lines[0], HudScript.TASK_TITLE)
+	assert_true(lines[1].contains("Catch a pony"))
+
+
+## THE TRAP REVIEW ROUND 1 CAUGHT IN game/world/ranch.gd's _refresh_tasks(), AND THE ONE
+## ITS FIRST-PASS FIX MISSED TOO. An inline ternary passed straight into a dynamically
+## dispatched call (this HUD is always reached through get_node_or_null() / has_method(),
+## never a statically HUD-typed var -- see set_tasks()'s own comment) throws exactly the
+## review's SCRIPT ERROR when the callee wants a strict `Array[Dictionary]` -- confirmed
+## directly against a throwaway RefCounted whose own set_tasks() kept that stricter
+## signature. Hoisting the SAME ternary into a typed local first -- the fix review round 1
+## prescribed -- turned out NOT to be enough on its own: `var rows: Array[Dictionary] =
+## x if cond else []` STILL throws "Trying to assign an array of type Array to a variable
+## of type Array[Dictionary]" the moment the bare `[]` branch is the one actually taken,
+## confirmed the same way. Every one of our gates and the full suite always has a real
+## GameState autoload, so `_board` is never actually null when _refresh_tasks() runs in
+## any of them -- the false branch was never once exercised by anything green, ternary or
+## not. What is actually reliable, confirmed against that same strict RefCounted sink on
+## BOTH branches, is a plain if/else statement: each assignment to the typed local is
+## independent, with no ternary type-merging step to go wrong. _refresh_tasks() now reads
+## that way, and this pins both of its branches through this HUD's own dynamic call.
+func test_the_if_else_hoisted_local_pattern_survives_the_dynamic_call_on_both_branches() -> void:
+	# THE NULL BOARD BRANCH: what _refresh_tasks() builds when _board is null.
+	var board: RequestBoard = null
+	var rows_when_null: Array[Dictionary] = []
+	if board != null:
+		rows_when_null = board.tutorial_rows()
+	_hud.set_tasks(rows_when_null)
+	assert_eq(_hud.task_lines().size(), 0, "an empty hoisted local clears the checklist")
+
+	# THE REAL BOARD BRANCH: what it builds once a board with rows on it exists.
+	var registry := PonyRegistryScript.new()
+	registry.load_all("res://data/ponies")
+	board = RequestBoardScript.new(1, registry, [] as Array[StringName], {})
+	board.seed_tutorial()
+	var rows_when_present: Array[Dictionary] = []
+	if board != null:
+		rows_when_present = board.tutorial_rows()
+	_hud.set_tasks(rows_when_present)
+	assert_eq(_hud.task_lines().size(), 4, "a title and the three seeded rows")
