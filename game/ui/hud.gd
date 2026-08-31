@@ -141,6 +141,12 @@ const COLOR_OUTLINE := Color(0.0, 0.0, 0.0, 0.55)
 ## a number the player owns, and the two must not read as one two-line block.
 const COLOR_WORLD_LINE := Color(0.82, 0.88, 1.0, 0.92)
 
+## The interaction prompt, sitting just under the reticle. Gold, like every other
+## "you may act on this" cue in the game (the menus' COLOR_VALUE is the same number), and
+## deliberately NOT the toast's white: a toast is something that happened, a prompt is
+## something you can do.
+const COLOR_PROMPT := Color(1.00, 0.86, 0.42, 1.0)
+
 ## Saddlebag pip geometry.
 const PIP_SIZE := Vector2(26.0, 26.0)
 const PIP_GAP := 8.0
@@ -172,6 +178,7 @@ const TOAST_FADE := 0.7
 const HINTS_ACTION := &"toggle_hints"
 
 @onready var _crosshair: Control = $Crosshair
+@onready var _prompt: Label = $Prompt
 @onready var _pips: Control = $Bag/Pips
 @onready var _bag_count: Label = $Bag/Count
 @onready var _bits: Label = $Bag/Bits
@@ -215,6 +222,8 @@ func _ready() -> void:
 	_style_label(_balance, 16, COLOR_WORLD_LINE)
 	_style_label(_world_line, 22, COLOR_WORLD_LINE)
 	_world_line.text = ""
+	_style_label(_prompt, 26, COLOR_PROMPT)
+	_prompt.text = ""
 	_style_label(_toast, 40, Color(1.0, 0.96, 0.86, 1.0))
 
 	_bag_title.text = "SADDLEBAG"
@@ -598,6 +607,31 @@ func set_world_line(text: String) -> void:
 
 func get_world_line() -> String:
 	return _world_line.text
+
+
+## WHAT THE INTERACT KEY WILL DO IF YOU PRESS IT NOW. Pushed every physics frame by
+## game/world/ranch.gd's resolver and cleared the moment nothing is in range.
+##
+## A PERSISTENT LABEL, NOT A TOAST, and that is the whole fix. Every one of these lines
+## used to go through toast(), which holds for TOAST_HOLD and fades over TOAST_FADE: a
+## player standing on a plot saw "Press E / X to build here." once, three seconds later saw
+## nothing, and had no way at all to find out what E was currently bound to. A prompt is
+## the state of the world, so it is drawn for as long as the state holds.
+##
+## SET UNCONDITIONALLY RATHER THAN ONLY ON CHANGE. Assigning the same string to a Label is
+## free, and the "only on change" version of this is exactly the latch bookkeeping that
+## went stale in ranch.gd and caused the bug this replaces.
+func set_prompt(text: String) -> void:
+	if _prompt != null:
+		_prompt.text = text
+
+
+func clear_prompt() -> void:
+	set_prompt("")
+
+
+func prompt_text() -> String:
+	return _prompt.text if _prompt != null else ""
 
 
 ## Both control schemes, side by side, because the build is handed to two people and

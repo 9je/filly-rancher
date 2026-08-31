@@ -370,3 +370,25 @@ func test_the_hints_card_names_pause_and_trade_and_never_free_cursor() -> void:
 func test_the_hud_keeps_processing_while_the_tree_is_paused() -> void:
 	assert_eq(_hud.process_mode, Node.PROCESS_MODE_ALWAYS,
 		"the HUD must keep processing while the world is paused, or toasts freeze")
+
+
+func test_the_prompt_starts_empty_and_holds_what_it_is_given() -> void:
+	assert_eq(_hud.prompt_text(), "", "nothing is in range at boot")
+	_hud.set_prompt("E: build here")
+	assert_eq(_hud.prompt_text(), "E: build here")
+
+
+func test_clearing_the_prompt_leaves_nothing_on_the_screen() -> void:
+	_hud.set_prompt("E: Market, sell gems")
+	_hud.clear_prompt()
+	assert_eq(_hud.prompt_text(), "")
+
+
+## THE PROMPT IS NOT THE TOAST, and the two must not be able to overwrite each other: a
+## toast is something that happened, a prompt is something you can do, and the whole reason
+## the prompt exists is that the toast fades.
+func test_the_prompt_and_the_toast_are_two_different_lines() -> void:
+	_hud.set_prompt("E: build here")
+	_hud.toast("Ranch saved")
+	assert_eq(_hud.prompt_text(), "E: build here")
+	assert_eq(_hud.toast_text(), "Ranch saved")

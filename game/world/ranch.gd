@@ -159,6 +159,7 @@ const StockPaletteScript := preload("res://systems/stock_palette.gd")
 const PlayerLookScript := preload("res://systems/player_look.gd")
 const StripScript := preload("res://world/strip.gd")
 const CasinoSignScript := preload("res://systems/casino_sign.gd")
+const InteractionScript := preload("res://world/interaction.gd")
 const BuildingScript := preload("res://world/building.gd")
 const CasinoScript := preload("res://systems/casino.gd")
 const SlotsScript := preload("res://systems/slots.gd")
@@ -272,6 +273,10 @@ const DEPOT_RADIUS := 4.0
 ## How close to the Spectra Palace the counter opens from. Wider than the Depot's, because
 ## the Palace is fourteen metres across and the door is in the middle of one long side.
 const PALACE_RADIUS := 5.0
+
+## The glyph the interact prompt prints. A constant here and a lookup in Task 4's device
+## tracker after that; stated as one name so there is one call site to change.
+const INTERACT_KEY := "E"
 
 ## Plot slots the map must carry -- the plan asks for four to six, and the reserved
 ## clearing (PropsScript.PEN_PLOTS_*) is an 18 m square, which fits four 7.8 m pens on a
@@ -486,10 +491,6 @@ var _collector_due := false
 ## own for the same reason; a .tres load per menu row is a load per row.
 var _stock_palette: StockPalette = null
 
-## The plot slot the player is standing in right now, or null. Tracked so the build prompt
-## fires once on entry rather than every physics frame.
-var _prompt_slot: PlotSlot = null
-
 ## How many plots a loaded save put back, and how many ponies went into pens rather than
 ## into the saddlebag. Printed by the gate.
 var _restored_plots := 0
@@ -507,16 +508,6 @@ var _shop: Shop = null
 ## Player preferences, owned here because this is where the things they control live: the
 ## camera rig and the audio bus.
 var _settings: Settings = null
-
-## Whether the market prompt has been shown for this approach. Same hysteresis as the plot
-## prompt: once on entering the radius, not once per frame.
-var _market_prompted := false
-
-## Whether the Depot prompt has been shown for this approach. The market prompt's rule.
-var _depot_prompted := false
-
-## Whether the Palace's prompt has already been shown for this approach.
-var _palace_prompted := false
 
 ## Every roll at every table comes off this one generator, so a gate can seed it and get the
 ## same night's play back. Seeded from the clock for a person actually playing; see
@@ -541,10 +532,6 @@ var _race_field: Array[Dictionary] = []
 ## stops being anybody's.
 var _priced_uid: StringName = &""
 var _priced_field: Array[Dictionary] = []
-
-## Whether the request board's prompt has been shown for this approach. The market
-## prompt's rule; see _market_prompted.
-var _board_prompted := false
 
 ## The three standing favours (game/systems/request_board.gd). REBUILT rather than mutated
 ## on every load, for exactly the reason rebind_economy() rebuilds the wallet: a load
@@ -1690,35 +1677,6 @@ func is_near_palace() -> bool:
 	return gap <= PALACE_RADIUS
 
 
-## E at the loading dock opens the Depot. Once per approach, the Market's and the board's
-## rule, for the reason _update_plot_interaction() gives.
-func _update_depot_interaction() -> void:
-	if not _no_other_menu_open():
-		return
-	var near := is_near_depot()
-	if near != _depot_prompted:
-		_depot_prompted = near
-		if near:
-			_toast("Press E / X at the Depot.")
-	if near and Input.is_action_just_pressed(&"interact") and _prompt_slot == null:
-		if depot_menu != null and depot_menu.has_method("open"):
-			depot_menu.open()
-
-
-## E at the Palace door opens the lobby. Once per approach, the Depot's and the Market's rule.
-func _update_palace_interaction() -> void:
-	if not _no_other_menu_open():
-		return
-	var near := is_near_palace()
-	if near != _palace_prompted:
-		_palace_prompted = near
-		if near and casino_can_enter():
-			_toast("Press E / X at the Spectra Palace.")
-	if near and Input.is_action_just_pressed(&"interact") and _prompt_slot == null:
-		if casino_menu != null and casino_menu.has_method("open"):
-			casino_menu.open()
-
-
 func _bind_pause_menu() -> void:
 	if pause_menu == null or not pause_menu.has_method("open"):
 		return
@@ -2786,26 +2744,6 @@ func is_near_market() -> bool:
 	return gap <= MARKET_RADIUS
 
 
-## E at the market opens it. The prompt shows once per approach, like the plot prompt.
-##
-## `_prompt_slot == null` in the press test is what stops one E press doing two things: a
-## plot slot that overlapped the market's radius would otherwise build a pen AND open the
-## shop off the same frame.
-func _update_market_interaction() -> void:
-	# The pause menu used to be tested separately on the next line. It is inside
-	# _no_other_menu_open() now, which is the whole point of _no_menu_but().
-	if not _no_other_menu_open():
-		return
-	var near := is_near_market()
-	if near != _market_prompted:
-		_market_prompted = near
-		if near:
-			_toast("Press E / X to trade.")
-	if near and Input.is_action_just_pressed(&"interact") and _prompt_slot == null:
-		if market_menu != null and market_menu.has_method("open"):
-			market_menu.open()
-
-
 ## WALK UP TO A LOCKED FENCE AND BE TOLD WHAT IT IS AND WHAT IT COSTS. Once per approach,
 ## the plot prompt's and the market prompt's rule, for the reason _update_plot_interaction()
 ## gives: a toast reprinted at 60 Hz never fades and never stops covering the screen.
@@ -3045,30 +2983,19 @@ func get_compendium() -> Compendium:
 
 ## Is the player standing at the request board?
 ##
-## THE MARKET WINS THE OVERLAP. The board stands five metres from the Market's origin and
-## the two radii meet in the middle, so without the second clause walking up to the stall
-## would print two prompts and E would be ambiguous between them. The Market is the older
-## and the busier of the two, so it keeps the ground.
+## THE OVERLAP WITH THE MARKET IS NOT SETTLED HERE ANY MORE. This used to end with
+## "and not is_near_market()", because the board stands five metres from the Market's
+## origin and the two radii meet in the middle. That rule now lives in one place, as one
+## line of game/world/interaction.gd's PRIORITY list, with every other precedence in the
+## game beside it; a predicate that answers "am I at the board" should answer that and not
+## also arbitrate.
 func is_near_board() -> bool:
 	var board := get_node_or_null(^"Buildings/Board") as Node3D
 	if board == null:
 		return false
 	var gap := Vector2(player.global_position.x - board.global_position.x,
 		player.global_position.z - board.global_position.z).length()
-	return gap <= BOARD_RADIUS and not is_near_market()
-
-
-## E at the board reads it. The prompt shows once per approach, like the market's.
-func _update_board_interaction() -> void:
-	if not _no_other_menu_open():
-		return
-	var near := is_near_board()
-	if near != _board_prompted:
-		_board_prompted = near
-		if near:
-			_toast("Press E / X to read the board.")
-	if near and Input.is_action_just_pressed(&"interact") and _prompt_slot == null:
-		_open_request_page()
+	return gap <= BOARD_RADIUS
 
 
 ## Show her what the board is asking for.
@@ -3207,6 +3134,168 @@ func _move_pony_into_pen(slot: PlotSlot) -> bool:
 	if _board != null:
 		_pay_out(_board.on_penned(instance.data()))
 	return true
+
+
+## EVERYTHING E COULD MEAN WHERE THE PLAYER IS STANDING, unranked. The world half of the
+## resolver: this file knows what a plot slot and a Pen and a saddlebag are, and
+## game/world/interaction.gd knows which of them wins. Public so a gate or a test can ask
+## "what is offered here" without an Input event and without a frame.
+##
+## A PEN IS ALWAYS A CANDIDATE, even with an empty bag or a full pen, so that standing in
+## your own paddock and pressing E can never open the Market instead. What the prompt says
+## in that state is Interaction.prompt_for()'s business.
+func interaction_candidates() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if player == null:
+		return out
+	var at: Vector3 = player.global_position
+	for slot in _plot_slots():
+		if not (player in slot.get_overlapping_bodies()):
+			continue
+		var gap: float = Vector2(at.x - slot.global_position.x,
+			at.z - slot.global_position.z).length()
+		if slot.is_empty():
+			out.append(InteractionScript.candidate(
+				InteractionScript.Kind.PLOT_BUILD, gap, String(slot.name)))
+		else:
+			out.append(InteractionScript.candidate(
+				InteractionScript.Kind.PEN_MOVE_IN, gap, _next_in_the_bag()))
+	if is_near_market():
+		out.append(InteractionScript.candidate(
+			InteractionScript.Kind.MARKET, _flat_gap_to(^"Buildings/Market")))
+	if is_near_board():
+		out.append(InteractionScript.candidate(
+			InteractionScript.Kind.BOARD, _flat_gap_to(^"Buildings/Board")))
+	if is_near_depot():
+		out.append(InteractionScript.candidate(
+			InteractionScript.Kind.DEPOT, _flat_gap_to(^"Buildings/Depot")))
+	# THE BAN CLOSES THE DOOR RATHER THAN GREYING IT OUT. The shipped code showed no prompt
+	# under a ban but still let the press through to casino_menu.open(), which then refused
+	# on its own can_open; a player got a silent nothing. A banned Palace is simply not
+	# offered, so the prompt and the button agree.
+	if is_near_palace() and casino_can_enter():
+		out.append(InteractionScript.candidate(
+			InteractionScript.Kind.PALACE, _flat_gap_to(^"Buildings/Palace")))
+	return out
+
+
+## Whoever is at the top of the saddlebag, by name, or "" for an empty bag. Only the prompt
+## reads this; _move_pony_into_pen() asks the Storage itself when the key is actually
+## pressed, so a pony beamed in between the prompt and the press is still the one who goes
+## into the pen.
+func _next_in_the_bag() -> String:
+	if player == null:
+		return ""
+	var beam: Node3D = player.get_magic_beam()
+	if beam == null:
+		return ""
+	var storage: Storage = beam.get_storage()
+	if storage == null:
+		return ""
+	var next: PonyInstance = storage.peek()
+	return next.display_name() if next != null else ""
+
+
+func _flat_gap_to(path: NodePath) -> float:
+	var node := get_node_or_null(path) as Node3D
+	if node == null or player == null:
+		return 0.0
+	return Vector2(player.global_position.x - node.global_position.x,
+		player.global_position.z - node.global_position.z).length()
+
+
+## THE ONE THING E WILL DO, or an empty dictionary. Public for the same reason
+## interaction_candidates() is.
+func current_interaction() -> Dictionary:
+	if not _no_other_menu_open():
+		return {}
+	return InteractionScript.resolve(interaction_candidates())
+
+
+## DO IT. Returns whether anything actually happened. Public and Input free, so a gate can
+## drive the verb the player presses instead of reaching past it (scenes/test/
+## collection_test.gd's own note explains why it had to reach past the old one).
+func perform_interaction(action: Dictionary) -> bool:
+	if action.is_empty():
+		return false
+	match int(action.get("kind", InteractionScript.Kind.NONE)):
+		InteractionScript.Kind.PLOT_BUILD:
+			var slot: PlotSlot = _slot_named(String(action.get("subject", "")))
+			if slot == null:
+				return false
+			# Told BEFORE the menu rather than after she has picked something: being made
+			# to choose a pen and only then being sent to stand somewhere else is a worse
+			# version of the same refusal.
+			if _player_stands_on_footprint(slot):
+				_toast("Step outside the plot markers to build here.")
+				return false
+			if build_menu == null or not build_menu.has_method("open"):
+				return false
+			return bool(build_menu.open(slot))
+		InteractionScript.Kind.PEN_MOVE_IN:
+			var pen_slot: PlotSlot = _nearest_occupied_slot()
+			return _move_pony_into_pen(pen_slot) if pen_slot != null else false
+		InteractionScript.Kind.MARKET:
+			if market_menu == null or not market_menu.has_method("open"):
+				return false
+			return bool(market_menu.open())
+		InteractionScript.Kind.BOARD:
+			_open_request_page()
+			return true
+		InteractionScript.Kind.DEPOT:
+			if depot_menu == null or not depot_menu.has_method("open"):
+				return false
+			return bool(depot_menu.open())
+		InteractionScript.Kind.PALACE:
+			if casino_menu == null or not casino_menu.has_method("open"):
+				return false
+			return bool(casino_menu.open())
+	return false
+
+
+## The plot slot called `slot_name`, or null. The PLOT_BUILD candidate carries the slot's
+## own node name as its subject precisely so this lookup is a name and not an index into a
+## list that may have been rebuilt since the candidate was made.
+func _slot_named(slot_name: String) -> PlotSlot:
+	for slot in _plot_slots():
+		if String(slot.name) == slot_name:
+			return slot
+	return null
+
+
+## The nearest built slot the player is actually standing in. The PEN_MOVE_IN candidate
+## carries the pony's name as its subject (that is what the prompt needs), so the slot is
+## found again here rather than carried; the resolver already guaranteed she is standing in
+## exactly one, and "nearest" settles a map edit that ever overlapped two.
+func _nearest_occupied_slot() -> PlotSlot:
+	var best: PlotSlot = null
+	var best_gap := INF
+	for slot in _plot_slots():
+		if slot.is_empty() or not (player in slot.get_overlapping_bodies()):
+			continue
+		var gap: float = Vector2(player.global_position.x - slot.global_position.x,
+			player.global_position.z - slot.global_position.z).length()
+		if gap < best_gap:
+			best_gap = gap
+			best = slot
+	return best
+
+
+## THE WHOLE INTERACT VERB, ONCE A FRAME. Ask the world what is on offer, ask the resolver
+## which one wins, say so on the HUD, and act on exactly that one if the key went down.
+##
+## NO LATCHES. The five handlers this replaces kept six of them between them, each
+## implementing "fire once per approach" a slightly different way, and one of them
+## (_prompt_slot) doubled as the mutex the other four consulted. The prompt is a persistent
+## label now, so there is nothing to fire once and nothing to go stale.
+func _update_interaction() -> void:
+	var action: Dictionary = current_interaction()
+	var hud := get_node_or_null(^"HUD")
+	if hud != null and hud.has_method("set_prompt"):
+		hud.set_prompt(InteractionScript.prompt_for(action, INTERACT_KEY))
+	if action.is_empty() or not Input.is_action_just_pressed(&"interact"):
+		return
+	perform_interaction(action)
 
 
 ## IS THE PLAYER STANDING WHERE THE FENCE IS ABOUT TO GO UP?
@@ -3355,14 +3444,8 @@ func _physics_process(delta: float) -> void:
 	# stand a fresh crowd behind it, and the pony count it is asserting on would move under
 	# it. The gates call spawner.tick_stock() themselves, deliberately, where they mean to.
 	spawner.tick_stock(delta)
-	_update_plot_interaction()
-	_update_market_interaction()
-	# After the market's, so that an E press which just opened the Market is already behind
-	# a menu by the time this asks; see is_near_board() on the overlap of the two radii.
-	_update_board_interaction()
-	_update_depot_interaction()
-	_update_palace_interaction()
-	# AFTER the Palace prompt, so a ban that landed this frame shuts the door the prompt
+	_update_interaction()
+	# AFTER the interaction pass, so a ban that landed this frame shuts a door the resolver
 	# would otherwise have just opened. See enforce_casino_ban().
 	enforce_casino_ban()
 	_update_gate_prompt()
@@ -3388,58 +3471,6 @@ func _physics_process(delta: float) -> void:
 	var hud := get_node_or_null(^"HUD")
 	if hud != null and hud.has_method("toast"):
 		hud.toast("Ranch saved" if ok else "SAVE FAILED. See the log.")
-
-
-## THE ONE INTERACT BUTTON, and what it means depends on where you are standing.
-##
-##   an EMPTY slot -> open the build menu.
-##   a slot with a PEN on it -> move the pony at the top of your saddlebag into it.
-##
-## One verb rather than two buttons, for the reason project.godot's `interact` block gives:
-## a player who has to remember which of two keys applies to which square of ground is a
-## player who presses neither. The prompt is shown once on entering a slot rather than
-## every frame -- a toast that reprints at 60 Hz never fades and never stops covering the
-## middle of the screen.
-##
-## Which slot she is in is asked of the Area3D rather than computed from distances: the
-## trigger volume is the authority on "am I on this plot", it is what a future prompt
-## billboard would hang off, and an Area3D with no shape (a real and completely invisible
-## failure -- see PlotSlot._ensure_shape) then shows up as a prompt that never appears
-## rather than as a distance check that quietly still works.
-func _update_plot_interaction() -> void:
-	# The same question the market prompt asks, and for the same reason: see
-	# _no_other_menu_open(). This used to ask only whether the BUILD menu was open, which
-	# let E build a pen out from under an open Market or an open pause menu.
-	if not _no_other_menu_open():
-		return
-
-	var here: PlotSlot = null
-	for slot in _plot_slots():
-		if player in slot.get_overlapping_bodies():
-			here = slot
-			break
-
-	if here != _prompt_slot:
-		_prompt_slot = here
-		if here != null:
-			if here.is_empty():
-				_toast("Press E / X to build here.")
-			else:
-				_toast("Press E / X to move a pony in.")
-
-	if here == null or not Input.is_action_just_pressed(&"interact"):
-		return
-	if here.is_empty():
-		# Told BEFORE the menu rather than after she has picked something: being made to
-		# choose a pen and only then being sent to stand somewhere else is a worse version
-		# of the same refusal.
-		if _player_stands_on_footprint(here):
-			_toast("Step outside the plot markers to build here.")
-			return
-		if build_menu != null and build_menu.has_method("open"):
-			build_menu.open(here)
-	else:
-		_move_pony_into_pen(here)
 
 
 # --- the gate -----------------------------------------------------------------------
