@@ -492,6 +492,17 @@ var _herd_ready := false
 ## another must produce a second prompt, and a bool would swallow it.
 var _gate_prompted: StringName = &""
 
+## Whether the cursor is currently meant to be captured to the game, mirroring the
+## CAPTURED/VISIBLE split _set_cursor_captured() drives Input.mouse_mode with. Tracked as a
+## plain bool ON RANCH, separately from Input.mouse_mode itself, because Godot's headless
+## display driver always reports Input.mouse_mode as MOUSE_MODE_VISIBLE no matter what was
+## last assigned to it (confirmed empirically -- `godot --headless` never returns anything
+## else from the getter) -- which would make the creation screen's cursor wiring the one
+## piece of it no headless test could ever observe. game/test/test_ranch_creation.gd reads
+## this instead. Starts true: camera_rig.gd captures the mouse in its own _ready(), before
+## any menu (including this one) has had a chance to run.
+var _cursor_captured := true
+
 ## Is this ranch the scene the process was launched with, or is it INSTANCED UNDER another
 ## scene that owns the process?
 ##
@@ -961,17 +972,27 @@ func _bind_build_menu() -> void:
 ## you cannot get the pointer back from is a menu players close with Alt-F4.
 func _on_menu_opened(_slot: PlotSlot) -> void:
 	get_tree().paused = true
-	if _interactive:
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_set_cursor_captured(false)
 
 
 func _on_menu_closed() -> void:
 	get_tree().paused = false
-	# Only re-grab the pointer for somebody actually playing. A headless or screenshot run
-	# has no window worth capturing it into, and grabbing it during an automated capture is
-	# exactly the kind of thing that makes people stop running captures.
+	_set_cursor_captured(true)
+
+
+## THE ONE PLACE THE CURSOR IS SHOWN OR HIDDEN. Split out of _on_menu_opened()/
+## _on_menu_closed() so _maybe_open_creation()/_on_creation_confirmed() below can free and
+## re-capture the mouse through the SAME path every other menu uses, without also touching
+## get_tree().paused a second time -- the creation screen already owns that toggle itself
+## (CreationScreen.open()/confirm()). Only a person actually playing has a cursor worth
+## moving: a headless or screenshot run has no window to capture it into, and grabbing it
+## during an automated capture is exactly the kind of thing that makes people stop running
+## captures. Touches nothing but Input.mouse_mode, so it needs no tree and is exactly what
+## game/test/test_ranch_creation.gd drives on a Ranch that was never added to one.
+func _set_cursor_captured(captured: bool) -> void:
+	_cursor_captured = captured
 	if _interactive:
-		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if captured else Input.MOUSE_MODE_VISIBLE
 
 
 func _current_bits() -> int:
@@ -1426,6 +1447,13 @@ func _no_menu_but(menu: CanvasLayer) -> bool:
 ## ranch, a headless gate and a screenshot run all skip it, so no automated run ever waits
 ## on a button nobody is going to press. A session that LOADED a save skips it too; there is
 ## no re-edit screen this phase.
+##
+## THE CURSOR IS FREED HERE, THE SAME WAY EVERY OTHER MENU FREES IT. Without this,
+## game/actors/player/camera_rig.gd has already captured the mouse in its own _ready()
+## (which runs before this function ever does), and nothing on the screen would be
+## clickable: the pointer stays locked to the paused, invisible ranch behind it. Not routed
+## through _on_menu_opened() itself, because that also toggles get_tree().paused a second
+## time (CreationScreen.open() already owns that) -- see _set_cursor_captured()'s comment.
 func _maybe_open_creation() -> void:
 	if not _interactive or _save_loaded or _game_state == null:
 		return
@@ -1434,12 +1462,14 @@ func _maybe_open_creation() -> void:
 	if not creation_screen.is_connected("confirmed", _on_creation_confirmed):
 		creation_screen.connect("confirmed", _on_creation_confirmed)
 	creation_screen.call("open", _game_state.player)
+	_set_cursor_captured(false)
 
 
 ## She has made her pony. Keep it, dress the model, and write it down straight away: the
 ## first thing that happens after this is a ranch, and a crash before the first autosave
 ## should not cost her the pony she just spent five minutes on.
 func _on_creation_confirmed(look: PlayerLook) -> void:
+	_set_cursor_captured(true)
 	if _game_state == null:
 		return
 	_game_state.player = look

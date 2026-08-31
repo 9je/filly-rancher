@@ -93,12 +93,10 @@ theme_override_constants/separation = 6
 
 [node name="Title" type="Label" parent="Panel/Column"]
 layout_mode = 2
-text = "Who are you?"
 theme_override_font_sizes/font_size = 22
 
 [node name="NameLabel" type="Label" parent="Panel/Column"]
 layout_mode = 2
-text = "Your name"
 
 [node name="NameBox" type="LineEdit" parent="Panel/Column"]
 layout_mode = 2
@@ -106,7 +104,6 @@ max_length = 16
 
 [node name="CoatLabel" type="Label" parent="Panel/Column"]
 layout_mode = 2
-text = "Coat"
 
 [node name="CoatRow" type="HBoxContainer" parent="Panel/Column"]
 layout_mode = 2
@@ -127,7 +124,6 @@ text = ">"
 
 [node name="ManeLabel" type="Label" parent="Panel/Column"]
 layout_mode = 2
-text = "Mane and tail"
 
 [node name="ManeRow" type="HBoxContainer" parent="Panel/Column"]
 layout_mode = 2
@@ -148,7 +144,6 @@ text = ">"
 
 [node name="EyesLabel" type="Label" parent="Panel/Column"]
 layout_mode = 2
-text = "Eyes"
 
 [node name="EyesRow" type="HBoxContainer" parent="Panel/Column"]
 layout_mode = 2
@@ -169,7 +164,6 @@ text = ">"
 
 [node name="MarkLabel" type="Label" parent="Panel/Column"]
 layout_mode = 2
-text = "Your cutie mark; draw it yourself"
 
 [node name="MarkCanvas" parent="Panel/Column" instance=ExtResource("2")]
 layout_mode = 2
@@ -177,7 +171,6 @@ size_flags_horizontal = 4
 
 [node name="HintLabel" type="Label" parent="Panel/Column"]
 layout_mode = 2
-text = "Left click to draw. Pick a shape to start from, or start with nothing."
 autowrap_mode = 3
 
 [node name="StampRow" type="HBoxContainer" parent="Panel/Column"]

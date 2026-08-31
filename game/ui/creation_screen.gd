@@ -61,11 +61,31 @@ var _open := false
 @onready var _mane_swatch: ColorRect = $Panel/Column/ManeRow/ManeSwatch
 @onready var _eyes_swatch: ColorRect = $Panel/Column/EyesRow/EyesSwatch
 
+## The screen's own Labels, assigned their text from the consts above in _ready() rather
+## than authored a second time as literals in creation_screen.tscn -- the .tscn used to
+## carry its own copy of every one of these strings, which is a second place the copy rule
+## (and a retitled label) could drift from what test_nothing_the_screen_draws_carries_a_dash
+## actually checks. The .gd consts are now the only place any of this text is written.
+@onready var _title_label: Label = $Panel/Column/Title
+@onready var _name_label: Label = $Panel/Column/NameLabel
+@onready var _coat_label: Label = $Panel/Column/CoatLabel
+@onready var _mane_label: Label = $Panel/Column/ManeLabel
+@onready var _eyes_label: Label = $Panel/Column/EyesLabel
+@onready var _mark_label: Label = $Panel/Column/MarkLabel
+@onready var _hint_label: Label = $Panel/Column/HintLabel
+
 
 func _ready() -> void:
 	visible = false
 	_palette = StockPaletteScript.load_player()
 	_name_box.max_length = PlayerLookScript.MAX_NAME_LENGTH
+	_title_label.text = TITLE
+	_name_label.text = NAME_LABEL
+	_coat_label.text = COAT_LABEL
+	_mane_label.text = MANE_LABEL
+	_eyes_label.text = EYES_LABEL
+	_mark_label.text = MARK_LABEL
+	_hint_label.text = HINT
 	_confirm.text = CONFIRM_LABEL
 	_name_box.text_changed.connect(set_name_text)
 	_confirm.pressed.connect(func() -> void: confirm())
