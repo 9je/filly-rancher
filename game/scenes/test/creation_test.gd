@@ -176,6 +176,17 @@ func _ready() -> void:
 				_set_check("their world positions sit on opposite sides of her barrel",
 					sign(local_a.x) != sign(local_b.x)
 						and absf(local_a.x) > 0.05 and absf(local_b.x) > 0.05)
+				for decal: Decal in decals:
+					var flank: String = "left" if String(decal.name) == \
+						String(CutieMarkScript.LEFT_NAME) else "right"
+					_set_check("the mark's top points at the sky on the %s flank" % flank,
+						CutieMarkScript.image_up(decal).dot(Vector3.UP) > 0.99)
+					_set_check("the mark is not mirrored on the %s flank" % flank,
+						not CutieMarkScript.is_mirrored(decal))
+					print("CREATION mark flank=%s up=%s right=%s mirrored=%s"
+						% [flank, CutieMarkScript.image_up(decal),
+							CutieMarkScript.image_right(decal),
+							CutieMarkScript.is_mirrored(decal)])
 
 	# --- the save round trips the name, the three indices and the mark pixel identical -----
 	var name_before: String = state.player.player_name

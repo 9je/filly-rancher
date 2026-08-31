@@ -94,3 +94,84 @@ func test_clear_takes_the_mark_off_again() -> void:
 
 func test_a_null_model_is_refused() -> void:
 	assert_eq(CutieMarkScript.apply(null, MarkPaintScript.blank()), 0)
+
+
+## THE 2026-08-31 PLAYTEST BUG. A Decal samples its albedo across its own local XZ plane
+## with V = 0 at the TOP of the image, so the drawing's own "up" is the decal's MINUS Z
+## axis. The shipped basis passed +Y as that column, which pointed image up at world DOWN,
+## and it was left handed besides, which mirrored the drawing. A flip plus a mirror is a
+## half turn, and a half turn is why a heart drawn point down came back point up.
+func test_the_drawing_lands_right_way_up_on_both_flanks() -> void:
+	_model = _base_model()
+	if _model == null:
+		pass_test("no converted assets on this machine")
+		return
+	add_child_autofree(_model)
+	CutieMarkScript.apply(_model, MarkPaintScript.orientation_probe())
+	var decals: Array[Decal] = CutieMarkScript.decals_of(_model)
+	assert_eq(decals.size(), 2)
+	for decal in decals:
+		assert_gt(CutieMarkScript.image_up(decal).dot(Vector3.UP), 0.99,
+			"the top of the canvas must point at the sky on %s" % decal.name)
+
+
+func test_neither_flank_mirrors_the_drawing() -> void:
+	_model = _base_model()
+	if _model == null:
+		pass_test("no converted assets on this machine")
+		return
+	add_child_autofree(_model)
+	CutieMarkScript.apply(_model, MarkPaintScript.orientation_probe())
+	for decal in CutieMarkScript.decals_of(_model):
+		assert_false(CutieMarkScript.is_mirrored(decal),
+			"%s is showing the drawing back to front" % decal.name)
+
+
+func test_the_projection_runs_from_the_flank_into_the_pony() -> void:
+	_model = _base_model()
+	if _model == null:
+		pass_test("no converted assets on this machine")
+		return
+	add_child_autofree(_model)
+	CutieMarkScript.apply(_model, MarkPaintScript.orientation_probe())
+	for decal in CutieMarkScript.decals_of(_model):
+		var out_local: Vector3 = _model.global_transform.basis.inverse() \
+			* CutieMarkScript.image_out(decal)
+		var side: float = signf(_model.to_local(decal.global_position).x)
+		assert_gt(out_local.x * side, 0.99,
+			"%s must face out of the flank it is on, so it projects inward" % decal.name)
+
+
+func test_the_top_of_the_canvas_sits_higher_on_the_barrel_than_the_bottom() -> void:
+	_model = _base_model()
+	if _model == null:
+		pass_test("no converted assets on this machine")
+		return
+	add_child_autofree(_model)
+	CutieMarkScript.apply(_model, MarkPaintScript.orientation_probe())
+	for decal in CutieMarkScript.decals_of(_model):
+		var top: Vector3 = CutieMarkScript.image_point_to_world(decal, 0.5, 0.0)
+		var bottom: Vector3 = CutieMarkScript.image_point_to_world(decal, 0.5, 1.0)
+		assert_gt(top.y, bottom.y, "%s has the canvas upside down" % decal.name)
+		assert_almost_eq(top.y - bottom.y, decal.size.z, 0.001,
+			"the canvas spans the decal's own depth along the barrel")
+
+
+## THE RIGHT FLANK REPEATS THE DRAWING RATHER THAN MIRRORING IT, and that is a decision
+## rather than an accident: a mark you cannot read from one side is not a cutie mark. So
+## the same image coordinate lands on the same side of the pony's own body on neither
+## flank, and on the same side of the VIEWER on both, which is what is_mirrored() asks.
+func test_the_two_flanks_read_the_same_way_round_from_outside() -> void:
+	_model = _base_model()
+	if _model == null:
+		pass_test("no converted assets on this machine")
+		return
+	add_child_autofree(_model)
+	CutieMarkScript.apply(_model, MarkPaintScript.orientation_probe())
+	var decals: Array[Decal] = CutieMarkScript.decals_of(_model)
+	assert_eq(decals.size(), 2)
+	for decal in decals:
+		var left_edge: Vector3 = CutieMarkScript.image_point_to_world(decal, 0.0, 0.5)
+		var offset: Vector3 = left_edge - decal.global_position
+		assert_lt(offset.dot(CutieMarkScript.image_right(decal)), 0.0,
+			"the left of the canvas is on the left as seen from outside %s" % decal.name)
