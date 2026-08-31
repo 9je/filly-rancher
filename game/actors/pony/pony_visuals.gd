@@ -53,43 +53,52 @@ const ANIMATION_PLAYER_PATH := ^"AnimationPlayer"
 
 
 ## Build a ready-to-use instance of `data`: resolve and load its model, attach the
-## mane/tail spring simulation via PonyRig, and hand back a Node3D whose
-## AnimationPlayer is reachable at ANIMATION_PLAYER_PATH.
+## mane/tail spring simulation via PonyRig, and hand back a Node3D whose AnimationPlayer is
+## reachable at ANIMATION_PLAYER_PATH.
+##
+## `model_path_override` REPLACES data.model_path AND NOTHING ELSE. It exists because a
+## stock pony's mane is a property of the INDIVIDUAL, not of the hidden record three
+## thousand of them share (game/systems/stock_palette.gd MANE_STYLES); everything else about
+## her, her personality, her stats, her name, still comes off the PonyData. Empty means "use
+## the record's own model", which is what all 43 named characters pass and what every
+## shipped call site did before this argument existed.
 ##
 ## Fails loudly via push_error and returns null -- never a half-built node -- for:
 ##   - a null `data`
-##   - an empty `data.model_path`
-##   - a `model_path` that does not resolve to an existing resource
-##   - a `model_path` that resolves but does not load as a PackedScene
+##   - an empty resolved model path
+##   - a model path that does not resolve to an existing resource
+##   - a model path that resolves but does not load as a PackedScene
 ##   - a model that loads but has no AnimationPlayer at ANIMATION_PLAYER_PATH
 ##     (later tasks depend on that path to play idle/walk; a model without one
 ##     is not something anything downstream can use)
-static func build(data: PonyData) -> Node3D:
+static func build(data: PonyData, model_path_override: String = "") -> Node3D:
 	if data == null:
 		push_error("PonyVisuals.build: data is null")
 		return null
 
-	if data.model_path.is_empty():
+	var model_path: String = model_path_override if not model_path_override.is_empty() \
+		else data.model_path
+	if model_path.is_empty():
 		push_error("PonyVisuals.build: pony '%s' has an empty model_path" % data.id)
 		return null
 
-	if not ResourceLoader.exists(data.model_path):
+	if not ResourceLoader.exists(model_path):
 		push_error("PonyVisuals.build: pony '%s' model_path '%s' does not resolve to an existing resource" % [
-			data.id, data.model_path
+			data.id, model_path
 		])
 		return null
 
-	var scene: Resource = load(data.model_path)
+	var scene: Resource = load(model_path)
 	if scene == null or not (scene is PackedScene):
 		push_error("PonyVisuals.build: pony '%s' model_path '%s' did not load as a PackedScene" % [
-			data.id, data.model_path
+			data.id, model_path
 		])
 		return null
 
 	var pony: Node3D = (scene as PackedScene).instantiate()
 	if pony == null:
 		push_error("PonyVisuals.build: pony '%s' model_path '%s' failed to instantiate" % [
-			data.id, data.model_path
+			data.id, model_path
 		])
 		return null
 
@@ -102,7 +111,7 @@ static func build(data: PonyData) -> Node3D:
 	var anim := pony.get_node_or_null(ANIMATION_PLAYER_PATH)
 	if anim == null or not (anim is AnimationPlayer):
 		push_error("PonyVisuals.build: pony '%s' (%s) has no AnimationPlayer at documented path %s" % [
-			data.id, data.model_path, ANIMATION_PLAYER_PATH
+			data.id, model_path, ANIMATION_PLAYER_PATH
 		])
 		pony.free()
 		return null

@@ -171,6 +171,7 @@ const WheelMenuScript := preload("res://ui/wheel_menu.gd")
 const RaceCardScript := preload("res://systems/race_card.gd")
 const RaceTrackScript := preload("res://world/race_track.gd")
 const CompanyRunnersScript := preload("res://systems/company_runners.gd")
+const AttendantScript := preload("res://world/attendant.gd")
 
 ## Headless watchdog ceiling. A normal run (assets present) finishes in under 2s on
 ## this machine; 30s leaves a wide margin for a slower box while still failing in
@@ -276,6 +277,24 @@ const DEPOT_RADIUS := 4.0
 ## the Palace is fourteen metres across and the door is in the middle of one long side.
 const PALACE_RADIUS := 5.0
 
+## THE TWO PONIES BEHIND COUNTERS, and where they stand.
+##
+## AT THE DOOR AND FACING OUT. "Facing the counter" is resolved as standing at the counter
+## and looking out across it, toward whoever walks up, which is what a vendor does and what
+## makes her legible from thirty metres away.
+##
+## OUTSIDE THE BUILDING, not inside it, and that is a consequence of Building's plinth (see
+## Building.FLOOR_TOP): the interior floor stands 0.75 m above the ground the terrain
+## reports, so a body seated on the terrain inside a building would be knee deep in its own
+## boards. Both counters are things the player opens from the door anyway.
+const ATTENDANT_STANDOFF := 1.8
+
+## Their looks, pinned rather than drawn. A shopkeeper who is a different colour every boot
+## is a shopkeeper nobody recognises, and a gate that screenshots the Market wants the same
+## picture twice.
+const VENDOR_LOOK := {"coat": 2, "mane": 5, "eyes": 1, "mane_style": 1}
+const TELLER_LOOK := {"coat": 6, "mane": 0, "eyes": 3, "mane_style": 3}
+
 ## Plot slots the map must carry -- the plan asks for four to six, and the reserved
 ## clearing (PropsScript.PEN_PLOTS_*) is an 18 m square, which fits four 7.8 m pens on a
 ## 9 m grid with room to walk between them. A range rather than an exact number so a later
@@ -366,6 +385,7 @@ const GATE_RAY_REACH := 2.0
 @onready var terrain: StaticBody3D = $Terrain
 @onready var props: Node3D = $Props
 @onready var buildings: Node3D = $Buildings
+@onready var attendants: Node3D = $Attendants
 @onready var spawner: Node3D = $Spawner
 @onready var player: CharacterBody3D = $Player
 @onready var player_spawn: Marker3D = $PlayerSpawn
@@ -744,6 +764,11 @@ func _ready() -> void:
 		if seated_building != null:
 			seat_height = seated_building.seat_ground(Callable(terrain, "height_at"))
 		PropsScript.seat(node, seat_height)
+
+	# THE VENDOR AND THE TELLER, right after the buildings that give them their doors are
+	# seated: _stand_attendants() reads the live building nodes' global_position/depth, so
+	# it has to run after this loop, not before it.
+	_stand_attendants()
 
 	# THE LOADING DOCK STAYS ON THE GROUND. Buildings/Depot/Crate is a Marker3D authored at
 	# local y = 0, which used to put it right at the old thin floor's own height; now that a
@@ -3548,6 +3573,56 @@ func _physics_process(delta: float) -> void:
 		hud.toast("Ranch saved" if ok else "SAVE FAILED. See the log.")
 
 
+# --- the two ponies behind counters --------------------------------------------------
+
+## STAND THE VENDOR AND THE TELLER. Their positions come off the live building nodes rather
+## than being typed as world coordinates, the same rule Strip.mount_marquee() follows: a
+## Building's door is in its local plus Z gable end, so the spot in front of it is its own
+## origin plus half its depth along that axis plus the standoff, whichever way the building
+## has been turned in the scene.
+##
+## THEY ARE UNDER `Attendants`, WHICH IS NEITHER Props NOR Buildings, so neither number the
+## ranch gate prints moves. See _report()'s own attendant checks.
+func _stand_attendants() -> void:
+	if attendants == null:
+		return
+	var registry := PonyRegistryScript.new()
+	registry.load_all(spawner.pony_dir if spawner != null else "res://data/ponies")
+	_stand_one(registry, "Vendor", ^"Buildings/Market", StockPaletteScript.IDS[1],
+		VENDOR_LOOK)
+	_stand_one(registry, "Teller", ^"Buildings/Palace", StockPaletteScript.IDS[2],
+		TELLER_LOOK)
+
+
+func _stand_one(registry: PonyRegistry, who: String, building_path: NodePath,
+		record_id: StringName, look: Dictionary) -> void:
+	var building := get_node_or_null(building_path) as Building
+	if building == null:
+		return
+	var data: PonyData = registry.by_id(record_id)
+	if data == null:
+		return
+	var out_dir: Vector3 = (building.global_transform.basis * Vector3(0.0, 0.0, 1.0))
+	out_dir.y = 0.0
+	if out_dir.length_squared() <= 0.0:
+		return
+	out_dir = out_dir.normalized()
+	var at: Vector3 = building.global_position \
+		+ out_dir * (building.depth * 0.5 + ATTENDANT_STANDOFF)
+	var node: Attendant = AttendantScript.new()
+	node.name = who
+	attendants.add_child(node)
+	node.global_position = Vector3(at.x, terrain.height_at(at.x, at.z), at.z)
+	node.dress(data, look, out_dir)
+	PropsScript.seat(node, terrain.height_at(at.x, at.z))
+
+
+## How many attendants are standing. Printed by the report and asserted there; a public
+## reader so a gate does not have to walk the tree.
+func attendant_count() -> int:
+	return attendants.get_child_count() if attendants != null else 0
+
+
 # --- the gate -----------------------------------------------------------------------
 
 ## The only place `checks` may be written. Guards against the exact bug a reviewer
@@ -3775,6 +3850,33 @@ func _report(pony_count: int, prop_count: int) -> void:
 			.distance_to(PropsScript.PEN_PLOTS_CENTRE) < 0.01)
 	if not pen_intrusions.is_empty():
 		push_error("ranch: pen-plot clearing intruded on by: %s" % ", ".join(pen_intrusions))
+
+	# --- the two ponies behind counters, and the census they must not touch ------------
+	#
+	# THEY ARE NOT PONIES AND THEY ARE NOT PROPS. `ponies=` counts spawner.get_spawned(),
+	# which only ever holds Pony nodes; `props=` is Props.expected_count() plus the
+	# Buildings children. The attendants are under `Attendants`, which is neither, so
+	# neither number moves and this line is their own.
+	var staff: int = attendant_count()
+	_set_check(checks, "the vendor and the teller are both standing", staff == 2)
+	var staff_are_bodies := true
+	var staff_dressed := 0
+	if attendants != null:
+		for child in attendants.get_children():
+			if child is PonyScript:
+				staff_are_bodies = false
+			elif child is AttendantScript and bool(child.call("has_model")):
+				staff_dressed += 1
+	_set_check(checks, "no attendant is a Pony, so the beam has nothing to take and the herd "
+		+ "has nobody extra in it", staff_are_bodies)
+	_set_check(checks, "every attendant is dressed, or the assets are absent",
+		staff_dressed == staff or not ponies_present)
+	var staff_in_herd := false
+	for pony in ponies:
+		if pony.get_parent() == attendants:
+			staff_in_herd = true
+	_set_check(checks, "no attendant is in the spawned herd", not staff_in_herd)
+	print("RANCH attendants=%d dressed=%d" % [staff, staff_dressed])
 
 	# --- plots and pens ------------------------------------------------------------------
 	var slots := _plot_slots()

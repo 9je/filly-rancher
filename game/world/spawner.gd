@@ -624,16 +624,13 @@ func _spawn_stock(marker: ZoneMarker, slot: int, rng: RandomNumberGenerator) -> 
 		_palette = StockPaletteScript.load_stock()
 	var id: StringName = StockPaletteScript.IDS[rng.randi_range(0,
 		StockPaletteScript.IDS.size() - 1)]
-	var triple: Dictionary = _palette.draw_triple(rng)
+	var look: Dictionary = _palette.draw_look(rng)
 	var data: PonyData = _registry_for_stock().by_id(id)
 	if data == null or data.model_path.is_empty() or not ResourceLoader.exists(data.model_path):
 		# The assetless checkout (docs/ci.md section 4). One calm skip, not a push_error per
 		# pony per marker; ranch.gd's report already says assets=absent at the top.
 		return null
-	var pony: CharacterBody3D = _spawn_one(data, marker, slot)
-	if pony != null:
-		pony.set_stock(triple)
-	return pony
+	return _spawn_one(data, marker, slot, look)
 
 
 ## The registry hidden records resolve through. Loaded once and kept, like _entries.
@@ -835,8 +832,10 @@ func _spawnable_entries() -> Array[PonyData]:
 	return _entries
 
 
-## One pony: drawn record, ground-found position, seeded RNG, layered collision.
-func _spawn_one(data: PonyData, marker: ZoneMarker, slot: int) -> CharacterBody3D:
+## One pony: drawn record, ground-found position, seeded RNG, layered collision. `look` is
+## her palette triple plus her base model, or {} for a named pony whose look is her model.
+func _spawn_one(data: PonyData, marker: ZoneMarker, slot: int,
+		look: Dictionary = {}) -> CharacterBody3D:
 	var pony: CharacterBody3D = PonyScene.instantiate()
 	pony.name = "Pony%02d_%s" % [slot, data.id]
 	pony.roam_radius = marker.roam_radius
@@ -865,6 +864,12 @@ func _spawn_one(data: PonyData, marker: ZoneMarker, slot: int) -> CharacterBody3
 	# (pony.gd's setup() doc says so explicitly).
 	pony.position = to_local(_ground_point(marker, slot))
 	add_child(pony)
+	# BEFORE setup(), and that ordering is now load bearing. setup() is what builds the
+	# body, and which base model it builds is a property of her look; set_stock() after the
+	# fact could only re-tint a body that had already been built from the wrong mesh. It is
+	# a no op for a named pony, who passes an empty look.
+	if not look.is_empty():
+		pony.set_stock(look)
 	pony.setup(data)
 	# AFTER setup(), so a listener may read get_data() straight off the signal's argument.
 	pony_spawned.emit(pony)

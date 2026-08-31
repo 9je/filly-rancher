@@ -55,7 +55,9 @@ func dress(data: PonyData, triple: Dictionary, display: String) -> bool:
 		_anim = null
 	if data == null:
 		return false
-	var built: Node3D = PonyVisualsScript.build(data)
+	var built: Node3D = PonyVisualsScript.build(data,
+		StockPaletteScript.mane_style_path(int(triple.get("mane_style", 0))) \
+			if not triple.is_empty() else "")
 	if built == null:
 		return false
 	_model = built

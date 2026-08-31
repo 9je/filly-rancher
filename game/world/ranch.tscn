@@ -173,6 +173,8 @@ modulate = Color(1, 0.94, 0.74, 1)
 shaded = false
 billboard = 0
 
+[node name="Attendants" type="Node3D" parent="."]
+
 [node name="Regions" type="Node3D" parent="."]
 
 [node name="Fence_orchard" type="Node3D" parent="Regions"]

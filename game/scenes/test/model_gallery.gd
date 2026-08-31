@@ -60,11 +60,12 @@ func _build_stock_row() -> void:
     rng.seed = 20260830
     var built := 0
     for i in 8:
-        var body: Node3D = PonyVisualsScript.build(data)
+        var look: Dictionary = palette.draw_look(rng)
+        var body: Node3D = PonyVisualsScript.build(data,
+            StockPaletteScript.mane_style_path(int(look["mane_style"])))
         if body == null:
             continue
-        var triple: Dictionary = palette.draw_triple(rng)
-        StockTintScript.apply(body, palette, triple)
+        StockTintScript.apply(body, palette, look)
         body.position = Vector3(built * 3.0, 0.0, 0.0)
         body.rotate_y(PI)
         add_child(body)
@@ -73,7 +74,7 @@ func _build_stock_row() -> void:
             # add_child(), not before: a node outside the tree has no global transform.
             CutieMarkScript.apply(body, MarkStampsScript.build(
                 MarkStampsScript.Stamp.STAR, Color(0.95, 0.80, 0.25)))
-        print("STOCK ", triple)
+        print("STOCK ", look)
         built += 1
     print("GALLERY_OK count=", built)
     if DisplayServer.get_name() == "headless":

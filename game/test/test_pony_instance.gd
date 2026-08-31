@@ -222,8 +222,16 @@ func test_a_palette_triple_round_trips_through_the_dictionary() -> void:
 	var inst := PonyInstanceScript.create(&"stock_shy")
 	inst.stock = {"coat": 3, "mane": 6, "eyes": 2}
 	var back := PonyInstanceScript.from_dict(inst.to_dict())
-	assert_eq(back.stock, {"coat": 3, "mane": 6, "eyes": 2})
+	assert_eq(back.stock, {"coat": 3, "mane": 6, "eyes": 2, "mane_style": 0},
+		"a stock save with no mane_style key defaults to 0, the shipped base")
 	assert_true(back.is_stock())
+
+
+func test_a_mane_style_round_trips_through_the_dictionary() -> void:
+	var inst := PonyInstanceScript.create(&"stock_shy")
+	inst.stock = {"coat": 3, "mane": 6, "eyes": 2, "mane_style": 2}
+	var back := PonyInstanceScript.from_dict(inst.to_dict())
+	assert_eq(back.stock, {"coat": 3, "mane": 6, "eyes": 2, "mane_style": 2})
 
 
 func test_a_record_written_before_phase_three_loads_as_a_named_pony() -> void:
@@ -242,6 +250,16 @@ func test_a_junk_stock_value_is_dropped_rather_than_stored() -> void:
 func test_stock_indices_are_coerced_to_ints() -> void:
 	# JSON has no integer type: every number comes back off disk as a float.
 	var inst := PonyInstanceScript.from_dict({"data_id": "stock_bold",
-		"stock": {"coat": 2.0, "mane": 4.0, "eyes": 1.0}})
-	assert_eq(inst.stock, {"coat": 2, "mane": 4, "eyes": 1})
+		"stock": {"coat": 2.0, "mane": 4.0, "eyes": 1.0, "mane_style": 3.0}})
+	assert_eq(inst.stock, {"coat": 2, "mane": 4, "eyes": 1, "mane_style": 3})
 	assert_eq(typeof(inst.stock["coat"]), TYPE_INT)
+	assert_eq(typeof(inst.stock["mane_style"]), TYPE_INT)
+
+
+func test_a_missing_mane_style_defaults_to_the_shipped_base() -> void:
+	# A save written before the donor pool existed has coat/mane/eyes but no mane_style key
+	# at all; it must load as index 0, pokeypierce.glb, rather than fail the "ok" check that
+	# only ever looked at the original three keys.
+	var inst := PonyInstanceScript.from_dict({"data_id": "stock_bold",
+		"stock": {"coat": 2, "mane": 4, "eyes": 1}})
+	assert_eq(inst.stock, {"coat": 2, "mane": 4, "eyes": 1, "mane_style": 0})

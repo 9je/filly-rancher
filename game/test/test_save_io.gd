@@ -555,7 +555,8 @@ func test_a_stock_pony_survives_a_whole_save_round_trip() -> void:
 	assert_true(SaveIOScript.save(SLOT, {"ponies": [inst.to_dict()]}))
 	var loaded := SaveIOScript.load(SLOT)
 	var back := PonyInstanceScript.from_dict(loaded["ponies"][0])
-	assert_eq(back.stock, {"coat": 5, "mane": 2, "eyes": 4})
+	assert_eq(back.stock, {"coat": 5, "mane": 2, "eyes": 4, "mane_style": 0},
+		"a stock save with no mane_style key defaults to 0, the shipped base")
 	assert_eq(back.data_id, &"stock_shy")
 	assert_eq(back.home_slot, &"plot_a")
 

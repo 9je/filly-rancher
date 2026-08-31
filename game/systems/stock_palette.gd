@@ -33,6 +33,68 @@ const PLAYER_PATH := "res://data/player_palette.tres"
 ## business touching.
 const IDS: Array[StringName] = [&"stock_shy", &"stock_bold", &"stock_curious"]
 
+## THE CURATED DONOR POOL: the base models a stock pony or the player's own pony may be
+## built from. The owner, 2026-08-31: every pony has the same mane, because all three
+## hidden records and the player point at pokeypierce.glb.
+##
+## SCRIPT CONSTANTS, NOT A .tres FIELD AND NOT MORE HIDDEN RECORDS. This is the one part of
+## the look system that must never be able to name a file that is not there, so it is
+## developer curation rather than tuning data; PlayerLook.mane_style is already an index and
+## an index wants a list beside IDS to index into; and hidden records would multiply by six
+## for nothing while a model list on PonyData would sit uselessly on all 43 named
+## characters who each already have exactly one.
+##
+## INDEX 0 IS pokeypierce.glb AND MUST STAY THERE. Every existing save, every hidden record
+## and PlayerLook's own default is index 0, so moving it would restyle every pony in every
+## file in the game.
+##
+## THEY ARE ALL RIGS SOMEBODY ELSE WEARS, and that is unavoidable: all 43 converted models
+## belong to a named character, pokeypierce.glb included, so there is no spare mesh to
+## promote. What makes one safe to draw at random is that it tints, animates and stands like
+## the base, and game/test/test_mane_pool.gd checks exactly that for every entry. A model
+## that fails is removed here rather than accommodated anywhere else.
+##
+## WHY THIS IS FOUR AND NOT SIX. The task's own first-choice five (lyra, minuette,
+## starlightglimmer, sunsetshimmer, twilight) and two of its four ordered fallbacks (trixie,
+## rarity) all FAILED test_every_model_in_the_pool_takes_the_tint_on_every_surface_the_base_does
+## -- measured, not assumed. StockTint matches material names exactly: lyra, minuette and
+## trixie split the mane into "hairback"/"hairfront" rather than one "hair" surface;
+## starlightglimmer and sunsetshimmer carry it as "Hair"/"Tail", capitalised, which a
+## case-sensitive match never sees; twilight and rarity are a different rig family entirely
+## (Base_Body / Hair_Navy / Base_Iris.R naming), so neither takes the tint on ANY surface at
+## all. That leaves only two working names from the whole fallback list -- vinylscratch and
+## shiningarmor -- one short of the pool's own four-style floor
+## (test_the_pool_has_a_few_styles...). nightlight was added, off the fallback list but
+## verified against the identical four checks, because it is the only other converted model
+## carrying the base's exact body/hair/tail/eyeball_l naming. See task-8-report.md for the
+## full per-model surface dump this is based on.
+const MANE_STYLES: Array[String] = [
+	"res://assets/converted/ponies/pokeypierce.glb",
+	"res://assets/converted/ponies/vinylscratch.glb",
+	"res://assets/converted/ponies/shiningarmor.glb",
+	"res://assets/converted/ponies/nightlight.glb",
+]
+
+## WHAT THE CREATION SCREEN'S ROW CALLS THEM. Numbered rather than described, on purpose:
+## a name like "Braided" that turns out not to match the mesh is worse than no name, and
+## the player is looking at the pony on the turntable while she cycles this row.
+static func mane_style_label(index: int) -> String:
+	return "Style %d of %d" % [posmod(index, maxi(1, MANE_STYLES.size())) + 1,
+		MANE_STYLES.size()]
+
+
+static func mane_style_count() -> int:
+	return MANE_STYLES.size()
+
+
+## Wraps, like every other row here and for the same reason: a hand edited save or an off
+## by one produces the wrong mane rather than an out of range read.
+static func mane_style_path(index: int) -> String:
+	if MANE_STYLES.is_empty():
+		return ""
+	return MANE_STYLES[posmod(index, MANE_STYLES.size())]
+
+
 @export var coats: Array[Color] = []
 @export var manes: Array[Color] = []
 @export var eyes: Array[Color] = []
@@ -125,11 +187,16 @@ static func _at(row: Array[Color], index: int) -> Color:
 	return row[posmod(index, row.size())]
 
 
-## One pony's whole look, drawn off `rng`. Three numbers pulled in a fixed order, so the
-## same seed always produces the same pony and a gate can pin one.
-func draw_triple(rng: RandomNumberGenerator) -> Dictionary:
+## ONE PONY'S WHOLE LOOK, drawn off `rng`. Four numbers pulled in a fixed order, so the same
+## seed always produces the same pony and a gate can pin one.
+##
+## RENAMED FROM draw_triple(), which it outgrew: the look is a colour triple plus a base
+## model now, and a function called "triple" that answers four keys is a function whose name
+## is lying. StockTint reads only the three colour keys and ignores the fourth.
+func draw_look(rng: RandomNumberGenerator) -> Dictionary:
 	return {
 		"coat": rng.randi_range(0, maxi(0, coats.size() - 1)),
 		"mane": rng.randi_range(0, maxi(0, manes.size() - 1)),
 		"eyes": rng.randi_range(0, maxi(0, eyes.size() - 1)),
+		"mane_style": rng.randi_range(0, maxi(0, mane_style_count() - 1)),
 	}

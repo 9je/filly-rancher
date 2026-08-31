@@ -166,3 +166,22 @@ func test_the_ink_names_are_part_of_what_the_screen_draws() -> void:
 		assert_true(drawn.has(CreationScreen.ink_name(index)),
 			"ink '%s' is on a button, so the copy rule applies to it"
 				% CreationScreen.ink_name(index))
+
+
+func test_cycling_the_mane_style_row_walks_the_pool_and_comes_back() -> void:
+	var n: int = StockPaletteScript.mane_style_count()
+	for i in n:
+		assert_eq(_screen.look().mane_style, i)
+		_screen.cycle_mane_style(1)
+	assert_eq(_screen.look().mane_style, 0, "one full lap returns to the base model")
+
+
+func test_cycling_backwards_from_zero_reaches_the_last_style() -> void:
+	_screen.cycle_mane_style(-1)
+	assert_eq(_screen.look().mane_style, StockPaletteScript.mane_style_count() - 1)
+
+
+func test_the_mane_style_survives_confirm() -> void:
+	_screen.cycle_mane_style(2)
+	_screen.confirm()
+	assert_eq(_screen.look().mane_style, 2)

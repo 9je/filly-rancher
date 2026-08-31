@@ -32,24 +32,25 @@ func test_an_empty_row_answers_white_rather_than_erroring() -> void:
 	assert_false(palette.is_valid())
 
 
-func test_draw_triple_is_deterministic_for_a_seed() -> void:
+func test_draw_look_is_deterministic_for_a_seed() -> void:
 	var palette: StockPalette = StockPaletteScript.load_stock()
 	var a := RandomNumberGenerator.new()
 	a.seed = 4242
 	var b := RandomNumberGenerator.new()
 	b.seed = 4242
-	assert_eq(palette.draw_triple(a), palette.draw_triple(b), "same seed, same pony")
+	assert_eq(palette.draw_look(a), palette.draw_look(b), "same seed, same pony")
 
 
-func test_draw_triple_stays_inside_every_row() -> void:
+func test_draw_look_stays_inside_every_row() -> void:
 	var palette: StockPalette = StockPaletteScript.load_stock()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
 	for i in 200:
-		var triple: Dictionary = palette.draw_triple(rng)
-		assert_between(int(triple["coat"]), 0, palette.coats.size() - 1)
-		assert_between(int(triple["mane"]), 0, palette.manes.size() - 1)
-		assert_between(int(triple["eyes"]), 0, palette.eyes.size() - 1)
+		var look: Dictionary = palette.draw_look(rng)
+		assert_between(int(look["coat"]), 0, palette.coats.size() - 1)
+		assert_between(int(look["mane"]), 0, palette.manes.size() - 1)
+		assert_between(int(look["eyes"]), 0, palette.eyes.size() - 1)
+		assert_between(int(look["mane_style"]), 0, StockPaletteScript.mane_style_count() - 1)
 
 
 func test_the_three_stock_ids_are_recognised_and_nobody_else_is() -> void:
