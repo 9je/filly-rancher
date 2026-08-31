@@ -374,6 +374,9 @@ restoring the cache) turns the suite green again.
 | `tools/prove_atomic_save.sh` | Out-of-band proof that an interrupted save cannot destroy the previous one — see below |
 | `game/scripts/prove_atomic_save.gd` | The phases that script drives (seed / SIGKILL mid-write / verify) |
 | `game/scenes/test/collection_test.gd` | The collection gate (see below) |
+| `game/scenes/test/ledger_test.gd` | The ledger gate (see below) |
+| `game/scenes/test/depot_test.gd` | The depot gate (see below) |
+| `game/scenes/test/creation_test.gd` | The creation gate (see below) |
 | `tools/setup_env.sh` | Installs/pins GUT (`GUT_VER`/`GUT_SHA256`, near the SourceIO block) |
 
 ---
@@ -493,8 +496,11 @@ tools/bin/godot --headless --audio-driver Dummy --path game world/ranch.tscn -- 
 
 Phase names are `dawn`, `day`, `dusk`, `night` and weathers are `clear`,
 `rain`, `fog`, `storm`, matched case-insensitively; `--world-time=` takes
-seconds. Expect the same `RANCH_OK ponies=49 props=58 assets=present` as an
-unpinned run, with the `RANCH world` line naming the hour that was pinned.
+seconds. Expect the same `RANCH_OK ponies=49 props=59 assets=present` as an
+unpinned run, with the `RANCH world` line naming the hour that was pinned. Both
+counts moved once more in Phase 3 slice 1: the crowd fills every region with
+stock ponies alongside the named roster, and the Depot is one more prop beside
+the Market and the request board.
 
 **Looking at the sky.** The gate checks numbers; only a person can say whether a
 stormy dusk *looks* like one. `bash tools/sky_sheet.sh` renders the ranch once
@@ -601,6 +607,197 @@ world seed, and nothing it prints is a raw physics quantity that a reordered
 frame could move. Diffing two runs is therefore a real check on the whole
 chain, and worth doing after touching the spawner, the beam or the board.
 
+
+---
+
+## The ledger gate
+
+`scenes/test/ledger_test.tscn` proves what `game/test/test_ledger.gd` cannot
+see: whether `ranch.gd`'s own `advance_world()` reaches
+`Ledger.is_collection_day_due()` once per period rather than once per phase
+change, whether a revoked permit really closes the fence a pony is standing
+behind rather than only a variable, whether a padlocked pen really stops
+paying rather than only reporting that it will.
+
+In one run, on the real ranch: a fresh ledger opening at
+`Ledger.STARTING_BALANCE` with the starting quota; one collection day per
+`WorldState.CYCLE_SECONDS * Ledger.PERIOD_CYCLES` of the clock, its balance
+proven with arithmetic computed *before* the clock moves rather than read off
+a flag afterwards; a collector who calls in the very same breath as the bill
+(a collection day always lands on the DAWN that opens its cycle, so
+`ranch._maybe_serve_collector()` finds the phase already DAWN and the fee
+already due before `advance_world()` even returns, and a second,
+gate-driven `serve_collector()` at that same dawn confirms nobody is served
+twice); three more bad periods climbing the ladder in the order the spec
+names -- a permit revoked with its fence still standing and every pony inside
+it still on her feet, a pen padlocked and still holding her resident while
+making no gems over 120 simulated seconds, a beam recalled and refusing to
+start with the saddlebag still holding what it held; `pay_the_company()` down
+past the ceiling giving all three back in one call; and a save, reset, rebind
+and load bringing the balance, the quota, the tier and the (now empty)
+padlock list back.
+
+It hosts `world/ranch.tscn` exactly the way the market, region, world and
+collection gates do, and for the same reasons.
+
+**It never advances the clock in one big jump.** `WorldState.set_elapsed()`
+only compares the phase and the weather it *lands on* against the ones it
+started from; a jump of exactly `CYCLE_SECONDS * PERIOD_CYCLES` is a whole
+number of cycles, so it always lands back on the same phase (DAWN) it left,
+and whether `_on_world_changed()` fires at all then depends on the weather
+roll alone -- measured, against this project's own fixed default world seed,
+to actually skip a period that way. The gate advances one phase at a time
+instead (`WorldState.PHASE_SECONDS[world.phase()]`, `collection_test.gd`'s own
+unit), which guarantees a real `phase_changed` every step and is besides the
+stronger form of "bills once, not four times a cycle": the loop runs the DAY,
+DUSK and NIGHT phase changes inside a period as well as its one DAWN, and
+`periods_run` must not move on the three that are not it.
+
+**Its pen resident is built with `Pen.add_pony()` directly**, the way
+`game/test/test_pen.gd` builds one, never caught with the beam off the
+roaming herd. What this gate is about is billing, not capture, and the
+roaming-census check below has nothing to explain away if the pen was never
+fed from it in the first place; `scenes/test/depot_test.gd` is where a pony
+is actually caught.
+
+**It opens two permits, the two priciest, and buys the fence check against
+the dearer one.** `ranch._dearest_open_permit()` -- what a `PERMIT_REVOKED`
+rung actually closes -- always picks the costliest OPEN permit, so the fence
+this gate measures has to be the one the ladder really revokes; and two open
+permits push four bad periods' upkeep past `Ledger.CEILING` for real, so the
+pay-down check is a real crossing rather than a lucky one.
+
+Run it with:
+
+```
+tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/ledger_test.tscn
+```
+
+Expect `LEDGER_OK checks=68`; the exit code is the verdict.
+
+---
+
+## The depot gate
+
+`scenes/test/depot_test.tscn` proves what `game/test/test_depot_menu.gd` and
+`game/test/test_pen.gd` cannot see: whether `ranch.gd`'s `deliver_pony()`
+really reaches into the SAME pen the beam just filled, whether the body that
+walks to the crate is the SAME body that was standing in the paddock a moment
+before, whether a delivery that should touch exactly one pony quietly frees a
+second one somewhere else in the world.
+
+In one run, on the real ranch: the Depot standing with its crate marker, and
+its counter refusing to open over the Market the way the Market refuses to
+open over it; a stock pony caught with the real magic beam (the same
+freeze/stand/aim/grab/secure/release sequence `collection_test.gd` uses) and
+moved into a pen through `ranch._move_pony_into_pen()`; the Deliver tab
+listing her, stock first, at `Ledger.DELIVERY_CREDIT_STOCK`; `deliver_pony()`
+answering `{"ok": true, "credit": 300, "named": false}` with the balance down
+by exactly that and neither `GameState` nor any pen able to find her anymore;
+her body still standing the frame after, `is_leaving()`, her distance to the
+crate falling, and her freed within `Pony.LEAVE_SECONDS` with her final
+measured distance inside `Pony.LEAVE_ARRIVAL_RADIUS`; a `WeakRef` held to
+every body in the world proving hers is the only one that went null; a NAMED
+pony (built straight into the pen, the way `ledger_test.gd`'s resident is)
+delivered and marked `Compendium.State.PROCESSED`, her pause menu row reading
+`Delivered :)` while the header still counts her caught; `pay_the_company()`
+moving the balance and debiting the wallet by exactly what was asked, and by
+no more than `payable()` when asked for more; a statement naming the player
+with no dash in it; and the world's population left at the boot count minus
+the one pony this gate actually delivered off the roaming herd, plus whatever
+`spawner.tick_stock()` -- called by the gate itself -- legitimately stood back
+up.
+
+It hosts `world/ranch.tscn` exactly the way the other hosted gates do, and for
+the same reasons.
+
+**A real bug this gate found and `game/world/pen.gd` now fixes: a released
+body used to keep its resident's collision mask.** Every pen resident is
+spawned with `CollisionLayers.PONY_WALKABLE`, which includes the `PEN_GATE`
+bit that stops a pony walking out through the one side of her own fence a
+farmer can pass (that is the whole reason the layer exists). A body handed to
+`Pony.leave_toward()` for the walk to the crate still carried that mask, so a
+delivered pony was trapped at her own gate leaf for the whole of
+`LEAVE_SECONDS` and freed by the timer rather than by arriving -- this gate's
+own first run measured her covering 2.9 m in 45 s before hitting the ceiling.
+`Pen.release_body()` now drops her mask to plain `WALKABLE` (what the player
+already carries) the moment she stops being anyone's resident;
+`game/test/test_pen.gd`'s `test_a_released_body_leaves_the_pen_alive_and_reparented`
+carries the regression.
+
+**Its named delivery never touches the roaming herd**, for
+`ledger_test.gd`'s reason: the population check at the end is a claim about
+the herd `spawner.get_spawned()` walks, and a pony built straight into the pen
+costs that claim nothing to keep clean.
+
+**A frame is let pass before either census is taken.** `queue_free()` only
+queues -- a freed body is still `is_instance_valid()`, and so still counted by
+`Spawner.get_spawned()`, until the engine actually clears it at the end of the
+frame the call was made on. Taking a census before that frame turns counts an
+already-departing body as one thing too many and charges the wrong step for
+a free it did not cause.
+
+Run it with:
+
+```
+tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/depot_test.tscn
+```
+
+Expect `DEPOT_OK checks=50`; the exit code is the verdict.
+
+---
+
+## The creation gate
+
+`scenes/test/creation_test.tscn` proves what
+`game/test/test_creation_screen.gd`, `game/test/test_stock_tint.gd`,
+`game/test/test_mark_paint.gd`, `game/test/test_player_look.gd` and
+`game/test/test_letters.gd` cannot see between them: whether cycling a
+swatch on the SCREEN really lands the same colour `StockPalette` itself
+answers for that index, whether confirming really reaches `GameState.player`
+and the real player model rather than a copy of it, whether the mark that
+comes back off a save is the same bytes rather than merely the same size.
+
+In one run, on the real ranch: the creation screen opened by the gate itself
+(a headless run never opens it on its own -- `ranch._maybe_open_creation()` is
+gated on `_interactive`) directly on `GameState.player`, with the turntable
+holding a model; each of the three swatch rows cycled all the way round and
+back, with the model's `body`, `hair` and `tail` and `eyeball_l` overrides
+compared against `StockTint.override_of()` and `StockPalette.load_player()`'s
+own answer at every step; a mark drawn with a stamp and two strokes on
+`creation_screen.canvas()`, confirmed onto `GameState.player`, with the two
+`CutieMark` decals on the player's own body sitting on opposite sides of her
+barrel in the model's own local space; a save, `GameState.reset()` and a load
+bringing the name, the three indices and the mark back pixel identical
+(`MarkPaint.equal()`); every `Letters` template rendered at
+`PlayerLook.MAX_NAME_LENGTH` characters with no line over `Letters.LINE_WIDTH`
+and no dash in any of them; and a hand written version 4 save on disk loading
+in this build with the name Twilight, the shipped look, a blank mark and a
+ledger at `Ledger.STARTING_BALANCE`.
+
+It hosts `world/ranch.tscn` exactly the way the other hosted gates do, and for
+the same reasons.
+
+**It never wires `CreationScreen.confirmed` to `ranch._on_creation_confirmed()`.**
+That handler is only ever connected for an interactive session, and it does
+two things a gate must never do: it saves to the player's own slot
+(`ranch.save_game()`, the default slot) and it shows a toast. This gate reaches
+`GameState.player` and the real player model the same two lines that handler
+would, minus the save and the toast, and does its own explicit save/load
+round trip afterward against a scratch slot.
+
+**Its own slots (8 for the round trip, 10 for the version 4 file) are distinct
+from every other hosted gate's** (`collection_test.gd`'s 5, `ledger_test.gd`'s
+6, `depot_test.gd`'s 7) **and from `ranch.gd`'s own boot-time save probe**
+(`Ranch.GATE_SAVE_SLOT`, 9), so none of them can ever race this one.
+
+Run it with:
+
+```
+tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/creation_test.tscn
+```
+
+Expect `CREATION_OK checks=84`; the exit code is the verdict.
 
 ---
 

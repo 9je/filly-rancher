@@ -821,6 +821,14 @@ func test_a_released_body_leaves_the_pen_alive_and_reparented() -> void:
 	assert_almost_eq(released.global_position, where, Vector3(0.01, 0.01, 0.01),
 		"she is standing where she was standing")
 	assert_null(pen.find_pony(inst.uid), "and the pen no longer has a record of her")
+	# SHE MUST BE ABLE TO WALK BACK OUT THROUGH HER OWN GATE. A resident's collision_mask
+	# carries PEN_GATE (Pen._spawn_body(), CollisionLayers.PONY_WALKABLE) so a resident
+	# cannot leave on her own; a body handed to the Depot's crate walk that still carried
+	# that mask would be trapped at her own gate leaf for the whole of Pony.LEAVE_SECONDS
+	# and never actually reach the crate. Found by scenes/test/depot_test.gd, which is the
+	# first place in the suite that runs a released body through real physics frames.
+	assert_eq((released as CollisionObject3D).collision_mask, LayersScript.WALKABLE,
+		"released, she carries a walking character's mask, not a resident's")
 	assert_eq(pen.count(), 0)
 	assert_eq(inst.home_slot, &"", "her address is cleared by the pen, as always")
 

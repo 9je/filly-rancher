@@ -1414,6 +1414,9 @@ func _bind_pause_menu() -> void:
 		pause_menu.set("regions", _regions_registry())
 		pause_menu.set("board", get_request_board())
 		pause_menu.set("world_state", get_world_state())
+		pause_menu.set("ledger", _game_state.ledger if _game_state != null else null)
+		pause_menu.set("player_look", _game_state.player if _game_state != null else null)
+		pause_menu.set("statement_provider", func() -> Array[String]: return _statement())
 	inject_pages.call()
 	if _game_state != null and not _game_state.state_loaded.is_connected(inject_pages):
 		_game_state.state_loaded.connect(inject_pages)

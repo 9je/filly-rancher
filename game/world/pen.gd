@@ -366,6 +366,17 @@ func remove_pony(uid: StringName) -> PonyInstance:
 ## HER ADDRESS IS CLEARED HERE, as it is by remove_pony(), because this pen is no longer
 ## where she lives and a record filed in a pen that has no record of her is the two homes
 ## bug PonyInstance.home_slot's comment describes.
+##
+## HER COLLISION MASK DROPS PEN_GATE. Every resident is spawned on PONY_WALKABLE
+## (_spawn_body() above), which is what stops her walking out through the one side of her
+## own fence a farmer can pass -- game/world/collision_layers.gd's whole reason for that
+## layer existing. A body handed to a walk (Pony.leave_toward(), the Depot crate) still
+## carries that mask unless something changes it, and PEN_GATE bodies never move for a
+## pony's own sake, so she is trapped at her own gate leaf for the whole of LEAVE_SECONDS
+## and delivered only when the timer, not the walk, ends her departure. She is no longer
+## anybody's resident the moment this function has run, so plain WALKABLE (what the player
+## and every prop-only obstacle already use) is what she is actually meant to carry from
+## here on.
 func release_body(uid: StringName, new_parent: Node3D) -> Node3D:
 	var body: Node3D = _bodies.get(uid, null)
 	var inst: PonyInstance = find_pony(uid)
@@ -377,6 +388,8 @@ func release_body(uid: StringName, new_parent: Node3D) -> Node3D:
 			_residents.remove_at(i)
 			break
 	_bodies.erase(uid)
+	if body is CollisionObject3D:
+		(body as CollisionObject3D).collision_mask = LayersScript.WALKABLE
 	_held_bodies.erase(uid)
 	inst.home_slot = &""
 	ProductionScript.forget(uid)
