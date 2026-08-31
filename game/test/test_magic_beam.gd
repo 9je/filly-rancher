@@ -804,6 +804,37 @@ func test_catching_a_named_pony_leaves_her_stock_empty() -> void:
 	assert_eq(beam.get_storage().contents()[0].stock, {})
 
 
+# --- the collector's recall (game/systems/ledger.gd's ladder) --------------------------
+
+func test_a_recalled_beam_refuses_to_start() -> void:
+	var beam: MagicBeam = _beam()
+	assert_false(beam.is_recalled())
+	beam.set_recalled(true)
+	assert_true(beam.is_recalled())
+	beam._start_beam()
+	assert_false(beam.is_active(), "the horn is recalled; nothing comes out of it")
+
+
+func test_the_beam_comes_back_and_works() -> void:
+	var beam: MagicBeam = _beam()
+	beam.set_recalled(true)
+	beam.set_recalled(false)
+	beam._start_beam()
+	assert_true(beam.is_active())
+
+
+func test_recalling_a_beam_that_is_holding_a_pony_releases_her_rather_than_losing_her() -> void:
+	var beam: MagicBeam = _beam()
+	var pony: Pony = PonyScene.instantiate()
+	add_child_autofree(pony)
+	pony.setup(_named_data())
+	var ghost: WeakRef = weakref(pony)
+	beam._begin_hold(pony)  # the file's existing helper for putting a pony in the beam
+	beam.set_recalled(true)
+	assert_false(beam.is_holding(), "she is put down, not vanished")
+	assert_not_null(ghost.get_ref(), "NO PONY EVER DIES; a recall is not a way to remove one")
+
+
 ## A hidden stock base record, resolved the same way every real caught stock pony's
 ## PonyInstance.data_id is: through the registry, not a direct path to game/data/hidden/.
 func _stock_data() -> PonyData:

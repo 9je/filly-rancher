@@ -65,6 +65,9 @@ mouse_filter = 2
 [node name="Bits" type="Label" parent="Bag"]
 layout_mode = 2
 
+[node name="Balance" type="Label" parent="Bag"]
+layout_mode = 2
+
 [node name="World" type="Label" parent="Bag"]
 layout_mode = 2
 

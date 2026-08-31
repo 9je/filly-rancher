@@ -616,6 +616,13 @@ var _aim_direction := Vector3.FORWARD
 ## is exactly the state you sweep across a field in.)
 var _beaming := false
 
+## Whether the Company has "recalled" the horn (game/systems/ledger.gd's collector ladder).
+## A recalled beam will not start, and a recall while she is holding somebody puts that pony
+## DOWN through the ordinary release path. It is a punishment, and every punishment in this
+## game is reversible and takes nothing away: the pony is still there, the bag is still
+## full, and paying the balance down hands the horn straight back.
+var _recalled := false
+
 var _held: Node3D
 var _hold_seconds := 0.0
 ## The two clocks THIS hold is running on, rolled once at _begin_hold() -- not the nominal
@@ -731,6 +738,16 @@ func set_capture_rng(rng: RandomNumberGenerator) -> void:
 ## query has to run inside the physics step), so is_holding() is still false immediately
 ## after this returns -- wait a frame.
 func grab() -> void:
+	_start_beam()
+
+
+## The guts of grab(), factored out so the recall guard has one place to live. Private:
+## grab() is the interface other tasks depend on (see the class comment), so nothing
+## outside this file should call this directly except a test that wants to check the
+## guard without going through Input.
+func _start_beam() -> void:
+	if _recalled:
+		return
 	_beaming = true
 
 
@@ -768,6 +785,25 @@ func is_holding() -> bool:
 ## Whether the beam is switched on at all (holding or sweeping for something to hold).
 func is_active() -> bool:
 	return _beaming
+
+
+## THE COLLECTOR'S RECALL (game/systems/ledger.gd). Called by game/world/ranch.gd's
+## _apply_beam_recall(), never by the beam itself. Idempotent: setting the same value
+## twice is a no-op, so a phase change that fires twice in one frame cannot double-release
+## whatever she happens to be holding.
+func set_recalled(value: bool) -> void:
+	if _recalled == value:
+		return
+	_recalled = value
+	if not _recalled:
+		return
+	if is_holding():
+		release()
+	_beaming = false
+
+
+func is_recalled() -> bool:
+	return _recalled
 
 
 ## What is currently in the beam, or null.

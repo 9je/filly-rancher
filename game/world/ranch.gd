@@ -424,6 +424,13 @@ var _region_fence_cache: Array[RegionFence] = []
 ## same object that will enforce it later rather than by an int compared in the UI.
 var _economy: Economy = null
 
+## The last cycle index a collection day was run for, so a phase change that fires twice,
+## a mid session load, or a pinned clock cannot bill the player twice for one period.
+var _last_collection_cycle := -1
+
+## True while a collector is owed a visit at the next dawn.
+var _collector_due := false
+
 ## The plot slot the player is standing in right now, or null. Tracked so the build prompt
 ## fires once on entry rather than every physics frame.
 var _prompt_slot: PlotSlot = null
@@ -1015,6 +1022,16 @@ func rebind_economy() -> void:
 	if hud != null and hud.has_method("set_bits"):
 		hud.set_bits(_economy.bits)
 
+	if _game_state != null and not _game_state.ledger.changed.is_connected(_on_balance_changed):
+		_game_state.ledger.changed.connect(_on_balance_changed)
+	_apply_padlocks()
+	_apply_beam_recall()
+	_push_balance()
+
+
+func _on_balance_changed(_balance: int) -> void:
+	_push_balance()
+
 
 # --- the clock and the sky --------------------------------------------------------------
 
@@ -1131,6 +1148,8 @@ func _on_world_changed() -> void:
 	# connection each (a second clock driving one sky is the bug that check exists for), so
 	# "the herd changes with the hour" has to ride the connection that is already there.
 	_refresh_herd()
+	_maybe_run_collection_day()
+	_maybe_serve_collector()
 
 
 ## THE SKY TURNED OVER, SO THE HERD DOES TOO. Everybody whose hours have ended walks off,
@@ -1500,6 +1519,169 @@ func _apply_settings() -> void:
 		_settings.apply_audio()
 
 
+## COLLECTION DAY, ONCE PER PERIOD. Every third cycle, on the first phase change inside it,
+## the upkeep and the service charge land on the balance and the period's quota is judged.
+## The collector the judgement arms does NOT call now; he calls at the next dawn, which is
+## what makes the letter arrive before the knock.
+func _maybe_run_collection_day() -> void:
+	if _game_state == null or _world == null:
+		return
+	var cycle: int = _world.cycle_index()
+	if not LedgerScript.is_collection_cycle(cycle) or cycle == _last_collection_cycle:
+		return
+	_last_collection_cycle = cycle
+	var summary: Dictionary = run_collection_day()
+	if int(summary["punishment"]) != LedgerScript.Punishment.NONE:
+		_collector_due = true
+
+
+func run_collection_day() -> Dictionary:
+	var ledger: Ledger = _game_state.ledger
+	var cycle: int = _world.cycle_index() if _world != null else 0
+	var summary: Dictionary = ledger.run_collection_day(cycle, _built_plot_count(),
+		_open_permit_count())
+	var letter: Dictionary = LettersScript.render(LettersScript.Id.COLLECTION_NOTICE, {
+		"name": _player_name(), "balance": int(summary["balance"]),
+		"upkeep": int(summary["upkeep"])})
+	_toast("%s. Balance: %d bits." % [letter["title"], int(summary["balance"])])
+	if not bool(summary["quota_met"]):
+		_toast("Quota: %d of %d delivered. An associate will call at dawn."
+			% [int(summary["delivered"]), int(summary["quota"])])
+	_push_balance()
+	return summary
+
+
+## THE COLLECTOR CALLS. One rung of the ladder, served once, at the next dawn after a
+## period that fell short. Every rung is reversible and none of them takes a pony:
+## a fee is bits, a revoked permit is a fence that closes over ponies who stay exactly where
+## they are, a padlock is a pen that makes no gems, and a recall is a horn she gets back
+## next cycle. Returns which rung was served, for the gates.
+func serve_collector() -> int:
+	if _game_state == null:
+		return LedgerScript.Punishment.NONE
+	var ledger: Ledger = _game_state.ledger
+	var punishment: int = ledger.take_pending_punishment()
+	match punishment:
+		LedgerScript.Punishment.FEE:
+			var fee: int = LedgerScript.COLLECTOR_FEE
+			if _economy != null and _economy.can_afford(fee):
+				_economy.spend(fee)
+				_toast("An associate called: a service fee of %d bits. Have a lovely day!"
+					% fee)
+			else:
+				# She cannot pay it, so it goes on the account. Nothing is confiscated.
+				ledger.balance += fee
+				_toast("An associate called: %d bits added to your balance. No trouble at all!"
+					% fee)
+		LedgerScript.Punishment.PERMIT_REVOKED:
+			var permit: StringName = _dearest_open_permit()
+			if permit != &"":
+				ledger.revoked_permits.append(String(permit))
+				_game_state.unlocks.erase(String(permit))
+				_apply_permits()
+				_toast("An associate called: one permit is under review. Pay to resume access.")
+		LedgerScript.Punishment.PEN_PADLOCKED:
+			var slot_id: StringName = _fullest_pen_slot()
+			if slot_id != &"":
+				ledger.padlocked_slots.append(String(slot_id))
+				_apply_padlocks()
+				_toast("An associate called: one pen is sealed pending payment. Everyone inside is fine!")
+		LedgerScript.Punishment.BEAM_RECALLED:
+			var cycle: int = _world.cycle_index() if _world != null else 0
+			ledger.beam_recalled_until = cycle + LedgerScript.BEAM_RECALL_CYCLES
+			_apply_beam_recall()
+			_toast("An associate called: your horn licence is suspended for one cycle.")
+	if punishment != LedgerScript.Punishment.NONE:
+		var letter: Dictionary = LettersScript.render(LettersScript.Id.COLLECTOR_VISIT, {
+			"name": _player_name(), "punishment": _punishment_phrase(punishment)})
+		_toast(String(letter["title"]))
+	_push_balance()
+	return punishment
+
+
+func _maybe_serve_collector() -> void:
+	if _world == null:
+		return
+	# The beam's recall expires on its own clock, so this is asked at every phase change and
+	# not only at dawn.
+	_apply_beam_recall()
+	if not _collector_due or _world.phase() != WorldStateScript.Phase.DAWN:
+		return
+	_collector_due = false
+	serve_collector()
+
+
+static func _punishment_phrase(punishment: int) -> String:
+	match punishment:
+		LedgerScript.Punishment.FEE:
+			return "a service fee"
+		LedgerScript.Punishment.PERMIT_REVOKED:
+			return "a permit under review"
+		LedgerScript.Punishment.PEN_PADLOCKED:
+			return "a sealed pen"
+		LedgerScript.Punishment.BEAM_RECALLED:
+			return "a suspended horn licence"
+	return "a courtesy visit"
+
+
+## The most expensive permit she currently holds. The dearest one, so the punishment is felt
+## rather than shrugged off, and so it is obvious which fence closed.
+func _dearest_open_permit() -> StringName:
+	var best: StringName = &""
+	var best_cost := -1
+	for region: RegionData in _regions_registry().all():
+		if not is_region_open(region.id):
+			continue
+		if region.permit_cost > best_cost:
+			best_cost = region.permit_cost
+			best = ShopScript.permit_id_for(region.id)
+	return best
+
+
+## The slot id of the pen with the most ponies in it that is not already padlocked.
+func _fullest_pen_slot() -> StringName:
+	var best: StringName = &""
+	var most := -1
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen == null or pen.is_padlocked():
+			continue
+		if pen.count() > most:
+			most = pen.count()
+			best = slot.slot_id
+	return best
+
+
+## Push the ledger's padlock list onto the pens. Absolute rather than incremental, the way
+## _apply_permits() and _apply_unlocks() are: a pen not on the list is not padlocked, so a
+## load, a relief and a collector all reach the same state from the same one function.
+func _apply_padlocks() -> void:
+	if _game_state == null:
+		return
+	var locked: Array = _game_state.ledger.padlocked_slots
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen != null:
+			pen.set_padlocked(String(slot.slot_id) in locked)
+
+
+## Same shape for the horn.
+func _apply_beam_recall() -> void:
+	if _game_state == null:
+		return
+	var beam: Node3D = player.get_magic_beam()
+	if beam == null or not beam.has_method("set_recalled"):
+		return
+	var cycle: int = _world.cycle_index() if _world != null else 0
+	beam.call("set_recalled", _game_state.ledger.beam_is_recalled(cycle))
+
+
+func _push_balance() -> void:
+	var hud := get_node_or_null(^"HUD")
+	if hud != null and hud.has_method("set_balance") and _game_state != null:
+		hud.call("set_balance", _game_state.ledger.balance)
+
+
 ## Read GameState.unlocks into the things that honour them. On boot and after every
 ## purchase. MagicBeam.apply_unlocks() is absolute rather than incremental, so calling this
 ## twice cannot stack a bonus.
@@ -1652,6 +1834,7 @@ func deliver_pony(uid: StringName) -> Dictionary:
 	body.leave_toward(crate_position())
 	if depot_menu != null and depot_menu.has_method("refresh"):
 		depot_menu.refresh()
+	_relieve_if_paid_down()
 	return {"ok": true, "credit": credit, "named": named, "name": inst.display_name()}
 
 
@@ -1687,15 +1870,20 @@ func _on_deliver_requested(uid: StringName) -> void:
 	deliver_pony(uid)
 
 
-## Give back whatever the balance being under the ceiling entitles her to. Task 6 adds the
-## permits, the padlocks and the beam; today the ledger's own bookkeeping is all there is,
-## and calling it here is what makes those arrive with no edit at this call site.
+## GIVE EVERYTHING BACK once the balance is under the ceiling. Called after every payment
+## and after every delivery, because either can be what brings her back into good standing.
 func _relieve_if_paid_down() -> void:
 	if _game_state == null:
 		return
 	var given: Dictionary = _game_state.ledger.relieve()
 	if given.is_empty():
 		return
+	for permit in given.get("permits", []):
+		if not String(permit) in _game_state.unlocks:
+			_game_state.unlocks.append(String(permit))
+	_apply_permits()
+	_apply_padlocks()
+	_apply_beam_recall()
 	_toast("Your account is in good standing again. Cloudsdale thanks you!")
 
 
