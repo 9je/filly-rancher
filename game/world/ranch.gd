@@ -219,10 +219,11 @@ const SEATING_TOLERANCE := 0.02
 ## at 0.35 m or under: a Nelder-Mead search of height_at() over the whole region (and a grid
 ## sweep of the original box this constant's comment used to name, x in [-10, 10], z in
 ## [58, 70]) bottoms out at 0.633 m, at the box's own x = -10 edge. Buildings/Palace sits at
-## exactly that spot (world (-10, 0, 61.6); see strip.gd's MARQUEE_AT, which was moved to
-## match). Nowhere closer to the strip's own centre does better than about 0.95 m, which is
-## what the original (0, 66) placement measured. Shrinking the building instead would fix
-## it (relief scales with footprint size), but a Palace narrow enough to clear 0.35 m
+## exactly that spot (world (-10, 0, 61.6); see strip.gd's mount_marquee(), whose board is
+## read off this same building rather than typed to match it separately). Nowhere closer to
+## the strip's own centre does better than about 0.95 m, which is what the original (0, 66)
+## placement measured. Shrinking the building instead would fix it (relief scales with
+## footprint size), but a Palace narrow enough to clear 0.35 m
 ## stops reading as the map's biggest building, which is the one thing ranch.tscn's comment
 ## on ridge_height says this building is for. 0.65 leaves a hair of margin over the measured
 ## 0.633 rather than trimming it to the metre.
@@ -643,6 +644,17 @@ func _ready() -> void:
 			strip.avoid_footprint(
 				Vector2(palace_building.global_position.x, palace_building.global_position.z),
 				Vector2(palace_building.width * 0.5, palace_building.depth * 0.5))
+			# THE SIGN IS SIZED AND PLACED FROM THE BUILDING, off the live node, for the
+			# reason avoid_footprint() is: a hand typed world position for the marquee is
+			# what put a 66 character line at y = 5.4 on a building whose ridge is at 4.6.
+			# The Palace is turned a half turn in ranch.tscn, so its door and its front face
+			# are on the LOW Z side; the front centre is therefore its origin minus half its
+			# depth along Z.
+			strip.mount_marquee(
+				palace_building.global_position
+					- Vector3(0.0, 0.0, palace_building.depth * 0.5),
+				Vector2(palace_building.width * 0.5, palace_building.depth * 0.5),
+				palace_building.global_position.y + palace_building.ridge_height)
 		strip.build()
 
 	if race_track != null and race_track.has_method("configure"):
@@ -729,10 +741,31 @@ func _ready() -> void:
 
 	# The hand-built barn and farmhouse first: they are the map's only real buildings
 	# (game/world/building.gd says why), they exist on every checkout including CI,
-	# and they are seated by exactly the rule props.gd seats the Kenney props with.
+	# and they are seated by exactly the rule props.gd seats the Kenney props with -- except
+	# for WHICH ground height that rule is handed. A Building is 14 by 9 m, not a point, and
+	# Building.seat_ground() reads the LOWEST corner of its own footprint rather than the
+	# single sample under its origin, which is what building.gd's SEAT_CLEARANCE exists for
+	# (see its own comment): a plinth deep enough to clear a dipping corner does nothing if
+	# it is still seated against the middle of the footprint instead.
 	for node: Node3D in buildings.get_children():
 		node.build()
-		PropsScript.seat(node, terrain.height_at(node.global_position.x, node.global_position.z))
+		var seat_height: float = terrain.height_at(node.global_position.x, node.global_position.z)
+		var seated_building: Building = node as BuildingScript
+		if seated_building != null:
+			seat_height = seated_building.seat_ground(Callable(terrain, "height_at"))
+		PropsScript.seat(node, seat_height)
+
+	# THE LOADING DOCK STAYS ON THE GROUND. Buildings/Depot/Crate is a Marker3D authored at
+	# local y = 0, which used to put it right at the old thin floor's own height; now that a
+	# Building's local y = 0 is buried SKIRT_DEPTH inside a plinth deep enough to clear the
+	# map's worst relief, a child left at that reference rides up with the whole building
+	# instead of staying where a pony delivering a crate can actually walk up to it. She
+	# arrives on the ground, not on the Depot's own doorstep, so the mark she is walking
+	# toward has to stay down there with her rather than floating at plinth height.
+	var crate_marker := get_node_or_null(^"Buildings/Depot/Crate") as Node3D
+	if crate_marker != null:
+		crate_marker.global_position.y = terrain.height_at(
+			crate_marker.global_position.x, crate_marker.global_position.z)
 
 	# THE SIGN READS ITSELF OUT OF THE GAMES. Written here rather than authored into
 	# ranch.tscn so that the lobby cannot advertise a house edge the tables are not actually
@@ -3569,9 +3602,16 @@ func _report(pony_count: int, prop_count: int) -> void:
 			pen_intrusions.append(prop.name)
 		# How far the bottom of the visible model sits from where props.gd seated it.
 		# Zero means the prop is standing ON the ground, not floating over it and not
-		# buried in it -- the assertion the eye would otherwise have to make.
-		var sunk: float = box.position.y - (terrain.height_at(
-			prop.global_position.x, prop.global_position.z) - PropsScript.SINK_BIAS)
+		# buried in it -- the assertion the eye would otherwise have to make. A Building
+		# was not seated against the single point under its own origin (see the seating
+		# loop above and Building.SEAT_CLEARANCE's comment); its expected ground is the
+		# same seat_ground() reading ranch.gd actually handed Props.seat() for it.
+		var expected_ground: float = terrain.height_at(
+			prop.global_position.x, prop.global_position.z)
+		var checked_building: Building = prop as BuildingScript
+		if checked_building != null:
+			expected_ground = checked_building.seat_ground(Callable(terrain, "height_at"))
+		var sunk: float = box.position.y - (expected_ground - PropsScript.SINK_BIAS)
 		if absf(sunk) > SEATING_TOLERANCE:
 			props_seated = false
 		print("RANCH prop %-34s pos=(%6.1f, %5.2f, %6.1f) height=%.2f seat_error=%+.3f"

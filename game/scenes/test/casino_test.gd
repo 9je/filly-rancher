@@ -249,8 +249,8 @@ func _drive_the_palace() -> void:
 		strip_node != null
 		and int(strip_node.call("light_count")) == StripScript.LIGHT_COUNT - 1)
 	_set_check("the marquee names the Palace and its sponsor",
-		strip_node != null and String(strip_node.call("marquee_text")).contains(
-			"Cloudsdale Weather Corporation"))
+		strip_node != null and ", ".join(strip_node.call("marquee_lines") as Array[String])
+			.contains("Cloudsdale Weather Corporation"))
 
 	# --- the Palace and its sign -----------------------------------------------------------
 	var palace := ranch.get_node_or_null(^"Buildings/Palace") as Node3D

@@ -45,6 +45,50 @@ const LayersScript := preload("res://world/collision_layers.gd")
 ## the withers one.
 const MIN_DOOR_CLEARANCE := 2.25
 
+## HOW FAR THE FLOOR SLAB REACHES ABOVE AND BELOW THE BUILDING'S OWN ORIGIN.
+##
+## THE BUG THESE CLOSE. The slab used to be 0.14 m thick with its bottom face at exactly
+## local y = 0, and Props.seat() drops a building until the bottom of its world AABB is
+## SINK_BIAS (0.05 m) under the ground height at ONE point. The ground under
+## Buildings/Palace has 0.633 m of relief across its 14 by 9 m footprint, measured, and
+## that is the FLATTEST such rectangle anywhere on the Strip (see ranch.gd's
+## PALACE_MAX_RELIEF). Ground that tall crossing a floor that thin is two nearly coplanar
+## surfaces fighting for the same pixels: the owner's "z fighting at the palace base, a
+## flickering skirt where the building meets terrain", 2026-08-31.
+##
+## SO THE FLOOR BECOMES A PLINTH. FLOOR_TOP clears the worst relief measured anywhere on
+## the map (0.633 m under the Palace) with a real margin over that, so no corner of terrain
+## ever pokes through the boards; SKIRT_DEPTH is below it, so the plinth's bottom face has
+## somewhere to be once ranch.gd seats it against the LOWEST corner of the footprint
+## instead of one point under the middle (see SEAT_CLEARANCE and Building.footprint_relief()
+## below -- the ground therefore always passes through the SIDE of a solid box, never a
+## horizontal face, no matter how the terrain tips under the four corners).
+##
+## THE STEP UP IS INTENTIONAL AND READS AS ONE. The better part of a metre is a stride, not
+## a wall, and a building that sits on a plinth reads as built rather than as dropped on
+## the grass.
+const FLOOR_TOP := 0.85
+const SKIRT_DEPTH := 1.20
+
+## HOW FAR PAST THE WORST CORNER ranch.gd SEATS A BUILDING, on top of Props.SINK_BIAS.
+##
+## THE REASON THIS EXISTS. Props.seat() only ever sees one ground height and shifts the
+## whole node so the bottom of its own visible AABB sits SINK_BIAS below THAT height --
+## it has no idea a building's footprint is 14 by 9 m rather than a point. Handing it the
+## height under the building's own origin (what ranch.gd did before this file existed) put
+## the plinth's bottom SINK_BIAS below the CENTRE of the footprint, which is no help at all
+## against a corner that dips lower than the centre does -- and a plinth deep enough to
+## clear that corner does not change where seat() puts the bottom face by one millimetre,
+## because seat() re-anchors to whatever the deepest point of the mesh is, whatever depth
+## that mesh happens to be built to. The only way to actually clear every corner is to seat
+## the building against the LOWEST one, which is what footprint_relief() below measures and
+## what ranch.gd's seating loop now hands to Props.seat() for every Building.
+##
+## SINK_BIAS alone (0.05 m) is not enough of a margin to call a passing check a real gap
+## rather than a rounding accident (see test_building_base.gd's own MARGIN, 0.15 m, which
+## SINK_BIAS on its own cannot clear); SEAT_CLEARANCE is the rest of it.
+const SEAT_CLEARANCE := 0.20
+
 @export_group("Shell")
 ## Footprint along X, in metres.
 @export var width := 9.0
@@ -102,10 +146,13 @@ func build() -> void:
 	var half_d := depth * 0.5
 	var t := wall_thickness
 
-	# --- floor -------------------------------------------------------------------
-	# A boarded floor rather than grass showing through the doorway: without it the
-	# opening reads as a hole punched in the wall instead of as a way in.
-	_slab("Floor", Vector3(width, 0.14, depth), Vector3(0.0, 0.07, 0.0), trim_mat)
+	# --- plinth ------------------------------------------------------------------
+	# A boarded floor on a deep skirt rather than grass showing through the doorway,
+	# and deep enough that the terrain crosses its SIDE rather than its faces. See
+	# FLOOR_TOP and SKIRT_DEPTH for the measurement this is sized from.
+	var plinth: float = FLOOR_TOP + SKIRT_DEPTH
+	_slab("Floor", Vector3(width, plinth, depth),
+		Vector3(0.0, FLOOR_TOP - plinth * 0.5, 0.0), trim_mat)
 
 	# --- walls -------------------------------------------------------------------
 	_slab("WallBack", Vector3(width, wall_height, t),
@@ -169,6 +216,44 @@ func build() -> void:
 	add_child(gable_node)
 
 	_add_interior_light()
+
+
+## The top of the plinth and the bottom of the skirt, in this building's own parent space.
+## For the test that walks every building on the map and asks whether the ground under its
+## own footprint can reach either one.
+func floor_top_y() -> float:
+	return position.y + FLOOR_TOP
+
+
+func skirt_bottom_y() -> float:
+	return position.y - SKIRT_DEPTH
+
+
+## Terrain height at this footprint's four corners, its four edge midpoints and its centre
+## -- nine points across the building's own turned basis, matching how
+## test_building_base.gd's per-building invariant walks it -- sampled through
+## `ground_sampler` (Terrain.height_at, handed over the same way Strip.configure() and
+## RegionFence.configure() already take one). Returns (lowest, highest); called before
+## seating (see seat_ground()) and again by ranch.gd's own gate so the number a building was
+## actually seated by and the number the gate checks it against can never drift apart.
+func footprint_relief(ground_sampler: Callable) -> Vector2:
+	var half := Vector2(width * 0.5, depth * 0.5)
+	var lowest := INF
+	var highest := -INF
+	for dx: float in [-half.x, 0.0, half.x]:
+		for dz: float in [-half.y, 0.0, half.y]:
+			var corner: Vector3 = global_position + global_transform.basis * Vector3(dx, 0.0, dz)
+			var h: float = float(ground_sampler.call(corner.x, corner.z))
+			lowest = minf(lowest, h)
+			highest = maxf(highest, h)
+	return Vector2(lowest, highest)
+
+
+## The ground height ranch.gd hands Props.seat() for this building, rather than the height
+## under its own origin: SEAT_CLEARANCE below the LOWEST point footprint_relief() finds.
+## See SEAT_CLEARANCE for why a single centre sample cannot do this job.
+func seat_ground(ground_sampler: Callable) -> float:
+	return footprint_relief(ground_sampler).x - SEAT_CLEARANCE
 
 
 ## A warm fill light inside the shell.

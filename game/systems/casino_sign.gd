@@ -29,6 +29,18 @@ const SPONSOR := "proudly sponsored by Cloudsdale Weather Corporation"
 const MARQUEE := "Spectra Palace, proudly sponsored by Cloudsdale Weather Corporation"
 
 
+## THE MARQUEE, AS TWO LINES RATHER THAN ONE. MARQUEE above is the whole sentence, and it
+## is still what the lobby sign and the toast say; the board outside is a headline with the
+## sponsor under it in smaller letters, because 66 characters on one line across a 14 metre
+## building is exactly the sign the owner could not read (2026-08-31).
+static func marquee_headline() -> String:
+	return HEADLINE
+
+
+static func marquee_sponsor() -> String:
+	return SPONSOR
+
+
 ## One published edge, as a line a person can check with a pencil. Bits in a hundred rather
 ## than a percentage sign, because "the house keeps 7 of every 100" is a sentence and "7%"
 ## is a number you can nod at without reading.
