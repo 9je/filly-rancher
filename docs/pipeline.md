@@ -978,6 +978,13 @@ second base model: `body`, `hair`, `tail`, `eyeball_l`, `eyeball_r` (and `wings`
 model has any), named exactly that in the exported glTF, or the tint and the mark both
 silently touch nothing.
 
+**`StockPalette.MANE_STYLES` (Phase 3 slice 2) grows the same way.** Its ordered
+fallback list is exhausted (`trixie`, `rarity`, `vinylscratch`, `shiningarmor` all
+tried), so the pool grows past its current four not by naming more reVAmped
+characters but by teaching `StockTint` to retarget the `Base_*` rig family's own
+material names (`Base_Body`, `Hair_Navy`, `Base_Iris.R` and so on), which `twilight`
+and `rarity` already ship and which the reVAmped name match cannot see.
+
 ---
 
 ## 6. Animation strategy — verdict, and how to add animations to a new character

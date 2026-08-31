@@ -447,17 +447,33 @@ func _drive_the_palace() -> void:
 			quoted = float(entry["odds"])
 	_set_check("the race panel lists her as an entrant", listed)
 
+	# SHE IS FED ON THE WALK TO THE WINDOW, the same move test_ranch_casino_rules.gd's
+	# test_feeding_her_between_the_price_and_the_confirm_does_not_move_the_odds makes,
+	# so this check can actually fail. Nothing else here mutates her between the quote
+	# and the settle, which would make the two derivations equal no matter whether
+	# start_race() reused the quote or rebuilt the field from scratch; moving her
+	# happiness after quoted is captured means a rebuilt field would reprice her, so a
+	# match below is real evidence the cached field, not a fresh one, is what settled.
+	racer.happiness = 1.0
+
 	var chips_at_the_off: int = state.casino.chips
 	var race: Dictionary = ranch.start_race(racer.uid, 100)
 	_set_check("the race is under orders", bool(race["ok"]))
 	# THE SHOWN ODDS AND THE SETTLED ODDS ARE THE SAME NUMBER, per uid. race_entrants() just
-	# quoted her; start_race() reused that exact quote (see _quoted_fields), so the price on
-	# the form guide and the price the card she is now running on both read off the SAME
-	# field, not two fields built moments apart from a pony who could have been fed between
+	# quoted her at happiness 0.40; start_race() reused that exact quote (see
+	# _quoted_fields) rather than rebuilding off her current happiness of 1.0, so the
+	# price on the form guide and the price the card she is now running on both read off
+	# the SAME field, not two fields built moments apart from a pony who was fed between
 	# them.
 	_set_check("the form guide prices her at the card's own odds",
 		absf(quoted - RaceCardScript.decimal_odds(race["field"],
 			RaceCardScript.PLAYER_LANE)) < 0.0001)
+	# BACK TO 0.40, the moment start_race() has returned. field and odds above are already
+	# frozen in `race`, a plain Dictionary copied out of start_race()'s locals, so this
+	# cannot touch them; it only puts her happiness back to what the checks below the
+	# settle (the "happier by exactly what a race is worth" one) are built to expect, the
+	# same 0.40 she was penned with.
+	racer.happiness = 0.40
 	_set_check("the stake left the purse before the field was drawn",
 		state.casino.chips == chips_at_the_off - 100)
 	_set_check("she is still in her pen while the race runs",

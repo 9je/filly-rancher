@@ -284,7 +284,7 @@ const PALACE_RADIUS := 5.0
 ## makes her legible from thirty metres away.
 ##
 ## OUTSIDE THE BUILDING, not inside it, and that is a consequence of Building's plinth (see
-## Building.FLOOR_TOP): the interior floor stands 0.75 m above the ground the terrain
+## Building.FLOOR_TOP): the interior floor stands 0.85 m above the ground the terrain
 ## reports, so a body seated on the terrain inside a building would be knee deep in its own
 ## boards. Both counters are things the player opens from the door anyway.
 const ATTENDANT_STANDOFF := 1.8
