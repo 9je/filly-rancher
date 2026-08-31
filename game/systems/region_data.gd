@@ -21,6 +21,13 @@ extends Resource
 @export var has_lake := false
 @export var lake_depth := 0.0
 
+## How crowded this region may be with STOCK ponies: the band a ZoneMarker's own
+## `stock_count` is clamped into. Authored here rather than only on the marker so the
+## region's data file stays the authority on its own population, the way `permit_cost` is
+## the authority on its price.
+@export var stock_min := 0
+@export var stock_max := 0
+
 const ShopScript := preload("res://systems/shop.gd")
 
 

@@ -96,6 +96,9 @@ extends CharacterBody3D
 const GaitScript := preload("res://systems/gait.gd")
 const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 const PonyVisualsScript := preload("res://actors/pony/pony_visuals.gd")
+const StockPaletteScript := preload("res://systems/stock_palette.gd")
+const StockTintScript := preload("res://systems/stock_tint.gd")
+const CutieMarkScript := preload("res://systems/cutie_mark.gd")
 
 ## The input action held to WALK instead of running. Named `sneak` rather than `walk`
 ## because slowness is not what it is FOR -- see is_sneaking() and Pony.SNEAK_NOTICE_FACTOR.
@@ -165,9 +168,12 @@ const ANIM_BLEND := 0.2
 @export var jump_buffer := 0.12
 
 @export_group("Character")
-## Which PonyData to wear. The player is Twilight in Phase 1A, but this is data, not
-## a hardcoded model path -- swapping her is editing this field, never editing code.
-@export var pony_id: StringName = &"twilight"
+## The base record the player's body is built from. A HIDDEN record
+## (game/systems/pony_registry.gd HIDDEN_DIR), because the player is not a collectible and
+## must not appear in the Compendium; and the same record the crowd is built from, because
+## the recolour is one pipeline with two users. Twilight Sparkle has left the player slot
+## and may join the catchable roster in a later phase's authoring.
+@export var pony_id: StringName = &"stock_shy"
 @export_dir var pony_dir := "res://data/ponies"
 
 @onready var camera_pivot: Node3D = $CameraPivot
@@ -232,6 +238,21 @@ func is_sneaking() -> bool:
 ## re-deriving PonyVisuals.ANIMATION_PLAYER_PATH against the model tree.
 func get_animation_player() -> AnimationPlayer:
 	return _anim
+
+
+## Wear `look`: the palette tint and the cutie mark, on the body already built. Called by
+## ranch.gd at boot and again whenever a load replaces GameState.player, so the pony on
+## screen is always the pony the save describes.
+##
+## THE SAME StockTint THE CROWD GOES THROUGH, deliberately: one pipeline, two users, and no
+## second path that could drift.
+func apply_look(look: PlayerLook) -> void:
+	if look == null or visuals.get_child_count() == 0:
+		return
+	var body: Node3D = visuals.get_child(0)
+	StockTintScript.apply(body, StockPaletteScript.load_player(),
+		{"coat": look.coat, "mane": look.mane, "eyes": look.eyes})
+	CutieMarkScript.apply(body, look.mark())
 
 
 func _physics_process(delta: float) -> void:
@@ -352,17 +373,29 @@ func _play(clip: StringName) -> void:
 ## already push_errors the specific reason.
 func _build_visuals() -> void:
 	var registry := PonyRegistryScript.new()
-	var ponies := registry.load_all(pony_dir)
-	if not ponies.has(pony_id):
-		push_error("Player: no PonyData with id '%s' in '%s'" % [pony_id, pony_dir])
+	registry.load_all(pony_dir)
+	# by_id() rather than the dictionary load_all() returns: the player's own record is a
+	# HIDDEN one (game/systems/pony_registry.gd HIDDEN_DIR), resolvable by id and absent
+	# from every listing, and the returned dictionary is the listing.
+	var data: PonyData = registry.by_id(pony_id)
+	if data == null:
+		push_error("Player: no PonyData with id '%s' in '%s' or in the hidden records"
+			% [pony_id, pony_dir])
 		return
 
-	var pony: Node3D = PonyVisualsScript.build(ponies[pony_id])
+	var pony: Node3D = PonyVisualsScript.build(data)
 	if pony == null:
 		push_error("Player: PonyVisuals.build failed for '%s'" % pony_id)
 		return
 
 	visuals.add_child(pony)
+	# INDEX 0, ALWAYS. `Visuals` already carries `BeamOrigin` as a scene-authored child
+	# (player.tscn), so a plain add_child() would leave the body at index 1 -- unlike
+	# game/actors/pony/pony.gd, whose Visuals starts empty. apply_look() below, and the
+	# crowd's own `visuals.get_child(0)` convention (pony.gd's _apply_stock_tint()), both
+	# read "the body" as the FIRST child of Visuals; this is what keeps that reading true
+	# for the player too.
+	visuals.move_child(pony, 0)
 	_place_beam_origin(pony)
 	_anim = pony.get_node_or_null(PonyVisualsScript.ANIMATION_PLAYER_PATH)
 	if _anim == null:

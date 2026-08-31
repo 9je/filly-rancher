@@ -149,6 +149,10 @@ const WorldStateScript := preload("res://systems/world_state.gd")
 const SkyRigScript := preload("res://world/sky_rig.gd")
 const RequestBoardScript := preload("res://systems/request_board.gd")
 const CompendiumScript := preload("res://systems/compendium.gd")
+const LedgerScript := preload("res://systems/ledger.gd")
+const LettersScript := preload("res://systems/letters.gd")
+const StockPaletteScript := preload("res://systems/stock_palette.gd")
+const PlayerLookScript := preload("res://systems/player_look.gd")
 
 ## Headless watchdog ceiling. A normal run (assets present) finishes in under 2s on
 ## this machine; 30s leaves a wide margin for a slower box while still failing in
@@ -226,6 +230,10 @@ const MARKET_RADIUS := 4.5
 ## Market's door, and two prompts that both fire in the gap between them would be two
 ## toasts fighting over one patch of grass.
 const BOARD_RADIUS := 3.0
+
+## How near the loading dock she has to be for E to open the Depot. Tighter than the
+## Market's radius because the Depot is a smaller building on a busier corner of the yard.
+const DEPOT_RADIUS := 4.0
 
 ## Plot slots the map must carry -- the plan asks for four to six, and the reserved
 ## clearing (PropsScript.PEN_PLOTS_*) is an 18 m square, which fits four 7.8 m pens on a
@@ -327,7 +335,14 @@ const GATE_RAY_REACH := 2.0
 @onready var regions_root: Node3D = $Regions
 @onready var build_menu: CanvasLayer = $BuildMenu
 @onready var market_menu: CanvasLayer = $MarketMenu
+@onready var depot_menu: CanvasLayer = $DepotMenu
 @onready var pause_menu: CanvasLayer = $PauseMenu
+## The screen a new game opens on (Task 8): the player's own pony on a turntable, and the
+## name the Company will know her by. Typed as the plain CanvasLayer ranch.tscn declares,
+## reached through has_method() like every other menu here, for the same reason
+## _bind_build_menu() gives: a script that failed to parse must be a FAILED check in
+## _report(), not a boot that dies reaching straight into a property it does not have.
+@onready var creation_screen: CanvasLayer = $CreationScreen
 ## The sky. Typed as the plain Node3D ranch.tscn declares rather than as SkyRig, and
 ## always reached through has_method(), for the reason _bind_build_menu() gives about the
 ## menus: a sky_rig.gd that failed to PARSE leaves exactly this node in the tree with no
@@ -416,6 +431,16 @@ var _region_fence_cache: Array[RegionFence] = []
 ## same object that will enforce it later rather than by an int compared in the UI.
 var _economy: Economy = null
 
+## True while a collector is owed a visit. A runtime cache, not the source of truth --
+## Ledger.pending_punishment is that, because it is what is actually saved.
+## _seed_collector_state() below is what keeps this in step with it across a load, and
+## Ledger.pending_punishment_cycle is what says WHICH dawn he may call on.
+var _collector_due := false
+
+## The crowd's palette, loaded once and kept, for _coat_word() below. The spawner keeps its
+## own for the same reason; a .tres load per menu row is a load per row.
+var _stock_palette: StockPalette = null
+
 ## The plot slot the player is standing in right now, or null. Tracked so the build prompt
 ## fires once on entry rather than every physics frame.
 var _prompt_slot: PlotSlot = null
@@ -441,6 +466,9 @@ var _settings: Settings = null
 ## Whether the market prompt has been shown for this approach. Same hysteresis as the plot
 ## prompt: once on entering the radius, not once per frame.
 var _market_prompted := false
+
+## Whether the Depot prompt has been shown for this approach. The market prompt's rule.
+var _depot_prompted := false
 
 ## Whether the request board's prompt has been shown for this approach. The market
 ## prompt's rule; see _market_prompted.
@@ -468,6 +496,17 @@ var _herd_ready := false
 ## The region id rather than a bool because there are four gates: walking from one to
 ## another must produce a second prompt, and a bool would swallow it.
 var _gate_prompted: StringName = &""
+
+## Whether the cursor is currently meant to be captured to the game, mirroring the
+## CAPTURED/VISIBLE split _set_cursor_captured() drives Input.mouse_mode with. Tracked as a
+## plain bool ON RANCH, separately from Input.mouse_mode itself, because Godot's headless
+## display driver always reports Input.mouse_mode as MOUSE_MODE_VISIBLE no matter what was
+## last assigned to it (confirmed empirically -- `godot --headless` never returns anything
+## else from the getter) -- which would make the creation screen's cursor wiring the one
+## piece of it no headless test could ever observe. game/test/test_ranch_creation.gd reads
+## this instead. Starts true: camera_rig.gd captures the mouse in its own _ready(), before
+## any menu (including this one) has had a chance to run.
+var _cursor_captured := true
 
 ## Is this ranch the scene the process was launched with, or is it INSTANCED UNDER another
 ## scene that owns the process?
@@ -568,7 +607,7 @@ func _ready() -> void:
 	# bind functions below overwrite it with the real predicate once there is something
 	# behind it. set() by name for the reason _bind_build_menu() gives: a menu whose script
 	# failed to parse is a FAILED check in _report(), not a boot that dies here.
-	for menu: CanvasLayer in [build_menu, market_menu, pause_menu]:
+	for menu: CanvasLayer in [build_menu, market_menu, pause_menu, depot_menu]:
 		if menu != null:
 			menu.set("can_open", func() -> bool: return false)
 
@@ -650,6 +689,9 @@ func _ready() -> void:
 	_bind_build_menu()
 
 	await _report(pony_count, prop_count)
+
+	_apply_player_look()
+	_maybe_open_creation()
 
 
 # --- saving and loading ----------------------------------------------------------------
@@ -904,6 +946,7 @@ func _bind_build_menu() -> void:
 	# Market and the pause menu to go unwired with it.
 	rebind_economy()
 	_bind_market_menu()
+	_bind_depot_menu()
 	_bind_pause_menu()
 
 	if build_menu == null or not build_menu.has_method("open"):
@@ -934,17 +977,27 @@ func _bind_build_menu() -> void:
 ## you cannot get the pointer back from is a menu players close with Alt-F4.
 func _on_menu_opened(_slot: PlotSlot) -> void:
 	get_tree().paused = true
-	if _interactive:
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_set_cursor_captured(false)
 
 
 func _on_menu_closed() -> void:
 	get_tree().paused = false
-	# Only re-grab the pointer for somebody actually playing. A headless or screenshot run
-	# has no window worth capturing it into, and grabbing it during an automated capture is
-	# exactly the kind of thing that makes people stop running captures.
+	_set_cursor_captured(true)
+
+
+## THE ONE PLACE THE CURSOR IS SHOWN OR HIDDEN. Split out of _on_menu_opened()/
+## _on_menu_closed() so _maybe_open_creation()/_on_creation_confirmed() below can free and
+## re-capture the mouse through the SAME path every other menu uses, without also touching
+## get_tree().paused a second time -- the creation screen already owns that toggle itself
+## (CreationScreen.open()/confirm()). Only a person actually playing has a cursor worth
+## moving: a headless or screenshot run has no window to capture it into, and grabbing it
+## during an automated capture is exactly the kind of thing that makes people stop running
+## captures. Touches nothing but Input.mouse_mode, so it needs no tree and is exactly what
+## game/test/test_ranch_creation.gd drives on a Ranch that was never added to one.
+func _set_cursor_captured(captured: bool) -> void:
+	_cursor_captured = captured
 	if _interactive:
-		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if captured else Input.MOUSE_MODE_VISIBLE
 
 
 func _current_bits() -> int:
@@ -1002,6 +1055,34 @@ func rebind_economy() -> void:
 	var hud := get_node_or_null(^"HUD")
 	if hud != null and hud.has_method("set_bits"):
 		hud.set_bits(_economy.bits)
+
+	if _game_state != null and not _game_state.ledger.changed.is_connected(_on_balance_changed):
+		_game_state.ledger.changed.connect(_on_balance_changed)
+	_apply_padlocks()
+	_apply_beam_recall()
+	_seed_collector_state()
+	_push_balance()
+	# A mid-session load REPLACES GameState.player (from_dict()), so the pony on screen has
+	# to be re-dressed here too, or a loaded save would show the look of the session it
+	# replaced until the player next changed a swatch.
+	_apply_player_look()
+
+
+func _on_balance_changed(_balance: int) -> void:
+	_push_balance()
+
+
+## WHATEVER THE COLLECTOR OWES RIGHT NOW, READ OFF THE PERSISTED LEDGER rather than left at
+## _collector_due's own runtime default of false. Called from rebind_economy(), so both a
+## boot that finds a save already on disk and a mid session load reach the same state a
+## live session would: the punishment itself was always saved correctly
+## (Ledger.to_dict()/from_dict(), Ledger.pending_punishment), but nothing used to tell this
+## var about it, so a load silently swallowed an armed collector until the next collection
+## day happened to arm a fresh one.
+func _seed_collector_state() -> void:
+	if _game_state == null:
+		return
+	_collector_due = _game_state.ledger.pending_punishment != LedgerScript.Punishment.NONE
 
 
 # --- the clock and the sky --------------------------------------------------------------
@@ -1119,6 +1200,8 @@ func _on_world_changed() -> void:
 	# connection each (a second clock driving one sky is the bug that check exists for), so
 	# "the herd changes with the hour" has to ride the connection that is already there.
 	_refresh_herd()
+	_maybe_run_collection_day()
+	_maybe_serve_collector()
 
 
 ## THE SKY TURNED OVER, SO THE HERD DOES TOO. Everybody whose hours have ended walks off,
@@ -1207,6 +1290,133 @@ func _bind_market_menu() -> void:
 			market_menu.connect(pair[0], pair[1])
 
 
+func _bind_depot_menu() -> void:
+	if depot_menu == null or not depot_menu.has_method("open"):
+		return
+	depot_menu.set("can_open", func() -> bool: return _no_menu_but(depot_menu))
+	depot_menu.set("rows_provider", func() -> Array[Dictionary]: return _penned_rows())
+	depot_menu.set("bits_provider", func() -> int: return _current_bits())
+	# WHAT THE LEDGER WILL ACTUALLY ACCEPT, so the Pay tab never offers a row that would be
+	# trimmed on the way through (Ledger.pay() caps at payable(); bits settle the service
+	# charges, not the principal). The menu asks; this file answers.
+	depot_menu.set("payable_provider", func() -> int:
+		return _game_state.ledger.payable() if _game_state != null else 0)
+	depot_menu.set("statement_provider", func() -> Array[String]: return _statement())
+	for pair in [["opened", _on_menu_opened_any], ["closed", _on_menu_closed],
+			["deliver_requested", _on_deliver_requested],
+			["pay_requested", _on_pay_requested]]:
+		if not depot_menu.is_connected(pair[0], pair[1]):
+			depot_menu.connect(pair[0], pair[1])
+
+
+## `_on_menu_opened` takes a PlotSlot; the Depot's `opened` carries nothing, so it needs a
+## nullary sibling rather than a bound lambda that would not compare equal on reconnect.
+func _on_menu_opened_any() -> void:
+	_on_menu_opened(null)
+
+
+## What is standing in the pens, as the Depot lists it. Stock ponies and named ponies alike;
+## the menu sorts and prices the rows, this only says who is here.
+func _penned_rows() -> Array[Dictionary]:
+	var rows: Array[Dictionary] = []
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen == null:
+			continue
+		for inst: PonyInstance in pen.ponies():
+			var data: PonyData = inst.data()
+			var rarity: int = data.rarity if data != null else PonyDataScript.Rarity.COMMON
+			rows.append({
+				"uid": inst.uid,
+				"name": inst.display_name(),
+				"stock": inst.is_stock(),
+				"coat": _coat_word(inst),
+				"credit": LedgerScript.delivery_credit(rarity, inst.is_stock()),
+			})
+	return rows
+
+
+## ONE WORD THAT TELLS TWO STOCK PONIES APART, for the Deliver tab. Every member of the
+## crowd shares one hidden record and therefore one display_name ("Pony"), so a pen holding
+## six of them listed six identical rows and the player picked one by counting. Her COAT is
+## the thing she is actually distinguishable by on screen, so the coat swatch her save
+## record carries is named (StockPalette.colour_name) and the menu draws it in front of her
+## name: "Butter Pony", "Sky Pony".
+##
+## EMPTY FOR A NAMED PONY, who has a name of her own and needs no help being told apart.
+func _coat_word(inst: PonyInstance) -> String:
+	if inst == null or not inst.is_stock():
+		return ""
+	if _stock_palette == null:
+		_stock_palette = StockPaletteScript.load_stock()
+	return StockPaletteScript.colour_name(
+		_stock_palette.coat_at(int(inst.stock.get("coat", 0))))
+
+
+func _statement() -> Array[String]:
+	if _game_state == null:
+		return []
+	var cycle: int = _world.cycle_index() if _world != null else 0
+	return _game_state.ledger.statement_lines(_player_name(), _built_plot_count(),
+		_open_permit_count(), cycle)
+
+
+## What the player called herself at the creation screen. The whole of the Company's
+## paperwork reads it from here so there is one answer.
+func _player_name() -> String:
+	return _game_state.player.player_name if _game_state != null else PlayerLookScript.DEFAULT_NAME
+
+
+func _built_plot_count() -> int:
+	var n := 0
+	for slot in _plot_slots():
+		if not slot.is_empty():
+			n += 1
+	return n
+
+
+func _open_permit_count() -> int:
+	var n := 0
+	for region: RegionData in _regions_registry().all():
+		if is_region_open(region.id):
+			n += 1
+	return n
+
+
+## The loading dock the delivered pony walks into, in world space, or the Depot's own origin
+## if the marker is missing.
+func crate_position() -> Vector3:
+	var crate := get_node_or_null(^"Buildings/Depot/Crate") as Node3D
+	if crate != null:
+		return crate.global_position
+	var depot := get_node_or_null(^"Buildings/Depot") as Node3D
+	return depot.global_position if depot != null else Vector3.ZERO
+
+
+func is_near_depot() -> bool:
+	var depot := get_node_or_null(^"Buildings/Depot") as Node3D
+	if depot == null:
+		return false
+	var gap := Vector2(player.global_position.x - depot.global_position.x,
+		player.global_position.z - depot.global_position.z).length()
+	return gap <= DEPOT_RADIUS
+
+
+## E at the loading dock opens the Depot. Once per approach, the Market's and the board's
+## rule, for the reason _update_plot_interaction() gives.
+func _update_depot_interaction() -> void:
+	if not _no_other_menu_open():
+		return
+	var near := is_near_depot()
+	if near != _depot_prompted:
+		_depot_prompted = near
+		if near:
+			_toast("Press E / X at the Depot.")
+	if near and Input.is_action_just_pressed(&"interact") and _prompt_slot == null:
+		if depot_menu != null and depot_menu.has_method("open"):
+			depot_menu.open()
+
+
 func _bind_pause_menu() -> void:
 	if pause_menu == null or not pause_menu.has_method("open"):
 		return
@@ -1232,6 +1442,7 @@ func _bind_pause_menu() -> void:
 		pause_menu.set("regions", _regions_registry())
 		pause_menu.set("board", get_request_board())
 		pause_menu.set("world_state", get_world_state())
+		pause_menu.set("statement_provider", func() -> Array[String]: return _statement())
 	inject_pages.call()
 	if _game_state != null and not _game_state.state_loaded.is_connected(inject_pages):
 		_game_state.state_loaded.connect(inject_pages)
@@ -1253,12 +1464,55 @@ func _bind_pause_menu() -> void:
 ## an open pause menu. Asking one question, excluding only the menu doing the asking, is
 ## what keeps the two directions from drifting apart again.
 func _no_menu_but(menu: CanvasLayer) -> bool:
-	for other in [build_menu, market_menu, pause_menu]:
+	for other in [build_menu, market_menu, pause_menu, depot_menu, creation_screen]:
 		if other == menu or other == null:
 			continue
 		if other.has_method("is_open") and other.is_open():
 			return false
 	return true
+
+
+## A NEW GAME OPENS ON THE CREATION SCREEN. Only for somebody actually playing: a hosted
+## ranch, a headless gate and a screenshot run all skip it, so no automated run ever waits
+## on a button nobody is going to press. A session that LOADED a save skips it too; there is
+## no re-edit screen this phase.
+##
+## THE CURSOR IS FREED HERE, THE SAME WAY EVERY OTHER MENU FREES IT. Without this,
+## game/actors/player/camera_rig.gd has already captured the mouse in its own _ready()
+## (which runs before this function ever does), and nothing on the screen would be
+## clickable: the pointer stays locked to the paused, invisible ranch behind it. Not routed
+## through _on_menu_opened() itself, because that also toggles get_tree().paused a second
+## time (CreationScreen.open() already owns that) -- see _set_cursor_captured()'s comment.
+func _maybe_open_creation() -> void:
+	if not _interactive or _save_loaded or _game_state == null:
+		return
+	if creation_screen == null or not creation_screen.has_method("open"):
+		return
+	if not creation_screen.is_connected("confirmed", _on_creation_confirmed):
+		creation_screen.connect("confirmed", _on_creation_confirmed)
+	creation_screen.call("open", _game_state.player)
+	_set_cursor_captured(false)
+
+
+## She has made her pony. Keep it, dress the model, and write it down straight away: the
+## first thing that happens after this is a ranch, and a crash before the first autosave
+## should not cost her the pony she just spent five minutes on.
+func _on_creation_confirmed(look: PlayerLook) -> void:
+	_set_cursor_captured(true)
+	if _game_state == null:
+		return
+	_game_state.player = look
+	_apply_player_look()
+	save_game()
+	var letter: Dictionary = LettersScript.render(LettersScript.Id.WELCOME, {
+		"name": look.player_name, "balance": _game_state.ledger.balance})
+	_toast("%s: %s" % [letter["sender"], letter["title"]])
+
+
+func _apply_player_look() -> void:
+	if _game_state == null or player == null or not player.has_method("apply_look"):
+		return
+	player.call("apply_look", _game_state.player)
 
 
 ## Nothing at all is up: no build menu, no Market, no pause menu.
@@ -1384,6 +1638,212 @@ func _apply_settings() -> void:
 		_settings.apply_audio()
 
 
+## COLLECTION DAY, ONCE PER PERIOD. Every third cycle, on the first phase change inside it,
+## the upkeep and the service charge land on the balance and the period's quota is judged.
+## The collector the judgement arms does NOT call now: he calls at the first dawn of a LATER
+## cycle (_maybe_serve_collector), which is what makes the letter arrive before the knock
+## and gives her a cycle to do something about it.
+##
+## GUARDED BY THE LEDGER'S OWN Ledger.is_collection_day_due(), NOT BY A RUNTIME COUNTER OF
+## THE LAST CYCLE BILLED. A runtime counter resets to nothing on every fresh process, so it
+## cannot tell "this period was never billed" from "this period was billed by whichever
+## session wrote the save this process just loaded" -- and a phase change landing inside a
+## cycle already billed by an earlier session used to re-run the collection day: upkeep and
+## the service charge added twice, the tier escalated twice, delivered_this_period reset a
+## second time. periods_run is part of the save, so asking the ledger is what makes a
+## reloaded process agree with the one that saved.
+func _maybe_run_collection_day() -> void:
+	if _game_state == null or _world == null:
+		return
+	var cycle: int = _world.cycle_index()
+	if not _game_state.ledger.is_collection_day_due(cycle):
+		return
+	var summary: Dictionary = run_collection_day()
+	if int(summary["punishment"]) != LedgerScript.Punishment.NONE:
+		_collector_due = true
+
+
+func run_collection_day() -> Dictionary:
+	var ledger: Ledger = _game_state.ledger
+	var cycle: int = _world.cycle_index() if _world != null else 0
+	var summary: Dictionary = ledger.run_collection_day(cycle, _built_plot_count(),
+		_open_permit_count())
+	var letter: Dictionary = LettersScript.render(LettersScript.Id.COLLECTION_NOTICE, {
+		"name": _player_name(), "balance": int(summary["balance"]),
+		"upkeep": int(summary["upkeep"])})
+	_toast("%s. Balance: %d bits." % [letter["title"], int(summary["balance"])])
+	if not bool(summary["quota_met"]):
+		_toast("Quota: %d of %d delivered. An associate will call at the next dawn."
+			% [int(summary["delivered"]), int(summary["quota"])])
+	_push_balance()
+	return summary
+
+
+## THE COLLECTOR CALLS. One rung of the ladder, served once, on the first DAWN OF A CYCLE
+## LATER THAN THE ONE THAT ARMED IT (see _maybe_serve_collector, and Ledger.
+## pending_punishment_cycle for why "later" rather than "next"). Every rung is reversible
+## and none of them takes a pony: a fee is bits, a revoked permit is a fence that closes
+## over ponies who stay exactly where they are, a padlock is a pen that makes no gems, and a
+## recall is a horn she gets back next cycle. Returns which rung was served, for the gates.
+##
+## A RUNG WITH NOTHING TO BITE ON FALLS BACK TO THE FEE rather than passing quietly. A
+## player with no permits bought has nothing to revoke and a player with no pen built has
+## nothing to padlock, and those are exactly the players early enough in the game to be
+## missing quota: serving them a rung with no consequence spent the escalation (tier had
+## already climbed) and gave them a free period. The fee is the rung below, it always lands,
+## and the toast and the letter both say what actually happened rather than what the ladder
+## intended.
+func serve_collector() -> int:
+	if _game_state == null:
+		return LedgerScript.Punishment.NONE
+	var ledger: Ledger = _game_state.ledger
+	var punishment: int = ledger.take_pending_punishment()
+	var served: int = punishment
+	match punishment:
+		LedgerScript.Punishment.FEE:
+			_serve_collector_fee()
+		LedgerScript.Punishment.PERMIT_REVOKED:
+			var permit: StringName = _dearest_open_permit()
+			if permit == &"":
+				served = LedgerScript.Punishment.FEE
+				_serve_collector_fee()
+			else:
+				ledger.revoked_permits.append(String(permit))
+				_game_state.unlocks.erase(String(permit))
+				_apply_permits()
+				_toast("An associate called: one permit is under review. Pay to resume access.")
+		LedgerScript.Punishment.PEN_PADLOCKED:
+			var slot_id: StringName = _fullest_pen_slot()
+			if slot_id == &"":
+				served = LedgerScript.Punishment.FEE
+				_serve_collector_fee()
+			else:
+				ledger.padlocked_slots.append(String(slot_id))
+				_apply_padlocks()
+				_toast("An associate called: one pen is sealed pending payment. Everyone inside is fine!")
+		LedgerScript.Punishment.BEAM_RECALLED:
+			var cycle: int = _world.cycle_index() if _world != null else 0
+			ledger.beam_recalled_until = cycle + LedgerScript.BEAM_RECALL_CYCLES
+			_apply_beam_recall()
+			_toast("An associate called: your horn licence is suspended for one cycle.")
+	if served != LedgerScript.Punishment.NONE:
+		var letter: Dictionary = LettersScript.render(LettersScript.Id.COLLECTOR_VISIT, {
+			"name": _player_name(), "punishment": _punishment_phrase(served)})
+		_toast(String(letter["title"]))
+	_push_balance()
+	return served
+
+
+## THE FIRST RUNG, AND THE ONE EVERY OTHER RUNG FALLS BACK ON. Paid out of the wallet if she
+## can cover it, added to the balance if she cannot; nothing is ever confiscated.
+func _serve_collector_fee() -> void:
+	var fee: int = LedgerScript.COLLECTOR_FEE
+	if _economy != null and _economy.can_afford(fee):
+		_economy.spend(fee)
+		_toast("An associate called: a service fee of %d bits. Have a lovely day!" % fee)
+	else:
+		_game_state.ledger.balance += fee
+		_toast("An associate called: %d bits added to your balance. No trouble at all!" % fee)
+
+
+## THE KNOCK, ONE FULL CYCLE AFTER THE LETTER. A collection day always lands on a DAWN
+## (Ledger.is_collection_cycle() only answers true at a cycle boundary, and a cycle's first
+## phase is DAWN by construction), so "serve at the next dawn" served the collector in the
+## very same _on_world_changed() that billed her: notice and visit in one frame, with no
+## period in between to ship or to pay in. The rung is therefore held until the first DAWN
+## of a cycle STRICTLY LATER than the one that armed it, which is the beat the spec
+## describes and the reason the letter is worth reading.
+##
+## THE ARMING CYCLE LIVES ON THE LEDGER (Ledger.pending_punishment_cycle), not here, so it
+## travels with the save: quitting between the notice and the visit comes back owing the
+## same visit on the same dawn, exactly as _seed_collector_state() does for the rung itself.
+func _maybe_serve_collector() -> void:
+	if _world == null:
+		return
+	# The beam's recall expires on its own clock, so this is asked at every phase change and
+	# not only at dawn.
+	_apply_beam_recall()
+	if not _collector_due or _world.phase() != WorldStateScript.Phase.DAWN:
+		return
+	if _game_state != null \
+			and _world.cycle_index() <= _game_state.ledger.pending_punishment_cycle:
+		# Armed this very cycle. The letter has just landed; he calls at the next dawn.
+		return
+	_collector_due = false
+	serve_collector()
+
+
+static func _punishment_phrase(punishment: int) -> String:
+	match punishment:
+		LedgerScript.Punishment.FEE:
+			return "a service fee"
+		LedgerScript.Punishment.PERMIT_REVOKED:
+			return "a permit under review"
+		LedgerScript.Punishment.PEN_PADLOCKED:
+			return "a sealed pen"
+		LedgerScript.Punishment.BEAM_RECALLED:
+			return "a suspended horn licence"
+	return "a courtesy visit"
+
+
+## The most expensive permit she currently holds. The dearest one, so the punishment is felt
+## rather than shrugged off, and so it is obvious which fence closed.
+func _dearest_open_permit() -> StringName:
+	var best: StringName = &""
+	var best_cost := -1
+	for region: RegionData in _regions_registry().all():
+		if not is_region_open(region.id):
+			continue
+		if region.permit_cost > best_cost:
+			best_cost = region.permit_cost
+			best = ShopScript.permit_id_for(region.id)
+	return best
+
+
+## The slot id of the pen with the most ponies in it that is not already padlocked.
+func _fullest_pen_slot() -> StringName:
+	var best: StringName = &""
+	var most := -1
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen == null or pen.is_padlocked():
+			continue
+		if pen.count() > most:
+			most = pen.count()
+			best = slot.slot_id
+	return best
+
+
+## Push the ledger's padlock list onto the pens. Absolute rather than incremental, the way
+## _apply_permits() and _apply_unlocks() are: a pen not on the list is not padlocked, so a
+## load, a relief and a collector all reach the same state from the same one function.
+func _apply_padlocks() -> void:
+	if _game_state == null:
+		return
+	var locked: Array = _game_state.ledger.padlocked_slots
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen != null:
+			pen.set_padlocked(String(slot.slot_id) in locked)
+
+
+## Same shape for the horn.
+func _apply_beam_recall() -> void:
+	if _game_state == null:
+		return
+	var beam: Node3D = player.get_magic_beam()
+	if beam == null or not beam.has_method("set_recalled"):
+		return
+	var cycle: int = _world.cycle_index() if _world != null else 0
+	beam.call("set_recalled", _game_state.ledger.beam_is_recalled(cycle))
+
+
+func _push_balance() -> void:
+	var hud := get_node_or_null(^"HUD")
+	if hud != null and hud.has_method("set_balance") and _game_state != null:
+		hud.call("set_balance", _game_state.ledger.balance)
+
+
 ## Read GameState.unlocks into the things that honour them. On boot and after every
 ## purchase. MagicBeam.apply_unlocks() is absolute rather than incremental, so calling this
 ## twice cannot stack a bonus.
@@ -1476,6 +1936,159 @@ func collect_gems() -> int:
 			_game_state.gems.add(int(rarity), int(tray[rarity]))
 			moved += int(tray[rarity])
 	return moved
+
+
+## The Depot menu, or null before boot has bound it. Exposed for gates and tests, matching
+## get_request_board() and get_compendium() below.
+func get_depot_menu() -> CanvasLayer:
+	return depot_menu
+
+
+## DELIVER ONE PONY. Returns `{"ok": bool, "credit": int, "named": bool, "name": String}`,
+## so a gate can assert on what happened rather than on a toast.
+##
+## THE WALK HAPPENS FIRST, AND EVERYTHING IRREVERSIBLE HANGS OFF ITS ANSWER. Pony.
+## leave_toward() returns false for a pony the beam has hold of, and this function used to
+## throw that answer away: it credited the account, deleted her record, marked her
+## PROCESSED and counted her toward quota BEFORE pointing her at the crate, so a resident
+## floating in the beam was paid for and then handed straight back on release. Now the
+## order is: find her, refuse if she is HELD, take her body out of the pen, point her at
+## the crate, and only once she is actually walking does anything change that cannot be
+## changed back.
+##
+## THE TWO REFUSALS ARE BEFORE ANY MUTATION, which is what makes "refuse and unwind
+## nothing" true rather than merely hopeful: nothing is unwound because nothing was done.
+## Even her body stays in the pen until the walk is accepted.
+##
+## HER BODY COMES OUT OF THE PEN ALIVE (Pen.release_body), and only after the walk has
+## been accepted, so a refusal leaves her standing in the pen she was already standing in.
+## She walks to the crate herself and frees herself on arrival, in Pony._state_leaving,
+## which stays the one line in this project that frees a pony. There is no branch here that
+## removes her any other way, deliberately: NO PONY EVER DIES ON SCREEN, and nothing
+## gruesome happens at the Depot.
+##
+## AND THE BEAM WILL NOT TAKE HER BACK once she is walking: Pony.is_being_delivered() is
+## true for the whole of the walk and MagicBeam._is_grabbable() declines her. That is a
+## grab that never starts, not a pony taken away.
+func deliver_pony(uid: StringName) -> Dictionary:
+	var refused := {"ok": false, "credit": 0, "named": false, "name": ""}
+	if _game_state == null:
+		return refused
+	var pen: Pen = null
+	var inst: PonyInstance = null
+	for slot in _plot_slots():
+		var candidate := slot.get_built() as Pen
+		if candidate == null:
+			continue
+		var found: PonyInstance = candidate.find_pony(uid)
+		if found != null:
+			pen = candidate
+			inst = found
+			break
+	if pen == null or inst == null:
+		return refused
+
+	# HER BODY, STILL IN THE PEN. Read rather than released, so the two refusals below cost
+	# nothing to make: at this point the pen still holds her, the save still has her record,
+	# and the account has not moved.
+	var body: Node3D = pen.body_for(uid)
+	if body == null or not (body is PonyScript):
+		return refused
+
+	# REFUSED WHILE THE BEAM HAS HER. The hold is the beam's, and a hold that turns into a
+	# capture must be allowed to finish as one; a delivery that talked over it would credit
+	# the account for a pony who is about to land back in the saddlebag.
+	if (body as PonyScript).state == PonyScript.State.HELD:
+		_toast("Put her down first, and the counter will take her from there!")
+		return refused
+
+	# THE WALK IS THE COMMIT POINT, and it is asked BEFORE anything is spent, deleted or
+	# credited. leave_toward() answers false for exactly one reason (she is HELD), which the
+	# line above has already refused; this is that same rule read off the seam's own answer
+	# rather than guessed at a second time, and it costs one branch to keep honest.
+	if not body.leave_toward(crate_position()):
+		_toast("Put her down first, and the counter will take her from there!")
+		return refused
+
+	# From here down the delivery HAS happened. release_body() cannot fail on a pony this
+	# function has already found a live body and a live record for (see pen.gd), and it is
+	# the call that takes the pen's collision bits off her so the walk can actually reach
+	# the crate.
+	if pen.release_body(uid, self) == null:
+		return refused
+	_game_state.remove_pony(uid)
+
+	var data: PonyData = inst.data()
+	var rarity: int = data.rarity if data != null else PonyDataScript.Rarity.COMMON
+	var credit: int = _game_state.ledger.credit_delivery(rarity, inst.is_stock())
+	var named: bool = not inst.is_stock()
+	if named:
+		_game_state.compendium.mark_processed(inst.data_id)
+
+	# credit_delivery() has already counted her, so the ledger's own running total IS the
+	# number this receipt should carry.
+	var shipments: int = _game_state.ledger.shipments
+	var letter: Dictionary = LettersScript.render(
+		LettersScript.Id.RECEIPT_NAMED if named else LettersScript.Id.RECEIPT_STOCK,
+		{"name": _player_name(), "count": shipments, "credit": credit,
+			"pony": inst.display_name()})
+	_toast("%s: %s shipment received, %d bits credited."
+		% [letter["sender"], LettersScript.ordinal(shipments), credit])
+
+	if depot_menu != null and depot_menu.has_method("refresh"):
+		depot_menu.refresh()
+	_relieve_if_paid_down()
+	return {"ok": true, "credit": credit, "named": named, "name": inst.display_name()}
+
+
+## PAY THE COMPANY. The ledger says how much it will accept (bits settle the service
+## charges, not the principal), the wallet is debited by exactly that, and the difference is
+## explained rather than silently swallowed. Returns what was actually paid.
+func _on_pay_requested(bits: int) -> void:
+	pay_the_company(bits)
+
+
+func pay_the_company(bits: int) -> int:
+	if _game_state == null or _economy == null:
+		return 0
+	var ledger: Ledger = _game_state.ledger
+	var wanted: int = mini(bits, _economy.bits)
+	var taken: int = ledger.pay(wanted)
+	if taken <= 0:
+		_toast("Bits settle the service charges. The principal is settled in stock.")
+		return 0
+	_economy.spend(taken)
+	if taken < bits:
+		_toast("Paid %d bits. That is as low as bits will take it; the rest is stock."
+			% taken)
+	else:
+		_toast("Paid %d bits. Balance: %d." % [taken, ledger.balance])
+	_relieve_if_paid_down()
+	if depot_menu != null and depot_menu.has_method("refresh"):
+		depot_menu.refresh()
+	return taken
+
+
+func _on_deliver_requested(uid: StringName) -> void:
+	deliver_pony(uid)
+
+
+## GIVE EVERYTHING BACK once the balance is under the ceiling. Called after every payment
+## and after every delivery, because either can be what brings her back into good standing.
+func _relieve_if_paid_down() -> void:
+	if _game_state == null:
+		return
+	var given: Dictionary = _game_state.ledger.relieve(
+		_world.cycle_index() if _world != null else -1)
+	if given.is_empty():
+		return
+	for permit in given.get("permits", []):
+		if not String(permit) in _game_state.unlocks:
+			_game_state.unlocks.append(String(permit))
+	_apply_permits()
+	_apply_padlocks()
+	_apply_beam_recall()
+	_toast("Your account is in good standing again. Cloudsdale thanks you!")
 
 
 func is_near_market() -> bool:
@@ -1583,6 +2196,11 @@ func _on_pony_noticed(data: PonyData) -> void:
 ## returning null means.
 func _on_pony_captured(instance: PonyInstance) -> void:
 	if instance == null or _game_state == null:
+		return
+	# THE CROWD IS NOT COLLECTED. A stock pony has no Compendium entry and no request ever
+	# names one: she is supply, not a character. Marking her would put an id in the book
+	# that no page can ever show and no count can ever include.
+	if instance.is_stock():
 		return
 	_game_state.compendium.mark_caught(instance.data_id)
 	if _board == null:
@@ -2017,11 +2635,17 @@ func _physics_process(delta: float) -> void:
 
 	if not _interactive:
 		return
+	# The wild refills itself while somebody is playing. Not while a gate is driving the
+	# scene: a gate that teleports the player about for two hundred frames would otherwise
+	# stand a fresh crowd behind it, and the pony count it is asserting on would move under
+	# it. The gates call spawner.tick_stock() themselves, deliberately, where they mean to.
+	spawner.tick_stock(delta)
 	_update_plot_interaction()
 	_update_market_interaction()
 	# After the market's, so that an E press which just opened the Market is already behind
 	# a menu by the time this asks; see is_near_board() on the overlap of the two radii.
 	_update_board_interaction()
+	_update_depot_interaction()
 	_update_gate_prompt()
 	if _game_state == null:
 		return
@@ -2118,7 +2742,7 @@ func _report(pony_count: int, prop_count: int) -> void:
 	var expected_props: int = PropsScript.expected_count() + buildings.get_child_count()
 	var expected_ponies := 0
 	for marker in spawner.get_markers():
-		expected_ponies += marker.spawn_count
+		expected_ponies += marker.spawn_count + spawner.stock_budget(marker)
 	# "Some pony in the roster has a model on this machine". Asked of the spawner's
 	# own roster rather than by re-scanning the directory here: one scan, one answer,
 	# and it cannot disagree with what the spawner actually drew from.
@@ -2248,6 +2872,21 @@ func _report(pony_count: int, prop_count: int) -> void:
 				marker.zone_id if marker != null else "<none>", from_marker,
 				pony.state_name(pony.state)])
 	_set_check(checks, "every pony spawned", ponies.size() == expected_ponies)
+	print("RANCH crowd named=%d stock=%d budget=%d" % [
+		spawner.named_standing(), spawner.stock_standing(), spawner.WORLD_PONY_BUDGET])
+	_set_check(checks, "the world stays inside its pony budget",
+		ponies.size() <= spawner.WORLD_PONY_BUDGET)
+	# The spec's pacing rule, asserted rather than hoped for: a named pony is at most one in
+	# five of what is standing in the homestead, so finding one takes minutes.
+	var ranch_named := 0
+	var ranch_stock := 0
+	for marker in spawner.get_markers():
+		if marker.zone_id != &"ranch":
+			continue
+		ranch_named += marker.spawn_count
+		ranch_stock += spawner.stock_budget(marker)
+	_set_check(checks, "named ponies are at most one in five of the homestead crowd",
+		ranch_stock >= ranch_named * 4)
 	_set_check(checks, "every pony is standing on the ground", on_ground)
 	_set_check(checks, "every pony was spawned inside her zone", in_zone)
 	_set_check(checks, "no pony needed a fallback placement",
@@ -2488,6 +3127,16 @@ func _report(pony_count: int, prop_count: int) -> void:
 	# Hand-built like the Market, so it stands on an assetless checkout too and this is not
 	# gated on assets_state.
 	_set_check(checks, "the board stands", get_node_or_null(^"Buildings/Board") != null)
+
+	_set_check(checks, "the Depot stands", get_node_or_null(^"Buildings/Depot") != null)
+	_set_check(checks, "the Depot has a crate to walk into",
+		get_node_or_null(^"Buildings/Depot/Crate") != null)
+	var ledger: Ledger = _game_state.ledger if _game_state != null else null
+	_set_check(checks, "the ranch built a ledger", ledger != null)
+	print("RANCH ledger balance=%d quota=%d delivered=%d tier=%d" % [
+		ledger.balance if ledger != null else 0, ledger.quota if ledger != null else 0,
+		ledger.delivered_this_period if ledger != null else 0,
+		ledger.tier if ledger != null else 0])
 
 	var book_registry: PonyRegistry = _pony_roster()
 	# `requests` is the ACTIVE count, the same number the check above reads. requests() also
@@ -2859,6 +3508,16 @@ func _report(pony_count: int, prop_count: int) -> void:
 		print("RANCH camera check FAILED -- no building found to probe (assets=%s)"
 			% assets_state)
 		_set_check(checks, "the camera pulls in against a building", false)
+
+	# --- the player's own look (Task 8) -----------------------------------------
+	var has_look: bool = _game_state != null and _game_state.player != null
+	_set_check(checks, "the player has a look", has_look)
+	_set_check(checks, "the creation screen is closed in an automated run",
+		creation_screen == null or not creation_screen.call("is_open"))
+	if has_look:
+		print("RANCH player name=%s coat=%d mane=%d eyes=%d mark=%s" % [
+			_player_name(), _game_state.player.coat, _game_state.player.mane,
+			_game_state.player.eyes, _game_state.player.has_mark()])
 
 	# --- verdict -------------------------------------------------------------------
 	# A duplicate label is not a check that failed -- it is a check that never ran. It

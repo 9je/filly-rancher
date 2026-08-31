@@ -10,6 +10,7 @@ const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 const RegionRegistryScript := preload("res://systems/region_registry.gd")
 const RequestBoardScript := preload("res://systems/request_board.gd")
 const WorldStateScript := preload("res://systems/world_state.gd")
+const LedgerScript := preload("res://systems/ledger.gd")
 
 const PONY_DIR := "res://data/ponies"
 
@@ -141,7 +142,7 @@ func test_cancel_on_settings_returns_to_main_and_on_main_closes() -> void:
 	assert_false(_menu.is_open())
 
 
-## Both pages, as the name promises. The two have DIFFERENT row counts (six on MAIN,
+## Both pages, as the name promises. The two have DIFFERENT row counts (seven on MAIN,
 ## three on SETTINGS) and _row_count() is the one thing that knows which, so a wrap that is
 ## only exercised on MAIN would let the settings page wrap past its last row into a fourth
 ## that is not drawn.
@@ -376,6 +377,24 @@ func test_accept_does_nothing_on_either_reading_page() -> void:
 		assert_signal_not_emitted(_menu, "save_requested")
 
 
+# --- the ledger page --------------------------------------------------------------------
+
+func test_the_ledger_page_repeats_the_statement() -> void:
+	_menu.statement_provider = func() -> Array[String]:
+		return LedgerScript.new().statement_lines("Moonbeam", 1, 0, 2)
+	assert_true(_menu.open_page(PauseMenu.Page.LEDGER))
+	assert_eq(_menu.page(), PauseMenu.Page.LEDGER)
+	var joined: String = "\n".join(_menu.ledger_rows())
+	assert_true(joined.contains("Sponsorship balance"))
+	assert_true(joined.contains("Moonbeam"))
+	assert_false(joined.contains("--"))
+
+
+func test_the_ledger_page_says_so_when_there_is_no_ledger_to_show() -> void:
+	_menu.statement_provider = Callable()
+	assert_eq(_menu.ledger_rows(), [PauseMenu.EMPTY_TEXT])
+
+
 # --- back, and a menu with nothing behind it --------------------------------------------
 
 func test_cancel_from_each_reading_page_returns_to_its_own_row_on_main() -> void:
@@ -482,3 +501,12 @@ func test_a_half_wired_compendium_reads_as_empty() -> void:
 	assert_false(_menu.has_book(), "a roster with no book is not a book")
 	assert_eq(_menu.compendium_header(), "")
 	assert_true(_menu.compendium_region_rows().is_empty())
+
+
+func test_a_delivered_character_reads_as_delivered_and_still_counts_as_caught() -> void:
+	_wire_book()
+	var first: PonyData = _registry.all()[0]
+	_compendium.mark_processed(first.id)
+	_menu.open_page(PauseMenu.Page.COMPENDIUM)
+	assert_true(_menu.compendium_header().contains("1 of"))
+	assert_true(_row_for(first.id).contains("Delivered :)"))

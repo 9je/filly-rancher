@@ -616,6 +616,13 @@ var _aim_direction := Vector3.FORWARD
 ## is exactly the state you sweep across a field in.)
 var _beaming := false
 
+## Whether the Company has "recalled" the horn (game/systems/ledger.gd's collector ladder).
+## A recalled beam will not start, and a recall while she is holding somebody puts that pony
+## DOWN through the ordinary release path. It is a punishment, and every punishment in this
+## game is reversible and takes nothing away: the pony is still there, the bag is still
+## full, and paying the balance down hands the horn straight back.
+var _recalled := false
+
 var _held: Node3D
 var _hold_seconds := 0.0
 ## The two clocks THIS hold is running on, rolled once at _begin_hold() -- not the nominal
@@ -731,6 +738,16 @@ func set_capture_rng(rng: RandomNumberGenerator) -> void:
 ## query has to run inside the physics step), so is_holding() is still false immediately
 ## after this returns -- wait a frame.
 func grab() -> void:
+	_start_beam()
+
+
+## The guts of grab(), factored out so the recall guard has one place to live. Private:
+## grab() is the interface other tasks depend on (see the class comment), so nothing
+## outside this file should call this directly except a test that wants to check the
+## guard without going through Input.
+func _start_beam() -> void:
+	if _recalled:
+		return
 	_beaming = true
 
 
@@ -768,6 +785,25 @@ func is_holding() -> bool:
 ## Whether the beam is switched on at all (holding or sweeping for something to hold).
 func is_active() -> bool:
 	return _beaming
+
+
+## THE COLLECTOR'S RECALL (game/systems/ledger.gd). Called by game/world/ranch.gd's
+## _apply_beam_recall(), never by the beam itself. Idempotent: setting the same value
+## twice is a no-op, so a phase change that fires twice in one frame cannot double-release
+## whatever she happens to be holding.
+func set_recalled(value: bool) -> void:
+	if _recalled == value:
+		return
+	_recalled = value
+	if not _recalled:
+		return
+	if is_holding():
+		release()
+	_beaming = false
+
+
+func is_recalled() -> bool:
+	return _recalled
 
 
 ## What is currently in the beam, or null.
@@ -1303,9 +1339,22 @@ func _mark_at(point: Vector3, normal: Vector3) -> void:
 ## A wild pony, or any loose rigid body. The rigid bodies cost almost nothing to support
 ## and are the part of the mechanic people play with for its own sake -- a beam that can
 ## only pick up quest objects is a menu, not a toy.
+##
+## EXCEPT A PONY WHO HAS ALREADY BEEN DELIVERED. Pony.is_being_delivered() is true for
+## exactly the walk from the pen to the Depot crate, and taking her off it would hand the
+## player the credit AND the pony back: release drops a held pony into
+## _settle_pony(), which stores the very PonyInstance the delivery removed from the save.
+## So she is declined here, at the one gate every grab in this file goes through (the ray
+## hit and the forgiveness pass both ask this), which also keeps the reticle honest --
+## nothing lights up over a pony the beam will not take.
+##
+## THIS IS THE ONE EXCEPTION TO "CAPTURE WINS", AND IT TAKES NOTHING. A declined grab is a
+## beam that does not start; she keeps walking, and the only thing that ever frees her is
+## still her own arrival in Pony._state_leaving. An ORDINARY departure (a pony whose hours
+## ended, no target) stays grabbable to the last step, as it always was.
 func _is_grabbable(body: Object) -> bool:
 	if body is PonyScript:
-		return true
+		return not (body as PonyScript).is_being_delivered()
 	return body is RigidBody3D
 
 
@@ -1457,6 +1506,12 @@ func _settle_pony(pony: Node3D) -> void:
 		# value goes into a save file and process uptime means nothing after a restart.
 		instance = PonyInstanceScript.create(
 			data.id, int(Time.get_unix_time_from_system() * 1000.0))
+		# HER COLOURS COME OFF HER BODY. A wild stock pony has no record until this moment,
+		# so the body the spawner tinted is the only thing that knows what she looks like;
+		# minting without this makes every caught stock pony a differently coloured stranger
+		# the next time she is stood up out of a pen.
+		if pony.has_method("get_stock"):
+			instance.stock = pony.get_stock()
 
 	if instance != null and _storage.store(instance):
 		pony.notify_captured()

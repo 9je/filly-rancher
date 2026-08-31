@@ -75,6 +75,11 @@ extends RefCounted
 ## Version 4 (Phase 2 slice 5) adds "compendium" and "requests"; compendium defaults to {}
 ## (nobody marked seen or caught) and requests defaults to [] (none pending).
 ##
+## Version 5 (Phase 3 slice 1) adds "ledger" and "player"; ledger defaults to {} (a brand
+## new sponsorship balance) and player defaults to {} (the name Twilight and the shipped
+## look). Both are read through their own from_dict(), each of which fills every missing
+## field from its own default, so a version 4 file needs nothing else.
+##
 ## --- JSON HAS NO INTEGER TYPE ---------------------------------------------------------
 ##
 ## Every number in a dictionary that came back from load() is a FLOAT, including the ones
@@ -99,7 +104,7 @@ extends RefCounted
 
 ## The format this build writes, and the highest it will read. See the version policy in
 ## the class comment before changing it.
-const FORMAT_VERSION := 4
+const FORMAT_VERSION := 5
 
 ## The key the version is stamped under. Reserved: a caller's payload must not use it --
 ## save() overwrites it, and load() reads it back out.
@@ -343,6 +348,15 @@ static func migrate(data: Dictionary, from_version: int) -> Dictionary:
 			out["compendium"] = {}
 		if not out.has("requests"):
 			out["requests"] = []
+	if from_version < 5:
+		if not out.has("ledger"):
+			out["ledger"] = {}
+		if not out.has("player"):
+			# PlayerLook.from_dict({}) is Twilight, the shipped look and a blank mark, which
+			# is exactly what the design doc says a version 4 save should load as. Stated
+			# here rather than left to that default so migrate()'s OUTPUT states the version
+			# 5 shape, the way the version 2 branch does.
+			out["player"] = {}
 	return out
 
 

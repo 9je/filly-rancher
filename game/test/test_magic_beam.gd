@@ -26,6 +26,9 @@ const PonyDataScript := preload("res://systems/pony_data.gd")
 ## static and pure and wants no pony in the world at all.
 const PlayerScene := preload("res://actors/player/player.tscn")
 const PonyScript := preload("res://actors/pony/pony.gd")
+## The body a stock pony's colours are minted off, and the record her instance resolves to.
+const PonyScene := preload("res://actors/pony/pony.tscn")
+const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 
 ## Floor for the beam fixture, matching game/test/test_player.gd: big enough that nothing
 ## here can walk off it.
@@ -776,3 +779,130 @@ func test_reach_stays_under_the_notice_invariant_even_with_the_long_beam() -> vo
 		var notice: float = PonyScript.notice_radius_for(personality, false)
 		assert_gte(notice - beam.reach(), MagicBeamScript.MIN_DETECTION_MARGIN,
 			"personality %d notices from %.1f, long beam reaches %.1f" % [personality, notice, beam.reach()])
+
+
+# --- a caught stock pony's colours ------------------------------------------------------
+
+func test_catching_a_stock_pony_carries_her_colours_onto_her_record() -> void:
+	var beam: MagicBeam = _beam()  # the file's existing helper
+	var pony: Pony = PonyScene.instantiate()
+	pony.set_stock({"coat": 1, "mane": 7, "eyes": 3})
+	add_child_autofree(pony)
+	pony.setup(_stock_data())  # a hidden record, resolved through PonyRegistry.by_id
+	beam._settle_pony(pony)
+	var stored: PonyInstance = beam.get_storage().contents()[0]
+	assert_eq(stored.stock, {"coat": 1, "mane": 7, "eyes": 3},
+		"her look is minted with her uid, or a caught stock pony is a stranger on reload")
+
+
+func test_catching_a_named_pony_leaves_her_stock_empty() -> void:
+	var beam: MagicBeam = _beam()
+	var pony: Pony = PonyScene.instantiate()
+	add_child_autofree(pony)
+	pony.setup(_named_data())
+	beam._settle_pony(pony)
+	assert_eq(beam.get_storage().contents()[0].stock, {})
+
+
+# --- the collector's recall (game/systems/ledger.gd's ladder) --------------------------
+
+func test_a_recalled_beam_refuses_to_start() -> void:
+	var beam: MagicBeam = _beam()
+	assert_false(beam.is_recalled())
+	beam.set_recalled(true)
+	assert_true(beam.is_recalled())
+	beam._start_beam()
+	assert_false(beam.is_active(), "the horn is recalled; nothing comes out of it")
+
+
+func test_the_beam_comes_back_and_works() -> void:
+	var beam: MagicBeam = _beam()
+	beam.set_recalled(true)
+	beam.set_recalled(false)
+	beam._start_beam()
+	assert_true(beam.is_active())
+
+
+func test_recalling_a_beam_that_is_holding_a_pony_releases_her_rather_than_losing_her() -> void:
+	var beam: MagicBeam = _beam()
+	var pony: Pony = PonyScene.instantiate()
+	add_child_autofree(pony)
+	pony.setup(_named_data())
+	var ghost: WeakRef = weakref(pony)
+	beam._begin_hold(pony)  # the file's existing helper for putting a pony in the beam
+	beam.set_recalled(true)
+	assert_false(beam.is_holding(), "she is put down, not vanished")
+	assert_not_null(ghost.get_ref(), "NO PONY EVER DIES; a recall is not a way to remove one")
+
+
+## THE OTHER BRANCH OF release(). The test above pins an UNSECURED hold (set down where
+## she is floating, escaped() reported); a hold that has already crossed into SECURED
+## territory when the recall lands takes release()'s other branch instead -- the ordinary
+## winning one, _settle_pony() -- and must end up stored, not merely "not vanished". A
+## recall landing on a secured hold and taking the LOSING branch would free her body with
+## no PonyInstance ever minted for it: a pony gone with no record at all, which is a worse
+## failure than the one the test above pins.
+func test_recalling_a_beam_holding_a_secured_pony_stores_her_as_the_ordinary_catch() -> void:
+	var beam: MagicBeam = _beam()
+	var pony: Pony = PonyScene.instantiate()
+	add_child_autofree(pony)
+	var data: PonyData = _named_data()
+	pony.setup(data)
+	beam._begin_hold(pony)
+	beam._hold_seconds = 999.0  # force is_secured() true regardless of this attempt's roll
+	assert_true(beam.is_secured(), "test setup: this hold must already read as secured")
+
+	beam.set_recalled(true)
+
+	assert_false(beam.is_holding(), "she leaves the beam either way")
+	assert_eq(beam.get_storage().count(), 1,
+		"a secured hold recalled mid air is the ordinary catch outcome, not a loss")
+	assert_eq(beam.get_storage().contents()[0].data_id, data.id,
+		"...and it is HER record that landed in the bag")
+
+
+## A hidden stock base record, resolved the same way every real caught stock pony's
+## PonyInstance.data_id is: through the registry, not a direct path to game/data/hidden/.
+func _stock_data() -> PonyData:
+	var registry := PonyRegistryScript.new()
+	registry.load_all("res://data/ponies")
+	return registry.by_id(&"stock_shy")
+
+
+## An ordinary named character, for the contrast case.
+func _named_data() -> PonyData:
+	var registry := PonyRegistryScript.new()
+	registry.load_all("res://data/ponies")
+	return registry.by_id(&"twilight")
+
+
+# --- the delivery walk is not a shopping trip ----------------------------------------------
+##
+## THE EXPLOIT THESE PIN. deliver_pony() pays for a pony and points her at the Depot crate;
+## she is a live CharacterBody3D walking across the map for the next few seconds. The beam
+## used to accept any Pony at all, so the player could shoot the pony she had just been paid
+## 4,000 bits for, and release() would settle her straight back into the saddlebag with the
+## very PonyInstance the delivery had removed from the save. Credit kept, pony kept, and it
+## repeats for as long as she can keep re-catching her.
+
+func test_the_beam_declines_a_pony_who_is_walking_to_the_crate() -> void:
+	var beam: MagicBeam = _beam()
+	var pony: Pony = PonyScene.instantiate()
+	add_child_autofree(pony)
+	assert_true(beam._is_grabbable(pony), "an ordinary pony is grabbable, or this pins nothing")
+	pony.leave_toward(pony.global_position + Vector3(20.0, 0.0, 0.0))
+	assert_true(pony.is_being_delivered(), "sanity: she is on a delivery walk")
+	assert_false(beam._is_grabbable(pony),
+		"a pony the Company has already paid for is not there to be taken back")
+
+
+func test_the_beam_still_takes_a_pony_whose_hours_simply_ended() -> void:
+	# An ORDINARY departure has no destination and is nobody's property: capture wins over
+	# leaving, exactly as it always did. Only the delivery walk is off limits.
+	var beam: MagicBeam = _beam()
+	var pony: Pony = PonyScene.instantiate()
+	add_child_autofree(pony)
+	pony.leave()
+	assert_true(pony.is_leaving(), "sanity: she is walking off the map")
+	assert_false(pony.is_being_delivered(), "...but nobody sent her anywhere")
+	assert_true(beam._is_grabbable(pony), "she is catchable to the last step, as she always was")

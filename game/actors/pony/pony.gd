@@ -109,6 +109,8 @@ const GaitScript := preload("res://systems/gait.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const PonyVisualsScript := preload("res://actors/pony/pony_visuals.gd")
 const PlayerScript := preload("res://actors/player/player.gd")
+const StockPaletteScript := preload("res://systems/stock_palette.gd")
+const StockTintScript := preload("res://systems/stock_tint.gd")
 
 ## Emitted when a beam hold has become a capture -- i.e. when the beam calls
 ## notify_captured(), immediately before it stores her record and frees this node.
@@ -310,6 +312,10 @@ const LEAVE_DISTANCE := DETECTION_AREA_RADIUS
 ## session.
 const LEAVE_SECONDS := 45.0
 
+## How near a delivered pony has to get to the crate before the walk is over. Wider than a
+## pony is long, so an arrival is not a race between her steering and the frame rate.
+const LEAVE_ARRIVAL_RADIUS := 1.2
+
 ## Width of the band, in metres, over which the leash takes hold -- see _leash(), which
 ## is where the reasoning lives. Derived from `roam_radius` rather than fixed, because a
 ## penned pony's territory is about 2 m across and a wild one's is 8 m, and a band sized
@@ -363,6 +369,14 @@ var beam_holds := 0
 @onready var detection_area: Area3D = $DetectionArea
 
 var _data: PonyData
+## Her palette triple if she is one of the crowd, or {} if she is a named character.
+## `{"coat": int, "mane": int, "eyes": int}`, indices into game/data/stock_palette.tres.
+##
+## ON THE BODY AS WELL AS ON THE RECORD. A WILD stock pony has no PonyInstance at all (an
+## individual identity is a thing a pony acquires by being caught), so the only place her
+## look can live before she is caught is here; MagicBeam copies it onto the instance it
+## mints (see _settle_pony). A penned pony comes the other way, through adopt().
+var _stock: Dictionary = {}
 ## Set only for a pony who has been OWNED -- see adopt() / get_instance(). Null for a wild
 ## pony the spawner put on the map, which is every pony until the beam catches one.
 var _instance: PonyInstance
@@ -375,6 +389,14 @@ var _rng := RandomNumberGenerator.new()
 ## the beam.
 var _leave_elapsed := 0.0
 var _leave_direction := Vector3.ZERO
+
+## Where she is walking TO, and whether there is anywhere in particular. An ordinary
+## departure has no target: she walks away from the player and is discarded once she is out
+## of his sight (see _state_leaving). A DELIVERY has one: the Depot crate. Same state, same
+## walk, same single place in this project where a pony is ever freed. The Depot does not
+## get a second way to remove a pony, because there must not be one.
+var _leave_target := Vector3.ZERO
+var _has_leave_target := false
 
 var _wander_speed := NOMINAL_WANDER_SPEED
 var _flee_speed := NOMINAL_FLEE_SPEED
@@ -432,6 +454,31 @@ func setup(data: PonyData) -> void:
 		_apply_data()
 
 
+## Give her a stock pony's look. Call BEFORE add_child, the same rule setup() states, or
+## call it afterwards and the tint is applied to the body she already has.
+func set_stock(triple: Dictionary) -> void:
+	_stock = triple.duplicate()
+	if is_node_ready():
+		_apply_stock_tint()
+
+
+func get_stock() -> Dictionary:
+	return _stock.duplicate()
+
+
+func is_stock() -> bool:
+	return not _stock.is_empty()
+
+
+## Recolour the built body from _stock. A no op for a named character and for a body that
+## failed to build, both of which are ordinary states rather than errors.
+func _apply_stock_tint() -> void:
+	if _stock.is_empty() or visuals.get_child_count() == 0:
+		return
+	var body: Node3D = visuals.get_child(0)
+	StockTintScript.apply(body, StockPaletteScript.load_stock(), _stock)
+
+
 ## Adopt an INDIVIDUAL: a PonyInstance (game/systems/pony_instance.gd) carrying her uid
 ## and her own happiness/hunger, whose `data_id` resolves to the PonyData her body is
 ## built from. The instance-aware sibling of setup(), and the path a pony taken back OUT of
@@ -453,6 +500,10 @@ func adopt(instance: PonyInstance) -> void:
 	_instance = instance
 	if instance == null:
 		return
+	# Her look comes back with her record, so a pony stood up out of a pen after a reload is
+	# the same pony the player put in it rather than a stranger with the same uid.
+	if not instance.stock.is_empty():
+		_stock = instance.stock.duplicate()
 	setup(instance.data())
 
 
@@ -647,9 +698,40 @@ func leave() -> bool:
 		return false
 	if state == State.LEAVING:
 		return true
+	_has_leave_target = false
 	_leave_elapsed = 0.0
 	_leave_direction = _away_from_player()
 	_transition_to(State.LEAVING)
+	return true
+
+
+## THE DELIVERY WALK. She sets off for `point` and frees herself when she gets there,
+## through exactly the same LEAVING state a runaway uses, so there is still only one way a
+## pony leaves the world.
+##
+## REFUSED WHILE HELD, like leave(), and for the same reason: capture wins. THE RETURN
+## VALUE IS LOAD BEARING, and game/world/ranch.gd's deliver_pony() is why: the Depot pays
+## for a pony only after this answers true, so a refusal here costs the player nothing and
+## leaves her record, her pen and her credit exactly where they were.
+##
+## AND FROM HERE ON THE BEAM WILL NOT TAKE HER: is_being_delivered() answers true for the
+## whole of this walk and game/actors/player/magic_beam.gd's _is_grabbable() declines a pony
+## it answers true for. That is a REFUSAL TO GRAB, not a pony removed. She keeps walking,
+## nothing frees her but her own arrival, and it is the one place capture does not win,
+## because she has already been paid for: a beam that could take her back off the walk would
+## hand the player the credit AND the pony.
+##
+## Re-targeting a pony who is ALREADY leaving is allowed and restarts her timer, so a crate
+## that moves (it does not, today) or a second delivery order cannot strand her.
+func leave_toward(point: Vector3) -> bool:
+	if state == State.HELD:
+		return false
+	_leave_target = point
+	_has_leave_target = true
+	_leave_elapsed = 0.0
+	_leave_direction = _toward_target()
+	if state != State.LEAVING:
+		_transition_to(State.LEAVING)
 	return true
 
 
@@ -657,6 +739,19 @@ func leave() -> bool:
 ## in the ordinary way, which is every pony whose conditions still hold.
 func is_leaving() -> bool:
 	return state == State.LEAVING
+
+
+## IS SHE ON A WALK SOMEBODY SENT HER ON, rather than one she chose? True only while she is
+## LEAVING toward a point handed to her by leave_toward(), which today means exactly one
+## thing: she has been delivered and is walking to the Depot crate.
+##
+## THE BEAM ASKS THIS BEFORE IT GRABS (magic_beam.gd, _is_grabbable). An ordinary departure
+## answers false and stays catchable to the last step, which is the rule everywhere else in
+## the game; a delivered pony answers true and is declined, because the Company has already
+## paid for her. Nothing here removes anybody: a declined grab is a beam that does not
+## start.
+func is_being_delivered() -> bool:
+	return state == State.LEAVING and _has_leave_target
 
 
 func _physics_process(delta: float) -> void:
@@ -798,12 +893,31 @@ func _state_held(delta: float) -> void:
 ## exists to hold a herd in place and she is no longer part of it.
 func _state_leaving(delta: float) -> Vector3:
 	_leave_elapsed += delta
+	if _has_leave_target:
+		var gap := Vector2(_leave_target.x - global_position.x,
+			_leave_target.z - global_position.z).length()
+		# The timer is still the ceiling: a pony who cannot reach the crate (a prop in the
+		# way, a stuck step) is not left walking into a wall forever.
+		if gap <= LEAVE_ARRIVAL_RADIUS or _leave_elapsed >= LEAVE_SECONDS:
+			queue_free()
+			return Vector3.ZERO
+		_leave_direction = _toward_target()
+		return _leave_direction * _flee_speed
 	if _leave_distance() > LEAVE_DISTANCE or _leave_elapsed >= LEAVE_SECONDS:
 		queue_free()
 		return Vector3.ZERO
 	if _leave_direction.length_squared() < 0.0001:
 		_leave_direction = _away_from_player()
 	return _leave_direction * _flee_speed
+
+
+## The flat direction to her destination, or her current heading if she is standing on it.
+func _toward_target() -> Vector3:
+	var to := _leave_target - global_position
+	to.y = 0.0
+	if to.length_squared() < 0.0001:
+		return _leave_direction if _leave_direction.length_squared() > 0.0001 else Vector3.FORWARD
+	return to.normalized()
 
 
 ## How far the player is from her right now, or INF when she cannot see one at all.
@@ -1104,6 +1218,7 @@ func _apply_data() -> void:
 		push_error("Pony: no AnimationPlayer at %s" % PonyVisualsScript.ANIMATION_PLAYER_PATH)
 		return
 	_play(&"idle")
+	_apply_stock_tint()
 
 
 func _personality() -> int:

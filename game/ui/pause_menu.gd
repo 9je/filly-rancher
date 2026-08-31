@@ -3,27 +3,32 @@ extends CanvasLayer
 ## ESCAPE OPENS THIS. It used to free the cursor and nothing else; the owner: "i also
 ## want pause menu instead of losing mouse control with escape". Phase 2 slice 1.
 ##
-## Resume, Compendium, Requests, Save, Settings, Quit. The rules are game/ui/build_menu.gd's:
-## navigable without a mouse on ui_*, PROCESS_MODE_ALWAYS while ranch.gd pauses the tree, and
-## it only emits. ranch.gd saves, quits, applies settings, and pauses or unpauses.
+## Resume, Compendium, Requests, The ledger, Save, Settings, Quit. The rules are
+## game/ui/build_menu.gd's: navigable without a mouse on ui_*, PROCESS_MODE_ALWAYS while
+## ranch.gd pauses the tree, and it only emits. ranch.gd saves, quits, applies settings, and
+## pauses or unpauses.
 ##
 ## `can_open` is how the ranch says "another menu is up": the build and market menus
 ## close on ui_cancel and this opens on `pause`, both of which are Escape, so without the
 ## guard one keypress would close one menu and open this one in the same frame.
 ##
-## THE TWO READING PAGES (phase 2 slice 5). COMPENDIUM is what the player knows of the
-## roster; REQUESTS is what the board is asking for. Both are READ ONLY: ui_accept does
-## nothing on either, because neither is a transaction. A request is paid by ranch.gd the
-## moment its progress completes (game/world/ranch.gd's _pay_out), never by hand from here,
-## so a "claim" row would be a button for something that has already happened.
+## THE THREE READING PAGES (phase 2 slice 5, and LEDGER in phase 3 slice 1). COMPENDIUM is
+## what the player knows of the roster; REQUESTS is what the board is asking for; LEDGER is
+## the Company's own statement, repeated rather than re-derived (see ledger_rows()). All
+## three are READ ONLY: ui_accept does nothing on any of them, because none is a
+## transaction. A request is paid by ranch.gd the moment its progress completes
+## (game/world/ranch.gd's _pay_out), never by hand from here, so a "claim" row would be a
+## button for something that has already happened; the balance is paid down at the Depot,
+## never from this page.
 ##
 ## EVERYTHING THESE PAGES DRAW IS INJECTED AND MAY BE NULL. ranch.gd sets `compendium`,
-## `registry`, `regions`, `board` and `world_state` when it binds this menu
-## (game/world/ranch.gd, _bind_pause_menu). Nothing here ever loads a registry or reaches
-## for GameState itself: this menu is instantiated bare by its own tests and by the boot
-## shutter, neither of which has a ranch behind it, and a page that loaded the roster off
-## disk to draw itself would make those two pay for a ranch they do not have. A page whose
-## sources are missing says EMPTY_TEXT and nothing else.
+## `registry`, `regions`, `board`, `world_state` and `statement_provider` when it binds this
+## menu (game/world/ranch.gd, _bind_pause_menu).
+## Nothing here ever loads a registry or reaches for GameState itself: this menu is
+## instantiated bare by its own tests and by the boot shutter, neither of which has a ranch
+## behind it, and a page that loaded the roster off disk to draw itself would make those two
+## pay for a ranch they do not have. A page whose sources are missing says EMPTY_TEXT and
+## nothing else.
 ##
 ## THE ROSTER ORDER IS PonyRegistry.all()'s, which is the roster sorted by id text. It is
 ## the registry's one stated total order, and it is the same walk Compendium makes to count
@@ -38,12 +43,12 @@ const PonyDataScript := preload("res://systems/pony_data.gd")
 const WorldStateScript := preload("res://systems/world_state.gd")
 const HudScript := preload("res://ui/hud.gd")
 
-enum Page { MAIN, SETTINGS, COMPENDIUM, REQUESTS }
-enum Row { RESUME, COMPENDIUM, REQUESTS, SAVE, SETTINGS, QUIT }
+enum Page { MAIN, SETTINGS, COMPENDIUM, REQUESTS, LEDGER }
+enum Row { RESUME, COMPENDIUM, REQUESTS, LEDGER, SAVE, SETTINGS, QUIT }
 enum SettingRow { VOLUME, SENSITIVITY, INVERT }
 
-const MAIN_ROWS := ["Resume", "Compendium", "Requests", "Save the ranch", "Settings",
-	"Quit to desktop"]
+const MAIN_ROWS := ["Resume", "Compendium", "Requests", "The ledger", "Save the ranch",
+	"Settings", "Quit to desktop"]
 
 ## How many character rows of the compendium are on screen at once. The roster is 43 long
 ## and the panel is not, so the list is a window over it rather than the whole thing.
@@ -77,6 +82,7 @@ const FOOTER_MAIN := "  ↑ ↓  choose      Enter / A  select      Esc / B  res
 const FOOTER_SETTINGS := "  ↑ ↓  choose      ← →  adjust      Esc / B  back"
 const FOOTER_COMPENDIUM := "  ↑ ↓  scroll      Esc / B  back"
 const FOOTER_REQUESTS := "  Finish one to get a new one.      Esc / B  back"
+const FOOTER_LEDGER := "  Esc / B  back"
 
 @onready var _title: Label = $Centre/Panel/Margin/Column/Title
 @onready var _rows: VBoxContainer = $Centre/Panel/Margin/Column/Rows
@@ -99,6 +105,14 @@ var registry: PonyRegistry = null
 var regions: RegionRegistry = null
 var board: RequestBoard = null
 var world_state: WorldState = null
+
+## THE LEDGER PAGE (task 9). `statement_provider` is a `func() -> Array[String]` that
+## repeats the Depot's own statement rather than re-deriving it here, so the pause menu and
+## the Depot counter can never disagree about what she owes. It is injected the same way the
+## five above are, and it is the WHOLE of what this page needs: a Ledger and a PlayerLook
+## were injected alongside it for a while and never read, because the statement they would
+## have been read for arrives already rendered. See ledger_rows().
+var statement_provider := Callable()
 
 var _page: int = Page.MAIN
 var _selected := 0
@@ -183,6 +197,10 @@ func _row_count() -> int:
 			return maxi(1, compendium_rows().size())
 		Page.REQUESTS:
 			return maxi(1, request_rows().size())
+		Page.LEDGER:
+			# The ledger page draws only notes (_draw_ledger(), _add_note()), never a
+			# selectable row, so there is exactly one cursor position on it: nowhere.
+			return 1
 	return MAIN_ROWS.size()
 
 
@@ -214,7 +232,7 @@ func confirm() -> bool:
 			adjust(1)
 			return true
 		return false
-	if _page == Page.COMPENDIUM or _page == Page.REQUESTS:
+	if _page == Page.COMPENDIUM or _page == Page.REQUESTS or _page == Page.LEDGER:
 		# Read only pages; see the class comment.
 		return false
 	match _selected:
@@ -224,6 +242,8 @@ func confirm() -> bool:
 			open_page(Page.COMPENDIUM)
 		Row.REQUESTS:
 			open_page(Page.REQUESTS)
+		Row.LEDGER:
+			open_page(Page.LEDGER)
 		Row.SAVE:
 			save_requested.emit()
 		Row.SETTINGS:
@@ -245,6 +265,8 @@ func back() -> void:
 			_return_to_main(Row.COMPENDIUM)
 		Page.REQUESTS:
 			_return_to_main(Row.REQUESTS)
+		Page.LEDGER:
+			_return_to_main(Row.LEDGER)
 		_:
 			close()
 
@@ -313,11 +335,15 @@ func has_book() -> bool:
 func compendium_header() -> String:
 	if not has_book():
 		return ""
+	# A delivered pony still counts as caught, since she was, on her way to the Depot,
+	# so PROCESSED is folded into the same tally rather than kept as a fourth number
+	# nobody reads.
+	var caught: int = compendium.count(CompendiumScript.State.CAUGHT, registry) \
+		+ compendium.count(CompendiumScript.State.PROCESSED, registry)
 	return "%d of %d caught, %d seen" % [
-		compendium.count(CompendiumScript.State.CAUGHT, registry),
+		caught,
 		compendium.total(registry),
-		compendium.count(CompendiumScript.State.SEEN, registry)
-			+ compendium.count(CompendiumScript.State.CAUGHT, registry),
+		compendium.count(CompendiumScript.State.SEEN, registry) + caught,
 	]
 
 
@@ -410,7 +436,13 @@ func _entry_name(data: PonyData) -> String:
 ## "when: dawn/day, any" once she is CAUGHT, and nothing before that. Catching her is what
 ## buys the schedule; seeing her once only proves she exists.
 func _entry_value(data: PonyData) -> String:
-	if compendium == null or compendium.state_of(data.id) != CompendiumScript.State.CAUGHT:
+	if compendium == null:
+		return ""
+	if compendium.state_of(data.id) == CompendiumScript.State.PROCESSED:
+		# The Company's word for it, in the Company's tone, until the story teaches the
+		# player what it means. See game/systems/compendium.gd.
+		return "Delivered :)"
+	if compendium.state_of(data.id) != CompendiumScript.State.CAUGHT:
 		return ""
 	return "when: %s, %s" % [_phases_text(data), _weathers_text(data)]
 
@@ -477,6 +509,19 @@ func footer_text() -> String:
 	return _footer.text if _footer != null else ""
 
 
+# --- the ledger ------------------------------------------------------------------------
+
+## The Company's account, repeated from the Ledger's own statement rather than re-derived
+## here, so the pause menu and the Depot counter can never disagree about what she owes.
+func ledger_rows() -> Array[String]:
+	if not statement_provider.is_valid():
+		return [EMPTY_TEXT]
+	var lines: Array[String] = []
+	for line in statement_provider.call():
+		lines.append(String(line))
+	return lines if not lines.is_empty() else [EMPTY_TEXT]
+
+
 # --- drawing -------------------------------------------------------------------------------
 
 func _refresh() -> void:
@@ -493,6 +538,8 @@ func _refresh() -> void:
 			_draw_compendium()
 		Page.REQUESTS:
 			_draw_requests()
+		Page.LEDGER:
+			_draw_ledger()
 		_:
 			_draw_main()
 
@@ -541,6 +588,13 @@ func _draw_requests() -> void:
 	for i in range(rows.size()):
 		var row: Dictionary = rows[i]
 		_add_row(i, String(row.get("text", "")), String(row.get("value", "")))
+
+
+func _draw_ledger() -> void:
+	_title.text = "THE LEDGER"
+	_footer.text = FOOTER_LEDGER
+	for line in ledger_rows():
+		_add_note(line)
 
 
 ## A line of text that is not a row: no panel, no border, never selected. The compendium's

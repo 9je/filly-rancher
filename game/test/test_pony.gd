@@ -702,6 +702,65 @@ func test_a_leaving_pony_is_freed_once_she_is_out_of_the_detection_area() -> voi
 		"the departure ended on the distance, not on the safety ceiling")
 
 
+func test_a_pony_can_be_sent_to_a_named_point_rather_than_merely_away() -> void:
+	var pony: Pony = _pony_on_a_floor()  # the file's existing helper
+	var crate := Vector3(6.0, 0.0, 0.0)
+	assert_true(pony.leave_toward(crate))
+	assert_true(pony.is_leaving())
+	assert_eq(pony.state, Pony.State.LEAVING)
+
+
+func test_she_frees_herself_on_reaching_the_crate() -> void:
+	var pony: Pony = _pony_on_a_floor()
+	var ghost: WeakRef = weakref(pony)
+	pony.leave_toward(pony.global_position + Vector3(2.0, 0.0, 0.0))
+	for i in 600:
+		await wait_physics_frames(1)
+		if ghost.get_ref() == null:
+			break
+	assert_null(ghost.get_ref(), "arriving at the crate is what ends the walk")
+
+
+func test_a_held_pony_refuses_to_be_delivered() -> void:
+	var pony: Pony = _pony_on_a_floor()
+	pony.set_held(true)
+	assert_false(pony.leave_toward(Vector3.ZERO), "capture wins over leaving, always")
+	assert_ne(pony.state, Pony.State.LEAVING)
+	pony.set_held(false)
+
+
+func test_grabbing_a_pony_on_her_way_to_the_crate_cancels_the_walk() -> void:
+	var pony: Pony = _pony_on_a_floor()
+	pony.leave_toward(pony.global_position + Vector3(20.0, 0.0, 0.0))
+	pony.set_held(true)
+	assert_false(pony.is_leaving(), "the beam takes her out of LEAVING")
+	pony.set_held(false)
+	assert_false(pony.is_leaving(), "and puts her back into her own life, not back on the walk")
+
+
+func test_a_plain_departure_still_walks_away_from_the_player() -> void:
+	var pony: Pony = _pony_on_a_floor()
+	assert_true(pony.leave())
+	assert_true(pony.is_leaving())
+
+
+# --- stock ---------------------------------------------------------------------------
+
+func test_a_pony_told_she_is_stock_carries_the_triple_and_reads_back() -> void:
+	var pony: Pony = PonyScene.instantiate()
+	pony.set_stock({"coat": 2, "mane": 5, "eyes": 1})
+	assert_true(pony.is_stock())
+	assert_eq(pony.get_stock(), {"coat": 2, "mane": 5, "eyes": 1})
+	pony.free()
+
+
+func test_a_named_pony_is_not_stock() -> void:
+	var pony: Pony = PonyScene.instantiate()
+	assert_false(pony.is_stock())
+	assert_eq(pony.get_stock(), {})
+	pony.free()
+
+
 # --- helpers ------------------------------------------------------------------------
 
 ## A pony wearing a real model but the personality and base_speed this test is about.
@@ -718,6 +777,13 @@ func _spawn(personality: int, base_speed: float, position: Vector3) -> Character
 	_world.add_child(pony)
 	pony.setup(data)
 	return pony
+
+
+## A bare BOLD pony standing on the test floor, with no player anywhere in the world. The
+## Depot delivery tests below are about leave_toward() itself, not about a personality's
+## reaction, so BOLD (no reaction state) keeps the two apart.
+func _pony_on_a_floor() -> Pony:
+	return _spawn(PonyDataScript.Personality.BOLD, 4.0, Vector3.ZERO) as Pony
 
 
 ## A stand-in that can also answer is_sneaking(), which is how Pony._player_is_sneaking()
@@ -747,3 +813,25 @@ func _add_player(position: Vector3) -> Sneaker:
 	body.position = position
 	_world.add_child(body)
 	return body
+
+
+## THE FLAG THE BEAM READS. A delivered pony is walking to the crate having already been
+## paid for, and game/actors/player/magic_beam.gd declines to grab her; an ordinary
+## departure answers false here and stays catchable. Two states that look identical from
+## outside (both are LEAVING) and must not be treated identically.
+func test_only_a_pony_sent_somewhere_counts_as_being_delivered() -> void:
+	var pony: Pony = _pony_on_a_floor()
+	assert_false(pony.is_being_delivered(), "standing in a field is not a delivery")
+	pony.leave()
+	assert_true(pony.is_leaving(), "she is on her way out")
+	assert_false(pony.is_being_delivered(),
+		"...but she chose it herself, and the beam may still have her")
+
+
+func test_a_pony_pointed_at_the_crate_is_being_delivered_for_the_whole_walk() -> void:
+	var pony: Pony = _pony_on_a_floor()
+	pony.leave_toward(pony.global_position + Vector3(20.0, 0.0, 0.0))
+	assert_true(pony.is_being_delivered(), "the walk begins under the Company's hand")
+	await wait_physics_frames(10)
+	assert_true(is_instance_valid(pony) and pony.is_being_delivered(),
+		"and stays that way while she walks, which is when the exploit would land")

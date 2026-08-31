@@ -175,6 +175,7 @@ const HINTS_ACTION := &"toggle_hints"
 @onready var _pips: Control = $Bag/Pips
 @onready var _bag_count: Label = $Bag/Count
 @onready var _bits: Label = $Bag/Bits
+@onready var _balance: Label = $Bag/Balance
 @onready var _world_line: Label = $Bag/World
 @onready var _bag_title: Label = $Bag/Title
 @onready var _toast: Label = $Toast
@@ -211,6 +212,7 @@ func _ready() -> void:
 	_style_label(_bag_count, 26, Color(1.0, 1.0, 1.0, 0.92))
 	_style_label(_bits, 22, Color(1.00, 0.80, 0.25, 1.0))
 	_bits.text = "0 bits"
+	_style_label(_balance, 16, COLOR_WORLD_LINE)
 	_style_label(_world_line, 22, COLOR_WORLD_LINE)
 	_world_line.text = ""
 	_style_label(_toast, 40, Color(1.0, 0.96, 0.86, 1.0))
@@ -555,6 +557,26 @@ func set_bits(total: int) -> void:
 
 func get_bits_text() -> String:
 	return _bits.text
+
+
+## The Company's account, on screen from minute one and never hidden. Shown beside the
+## wallet on purpose: the two numbers are the whole of the game's tension and reading one
+## without the other is what lets a player feel rich.
+func set_balance(total: int) -> void:
+	_balance.text = _balance_text(total)
+
+
+func get_balance_text() -> String:
+	return _balance.text
+
+
+## A NEGATIVE BALANCE IS CREDIT, AND SAYS SO. A minus sign in front of a debt is the one
+## place a player will misread this number, and a delivered legendary really can push it
+## under zero.
+static func _balance_text(total: int) -> String:
+	if total < 0:
+		return "CWC balance: %d bits in credit" % absi(total)
+	return "CWC balance: %d bits" % total
 
 
 ## THE HOUR AND THE SKY, IN WORDS. Set by game/world/ranch.gd from WorldState.describe()

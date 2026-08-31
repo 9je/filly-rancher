@@ -358,6 +358,23 @@ func test_a_resident_gets_a_body_leashed_to_the_pen() -> void:
 		"...on the same layer the spawner puts a wild pony on")
 
 
+func test_a_penned_stock_pony_keeps_her_colours() -> void:
+	# IN TREE, like test_a_resident_gets_a_body_leashed_to_the_pen just above: _spawn_body()
+	# does nothing outside the tree (pen.gd), so _pen()'s out-of-tree pen never grows a body
+	# to check the colours on.
+	var pen: Pen = PenScript.new()
+	pen.capacity = 3
+	pen.slot_id = &"slot_stock"
+	add_child_autofree(pen)
+	var inst := PonyInstanceScript.create(&"stock_curious")
+	inst.stock = {"coat": 4, "mane": 1, "eyes": 0}
+	assert_true(pen.add_pony(inst))
+	var body: Node3D = pen.body_for(inst.uid)
+	assert_not_null(body, "a resident has a body standing in the pen")
+	assert_eq(body.get_stock(), {"coat": 4, "mane": 1, "eyes": 0},
+		"the body wears what her record says")
+
+
 func test_a_removed_resident_loses_her_body() -> void:
 	var pen: Pen = PenScript.new()
 	pen.capacity = 2
@@ -783,3 +800,54 @@ func test_a_full_resident_does_not_eat() -> void:
 	pen.add_pony(her)
 	pen.tick(0.1)
 	assert_eq(inv.count(&"hay"), 1, "food is not wasted on a pony who is not hungry")
+
+
+# --- the Depot: a live body released, and the collector's padlock ------------------------
+
+func test_a_released_body_leaves_the_pen_alive_and_reparented() -> void:
+	var pen: Pen = _pen(3)
+	add_child_autofree(pen)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	var inst := PonyInstanceScript.create(&"stock_bold")
+	inst.stock = {"coat": 1, "mane": 1, "eyes": 1}
+	pen.add_pony(inst)
+	var body: Node3D = pen.body_for(inst.uid)
+	var where: Vector3 = body.global_position
+	var released: Node3D = pen.release_body(inst.uid, host)
+	assert_eq(released, body, "the same body, still alive")
+	assert_true(is_instance_valid(released))
+	assert_eq(released.get_parent(), host)
+	assert_almost_eq(released.global_position, where, Vector3(0.01, 0.01, 0.01),
+		"she is standing where she was standing")
+	assert_null(pen.find_pony(inst.uid), "and the pen no longer has a record of her")
+	# SHE MUST BE ABLE TO WALK BACK OUT THROUGH HER OWN GATE. A resident's collision_mask
+	# carries PEN_GATE (Pen._spawn_body(), CollisionLayers.PONY_WALKABLE) so a resident
+	# cannot leave on her own; a body handed to the Depot's crate walk that still carried
+	# that mask would be trapped at her own gate leaf for the whole of Pony.LEAVE_SECONDS
+	# and never actually reach the crate. Found by scenes/test/depot_test.gd, which is the
+	# first place in the suite that runs a released body through real physics frames.
+	assert_eq((released as CollisionObject3D).collision_mask, LayersScript.WALKABLE,
+		"released, she carries a walking character's mask, not a resident's")
+	assert_eq(pen.count(), 0)
+	assert_eq(inst.home_slot, &"", "her address is cleared by the pen, as always")
+
+
+func test_releasing_a_pony_who_is_not_here_answers_null_and_changes_nothing() -> void:
+	var pen: Pen = _pen(3)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	assert_null(pen.release_body(&"nobody#000001", host))
+	assert_eq(pen.count(), 0)
+
+
+func test_a_padlocked_pen_makes_no_gems_and_keeps_its_ponies() -> void:
+	var pen := _pen(3)
+	var inst := PonyInstanceScript.create(&"stock_shy")
+	inst.happiness = 1.0
+	pen.add_pony(inst)
+	pen.set_padlocked(true)
+	assert_eq(pen.tick(120.0), 0, "no gems until the balance is back under the ceiling")
+	assert_eq(pen.count(), 1, "and nobody is taken")
+	pen.set_padlocked(false)
+	assert_gt(pen.tick(120.0), 0, "paying gives the pen back")

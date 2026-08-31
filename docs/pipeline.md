@@ -936,6 +936,47 @@ Blender pony standing in the same field are lit alike.
   drops accessories and the eye-lens refraction shell. That last one is a
   judgement call and is flagged as such in the code.
 
+### Recolouring a pony
+
+Phase 3 slice 1 adds a second population beside the named roster: a stock crowd, and
+the player's own pony, both built from one base model and recoloured per instance
+rather than authored per character. The base model is `pokeypierce.glb`; every stock
+pony and the player both wear it, tinted differently.
+
+**The material names are the handle.** The reVAmped rig's glTF materials are named
+`body`, `hair`, `tail`, `eyeball_l`, `eyeball_r` and `wings`, and Godot's glTF importer
+copies each glTF material's name straight into the imported
+`StandardMaterial3D.resource_name`. `game/systems/stock_tint.gd` matches on that name,
+not on a surface index (an index would break the moment a re-export put the surfaces in
+another order): `body` and `wings` take the coat colour, `hair` and `tail` take the mane
+colour, `eyeball_l` and `eyeball_r` take the eye colour.
+
+**A coat or mane surface drops its texture; an eyeball surface keeps its.** The base
+model's `body` and `hair` textures are flat colour already (the body texture is 99.2%
+one RGB value, the rest being the character's own cutie mark), so replacing them with a
+plain `albedo_color` loses nothing an unregistered stock pony should have anyway. The
+normal map is kept either way, so a tinted pony still lights and silhouettes like the
+model she was built from. The eyeball texture is different: it carries the pupil, the
+white and the iris, so it is kept and the swatch colour modulates it instead of
+replacing it -- an eye swatch tints the baked iris rather than standing in for it.
+
+**The cutie mark is a `Decal` per flank**, not a texture edit -- the base model has no
+spare UV island to paint one into. Each `Decal` hangs off a `BoneAttachment3D` at the
+`Pelvis` bone (or `Chest1`, for a rig that names its hips something else) so it follows
+the haunch through the walk cycle. Placement is computed in the model's own local space
+and converted through the attachment's transform, so it lands on the flank whatever the
+bone's rest pose turns out to be. The measured numbers (`game/systems/cutie_mark.gd`):
+the body mesh spans x in [-0.238, 0.238], y in [0.459, 1.164] and z in [-0.504, 0.393]
+in model space, with the tail at +z; a flank decal sits at x = ±0.26 (just clear of the
+surface), y = 0.86 (mid barrel), z = 0.22 (the haunch), 0.30 m across the flank and 0.30
+m along her, projecting 0.26 m into the pony -- shallow enough that the two flanks'
+projections cannot reach each other through the barrel.
+
+**A new pony model is usable as a stock base only if its material names match that
+list.** That is the one thing to check before pointing `StockTint`/`CutieMark` at a
+second base model: `body`, `hair`, `tail`, `eyeball_l`, `eyeball_r` (and `wings`, if the
+model has any), named exactly that in the exported glTF, or the tint and the mark both
+silently touch nothing.
 
 ---
 
@@ -1229,8 +1270,11 @@ tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/smoke.ts
 # raycast onto real ground inside their zones, camera spring arm pulling in against
 # an actual building). Prints the marker ONLY if all of them held.
 tools/bin/godot --headless --audio-driver Dummy --path game world/ranch.tscn
-# -> RANCH_OK ponies=22 props=58 assets=present   exit 0
+# -> RANCH_OK ponies=49 props=59 assets=present   exit 0
 # (assets=absent + zero counts on a checkout that has not run the asset pipeline)
+# Both counts moved from an earlier build's 22/58: the crowd (Phase 3 slice 1) fills every
+# region with stock ponies alongside the named roster, and the Depot building (the same
+# slice) is one more prop beside the Market and the request board.
 
 # Hair follow-through: measures how far the mane/tail trail the body, against a
 # rigid-hair baseline, over a scripted start-and-stop (see docs/notes-hair-sim.md)
@@ -1434,12 +1478,14 @@ Task 7 the main scene is `res://world/ranch.tscn` (`game/project.godot`), not
 `res://scenes/test/smoke.tscn`. The Linux binary prints:
 
 ```
-RANCH_OK ponies=22 props=58 assets=present
+RANCH_OK ponies=49 props=59 assets=present
 ```
 
 exit 0 — the same line the headless scene run prints, confirming the exported
 binary boots the packed ranch, builds its terrain, loads its props, spawns its
 herd and passes every check `game/world/ranch.gd` runs, not just that it starts.
+Both counts moved from an earlier build's 22/58 for the reason given above (§7):
+the crowd and the Depot are Phase 3 slice 1 additions.
 `smoke.tscn` still exists and still prints `SMOKE_OK` when run directly as a
 gate; it is simply no longer what the game boots into, and `SMOKE_OK` has been
 removed from the accepted markers in `.github/workflows/smoke_run.sh` so a

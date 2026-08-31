@@ -11,7 +11,20 @@ extends RefCounted
 
 const PonyDataScript := preload("res://systems/pony_data.gd")
 
+## Records that must RESOLVE by id but must never be LISTED. The stock pony base records
+## live here (game/systems/stock_palette.gd IDS), and Phase 3 slice 4's talk box NPCs will
+## join them. A PonyInstance carrying data_id &"stock_shy" has to reach a real PonyData or
+## her pen has no body to build and her save row has no name; and the same record must be
+## invisible to the Compendium, to the pause menu's roster page and to every spawn table,
+## or the collection quietly grows entries the player can never complete.
+##
+## Loaded by load_all() from a fixed path rather than from its `dir` argument: the tests
+## and the fixtures point `dir` at directories of their own, and a fixture registry that
+## silently lost the base records would fail far away from the line that caused it.
+const HIDDEN_DIR := "res://data/hidden"
+
 var _by_id: Dictionary = {}  # StringName -> PonyData
+var _hidden: Dictionary = {}  # StringName -> PonyData
 
 
 ## Scans `dir` for `.tres` files, loads each as a PonyData resource, and
@@ -47,6 +60,8 @@ func load_all(dir: String) -> Dictionary:
 				_load_one(path)
 		file_name = da.get_next()
 	da.list_dir_end()
+
+	_load_hidden()
 
 	return _by_id
 
@@ -105,6 +120,42 @@ func _load_one(path: String) -> void:
 	_by_id[data.id] = data
 
 
+## Fill the hidden index. Missing directory is not an error worth failing a load over: a
+## checkout without game/data/hidden/ is a broken checkout, and PonyInstance.data()
+## answering null is already a supported answer everywhere it is read.
+func _load_hidden() -> void:
+	_hidden.clear()
+	var da := DirAccess.open(HIDDEN_DIR)
+	if da == null:
+		return
+	da.list_dir_begin()
+	var seen := {}
+	var file_name := da.get_next()
+	while file_name != "":
+		if not da.current_is_dir():
+			var path := _resource_path(HIDDEN_DIR, file_name)
+			if path != "" and not seen.has(path):
+				seen[path] = true
+				var res: Resource = load(path)
+				if res != null and res is PonyDataScript:
+					var data: PonyData = res
+					_hidden[data.id] = data
+				else:
+					push_error("PonyRegistry: '%s' did not load as a PonyData resource" % path)
+		file_name = da.get_next()
+	da.list_dir_end()
+
+
+## Every hidden id this registry can resolve, in text order, for the gates.
+func hidden_ids() -> Array[StringName]:
+	var out: Array[StringName] = []
+	for id: StringName in _hidden.keys():
+		out.append(id)
+	out.sort_custom(func(a: StringName, b: StringName) -> bool:
+		return String(a) < String(b))
+	return out
+
+
 ## The PonyData indexed under `id`, or NULL if this registry has never heard of her.
 ##
 ## NULL IS A SUPPORTED ANSWER. A PonyInstance (game/systems/pony_instance.gd) stores only
@@ -116,8 +167,14 @@ func _load_one(path: String) -> void:
 ## Not a `has()` plus an indexed read at every call site: two lookups where one will do,
 ## and the two-step version invites the race-free-looking `if has(x): use(_by_id[x])`
 ## pattern that stops being right the moment anything can reload the registry.
+##
+## HIDDEN RECORDS RESOLVE HERE AND NOWHERE ELSE. See HIDDEN_DIR: the stock pony base
+## records answer by_id() so a penned or saved stock pony has a body and a name, and they
+## are absent from ids(), all(), by_zone() and by_rarity() so the collection stays the 43
+## authored characters.
 func by_id(id: StringName) -> PonyData:
-	return _by_id.get(id, null)
+	var found: PonyData = _by_id.get(id, null)
+	return found if found != null else _hidden.get(id, null)
 
 
 ## Every id this registry has loaded, SORTED BY THE TEXT of the name.

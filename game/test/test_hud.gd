@@ -293,6 +293,20 @@ func test_the_bits_line_shows_the_wallet() -> void:
 	assert_eq(_hud.get_bits_text(), "1234 bits")
 
 
+## THE COMPANY'S BALANCE, beside the wallet on purpose (game/systems/ledger.gd's class
+## comment): the two numbers together are the whole of the game's tension.
+func test_the_hud_shows_the_company_balance() -> void:
+	_hud.set_balance(25000)
+	assert_eq(_hud.get_balance_text(), "CWC balance: 25000 bits")
+	assert_false(_hud.get_balance_text().contains("--"))
+
+
+## A NEGATIVE BALANCE IS CREDIT, AND SAYS SO -- see hud.gd's _balance_text().
+func test_a_negative_balance_reads_as_credit_rather_than_as_a_minus_sign() -> void:
+	_hud.set_balance(-400)
+	assert_eq(_hud.get_balance_text(), "CWC balance: 400 bits in credit")
+
+
 ## THE WORLD LINE IS THE ONLY PLACE THE HOUR IS EVER STATED. game/world/ranch.gd sets it
 ## from WorldState.describe() at boot and again on every phase or weather change; a HUD that
 ## accepted the line and dropped it would leave the player reading the hour off the light,

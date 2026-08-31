@@ -49,6 +49,8 @@ const ZoneMarkerScript := preload("res://world/zone_marker.gd")
 const PonyScript := preload("res://actors/pony/pony.gd")
 const WorldStateScript := preload("res://systems/world_state.gd")
 const LayersScript := preload("res://world/collision_layers.gd")
+const StockPaletteScript := preload("res://systems/stock_palette.gd")
+const RegionRegistryScript := preload("res://systems/region_registry.gd")
 
 const FIXTURE_DIR := "res://test/fixtures/ponies_conditional"
 
@@ -72,6 +74,7 @@ var _world: Node3D
 func before_each() -> void:
 	_world = Node3D.new()
 	add_child_autofree(_world)
+	_stock_worlds = {}
 
 	var floor_body := StaticBody3D.new()
 	floor_body.collision_layer = LayersScript.TERRAIN
@@ -400,6 +403,165 @@ func test_a_leaving_pony_is_gone_within_leave_seconds() -> void:
 		"the storm ponies are off the map, and their records are still on disk")
 
 
+# --- stock: the crowd, the budget and the respawn timer -------------------------------
+##
+## Run against the REAL roster and the REAL regions, not the fixtures above: stock_budget()
+## reads the shipped RegionRegistry, and the "orchard"/"ranch" zone ids below only mean
+## anything against it. _build_world() gives every marker the real "ranch" zone (a big
+## enough pool that two markers drawing two named ponies apiece do not collide), and each
+## test that cares about a REGION overrides zone_id on the marker it gets back.
+
+func test_a_marker_stands_its_whole_stock_budget() -> void:
+	var world := _build_world(2, 3)  # two markers, spawn_count 2 each; helper already here
+	for marker: ZoneMarker in world.spawner.get_markers():
+		marker.stock_count = 3
+	world.spawner.populate(WorldStateScript.Phase.DAY, WorldStateScript.Weather.CLEAR)
+	assert_eq(world.spawner.stock_standing(), 6, "three stock per marker, two markers")
+	assert_eq(world.spawner.named_standing(), 4, "the named draw is untouched by stock")
+
+
+func test_stock_ponies_may_stand_twice_but_named_ponies_may_not() -> void:
+	var world := _build_world(2, 1)
+	for marker: ZoneMarker in world.spawner.get_markers():
+		marker.stock_count = 4
+	world.spawner.populate(WorldStateScript.Phase.DAY, WorldStateScript.Weather.CLEAR)
+	var counts := {}
+	for pony in world.spawner.get_spawned():
+		var data: PonyData = pony.get_data()
+		counts[data.id] = int(counts.get(data.id, 0)) + 1
+	for id in counts:
+		if StockPaletteScript.is_stock_id(id):
+			continue
+		assert_eq(int(counts[id]), 1, "a named character stands in exactly one place")
+	assert_gt(world.spawner.stock_standing(), 3, "the crowd is allowed to repeat itself")
+
+
+func test_every_stock_pony_carries_a_palette_triple() -> void:
+	var world := _build_world(1, 1)
+	world.spawner.get_markers()[0].stock_count = 5
+	world.spawner.populate(WorldStateScript.Phase.DAY, WorldStateScript.Weather.CLEAR)
+	var seen_triples := {}
+	for pony in world.spawner.get_spawned():
+		if not pony.is_stock():
+			continue
+		var triple: Dictionary = pony.get_stock()
+		assert_true(triple.has("coat") and triple.has("mane") and triple.has("eyes"),
+			"a stock pony's look is a coat, a mane and a pair of eyes")
+		seen_triples[str(triple)] = true
+	assert_gt(seen_triples.size(), 1, "five stock ponies are not five copies of one pony")
+
+
+## NOT A CROSS-BOOT DETERMINISM TEST, and its old name (..._is_deterministic_for_a_seed)
+## claimed it was. _build_world() memoizes, so both calls below hand back the SAME spawner,
+## and Spawner._fill_stock() seeds its per-marker draw off marker.get_instance_id(), which
+## is a fresh number for every ZoneMarker ever built, so two separately built worlds would
+## never agree and the test would have been pinning a fiction. What it really checks, and
+## what is worth checking, is that populate() over a world that already has its crowd
+## standing leaves that crowd alone rather than drawing a second one on top of it.
+func test_populating_a_standing_crowd_twice_leaves_the_same_crowd() -> void:
+	var first: Array = _stock_signature(_build_world(1, 1))
+	var second: Array = _stock_signature(_build_world(1, 1))
+	assert_eq(first, second, "populate() over a full world tops nothing up and replaces nobody")
+
+
+func test_a_marker_budget_is_clamped_into_its_region_band() -> void:
+	var world := _build_world(1, 1)
+	var marker: ZoneMarker = world.spawner.get_markers()[0]
+	marker.zone_id = &"orchard"
+	marker.stock_count = 99
+	var region: RegionData = RegionRegistryScript.new().load_all().get(&"orchard")
+	assert_eq(world.spawner.stock_budget(marker), region.stock_max,
+		"a region's data file caps how crowded it may be")
+	marker.stock_count = 0
+	assert_eq(world.spawner.stock_budget(marker), region.stock_min,
+		"and how empty")
+
+
+## A REGION FILE WITH ITS BAND THE WRONG WAY ROUND. clampi() with max below min returns the
+## MAX, so stock_min 4 / stock_max 2 would quietly stand 2 ponies in a field its own data
+## file asks for at least 4 of. Hand authored .tres, one place the two numbers are ever
+## compared: the upper bound is raised to the lower one instead.
+func test_an_inverted_region_band_reads_as_at_least_its_minimum() -> void:
+	var world := _build_world(1, 1)
+	var marker: ZoneMarker = world.spawner.get_markers()[0]
+	marker.zone_id = &"orchard"
+
+	# A hand authored region file with its two numbers the wrong way round, swapped into the
+	# registry the spawner reads. The shipped .tres is not touched.
+	var registry: RegionRegistry = RegionRegistryScript.new()
+	registry.load_all()
+	var inverted: RegionData = registry.by_id(&"orchard").duplicate()
+	inverted.stock_min = 4
+	inverted.stock_max = 2
+	registry._by_id[&"orchard"] = inverted
+	world.spawner._regions = registry
+
+	marker.stock_count = 99
+	assert_eq(world.spawner.stock_budget(marker), 4,
+		"a band the wrong way round reads as 'at least stock_min', not 'at most stock_max'")
+	marker.stock_count = 0
+	assert_eq(world.spawner.stock_budget(marker), 4,
+		"and the minimum is still a minimum")
+
+
+func test_a_marker_outside_every_region_uses_its_own_count() -> void:
+	var world := _build_world(1, 1)
+	var marker: ZoneMarker = world.spawner.get_markers()[0]
+	marker.zone_id = &"ranch"
+	marker.stock_count = 4
+	assert_eq(world.spawner.stock_budget(marker), 4, "the homestead is behind no permit")
+
+
+func test_stock_respawns_on_a_timer_after_one_is_taken() -> void:
+	var world := _build_world(1, 1)
+	world.spawner.get_markers()[0].stock_count = 3
+	world.spawner.populate(WorldStateScript.Phase.DAY, WorldStateScript.Weather.CLEAR)
+	assert_eq(world.spawner.stock_standing(), 3)
+	var victim: CharacterBody3D = null
+	for pony in world.spawner.get_spawned():
+		if pony.is_stock():
+			victim = pony
+			break
+	victim.free()
+	# A DUMMY RENDERER ARTIFACT, NOT A BUG IN THE TALLY BELOW. Every hidden stock record
+	# shares one base model (game/data/hidden/*.tres all point at pokeypierce.glb, by
+	# Task 1's design), and freeing a tinted body while a sibling standing on the same
+	# shared mesh survives prints one engine "Parameter material is null" line out of
+	# servers/rendering/dummy/storage/material_storage.cpp the instant she frees. Reproduced
+	# in isolation against StockTint/PonyVisuals alone, with no Pony and no Spawner involved:
+	# it never leaves anything actually broken (the survivor keeps rendering, the tally below
+	# is exactly right), it only fires under the headless Dummy backend these gates run under,
+	# and it fires whether the free is immediate or queued. Marked handled, not silenced
+	# outright, so an unrelated engine error occurring here still fails this test.
+	for e in get_errors():
+		if e.is_engine_error() and e.contains_text("material"):
+			e.handled = true
+	assert_eq(world.spawner.stock_standing(), 2, "a freed body leaves the tally at once")
+	assert_eq(world.spawner.tick_stock(SpawnerScript.STOCK_RESPAWN_SECONDS * 0.5), 0,
+		"half the timer buys nothing")
+	assert_eq(world.spawner.tick_stock(SpawnerScript.STOCK_RESPAWN_SECONDS * 0.6), 1,
+		"and the rest of it brings one back")
+	assert_eq(world.spawner.stock_standing(), 3)
+
+
+func test_a_full_marker_never_respawns() -> void:
+	var world := _build_world(1, 1)
+	world.spawner.get_markers()[0].stock_count = 2
+	world.spawner.populate(WorldStateScript.Phase.DAY, WorldStateScript.Weather.CLEAR)
+	assert_eq(world.spawner.tick_stock(SpawnerScript.STOCK_RESPAWN_SECONDS * 10.0), 0,
+		"a field that is already full stays as it is")
+
+
+func test_a_change_of_sky_does_not_move_the_crowd() -> void:
+	var world := _build_world(1, 1)
+	world.spawner.get_markers()[0].stock_count = 4
+	world.spawner.populate(WorldStateScript.Phase.DAY, WorldStateScript.Weather.CLEAR)
+	var before: int = world.spawner.stock_standing()
+	world.spawner.refresh(WorldStateScript.Phase.NIGHT, WorldStateScript.Weather.STORM, 0,
+		Vector3(500.0, 0.0, 500.0))
+	assert_eq(world.spawner.stock_standing(), before, "stock ponies keep no hours")
+
+
 # --- helpers -------------------------------------------------------------------------
 
 ## A spawner over one marker per entry in `specs`, each `[zone_id, spawn_count]`, on the
@@ -474,3 +636,69 @@ func _assert_no_duplicates(spawner: Spawner, when: String) -> void:
 ## can actually see rather than against this.
 func _far_away() -> Vector3:
 	return Vector3(500.0, 0.0, 500.0)
+
+
+# --- the stock harness -----------------------------------------------------------------
+##
+## A second, smaller harness than _spawner()'s: the stock tests need the REAL roster (the
+## fixture roster has at most two unconditional ponies per zone, nowhere near enough to
+## draw two markers of two named ponies apiece without a collision) and the REAL "ranch"
+## zone_id, which two of the tests above overwrite with a real region's id to reach
+## stock_budget()'s clamp. `pony_dir` is left at Spawner's own default (res://data/ponies)
+## rather than pointed at FIXTURE_DIR for that reason.
+
+## Memoized per (markers, stock_count) and reset each before_each(). Spawner._fill_stock()
+## seeds its per-marker draw off `marker.get_instance_id()` (see game/world/spawner.gd),
+## which is a fresh, ever-increasing number for every ZoneMarker.new(): two markers built
+## a moment apart never share one. Building fresh markers for every call would therefore
+## make test_populating_a_standing_crowd_twice_leaves_the_same_crowd compare two different
+## seeds and call that a bug; memoizing here means "call it twice" reads back the one crowd
+## this helper actually stood, which is the idempotence populate()'s own tests above pin
+## everywhere else in this file.
+var _stock_worlds: Dictionary = {}
+
+
+## A spawner over `markers` ZoneMarkers, each zoned "ranch" (the class default) with
+## spawn_count 2 and an initial `stock_count`, sharing the floor before_each() builds.
+## Returns a Dictionary so a test reads `world.spawner`; see the class comment on why
+## this is not a plain Spawner.
+func _build_world(markers: int, stock_count: int) -> Dictionary:
+	var key := "%d:%d" % [markers, stock_count]
+	if _stock_worlds.has(key):
+		return _stock_worlds[key]
+
+	var zones := Node3D.new()
+	zones.name = "StockZones%d" % _world.get_child_count()
+	_world.add_child(zones)
+	var x := -12.0
+	for i in range(markers):
+		var marker: ZoneMarker = ZoneMarkerScript.new()
+		marker.spawn_radius = 4.0
+		marker.roam_radius = 2.0
+		marker.spawn_count = 2
+		marker.stock_count = stock_count
+		marker.position = Vector3(x, 0.0, 0.0)
+		zones.add_child(marker)
+		x += 24.0
+
+	var spawner: Spawner = SpawnerScript.new()
+	spawner.spawn_seed = SEED
+	_world.add_child(spawner)
+	spawner.zones_path = spawner.get_path_to(zones)
+
+	var world := {"spawner": spawner}
+	_stock_worlds[key] = world
+	return world
+
+
+## The stock crowd's palette triples, sorted, after populate() has stood them. What
+## test_populating_a_standing_crowd_twice_leaves_the_same_crowd compares between two calls.
+func _stock_signature(world: Dictionary) -> Array:
+	var spawner: Spawner = world.spawner
+	spawner.populate(WorldStateScript.Phase.DAY, WorldStateScript.Weather.CLEAR)
+	var sig: Array = []
+	for pony in spawner.get_spawned():
+		if pony.is_stock():
+			sig.append(str(pony.get_stock()))
+	sig.sort()
+	return sig
