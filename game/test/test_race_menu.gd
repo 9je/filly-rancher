@@ -5,6 +5,7 @@ extends GutTest
 const RaceMenuScene := preload("res://ui/race_menu.tscn")
 const RaceCardScript := preload("res://systems/race_card.gd")
 const CompanyRunnersScript := preload("res://systems/company_runners.gd")
+const MenuStyleScript := preload("res://ui/menu_style.gd")
 
 var _menu: RaceMenu = null
 var _chips := 500
@@ -160,6 +161,18 @@ func test_moving_past_the_last_lane_reaches_the_stake_and_raises_it() -> void:
 		[&"b#000002", 3, _menu.stakes()[1]])
 
 
+## MOVED (Task 4): the footer is now MenuStyle's shared builder, the same as every other
+## table's, and no longer carries a hand written note about the stake. Where the stake
+## lives is documented in the tab strip instead, which prints it on the BET tab whenever
+## a field is up (see RaceMenu.tabs_text()).
 func test_the_footer_documents_where_the_stake_actually_lives() -> void:
-	assert_true(_menu._footer.text.to_lower().contains("stake"),
-		"the footer must say where left/right moves the stake, or nobody will find it")
+	assert_eq(_menu._footer.text, MenuStyleScript.footer_tabs_and_rows("confirm", "leave"),
+		"the footer now comes from the shared builder, not a hand written line")
+	var field: Array[Dictionary] = _field()
+	var odds: Array[float] = []
+	for lane in RaceCardScript.LANES:
+		odds.append(RaceCardScript.decimal_odds(field, lane))
+	_menu.set_field(field, odds)
+	_menu.set_tab(RaceMenu.Tab.BET)
+	assert_true(_menu._tabs.text.to_lower().contains("stake"),
+		"the stake position must still be documented somewhere, even off the footer")

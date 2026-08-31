@@ -11,6 +11,8 @@ extends CanvasLayer
 ## Three tabs rather than three menus, because they are three questions about one account
 ## and the player is standing at one counter.
 
+const MenuStyleScript := preload("res://ui/menu_style.gd")
+
 enum Tab { DELIVER, PAY, STATEMENT }
 
 const TAB_NAMES: Array[String] = ["Deliver", "Pay", "Statement"]
@@ -21,10 +23,6 @@ const EMPTY_TEXT := "No ponies in your pens right now."
 ## WALLET holds and to what the LEDGER will accept (pay_amounts), and a player sitting on a
 ## pile of bits at the principal floor would read that as a bug in her own wallet.
 const EMPTY_PAY_TEXT := "Nothing to settle here today. Bits settle the service charges."
-## The same glyphs game/ui/market_menu.gd and game/ui/pause_menu.gd print, rather than the
-## words "up down": three menus in one game describing the same two keys two different ways
-## is the kind of drift a player reads as two different games.
-const FOOTER := "  ← → / D-pad  tab      ↑ ↓  choose      Enter / A  confirm      Esc / B  leave"
 
 ## THE SECOND PRESS A NAMED DELIVERY COSTS. A member of the crowd is 300 bits and there are
 ## dozens of her; a named pony is up to 4,000 bits and there is exactly one, and she is gone
@@ -40,11 +38,6 @@ const CONFIRM_NO := "No, she stays here"
 ## The amounts the Pay tab offers, before they are cut down to what she can afford and to
 ## what the ledger will accept.
 const PAY_STEPS: Array[int] = [100, 500, 2000, 10000]
-
-const COLOR_TITLE := Color(1.0, 0.96, 0.86, 1.0)
-const COLOR_NAME := Color(1.0, 1.0, 1.0, 0.94)
-const COLOR_DIM := Color(1.0, 1.0, 1.0, 0.58)
-const COLOR_VALUE := Color(1.00, 0.80, 0.25, 1.0)
 
 signal opened()
 signal closed()
@@ -82,7 +75,6 @@ var _confirming_name := ""
 func _ready() -> void:
 	visible = false
 	_title.text = TITLE
-	_footer.text = FOOTER
 
 
 func open() -> bool:
@@ -284,18 +276,20 @@ func refresh() -> void:
 	# escaping while the menu is open, leaves _selected pointing past the end, and the next
 	# confirm() would read a row that is not there. Clamping at the draw keeps the cursor on
 	# the row the player can actually see.
+	_footer.text = MenuStyleScript.footer_tabs_and_rows("confirm", "leave")
+	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
 	var count: int = _row_count()
 	_selected = clampi(_selected, 0, maxi(0, count - 1)) if count > 0 else 0
-	_tabs.text = "   ".join(TAB_NAMES.map(func(t: String) -> String:
-		return "[%s]" % t if TAB_NAMES.find(t) == _tab else " %s " % t))
+	_tabs.text = MenuStyleScript.tab_strip(TAB_NAMES, _tab)
 	for child in _rows.get_children():
 		child.queue_free()
 	var lines: Array[String] = drawn_lines()
 	for i in lines.size():
 		var label := Label.new()
-		label.text = ("> " if i == _selected and _tab != Tab.STATEMENT else "  ") + lines[i]
+		var picked: bool = i == _selected and _tab != Tab.STATEMENT
+		label.text = MenuStyleScript.caret(picked) + lines[i]
 		label.add_theme_color_override("font_color",
-			COLOR_VALUE if i == _selected and _tab != Tab.STATEMENT else COLOR_NAME)
+			MenuStyleScript.COLOR_VALUE if picked else MenuStyleScript.COLOR_NAME)
 		_rows.add_child(label)
 
 

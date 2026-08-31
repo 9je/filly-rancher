@@ -350,12 +350,14 @@ func test_the_bag_box_is_tall_enough_for_every_line_in_it() -> void:
 			% [bag.size.y, bag.get_combined_minimum_size().y])
 
 
-func test_the_hints_card_names_pause_and_trade_and_never_free_cursor() -> void:
+## RENAMED (Task 4): "and trade" -> "and sell gems", the row's own new name (HUD.HINTS'
+## TRADE row became SELL GEMS when the card went device aware).
+func test_the_hints_card_names_pause_and_sell_gems_and_never_free_cursor() -> void:
 	var joined := ""
 	for row in _hud.HINTS:
 		joined += " ".join(row) + "\n"
 	assert_string_contains(joined, "PAUSE")
-	assert_string_contains(joined, "TRADE")
+	assert_string_contains(joined, "SELL GEMS")
 	assert_false(joined.contains("FREE CURSOR"), "Escape pauses now; it does not free the cursor")
 	assert_false(joined.contains("--"), "no double hyphen on the card")
 	assert_false(joined.contains("—"), "no em dash on the card")

@@ -15,25 +15,13 @@ extends CanvasLayer
 const ShopRegistryScript := preload("res://systems/shop_registry.gd")
 const ShopItemScript := preload("res://systems/shop_item.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
+const MenuStyleScript := preload("res://ui/menu_style.gd")
 
 enum Tab { SELL, BUY }
-
-const COLOR_TITLE := Color(1.0, 0.96, 0.86, 1.0)
-const COLOR_NAME := Color(1.0, 1.0, 1.0, 0.94)
-const COLOR_DIM := Color(1.0, 1.0, 1.0, 0.58)
-const COLOR_COST := Color(1.00, 0.80, 0.25, 1.0)
-const COLOR_UNAFFORDABLE := Color(1.0, 0.45, 0.42, 0.85)
-const COLOR_TAB_ON := Color(1.0, 0.86, 0.55, 1.0)
-const COLOR_TAB_OFF := Color(1.0, 1.0, 1.0, 0.40)
-const ROW_SELECTED_BG := Color(1.0, 0.86, 0.55, 0.16)
-const ROW_SELECTED_BORDER := Color(1.0, 0.86, 0.55, 0.75)
-const ROW_IDLE_BG := Color(1.0, 1.0, 1.0, 0.04)
-const ROW_IDLE_BORDER := Color(1.0, 1.0, 1.0, 0.10)
 
 ## Rarity names for the Sell tab, in enum order. Prose, and PonyData.Rarity is the list it
 ## is prose about: see _rarity_name() for what happens when the two disagree.
 const RARITY_NAMES := ["Common", "Uncommon", "Rare", "Legendary"]
-const FOOTER_DEFAULT := "  ← → / D-pad  tab      ↑ ↓  choose      Enter / A  confirm      Esc / B  back"
 
 @onready var _title: Label = $Centre/Panel/Margin/Column/Title
 @onready var _wallet: Label = $Centre/Panel/Margin/Column/Wallet
@@ -73,12 +61,11 @@ func _ready() -> void:
 	var registry: ShopRegistry = ShopRegistryScript.new()
 	registry.load_all(ShopRegistryScript.SHOP_DIR)
 	_catalogue = registry.all()
-	_style_label(_title, 34, COLOR_TITLE)
-	_style_label(_wallet, 22, COLOR_DIM)
-	_style_label(_gems, 22, COLOR_DIM)
-	_style_label(_sell_tab, 26, COLOR_TAB_ON)
-	_style_label(_buy_tab, 26, COLOR_TAB_OFF)
-	_style_label(_footer, 20, COLOR_DIM)
+	MenuStyleScript.style_label(_title, MenuStyleScript.TITLE_SIZE, MenuStyleScript.COLOR_TITLE)
+	MenuStyleScript.style_label(_wallet, MenuStyleScript.ROW_SIZE, MenuStyleScript.COLOR_DIM)
+	MenuStyleScript.style_label(_gems, MenuStyleScript.ROW_SIZE, MenuStyleScript.COLOR_DIM)
+	MenuStyleScript.style_label(_sell_tab, 26, MenuStyleScript.COLOR_TAB_ON)
+	MenuStyleScript.style_label(_buy_tab, 26, MenuStyleScript.COLOR_TAB_OFF)
 	_title.text = "MARKET"
 	_sell_tab.text = "SELL"
 	_buy_tab.text = "BUY"
@@ -289,12 +276,14 @@ func _unhandled_input(event: InputEvent) -> void:
 func refresh() -> void:
 	if shop == null:
 		return
+	_footer.text = MenuStyleScript.footer_tabs_and_rows("confirm", "back")
+	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
 	_wallet.text = "%d bits" % shop.bits()
 	_gems.text = "%d gems in your pouch" % _pouch_total()
-	_style_label(_sell_tab, 26, COLOR_TAB_ON if _tab == Tab.SELL else COLOR_TAB_OFF)
-	_style_label(_buy_tab, 26, COLOR_TAB_ON if _tab == Tab.BUY else COLOR_TAB_OFF)
-	_style_label(_footer, 20, COLOR_DIM)
-	_footer.text = FOOTER_DEFAULT
+	MenuStyleScript.style_label(_sell_tab, 26,
+		MenuStyleScript.COLOR_TAB_ON if _tab == Tab.SELL else MenuStyleScript.COLOR_TAB_OFF)
+	MenuStyleScript.style_label(_buy_tab, 26,
+		MenuStyleScript.COLOR_TAB_ON if _tab == Tab.BUY else MenuStyleScript.COLOR_TAB_OFF)
 	# remove_child BEFORE queue_free: a queued node is still a child until the end of the
 	# frame, so freeing alone would leave the old rows laid out underneath the new ones for
 	# one frame every time the cursor moves.
@@ -349,38 +338,35 @@ func _add_row(index: int, row_name: String, blurb: String, price: String, enable
 	var title := Label.new()
 	title.text = row_name
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_style_label(title, 26, COLOR_NAME if enabled else COLOR_DIM)
+	MenuStyleScript.style_label(title, 26,
+		MenuStyleScript.COLOR_NAME if enabled else MenuStyleScript.COLOR_DIM)
 	head.add_child(title)
 	var cost := Label.new()
 	cost.text = price
-	_style_label(cost, 23, COLOR_COST if enabled else COLOR_UNAFFORDABLE)
+	MenuStyleScript.style_label(cost, 23,
+		MenuStyleScript.COLOR_VALUE if enabled else MenuStyleScript.COLOR_UNAFFORDABLE)
 	head.add_child(cost)
 	if not blurb.is_empty():
 		var sub := Label.new()
 		sub.text = blurb
 		sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		sub.custom_minimum_size = Vector2(720.0, 0.0)
-		_style_label(sub, 19, COLOR_DIM)
+		MenuStyleScript.style_label(sub, 19, MenuStyleScript.COLOR_DIM)
 		column.add_child(sub)
 	_rows.add_child(row)
 
 
 func _refuse(text: String) -> void:
 	_footer.text = "  " + text
-	_style_label(_footer, 20, COLOR_UNAFFORDABLE)
+	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE,
+		MenuStyleScript.COLOR_UNAFFORDABLE)
 
 
 func _row_style(selected: bool) -> StyleBoxFlat:
 	var box := StyleBoxFlat.new()
-	box.bg_color = ROW_SELECTED_BG if selected else ROW_IDLE_BG
-	box.border_color = ROW_SELECTED_BORDER if selected else ROW_IDLE_BORDER
+	box.bg_color = MenuStyleScript.ROW_SELECTED_BG if selected else MenuStyleScript.ROW_IDLE_BG
+	box.border_color = MenuStyleScript.ROW_SELECTED_BORDER if selected \
+		else MenuStyleScript.ROW_IDLE_BORDER
 	box.set_border_width_all(2 if selected else 1)
 	box.set_corner_radius_all(8)
 	return box
-
-
-func _style_label(label: Label, size: int, color: Color) -> void:
-	label.add_theme_font_size_override(&"font_size", size)
-	label.add_theme_color_override(&"font_color", color)
-	label.add_theme_color_override(&"font_outline_color", Color(0.0, 0.0, 0.0, 0.75))
-	label.add_theme_constant_override(&"outline_size", 5)

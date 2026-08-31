@@ -15,19 +15,17 @@ extends CanvasLayer
 ## THE CAGE OFFERS ONLY WHAT SHE CAN COVER, in both directions, for the reason
 ## DepotMenu.pay_amounts() gives: a menu row that always refuses is a menu row that lies.
 
+const MenuStyleScript := preload("res://ui/menu_style.gd")
+
 enum Tab { CAGE, HOUSE, GAMES }
 enum Game { SLOTS, WHEEL, BLACKJACK, RACING }
 
 const TAB_NAMES: Array[String] = ["Cage", "House", "Games"]
 const GAME_NAMES: Array[String] = ["Slots", "The Wheel", "Blackjack", "Racing"]
 const TITLE := "Spectra Palace"
-const FOOTER := "  up down  choose      left right  tab      Enter / A  confirm      Esc / B  leave"
 
 ## The amounts the cage offers before they are cut down to what she is holding.
 const CAGE_STEPS: Array[int] = [100, 500, 2000, 10000]
-
-const COLOR_NAME := Color(1.0, 1.0, 1.0, 0.94)
-const COLOR_VALUE := Color(1.00, 0.80, 0.25, 1.0)
 
 signal opened()
 signal closed()
@@ -53,7 +51,6 @@ var _open := false
 func _ready() -> void:
 	visible = false
 	_title.text = TITLE
-	_footer.text = FOOTER
 
 
 func open() -> bool:
@@ -183,16 +180,18 @@ func confirm() -> bool:
 func refresh() -> void:
 	if not is_node_ready():
 		return
-	_tabs.text = "   ".join(TAB_NAMES.map(func(t: String) -> String:
-		return "[%s]" % t if TAB_NAMES.find(t) == _tab else " %s " % t))
+	_footer.text = MenuStyleScript.footer_tabs_and_rows("confirm", "leave")
+	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
+	_tabs.text = MenuStyleScript.tab_strip(TAB_NAMES, _tab)
 	for child in _rows.get_children():
 		child.queue_free()
 	var lines: Array[String] = drawn_lines()
 	for i in lines.size():
 		var label := Label.new()
 		var picked: bool = i == _selected and _tab != Tab.HOUSE
-		label.text = ("> " if picked else "  ") + lines[i]
-		label.add_theme_color_override("font_color", COLOR_VALUE if picked else COLOR_NAME)
+		label.text = MenuStyleScript.caret(picked) + lines[i]
+		label.add_theme_color_override("font_color",
+			MenuStyleScript.COLOR_VALUE if picked else MenuStyleScript.COLOR_NAME)
 		_rows.add_child(label)
 
 

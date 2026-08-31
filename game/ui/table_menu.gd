@@ -20,14 +20,11 @@ extends CanvasLayer
 ## every table's .tscn must have is the one game/ui/depot_menu.tscn has: Dim, and
 ## Centre/Panel/Margin/Column holding Title, Tabs, Rows and Footer.
 
+const MenuStyleScript := preload("res://ui/menu_style.gd")
+
 ## What the tables let her bet. Even numbers, always: Blackjack.payout() pays three to two
 ## with integer division and an odd stake would round the bonus down by half a chip.
 const STAKES: Array[int] = [10, 50, 200]
-
-const FOOTER := "  up down  choose      left right  tab      Enter / A  confirm      Esc / B  leave"
-const COLOR_NAME := Color(1.0, 1.0, 1.0, 0.94)
-const COLOR_VALUE := Color(1.00, 0.80, 0.25, 1.0)
-const COLOR_DIM := Color(1.0, 1.0, 1.0, 0.58)
 
 signal opened()
 signal closed()
@@ -49,7 +46,6 @@ var _result: Array[String] = []
 func _ready() -> void:
 	visible = false
 	_title.text = title_text()
-	_footer.text = FOOTER
 
 
 func open() -> bool:
@@ -144,6 +140,8 @@ func stake_lines() -> Array[String]:
 func refresh() -> void:
 	if not is_node_ready():
 		return
+	_footer.text = MenuStyleScript.footer_tabs_and_rows("confirm", "leave")
+	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
 	_title.text = title_text()
 	_tabs.text = tabs_text()
 	for child in _rows.get_children():
@@ -153,8 +151,9 @@ func refresh() -> void:
 	for i in lines.size():
 		var label := Label.new()
 		var picked: bool = i == caret and row_count() > 0
-		label.text = ("> " if picked else "  ") + lines[i]
-		label.add_theme_color_override("font_color", COLOR_VALUE if picked else COLOR_NAME)
+		label.text = MenuStyleScript.caret(picked) + lines[i]
+		label.add_theme_color_override("font_color",
+			MenuStyleScript.COLOR_VALUE if picked else MenuStyleScript.COLOR_NAME)
 		_rows.add_child(label)
 
 

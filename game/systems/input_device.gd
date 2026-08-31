@@ -1,0 +1,113 @@
+extends Node
+## WHICH THING IS IN THE PLAYER'S HANDS RIGHT NOW, so a panel can print one set of hints
+## instead of both. The owner, 2026-08-31: "show keyboard hints XOR gamepad hints based on
+## the last input device used, not both at once". Every shipped footer printed both on one
+## line, which is how a menu ends up saying "Enter / A  confirm      Esc / B  leave".
+##
+## ONE SCRIPT, TWO HALVES, AND THE SPLIT IS THE WHOLE DESIGN. The READERS are static
+## (last(), using_gamepad(), hint()), because game/ui/menu_style.gd is a RefCounted helper
+## with no node to reach a singleton through, and because a test can then drive the whole
+## thing with note() and no autoload at all. The WRITER is a node, because seeing every
+## event in the game needs _input(), and it is registered as an autoload in
+## game/project.godot beside AudioSafety and GameState.
+##
+## NO class_name, MATCHING GameState AND AudioSafety, AND FOR A HARDER REASON THAN STYLE
+## THIS TIME: Godot 4.5 refuses to compile a script that declares `class_name InputDevice`
+## in the same project as an autoload singleton also named InputDevice ("Class 'InputDevice'
+## hides an autoload singleton"). Every reader preloads this by path anyway, the same as
+## every other script in this project, so the global name was never needed.
+##
+## PROCESS_MODE_ALWAYS, AND IT IS NOT OPTIONAL. Every menu in this game pauses the tree
+## while it is up (game/world/ranch.gd owns that), which is exactly when the hints are on
+## screen being read. A tracker that stopped with the tree would freeze on whichever device
+## closed the last menu and never move again.
+##
+## A STICK IS ONLY A STICK PAST THE DEADZONE. An idle thumbstick drifts and emits
+## InputEventJoypadMotion forever; a tracker that believed all of them would flip the whole
+## HUD to gamepad hints while the controller sat on the table.
+##
+## Readers preload this by path, like everything else in this project.
+
+enum Kind { KEYBOARD, GAMEPAD }
+
+## How far a stick has to be pushed before it counts as somebody using it.
+const STICK_DEADZONE := 0.5
+
+## WHAT EACH THING IS CALLED ON EACH DEVICE, keyboard first, gamepad second.
+##
+## The first five keys are real actions in game/project.godot's [input] block and
+## test_input_device.gd walks the live InputMap to prove each one is really bound on both
+## schemes; a binding removed there and not here is a hint that tells the player to press
+## something that does nothing.
+##
+## The last two are COMPOSITES and are deliberately not actions. A footer says "the two
+## keys that change row", and spelling that as two separate entries doubles the length of
+## every footer in the game to say one thing twice. ACTION_GLYPHS below is the subset that
+## is checked against the InputMap.
+const GLYPHS := {
+	&"interact": ["E", "X"],
+	&"ui_accept": ["Enter", "A"],
+	&"ui_cancel": ["Esc", "B"],
+	&"pause": ["Esc", "Start"],
+	&"toggle_hints": ["H", "Back"],
+	&"menu_rows": ["Up Down", "D-pad up down"],
+	&"menu_tabs": ["Left Right", "D-pad left right"],
+}
+
+## The subset of GLYPHS that names a real action. See GLYPHS.
+const ACTION_GLYPHS: Array[StringName] = [&"interact", &"ui_accept", &"ui_cancel",
+	&"pause", &"toggle_hints"]
+
+## Static, so a reader needs no node. Starts on the keyboard: somebody sitting at one must
+## not have to press a key before the game will admit she is there.
+static var _last: int = Kind.KEYBOARD
+
+
+func _ready() -> void:
+	# See the class comment: the menus that read this are on screen precisely when the tree
+	# is paused.
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
+
+func _input(event: InputEvent) -> void:
+	note(event)
+
+
+## Record what sent `event`. Anything that is not one of the five interesting classes
+## leaves the answer exactly where it was, which is the right answer for a synthetic
+## InputEventAction: it says nothing about who sent it.
+static func note(event: InputEvent) -> void:
+	if event == null:
+		return
+	if event is InputEventKey or event is InputEventMouseButton \
+			or event is InputEventMouseMotion:
+		_last = Kind.KEYBOARD
+	elif event is InputEventJoypadButton:
+		_last = Kind.GAMEPAD
+	elif event is InputEventJoypadMotion:
+		if absf((event as InputEventJoypadMotion).axis_value) >= STICK_DEADZONE:
+			_last = Kind.GAMEPAD
+
+
+static func last() -> int:
+	return _last
+
+
+static func using_gamepad() -> bool:
+	return _last == Kind.GAMEPAD
+
+
+## What to print for `action` on the device she is holding. An unknown action answers the
+## empty string rather than erroring: a footer with a gap in it is a cosmetic fault and a
+## crashed menu is not.
+static func hint(action: StringName) -> String:
+	if not GLYPHS.has(action):
+		return ""
+	var pair: Array = GLYPHS[action]
+	return String(pair[1] if using_gamepad() else pair[0])
+
+
+## Back to the keyboard. For the tests, which share one static and would otherwise leak a
+## GAMEPAD from one case into the next.
+static func reset() -> void:
+	_last = Kind.KEYBOARD

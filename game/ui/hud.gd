@@ -76,6 +76,7 @@ extends CanvasLayer
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const MagicBeamScript := preload("res://actors/player/magic_beam.gd")
+const InputDeviceScript := preload("res://systems/input_device.gd")
 
 ## Radius of the reticle ring, in (1920x1080-base) pixels. Small: it has to mark a point
 ## precisely, and a big one would obscure the pony it is resting on.
@@ -207,6 +208,10 @@ var _was_beaming := false
 ## something else happens to trigger a redraw.
 var _was_in_range := false
 
+## Which device the card was last built for, so _process() can rebuild it when she puts one
+## down and picks the other up. Cheap: fourteen Labels, and only on an actual change.
+var _hints_device: int = -1
+
 
 func _ready() -> void:
 	# Toasts fired from the Market and pause menus must keep fading while the world
@@ -234,6 +239,9 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if _hints_device != InputDeviceScript.last():
+		_build_hints()
+
 	_elapsed += delta
 
 	# See the class comment: sibling ready order is not something to depend on.
@@ -634,42 +642,51 @@ func prompt_text() -> String:
 	return _prompt.text if _prompt != null else ""
 
 
-## Both control schemes, side by side, because the build is handed to two people and
-## only one of them is going to be at the keyboard. Every row here mirrors an action in
-## game/project.godot's `[input]` block -- a binding that changes there and not here is
-## a hint card that lies.
+## THE CONTROL CARD, IN THE GLYPHS OF ONE DEVICE. Every row here mirrors an action in
+## game/project.godot's [input] block; a binding that changes there and not here is a hint
+## card that lies.
 ##
-## A GridContainer of Labels rather than one pre-aligned block of text: Godot's default
-## UI font is proportional, so space-padded columns line up in the source file and
-## nowhere else.
+## IT USED TO PRINT BOTH SCHEMES SIDE BY SIDE, on the stated grounds that "the build is
+## handed to two people and only one of them is going to be at the keyboard". That is still
+## true and it is now answered by showing the scheme in use rather than both at once
+## (owner, 2026-08-31); game/systems/input_device.gd is what knows which.
+##
+## A GridContainer of Labels rather than one pre-aligned block of text: Godot's default UI
+## font is proportional, so space-padded columns line up in the source file and nowhere
+## else. Two columns now, not three.
+##
 ## RUNNING IS THE DEFAULT AND SHIFT SLOWS YOU DOWN, which is the opposite of what every
-## other game trains a player to expect -- so the card says what the slow gait BUYS on its
-## own continuation line rather than leaving "why would I ever hold this?" as something
-## the player has to work out from a speed change alone.
+## other game trains a player to expect, so the card says what the slow gait BUYS on its
+## own continuation line.
 const HINTS := [
 	["MOVE (run)", "W A S D", "Left stick"],
 	["WALK / SNEAK", "Shift (hold)", "LB (hold)"],
 	["", "creep quietly, and ponies notice you from half as far", ""],
 	["JUMP", "Space", "A"],
 	["INTERACT", "E", "X"],
-	["", "build on an empty plot, move a pony in", ""],
+	["", "the line under the crosshair says what it will do", ""],
 	["LOOK", "Mouse", "Right stick"],
-	["ZOOM", "Scroll / = -", "D-pad up/down"],
+	["ZOOM", "Scroll / = -", "D-pad up down"],
 	["MAGIC BEAM", "Right mouse (hold)", "Right trigger (hold)"],
 	["", "hold until the OUTER PINK ring fills, then let go to stow her", ""],
 	["", "the INNER AMBER ring is her fight. Let it empty and she wriggles free", ""],
-	["TRADE", "E at the market", "X at the market"],
-	["", "sell gems for bits, buy food and gear", ""],
+	["SELL GEMS", "E at the Market", "X at the Market"],
 	["PAUSE", "Esc", "Start"],
 	["THIS CARD", "H", "Back"],
 ]
 
 
 func _build_hints() -> void:
+	_hints_grid.columns = 2
+	for child in _hints_grid.get_children():
+		child.queue_free()
+	var column: int = 2 if InputDeviceScript.using_gamepad() else 1
 	for row: Array in HINTS:
-		for column in range(3):
+		var label_text := String(row[0])
+		var note: bool = label_text == ""
+		for pair: Array in [[label_text, 0.60], [String(row[column if not note else 1]), 0.92]]:
 			var label := Label.new()
-			label.text = String(row[column])
-			var dim: float = 0.60 if column == 0 or String(row[0]) == "" else 0.92
-			_style_label(label, 20, Color(1.0, 1.0, 1.0, dim))
+			label.text = String(pair[0])
+			_style_label(label, 20, Color(1.0, 1.0, 1.0, float(pair[1])))
 			_hints_grid.add_child(label)
+	_hints_device = InputDeviceScript.last()

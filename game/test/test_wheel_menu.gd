@@ -3,6 +3,7 @@ extends GutTest
 
 const WheelMenuScene := preload("res://ui/wheel_menu.tscn")
 const WheelScript := preload("res://systems/wheel.gd")
+const MenuStyleScript := preload("res://ui/menu_style.gd")
 
 var _menu: WheelMenu = null
 var _chips := 500
@@ -122,6 +123,12 @@ func test_the_number_tab_reaches_the_stake_the_same_way() -> void:
 	assert_eq(_menu.tab(), WheelMenu.Tab.NUMBER)
 
 
+## MOVED (Task 4): the footer is now MenuStyle's shared builder, the same as every other
+## table's, and no longer carries a hand written note about the stake. Where the stake
+## lives is still on screen: the stake row itself is always drawn (WheelMenu.drawn_lines()),
+## right after the last guess.
 func test_the_footer_documents_where_the_stake_actually_lives() -> void:
-	assert_true(_menu._footer.text.to_lower().contains("stake"),
-		"the footer must say where left/right moves the stake, or nobody will find it")
+	assert_eq(_menu._footer.text, MenuStyleScript.footer_tabs_and_rows("confirm", "leave"),
+		"the footer now comes from the shared builder, not a hand written line")
+	assert_true("\n".join(_menu.drawn_lines()).to_lower().contains("stake"),
+		"the stake row itself must still say what it is, even off the footer")

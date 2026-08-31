@@ -149,6 +149,7 @@ const ZoneMarkerScript := preload("res://world/zone_marker.gd")
 const PonyScript := preload("res://actors/pony/pony.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const PlayerScript := preload("res://actors/player/player.gd")
+const InputDeviceScript := preload("res://systems/input_device.gd")
 const WorldStateScript := preload("res://systems/world_state.gd")
 const SkyRigScript := preload("res://world/sky_rig.gd")
 const RequestBoardScript := preload("res://systems/request_board.gd")
@@ -274,10 +275,6 @@ const DEPOT_RADIUS := 4.0
 ## How close to the Spectra Palace the counter opens from. Wider than the Depot's, because
 ## the Palace is fourteen metres across and the door is in the middle of one long side.
 const PALACE_RADIUS := 5.0
-
-## The glyph the interact prompt prints. A constant here and a lookup in Task 4's device
-## tracker after that; stated as one name so there is one call site to change.
-const INTERACT_KEY := "E"
 
 ## Plot slots the map must carry -- the plan asks for four to six, and the reserved
 ## clearing (PropsScript.PEN_PLOTS_*) is an 18 m square, which fits four 7.8 m pens on a
@@ -3325,7 +3322,8 @@ func _update_interaction() -> void:
 	var action: Dictionary = current_interaction()
 	var hud := get_node_or_null(^"HUD")
 	if hud != null and hud.has_method("set_prompt"):
-		hud.set_prompt(InteractionScript.prompt_for(action, INTERACT_KEY))
+		hud.set_prompt(InteractionScript.prompt_for(action,
+			InputDeviceScript.hint(&"interact")))
 	if action.is_empty() or not Input.is_action_just_pressed(&"interact"):
 		return
 	perform_interaction(action)

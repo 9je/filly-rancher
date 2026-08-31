@@ -42,6 +42,7 @@ const CompendiumScript := preload("res://systems/compendium.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const WorldStateScript := preload("res://systems/world_state.gd")
 const HudScript := preload("res://ui/hud.gd")
+const MenuStyleScript := preload("res://ui/menu_style.gd")
 
 enum Page { MAIN, SETTINGS, COMPENDIUM, REQUESTS, LEDGER }
 enum Row { RESUME, COMPENDIUM, REQUESTS, LEDGER, SAVE, SETTINGS, QUIT }
@@ -76,19 +77,6 @@ const EMPTY_TEXT := "Nothing to show yet."
 ## independently (game/systems/pony_data.gd), so the two are answered separately.
 const ANY_TEXT := "any"
 
-const COLOR_TITLE := Color(1.0, 0.96, 0.86, 1.0)
-const COLOR_NAME := Color(1.0, 1.0, 1.0, 0.94)
-const COLOR_DIM := Color(1.0, 1.0, 1.0, 0.58)
-const COLOR_VALUE := Color(1.00, 0.80, 0.25, 1.0)
-const ROW_SELECTED_BG := Color(1.0, 0.86, 0.55, 0.16)
-const ROW_SELECTED_BORDER := Color(1.0, 0.86, 0.55, 0.75)
-const ROW_IDLE_BG := Color(1.0, 1.0, 1.0, 0.04)
-const ROW_IDLE_BORDER := Color(1.0, 1.0, 1.0, 0.10)
-const FOOTER_MAIN := "  ↑ ↓  choose      Enter / A  select      Esc / B  resume"
-const FOOTER_SETTINGS := "  ↑ ↓  choose      ← →  adjust      Esc / B  back"
-const FOOTER_COMPENDIUM := "  ↑ ↓  scroll      Esc / B  back"
-const FOOTER_REQUESTS := "  Finish one to get a new one.      Esc / B  back"
-const FOOTER_LEDGER := "  Esc / B  back"
 
 @onready var _title: Label = $Centre/Panel/Margin/Column/Title
 @onready var _rows: VBoxContainer = $Centre/Panel/Margin/Column/Rows
@@ -129,8 +117,7 @@ var _open := false
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	_style_label(_title, 34, COLOR_TITLE)
-	_style_label(_footer, 20, COLOR_DIM)
+	MenuStyleScript.style_label(_title, MenuStyleScript.TITLE_SIZE, MenuStyleScript.COLOR_TITLE)
 	_title.text = "PAUSED"
 	visible = false
 
@@ -552,14 +539,17 @@ func _refresh() -> void:
 
 func _draw_main() -> void:
 	_title.text = "PAUSED"
-	_footer.text = FOOTER_MAIN
+	_footer.text = MenuStyleScript.footer_rows("select", "resume")
+	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
 	for i in range(MAIN_ROWS.size()):
 		_add_row(i, MAIN_ROWS[i], "")
 
 
 func _draw_settings() -> void:
 	_title.text = "SETTINGS"
-	_footer.text = FOOTER_SETTINGS
+	_footer.text = MenuStyleScript.footer([[&"menu_rows", "choose"],
+		[&"menu_tabs", "adjust"], [&"ui_cancel", "back"]])
+	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
 	_add_row(0, "Master volume", "%d%%" % int(round(settings.master_volume * 100.0)))
 	_add_row(1, "Mouse sensitivity", "%.1f" % (settings.mouse_sensitivity * 1000.0))
 	_add_row(2, "Invert look", "On" if settings.invert_look else "Off")
@@ -567,7 +557,8 @@ func _draw_settings() -> void:
 
 func _draw_compendium() -> void:
 	_title.text = "COMPENDIUM"
-	_footer.text = FOOTER_COMPENDIUM
+	_footer.text = MenuStyleScript.footer_reading("back")
+	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
 	if not has_book():
 		_add_note(EMPTY_TEXT)
 		return
@@ -581,12 +572,13 @@ func _draw_compendium() -> void:
 	for i in compendium_window():
 		var data: PonyData = entries[i]
 		_add_row(i, _entry_name(data), _entry_value(data), _rarity_color(data.rarity),
-			COLOR_DIM, true)
+			MenuStyleScript.COLOR_DIM, true)
 
 
 func _draw_requests() -> void:
 	_title.text = "REQUESTS"
-	_footer.text = FOOTER_REQUESTS
+	_footer.text = MenuStyleScript.footer_reading("back") + "      Finish one to get a new one."
+	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
 	var rows := request_rows()
 	if rows.is_empty():
 		_add_note(EMPTY_TEXT)
@@ -598,7 +590,8 @@ func _draw_requests() -> void:
 
 func _draw_ledger() -> void:
 	_title.text = "THE LEDGER"
-	_footer.text = FOOTER_LEDGER
+	_footer.text = MenuStyleScript.footer_reading("back")
+	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
 	for line in ledger_rows():
 		_add_note(line)
 
@@ -609,12 +602,13 @@ func _add_note(text: String) -> void:
 	var label := Label.new()
 	label.text = text
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_style_label(label, 22, COLOR_DIM)
+	MenuStyleScript.style_label(label, 22, MenuStyleScript.COLOR_DIM)
 	_rows.add_child(label)
 
 
-func _add_row(index: int, row_name: String, value: String, name_color: Color = COLOR_NAME,
-		value_color: Color = COLOR_VALUE, compact: bool = false) -> void:
+func _add_row(index: int, row_name: String, value: String,
+		name_color: Color = MenuStyleScript.COLOR_NAME,
+		value_color: Color = MenuStyleScript.COLOR_VALUE, compact: bool = false) -> void:
 	var row := PanelContainer.new()
 	row.add_theme_stylebox_override(&"panel", _row_style(index == _selected))
 	var margin := MarginContainer.new()
@@ -628,27 +622,21 @@ func _add_row(index: int, row_name: String, value: String, name_color: Color = C
 	var title := Label.new()
 	title.text = row_name
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_style_label(title, 22 if compact else 26, name_color)
+	MenuStyleScript.style_label(title, 22 if compact else 26, name_color)
 	head.add_child(title)
 	if not value.is_empty():
 		var val := Label.new()
 		val.text = value
-		_style_label(val, 20 if compact else 24, value_color)
+		MenuStyleScript.style_label(val, 20 if compact else 24, value_color)
 		head.add_child(val)
 	_rows.add_child(row)
 
 
 func _row_style(selected: bool) -> StyleBoxFlat:
 	var box := StyleBoxFlat.new()
-	box.bg_color = ROW_SELECTED_BG if selected else ROW_IDLE_BG
-	box.border_color = ROW_SELECTED_BORDER if selected else ROW_IDLE_BORDER
+	box.bg_color = MenuStyleScript.ROW_SELECTED_BG if selected else MenuStyleScript.ROW_IDLE_BG
+	box.border_color = MenuStyleScript.ROW_SELECTED_BORDER if selected \
+		else MenuStyleScript.ROW_IDLE_BORDER
 	box.set_border_width_all(2 if selected else 1)
 	box.set_corner_radius_all(8)
 	return box
-
-
-func _style_label(label: Label, size: int, color: Color) -> void:
-	label.add_theme_font_size_override(&"font_size", size)
-	label.add_theme_color_override(&"font_color", color)
-	label.add_theme_color_override(&"font_outline_color", Color(0.0, 0.0, 0.0, 0.75))
-	label.add_theme_constant_override(&"outline_size", 5)
