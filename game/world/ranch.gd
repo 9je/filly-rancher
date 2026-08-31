@@ -2464,10 +2464,6 @@ func start_race(uid: StringName, lane: int, stake: int) -> Dictionary:
 		return refused
 
 	var result: Dictionary = RaceCardScript.run(field, _casino_rng.randi())
-	_race_entrant = uid
-	_race_lane = lane
-	_race_stake = stake
-	_race_field = field
 
 	var pen: Pen = found["pen"]
 	var body: Node3D = pen.body_for(uid)
@@ -2476,8 +2472,34 @@ func start_race(uid: StringName, lane: int, stake: int) -> Dictionary:
 		# still standing where she was; the player just does not see her in two places.
 		body.visible = false
 
-	race_track.call("dress", field)
-	race_track.call("start", field, result)
+	# BOTH RETURNS ARE READ, NEITHER IS DISCARDED. dress() is informational only -- fewer
+	# than LANES dressed is the documented degraded state on a checkout with no converted
+	# assets, and the race still runs on the RaceRunner nodes regardless of whether they
+	# carry a model (see race_runner.gd) -- but start()'s bool is the one true signal for
+	# whether a race actually began, and it can answer false (a field this call built wrong,
+	# the track already mid race some other way). A false here must not be allowed to leave
+	# the stake spent and her body hidden with nothing ever going to put either back:
+	# race_finished is the only other unhide site, and the bet's own bookkeeping below is
+	# only set once start() has actually said yes.
+	var dressed: int = int(race_track.call("dress", field))
+	var started: bool = bool(race_track.call("start", field, result))
+	if not started:
+		# UNWIND. Nothing about this race actually happened, so nothing about it may stick:
+		# the stake comes back, her body is shown again, and this is a refusal exactly like
+		# any of the ones above it.
+		_game_state.casino.add_chips(stake)
+		if body != null:
+			body.visible = true
+		push_error(
+			"ranch.start_race: race_track.start() refused a %d-lane field (%d dressed); stake refunded."
+			% [field.size(), dressed])
+		return refused
+
+	_race_entrant = uid
+	_race_lane = lane
+	_race_stake = stake
+	_race_field = field
+
 	if race_menu != null and race_menu.has_method("close"):
 		race_menu.close()
 	_toast("They are under orders at the Spectra Palace!")

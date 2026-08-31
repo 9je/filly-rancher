@@ -121,3 +121,45 @@ func test_nothing_it_draws_carries_a_dash() -> void:
 		_menu.set_tab(tab)
 		for line in _menu.drawn_lines():
 			assert_false(line.contains("--") or line.contains("—"), line)
+
+
+## THE GAP THIS PINS. row_count() used to claim the stake "is moved with left and right the
+## way every other table's is", but nothing on the BET tab ever called set_stake_index() from
+## an input path: up/down picked a lane and left/right always switched the casino's own tab,
+## so a player could never actually reach anything above the cheapest stake. This drives the
+## real input methods (move_selection()/switch_tab()/confirm()), never set_stake_index()
+## itself, the way a real up/down/left/right/Enter press through TableMenu's own
+## _unhandled_input() would.
+func test_moving_past_the_last_lane_reaches_the_stake_and_raises_it() -> void:
+	var field: Array[Dictionary] = _field()
+	var odds: Array[float] = []
+	for lane in RaceCardScript.LANES:
+		odds.append(RaceCardScript.decimal_odds(field, lane))
+	_menu.move_selection(1)
+	_menu.confirm()
+	_menu.set_field(field, odds)
+	_menu.set_tab(RaceMenu.Tab.BET)
+
+	_menu.move_selection(3)
+	assert_eq(_menu.selected_lane(), 3, "sanity: three presses down lands on lane 3")
+	# ONE MORE STEP OF THE SAME SIZE CARRIES PAST THE REMAINING LANES ONTO THE STAKE ROW
+	# (row_count() is LANES + 1), and must not quietly change which lane a bet would land on.
+	_menu.move_selection(3)
+	assert_eq(_menu.selected_lane(), 3,
+		"the cursor moved on to the stake row; the backed lane must not have moved with it")
+
+	assert_eq(_menu.stake_index(), 0, "sanity: still the cheapest stake before touching it")
+	_menu.switch_tab(1)
+	assert_eq(_menu.tab(), RaceMenu.Tab.BET,
+		"left/right on the stake row must move the stake, not leave the tab")
+	assert_eq(_menu.stake_index(), 1, "one press on the stake row must raise the stake")
+
+	watch_signals(_menu)
+	assert_true(_menu.confirm())
+	assert_signal_emitted_with_parameters(_menu, "race_requested",
+		[&"b#000002", 3, _menu.stakes()[1]])
+
+
+func test_the_footer_documents_where_the_stake_actually_lives() -> void:
+	assert_true(_menu._footer.text.to_lower().contains("stake"),
+		"the footer must say where left/right moves the stake, or nobody will find it")
