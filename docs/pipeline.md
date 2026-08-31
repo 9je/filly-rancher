@@ -979,11 +979,14 @@ model has any), named exactly that in the exported glTF, or the tint and the mar
 silently touch nothing.
 
 **`StockPalette.MANE_STYLES` (Phase 3 slice 2) grows the same way.** Its ordered
-fallback list is exhausted (`trixie`, `rarity`, `vinylscratch`, `shiningarmor` all
-tried), so the pool grows past its current four not by naming more reVAmped
-characters but by teaching `StockTint` to retarget the `Base_*` rig family's own
-material names (`Base_Body`, `Hair_Navy`, `Base_Iris.R` and so on), which `twilight`
-and `rarity` already ship and which the reVAmped name match cannot see.
+fallback list is exhausted: all four were tried, `trixie` and `rarity` were rejected
+on measurement (split or differently-named mane surfaces), and `vinylscratch` and
+`shiningarmor` were tried AND ACCEPTED. Those two are half the pool as it ships
+today, standing alongside `pokeypierce` and `nightlight`. So the pool grows past
+its current four not by naming more reVAmped characters but by teaching `StockTint`
+to retarget the `Base_*` rig family's own material names (`Base_Body`, `Hair_Navy`,
+`Base_Iris.R` and so on), which `twilight` and `rarity` already ship and which the
+reVAmped name match cannot see.
 
 ---
 

@@ -22,6 +22,11 @@ const PALACE_DEPTH := 9.0
 const PALACE_RIDGE_Y := 4.6
 const PALACE_FRONT_Z := PALACE_ORIGIN.z - PALACE_DEPTH * 0.5
 
+## The way that half turn points the Palace's own local +Z, which is the gable end its door
+## is in: world minus Z. ranch.gd derives this off the live node's basis rather than typing
+## it, which is the whole point of the argument.
+const PALACE_OUT_DIR := Vector3(0.0, 0.0, -1.0)
+
 
 func _strip_region() -> RegionData:
 	var region: RegionData = RegionDataScript.new()
@@ -44,6 +49,22 @@ func _built_strip() -> Strip:
 	strip.configure(_strip_region(), func(_x: float, _z: float) -> float: return 0.0)
 	strip.mount_marquee(
 		Vector3(PALACE_ORIGIN.x, PALACE_ORIGIN.y, PALACE_FRONT_Z),
+		PALACE_OUT_DIR,
+		Vector2(PALACE_WIDTH * 0.5, PALACE_DEPTH * 0.5),
+		PALACE_ORIGIN.y + PALACE_RIDGE_Y)
+	strip.build()
+	return strip
+
+
+## The same Strip, mounted on a Palace turned to face somewhere else entirely. Nothing about
+## the ranch stands this way; it exists so the claims below are claims about the arithmetic
+## rather than about the one angle ranch.tscn happens to use.
+func _built_strip_facing(out_dir: Vector3) -> Strip:
+	var strip: Strip = StripScript.new()
+	add_child_autofree(strip)
+	strip.configure(_strip_region(), func(_x: float, _z: float) -> float: return 0.0)
+	strip.mount_marquee(
+		PALACE_ORIGIN + out_dir * (PALACE_DEPTH * 0.5), out_dir,
 		Vector2(PALACE_WIDTH * 0.5, PALACE_DEPTH * 0.5),
 		PALACE_ORIGIN.y + PALACE_RIDGE_Y)
 	strip.build()
@@ -128,3 +149,36 @@ func test_the_marquee_says_the_headline_and_the_sponsor_and_nothing_else() -> vo
 	assert_eq(lines[1], CasinoSignScript.SPONSOR)
 	for line in lines:
 		assert_false(line.contains("--") or line.contains("—"), line)
+
+
+## THE SIGN IS ON THE SIDE THE DOOR IS ON, WHICHEVER SIDE THAT IS. strip.gd used to hang the
+## board at `front_centre.z - MARQUEE_STANDOFF` and turn its letters by exactly PI: world
+## minus Z, written twice, correct only for the one angle ranch.tscn stands the Palace at.
+## A Palace turned any other way had its sign standing INSIDE the building with its back to
+## the approach. Nothing on the shipped map turns it, so the only way this stays true is a
+## test that turns it.
+func test_the_marquee_follows_the_building_round_rather_than_facing_world_minus_z() -> void:
+	for out_dir: Vector3 in [Vector3(0.0, 0.0, -1.0), Vector3(0.0, 0.0, 1.0),
+			Vector3(1.0, 0.0, 0.0), Vector3(-1.0, 0.0, 0.0)]:
+		var strip: Strip = _built_strip_facing(out_dir)
+		var front: Vector3 = PALACE_ORIGIN + out_dir * (PALACE_DEPTH * 0.5)
+		var centre: Vector3 = strip.marquee_board_centre()
+		var flat_offset := Vector3(centre.x - front.x, 0.0, centre.z - front.z)
+		assert_almost_eq(flat_offset.dot(out_dir), StripScript.MARQUEE_STANDOFF, 0.001,
+			"the board stands one standoff OUT from the front face, on the door's own side")
+		assert_almost_eq(flat_offset.length(), StripScript.MARQUEE_STANDOFF, 0.001,
+			"and nowhere sideways of it")
+		assert_almost_eq(strip.marquee_facing().dot(out_dir), 1.0, 0.001,
+			"the board looks the same way the door does")
+
+
+func test_the_marquee_letters_turn_with_the_board() -> void:
+	for out_dir: Vector3 in [Vector3(0.0, 0.0, -1.0), Vector3(1.0, 0.0, 0.0)]:
+		var strip: Strip = _built_strip_facing(out_dir)
+		var headline := strip.get_node_or_null(^"MarqueeHeadline") as Label3D
+		assert_not_null(headline, "the board carries a headline")
+		# Label3D's own text faces its local plus Z, so the yaw the label is turned by must
+		# point that axis along the facing.
+		var looks: Vector3 = headline.global_transform.basis * Vector3(0.0, 0.0, 1.0)
+		assert_almost_eq(Vector3(looks.x, 0.0, looks.z).normalized().dot(out_dir), 1.0,
+			0.001, "the letters read from the approach, not from inside the building")

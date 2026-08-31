@@ -670,12 +670,23 @@ func _ready() -> void:
 			# THE SIGN IS SIZED AND PLACED FROM THE BUILDING, off the live node, for the
 			# reason avoid_footprint() is: a hand typed world position for the marquee is
 			# what put a 66 character line at y = 5.4 on a building whose ridge is at 4.6.
-			# The Palace is turned a half turn in ranch.tscn, so its door and its front face
-			# are on the LOW Z side; the front centre is therefore its origin minus half its
-			# depth along Z.
+			#
+			# AND THE WAY IT FACES COMES OFF THE SAME NODE. A Building's door is in its local
+			# plus Z gable end, so the front face and the direction the sign has to look are
+			# that axis put through the building's own basis, the same derivation
+			# _stand_one() uses to work out which side of a building an attendant stands on.
+			# This used to be "minus half the depth along world Z" plus a half turn baked
+			# into strip.gd, which is the Palace's CURRENT angle written down twice and wrong
+			# for any other.
+			var palace_out: Vector3 = palace_building.global_transform.basis \
+				* Vector3(0.0, 0.0, 1.0)
+			palace_out.y = 0.0
+			palace_out = palace_out.normalized() if palace_out.length_squared() > 0.0 \
+				else Vector3(0.0, 0.0, 1.0)
 			strip.mount_marquee(
 				palace_building.global_position
-					- Vector3(0.0, 0.0, palace_building.depth * 0.5),
+					+ palace_out * (palace_building.depth * 0.5),
+				palace_out,
 				Vector2(palace_building.width * 0.5, palace_building.depth * 0.5),
 				palace_building.global_position.y + palace_building.ridge_height)
 		strip.build()

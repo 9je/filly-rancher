@@ -91,6 +91,10 @@ var _lights: Array[Node3D] = []
 var _built := false
 
 var _marquee_centre := Vector3.ZERO
+## The way the board looks, flat and unit length. A Building's door is in its local plus Z
+## gable end, so this is that axis put through the building's own basis by ranch.gd; the
+## default is the unturned axis, for a Strip nobody has mounted a sign on.
+var _marquee_facing := Vector3(0.0, 0.0, 1.0)
 var _marquee_size := Vector2.ZERO
 var _marquee_ceiling := 0.0
 var _has_marquee := false
@@ -128,23 +132,42 @@ func avoid_footprint(centre_xz: Vector2, half_extents: Vector2) -> void:
 
 
 ## WHERE THE SIGN GOES, in the building's own terms. `front_centre` is the middle of the
-## Palace's front wall in world space, `half_extents` its half width and half depth, and
-## `ridge_y` the world height of its ridge. Call before build(), same contract as
-## configure() and avoid_footprint(); an unmounted Strip simply stands no marquee, which is
-## a Strip with no building on it.
+## Palace's front wall in world space, `out_dir` the direction its door faces (flat, unit
+## length), `half_extents` its half width and half depth, and `ridge_y` the world height of
+## its ridge. Call before build(), same contract as configure() and avoid_footprint(); an
+## unmounted Strip simply stands no marquee, which is a Strip with no building on it.
 ##
 ## KEPT AS PLAIN NUMBERS rather than as a Building reference, for the reason
 ## avoid_footprint() gives: this file does not have to know what a Building is, and
 ## ranch.gd reads the live node's own width, depth and ridge_height so a re sited or
 ## re proportioned Palace moves its own sign.
-func mount_marquee(front_centre: Vector3, half_extents: Vector2, ridge_y: float) -> void:
+##
+## OUT_DIR IS HANDED IN RATHER THAN ASSUMED. This file used to hang the board at
+## `front_centre.z - MARQUEE_STANDOFF` and turn its letters by exactly PI, which is world
+## minus Z written down twice: correct only because ranch.tscn happens to turn the Palace a
+## half turn, and silently wrong for any other angle, including the one a later re siting
+## would use. ranch.gd derives the direction from the building's own basis, the same way
+## _stand_one() derives where an attendant stands, and hands it over.
+func mount_marquee(front_centre: Vector3, out_dir: Vector3, half_extents: Vector2,
+		ridge_y: float) -> void:
+	var facing: Vector3 = Vector3(out_dir.x, 0.0, out_dir.z)
+	if facing.length_squared() <= 0.0:
+		# A degenerate direction is a caller bug, not a reason to stand no sign: fall back
+		# on the way every Building's own door faces before it is turned.
+		facing = Vector3(0.0, 0.0, 1.0)
+	_marquee_facing = facing.normalized()
 	var board_width: float = half_extents.x * 2.0 * MARQUEE_WIDTH_FRACTION
 	_marquee_size = Vector2(board_width, MARQUEE_HEIGHT)
 	_marquee_ceiling = ridge_y - MARQUEE_TOP_GAP
-	_marquee_centre = Vector3(front_centre.x,
-		_marquee_ceiling - MARQUEE_HEIGHT * 0.5,
-		front_centre.z - MARQUEE_STANDOFF)
+	_marquee_centre = Vector3(front_centre.x, _marquee_ceiling - MARQUEE_HEIGHT * 0.5,
+		front_centre.z) + _marquee_facing * MARQUEE_STANDOFF
 	_has_marquee = true
+
+
+## The direction the board's face looks in, flat and unit length. Whatever mount_marquee()
+## was handed, or the unturned default before it is called.
+func marquee_facing() -> Vector3:
+	return _marquee_facing
 
 
 func marquee_board_size() -> Vector2:
@@ -274,20 +297,24 @@ func _marquee() -> void:
 	trim_box.material = _flat_material(MARQUEE_TRIM_COLOR)
 	trim.mesh = trim_box
 	add_child(trim)
-	trim.global_position = _marquee_centre + Vector3(0.0, 0.0, -0.03)
+	trim.global_position = _marquee_centre + _marquee_facing * 0.03
 
 	var lines: Array[String] = marquee_lines()
 	var headline_height: float = _marquee_size.y * MARQUEE_HEADLINE_FRACTION
 	_marquee_label("MarqueeHeadline", lines[0], headline_height,
-		_marquee_centre + Vector3(0.0, _marquee_size.y * 0.20, -0.09))
+		_marquee_centre + Vector3(0.0, _marquee_size.y * 0.20, 0.0)
+			+ _marquee_facing * 0.09)
 	_marquee_label("MarqueeSponsor", lines[1],
 		headline_height * MARQUEE_SPONSOR_SCALE,
-		_marquee_centre + Vector3(0.0, -_marquee_size.y * 0.24, -0.09))
+		_marquee_centre + Vector3(0.0, -_marquee_size.y * 0.24, 0.0)
+			+ _marquee_facing * 0.09)
 
 
 ## One line of the sign, `cap_height` metres tall, fitted to the board's width and hung at
-## `at`. Faces the walk up from the homestead, which comes from Z below the building, so it
-## turns a half turn to meet her: Label3D's own text faces plus Z.
+## `at`. Faces the walk up to the door, whichever way the building has been turned: Label3D's
+## own text faces its local plus Z, so the yaw that points that at _marquee_facing is
+## atan2(x, z) of the facing itself. A hard coded half turn read correctly only for a
+## building standing exactly the way ranch.tscn happens to stand this one.
 func _marquee_label(label_name: String, text: String, cap_height: float,
 		at: Vector3) -> void:
 	var label := Label3D.new()
@@ -309,7 +336,7 @@ func _marquee_label(label_name: String, text: String, cap_height: float,
 	label.no_depth_test = false
 	add_child(label)
 	label.global_position = at
-	label.rotation.y = PI
+	label.rotation.y = atan2(_marquee_facing.x, _marquee_facing.z)
 
 
 func _flat_material(colour: Color) -> StandardMaterial3D:

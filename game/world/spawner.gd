@@ -630,6 +630,18 @@ func _spawn_stock(marker: ZoneMarker, slot: int, rng: RandomNumberGenerator) -> 
 		# The assetless checkout (docs/ci.md section 4). One calm skip, not a push_error per
 		# pony per marker; ranch.gd's report already says assets=absent at the top.
 		return null
+	# AND THE PATH THAT ACTUALLY LOADS. A stock pony's body is NOT built from
+	# data.model_path: Pony._base_model_path() answers StockPalette.mane_style_path() for
+	# her drawn mane style, and PonyVisuals builds from that instead (the record's own path
+	# is what the 43 NAMED characters use). Guarding only the record left the assetless
+	# checkout skipping on the wrong file: the hidden records happen to point at
+	# pokeypierce.glb, which is also pool index 0, so the guard passed or failed by
+	# coincidence and any pool entry that was missing on its own went straight through to a
+	# push_error per pony per marker.
+	var pool_path: String = StockPaletteScript.mane_style_path(
+		int(look.get("mane_style", 0)))
+	if pool_path.is_empty() or not ResourceLoader.exists(pool_path):
+		return null
 	return _spawn_one(data, marker, slot, look)
 
 
