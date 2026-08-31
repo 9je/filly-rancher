@@ -125,6 +125,10 @@ extends Node3D
 ## scene. See _hosted below for why the quit cannot simply stay unconditional.
 signal gate_report_finished(all_ok: bool)
 
+## Emitted when a race at the Palace has been paid out, with what the player's bet returned
+## (0 for a loser) and which lane won. A gate hangs off this rather than polling the track.
+signal race_settled(payout: int, winner: int)
+
 const LayersScript := preload("res://world/collision_layers.gd")
 const PropsScript := preload("res://world/props.gd")
 const GateWatchdogScript := preload("res://scripts/gate_watchdog.gd")
@@ -162,6 +166,9 @@ const WheelScript := preload("res://systems/wheel.gd")
 const BlackjackScript := preload("res://systems/blackjack.gd")
 const CasinoMenuScript := preload("res://ui/casino_menu.gd")
 const WheelMenuScript := preload("res://ui/wheel_menu.gd")
+const RaceCardScript := preload("res://systems/race_card.gd")
+const RaceTrackScript := preload("res://world/race_track.gd")
+const CompanyRunnersScript := preload("res://systems/company_runners.gd")
 
 ## Headless watchdog ceiling. A normal run (assets present) finishes in under 2s on
 ## this machine; 30s leaves a wide margin for a slower box while still failing in
@@ -373,6 +380,8 @@ const GATE_RAY_REACH := 2.0
 @onready var slots_menu: CanvasLayer = $SlotsMenu
 @onready var wheel_menu: CanvasLayer = $WheelMenu
 @onready var blackjack_menu: CanvasLayer = $BlackjackMenu
+@onready var race_track: Node3D = $Strip/Track
+@onready var race_menu: CanvasLayer = $RaceMenu
 ## The screen a new game opens on (Task 8): the player's own pony on a turntable, and the
 ## name the Company will know her by. Typed as the plain CanvasLayer ranch.tscn declares,
 ## reached through has_method() like every other menu here, for the same reason
@@ -514,6 +523,14 @@ var _palace_prompted := false
 ## set_casino_seed().
 var _casino_rng := RandomNumberGenerator.new()
 
+## The bet currently on the track: whose race it is, which lane is backed, for how much, and
+## the exact field the odds were quoted from. Kept here rather than on the track, because the
+## track knows about lanes and this file knows about money.
+var _race_entrant: StringName = &""
+var _race_lane := -1
+var _race_stake := 0
+var _race_field: Array[Dictionary] = []
+
 ## Whether the request board's prompt has been shown for this approach. The market
 ## prompt's rule; see _market_prompted.
 var _board_prompted := false
@@ -630,6 +647,12 @@ func _ready() -> void:
 				Vector2(palace_building.width * 0.5, palace_building.depth * 0.5))
 		strip.build()
 
+	if race_track != null and race_track.has_method("configure"):
+		race_track.call("configure", Callable(terrain, "height_at"))
+		race_track.call("build")
+		if not race_track.is_connected("race_finished", _on_race_finished):
+			race_track.connect("race_finished", _on_race_finished)
+
 	# EVERY PONY WHO EVER REACHES THE MAP, at boot and at every later change of sky (see
 	# Spawner.pony_spawned). Connected at the top of boot rather than beside the populate()
 	# call below because populate() emits it from inside itself: a connect made after that
@@ -674,7 +697,7 @@ func _ready() -> void:
 	# behind it. set() by name for the reason _bind_build_menu() gives: a menu whose script
 	# failed to parse is a FAILED check in _report(), not a boot that dies here.
 	for menu: CanvasLayer in [build_menu, market_menu, pause_menu, depot_menu, casino_menu,
-			slots_menu, wheel_menu, blackjack_menu]:
+			slots_menu, wheel_menu, blackjack_menu, race_menu]:
 		if menu != null:
 			menu.set("can_open", func() -> bool: return false)
 
@@ -1434,6 +1457,18 @@ func _bind_casino_menus() -> void:
 			_on_deal_requested):
 		blackjack_menu.connect("deal_requested", _on_deal_requested)
 
+	if race_menu != null and race_menu.has_method("open"):
+		race_menu.set("can_open",
+			func() -> bool: return _no_menu_but(race_menu) and casino_can_enter())
+		race_menu.set("chips_provider", func() -> int: return _current_chips())
+		race_menu.set("entrants_provider",
+			func() -> Array[Dictionary]: return race_entrants())
+		for pair in [["opened", _on_menu_opened_any], ["closed", _on_menu_closed],
+				["entrant_chosen", _on_entrant_chosen],
+				["race_requested", _on_race_requested]]:
+			if not race_menu.is_connected(pair[0], pair[1]):
+				race_menu.connect(pair[0], pair[1])
+
 
 ## WHETHER THE PALACE WILL LET HER IN. Always true in this slice.
 ##
@@ -1473,6 +1508,50 @@ func _penned_rows() -> Array[Dictionary]:
 				"credit": LedgerScript.delivery_credit(rarity, inst.is_stock()),
 			})
 	return rows
+
+
+## The pen holding `uid` and the record in it, as {"pen": Pen, "inst": PonyInstance}, or an
+## empty dictionary. One walk over the plots, shared by the Depot's delivery and the track's
+## entry, so the two cannot disagree about where a pony lives.
+func _penned(uid: StringName) -> Dictionary:
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen == null:
+			continue
+		var found: PonyInstance = pen.find_pony(uid)
+		if found != null:
+			return {"pen": pen, "inst": found}
+	return {}
+
+
+## Who the player could enter in a race: everybody standing in a pen. Named and stock alike,
+## because a stock pony is an outsider on the card and backing her is the fun bet.
+func race_entrants() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen == null:
+			continue
+		for inst: PonyInstance in pen.ponies():
+			out.append({"uid": inst.uid, "name": inst.display_name(),
+				"happiness": inst.happiness})
+	return out
+
+
+## She picked a pony. Build the card for her and push the six prices back to the panel; the
+## panel has no way to price a lane itself, deliberately.
+func _on_entrant_chosen(uid: StringName) -> void:
+	var found: Dictionary = _penned(uid)
+	if found.is_empty() or race_menu == null:
+		return
+	var field: Array[Dictionary] = RaceCardScript.build_field(
+		RaceCardScript.entrant_from(found["inst"] as PonyInstance),
+		CompanyRunnersScript.load_shipped())
+	var odds: Array[float] = []
+	for lane in field.size():
+		odds.append(RaceCardScript.decimal_odds(field, lane))
+	race_menu.call("set_field", field, odds)
+	race_menu.call("set_tab", 1)
 
 
 ## ONE WORD THAT TELLS TWO STOCK PONIES APART, for the Deliver tab. Every member of the
@@ -1642,7 +1721,7 @@ func _bind_pause_menu() -> void:
 ## what keeps the two directions from drifting apart again.
 func _no_menu_but(menu: CanvasLayer) -> bool:
 	for other in [build_menu, market_menu, pause_menu, depot_menu, creation_screen,
-			casino_menu, slots_menu, wheel_menu, blackjack_menu]:
+			casino_menu, slots_menu, wheel_menu, blackjack_menu, race_menu]:
 		if other == menu or other == null:
 			continue
 		if other.has_method("is_open") and other.is_open():
@@ -2356,6 +2435,93 @@ func play_blackjack(stake: int) -> Dictionary:
 	return {"ok": true, "hand": hand, "won": won, "stake": stake}
 
 
+## RUN A RACE. Returns {"ok": bool, "field": Array, "result": Dictionary, "odds": float}.
+##
+## WHAT DOES NOT HAPPEN HERE, and it is the point of the whole task: the entrant is not taken
+## out of her pen, not handed to the track, not adopted by anything and not freed. Her pen
+## body is hidden for the length of the race so the world does not show her twice, and
+## _on_race_finished() shows it again. The six bodies on the track are RaceRunners, which are
+## not ponies at all; see game/world/race_runner.gd.
+##
+## THE STAKE COMES OUT BEFORE THE FIELD IS DRAWN, the same order every table here uses. The
+## seed comes off the casino's own generator, so a gate that called set_casino_seed() gets the
+## same race every run and a player gets a different one every time.
+func start_race(uid: StringName, lane: int, stake: int) -> Dictionary:
+	var refused := {"ok": false, "field": [], "result": {}, "odds": 0.0}
+	if _game_state == null or race_track == null or race_track.call("is_running"):
+		return refused
+	var found: Dictionary = _penned(uid)
+	if found.is_empty():
+		return refused
+	if not _game_state.casino.can_stake(stake):
+		return refused
+	var inst: PonyInstance = found["inst"]
+	var field: Array[Dictionary] = RaceCardScript.build_field(
+		RaceCardScript.entrant_from(inst), CompanyRunnersScript.load_shipped())
+	if lane < 0 or lane >= field.size():
+		return refused
+	if not _game_state.casino.remove_chips(stake):
+		return refused
+
+	var result: Dictionary = RaceCardScript.run(field, _casino_rng.randi())
+	_race_entrant = uid
+	_race_lane = lane
+	_race_stake = stake
+	_race_field = field
+
+	var pen: Pen = found["pen"]
+	var body: Node3D = pen.body_for(uid)
+	if body != null:
+		# HIDDEN, NEVER REMOVED. She is still in the pen's roster, still in the save, and
+		# still standing where she was; the player just does not see her in two places.
+		body.visible = false
+
+	race_track.call("dress", field)
+	race_track.call("start", field, result)
+	if race_menu != null and race_menu.has_method("close"):
+		race_menu.close()
+	_toast("They are under orders at the Spectra Palace!")
+	return {"ok": true, "field": field, "result": result,
+		"odds": RaceCardScript.decimal_odds(field, lane)}
+
+
+## The wire. Pay the bet, give the racer back her pen body, and write what running did to her.
+func _on_race_finished(_order: Array, winner: int) -> void:
+	var won: int = RaceCardScript.payout(_race_field, _race_lane, _race_stake, winner)
+	if _game_state != null and won > 0:
+		_game_state.casino.add_chips(won)
+	var found: Dictionary = _penned(_race_entrant)
+	if not found.is_empty():
+		var pen: Pen = found["pen"]
+		var body: Node3D = pen.body_for(_race_entrant)
+		if body != null:
+			body.visible = true
+		RaceCardScript.apply_race_effects(found["inst"] as PonyInstance)
+	var winner_name: String = String(_race_field[winner]["name"]) \
+		if winner >= 0 and winner < _race_field.size() else "the field"
+	if won > 0:
+		_toast("%s takes it. You win %d chips!" % [winner_name, won])
+	else:
+		_toast("%s takes it. Better luck in the next." % winner_name)
+	_refresh_casino_menus()
+	race_settled.emit(won, winner)
+	_race_entrant = &""
+	_race_lane = -1
+	_race_stake = 0
+
+
+func get_race_track() -> Node3D:
+	return race_track
+
+
+func get_race_menu() -> CanvasLayer:
+	return race_menu
+
+
+func _on_race_requested(uid: StringName, lane: int, stake: int) -> void:
+	start_race(uid, lane, stake)
+
+
 func _cards_text(cards: Array) -> String:
 	var names: Array[String] = []
 	for card in cards:
@@ -2364,7 +2530,7 @@ func _cards_text(cards: Array) -> String:
 
 
 func _refresh_casino_menus() -> void:
-	for menu: CanvasLayer in [casino_menu, slots_menu, wheel_menu, blackjack_menu]:
+	for menu: CanvasLayer in [casino_menu, slots_menu, wheel_menu, blackjack_menu, race_menu]:
 		if menu != null and menu.has_method("refresh"):
 			menu.call("refresh")
 
@@ -2409,8 +2575,7 @@ func _on_game_requested(game: int) -> void:
 		table.open()
 
 
-## The menu behind one of CasinoMenu's four doors, or null. Racing's is built in Task 7 and
-## answers null until then.
+## The menu behind one of CasinoMenu's four doors, or null.
 func get_table_menu(game: int) -> CanvasLayer:
 	match game:
 		CasinoMenuScript.Game.SLOTS:
@@ -2419,6 +2584,8 @@ func get_table_menu(game: int) -> CanvasLayer:
 			return wheel_menu
 		CasinoMenuScript.Game.BLACKJACK:
 			return blackjack_menu
+		CasinoMenuScript.Game.RACING:
+			return race_menu
 	return null
 
 
