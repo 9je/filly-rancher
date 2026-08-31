@@ -152,6 +152,7 @@ const CompendiumScript := preload("res://systems/compendium.gd")
 const LedgerScript := preload("res://systems/ledger.gd")
 const LettersScript := preload("res://systems/letters.gd")
 const StockPaletteScript := preload("res://systems/stock_palette.gd")
+const PlayerLookScript := preload("res://systems/player_look.gd")
 
 ## Headless watchdog ceiling. A normal run (assets present) finishes in under 2s on
 ## this machine; 30s leaves a wide margin for a slower box while still failing in
@@ -336,6 +337,12 @@ const GATE_RAY_REACH := 2.0
 @onready var market_menu: CanvasLayer = $MarketMenu
 @onready var depot_menu: CanvasLayer = $DepotMenu
 @onready var pause_menu: CanvasLayer = $PauseMenu
+## The screen a new game opens on (Task 8): the player's own pony on a turntable, and the
+## name the Company will know her by. Typed as the plain CanvasLayer ranch.tscn declares,
+## reached through has_method() like every other menu here, for the same reason
+## _bind_build_menu() gives: a script that failed to parse must be a FAILED check in
+## _report(), not a boot that dies reaching straight into a property it does not have.
+@onready var creation_screen: CanvasLayer = $CreationScreen
 ## The sky. Typed as the plain Node3D ranch.tscn declares rather than as SkyRig, and
 ## always reached through has_method(), for the reason _bind_build_menu() gives about the
 ## menus: a sky_rig.gd that failed to PARSE leaves exactly this node in the tree with no
@@ -666,6 +673,9 @@ func _ready() -> void:
 	_bind_build_menu()
 
 	await _report(pony_count, prop_count)
+
+	_apply_player_look()
+	_maybe_open_creation()
 
 
 # --- saving and loading ----------------------------------------------------------------
@@ -1026,6 +1036,10 @@ func rebind_economy() -> void:
 	_apply_beam_recall()
 	_seed_collector_state()
 	_push_balance()
+	# A mid-session load REPLACES GameState.player (from_dict()), so the pony on screen has
+	# to be re-dressed here too, or a loaded save would show the look of the session it
+	# replaced until the player next changed a swatch.
+	_apply_player_look()
 
 
 func _on_balance_changed(_balance: int) -> void:
@@ -1298,10 +1312,10 @@ func _statement() -> Array[String]:
 		_open_permit_count(), cycle)
 
 
-## What the player called herself at the creation screen. "Twilight" until Task 8 makes the
-## screen; the whole of the Company's paperwork reads it from here so there is one answer.
+## What the player called herself at the creation screen. The whole of the Company's
+## paperwork reads it from here so there is one answer.
 func _player_name() -> String:
-	return "Twilight"
+	return _game_state.player.player_name if _game_state != null else PlayerLookScript.DEFAULT_NAME
 
 
 func _built_plot_count() -> int:
@@ -1400,12 +1414,46 @@ func _bind_pause_menu() -> void:
 ## an open pause menu. Asking one question, excluding only the menu doing the asking, is
 ## what keeps the two directions from drifting apart again.
 func _no_menu_but(menu: CanvasLayer) -> bool:
-	for other in [build_menu, market_menu, pause_menu, depot_menu]:
+	for other in [build_menu, market_menu, pause_menu, depot_menu, creation_screen]:
 		if other == menu or other == null:
 			continue
 		if other.has_method("is_open") and other.is_open():
 			return false
 	return true
+
+
+## A NEW GAME OPENS ON THE CREATION SCREEN. Only for somebody actually playing: a hosted
+## ranch, a headless gate and a screenshot run all skip it, so no automated run ever waits
+## on a button nobody is going to press. A session that LOADED a save skips it too; there is
+## no re-edit screen this phase.
+func _maybe_open_creation() -> void:
+	if not _interactive or _save_loaded or _game_state == null:
+		return
+	if creation_screen == null or not creation_screen.has_method("open"):
+		return
+	if not creation_screen.is_connected("confirmed", _on_creation_confirmed):
+		creation_screen.connect("confirmed", _on_creation_confirmed)
+	creation_screen.call("open", _game_state.player)
+
+
+## She has made her pony. Keep it, dress the model, and write it down straight away: the
+## first thing that happens after this is a ranch, and a crash before the first autosave
+## should not cost her the pony she just spent five minutes on.
+func _on_creation_confirmed(look: PlayerLook) -> void:
+	if _game_state == null:
+		return
+	_game_state.player = look
+	_apply_player_look()
+	save_game()
+	var letter: Dictionary = LettersScript.render(LettersScript.Id.WELCOME, {
+		"name": look.player_name, "balance": _game_state.ledger.balance})
+	_toast("%s: %s" % [letter["sender"], letter["title"]])
+
+
+func _apply_player_look() -> void:
+	if _game_state == null or player == null or not player.has_method("apply_look"):
+		return
+	player.call("apply_look", _game_state.player)
 
 
 ## Nothing at all is up: no build menu, no Market, no pause menu.
@@ -3324,6 +3372,16 @@ func _report(pony_count: int, prop_count: int) -> void:
 		print("RANCH camera check FAILED -- no building found to probe (assets=%s)"
 			% assets_state)
 		_set_check(checks, "the camera pulls in against a building", false)
+
+	# --- the player's own look (Task 8) -----------------------------------------
+	var has_look: bool = _game_state != null and _game_state.player != null
+	_set_check(checks, "the player has a look", has_look)
+	_set_check(checks, "the creation screen is closed in an automated run",
+		creation_screen == null or not creation_screen.call("is_open"))
+	if has_look:
+		print("RANCH player name=%s coat=%d mane=%d eyes=%d mark=%s" % [
+			_player_name(), _game_state.player.coat, _game_state.player.mane,
+			_game_state.player.eyes, _game_state.player.has_mark()])
 
 	# --- verdict -------------------------------------------------------------------
 	# A duplicate label is not a check that failed -- it is a check that never ran. It

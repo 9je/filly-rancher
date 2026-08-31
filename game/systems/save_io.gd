@@ -351,6 +351,12 @@ static func migrate(data: Dictionary, from_version: int) -> Dictionary:
 	if from_version < 5:
 		if not out.has("ledger"):
 			out["ledger"] = {}
+		if not out.has("player"):
+			# PlayerLook.from_dict({}) is Twilight, the shipped look and a blank mark, which
+			# is exactly what the design doc says a version 4 save should load as. Stated
+			# here rather than left to that default so migrate()'s OUTPUT states the version
+			# 5 shape, the way the version 2 branch does.
+			out["player"] = {}
 	return out
 
 

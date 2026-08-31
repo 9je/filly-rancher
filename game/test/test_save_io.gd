@@ -558,3 +558,23 @@ func test_a_stock_pony_survives_a_whole_save_round_trip() -> void:
 	assert_eq(back.stock, {"coat": 5, "mane": 2, "eyes": 4})
 	assert_eq(back.data_id, &"stock_shy")
 	assert_eq(back.home_slot, &"plot_a")
+
+
+# --- the player's own look in the save file -----------------------------------------------
+
+func test_a_version_four_save_gets_twilight_with_a_blank_mark() -> void:
+	var migrated: Dictionary = SaveIOScript.migrate({"bits": 40}, 4)
+	assert_eq(migrated["player"], {})
+	var look: PlayerLook = PlayerLook.from_dict(migrated["player"])
+	assert_eq(look.player_name, PlayerLook.DEFAULT_NAME)
+	assert_false(look.has_mark())
+
+
+func test_a_drawn_mark_survives_the_file_on_disk() -> void:
+	var look: PlayerLook = PlayerLook.default_look()
+	var drawn: Image = MarkStamps.build(MarkStamps.Stamp.FLOWER, Color(0.4, 0.8, 0.3))
+	look.set_mark(drawn)
+	assert_true(SaveIOScript.save(SLOT, {"player": look.to_dict()}))
+	var loaded: Dictionary = SaveIOScript.load(SLOT)
+	assert_true(MarkPaint.equal(PlayerLook.from_dict(loaded["player"]).mark(), drawn),
+		"the save is one self contained JSON blob and the drawing comes back exactly")

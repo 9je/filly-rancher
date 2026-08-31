@@ -30,6 +30,8 @@ const PonyDataScript := preload("res://systems/pony_data.gd")
 const GemPouchScript := preload("res://systems/gem_pouch.gd")
 const InventoryScript := preload("res://systems/inventory.gd")
 const CompendiumScript := preload("res://systems/compendium.gd")
+const PlayerLookScript := preload("res://systems/player_look.gd")
+const MarkStampsScript := preload("res://systems/mark_stamps.gd")
 
 const SCRATCH_DIR := "user://test_scratch/game_state"
 const SLOT := 3
@@ -271,6 +273,24 @@ func test_a_load_replaces_the_ledger_rather_than_mutating_it() -> void:
 	var old: Ledger = state.ledger
 	state.from_dict({})
 	assert_ne(state.ledger, old, "a listener holding the old account must be told to re-read")
+
+
+## THE LIVE AUTOLOAD IS NOT TOUCHED HERE, for the reason the class comment gives: this
+## suite builds its own GameState with .new() rather than mutating the registered one.
+## `state.player`/`state.reset()`/`state.to_dict()`/`state.from_dict()` are the same methods
+## an autoload-driven round trip would go through.
+func test_the_player_look_round_trips_through_the_state() -> void:
+	var state = _state()
+	state.player.player_name = "Moonbeam"
+	state.player.coat = 9
+	state.player.set_mark(MarkStampsScript.build(MarkStampsScript.Stamp.STAR, Color.RED))
+	var data: Dictionary = state.to_dict()
+	state.reset()
+	assert_eq(state.player.player_name, PlayerLookScript.DEFAULT_NAME)
+	state.from_dict(data)
+	assert_eq(state.player.player_name, "Moonbeam")
+	assert_eq(state.player.coat, 9)
+	assert_true(state.player.has_mark())
 
 
 # --- the disk round trip ----------------------------------------------------------------

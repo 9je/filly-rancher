@@ -24,7 +24,7 @@ const FLOOR_SIZE := Vector3(40.0, 1.0, 40.0)
 const RUN_FRAMES := 45
 
 var _world: Node3D
-var _player: CharacterBody3D
+var _player_node: CharacterBody3D
 var _camera: Camera3D
 
 
@@ -44,8 +44,8 @@ func before_each() -> void:
 	_camera = Camera3D.new()
 	_world.add_child(_camera)
 
-	_player = PlayerScene.instantiate()
-	_world.add_child(_player)
+	_player_node = PlayerScene.instantiate()
+	_world.add_child(_player_node)
 
 
 func after_each() -> void:
@@ -61,6 +61,13 @@ func _aim_camera(forward: Vector3) -> void:
 	_camera.global_position = Vector3(0.0, 3.0, 0.0) - forward * 4.0
 	_camera.look_at(Vector3(0.0, 1.0, 0.0), Vector3.UP)
 	_camera.current = true
+
+
+## The player under test, typed as the real class rather than as the CharacterBody3D
+## `_player_node` is declared as -- Task 8's apply_look() and the fields it reads
+## (visuals) live on Player, not on its base.
+func _player() -> Player:
+	return _player_node as Player
 
 
 ## The two gameplay speeds, checked against what the animation can actually depict.
@@ -123,23 +130,23 @@ func test_every_movement_action_has_a_keyboard_and_a_gamepad_binding() -> void:
 
 
 func test_scene_contract_for_later_tasks() -> void:
-	assert_not_null(_player.get_node_or_null("CameraPivot"),
+	assert_not_null(_player_node.get_node_or_null("CameraPivot"),
 		"Task 5 mounts its camera rig on a child named exactly 'CameraPivot'")
-	var pivot: Node3D = _player.get_node("CameraPivot")
+	var pivot: Node3D = _player_node.get_node("CameraPivot")
 	assert_almost_eq(pivot.position.y, 1.45, 0.001,
 		"the camera pivot sits at head height on the metric pony")
-	assert_not_null(_player.get_beam_origin(),
+	assert_not_null(_player_node.get_beam_origin(),
 		"Task 8 anchors the magic beam at get_beam_origin()")
 
 
 func test_beam_origin_turns_with_the_pony_not_with_the_body() -> void:
 	# The body never yaws (see player.gd) -- the beam origin has to follow her facing
 	# anyway, or the beam would leave her horn whenever she faced sideways.
-	var visuals: Node3D = _player.get_node("Visuals")
-	var before: Vector3 = _player.get_beam_origin().global_position
+	var visuals: Node3D = _player_node.get_node("Visuals")
+	var before: Vector3 = _player_node.get_beam_origin().global_position
 	visuals.rotation.y = PI * 0.5
-	var after: Vector3 = _player.get_beam_origin().global_position
-	assert_almost_eq(_player.rotation.y, 0.0, 0.0001, "the body itself must not yaw")
+	var after: Vector3 = _player_node.get_beam_origin().global_position
+	assert_almost_eq(_player_node.rotation.y, 0.0, 0.0001, "the body itself must not yaw")
 	assert_gt(before.distance_to(after), 0.1,
 		"the beam origin must move when the visuals turn")
 
@@ -147,10 +154,10 @@ func test_beam_origin_turns_with_the_pony_not_with_the_body() -> void:
 func test_moves_along_the_camera_forward_axis_when_the_camera_is_yawed() -> void:
 	# Camera looks down -X, so "forward" for the player must be -X, not her own -Z.
 	_aim_camera(Vector3.LEFT)
-	var start: Vector3 = _player.global_position
+	var start: Vector3 = _player_node.global_position
 	Input.action_press("move_forward")
 	await wait_physics_frames(RUN_FRAMES)
-	var travel: Vector3 = _player.global_position - start
+	var travel: Vector3 = _player_node.global_position - start
 	assert_lt(travel.x, -0.5, "she must travel along the camera's forward axis (-X)")
 	assert_almost_eq(travel.z, 0.0, 0.1, "she must not travel along her own -Z")
 
@@ -158,10 +165,10 @@ func test_moves_along_the_camera_forward_axis_when_the_camera_is_yawed() -> void
 func test_strafe_is_relative_to_the_camera_too() -> void:
 	# Camera looks down -X; the player's right is then -Z.
 	_aim_camera(Vector3.LEFT)
-	var start: Vector3 = _player.global_position
+	var start: Vector3 = _player_node.global_position
 	Input.action_press("move_right")
 	await wait_physics_frames(RUN_FRAMES)
-	var travel: Vector3 = _player.global_position - start
+	var travel: Vector3 = _player_node.global_position - start
 	assert_lt(travel.z, -0.5, "'move_right' relative to a camera looking down -X is -Z")
 	assert_almost_eq(travel.x, 0.0, 0.1, "strafing must not creep forward")
 
@@ -173,12 +180,12 @@ func test_the_default_gait_is_the_run_and_sneak_slows_her_down() -> void:
 	_aim_camera(Vector3.FORWARD)
 	Input.action_press("move_forward")
 	await wait_physics_frames(RUN_FRAMES)
-	var default_speed: float = _player.get_ground_speed()
-	assert_false(_player.is_sneaking(), "nothing is held, so she is not sneaking")
+	var default_speed: float = _player_node.get_ground_speed()
+	assert_false(_player_node.is_sneaking(), "nothing is held, so she is not sneaking")
 	Input.action_press("sneak")
 	await wait_physics_frames(RUN_FRAMES)
-	var sneak_speed: float = _player.get_ground_speed()
-	assert_true(_player.is_sneaking(), "holding the modifier must report as sneaking")
+	var sneak_speed: float = _player_node.get_ground_speed()
+	assert_true(_player_node.is_sneaking(), "holding the modifier must report as sneaking")
 	# What the CONTROLLER is asserted to do: reach both commanded speeds and tell them
 	# apart. What those speeds cost in animation terms is asserted once, on the constants,
 	# in test_the_two_gameplay_speeds_stay_inside_their_animation_budget -- this test used
@@ -196,18 +203,18 @@ func test_the_default_gait_is_the_run_and_sneak_slows_her_down() -> void:
 	# be a one-way trip into the slow gait.
 	Input.action_release("sneak")
 	await wait_physics_frames(RUN_FRAMES)
-	assert_almost_eq(_player.get_ground_speed(), PlayerScript.RUN_SPEED, 0.01,
+	assert_almost_eq(_player_node.get_ground_speed(), PlayerScript.RUN_SPEED, 0.01,
 		"releasing `sneak` must put her back at RUN_SPEED")
 
 
 func test_stands_still_and_stays_on_the_floor_with_no_input() -> void:
 	_aim_camera(Vector3.FORWARD)
-	var start: Vector3 = _player.global_position
+	var start: Vector3 = _player_node.global_position
 	await wait_physics_frames(RUN_FRAMES)
-	assert_true(_player.is_on_floor(), "gravity must settle her onto the floor, not through it")
-	assert_almost_eq(_player.global_position.distance_to(start), 0.0, 0.05,
+	assert_true(_player_node.is_on_floor(), "gravity must settle her onto the floor, not through it")
+	assert_almost_eq(_player_node.global_position.distance_to(start), 0.0, 0.05,
 		"she must not drift when nothing is pressed")
-	assert_almost_eq(_player.get_ground_speed(), 0.0, 0.001, "no input means no velocity")
+	assert_almost_eq(_player_node.get_ground_speed(), 0.0, 0.001, "no input means no velocity")
 
 
 func test_plays_idle_at_rest_and_walk_when_sneaking() -> void:
@@ -215,7 +222,7 @@ func test_plays_idle_at_rest_and_walk_when_sneaking() -> void:
 	# a moving player with nothing held runs, and that path is covered by
 	# test_plays_gallop_by_default_and_drops_to_walk_when_sneaking.
 	_aim_camera(Vector3.FORWARD)
-	var anim: AnimationPlayer = _player.get_animation_player()
+	var anim: AnimationPlayer = _player_node.get_animation_player()
 	assert_not_null(anim, "the player's body must build with a reachable AnimationPlayer")
 	await wait_physics_frames(5)
 	assert_eq(anim.current_animation, "idle", "a standing player plays 'idle'")
@@ -225,7 +232,7 @@ func test_plays_idle_at_rest_and_walk_when_sneaking() -> void:
 	await wait_physics_frames(RUN_FRAMES)
 	assert_eq(anim.current_animation, "walk", "a sneaking player plays 'walk'")
 	# PINNED TO LITERALS, NOT TO GaitScript. This assertion used to compare anim.speed_scale
-	# against playback_scale_for_speed(_player.get_ground_speed()) -- the engine's answer
+	# against playback_scale_for_speed(_player_node.get_ground_speed()) -- the engine's answer
 	# measured against the very function that produced it, so stubbing that function to
 	# return a flat 1.0 made both sides 1.0 and the test still passed. Phase 1A's final
 	# review found it (and the two siblings in game/scenes/test/playground.gd and
@@ -237,7 +244,7 @@ func test_plays_idle_at_rest_and_walk_when_sneaking() -> void:
 	# depicts plays at 2.0x -- zero skate by construction, well inside gait.gd's 0.5..3.0
 	# walk window. test_gait.gd pins 0.66 against the exporter's printed WALK_IMPLIED_SPEED,
 	# so a retuned stride goes red THERE and points at these.
-	assert_almost_eq(_player.get_ground_speed(), 1.32, 0.01,
+	assert_almost_eq(_player_node.get_ground_speed(), 1.32, 0.01,
 		"holding 'sneak' must settle her at SNEAK_SPEED, 1.32 m/s")
 	assert_almost_eq(anim.speed_scale, 2.0, 0.01,
 		"...and 1.32 m/s of a 0.66 m/s clip is exactly 2.0x playback -- a literal, because "
@@ -250,12 +257,12 @@ func test_plays_gallop_by_default_and_drops_to_walk_when_sneaking() -> void:
 	# observable end of it: move with nothing held, get the gallop clip, at the rate that
 	# keeps its hooves as planted as 5.2 m/s allows.
 	_aim_camera(Vector3.FORWARD)
-	var anim: AnimationPlayer = _player.get_animation_player()
+	var anim: AnimationPlayer = _player_node.get_animation_player()
 	assert_not_null(anim, "the player's body must build with a reachable AnimationPlayer")
 	Input.action_press("move_forward")
 	await wait_physics_frames(RUN_FRAMES)
 
-	var speed: float = _player.get_ground_speed()
+	var speed: float = _player_node.get_ground_speed()
 	assert_gt(speed, GaitScript.GALLOP_HANDOVER_SPEED,
 		"the default gait must be past the speed the walk clip can depict")
 	assert_eq(anim.current_animation, "gallop", "above the walk band she plays 'gallop'")
@@ -279,3 +286,18 @@ func test_plays_gallop_by_default_and_drops_to_walk_when_sneaking() -> void:
 	Input.action_press("sneak")
 	await wait_physics_frames(RUN_FRAMES)
 	assert_eq(anim.current_animation, "walk", "holding 'sneak' must drop her to 'walk'")
+
+
+func test_the_player_wears_the_look_she_is_given() -> void:
+	var player: Player = _player()  # the file's existing helper
+	if player.get_animation_player() == null:
+		pass_test("no converted assets on this machine")
+		return
+	var look: PlayerLook = PlayerLook.default_look()
+	look.coat = 2
+	look.set_mark(MarkStamps.build(MarkStamps.Stamp.HEART, Color.RED))
+	player.apply_look(look)
+	var body: Node3D = player.visuals.get_child(0)
+	assert_eq(StockTint.override_of(body, &"body").albedo_color,
+		StockPalette.load_player().coat_at(2))
+	assert_eq(CutieMark.decals_of(body).size(), 2)

@@ -1,0 +1,249 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://ui/creation_screen.gd" id="1"]
+[ext_resource type="PackedScene" path="res://ui/mark_canvas.tscn" id="2"]
+
+[sub_resource type="ProceduralSkyMaterial" id="DawnSkyMaterial"]
+sky_top_color = Color(0.42, 0.5, 0.78, 1.0)
+sky_horizon_color = Color(0.95, 0.72, 0.52, 1.0)
+sky_curve = 0.18
+ground_bottom_color = Color(0.22, 0.19, 0.24, 1.0)
+ground_horizon_color = Color(0.85, 0.62, 0.48, 1.0)
+sun_angle_max = 30.0
+sun_curve = 0.15
+
+[sub_resource type="Sky" id="DawnSky"]
+sky_material = SubResource("DawnSkyMaterial")
+
+[sub_resource type="Environment" id="DawnEnvironment"]
+background_mode = 2
+sky = SubResource("DawnSky")
+ambient_light_source = 2
+ambient_light_sky_contribution = 1.0
+tonemap_mode = 2
+
+[sub_resource type="StyleBoxFlat" id="PanelStyle"]
+bg_color = Color(0.0392157, 0.0470588, 0.0784314, 0.92)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.858824, 0.552941, 0.32)
+content_margin_left = 22.0
+content_margin_top = 18.0
+content_margin_right = 22.0
+content_margin_bottom = 18.0
+
+[sub_resource type="StyleBoxFlat" id="BackdropStyle"]
+bg_color = Color(0.02, 0.02, 0.03, 1.0)
+
+[node name="CreationScreen" type="CanvasLayer"]
+layer = 5
+process_mode = 3
+script = ExtResource("1")
+
+[node name="Backdrop" type="Panel" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("BackdropStyle")
+
+[node name="Viewport" type="SubViewportContainer" parent="."]
+anchor_right = 0.42
+anchor_bottom = 1.0
+grow_horizontal = 1
+grow_vertical = 2
+mouse_filter = 2
+stretch = true
+
+[node name="SubViewport" type="SubViewport" parent="Viewport"]
+transparent_bg = false
+handle_input_locally = false
+size = Vector2i(480, 640)
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="Viewport/SubViewport"]
+environment = SubResource("DawnEnvironment")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="Viewport/SubViewport"]
+transform = Transform3D(0.766, -0.408, 0.5, 0, 0.774, 0.634, -0.643, -0.486, 0.593, 0, 3, 0)
+light_color = Color(1.0, 0.86, 0.66, 1.0)
+light_energy = 1.1
+shadow_enabled = true
+
+[node name="Camera3D" type="Camera3D" parent="Viewport/SubViewport"]
+transform = Transform3D(0.9995, 0, 0, 0, 0.999, -0.0312, 0, 0.0312, 0.999, 0, 1.1, 3.2)
+current = true
+
+[node name="Turntable" type="Node3D" parent="Viewport/SubViewport"]
+
+[node name="Panel" type="PanelContainer" parent="."]
+anchor_left = 0.42
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("PanelStyle")
+
+[node name="Column" type="VBoxContainer" parent="Panel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Title" type="Label" parent="Panel/Column"]
+layout_mode = 2
+text = "Who are you?"
+theme_override_font_sizes/font_size = 22
+
+[node name="NameLabel" type="Label" parent="Panel/Column"]
+layout_mode = 2
+text = "Your name"
+
+[node name="NameBox" type="LineEdit" parent="Panel/Column"]
+layout_mode = 2
+max_length = 16
+
+[node name="CoatLabel" type="Label" parent="Panel/Column"]
+layout_mode = 2
+text = "Coat"
+
+[node name="CoatRow" type="HBoxContainer" parent="Panel/Column"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PrevCoat" type="Button" parent="Panel/Column/CoatRow"]
+layout_mode = 2
+text = "<"
+
+[node name="CoatSwatch" type="ColorRect" parent="Panel/Column/CoatRow"]
+custom_minimum_size = Vector2(40, 32)
+layout_mode = 2
+color = Color(0.6, 0.6, 0.6, 1.0)
+
+[node name="NextCoat" type="Button" parent="Panel/Column/CoatRow"]
+layout_mode = 2
+text = ">"
+
+[node name="ManeLabel" type="Label" parent="Panel/Column"]
+layout_mode = 2
+text = "Mane and tail"
+
+[node name="ManeRow" type="HBoxContainer" parent="Panel/Column"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PrevMane" type="Button" parent="Panel/Column/ManeRow"]
+layout_mode = 2
+text = "<"
+
+[node name="ManeSwatch" type="ColorRect" parent="Panel/Column/ManeRow"]
+custom_minimum_size = Vector2(40, 32)
+layout_mode = 2
+color = Color(0.6, 0.6, 0.6, 1.0)
+
+[node name="NextMane" type="Button" parent="Panel/Column/ManeRow"]
+layout_mode = 2
+text = ">"
+
+[node name="EyesLabel" type="Label" parent="Panel/Column"]
+layout_mode = 2
+text = "Eyes"
+
+[node name="EyesRow" type="HBoxContainer" parent="Panel/Column"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PrevEyes" type="Button" parent="Panel/Column/EyesRow"]
+layout_mode = 2
+text = "<"
+
+[node name="EyesSwatch" type="ColorRect" parent="Panel/Column/EyesRow"]
+custom_minimum_size = Vector2(40, 32)
+layout_mode = 2
+color = Color(0.6, 0.6, 0.6, 1.0)
+
+[node name="NextEyes" type="Button" parent="Panel/Column/EyesRow"]
+layout_mode = 2
+text = ">"
+
+[node name="MarkLabel" type="Label" parent="Panel/Column"]
+layout_mode = 2
+text = "Your cutie mark; draw it yourself"
+
+[node name="MarkCanvas" parent="Panel/Column" instance=ExtResource("2")]
+layout_mode = 2
+size_flags_horizontal = 4
+
+[node name="HintLabel" type="Label" parent="Panel/Column"]
+layout_mode = 2
+text = "Left click to draw. Pick a shape to start from, or start with nothing."
+autowrap_mode = 3
+
+[node name="StampRow" type="HBoxContainer" parent="Panel/Column"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Stamp0" type="Button" parent="Panel/Column/StampRow"]
+layout_mode = 2
+text = "Star"
+
+[node name="Stamp1" type="Button" parent="Panel/Column/StampRow"]
+layout_mode = 2
+text = "Heart"
+
+[node name="Stamp2" type="Button" parent="Panel/Column/StampRow"]
+layout_mode = 2
+text = "Apple"
+
+[node name="Stamp3" type="Button" parent="Panel/Column/StampRow"]
+layout_mode = 2
+text = "Cloud"
+
+[node name="Stamp4" type="Button" parent="Panel/Column/StampRow"]
+layout_mode = 2
+text = "Flower"
+
+[node name="Stamp5" type="Button" parent="Panel/Column/StampRow"]
+layout_mode = 2
+text = "Gem"
+
+[node name="ToolRow" type="HBoxContainer" parent="Panel/Column"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Brush1" type="Button" parent="Panel/Column/ToolRow"]
+layout_mode = 2
+text = "1"
+
+[node name="Brush2" type="Button" parent="Panel/Column/ToolRow"]
+layout_mode = 2
+text = "2"
+
+[node name="Brush4" type="Button" parent="Panel/Column/ToolRow"]
+layout_mode = 2
+text = "4"
+
+[node name="Brush8" type="Button" parent="Panel/Column/ToolRow"]
+layout_mode = 2
+text = "8"
+
+[node name="Eraser" type="Button" parent="Panel/Column/ToolRow"]
+layout_mode = 2
+toggle_mode = true
+text = "Eraser"
+
+[node name="ActionRow" type="HBoxContainer" parent="Panel/Column"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Undo" type="Button" parent="Panel/Column/ActionRow"]
+layout_mode = 2
+text = "Undo"
+
+[node name="Clear" type="Button" parent="Panel/Column/ActionRow"]
+layout_mode = 2
+text = "Clear"
+
+[node name="Confirm" type="Button" parent="Panel/Column"]
+layout_mode = 2

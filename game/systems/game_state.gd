@@ -50,6 +50,7 @@ const GemPouchScript := preload("res://systems/gem_pouch.gd")
 const InventoryScript := preload("res://systems/inventory.gd")
 const CompendiumScript := preload("res://systems/compendium.gd")
 const LedgerScript := preload("res://systems/ledger.gd")
+const PlayerLookScript := preload("res://systems/player_look.gd")
 
 ## Where the authored character roster is read from. The same directory the spawner and
 ## PonyInstance use; named here because this is now the one place it is loaded.
@@ -83,6 +84,7 @@ const KEY_WORLD_TIME := "world_time"
 const KEY_COMPENDIUM := "compendium"
 const KEY_REQUESTS := "requests"
 const KEY_LEDGER := "ledger"
+const KEY_PLAYER := "player"
 
 ## Emitted after from_dict() or load_from_slot() has replaced the world. A HUD or a pen
 ## that cached anything out of here has to rebuild on this.
@@ -148,6 +150,11 @@ var compendium: Compendium = CompendiumScript.new()
 ## same rule `gems` and `compendium` follow and for the same reason: a listener holding the
 ## old object is holding the account of a ranch nobody is playing any more.
 var ledger: Ledger = LedgerScript.new()
+
+## THE PONY THE PLAYER MADE (game/systems/player_look.gd): her name, her three palette
+## indices, her mane style and the cutie mark she drew. REPLACED, NOT MUTATED, by
+## from_dict() and reset(), the same rule `gems`, `compendium` and `ledger` follow.
+var player: PlayerLook = PlayerLookScript.default_look()
 
 ## Pending requests, as plain Dictionaries whose shape this file does not know or check;
 ## a later task defines it and reads/writes it. Untyped for the same reason `unlocks` is:
@@ -282,6 +289,7 @@ func to_dict() -> Dictionary:
 		KEY_COMPENDIUM: compendium.to_dict(),
 		KEY_REQUESTS: requests.duplicate(true),
 		KEY_LEDGER: ledger.to_dict(),
+		KEY_PLAYER: player.to_dict(),
 	}
 
 
@@ -342,6 +350,10 @@ func from_dict(data: Dictionary) -> void:
 	ledger = LedgerScript.from_dict(
 		saved_ledger if typeof(saved_ledger) == TYPE_DICTIONARY else {})
 
+	var saved_player: Variant = data.get(KEY_PLAYER, {})
+	player = PlayerLookScript.from_dict(
+		saved_player if typeof(saved_player) == TYPE_DICTIONARY else {})
+
 	state_loaded.emit()
 
 
@@ -358,6 +370,7 @@ func reset() -> void:
 	compendium = CompendiumScript.new()
 	requests = []
 	ledger = LedgerScript.new()
+	player = PlayerLookScript.default_look()
 
 
 # --- disk ---------------------------------------------------------------------------------
