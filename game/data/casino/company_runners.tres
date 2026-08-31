@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="CompanyRunners" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/company_runners.gd" id="1_runners"]
+
+[resource]
+script = ExtResource("1_runners")
+runner_names = Array[String](["Quarterly Dividend", "Stock Option", "Fully Vested", "Gross Margin", "Overtime"])
+speeds = Array[float]([5.4, 4.6, 6.0, 3.8, 4.2])
+staminas = Array[float]([6.0, 5.0, 4.5, 6.5, 5.5])
+spirits = Array[float]([5.5, 6.0, 4.5, 5.0, 7.0])
+base_ids = Array[StringName]([&"stock_bold", &"stock_curious", &"stock_bold", &"stock_shy", &"stock_curious"])
+coats = Array[int]([2, 6, 0, 5, 3])
+manes = Array[int]([4, 1, 2, 7, 5])
+eyes = Array[int]([1, 4, 0, 3, 2])

@@ -14,22 +14,35 @@ func _registry() -> RegionRegistry:
 	return reg
 
 
-func test_the_four_regions_load() -> void:
+func test_the_five_regions_load() -> void:
 	var ids: Array = []
 	for r in _registry().all():
 		ids.append(String(r.id))
 	ids.sort()
-	assert_eq(ids, ["everfree", "lake", "nightmeadow", "orchard"])
+	assert_eq(ids, ["everfree", "lake", "nightmeadow", "orchard", "strip"])
 
 
-func test_all_is_sorted_by_permit_cost_then_id_and_costs_are_positive() -> void:
+func test_all_is_sorted_by_permit_cost_then_id_and_no_cost_is_negative() -> void:
 	var items := _registry().all()
 	for i in range(items.size()):
-		assert_gt(items[i].permit_cost, 0, "%s must cost something" % items[i].id)
+		assert_gte(items[i].permit_cost, 0, "%s must not cost less than nothing" % items[i].id)
 		if i > 0:
 			var a := items[i - 1]
 			var b := items[i]
 			assert_true(a.permit_cost < b.permit_cost or (a.permit_cost == b.permit_cost and String(a.id) < String(b.id)))
+
+
+## The Strip is free and open from the first minute, so it has no permit, no gate and no
+## price. Exactly one region is like that; a second one would be a permit somebody forgot to
+## price rather than a decision.
+func test_exactly_one_region_is_free_and_it_sorts_first() -> void:
+	var items := _registry().all()
+	var free := 0
+	for r in items:
+		if r.permit_cost <= 0:
+			free += 1
+	assert_eq(free, 1)
+	assert_eq(items[0].id, &"strip", "a free region sorts ahead of every priced one")
 
 
 func test_every_region_sits_outside_the_homestead_apron_and_inside_the_map() -> void:
@@ -81,10 +94,14 @@ func test_exactly_one_region_has_a_lake() -> void:
 	assert_eq(lakes, 1)
 
 
-func test_every_shipped_region_declares_a_stock_band() -> void:
+func test_every_priced_region_declares_a_stock_band() -> void:
 	var registry := RegionRegistryScript.new()
 	registry.load_all()
 	for region: RegionData in registry.all():
-		assert_gt(region.stock_max, 0, "%s must say how many stock ponies it holds" % region.id)
 		assert_true(region.stock_min <= region.stock_max,
 			"%s has an inverted stock band" % region.id)
+		if region.permit_cost <= 0:
+			assert_eq(region.stock_max, 0,
+				"%s is paved; nobody grazes on it" % region.id)
+			continue
+		assert_gt(region.stock_max, 0, "%s must say how many stock ponies it holds" % region.id)

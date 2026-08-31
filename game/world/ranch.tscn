@@ -1,4 +1,4 @@
-[gd_scene load_steps=20 format=3]
+[gd_scene load_steps=27 format=3]
 
 [ext_resource type="Script" path="res://world/ranch.gd" id="1"]
 [ext_resource type="Script" path="res://world/terrain.gd" id="2"]
@@ -16,6 +16,13 @@
 [ext_resource type="Script" path="res://world/sky_rig.gd" id="14"]
 [ext_resource type="PackedScene" path="res://ui/depot_menu.tscn" id="15"]
 [ext_resource type="PackedScene" path="res://ui/creation_screen.tscn" id="16"]
+[ext_resource type="Script" path="res://world/strip.gd" id="17"]
+[ext_resource type="PackedScene" path="res://ui/casino_menu.tscn" id="18"]
+[ext_resource type="PackedScene" path="res://ui/slots_menu.tscn" id="19"]
+[ext_resource type="PackedScene" path="res://ui/wheel_menu.tscn" id="20"]
+[ext_resource type="PackedScene" path="res://ui/blackjack_menu.tscn" id="21"]
+[ext_resource type="Script" path="res://world/race_track.gd" id="22"]
+[ext_resource type="PackedScene" path="res://ui/race_menu.tscn" id="23"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
 sky_top_color = Color(0.309804, 0.505882, 0.760784, 1)
@@ -141,6 +148,31 @@ roof_color = Color(0.3, 0.34, 0.4, 1)
 [node name="Crate" type="Marker3D" parent="Buildings/Depot"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 3.2)
 
+[node name="Palace" type="StaticBody3D" parent="Buildings"]
+transform = Transform3D(-1, 0, -8.7422777e-08, 0, 1, 0, 8.7422777e-08, 0, -1, -10, 0, 61.6)
+script = ExtResource("7")
+width = 14.0
+depth = 9.0
+wall_height = 3.6
+ridge_height = 4.6
+door_width = 3.2
+door_height = 3.0
+wall_color = Color(0.36, 0.16, 0.42, 1)
+roof_color = Color(0.95, 0.78, 0.28, 1)
+trim_color = Color(0.98, 0.86, 0.45, 1)
+
+[node name="Cage" type="Marker3D" parent="Buildings/Palace"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -3.4)
+
+[node name="Sign" type="Label3D" parent="Buildings/Palace"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.1, -4.1)
+pixel_size = 0.0032
+font_size = 48
+outline_size = 6
+modulate = Color(1, 0.94, 0.74, 1)
+shaded = false
+billboard = 0
+
 [node name="Regions" type="Node3D" parent="."]
 
 [node name="Fence_orchard" type="Node3D" parent="Regions"]
@@ -154,6 +186,12 @@ script = ExtResource("13")
 
 [node name="Fence_nightmeadow" type="Node3D" parent="Regions"]
 script = ExtResource("13")
+
+[node name="Strip" type="Node3D" parent="."]
+script = ExtResource("17")
+
+[node name="Track" type="Node3D" parent="Strip"]
+script = ExtResource("22")
 
 [node name="Zones" type="Node3D" parent="."]
 
@@ -285,6 +323,16 @@ collision_mask = 15
 [node name="PauseMenu" parent="." instance=ExtResource("12")]
 
 [node name="CreationScreen" parent="." instance=ExtResource("16")]
+
+[node name="CasinoMenu" parent="." instance=ExtResource("18")]
+
+[node name="SlotsMenu" parent="." instance=ExtResource("19")]
+
+[node name="WheelMenu" parent="." instance=ExtResource("20")]
+
+[node name="BlackjackMenu" parent="." instance=ExtResource("21")]
+
+[node name="RaceMenu" parent="." instance=ExtResource("23")]
 
 [node name="CaptureCamera" type="Camera3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44, 27, 46)

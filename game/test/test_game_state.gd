@@ -500,3 +500,30 @@ func test_save_on_quit_writes_when_a_scene_has_enabled_it() -> void:
 	var reloaded = _state()
 	assert_true(reloaded.load_from_slot(GameStateScript.DEFAULT_SLOT))
 	assert_eq(reloaded.pony_count(), 2, "...and it is the ranch that was on screen")
+
+
+# --- the chip purse in the save file -----------------------------------------------------
+
+func test_the_chip_purse_round_trips_through_the_state() -> void:
+	var state = _state()
+	state.casino.add_chips(750)
+	var data: Dictionary = state.to_dict()
+	var back = _state()
+	back.from_dict(data)
+	assert_eq(back.casino.chips, 750)
+
+
+func test_a_state_with_no_casino_key_loads_with_an_empty_purse() -> void:
+	var state = _state()
+	state.casino.add_chips(500)
+	state.from_dict({"bits": 10})
+	assert_eq(state.casino.chips, 0, "a save from before the Palace opened holds no chips")
+
+
+func test_reset_empties_the_purse_and_replaces_it() -> void:
+	var state = _state()
+	var before: Casino = state.casino
+	state.casino.add_chips(90)
+	state.reset()
+	assert_eq(state.casino.chips, 0)
+	assert_ne(state.casino, before, "replaced, not mutated; a listener on the old one is stale")

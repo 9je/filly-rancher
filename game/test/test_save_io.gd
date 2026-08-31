@@ -578,3 +578,26 @@ func test_a_drawn_mark_survives_the_file_on_disk() -> void:
 	var loaded: Dictionary = SaveIOScript.load(SLOT)
 	assert_true(MarkPaint.equal(PlayerLook.from_dict(loaded["player"]).mark(), drawn),
 		"the save is one self contained JSON blob and the drawing comes back exactly")
+
+
+# --- the chip purse in the save file -------------------------------------------------------
+
+func test_a_version_5_save_carries_the_casino_key_back_intact() -> void:
+	var written := {"bits": 10, "casino": {"chips": 321}}
+	assert_true(SaveIOScript.save(SLOT, written))
+	var back := SaveIOScript.load(SLOT)
+	assert_eq(int((back["casino"] as Dictionary)["chips"]), 321)
+
+
+func test_a_version_5_save_written_before_the_palace_opened_loads_with_no_chips() -> void:
+	var written := {"bits": 10}
+	assert_true(SaveIOScript.save(SLOT, written))
+	var back := SaveIOScript.load(SLOT)
+	assert_false(back.has("casino"),
+		"version 5 is loaded as it stands; GameState.from_dict supplies the default")
+
+
+func test_migrating_a_version_4_save_states_the_casino_key() -> void:
+	var migrated := SaveIOScript.migrate({"bits": 10}, 4)
+	assert_true(migrated.has("casino"), "migrate's output states the whole version 5 shape")
+	assert_eq(migrated["casino"], {})

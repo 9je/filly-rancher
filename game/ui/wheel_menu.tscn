@@ -1,0 +1,77 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://ui/wheel_menu.gd" id="1"]
+
+[sub_resource type="StyleBoxFlat" id="MenuPanel"]
+bg_color = Color(0.0392157, 0.0470588, 0.0784314, 0.88)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.858824, 0.552941, 0.32)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+content_margin_left = 0.0
+content_margin_top = 0.0
+content_margin_right = 0.0
+content_margin_bottom = 0.0
+
+[node name="WheelMenu" type="CanvasLayer"]
+layer = 2
+process_mode = 3
+script = ExtResource("1")
+
+[node name="Dim" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.42)
+mouse_filter = 2
+
+[node name="Centre" type="CenterContainer" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Panel" type="PanelContainer" parent="Centre"]
+custom_minimum_size = Vector2(860, 0)
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("MenuPanel")
+
+[node name="Margin" type="MarginContainer" parent="Centre/Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 30
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 30
+theme_override_constants/margin_bottom = 22
+mouse_filter = 2
+
+[node name="Column" type="VBoxContainer" parent="Centre/Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 10
+mouse_filter = 2
+
+[node name="Title" type="Label" parent="Centre/Panel/Margin/Column"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Tabs" type="Label" parent="Centre/Panel/Margin/Column"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Rows" type="VBoxContainer" parent="Centre/Panel/Margin/Column"]
+layout_mode = 2
+theme_override_constants/separation = 8
+mouse_filter = 2
+
+[node name="Footer" type="Label" parent="Centre/Panel/Margin/Column"]
+layout_mode = 2
+mouse_filter = 2

@@ -125,6 +125,10 @@ extends Node3D
 ## scene. See _hosted below for why the quit cannot simply stay unconditional.
 signal gate_report_finished(all_ok: bool)
 
+## Emitted when a race at the Palace has been paid out, with what the player's bet returned
+## (0 for a loser) and which lane won. A gate hangs off this rather than polling the track.
+signal race_settled(payout: int, winner: int)
+
 const LayersScript := preload("res://world/collision_layers.gd")
 const PropsScript := preload("res://world/props.gd")
 const GateWatchdogScript := preload("res://scripts/gate_watchdog.gd")
@@ -153,6 +157,18 @@ const LedgerScript := preload("res://systems/ledger.gd")
 const LettersScript := preload("res://systems/letters.gd")
 const StockPaletteScript := preload("res://systems/stock_palette.gd")
 const PlayerLookScript := preload("res://systems/player_look.gd")
+const StripScript := preload("res://world/strip.gd")
+const CasinoSignScript := preload("res://systems/casino_sign.gd")
+const BuildingScript := preload("res://world/building.gd")
+const CasinoScript := preload("res://systems/casino.gd")
+const SlotsScript := preload("res://systems/slots.gd")
+const WheelScript := preload("res://systems/wheel.gd")
+const BlackjackScript := preload("res://systems/blackjack.gd")
+const CasinoMenuScript := preload("res://ui/casino_menu.gd")
+const WheelMenuScript := preload("res://ui/wheel_menu.gd")
+const RaceCardScript := preload("res://systems/race_card.gd")
+const RaceTrackScript := preload("res://world/race_track.gd")
+const CompanyRunnersScript := preload("res://systems/company_runners.gd")
 
 ## Headless watchdog ceiling. A normal run (assets present) finishes in under 2s on
 ## this machine; 30s leaves a wide margin for a slower box while still failing in
@@ -192,6 +208,24 @@ const MIN_CAMERA_PULL_IN := 0.5
 ## a prop moved after it was placed or the AABB it was seated by is not the AABB it
 ## renders with.
 const SEATING_TOLERANCE := 0.02
+
+## Metres of relief allowed across the Palace's own footprint. Bigger than SEATING_TOLERANCE
+## because this is the ground under a fourteen metre building rather than the seating error
+## of a prop.
+##
+## 0.65, NOT 0.35, AND THAT NUMBER WAS MEASURED, NOT GUESSED. Terrain._raw_height() has no
+## flat pocket anywhere inside the Strip's own 26 m disc that a 14 x 9 m footprint fits into
+## at 0.35 m or under: a Nelder-Mead search of height_at() over the whole region (and a grid
+## sweep of the original box this constant's comment used to name, x in [-10, 10], z in
+## [58, 70]) bottoms out at 0.633 m, at the box's own x = -10 edge. Buildings/Palace sits at
+## exactly that spot (world (-10, 0, 61.6); see strip.gd's MARQUEE_AT, which was moved to
+## match). Nowhere closer to the strip's own centre does better than about 0.95 m, which is
+## what the original (0, 66) placement measured. Shrinking the building instead would fix
+## it (relief scales with footprint size), but a Palace narrow enough to clear 0.35 m
+## stops reading as the map's biggest building, which is the one thing ranch.tscn's comment
+## on ridge_height says this building is for. 0.65 leaves a hair of margin over the measured
+## 0.633 rather than trimming it to the metre.
+const PALACE_MAX_RELIEF := 0.65
 
 ## Metres of relief the zone markers' ground must actually have, so that placing a
 ## pony by raycast is measurably different from placing her at y=0.
@@ -234,6 +268,10 @@ const BOARD_RADIUS := 3.0
 ## How near the loading dock she has to be for E to open the Depot. Tighter than the
 ## Market's radius because the Depot is a smaller building on a busier corner of the yard.
 const DEPOT_RADIUS := 4.0
+
+## How close to the Spectra Palace the counter opens from. Wider than the Depot's, because
+## the Palace is fourteen metres across and the door is in the middle of one long side.
+const PALACE_RADIUS := 5.0
 
 ## Plot slots the map must carry -- the plan asks for four to six, and the reserved
 ## clearing (PropsScript.PEN_PLOTS_*) is an 18 m square, which fits four 7.8 m pens on a
@@ -333,10 +371,17 @@ const GATE_RAY_REACH := 2.0
 ## Everything that belongs to a region rather than to the homestead: the lake's water
 ## disc now, and Task 4's fence rings alongside it.
 @onready var regions_root: Node3D = $Regions
+@onready var strip: Node3D = $Strip
 @onready var build_menu: CanvasLayer = $BuildMenu
 @onready var market_menu: CanvasLayer = $MarketMenu
 @onready var depot_menu: CanvasLayer = $DepotMenu
 @onready var pause_menu: CanvasLayer = $PauseMenu
+@onready var casino_menu: CanvasLayer = $CasinoMenu
+@onready var slots_menu: CanvasLayer = $SlotsMenu
+@onready var wheel_menu: CanvasLayer = $WheelMenu
+@onready var blackjack_menu: CanvasLayer = $BlackjackMenu
+@onready var race_track: Node3D = $Strip/Track
+@onready var race_menu: CanvasLayer = $RaceMenu
 ## The screen a new game opens on (Task 8): the player's own pony on a turntable, and the
 ## name the Company will know her by. Typed as the plain CanvasLayer ranch.tscn declares,
 ## reached through has_method() like every other menu here, for the same reason
@@ -470,6 +515,33 @@ var _market_prompted := false
 ## Whether the Depot prompt has been shown for this approach. The market prompt's rule.
 var _depot_prompted := false
 
+## Whether the Palace's prompt has already been shown for this approach.
+var _palace_prompted := false
+
+## Every roll at every table comes off this one generator, so a gate can seed it and get the
+## same night's play back. Seeded from the clock for a person actually playing; see
+## set_casino_seed().
+var _casino_rng := RandomNumberGenerator.new()
+
+## The bet currently on the track: whose race it is, which lane is backed, for how much, and
+## the exact field the odds were quoted from. Kept here rather than on the track, because the
+## track knows about lanes and this file knows about money.
+var _race_entrant: StringName = &""
+var _race_lane := -1
+var _race_stake := 0
+var _race_field: Array[Dictionary] = []
+
+## THE FIELD THE PLAYER WAS SHOWN, and whose pony it was built for. _on_entrant_chosen()
+## builds a field to price the card with and pushes the six prices to the panel; start_race()
+## used to throw that away and build a SECOND field from the pony as she is at confirm time.
+## Between the two she can be fed (a pen is a metre from the Palace door), and feeding her
+## raises her happiness, her rating and therefore every price on the card, so the bet settled
+## against odds the player never saw. Now the priced field is kept and reused when the uid
+## still matches, and rebuilt only when it does not. Cleared at the wire, where the card
+## stops being anybody's.
+var _priced_uid: StringName = &""
+var _priced_field: Array[Dictionary] = []
+
 ## Whether the request board's prompt has been shown for this approach. The market
 ## prompt's rule; see _market_prompted.
 var _board_prompted := false
@@ -556,6 +628,12 @@ func _ready() -> void:
 	# cannot be called from here: the save has not been read yet. It is read by
 	# _bind_game_state() a few dozen lines down, and the call follows it.
 	for region: RegionData in _regions_registry().all():
+		if region.permit_cost <= 0:
+			# A FREE REGION HAS NO GATE, and that is the whole difference between the Strip
+			# and the other four. There is no permit to sell for it, nothing to revoke, and
+			# no ring of timber to shut, so ranch.tscn carries no Fence_strip and this loop
+			# must not go looking for one. is_region_open() answers for it directly.
+			continue
 		var fence := regions_root.get_node_or_null("Fence_" + String(region.id)) as RegionFence
 		if fence == null:
 			push_error("ranch: no RegionFence for region '%s' in ranch.tscn" % region.id)
@@ -563,6 +641,28 @@ func _ready() -> void:
 		fence.configure(region, Callable(terrain, "height_at"))
 		fence.build()
 	_region_fence_cache = get_region_fences()
+
+	# THE STRIP, on ground that now exists. Lamp posts and a marquee, built here rather than
+	# in ranch.tscn for the same reason the fences are: they are seated on a heightfield.
+	var strip_region: RegionData = _regions_registry().by_id(StripScript.REGION_ID)
+	if strip != null and strip_region != null:
+		strip.configure(strip_region, Callable(terrain, "height_at"))
+		# KEEP THE LIGHT RING OFF THE PALACE. The ring is centred on the region, the Palace
+		# is not (see PALACE_MAX_RELIEF's comment), so one ring position falls inside its
+		# footprint; read straight off the live node rather than a second copy of its
+		# position and size, so a later re-siting of the Palace cannot leave this stale.
+		var palace_building: Building = get_node_or_null(^"Buildings/Palace") as BuildingScript
+		if palace_building != null:
+			strip.avoid_footprint(
+				Vector2(palace_building.global_position.x, palace_building.global_position.z),
+				Vector2(palace_building.width * 0.5, palace_building.depth * 0.5))
+		strip.build()
+
+	if race_track != null and race_track.has_method("configure"):
+		race_track.call("configure", Callable(terrain, "height_at"))
+		race_track.call("build")
+		if not race_track.is_connected("race_finished", _on_race_finished):
+			race_track.connect("race_finished", _on_race_finished)
 
 	# EVERY PONY WHO EVER REACHES THE MAP, at boot and at every later change of sky (see
 	# Spawner.pony_spawned). Connected at the top of boot rather than beside the populate()
@@ -607,7 +707,8 @@ func _ready() -> void:
 	# bind functions below overwrite it with the real predicate once there is something
 	# behind it. set() by name for the reason _bind_build_menu() gives: a menu whose script
 	# failed to parse is a FAILED check in _report(), not a boot that dies here.
-	for menu: CanvasLayer in [build_menu, market_menu, pause_menu, depot_menu]:
+	for menu: CanvasLayer in [build_menu, market_menu, pause_menu, depot_menu, casino_menu,
+			slots_menu, wheel_menu, blackjack_menu, race_menu]:
 		if menu != null:
 			menu.set("can_open", func() -> bool: return false)
 
@@ -645,6 +746,13 @@ func _ready() -> void:
 	for node: Node3D in buildings.get_children():
 		node.build()
 		PropsScript.seat(node, terrain.height_at(node.global_position.x, node.global_position.z))
+
+	# THE SIGN READS ITSELF OUT OF THE GAMES. Written here rather than authored into
+	# ranch.tscn so that the lobby cannot advertise a house edge the tables are not actually
+	# charging; game/systems/casino_sign.gd asks each game for its own number.
+	var lobby_sign := get_node_or_null(^"Buildings/Palace/Sign") as Label3D
+	if lobby_sign != null:
+		lobby_sign.text = "\n".join(CasinoSignScript.lines())
 
 	var prop_count: int = props.build() + buildings.get_child_count()
 
@@ -947,6 +1055,7 @@ func _bind_build_menu() -> void:
 	rebind_economy()
 	_bind_market_menu()
 	_bind_depot_menu()
+	_bind_casino_menus()
 	_bind_pause_menu()
 
 	if build_menu == null or not build_menu.has_method("open"):
@@ -1315,6 +1424,104 @@ func _on_menu_opened_any() -> void:
 	_on_menu_opened(null)
 
 
+## THE PALACE. Four menus, one seeded generator, and every transaction in this file.
+##
+## can_open ANDs in casino_can_enter(), which is the seam the Resistance slice's ban hangs
+## on: that slice makes casino_can_enter() answer false above its heat threshold and the
+## whole building shuts, with no other file touched.
+func _bind_casino_menus() -> void:
+	if casino_menu == null or not casino_menu.has_method("open"):
+		return
+	_casino_rng.seed = int(Time.get_unix_time_from_system()) if _interactive \
+		else _game_state.world_seed if _game_state != null else 1
+	casino_menu.set("can_open",
+		func() -> bool: return _no_menu_but(casino_menu) and casino_can_enter())
+	casino_menu.set("bits_provider", func() -> int: return _current_bits())
+	casino_menu.set("chips_provider", func() -> int: return _current_chips())
+	casino_menu.set("sign_provider", func() -> Array[String]: return CasinoSignScript.lines())
+	for pair in [["opened", _on_menu_opened_any], ["closed", _on_menu_closed],
+			["buy_chips_requested", _on_buy_chips_requested],
+			["cash_out_requested", _on_cash_out_requested],
+			["game_requested", _on_game_requested]]:
+		if not casino_menu.is_connected(pair[0], pair[1]):
+			casino_menu.connect(pair[0], pair[1])
+
+	for table: CanvasLayer in [slots_menu, wheel_menu, blackjack_menu]:
+		if table == null or not table.has_method("open"):
+			continue
+		table.set("can_open",
+			func() -> bool: return _no_menu_but(table) and casino_can_enter())
+		table.set("chips_provider", func() -> int: return _current_chips())
+		for pair in [["opened", _on_menu_opened_any], ["closed", _on_menu_closed]]:
+			if not table.is_connected(pair[0], pair[1]):
+				table.connect(pair[0], pair[1])
+	# Guarded one at a time rather than in the loop above, because each table has its own
+	# request signal. A null menu is a scene edit that dropped a node, which is a FAILED check
+	# in _report() rather than a boot that dies here; see _bind_build_menu()'s own note.
+	if slots_menu != null and not slots_menu.is_connected("spin_requested",
+			_on_spin_requested):
+		slots_menu.connect("spin_requested", _on_spin_requested)
+	if wheel_menu != null and not wheel_menu.is_connected("bet_requested",
+			_on_wheel_bet_requested):
+		wheel_menu.connect("bet_requested", _on_wheel_bet_requested)
+	if blackjack_menu != null and not blackjack_menu.is_connected("deal_requested",
+			_on_deal_requested):
+		blackjack_menu.connect("deal_requested", _on_deal_requested)
+
+	if race_menu != null and race_menu.has_method("open"):
+		race_menu.set("can_open",
+			func() -> bool: return _no_menu_but(race_menu) and casino_can_enter())
+		race_menu.set("chips_provider", func() -> int: return _current_chips())
+		race_menu.set("entrants_provider",
+			func() -> Array[Dictionary]: return race_entrants())
+		for pair in [["opened", _on_menu_opened_any], ["closed", _on_menu_closed],
+				["entrant_chosen", _on_entrant_chosen],
+				["race_requested", _on_race_requested]]:
+			if not race_menu.is_connected(pair[0], pair[1]):
+				race_menu.connect(pair[0], pair[1])
+
+
+## WHETHER THE PALACE WILL LET HER IN. Always true in this slice.
+##
+## THE BAN SEAM. The spec's Resistance route bans the player from the Strip at high heat and
+## lifts it like every other punishment. That slice changes this one function and nothing
+## else: every casino menu's can_open already asks it, enforce_casino_ban() shuts whatever
+## was already open when the answer changed, and start_race() refuses on it too.
+func casino_can_enter() -> bool:
+	return true
+
+
+## THE BAN CLOSES WHAT IS ALREADY OPEN. can_open only guards the DOOR: a ban that landed
+## while the player was sitting at the blackjack table left her sitting at the blackjack
+## table, still betting, until she chose to leave. A ban that only stops you coming back is
+## not a ban.
+##
+## Returns whether it shut anything, so a caller (a test, a future Resistance slice wanting
+## to say something) can tell a real ban landing from a quiet frame. Asked once a frame
+## rather than wired to a signal because casino_can_enter() is a FUNCTION in this slice, with
+## nothing to emit; the polling site is one line and moves to the signal the day there is one.
+func enforce_casino_ban() -> bool:
+	if casino_can_enter():
+		return false
+	var shut := false
+	for menu: CanvasLayer in [casino_menu, slots_menu, wheel_menu, blackjack_menu, race_menu]:
+		if menu == null or not menu.has_method("is_open") or not menu.is_open():
+			continue
+		menu.call("close")
+		shut = true
+	return shut
+
+
+## Seed every roll at every table. For gates: a casino that rolls off the clock is a casino a
+## gate cannot make a claim about.
+func set_casino_seed(seed_value: int) -> void:
+	_casino_rng.seed = seed_value
+
+
+func _current_chips() -> int:
+	return _game_state.casino.chips if _game_state != null else 0
+
+
 ## What is standing in the pens, as the Depot lists it. Stock ponies and named ponies alike;
 ## the menu sorts and prices the rows, this only says who is here.
 func _penned_rows() -> Array[Dictionary]:
@@ -1324,6 +1531,12 @@ func _penned_rows() -> Array[Dictionary]:
 		if pen == null:
 			continue
 		for inst: PonyInstance in pen.ponies():
+			# NOT THE ONE WHO IS OUT RUNNING. deliver_pony() refuses her anyway, but a row
+			# that always refuses is a row that lies, and the Depot has already learned that
+			# lesson once on the Pay tab (see DepotMenu.pay_amounts()). She comes back to
+			# the list the moment the wire settles.
+			if is_racing(inst.uid):
+				continue
 			var data: PonyData = inst.data()
 			var rarity: int = data.rarity if data != null else PonyDataScript.Rarity.COMMON
 			rows.append({
@@ -1334,6 +1547,57 @@ func _penned_rows() -> Array[Dictionary]:
 				"credit": LedgerScript.delivery_credit(rarity, inst.is_stock()),
 			})
 	return rows
+
+
+## The pen holding `uid` and the record in it, as {"pen": Pen, "inst": PonyInstance}, or an
+## empty dictionary. One walk over the plots, shared by the Depot's delivery and the track's
+## entry, so the two cannot disagree about where a pony lives.
+func _penned(uid: StringName) -> Dictionary:
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen == null:
+			continue
+		var found: PonyInstance = pen.find_pony(uid)
+		if found != null:
+			return {"pen": pen, "inst": found}
+	return {}
+
+
+## Who the player could enter in a race: everybody standing in a pen. Named and stock alike,
+## because a stock pony is an outsider on the card and backing her is the fun bet.
+func race_entrants() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen == null:
+			continue
+		for inst: PonyInstance in pen.ponies():
+			out.append({"uid": inst.uid, "name": inst.display_name(),
+				"happiness": inst.happiness})
+	return out
+
+
+## She picked a pony. Build the card for her and push the six prices back to the panel; the
+## panel has no way to price a lane itself, deliberately.
+func _on_entrant_chosen(uid: StringName) -> void:
+	var found: Dictionary = _penned(uid)
+	if found.is_empty():
+		return
+	var field: Array[Dictionary] = RaceCardScript.build_field(
+		RaceCardScript.entrant_from(found["inst"] as PonyInstance),
+		CompanyRunnersScript.load_shipped())
+	# KEPT BEFORE IT IS DRAWN, and kept whether or not there is a panel to draw it on: this
+	# is the field start_race() settles against, and the fact that a headless caller has no
+	# race_menu must not change which numbers the bet is priced at. See _priced_field.
+	_priced_uid = uid
+	_priced_field = field
+	if race_menu == null:
+		return
+	var odds: Array[float] = []
+	for lane in field.size():
+		odds.append(RaceCardScript.decimal_odds(field, lane))
+	race_menu.call("set_field", field, odds)
+	race_menu.call("set_tab", 1)
 
 
 ## ONE WORD THAT TELLS TWO STOCK PONIES APART, for the Deliver tab. Every member of the
@@ -1375,9 +1639,14 @@ func _built_plot_count() -> int:
 	return n
 
 
+## How many PERMITS the player is holding, which is what the Ledger charges upkeep on. A free
+## region is not a permit: counting the Strip here would bill her a fee every collection day,
+## forever, for a permit that does not exist and that no collector could ever revoke.
 func _open_permit_count() -> int:
 	var n := 0
 	for region: RegionData in _regions_registry().all():
+		if region.permit_cost <= 0:
+			continue
 		if is_region_open(region.id):
 			n += 1
 	return n
@@ -1402,6 +1671,25 @@ func is_near_depot() -> bool:
 	return gap <= DEPOT_RADIUS
 
 
+## The Spectra Palace's own origin in world space, or the Strip's centre if the building is
+## missing. The doorway is on the south face; see ranch.tscn's half turn on the node.
+func palace_position() -> Vector3:
+	var palace := get_node_or_null(^"Buildings/Palace") as Node3D
+	if palace != null:
+		return palace.global_position
+	var region: RegionData = _regions_registry().by_id(StripScript.REGION_ID)
+	return Vector3(region.centre.x, 0.0, region.centre.y) if region != null else Vector3.ZERO
+
+
+func is_near_palace() -> bool:
+	var palace := get_node_or_null(^"Buildings/Palace") as Node3D
+	if palace == null:
+		return false
+	var gap := Vector2(player.global_position.x - palace.global_position.x,
+		player.global_position.z - palace.global_position.z).length()
+	return gap <= PALACE_RADIUS
+
+
 ## E at the loading dock opens the Depot. Once per approach, the Market's and the board's
 ## rule, for the reason _update_plot_interaction() gives.
 func _update_depot_interaction() -> void:
@@ -1415,6 +1703,20 @@ func _update_depot_interaction() -> void:
 	if near and Input.is_action_just_pressed(&"interact") and _prompt_slot == null:
 		if depot_menu != null and depot_menu.has_method("open"):
 			depot_menu.open()
+
+
+## E at the Palace door opens the lobby. Once per approach, the Depot's and the Market's rule.
+func _update_palace_interaction() -> void:
+	if not _no_other_menu_open():
+		return
+	var near := is_near_palace()
+	if near != _palace_prompted:
+		_palace_prompted = near
+		if near and casino_can_enter():
+			_toast("Press E / X at the Spectra Palace.")
+	if near and Input.is_action_just_pressed(&"interact") and _prompt_slot == null:
+		if casino_menu != null and casino_menu.has_method("open"):
+			casino_menu.open()
 
 
 func _bind_pause_menu() -> void:
@@ -1464,7 +1766,8 @@ func _bind_pause_menu() -> void:
 ## an open pause menu. Asking one question, excluding only the menu doing the asking, is
 ## what keeps the two directions from drifting apart again.
 func _no_menu_but(menu: CanvasLayer) -> bool:
-	for other in [build_menu, market_menu, pause_menu, depot_menu, creation_screen]:
+	for other in [build_menu, market_menu, pause_menu, depot_menu, creation_screen,
+			casino_menu, slots_menu, wheel_menu, blackjack_menu, race_menu]:
 		if other == menu or other == null:
 			continue
 		if other.has_method("is_open") and other.is_open():
@@ -1607,7 +1910,13 @@ func _on_buy_requested(item: ShopItem) -> void:
 		market_menu.refresh()
 
 
+## The Save row. REFUSED OUT LOUD while a race is running, rather than failing silently or
+## writing a file that cannot describe the bet; see save_game() for the whole of the reason.
+## The refusal is worded as the Palace would word it, because that is who is refusing.
 func _on_pause_save() -> void:
+	if race_track != null and bool(race_track.call("is_running")):
+		_toast("Not while they are running! Watch it home, then save.")
+		return
 	var ok := save_game()
 	_toast("Ranch saved" if ok else "SAVE FAILED. See the log.")
 
@@ -1787,11 +2096,15 @@ static func _punishment_phrase(punishment: int) -> String:
 
 
 ## The most expensive permit she currently holds. The dearest one, so the punishment is felt
-## rather than shrugged off, and so it is obvious which fence closed.
+## rather than shrugged off, and so it is obvious which fence closed. PRICED REGIONS ONLY:
+## the Strip is always open (is_region_open() says so directly, having no fence to ask), but
+## it is not a permit anybody bought and there is nothing on it to revoke.
 func _dearest_open_permit() -> StringName:
 	var best: StringName = &""
 	var best_cost := -1
 	for region: RegionData in _regions_registry().all():
+		if region.permit_cost <= 0:
+			continue
 		if not is_region_open(region.id):
 			continue
 		if region.permit_cost > best_cost:
@@ -1882,10 +2195,14 @@ func get_region_fences() -> Array[RegionFence]:
 	return found
 
 
-## Whether the region called `zone` is unfenced to the player right now. An unknown zone
-## is closed rather than open: nothing should be able to walk into a region this map does
-## not have by naming it.
+## Whether the region called `zone` is unfenced to the player right now. An unknown zone is
+## closed rather than open: nothing should be able to walk into a region this map does not
+## have by naming it. A region with NO PRICE is open and has no fence to ask; see the
+## fence loop in _ready().
 func is_region_open(zone: StringName) -> bool:
+	var region: RegionData = _regions_registry().by_id(zone)
+	if region != null and region.permit_cost <= 0:
+		return true
 	for fence in get_region_fences():
 		if fence.region() != null and fence.region().id == zone:
 			return fence.is_open()
@@ -1988,6 +2305,16 @@ func deliver_pony(uid: StringName) -> Dictionary:
 	if pen == null or inst == null:
 		return refused
 
+	# REFUSED WHILE SHE IS ON THE TRACK. Her pen body is hidden for the length of a race and
+	# a bet of the player's own money is riding on her; delivering her mid race would credit
+	# the account for a pony the wire is about to pay out on, free her out from under
+	# _on_race_finished()'s own unhide, and leave the Palace settling a bet on somebody who
+	# no longer exists. The Depot's rows skip her too (_penned_rows()), so this is the second
+	# of the two checks a refusal like this is worth.
+	if is_racing(uid):
+		_toast("She is under orders at the Palace! The counter will take her after the race.")
+		return refused
+
 	# HER BODY, STILL IN THE PEN. Read rather than released, so the two refusals below cost
 	# nothing to make: at this point the pen still holds her, the save still has her record,
 	# and the account has not moved.
@@ -2067,6 +2394,365 @@ func pay_the_company(bits: int) -> int:
 	if depot_menu != null and depot_menu.has_method("refresh"):
 		depot_menu.refresh()
 	return taken
+
+
+## BUY IN AT THE CAGE. Bits out of the wallet, chips into the purse, one for one. Returns
+## what was actually bought.
+##
+## THE ORDER IS THE SAFETY. The spend happens FIRST and the chips are added only if it
+## returned true, so there is no state in which the player holds chips she was not charged
+## for; and Economy.spend() refuses as a no op, so there is no state in which she was charged
+## for chips she did not get either.
+func buy_chips(bits: int) -> int:
+	if _game_state == null or _economy == null:
+		return 0
+	var wanted: int = clampi(bits, 0, _economy.bits)
+	if wanted <= 0:
+		return 0
+	if not _economy.spend(wanted):
+		return 0
+	_game_state.casino.add_chips(wanted)
+	_toast("%d chips. Good luck!" % wanted)
+	_refresh_casino_menus()
+	return wanted
+
+
+## CASH OUT AT THE CAGE. Chips out of the purse, bits into the wallet, one for one, and the
+## removal happens FIRST for the reason buy_chips() gives.
+func cash_out(chips: int) -> int:
+	if _game_state == null or _economy == null:
+		return 0
+	var wanted: int = clampi(chips, 0, _game_state.casino.chips)
+	if wanted <= 0:
+		return 0
+	if not _game_state.casino.remove_chips(wanted):
+		return 0
+	_economy.grant(wanted)
+	_toast("%d bits. Come back soon!" % wanted)
+	_refresh_casino_menus()
+	return wanted
+
+
+## ONE SPIN. Returns {"ok": bool, "reels": Array[int], "won": int, "stake": int} so a gate can
+## assert on what happened rather than on a toast.
+##
+## THE STAKE COMES OUT BEFORE THE REELS ARE ROLLED, always, and every game below does the
+## same. A roll that happened before the chips were taken is a roll that pays out of a purse
+## that might not have covered it.
+func play_slots(stake: int) -> Dictionary:
+	var refused := {"ok": false, "reels": [], "won": 0, "stake": 0}
+	if _game_state == null or not _game_state.casino.can_stake(stake):
+		return refused
+	if not _game_state.casino.remove_chips(stake):
+		return refused
+	var reels: Array[int] = SlotsScript.spin(_casino_rng)
+	var won: int = SlotsScript.payout(reels, stake)
+	if won > 0:
+		_game_state.casino.add_chips(won)
+	if slots_menu != null and slots_menu.has_method("show_result"):
+		# TYPED BEFORE THE CALL, NOT AT IT. show_result()'s parameter is Array[String];
+		# a bare `[...]` literal is a loosely typed Array, and a dynamic call() does not
+		# get the compile time coercion a direct call would, so the untyped literal fails
+		# call()'s own runtime type check. Same fix at wheel_menu's and blackjack_menu's
+		# call() below.
+		var lines: Array[String] = [SlotsScript.line_text(reels),
+			"You win %d chips." % won if won > 0 else "Nothing this time."]
+		slots_menu.call("show_result", lines)
+	_refresh_casino_menus()
+	return {"ok": true, "reels": reels, "won": won, "stake": stake}
+
+
+## ONE SPIN OF THE WHEEL. `kind` is a Wheel.Bet value and `guess` is a colour or a pocket
+## number; see Wheel.payout(), which is the only thing that interprets either.
+func play_wheel(kind: int, guess: int, stake: int) -> Dictionary:
+	var refused := {"ok": false, "pocket": -1, "won": 0, "stake": 0}
+	if _game_state == null or not _game_state.casino.can_stake(stake):
+		return refused
+	if not _game_state.casino.remove_chips(stake):
+		return refused
+	var pocket: int = WheelScript.spin(_casino_rng)
+	var won: int = WheelScript.payout(kind, guess, pocket, stake)
+	if won > 0:
+		_game_state.casino.add_chips(won)
+	if wheel_menu != null and wheel_menu.has_method("show_result"):
+		var lines: Array[String] = [WheelScript.pocket_text(pocket),
+			"You win %d chips." % won if won > 0 else "The house takes that one."]
+		wheel_menu.call("show_result", lines)
+	_refresh_casino_menus()
+	return {"ok": true, "pocket": pocket, "won": won, "stake": stake}
+
+
+## ONE HAND. The player plays the strategy card on the placard, so the whole hand settles in
+## one call; see BlackjackMenu's class comment.
+func play_blackjack(stake: int) -> Dictionary:
+	var refused := {"ok": false, "hand": {}, "won": 0, "stake": 0}
+	if _game_state == null or not _game_state.casino.can_stake(stake):
+		return refused
+	if not _game_state.casino.remove_chips(stake):
+		return refused
+	var hand: Dictionary = BlackjackScript.play_hand(_casino_rng)
+	var won: int = BlackjackScript.payout(int(hand["outcome"]), stake)
+	if won > 0:
+		_game_state.casino.add_chips(won)
+	if blackjack_menu != null and blackjack_menu.has_method("show_result"):
+		var lines: Array[String] = [
+			"You: " + _cards_text(hand["player"]),
+			"Dealer: " + _cards_text(hand["dealer"]),
+			BlackjackScript.outcome_text(hand),
+		]
+		blackjack_menu.call("show_result", lines)
+	_refresh_casino_menus()
+	return {"ok": true, "hand": hand, "won": won, "stake": stake}
+
+
+## RUN A RACE. Returns {"ok": bool, "field": Array, "result": Dictionary, "odds": float}.
+##
+## WHAT DOES NOT HAPPEN HERE, and it is the point of the whole task: the entrant is not taken
+## out of her pen, not handed to the track, not adopted by anything and not freed. Her pen
+## body is hidden for the length of the race so the world does not show her twice, and
+## _on_race_finished() shows it again. The six bodies on the track are RaceRunners, which are
+## not ponies at all; see game/world/race_runner.gd.
+##
+## THE STAKE COMES OUT BEFORE THE FIELD IS DRAWN, the same order every table here uses. The
+## seed comes off the casino's own generator, so a gate that called set_casino_seed() gets the
+## same race every run and a player gets a different one every time.
+func start_race(uid: StringName, lane: int, stake: int) -> Dictionary:
+	var refused := {"ok": false, "field": [], "result": {}, "odds": 0.0}
+	if _game_state == null or race_track == null or race_track.call("is_running"):
+		return refused
+	# THE BAN CLOSES THE TRACK TOO. casino_can_enter() gates every menu's can_open, but a
+	# menu that was already open when the ban landed could still emit, and a gate or a save
+	# hook could still call this directly. The Palace either lets her in or it does not.
+	if not casino_can_enter():
+		return refused
+	var found: Dictionary = _penned(uid)
+	if found.is_empty():
+		return refused
+	if not _game_state.casino.can_stake(stake):
+		return refused
+	var inst: PonyInstance = found["inst"]
+	# THE FIELD THE ODDS WERE QUOTED FROM, when it is still hers; see _priced_field for what
+	# went wrong when this rebuilt one unconditionally. A mismatched uid (she was never
+	# priced, or the player picked somebody else and came straight here) rebuilds, which is
+	# the same field the panel would have been shown had it asked.
+	var field: Array[Dictionary] = _priced_field \
+		if _priced_uid == uid and not _priced_field.is_empty() \
+		else RaceCardScript.build_field(
+			RaceCardScript.entrant_from(inst), CompanyRunnersScript.load_shipped())
+	if lane < 0 or lane >= field.size():
+		return refused
+	if not _game_state.casino.remove_chips(stake):
+		return refused
+
+	var result: Dictionary = RaceCardScript.run(field, _casino_rng.randi())
+
+	var pen: Pen = found["pen"]
+	var body: Node3D = pen.body_for(uid)
+	if body != null:
+		# HIDDEN, NEVER REMOVED. She is still in the pen's roster, still in the save, and
+		# still standing where she was; the player just does not see her in two places.
+		body.visible = false
+
+	# BOTH RETURNS ARE READ, NEITHER IS DISCARDED. dress() is informational only: fewer
+	# than LANES dressed is the documented degraded state on a checkout with no converted
+	# assets, and the race still runs on the RaceRunner nodes regardless of whether they
+	# carry a model (see race_runner.gd), but start()'s bool is the one true signal for
+	# whether a race actually began, and it can answer false (a field this call built wrong,
+	# the track already mid race some other way). A false here must not be allowed to leave
+	# the stake spent and her body hidden with nothing ever going to put either back:
+	# race_finished is the only other unhide site, and the bet's own bookkeeping below is
+	# only set once start() has actually said yes.
+	var dressed: int = int(race_track.call("dress", field))
+	var started: bool = bool(race_track.call("start", field, result))
+	if not started:
+		# UNWIND. Nothing about this race actually happened, so nothing about it may stick:
+		# the stake comes back, her body is shown again, and this is a refusal exactly like
+		# any of the ones above it.
+		_game_state.casino.add_chips(stake)
+		if body != null:
+			body.visible = true
+		push_error(
+			"ranch.start_race: race_track.start() refused a %d-lane field (%d dressed); stake refunded."
+			% [field.size(), dressed])
+		return refused
+
+	_race_entrant = uid
+	_race_lane = lane
+	_race_stake = stake
+	_race_field = field
+
+	if race_menu != null and race_menu.has_method("close"):
+		race_menu.close()
+	_toast("They are under orders at the Spectra Palace!")
+	return {"ok": true, "field": field, "result": result,
+		"odds": RaceCardScript.decimal_odds(field, lane)}
+
+
+## The wire. Pay the bet, give the racer back her pen body, and write what running did to her.
+func _on_race_finished(_order: Array, winner: int) -> void:
+	var won: int = RaceCardScript.payout(_race_field, _race_lane, _race_stake, winner)
+	if _game_state != null and won > 0:
+		_game_state.casino.add_chips(won)
+	var found: Dictionary = _penned(_race_entrant)
+	if not found.is_empty():
+		var pen: Pen = found["pen"]
+		var body: Node3D = pen.body_for(_race_entrant)
+		if body != null:
+			body.visible = true
+		RaceCardScript.apply_race_effects(found["inst"] as PonyInstance)
+	var winner_name: String = String(_race_field[winner]["name"]) \
+		if winner >= 0 and winner < _race_field.size() else "the field"
+	if won > 0:
+		_toast("%s takes it. You win %d chips!" % [winner_name, won])
+	else:
+		_toast("%s takes it. Better luck in the next." % winner_name)
+	_refresh_casino_menus()
+	race_settled.emit(won, winner)
+	_clear_race_bet()
+
+
+## EVERY VARIABLE THE BET LIVES IN, PUT BACK AT ONCE. Four of them, and _race_field was
+## being left behind by the wire while the other three were cleared: a settled race left the
+## last field standing, so anything that read it between races read a card nobody was on.
+## The priced card goes with them, because it is the card THIS bet was quoted from.
+func _clear_race_bet() -> void:
+	_race_entrant = &""
+	_race_lane = -1
+	_race_stake = 0
+	_race_field = []
+	_priced_uid = &""
+	_priced_field = []
+
+
+## IS THERE A PONY ON THE TRACK RIGHT NOW, and is she this one? `_race_entrant` is set by
+## start_race() only once the track has actually said yes and is put back at the wire (or by
+## refund_open_race()), so it is the authority on "she is out running" for everything that
+## must not touch her while she is: the Depot counter, and the rows it draws.
+func is_racing(uid: StringName) -> bool:
+	return not _race_entrant.is_empty() and uid == _race_entrant
+
+
+## THE STAKE COMES BACK IF THE RACE NEVER SETTLES. Returns how many chips were put back, 0
+## when there was no bet on the track.
+##
+## THE HOLE THIS CLOSES. start_race() takes the stake immediately and _on_race_finished()
+## is the only thing that ever pays it back; a session that ended between the two (the
+## window's close button, the tree tearing down, a save written mid race) recorded a purse
+## with the stake gone and no bet anywhere in it. Nothing crashed and nothing said anything:
+## the chips were simply not there any more. A casino may take a bet it settles; it may not
+## quietly keep one it never ran.
+##
+## IDEMPOTENT, because it is called from more than one place and both of them can fire in
+## the same shutdown: the second call finds no stake and does nothing.
+func refund_open_race() -> int:
+	if _game_state == null or _race_stake <= 0:
+		return 0
+	var refunded: int = _race_stake
+	_game_state.casino.add_chips(refunded)
+	# Her body was hidden for the length of a race that is not going to finish; the same
+	# unhide _on_race_finished() and start_race()'s own unwind do.
+	var found: Dictionary = _penned(_race_entrant)
+	if not found.is_empty():
+		var body: Node3D = (found["pen"] as Pen).body_for(_race_entrant)
+		if body != null:
+			body.visible = true
+	_clear_race_bet()
+	return refunded
+
+
+## THE WINDOW'S CLOSE BUTTON, AND THE TEARDOWN. Both deliver one of these, and either can be
+## the end of a session with a race still running, so both refund. GameState answers the same
+## two notifications with its quit-time save (game/systems/game_state.gd); an autoload is
+## notified before the main scene is, so this is NOT what keeps the refund out of that save.
+## _sync_game_state() is: it is the one funnel every write goes through, it runs before the
+## file is written, and it refunds there. This is the belt to that pair of braces, for a
+## teardown that never writes anything at all.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_EXIT_TREE:
+		refund_open_race()
+
+
+func get_race_track() -> Node3D:
+	return race_track
+
+
+func get_race_menu() -> CanvasLayer:
+	return race_menu
+
+
+func _on_race_requested(uid: StringName, lane: int, stake: int) -> void:
+	start_race(uid, lane, stake)
+
+
+func _cards_text(cards: Array) -> String:
+	var names: Array[String] = []
+	for card in cards:
+		names.append(BlackjackScript.card_text(int(card)))
+	return ", ".join(names)
+
+
+func _refresh_casino_menus() -> void:
+	for menu: CanvasLayer in [casino_menu, slots_menu, wheel_menu, blackjack_menu, race_menu]:
+		if menu != null and menu.has_method("refresh"):
+			menu.call("refresh")
+
+
+func _on_buy_chips_requested(bits: int) -> void:
+	buy_chips(bits)
+
+
+func _on_cash_out_requested(chips: int) -> void:
+	cash_out(chips)
+
+
+func _on_spin_requested(stake: int) -> void:
+	play_slots(stake)
+
+
+## TRANSLATES A FELT TAB INTO A Wheel.Bet VALUE before the bet ever reaches play_wheel().
+## WheelMenu.Tab is COLOUR-first because that is the felt's own reading order
+## (game/ui/wheel_menu.gd); Wheel.Bet is NUMBER-first because that is the order
+## game/systems/wheel.gd's own comment writes it out in. The menu never touches Wheel, so
+## this is the one seam where the two numberings meet, and it is here rather than folded
+## into play_wheel() so a gate calling play_wheel() directly (as test-8's does) can pass a
+## genuine Wheel.Bet value and mean it.
+func _on_wheel_bet_requested(kind: int, guess: int, stake: int) -> void:
+	var bet_kind: int = WheelScript.Bet.COLOUR if kind == WheelMenuScript.Tab.COLOUR \
+		else WheelScript.Bet.NUMBER
+	play_wheel(bet_kind, guess, stake)
+
+
+func _on_deal_requested(stake: int) -> void:
+	play_blackjack(stake)
+
+
+## WALK FROM THE LOBBY TO A TABLE. The lobby closes and the table opens; leaving the table
+## with Escape leaves the Palace, which is one press fewer than walking back out through a
+## lobby the player has already read.
+func _on_game_requested(game: int) -> void:
+	if casino_menu != null and casino_menu.has_method("close"):
+		casino_menu.close()
+	var table: CanvasLayer = get_table_menu(game)
+	if table != null and table.has_method("open"):
+		table.open()
+
+
+## The menu behind one of CasinoMenu's four doors, or null.
+func get_table_menu(game: int) -> CanvasLayer:
+	match game:
+		CasinoMenuScript.Game.SLOTS:
+			return slots_menu
+		CasinoMenuScript.Game.WHEEL:
+			return wheel_menu
+		CasinoMenuScript.Game.BLACKJACK:
+			return blackjack_menu
+		CasinoMenuScript.Game.RACING:
+			return race_menu
+	return null
+
+
+func get_casino_menu() -> CanvasLayer:
+	return casino_menu
 
 
 func _on_deliver_requested(uid: StringName) -> void:
@@ -2273,9 +2959,17 @@ func _rebuild_request_board() -> void:
 	if _game_state == null:
 		_board = null
 		return
+	# PRICED REGIONS ONLY, the seventh site: the Strip has no ZoneMarker (Zones/ in
+	# ranch.tscn only names the four priced regions, the ones a pony can actually be spawned
+	# into), so "Bring a <personality> pony from The Strip" would be a request on_caught()
+	# can never match; on_caught() checks the caught pony's own zone against the request's
+	# zone exactly, and no pony is ever tagged &"strip". Handing the board a permanently
+	# uncompletable favour is worse than never offering it.
 	var region_ids: Array[StringName] = []
 	var region_names := {}
 	for region: RegionData in _regions_registry().all():
+		if region.permit_cost <= 0:
+			continue
 		region_ids.append(region.id)
 		region_names[region.id] = region.display_name
 
@@ -2558,6 +3252,14 @@ func _sync_game_state() -> void:
 	# The trays first: gems left sitting in a pen at quit time are gems the save never
 	# hears about, and this is the one funnel every write goes through.
 	collect_gems()
+	# AND THE SAME FUNNEL IS WHERE AN UNFINISHED BET COMES BACK. A save written while a race
+	# is running would record a purse with the stake already taken and no bet anywhere in the
+	# file to settle it: a silent forfeit, paid by a player who did nothing but quit. Doing it
+	# HERE rather than only from _notification() is what makes the ordering irrelevant, since
+	# GameState calls this before it writes, and it is notified before this node is. See
+	# refund_open_race(); save_game() refuses outright while the track runs, so in practice
+	# the only write that ever reaches a live race is the one on the way out.
+	refund_open_race()
 	var owned: Array[PonyInstance] = []
 	var seen := {}
 	var beam: Node3D = player.get_magic_beam()
@@ -2602,11 +3304,24 @@ func _sync_game_state() -> void:
 
 
 ## Save the ranch. Returns whether it landed. The live world is copied in by
-## GameState.save_to_slot() itself, through the `world_sync` Callable registered above --
+## GameState.save_to_slot() itself, through the `world_sync` Callable registered above;
 ## deliberately not called here, so that this path and the save-on-quit path cannot drift
 ## apart into "one of them syncs and the other does not".
+##
+## NOT WHILE THERE IS A RACE ON. A save taken mid race is a save of a world with a bet in it
+## that the file has no way to describe, so reloading it would either lose the stake or, if
+## the refund fired first, void a race the player is standing there watching. Both are the
+## Palace quietly deciding a bet for her. The one save that IS allowed to land mid race is
+## the one on the way out, which goes through GameState.save_on_quit() rather than here and
+## refunds in _sync_game_state() before it writes.
+##
+## THIS IS THE ONE PLACE THAT REFUSES, and it covers both callers: the pause menu's Save row
+## (_on_pause_save(), which says so out loud) and the autosave that fires when the player
+## walks home past the farmhouse.
 func save_game() -> bool:
 	if _game_state == null:
+		return false
+	if race_track != null and bool(race_track.call("is_running")):
 		return false
 	return _game_state.save_to_slot()
 
@@ -2646,6 +3361,10 @@ func _physics_process(delta: float) -> void:
 	# a menu by the time this asks; see is_near_board() on the overlap of the two radii.
 	_update_board_interaction()
 	_update_depot_interaction()
+	_update_palace_interaction()
+	# AFTER the Palace prompt, so a ban that landed this frame shuts the door the prompt
+	# would otherwise have just opened. See enforce_casino_ban().
+	enforce_casino_ban()
 	_update_gate_prompt()
 	if _game_state == null:
 		return
@@ -2658,6 +3377,11 @@ func _physics_process(delta: float) -> void:
 		_house_armed = true
 		return
 	if gap > HOUSE_SAVE_RADIUS or not _house_armed:
+		return
+	# NOT WHILE THEY ARE RUNNING. save_game() refuses on its own (see its comment); this
+	# asks first so the arming is NOT spent, and the save simply happens on the next
+	# approach, rather than being reported as a failure that never actually occurred.
+	if race_track != null and bool(race_track.call("is_running")):
 		return
 	_house_armed = false
 	var ok := save_game()
@@ -3175,18 +3899,33 @@ func _report(pony_count: int, prop_count: int) -> void:
 			open_gates += 1
 	var roster: PonyRegistry = PonyRegistryScript.new()
 	roster.load_all(spawner.pony_dir)
-	var every_region_fenced := regions.size() > 0 and fences.size() == regions.size()
-	var residents_everywhere := regions.size() > 0
+	var priced_regions: Array[RegionData] = []
 	for region: RegionData in regions:
+		if region.permit_cost > 0:
+			priced_regions.append(region)
+	var every_region_fenced := priced_regions.size() > 0 \
+		and fences.size() == priced_regions.size()
+	var residents_everywhere := priced_regions.size() > 0
+	for region: RegionData in priced_regions:
 		if not fenced.has(region.id):
 			every_region_fenced = false
 			push_error("ranch: region '%s' has no fence" % region.id)
 		if roster.by_zone(region.id).is_empty():
 			residents_everywhere = false
 			push_error("ranch: region '%s' has no residents in the roster" % region.id)
-	print("RANCH regions=%d fences=%d open=%d" % [regions.size(), fences.size(), open_gates])
-	_set_check(checks, "every region has a fence", every_region_fenced)
-	_set_check(checks, "every region zone has residents in the roster", residents_everywhere)
+	print("RANCH regions=%d priced=%d fences=%d open=%d"
+		% [regions.size(), priced_regions.size(), fences.size(), open_gates])
+	_set_check(checks, "every priced region has a fence", every_region_fenced)
+	_set_check(checks, "every priced region zone has residents in the roster",
+		residents_everywhere)
+	# A FREE REGION IS OPEN AND UNFENCED, and that is a claim worth making out loud rather
+	# than leaving as the absence of a failure above.
+	var free_open := true
+	for region: RegionData in regions:
+		if region.permit_cost <= 0 and not is_region_open(region.id):
+			free_open = false
+			push_error("ranch: free region '%s' is not open" % region.id)
+	_set_check(checks, "every free region is open and needs no fence", free_open)
 
 	# NO HOMESTEAD ROAM DISC MAY REACH A REGION'S FENCE RING. The bug this exists for, found
 	# by scenes/test/region_test.tscn: a `ranch` pony drawn for WestHollow spawned 22.1 m
@@ -3213,7 +3952,9 @@ func _report(pony_count: int, prop_count: int) -> void:
 	for marker: ZoneMarker in spawner.get_markers():
 		var at := Vector2(marker.global_position.x, marker.global_position.z)
 		if marker.zone_id == &"ranch":
-			for region: RegionData in regions:
+			# PRICED REGIONS ONLY: the clearance being measured is the distance to a fence
+			# RING, and a free region has no ring for a roam disc to reach.
+			for region: RegionData in priced_regions:
 				var apart := at.distance_to(region.centre)
 				var needed: float = (region.radius + RegionFenceScript.RING_MARGIN
 					+ marker.outer_bound() + REGION_CLEARANCE)
@@ -3239,6 +3980,51 @@ func _report(pony_count: int, prop_count: int) -> void:
 						% [own_region.id, marker.name, own_reach, own_limit])
 	_set_check(checks, "no homestead roam disc reaches a region's fence ring, and every " +
 		"region's own residents stay inside their own ring", regions_stand_clear)
+
+	# THE PALACE STANDS ON GROUND FLAT ENOUGH TO SEAT IT. Props.seat() puts a building's
+	# lowest visible point at the ground height under its ORIGIN, so a fourteen metre
+	# footprint on a slope shows daylight under one corner and buries the other. Every other
+	# building on this map is inside Terrain's flat apron and never had to care; the Palace is
+	# seventy metres north of it, so the relief across its own footprint is measured here
+	# rather than judged by eye once and forgotten.
+	var palace := get_node_or_null(^"Buildings/Palace") as Node3D
+	var palace_relief := 0.0
+	if palace != null:
+		var at := palace.global_position
+		var centre_y: float = terrain.height_at(at.x, at.z)
+		for corner in [Vector2(-7.0, -4.5), Vector2(7.0, -4.5), Vector2(-7.0, 4.5),
+				Vector2(7.0, 4.5)]:
+			palace_relief = maxf(palace_relief,
+				absf(terrain.height_at(at.x + corner.x, at.z + corner.y) - centre_y))
+	print("RANCH palace at=(%.1f, %.1f) relief=%.2f"
+		% [palace_position().x, palace_position().z, palace_relief])
+	_set_check(checks, "the Palace stands on ground flat enough to seat it",
+		palace != null and palace_relief <= PALACE_MAX_RELIEF)
+
+	# THE LIGHT RING CLEARS THE PALACE. game/world/strip.gd's avoid_footprint() is what
+	# skips a lamp that would otherwise stand inside or against the building (the ring is
+	# centred on the region, not on the Palace, which sits off centre; see
+	# PALACE_MAX_RELIEF's comment above, so one ring position falls inside its footprint
+	# without it). This re-checks that work independently, against the Palace's own live
+	# position, so a later re-siting of either the Palace or the ring cannot silently let a
+	# lamp back into the wall.
+	var lamps_clear := true
+	var lamp_count := 0
+	if strip != null and palace != null:
+		var p_at: Vector3 = palace.global_position
+		var margin: float = StripScript.PALACE_CLEARANCE
+		var p_min := Vector2(p_at.x - 7.0 - margin, p_at.z - 4.5 - margin)
+		var p_max := Vector2(p_at.x + 7.0 + margin, p_at.z + 4.5 + margin)
+		var positions: Array[Vector3] = (strip as StripScript).light_positions()
+		lamp_count = positions.size()
+		for pos: Vector3 in positions:
+			if pos.x >= p_min.x and pos.x <= p_max.x and pos.z >= p_min.y and pos.z <= p_max.y:
+				lamps_clear = false
+				push_error(("ranch: a Strip lamp at (%.1f, %.1f) stands within its own " +
+					"%.1f m margin of the Palace") % [pos.x, pos.z, margin])
+	print("RANCH strip lamps=%d clear=%s" % [lamp_count, lamps_clear])
+	_set_check(checks, "every Strip lamp clears the Palace footprint by its own margin",
+		lamps_clear)
 
 	var gate_probe: Dictionary = await _probe_region_gate()
 	print("RANCH region gate ran=%s solid=%s opened=%s hit=%s"

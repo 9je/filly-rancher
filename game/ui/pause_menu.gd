@@ -54,10 +54,16 @@ const MAIN_ROWS := ["Resume", "Compendium", "Requests", "The ledger", "Save the 
 ## and the panel is not, so the list is a window over it rather than the whole thing.
 const PAGE_ROWS := 10
 
-## The homestead is a zone every bit as much as the four regions are, but it is not a
-## RegionData (RegionRegistry only carries the places you buy a permit for), so its row is
-## built by hand and goes first: it is where the player starts and where she spends most of
-## her time. See game/systems/region_registry.gd.
+## The homestead is a zone every bit as much as the catalogued regions are, but it is not a
+## RegionData at all, so its row is built by hand and goes first: it is where the player
+## starts and where she spends most of her time. See game/systems/region_registry.gd.
+##
+## THE STRIP IS NOT AN EXCEPTION TO THAT, and its row is deliberate. RegionRegistry used to
+## carry only the places you buy a permit for; since phase 3 slice 2 it also carries the
+## free paved Strip (permit_cost 0), which is a RegionData like any other and therefore gets
+## its zone row here like any other. Nobody is caught there (its spawn list is empty on
+## purpose: it is a casino, not a meadow), so the row reads "0 of 0", which is the truth and
+## is what a zone with nobody in it should say.
 const RANCH_ZONE := &"ranch"
 const RANCH_NAME := "Ranch"
 

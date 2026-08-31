@@ -357,6 +357,11 @@ static func migrate(data: Dictionary, from_version: int) -> Dictionary:
 			# here rather than left to that default so migrate()'s OUTPUT states the version
 			# 5 shape, the way the version 2 branch does.
 			out["player"] = {}
+		if not out.has("casino"):
+			# An empty dictionary is Casino.from_dict's own "no chips", which is what a save
+			# from before the Palace opened should load as. Stated here rather than left to
+			# that default so migrate()'s OUTPUT states the whole version 5 shape.
+			out["casino"] = {}
 	return out
 
 

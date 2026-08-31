@@ -377,6 +377,7 @@ restoring the cache) turns the suite green again.
 | `game/scenes/test/ledger_test.gd` | The ledger gate (see below) |
 | `game/scenes/test/depot_test.gd` | The depot gate (see below) |
 | `game/scenes/test/creation_test.gd` | The creation gate (see below) |
+| `game/scenes/test/casino_test.gd` | The casino gate (see below) |
 | `tools/setup_env.sh` | Installs/pins GUT (`GUT_VER`/`GUT_SHA256`, near the SourceIO block) |
 
 ---
@@ -496,11 +497,20 @@ tools/bin/godot --headless --audio-driver Dummy --path game world/ranch.tscn -- 
 
 Phase names are `dawn`, `day`, `dusk`, `night` and weathers are `clear`,
 `rain`, `fog`, `storm`, matched case-insensitively; `--world-time=` takes
-seconds. Expect the same `RANCH_OK ponies=49 props=59 assets=present` as an
+seconds. Expect the same `RANCH_OK ponies=49 props=60 assets=present` as an
 unpinned run, with the `RANCH world` line naming the hour that was pinned. Both
 counts moved once more in Phase 3 slice 1: the crowd fills every region with
 stock ponies alongside the named roster, and the Depot is one more prop beside
 the Market and the request board.
+
+`props` moved again, from 59 to 60, in Phase 3 slice 2: the Spectra Palace is a
+sixth building under `Buildings`, seated and counted the same way the barn and
+the Depot are. Its own lamp posts are NOT in that count; they are children of
+the `Strip` node, not of `Buildings` or `Props`, because a lamp is scenery the
+gate has no claim on. The Strip is also the map's first region with no permit
+and no price, which moves what the ranch gate's `RANCH regions=` line checks:
+"every region has a fence" is now "every priced region has a fence", because a
+free region has nothing to unlock and ranch.tscn carries no `Fence_strip`.
 
 **Looking at the sky.** The gate checks numbers; only a person can say whether a
 stormy dusk *looks* like one. `bash tools/sky_sheet.sh` renders the ranch once
@@ -803,6 +813,82 @@ tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/creation
 ```
 
 Expect `CREATION_OK checks=89`; the exit code is the verdict.
+
+---
+
+## The casino gate
+
+`scenes/test/casino_test.tscn` proves what `game/test/test_slots.gd` and its
+four siblings cannot see: whether `ranch.gd` really takes the stake before it
+rolls, whether the cage is really one for one across a live `Economy` and a
+live `GameState`, whether a race that plays out on the real track for real
+seconds settles the bet the card decided, and whether the pony who ran it is
+standing in her pen afterwards with every other pony on the map untouched.
+
+It runs in two halves and the fast one goes first. The pure logic half needs no
+scene: a hundred thousand seeded plays of each of the four games, measured
+against the number that game publishes, plus a chips and bits round trip at
+four sizes, plus the claim that a race's finish order is a function of the
+field and the seed and of nothing else. A broken paytable therefore fails
+before the ranch has finished booting.
+
+The hosted half then drives the real building: the Strip standing as a free,
+unfenced, open region; the Spectra Palace with its cage counter and a lobby
+sign that carries every game's real edge; a six lane track exactly as long as
+`RaceCard.TRACK_LENGTH` believes it is; the cage refusing an overpay, a zero
+and a negative in both directions; forty spins, forty wheel bets and forty
+hands each settling at exactly the stake out and the win in (one of those
+wheel bets driven end to end through the felt itself rather than through
+`play_wheel()` directly, so a swap between the felt's own tab order and
+`Wheel.Bet`'s order cannot silently mispay a colour bet at number odds); a
+bet abandoned halfway costing nothing; and one whole race with one of the
+player's own ponies in it.
+
+Four things about how it reads are worth knowing before editing it.
+
+**It never widens a tolerance to go green.** `EDGE_TOLERANCE` is 0.006 over a
+hundred thousand plays, which a fair sample never trips and a paytable typo
+always does. A convergence check that fails is a question about the paytable
+or about the settle, never about the constant.
+
+**Its seeds were chosen by search, not picked by hand.** Slots and racing both
+carry payouts rare and large enough (a 450x triple, a card whose odds round to
+the nearest chip) that a hundred thousand plays has real seed to seed spread
+around the published edge, on the order of a per cent either way. `SLOTS_SEED`,
+`WHEEL_SEED` and `RACE_SEED` were each checked to land inside
+`EDGE_TOLERANCE` against this file's real payout code before being fixed in
+place; a genuine paytable or settle break still moves the measured edge by
+several times that spread.
+
+**Its racer is built with `Pen.add_pony()`**, the way `scenes/test/ledger_test.gd`
+builds its pen resident and for the same reason: this gate is about money and
+about a pony coming home, not about capture, so the roaming census it asserts
+on has nothing to explain away. `scenes/test/depot_test.gd` is where a pony is
+actually caught with the beam.
+
+**It holds a `WeakRef` to every body in the world across the race.** The
+slice's hardest rule is that racing never frees a pony, and the six things
+running down the track are `RaceRunner` nodes rather than `Pony` nodes
+precisely because of it. A refactor that quietly turned a runner back into a
+pony would pass every other check in this file; that one would not.
+
+The race is watched at ten times speed (`Engine.time_scale`, restored
+afterwards). The result was decided by `RaceCard.run()` before the first frame,
+so the clock changes nothing about it, but `game/world/pen.gd`'s own
+`_process()` keeps ticking `Needs` for every pony it holds, race or none, at
+that same raised speed, so the racer's hunger check is a window (the race's
+own `RACE_HUNGER` plus at most the ordinary ambient drift the wait actually
+took), never a bare equality. Her happiness carries no matching drift: `Needs`
+only spends happiness once hunger crosses `HUNGRY_THRESHOLD`, and hers never
+gets close.
+
+Run it with:
+
+```
+tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/casino_test.tscn
+```
+
+Expect `CASINO_OK checks=70`; the exit code is the verdict.
 
 ---
 
