@@ -11,6 +11,8 @@ const StockPaletteScript := preload("res://systems/stock_palette.gd")
 const StockTintScript := preload("res://systems/stock_tint.gd")
 const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 const PonyVisualsScript := preload("res://actors/pony/pony_visuals.gd")
+const CutieMarkScript := preload("res://systems/cutie_mark.gd")
+const MarkStampsScript := preload("res://systems/mark_stamps.gd")
 
 const PONY_DIR := "res://assets/converted/ponies/"
 
@@ -62,6 +64,11 @@ func _build_stock_row() -> void:
         body.position = Vector3(built * 3.0, 0.0, 0.0)
         body.rotate_y(PI)
         add_child(body)
+        if built == 0:
+            # CutieMark.apply() reads the model's global_transform, so it has to run after
+            # add_child(), not before: a node outside the tree has no global transform.
+            CutieMarkScript.apply(body, MarkStampsScript.build(
+                MarkStampsScript.Stamp.STAR, Color(0.95, 0.80, 0.25)))
         print("STOCK ", triple)
         built += 1
     print("GALLERY_OK count=", built)
