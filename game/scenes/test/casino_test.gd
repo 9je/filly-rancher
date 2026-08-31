@@ -38,6 +38,7 @@ const StripScript := preload("res://world/strip.gd")
 const EconomyScript := preload("res://systems/economy.gd")
 const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const NeedsScript := preload("res://systems/needs.gd")
+const SaveIOScript := preload("res://systems/save_io.gd")
 
 ## The spec's number: a hundred thousand plays per game.
 const PLAYS := 100000
@@ -529,6 +530,16 @@ func _drive_the_palace() -> void:
 	_set_check("a reset empties the purse", state.casino.chips == 0)
 	_set_check("the save came back", state.load_from_slot(SLOT))
 	_set_check("and the chips came back with it", state.casino.chips == chips_at_save)
+
+	# --- leave no scratch file behind, the same way every sibling hosted gate cleans up its
+	# own slot (collection_test.gd's 5, ledger_test.gd's 6, depot_test.gd's 7,
+	# creation_test.gd's 8/10) -----------------------------------------------------------------
+	var slot_path: String = ProjectSettings.globalize_path(SaveIOScript.slot_path(SLOT))
+	if FileAccess.file_exists(slot_path):
+		DirAccess.remove_absolute(slot_path)
+	var backup_path: String = ProjectSettings.globalize_path(SaveIOScript.backup_path(SLOT))
+	if FileAccess.file_exists(backup_path):
+		DirAccess.remove_absolute(backup_path)
 
 
 func _finish() -> void:
