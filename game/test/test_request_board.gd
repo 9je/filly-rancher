@@ -32,8 +32,14 @@ func before_each() -> void:
 	registry.load_all(PONY_DIR)
 
 
-func _board(seed_value: int) -> RequestBoard:
+func _board(seed_value: int = 1) -> RequestBoard:
 	return RequestBoardScript.new(seed_value, registry, REGIONS, REGION_NAMES)
+
+
+## The first record out of the real roster, for a test that needs SOME caught pony and does
+## not care which one.
+func _any_data() -> PonyData:
+	return _all_ponies()[0]
 
 
 func _all_ponies() -> Array:
@@ -568,3 +574,53 @@ func test_from_array_on_an_empty_array_produces_an_empty_board() -> void:
 	var board := RequestBoardScript.from_array([], registry, REGIONS, REGION_NAMES)
 	assert_eq(board.requests().size(), 0)
 	assert_eq(board.active().size(), 0)
+
+
+# --- the tutorial checklist the HUD pins --------------------------------------------------
+
+## THE THREE PINNED ON THE HUD. They already existed and were only visible on a pause menu
+## page a new player has no reason to open (owner, 2026-08-31: the how do I earn money path
+## is not legible in the first minutes).
+func test_the_tutorial_rows_are_the_three_seeded_ones_in_order() -> void:
+	var board: RequestBoard = _board()
+	board.seed_tutorial()
+	var rows: Array[Dictionary] = board.tutorial_rows()
+	assert_eq(rows.size(), 3)
+	for i in rows.size():
+		assert_eq(String(rows[i]["id"]), RequestBoardScript.TUTORIAL_IDS[i])
+		assert_false(String(rows[i]["text"]).is_empty())
+		assert_gt(int(rows[i]["reward_bits"]), 0)
+
+
+func test_a_board_with_no_tutorial_seeded_pins_nothing() -> void:
+	assert_eq(_board().tutorial_rows().size(), 0)
+
+
+func test_a_finished_tutorial_row_says_so_but_stays_pinned_until_it_is_claimed() -> void:
+	var board: RequestBoard = _board()
+	board.seed_tutorial()
+	board.on_caught(_any_data(), &"ranch")
+	var rows: Array[Dictionary] = board.tutorial_rows()
+	assert_eq(rows.size(), 3, "finishing one does not take it off the list")
+	assert_true(bool(rows[0]["done"]), "catching a pony finishes the first one")
+	assert_false(bool(rows[0]["paid"]))
+
+
+func test_a_claimed_tutorial_row_comes_off_the_list() -> void:
+	var board: RequestBoard = _board()
+	board.seed_tutorial()
+	board.on_caught(_any_data(), &"ranch")
+	board.claim(RequestBoardScript.TUTORIAL_IDS[0])
+	var rows: Array[Dictionary] = board.tutorial_rows()
+	assert_eq(rows.size(), 2)
+	assert_eq(String(rows[0]["id"]), RequestBoardScript.TUTORIAL_IDS[1])
+
+
+func test_the_tutorial_ids_are_the_ids_seed_tutorial_actually_writes() -> void:
+	var board: RequestBoard = _board()
+	board.seed_tutorial()
+	var seeded: Array[String] = []
+	for r in board.requests():
+		seeded.append(String((r as Dictionary)["id"]))
+	assert_eq(seeded, RequestBoardScript.TUTORIAL_IDS,
+		"a constant that has drifted from the seeder pins the wrong three")

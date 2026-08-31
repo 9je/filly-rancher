@@ -121,6 +121,15 @@ func test_the_prompt_uses_the_key_it_is_handed() -> void:
 		"X: Market, sell gems")
 
 
+## THE REPORT: "the Market prompt says what it does". "E: Market" tells a player where she
+## is standing, which she can already see; the verb is the part she needs.
+func test_the_market_prompt_names_the_verb_and_not_only_the_place() -> void:
+	var line: String = InteractionScript.prompt_for(
+		InteractionScript.candidate(InteractionScript.Kind.MARKET, 1.0), "E")
+	assert_true(line.to_lower().contains("sell"), line)
+	assert_true(line.to_lower().contains("gem"), line)
+
+
 func test_nothing_resolves_to_an_empty_prompt() -> void:
 	assert_eq(InteractionScript.prompt_for({}, "E"), "")
 

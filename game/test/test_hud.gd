@@ -15,6 +15,7 @@ extends GutTest
 ## of game/scripts/pony_rig.gd.
 
 const HudScene := preload("res://ui/hud.tscn")
+const HudScript := preload("res://ui/hud.gd")
 const StorageScript := preload("res://systems/storage.gd")
 const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
@@ -394,3 +395,40 @@ func test_the_prompt_and_the_toast_are_two_different_lines() -> void:
 	_hud.toast("Ranch saved")
 	assert_eq(_hud.prompt_text(), "E: build here")
 	assert_eq(_hud.toast_text(), "Ranch saved")
+
+
+# --- the starter checklist --------------------------------------------------------------
+
+func test_the_task_list_is_empty_until_it_is_given_rows() -> void:
+	assert_eq(_hud.task_lines().size(), 0)
+
+
+func test_the_task_list_ticks_what_is_done_and_leaves_the_rest_open() -> void:
+	_hud.set_tasks([
+		{"id": "tutorial_catch", "text": "Catch a pony with your magic beam.",
+			"done": true, "paid": false, "reward_bits": 20},
+		{"id": "tutorial_pen", "text": "Move a pony into a pen.",
+			"done": false, "paid": false, "reward_bits": 30},
+	])
+	var lines: Array[String] = _hud.task_lines()
+	assert_eq(lines.size(), 3, "a title and two rows")
+	assert_eq(lines[0], HudScript.TASK_TITLE)
+	assert_true(lines[1].contains("Catch a pony"))
+	assert_true(lines[1].contains("20"), "the reward is the reason to do it")
+	assert_ne(lines[1].substr(0, 2), lines[2].substr(0, 2),
+		"a finished row and an open one must not look the same")
+
+
+func test_an_empty_task_list_draws_no_title_either() -> void:
+	_hud.set_tasks([{"id": "a", "text": "t", "done": false, "paid": false,
+		"reward_bits": 1}])
+	_hud.set_tasks([])
+	assert_eq(_hud.task_lines().size(), 0,
+		"once the three are claimed the checklist goes away entirely")
+
+
+func test_nothing_the_task_list_draws_carries_a_dash() -> void:
+	_hud.set_tasks([{"id": "tutorial_sell", "text": "Sell a gem at the market.",
+		"done": false, "paid": false, "reward_bits": 50}])
+	for line in _hud.task_lines():
+		assert_false(line.contains("--") or line.contains("—"), line)

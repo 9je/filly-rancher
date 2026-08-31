@@ -178,6 +178,21 @@ const TOAST_FADE := 0.7
 ## the gamepad Back button.
 const HINTS_ACTION := &"toggle_hints"
 
+## THE THREE THINGS TO DO FIRST, pinned until they are claimed. The owner, 2026-08-31: the
+## how do I earn money path is not legible in the first minutes. These three requests have
+## existed since Phase 2 slice 5 and were reachable only through the pause menu's Requests
+## page, which a new player has no reason to open.
+##
+## THEY GO AWAY ON THEIR OWN. Once all three are claimed, tutorial_rows() answers empty and
+## this whole block, title and all, stops being drawn: a permanent checklist in the corner
+## of an experienced player's screen is clutter, and the board is where requests live after
+## the first ten minutes.
+const TASK_TITLE := "Getting started"
+const TASK_DONE := "[x] "
+const TASK_OPEN := "[ ] "
+const COLOR_TASK_DONE := Color(0.62, 0.86, 0.60, 0.92)
+const COLOR_TASK_OPEN := Color(1.0, 1.0, 1.0, 0.88)
+
 @onready var _crosshair: Control = $Crosshair
 @onready var _prompt: Label = $Prompt
 @onready var _pips: Control = $Bag/Pips
@@ -189,6 +204,7 @@ const HINTS_ACTION := &"toggle_hints"
 @onready var _toast: Label = $Toast
 @onready var _hints: PanelContainer = $Hints
 @onready var _hints_grid: GridContainer = $Hints/Margin/Grid
+@onready var _tasks: VBoxContainer = $Tasks
 
 ## Resolved by _bind(); both may be null until it succeeds.
 var _beam: Node3D
@@ -197,6 +213,7 @@ var _storage: Storage
 var _toast_left := 0.0
 ## Toasts raised while another one is on screen, oldest first. See toast().
 var _toast_queue: Array[String] = []
+var _task_lines: Array[String] = []
 var _rarities: Array[int] = []
 var _capacity := 0
 var _elapsed := 0.0
@@ -333,6 +350,45 @@ func get_shown_rarities() -> Array[int]:
 
 func get_capacity() -> int:
 	return _capacity
+
+
+## Push the checklist. `rows` is RequestBoard.tutorial_rows()'s output; an empty array
+## clears the block entirely.
+##
+## TYPED `Array` RATHER THAN `Array[Dictionary]`, DELIBERATELY. This HUD is always reached
+## through get_node_or_null()/has_method() (ranch.gd never declares a static HUD-typed
+## var), so every call here goes through GDScript's dynamic dispatch, and an untyped array
+## literal built at a call site with no static knowledge of this signature cannot coerce to
+## a strictly typed Array[Dictionary] parameter across that boundary (Godot 4.5 raises
+## "does not have the same element type as the expected typed array argument"). A real
+## Array[Dictionary] (what ranch.gd actually passes, straight off tutorial_rows()) narrows
+## into a plain Array with no coercion at all, so nothing is lost on the production path.
+func set_tasks(rows: Array) -> void:
+	_task_lines = []
+	for child in _tasks.get_children():
+		child.queue_free()
+	if rows.is_empty():
+		return
+	_task_lines.append(TASK_TITLE)
+	for row: Dictionary in rows:
+		var done: bool = bool(row.get("done", false))
+		_task_lines.append("%s%s  (%d bits)" % [TASK_DONE if done else TASK_OPEN,
+			String(row.get("text", "")), int(row.get("reward_bits", 0))])
+	for i in _task_lines.size():
+		var label := Label.new()
+		label.text = _task_lines[i]
+		var colour: Color = COLOR_WORLD_LINE
+		if i > 0:
+			colour = COLOR_TASK_DONE if _task_lines[i].begins_with(TASK_DONE) \
+				else COLOR_TASK_OPEN
+		_style_label(label, 24 if i == 0 else 20, colour)
+		_tasks.add_child(label)
+
+
+## Every line the checklist is drawing, in order, title first. For the tests, which
+## otherwise have no way to read it without walking Label nodes.
+func task_lines() -> Array[String]:
+	return _task_lines.duplicate()
 
 
 # --- binding ---------------------------------------------------------------------

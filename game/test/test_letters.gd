@@ -56,3 +56,32 @@ func test_the_ordinal_suffixes_are_right_where_english_is_odd() -> void:
 func test_an_unknown_id_answers_an_empty_letter_rather_than_crashing() -> void:
 	var letter: Dictionary = LettersScript.render(999, {})
 	assert_eq(letter["body"], [])
+
+
+# --- the welcome letter, reworked as the one screen explainer -----------------------------
+
+## THE ONE SCREEN EXPLAINER. The owner, 2026-08-31: "rework the WELCOME letter into a one
+## screen explainer (catch, pen, gems, sell at the Market; quota and balance in one
+## sentence each)". The shipped welcome said "Catch ponies, keep them happy, and bring us
+## stock", which names none of the four steps and neither of the two numbers.
+func test_the_welcome_letter_names_every_step_of_the_money_loop() -> void:
+	var letter: Dictionary = LettersScript.render(LettersScript.Id.WELCOME,
+		{"name": "Twilight", "balance": 25000, "quota": 2})
+	var body: String = "\n".join(letter["body"]).to_lower()
+	for step: String in ["catch", "pen", "gem", "market"]:
+		assert_true(body.contains(step), "the welcome must name '%s': %s" % [step, body])
+
+
+func test_the_welcome_letter_states_the_balance_and_the_quota_once_each() -> void:
+	var letter: Dictionary = LettersScript.render(LettersScript.Id.WELCOME,
+		{"name": "Twilight", "balance": 25000, "quota": 2})
+	var body: String = "\n".join(letter["body"])
+	assert_true(body.contains("25000") or body.contains("25,000"), body)
+	assert_true(body.contains("2 ponies") or body.contains("2 pony"), body)
+
+
+func test_the_welcome_letter_still_fits_the_panel_at_the_longest_legal_name() -> void:
+	var letter: Dictionary = LettersScript.render(LettersScript.Id.WELCOME,
+		{"name": "M".repeat(LettersScript.MAX_NAME_LENGTH), "balance": 25000, "quota": 2})
+	for line: String in letter["body"]:
+		assert_lte(line.length(), LettersScript.LINE_WIDTH, line)

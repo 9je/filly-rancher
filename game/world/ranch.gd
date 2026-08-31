@@ -2940,6 +2940,7 @@ func _seen_ids() -> Array:
 func _rebuild_request_board() -> void:
 	if _game_state == null:
 		_board = null
+		_refresh_tasks()
 		return
 	# PRICED REGIONS ONLY, the seventh site: the Strip has no ZoneMarker (Zones/ in
 	# ranch.tscn only names the four priced regions, the ones a pony can actually be spawned
@@ -2963,6 +2964,17 @@ func _rebuild_request_board() -> void:
 	else:
 		_board = RequestBoardScript.from_array(saved, _pony_roster(), region_ids, region_names)
 	_board.fill(_seen_ids())
+	_refresh_tasks()
+
+
+## Repaint the HUD's starter checklist. Called wherever the board can have moved: after a
+## payout, after a rebuild, and once at boot. Cheap (three rows, and nothing at all once
+## they are claimed) and idempotent.
+func _refresh_tasks() -> void:
+	var hud := get_node_or_null(^"HUD")
+	if hud == null or not hud.has_method("set_tasks"):
+		return
+	hud.set_tasks(_board.tutorial_rows() if _board != null else [] as Array[Dictionary])
 
 
 ## PAY FOR EVERY REQUEST THIS EVENT JUST COMPLETED. `completed` is what an on_*() call
@@ -3010,6 +3022,7 @@ func _pay_out(completed: Array) -> void:
 			reward_text += " and %d %s" % [reward_food_count, reward_food]
 		_toast("Request done: %s (%s)" % [String(claimed.get("text", "")), reward_text])
 		_board.fill(_seen_ids())
+	_refresh_tasks()
 
 
 ## The board this ranch is running, or null only if there is no GameState to hold it.

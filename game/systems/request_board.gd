@@ -77,6 +77,18 @@ enum Kind { CATCH_ANY, PEN_ANY, SELL_ANY, BRING_PERSONALITY_FROM_ZONE, SELL_GEMS
 ## How many not-done requests the board tries to keep on offer at once.
 const ACTIVE := 3
 
+## THE THREE THE HUD PINS, in the order seed_tutorial() hands them out. A constant rather
+## than three literals in two places: the checklist on the screen and the requests on the
+## board have to be the same three, and test_request_board.gd asserts that they are.
+const TUTORIAL_IDS: Array[String] = ["tutorial_catch", "tutorial_pen", "tutorial_sell"]
+const TUTORIAL_REWARDS: Array[int] = [20, 30, 50]
+const TUTORIAL_TEXT: Array[String] = [
+	"Catch a pony with your magic beam.",
+	"Move a pony into a pen.",
+	"Sell a gem at the market.",
+]
+const TUTORIAL_KINDS: Array[int] = [Kind.CATCH_ANY, Kind.PEN_ANY, Kind.SELL_ANY]
+
 ## The item id and fixed amount SEE_CHARACTER's reward hands out alongside its bits. See the
 ## class comment on why this is a constant rather than a dictionary field.
 const SEE_CHARACTER_FOOD_ID := "hay"
@@ -148,16 +160,38 @@ func drawable_zones() -> Array[StringName]:
 ## rewards. Does not consume the draw sequence and is not idempotent; call it once, at the
 ## start of a fresh ranch.
 func seed_tutorial() -> void:
-	_requests.append(_tutorial_request("tutorial_catch", Kind.CATCH_ANY, 20,
-		"Catch a pony with your magic beam."))
-	_requests.append(_tutorial_request("tutorial_pen", Kind.PEN_ANY, 30,
-		"Move a pony into a pen."))
-	_requests.append(_tutorial_request("tutorial_sell", Kind.SELL_ANY, 50,
-		"Sell a gem at the market."))
+	for i in TUTORIAL_IDS.size():
+		_requests.append(_tutorial_request(TUTORIAL_IDS[i], TUTORIAL_KINDS[i],
+			TUTORIAL_REWARDS[i], TUTORIAL_TEXT[i]))
 
 
 func _tutorial_request(id: String, kind: int, reward_bits: int, text: String) -> Dictionary:
 	return _blank_request(id, kind, reward_bits, "", 0, text)
+
+
+## THE CHECKLIST THE HUD PINS. The three tutorial requests that are on this board and have
+## not been claimed, in seeded order, as flat rows.
+##
+## A FINISHED ONE STAYS PINNED UNTIL IT IS CLAIMED, deliberately: "done" is the thing the
+## player did and "paid" is the bits arriving, and a row that vanished the moment it was
+## satisfied would take the reward off the screen before she saw it land.
+##
+## AN EMPTY ANSWER IS THE NORMAL LATE GAME STATE, and the HUD draws nothing at all for it.
+func tutorial_rows() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for id: String in TUTORIAL_IDS:
+		for r in _requests:
+			var req: Dictionary = r
+			if String(req.get("id", "")) != id or bool(req.get("paid", false)):
+				continue
+			out.append({
+				"id": id,
+				"text": String(req.get("text", "")),
+				"done": bool(req.get("done", false)),
+				"paid": bool(req.get("paid", false)),
+				"reward_bits": int(req.get("reward_bits", 0)),
+			})
+	return out
 
 
 func _blank_request(id: String, kind: int, reward_bits: int, reward_food: String,
