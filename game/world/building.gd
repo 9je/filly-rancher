@@ -116,8 +116,8 @@ const PLINTH_INSET := 0.06
 ## as a wall: 2.8 m of run for 1.80 m of rise is 32.7 degrees, well under the 60 the test
 ## refuses and well over the 10 below which it stops reading as a climb at all. A shorter
 ## run would be a steeper, meaner threshold; a longer one starts colliding with whatever is
-## standing in front of the building (see ranch.gd's ATTENDANT_STANDOFF, which is measured
-## from the foot of this ramp for exactly that reason).
+## standing in front of the building (see ranch.gd's ATTENDANT_CLEARANCE, which steps its two
+## attendants sideways out of this ramp's way for exactly that reason).
 ##
 ## DOOR_APRON_THICKNESS is how thick that box is, cosmetic rather than structural: this is
 ## readability of the threshold, not a physics walkway, and interactions elsewhere in the
@@ -334,9 +334,9 @@ func skirt_bottom_y() -> float:
 ## HOW FAR OUT ALONG THIS BUILDING'S OWN +Z THE DOOR APRON'S FOOT REACHES, from the origin.
 ## Half the depth for a building with no doorway (Buildings/Board), which stands no apron.
 ##
-## Public because things get placed in front of doors: ranch.gd stands the Vendor and the
-## Teller past this rather than past half the depth, or they would be standing knee deep in
-## a ramp that did not exist when ATTENDANT_STANDOFF was chosen.
+## Public because things get placed in front of doors: it is the reach a placement beside a
+## doorway has to stay clear of, and game/test/test_attendant.gd asserts the Vendor and the
+## Teller stand beside this ramp rather than on it or past its foot.
 func apron_foot_z() -> float:
 	if door_width <= 0.001:
 		return depth * 0.5

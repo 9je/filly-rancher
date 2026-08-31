@@ -275,7 +275,23 @@ const DEPOT_RADIUS := 4.0
 
 ## How close to the Spectra Palace the counter opens from. Wider than the Depot's, because
 ## the Palace is fourteen metres across and the door is in the middle of one long side.
-const PALACE_RADIUS := 5.0
+##
+## 5.0 WAS NOT A RADIUS, IT WAS A HALF METRE BAND. Every other radius here is measured from
+## an origin a metre or two behind its own front wall; the Palace is nine metres deep, so its
+## wall stands 4.5 m from the point this distance is measured to and 5.0 left half a metre of
+## ground in front of it. That was survivable while the approach ended at the wall. It stopped
+## being survivable the moment the door grew a Building.DOOR_APRON_RUN ramp: a player climbing
+## 2.8 m of it got no prompt until her last stride, and the Teller could not be stood anywhere
+## outside the wall and inside the radius AT ALL. The arithmetic, with her own collider
+## (Attendant.BODY_RADIUS) as the floor on how close to a wall a body can stand:
+##
+##     sqrt((4.5 + 0.55)^2 + (1.6 + 0.55)^2) = 5.49
+##
+## which is already outside 5.0 before a single centimetre of margin. 6.0 clears that with
+## room (the shipped Teller lands at 5.62) and covers the upper half of the ramp besides.
+## Nothing else on the map is affected: the Palace stands alone on the Strip, seventy metres
+## from the nearest other interactable, and Interaction.PRIORITY ranks it last regardless.
+const PALACE_RADIUS := 6.0
 
 ## THE TWO PONIES BEHIND COUNTERS, and where they stand.
 ##
@@ -289,12 +305,27 @@ const PALACE_RADIUS := 5.0
 ## a body seated on the terrain inside a building would be buried in its own boards. Both
 ## counters are things the player opens from the door anyway.
 ##
-## MEASURED FROM THE FOOT OF THE DOOR APRON, NOT FROM THE WALL. The ramp down from the
-## doorway runs Building.DOOR_APRON_RUN out past the plinth (see Building.apron_foot_z()),
-## and an attendant standing closer than that stands on ground the ramp is above: she would
-## be knee deep in a plank instead of a plinth. So this is clearance PAST the ramp's foot,
-## which also keeps her off the one bit of ground the player has to walk up.
-const ATTENDANT_STANDOFF := 1.0
+## BESIDE THE DOOR, NOT IN FRONT OF IT, and the number is her own collider.
+##
+## THE FIRST ANSWER TO THE RAMP WAS THE WRONG ONE. When the door apron grew to
+## Building.DOOR_APRON_RUN, an attendant standing half a depth plus a standoff in front of
+## the door was standing ON the new ramp, so the standoff was measured past the ramp's FOOT
+## instead. That fixed the clipping and broke the staging: it pushed the Teller 8.24 m out
+## from the Palace (past PALACE_RADIUS, past the marquee, past the clear ground the Strip
+## keeps around the building) and the Vendor 5.99 m out from the Market, and both read as
+## stranded in a field rather than as staffing a door. Ruling 29.
+##
+## SO SHE STEPS SIDEWAYS INSTEAD OF BACKWARDS. The ramp is only door_width wide and the wall
+## either side of it is not; standing beside the doorway, against that wall, is both where a
+## doorman actually stands and the one spot near the door that no ramp occupies. She is
+## offset by this much OUT from the wall's own outer face and by this much SIDEWAYS from the
+## apron's edge, which puts her clear of the plinth, clear of the ramp, under the eaves, and
+## inside the radius that opens the building.
+##
+## IT IS Attendant.BODY_RADIUS PLUS A HAIR, deliberately: her collider is a capsule of that
+## radius, so anything less would have her leaning into the wall or into the ramp. Deriving
+## it means a future change to her size moves her rather than embedding her.
+const ATTENDANT_CLEARANCE := AttendantScript.BODY_RADIUS + 0.10
 
 ## Their looks, pinned rather than drawn. A shopkeeper who is a different colour every boot
 ## is a shopkeeper nobody recognises, and a gate that screenshots the Market wants the same
@@ -803,7 +834,7 @@ func _ready() -> void:
 	# toward has to stay down there with her rather than floating at plinth height.
 	#
 	# Its z in ranch.tscn stands clear of the door apron's foot for the reason
-	# ATTENDANT_STANDOFF gives: a dock mark under the ramp is a pony walking into one.
+	# ATTENDANT_CLEARANCE gives: a dock mark under the ramp is a pony walking into one.
 	var crate_marker := get_node_or_null(^"Buildings/Depot/Crate") as Node3D
 	if crate_marker != null:
 		crate_marker.global_position.y = terrain.height_at(
@@ -3664,20 +3695,25 @@ func _physics_process(delta: float) -> void:
 ## THEY ARE UNDER `Attendants`, WHICH IS NEITHER Props NOR Buildings, so neither number the
 ## ranch gate prints moves. See _report()'s own attendant checks.
 ##
-## PAST THE DOOR APRON'S FOOT, not past the wall: see ATTENDANT_STANDOFF.
+## BESIDE THE DOOR APRON, against the wall next to the doorway: see ATTENDANT_CLEARANCE.
 func _stand_attendants() -> void:
 	if attendants == null:
 		return
 	var registry := PonyRegistryScript.new()
 	registry.load_all(spawner.pony_dir if spawner != null else "res://data/ponies")
+	# WHICH SIDE OF THE DOOR. The Palace stands alone on the Strip and either flank is as
+	# good as the other. The Market does not: Buildings/Board is five metres off its own
+	# front corner, and the Vendor put on the Market's local plus X lands 0.28 m from the
+	# Board's plinth, which is inside her own collider. She takes the other flank. This is
+	# a fact about where these two buildings stand, so it is an argument rather than a rule.
 	_stand_one(registry, "Vendor", ^"Buildings/Market", StockPaletteScript.IDS[1],
-		VENDOR_LOOK)
+		VENDOR_LOOK, -1.0)
 	_stand_one(registry, "Teller", ^"Buildings/Palace", StockPaletteScript.IDS[2],
-		TELLER_LOOK)
+		TELLER_LOOK, 1.0)
 
 
 func _stand_one(registry: PonyRegistry, who: String, building_path: NodePath,
-		record_id: StringName, look: Dictionary) -> void:
+		record_id: StringName, look: Dictionary, side: float) -> void:
 	var building := get_node_or_null(building_path) as Building
 	if building == null:
 		return
@@ -3689,8 +3725,18 @@ func _stand_one(registry: PonyRegistry, who: String, building_path: NodePath,
 	if out_dir.length_squared() <= 0.0:
 		return
 	out_dir = out_dir.normalized()
+	# THE OTHER AXIS OF THE SAME BASIS. A Building's door is in its local plus Z gable end,
+	# so its local plus X runs along the wall the door is cut into: one step out and one step
+	# along puts her beside the doorway rather than in it. `side` picks which flank, for the
+	# reason _stand_attendants() gives. See ATTENDANT_CLEARANCE.
+	var side_dir: Vector3 = (building.global_transform.basis * Vector3(1.0, 0.0, 0.0))
+	side_dir.y = 0.0
+	if side_dir.length_squared() <= 0.0:
+		return
+	side_dir = side_dir.normalized()
 	var at: Vector3 = building.global_position \
-		+ out_dir * (building.apron_foot_z() + ATTENDANT_STANDOFF)
+		+ out_dir * (building.depth * 0.5 + ATTENDANT_CLEARANCE) \
+		+ side_dir * signf(side) * (building.door_width * 0.5 + ATTENDANT_CLEARANCE)
 	var node: Attendant = AttendantScript.new()
 	node.name = who
 	attendants.add_child(node)
