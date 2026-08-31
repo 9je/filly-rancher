@@ -39,6 +39,7 @@ extends StaticBody3D
 ## one correctly-scaled object among stylised ones does not.
 
 const LayersScript := preload("res://world/collision_layers.gd")
+const PropsScript := preload("res://world/props.gd")
 
 ## Metres of headroom a doorway must offer. The pony's full 2.138 m plus a hand's
 ## width, so the number in this file is recognisably the horn-tip measurement and not
@@ -50,15 +51,22 @@ const MIN_DOOR_CLEARANCE := 2.25
 ## THE BUG THESE CLOSE. The slab used to be 0.14 m thick with its bottom face at exactly
 ## local y = 0, and Props.seat() drops a building until the bottom of its world AABB is
 ## SINK_BIAS (0.05 m) under the ground height at ONE point. The ground under
-## Buildings/Palace has 0.633 m of relief across its 14 by 9 m footprint, measured, and
-## that is the FLATTEST such rectangle anywhere on the Strip (see ranch.gd's
-## PALACE_MAX_RELIEF). Ground that tall crossing a floor that thin is two nearly coplanar
-## surfaces fighting for the same pixels: the owner's "z fighting at the palace base, a
-## flickering skirt where the building meets terrain", 2026-08-31.
+## Buildings/Palace SPANS 1.264 m from its lowest sample to its highest across that 14 by 9 m
+## footprint, measured, and that is the FLATTEST such rectangle anywhere on the Strip.
+## Ground that tall crossing a floor that thin is two nearly coplanar surfaces fighting for
+## the same pixels: the owner's "z fighting at the palace base, a flickering skirt where the
+## building meets terrain", 2026-08-31.
 ##
-## SO THE FLOOR BECOMES A PLINTH. FLOOR_TOP clears the worst relief measured anywhere on
-## the map (0.633 m under the Palace) with a real margin over that, so no corner of terrain
-## ever pokes through the boards; SKIRT_DEPTH is below it, so the plinth's bottom face has
+## 1.264 IS THE SPAN; 0.633 IS THE HALF SPAN. ranch.gd's PALACE_MAX_RELIEF is written against
+## the largest DEVIATION of a corner from the height under the building's own centre, which
+## is half the distance a plinth actually has to bridge. Reading that half span as if it were
+## the span is what an earlier version of this comment and of test_building_base.gd both did.
+##
+## SO THE FLOOR BECOMES A PLINTH. What has to clear the span is not FLOOR_TOP on its own but
+## FLOOR_TOP + GROUND_DROP (1.80 m), because ranch.gd seats a building against the LOWEST
+## corner of its footprint rather than a point under the middle; that is what leaves no
+## corner of terrain poking through the boards. SKIRT_DEPTH is below it, so the plinth's
+## bottom face has
 ## somewhere to be once ranch.gd seats it against the LOWEST corner of the footprint
 ## instead of one point under the middle (see SEAT_CLEARANCE and Building.footprint_relief()
 ## below -- the ground therefore always passes through the SIDE of a solid box, never a
@@ -92,14 +100,29 @@ const PLINTH_INSET := 0.06
 ## THE BUG THIS CLOSES. Floor is one solid slab across the WHOLE footprint, door gap or
 ## not -- the door only cuts a hole in the WALL layer, not in the plinth underneath it. Once
 ## the plinth's own top rose to FLOOR_TOP, every doorway on the map came with a sheer,
-## unclimbable step in front of it and nothing to mark it as one: Ruling 22, round 1, folded
-## into this task. DOOR_APRON_RUN is the horizontal distance a single sloped box climbs
-## through, from local y = 0 at the doorway up to FLOOR_TOP one run's length further in
-## (see the apron block in build() for the box and its rotation); DOOR_APRON_THICKNESS is
-## how thick that box is, cosmetic rather than structural -- this is readability of the
-## threshold, not a physics walkway, and interactions elsewhere in the game are XZ-radius
-## and untouched by it.
-const DOOR_APRON_RUN := 1.4
+## unclimbable step in front of it and nothing to mark it as one: Ruling 22, round 1.
+##
+## AND THE FIRST APRON DID NOT CLOSE IT. It ran from local y = 0 INWARD and UPWARD to
+## FLOOR_TOP, which puts the whole box inside the solid plinth: local y = 0 is not the
+## ground (see GROUND_DROP), and everything from there up to FLOOR_TOP over the entire
+## footprint is plinth. Six buildings kept their 1.80 m sheer thresholds, and the player's
+## only evidence that an apron existed at all was a 5 cm lip of it standing proud of the
+## interior floorboards. Whole branch review, 2026-08-31.
+##
+## SO IT RUNS THE OTHER WAY: from FLOOR_TOP at the plinth's own front face, OUTWARD past
+## that face and DOWNWARD to the ground the building was seated against, which is
+## GROUND_DROP below local y = 0. That is a rise of FLOOR_TOP + GROUND_DROP (1.80 m), and
+## DOOR_APRON_RUN is what turns that rise into a slope somebody reads as a ramp rather than
+## as a wall: 2.8 m of run for 1.80 m of rise is 32.7 degrees, well under the 60 the test
+## refuses and well over the 10 below which it stops reading as a climb at all. A shorter
+## run would be a steeper, meaner threshold; a longer one starts colliding with whatever is
+## standing in front of the building (see ranch.gd's ATTENDANT_STANDOFF, which is measured
+## from the foot of this ramp for exactly that reason).
+##
+## DOOR_APRON_THICKNESS is how thick that box is, cosmetic rather than structural: this is
+## readability of the threshold, not a physics walkway, and interactions elsewhere in the
+## game are XZ radius and untouched by it.
+const DOOR_APRON_RUN := 2.8
 const DOOR_APRON_THICKNESS := 0.12
 
 ## HOW FAR PAST THE WORST CORNER ranch.gd SEATS A BUILDING, on top of Props.SINK_BIAS.
@@ -120,6 +143,23 @@ const DOOR_APRON_THICKNESS := 0.12
 ## rather than a rounding accident (see test_building_base.gd's own MARGIN, 0.15 m, which
 ## SINK_BIAS on its own cannot clear); SEAT_CLEARANCE is the rest of it.
 const SEAT_CLEARANCE := 0.20
+
+## WHERE THE GROUND ACTUALLY IS, IN THIS BUILDING'S OWN COORDINATES.
+##
+## Follow the seating arithmetic through once. ranch.gd hands Props.seat() the number
+## seat_ground() answers, which is SEAT_CLEARANCE under the LOWEST corner of the footprint,
+## and seat() then shifts the whole node until the bottom of its visible AABB, which is the
+## plinth's underside SKIRT_DEPTH below local y = 0, sits Props.SINK_BIAS under that. Local
+## y = 0 therefore comes to rest exactly this far ABOVE that lowest corner, on every
+## building on the map: 0.95 m as the constants stand.
+##
+## THE BUG THIS CLOSES, AND IT IS THE WHOLE REASON THIS CONSTANT EXISTS. The first door
+## apron climbed "from the doorway at y = 0" to FLOOR_TOP, on the assumption that local
+## y = 0 was the ground. It is not: it is nearly a metre in the air and buried inside a
+## solid plinth, so the apron was entombed and every doorway on the map stayed a
+## FLOOR_TOP + GROUND_DROP (1.80 m) sheer step, with a 5 cm lip of apron poking up through
+## the interior floor as the only visible sign of it. Whole branch review, 2026-08-31.
+const GROUND_DROP := SKIRT_DEPTH - SEAT_CLEARANCE - PropsScript.SINK_BIAS
 
 @export_group("Shell")
 ## Footprint along X, in metres.
@@ -211,20 +251,31 @@ func build() -> void:
 			Vector3(0.0, door_height + lintel * 0.5, front_z), trim_mat)
 
 	# --- door apron ------------------------------------------------------------------
-	# THE PLINTH'S OWN SOLID FACE, RIGHT WHERE THE DOOR GAP IS, WOULD OTHERWISE BE A
-	# SHEER STEP FROM LOCAL Y = 0 UP TO FLOOR_TOP with nothing marking it as a way up --
-	# see DOOR_APRON_RUN's own comment. A single leaning box, built the same way the roof
-	# above is (a rotated BoxMesh rather than hand-wound triangles), climbing from the
-	# doorway at y = 0 to FLOOR_TOP one DOOR_APRON_RUN further into the building. Clamped
-	# so it can never run out through the back wall of a shallow building.
+	# THE PLINTH'S OWN SOLID FACE, RIGHT WHERE THE DOOR GAP IS, WOULD OTHERWISE BE A SHEER
+	# 1.80 m STEP with nothing marking it as a way up. See DOOR_APRON_RUN's own comment for
+	# the two versions of this and why the first one was invisible.
+	#
+	# ANCHORED AT THE TOP, NOT THE BOTTOM. The high end of the slope sits at exactly
+	# FLOOR_TOP, at the PLINTH's front face rather than the wall's (the plinth is inset by
+	# PLINTH_INSET, so its face is the one the ramp actually has to meet), and it runs out
+	# and down from there. That anchoring is what keeps every part of the box above the
+	# boards OUTSIDE the footprint the boards cover: the only corner of the apron that
+	# reaches back inside the plinth's own XZ rectangle is the underside one, and it is below
+	# FLOOR_TOP, buried in solid plinth where nobody sees it. The interior lip is not
+	# tolerated here, it is geometrically unreachable.
+	#
+	# A single leaning box, built the same way the roof below is (a rotated BoxMesh rather
+	# than hand-wound triangles), so what is drawn and what is collided with are one shape.
 	if door_width > 0.001:
-		var apron_run: float = minf(DOOR_APRON_RUN, depth * 0.4)
-		var apron_rise := FLOOR_TOP
+		var apron_run: float = DOOR_APRON_RUN
+		var apron_rise: float = FLOOR_TOP + GROUND_DROP
 		var apron_slope := sqrt(apron_run * apron_run + apron_rise * apron_rise)
 		var apron_angle := atan2(apron_rise, apron_run)
+		# The plinth's front face, not front_z: front_z is the WALL's mid-thickness plane.
+		var apron_top_z: float = half_d - PLINTH_INSET
 		_slab("DoorApron", Vector3(door_width, DOOR_APRON_THICKNESS, apron_slope),
-			Vector3(0.0, apron_rise * 0.5, front_z - apron_run * 0.5), trim_mat, 0.0,
-			apron_angle)
+			Vector3(0.0, FLOOR_TOP - apron_rise * 0.5, apron_top_z + apron_run * 0.5),
+			trim_mat, 0.0, apron_angle)
 
 	# --- roof ---------------------------------------------------------------------
 	# Two slabs leaning against each other. Built as rotated BoxMeshes rather than as
@@ -278,6 +329,18 @@ func floor_top_y() -> float:
 
 func skirt_bottom_y() -> float:
 	return position.y - SKIRT_DEPTH
+
+
+## HOW FAR OUT ALONG THIS BUILDING'S OWN +Z THE DOOR APRON'S FOOT REACHES, from the origin.
+## Half the depth for a building with no doorway (Buildings/Board), which stands no apron.
+##
+## Public because things get placed in front of doors: ranch.gd stands the Vendor and the
+## Teller past this rather than past half the depth, or they would be standing knee deep in
+## a ramp that did not exist when ATTENDANT_STANDOFF was chosen.
+func apron_foot_z() -> float:
+	if door_width <= 0.001:
+		return depth * 0.5
+	return depth * 0.5 - PLINTH_INSET + DOOR_APRON_RUN
 
 
 ## Terrain height at this footprint's four corners, its four edge midpoints and its centre

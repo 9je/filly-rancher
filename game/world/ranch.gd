@@ -284,10 +284,17 @@ const PALACE_RADIUS := 5.0
 ## makes her legible from thirty metres away.
 ##
 ## OUTSIDE THE BUILDING, not inside it, and that is a consequence of Building's plinth (see
-## Building.FLOOR_TOP): the interior floor stands 0.85 m above the ground the terrain
-## reports, so a body seated on the terrain inside a building would be knee deep in its own
-## boards. Both counters are things the player opens from the door anyway.
-const ATTENDANT_STANDOFF := 1.8
+## Building.FLOOR_TOP and Building.GROUND_DROP): the interior floor stands FLOOR_TOP +
+## GROUND_DROP, 1.80 m, above the lowest corner of ground the building was seated against, so
+## a body seated on the terrain inside a building would be buried in its own boards. Both
+## counters are things the player opens from the door anyway.
+##
+## MEASURED FROM THE FOOT OF THE DOOR APRON, NOT FROM THE WALL. The ramp down from the
+## doorway runs Building.DOOR_APRON_RUN out past the plinth (see Building.apron_foot_z()),
+## and an attendant standing closer than that stands on ground the ramp is above: she would
+## be knee deep in a plank instead of a plinth. So this is clearance PAST the ramp's foot,
+## which also keeps her off the one bit of ground the player has to walk up.
+const ATTENDANT_STANDOFF := 1.0
 
 ## Their looks, pinned rather than drawn. A shopkeeper who is a different colour every boot
 ## is a shopkeeper nobody recognises, and a gate that screenshots the Market wants the same
@@ -777,6 +784,9 @@ func _ready() -> void:
 	# instead of staying where a pony delivering a crate can actually walk up to it. She
 	# arrives on the ground, not on the Depot's own doorstep, so the mark she is walking
 	# toward has to stay down there with her rather than floating at plinth height.
+	#
+	# Its z in ranch.tscn stands clear of the door apron's foot for the reason
+	# ATTENDANT_STANDOFF gives: a dock mark under the ramp is a pony walking into one.
 	var crate_marker := get_node_or_null(^"Buildings/Depot/Crate") as Node3D
 	if crate_marker != null:
 		crate_marker.global_position.y = terrain.height_at(
@@ -3583,6 +3593,8 @@ func _physics_process(delta: float) -> void:
 ##
 ## THEY ARE UNDER `Attendants`, WHICH IS NEITHER Props NOR Buildings, so neither number the
 ## ranch gate prints moves. See _report()'s own attendant checks.
+##
+## PAST THE DOOR APRON'S FOOT, not past the wall: see ATTENDANT_STANDOFF.
 func _stand_attendants() -> void:
 	if attendants == null:
 		return
@@ -3608,7 +3620,7 @@ func _stand_one(registry: PonyRegistry, who: String, building_path: NodePath,
 		return
 	out_dir = out_dir.normalized()
 	var at: Vector3 = building.global_position \
-		+ out_dir * (building.depth * 0.5 + ATTENDANT_STANDOFF)
+		+ out_dir * (building.apron_foot_z() + ATTENDANT_STANDOFF)
 	var node: Attendant = AttendantScript.new()
 	node.name = who
 	attendants.add_child(node)

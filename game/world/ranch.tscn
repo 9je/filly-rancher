@@ -146,7 +146,7 @@ wall_color = Color(0.62, 0.64, 0.68, 1)
 roof_color = Color(0.3, 0.34, 0.4, 1)
 
 [node name="Crate" type="Marker3D" parent="Buildings/Depot"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 3.2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 5.8)
 
 [node name="Palace" type="StaticBody3D" parent="Buildings"]
 transform = Transform3D(-1, 0, -8.7422777e-08, 0, 1, 0, 8.7422777e-08, 0, -1, -10, 0, 61.6)
