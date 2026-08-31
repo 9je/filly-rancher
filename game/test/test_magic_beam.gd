@@ -835,6 +835,32 @@ func test_recalling_a_beam_that_is_holding_a_pony_releases_her_rather_than_losin
 	assert_not_null(ghost.get_ref(), "NO PONY EVER DIES; a recall is not a way to remove one")
 
 
+## THE OTHER BRANCH OF release(). The test above pins an UNSECURED hold (set down where
+## she is floating, escaped() reported); a hold that has already crossed into SECURED
+## territory when the recall lands takes release()'s other branch instead -- the ordinary
+## winning one, _settle_pony() -- and must end up stored, not merely "not vanished". A
+## recall landing on a secured hold and taking the LOSING branch would free her body with
+## no PonyInstance ever minted for it: a pony gone with no record at all, which is a worse
+## failure than the one the test above pins.
+func test_recalling_a_beam_holding_a_secured_pony_stores_her_as_the_ordinary_catch() -> void:
+	var beam: MagicBeam = _beam()
+	var pony: Pony = PonyScene.instantiate()
+	add_child_autofree(pony)
+	var data: PonyData = _named_data()
+	pony.setup(data)
+	beam._begin_hold(pony)
+	beam._hold_seconds = 999.0  # force is_secured() true regardless of this attempt's roll
+	assert_true(beam.is_secured(), "test setup: this hold must already read as secured")
+
+	beam.set_recalled(true)
+
+	assert_false(beam.is_holding(), "she leaves the beam either way")
+	assert_eq(beam.get_storage().count(), 1,
+		"a secured hold recalled mid air is the ordinary catch outcome, not a loss")
+	assert_eq(beam.get_storage().contents()[0].data_id, data.id,
+		"...and it is HER record that landed in the bag")
+
+
 ## A hidden stock base record, resolved the same way every real caught stock pony's
 ## PonyInstance.data_id is: through the registry, not a direct path to game/data/hidden/.
 func _stock_data() -> PonyData:

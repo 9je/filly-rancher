@@ -424,11 +424,9 @@ var _region_fence_cache: Array[RegionFence] = []
 ## same object that will enforce it later rather than by an int compared in the UI.
 var _economy: Economy = null
 
-## The last cycle index a collection day was run for, so a phase change that fires twice,
-## a mid session load, or a pinned clock cannot bill the player twice for one period.
-var _last_collection_cycle := -1
-
-## True while a collector is owed a visit at the next dawn.
+## True while a collector is owed a visit at the next dawn. A runtime cache, not the
+## source of truth -- Ledger.pending_punishment is that, because it is what is actually
+## saved. _seed_collector_state() below is what keeps this in step with it across a load.
 var _collector_due := false
 
 ## The plot slot the player is standing in right now, or null. Tracked so the build prompt
@@ -1026,11 +1024,25 @@ func rebind_economy() -> void:
 		_game_state.ledger.changed.connect(_on_balance_changed)
 	_apply_padlocks()
 	_apply_beam_recall()
+	_seed_collector_state()
 	_push_balance()
 
 
 func _on_balance_changed(_balance: int) -> void:
 	_push_balance()
+
+
+## WHATEVER THE COLLECTOR OWES RIGHT NOW, READ OFF THE PERSISTED LEDGER rather than left at
+## _collector_due's own runtime default of false. Called from rebind_economy(), so both a
+## boot that finds a save already on disk and a mid session load reach the same state a
+## live session would: the punishment itself was always saved correctly
+## (Ledger.to_dict()/from_dict(), Ledger.pending_punishment), but nothing used to tell this
+## var about it, so a load silently swallowed an armed collector until the next collection
+## day happened to arm a fresh one.
+func _seed_collector_state() -> void:
+	if _game_state == null:
+		return
+	_collector_due = _game_state.ledger.pending_punishment != LedgerScript.Punishment.NONE
 
 
 # --- the clock and the sky --------------------------------------------------------------
@@ -1523,13 +1535,21 @@ func _apply_settings() -> void:
 ## the upkeep and the service charge land on the balance and the period's quota is judged.
 ## The collector the judgement arms does NOT call now; he calls at the next dawn, which is
 ## what makes the letter arrive before the knock.
+##
+## GUARDED BY THE LEDGER'S OWN Ledger.is_collection_day_due(), NOT BY A RUNTIME COUNTER OF
+## THE LAST CYCLE BILLED. A runtime counter resets to nothing on every fresh process, so it
+## cannot tell "this period was never billed" from "this period was billed by whichever
+## session wrote the save this process just loaded" -- and a phase change landing inside a
+## cycle already billed by an earlier session used to re-run the collection day: upkeep and
+## the service charge added twice, the tier escalated twice, delivered_this_period reset a
+## second time. periods_run is part of the save, so asking the ledger is what makes a
+## reloaded process agree with the one that saved.
 func _maybe_run_collection_day() -> void:
 	if _game_state == null or _world == null:
 		return
 	var cycle: int = _world.cycle_index()
-	if not LedgerScript.is_collection_cycle(cycle) or cycle == _last_collection_cycle:
+	if not _game_state.ledger.is_collection_day_due(cycle):
 		return
-	_last_collection_cycle = cycle
 	var summary: Dictionary = run_collection_day()
 	if int(summary["punishment"]) != LedgerScript.Punishment.NONE:
 		_collector_due = true

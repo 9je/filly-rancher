@@ -169,6 +169,23 @@ func payable() -> int:
 	return maxi(0, balance - PRINCIPAL_FLOOR)
 
 
+## WHETHER A COLLECTION DAY IS OWED FOR `cycle`: true only when `cycle` really is a
+## collection cycle AND the period it falls in has not already been billed. Reads only
+## `periods_run`, which travels with the save (to_dict()/from_dict()), so a caller can ask
+## this instead of keeping its own runtime counter of the last cycle it billed.
+##
+## THIS IS THE WHOLE FIX FOR A BUG A RUNTIME COUNTER CANNOT SEE. game/world/ranch.gd used
+## to guard run_collection_day() with a plain `var _last_collection_cycle := -1` that reset
+## to -1 on every fresh process; a save loaded mid cycle (or a fresh process booting
+## straight into one) had no way to tell "never billed" from "billed by the session that
+## wrote this save", and re-billed the same period's upkeep and service charge, escalated
+## the tier a second time, and threw away delivered_this_period's count. periods_run is
+## the one number that already survives that boundary honestly, because it is part of the
+## save.
+func is_collection_day_due(cycle: int) -> bool:
+	return is_collection_cycle(cycle) and period_of(cycle) > periods_run
+
+
 ## THE COLLECTION DAY. Adds the upkeep and the service charge, judges the period, arms the
 ## next collector, and starts the count again. Returns everything the ranch, the statement
 ## and the tests need, in one dictionary, so nothing has to ask this object a second
