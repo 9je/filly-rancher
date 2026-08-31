@@ -249,8 +249,8 @@ func _drive_the_palace() -> void:
 		strip_node != null
 		and int(strip_node.call("light_count")) == StripScript.LIGHT_COUNT - 1)
 	_set_check("the marquee names the Palace and its sponsor",
-		strip_node != null and String(strip_node.call("marquee_text")).contains(
-			"Cloudsdale Weather Corporation"))
+		strip_node != null and ", ".join(strip_node.call("marquee_lines") as Array[String])
+			.contains("Cloudsdale Weather Corporation"))
 
 	# --- the Palace and its sign -----------------------------------------------------------
 	var palace := ranch.get_node_or_null(^"Buildings/Palace") as Node3D
@@ -357,7 +357,7 @@ func _drive_the_palace() -> void:
 	# future re-ordering of either enum would still pass every check above it while quietly
 	# paying a colour bet at 24x instead of 6x. This drives the felt itself: open the table,
 	# pick the COLOUR tab, confirm, repeat until a win is seen, and check what it paid.
-	var wheel_table: CanvasLayer = ranch.get_table_menu(CasinoMenuScript.Game.WHEEL)
+	var wheel_table: CanvasLayer = ranch.get_table_menu(CasinoMenuScript.Row.WHEEL)
 	_set_check("the wheel opens as a table", wheel_table != null and bool(wheel_table.call("open")))
 	var menu_win_seen := false
 	var menu_win_correct := true
@@ -391,7 +391,7 @@ func _drive_the_palace() -> void:
 	_set_check("every hand settles at exactly the stake out and the win in", settled)
 
 	# --- a bet abandoned in the middle of being placed ----------------------------------------
-	var table: CanvasLayer = ranch.get_table_menu(CasinoMenuScript.Game.SLOTS)
+	var table: CanvasLayer = ranch.get_table_menu(CasinoMenuScript.Row.SLOTS)
 	var before_cancel: int = state.casino.chips
 	_set_check("a table opens at the Palace", table != null and table.call("open"))
 	if table != null:
@@ -440,14 +440,40 @@ func _drive_the_palace() -> void:
 
 	var entrants: Array[Dictionary] = ranch.race_entrants()
 	var listed := false
+	var quoted := 0.0
 	for entry in entrants:
 		if StringName(entry["uid"]) == racer.uid:
 			listed = true
+			quoted = float(entry["odds"])
 	_set_check("the race panel lists her as an entrant", listed)
 
+	# SHE IS FED ON THE WALK TO THE WINDOW, the same move test_ranch_casino_rules.gd's
+	# test_feeding_her_between_the_price_and_the_confirm_does_not_move_the_odds makes,
+	# so this check can actually fail. Nothing else here mutates her between the quote
+	# and the settle, which would make the two derivations equal no matter whether
+	# start_race() reused the quote or rebuilt the field from scratch; moving her
+	# happiness after quoted is captured means a rebuilt field would reprice her, so a
+	# match below is real evidence the cached field, not a fresh one, is what settled.
+	racer.happiness = 1.0
+
 	var chips_at_the_off: int = state.casino.chips
-	var race: Dictionary = ranch.start_race(racer.uid, RaceCardScript.PLAYER_LANE, 100)
+	var race: Dictionary = ranch.start_race(racer.uid, 100)
 	_set_check("the race is under orders", bool(race["ok"]))
+	# THE SHOWN ODDS AND THE SETTLED ODDS ARE THE SAME NUMBER, per uid. race_entrants() just
+	# quoted her at happiness 0.40; start_race() reused that exact quote (see
+	# _quoted_fields) rather than rebuilding off her current happiness of 1.0, so the
+	# price on the form guide and the price the card she is now running on both read off
+	# the SAME field, not two fields built moments apart from a pony who was fed between
+	# them.
+	_set_check("the form guide prices her at the card's own odds",
+		absf(quoted - RaceCardScript.decimal_odds(race["field"],
+			RaceCardScript.PLAYER_LANE)) < 0.0001)
+	# BACK TO 0.40, the moment start_race() has returned. field and odds above are already
+	# frozen in `race`, a plain Dictionary copied out of start_race()'s locals, so this
+	# cannot touch them; it only puts her happiness back to what the checks below the
+	# settle (the "happier by exactly what a race is worth" one) are built to expect, the
+	# same 0.40 she was penned with.
+	racer.happiness = 0.40
 	_set_check("the stake left the purse before the field was drawn",
 		state.casino.chips == chips_at_the_off - 100)
 	_set_check("she is still in her pen while the race runs",
@@ -488,6 +514,8 @@ func _drive_the_palace() -> void:
 		settled_payout == expected_payout)
 	_set_check("the purse moved by exactly the stake out and the win in",
 		state.casino.chips == chips_at_the_off - 100 + expected_payout)
+	_set_check("a losing race pays exactly nothing",
+		settled_winner == RaceCardScript.PLAYER_LANE or settled_payout == 0)
 
 	_set_check("she came home to the same pen",
 		pen != null and pen.find_pony(racer.uid) != null)

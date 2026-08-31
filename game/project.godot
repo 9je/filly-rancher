@@ -28,6 +28,7 @@ config/features=PackedStringArray("4.5", "Forward Plus")
 
 AudioSafety="*res://systems/audio_safety.gd"
 GameState="*res://systems/game_state.gd"
+InputDevice="*res://systems/input_device.gd"
 
 [rendering]
 renderer/rendering_method="forward_plus"

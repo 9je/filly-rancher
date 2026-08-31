@@ -3,6 +3,7 @@ extends GutTest
 
 const WheelMenuScene := preload("res://ui/wheel_menu.tscn")
 const WheelScript := preload("res://systems/wheel.gd")
+const MenuStyleScript := preload("res://ui/menu_style.gd")
 
 var _menu: WheelMenu = null
 var _chips := 500
@@ -122,6 +123,38 @@ func test_the_number_tab_reaches_the_stake_the_same_way() -> void:
 	assert_eq(_menu.tab(), WheelMenu.Tab.NUMBER)
 
 
+## THE REPORT: "each table screen shows your chips, the stake picker, and what keys do
+## what". A table that only says "Stake: [10 chips]" leaves a player who has not read a
+## document with no way to find out what Enter does here.
+func test_the_table_says_what_she_is_holding() -> void:
+	assert_true(_menu.chips_line().contains(str(_chips)),
+		"her chips must be on the screen she is betting them on: %s" % _menu.chips_line())
+
+
+func test_the_table_says_what_the_keys_do_on_this_table() -> void:
+	var keys: String = _menu.keys_line()
+	assert_false(keys.is_empty())
+	assert_true(keys.to_lower().contains("stake"),
+		"the stake picker is the control a new player cannot guess: %s" % keys)
+
+
+## THE REPORT: "results render prominently (win/lose line with numbers)".
+func test_a_settled_result_renders_as_its_own_block_with_the_numbers_in_it() -> void:
+	_menu.show_result(["You win 40 chips!", "Two cherries and a bell."])
+	var block: Array[String] = _menu.result_block()
+	assert_gt(block.size(), 0, "a settled bet must leave something on the screen")
+	assert_true("\n".join(block).contains("40"),
+		"the number is the whole point of the line")
+	assert_true("\n".join(_menu.drawn_lines()).contains("40"),
+		"and it is drawn, not merely stored")
+
+
+## MOVED (Task 4): the footer is now MenuStyle's shared builder, the same as every other
+## table's, and no longer carries a hand written note about the stake. Where the stake
+## lives is still on screen: the stake row itself is always drawn (WheelMenu.drawn_lines()),
+## right after the last guess.
 func test_the_footer_documents_where_the_stake_actually_lives() -> void:
-	assert_true(_menu._footer.text.to_lower().contains("stake"),
-		"the footer must say where left/right moves the stake, or nobody will find it")
+	assert_eq(_menu._footer.text, MenuStyleScript.footer_tabs_and_rows("confirm", "leave"),
+		"the footer now comes from the shared builder, not a hand written line")
+	assert_true("\n".join(_menu.drawn_lines()).to_lower().contains("stake"),
+		"the stake row itself must still say what it is, even off the footer")

@@ -50,12 +50,34 @@ const POST_THICKNESS := 0.18
 ## rather than as a near miss.
 const PALACE_CLEARANCE := 1.5
 
-## The marquee, in world space: just south of the Palace's door, at first floor height, facing
-## the walk up from the homestead. Tied to Buildings/Palace's actual transform in ranch.tscn
-## (its origin is (-10, 0, 61.6), see PALACE_MAX_RELIEF's comment in ranch.gd for why it is
-## not at the Strip's own centre): x matches the Palace, z is 5.4 m south of its door.
-const MARQUEE_AT := Vector3(-10.0, 5.4, 56.2)
-const MARQUEE_SIZE := 0.55
+## THE MARQUEE BOARD, sized and placed from the PALACE'S OWN MEASUREMENTS rather than typed
+## as world coordinates. mount_marquee() is handed the front face of the building, its half
+## extents and its ridge height by ranch.gd, off the live node; every number below is a
+## fraction or an offset applied to those. The pair could drift before, and did: a hand
+## typed MARQUEE_AT sat at y = 5.4 on a building whose ridge is at 4.6.
+##
+## WIDTH is a fraction of the building's own width, so the board is always visibly narrower
+## than the wall behind it. TOP_GAP is how far its top edge stays UNDER the ridge, which is
+## the "mounted clear of the roofline" the report asked for. STANDOFF is how far in front of
+## the wall it hangs, far enough that the two never fight for pixels.
+const MARQUEE_WIDTH_FRACTION := 0.62
+const MARQUEE_HEIGHT := 1.60
+const MARQUEE_TOP_GAP := 0.35
+const MARQUEE_STANDOFF := 0.55
+const MARQUEE_BOARD_COLOR := Color(0.16, 0.07, 0.20)
+const MARQUEE_TRIM_COLOR := Color(0.98, 0.86, 0.45)
+const MARQUEE_TRIM := 0.10
+
+## The headline fills this much of the board's height; the sponsor line under it is
+## SPONSOR_SCALE of that. Both are a FRACTION OF THE BOARD, which is what "fitted text"
+## means: change the board and the letters follow it.
+const MARQUEE_HEADLINE_FRACTION := 0.34
+const MARQUEE_SPONSOR_SCALE := 0.55
+
+## Font size the Label3Ds are rasterised at. Only the ratio font_size * pixel_size is a
+## physical size; this is picked high so the glyphs stay crisp on a board a player walks up
+## to, and pixel_size is then derived from it.
+const MARQUEE_FONT_SIZE := 96
 
 const POST_COLOR := Color(0.24, 0.22, 0.28)
 const LAMP_COLOR := Color(1.0, 0.86, 0.55)
@@ -67,6 +89,15 @@ var _region: RegionData = null
 var _ground := Callable()
 var _lights: Array[Node3D] = []
 var _built := false
+
+var _marquee_centre := Vector3.ZERO
+## The way the board looks, flat and unit length. A Building's door is in its local plus Z
+## gable end, so this is that axis put through the building's own basis by ranch.gd; the
+## default is the unturned axis, for a Strip nobody has mounted a sign on.
+var _marquee_facing := Vector3(0.0, 0.0, 1.0)
+var _marquee_size := Vector2.ZERO
+var _marquee_ceiling := 0.0
+var _has_marquee := false
 
 ## The rectangle, in world XZ, no lamp may stand inside. Empty (min == max == ZERO with
 ## _has_avoid false) until avoid_footprint() is called; nothing is skipped in that case.
@@ -100,6 +131,63 @@ func avoid_footprint(centre_xz: Vector2, half_extents: Vector2) -> void:
 	_has_avoid = true
 
 
+## WHERE THE SIGN GOES, in the building's own terms. `front_centre` is the middle of the
+## Palace's front wall in world space, `out_dir` the direction its door faces (flat, unit
+## length), `half_extents` its half width and half depth, and `ridge_y` the world height of
+## its ridge. Call before build(), same contract as configure() and avoid_footprint(); an
+## unmounted Strip simply stands no marquee, which is a Strip with no building on it.
+##
+## KEPT AS PLAIN NUMBERS rather than as a Building reference, for the reason
+## avoid_footprint() gives: this file does not have to know what a Building is, and
+## ranch.gd reads the live node's own width, depth and ridge_height so a re sited or
+## re proportioned Palace moves its own sign.
+##
+## OUT_DIR IS HANDED IN RATHER THAN ASSUMED. This file used to hang the board at
+## `front_centre.z - MARQUEE_STANDOFF` and turn its letters by exactly PI, which is world
+## minus Z written down twice: correct only because ranch.tscn happens to turn the Palace a
+## half turn, and silently wrong for any other angle, including the one a later re siting
+## would use. ranch.gd derives the direction from the building's own basis, the same way
+## _stand_one() derives where an attendant stands, and hands it over.
+func mount_marquee(front_centre: Vector3, out_dir: Vector3, half_extents: Vector2,
+		ridge_y: float) -> void:
+	var facing: Vector3 = Vector3(out_dir.x, 0.0, out_dir.z)
+	if facing.length_squared() <= 0.0:
+		# A degenerate direction is a caller bug, not a reason to stand no sign: fall back
+		# on the way every Building's own door faces before it is turned.
+		facing = Vector3(0.0, 0.0, 1.0)
+	_marquee_facing = facing.normalized()
+	var board_width: float = half_extents.x * 2.0 * MARQUEE_WIDTH_FRACTION
+	_marquee_size = Vector2(board_width, MARQUEE_HEIGHT)
+	_marquee_ceiling = ridge_y - MARQUEE_TOP_GAP
+	_marquee_centre = Vector3(front_centre.x, _marquee_ceiling - MARQUEE_HEIGHT * 0.5,
+		front_centre.z) + _marquee_facing * MARQUEE_STANDOFF
+	_has_marquee = true
+
+
+## The direction the board's face looks in, flat and unit length. Whatever mount_marquee()
+## was handed, or the unturned default before it is called.
+func marquee_facing() -> Vector3:
+	return _marquee_facing
+
+
+func marquee_board_size() -> Vector2:
+	return _marquee_size
+
+
+func marquee_board_centre() -> Vector3:
+	return _marquee_centre
+
+
+func marquee_top_y() -> float:
+	return _marquee_centre.y + _marquee_size.y * 0.5
+
+
+## What the board says, top line first. Read out of CasinoSign so the sign outside cannot
+## drift from the sign in the lobby.
+func marquee_lines() -> Array[String]:
+	return [CasinoSignScript.marquee_headline(), CasinoSignScript.marquee_sponsor()]
+
+
 ## Stand the lamps and hang the marquee. Idempotent. One lamp per ring position, unless
 ## avoid_footprint() was called and a position lands inside it, in which case that one is
 ## skipped rather than moved: a gap in the ring exactly where a wall already blocks the view
@@ -131,10 +219,6 @@ func light_positions() -> Array[Vector3]:
 	for l in _lights:
 		out.append(l.global_position)
 	return out
-
-
-func marquee_text() -> String:
-	return CasinoSignScript.MARQUEE
 
 
 func _y(x: float, z: float) -> float:
@@ -184,22 +268,80 @@ func _lamp(lamp_name: String, base: Vector3) -> Node3D:
 	return post
 
 
-## The sign you read on the way in. A Label3D rather than a texture so the words come from
-## CasinoSign and cannot drift from the building they are advertising.
+## THE SIGN YOU READ ON THE WAY IN: a backing board with a trim edge, the headline fitted
+## across it, and the sponsor line under it in smaller letters.
+##
+## FITTED MEANS THE TEXT IS TOLD HOW WIDE IT MAY BE. Label3D.width is a wrapping width in
+## the same pixel units font_size is in, so setting it to the board's width in pixels and
+## turning autowrap on is what actually stops a long line running off the edge; the old
+## marquee set neither and rendered about 18 m of text across a 14 m building. pixel_size
+## is then the board's real width divided by that same pixel width, so one number converts
+## the whole thing and the letters cannot end up a different size from the board.
 func _marquee() -> void:
+	if not _has_marquee:
+		return
+	var board := MeshInstance3D.new()
+	board.name = "MarqueeBoard"
+	var box := BoxMesh.new()
+	box.size = Vector3(_marquee_size.x, _marquee_size.y, 0.12)
+	box.material = _flat_material(MARQUEE_BOARD_COLOR)
+	board.mesh = box
+	add_child(board)
+	board.global_position = _marquee_centre
+
+	var trim := MeshInstance3D.new()
+	trim.name = "MarqueeTrim"
+	var trim_box := BoxMesh.new()
+	trim_box.size = Vector3(_marquee_size.x + MARQUEE_TRIM * 2.0,
+		_marquee_size.y + MARQUEE_TRIM * 2.0, 0.08)
+	trim_box.material = _flat_material(MARQUEE_TRIM_COLOR)
+	trim.mesh = trim_box
+	add_child(trim)
+	trim.global_position = _marquee_centre + _marquee_facing * 0.03
+
+	var lines: Array[String] = marquee_lines()
+	var headline_height: float = _marquee_size.y * MARQUEE_HEADLINE_FRACTION
+	_marquee_label("MarqueeHeadline", lines[0], headline_height,
+		_marquee_centre + Vector3(0.0, _marquee_size.y * 0.20, 0.0)
+			+ _marquee_facing * 0.09)
+	_marquee_label("MarqueeSponsor", lines[1],
+		headline_height * MARQUEE_SPONSOR_SCALE,
+		_marquee_centre + Vector3(0.0, -_marquee_size.y * 0.24, 0.0)
+			+ _marquee_facing * 0.09)
+
+
+## One line of the sign, `cap_height` metres tall, fitted to the board's width and hung at
+## `at`. Faces the walk up to the door, whichever way the building has been turned: Label3D's
+## own text faces its local plus Z, so the yaw that points that at _marquee_facing is
+## atan2(x, z) of the facing itself. A hard coded half turn read correctly only for a
+## building standing exactly the way ranch.tscn happens to stand this one.
+func _marquee_label(label_name: String, text: String, cap_height: float,
+		at: Vector3) -> void:
 	var label := Label3D.new()
-	label.name = "Marquee"
-	label.text = CasinoSignScript.MARQUEE
-	label.font_size = 64
-	label.pixel_size = MARQUEE_SIZE / 64.0
+	label.name = label_name
+	label.text = text
+	label.font_size = MARQUEE_FONT_SIZE
+	var pixel: float = cap_height / float(MARQUEE_FONT_SIZE)
+	label.pixel_size = pixel
+	# The width the text may occupy, in the same pixel units font_size is in. Set together
+	# with the wrap mode; either one alone does nothing.
+	label.width = _marquee_size.x / pixel
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.modulate = MARQUEE_COLOR
-	label.outline_size = 12
+	label.outline_size = 10
 	label.billboard = BaseMaterial3D.BILLBOARD_DISABLED
 	label.double_sided = false
 	label.shaded = false
 	label.no_depth_test = false
 	add_child(label)
-	label.global_position = MARQUEE_AT
-	# Label3D faces +Z; the walk up from the homestead comes from Z below zero, so it turns
-	# a half turn to meet the player coming north.
-	label.rotation.y = PI
+	label.global_position = at
+	label.rotation.y = atan2(_marquee_facing.x, _marquee_facing.z)
+
+
+func _flat_material(colour: Color) -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = colour
+	mat.roughness = 0.85
+	mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+	return mat

@@ -23,6 +23,9 @@ extends RefCounted
 ## transform is built in the model's own space and then multiplied through the attachment's
 ## inverse global transform, so whatever the bone's rest pose is, the decal lands on the
 ## flank.
+##
+## Which way up the drawing then lands is a separate question, answered by the UV
+## convention block above _flank_transform().
 
 const LEFT_NAME := &"CutieMarkLeft"
 const RIGHT_NAME := &"CutieMarkRight"
@@ -71,15 +74,85 @@ static func apply(model: Node3D, mark: Image) -> int:
 	return placed
 
 
-## The world transform of one flank's decal. Its local -Y is the projection axis, so it is
-## aimed INWARD along the barrel: for the +X flank that is -X, and the reverse for the other.
+## HOW A DECAL'S TEXTURE IS ORIENTED, and the bug this block exists to close.
+##
+## A Decal projects along its own local minus Y and samples its albedo across the local XZ
+## plane: the sampled U runs with local plus X and the sampled V runs with local plus Z,
+## and V = 0 is the TOP row of the image. So the world direction the drawing's own "up"
+## points in is the decal's MINUS Z axis, and the direction its "right" points in is the
+## PLUS X axis. IMAGE_UP_AXIS and IMAGE_RIGHT_AXIS below are that convention written down
+## once, and image_up()/image_right() are the only two places it is applied.
+##
+## WHAT WENT WRONG. This file used to pass Vector3(0, 1, 0) as the local Z column, with the
+## comment "local Z runs up the barrel". That is the barrel's up, not the image's: it put
+## image up at world DOWN. The same basis also came out LEFT HANDED (determinant minus one
+## on both flanks), which mirrors the drawing. A vertical flip plus a mirror is a half
+## turn, which is exactly what the 2026-08-31 playtest screenshot shows: a heart drawn
+## point down rendered point up. Passing Vector3(0, -1, 0) instead fixes both halves in one
+## column, because it puts image up at world up AND makes the basis right handed.
+const IMAGE_UP_AXIS := Vector3(0.0, 0.0, -1.0)
+const IMAGE_RIGHT_AXIS := Vector3(1.0, 0.0, 0.0)
+
+
+## The world transform of one flank's decal. Its local minus Y is the projection axis, so
+## it is aimed INWARD along the barrel: for the plus X flank that is minus X, and the
+## reverse for the other.
+##
+## THE RIGHT FLANK REPEATS THE DRAWING RATHER THAN MIRRORING IT, and that is the decision,
+## not an accident of the arithmetic. Image right lands on world minus Z on the plus X
+## flank and on world plus Z on the minus X flank, and a viewer standing outside either one
+## has that direction on her own right; so a letter reads as a letter and a heart reads as
+## a heart from both sides. The cost is that an asymmetric mark is not the same paint seen
+## from two angles, which is the correct trade for a mark the player drew herself and has
+## to be able to recognise.
 static func _flank_transform(model: Node3D, side: float) -> Transform3D:
 	var basis := Basis(
-		Vector3(0.0, 0.0, -side),   # local X runs along the pony
-		Vector3(side, 0.0, 0.0),    # local Y is the projection axis, pointing outward
-		Vector3(0.0, 1.0, 0.0))     # local Z runs up the barrel
+		Vector3(0.0, 0.0, -side),   # local X: image RIGHT, running along the pony
+		Vector3(side, 0.0, 0.0),    # local Y: outward, so the projection down minus Y goes in
+		Vector3(0.0, -1.0, 0.0))    # local Z: image DOWN, so image up is world up
 	var where := Vector3(FLANK.x * side, FLANK.y, FLANK.z)
 	return model.global_transform * Transform3D(basis, where)
+
+
+## The world direction the TOP of the drawing points in. See the convention block above.
+static func image_up(decal: Decal) -> Vector3:
+	if decal == null:
+		return Vector3.ZERO
+	return (decal.global_transform.basis * IMAGE_UP_AXIS).normalized()
+
+
+## The world direction the RIGHT of the drawing points in.
+static func image_right(decal: Decal) -> Vector3:
+	if decal == null:
+		return Vector3.ZERO
+	return (decal.global_transform.basis * IMAGE_RIGHT_AXIS).normalized()
+
+
+## The way the decal faces: out of the flank, back along the projection.
+static func image_out(decal: Decal) -> Vector3:
+	if decal == null:
+		return Vector3.ZERO
+	return decal.global_transform.basis.y.normalized()
+
+
+## Is the drawing MIRRORED as seen by somebody standing outside this flank? right cross up
+## points at that viewer for an un mirrored image and away from her for a mirrored one, so
+## this one dot product answers the question without caring which flank it is or how the
+## model happens to be turned.
+static func is_mirrored(decal: Decal) -> bool:
+	if decal == null:
+		return false
+	return image_right(decal).cross(image_up(decal)).dot(image_out(decal)) < 0.0
+
+
+## Where the pixel at image coordinate (u, v), both in [0, 1] with (0, 0) at the TOP LEFT
+## of the canvas, lands in world space on the flank. The one function a headless test can
+## use to ask where a drawn pixel actually goes, since a headless run renders nothing.
+static func image_point_to_world(decal: Decal, u: float, v: float) -> Vector3:
+	if decal == null:
+		return Vector3.ZERO
+	return decal.global_transform * Vector3(
+		(u - 0.5) * decal.size.x, 0.0, (v - 0.5) * decal.size.z)
 
 
 static func decals_of(model: Node3D) -> Array[Decal]:

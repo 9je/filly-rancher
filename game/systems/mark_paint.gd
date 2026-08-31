@@ -77,6 +77,26 @@ static func stroke(image: Image, from: Vector2i, to: Vector2i, colour: Color,
 			int(round(lerpf(float(from.y), float(to.y), t)))), colour, radius)
 
 
+## AN ASYMMETRIC FIGURE, FOR PROVING WHICH WAY UP A FLANK IS. Not a stamp, and never
+## offered to the player: game/systems/mark_stamps.gd holds the shapes she may start from.
+## This one exists so that game/test/test_cutie_mark.gd, scenes/test/creation_test.gd and
+## the model gallery's --mark row all check the SAME drawing, and so that a person looking
+## at a rendered flank can say "that is an F" or "that is not one".
+##
+## AN F, AND AN F ON PURPOSE. It has no symmetry of any kind: turn it upside down and it
+## stops being an F, mirror it and it stops being an F, and turn it half way round (which
+## is what a flip plus a mirror is, and what the 2026-08-31 playtest actually saw) and it
+## stops being an F. A heart or a star would have survived at least one of those three.
+static func orientation_probe(colour := Color(0.10, 0.10, 0.12, 1.0)) -> Image:
+	var image: Image = blank()
+	# The spine, down the LEFT of the canvas; y grows downward, so 8 is near the top.
+	stroke(image, Vector2i(18, 8), Vector2i(18, 56), colour, 3)
+	# The long top arm and the short middle one, both reaching RIGHT.
+	stroke(image, Vector2i(18, 11), Vector2i(50, 11), colour, 3)
+	stroke(image, Vector2i(18, 30), Vector2i(40, 30), colour, 3)
+	return image
+
+
 static func is_blank(image: Image) -> bool:
 	if image == null:
 		return true

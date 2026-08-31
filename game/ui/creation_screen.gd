@@ -33,6 +33,7 @@ const TITLE := "Who are you?"
 const NAME_LABEL := "Your name"
 const COAT_LABEL := "Coat"
 const MANE_LABEL := "Mane and tail"
+const MANE_STYLE_LABEL := "Mane style"
 const EYES_LABEL := "Eyes"
 const MARK_LABEL := "Your cutie mark; draw it yourself"
 const CONFIRM_LABEL := "This is me"
@@ -84,6 +85,7 @@ var _open := false
 @onready var _camera: Camera3D = $Viewport/SubViewport/Camera3D
 @onready var _coat_swatch: ColorRect = $Panel/Column/CoatRow/CoatSwatch
 @onready var _mane_swatch: ColorRect = $Panel/Column/ManeRow/ManeSwatch
+@onready var _mane_style_value: Label = $Panel/Column/ManeStyleRow/ManeStyleValue
 @onready var _eyes_swatch: ColorRect = $Panel/Column/EyesRow/EyesSwatch
 
 ## The ink she is drawing in right now, shown beside the ink buttons the same way each
@@ -100,6 +102,7 @@ var _open := false
 @onready var _name_label: Label = $Panel/Column/NameLabel
 @onready var _coat_label: Label = $Panel/Column/CoatLabel
 @onready var _mane_label: Label = $Panel/Column/ManeLabel
+@onready var _mane_style_label: Label = $Panel/Column/ManeStyleLabel
 @onready var _eyes_label: Label = $Panel/Column/EyesLabel
 @onready var _mark_label: Label = $Panel/Column/MarkLabel
 @onready var _hint_label: Label = $Panel/Column/HintLabel
@@ -113,6 +116,7 @@ func _ready() -> void:
 	_name_label.text = NAME_LABEL
 	_coat_label.text = COAT_LABEL
 	_mane_label.text = MANE_LABEL
+	_mane_style_label.text = MANE_STYLE_LABEL
 	_eyes_label.text = EYES_LABEL
 	_mark_label.text = MARK_LABEL
 	_hint_label.text = HINT
@@ -177,6 +181,17 @@ func cycle_eyes(step: int) -> void:
 	_refresh_swatches()
 
 
+## CYCLE THE BASE MODEL. Unlike the three colour rows, this is not a tint: it is a
+## different mesh, so the pony on the turntable is rebuilt and then restyled, which is why
+## this is the one row that does not simply call _restyle().
+func cycle_mane_style(step: int) -> void:
+	_look.mane_style = posmod(_look.mane_style + step,
+		maxi(1, StockPaletteScript.mane_style_count()))
+	_build_model()
+	_restyle()
+	_refresh_swatches()
+
+
 func stamp(id: int) -> void:
 	_canvas.stamp(id)
 
@@ -226,8 +241,10 @@ func confirm() -> bool:
 
 ## Every string this screen draws, for the copy rule test.
 func drawn_lines() -> Array[String]:
-	var lines: Array[String] = [TITLE, NAME_LABEL, COAT_LABEL, MANE_LABEL, EYES_LABEL,
-		MARK_LABEL, CONFIRM_LABEL, HINT]
+	var lines: Array[String] = [TITLE, NAME_LABEL, COAT_LABEL, MANE_LABEL, MANE_STYLE_LABEL,
+		EYES_LABEL, MARK_LABEL, CONFIRM_LABEL, HINT]
+	for i in StockPaletteScript.mane_style_count():
+		lines.append(StockPaletteScript.mane_style_label(i))
 	for id: int in MarkStampsScript.ids():
 		lines.append(MarkStampsScript.stamp_name(id))
 	# The ink buttons say these, so the copy rule applies to them like everything else.
@@ -253,7 +270,8 @@ func _build_model() -> void:
 		# The assetless checkout (docs/ci.md section 4). The swatches and the canvas still
 		# work; there is simply nothing standing on the turntable to look at.
 		return
-	_model = PonyVisualsScript.build(data)
+	_model = PonyVisualsScript.build(data,
+		StockPaletteScript.mane_style_path(_look.mane_style))
 	if _model != null:
 		_model.rotate_y(PI)
 		_turntable.add_child(_model)
@@ -285,6 +303,10 @@ func _wire_controls() -> void:
 	_connect(^"Panel/Column/CoatRow/NextCoat", func() -> void: cycle_coat(1))
 	_connect(^"Panel/Column/ManeRow/PrevMane", func() -> void: cycle_mane(-1))
 	_connect(^"Panel/Column/ManeRow/NextMane", func() -> void: cycle_mane(1))
+	_connect(^"Panel/Column/ManeStyleRow/PrevManeStyle",
+		func() -> void: cycle_mane_style(-1))
+	_connect(^"Panel/Column/ManeStyleRow/NextManeStyle",
+		func() -> void: cycle_mane_style(1))
 	_connect(^"Panel/Column/EyesRow/PrevEyes", func() -> void: cycle_eyes(-1))
 	_connect(^"Panel/Column/EyesRow/NextEyes", func() -> void: cycle_eyes(1))
 
@@ -331,3 +353,5 @@ func _refresh_swatches() -> void:
 		_mane_swatch.color = _palette.mane_at(_look.mane)
 	if _eyes_swatch != null:
 		_eyes_swatch.color = _palette.eye_at(_look.eyes)
+	if _mane_style_value != null:
+		_mane_style_value.text = StockPaletteScript.mane_style_label(_look.mane_style)

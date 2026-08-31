@@ -37,6 +37,7 @@ const GameStateScript := preload("res://systems/game_state.gd")
 const PenScript := preload("res://world/pen.gd")
 const PlotSlotScript := preload("res://world/plot_slot.gd")
 const PonyInstanceScript := preload("res://systems/pony_instance.gd")
+const RaceCardScript := preload("res://systems/race_card.gd")
 
 const STARTING_CHIPS := 500
 const STAKE := 50
@@ -111,7 +112,7 @@ func test_a_track_that_refuses_to_start_refunds_the_stake_and_shows_her_again() 
 
 	assert_true(body.visible, "sanity: she is standing in plain sight before any of this")
 
-	var result: Dictionary = ranch.start_race(inst.uid, 0, STAKE)
+	var result: Dictionary = ranch.start_race(inst.uid, STAKE)
 	assert_push_error(1,
 		"a race that race_track itself refused to start must still be reported")
 
@@ -137,7 +138,7 @@ func test_a_track_that_does_start_leaves_the_stake_spent_and_the_body_hidden() -
 	var inst: PonyInstance = built["inst"]
 	var body: Node3D = built["body"]
 
-	var result: Dictionary = ranch.start_race(inst.uid, 0, STAKE)
+	var result: Dictionary = ranch.start_race(inst.uid, STAKE)
 	assert_push_error(0, "a race the track actually agreed to run must not be reported")
 
 	assert_true(result["ok"], "a track that agrees to start must report the race as ok")
@@ -147,3 +148,51 @@ func test_a_track_that_does_start_leaves_the_stake_spent_and_the_body_hidden() -
 		"an ordinary, accepted race must still hide her body for the length of the race")
 	assert_eq(ranch._race_entrant, inst.uid,
 		"an ordinary, accepted race must still record whose bet is on the track")
+
+
+## THE FORM GUIDE, off a live ranch. She is the only pony penned, so she is the only row;
+## her price has to be a real bet (more than a chip returned per chip staked) and her chance
+## has to be a real probability.
+func test_the_form_guide_prices_every_penned_pony_and_nobody_else() -> void:
+	var built := _ranch_with_pony(FakeTrackThatAccepts.new())
+	var ranch: RanchScript = built["ranch"]
+	var rows: Array[Dictionary] = ranch.race_entrants()
+	assert_gt(rows.size(), 0, "there is a pony in a pen")
+	for row in rows:
+		assert_true(row.has("odds"), "every row carries her price")
+		assert_gt(float(row["odds"]), 1.0,
+			"an entrant who paid a chip or less for a chip would be a refund, not a bet")
+		assert_between(float(row["chance"]), 0.0, 1.0)
+
+
+## YOUR PONY IS YOUR BET. There is no lane argument any more, so the only price a race can
+## ever settle at is the one the form guide quoted for RaceCard.PLAYER_LANE.
+func test_a_race_can_only_ever_be_backed_on_the_player_s_own_lane() -> void:
+	var built := _ranch_with_pony(FakeTrackThatAccepts.new())
+	var ranch: RanchScript = built["ranch"]
+	var rows: Array[Dictionary] = ranch.race_entrants()
+	var race: Dictionary = ranch.start_race(StringName(rows[0]["uid"]), 10)
+	assert_true(bool(race["ok"]))
+	assert_almost_eq(float(race["odds"]),
+		RaceCardScript.decimal_odds(race["field"], RaceCardScript.PLAYER_LANE), 0.0001,
+		"the quoted price and the settled price are the same number")
+
+
+## A ROW THAT ALWAYS REFUSES IS A ROW THAT LIES (Ruling 27). start_race() refuses a pony who
+## is already out on the track, so the form guide offering her was an entry that could only
+## ever bounce. _penned_rows() has excluded her from the Depot's Deliver tab for exactly this
+## reason since the racing slice landed; this is the same rule on the same pony, said in the
+## other panel she appears in.
+func test_the_pony_already_on_the_track_is_not_offered_a_second_race() -> void:
+	var built := _ranch_with_pony(FakeTrackThatAccepts.new())
+	var ranch: RanchScript = built["ranch"]
+	var before: Array[Dictionary] = ranch.race_entrants()
+	assert_eq(before.size(), 1, "one pony penned, one row")
+	var uid := StringName(before[0]["uid"])
+	assert_true(bool(ranch.start_race(uid, 10)["ok"]), "she goes out on the track")
+	assert_true(ranch.is_racing(uid), "sanity: the ranch says she is racing")
+	for row in ranch.race_entrants():
+		assert_ne(StringName(row["uid"]), uid,
+			"the guide is still offering the pony who is already running")
+	assert_eq(ranch.race_entrants().size(), 0,
+		"she was the only pony penned, so the guide is empty until the wire settles")

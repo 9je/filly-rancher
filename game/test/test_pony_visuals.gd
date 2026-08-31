@@ -12,6 +12,7 @@ const PonyVisualsScript := preload("res://actors/pony/pony_visuals.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 const PonyRigScript := preload("res://scripts/pony_rig.gd")
+const StockPaletteScript := preload("res://systems/stock_palette.gd")
 
 const PONY_DIR := "res://data/ponies/"
 
@@ -21,6 +22,12 @@ func _make_pony(id: StringName, model_path: String) -> PonyData:
 	data.id = id
 	data.model_path = model_path
 	return data
+
+
+func _any_record() -> PonyData:
+	var registry := PonyRegistryScript.new()
+	var ponies := registry.load_all(PONY_DIR)
+	return ponies.get(&"twilight", null) as PonyData
 
 
 func test_build_null_data_returns_null_and_reports() -> void:
@@ -104,3 +111,26 @@ func test_build_does_not_require_a_voice_bank() -> void:
 	autofree(pony)
 
 	assert_not_null(pony, "a missing voice bank must not block a spawn")
+
+
+func test_an_override_replaces_the_model_and_leaves_everything_else_alone() -> void:
+	var data: PonyData = _any_record()
+	if data == null or not ResourceLoader.exists(StockPaletteScript.mane_style_path(1)):
+		pass_test("no converted assets on this machine")
+		return
+	var node: Node3D = PonyVisualsScript.build(data, StockPaletteScript.mane_style_path(1))
+	assert_not_null(node)
+	autofree(node)
+	assert_not_null(node.get_node_or_null(PonyVisualsScript.ANIMATION_PLAYER_PATH),
+		"an overridden model still has to satisfy the AnimationPlayer contract")
+
+
+func test_an_override_that_is_not_on_disk_is_refused_rather_than_falling_back() -> void:
+	var data: PonyData = _any_record()
+	if data == null:
+		pass_test("no roster on this machine")
+		return
+	assert_null(PonyVisualsScript.build(data, "res://assets/converted/ponies/nobody.glb"),
+		"silently building the record's own model would hide the typo forever")
+	assert_push_error(1, "a missing override path should push_error, matching the record's "
+		+ "own missing model_path case above")

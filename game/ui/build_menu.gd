@@ -58,20 +58,7 @@ extends CanvasLayer
 const PlotRegistryScript := preload("res://systems/plot_registry.gd")
 const PlotDataScript := preload("res://systems/plot_data.gd")
 const PlotSlotScript := preload("res://world/plot_slot.gd")
-
-## Colours, matching game/ui/hud.gd's palette rather than inventing a second one.
-const COLOR_TITLE := Color(1.0, 0.96, 0.86, 1.0)
-const COLOR_NAME := Color(1.0, 1.0, 1.0, 0.94)
-const COLOR_DIM := Color(1.0, 1.0, 1.0, 0.58)
-const COLOR_COST := Color(1.00, 0.80, 0.25, 1.0)
-## An unaffordable row is drawn in this instead of being hidden: seeing what you are saving
-## up for is most of what makes saving up for it interesting.
-const COLOR_UNAFFORDABLE := Color(1.0, 0.45, 0.42, 0.85)
-
-const ROW_SELECTED_BG := Color(1.0, 0.86, 0.55, 0.16)
-const ROW_SELECTED_BORDER := Color(1.0, 0.86, 0.55, 0.75)
-const ROW_IDLE_BG := Color(1.0, 1.0, 1.0, 0.04)
-const ROW_IDLE_BORDER := Color(1.0, 1.0, 1.0, 0.10)
+const MenuStyleScript := preload("res://ui/menu_style.gd")
 
 @onready var _dim: ColorRect = $Dim
 @onready var _panel: PanelContainer = $Centre/Panel
@@ -119,11 +106,9 @@ func _ready() -> void:
 	_registry = PlotRegistryScript.new()
 	_registry.load_all(PlotRegistryScript.PLOT_DIR)
 	_plots = _registry.all()
-	_style_label(_title, 34, COLOR_TITLE)
-	_style_label(_wallet, 22, COLOR_DIM)
-	_style_label(_footer, 20, COLOR_DIM)
+	MenuStyleScript.style_label(_title, MenuStyleScript.TITLE_SIZE, MenuStyleScript.COLOR_TITLE)
+	MenuStyleScript.style_label(_wallet, MenuStyleScript.ROW_SIZE, MenuStyleScript.COLOR_DIM)
 	_title.text = "BUILD"
-	_footer.text = "  ↑ ↓ / D-pad  choose      Enter / A  build      Esc / B  back"
 	_build_rows()
 	visible = false
 
@@ -217,7 +202,8 @@ func confirm() -> bool:
 	if not can_afford(plot):
 		_footer.text = "  %s costs %d bits. You have %d." % [plot.display_name, plot.cost,
 			bits()]
-		_style_label(_footer, 20, COLOR_UNAFFORDABLE)
+		MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE,
+			MenuStyleScript.COLOR_UNAFFORDABLE)
 		return false
 	var slot := _slot
 	close()
@@ -276,19 +262,19 @@ func _build_rows() -> void:
 		title.name = "Name"
 		title.text = plot.display_name
 		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		_style_label(title, 27, COLOR_NAME)
+		MenuStyleScript.style_label(title, 27, MenuStyleScript.COLOR_NAME)
 		head.add_child(title)
 
 		var holds := Label.new()
 		holds.name = "Holds"
 		holds.text = ("holds %d" % plot.capacity) if plot.capacity > 0 else ""
-		_style_label(holds, 21, COLOR_DIM)
+		MenuStyleScript.style_label(holds, 21, MenuStyleScript.COLOR_DIM)
 		head.add_child(holds)
 
 		var price := Label.new()
 		price.name = "Cost"
 		price.text = "FREE" if plot.cost == 0 else "%d bits" % plot.cost
-		_style_label(price, 24, COLOR_COST)
+		MenuStyleScript.style_label(price, 24, MenuStyleScript.COLOR_VALUE)
 		head.add_child(price)
 
 		var blurb := Label.new()
@@ -296,7 +282,7 @@ func _build_rows() -> void:
 		blurb.text = plot.description
 		blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		blurb.custom_minimum_size = Vector2(720.0, 0.0)
-		_style_label(blurb, 19, COLOR_DIM)
+		MenuStyleScript.style_label(blurb, 19, MenuStyleScript.COLOR_DIM)
 		column.add_child(blurb)
 
 		_rows.add_child(row)
@@ -305,36 +291,29 @@ func _build_rows() -> void:
 
 ## Repaint the selection highlight, the wallet line and the affordability colours.
 func _refresh() -> void:
+	_footer.text = MenuStyleScript.footer_rows("build", "back")
+	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
 	_wallet.text = "%d bits" % bits()
-	_style_label(_footer, 20, COLOR_DIM)
-	_footer.text = "  ↑ ↓ / D-pad  choose      Enter / A  build      Esc / B  back"
 	for i in range(_row_nodes.size()):
 		var row := _row_nodes[i]
 		row.add_theme_stylebox_override(&"panel", _row_style(i == _selected))
 		var affordable := can_afford(_plots[i])
 		var price := row.find_child("Cost", true, false) as Label
 		if price != null:
-			_style_label(price, 24, COLOR_COST if affordable else COLOR_UNAFFORDABLE)
+			MenuStyleScript.style_label(price, 24,
+				MenuStyleScript.COLOR_VALUE if affordable else MenuStyleScript.COLOR_UNAFFORDABLE)
 		var title := row.find_child("Name", true, false) as Label
 		if title != null:
-			_style_label(title, 27, COLOR_NAME if affordable else COLOR_DIM)
+			MenuStyleScript.style_label(title, 27,
+				MenuStyleScript.COLOR_NAME if affordable else MenuStyleScript.COLOR_DIM)
 
 
 func _row_style(selected: bool) -> StyleBoxFlat:
 	var box := StyleBoxFlat.new()
-	box.bg_color = ROW_SELECTED_BG if selected else ROW_IDLE_BG
-	box.border_color = ROW_SELECTED_BORDER if selected else ROW_IDLE_BORDER
+	box.bg_color = MenuStyleScript.ROW_SELECTED_BG if selected else MenuStyleScript.ROW_IDLE_BG
+	box.border_color = MenuStyleScript.ROW_SELECTED_BORDER if selected \
+		else MenuStyleScript.ROW_IDLE_BORDER
 	box.set_border_width_all(2 if selected else 1)
 	box.set_corner_radius_all(8)
 	box.content_margin_left = 0.0
 	return box
-
-
-## Same treatment game/ui/hud.gd gives its labels, and for the same reason: this panel is
-## translucent over a bright green field, and unoutlined text on it is genuinely hard to
-## read.
-func _style_label(label: Label, size: int, color: Color) -> void:
-	label.add_theme_font_size_override(&"font_size", size)
-	label.add_theme_color_override(&"font_color", color)
-	label.add_theme_color_override(&"font_outline_color", Color(0.0, 0.0, 0.0, 0.75))
-	label.add_theme_constant_override(&"outline_size", 5)

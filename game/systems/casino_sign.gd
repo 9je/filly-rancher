@@ -29,6 +29,18 @@ const SPONSOR := "proudly sponsored by Cloudsdale Weather Corporation"
 const MARQUEE := "Spectra Palace, proudly sponsored by Cloudsdale Weather Corporation"
 
 
+## THE MARQUEE, AS TWO LINES RATHER THAN ONE. MARQUEE above is the whole sentence, and it
+## is still what the lobby sign and the toast say; the board outside is a headline with the
+## sponsor under it in smaller letters, because 66 characters on one line across a 14 metre
+## building is exactly the sign the owner could not read (2026-08-31).
+static func marquee_headline() -> String:
+	return HEADLINE
+
+
+static func marquee_sponsor() -> String:
+	return SPONSOR
+
+
 ## One published edge, as a line a person can check with a pencil. Bits in a hundred rather
 ## than a percentage sign, because "the house keeps 7 of every 100" is a sentence and "7%"
 ## is a number you can nod at without reading.
@@ -62,4 +74,18 @@ static func cage_lines() -> Array[String]:
 			% [CasinoScript.CHIP_RATE, CasinoScript.CHIP_RATE],
 		"We take nothing at this window. We take it at the tables,",
 		"and we told you exactly how much on the way in.",
+	]
+
+
+## THE SAME THING, SHORT ENOUGH TO SIT ABOVE THE AMOUNTS ON THE CAGE PAGE. The owner,
+## 2026-08-31: "the cage explains itself (bits to chips, one to one, both ways)". A page of
+## bare amounts is a page a player leaves without knowing what a chip is.
+##
+## THREE LINES AND NOT FIVE, because the rows underneath are what she came for and a wall
+## of text above them is the same problem in the other direction.
+static func cage_explainer() -> Array[String]:
+	return [
+		"Bits buy chips one for one, and chips cash out one for one, both ways.",
+		"The cage keeps nothing. The tables keep what the House rules page says.",
+		"",
 	]

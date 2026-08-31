@@ -378,6 +378,8 @@ restoring the cache) turns the suite green again.
 | `game/scenes/test/depot_test.gd` | The depot gate (see below) |
 | `game/scenes/test/creation_test.gd` | The creation gate (see below) |
 | `game/scenes/test/casino_test.gd` | The casino gate (see below) |
+| `game/scenes/test/model_gallery.gd` | The model gallery, and its `--stock` and `--mark` rows (see below) |
+| `game/world/interaction.gd` | The interact resolver. The collection gate drives its pen step through it, standing the player on the plot and asking `ranch.current_interaction()` what the key means there before calling `ranch.perform_interaction()`; the depot gate still calls `_move_pony_into_pen()` directly |
 | `tools/setup_env.sh` | Installs/pins GUT (`GUT_VER`/`GUT_SHA256`, near the SourceIO block) |
 
 ---
@@ -437,7 +439,7 @@ Run it with:
 tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/region_test.tscn
 ```
 
-Expect `REGION_OK checks=47`; the exit code is the verdict.
+Expect `REGION_OK checks=49`; the exit code is the verdict.
 
 ---
 
@@ -511,6 +513,18 @@ gate has no claim on. The Strip is also the map's first region with no permit
 and no price, which moves what the ranch gate's `RANCH regions=` line checks:
 "every region has a fence" is now "every priced region has a fence", because a
 free region has nothing to unlock and ranch.tscn carries no `Fence_strip`.
+
+**`props` and `ponies` did NOT move when the Market got a vendor and the Palace got
+a teller, and that is deliberate.** Both are `Attendant` nodes: `PonyVisuals.build`
+plus `StockTint`, exactly what a race lane's runner is, standing under a new
+`Attendants` node that is neither `Props` nor `Buildings`. `props` counts
+`Props.expected_count()` plus the `Buildings` children and `ponies` counts
+`spawner.get_spawned()`, which only ever holds `Pony` nodes, so neither can see
+them. The report prints its own `RANCH attendants=2 dressed=2` line and carries
+four checks: that both are standing, that neither is a `Pony` (which is exactly
+what `MagicBeam._is_grabbable()` tests, so it is also the claim that the beam has
+nothing there to take), that both are dressed unless the assets are absent, and
+that neither is in the spawned herd.
 
 **Looking at the sky.** The gate checks numbers; only a person can say whether a
 stormy dusk *looks* like one. `bash tools/sky_sheet.sh` renders the ranch once
@@ -610,12 +624,22 @@ Run it with:
 tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/collection_test.tscn
 ```
 
-Expect `COLLECTION_OK checks=72`; the exit code is the verdict. Every line it
+Expect `COLLECTION_OK checks=73`; the exit code is the verdict. Every line it
 prints is prefixed `COLLECTION`, and two runs print byte-identical lines: the
 beam's capture generator is seeded, the herd and the weather come out of the
 world seed, and nothing it prints is a raw physics quantity that a reordered
 frame could move. Diffing two runs is therefore a real check on the whole
 chain, and worth doing after touching the spawner, the beam or the board.
+
+**A note on that seed, from the mane pool slice.** `StockPalette.draw_look()`
+pulls FOUR numbers off the spawn generator where the old `draw_triple()` pulled
+three, so the stock stream advanced by one extra draw per pony and the herd a
+given world seed produces is not the herd that seed produced before that slice.
+That is a change to what is GENERATED, not to what is STORED: every save keeps
+each pony's look as her own record and reloads exactly the ponies it was
+written with, so no existing file moved. Only "boot the same seed twice, on
+either side of that commit, and compare the crowd" changed its answer, which is
+why the byte-identical claim above is about two runs of the SAME build.
 
 
 ---
@@ -790,6 +814,30 @@ and no dash in any of them; and a hand written version 4 save on disk loading
 in this build with the name Twilight, the shipped look, a blank mark and a
 ledger at `Ledger.STARTING_BALANCE`.
 
+**It now also asks which way up the mark landed.** A headless run renders nothing,
+so the gate cannot look at a flank; what it can do is ask the decal where the top
+of the canvas points and whether the drawing is mirrored as seen from outside.
+`CutieMark.image_up()` must point at the sky and `CutieMark.is_mirrored()` must be
+false on both flanks, and the gate prints
+`CREATION mark flank=<left|right> up=... right=... mirrored=...` for each so a
+regression is a readable line rather than only a red. The bug this pins shipped in
+slice 1: a Decal samples its albedo across its own local XZ plane with V zero at
+the TOP of the image, and the flank basis passed plus Y as its local Z column,
+which put image up at world down and, being left handed besides, mirrored the
+drawing as well. A flip plus a mirror is a half turn, which is why a heart drawn
+point down rendered point up.
+
+**And a person still has to look at one.** The numbers above cannot say whether an
+F on a pony's side reads as an F.
+`tools/bin/godot --path game scenes/test/model_gallery.tscn -- --mark` stands three
+copies of the base model wearing `MarkPaint.orientation_probe()`, turned to show
+the left flank, the front and the right flank. What to look for is printed by the
+scene itself: the F right way up on both flanks, its spine on the left as you look
+at it, and the two flanks reading the SAME, because the right flank repeats the
+drawing rather than mirroring it (a mark you cannot read from one side is not a
+cutie mark). Headless it prints `GALLERY_MARK_OK count=3` and the exit code is the
+verdict.
+
 It hosts `world/ranch.tscn` exactly the way the other hosted gates do, and for
 the same reasons.
 
@@ -812,7 +860,7 @@ Run it with:
 tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/creation_test.tscn
 ```
 
-Expect `CREATION_OK checks=89`; the exit code is the verdict.
+Expect `CREATION_OK checks=93`; the exit code is the verdict.
 
 ---
 
@@ -842,9 +890,14 @@ wheel bets driven end to end through the felt itself rather than through
 `play_wheel()` directly, so a swap between the felt's own tab order and
 `Wheel.Bet`'s order cannot silently mispay a colour bet at number odds); a
 bet abandoned halfway costing nothing; and one whole race with one of the
-player's own ponies in it.
+player's own ponies in it, entered off the form guide rather than backed on
+a lane. The 2026-08-31 spec amendment made your pony your bet: there is no
+lane argument on `ranch.start_race()` any more, and the gate checks that the
+price the form guide showed for her is the same number
+`RaceCard.decimal_odds(field, PLAYER_LANE)` settles at, and that a race she does
+not win pays exactly zero.
 
-Four things about how it reads are worth knowing before editing it.
+Five things about how it reads are worth knowing before editing it.
 
 **It never widens a tolerance to go green.** `EDGE_TOLERANCE` is 0.006 over a
 hundred thousand plays, which a fair sample never trips and a paytable typo
@@ -872,6 +925,13 @@ running down the track are `RaceRunner` nodes rather than `Pony` nodes
 precisely because of it. A refactor that quietly turned a runner back into a
 pony would pass every other check in this file; that one would not.
 
+**Its menu seam checks moved with the flow.** They used to drive
+`CasinoMenu.Tab.GAMES` and `game_requested`; the lobby is one screen of rows now
+and emits `room_requested`, so that is what they drive. The point of those checks
+is unchanged: a swap between a menu's own row order and the enum behind it must not
+be able to silently open the wrong room, in the same way the wheel's felt tab order
+must not be able to mispay a colour bet at number odds.
+
 The race is watched at ten times speed (`Engine.time_scale`, restored
 afterwards). The result was decided by `RaceCard.run()` before the first frame,
 so the clock changes nothing about it, but `game/world/pen.gd`'s own
@@ -888,7 +948,7 @@ Run it with:
 tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/casino_test.tscn
 ```
 
-Expect `CASINO_OK checks=70`; the exit code is the verdict.
+Expect `CASINO_OK checks=72`; the exit code is the verdict.
 
 ---
 

@@ -20,14 +20,12 @@ extends CanvasLayer
 ## every table's .tscn must have is the one game/ui/depot_menu.tscn has: Dim, and
 ## Centre/Panel/Margin/Column holding Title, Tabs, Rows and Footer.
 
+const MenuStyleScript := preload("res://ui/menu_style.gd")
+const InputDeviceScript := preload("res://systems/input_device.gd")
+
 ## What the tables let her bet. Even numbers, always: Blackjack.payout() pays three to two
 ## with integer division and an odd stake would round the bonus down by half a chip.
 const STAKES: Array[int] = [10, 50, 200]
-
-const FOOTER := "  up down  choose      left right  tab      Enter / A  confirm      Esc / B  leave"
-const COLOR_NAME := Color(1.0, 1.0, 1.0, 0.94)
-const COLOR_VALUE := Color(1.00, 0.80, 0.25, 1.0)
-const COLOR_DIM := Color(1.0, 1.0, 1.0, 0.58)
 
 signal opened()
 signal closed()
@@ -49,7 +47,6 @@ var _result: Array[String] = []
 func _ready() -> void:
 	visible = false
 	_title.text = title_text()
-	_footer.text = FOOTER
 
 
 func open() -> bool:
@@ -129,6 +126,41 @@ func result_lines() -> Array[String]:
 	return _result.duplicate()
 
 
+## Injected by ranch.gd alongside chips_provider, so a table can say what she is holding.
+## Already present as chips_provider; this is only the sentence built from it.
+##
+## THE REPORT: "each table screen shows your chips, the stake picker, and what keys do
+## what". A table that shows only a stake row is a table a player cannot tell she is broke
+## at until a bet silently refuses.
+func chips_line() -> String:
+	var chips: int = int(chips_provider.call()) if chips_provider.is_valid() else 0
+	if chips <= 0:
+		return "You have no chips. The cage is in the lobby, and it is one for one."
+	return "You have %d chips." % chips
+
+
+## WHAT THE KEYS DO ON THIS TABLE, in the glyphs of the device in her hands. Distinct from
+## the footer, which says how to move around a menu: this says what the CONTROLS OF THE GAME
+## are, which on every table in this building is "the stake is on the last row".
+func keys_line() -> String:
+	return "Pick a stake on the stake row, then %s to play. %s leaves." % [
+		InputDeviceScript.hint(&"ui_accept"), InputDeviceScript.hint(&"ui_cancel")]
+
+
+## THE LAST HAND, AS ITS OWN BLOCK, with a rule above it so it does not read as another
+## row. Empty until something has been settled, which is the correct state for a table
+## nobody has played yet.
+func result_block() -> Array[String]:
+	if _result.is_empty():
+		return []
+	var out: Array[String] = ["", "= = = = = = = = = = = = = = = = = = = ="]
+	for line in _result:
+		out.append(line)
+	out.append("= = = = = = = = = = = = = = = = = = = =")
+	out.append("")
+	return out
+
+
 ## The stake row, drawn by every table above its own rows.
 func stake_lines() -> Array[String]:
 	var available: Array[int] = stakes()
@@ -144,6 +176,8 @@ func stake_lines() -> Array[String]:
 func refresh() -> void:
 	if not is_node_ready():
 		return
+	_footer.text = MenuStyleScript.footer_tabs_and_rows("confirm", "leave")
+	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
 	_title.text = title_text()
 	_tabs.text = tabs_text()
 	for child in _rows.get_children():
@@ -153,8 +187,9 @@ func refresh() -> void:
 	for i in lines.size():
 		var label := Label.new()
 		var picked: bool = i == caret and row_count() > 0
-		label.text = ("> " if picked else "  ") + lines[i]
-		label.add_theme_color_override("font_color", COLOR_VALUE if picked else COLOR_NAME)
+		label.text = MenuStyleScript.caret(picked) + lines[i]
+		label.add_theme_color_override("font_color",
+			MenuStyleScript.COLOR_VALUE if picked else MenuStyleScript.COLOR_NAME)
 		_rows.add_child(label)
 
 

@@ -479,6 +479,19 @@ func _apply_stock_tint() -> void:
 	StockTintScript.apply(body, StockPaletteScript.load_stock(), _stock)
 
 
+## Which base model this pony's body is built from: her own, off her stock look, or the
+## record's for a named character. Empty means "the record's own", which is what
+## PonyVisuals.build() wants for the 43 named ponies.
+##
+## READ BEFORE THE BODY IS BUILT, which is why set_stock() has always had to be called
+## before setup() and now really needs to be: a tint can be re-applied to a body that
+## already exists, a different mesh cannot.
+func _base_model_path() -> String:
+	if _stock.is_empty():
+		return ""
+	return StockPaletteScript.mane_style_path(int(_stock.get("mane_style", 0)))
+
+
 ## Adopt an INDIVIDUAL: a PonyInstance (game/systems/pony_instance.gd) carrying her uid
 ## and her own happiness/hunger, whose `data_id` resolves to the PonyData her body is
 ## built from. The instance-aware sibling of setup(), and the path a pony taken back OUT of
@@ -1205,7 +1218,7 @@ func _apply_data() -> void:
 	_wander_speed = wander_speed_for(_data.base_speed)
 	_flee_speed = flee_speed_for(_data.base_speed)
 
-	var body: Node3D = PonyVisualsScript.build(_data)
+	var body: Node3D = PonyVisualsScript.build(_data, _base_model_path())
 	if body == null:
 		push_error("Pony: PonyVisuals.build failed for '%s'" % _id())
 		return

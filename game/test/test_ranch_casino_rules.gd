@@ -149,7 +149,7 @@ func before_each() -> void:
 
 
 func _start_a_race() -> Dictionary:
-	var result: Dictionary = _ranch.start_race(_inst.uid, RaceCardScript.PLAYER_LANE, STAKE)
+	var result: Dictionary = _ranch.start_race(_inst.uid, STAKE)
 	assert_true(bool(result["ok"]), "precondition: the race actually got under way")
 	return result
 
@@ -192,7 +192,7 @@ func test_a_settled_race_is_not_refunded_on_top_of_what_it_paid() -> void:
 
 
 func test_the_wire_clears_every_variable_the_bet_lived_in() -> void:
-	_ranch._on_entrant_chosen(_inst.uid)
+	_ranch.race_entrants()
 	_start_a_race()
 	_track.running = false
 	_ranch._on_race_finished(WINNING_ORDER, RaceCardScript.PLAYER_LANE)
@@ -201,7 +201,8 @@ func test_the_wire_clears_every_variable_the_bet_lived_in() -> void:
 	assert_eq(_ranch._race_stake, 0)
 	assert_true(_ranch._race_field.is_empty(),
 		"the field was the one variable the wire used to leave standing")
-	assert_eq(_ranch._priced_uid, &"", "and the card it was priced from goes with it")
+	assert_true(_ranch._quoted_fields.is_empty(),
+		"and the cards every penned pony was priced from go with it")
 
 
 func test_the_ranch_cannot_be_saved_while_a_race_is_running() -> void:
@@ -316,7 +317,7 @@ func test_no_ban_leaves_an_open_table_exactly_where_it_was() -> void:
 
 func test_a_banned_palace_will_not_start_a_race_at_all() -> void:
 	_build(BannedRanch.new(), GameStateScript.new())
-	var result: Dictionary = _ranch.start_race(_inst.uid, RaceCardScript.PLAYER_LANE, STAKE)
+	var result: Dictionary = _ranch.start_race(_inst.uid, STAKE)
 	assert_false(bool(result["ok"]), "a barred player does not get to put a horse on the card")
 	assert_eq(_ranch._game_state.casino.chips, STARTING_CHIPS, "and is charged nothing for it")
 	assert_true(_body.visible, "and her pony never left the pen")
@@ -326,8 +327,8 @@ func test_a_banned_palace_will_not_start_a_race_at_all() -> void:
 
 func test_feeding_her_between_the_price_and_the_confirm_does_not_move_the_odds() -> void:
 	_inst.happiness = 0.2
-	_ranch._on_entrant_chosen(_inst.uid)
-	var quoted: float = RaceCardScript.decimal_odds(_ranch._priced_field,
+	_ranch.race_entrants()
+	var quoted: float = RaceCardScript.decimal_odds(_ranch._quoted_fields[_inst.uid],
 		RaceCardScript.PLAYER_LANE)
 
 	# SHE IS FED ON THE WAY TO THE WINDOW. A pen is a short walk from the Palace door, and
@@ -346,14 +347,13 @@ func test_feeding_her_between_the_price_and_the_confirm_does_not_move_the_odds()
 
 
 func test_a_pony_who_was_never_priced_is_priced_now() -> void:
-	_ranch._on_entrant_chosen(_inst.uid)
-	# The player changed her mind and backed somebody the panel never priced. There is no
-	# shown field to honour, so the card is built from the pony as she stands.
-	_ranch._priced_uid = &"somebody#000099"
+	# The form guide was never opened, so _quoted_fields has no entry for her at all. There
+	# is no shown field to honour, so the card is built from the pony as she stands.
+	assert_true(_ranch._quoted_fields.is_empty(), "precondition: nobody has been priced yet")
 	_inst.happiness = 1.0
 	var fresh: Array[Dictionary] = RaceCardScript.build_field(
 		RaceCardScript.entrant_from(_inst), CompanyRunnersScript.load_shipped())
 	var result: Dictionary = _start_a_race()
 	assert_almost_eq(float(result["odds"]),
 		RaceCardScript.decimal_odds(fresh, RaceCardScript.PLAYER_LANE), 1e-6,
-		"a mismatched uid rebuilds the card rather than pricing her off somebody else's")
+		"an unquoted uid builds its own card rather than settling against nothing")

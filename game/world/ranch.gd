@@ -149,6 +149,7 @@ const ZoneMarkerScript := preload("res://world/zone_marker.gd")
 const PonyScript := preload("res://actors/pony/pony.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const PlayerScript := preload("res://actors/player/player.gd")
+const InputDeviceScript := preload("res://systems/input_device.gd")
 const WorldStateScript := preload("res://systems/world_state.gd")
 const SkyRigScript := preload("res://world/sky_rig.gd")
 const RequestBoardScript := preload("res://systems/request_board.gd")
@@ -159,6 +160,7 @@ const StockPaletteScript := preload("res://systems/stock_palette.gd")
 const PlayerLookScript := preload("res://systems/player_look.gd")
 const StripScript := preload("res://world/strip.gd")
 const CasinoSignScript := preload("res://systems/casino_sign.gd")
+const InteractionScript := preload("res://world/interaction.gd")
 const BuildingScript := preload("res://world/building.gd")
 const CasinoScript := preload("res://systems/casino.gd")
 const SlotsScript := preload("res://systems/slots.gd")
@@ -169,6 +171,7 @@ const WheelMenuScript := preload("res://ui/wheel_menu.gd")
 const RaceCardScript := preload("res://systems/race_card.gd")
 const RaceTrackScript := preload("res://world/race_track.gd")
 const CompanyRunnersScript := preload("res://systems/company_runners.gd")
+const AttendantScript := preload("res://world/attendant.gd")
 
 ## Headless watchdog ceiling. A normal run (assets present) finishes in under 2s on
 ## this machine; 30s leaves a wide margin for a slower box while still failing in
@@ -218,10 +221,11 @@ const SEATING_TOLERANCE := 0.02
 ## at 0.35 m or under: a Nelder-Mead search of height_at() over the whole region (and a grid
 ## sweep of the original box this constant's comment used to name, x in [-10, 10], z in
 ## [58, 70]) bottoms out at 0.633 m, at the box's own x = -10 edge. Buildings/Palace sits at
-## exactly that spot (world (-10, 0, 61.6); see strip.gd's MARQUEE_AT, which was moved to
-## match). Nowhere closer to the strip's own centre does better than about 0.95 m, which is
-## what the original (0, 66) placement measured. Shrinking the building instead would fix
-## it (relief scales with footprint size), but a Palace narrow enough to clear 0.35 m
+## exactly that spot (world (-10, 0, 61.6); see strip.gd's mount_marquee(), whose board is
+## read off this same building rather than typed to match it separately). Nowhere closer to
+## the strip's own centre does better than about 0.95 m, which is what the original (0, 66)
+## placement measured. Shrinking the building instead would fix it (relief scales with
+## footprint size), but a Palace narrow enough to clear 0.35 m
 ## stops reading as the map's biggest building, which is the one thing ranch.tscn's comment
 ## on ridge_height says this building is for. 0.65 leaves a hair of margin over the measured
 ## 0.633 rather than trimming it to the metre.
@@ -271,7 +275,63 @@ const DEPOT_RADIUS := 4.0
 
 ## How close to the Spectra Palace the counter opens from. Wider than the Depot's, because
 ## the Palace is fourteen metres across and the door is in the middle of one long side.
-const PALACE_RADIUS := 5.0
+##
+## 5.0 WAS NOT A RADIUS, IT WAS A HALF METRE BAND. Every other radius here is measured from
+## an origin a metre or two behind its own front wall; the Palace is nine metres deep, so its
+## wall stands 4.5 m from the point this distance is measured to and 5.0 left half a metre of
+## ground in front of it. That was survivable while the approach ended at the wall. It stopped
+## being survivable the moment the door grew a Building.DOOR_APRON_RUN ramp: a player climbing
+## 2.8 m of it got no prompt until her last stride, and the Teller could not be stood anywhere
+## outside the wall and inside the radius AT ALL. The arithmetic, with her own collider
+## (Attendant.BODY_RADIUS) as the floor on how close to a wall a body can stand:
+##
+##     sqrt((4.5 + 0.55)^2 + (1.6 + 0.55)^2) = 5.49
+##
+## which is already outside 5.0 before a single centimetre of margin. 6.0 clears that with
+## room (the shipped Teller lands at 5.62) and covers the upper half of the ramp besides.
+## Nothing else on the map is affected: the Palace stands alone on the Strip, seventy metres
+## from the nearest other interactable, and Interaction.PRIORITY ranks it last regardless.
+const PALACE_RADIUS := 6.0
+
+## THE TWO PONIES BEHIND COUNTERS, and where they stand.
+##
+## AT THE DOOR AND FACING OUT. "Facing the counter" is resolved as standing at the counter
+## and looking out across it, toward whoever walks up, which is what a vendor does and what
+## makes her legible from thirty metres away.
+##
+## OUTSIDE THE BUILDING, not inside it, and that is a consequence of Building's plinth (see
+## Building.FLOOR_TOP and Building.GROUND_DROP): the interior floor stands FLOOR_TOP +
+## GROUND_DROP, 1.80 m, above the lowest corner of ground the building was seated against, so
+## a body seated on the terrain inside a building would be buried in its own boards. Both
+## counters are things the player opens from the door anyway.
+##
+## BESIDE THE DOOR, NOT IN FRONT OF IT, and the number is her own collider.
+##
+## THE FIRST ANSWER TO THE RAMP WAS THE WRONG ONE. When the door apron grew to
+## Building.DOOR_APRON_RUN, an attendant standing half a depth plus a standoff in front of
+## the door was standing ON the new ramp, so the standoff was measured past the ramp's FOOT
+## instead. That fixed the clipping and broke the staging: it pushed the Teller 8.24 m out
+## from the Palace (past PALACE_RADIUS, past the marquee, past the clear ground the Strip
+## keeps around the building) and the Vendor 5.99 m out from the Market, and both read as
+## stranded in a field rather than as staffing a door. Ruling 29.
+##
+## SO SHE STEPS SIDEWAYS INSTEAD OF BACKWARDS. The ramp is only door_width wide and the wall
+## either side of it is not; standing beside the doorway, against that wall, is both where a
+## doorman actually stands and the one spot near the door that no ramp occupies. She is
+## offset by this much OUT from the wall's own outer face and by this much SIDEWAYS from the
+## apron's edge, which puts her clear of the plinth, clear of the ramp, under the eaves, and
+## inside the radius that opens the building.
+##
+## IT IS Attendant.BODY_RADIUS PLUS A HAIR, deliberately: her collider is a capsule of that
+## radius, so anything less would have her leaning into the wall or into the ramp. Deriving
+## it means a future change to her size moves her rather than embedding her.
+const ATTENDANT_CLEARANCE := AttendantScript.BODY_RADIUS + 0.10
+
+## Their looks, pinned rather than drawn. A shopkeeper who is a different colour every boot
+## is a shopkeeper nobody recognises, and a gate that screenshots the Market wants the same
+## picture twice.
+const VENDOR_LOOK := {"coat": 2, "mane": 5, "eyes": 1, "mane_style": 1}
+const TELLER_LOOK := {"coat": 6, "mane": 0, "eyes": 3, "mane_style": 3}
 
 ## Plot slots the map must carry -- the plan asks for four to six, and the reserved
 ## clearing (PropsScript.PEN_PLOTS_*) is an 18 m square, which fits four 7.8 m pens on a
@@ -363,6 +423,7 @@ const GATE_RAY_REACH := 2.0
 @onready var terrain: StaticBody3D = $Terrain
 @onready var props: Node3D = $Props
 @onready var buildings: Node3D = $Buildings
+@onready var attendants: Node3D = $Attendants
 @onready var spawner: Node3D = $Spawner
 @onready var player: CharacterBody3D = $Player
 @onready var player_spawn: Marker3D = $PlayerSpawn
@@ -388,6 +449,12 @@ const GATE_RAY_REACH := 2.0
 ## _bind_build_menu() gives: a script that failed to parse must be a FAILED check in
 ## _report(), not a boot that dies reaching straight into a property it does not have.
 @onready var creation_screen: CanvasLayer = $CreationScreen
+## THE READER FOR THE COMPANY'S POST (Ruling 25). Read only, closes on confirm, and shown
+## exactly once: right after the creation screen is confirmed, carrying the WELCOME letter,
+## which is where the four steps of the money loop and both of the ledger's numbers are
+## written. Typed as the plain CanvasLayer ranch.tscn declares and reached through
+## has_method(), like every other menu here, for the reason _bind_build_menu() gives.
+@onready var letter_panel: CanvasLayer = $LetterPanel
 ## The sky. Typed as the plain Node3D ranch.tscn declares rather than as SkyRig, and
 ## always reached through has_method(), for the reason _bind_build_menu() gives about the
 ## menus: a sky_rig.gd that failed to PARSE leaves exactly this node in the tree with no
@@ -486,10 +553,6 @@ var _collector_due := false
 ## own for the same reason; a .tres load per menu row is a load per row.
 var _stock_palette: StockPalette = null
 
-## The plot slot the player is standing in right now, or null. Tracked so the build prompt
-## fires once on entry rather than every physics frame.
-var _prompt_slot: PlotSlot = null
-
 ## How many plots a loaded save put back, and how many ponies went into pens rather than
 ## into the saddlebag. Printed by the gate.
 var _restored_plots := 0
@@ -508,16 +571,6 @@ var _shop: Shop = null
 ## camera rig and the audio bus.
 var _settings: Settings = null
 
-## Whether the market prompt has been shown for this approach. Same hysteresis as the plot
-## prompt: once on entering the radius, not once per frame.
-var _market_prompted := false
-
-## Whether the Depot prompt has been shown for this approach. The market prompt's rule.
-var _depot_prompted := false
-
-## Whether the Palace's prompt has already been shown for this approach.
-var _palace_prompted := false
-
 ## Every roll at every table comes off this one generator, so a gate can seed it and get the
 ## same night's play back. Seeded from the clock for a person actually playing; see
 ## set_casino_seed().
@@ -531,20 +584,9 @@ var _race_lane := -1
 var _race_stake := 0
 var _race_field: Array[Dictionary] = []
 
-## THE FIELD THE PLAYER WAS SHOWN, and whose pony it was built for. _on_entrant_chosen()
-## builds a field to price the card with and pushes the six prices to the panel; start_race()
-## used to throw that away and build a SECOND field from the pony as she is at confirm time.
-## Between the two she can be fed (a pen is a metre from the Palace door), and feeding her
-## raises her happiness, her rating and therefore every price on the card, so the bet settled
-## against odds the player never saw. Now the priced field is kept and reused when the uid
-## still matches, and rebuilt only when it does not. Cleared at the wire, where the card
-## stops being anybody's.
-var _priced_uid: StringName = &""
-var _priced_field: Array[Dictionary] = []
-
-## Whether the request board's prompt has been shown for this approach. The market
-## prompt's rule; see _market_prompted.
-var _board_prompted := false
+## The card each penned pony was last quoted at, keyed by uid. Filled by race_entrants(),
+## read by start_race(), emptied by _clear_race_bet().
+var _quoted_fields: Dictionary = {}
 
 ## The three standing favours (game/systems/request_board.gd). REBUILT rather than mutated
 ## on every load, for exactly the reason rebind_economy() rebuilds the wallet: a load
@@ -656,6 +698,28 @@ func _ready() -> void:
 			strip.avoid_footprint(
 				Vector2(palace_building.global_position.x, palace_building.global_position.z),
 				Vector2(palace_building.width * 0.5, palace_building.depth * 0.5))
+			# THE SIGN IS SIZED AND PLACED FROM THE BUILDING, off the live node, for the
+			# reason avoid_footprint() is: a hand typed world position for the marquee is
+			# what put a 66 character line at y = 5.4 on a building whose ridge is at 4.6.
+			#
+			# AND THE WAY IT FACES COMES OFF THE SAME NODE. A Building's door is in its local
+			# plus Z gable end, so the front face and the direction the sign has to look are
+			# that axis put through the building's own basis, the same derivation
+			# _stand_one() uses to work out which side of a building an attendant stands on.
+			# This used to be "minus half the depth along world Z" plus a half turn baked
+			# into strip.gd, which is the Palace's CURRENT angle written down twice and wrong
+			# for any other.
+			var palace_out: Vector3 = palace_building.global_transform.basis \
+				* Vector3(0.0, 0.0, 1.0)
+			palace_out.y = 0.0
+			palace_out = palace_out.normalized() if palace_out.length_squared() > 0.0 \
+				else Vector3(0.0, 0.0, 1.0)
+			strip.mount_marquee(
+				palace_building.global_position
+					+ palace_out * (palace_building.depth * 0.5),
+				palace_out,
+				Vector2(palace_building.width * 0.5, palace_building.depth * 0.5),
+				palace_building.global_position.y + palace_building.ridge_height)
 		strip.build()
 
 	if race_track != null and race_track.has_method("configure"):
@@ -742,10 +806,39 @@ func _ready() -> void:
 
 	# The hand-built barn and farmhouse first: they are the map's only real buildings
 	# (game/world/building.gd says why), they exist on every checkout including CI,
-	# and they are seated by exactly the rule props.gd seats the Kenney props with.
+	# and they are seated by exactly the rule props.gd seats the Kenney props with -- except
+	# for WHICH ground height that rule is handed. A Building is 14 by 9 m, not a point, and
+	# Building.seat_ground() reads the LOWEST corner of its own footprint rather than the
+	# single sample under its origin, which is what building.gd's SEAT_CLEARANCE exists for
+	# (see its own comment): a plinth deep enough to clear a dipping corner does nothing if
+	# it is still seated against the middle of the footprint instead.
 	for node: Node3D in buildings.get_children():
 		node.build()
-		PropsScript.seat(node, terrain.height_at(node.global_position.x, node.global_position.z))
+		var seat_height: float = terrain.height_at(node.global_position.x, node.global_position.z)
+		var seated_building: Building = node as BuildingScript
+		if seated_building != null:
+			seat_height = seated_building.seat_ground(Callable(terrain, "height_at"))
+		PropsScript.seat(node, seat_height)
+
+	# THE VENDOR AND THE TELLER, right after the buildings that give them their doors are
+	# seated: _stand_attendants() reads the live building nodes' global_position/depth, so
+	# it has to run after this loop, not before it.
+	_stand_attendants()
+
+	# THE LOADING DOCK STAYS ON THE GROUND. Buildings/Depot/Crate is a Marker3D authored at
+	# local y = 0, which used to put it right at the old thin floor's own height; now that a
+	# Building's local y = 0 is buried SKIRT_DEPTH inside a plinth deep enough to clear the
+	# map's worst relief, a child left at that reference rides up with the whole building
+	# instead of staying where a pony delivering a crate can actually walk up to it. She
+	# arrives on the ground, not on the Depot's own doorstep, so the mark she is walking
+	# toward has to stay down there with her rather than floating at plinth height.
+	#
+	# Its z in ranch.tscn stands clear of the door apron's foot for the reason
+	# ATTENDANT_CLEARANCE gives: a dock mark under the ramp is a pony walking into one.
+	var crate_marker := get_node_or_null(^"Buildings/Depot/Crate") as Node3D
+	if crate_marker != null:
+		crate_marker.global_position.y = terrain.height_at(
+			crate_marker.global_position.x, crate_marker.global_position.z)
 
 	# THE SIGN READS ITSELF OUT OF THE GAMES. Written here rather than authored into
 	# ranch.tscn so that the lobby cannot advertise a house edge the tables are not actually
@@ -1057,6 +1150,7 @@ func _bind_build_menu() -> void:
 	_bind_depot_menu()
 	_bind_casino_menus()
 	_bind_pause_menu()
+	_bind_letter_panel()
 
 	if build_menu == null or not build_menu.has_method("open"):
 		return
@@ -1424,6 +1518,18 @@ func _on_menu_opened_any() -> void:
 	_on_menu_opened(null)
 
 
+## THE LETTER READER, ON THE SAME PAUSE WIRING AS EVERY OTHER PANEL (Ruling 25). It has no
+## providers and no request signals: it is handed a rendered letter by whoever is showing
+## one and hands nothing back but "I am up" and "I am gone". That is the entire binding, and
+## it is why _show_welcome_letter() can simply call open() and be finished.
+func _bind_letter_panel() -> void:
+	if letter_panel == null or not letter_panel.has_method("open"):
+		return
+	for pair in [["opened", _on_menu_opened_any], ["closed", _on_menu_closed]]:
+		if not letter_panel.is_connected(pair[0], pair[1]):
+			letter_panel.connect(pair[0], pair[1])
+
+
 ## THE PALACE. Four menus, one seeded generator, and every transaction in this file.
 ##
 ## can_open ANDs in casino_can_enter(), which is the seam the Resistance slice's ban hangs
@@ -1442,7 +1548,7 @@ func _bind_casino_menus() -> void:
 	for pair in [["opened", _on_menu_opened_any], ["closed", _on_menu_closed],
 			["buy_chips_requested", _on_buy_chips_requested],
 			["cash_out_requested", _on_cash_out_requested],
-			["game_requested", _on_game_requested]]:
+			["room_requested", _on_room_requested]]:
 		if not casino_menu.is_connected(pair[0], pair[1]):
 			casino_menu.connect(pair[0], pair[1])
 
@@ -1475,7 +1581,6 @@ func _bind_casino_menus() -> void:
 		race_menu.set("entrants_provider",
 			func() -> Array[Dictionary]: return race_entrants())
 		for pair in [["opened", _on_menu_opened_any], ["closed", _on_menu_closed],
-				["entrant_chosen", _on_entrant_chosen],
 				["race_requested", _on_race_requested]]:
 			if not race_menu.is_connected(pair[0], pair[1]):
 				race_menu.connect(pair[0], pair[1])
@@ -1563,41 +1668,47 @@ func _penned(uid: StringName) -> Dictionary:
 	return {}
 
 
-## Who the player could enter in a race: everybody standing in a pen. Named and stock alike,
-## because a stock pony is an outsider on the card and backing her is the fun bet.
+## THE FORM GUIDE: everybody standing in a pen, with her live price.
+##
+## PRICED HERE AND NOWHERE ELSE. Each row's odds are read off the field that pony WOULD run
+## in, through RaceCard.decimal_odds(field, PLAYER_LANE), so the number on the screen is by
+## construction the number the settle uses; the panel has no way to price a lane itself and
+## deliberately never gets one.
+##
+## THE QUOTED CARDS ARE KEPT, keyed by uid. The shipped code cached one field because the
+## panel had a two step flow (pick a pony, then pick a lane); the guide prices everybody at
+## once, so the cache is a dictionary and the guarantee is wider: the field a race settles
+## against is exactly the field whose odds were on the screen when she pressed the button.
+## _clear_race_bet() empties it with the rest of the bet.
+##
+## NOT THE ONE WHO IS ALREADY OUT ON THE TRACK (Ruling 27). start_race() refuses her, so a
+## row offering her was a row that could only ever refuse, and the Depot's Deliver tab and
+## its Pay tab both learned that lesson already: a row that always refuses is a row that
+## lies (see _penned_rows() and DepotMenu.pay_amounts()). She comes back to the guide the
+## moment the wire settles, exactly as she comes back to the Deliver tab.
 func race_entrants() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
+	var runners: CompanyRunners = CompanyRunnersScript.load_shipped()
+	_quoted_fields.clear()
 	for slot in _plot_slots():
 		var pen := slot.get_built() as Pen
 		if pen == null:
 			continue
 		for inst: PonyInstance in pen.ponies():
-			out.append({"uid": inst.uid, "name": inst.display_name(),
-				"happiness": inst.happiness})
+			if is_racing(inst.uid):
+				continue
+			var field: Array[Dictionary] = RaceCardScript.build_field(
+				RaceCardScript.entrant_from(inst), runners)
+			_quoted_fields[inst.uid] = field
+			var chances: Array[float] = RaceCardScript.win_chances(field)
+			out.append({
+				"uid": inst.uid,
+				"name": inst.display_name(),
+				"happiness": inst.happiness,
+				"odds": RaceCardScript.decimal_odds(field, RaceCardScript.PLAYER_LANE),
+				"chance": chances[RaceCardScript.PLAYER_LANE] if not chances.is_empty() else 0.0,
+			})
 	return out
-
-
-## She picked a pony. Build the card for her and push the six prices back to the panel; the
-## panel has no way to price a lane itself, deliberately.
-func _on_entrant_chosen(uid: StringName) -> void:
-	var found: Dictionary = _penned(uid)
-	if found.is_empty():
-		return
-	var field: Array[Dictionary] = RaceCardScript.build_field(
-		RaceCardScript.entrant_from(found["inst"] as PonyInstance),
-		CompanyRunnersScript.load_shipped())
-	# KEPT BEFORE IT IS DRAWN, and kept whether or not there is a panel to draw it on: this
-	# is the field start_race() settles against, and the fact that a headless caller has no
-	# race_menu must not change which numbers the bet is priced at. See _priced_field.
-	_priced_uid = uid
-	_priced_field = field
-	if race_menu == null:
-		return
-	var odds: Array[float] = []
-	for lane in field.size():
-		odds.append(RaceCardScript.decimal_odds(field, lane))
-	race_menu.call("set_field", field, odds)
-	race_menu.call("set_tab", 1)
 
 
 ## ONE WORD THAT TELLS TWO STOCK PONIES APART, for the Deliver tab. Every member of the
@@ -1690,35 +1801,6 @@ func is_near_palace() -> bool:
 	return gap <= PALACE_RADIUS
 
 
-## E at the loading dock opens the Depot. Once per approach, the Market's and the board's
-## rule, for the reason _update_plot_interaction() gives.
-func _update_depot_interaction() -> void:
-	if not _no_other_menu_open():
-		return
-	var near := is_near_depot()
-	if near != _depot_prompted:
-		_depot_prompted = near
-		if near:
-			_toast("Press E / X at the Depot.")
-	if near and Input.is_action_just_pressed(&"interact") and _prompt_slot == null:
-		if depot_menu != null and depot_menu.has_method("open"):
-			depot_menu.open()
-
-
-## E at the Palace door opens the lobby. Once per approach, the Depot's and the Market's rule.
-func _update_palace_interaction() -> void:
-	if not _no_other_menu_open():
-		return
-	var near := is_near_palace()
-	if near != _palace_prompted:
-		_palace_prompted = near
-		if near and casino_can_enter():
-			_toast("Press E / X at the Spectra Palace.")
-	if near and Input.is_action_just_pressed(&"interact") and _prompt_slot == null:
-		if casino_menu != null and casino_menu.has_method("open"):
-			casino_menu.open()
-
-
 func _bind_pause_menu() -> void:
 	if pause_menu == null or not pause_menu.has_method("open"):
 		return
@@ -1767,7 +1849,7 @@ func _bind_pause_menu() -> void:
 ## what keeps the two directions from drifting apart again.
 func _no_menu_but(menu: CanvasLayer) -> bool:
 	for other in [build_menu, market_menu, pause_menu, depot_menu, creation_screen,
-			casino_menu, slots_menu, wheel_menu, blackjack_menu, race_menu]:
+			casino_menu, slots_menu, wheel_menu, blackjack_menu, race_menu, letter_panel]:
 		if other == menu or other == null:
 			continue
 		if other.has_method("is_open") and other.is_open():
@@ -1807,8 +1889,37 @@ func _on_creation_confirmed(look: PlayerLook) -> void:
 	_game_state.player = look
 	_apply_player_look()
 	save_game()
+	_show_welcome_letter(look)
+
+
+## THE ONE LETTER A NEW RANCH OPENS ON, drawn rather than thrown away.
+##
+## THE QUOTA COMES OFF THE LEDGER. This call used to hand render() a name and a balance and
+## nothing else, so the template's `quota` fell through to its own default of 0 and the
+## welcome letter told every new player "We expect 0 ponies delivered to the Depot each
+## period", which is both wrong and the exact opposite of the thing that letter exists to
+## say. Ledger.quota is the number the Depot actually judges her against; there is only one
+## of it, and this is where it comes from.
+##
+## AND THE BODY IS SHOWN, NOT TOASTED. The whole of the game's onboarding is in the body of
+## this letter (catch, pen, collect, sell, then the balance and the quota in a sentence
+## each); toasting the TITLE said "Cloudsdale Weather Corporation: Welcome to the family!"
+## and dropped every word of it. game/ui/letter_panel.gd is the reader, ranch.gd does the
+## showing, and the pause comes through the same shared handlers every other panel uses.
+## Ruling 25.
+func _show_welcome_letter(look: PlayerLook) -> void:
+	if _game_state == null:
+		return
 	var letter: Dictionary = LettersScript.render(LettersScript.Id.WELCOME, {
-		"name": look.player_name, "balance": _game_state.ledger.balance})
+		"name": look.player_name,
+		"balance": _game_state.ledger.balance,
+		"quota": _game_state.ledger.quota,
+	})
+	if letter_panel != null and letter_panel.has_method("open") \
+			and bool(letter_panel.call("open", letter)):
+		return
+	# A panel that failed to parse, or a detached Ranch in a test that never wired one: say
+	# what arrived rather than saying nothing at all.
 	_toast("%s: %s" % [letter["sender"], letter["title"]])
 
 
@@ -2507,16 +2618,21 @@ func play_blackjack(stake: int) -> Dictionary:
 
 ## RUN A RACE. Returns {"ok": bool, "field": Array, "result": Dictionary, "odds": float}.
 ##
-## WHAT DOES NOT HAPPEN HERE, and it is the point of the whole task: the entrant is not taken
-## out of her pen, not handed to the track, not adopted by anything and not freed. Her pen
-## body is hidden for the length of the race so the world does not show her twice, and
-## _on_race_finished() shows it again. The six bodies on the track are RaceRunners, which are
-## not ponies at all; see game/world/race_runner.gd.
+## YOUR PONY IS YOUR BET, so there is no lane argument: the entrant always runs on
+## RaceCard.PLAYER_LANE and that is the only lane the stake can be on. The lane parameter
+## this used to take let a caller back a Company runner, which is what the 2026-08-31
+## playtest asked to have removed.
+##
+## WHAT DOES NOT HAPPEN HERE, and it is still the point of the whole thing: the entrant is
+## not taken out of her pen, not handed to the track, not adopted by anything and not freed.
+## Her pen body is hidden for the length of the race so the world does not show her twice,
+## and _on_race_finished() shows it again. The six bodies on the track are RaceRunners, which
+## are not ponies at all; see game/world/race_runner.gd.
 ##
 ## THE STAKE COMES OUT BEFORE THE FIELD IS DRAWN, the same order every table here uses. The
 ## seed comes off the casino's own generator, so a gate that called set_casino_seed() gets the
 ## same race every run and a player gets a different one every time.
-func start_race(uid: StringName, lane: int, stake: int) -> Dictionary:
+func start_race(uid: StringName, stake: int) -> Dictionary:
 	var refused := {"ok": false, "field": [], "result": {}, "odds": 0.0}
 	if _game_state == null or race_track == null or race_track.call("is_running"):
 		return refused
@@ -2531,16 +2647,15 @@ func start_race(uid: StringName, lane: int, stake: int) -> Dictionary:
 	if not _game_state.casino.can_stake(stake):
 		return refused
 	var inst: PonyInstance = found["inst"]
-	# THE FIELD THE ODDS WERE QUOTED FROM, when it is still hers; see _priced_field for what
-	# went wrong when this rebuilt one unconditionally. A mismatched uid (she was never
-	# priced, or the player picked somebody else and came straight here) rebuilds, which is
-	# the same field the panel would have been shown had it asked.
-	var field: Array[Dictionary] = _priced_field \
-		if _priced_uid == uid and not _priced_field.is_empty() \
-		else RaceCardScript.build_field(
+	# THE FIELD THE ODDS WERE QUOTED FROM, when there is one. A uid with no quote (a gate or
+	# a save hook calling straight in without opening the panel) rebuilds, which is the same
+	# field the guide would have shown had it been asked.
+	var field: Array[Dictionary] = []
+	if _quoted_fields.has(uid):
+		field = _quoted_fields[uid]
+	if field.is_empty():
+		field = RaceCardScript.build_field(
 			RaceCardScript.entrant_from(inst), CompanyRunnersScript.load_shipped())
-	if lane < 0 or lane >= field.size():
-		return refused
 	if not _game_state.casino.remove_chips(stake):
 		return refused
 
@@ -2577,7 +2692,7 @@ func start_race(uid: StringName, lane: int, stake: int) -> Dictionary:
 		return refused
 
 	_race_entrant = uid
-	_race_lane = lane
+	_race_lane = RaceCardScript.PLAYER_LANE
 	_race_stake = stake
 	_race_field = field
 
@@ -2585,7 +2700,7 @@ func start_race(uid: StringName, lane: int, stake: int) -> Dictionary:
 		race_menu.close()
 	_toast("They are under orders at the Spectra Palace!")
 	return {"ok": true, "field": field, "result": result,
-		"odds": RaceCardScript.decimal_odds(field, lane)}
+		"odds": RaceCardScript.decimal_odds(field, RaceCardScript.PLAYER_LANE)}
 
 
 ## The wire. Pay the bet, give the racer back her pen body, and write what running did to her.
@@ -2605,7 +2720,7 @@ func _on_race_finished(_order: Array, winner: int) -> void:
 	if won > 0:
 		_toast("%s takes it. You win %d chips!" % [winner_name, won])
 	else:
-		_toast("%s takes it. Better luck in the next." % winner_name)
+		_toast("%s takes it. Your pony was not in front today." % winner_name)
 	_refresh_casino_menus()
 	race_settled.emit(won, winner)
 	_clear_race_bet()
@@ -2614,14 +2729,13 @@ func _on_race_finished(_order: Array, winner: int) -> void:
 ## EVERY VARIABLE THE BET LIVES IN, PUT BACK AT ONCE. Four of them, and _race_field was
 ## being left behind by the wire while the other three were cleared: a settled race left the
 ## last field standing, so anything that read it between races read a card nobody was on.
-## The priced card goes with them, because it is the card THIS bet was quoted from.
+## The quoted cards go with them, because they are the cards THIS bet's odds came from.
 func _clear_race_bet() -> void:
 	_race_entrant = &""
 	_race_lane = -1
 	_race_stake = 0
 	_race_field = []
-	_priced_uid = &""
-	_priced_field = []
+	_quoted_fields.clear()
 
 
 ## IS THERE A PONY ON THE TRACK RIGHT NOW, and is she this one? `_race_entrant` is set by
@@ -2680,8 +2794,8 @@ func get_race_menu() -> CanvasLayer:
 	return race_menu
 
 
-func _on_race_requested(uid: StringName, lane: int, stake: int) -> void:
-	start_race(uid, lane, stake)
+func _on_race_requested(uid: StringName, stake: int) -> void:
+	start_race(uid, stake)
 
 
 func _cards_text(cards: Array) -> String:
@@ -2726,27 +2840,48 @@ func _on_deal_requested(stake: int) -> void:
 	play_blackjack(stake)
 
 
-## WALK FROM THE LOBBY TO A TABLE. The lobby closes and the table opens; leaving the table
-## with Escape leaves the Palace, which is one press fewer than walking back out through a
-## lobby the player has already read.
-func _on_game_requested(game: int) -> void:
+## SHE PICKED A ROW IN THE LOBBY. The cage and the house rules are pages of the lobby menu
+## itself, so those two turn a tab rather than opening anything; the four games each open
+## their own panel, exactly as before.
+func _on_room_requested(row: int) -> void:
+	if casino_menu == null:
+		return
+	match row:
+		CasinoMenuScript.Row.CAGE:
+			casino_menu.call("set_tab", CasinoMenuScript.Tab.CAGE)
+		CasinoMenuScript.Row.RULES:
+			casino_menu.call("set_tab", CasinoMenuScript.Tab.RULES)
+		CasinoMenuScript.Row.SLOTS:
+			_open_table(slots_menu)
+		CasinoMenuScript.Row.WHEEL:
+			_open_table(wheel_menu)
+		CasinoMenuScript.Row.BLACKJACK:
+			_open_table(blackjack_menu)
+		CasinoMenuScript.Row.RACING:
+			_open_table(race_menu)
+
+
+## Close the lobby and open one table over the top of it. Closing first, and not after, so
+## _no_menu_but() is true by the time the table asks it: two open menus is the state that
+## leaves the world unpaused under the one still on screen (see _no_menu_but()).
+func _open_table(menu: CanvasLayer) -> void:
+	if menu == null or not menu.has_method("open"):
+		return
 	if casino_menu != null and casino_menu.has_method("close"):
 		casino_menu.close()
-	var table: CanvasLayer = get_table_menu(game)
-	if table != null and table.has_method("open"):
-		table.open()
+	menu.call("open")
 
 
-## The menu behind one of CasinoMenu's four doors, or null.
-func get_table_menu(game: int) -> CanvasLayer:
-	match game:
-		CasinoMenuScript.Game.SLOTS:
+## The menu behind one of CasinoMenu's four game rows, or null.
+func get_table_menu(row: int) -> CanvasLayer:
+	match row:
+		CasinoMenuScript.Row.SLOTS:
 			return slots_menu
-		CasinoMenuScript.Game.WHEEL:
+		CasinoMenuScript.Row.WHEEL:
 			return wheel_menu
-		CasinoMenuScript.Game.BLACKJACK:
+		CasinoMenuScript.Row.BLACKJACK:
 			return blackjack_menu
-		CasinoMenuScript.Game.RACING:
+		CasinoMenuScript.Row.RACING:
 			return race_menu
 	return null
 
@@ -2786,29 +2921,12 @@ func is_near_market() -> bool:
 	return gap <= MARKET_RADIUS
 
 
-## E at the market opens it. The prompt shows once per approach, like the plot prompt.
-##
-## `_prompt_slot == null` in the press test is what stops one E press doing two things: a
-## plot slot that overlapped the market's radius would otherwise build a pen AND open the
-## shop off the same frame.
-func _update_market_interaction() -> void:
-	# The pause menu used to be tested separately on the next line. It is inside
-	# _no_other_menu_open() now, which is the whole point of _no_menu_but().
-	if not _no_other_menu_open():
-		return
-	var near := is_near_market()
-	if near != _market_prompted:
-		_market_prompted = near
-		if near:
-			_toast("Press E / X to trade.")
-	if near and Input.is_action_just_pressed(&"interact") and _prompt_slot == null:
-		if market_menu != null and market_menu.has_method("open"):
-			market_menu.open()
-
-
 ## WALK UP TO A LOCKED FENCE AND BE TOLD WHAT IT IS AND WHAT IT COSTS. Once per approach,
-## the plot prompt's and the market prompt's rule, for the reason _update_plot_interaction()
-## gives: a toast reprinted at 60 Hz never fades and never stops covering the screen.
+## because a toast reprinted at 60 Hz never fades and never stops covering the screen. This
+## is the last prompt in the game still working that way: everything the interact key can
+## reach went through game/world/interaction.gd and became a persistent HUD line instead (see
+## _update_interaction()), and the five _update_*_interaction() handlers this sentence used
+## to point at are gone with their latches.
 ##
 ## THERE IS NO BUTTON HERE, deliberately. A gate is not a thing you interact with; it is a
 ## thing you are refused by, and the refusal has to name the shop that lifts it. Pressing E
@@ -2958,6 +3076,7 @@ func _seen_ids() -> Array:
 func _rebuild_request_board() -> void:
 	if _game_state == null:
 		_board = null
+		_refresh_tasks()
 		return
 	# PRICED REGIONS ONLY, the seventh site: the Strip has no ZoneMarker (Zones/ in
 	# ranch.tscn only names the four priced regions, the ones a pony can actually be spawned
@@ -2981,6 +3100,34 @@ func _rebuild_request_board() -> void:
 	else:
 		_board = RequestBoardScript.from_array(saved, _pony_roster(), region_ids, region_names)
 	_board.fill(_seen_ids())
+	_refresh_tasks()
+
+
+## Repaint the HUD's starter checklist. Called wherever the board can have moved: after a
+## payout, after a rebuild, and once at boot. Cheap (three rows, and nothing at all once
+## they are claimed) and idempotent.
+func _refresh_tasks() -> void:
+	var hud := get_node_or_null(^"HUD")
+	if hud == null or not hud.has_method("set_tasks"):
+		return
+	# HOISTED INTO A TYPED LOCAL, AND ASSEMBLED WITH A PLAIN if/else RATHER THAN A
+	# TERNARY. Passing an inline `_board.tutorial_rows() if _board != null else []`
+	# straight into this dynamic call throws exactly the SCRIPT ERROR
+	# game/ui/hud.gd's set_tasks() comment describes, on the null-board branch
+	# _bind_game_state() promises is not fatal (review round 1). The seemingly obvious
+	# fix -- hoisting that same ternary into a typed local first -- is NOT enough on its
+	# own: a `var rows: Array[Dictionary] = x if cond else []` still throws "Trying to
+	# assign an array of type Array to a variable of type Array[Dictionary]" the moment
+	# the bare `[]` branch is the one actually taken (confirmed directly: the true branch,
+	# where `_board.tutorial_rows()` runs, assigns fine, and the false branch, an untyped
+	# empty literal squeezed through the ternary, does not). A plain if/else statement
+	# has no such quirk -- each assignment to `rows` is independently typed, not merged
+	# through a ternary's own type inference -- so it is what actually survives both
+	# branches, not just the one every real playthrough happens to exercise.
+	var rows: Array[Dictionary] = []
+	if _board != null:
+		rows = _board.tutorial_rows()
+	hud.set_tasks(rows)
 
 
 ## PAY FOR EVERY REQUEST THIS EVENT JUST COMPLETED. `completed` is what an on_*() call
@@ -3028,6 +3175,7 @@ func _pay_out(completed: Array) -> void:
 			reward_text += " and %d %s" % [reward_food_count, reward_food]
 		_toast("Request done: %s (%s)" % [String(claimed.get("text", "")), reward_text])
 		_board.fill(_seen_ids())
+	_refresh_tasks()
 
 
 ## The board this ranch is running, or null only if there is no GameState to hold it.
@@ -3045,30 +3193,19 @@ func get_compendium() -> Compendium:
 
 ## Is the player standing at the request board?
 ##
-## THE MARKET WINS THE OVERLAP. The board stands five metres from the Market's origin and
-## the two radii meet in the middle, so without the second clause walking up to the stall
-## would print two prompts and E would be ambiguous between them. The Market is the older
-## and the busier of the two, so it keeps the ground.
+## THE OVERLAP WITH THE MARKET IS NOT SETTLED HERE ANY MORE. This used to end with
+## "and not is_near_market()", because the board stands five metres from the Market's
+## origin and the two radii meet in the middle. That rule now lives in one place, as one
+## line of game/world/interaction.gd's PRIORITY list, with every other precedence in the
+## game beside it; a predicate that answers "am I at the board" should answer that and not
+## also arbitrate.
 func is_near_board() -> bool:
 	var board := get_node_or_null(^"Buildings/Board") as Node3D
 	if board == null:
 		return false
 	var gap := Vector2(player.global_position.x - board.global_position.x,
 		player.global_position.z - board.global_position.z).length()
-	return gap <= BOARD_RADIUS and not is_near_market()
-
-
-## E at the board reads it. The prompt shows once per approach, like the market's.
-func _update_board_interaction() -> void:
-	if not _no_other_menu_open():
-		return
-	var near := is_near_board()
-	if near != _board_prompted:
-		_board_prompted = near
-		if near:
-			_toast("Press E / X to read the board.")
-	if near and Input.is_action_just_pressed(&"interact") and _prompt_slot == null:
-		_open_request_page()
+	return gap <= BOARD_RADIUS
 
 
 ## Show her what the board is asking for.
@@ -3207,6 +3344,169 @@ func _move_pony_into_pen(slot: PlotSlot) -> bool:
 	if _board != null:
 		_pay_out(_board.on_penned(instance.data()))
 	return true
+
+
+## EVERYTHING E COULD MEAN WHERE THE PLAYER IS STANDING, unranked. The world half of the
+## resolver: this file knows what a plot slot and a Pen and a saddlebag are, and
+## game/world/interaction.gd knows which of them wins. Public so a gate or a test can ask
+## "what is offered here" without an Input event and without a frame.
+##
+## A PEN IS ALWAYS A CANDIDATE, even with an empty bag or a full pen, so that standing in
+## your own paddock and pressing E can never open the Market instead. What the prompt says
+## in that state is Interaction.prompt_for()'s business.
+func interaction_candidates() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if player == null:
+		return out
+	var at: Vector3 = player.global_position
+	for slot in _plot_slots():
+		if not (player in slot.get_overlapping_bodies()):
+			continue
+		var gap: float = Vector2(at.x - slot.global_position.x,
+			at.z - slot.global_position.z).length()
+		if slot.is_empty():
+			out.append(InteractionScript.candidate(
+				InteractionScript.Kind.PLOT_BUILD, gap, String(slot.name)))
+		else:
+			out.append(InteractionScript.candidate(
+				InteractionScript.Kind.PEN_MOVE_IN, gap, _next_in_the_bag()))
+	if is_near_market():
+		out.append(InteractionScript.candidate(
+			InteractionScript.Kind.MARKET, _flat_gap_to(^"Buildings/Market")))
+	if is_near_board():
+		out.append(InteractionScript.candidate(
+			InteractionScript.Kind.BOARD, _flat_gap_to(^"Buildings/Board")))
+	if is_near_depot():
+		out.append(InteractionScript.candidate(
+			InteractionScript.Kind.DEPOT, _flat_gap_to(^"Buildings/Depot")))
+	# THE BAN CLOSES THE DOOR RATHER THAN GREYING IT OUT. The shipped code showed no prompt
+	# under a ban but still let the press through to casino_menu.open(), which then refused
+	# on its own can_open; a player got a silent nothing. A banned Palace is simply not
+	# offered, so the prompt and the button agree.
+	if is_near_palace() and casino_can_enter():
+		out.append(InteractionScript.candidate(
+			InteractionScript.Kind.PALACE, _flat_gap_to(^"Buildings/Palace")))
+	return out
+
+
+## Whoever is at the top of the saddlebag, by name, or "" for an empty bag. Only the prompt
+## reads this; _move_pony_into_pen() asks the Storage itself when the key is actually
+## pressed, so a pony beamed in between the prompt and the press is still the one who goes
+## into the pen.
+func _next_in_the_bag() -> String:
+	if player == null:
+		return ""
+	var beam: Node3D = player.get_magic_beam()
+	if beam == null:
+		return ""
+	var storage: Storage = beam.get_storage()
+	if storage == null:
+		return ""
+	var next: PonyInstance = storage.peek()
+	return next.display_name() if next != null else ""
+
+
+func _flat_gap_to(path: NodePath) -> float:
+	var node := get_node_or_null(path) as Node3D
+	if node == null or player == null:
+		return 0.0
+	return Vector2(player.global_position.x - node.global_position.x,
+		player.global_position.z - node.global_position.z).length()
+
+
+## THE ONE THING E WILL DO, or an empty dictionary. Public for the same reason
+## interaction_candidates() is.
+func current_interaction() -> Dictionary:
+	if not _no_other_menu_open():
+		return {}
+	return InteractionScript.resolve(interaction_candidates())
+
+
+## DO IT. Returns whether anything actually happened. Public and Input free, so a gate can
+## drive the verb the player presses instead of reaching past it (scenes/test/
+## collection_test.gd's own note explains why it had to reach past the old one).
+func perform_interaction(action: Dictionary) -> bool:
+	if action.is_empty():
+		return false
+	match int(action.get("kind", InteractionScript.Kind.NONE)):
+		InteractionScript.Kind.PLOT_BUILD:
+			var slot: PlotSlot = _slot_named(String(action.get("subject", "")))
+			if slot == null:
+				return false
+			# Told BEFORE the menu rather than after she has picked something: being made
+			# to choose a pen and only then being sent to stand somewhere else is a worse
+			# version of the same refusal.
+			if _player_stands_on_footprint(slot):
+				_toast("Step outside the plot markers to build here.")
+				return false
+			if build_menu == null or not build_menu.has_method("open"):
+				return false
+			return bool(build_menu.open(slot))
+		InteractionScript.Kind.PEN_MOVE_IN:
+			var pen_slot: PlotSlot = _nearest_occupied_slot()
+			return _move_pony_into_pen(pen_slot) if pen_slot != null else false
+		InteractionScript.Kind.MARKET:
+			if market_menu == null or not market_menu.has_method("open"):
+				return false
+			return bool(market_menu.open())
+		InteractionScript.Kind.BOARD:
+			_open_request_page()
+			return true
+		InteractionScript.Kind.DEPOT:
+			if depot_menu == null or not depot_menu.has_method("open"):
+				return false
+			return bool(depot_menu.open())
+		InteractionScript.Kind.PALACE:
+			if casino_menu == null or not casino_menu.has_method("open"):
+				return false
+			return bool(casino_menu.open())
+	return false
+
+
+## The plot slot called `slot_name`, or null. The PLOT_BUILD candidate carries the slot's
+## own node name as its subject precisely so this lookup is a name and not an index into a
+## list that may have been rebuilt since the candidate was made.
+func _slot_named(slot_name: String) -> PlotSlot:
+	for slot in _plot_slots():
+		if String(slot.name) == slot_name:
+			return slot
+	return null
+
+
+## The nearest built slot the player is actually standing in. The PEN_MOVE_IN candidate
+## carries the pony's name as its subject (that is what the prompt needs), so the slot is
+## found again here rather than carried; the resolver already guaranteed she is standing in
+## exactly one, and "nearest" settles a map edit that ever overlapped two.
+func _nearest_occupied_slot() -> PlotSlot:
+	var best: PlotSlot = null
+	var best_gap := INF
+	for slot in _plot_slots():
+		if slot.is_empty() or not (player in slot.get_overlapping_bodies()):
+			continue
+		var gap: float = Vector2(player.global_position.x - slot.global_position.x,
+			player.global_position.z - slot.global_position.z).length()
+		if gap < best_gap:
+			best_gap = gap
+			best = slot
+	return best
+
+
+## THE WHOLE INTERACT VERB, ONCE A FRAME. Ask the world what is on offer, ask the resolver
+## which one wins, say so on the HUD, and act on exactly that one if the key went down.
+##
+## NO LATCHES. The five handlers this replaces kept six of them between them, each
+## implementing "fire once per approach" a slightly different way, and one of them
+## (_prompt_slot) doubled as the mutex the other four consulted. The prompt is a persistent
+## label now, so there is nothing to fire once and nothing to go stale.
+func _update_interaction() -> void:
+	var action: Dictionary = current_interaction()
+	var hud := get_node_or_null(^"HUD")
+	if hud != null and hud.has_method("set_prompt"):
+		hud.set_prompt(InteractionScript.prompt_for(action,
+			InputDeviceScript.hint(&"interact")))
+	if action.is_empty() or not Input.is_action_just_pressed(&"interact"):
+		return
+	perform_interaction(action)
 
 
 ## IS THE PLAYER STANDING WHERE THE FENCE IS ABOUT TO GO UP?
@@ -3355,14 +3655,8 @@ func _physics_process(delta: float) -> void:
 	# stand a fresh crowd behind it, and the pony count it is asserting on would move under
 	# it. The gates call spawner.tick_stock() themselves, deliberately, where they mean to.
 	spawner.tick_stock(delta)
-	_update_plot_interaction()
-	_update_market_interaction()
-	# After the market's, so that an E press which just opened the Market is already behind
-	# a menu by the time this asks; see is_near_board() on the overlap of the two radii.
-	_update_board_interaction()
-	_update_depot_interaction()
-	_update_palace_interaction()
-	# AFTER the Palace prompt, so a ban that landed this frame shuts the door the prompt
+	_update_interaction()
+	# AFTER the interaction pass, so a ban that landed this frame shuts a door the resolver
 	# would otherwise have just opened. See enforce_casino_ban().
 	enforce_casino_ban()
 	_update_gate_prompt()
@@ -3390,56 +3684,71 @@ func _physics_process(delta: float) -> void:
 		hud.toast("Ranch saved" if ok else "SAVE FAILED. See the log.")
 
 
-## THE ONE INTERACT BUTTON, and what it means depends on where you are standing.
+# --- the two ponies behind counters --------------------------------------------------
+
+## STAND THE VENDOR AND THE TELLER. Their positions come off the live building nodes rather
+## than being typed as world coordinates, the same rule Strip.mount_marquee() follows: a
+## Building's door is in its local plus Z gable end, so the spot in front of it is its own
+## origin plus half its depth along that axis plus the standoff, whichever way the building
+## has been turned in the scene.
 ##
-##   an EMPTY slot -> open the build menu.
-##   a slot with a PEN on it -> move the pony at the top of your saddlebag into it.
+## THEY ARE UNDER `Attendants`, WHICH IS NEITHER Props NOR Buildings, so neither number the
+## ranch gate prints moves. See _report()'s own attendant checks.
 ##
-## One verb rather than two buttons, for the reason project.godot's `interact` block gives:
-## a player who has to remember which of two keys applies to which square of ground is a
-## player who presses neither. The prompt is shown once on entering a slot rather than
-## every frame -- a toast that reprints at 60 Hz never fades and never stops covering the
-## middle of the screen.
-##
-## Which slot she is in is asked of the Area3D rather than computed from distances: the
-## trigger volume is the authority on "am I on this plot", it is what a future prompt
-## billboard would hang off, and an Area3D with no shape (a real and completely invisible
-## failure -- see PlotSlot._ensure_shape) then shows up as a prompt that never appears
-## rather than as a distance check that quietly still works.
-func _update_plot_interaction() -> void:
-	# The same question the market prompt asks, and for the same reason: see
-	# _no_other_menu_open(). This used to ask only whether the BUILD menu was open, which
-	# let E build a pen out from under an open Market or an open pause menu.
-	if not _no_other_menu_open():
+## BESIDE THE DOOR APRON, against the wall next to the doorway: see ATTENDANT_CLEARANCE.
+func _stand_attendants() -> void:
+	if attendants == null:
 		return
+	var registry := PonyRegistryScript.new()
+	registry.load_all(spawner.pony_dir if spawner != null else "res://data/ponies")
+	# WHICH SIDE OF THE DOOR. The Palace stands alone on the Strip and either flank is as
+	# good as the other. The Market does not: Buildings/Board is five metres off its own
+	# front corner, and the Vendor put on the Market's local plus X lands 0.28 m from the
+	# Board's plinth, which is inside her own collider. She takes the other flank. This is
+	# a fact about where these two buildings stand, so it is an argument rather than a rule.
+	_stand_one(registry, "Vendor", ^"Buildings/Market", StockPaletteScript.IDS[1],
+		VENDOR_LOOK, -1.0)
+	_stand_one(registry, "Teller", ^"Buildings/Palace", StockPaletteScript.IDS[2],
+		TELLER_LOOK, 1.0)
 
-	var here: PlotSlot = null
-	for slot in _plot_slots():
-		if player in slot.get_overlapping_bodies():
-			here = slot
-			break
 
-	if here != _prompt_slot:
-		_prompt_slot = here
-		if here != null:
-			if here.is_empty():
-				_toast("Press E / X to build here.")
-			else:
-				_toast("Press E / X to move a pony in.")
-
-	if here == null or not Input.is_action_just_pressed(&"interact"):
+func _stand_one(registry: PonyRegistry, who: String, building_path: NodePath,
+		record_id: StringName, look: Dictionary, side: float) -> void:
+	var building := get_node_or_null(building_path) as Building
+	if building == null:
 		return
-	if here.is_empty():
-		# Told BEFORE the menu rather than after she has picked something: being made to
-		# choose a pen and only then being sent to stand somewhere else is a worse version
-		# of the same refusal.
-		if _player_stands_on_footprint(here):
-			_toast("Step outside the plot markers to build here.")
-			return
-		if build_menu != null and build_menu.has_method("open"):
-			build_menu.open(here)
-	else:
-		_move_pony_into_pen(here)
+	var data: PonyData = registry.by_id(record_id)
+	if data == null:
+		return
+	var out_dir: Vector3 = (building.global_transform.basis * Vector3(0.0, 0.0, 1.0))
+	out_dir.y = 0.0
+	if out_dir.length_squared() <= 0.0:
+		return
+	out_dir = out_dir.normalized()
+	# THE OTHER AXIS OF THE SAME BASIS. A Building's door is in its local plus Z gable end,
+	# so its local plus X runs along the wall the door is cut into: one step out and one step
+	# along puts her beside the doorway rather than in it. `side` picks which flank, for the
+	# reason _stand_attendants() gives. See ATTENDANT_CLEARANCE.
+	var side_dir: Vector3 = (building.global_transform.basis * Vector3(1.0, 0.0, 0.0))
+	side_dir.y = 0.0
+	if side_dir.length_squared() <= 0.0:
+		return
+	side_dir = side_dir.normalized()
+	var at: Vector3 = building.global_position \
+		+ out_dir * (building.depth * 0.5 + ATTENDANT_CLEARANCE) \
+		+ side_dir * signf(side) * (building.door_width * 0.5 + ATTENDANT_CLEARANCE)
+	var node: Attendant = AttendantScript.new()
+	node.name = who
+	attendants.add_child(node)
+	node.global_position = Vector3(at.x, terrain.height_at(at.x, at.z), at.z)
+	node.dress(data, look, out_dir)
+	PropsScript.seat(node, terrain.height_at(at.x, at.z))
+
+
+## How many attendants are standing. Printed by the report and asserted there; a public
+## reader so a gate does not have to walk the tree.
+func attendant_count() -> int:
+	return attendants.get_child_count() if attendants != null else 0
 
 
 # --- the gate -----------------------------------------------------------------------
@@ -3538,9 +3847,16 @@ func _report(pony_count: int, prop_count: int) -> void:
 			pen_intrusions.append(prop.name)
 		# How far the bottom of the visible model sits from where props.gd seated it.
 		# Zero means the prop is standing ON the ground, not floating over it and not
-		# buried in it -- the assertion the eye would otherwise have to make.
-		var sunk: float = box.position.y - (terrain.height_at(
-			prop.global_position.x, prop.global_position.z) - PropsScript.SINK_BIAS)
+		# buried in it -- the assertion the eye would otherwise have to make. A Building
+		# was not seated against the single point under its own origin (see the seating
+		# loop above and Building.SEAT_CLEARANCE's comment); its expected ground is the
+		# same seat_ground() reading ranch.gd actually handed Props.seat() for it.
+		var expected_ground: float = terrain.height_at(
+			prop.global_position.x, prop.global_position.z)
+		var checked_building: Building = prop as BuildingScript
+		if checked_building != null:
+			expected_ground = checked_building.seat_ground(Callable(terrain, "height_at"))
+		var sunk: float = box.position.y - (expected_ground - PropsScript.SINK_BIAS)
 		if absf(sunk) > SEATING_TOLERANCE:
 			props_seated = false
 		print("RANCH prop %-34s pos=(%6.1f, %5.2f, %6.1f) height=%.2f seat_error=%+.3f"
@@ -3662,6 +3978,33 @@ func _report(pony_count: int, prop_count: int) -> void:
 			.distance_to(PropsScript.PEN_PLOTS_CENTRE) < 0.01)
 	if not pen_intrusions.is_empty():
 		push_error("ranch: pen-plot clearing intruded on by: %s" % ", ".join(pen_intrusions))
+
+	# --- the two ponies behind counters, and the census they must not touch ------------
+	#
+	# THEY ARE NOT PONIES AND THEY ARE NOT PROPS. `ponies=` counts spawner.get_spawned(),
+	# which only ever holds Pony nodes; `props=` is Props.expected_count() plus the
+	# Buildings children. The attendants are under `Attendants`, which is neither, so
+	# neither number moves and this line is their own.
+	var staff: int = attendant_count()
+	_set_check(checks, "the vendor and the teller are both standing", staff == 2)
+	var staff_are_bodies := true
+	var staff_dressed := 0
+	if attendants != null:
+		for child in attendants.get_children():
+			if child is PonyScript:
+				staff_are_bodies = false
+			elif child is AttendantScript and bool(child.call("has_model")):
+				staff_dressed += 1
+	_set_check(checks, "no attendant is a Pony, so the beam has nothing to take and the herd "
+		+ "has nobody extra in it", staff_are_bodies)
+	_set_check(checks, "every attendant is dressed, or the assets are absent",
+		staff_dressed == staff or not ponies_present)
+	var staff_in_herd := false
+	for pony in ponies:
+		if pony.get_parent() == attendants:
+			staff_in_herd = true
+	_set_check(checks, "no attendant is in the spawned herd", not staff_in_herd)
+	print("RANCH attendants=%d dressed=%d" % [staff, staff_dressed])
 
 	# --- plots and pens ------------------------------------------------------------------
 	var slots := _plot_slots()

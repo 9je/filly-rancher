@@ -136,8 +136,10 @@ var caught_at_ms := 0
 ## allowed to write this field, or there would be two authorities on where she lives.
 var home_slot: StringName = &""
 
-## HER LOOK, if she is one of the crowd: `{"coat": int, "mane": int, "eyes": int}`, indices
-## into game/data/stock_palette.tres. EMPTY for a named character, whose look is her model.
+## HER LOOK, if she is one of the crowd: `{"coat": int, "mane": int, "eyes": int,
+## "mane_style": int}`. The first three are indices into game/data/stock_palette.tres; the
+## fourth is an index into StockPalette.MANE_STYLES, which base model she was built from.
+## EMPTY for a named character, whose look is her model.
 ##
 ## ON THE INDIVIDUAL AND NOT ON THE CHARACTER, because that is the whole difference between
 ## a stock pony and a named one: two ponies of the same character are the same colours, and
@@ -310,6 +312,10 @@ static func from_dict(d: Dictionary) -> PonyInstance:
 				"coat": int(triple["coat"]),
 				"mane": int(triple["mane"]),
 				"eyes": int(triple["eyes"]),
+				# OPTIONAL, AND ZERO IS THE SHIPPED BASE. Every save written before the
+				# donor pool existed has no such key, and index 0 is pokeypierce.glb, so
+				# those ponies load looking exactly as they did.
+				"mane_style": maxi(0, int(triple.get("mane_style", 0))),
 			}
 	return inst
 

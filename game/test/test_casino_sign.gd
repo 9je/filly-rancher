@@ -36,6 +36,18 @@ func test_the_cage_says_one_for_one_in_both_directions() -> void:
 	assert_false(text.is_empty())
 
 
+## THE REPORT: "the cage explains itself (bits to chips, one to one, both ways)".
+func test_the_cage_explainer_says_one_for_one_both_ways() -> void:
+	var text: String = "\n".join(CasinoSignScript.cage_explainer()).to_lower()
+	assert_true(text.contains("one for one"), text)
+	assert_true(text.contains("both ways"), text)
+
+
+func test_nothing_on_the_cage_explainer_carries_a_dash() -> void:
+	for line in CasinoSignScript.cage_explainer():
+		assert_false(line.contains("--") or line.contains("—"), line)
+
+
 func test_nothing_on_the_sign_or_the_counter_carries_a_dash() -> void:
 	for line in CasinoSignScript.lines() + CasinoSignScript.cage_lines():
 		assert_false(line.is_empty())

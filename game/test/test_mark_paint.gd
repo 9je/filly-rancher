@@ -89,3 +89,20 @@ func test_a_copy_is_independent_of_its_original() -> void:
 	var b: Image = MarkPaintScript.copy_of(a)
 	MarkPaintScript.dot(b, Vector2i(5, 5), Color.RED, 1)
 	assert_true(MarkPaintScript.is_blank(a), "the undo stack must not share pixels with the canvas")
+
+
+func test_the_orientation_probe_is_not_blank_and_is_asymmetric() -> void:
+	var probe: Image = MarkPaintScript.orientation_probe()
+	assert_false(MarkPaintScript.is_blank(probe), "the probe has to be visible to prove anything")
+	var top_left := 0
+	var bottom_right := 0
+	for y in MarkPaintScript.SIZE:
+		for x in MarkPaintScript.SIZE:
+			if probe.get_pixel(x, y).a <= 0.0:
+				continue
+			if x < MarkPaintScript.SIZE / 2 and y < MarkPaintScript.SIZE / 2:
+				top_left += 1
+			elif x >= MarkPaintScript.SIZE / 2 and y >= MarkPaintScript.SIZE / 2:
+				bottom_right += 1
+	assert_gt(top_left, bottom_right * 2,
+		"the probe must be top heavy and left heavy, or it cannot show a flip or a mirror")

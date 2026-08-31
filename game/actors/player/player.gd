@@ -186,6 +186,11 @@ var _visual_yaw := 0.0
 var _coyote_left := 0.0
 var _jump_buffered := 0.0
 
+## The mane style the body currently standing in Visuals was built from. apply_look()
+## compares against it: a tint can be re-applied to a body that already exists, a different
+## mesh cannot, so a change here means a rebuild.
+var _mane_style_built := 0
+
 
 func _ready() -> void:
 	_visual_yaw = visuals.rotation.y
@@ -247,12 +252,29 @@ func get_animation_player() -> AnimationPlayer:
 ## THE SAME StockTint THE CROWD GOES THROUGH, deliberately: one pipeline, two users, and no
 ## second path that could drift.
 func apply_look(look: PlayerLook) -> void:
-	if look == null or visuals.get_child_count() == 0:
+	if look == null:
+		return
+	if look.mane_style != _mane_style_built:
+		_rebuild_visuals(look.mane_style)
+	if visuals.get_child_count() == 0:
 		return
 	var body: Node3D = visuals.get_child(0)
 	StockTintScript.apply(body, StockPaletteScript.load_player(),
 		{"coat": look.coat, "mane": look.mane, "eyes": look.eyes})
 	CutieMarkScript.apply(body, look.mark())
+
+
+## Swap the body for one built from a different base model. Freed outright rather than
+## queue_free()'d, for game/world/race_runner.gd's reason: a queued node is still among
+## get_children() until the end of the frame, so the "body is child 0 of Visuals"
+## convention this whole file rests on would be false for a frame.
+func _rebuild_visuals(mane_style: int) -> void:
+	if visuals.get_child_count() > 0:
+		var old: Node = visuals.get_child(0)
+		visuals.remove_child(old)
+		old.free()
+	_anim = null
+	_build_visuals(mane_style)
 
 
 func _physics_process(delta: float) -> void:
@@ -371,7 +393,7 @@ func _play(clip: StringName) -> void:
 ## is reported loudly but is not fatal: an invisible player that still walks around is
 ## a far better headless-test and debugging experience than a crash, and PonyVisuals
 ## already push_errors the specific reason.
-func _build_visuals() -> void:
+func _build_visuals(mane_style: int = 0) -> void:
 	var registry := PonyRegistryScript.new()
 	registry.load_all(pony_dir)
 	# by_id() rather than the dictionary load_all() returns: the player's own record is a
@@ -383,10 +405,12 @@ func _build_visuals() -> void:
 			% [pony_id, pony_dir])
 		return
 
-	var pony: Node3D = PonyVisualsScript.build(data)
+	var pony: Node3D = PonyVisualsScript.build(data,
+		StockPaletteScript.mane_style_path(mane_style))
 	if pony == null:
 		push_error("Player: PonyVisuals.build failed for '%s'" % pony_id)
 		return
+	_mane_style_built = mane_style
 
 	visuals.add_child(pony)
 	# INDEX 0, ALWAYS. `Visuals` already carries `BeamOrigin` as a scene-authored child

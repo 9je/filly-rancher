@@ -15,11 +15,14 @@ extends GutTest
 ## of game/scripts/pony_rig.gd.
 
 const HudScene := preload("res://ui/hud.tscn")
+const HudScript := preload("res://ui/hud.gd")
 const StorageScript := preload("res://systems/storage.gd")
 const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const MagicBeamScript := preload("res://actors/player/magic_beam.gd")
 const WorldStateScript := preload("res://systems/world_state.gd")
+const RequestBoardScript := preload("res://systems/request_board.gd")
+const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 
 var _hud: CanvasLayer
 ## The HUD's own parent. It looks for a sibling named "Player" (that is how it is
@@ -350,12 +353,14 @@ func test_the_bag_box_is_tall_enough_for_every_line_in_it() -> void:
 			% [bag.size.y, bag.get_combined_minimum_size().y])
 
 
-func test_the_hints_card_names_pause_and_trade_and_never_free_cursor() -> void:
+## RENAMED (Task 4): "and trade" -> "and sell gems", the row's own new name (HUD.HINTS'
+## TRADE row became SELL GEMS when the card went device aware).
+func test_the_hints_card_names_pause_and_sell_gems_and_never_free_cursor() -> void:
 	var joined := ""
 	for row in _hud.HINTS:
 		joined += " ".join(row) + "\n"
 	assert_string_contains(joined, "PAUSE")
-	assert_string_contains(joined, "TRADE")
+	assert_string_contains(joined, "SELL GEMS")
 	assert_false(joined.contains("FREE CURSOR"), "Escape pauses now; it does not free the cursor")
 	assert_false(joined.contains("--"), "no double hyphen on the card")
 	assert_false(joined.contains("—"), "no em dash on the card")
@@ -370,3 +375,119 @@ func test_the_hints_card_names_pause_and_trade_and_never_free_cursor() -> void:
 func test_the_hud_keeps_processing_while_the_tree_is_paused() -> void:
 	assert_eq(_hud.process_mode, Node.PROCESS_MODE_ALWAYS,
 		"the HUD must keep processing while the world is paused, or toasts freeze")
+
+
+func test_the_prompt_starts_empty_and_holds_what_it_is_given() -> void:
+	assert_eq(_hud.prompt_text(), "", "nothing is in range at boot")
+	_hud.set_prompt("E: build here")
+	assert_eq(_hud.prompt_text(), "E: build here")
+
+
+func test_clearing_the_prompt_leaves_nothing_on_the_screen() -> void:
+	_hud.set_prompt("E: Market, sell gems")
+	_hud.clear_prompt()
+	assert_eq(_hud.prompt_text(), "")
+
+
+## THE PROMPT IS NOT THE TOAST, and the two must not be able to overwrite each other: a
+## toast is something that happened, a prompt is something you can do, and the whole reason
+## the prompt exists is that the toast fades.
+func test_the_prompt_and_the_toast_are_two_different_lines() -> void:
+	_hud.set_prompt("E: build here")
+	_hud.toast("Ranch saved")
+	assert_eq(_hud.prompt_text(), "E: build here")
+	assert_eq(_hud.toast_text(), "Ranch saved")
+
+
+# --- the starter checklist --------------------------------------------------------------
+
+func test_the_task_list_is_empty_until_it_is_given_rows() -> void:
+	assert_eq(_hud.task_lines().size(), 0)
+
+
+func test_the_task_list_ticks_what_is_done_and_leaves_the_rest_open() -> void:
+	_hud.set_tasks([
+		{"id": "tutorial_catch", "text": "Catch a pony with your magic beam.",
+			"done": true, "paid": false, "reward_bits": 20},
+		{"id": "tutorial_pen", "text": "Move a pony into a pen.",
+			"done": false, "paid": false, "reward_bits": 30},
+	])
+	var lines: Array[String] = _hud.task_lines()
+	assert_eq(lines.size(), 3, "a title and two rows")
+	assert_eq(lines[0], HudScript.TASK_TITLE)
+	assert_true(lines[1].contains("Catch a pony"))
+	assert_true(lines[1].contains("20"), "the reward is the reason to do it")
+	assert_ne(lines[1].substr(0, 2), lines[2].substr(0, 2),
+		"a finished row and an open one must not look the same")
+
+
+func test_an_empty_task_list_draws_no_title_either() -> void:
+	_hud.set_tasks([{"id": "a", "text": "t", "done": false, "paid": false,
+		"reward_bits": 1}])
+	_hud.set_tasks([])
+	assert_eq(_hud.task_lines().size(), 0,
+		"once the three are claimed the checklist goes away entirely")
+
+
+func test_nothing_the_task_list_draws_carries_a_dash() -> void:
+	_hud.set_tasks([{"id": "tutorial_sell", "text": "Sell a gem at the market.",
+		"done": false, "paid": false, "reward_bits": 50}])
+	for line in _hud.task_lines():
+		assert_false(line.contains("--") or line.contains("—"), line)
+
+
+## GUARDED, NOT TRUSTED (review round 1 finding 2). `rows` is a plain Array now (see
+## set_tasks()'s own comment for why it cannot be Array[Dictionary]), so nothing at the
+## call boundary refuses a junk element the way a real typed array would. A typed
+## `for row: Dictionary in rows` loop over an untyped Array crashes the instant one element
+## is not a Dictionary; set_tasks() skips it instead, so one bad row loses itself rather
+## than the whole checklist.
+func test_a_junk_element_is_skipped_rather_than_crashing_the_whole_checklist() -> void:
+	_hud.set_tasks([
+		{"id": "tutorial_catch", "text": "Catch a pony with your magic beam.",
+			"done": false, "paid": false, "reward_bits": 20},
+		7,
+		"junk",
+	])
+	var lines: Array[String] = _hud.task_lines()
+	assert_eq(lines.size(), 2, "the title and the one valid row; the two junk entries are gone")
+	assert_eq(lines[0], HudScript.TASK_TITLE)
+	assert_true(lines[1].contains("Catch a pony"))
+
+
+## THE TRAP REVIEW ROUND 1 CAUGHT IN game/world/ranch.gd's _refresh_tasks(), AND THE ONE
+## ITS FIRST-PASS FIX MISSED TOO. An inline ternary passed straight into a dynamically
+## dispatched call (this HUD is always reached through get_node_or_null() / has_method(),
+## never a statically HUD-typed var -- see set_tasks()'s own comment) throws exactly the
+## review's SCRIPT ERROR when the callee wants a strict `Array[Dictionary]` -- confirmed
+## directly against a throwaway RefCounted whose own set_tasks() kept that stricter
+## signature. Hoisting the SAME ternary into a typed local first -- the fix review round 1
+## prescribed -- turned out NOT to be enough on its own: `var rows: Array[Dictionary] =
+## x if cond else []` STILL throws "Trying to assign an array of type Array to a variable
+## of type Array[Dictionary]" the moment the bare `[]` branch is the one actually taken,
+## confirmed the same way. Every one of our gates and the full suite always has a real
+## GameState autoload, so `_board` is never actually null when _refresh_tasks() runs in
+## any of them -- the false branch was never once exercised by anything green, ternary or
+## not. What is actually reliable, confirmed against that same strict RefCounted sink on
+## BOTH branches, is a plain if/else statement: each assignment to the typed local is
+## independent, with no ternary type-merging step to go wrong. _refresh_tasks() now reads
+## that way, and this pins both of its branches through this HUD's own dynamic call.
+func test_the_if_else_hoisted_local_pattern_survives_the_dynamic_call_on_both_branches() -> void:
+	# THE NULL BOARD BRANCH: what _refresh_tasks() builds when _board is null.
+	var board: RequestBoard = null
+	var rows_when_null: Array[Dictionary] = []
+	if board != null:
+		rows_when_null = board.tutorial_rows()
+	_hud.set_tasks(rows_when_null)
+	assert_eq(_hud.task_lines().size(), 0, "an empty hoisted local clears the checklist")
+
+	# THE REAL BOARD BRANCH: what it builds once a board with rows on it exists.
+	var registry := PonyRegistryScript.new()
+	registry.load_all("res://data/ponies")
+	board = RequestBoardScript.new(1, registry, [] as Array[StringName], {})
+	board.seed_tutorial()
+	var rows_when_present: Array[Dictionary] = []
+	if board != null:
+		rows_when_present = board.tutorial_rows()
+	_hud.set_tasks(rows_when_present)
+	assert_eq(_hud.task_lines().size(), 4, "a title and the three seeded rows")

@@ -76,6 +76,7 @@ extends CanvasLayer
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const MagicBeamScript := preload("res://actors/player/magic_beam.gd")
+const InputDeviceScript := preload("res://systems/input_device.gd")
 
 ## Radius of the reticle ring, in (1920x1080-base) pixels. Small: it has to mark a point
 ## precisely, and a big one would obscure the pony it is resting on.
@@ -141,6 +142,12 @@ const COLOR_OUTLINE := Color(0.0, 0.0, 0.0, 0.55)
 ## a number the player owns, and the two must not read as one two-line block.
 const COLOR_WORLD_LINE := Color(0.82, 0.88, 1.0, 0.92)
 
+## The interaction prompt, sitting just under the reticle. Gold, like every other
+## "you may act on this" cue in the game (the menus' COLOR_VALUE is the same number), and
+## deliberately NOT the toast's white: a toast is something that happened, a prompt is
+## something you can do.
+const COLOR_PROMPT := Color(1.00, 0.86, 0.42, 1.0)
+
 ## Saddlebag pip geometry.
 const PIP_SIZE := Vector2(26.0, 26.0)
 const PIP_GAP := 8.0
@@ -171,7 +178,23 @@ const TOAST_FADE := 0.7
 ## the gamepad Back button.
 const HINTS_ACTION := &"toggle_hints"
 
+## THE THREE THINGS TO DO FIRST, pinned until they are claimed. The owner, 2026-08-31: the
+## how do I earn money path is not legible in the first minutes. These three requests have
+## existed since Phase 2 slice 5 and were reachable only through the pause menu's Requests
+## page, which a new player has no reason to open.
+##
+## THEY GO AWAY ON THEIR OWN. Once all three are claimed, tutorial_rows() answers empty and
+## this whole block, title and all, stops being drawn: a permanent checklist in the corner
+## of an experienced player's screen is clutter, and the board is where requests live after
+## the first ten minutes.
+const TASK_TITLE := "Getting started"
+const TASK_DONE := "[x] "
+const TASK_OPEN := "[ ] "
+const COLOR_TASK_DONE := Color(0.62, 0.86, 0.60, 0.92)
+const COLOR_TASK_OPEN := Color(1.0, 1.0, 1.0, 0.88)
+
 @onready var _crosshair: Control = $Crosshair
+@onready var _prompt: Label = $Prompt
 @onready var _pips: Control = $Bag/Pips
 @onready var _bag_count: Label = $Bag/Count
 @onready var _bits: Label = $Bag/Bits
@@ -181,6 +204,7 @@ const HINTS_ACTION := &"toggle_hints"
 @onready var _toast: Label = $Toast
 @onready var _hints: PanelContainer = $Hints
 @onready var _hints_grid: GridContainer = $Hints/Margin/Grid
+@onready var _tasks: VBoxContainer = $Tasks
 
 ## Resolved by _bind(); both may be null until it succeeds.
 var _beam: Node3D
@@ -189,6 +213,7 @@ var _storage: Storage
 var _toast_left := 0.0
 ## Toasts raised while another one is on screen, oldest first. See toast().
 var _toast_queue: Array[String] = []
+var _task_lines: Array[String] = []
 var _rarities: Array[int] = []
 var _capacity := 0
 var _elapsed := 0.0
@@ -199,6 +224,10 @@ var _was_beaming := false
 ## reticle has to repaint on the frame the crosshair leaves her, not on the next time
 ## something else happens to trigger a redraw.
 var _was_in_range := false
+
+## Which device the card was last built for, so _process() can rebuild it when she puts one
+## down and picks the other up. Cheap: fourteen Labels, and only on an actual change.
+var _hints_device: int = -1
 
 
 func _ready() -> void:
@@ -215,6 +244,8 @@ func _ready() -> void:
 	_style_label(_balance, 16, COLOR_WORLD_LINE)
 	_style_label(_world_line, 22, COLOR_WORLD_LINE)
 	_world_line.text = ""
+	_style_label(_prompt, 26, COLOR_PROMPT)
+	_prompt.text = ""
 	_style_label(_toast, 40, Color(1.0, 0.96, 0.86, 1.0))
 
 	_bag_title.text = "SADDLEBAG"
@@ -225,6 +256,9 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if _hints_device != InputDeviceScript.last():
+		_build_hints()
+
 	_elapsed += delta
 
 	# See the class comment: sibling ready order is not something to depend on.
@@ -316,6 +350,54 @@ func get_shown_rarities() -> Array[int]:
 
 func get_capacity() -> int:
 	return _capacity
+
+
+## Push the checklist. `rows` is RequestBoard.tutorial_rows()'s output; an empty array
+## clears the block entirely.
+##
+## TYPED `Array` RATHER THAN `Array[Dictionary]`, DELIBERATELY. This HUD is always reached
+## through get_node_or_null()/has_method() (ranch.gd never declares a static HUD-typed
+## var), so every call here goes through GDScript's dynamic dispatch, and an untyped array
+## literal built at a call site with no static knowledge of this signature cannot coerce to
+## a strictly typed Array[Dictionary] parameter across that boundary (Godot 4.5 raises
+## "does not have the same element type as the expected typed array argument"). A real
+## Array[Dictionary] (what ranch.gd actually passes, straight off tutorial_rows()) narrows
+## into a plain Array with no coercion at all, so nothing is lost on the production path.
+func set_tasks(rows: Array) -> void:
+	_task_lines = []
+	for child in _tasks.get_children():
+		child.queue_free()
+	if rows.is_empty():
+		return
+	_task_lines.append(TASK_TITLE)
+	for entry in rows:
+		# GUARDED, NOT TRUSTED: `rows` is a plain Array (see the signature comment above),
+		# so a junk element (an int, a String, null) reaches here as Variant rather than
+		# being refused at the call boundary the way a real Array[Dictionary] would refuse
+		# it. A typed `for row: Dictionary in rows` loop over an untyped Array crashes the
+		# instant one element is not actually a Dictionary; skipping it here instead means
+		# one bad row loses itself rather than the whole checklist.
+		if typeof(entry) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = entry
+		var done: bool = bool(row.get("done", false))
+		_task_lines.append("%s%s  (%d bits)" % [TASK_DONE if done else TASK_OPEN,
+			String(row.get("text", "")), int(row.get("reward_bits", 0))])
+	for i in _task_lines.size():
+		var label := Label.new()
+		label.text = _task_lines[i]
+		var colour: Color = COLOR_WORLD_LINE
+		if i > 0:
+			colour = COLOR_TASK_DONE if _task_lines[i].begins_with(TASK_DONE) \
+				else COLOR_TASK_OPEN
+		_style_label(label, 24 if i == 0 else 20, colour)
+		_tasks.add_child(label)
+
+
+## Every line the checklist is drawing, in order, title first. For the tests, which
+## otherwise have no way to read it without walking Label nodes.
+func task_lines() -> Array[String]:
+	return _task_lines.duplicate()
 
 
 # --- binding ---------------------------------------------------------------------
@@ -600,42 +682,76 @@ func get_world_line() -> String:
 	return _world_line.text
 
 
-## Both control schemes, side by side, because the build is handed to two people and
-## only one of them is going to be at the keyboard. Every row here mirrors an action in
-## game/project.godot's `[input]` block -- a binding that changes there and not here is
-## a hint card that lies.
+## WHAT THE INTERACT KEY WILL DO IF YOU PRESS IT NOW. Pushed every physics frame by
+## game/world/ranch.gd's resolver and cleared the moment nothing is in range.
 ##
-## A GridContainer of Labels rather than one pre-aligned block of text: Godot's default
-## UI font is proportional, so space-padded columns line up in the source file and
-## nowhere else.
+## A PERSISTENT LABEL, NOT A TOAST, and that is the whole fix. Every one of these lines
+## used to go through toast(), which holds for TOAST_HOLD and fades over TOAST_FADE: a
+## player standing on a plot saw "Press E / X to build here." once, three seconds later saw
+## nothing, and had no way at all to find out what E was currently bound to. A prompt is
+## the state of the world, so it is drawn for as long as the state holds.
+##
+## SET UNCONDITIONALLY RATHER THAN ONLY ON CHANGE. Assigning the same string to a Label is
+## free, and the "only on change" version of this is exactly the latch bookkeeping that
+## went stale in ranch.gd and caused the bug this replaces.
+func set_prompt(text: String) -> void:
+	if _prompt != null:
+		_prompt.text = text
+
+
+func clear_prompt() -> void:
+	set_prompt("")
+
+
+func prompt_text() -> String:
+	return _prompt.text if _prompt != null else ""
+
+
+## THE CONTROL CARD, IN THE GLYPHS OF ONE DEVICE. Every row here mirrors an action in
+## game/project.godot's [input] block; a binding that changes there and not here is a hint
+## card that lies.
+##
+## IT USED TO PRINT BOTH SCHEMES SIDE BY SIDE, on the stated grounds that "the build is
+## handed to two people and only one of them is going to be at the keyboard". That is still
+## true and it is now answered by showing the scheme in use rather than both at once
+## (owner, 2026-08-31); game/systems/input_device.gd is what knows which.
+##
+## A GridContainer of Labels rather than one pre-aligned block of text: Godot's default UI
+## font is proportional, so space-padded columns line up in the source file and nowhere
+## else. Two columns now, not three.
+##
 ## RUNNING IS THE DEFAULT AND SHIFT SLOWS YOU DOWN, which is the opposite of what every
-## other game trains a player to expect -- so the card says what the slow gait BUYS on its
-## own continuation line rather than leaving "why would I ever hold this?" as something
-## the player has to work out from a speed change alone.
+## other game trains a player to expect, so the card says what the slow gait BUYS on its
+## own continuation line.
 const HINTS := [
 	["MOVE (run)", "W A S D", "Left stick"],
 	["WALK / SNEAK", "Shift (hold)", "LB (hold)"],
 	["", "creep quietly, and ponies notice you from half as far", ""],
 	["JUMP", "Space", "A"],
 	["INTERACT", "E", "X"],
-	["", "build on an empty plot, move a pony in", ""],
+	["", "the line under the crosshair says what it will do", ""],
 	["LOOK", "Mouse", "Right stick"],
-	["ZOOM", "Scroll / = -", "D-pad up/down"],
+	["ZOOM", "Scroll / = -", "D-pad up down"],
 	["MAGIC BEAM", "Right mouse (hold)", "Right trigger (hold)"],
 	["", "hold until the OUTER PINK ring fills, then let go to stow her", ""],
 	["", "the INNER AMBER ring is her fight. Let it empty and she wriggles free", ""],
-	["TRADE", "E at the market", "X at the market"],
-	["", "sell gems for bits, buy food and gear", ""],
+	["SELL GEMS", "E at the Market", "X at the Market"],
 	["PAUSE", "Esc", "Start"],
 	["THIS CARD", "H", "Back"],
 ]
 
 
 func _build_hints() -> void:
+	_hints_grid.columns = 2
+	for child in _hints_grid.get_children():
+		child.queue_free()
+	var column: int = 2 if InputDeviceScript.using_gamepad() else 1
 	for row: Array in HINTS:
-		for column in range(3):
+		var label_text := String(row[0])
+		var note: bool = label_text == ""
+		for pair: Array in [[label_text, 0.60], [String(row[column if not note else 1]), 0.92]]:
 			var label := Label.new()
-			label.text = String(row[column])
-			var dim: float = 0.60 if column == 0 or String(row[0]) == "" else 0.92
-			_style_label(label, 20, Color(1.0, 1.0, 1.0, dim))
+			label.text = String(pair[0])
+			_style_label(label, 20, Color(1.0, 1.0, 1.0, float(pair[1])))
 			_hints_grid.add_child(label)
+	_hints_device = InputDeviceScript.last()

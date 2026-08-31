@@ -48,6 +48,7 @@ const MagicBeamScript := preload("res://actors/player/magic_beam.gd")
 const WorldStateScript := preload("res://systems/world_state.gd")
 const SaveIOScript := preload("res://systems/save_io.gd")
 const MarketMenuScript := preload("res://ui/market_menu.gd")
+const InteractionScript := preload("res://world/interaction.gd")
 
 const SLOT := 5  # a scratch slot; a hosted ranch reads no slot at all, so nothing collides
 
@@ -318,12 +319,17 @@ func _ready() -> void:
 		state.bits == bits_before_catch + int(catch_request.get("reward_bits", 0)))
 
 	# --- she is penned -------------------------------------------------------------------
-	# THE PEN IS BUILT AND SHE IS MOVED IN THROUGH ranch.gd's OWN _move_pony_into_pen(),
-	# which is what the E prompt calls. The prompt itself cannot be driven from here: the
-	# whole of ranch.gd's _physics_process input handling is gated on `_interactive`, which
-	# is false in a headless run precisely so a gate teleporting the player about cannot
-	# trip a build menu or an autosave. Calling the handler is therefore the closest this
-	# can get to the player's own path, and it is the half that carries the board.
+	# THE PEN IS BUILT AND SHE IS MOVED IN THROUGH THE INTERACT VERB ITSELF: the player is
+	# stood on the plot, ranch.current_interaction() is asked what the key would do there,
+	# and ranch.perform_interaction() does exactly that. Both are public and Input free for
+	# this reason (see their own comments), so the gate no longer has to reach past the
+	# resolver into _move_pony_into_pen() and take on faith that the two agree.
+	#
+	# WHAT STILL CANNOT BE DRIVEN FROM HERE is the KEY PRESS: the whole of ranch.gd's
+	# _physics_process input handling is gated on `_interactive`, which is false in a
+	# headless run precisely so a gate teleporting the player about cannot trip a build menu
+	# or an autosave. Everything downstream of Input.is_action_just_pressed() is what runs
+	# below, which is the half that carries the board.
 	var slots: Array[PlotSlot] = ranch.plot_slots()
 	var free_plot: PlotData = null
 	for plot: PlotData in ranch.plots_catalogue().all():
@@ -337,8 +343,23 @@ func _ready() -> void:
 		return
 	_set_check("the pen goes up", slots[0].build(free_plot))
 	var bits_before_pen: int = state.bits
+	# Standing IN the plot is what makes the slot a candidate at all (see
+	# ranch.interaction_candidates(), which asks the slot's own overlapping bodies), and an
+	# Area3D does not know about a body that was teleported into it until the physics server
+	# has run.
+	ranch.player.global_position = Vector3(slots[0].global_position.x,
+		ranch.player.global_position.y, slots[0].global_position.z)
+	ranch.player.velocity = Vector3.ZERO
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	var pen_action: Dictionary = ranch.current_interaction()
+	print("COLLECTION interact kind=%d subject='%s'" % [
+		int(pen_action.get("kind", -1)), String(pen_action.get("subject", ""))])
+	_set_check("standing in a built pen, the interact key means move her in",
+		int(pen_action.get("kind", InteractionScript.Kind.NONE))
+			== InteractionScript.Kind.PEN_MOVE_IN)
 	_set_check("the pony in the saddlebag moves into it",
-		ranch._move_pony_into_pen(slots[0]))
+		ranch.perform_interaction(pen_action))
 	var pen := slots[0].get_built() as Pen
 	print("COLLECTION pen residents=%d bagged=%d bits=%d->%d"
 		% [pen.count() if pen != null else -1, storage.count(), bits_before_pen, state.bits])
