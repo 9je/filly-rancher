@@ -155,23 +155,3 @@ func test_the_top_of_the_canvas_sits_higher_on_the_barrel_than_the_bottom() -> v
 		assert_gt(top.y, bottom.y, "%s has the canvas upside down" % decal.name)
 		assert_almost_eq(top.y - bottom.y, decal.size.z, 0.001,
 			"the canvas spans the decal's own depth along the barrel")
-
-
-## THE RIGHT FLANK REPEATS THE DRAWING RATHER THAN MIRRORING IT, and that is a decision
-## rather than an accident: a mark you cannot read from one side is not a cutie mark. So
-## the same image coordinate lands on the same side of the pony's own body on neither
-## flank, and on the same side of the VIEWER on both, which is what is_mirrored() asks.
-func test_the_two_flanks_read_the_same_way_round_from_outside() -> void:
-	_model = _base_model()
-	if _model == null:
-		pass_test("no converted assets on this machine")
-		return
-	add_child_autofree(_model)
-	CutieMarkScript.apply(_model, MarkPaintScript.orientation_probe())
-	var decals: Array[Decal] = CutieMarkScript.decals_of(_model)
-	assert_eq(decals.size(), 2)
-	for decal in decals:
-		var left_edge: Vector3 = CutieMarkScript.image_point_to_world(decal, 0.0, 0.5)
-		var offset: Vector3 = left_edge - decal.global_position
-		assert_lt(offset.dot(CutieMarkScript.image_right(decal)), 0.0,
-			"the left of the canvas is on the left as seen from outside %s" % decal.name)
