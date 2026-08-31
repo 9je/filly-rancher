@@ -2388,8 +2388,14 @@ func play_slots(stake: int) -> Dictionary:
 	if won > 0:
 		_game_state.casino.add_chips(won)
 	if slots_menu != null and slots_menu.has_method("show_result"):
-		slots_menu.call("show_result", [SlotsScript.line_text(reels),
-			"You win %d chips." % won if won > 0 else "Nothing this time."])
+		# TYPED BEFORE THE CALL, NOT AT IT. show_result()'s parameter is Array[String];
+		# a bare `[...]` literal is a loosely typed Array, and a dynamic call() does not
+		# get the compile time coercion a direct call would, so the untyped literal fails
+		# call()'s own runtime type check. Same fix at wheel_menu's and blackjack_menu's
+		# call() below.
+		var lines: Array[String] = [SlotsScript.line_text(reels),
+			"You win %d chips." % won if won > 0 else "Nothing this time."]
+		slots_menu.call("show_result", lines)
 	_refresh_casino_menus()
 	return {"ok": true, "reels": reels, "won": won, "stake": stake}
 
@@ -2407,8 +2413,9 @@ func play_wheel(kind: int, guess: int, stake: int) -> Dictionary:
 	if won > 0:
 		_game_state.casino.add_chips(won)
 	if wheel_menu != null and wheel_menu.has_method("show_result"):
-		wheel_menu.call("show_result", [WheelScript.pocket_text(pocket),
-			"You win %d chips." % won if won > 0 else "The house takes that one."])
+		var lines: Array[String] = [WheelScript.pocket_text(pocket),
+			"You win %d chips." % won if won > 0 else "The house takes that one."]
+		wheel_menu.call("show_result", lines)
 	_refresh_casino_menus()
 	return {"ok": true, "pocket": pocket, "won": won, "stake": stake}
 
@@ -2426,11 +2433,12 @@ func play_blackjack(stake: int) -> Dictionary:
 	if won > 0:
 		_game_state.casino.add_chips(won)
 	if blackjack_menu != null and blackjack_menu.has_method("show_result"):
-		blackjack_menu.call("show_result", [
+		var lines: Array[String] = [
 			"You: " + _cards_text(hand["player"]),
 			"Dealer: " + _cards_text(hand["dealer"]),
 			BlackjackScript.outcome_text(hand),
-		])
+		]
+		blackjack_menu.call("show_result", lines)
 	_refresh_casino_menus()
 	return {"ok": true, "hand": hand, "won": won, "stake": stake}
 
