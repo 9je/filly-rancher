@@ -46,6 +46,61 @@ func test_a_built_shell_has_its_floor_where_the_constants_say() -> void:
 		0.0001, "and the bottom is SKIRT_DEPTH below it")
 
 
+## THE STRIPING FROM THE 2026-08-31 REVIEW (Ruling 22, round 1): the plinth's outer face
+## and the wall standing on it were exactly coplanar over y in [0, FLOOR_TOP], which is two
+## opaque faces fighting for the same pixels the whole height of the step. The plinth must
+## sit strictly behind the wall plane on every side, not just close to it, or a future edit
+## that shaves PLINTH_INSET back toward zero could reintroduce the exact same flicker
+## without a single test noticing.
+func test_the_plinth_sits_inset_behind_every_wall_plane() -> void:
+	var b: Building = BuildingScript.new()
+	b.width = 6.0
+	b.depth = 4.0
+	add_child_autofree(b)
+	b.build()
+	var floor_node := b.get_node_or_null(^"Floor") as MeshInstance3D
+	var box: BoxMesh = floor_node.mesh
+	assert_gt(BuildingScript.PLINTH_INSET, 0.0, "there is a real inset, not a zero one")
+	assert_lt(box.size.x, b.width, "the plinth's outer face on x sits strictly inside the "
+		+ "wall plane -- flush is what striped")
+	assert_lt(box.size.z, b.depth, "the plinth's outer face on z sits strictly inside the "
+		+ "wall plane -- flush is what striped")
+	assert_almost_eq(box.size.x, b.width - BuildingScript.PLINTH_INSET * 2.0, 0.0001,
+		"the inset is exactly PLINTH_INSET on both x faces")
+	assert_almost_eq(box.size.z, b.depth - BuildingScript.PLINTH_INSET * 2.0, 0.0001,
+		"the inset is exactly PLINTH_INSET on both z faces")
+
+
+## THE FOLDED FIX FROM THE SAME REVIEW (Ruling 22): the plinth is one solid slab across the
+## whole footprint, door gap or not, so raising it to FLOOR_TOP turned every doorway into a
+## sheer, unmarked step. A leaning box, built the same way the roof already is, standing in
+## for a ramp -- and a slope test is the only way "it exists" and "it is a ladder, not a
+## ramp" stay two different failures.
+func test_the_door_gets_an_apron_down_from_the_interior_floor() -> void:
+	var b: Building = BuildingScript.new()
+	b.width = 6.0
+	b.depth = 4.0
+	b.door_width = 2.8
+	add_child_autofree(b)
+	b.build()
+	var apron := b.get_node_or_null(^"DoorApron") as MeshInstance3D
+	assert_not_null(apron, "every doorway gets a way down from the interior floor")
+	var box: BoxMesh = apron.mesh
+	assert_almost_eq(box.size.x, b.door_width, 0.0001, "the apron is exactly door_width wide")
+	# Undo the rotation to recover the apron's own rise and run: box.size.z is the
+	# hypotenuse (the leaning box's long axis), so this is the same decomposition build()
+	# used to size it in the first place.
+	var rise: float = box.size.z * sin(apron.rotation.x)
+	var run: float = box.size.z * cos(apron.rotation.x)
+	assert_almost_eq(rise, BuildingScript.FLOOR_TOP, 0.01,
+		"the apron actually climbs the full height of the plinth's top, not partway")
+	assert_gt(run, 0.5, "a run this short reads as a ladder, not a ramp")
+	assert_lt(run, b.depth, "a run this long would poke out through the back wall")
+	var angle_deg: float = rad_to_deg(apron.rotation.x)
+	assert_gt(angle_deg, 10.0, "too shallow to read as a ramp rather than flat ground")
+	assert_lt(angle_deg, 60.0, "too steep to read as a ramp rather than a wall")
+
+
 ## EVERY BUILDING IN ranch.tscn, ON THE REAL TERRAIN, at the four corners of its own
 ## footprint and at its centre. This is the check that answers "does any other building
 ## show it", which no amount of staring at the Palace can.

@@ -70,6 +70,38 @@ const MIN_DOOR_CLEARANCE := 2.25
 const FLOOR_TOP := 0.85
 const SKIRT_DEPTH := 1.20
 
+## HOW FAR THE PLINTH'S OWN OUTER FACE SITS BACK FROM THE WALL PLANE ABOVE IT, ON EVERY
+## SIDE.
+##
+## THE BUG THIS CLOSES. Without an inset the Floor slab spans exactly `width` by `depth`,
+## the same footprint WallLeft/WallRight/WallBack are built flush against, so over
+## y in [0, FLOOR_TOP] the plinth's outer face and the wall's outer face are the SAME
+## PLANE: two opaque surfaces of different materials fighting for the same pixels the whole
+## height of the step, which is the striping the 2026-08-31 review's own screenshots showed
+## at the Palace's base and at the Barn's scale reference
+## (02_player_eye_at_spawn.png, 05_scale_at_the_barn.png) -- Ruling 22, round 1.
+##
+## A FEW CENTIMETRES OF REVEAL is what a real foundation looks like anyway: the wall stands
+## PROUD of the skirt beneath it rather than continuing its face straight down. Small enough
+## that no one mistakes it for a design change, big enough that the two faces are never
+## anywhere near coplanar.
+const PLINTH_INSET := 0.06
+
+## THE DOOR APRON: how far it runs, and how thick.
+##
+## THE BUG THIS CLOSES. Floor is one solid slab across the WHOLE footprint, door gap or
+## not -- the door only cuts a hole in the WALL layer, not in the plinth underneath it. Once
+## the plinth's own top rose to FLOOR_TOP, every doorway on the map came with a sheer,
+## unclimbable step in front of it and nothing to mark it as one: Ruling 22, round 1, folded
+## into this task. DOOR_APRON_RUN is the horizontal distance a single sloped box climbs
+## through, from local y = 0 at the doorway up to FLOOR_TOP one run's length further in
+## (see the apron block in build() for the box and its rotation); DOOR_APRON_THICKNESS is
+## how thick that box is, cosmetic rather than structural -- this is readability of the
+## threshold, not a physics walkway, and interactions elsewhere in the game are XZ-radius
+## and untouched by it.
+const DOOR_APRON_RUN := 1.4
+const DOOR_APRON_THICKNESS := 0.12
+
 ## HOW FAR PAST THE WORST CORNER ranch.gd SEATS A BUILDING, on top of Props.SINK_BIAS.
 ##
 ## THE REASON THIS EXISTS. Props.seat() only ever sees one ground height and shifts the
@@ -149,9 +181,12 @@ func build() -> void:
 	# --- plinth ------------------------------------------------------------------
 	# A boarded floor on a deep skirt rather than grass showing through the doorway,
 	# and deep enough that the terrain crosses its SIDE rather than its faces. See
-	# FLOOR_TOP and SKIRT_DEPTH for the measurement this is sized from.
+	# FLOOR_TOP and SKIRT_DEPTH for the measurement this is sized from. Inset by
+	# PLINTH_INSET on every side so its own outer face is never flush with the wall
+	# plane standing on top of it -- see PLINTH_INSET's own comment for the coplanar
+	# pair that made.
 	var plinth: float = FLOOR_TOP + SKIRT_DEPTH
-	_slab("Floor", Vector3(width, plinth, depth),
+	_slab("Floor", Vector3(width - PLINTH_INSET * 2.0, plinth, depth - PLINTH_INSET * 2.0),
 		Vector3(0.0, FLOOR_TOP - plinth * 0.5, 0.0), trim_mat)
 
 	# --- walls -------------------------------------------------------------------
@@ -174,6 +209,22 @@ func build() -> void:
 	if lintel > 0.001:
 		_slab("Lintel", Vector3(door_width, lintel, t),
 			Vector3(0.0, door_height + lintel * 0.5, front_z), trim_mat)
+
+	# --- door apron ------------------------------------------------------------------
+	# THE PLINTH'S OWN SOLID FACE, RIGHT WHERE THE DOOR GAP IS, WOULD OTHERWISE BE A
+	# SHEER STEP FROM LOCAL Y = 0 UP TO FLOOR_TOP with nothing marking it as a way up --
+	# see DOOR_APRON_RUN's own comment. A single leaning box, built the same way the roof
+	# above is (a rotated BoxMesh rather than hand-wound triangles), climbing from the
+	# doorway at y = 0 to FLOOR_TOP one DOOR_APRON_RUN further into the building. Clamped
+	# so it can never run out through the back wall of a shallow building.
+	if door_width > 0.001:
+		var apron_run: float = minf(DOOR_APRON_RUN, depth * 0.4)
+		var apron_rise := FLOOR_TOP
+		var apron_slope := sqrt(apron_run * apron_run + apron_rise * apron_rise)
+		var apron_angle := atan2(apron_rise, apron_run)
+		_slab("DoorApron", Vector3(door_width, DOOR_APRON_THICKNESS, apron_slope),
+			Vector3(0.0, apron_rise * 0.5, front_z - apron_run * 0.5), trim_mat, 0.0,
+			apron_angle)
 
 	# --- roof ---------------------------------------------------------------------
 	# Two slabs leaning against each other. Built as rotated BoxMeshes rather than as
@@ -303,9 +354,11 @@ func _material(colour: Color) -> StandardMaterial3D:
 
 
 ## One box: a MeshInstance3D and a matching CollisionShape3D sharing a transform, so
-## what you see and what you bump into cannot drift apart.
+## what you see and what you bump into cannot drift apart. `roll` (rotation about Z) is
+## what the roof slabs lean on; `pitch` (rotation about X) is what the door apron leans
+## on -- see build()'s door apron block for the rotation this is derived from.
 func _slab(slab_name: String, size: Vector3, at: Vector3, mat: StandardMaterial3D,
-		roll := 0.0) -> void:
+		roll := 0.0, pitch := 0.0) -> void:
 	var box := BoxMesh.new()
 	box.size = size
 	box.material = mat
@@ -315,6 +368,7 @@ func _slab(slab_name: String, size: Vector3, at: Vector3, mat: StandardMaterial3
 	mesh_node.mesh = box
 	mesh_node.position = at
 	mesh_node.rotation.z = roll
+	mesh_node.rotation.x = pitch
 	add_child(mesh_node)
 
 	var shape := BoxShape3D.new()
@@ -324,4 +378,5 @@ func _slab(slab_name: String, size: Vector3, at: Vector3, mat: StandardMaterial3
 	col.shape = shape
 	col.position = at
 	col.rotation.z = roll
+	col.rotation.x = pitch
 	add_child(col)
