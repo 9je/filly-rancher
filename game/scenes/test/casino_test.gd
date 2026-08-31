@@ -440,14 +440,24 @@ func _drive_the_palace() -> void:
 
 	var entrants: Array[Dictionary] = ranch.race_entrants()
 	var listed := false
+	var quoted := 0.0
 	for entry in entrants:
 		if StringName(entry["uid"]) == racer.uid:
 			listed = true
+			quoted = float(entry["odds"])
 	_set_check("the race panel lists her as an entrant", listed)
 
 	var chips_at_the_off: int = state.casino.chips
-	var race: Dictionary = ranch.start_race(racer.uid, RaceCardScript.PLAYER_LANE, 100)
+	var race: Dictionary = ranch.start_race(racer.uid, 100)
 	_set_check("the race is under orders", bool(race["ok"]))
+	# THE SHOWN ODDS AND THE SETTLED ODDS ARE THE SAME NUMBER, per uid. race_entrants() just
+	# quoted her; start_race() reused that exact quote (see _quoted_fields), so the price on
+	# the form guide and the price the card she is now running on both read off the SAME
+	# field, not two fields built moments apart from a pony who could have been fed between
+	# them.
+	_set_check("the form guide prices her at the card's own odds",
+		absf(quoted - RaceCardScript.decimal_odds(race["field"],
+			RaceCardScript.PLAYER_LANE)) < 0.0001)
 	_set_check("the stake left the purse before the field was drawn",
 		state.casino.chips == chips_at_the_off - 100)
 	_set_check("she is still in her pen while the race runs",
@@ -488,6 +498,8 @@ func _drive_the_palace() -> void:
 		settled_payout == expected_payout)
 	_set_check("the purse moved by exactly the stake out and the win in",
 		state.casino.chips == chips_at_the_off - 100 + expected_payout)
+	_set_check("a losing race pays exactly nothing",
+		settled_winner == RaceCardScript.PLAYER_LANE or settled_payout == 0)
 
 	_set_check("she came home to the same pen",
 		pen != null and pen.find_pony(racer.uid) != null)

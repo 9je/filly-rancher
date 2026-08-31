@@ -520,16 +520,9 @@ var _race_lane := -1
 var _race_stake := 0
 var _race_field: Array[Dictionary] = []
 
-## THE FIELD THE PLAYER WAS SHOWN, and whose pony it was built for. _on_entrant_chosen()
-## builds a field to price the card with and pushes the six prices to the panel; start_race()
-## used to throw that away and build a SECOND field from the pony as she is at confirm time.
-## Between the two she can be fed (a pen is a metre from the Palace door), and feeding her
-## raises her happiness, her rating and therefore every price on the card, so the bet settled
-## against odds the player never saw. Now the priced field is kept and reused when the uid
-## still matches, and rebuilt only when it does not. Cleared at the wire, where the card
-## stops being anybody's.
-var _priced_uid: StringName = &""
-var _priced_field: Array[Dictionary] = []
+## The card each penned pony was last quoted at, keyed by uid. Filled by race_entrants(),
+## read by start_race(), emptied by _clear_race_bet().
+var _quoted_fields: Dictionary = {}
 
 ## The three standing favours (game/systems/request_board.gd). REBUILT rather than mutated
 ## on every load, for exactly the reason rebind_economy() rebuilds the wallet: a load
@@ -1492,7 +1485,6 @@ func _bind_casino_menus() -> void:
 		race_menu.set("entrants_provider",
 			func() -> Array[Dictionary]: return race_entrants())
 		for pair in [["opened", _on_menu_opened_any], ["closed", _on_menu_closed],
-				["entrant_chosen", _on_entrant_chosen],
 				["race_requested", _on_race_requested]]:
 			if not race_menu.is_connected(pair[0], pair[1]):
 				race_menu.connect(pair[0], pair[1])
@@ -1580,41 +1572,39 @@ func _penned(uid: StringName) -> Dictionary:
 	return {}
 
 
-## Who the player could enter in a race: everybody standing in a pen. Named and stock alike,
-## because a stock pony is an outsider on the card and backing her is the fun bet.
+## THE FORM GUIDE: everybody standing in a pen, with her live price.
+##
+## PRICED HERE AND NOWHERE ELSE. Each row's odds are read off the field that pony WOULD run
+## in, through RaceCard.decimal_odds(field, PLAYER_LANE), so the number on the screen is by
+## construction the number the settle uses; the panel has no way to price a lane itself and
+## deliberately never gets one.
+##
+## THE QUOTED CARDS ARE KEPT, keyed by uid. The shipped code cached one field because the
+## panel had a two step flow (pick a pony, then pick a lane); the guide prices everybody at
+## once, so the cache is a dictionary and the guarantee is wider: the field a race settles
+## against is exactly the field whose odds were on the screen when she pressed the button.
+## _clear_race_bet() empties it with the rest of the bet.
 func race_entrants() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
+	var runners: CompanyRunners = CompanyRunnersScript.load_shipped()
+	_quoted_fields.clear()
 	for slot in _plot_slots():
 		var pen := slot.get_built() as Pen
 		if pen == null:
 			continue
 		for inst: PonyInstance in pen.ponies():
-			out.append({"uid": inst.uid, "name": inst.display_name(),
-				"happiness": inst.happiness})
+			var field: Array[Dictionary] = RaceCardScript.build_field(
+				RaceCardScript.entrant_from(inst), runners)
+			_quoted_fields[inst.uid] = field
+			var chances: Array[float] = RaceCardScript.win_chances(field)
+			out.append({
+				"uid": inst.uid,
+				"name": inst.display_name(),
+				"happiness": inst.happiness,
+				"odds": RaceCardScript.decimal_odds(field, RaceCardScript.PLAYER_LANE),
+				"chance": chances[RaceCardScript.PLAYER_LANE] if not chances.is_empty() else 0.0,
+			})
 	return out
-
-
-## She picked a pony. Build the card for her and push the six prices back to the panel; the
-## panel has no way to price a lane itself, deliberately.
-func _on_entrant_chosen(uid: StringName) -> void:
-	var found: Dictionary = _penned(uid)
-	if found.is_empty():
-		return
-	var field: Array[Dictionary] = RaceCardScript.build_field(
-		RaceCardScript.entrant_from(found["inst"] as PonyInstance),
-		CompanyRunnersScript.load_shipped())
-	# KEPT BEFORE IT IS DRAWN, and kept whether or not there is a panel to draw it on: this
-	# is the field start_race() settles against, and the fact that a headless caller has no
-	# race_menu must not change which numbers the bet is priced at. See _priced_field.
-	_priced_uid = uid
-	_priced_field = field
-	if race_menu == null:
-		return
-	var odds: Array[float] = []
-	for lane in field.size():
-		odds.append(RaceCardScript.decimal_odds(field, lane))
-	race_menu.call("set_field", field, odds)
-	race_menu.call("set_tab", 1)
 
 
 ## ONE WORD THAT TELLS TWO STOCK PONIES APART, for the Deliver tab. Every member of the
@@ -2495,16 +2485,21 @@ func play_blackjack(stake: int) -> Dictionary:
 
 ## RUN A RACE. Returns {"ok": bool, "field": Array, "result": Dictionary, "odds": float}.
 ##
-## WHAT DOES NOT HAPPEN HERE, and it is the point of the whole task: the entrant is not taken
-## out of her pen, not handed to the track, not adopted by anything and not freed. Her pen
-## body is hidden for the length of the race so the world does not show her twice, and
-## _on_race_finished() shows it again. The six bodies on the track are RaceRunners, which are
-## not ponies at all; see game/world/race_runner.gd.
+## YOUR PONY IS YOUR BET, so there is no lane argument: the entrant always runs on
+## RaceCard.PLAYER_LANE and that is the only lane the stake can be on. The lane parameter
+## this used to take let a caller back a Company runner, which is what the 2026-08-31
+## playtest asked to have removed.
+##
+## WHAT DOES NOT HAPPEN HERE, and it is still the point of the whole thing: the entrant is
+## not taken out of her pen, not handed to the track, not adopted by anything and not freed.
+## Her pen body is hidden for the length of the race so the world does not show her twice,
+## and _on_race_finished() shows it again. The six bodies on the track are RaceRunners, which
+## are not ponies at all; see game/world/race_runner.gd.
 ##
 ## THE STAKE COMES OUT BEFORE THE FIELD IS DRAWN, the same order every table here uses. The
 ## seed comes off the casino's own generator, so a gate that called set_casino_seed() gets the
 ## same race every run and a player gets a different one every time.
-func start_race(uid: StringName, lane: int, stake: int) -> Dictionary:
+func start_race(uid: StringName, stake: int) -> Dictionary:
 	var refused := {"ok": false, "field": [], "result": {}, "odds": 0.0}
 	if _game_state == null or race_track == null or race_track.call("is_running"):
 		return refused
@@ -2519,16 +2514,15 @@ func start_race(uid: StringName, lane: int, stake: int) -> Dictionary:
 	if not _game_state.casino.can_stake(stake):
 		return refused
 	var inst: PonyInstance = found["inst"]
-	# THE FIELD THE ODDS WERE QUOTED FROM, when it is still hers; see _priced_field for what
-	# went wrong when this rebuilt one unconditionally. A mismatched uid (she was never
-	# priced, or the player picked somebody else and came straight here) rebuilds, which is
-	# the same field the panel would have been shown had it asked.
-	var field: Array[Dictionary] = _priced_field \
-		if _priced_uid == uid and not _priced_field.is_empty() \
-		else RaceCardScript.build_field(
+	# THE FIELD THE ODDS WERE QUOTED FROM, when there is one. A uid with no quote (a gate or
+	# a save hook calling straight in without opening the panel) rebuilds, which is the same
+	# field the guide would have shown had it been asked.
+	var field: Array[Dictionary] = []
+	if _quoted_fields.has(uid):
+		field = _quoted_fields[uid]
+	if field.is_empty():
+		field = RaceCardScript.build_field(
 			RaceCardScript.entrant_from(inst), CompanyRunnersScript.load_shipped())
-	if lane < 0 or lane >= field.size():
-		return refused
 	if not _game_state.casino.remove_chips(stake):
 		return refused
 
@@ -2565,7 +2559,7 @@ func start_race(uid: StringName, lane: int, stake: int) -> Dictionary:
 		return refused
 
 	_race_entrant = uid
-	_race_lane = lane
+	_race_lane = RaceCardScript.PLAYER_LANE
 	_race_stake = stake
 	_race_field = field
 
@@ -2573,7 +2567,7 @@ func start_race(uid: StringName, lane: int, stake: int) -> Dictionary:
 		race_menu.close()
 	_toast("They are under orders at the Spectra Palace!")
 	return {"ok": true, "field": field, "result": result,
-		"odds": RaceCardScript.decimal_odds(field, lane)}
+		"odds": RaceCardScript.decimal_odds(field, RaceCardScript.PLAYER_LANE)}
 
 
 ## The wire. Pay the bet, give the racer back her pen body, and write what running did to her.
@@ -2593,7 +2587,7 @@ func _on_race_finished(_order: Array, winner: int) -> void:
 	if won > 0:
 		_toast("%s takes it. You win %d chips!" % [winner_name, won])
 	else:
-		_toast("%s takes it. Better luck in the next." % winner_name)
+		_toast("%s takes it. Your pony was not in front today." % winner_name)
 	_refresh_casino_menus()
 	race_settled.emit(won, winner)
 	_clear_race_bet()
@@ -2602,14 +2596,13 @@ func _on_race_finished(_order: Array, winner: int) -> void:
 ## EVERY VARIABLE THE BET LIVES IN, PUT BACK AT ONCE. Four of them, and _race_field was
 ## being left behind by the wire while the other three were cleared: a settled race left the
 ## last field standing, so anything that read it between races read a card nobody was on.
-## The priced card goes with them, because it is the card THIS bet was quoted from.
+## The quoted cards go with them, because they are the cards THIS bet's odds came from.
 func _clear_race_bet() -> void:
 	_race_entrant = &""
 	_race_lane = -1
 	_race_stake = 0
 	_race_field = []
-	_priced_uid = &""
-	_priced_field = []
+	_quoted_fields.clear()
 
 
 ## IS THERE A PONY ON THE TRACK RIGHT NOW, and is she this one? `_race_entrant` is set by
@@ -2668,8 +2661,8 @@ func get_race_menu() -> CanvasLayer:
 	return race_menu
 
 
-func _on_race_requested(uid: StringName, lane: int, stake: int) -> void:
-	start_race(uid, lane, stake)
+func _on_race_requested(uid: StringName, stake: int) -> void:
+	start_race(uid, stake)
 
 
 func _cards_text(cards: Array) -> String:
