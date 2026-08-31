@@ -45,8 +45,8 @@ func dress(data: PonyData, triple: Dictionary, display: String) -> bool:
 	if _model != null:
 		# Removed from the tree AND freed immediately, not just marked: dress() can be
 		# called twice in the same frame (a re-entered race), and a model only
-		# queue_free()'d would still be among get_children() -- and still alive as an
-		# orphan -- until the next idle frame processed the deferred call. Once
+		# queue_free()'d would still be among get_children(), and still alive as an
+		# orphan, until the next idle frame processed the deferred call. Once
 		# remove_child() has detached it, it is no longer in the tree and not mid signal,
 		# so free() outright is safe and leaves nothing for GUT's orphan check to catch.
 		remove_child(_model)

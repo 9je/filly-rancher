@@ -98,7 +98,7 @@ func test_seed_tutorial_creates_three_requests_in_exact_order_with_exact_text_an
 # --- reading -----------------------------------------------------------------------------
 
 ## The board's own account of what BRING_PERSONALITY_FROM_ZONE can draw next is exactly
-## what it was constructed with -- a copy, so a caller (ranch.gd) can check what it fed the
+## what it was constructed with: a copy, so a caller (ranch.gd) can check what it fed the
 ## board without being able to reach in and change it. This is what let the ranch-level
 ## regression (game/scenes/test/region_test.gd: the board must never draw a zone with no
 ## spawn marker in it) assert against something the board itself reports, rather than

@@ -221,7 +221,7 @@ const SEATING_TOLERANCE := 0.02
 ## exactly that spot (world (-10, 0, 61.6); see strip.gd's MARQUEE_AT, which was moved to
 ## match). Nowhere closer to the strip's own centre does better than about 0.95 m, which is
 ## what the original (0, 66) placement measured. Shrinking the building instead would fix
-## it -- relief scales with footprint size -- but a Palace narrow enough to clear 0.35 m
+## it (relief scales with footprint size), but a Palace narrow enough to clear 0.35 m
 ## stops reading as the map's biggest building, which is the one thing ranch.tscn's comment
 ## on ridge_height says this building is for. 0.65 leaves a hair of margin over the measured
 ## 0.633 rather than trimming it to the metre.
@@ -530,6 +530,17 @@ var _race_entrant: StringName = &""
 var _race_lane := -1
 var _race_stake := 0
 var _race_field: Array[Dictionary] = []
+
+## THE FIELD THE PLAYER WAS SHOWN, and whose pony it was built for. _on_entrant_chosen()
+## builds a field to price the card with and pushes the six prices to the panel; start_race()
+## used to throw that away and build a SECOND field from the pony as she is at confirm time.
+## Between the two she can be fed (a pen is a metre from the Palace door), and feeding her
+## raises her happiness, her rating and therefore every price on the card, so the bet settled
+## against odds the player never saw. Now the priced field is kept and reused when the uid
+## still matches, and rebuilt only when it does not. Cleared at the wire, where the card
+## stops being anybody's.
+var _priced_uid: StringName = &""
+var _priced_field: Array[Dictionary] = []
 
 ## Whether the request board's prompt has been shown for this approach. The market
 ## prompt's rule; see _market_prompted.
@@ -1474,9 +1485,31 @@ func _bind_casino_menus() -> void:
 ##
 ## THE BAN SEAM. The spec's Resistance route bans the player from the Strip at high heat and
 ## lifts it like every other punishment. That slice changes this one function and nothing
-## else: every casino menu's can_open already asks it.
+## else: every casino menu's can_open already asks it, enforce_casino_ban() shuts whatever
+## was already open when the answer changed, and start_race() refuses on it too.
 func casino_can_enter() -> bool:
 	return true
+
+
+## THE BAN CLOSES WHAT IS ALREADY OPEN. can_open only guards the DOOR: a ban that landed
+## while the player was sitting at the blackjack table left her sitting at the blackjack
+## table, still betting, until she chose to leave. A ban that only stops you coming back is
+## not a ban.
+##
+## Returns whether it shut anything, so a caller (a test, a future Resistance slice wanting
+## to say something) can tell a real ban landing from a quiet frame. Asked once a frame
+## rather than wired to a signal because casino_can_enter() is a FUNCTION in this slice, with
+## nothing to emit; the polling site is one line and moves to the signal the day there is one.
+func enforce_casino_ban() -> bool:
+	if casino_can_enter():
+		return false
+	var shut := false
+	for menu: CanvasLayer in [casino_menu, slots_menu, wheel_menu, blackjack_menu, race_menu]:
+		if menu == null or not menu.has_method("is_open") or not menu.is_open():
+			continue
+		menu.call("close")
+		shut = true
+	return shut
 
 
 ## Seed every roll at every table. For gates: a casino that rolls off the clock is a casino a
@@ -1498,6 +1531,12 @@ func _penned_rows() -> Array[Dictionary]:
 		if pen == null:
 			continue
 		for inst: PonyInstance in pen.ponies():
+			# NOT THE ONE WHO IS OUT RUNNING. deliver_pony() refuses her anyway, but a row
+			# that always refuses is a row that lies, and the Depot has already learned that
+			# lesson once on the Pay tab (see DepotMenu.pay_amounts()). She comes back to
+			# the list the moment the wire settles.
+			if is_racing(inst.uid):
+				continue
 			var data: PonyData = inst.data()
 			var rarity: int = data.rarity if data != null else PonyDataScript.Rarity.COMMON
 			rows.append({
@@ -1542,11 +1581,18 @@ func race_entrants() -> Array[Dictionary]:
 ## panel has no way to price a lane itself, deliberately.
 func _on_entrant_chosen(uid: StringName) -> void:
 	var found: Dictionary = _penned(uid)
-	if found.is_empty() or race_menu == null:
+	if found.is_empty():
 		return
 	var field: Array[Dictionary] = RaceCardScript.build_field(
 		RaceCardScript.entrant_from(found["inst"] as PonyInstance),
 		CompanyRunnersScript.load_shipped())
+	# KEPT BEFORE IT IS DRAWN, and kept whether or not there is a panel to draw it on: this
+	# is the field start_race() settles against, and the fact that a headless caller has no
+	# race_menu must not change which numbers the bet is priced at. See _priced_field.
+	_priced_uid = uid
+	_priced_field = field
+	if race_menu == null:
+		return
 	var odds: Array[float] = []
 	for lane in field.size():
 		odds.append(RaceCardScript.decimal_odds(field, lane))
@@ -1864,7 +1910,13 @@ func _on_buy_requested(item: ShopItem) -> void:
 		market_menu.refresh()
 
 
+## The Save row. REFUSED OUT LOUD while a race is running, rather than failing silently or
+## writing a file that cannot describe the bet; see save_game() for the whole of the reason.
+## The refusal is worded as the Palace would word it, because that is who is refusing.
 func _on_pause_save() -> void:
+	if race_track != null and bool(race_track.call("is_running")):
+		_toast("Not while they are running! Watch it home, then save.")
+		return
 	var ok := save_game()
 	_toast("Ranch saved" if ok else "SAVE FAILED. See the log.")
 
@@ -2253,6 +2305,16 @@ func deliver_pony(uid: StringName) -> Dictionary:
 	if pen == null or inst == null:
 		return refused
 
+	# REFUSED WHILE SHE IS ON THE TRACK. Her pen body is hidden for the length of a race and
+	# a bet of the player's own money is riding on her; delivering her mid race would credit
+	# the account for a pony the wire is about to pay out on, free her out from under
+	# _on_race_finished()'s own unhide, and leave the Palace settling a bet on somebody who
+	# no longer exists. The Depot's rows skip her too (_penned_rows()), so this is the second
+	# of the two checks a refusal like this is worth.
+	if is_racing(uid):
+		_toast("She is under orders at the Palace! The counter will take her after the race.")
+		return refused
+
 	# HER BODY, STILL IN THE PEN. Read rather than released, so the two refusals below cost
 	# nothing to make: at this point the pen still holds her, the save still has her record,
 	# and the account has not moved.
@@ -2458,14 +2520,25 @@ func start_race(uid: StringName, lane: int, stake: int) -> Dictionary:
 	var refused := {"ok": false, "field": [], "result": {}, "odds": 0.0}
 	if _game_state == null or race_track == null or race_track.call("is_running"):
 		return refused
+	# THE BAN CLOSES THE TRACK TOO. casino_can_enter() gates every menu's can_open, but a
+	# menu that was already open when the ban landed could still emit, and a gate or a save
+	# hook could still call this directly. The Palace either lets her in or it does not.
+	if not casino_can_enter():
+		return refused
 	var found: Dictionary = _penned(uid)
 	if found.is_empty():
 		return refused
 	if not _game_state.casino.can_stake(stake):
 		return refused
 	var inst: PonyInstance = found["inst"]
-	var field: Array[Dictionary] = RaceCardScript.build_field(
-		RaceCardScript.entrant_from(inst), CompanyRunnersScript.load_shipped())
+	# THE FIELD THE ODDS WERE QUOTED FROM, when it is still hers; see _priced_field for what
+	# went wrong when this rebuilt one unconditionally. A mismatched uid (she was never
+	# priced, or the player picked somebody else and came straight here) rebuilds, which is
+	# the same field the panel would have been shown had it asked.
+	var field: Array[Dictionary] = _priced_field \
+		if _priced_uid == uid and not _priced_field.is_empty() \
+		else RaceCardScript.build_field(
+			RaceCardScript.entrant_from(inst), CompanyRunnersScript.load_shipped())
 	if lane < 0 or lane >= field.size():
 		return refused
 	if not _game_state.casino.remove_chips(stake):
@@ -2480,10 +2553,10 @@ func start_race(uid: StringName, lane: int, stake: int) -> Dictionary:
 		# still standing where she was; the player just does not see her in two places.
 		body.visible = false
 
-	# BOTH RETURNS ARE READ, NEITHER IS DISCARDED. dress() is informational only -- fewer
+	# BOTH RETURNS ARE READ, NEITHER IS DISCARDED. dress() is informational only: fewer
 	# than LANES dressed is the documented degraded state on a checkout with no converted
 	# assets, and the race still runs on the RaceRunner nodes regardless of whether they
-	# carry a model (see race_runner.gd) -- but start()'s bool is the one true signal for
+	# carry a model (see race_runner.gd), but start()'s bool is the one true signal for
 	# whether a race actually began, and it can answer false (a field this call built wrong,
 	# the track already mid race some other way). A false here must not be allowed to leave
 	# the stake spent and her body hidden with nothing ever going to put either back:
@@ -2535,9 +2608,68 @@ func _on_race_finished(_order: Array, winner: int) -> void:
 		_toast("%s takes it. Better luck in the next." % winner_name)
 	_refresh_casino_menus()
 	race_settled.emit(won, winner)
+	_clear_race_bet()
+
+
+## EVERY VARIABLE THE BET LIVES IN, PUT BACK AT ONCE. Four of them, and _race_field was
+## being left behind by the wire while the other three were cleared: a settled race left the
+## last field standing, so anything that read it between races read a card nobody was on.
+## The priced card goes with them, because it is the card THIS bet was quoted from.
+func _clear_race_bet() -> void:
 	_race_entrant = &""
 	_race_lane = -1
 	_race_stake = 0
+	_race_field = []
+	_priced_uid = &""
+	_priced_field = []
+
+
+## IS THERE A PONY ON THE TRACK RIGHT NOW, and is she this one? `_race_entrant` is set by
+## start_race() only once the track has actually said yes and is put back at the wire (or by
+## refund_open_race()), so it is the authority on "she is out running" for everything that
+## must not touch her while she is: the Depot counter, and the rows it draws.
+func is_racing(uid: StringName) -> bool:
+	return not _race_entrant.is_empty() and uid == _race_entrant
+
+
+## THE STAKE COMES BACK IF THE RACE NEVER SETTLES. Returns how many chips were put back, 0
+## when there was no bet on the track.
+##
+## THE HOLE THIS CLOSES. start_race() takes the stake immediately and _on_race_finished()
+## is the only thing that ever pays it back; a session that ended between the two (the
+## window's close button, the tree tearing down, a save written mid race) recorded a purse
+## with the stake gone and no bet anywhere in it. Nothing crashed and nothing said anything:
+## the chips were simply not there any more. A casino may take a bet it settles; it may not
+## quietly keep one it never ran.
+##
+## IDEMPOTENT, because it is called from more than one place and both of them can fire in
+## the same shutdown: the second call finds no stake and does nothing.
+func refund_open_race() -> int:
+	if _game_state == null or _race_stake <= 0:
+		return 0
+	var refunded: int = _race_stake
+	_game_state.casino.add_chips(refunded)
+	# Her body was hidden for the length of a race that is not going to finish; the same
+	# unhide _on_race_finished() and start_race()'s own unwind do.
+	var found: Dictionary = _penned(_race_entrant)
+	if not found.is_empty():
+		var body: Node3D = (found["pen"] as Pen).body_for(_race_entrant)
+		if body != null:
+			body.visible = true
+	_clear_race_bet()
+	return refunded
+
+
+## THE WINDOW'S CLOSE BUTTON, AND THE TEARDOWN. Both deliver one of these, and either can be
+## the end of a session with a race still running, so both refund. GameState answers the same
+## two notifications with its quit-time save (game/systems/game_state.gd); an autoload is
+## notified before the main scene is, so this is NOT what keeps the refund out of that save.
+## _sync_game_state() is: it is the one funnel every write goes through, it runs before the
+## file is written, and it refunds there. This is the belt to that pair of braces, for a
+## teardown that never writes anything at all.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_EXIT_TREE:
+		refund_open_race()
 
 
 func get_race_track() -> Node3D:
@@ -2830,7 +2962,7 @@ func _rebuild_request_board() -> void:
 	# PRICED REGIONS ONLY, the seventh site: the Strip has no ZoneMarker (Zones/ in
 	# ranch.tscn only names the four priced regions, the ones a pony can actually be spawned
 	# into), so "Bring a <personality> pony from The Strip" would be a request on_caught()
-	# can never match -- on_caught() checks the caught pony's own zone against the request's
+	# can never match; on_caught() checks the caught pony's own zone against the request's
 	# zone exactly, and no pony is ever tagged &"strip". Handing the board a permanently
 	# uncompletable favour is worse than never offering it.
 	var region_ids: Array[StringName] = []
@@ -3120,6 +3252,14 @@ func _sync_game_state() -> void:
 	# The trays first: gems left sitting in a pen at quit time are gems the save never
 	# hears about, and this is the one funnel every write goes through.
 	collect_gems()
+	# AND THE SAME FUNNEL IS WHERE AN UNFINISHED BET COMES BACK. A save written while a race
+	# is running would record a purse with the stake already taken and no bet anywhere in the
+	# file to settle it: a silent forfeit, paid by a player who did nothing but quit. Doing it
+	# HERE rather than only from _notification() is what makes the ordering irrelevant, since
+	# GameState calls this before it writes, and it is notified before this node is. See
+	# refund_open_race(); save_game() refuses outright while the track runs, so in practice
+	# the only write that ever reaches a live race is the one on the way out.
+	refund_open_race()
 	var owned: Array[PonyInstance] = []
 	var seen := {}
 	var beam: Node3D = player.get_magic_beam()
@@ -3164,11 +3304,24 @@ func _sync_game_state() -> void:
 
 
 ## Save the ranch. Returns whether it landed. The live world is copied in by
-## GameState.save_to_slot() itself, through the `world_sync` Callable registered above --
+## GameState.save_to_slot() itself, through the `world_sync` Callable registered above;
 ## deliberately not called here, so that this path and the save-on-quit path cannot drift
 ## apart into "one of them syncs and the other does not".
+##
+## NOT WHILE THERE IS A RACE ON. A save taken mid race is a save of a world with a bet in it
+## that the file has no way to describe, so reloading it would either lose the stake or, if
+## the refund fired first, void a race the player is standing there watching. Both are the
+## Palace quietly deciding a bet for her. The one save that IS allowed to land mid race is
+## the one on the way out, which goes through GameState.save_on_quit() rather than here and
+## refunds in _sync_game_state() before it writes.
+##
+## THIS IS THE ONE PLACE THAT REFUSES, and it covers both callers: the pause menu's Save row
+## (_on_pause_save(), which says so out loud) and the autosave that fires when the player
+## walks home past the farmhouse.
 func save_game() -> bool:
 	if _game_state == null:
+		return false
+	if race_track != null and bool(race_track.call("is_running")):
 		return false
 	return _game_state.save_to_slot()
 
@@ -3209,6 +3362,9 @@ func _physics_process(delta: float) -> void:
 	_update_board_interaction()
 	_update_depot_interaction()
 	_update_palace_interaction()
+	# AFTER the Palace prompt, so a ban that landed this frame shuts the door the prompt
+	# would otherwise have just opened. See enforce_casino_ban().
+	enforce_casino_ban()
 	_update_gate_prompt()
 	if _game_state == null:
 		return
@@ -3221,6 +3377,11 @@ func _physics_process(delta: float) -> void:
 		_house_armed = true
 		return
 	if gap > HOUSE_SAVE_RADIUS or not _house_armed:
+		return
+	# NOT WHILE THEY ARE RUNNING. save_game() refuses on its own (see its comment); this
+	# asks first so the arming is NOT spent, and the save simply happens on the next
+	# approach, rather than being reported as a failure that never actually occurred.
+	if race_track != null and bool(race_track.call("is_running")):
 		return
 	_house_armed = false
 	var ok := save_game()
@@ -3842,8 +4003,8 @@ func _report(pony_count: int, prop_count: int) -> void:
 
 	# THE LIGHT RING CLEARS THE PALACE. game/world/strip.gd's avoid_footprint() is what
 	# skips a lamp that would otherwise stand inside or against the building (the ring is
-	# centred on the region, not on the Palace, which sits off centre -- see
-	# PALACE_MAX_RELIEF's comment above -- so one ring position falls inside its footprint
+	# centred on the region, not on the Palace, which sits off centre; see
+	# PALACE_MAX_RELIEF's comment above, so one ring position falls inside its footprint
 	# without it). This re-checks that work independently, against the Palace's own live
 	# position, so a later re-siting of either the Palace or the ring cannot silently let a
 	# lamp back into the wall.

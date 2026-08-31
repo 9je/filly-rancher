@@ -5,25 +5,25 @@ extends GutTest
 ## THE BUG THIS PINS. start_race() used to call race_track.dress(field) and
 ## race_track.start(field, result) as bare statements, reading neither return. By the point
 ## those two calls happen the stake has already left the purse and the entrant's pen body
-## has already been hidden -- and if start() ever answered false, nothing put either of
+## has already been hidden; and if start() ever answered false, nothing put either of
 ## those back: race_finished is the only place that unhides her, and a race that never
 ## started never fires it. The caller still got back {"ok": true, ...}.
 ##
 ## WHY A STUBBED TRACK, NOT A DOCTORED FIELD. RaceTrack.start() only refuses a field whose
 ## size does not match LANES, which in real play only happens if CompanyRunners fails to
-## load -- a condition this checkout cannot reliably force to order. A fake race_track
+## load: a condition this checkout cannot reliably force to order. A fake race_track
 ## whose start() always says no exercises the exact same code path (an authentic, LANES
 ## sized field; only the track's own answer is false) without depending on that.
 ##
 ## WHY A DETACHED RANCH, RATHER THAN world/ranch.tscn. See test_ranch_collection.gd's class
-## comment for the reasoning this file borrows -- a full ranch scene boots terrain, a
+## comment for the reasoning this file borrows: a full ranch scene boots terrain, a
 ## spawner and a physics warmup this bug has nothing to do with. Ranch.new() never enters a
 ## tree, so _ready() never runs and every @onready var stays null except the ones this file
 ## sets by hand.
 ##
 ## WHY THE PEN BODY IS A BARE Node3D, NOT A REAL PONY. Pen._spawn_body() only ever builds a
 ## body when the pen is inside a tree (guarded by is_inside_tree()), which a detached Pen
-## never is -- confirmed by game/test/test_pen.gd's own "most of this runs out of tree"
+## never is, confirmed by game/test/test_pen.gd's own "most of this runs out of tree"
 ## reasoning. What this test needs is only whether start_race() shows an existing body
 ## again, not whether one gets built, so a stand-in is registered directly into the pen's
 ## own `_bodies` dictionary the way this project already reaches into a collaborator's
@@ -59,7 +59,7 @@ class FakeTrackThatRefuses:
 
 
 ## The control case's track: agrees to start every race. Never actually runs a clock or
-## fires race_finished -- this file is not testing the wire back, only that start_race()'s
+## fires race_finished; this file is not testing the wire back, only that start_race()'s
 ## unwind is conditioned on start()'s answer rather than unconditional.
 class FakeTrackThatAccepts:
 	extends Node3D
@@ -119,7 +119,7 @@ func test_a_track_that_refuses_to_start_refunds_the_stake_and_shows_her_again() 
 	assert_eq(ranch._game_state.casino.chips, STARTING_CHIPS,
 		"the stake must come back when the race never actually started")
 	assert_true(body.visible,
-		"her body must be shown again -- race_finished is the only other unhide site, and " +
+		"her body must be shown again; race_finished is the only other unhide site, and " +
 		"a race that never started never fires it")
 	assert_true(pen.find_pony(inst.uid) != null,
 		"she must still be exactly where she always was: living in her own pen")
@@ -129,7 +129,7 @@ func test_a_track_that_refuses_to_start_refunds_the_stake_and_shows_her_again() 
 
 func test_a_track_that_does_start_leaves_the_stake_spent_and_the_body_hidden() -> void:
 	# THE CONTROL CASE: with a track that actually agrees to run, the same call must still
-	# spend the stake and hide the body -- proving the guard above is conditioned on
+	# spend the stake and hide the body, proving the guard above is conditioned on
 	# start()'s own answer, not an unconditional refund that would silently break every
 	# ordinary race too.
 	var built := _ranch_with_pony(FakeTrackThatAccepts.new())

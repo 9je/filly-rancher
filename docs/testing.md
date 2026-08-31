@@ -505,7 +505,7 @@ the Market and the request board.
 
 `props` moved again, from 59 to 60, in Phase 3 slice 2: the Spectra Palace is a
 sixth building under `Buildings`, seated and counted the same way the barn and
-the Depot are. Its own lamp posts are NOT in that count -- they are children of
+the Depot are. Its own lamp posts are NOT in that count; they are children of
 the `Strip` node, not of `Buildings` or `Props`, because a lamp is scenery the
 gate has no claim on. The Strip is also the map's first region with no permit
 and no price, which moves what the ranch gate's `RANCH regions=` line checks:
@@ -876,7 +876,7 @@ The race is watched at ten times speed (`Engine.time_scale`, restored
 afterwards). The result was decided by `RaceCard.run()` before the first frame,
 so the clock changes nothing about it, but `game/world/pen.gd`'s own
 `_process()` keeps ticking `Needs` for every pony it holds, race or none, at
-that same raised speed -- so the racer's hunger check is a window (the race's
+that same raised speed, so the racer's hunger check is a window (the race's
 own `RACE_HUNGER` plus at most the ordinary ambient drift the wait actually
 took), never a bare equality. Her happiness carries no matching drift: `Needs`
 only spends happiness once hunger crosses `HUNGRY_THRESHOLD`, and hers never

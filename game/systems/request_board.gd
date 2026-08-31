@@ -136,7 +136,7 @@ func active() -> Array:
 ## The zone ids a BRING_PERSONALITY_FROM_ZONE draw can land on, as handed to `_init()`;
 ## a copy, so mutating the result never touches the board's own pool. Exists so a caller
 ## that built this board from a real map (game/world/ranch.gd) can assert, from outside,
-## that every zone it can draw is one a pony can actually be caught in -- see
+## that every zone it can draw is one a pony can actually be caught in; see
 ## _rebuild_request_board()'s own comment for the bug this closes.
 func drawable_zones() -> Array[StringName]:
 	return _regions.duplicate()

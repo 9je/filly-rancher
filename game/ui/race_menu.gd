@@ -66,8 +66,8 @@ func set_tab(value: int) -> void:
 
 ## Left and right switch the casino's own tabs everywhere on this panel except one place:
 ## sitting on the BET tab's stake row (row_count() - 1, one past the last lane), where the
-## only room left among four directional buttons for a third independent control -- which
-## lane, which tab, how much -- is to repurpose this one. The footer says so.
+## only room left among four directional buttons for a third independent control (which
+## lane, which tab, how much) is to repurpose this one. The footer says so.
 func switch_tab(step: int) -> void:
 	if _tab == Tab.BET and not _field.is_empty() and _selected == _field.size():
 		var available: Array[int] = stakes()

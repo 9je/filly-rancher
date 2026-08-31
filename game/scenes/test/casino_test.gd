@@ -461,8 +461,8 @@ func _drive_the_palace() -> void:
 	# VALUE at the moment the lambda is created; reassigning `settled_payout = payout`
 	# inside the closure would rebind the closure's own copy and never touch this
 	# function's variable, so the wait loop below would spin to the timeout even on a race
-	# that settled on schedule. A Dictionary is a reference type -- the closure and this
-	# function share the same object -- so mutating a key inside it is visible out here.
+	# that settled on schedule. A Dictionary is a reference type: the closure and this
+	# function share the same object, so mutating a key inside it is visible out here.
 	# scenes/test/capture_test.gd's own watchers use the same trick with an Array.
 	var race_result := {"payout": -1, "winner": -1}
 	var watcher := func(payout: int, winner: int) -> void:
@@ -499,7 +499,7 @@ func _drive_the_palace() -> void:
 	# real seconds this wait loop just spent watching the track (`waited`, already scaled by
 	# RACE_TIME_SCALE the same way Pen's own delta was). So her hunger the moment she comes
 	# home is RACE_HUNGER plus AT LEAST zero and AT MOST HUNGER_PER_SECOND * waited of
-	# ordinary ambient drift -- never less than the race's own cost, which is what would
+	# ordinary ambient drift; never less than the race's own cost, which is what would
 	# actually go wrong if apply_race_effects() were skipped or halved. Happiness carries no
 	# matching drift: Needs.tick() only spends happiness once hunger crosses HUNGRY_THRESHOLD
 	# (0.5), and hers never gets close, so it stays an exact check.

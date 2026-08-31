@@ -117,7 +117,7 @@ func _ready() -> void:
 
 	# THE SEVENTH SITE: a free region has no ZoneMarker (Zones/ in ranch.tscn only names
 	# the priced regions, the ones a pony can actually spawn into), so the request board
-	# must never draw "Bring a <personality> pony from The Strip" -- on_caught() matches a
+	# must never draw "Bring a <personality> pony from The Strip"; on_caught() matches a
 	# request's zone against the caught pony's own zone exactly, and no pony is ever tagged
 	# &"strip", so that request could never be completed. drawable_zones() is the board's
 	# own account of what it might ask for next; it must match the priced-region count

@@ -7,21 +7,27 @@ extends Node3D
 ## (game/data/regions/strip.tres, read by game/world/terrain.gd like every other region's).
 ## The Palace itself is a Building under $Buildings, seated and counted with the barn and the
 ## Depot, because it is a building. This node owns only the scenery that makes the place read
-## as somewhere at night: ten lamp posts on a ring and one lit marquee facing the walk up
-## from the homestead.
+## as somewhere at night: a ring of lamp posts and one lit marquee facing the walk up from
+## the homestead.
+##
+## NINE LAMPS ON A TEN POSITION RING. LIGHT_COUNT is the number of points build() walks, not
+## the number of posts that end up standing: avoid_footprint() skips any position that lands
+## inside the Palace's own footprint, and on this map exactly one does, so a built Strip
+## reports light_count() of 9. See build() and avoid_footprint() for why the position is
+## dropped rather than nudged.
 ##
 ## ITS CHILDREN ARE DELIBERATELY NOT COUNTED AS PROPS. ranch.gd's prop census is
 ## Props.expected_count() plus the Buildings children, and lamp posts are under neither. A
-## lamp is scenery; the gate has no claim to make about it, and adding ten of them to a count
-## every doc in the repo names would be churn for nothing.
+## lamp is scenery; the gate has no claim to make about it, and adding a ring of them to a
+## count every doc in the repo names would be churn for nothing.
 ##
 ## BUILT IN CODE AND NOT IN THE SCENE FILE, for the reason game/world/region_fence.gd gives:
 ## the ground does not exist until Terrain.build() has run, and a lamp post authored in
 ## ranch.tscn would be a lamp post hanging at y = 0 over a map with real relief in it.
 ##
 ## THE LIGHTS CAST NO SHADOWS, unlike Building's interior fill. A lamp post out in the open
-## has nothing to leak through, and ten shadow casting omnis on a heightfield is a bill this
-## map does not need to pay for a decorative glow.
+## has nothing to leak through, and a ring of shadow casting omnis on a heightfield is a bill
+## this map does not need to pay for a decorative glow.
 
 const LayersScript := preload("res://world/collision_layers.gd")
 const CasinoSignScript := preload("res://systems/casino_sign.gd")
@@ -78,7 +84,7 @@ func configure(region: RegionData, ground_sampler: Callable) -> void:
 
 ## A footprint, in world XZ, that no lamp may stand inside or against: `centre_xz` and
 ## `half_extents` (half-width, half-depth) of whatever is standing on the Strip's own
-## ground -- today, only Buildings/Palace. PALACE_CLEARANCE is added past those edges on
+## ground; today, only Buildings/Palace. PALACE_CLEARANCE is added past those edges on
 ## every side. Call before build(), same as configure(); a no-op call is safe (nothing is
 ## skipped) so a caller with nothing to avoid can simply not call it.
 ##
@@ -94,11 +100,11 @@ func avoid_footprint(centre_xz: Vector2, half_extents: Vector2) -> void:
 	_has_avoid = true
 
 
-## Stand the lamps and hang the marquee. Idempotent. Ten lamps unless avoid_footprint() was
-## called and one ring position lands inside it, in which case that one is skipped rather
-## than moved: a gap in the ring exactly where a wall already blocks the view from outside
-## reads as intentional, and nudging a post risks landing it somewhere else that clips
-## something else instead.
+## Stand the lamps and hang the marquee. Idempotent. One lamp per ring position, unless
+## avoid_footprint() was called and a position lands inside it, in which case that one is
+## skipped rather than moved: a gap in the ring exactly where a wall already blocks the view
+## from outside reads as intentional, and nudging a post risks landing it somewhere else
+## that clips something else instead.
 func build() -> void:
 	if _built or _region == null:
 		return
@@ -119,7 +125,7 @@ func light_count() -> int:
 
 
 ## Every built lamp's own world position, for a caller (the ranch gate) that wants to
-## confirm none of them stands inside or against something else -- see avoid_footprint().
+## confirm none of them stands inside or against something else; see avoid_footprint().
 func light_positions() -> Array[Vector3]:
 	var out: Array[Vector3] = []
 	for l in _lights:
