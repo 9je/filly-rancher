@@ -451,10 +451,17 @@ func test_every_stock_pony_carries_a_palette_triple() -> void:
 	assert_gt(seen_triples.size(), 1, "five stock ponies are not five copies of one pony")
 
 
-func test_the_stock_draw_is_deterministic_for_a_seed() -> void:
+## NOT A CROSS-BOOT DETERMINISM TEST, and its old name (..._is_deterministic_for_a_seed)
+## claimed it was. _build_world() memoizes, so both calls below hand back the SAME spawner,
+## and Spawner._fill_stock() seeds its per-marker draw off marker.get_instance_id(), which
+## is a fresh number for every ZoneMarker ever built, so two separately built worlds would
+## never agree and the test would have been pinning a fiction. What it really checks, and
+## what is worth checking, is that populate() over a world that already has its crowd
+## standing leaves that crowd alone rather than drawing a second one on top of it.
+func test_populating_a_standing_crowd_twice_leaves_the_same_crowd() -> void:
 	var first: Array = _stock_signature(_build_world(1, 1))
 	var second: Array = _stock_signature(_build_world(1, 1))
-	assert_eq(first, second, "the same world seed stands the same crowd")
+	assert_eq(first, second, "populate() over a full world tops nothing up and replaces nobody")
 
 
 func test_a_marker_budget_is_clamped_into_its_region_band() -> void:
@@ -468,6 +475,33 @@ func test_a_marker_budget_is_clamped_into_its_region_band() -> void:
 	marker.stock_count = 0
 	assert_eq(world.spawner.stock_budget(marker), region.stock_min,
 		"and how empty")
+
+
+## A REGION FILE WITH ITS BAND THE WRONG WAY ROUND. clampi() with max below min returns the
+## MAX, so stock_min 4 / stock_max 2 would quietly stand 2 ponies in a field its own data
+## file asks for at least 4 of. Hand authored .tres, one place the two numbers are ever
+## compared: the upper bound is raised to the lower one instead.
+func test_an_inverted_region_band_reads_as_at_least_its_minimum() -> void:
+	var world := _build_world(1, 1)
+	var marker: ZoneMarker = world.spawner.get_markers()[0]
+	marker.zone_id = &"orchard"
+
+	# A hand authored region file with its two numbers the wrong way round, swapped into the
+	# registry the spawner reads. The shipped .tres is not touched.
+	var registry: RegionRegistry = RegionRegistryScript.new()
+	registry.load_all()
+	var inverted: RegionData = registry.by_id(&"orchard").duplicate()
+	inverted.stock_min = 4
+	inverted.stock_max = 2
+	registry._by_id[&"orchard"] = inverted
+	world.spawner._regions = registry
+
+	marker.stock_count = 99
+	assert_eq(world.spawner.stock_budget(marker), 4,
+		"a band the wrong way round reads as 'at least stock_min', not 'at most stock_max'")
+	marker.stock_count = 0
+	assert_eq(world.spawner.stock_budget(marker), 4,
+		"and the minimum is still a minimum")
 
 
 func test_a_marker_outside_every_region_uses_its_own_count() -> void:
@@ -617,10 +651,10 @@ func _far_away() -> Vector3:
 ## seeds its per-marker draw off `marker.get_instance_id()` (see game/world/spawner.gd),
 ## which is a fresh, ever-increasing number for every ZoneMarker.new(): two markers built
 ## a moment apart never share one. Building fresh markers for every call would therefore
-## make test_the_stock_draw_is_deterministic_for_a_seed compare two different seeds and
-## call that a bug; memoizing here means "call it twice" reads back the one crowd this
-## helper actually stood, which is the same "same seed, same draw" fact populate()'s own
-## idempotence tests above pin everywhere else in this file.
+## make test_populating_a_standing_crowd_twice_leaves_the_same_crowd compare two different
+## seeds and call that a bug; memoizing here means "call it twice" reads back the one crowd
+## this helper actually stood, which is the idempotence populate()'s own tests above pin
+## everywhere else in this file.
 var _stock_worlds: Dictionary = {}
 
 
@@ -658,7 +692,7 @@ func _build_world(markers: int, stock_count: int) -> Dictionary:
 
 
 ## The stock crowd's palette triples, sorted, after populate() has stood them. What
-## test_the_stock_draw_is_deterministic_for_a_seed compares between two builds.
+## test_populating_a_standing_crowd_twice_leaves_the_same_crowd compares between two calls.
 func _stock_signature(world: Dictionary) -> Array:
 	var spawner: Spawner = world.spawner
 	spawner.populate(WorldStateScript.Phase.DAY, WorldStateScript.Weather.CLEAR)

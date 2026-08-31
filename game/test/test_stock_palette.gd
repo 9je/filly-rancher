@@ -57,3 +57,32 @@ func test_the_three_stock_ids_are_recognised_and_nobody_else_is() -> void:
 		assert_true(StockPaletteScript.is_stock_id(id), "%s is a stock id" % id)
 	assert_false(StockPaletteScript.is_stock_id(&"twilight"))
 	assert_false(StockPaletteScript.is_stock_id(&""))
+
+
+# --- one word for a colour ------------------------------------------------------------------
+
+## What the Depot's Deliver tab tells two members of the crowd apart by. The property that
+## matters is not which word any one coat gets, it is that the shipped coats do not all get
+## the SAME word: a pen of six stock ponies has to list six readable rows.
+func test_every_shipped_stock_coat_gets_a_word_of_its_own() -> void:
+	var palette: StockPalette = StockPaletteScript.load_stock()
+	assert_gt(palette.coats.size(), 1, "sanity: there is a row to name")
+	var seen := {}
+	for i in palette.coats.size():
+		var word: String = StockPaletteScript.colour_name(palette.coat_at(i))
+		assert_false(word.is_empty(), "coat %d has no word at all" % i)
+		seen[word] = true
+	assert_eq(seen.size(), palette.coats.size(),
+		"two coats sharing one word is two identical rows on the Deliver tab")
+
+
+func test_a_washed_out_colour_is_named_by_how_light_it_is_rather_than_by_hue() -> void:
+	assert_eq(StockPaletteScript.colour_name(Color(0.98, 0.97, 0.96)), "Cream")
+	assert_eq(StockPaletteScript.colour_name(Color(0.55, 0.54, 0.56)), "Ash")
+	assert_eq(StockPaletteScript.colour_name(Color(0.06, 0.06, 0.07)), "Coal")
+
+
+func test_a_saturated_colour_is_named_by_its_hue() -> void:
+	assert_eq(StockPaletteScript.colour_name(Color(0.90, 0.20, 0.30)), "Rose")
+	assert_eq(StockPaletteScript.colour_name(Color(0.35, 0.70, 0.40)), "Meadow")
+	assert_eq(StockPaletteScript.colour_name(Color(0.25, 0.45, 0.85)), "Sky")

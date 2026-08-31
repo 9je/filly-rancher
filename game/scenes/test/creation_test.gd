@@ -106,6 +106,38 @@ func _ready() -> void:
 	if canvas == null:
 		_finish()
 		return
+	# --- THE INK ROW, THROUGH THE BUTTONS A PLAYER PRESSES ---------------------------------
+	#
+	# WHAT THIS IS ABOUT. MarkCanvas.set_colour() shipped with the canvas and nothing ever
+	# called it, so every cutie mark in the game came out the one hard coded grey the widget
+	# opens on. The screen now carries a row of inks; what has to be true is that PRESSING
+	# ONE reaches the pixels, and pressing a different one reaches them differently. Driven
+	# by emitting the buttons' own `pressed` rather than by calling set_ink(), so the wiring
+	# in _wire_controls() is part of what is under test.
+	#
+	# THE PIXEL IS FOUND BY SCANNING rather than read at a fixed coordinate: a headless
+	# Control has no layout, so the canvas maps every local point onto the same pixel. WHERE
+	# the ink went is not the question here; WHICH ink went is.
+	var ink_colours: Array[Color] = []
+	for index in [0, 3]:
+		var button := screen.get_node_or_null(
+			NodePath("Panel/Column/InkRow/Ink%d" % index)) as BaseButton
+		_set_check("ink %d has a button on the screen" % index, button != null)
+		if button == null:
+			continue
+		button.pressed.emit()
+		canvas.clear_all()
+		canvas.paint_at(Vector2(4, 4))
+		var landed: Color = _first_ink(canvas.image())
+		print("CREATION ink %d wanted=%s landed=%s"
+			% [index, CreationScreen.ink_at(index), landed])
+		_set_check("pressing ink %d paints in ink %d" % [index, index],
+			_same_colour(landed, CreationScreen.ink_at(index)))
+		ink_colours.append(landed)
+	_set_check("two different inks land two different colours in the saved image",
+		ink_colours.size() == 2 and not _same_colour(ink_colours[0], ink_colours[1]))
+	canvas.clear_all()
+
 	canvas.set_colour(Color(0.2, 0.6, 0.9))
 	canvas.stamp(MarkStampsScript.Stamp.STAR)
 	canvas.set_colour(Color(0.9, 0.3, 0.1))
@@ -219,6 +251,24 @@ func _ready() -> void:
 		DirAccess.remove_absolute(v4_backup)
 
 	_finish()
+
+
+## The first non transparent pixel in `image`, or MarkPaint.EMPTY if there is none. See the
+## ink block above for why this scans instead of reading a coordinate.
+func _first_ink(image: Image) -> Color:
+	for y in image.get_height():
+		for x in image.get_width():
+			var pixel: Color = image.get_pixel(x, y)
+			if pixel.a > 0.0:
+				return pixel
+	return MarkPaintScript.EMPTY
+
+
+## An eight bit per channel image cannot hold a float colour exactly, so this is the
+## tolerance a round trip through Image.set_pixel/get_pixel actually needs (1/255 is about
+## 0.004).
+func _same_colour(a: Color, b: Color) -> bool:
+	return absf(a.r - b.r) < 0.01 and absf(a.g - b.g) < 0.01 and absf(a.b - b.b) < 0.01
 
 
 ## Cycle `screen`'s row of `size` swatches all the way round (size + 1 steps, so it wraps

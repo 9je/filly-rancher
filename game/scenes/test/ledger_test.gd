@@ -191,19 +191,43 @@ func _ready() -> void:
 	_set_check("the first collection day left the balance above where it started",
 		ledger.balance > balance_at_start)
 	_set_check("the quota went unmet, so the ladder climbed one rung", ledger.tier == 1)
-	# THE COLLECTOR ALREADY CALLED, IN THE SAME BREATH AS THE BILL. A collection day always
-	# lands exactly on the DAWN that opens its cycle (is_collection_cycle() only answers true
-	# at a cycle boundary, and a new cycle's first phase is DAWN by construction), so
-	# ranch._maybe_serve_collector() -- called right after ranch._maybe_run_collection_day()
-	# out of the very same _on_world_changed() -- finds _collector_due already true and the
-	# phase already DAWN, and serves the fee before advance_world() ever returns here. There
-	# is no separate "wait for dawn" step to drive; the arithmetic below is the proof the fee
-	# really was served (she cannot afford it, so it rides on the balance) rather than merely
-	# judged, and the explicit call after it is the SECOND call at that same dawn the spec asks
-	# for.
+
+	# --- THE LETTER, AND ONLY THE LETTER (Ruling 8) ---------------------------------------
+	#
+	# A COLLECTION DAY ALWAYS LANDS ON A DAWN. is_collection_cycle() only answers true at a
+	# cycle boundary and a cycle's first phase is DAWN by construction, so "serve the
+	# collector at the next dawn" used to mean THIS dawn: _maybe_serve_collector() runs out
+	# of the very same _on_world_changed() that billed, found the rung armed and the phase
+	# already right, and knocked in the same frame as the notice. The spec's beat is the
+	# letter first, then a period to ship or to pay in, then the visit; so the rung is now
+	# held until the first dawn of a cycle STRICTLY LATER than the one that armed it.
+	var armed_cycle: int = world.cycle_index()
+	print("LEDGER armed cycle=%d phase=%d pending=%d"
+		% [armed_cycle, world.phase(), ledger.pending_punishment])
+	_set_check("the bill landed on a dawn, which is what makes the timing hard",
+		world.phase() == WorldStateScript.Phase.DAWN)
+	_set_check("the collector is armed", ledger.pending_punishment == LedgerScript.Punishment.FEE)
+	_set_check("...and the ledger recorded which cycle armed him",
+		ledger.pending_punishment_cycle == armed_cycle)
+	_set_check("the bill is exactly upkeep plus the service charge, with no visit in it",
+		ledger.balance == balance_at_start + expected_upkeep + expected_charge)
+	# The same call the clock makes, at the same dawn, driven by hand: it must still refuse.
+	ranch._maybe_serve_collector()
+	_set_check("nobody knocks at the dawn the notice was written on",
+		ledger.pending_punishment == LedgerScript.Punishment.FEE
+			and ledger.balance == balance_at_start + expected_upkeep + expected_charge)
+
+	# --- AND THEN THE KNOCK, at the first dawn of a later cycle ----------------------------
+	var balance_before_visit: int = ledger.balance
+	_advance_to_next_dawn(ranch, world, "the first collector visit")
+	census_ids = _check_census(ranch, census_ids, "the first collector visit")
+	print("LEDGER visit cycle=%d balance=%d->%d pending=%d"
+		% [world.cycle_index(), balance_before_visit, ledger.balance, ledger.pending_punishment])
+	_set_check("he calls on a later cycle than the one that armed him",
+		world.cycle_index() > armed_cycle)
 	_set_check("the fee really was served, not merely judged",
-		ledger.balance == balance_at_start + expected_upkeep + expected_charge
-			+ LedgerScript.COLLECTOR_FEE)
+		ledger.balance == balance_before_visit + LedgerScript.COLLECTOR_FEE)
+	_set_check("...and the rung is spent", ledger.pending_punishment == LedgerScript.Punishment.NONE)
 	var second_call: int = ranch.serve_collector()
 	_set_check("a second call at the same dawn serves nobody",
 		second_call == LedgerScript.Punishment.NONE)
@@ -221,10 +245,26 @@ func _ready() -> void:
 			ledger.periods_run == i + 2)
 		_set_check("rung %d climbs the ladder to %s, in order" % [i + 2, ladder_names[i]],
 			ledger.tier == i + 2)
+		var armed_at: int = world.cycle_index()
+		_set_check("rung %d is armed at the bill, not served at it" % (i + 2),
+			ledger.pending_punishment == ladder[i]
+				and ledger.pending_punishment_cycle == armed_at)
+
+		# WEAKREFS TAKEN BEFORE THE RUNG IS SERVED, which is the only order in which "nobody
+		# was lost" can be asked. Held here rather than inside the match below because the
+		# rung lands inside _advance_to_next_dawn() on the next line, and by the time the
+		# match runs the thing this is watching has already happened.
+		var watched: Dictionary = _region_refs(ranch, region) \
+			if ladder[i] == LedgerScript.Punishment.PERMIT_REVOKED else {}
+
+		_advance_to_next_dawn(ranch, world, "collector visit %d" % (i + 2))
+		print("LEDGER collector rung=%d armed_at=%d served_at=%d balance=%d->%d"
+			% [i + 2, armed_at, world.cycle_index(), before, ledger.balance])
+		_set_check("rung %d was served on a later cycle than it was judged on" % (i + 2),
+			world.cycle_index() > armed_at
+				and ledger.pending_punishment == LedgerScript.Punishment.NONE)
 		var served: int = ranch.serve_collector()
-		print("LEDGER collector rung=%d already_served=%s balance=%d->%d"
-			% [i + 2, served == LedgerScript.Punishment.NONE, before, ledger.balance])
-		_set_check("rung %d was already served at the same dawn it was judged" % (i + 2),
+		_set_check("rung %d cannot be served a second time at that dawn" % (i + 2),
 			served == LedgerScript.Punishment.NONE)
 		census_ids = _check_census(ranch, census_ids, "rung %d" % (i + 2))
 
@@ -233,12 +273,19 @@ func _ready() -> void:
 				_set_check("the permit's unlock is gone", not ranch.is_region_open(region.id))
 				_set_check("the region's fence node still stands",
 					is_instance_valid(fence) and fence.is_inside_tree())
-				var still_here := true
-				for pony: Pony in ranch.spawner.get_spawned():
-					var data: PonyData = pony.get_data()
-					if data != null and region.id in data.spawn_zones and not is_instance_valid(pony):
-						still_here = false
-				_set_check("every pony inside the region is still standing", still_here)
+				# THE CHECK THIS REPLACES COULD NOT FAIL. It walked get_spawned(), which
+				# PRUNES invalid nodes before it answers, and asked is_instance_valid() of
+				# what came back: every pony in that list is valid by construction, so the
+				# loop was a no-op wearing the name of a safety check. WeakRefs taken before
+				# the rung landed are the only thing that can actually see a pony go.
+				var lost: int = 0
+				for id in watched:
+					if (watched[id] as WeakRef).get_ref() == null:
+						lost += 1
+				print("LEDGER revoked-region watch=%d lost=%d" % [watched.size(), lost])
+				_set_check("there were ponies in the revoked region for this to be about",
+					watched.size() > 0)
+				_set_check("every pony inside the region is still standing", lost == 0)
 			LedgerScript.Punishment.PEN_PADLOCKED:
 				_set_check("the pen is padlocked", pen.is_padlocked())
 				_set_check("...and still holds her", pen.count() == 1
@@ -322,6 +369,41 @@ func _advance_to_next_period(ranch: Ranch, world: WorldState, ledger: Ledger,
 		ranch.advance_world(WorldStateScript.PHASE_SECONDS[world.phase()])
 		guard += 1
 	_set_check("%s landed inside the step budget this gate gave it" % context, guard < 20)
+
+
+## Advance one phase at a time until the clock is on a DAWN again, taking at least one step
+## so "already at dawn" cannot answer instantly. Four phases to a cycle
+## (WorldStateScript.Phase), so this is one cycle of play; the collector armed by the
+## collection day that opened this cycle is served on the way through it.
+func _advance_to_next_dawn(ranch: Ranch, world: WorldState, context: String) -> void:
+	var guard := 0
+	while guard < 8:
+		ranch.advance_world(WorldStateScript.PHASE_SECONDS[world.phase()])
+		guard += 1
+		if world.phase() == WorldStateScript.Phase.DAWN:
+			break
+	_set_check("%s reached the next dawn inside the step budget" % context,
+		world.phase() == WorldStateScript.Phase.DAWN)
+
+
+## A WeakRef to every pony who belongs to `region` or is standing inside it right now, keyed
+## by instance id. BOTH readings on purpose: the crowd is drawn at markers inside a region
+## and carries no spawn_zones of its own, while a named character carries the zone list and
+## may be anywhere in it, so either alone can come back empty and make the check that reads
+## this vacuous again.
+func _region_refs(ranch: Ranch, region: RegionData) -> Dictionary:
+	var out := {}
+	var registry: RegionRegistry = ranch._regions_registry()
+	for pony: Pony in ranch.spawner.get_spawned():
+		var data: PonyData = pony.get_data()
+		var belongs: bool = data != null and region.id in data.spawn_zones
+		if not belongs:
+			var here: RegionData = registry.region_at(
+				Vector2(pony.global_position.x, pony.global_position.z))
+			belongs = here != null and here.id == region.id
+		if belongs:
+			out[pony.get_instance_id()] = weakref(pony)
+	return out
 
 
 # --- the pony census ---------------------------------------------------------------------

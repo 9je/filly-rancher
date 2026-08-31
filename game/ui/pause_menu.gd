@@ -22,8 +22,8 @@ extends CanvasLayer
 ## never from this page.
 ##
 ## EVERYTHING THESE PAGES DRAW IS INJECTED AND MAY BE NULL. ranch.gd sets `compendium`,
-## `registry`, `regions`, `board`, `world_state`, `ledger`, `player_look` and
-## `statement_provider` when it binds this menu (game/world/ranch.gd, _bind_pause_menu).
+## `registry`, `regions`, `board`, `world_state` and `statement_provider` when it binds this
+## menu (game/world/ranch.gd, _bind_pause_menu).
 ## Nothing here ever loads a registry or reaches for GameState itself: this menu is
 ## instantiated bare by its own tests and by the boot shutter, neither of which has a ranch
 ## behind it, and a page that loaded the roster off disk to draw itself would make those two
@@ -106,12 +106,12 @@ var regions: RegionRegistry = null
 var board: RequestBoard = null
 var world_state: WorldState = null
 
-## THE LEDGER PAGE (task 9). `ledger` and `player_look` are injected the same way the five
-## above are; `statement_provider` is a `func() -> Array[String]` that repeats the Depot's
-## own statement rather than re-deriving it here, so the pause menu and the Depot counter
-## can never disagree about what she owes. See ledger_rows().
-var ledger: Ledger = null
-var player_look: PlayerLook = null
+## THE LEDGER PAGE (task 9). `statement_provider` is a `func() -> Array[String]` that
+## repeats the Depot's own statement rather than re-deriving it here, so the pause menu and
+## the Depot counter can never disagree about what she owes. It is injected the same way the
+## five above are, and it is the WHOLE of what this page needs: a Ledger and a PlayerLook
+## were injected alongside it for a while and never read, because the statement they would
+## have been read for arrives already rendered. See ledger_rows().
 var statement_provider := Callable()
 
 var _page: int = Page.MAIN

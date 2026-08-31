@@ -86,3 +86,83 @@ func test_nothing_the_screen_draws_carries_a_dash() -> void:
 	for line in _screen.drawn_lines():
 		assert_false(line.contains("--"), "'%s' carries a double hyphen" % line)
 		assert_false(line.contains(char(0x2014)), "'%s' carries an em dash" % line)
+
+
+# --- the ink row --------------------------------------------------------------------------
+##
+## THE GAP THESE PIN. MarkCanvas.set_colour() shipped with the canvas and nothing ever
+## called it, so every cutie mark in the game came out the one hard coded grey the widget
+## opens on. The screen now has a row of ink buttons over it, and what matters is that
+## PRESSING ONE reaches the canvas: an ink row that changes a swatch and not the ink is the
+## same bug with a nicer face on it.
+
+## The first non transparent pixel in `image`, or EMPTY if she drew nothing. Read this way
+## rather than at a fixed coordinate because a headless Control has no layout, so the canvas
+## maps every local point to the same pixel; WHERE the ink landed is not what is under test
+## here, WHICH ink landed is.
+func _first_ink(image: Image) -> Color:
+	for y in image.get_height():
+		for x in image.get_width():
+			var pixel: Color = image.get_pixel(x, y)
+			if pixel.a > 0.0:
+				return pixel
+	return MarkPaintScript.EMPTY
+
+
+## An 8-bit-per-channel image cannot store a float colour exactly, so this is the tolerance
+## a round trip through Image.set_pixel/get_pixel actually needs (1/255 is about 0.004).
+func _same_colour(a: Color, b: Color) -> bool:
+	return absf(a.r - b.r) < 0.01 and absf(a.g - b.g) < 0.01 and absf(a.b - b.b) < 0.01
+
+
+func test_the_screen_offers_a_row_of_inks() -> void:
+	assert_gt(CreationScreen.ink_count(), 1, "one ink is not a palette")
+	assert_eq(CreationScreen.INK_NAMES.size(), CreationScreen.INK_COLOURS.size(),
+		"every ink has a name and every name has an ink")
+
+
+func test_the_ink_buttons_exist_and_are_wired_to_the_canvas() -> void:
+	var canvas: MarkCanvas = _screen.canvas()
+	for index in CreationScreen.ink_count():
+		var button := _screen.get_node_or_null(
+			NodePath("Panel/Column/InkRow/Ink%d" % index)) as BaseButton
+		assert_not_null(button, "ink %d has no button to press" % index)
+		if button == null:
+			continue
+		assert_eq((button as Button).text, CreationScreen.ink_name(index),
+			"the button says what the const says")
+		button.pressed.emit()
+		canvas.clear_all()
+		canvas.paint_at(Vector2.ZERO)
+		assert_true(_same_colour(_first_ink(canvas.image()), CreationScreen.ink_at(index)),
+			"pressing ink %d has to reach the canvas, not only the swatch" % index)
+
+
+func test_two_different_inks_leave_two_different_colours() -> void:
+	var canvas: MarkCanvas = _screen.canvas()
+	_screen.set_ink(0)
+	canvas.clear_all()
+	canvas.paint_at(Vector2.ZERO)
+	var first: Color = _first_ink(canvas.image())
+	_screen.set_ink(1)
+	canvas.clear_all()
+	canvas.paint_at(Vector2.ZERO)
+	var second: Color = _first_ink(canvas.image())
+	assert_false(_same_colour(first, second),
+		"two inks that paint the same colour are one ink and a lie")
+
+
+func test_picking_an_ink_turns_the_eraser_off() -> void:
+	var canvas: MarkCanvas = _screen.canvas()
+	canvas.set_eraser(true)
+	assert_true(canvas.is_erasing())
+	_screen.set_ink(2)
+	assert_false(canvas.is_erasing(), "asking for a colour is asking to draw with it")
+
+
+func test_the_ink_names_are_part_of_what_the_screen_draws() -> void:
+	var drawn: Array[String] = _screen.drawn_lines()
+	for index in CreationScreen.ink_count():
+		assert_true(drawn.has(CreationScreen.ink_name(index)),
+			"ink '%s' is on a button, so the copy rule applies to it"
+				% CreationScreen.ink_name(index))

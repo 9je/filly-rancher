@@ -431,10 +431,15 @@ var _region_fence_cache: Array[RegionFence] = []
 ## same object that will enforce it later rather than by an int compared in the UI.
 var _economy: Economy = null
 
-## True while a collector is owed a visit at the next dawn. A runtime cache, not the
-## source of truth -- Ledger.pending_punishment is that, because it is what is actually
-## saved. _seed_collector_state() below is what keeps this in step with it across a load.
+## True while a collector is owed a visit. A runtime cache, not the source of truth --
+## Ledger.pending_punishment is that, because it is what is actually saved.
+## _seed_collector_state() below is what keeps this in step with it across a load, and
+## Ledger.pending_punishment_cycle is what says WHICH dawn he may call on.
 var _collector_due := false
+
+## The crowd's palette, loaded once and kept, for _coat_word() below. The spawner keeps its
+## own for the same reason; a .tres load per menu row is a load per row.
+var _stock_palette: StockPalette = null
 
 ## The plot slot the player is standing in right now, or null. Tracked so the build prompt
 ## fires once on entry rather than every physics frame.
@@ -1291,6 +1296,11 @@ func _bind_depot_menu() -> void:
 	depot_menu.set("can_open", func() -> bool: return _no_menu_but(depot_menu))
 	depot_menu.set("rows_provider", func() -> Array[Dictionary]: return _penned_rows())
 	depot_menu.set("bits_provider", func() -> int: return _current_bits())
+	# WHAT THE LEDGER WILL ACTUALLY ACCEPT, so the Pay tab never offers a row that would be
+	# trimmed on the way through (Ledger.pay() caps at payable(); bits settle the service
+	# charges, not the principal). The menu asks; this file answers.
+	depot_menu.set("payable_provider", func() -> int:
+		return _game_state.ledger.payable() if _game_state != null else 0)
 	depot_menu.set("statement_provider", func() -> Array[String]: return _statement())
 	for pair in [["opened", _on_menu_opened_any], ["closed", _on_menu_closed],
 			["deliver_requested", _on_deliver_requested],
@@ -1320,9 +1330,27 @@ func _penned_rows() -> Array[Dictionary]:
 				"uid": inst.uid,
 				"name": inst.display_name(),
 				"stock": inst.is_stock(),
+				"coat": _coat_word(inst),
 				"credit": LedgerScript.delivery_credit(rarity, inst.is_stock()),
 			})
 	return rows
+
+
+## ONE WORD THAT TELLS TWO STOCK PONIES APART, for the Deliver tab. Every member of the
+## crowd shares one hidden record and therefore one display_name ("Pony"), so a pen holding
+## six of them listed six identical rows and the player picked one by counting. Her COAT is
+## the thing she is actually distinguishable by on screen, so the coat swatch her save
+## record carries is named (StockPalette.colour_name) and the menu draws it in front of her
+## name: "Butter Pony", "Sky Pony".
+##
+## EMPTY FOR A NAMED PONY, who has a name of her own and needs no help being told apart.
+func _coat_word(inst: PonyInstance) -> String:
+	if inst == null or not inst.is_stock():
+		return ""
+	if _stock_palette == null:
+		_stock_palette = StockPaletteScript.load_stock()
+	return StockPaletteScript.colour_name(
+		_stock_palette.coat_at(int(inst.stock.get("coat", 0))))
 
 
 func _statement() -> Array[String]:
@@ -1414,8 +1442,6 @@ func _bind_pause_menu() -> void:
 		pause_menu.set("regions", _regions_registry())
 		pause_menu.set("board", get_request_board())
 		pause_menu.set("world_state", get_world_state())
-		pause_menu.set("ledger", _game_state.ledger if _game_state != null else null)
-		pause_menu.set("player_look", _game_state.player if _game_state != null else null)
 		pause_menu.set("statement_provider", func() -> Array[String]: return _statement())
 	inject_pages.call()
 	if _game_state != null and not _game_state.state_loaded.is_connected(inject_pages):
@@ -1614,8 +1640,9 @@ func _apply_settings() -> void:
 
 ## COLLECTION DAY, ONCE PER PERIOD. Every third cycle, on the first phase change inside it,
 ## the upkeep and the service charge land on the balance and the period's quota is judged.
-## The collector the judgement arms does NOT call now; he calls at the next dawn, which is
-## what makes the letter arrive before the knock.
+## The collector the judgement arms does NOT call now: he calls at the first dawn of a LATER
+## cycle (_maybe_serve_collector), which is what makes the letter arrive before the knock
+## and gives her a cycle to do something about it.
 ##
 ## GUARDED BY THE LEDGER'S OWN Ledger.is_collection_day_due(), NOT BY A RUNTIME COUNTER OF
 ## THE LAST CYCLE BILLED. A runtime counter resets to nothing on every fresh process, so it
@@ -1646,44 +1673,51 @@ func run_collection_day() -> Dictionary:
 		"upkeep": int(summary["upkeep"])})
 	_toast("%s. Balance: %d bits." % [letter["title"], int(summary["balance"])])
 	if not bool(summary["quota_met"]):
-		_toast("Quota: %d of %d delivered. An associate will call at dawn."
+		_toast("Quota: %d of %d delivered. An associate will call at the next dawn."
 			% [int(summary["delivered"]), int(summary["quota"])])
 	_push_balance()
 	return summary
 
 
-## THE COLLECTOR CALLS. One rung of the ladder, served once, at the next dawn after a
-## period that fell short. Every rung is reversible and none of them takes a pony:
-## a fee is bits, a revoked permit is a fence that closes over ponies who stay exactly where
-## they are, a padlock is a pen that makes no gems, and a recall is a horn she gets back
-## next cycle. Returns which rung was served, for the gates.
+## THE COLLECTOR CALLS. One rung of the ladder, served once, on the first DAWN OF A CYCLE
+## LATER THAN THE ONE THAT ARMED IT (see _maybe_serve_collector, and Ledger.
+## pending_punishment_cycle for why "later" rather than "next"). Every rung is reversible
+## and none of them takes a pony: a fee is bits, a revoked permit is a fence that closes
+## over ponies who stay exactly where they are, a padlock is a pen that makes no gems, and a
+## recall is a horn she gets back next cycle. Returns which rung was served, for the gates.
+##
+## A RUNG WITH NOTHING TO BITE ON FALLS BACK TO THE FEE rather than passing quietly. A
+## player with no permits bought has nothing to revoke and a player with no pen built has
+## nothing to padlock, and those are exactly the players early enough in the game to be
+## missing quota: serving them a rung with no consequence spent the escalation (tier had
+## already climbed) and gave them a free period. The fee is the rung below, it always lands,
+## and the toast and the letter both say what actually happened rather than what the ladder
+## intended.
 func serve_collector() -> int:
 	if _game_state == null:
 		return LedgerScript.Punishment.NONE
 	var ledger: Ledger = _game_state.ledger
 	var punishment: int = ledger.take_pending_punishment()
+	var served: int = punishment
 	match punishment:
 		LedgerScript.Punishment.FEE:
-			var fee: int = LedgerScript.COLLECTOR_FEE
-			if _economy != null and _economy.can_afford(fee):
-				_economy.spend(fee)
-				_toast("An associate called: a service fee of %d bits. Have a lovely day!"
-					% fee)
-			else:
-				# She cannot pay it, so it goes on the account. Nothing is confiscated.
-				ledger.balance += fee
-				_toast("An associate called: %d bits added to your balance. No trouble at all!"
-					% fee)
+			_serve_collector_fee()
 		LedgerScript.Punishment.PERMIT_REVOKED:
 			var permit: StringName = _dearest_open_permit()
-			if permit != &"":
+			if permit == &"":
+				served = LedgerScript.Punishment.FEE
+				_serve_collector_fee()
+			else:
 				ledger.revoked_permits.append(String(permit))
 				_game_state.unlocks.erase(String(permit))
 				_apply_permits()
 				_toast("An associate called: one permit is under review. Pay to resume access.")
 		LedgerScript.Punishment.PEN_PADLOCKED:
 			var slot_id: StringName = _fullest_pen_slot()
-			if slot_id != &"":
+			if slot_id == &"":
+				served = LedgerScript.Punishment.FEE
+				_serve_collector_fee()
+			else:
 				ledger.padlocked_slots.append(String(slot_id))
 				_apply_padlocks()
 				_toast("An associate called: one pen is sealed pending payment. Everyone inside is fine!")
@@ -1692,14 +1726,37 @@ func serve_collector() -> int:
 			ledger.beam_recalled_until = cycle + LedgerScript.BEAM_RECALL_CYCLES
 			_apply_beam_recall()
 			_toast("An associate called: your horn licence is suspended for one cycle.")
-	if punishment != LedgerScript.Punishment.NONE:
+	if served != LedgerScript.Punishment.NONE:
 		var letter: Dictionary = LettersScript.render(LettersScript.Id.COLLECTOR_VISIT, {
-			"name": _player_name(), "punishment": _punishment_phrase(punishment)})
+			"name": _player_name(), "punishment": _punishment_phrase(served)})
 		_toast(String(letter["title"]))
 	_push_balance()
-	return punishment
+	return served
 
 
+## THE FIRST RUNG, AND THE ONE EVERY OTHER RUNG FALLS BACK ON. Paid out of the wallet if she
+## can cover it, added to the balance if she cannot; nothing is ever confiscated.
+func _serve_collector_fee() -> void:
+	var fee: int = LedgerScript.COLLECTOR_FEE
+	if _economy != null and _economy.can_afford(fee):
+		_economy.spend(fee)
+		_toast("An associate called: a service fee of %d bits. Have a lovely day!" % fee)
+	else:
+		_game_state.ledger.balance += fee
+		_toast("An associate called: %d bits added to your balance. No trouble at all!" % fee)
+
+
+## THE KNOCK, ONE FULL CYCLE AFTER THE LETTER. A collection day always lands on a DAWN
+## (Ledger.is_collection_cycle() only answers true at a cycle boundary, and a cycle's first
+## phase is DAWN by construction), so "serve at the next dawn" served the collector in the
+## very same _on_world_changed() that billed her: notice and visit in one frame, with no
+## period in between to ship or to pay in. The rung is therefore held until the first DAWN
+## of a cycle STRICTLY LATER than the one that armed it, which is the beat the spec
+## describes and the reason the letter is worth reading.
+##
+## THE ARMING CYCLE LIVES ON THE LEDGER (Ledger.pending_punishment_cycle), not here, so it
+## travels with the save: quitting between the notice and the visit comes back owing the
+## same visit on the same dawn, exactly as _seed_collector_state() does for the rung itself.
 func _maybe_serve_collector() -> void:
 	if _world == null:
 		return
@@ -1707,6 +1764,10 @@ func _maybe_serve_collector() -> void:
 	# not only at dawn.
 	_apply_beam_recall()
 	if not _collector_due or _world.phase() != WorldStateScript.Phase.DAWN:
+		return
+	if _game_state != null \
+			and _world.cycle_index() <= _game_state.ledger.pending_punishment_cycle:
+		# Armed this very cycle. The letter has just landed; he calls at the next dawn.
 		return
 	_collector_due = false
 	serve_collector()
@@ -1886,12 +1947,29 @@ func get_depot_menu() -> CanvasLayer:
 ## DELIVER ONE PONY. Returns `{"ok": bool, "credit": int, "named": bool, "name": String}`,
 ## so a gate can assert on what happened rather than on a toast.
 ##
-## THE ORDER MATTERS AND IS THE POINT. Her body comes out of the pen ALIVE
-## (Pen.release_body), her record leaves the save, the ledger is credited, the book records
-## her, the receipt is written, and only then is she pointed at the crate. She walks there
-## herself and frees herself on arrival, in Pony._state_leaving, which stays the one line in
-## this project that frees a pony. There is no branch here that removes her any other way,
-## deliberately: NO PONY EVER DIES ON SCREEN, and nothing gruesome happens at the Depot.
+## THE WALK HAPPENS FIRST, AND EVERYTHING IRREVERSIBLE HANGS OFF ITS ANSWER. Pony.
+## leave_toward() returns false for a pony the beam has hold of, and this function used to
+## throw that answer away: it credited the account, deleted her record, marked her
+## PROCESSED and counted her toward quota BEFORE pointing her at the crate, so a resident
+## floating in the beam was paid for and then handed straight back on release. Now the
+## order is: find her, refuse if she is HELD, take her body out of the pen, point her at
+## the crate, and only once she is actually walking does anything change that cannot be
+## changed back.
+##
+## THE TWO REFUSALS ARE BEFORE ANY MUTATION, which is what makes "refuse and unwind
+## nothing" true rather than merely hopeful: nothing is unwound because nothing was done.
+## Even her body stays in the pen until the walk is accepted.
+##
+## HER BODY COMES OUT OF THE PEN ALIVE (Pen.release_body), and only after the walk has
+## been accepted, so a refusal leaves her standing in the pen she was already standing in.
+## She walks to the crate herself and frees herself on arrival, in Pony._state_leaving,
+## which stays the one line in this project that frees a pony. There is no branch here that
+## removes her any other way, deliberately: NO PONY EVER DIES ON SCREEN, and nothing
+## gruesome happens at the Depot.
+##
+## AND THE BEAM WILL NOT TAKE HER BACK once she is walking: Pony.is_being_delivered() is
+## true for the whole of the walk and MagicBeam._is_grabbable() declines her. That is a
+## grab that never starts, not a pony taken away.
 func deliver_pony(uid: StringName) -> Dictionary:
 	var refused := {"ok": false, "credit": 0, "named": false, "name": ""}
 	if _game_state == null:
@@ -1910,8 +1988,33 @@ func deliver_pony(uid: StringName) -> Dictionary:
 	if pen == null or inst == null:
 		return refused
 
-	var body: Node3D = pen.release_body(uid, self)
-	if body == null:
+	# HER BODY, STILL IN THE PEN. Read rather than released, so the two refusals below cost
+	# nothing to make: at this point the pen still holds her, the save still has her record,
+	# and the account has not moved.
+	var body: Node3D = pen.body_for(uid)
+	if body == null or not (body is PonyScript):
+		return refused
+
+	# REFUSED WHILE THE BEAM HAS HER. The hold is the beam's, and a hold that turns into a
+	# capture must be allowed to finish as one; a delivery that talked over it would credit
+	# the account for a pony who is about to land back in the saddlebag.
+	if (body as PonyScript).state == PonyScript.State.HELD:
+		_toast("Put her down first, and the counter will take her from there!")
+		return refused
+
+	# THE WALK IS THE COMMIT POINT, and it is asked BEFORE anything is spent, deleted or
+	# credited. leave_toward() answers false for exactly one reason (she is HELD), which the
+	# line above has already refused; this is that same rule read off the seam's own answer
+	# rather than guessed at a second time, and it costs one branch to keep honest.
+	if not body.leave_toward(crate_position()):
+		_toast("Put her down first, and the counter will take her from there!")
+		return refused
+
+	# From here down the delivery HAS happened. release_body() cannot fail on a pony this
+	# function has already found a live body and a live record for (see pen.gd), and it is
+	# the call that takes the pen's collision bits off her so the walk can actually reach
+	# the crate.
+	if pen.release_body(uid, self) == null:
 		return refused
 	_game_state.remove_pony(uid)
 
@@ -1932,7 +2035,6 @@ func deliver_pony(uid: StringName) -> Dictionary:
 	_toast("%s: %s shipment received, %d bits credited."
 		% [letter["sender"], LettersScript.ordinal(shipments), credit])
 
-	body.leave_toward(crate_position())
 	if depot_menu != null and depot_menu.has_method("refresh"):
 		depot_menu.refresh()
 	_relieve_if_paid_down()
@@ -1976,7 +2078,8 @@ func _on_deliver_requested(uid: StringName) -> void:
 func _relieve_if_paid_down() -> void:
 	if _game_state == null:
 		return
-	var given: Dictionary = _game_state.ledger.relieve()
+	var given: Dictionary = _game_state.ledger.relieve(
+		_world.cycle_index() if _world != null else -1)
 	if given.is_empty():
 		return
 	for permit in given.get("permits", []):

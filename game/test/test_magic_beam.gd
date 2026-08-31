@@ -874,3 +874,35 @@ func _named_data() -> PonyData:
 	var registry := PonyRegistryScript.new()
 	registry.load_all("res://data/ponies")
 	return registry.by_id(&"twilight")
+
+
+# --- the delivery walk is not a shopping trip ----------------------------------------------
+##
+## THE EXPLOIT THESE PIN. deliver_pony() pays for a pony and points her at the Depot crate;
+## she is a live CharacterBody3D walking across the map for the next few seconds. The beam
+## used to accept any Pony at all, so the player could shoot the pony she had just been paid
+## 4,000 bits for, and release() would settle her straight back into the saddlebag with the
+## very PonyInstance the delivery had removed from the save. Credit kept, pony kept, and it
+## repeats for as long as she can keep re-catching her.
+
+func test_the_beam_declines_a_pony_who_is_walking_to_the_crate() -> void:
+	var beam: MagicBeam = _beam()
+	var pony: Pony = PonyScene.instantiate()
+	add_child_autofree(pony)
+	assert_true(beam._is_grabbable(pony), "an ordinary pony is grabbable, or this pins nothing")
+	pony.leave_toward(pony.global_position + Vector3(20.0, 0.0, 0.0))
+	assert_true(pony.is_being_delivered(), "sanity: she is on a delivery walk")
+	assert_false(beam._is_grabbable(pony),
+		"a pony the Company has already paid for is not there to be taken back")
+
+
+func test_the_beam_still_takes_a_pony_whose_hours_simply_ended() -> void:
+	# An ORDINARY departure has no destination and is nobody's property: capture wins over
+	# leaving, exactly as it always did. Only the delivery walk is off limits.
+	var beam: MagicBeam = _beam()
+	var pony: Pony = PonyScene.instantiate()
+	add_child_autofree(pony)
+	pony.leave()
+	assert_true(pony.is_leaving(), "sanity: she is walking off the map")
+	assert_false(pony.is_being_delivered(), "...but nobody sent her anywhere")
+	assert_true(beam._is_grabbable(pony), "she is catchable to the last step, as she always was")

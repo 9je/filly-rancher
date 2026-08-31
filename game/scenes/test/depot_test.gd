@@ -200,6 +200,56 @@ func _ready() -> void:
 	# own bookkeeping.
 	var body_before: Node3D = pen.body_for(stock_uid)
 	_set_check("the pen knows which body is hers before any of this starts", body_before != null)
+	if body_before == null:
+		_finish()
+		return
+
+	# --- THE CONTROL FOR THE TWO REFUSALS BELOW ------------------------------------------
+	# A pony standing in a pen IS grabbable, and this says so out loud. Without it, every
+	# "the beam declines her" check further down could pass on a beam that declines
+	# everything, or on a body that was never a candidate in the first place.
+	_set_check("a penned pony is something the beam would ordinarily take",
+		beam._is_grabbable(body_before))
+
+	# --- REFUSAL ONE: SHE CANNOT BE SOLD OUT OF THE BEAM ----------------------------------
+	#
+	# THE BUG. deliver_pony() credited the account, deleted her record, marked her PROCESSED
+	# and counted her toward quota BEFORE pointing her at the crate, and it threw away
+	# leave_toward()'s answer. leave_toward() refuses a HELD pony (capture wins), so
+	# delivering a pony the beam had hold of paid the player in full and then handed her back
+	# on release: credit kept, pony kept, repeatable.
+	#
+	# HELD IS SET DIRECTLY, which is exactly what MagicBeam._begin_hold() does to her
+	# (game/actors/player/magic_beam.gd) and nothing else. Driving a real beam catch on a
+	# resident would ALSO take her out of the pen on release, which is a different mechanic
+	# (capture wins) and would leave nothing here to deliver.
+	var balance_held: int = state.ledger.balance
+	var shipments_held: int = state.ledger.shipments
+	# WHETHER GameState ITSELF KNOWS HER IS READ BEFORE, NOT ASSUMED. A pony living in a pen
+	# is held by the PEN's roster; GameState.ponies is the saddlebag's side of the save, and
+	# _move_pony_into_pen() has already taken her off it. What must not change is this
+	# answer, whatever it is.
+	var known_held: bool = state.find_pony(stock_uid) != null
+	var residents_held: int = pen.count()
+	(body_before as Pony).set_held(true)
+	var refused: Dictionary = ranch.deliver_pony(stock_uid)
+	print("DEPOT held-delivery ok=%s balance=%d->%d penned=%s"
+		% [refused.get("ok"), balance_held, state.ledger.balance, pen.find_pony(stock_uid) != null])
+	_set_check("delivering a pony the beam has hold of is refused",
+		bool(refused.get("ok", true)) == false and int(refused.get("credit", -1)) == 0)
+	_set_check("...and no credit was applied for her", state.ledger.balance == balance_held)
+	_set_check("...and she was not counted toward the quota or the receipts",
+		state.ledger.delivered_this_period == 0 and state.ledger.shipments == shipments_held)
+	_set_check("...and the save's view of her did not change",
+		(state.find_pony(stock_uid) != null) == known_held)
+	_set_check("...and her record is still on the pen's roster, with the same body",
+		pen.find_pony(stock_uid) != null and pen.body_for(stock_uid) == body_before
+			and pen.count() == residents_held)
+	_set_check("...and she was not sent walking anywhere",
+		not (body_before as Pony).is_leaving())
+	(body_before as Pony).set_held(false)
+	_set_check("putting her down leaves her deliverable again",
+		(body_before as Pony).state != PonyScript.State.HELD)
 
 	var balance_before: int = state.ledger.balance
 	var result: Dictionary = ranch.deliver_pony(stock_uid)
@@ -232,6 +282,41 @@ func _ready() -> void:
 		delivered_body != null and is_instance_valid(delivered_body)
 			and delivered_body.is_inside_tree())
 	_set_check("she is leaving, not idling", delivered_body != null and delivered_body.is_leaving())
+
+	# --- REFUSAL TWO: SHE CANNOT BE CAUGHT BACK OFF THE WALK -------------------------------
+	#
+	# THE OTHER HALF OF THE SAME EXPLOIT. She is a live pony walking across the map with the
+	# player's credit already banked, and the beam used to accept any Pony at all: shooting
+	# her put her back in the saddlebag with the very PonyInstance the delivery had removed
+	# from the save (MagicBeam._settle_pony reuses the instance the body still carries, and
+	# Pen.release_body never cleared it). Credit kept, pony kept.
+	_set_check("she is marked as under delivery for the whole walk",
+		delivered_body != null and delivered_body.is_being_delivered())
+	_set_check("the beam declines a pony the Company has already paid for",
+		delivered_body != null and not beam._is_grabbable(delivered_body))
+
+	# AND THE SAME THING DRIVEN THROUGH THE REAL BEAM, from behind her so the player is never
+	# standing between her and the crate: nothing about this attempt may take her, put her in
+	# the bag, or move the balance.
+	var balance_mid_walk: int = state.ledger.balance
+	await _stand_player_behind(ranch, delivered_body)
+	await _aim_at(ranch, _chest(delivered_body), "the delivered pony mid walk")
+	beam.grab()
+	for i in range(GRAB_WAIT_FRAMES):
+		await get_tree().physics_frame
+		if delivered_body == null or not is_instance_valid(delivered_body):
+			break
+		if beam.get_held_body() == delivered_body:
+			break
+	_set_check("aiming the real beam at her and grabbing does not take her",
+		beam.get_held_body() != delivered_body)
+	beam.release()
+	_set_check("...and she did not land back in the saddlebag", storage.count() == 0)
+	_set_check("...and the credit the Company paid still stands",
+		state.ledger.balance == balance_mid_walk)
+	_set_check("...and she is still walking, not taken and not freed",
+		delivered_body != null and is_instance_valid(delivered_body)
+			and delivered_body.is_being_delivered())
 
 	var first_gap := INF
 	var last_gap := INF
@@ -269,9 +354,42 @@ func _ready() -> void:
 	_set_check("a second resident, this one named, moves into the pen",
 		pen.add_pony(named_inst))
 	state.compendium.mark_caught(named_data.id)
-	var result_named: Dictionary = ranch.deliver_pony(named_inst.uid)
+
+	# --- THE COUNTER ASKS FIRST, FOR A NAMED PONY (Ruling 9) -------------------------------
+	# Driven through the MENU rather than by calling deliver_pony() again, because the second
+	# press is the whole of what this fix is: a named pony is up to 4,000 bits and there is
+	# exactly one of her, so a single mis-press must not be able to spend her.
+	depot_menu.open()
+	depot_menu.set_tab(DepotMenu.Tab.DELIVER)
+	var named_row := -1
+	var menu_rows: Array[Dictionary] = depot_menu.deliver_rows()
+	for i in range(menu_rows.size()):
+		if StringName(menu_rows[i].get("uid", &"")) == named_inst.uid:
+			named_row = i
+			break
+	_set_check("the named pony is on the Deliver tab", named_row >= 0)
+	if named_row < 0:
+		_finish()
+		return
+	depot_menu.move_selection(named_row - depot_menu.selected_index())
+	var shipments_before_confirm: int = state.ledger.shipments
+	_set_check("the first press asks rather than delivers", depot_menu.confirm()
+		and depot_menu.is_confirming())
+	_set_check("...and nobody has been shipped by asking",
+		state.ledger.shipments == shipments_before_confirm
+			and pen.find_pony(named_inst.uid) != null)
+	_set_check("the cursor sits on the refusal, so a double press keeps her",
+		depot_menu.selected_index() == 1)
+	depot_menu.move_selection(-1)
+	_set_check("answering yes is what hands her over", depot_menu.confirm())
+	depot_menu.close()
+	_set_check("...and the question is gone with her", not depot_menu.is_confirming())
+	var result_named := {"ok": state.find_pony(named_inst.uid) == null,
+		"named": true}
 	_set_check("delivering a named pony answers ok and names her", bool(result_named.get("ok", false))
 		and bool(result_named.get("named", false)))
+	_set_check("her shipment was counted exactly once",
+		state.ledger.shipments == shipments_before_confirm + 1)
 	_set_check("she is marked PROCESSED",
 		state.compendium.state_of(named_data.id) == CompendiumScript.State.PROCESSED)
 
@@ -383,6 +501,21 @@ func _stand_player_near(ranch: Ranch, pony: Node3D, distance: float) -> void:
 	ranch.player.global_position = stand
 	ranch.player.velocity = Vector3.ZERO
 	await _frames(SETTLE_FRAMES)
+
+
+## Put the player GRAB_DISTANCE metres behind a walking pony, on the far side from where she
+## is headed, so that grabbing at her cannot also mean standing in her way. Used for the
+## mid-walk beam attempt, which must leave her walk untouched.
+func _stand_player_behind(ranch: Ranch, pony: Node3D) -> void:
+	var ahead: Vector3 = ranch.crate_position() - pony.global_position
+	ahead.y = 0.0
+	if ahead.length_squared() < 0.01:
+		ahead = Vector3.FORWARD
+	var stand: Vector3 = pony.global_position - ahead.normalized() * GRAB_DISTANCE
+	stand.y = float(ranch.terrain.call("height_at", stand.x, stand.z)) + 0.15
+	ranch.player.global_position = stand
+	ranch.player.velocity = Vector3.ZERO
+	await _frames(2)
 
 
 ## Drive the camera rig until get_aim_ray() points at `target`, then assert that it does.

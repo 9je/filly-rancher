@@ -219,10 +219,6 @@ func data() -> PonyData:
 	return resolve_data(data_id)
 
 
-## What to call her on screen: her nickname, else her character's display name, else the
-## raw data_id. The last fallback is deliberately the id rather than "" or "a pony": a
-## label that says `not_a_pony_at_all` tells whoever is looking at it what went wrong,
-## and an empty one tells them nothing.
 ## Is she one of the crowd? Asked of her LOOK rather than of her data_id, because the look
 ## is what the save carries and the id is what a build's roster happens to hold: a record
 ## whose data_id this build has never heard of still resolves to null and still has to know
@@ -231,6 +227,10 @@ func is_stock() -> bool:
 	return not stock.is_empty()
 
 
+## What to call her on screen: her nickname, else her character's display name, else the
+## raw data_id. The last fallback is deliberately the id rather than "" or "a pony": a
+## label that says `not_a_pony_at_all` tells whoever is looking at it what went wrong,
+## and an empty one tells them nothing.
 func display_name() -> String:
 	if not nickname.is_empty():
 		return nickname

@@ -146,3 +146,114 @@ func test_a_reloaded_pending_punishment_is_served_at_the_next_dawn_exactly_once(
 		"nothing pending, so a second dawn call must stay a no-op")
 
 	SaveIOScript.delete_slot(SLOT_PUNISHMENT)
+
+
+# --- Ruling 8: the letter arrives a whole cycle before the knock ---------------------------
+
+## A COLLECTION DAY ALWAYS LANDS ON A DAWN, which is what made "serve at the next dawn"
+## serve at THIS one: Ledger.is_collection_cycle() only answers true at a cycle boundary,
+## and a cycle's first phase is DAWN by construction, so ranch._maybe_serve_collector()
+## (called out of the same _on_world_changed() as the bill) found the collector armed and
+## the phase already right, and the notice and the visit landed in one frame. The player
+## never got a period to ship or to pay in, which is the whole point of the notice.
+func test_a_collector_armed_today_does_not_call_at_the_dawn_that_armed_him() -> void:
+	var state: Node = autofree(GameStateScript.new())
+	var ranch := _ranch()
+	ranch._game_state = state
+	var world: WorldState = WorldStateScript.new(1, 3.0 * WorldStateScript.CYCLE_SECONDS)
+	ranch._world = world
+	assert_eq(world.cycle_index(), 3, "sanity: three cycles in")
+	assert_eq(world.phase(), WorldStateScript.Phase.DAWN,
+		"sanity: a collection cycle opens on a dawn, which is the whole difficulty")
+
+	ranch._on_world_changed()
+	assert_eq(state.ledger.periods_run, 1, "the period was billed")
+	assert_eq(state.ledger.pending_punishment, LedgerScript.Punishment.FEE,
+		"an unmet quota arms the first rung")
+	assert_eq(state.ledger.pending_punishment_cycle, 3,
+		"and the ledger remembers which cycle armed it")
+	var billed: int = state.ledger.balance
+
+	ranch._maybe_serve_collector()
+	assert_eq(state.ledger.pending_punishment, LedgerScript.Punishment.FEE,
+		"nobody calls at the dawn the notice was written on")
+	assert_eq(state.ledger.balance, billed,
+		"...and nothing is charged for a visit that has not happened")
+
+	# The first dawn of a LATER cycle. Not a collection cycle (4 is not a multiple of 3), so
+	# nothing is billed here; the only thing that happens is the knock.
+	world.set_elapsed(4.0 * WorldStateScript.CYCLE_SECONDS)
+	assert_eq(world.phase(), WorldStateScript.Phase.DAWN, "sanity: a cycle opens on dawn")
+	ranch._on_world_changed()
+	assert_eq(state.ledger.periods_run, 1, "cycle 4 is not a collection day")
+	assert_eq(state.ledger.pending_punishment, LedgerScript.Punishment.NONE,
+		"the first dawn of a later cycle is when the associate calls")
+	assert_eq(state.ledger.balance, billed + LedgerScript.COLLECTOR_FEE,
+		"...and the fee lands then, not a cycle earlier")
+
+
+## The arming cycle has to survive the save, or a session that quits between the notice and
+## the visit comes back and is knocked on immediately.
+func test_the_arming_cycle_travels_with_the_save() -> void:
+	var writer: Node = autofree(GameStateScript.new())
+	writer.ledger.pending_punishment = LedgerScript.Punishment.PEN_PADLOCKED
+	writer.ledger.pending_punishment_cycle = 9
+	assert_true(writer.save_to_slot(SLOT_PUNISHMENT), "the save must land")
+
+	var reader: Node = autofree(GameStateScript.new())
+	assert_true(reader.load_from_slot(SLOT_PUNISHMENT), "...and load back")
+	assert_eq(reader.ledger.pending_punishment_cycle, 9,
+		"the dawn he may call on is part of the save, like the rung itself")
+
+	var ranch := _ranch()
+	ranch._game_state = reader
+	ranch._seed_collector_state()
+	var world: WorldState = WorldStateScript.new(1, 9.0 * WorldStateScript.CYCLE_SECONDS)
+	ranch._world = world
+	ranch._maybe_serve_collector()
+	assert_eq(reader.ledger.pending_punishment, LedgerScript.Punishment.PEN_PADLOCKED,
+		"a reload on the arming cycle's own dawn is still too early")
+
+	world.set_elapsed(10.0 * WorldStateScript.CYCLE_SECONDS)
+	ranch._maybe_serve_collector()
+	assert_eq(reader.ledger.pending_punishment, LedgerScript.Punishment.NONE,
+		"the dawn after it is not")
+
+	SaveIOScript.delete_slot(SLOT_PUNISHMENT)
+
+
+# --- a rung with nothing to bite on ---------------------------------------------------------
+
+## A player with no permits bought and no pen built is exactly the player early enough in
+## the game to be missing quota, and the two middle rungs have nothing to take from her.
+## They used to pass silently: the tier had already climbed, the rung was consumed, and the
+## period cost her nothing at all. The fee is the rung below and it always lands.
+func test_a_permit_rung_with_no_permit_open_falls_back_to_the_fee() -> void:
+	var state: Node = autofree(GameStateScript.new())
+	var ranch := _ranch()
+	ranch._game_state = state
+	ranch._world = WorldStateScript.new(1, 0.0)
+	state.ledger.pending_punishment = LedgerScript.Punishment.PERMIT_REVOKED
+	var before: int = state.ledger.balance
+
+	assert_eq(ranch.serve_collector(), LedgerScript.Punishment.FEE,
+		"with no permit to review, the rung below is what is actually served")
+	assert_eq(state.ledger.balance, before + LedgerScript.COLLECTOR_FEE,
+		"...and it lands on the balance, there being no wallet on a detached ranch")
+	assert_true(state.ledger.revoked_permits.is_empty(),
+		"nothing was revoked, because there was nothing to revoke")
+
+
+func test_a_padlock_rung_with_no_pen_built_falls_back_to_the_fee() -> void:
+	var state: Node = autofree(GameStateScript.new())
+	var ranch := _ranch()
+	ranch._game_state = state
+	ranch._world = WorldStateScript.new(1, 0.0)
+	state.ledger.pending_punishment = LedgerScript.Punishment.PEN_PADLOCKED
+	var before: int = state.ledger.balance
+
+	assert_eq(ranch.serve_collector(), LedgerScript.Punishment.FEE,
+		"with no pen to seal, the rung below is what is actually served")
+	assert_eq(state.ledger.balance, before + LedgerScript.COLLECTOR_FEE)
+	assert_true(state.ledger.padlocked_slots.is_empty(),
+		"and no slot id was recorded for a padlock that never happened")

@@ -54,6 +54,49 @@ static func _load(path: String) -> StockPalette:
 	return res as StockPalette
 
 
+## ONE PLAIN ENGLISH WORD FOR A COLOUR, for the places a swatch cannot be shown. The Depot's
+## Deliver tab is the one that needs it: every stock pony shares one hidden record and one
+## display_name ("Pony"), so a pen full of them lists a column of identical rows unless
+## something says which is which, and her coat is what the player can actually see from
+## across the field.
+##
+## DERIVED FROM THE COLOUR, NOT AUTHORED BESIDE IT. A parallel Array[String] on the two
+## .tres files would be a second row to keep in step with the first, and the failure mode is
+## a palette edit that silently renames somebody. Hue bands cost nothing to keep true: they
+## answer for the player palette, for the crowd's, and for whatever a later authoring pass
+## puts in either of them.
+##
+## THE EIGHT SHIPPED STOCK COATS LAND ON EIGHT DIFFERENT WORDS, which is the property that
+## makes the Deliver tab readable, and game/test/test_stock_palette.gd pins exactly that
+## rather than pinning any one colour to any one word.
+static func colour_name(colour: Color) -> String:
+	# DARK FIRST, AND IT IS NOT A ROUNDING DETAIL. Colour.s is a RATIO, so a near black like
+	# (0.06, 0.06, 0.07) reads as 14% saturated blue and would come out "Sky"; nobody looking
+	# at that pony would call her blue. Anything this dark is read as its darkness.
+	if colour.v < 0.28:
+		return "Coal"
+	# Then washed out: hue means nothing on a colour with no saturation left in it, and these
+	# are the coats a player reads as "white pony" and "grey pony".
+	if colour.s < 0.12:
+		return "Cream" if colour.v >= 0.80 else "Ash"
+	var hue: float = colour.h
+	if hue < 0.042 or hue >= 0.917:
+		return "Rose"
+	if hue < 0.097:
+		return "Caramel"
+	if hue < 0.181:
+		return "Butter"
+	if hue < 0.458:
+		return "Meadow"
+	if hue < 0.542:
+		return "Teal"
+	if hue < 0.694:
+		return "Sky"
+	if hue < 0.833:
+		return "Lilac"
+	return "Berry"
+
+
 ## Is `id` one of the three hidden stock records? The one question every caller that has to
 ## tell a member of the crowd from a collectible asks, in one place.
 static func is_stock_id(id: StringName) -> bool:

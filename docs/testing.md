@@ -623,14 +623,19 @@ In one run, on the real ranch: a fresh ledger opening at
 `Ledger.STARTING_BALANCE` with the starting quota; one collection day per
 `WorldState.CYCLE_SECONDS * Ledger.PERIOD_CYCLES` of the clock, its balance
 proven with arithmetic computed *before* the clock moves rather than read off
-a flag afterwards; a collector who calls in the very same breath as the bill
-(a collection day always lands on the DAWN that opens its cycle, so
-`ranch._maybe_serve_collector()` finds the phase already DAWN and the fee
-already due before `advance_world()` even returns, and a second,
-gate-driven `serve_collector()` at that same dawn confirms nobody is served
-twice); three more bad periods climbing the ladder in the order the spec
-names -- a permit revoked with its fence still standing and every pony inside
-it still on her feet, a pen padlocked and still holding her resident while
+a flag afterwards; a collector who is ARMED by that bill and does not call
+until the first dawn of a LATER cycle (a collection day always lands on the
+DAWN that opens its cycle, so "serve at the next dawn" used to mean serving
+in the same frame as the notice; the gate drives the armed dawn, checks that
+nobody knocks, drives a whole cycle on, and checks that the fee lands there,
+with a second gate-driven `serve_collector()` at that dawn confirming nobody
+is served twice); three more bad periods climbing the ladder in the order the
+spec names: a permit revoked with its fence still standing and every pony
+inside it still on her feet (weakrefs taken BEFORE the rung lands, the only
+order in which that question can be asked: the check this replaces walked
+`Spawner.get_spawned()`, which prunes invalid nodes before it answers, and
+asked `is_instance_valid()` of what came back, so it could not fail), a pen
+padlocked and still holding her resident while
 making no gems over 120 simulated seconds, a beam recalled and refusing to
 start with the saddlebag still holding what it held; `pay_the_company()` down
 past the ceiling giving all three back in one call; and a save, reset, rebind
@@ -673,7 +678,7 @@ Run it with:
 tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/ledger_test.tscn
 ```
 
-Expect `LEDGER_OK checks=68`; the exit code is the verdict.
+Expect `LEDGER_OK checks=87`; the exit code is the verdict.
 
 ---
 
@@ -743,7 +748,7 @@ Run it with:
 tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/depot_test.tscn
 ```
 
-Expect `DEPOT_OK checks=50`; the exit code is the verdict.
+Expect `DEPOT_OK checks=72`; the exit code is the verdict.
 
 ---
 
@@ -797,7 +802,7 @@ Run it with:
 tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/creation_test.tscn
 ```
 
-Expect `CREATION_OK checks=84`; the exit code is the verdict.
+Expect `CREATION_OK checks=89`; the exit code is the verdict.
 
 ---
 

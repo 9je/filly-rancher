@@ -1339,9 +1339,22 @@ func _mark_at(point: Vector3, normal: Vector3) -> void:
 ## A wild pony, or any loose rigid body. The rigid bodies cost almost nothing to support
 ## and are the part of the mechanic people play with for its own sake -- a beam that can
 ## only pick up quest objects is a menu, not a toy.
+##
+## EXCEPT A PONY WHO HAS ALREADY BEEN DELIVERED. Pony.is_being_delivered() is true for
+## exactly the walk from the pen to the Depot crate, and taking her off it would hand the
+## player the credit AND the pony back: release drops a held pony into
+## _settle_pony(), which stores the very PonyInstance the delivery removed from the save.
+## So she is declined here, at the one gate every grab in this file goes through (the ray
+## hit and the forgiveness pass both ask this), which also keeps the reticle honest --
+## nothing lights up over a pony the beam will not take.
+##
+## THIS IS THE ONE EXCEPTION TO "CAPTURE WINS", AND IT TAKES NOTHING. A declined grab is a
+## beam that does not start; she keeps walking, and the only thing that ever frees her is
+## still her own arrival in Pony._state_leaving. An ORDINARY departure (a pony whose hours
+## ended, no target) stays grabbable to the last step, as it always was.
 func _is_grabbable(body: Object) -> bool:
 	if body is PonyScript:
-		return true
+		return not (body as PonyScript).is_being_delivered()
 	return body is RigidBody3D
 
 

@@ -578,6 +578,13 @@ func _staying_by_marker() -> Dictionary:
 ## How many stock ponies belong at `marker`: its own `stock_count`, clamped into its
 ## region's authored band. A marker whose zone has no RegionData (the open homestead) uses
 ## its own number as it stands.
+##
+## THE UPPER BOUND IS RAISED TO THE LOWER ONE IF A DATA FILE HAS THEM THE WRONG WAY ROUND.
+## clampi() with max below min returns the MAX, so an authoring slip of stock_min 4,
+## stock_max 2 would quietly empty a region down to 2 while its own file asked for at least
+## 4; taking maxi() of the pair means a bad band reads as "at least stock_min" rather than
+## as a silently under-populated field. A region .tres is hand authored and this is the one
+## place its two numbers are ever compared.
 func stock_budget(marker: ZoneMarker) -> int:
 	if marker == null:
 		return 0
@@ -587,7 +594,8 @@ func stock_budget(marker: ZoneMarker) -> int:
 	var region: RegionData = _regions.by_id(marker.zone_id)
 	if region == null:
 		return maxi(0, marker.stock_count)
-	return clampi(marker.stock_count, region.stock_min, region.stock_max)
+	return clampi(marker.stock_count, region.stock_min,
+		maxi(region.stock_min, region.stock_max))
 
 
 func stock_standing() -> int:

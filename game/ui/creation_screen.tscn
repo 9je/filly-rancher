@@ -201,6 +201,33 @@ text = "Flower"
 layout_mode = 2
 text = "Gem"
 
+[node name="InkRow" type="HBoxContainer" parent="Panel/Column"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="InkSwatch" type="ColorRect" parent="Panel/Column/InkRow"]
+custom_minimum_size = Vector2(40, 32)
+layout_mode = 2
+color = Color(0.2, 0.2, 0.24, 1.0)
+
+[node name="Ink0" type="Button" parent="Panel/Column/InkRow"]
+layout_mode = 2
+
+[node name="Ink1" type="Button" parent="Panel/Column/InkRow"]
+layout_mode = 2
+
+[node name="Ink2" type="Button" parent="Panel/Column/InkRow"]
+layout_mode = 2
+
+[node name="Ink3" type="Button" parent="Panel/Column/InkRow"]
+layout_mode = 2
+
+[node name="Ink4" type="Button" parent="Panel/Column/InkRow"]
+layout_mode = 2
+
+[node name="Ink5" type="Button" parent="Panel/Column/InkRow"]
+layout_mode = 2
+
 [node name="ToolRow" type="HBoxContainer" parent="Panel/Column"]
 layout_mode = 2
 theme_override_constants/separation = 4

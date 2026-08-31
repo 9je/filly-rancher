@@ -115,10 +115,25 @@ var shipments := 0
 ## good periods as the bad run took.
 var tier := 0
 
-## The punishment the collector will serve at the NEXT DAWN, taken exactly once by
+## The punishment the collector will serve, taken exactly once by
 ## take_pending_punishment(). Separated from the collection day itself because the design
 ## doc puts the visit at dawn and the arithmetic at the cycle boundary.
 var pending_punishment: int = Punishment.NONE
+
+## THE CYCLE THE PENDING PUNISHMENT WAS ARMED ON, or -1 when nothing is armed. This is what
+## makes "the letter arrives before the knock" true rather than a phrase in a doc comment.
+##
+## A COLLECTION DAY ALWAYS LANDS ON A DAWN: is_collection_cycle() only answers true at a
+## cycle boundary and a cycle's first phase is DAWN by construction. So a caller that
+## served the pending punishment at "the next DAWN" served it in the same breath as the
+## bill: the letter and the knock in one frame, which is not the beat the spec describes.
+## game/world/ranch.gd's _maybe_serve_collector() therefore requires the current cycle to be
+## STRICTLY GREATER than this one, which puts the visit on the first dawn of a LATER cycle:
+## the player reads the notice, has a cycle to ship or to pay, and then somebody calls.
+##
+## SAVED, like pending_punishment itself, so a session that quits between the notice and the
+## visit comes back owing the same visit on the same dawn rather than one dawn early.
+var pending_punishment_cycle := -1
 
 ## Permit unlock ids currently revoked, and plot slot ids currently padlocked. Plain
 ## Strings, and untyped Arrays, for GameState.unlocks' reason: these are assigned
@@ -206,6 +221,7 @@ func run_collection_day(cycle: int, built_plots: int, open_permits: int,
 		punishment = LADDER[clampi(tier, 0, LADDER.size() - 1)]
 		tier = mini(tier + 1, LADDER.size())
 	pending_punishment = punishment
+	pending_punishment_cycle = cycle if punishment != Punishment.NONE else -1
 
 	delivered_this_period = 0
 	periods_run += 1
@@ -256,9 +272,13 @@ func pay(bits: int) -> int:
 ## The punishment a collector should serve at this dawn, taken exactly once. A second call
 ## before the next collection day answers NONE, so a dawn that fires twice (a mid session
 ## load, a pinned clock) cannot serve one collector twice.
+##
+## WHEN it may be taken is the caller's question, not this one's: see
+## pending_punishment_cycle and game/world/ranch.gd's _maybe_serve_collector().
 func take_pending_punishment() -> int:
 	var punishment: int = pending_punishment
 	pending_punishment = Punishment.NONE
+	pending_punishment_cycle = -1
 	return punishment
 
 
@@ -267,19 +287,32 @@ func take_pending_punishment() -> int:
 ## unpadlock the pens and hand the horn back; or an EMPTY dictionary when there was nothing
 ## to give back or she is still over the ceiling, which is the caller's cue to do nothing
 ## and say nothing.
-func relieve() -> Dictionary:
+## THE RECALL IS CLEARED WHETHER OR NOT IT WAS STILL RUNNING, but it is only REPORTED when
+## it was. beam_recalled_until is a cycle number that goes stale on its own clock: one cycle
+## after the visit the horn is already back, and a note left sitting in this field would
+## make the next relieve() announce it was handing back something the player has been using
+## for the last twenty minutes. `cycle` is the world's current cycle; pass -1 (the default)
+## from a caller that has no clock, which reads every recall as still running and is the
+## safe way round, because it hands the horn back rather than forgetting to.
+func relieve(cycle: int = -1) -> Dictionary:
 	if balance > CEILING:
 		return {}
+	var recalled: bool = beam_is_recalled(cycle) if cycle >= 0 else beam_recalled_until >= 0
 	if revoked_permits.is_empty() and padlocked_slots.is_empty() and beam_recalled_until < 0:
 		return {}
 	var given := {
 		"permits": revoked_permits.duplicate(),
 		"slots": padlocked_slots.duplicate(),
-		"beam": beam_recalled_until >= 0,
+		"beam": recalled,
 	}
 	revoked_permits = []
 	padlocked_slots = []
 	beam_recalled_until = -1
+	if given["permits"].is_empty() and given["slots"].is_empty() and not recalled:
+		# Nothing was actually owed back: the only note on file was a recall that had
+		# already expired, and it has now been tidied away. An empty answer is the caller's
+		# cue to say nothing, which is right, because there is nothing to tell her.
+		return {}
 	return given
 
 
@@ -318,6 +351,7 @@ func to_dict() -> Dictionary:
 		"shipments": shipments,
 		"tier": tier,
 		"pending_punishment": pending_punishment,
+		"pending_punishment_cycle": pending_punishment_cycle,
 		"revoked_permits": revoked_permits.duplicate(),
 		"padlocked_slots": padlocked_slots.duplicate(),
 		"beam_recalled_until": beam_recalled_until,
@@ -339,6 +373,10 @@ static func from_dict(d: Dictionary) -> Ledger:
 	out.tier = clampi(int(d.get("tier", 0)), 0, LADDER.size())
 	out.pending_punishment = clampi(int(d.get("pending_punishment", Punishment.NONE)),
 		Punishment.NONE, Punishment.BEAM_RECALLED)
+	# A save written before this field existed carries no arming cycle. -1 is the honest
+	# answer for it and it is also the permissive one: any cycle is later than -1, so an
+	# older save's armed collector calls at the very next dawn rather than never.
+	out.pending_punishment_cycle = int(d.get("pending_punishment_cycle", -1))
 	out.revoked_permits = _string_list(d.get("revoked_permits", []))
 	out.padlocked_slots = _string_list(d.get("padlocked_slots", []))
 	out.beam_recalled_until = int(d.get("beam_recalled_until", -1))

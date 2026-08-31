@@ -709,10 +709,17 @@ func leave() -> bool:
 ## through exactly the same LEAVING state a runaway uses, so there is still only one way a
 ## pony leaves the world.
 ##
-## REFUSED WHILE HELD, like leave(), and for the same reason: capture wins. A pony the
-## player grabs on her way to the crate is taken out of LEAVING by set_held(true) and
-## dropped back into IDLE by set_held(false), so a change of heart at the Depot door gives
-## her back rather than sending her on.
+## REFUSED WHILE HELD, like leave(), and for the same reason: capture wins. THE RETURN
+## VALUE IS LOAD BEARING, and game/world/ranch.gd's deliver_pony() is why: the Depot pays
+## for a pony only after this answers true, so a refusal here costs the player nothing and
+## leaves her record, her pen and her credit exactly where they were.
+##
+## AND FROM HERE ON THE BEAM WILL NOT TAKE HER: is_being_delivered() answers true for the
+## whole of this walk and game/actors/player/magic_beam.gd's _is_grabbable() declines a pony
+## it answers true for. That is a REFUSAL TO GRAB, not a pony removed. She keeps walking,
+## nothing frees her but her own arrival, and it is the one place capture does not win,
+## because she has already been paid for: a beam that could take her back off the walk would
+## hand the player the credit AND the pony.
 ##
 ## Re-targeting a pony who is ALREADY leaving is allowed and restarts her timer, so a crate
 ## that moves (it does not, today) or a second delivery order cannot strand her.
@@ -732,6 +739,19 @@ func leave_toward(point: Vector3) -> bool:
 ## in the ordinary way, which is every pony whose conditions still hold.
 func is_leaving() -> bool:
 	return state == State.LEAVING
+
+
+## IS SHE ON A WALK SOMEBODY SENT HER ON, rather than one she chose? True only while she is
+## LEAVING toward a point handed to her by leave_toward(), which today means exactly one
+## thing: she has been delivered and is walking to the Depot crate.
+##
+## THE BEAM ASKS THIS BEFORE IT GRABS (magic_beam.gd, _is_grabbable). An ordinary departure
+## answers false and stays catchable to the last step, which is the rule everywhere else in
+## the game; a delivered pony answers true and is declined, because the Company has already
+## paid for her. Nothing here removes anybody: a declined grab is a beam that does not
+## start.
+func is_being_delivered() -> bool:
+	return state == State.LEAVING and _has_leave_target
 
 
 func _physics_process(delta: float) -> void:

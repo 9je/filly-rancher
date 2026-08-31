@@ -813,3 +813,25 @@ func _add_player(position: Vector3) -> Sneaker:
 	body.position = position
 	_world.add_child(body)
 	return body
+
+
+## THE FLAG THE BEAM READS. A delivered pony is walking to the crate having already been
+## paid for, and game/actors/player/magic_beam.gd declines to grab her; an ordinary
+## departure answers false here and stays catchable. Two states that look identical from
+## outside (both are LEAVING) and must not be treated identically.
+func test_only_a_pony_sent_somewhere_counts_as_being_delivered() -> void:
+	var pony: Pony = _pony_on_a_floor()
+	assert_false(pony.is_being_delivered(), "standing in a field is not a delivery")
+	pony.leave()
+	assert_true(pony.is_leaving(), "she is on her way out")
+	assert_false(pony.is_being_delivered(),
+		"...but she chose it herself, and the beam may still have her")
+
+
+func test_a_pony_pointed_at_the_crate_is_being_delivered_for_the_whole_walk() -> void:
+	var pony: Pony = _pony_on_a_floor()
+	pony.leave_toward(pony.global_position + Vector3(20.0, 0.0, 0.0))
+	assert_true(pony.is_being_delivered(), "the walk begins under the Company's hand")
+	await wait_physics_frames(10)
+	assert_true(is_instance_valid(pony) and pony.is_being_delivered(),
+		"and stays that way while she walks, which is when the exploit would land")

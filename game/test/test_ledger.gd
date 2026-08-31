@@ -179,6 +179,60 @@ func test_relief_arrives_when_the_balance_is_back_under_the_ceiling() -> void:
 	assert_eq(l.relieve(), {}, "and nothing is given back twice")
 
 
+## AN EXPIRED RECALL IS NOT SOMETHING TO GIVE BACK. beam_recalled_until is a cycle number
+## that goes stale on its own clock: one cycle after the visit the horn is already back in
+## her hands. Left on file, it made the next relieve() report `beam: true` and the ranch
+## announce it was handing back something she had been using for the last twenty minutes.
+func test_relieve_does_not_report_a_recall_that_had_already_expired() -> void:
+	var l := LedgerScript.new()
+	l.balance = LedgerScript.CEILING - 1
+	l.beam_recalled_until = 4
+	var given: Dictionary = l.relieve(9)
+	assert_true(given.is_empty(),
+		"the horn came back on cycle 4 by itself; there is nothing to announce on cycle 9")
+	assert_eq(l.beam_recalled_until, -1, "and the stale note is cleared off the file")
+
+
+func test_relieve_still_reports_a_recall_that_is_running() -> void:
+	var l := LedgerScript.new()
+	l.balance = LedgerScript.CEILING - 1
+	l.beam_recalled_until = 12
+	var given: Dictionary = l.relieve(9)
+	assert_true(bool(given.get("beam", false)),
+		"a recall with cycles left on it is a real thing to hand back")
+	assert_eq(l.beam_recalled_until, -1)
+
+
+func test_relieve_with_no_clock_reads_every_recall_as_running() -> void:
+	# The safe way round for a caller with no world clock: hand the horn back rather than
+	# forget to.
+	var l := LedgerScript.new()
+	l.balance = LedgerScript.CEILING - 1
+	l.beam_recalled_until = 4
+	assert_true(bool(l.relieve().get("beam", false)))
+
+
+## The arming cycle is set by the collection day that arms the rung, and cleared with it.
+func test_a_collection_day_records_which_cycle_armed_the_collector() -> void:
+	var l := LedgerScript.new()
+	var summary: Dictionary = l.run_collection_day(6, 1, 0)
+	assert_ne(int(summary["punishment"]), LedgerScript.Punishment.NONE,
+		"sanity: an unmet quota arms somebody")
+	assert_eq(l.pending_punishment_cycle, 6, "the cycle that armed him is on file")
+	l.take_pending_punishment()
+	assert_eq(l.pending_punishment_cycle, -1, "and goes when he is served")
+
+
+func test_a_good_period_arms_nobody_and_records_no_cycle() -> void:
+	var l := LedgerScript.new()
+	for i in LedgerScript.STARTING_QUOTA:
+		l.credit_delivery(PonyDataScript.Rarity.COMMON, true)
+	l.run_collection_day(3, 1, 0)
+	assert_eq(l.pending_punishment, LedgerScript.Punishment.NONE)
+	assert_eq(l.pending_punishment_cycle, -1,
+		"nothing is armed, so there is no dawn to hold anybody until")
+
+
 func test_the_beam_recall_lasts_exactly_one_cycle() -> void:
 	var l := LedgerScript.new()
 	l.beam_recalled_until = 5 + LedgerScript.BEAM_RECALL_CYCLES
@@ -207,6 +261,17 @@ func test_gems_alone_never_clear_the_balance() -> void:
 	for value in values:
 		income += per_pony * value
 	var l := LedgerScript.new()
+	# WHAT THE FLOOR IS ACTUALLY DOING HERE, said as an assertion rather than left to be
+	# inferred from the ending balance. One period of that ranch out-earns one period of
+	# upkeep AND its service charge several times over, so the balance below is NOT held up
+	# by the arithmetic being tight: on interest and upkeep alone this player clears the
+	# account and the promise the class comment makes would be false. It is PRINCIPAL_FLOOR
+	# and nothing else that keeps it true, which is exactly what the class comment says and
+	# what a later retune of UPKEEP_BASE (Ruling 13 parks one) must not be allowed to hide.
+	var one_period_cost: int = l.upkeep_for(6, 4) + l.service_charge()
+	assert_gt(income, one_period_cost,
+		"the best ranch in the game out-earns its own upkeep and service charge; the floor,"
+		+ " not the tuning, is the mechanism this test is about")
 	for period in 50:
 		l.run_collection_day(LedgerScript.PERIOD_CYCLES * (period + 1), 6, 4)
 		l.pay(income)
@@ -245,6 +310,7 @@ func test_the_whole_ledger_round_trips() -> void:
 	l.shipments = 21
 	l.tier = 2
 	l.pending_punishment = LedgerScript.Punishment.PEN_PADLOCKED
+	l.pending_punishment_cycle = 6
 	l.revoked_permits = ["permit_lake"]
 	l.padlocked_slots = ["plot_b"]
 	l.beam_recalled_until = 19
@@ -256,6 +322,8 @@ func test_the_whole_ledger_round_trips() -> void:
 	assert_eq(back.shipments, 21)
 	assert_eq(back.tier, 2)
 	assert_eq(back.pending_punishment, LedgerScript.Punishment.PEN_PADLOCKED)
+	assert_eq(back.pending_punishment_cycle, 6,
+		"which dawn he may call on travels with the rung he is calling about")
 	assert_eq(back.revoked_permits, ["permit_lake"])
 	assert_eq(back.padlocked_slots, ["plot_b"])
 	assert_eq(back.beam_recalled_until, 19)

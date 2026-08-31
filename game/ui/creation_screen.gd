@@ -36,7 +36,32 @@ const MANE_LABEL := "Mane and tail"
 const EYES_LABEL := "Eyes"
 const MARK_LABEL := "Your cutie mark; draw it yourself"
 const CONFIRM_LABEL := "This is me"
-const HINT := "Left click to draw. Pick a shape to start from, or start with nothing."
+const HINT := "Left click to draw. Pick an ink and a shape to start from, or start with nothing."
+
+## THE INKS SHE MAY DRAW HER MARK IN, as a row of named buttons over the canvas. The canvas
+## has always been able to take a colour (MarkCanvas.set_colour); until this row existed
+## nothing ever called it, so every cutie mark in the game came out the one hard coded grey
+## that widget happens to start on, which is not a cutie mark, it is a smudge.
+##
+## SIX, NAMED, AND FEW ON PURPOSE. This is a sixty four pixel square drawn with a mouse in
+## the first two minutes of a new game, not an art package; six inks that read clearly
+## against a coat beat a colour wheel nobody wants to fight at that moment. INK_COLOURS[0]
+## is the grey the canvas already opens on, so the row includes the state it starts in
+## rather than leaving one unnamed colour off the end of it.
+##
+## NAMES AND COLOURS AS TWO PARALLEL ARRAYS rather than one array of dictionaries: a typed
+## Array[Color] is what set_colour() wants and a typed Array[String] is what drawn_lines()
+## (and therefore the copy rule test) wants, and neither has to unpack anything to get it.
+## They are indexed together; ink_at() and ink_name() are the only two readers.
+const INK_NAMES: Array[String] = ["Charcoal", "Rose", "Sunshine", "Meadow", "Sky", "Plum"]
+const INK_COLOURS: Array[Color] = [
+	Color(0.20, 0.20, 0.24, 1.0),
+	Color(0.88, 0.32, 0.42, 1.0),
+	Color(0.98, 0.78, 0.24, 1.0),
+	Color(0.36, 0.72, 0.42, 1.0),
+	Color(0.28, 0.56, 0.88, 1.0),
+	Color(0.60, 0.36, 0.78, 1.0),
+]
 
 ## Degrees per second the turntable turns. Slow enough to read, fast enough to see both
 ## flanks (and both cutie marks) inside a few seconds.
@@ -60,6 +85,11 @@ var _open := false
 @onready var _coat_swatch: ColorRect = $Panel/Column/CoatRow/CoatSwatch
 @onready var _mane_swatch: ColorRect = $Panel/Column/ManeRow/ManeSwatch
 @onready var _eyes_swatch: ColorRect = $Panel/Column/EyesRow/EyesSwatch
+
+## The ink she is drawing in right now, shown beside the ink buttons the same way each
+## colour row shows its own pick. The canvas is the authority on which ink is loaded; this
+## is only how it is read back without drawing a test stroke to find out.
+@onready var _ink_swatch: ColorRect = $Panel/Column/InkRow/InkSwatch
 
 ## The screen's own Labels, assigned their text from the consts above in _ready() rather
 ## than authored a second time as literals in creation_screen.tscn -- the .tscn used to
@@ -90,6 +120,7 @@ func _ready() -> void:
 	_name_box.text_changed.connect(set_name_text)
 	_confirm.pressed.connect(func() -> void: confirm())
 	_canvas.changed.connect(func() -> void: _sync_mark())
+	set_ink(0)
 	_camera.look_at(Vector3(0.0, 1.0, 0.0), Vector3.UP)
 	_wire_controls()
 
@@ -150,6 +181,35 @@ func stamp(id: int) -> void:
 	_canvas.stamp(id)
 
 
+## How many inks the row offers.
+static func ink_count() -> int:
+	return INK_NAMES.size()
+
+
+## Ink `index`'s colour. Wraps, like every StockPalette row does and for the same reason: an
+## off by one in a caller produces the wrong ink rather than an out of range read.
+static func ink_at(index: int) -> Color:
+	if INK_COLOURS.is_empty():
+		return Color.BLACK
+	return INK_COLOURS[posmod(index, INK_COLOURS.size())]
+
+
+## Ink `index`'s name, as the button says it and as drawn_lines() reports it.
+static func ink_name(index: int) -> String:
+	if INK_NAMES.is_empty():
+		return ""
+	return INK_NAMES[posmod(index, INK_NAMES.size())]
+
+
+## PICK AN INK. Everything the ink buttons do, and the one call anything else needs: the
+## canvas holds the colour (and turns the eraser off when it takes one), this only chooses
+## which and keeps the swatch in step.
+func set_ink(index: int) -> void:
+	_canvas.set_colour(ink_at(index))
+	if _ink_swatch != null:
+		_ink_swatch.color = ink_at(index)
+
+
 ## Take the look as it stands and hand it over. Returns whether anything happened; a second
 ## call does nothing, so a double click on the button cannot start two ranches.
 func confirm() -> bool:
@@ -170,6 +230,9 @@ func drawn_lines() -> Array[String]:
 		MARK_LABEL, CONFIRM_LABEL, HINT]
 	for id: int in MarkStampsScript.ids():
 		lines.append(MarkStampsScript.stamp_name(id))
+	# The ink buttons say these, so the copy rule applies to them like everything else.
+	for ink: String in INK_NAMES:
+		lines.append(ink)
 	return lines
 
 
@@ -227,6 +290,18 @@ func _wire_controls() -> void:
 
 	for id: int in MarkStampsScript.ids():
 		_connect(NodePath("Panel/Column/StampRow/Stamp%d" % id), func() -> void: stamp(id))
+
+	# The ink row. The buttons' labels are assigned from INK_NAMES here rather than authored
+	# a second time in creation_screen.tscn, for the reason the Label block above gives: the
+	# .gd consts are the only place any of this screen's text is written.
+	for index: int in range(ink_count()):
+		var ink := get_node_or_null(
+			NodePath("Panel/Column/InkRow/Ink%d" % index)) as BaseButton
+		if ink == null:
+			continue
+		if ink is Button:
+			(ink as Button).text = ink_name(index)
+		ink.pressed.connect(func() -> void: set_ink(index))
 
 	for radius: int in MarkPaintScript.BRUSHES:
 		_connect(NodePath("Panel/Column/ToolRow/Brush%d" % radius),
