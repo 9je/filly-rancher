@@ -2872,8 +2872,11 @@ func is_near_market() -> bool:
 
 
 ## WALK UP TO A LOCKED FENCE AND BE TOLD WHAT IT IS AND WHAT IT COSTS. Once per approach,
-## the plot prompt's and the market prompt's rule, for the reason _update_plot_interaction()
-## gives: a toast reprinted at 60 Hz never fades and never stops covering the screen.
+## because a toast reprinted at 60 Hz never fades and never stops covering the screen. This
+## is the last prompt in the game still working that way: everything the interact key can
+## reach went through game/world/interaction.gd and became a persistent HUD line instead (see
+## _update_interaction()), and the five _update_*_interaction() handlers this sentence used
+## to point at are gone with their latches.
 ##
 ## THERE IS NO BUTTON HERE, deliberately. A gate is not a thing you interact with; it is a
 ## thing you are refused by, and the refusal has to name the shop that lifts it. Pressing E

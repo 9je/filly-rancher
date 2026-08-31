@@ -2,10 +2,30 @@ extends GutTest
 ## THE ONE INTERACT RESOLVER. Exactly one candidate wins per frame, the order is stated
 ## rather than emergent, and the prompt always names what E is about to do.
 ##
-## This file drives no scene and touches no node: the resolver takes dictionaries and
-## answers with one, which is the whole reason it was pulled out of ranch.gd.
+## MOST OF THIS FILE DRIVES NO SCENE AND TOUCHES NO NODE: the resolver takes dictionaries
+## and answers with one, which is the whole reason it was pulled out of ranch.gd.
+##
+## THE LAST TWO TESTS ARE THE OTHER HALF, and they exist because the whole-branch review of
+## 2026-08-31 found that half uncalled. resolve() and prompt_for() are exercised everywhere;
+## the WORLD side of the seam, ranch.gd's current_interaction(), which gathers the
+## candidates and refuses to offer any of them while a menu is up, had exactly one caller
+## and no test. A pure function nobody drives through its real caller is a pure function
+## that can be right about nothing.
 
 const InteractionScript := preload("res://world/interaction.gd")
+const RanchScene := preload("res://world/ranch.tscn")
+
+
+## A menu that is open or is not, and says so through the one method _no_menu_but() asks
+## for. Standing in for any of the ten real panels, none of which can be opened without a
+## tree to pause.
+class FakeMenu:
+	extends CanvasLayer
+
+	var open := false
+
+	func is_open() -> bool:
+		return open
 
 
 func test_nothing_in_range_resolves_to_nothing() -> void:
@@ -142,3 +162,64 @@ func test_nothing_the_resolver_says_carries_a_dash() -> void:
 			var line: String = InteractionScript.prompt_for(
 				InteractionScript.candidate(kind, 1.0, subject), "E")
 			assert_false(line.contains("--") or line.contains("—"), line)
+
+
+## THE SHIPPED RANCH, WITH THE PLAYER WALKED TO THE MARKET'S DOOR. A detached Ranch cannot
+## answer this one: interaction_candidates() measures global_position, and a node that never
+## entered a tree has none, so the only honest way to ask what the interact key means
+## somewhere is to stand in that somewhere on the real map.
+func _ranch_at_the_market() -> Node3D:
+	var ranch: Node3D = RanchScene.instantiate()
+	add_child_autofree(ranch)
+	await get_tree().process_frame
+	var market: Node3D = ranch.get_node(^"Buildings/Market")
+	var player: Node3D = ranch.get_node(^"Player")
+	player.global_position = Vector3(market.global_position.x,
+		player.global_position.y, market.global_position.z)
+	await get_tree().physics_frame
+	return ranch
+
+
+func test_the_ranch_offers_the_verb_when_nothing_is_in_the_way() -> void:
+	var ranch: Node3D = await _ranch_at_the_market()
+	var action: Dictionary = ranch.current_interaction()
+	assert_eq(int(action.get("kind", InteractionScript.Kind.NONE)),
+		InteractionScript.Kind.MARKET,
+		"standing on the Market's own origin, the interact key means the Market")
+	assert_ne(InteractionScript.prompt_for(action, "E"), "",
+		"...and the HUD has a line to print about it")
+
+
+## AN OPEN MENU EMPTIES THE VERB. Every panel in this game pauses the tree and unpauses it
+## on close, so a second one opened underneath the first would unpause the world while the
+## first is still on screen; current_interaction() answers an EMPTY dictionary rather than a
+## candidate whenever anything is up, which is what makes that unreachable through E rather
+## than merely discouraged. _update_interaction() then prints no prompt and performs nothing,
+## because prompt_for({}) is "" and perform_interaction({}) is false.
+##
+## THE MENU IS A STUB, AND DELIBERATELY. Opening a real panel emits `opened`, which ranch.gd
+## answers by pausing the whole tree. Inside a test run that is GUT's tree, and slice 1
+## Task 5 already found what a menu that pauses it does to twenty five unrelated tests. What
+## is under test is the PREDICATE, and the predicate asks exactly one question of exactly one
+## method.
+func test_an_open_menu_empties_the_verb_entirely() -> void:
+	var ranch: Node3D = await _ranch_at_the_market()
+	var menu: FakeMenu = FakeMenu.new()
+	ranch.add_child(menu)
+	ranch.market_menu = menu
+
+	menu.open = false
+	assert_false(ranch.current_interaction().is_empty(),
+		"sanity: with the menu shut there is a verb to empty")
+
+	menu.open = true
+	assert_true(ranch.current_interaction().is_empty(),
+		"with a menu up, E must mean nothing at all rather than something refusable")
+	assert_eq(InteractionScript.prompt_for(ranch.current_interaction(), "E"), "",
+		"...and the HUD must therefore print no prompt")
+	assert_false(ranch.perform_interaction(ranch.current_interaction()),
+		"...and performing nothing must do nothing")
+
+	menu.open = false
+	assert_false(ranch.current_interaction().is_empty(),
+		"closing the menu hands the verb straight back, with no latch in between")

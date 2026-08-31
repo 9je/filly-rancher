@@ -379,7 +379,7 @@ restoring the cache) turns the suite green again.
 | `game/scenes/test/creation_test.gd` | The creation gate (see below) |
 | `game/scenes/test/casino_test.gd` | The casino gate (see below) |
 | `game/scenes/test/model_gallery.gd` | The model gallery, and its `--stock` and `--mark` rows (see below) |
-| `game/world/interaction.gd` | The interact resolver the gates drive through `ranch.perform_interaction()` |
+| `game/world/interaction.gd` | The interact resolver. The collection gate drives its pen step through it, standing the player on the plot and asking `ranch.current_interaction()` what the key means there before calling `ranch.perform_interaction()`; the depot gate still calls `_move_pony_into_pen()` directly |
 | `tools/setup_env.sh` | Installs/pins GUT (`GUT_VER`/`GUT_SHA256`, near the SourceIO block) |
 
 ---
@@ -624,12 +624,22 @@ Run it with:
 tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/collection_test.tscn
 ```
 
-Expect `COLLECTION_OK checks=72`; the exit code is the verdict. Every line it
+Expect `COLLECTION_OK checks=73`; the exit code is the verdict. Every line it
 prints is prefixed `COLLECTION`, and two runs print byte-identical lines: the
 beam's capture generator is seeded, the herd and the weather come out of the
 world seed, and nothing it prints is a raw physics quantity that a reordered
 frame could move. Diffing two runs is therefore a real check on the whole
 chain, and worth doing after touching the spawner, the beam or the board.
+
+**A note on that seed, from the mane pool slice.** `StockPalette.draw_look()`
+pulls FOUR numbers off the spawn generator where the old `draw_triple()` pulled
+three, so the stock stream advanced by one extra draw per pony and the herd a
+given world seed produces is not the herd that seed produced before that slice.
+That is a change to what is GENERATED, not to what is STORED: every save keeps
+each pony's look as her own record and reloads exactly the ponies it was
+written with, so no existing file moved. Only "boot the same seed twice, on
+either side of that commit, and compare the crowd" changed its answer, which is
+why the byte-identical claim above is about two runs of the SAME build.
 
 
 ---

@@ -45,9 +45,10 @@ var shop: Shop = null
 ## How the ranch says "another menu is up", the same guard pause_menu.gd carries and for
 ## the same reason: every menu here pauses the tree and unpauses it on close, so a Market
 ## opened over an already-open pause menu would unpause the world underneath it the moment
-## the Market closed. ranch.gd's _update_market_interaction() checks before it presses E,
-## but a call-site guard only protects the call sites that remember it; this is the one the
-## contract lives in.
+## the Market closed. ranch.gd's current_interaction() offers no candidate at all while
+## another menu is up, so the key never reaches here in the first place, but a call-site
+## guard only protects the call sites that remember it; this is the one the contract lives
+## in.
 var can_open := Callable()
 
 var _catalogue: Array[ShopItem] = []
