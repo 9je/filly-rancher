@@ -66,6 +66,14 @@ func row_count() -> int:
 	return stakes().size() if _tab == Tab.TABLE else 0
 
 
+## The last hand is printed above the stake line; see SlotsMenu.first_row_line_index() for
+## the whole of the reasoning. Zero on the placard, which draws no cursor at all.
+func first_row_line_index() -> int:
+	if _tab != Tab.TABLE:
+		return 0
+	return result_lines().size() + (1 if not result_lines().is_empty() else 0)
+
+
 func move_selection(step: int) -> void:
 	var n: int = row_count()
 	if n <= 0:

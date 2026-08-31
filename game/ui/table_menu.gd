@@ -149,9 +149,10 @@ func refresh() -> void:
 	for child in _rows.get_children():
 		child.queue_free()
 	var lines: Array[String] = drawn_lines()
+	var caret: int = _selected + first_row_line_index()
 	for i in lines.size():
 		var label := Label.new()
-		var picked: bool = i == _selected and row_count() > 0
+		var picked: bool = i == caret and row_count() > 0
 		label.text = ("> " if picked else "  ") + lines[i]
 		label.add_theme_color_override("font_color", COLOR_VALUE if picked else COLOR_NAME)
 		_rows.add_child(label)
@@ -175,6 +176,19 @@ func drawn_lines() -> Array[String]:
 
 ## How many of those lines the selection may sit on.
 func row_count() -> int:
+	return 0
+
+
+## WHICH DRAWN LINE ROW ZERO IS. `_selected` counts SELECTABLE rows; drawn_lines() counts
+## PRINTED lines, and every table in the Palace prints the last result above its rows. So
+## the two agree only until the first spin, after which the caret was drawn three lines
+## above the row it was actually on (two result lines plus the blank under them) and the
+## player was reading a highlight that pointed at the wrong thing.
+##
+## A table that prints anything above its first selectable row says how much, here, and
+## refresh() adds it. Zero by default, which is the answer for a table whose first printed
+## line IS its first row, and for the panels that draw no cursor at all.
+func first_row_line_index() -> int:
 	return 0
 
 

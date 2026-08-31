@@ -44,6 +44,14 @@ func row_count() -> int:
 	return stakes().size()
 
 
+## The last spin is printed above the stake line, so the caret has to come down past it.
+## `_selected` never moves on this table (move_selection() below turns up and down into a
+## change of stake, which is drawn on one line), so row zero is the stake line and this is
+## the whole of the offset: the result lines, plus the blank drawn_lines() puts under them.
+func first_row_line_index() -> int:
+	return result_lines().size() + (1 if not result_lines().is_empty() else 0)
+
+
 func move_selection(step: int) -> void:
 	var n: int = row_count()
 	if n <= 0:
