@@ -1459,7 +1459,7 @@ func _bind_casino_menus() -> void:
 	for pair in [["opened", _on_menu_opened_any], ["closed", _on_menu_closed],
 			["buy_chips_requested", _on_buy_chips_requested],
 			["cash_out_requested", _on_cash_out_requested],
-			["game_requested", _on_game_requested]]:
+			["room_requested", _on_room_requested]]:
 		if not casino_menu.is_connected(pair[0], pair[1]):
 			casino_menu.connect(pair[0], pair[1])
 
@@ -2714,27 +2714,48 @@ func _on_deal_requested(stake: int) -> void:
 	play_blackjack(stake)
 
 
-## WALK FROM THE LOBBY TO A TABLE. The lobby closes and the table opens; leaving the table
-## with Escape leaves the Palace, which is one press fewer than walking back out through a
-## lobby the player has already read.
-func _on_game_requested(game: int) -> void:
+## SHE PICKED A ROW IN THE LOBBY. The cage and the house rules are pages of the lobby menu
+## itself, so those two turn a tab rather than opening anything; the four games each open
+## their own panel, exactly as before.
+func _on_room_requested(row: int) -> void:
+	if casino_menu == null:
+		return
+	match row:
+		CasinoMenuScript.Row.CAGE:
+			casino_menu.call("set_tab", CasinoMenuScript.Tab.CAGE)
+		CasinoMenuScript.Row.RULES:
+			casino_menu.call("set_tab", CasinoMenuScript.Tab.RULES)
+		CasinoMenuScript.Row.SLOTS:
+			_open_table(slots_menu)
+		CasinoMenuScript.Row.WHEEL:
+			_open_table(wheel_menu)
+		CasinoMenuScript.Row.BLACKJACK:
+			_open_table(blackjack_menu)
+		CasinoMenuScript.Row.RACING:
+			_open_table(race_menu)
+
+
+## Close the lobby and open one table over the top of it. Closing first, and not after, so
+## _no_menu_but() is true by the time the table asks it: two open menus is the state that
+## leaves the world unpaused under the one still on screen (see _no_menu_but()).
+func _open_table(menu: CanvasLayer) -> void:
+	if menu == null or not menu.has_method("open"):
+		return
 	if casino_menu != null and casino_menu.has_method("close"):
 		casino_menu.close()
-	var table: CanvasLayer = get_table_menu(game)
-	if table != null and table.has_method("open"):
-		table.open()
+	menu.call("open")
 
 
-## The menu behind one of CasinoMenu's four doors, or null.
-func get_table_menu(game: int) -> CanvasLayer:
-	match game:
-		CasinoMenuScript.Game.SLOTS:
+## The menu behind one of CasinoMenu's four game rows, or null.
+func get_table_menu(row: int) -> CanvasLayer:
+	match row:
+		CasinoMenuScript.Row.SLOTS:
 			return slots_menu
-		CasinoMenuScript.Game.WHEEL:
+		CasinoMenuScript.Row.WHEEL:
 			return wheel_menu
-		CasinoMenuScript.Game.BLACKJACK:
+		CasinoMenuScript.Row.BLACKJACK:
 			return blackjack_menu
-		CasinoMenuScript.Game.RACING:
+		CasinoMenuScript.Row.RACING:
 			return race_menu
 	return null
 

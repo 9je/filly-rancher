@@ -21,6 +21,7 @@ extends CanvasLayer
 ## Centre/Panel/Margin/Column holding Title, Tabs, Rows and Footer.
 
 const MenuStyleScript := preload("res://ui/menu_style.gd")
+const InputDeviceScript := preload("res://systems/input_device.gd")
 
 ## What the tables let her bet. Even numbers, always: Blackjack.payout() pays three to two
 ## with integer division and an odd stake would round the bonus down by half a chip.
@@ -123,6 +124,41 @@ func show_result(lines: Array[String]) -> void:
 
 func result_lines() -> Array[String]:
 	return _result.duplicate()
+
+
+## Injected by ranch.gd alongside chips_provider, so a table can say what she is holding.
+## Already present as chips_provider; this is only the sentence built from it.
+##
+## THE REPORT: "each table screen shows your chips, the stake picker, and what keys do
+## what". A table that shows only a stake row is a table a player cannot tell she is broke
+## at until a bet silently refuses.
+func chips_line() -> String:
+	var chips: int = int(chips_provider.call()) if chips_provider.is_valid() else 0
+	if chips <= 0:
+		return "You have no chips. The cage is in the lobby, and it is one for one."
+	return "You have %d chips." % chips
+
+
+## WHAT THE KEYS DO ON THIS TABLE, in the glyphs of the device in her hands. Distinct from
+## the footer, which says how to move around a menu: this says what the CONTROLS OF THE GAME
+## are, which on every table in this building is "the stake is on the last row".
+func keys_line() -> String:
+	return "Pick a stake on the stake row, then %s to play. %s leaves." % [
+		InputDeviceScript.hint(&"ui_accept"), InputDeviceScript.hint(&"ui_cancel")]
+
+
+## THE LAST HAND, AS ITS OWN BLOCK, with a rule above it so it does not read as another
+## row. Empty until something has been settled, which is the correct state for a table
+## nobody has played yet.
+func result_block() -> Array[String]:
+	if _result.is_empty():
+		return []
+	var out: Array[String] = ["", "= = = = = = = = = = = = = = = = = = = ="]
+	for line in _result:
+		out.append(line)
+	out.append("= = = = = = = = = = = = = = = = = = = =")
+	out.append("")
+	return out
 
 
 ## The stake row, drawn by every table above its own rows.

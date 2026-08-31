@@ -117,11 +117,8 @@ func selected_guess() -> int:
 
 
 func drawn_lines() -> Array[String]:
-	var lines: Array[String] = []
-	for line in result_lines():
-		lines.append(line)
-	if not result_lines().is_empty():
-		lines.append("")
+	var lines: Array[String] = [chips_line(), keys_line()]
+	lines.append_array(result_block())
 	if _tab == Tab.NUMBER:
 		for pocket in range(1, WheelScript.NUMBERS + 1):
 			lines.append("Back %d, %s at %d to 1"
@@ -148,10 +145,12 @@ func row_count() -> int:
 	return guess_count() + 1
 
 
-## The last spin is printed above the first guess, so the caret has to come down past it;
-## see SlotsMenu.first_row_line_index() for the whole of the reasoning.
+## The chips line, the keys line and the last spin are all printed above the first guess, so
+## the caret has to come down past them; see SlotsMenu.first_row_line_index() for the whole
+## of the reasoning. See TableMenu.result_block() for what replaced the raw result lines
+## this offset used to count.
 func first_row_line_index() -> int:
-	return result_lines().size() + (1 if not result_lines().is_empty() else 0)
+	return 2 + result_block().size()
 
 
 func confirm() -> bool:

@@ -357,7 +357,7 @@ func _drive_the_palace() -> void:
 	# future re-ordering of either enum would still pass every check above it while quietly
 	# paying a colour bet at 24x instead of 6x. This drives the felt itself: open the table,
 	# pick the COLOUR tab, confirm, repeat until a win is seen, and check what it paid.
-	var wheel_table: CanvasLayer = ranch.get_table_menu(CasinoMenuScript.Game.WHEEL)
+	var wheel_table: CanvasLayer = ranch.get_table_menu(CasinoMenuScript.Row.WHEEL)
 	_set_check("the wheel opens as a table", wheel_table != null and bool(wheel_table.call("open")))
 	var menu_win_seen := false
 	var menu_win_correct := true
@@ -391,7 +391,7 @@ func _drive_the_palace() -> void:
 	_set_check("every hand settles at exactly the stake out and the win in", settled)
 
 	# --- a bet abandoned in the middle of being placed ----------------------------------------
-	var table: CanvasLayer = ranch.get_table_menu(CasinoMenuScript.Game.SLOTS)
+	var table: CanvasLayer = ranch.get_table_menu(CasinoMenuScript.Row.SLOTS)
 	var before_cancel: int = state.casino.chips
 	_set_check("a table opens at the Palace", table != null and table.call("open"))
 	if table != null:

@@ -75,3 +75,17 @@ static func cage_lines() -> Array[String]:
 		"We take nothing at this window. We take it at the tables,",
 		"and we told you exactly how much on the way in.",
 	]
+
+
+## THE SAME THING, SHORT ENOUGH TO SIT ABOVE THE AMOUNTS ON THE CAGE PAGE. The owner,
+## 2026-08-31: "the cage explains itself (bits to chips, one to one, both ways)". A page of
+## bare amounts is a page a player leaves without knowing what a chip is.
+##
+## THREE LINES AND NOT FIVE, because the rows underneath are what she came for and a wall
+## of text above them is the same problem in the other direction.
+static func cage_explainer() -> Array[String]:
+	return [
+		"Bits buy chips one for one, and chips cash out one for one, both ways.",
+		"The cage keeps nothing. The tables keep what the House rules page says.",
+		"",
+	]

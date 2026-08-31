@@ -1,27 +1,44 @@
 class_name CasinoMenu
 extends CanvasLayer
-## THE LOBBY OF THE SPECTRA PALACE: the cage, the house sign, and the four doors.
+## ONE SCREEN YOU WALK INTO, with one row per thing you can do in the building. The owner,
+## 2026-08-31: "rework the casino flow so it is playable without reading docs. Entering the
+## Palace opens ONE lobby screen with big obvious rows".
 ##
-## THE MENU DRAWS AND EMITS; ranch.gd TRANSACTS AND PAYS. This file never touches Economy,
-## Casino, GameState or a pony. It is handed four Callables (how many bits, how many chips,
-## what the sign says, and whether it may open at all) and it hands back three signals. Same
-## split as game/ui/depot_menu.gd, same reason: the whole of this is testable in milliseconds
-## against four lambdas, and the money lives in exactly one file.
+## WHAT WAS WRONG. The lobby opened on the CAGE tab, whose rows were bare amounts with no
+## explanation of what a chip was; the four games lived behind a third tab reachable only
+## by pressing left or right, which nothing on the screen said; and the house edge sat on a
+## tab in between. A player who had not read the design document could open this menu and
+## not find the slot machine.
 ##
-## THE HOUSE TAB IS NOT DECORATION. The spec's promise is that the edge is published in the
-## lobby, so it is a tab in the lobby menu as well as a sign on the wall; a player who never
-## looks up still gets the numbers put in front of her before she buys a chip.
+## THE CAGE AND THE RULES ARE STILL TABS, because they are pages rather than rooms and a
+## player who picks them from the lobby ends up on them. Everything else about the split is
+## unchanged: this file never touches Economy, Casino, GameState or a pony, it is handed
+## four Callables and it hands back three signals, and ranch.gd does every transaction.
 ##
 ## THE CAGE OFFERS ONLY WHAT SHE CAN COVER, in both directions, for the reason
 ## DepotMenu.pay_amounts() gives: a menu row that always refuses is a menu row that lies.
 
 const MenuStyleScript := preload("res://ui/menu_style.gd")
+const CasinoSignScript := preload("res://systems/casino_sign.gd")
 
-enum Tab { CAGE, HOUSE, GAMES }
-enum Game { SLOTS, WHEEL, BLACKJACK, RACING }
+enum Tab { LOBBY, CAGE, RULES }
 
-const TAB_NAMES: Array[String] = ["Cage", "House", "Games"]
-const GAME_NAMES: Array[String] = ["Slots", "The Wheel", "Blackjack", "Racing"]
+## The rows in the lobby, in order. The enum and LOBBY_ROWS are indexed together.
+enum Row { CAGE, SLOTS, WHEEL, BLACKJACK, RACING, RULES }
+
+## ONE LINE PER ROOM, AND EVERY ONE OF THEM SAYS WHAT IT IS FOR. "Slots" is a noun a player
+## already knows; "Wheel" is not, and neither is "Cage". The second half of each row is the
+## whole of the onboarding this building needs.
+const LOBBY_ROWS: Array[String] = [
+	"Cage            turn bits into chips, and chips back into bits",
+	"Slots           three reels, one lever, the fast one",
+	"The Wheel       back a colour or back a number",
+	"Blackjack       get closer to 21 than the dealer, without going over",
+	"Racing          enter one of your own ponies and back her to win",
+	"House rules     exactly how much we keep, printed by us",
+]
+
+const TAB_NAMES: Array[String] = ["Lobby", "Cage", "House rules"]
 const TITLE := "Spectra Palace"
 
 ## The amounts the cage offers before they are cut down to what she is holding.
@@ -31,14 +48,14 @@ signal opened()
 signal closed()
 signal buy_chips_requested(bits: int)
 signal cash_out_requested(chips: int)
-signal game_requested(game: int)
+signal room_requested(row: int)
 
 var can_open := Callable()
 var bits_provider := Callable()
 var chips_provider := Callable()
 var sign_provider := Callable()
 
-var _tab: int = Tab.CAGE
+var _tab: int = Tab.LOBBY
 var _selected := 0
 var _open := false
 
@@ -59,7 +76,7 @@ func open() -> bool:
 	if can_open.is_valid() and not can_open.call():
 		return false
 	_open = true
-	_tab = Tab.CAGE
+	_tab = Tab.LOBBY
 	_selected = 0
 	visible = true
 	refresh()
@@ -84,13 +101,13 @@ func tab() -> int:
 
 
 func set_tab(value: int) -> void:
-	_tab = clampi(value, Tab.CAGE, Tab.GAMES)
+	_tab = clampi(value, Tab.LOBBY, Tab.RULES)
 	_selected = 0
 	refresh()
 
 
 func switch_tab(step: int) -> void:
-	set_tab(posmod(_tab + step, Tab.GAMES + 1))
+	set_tab(posmod(_tab + step, Tab.RULES + 1))
 
 
 func selected_index() -> int:
@@ -127,12 +144,26 @@ func _steps_within(held: int) -> Array[int]:
 	return out
 
 
+## WHAT SHE IS HOLDING, ON EVERY PAGE OF THE BUILDING. Bits and chips together, because
+## the one thing a player in a casino needs continuously is her own balance, and because
+## seeing them side by side is what makes "one for one" mean something.
+func header_line() -> String:
+	var bits: int = int(bits_provider.call()) if bits_provider.is_valid() else 0
+	var chips: int = int(chips_provider.call()) if chips_provider.is_valid() else 0
+	return "You have %d bits and %d chips." % [bits, chips]
+
+
 ## Every line this menu is currently drawing, in order. For the tests, which otherwise have
 ## no way to ask whether a string carries a dash without walking the Label nodes.
 func drawn_lines() -> Array[String]:
 	var lines: Array[String] = []
 	match _tab:
+		Tab.LOBBY:
+			for row in LOBBY_ROWS:
+				lines.append(row)
 		Tab.CAGE:
+			for line in CasinoSignScript.cage_explainer():
+				lines.append(line)
 			var buys: Array[int] = buy_amounts()
 			var cashes: Array[int] = cash_amounts()
 			if buys.is_empty() and cashes.is_empty():
@@ -141,14 +172,18 @@ func drawn_lines() -> Array[String]:
 				lines.append("Buy %d chips for %d bits" % [amount, amount])
 			for amount in cashes:
 				lines.append("Cash out %d chips for %d bits" % [amount, amount])
-		Tab.HOUSE:
+		Tab.RULES:
 			if sign_provider.is_valid():
 				for line in sign_provider.call():
 					lines.append(String(line))
-		Tab.GAMES:
-			for game_name in GAME_NAMES:
-				lines.append(game_name)
 	return lines
+
+
+## WHICH DRAWN LINE ROW ZERO IS, the same question game/ui/table_menu.gd answers for its own
+## tables: the CAGE page prints the explainer above its first choosable row, so the caret
+## has to be offset by exactly that many lines or it highlights a sentence.
+func first_row_line_index() -> int:
+	return CasinoSignScript.cage_explainer().size() if _tab == Tab.CAGE else 0
 
 
 ## Act on the highlighted row. The cage's rows are the buys followed by the cashes, so the
@@ -156,6 +191,11 @@ func drawn_lines() -> Array[String]:
 ## player is standing at one window.
 func confirm() -> bool:
 	match _tab:
+		Tab.LOBBY:
+			if _selected < 0 or _selected >= LOBBY_ROWS.size():
+				return false
+			room_requested.emit(_selected)
+			return true
 		Tab.CAGE:
 			var buys: Array[int] = buy_amounts()
 			var cashes: Array[int] = cash_amounts()
@@ -169,11 +209,6 @@ func confirm() -> bool:
 				cash_out_requested.emit(cashes[index])
 				return true
 			return false
-		Tab.GAMES:
-			if _selected < 0 or _selected >= GAME_NAMES.size():
-				return false
-			game_requested.emit(_selected)
-			return true
 	return false
 
 
@@ -182,25 +217,26 @@ func refresh() -> void:
 		return
 	_footer.text = MenuStyleScript.footer_tabs_and_rows("confirm", "leave")
 	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
-	_tabs.text = MenuStyleScript.tab_strip(TAB_NAMES, _tab)
+	_tabs.text = MenuStyleScript.tab_strip(TAB_NAMES, _tab) + "      " + header_line()
 	for child in _rows.get_children():
 		child.queue_free()
 	var lines: Array[String] = drawn_lines()
+	var caret: int = _selected + first_row_line_index()
 	for i in lines.size():
 		var label := Label.new()
-		var picked: bool = i == _selected and _tab != Tab.HOUSE
+		var picked: bool = i == caret and _row_count() > 0
 		label.text = MenuStyleScript.caret(picked) + lines[i]
-		label.add_theme_color_override("font_color",
+		MenuStyleScript.style_label(label, MenuStyleScript.ROW_SIZE,
 			MenuStyleScript.COLOR_VALUE if picked else MenuStyleScript.COLOR_NAME)
 		_rows.add_child(label)
 
 
 func _row_count() -> int:
 	match _tab:
+		Tab.LOBBY:
+			return LOBBY_ROWS.size()
 		Tab.CAGE:
 			return buy_amounts().size() + cash_amounts().size()
-		Tab.GAMES:
-			return GAME_NAMES.size()
 	return 0
 
 

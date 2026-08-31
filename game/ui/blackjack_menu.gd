@@ -46,17 +46,14 @@ func tabs_text() -> String:
 
 
 func drawn_lines() -> Array[String]:
-	var lines: Array[String] = []
 	if _tab == Tab.PLACARD:
+		var placard: Array[String] = []
 		for line in BlackjackScript.placard_lines():
-			lines.append(line)
-		return lines
-	for line in result_lines():
-		lines.append(line)
-	if not result_lines().is_empty():
-		lines.append("")
-	for line in stake_lines():
-		lines.append(line)
+			placard.append(line)
+		return placard
+	var lines: Array[String] = [chips_line(), keys_line()]
+	lines.append_array(result_block())
+	lines.append_array(stake_lines())
 	if not stakes().is_empty():
 		lines.append("Deal for %d chips" % selected_stake())
 	return lines
@@ -66,12 +63,13 @@ func row_count() -> int:
 	return stakes().size() if _tab == Tab.TABLE else 0
 
 
-## The last hand is printed above the stake line; see SlotsMenu.first_row_line_index() for
-## the whole of the reasoning. Zero on the placard, which draws no cursor at all.
+## The caret sits on the "Stake:" line; see SlotsMenu.first_row_line_index() for the whole
+## of the reasoning and game/test/test_table_caret.gd for the pin. Zero on the placard,
+## which draws no cursor at all.
 func first_row_line_index() -> int:
 	if _tab != Tab.TABLE:
 		return 0
-	return result_lines().size() + (1 if not result_lines().is_empty() else 0)
+	return 2 + result_block().size()
 
 
 func move_selection(step: int) -> void:

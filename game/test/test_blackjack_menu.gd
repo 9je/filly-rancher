@@ -66,3 +66,29 @@ func test_nothing_it_draws_carries_a_dash() -> void:
 		_menu.set_tab(tab)
 		for line in _menu.drawn_lines():
 			assert_false(line.contains("--") or line.contains("—"), line)
+
+
+## THE REPORT: "each table screen shows your chips, the stake picker, and what keys do
+## what". A table that only says "Stake: [10 chips]" leaves a player who has not read a
+## document with no way to find out what Enter does here.
+func test_the_table_says_what_she_is_holding() -> void:
+	assert_true(_menu.chips_line().contains(str(_chips)),
+		"her chips must be on the screen she is betting them on: %s" % _menu.chips_line())
+
+
+func test_the_table_says_what_the_keys_do_on_this_table() -> void:
+	var keys: String = _menu.keys_line()
+	assert_false(keys.is_empty())
+	assert_true(keys.to_lower().contains("stake"),
+		"the stake picker is the control a new player cannot guess: %s" % keys)
+
+
+## THE REPORT: "results render prominently (win/lose line with numbers)".
+func test_a_settled_result_renders_as_its_own_block_with_the_numbers_in_it() -> void:
+	_menu.show_result(["You win 40 chips!", "Two cherries and a bell."])
+	var block: Array[String] = _menu.result_block()
+	assert_gt(block.size(), 0, "a settled bet must leave something on the screen")
+	assert_true("\n".join(block).contains("40"),
+		"the number is the whole point of the line")
+	assert_true("\n".join(_menu.drawn_lines()).contains("40"),
+		"and it is drawn, not merely stored")
