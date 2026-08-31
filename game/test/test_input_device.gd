@@ -11,6 +11,12 @@ func before_each() -> void:
 	InputDeviceScript.reset()
 
 
+## And put it back for whatever GUT runs next: the state is static and does not belong to
+## this file once the last case here has finished with it.
+func after_all() -> void:
+	InputDeviceScript.reset()
+
+
 func test_it_starts_on_the_keyboard() -> void:
 	assert_eq(InputDeviceScript.last(), InputDeviceScript.Kind.KEYBOARD,
 		"somebody at a keyboard must not have to press a key to be recognised")

@@ -86,10 +86,16 @@ func selected_entrant_uid() -> StringName:
 ## ONE ROW PER PONY: her name, what she pays, and the only thing about her the player can
 ## change before the off. A hungry pony is a slow pony, and her spirits are the visible half
 ## of that.
+##
+## ONE SPACE, NOT A PADDED COLUMN (Ruling 26). This line shipped as "%-16s pays %s   spirits
+## %d of 10", which pads the name to sixteen CHARACTERS and then claims a column. The panel
+## draws in a proportional font, so sixteen characters is a different width on every row and
+## the "column" is ragged wherever two names differ in shape. A comma reads as a sentence,
+## costs no alignment that was ever really there, and leaves a short name a short row.
 func form_lines() -> Array[String]:
 	var out: Array[String] = []
 	for entry in entrants():
-		out.append("%-16s pays %s   spirits %d of 10" % [
+		out.append("%s pays %s, spirits %d of 10" % [
 			String(entry.get("name", "Pony")),
 			RaceCardScript.odds_text(float(entry.get("odds", 0.0))),
 			roundi(float(entry.get("happiness", 0.0)) * 10.0)])

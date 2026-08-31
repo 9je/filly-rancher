@@ -46,11 +46,29 @@ const CARET := "> "
 const NO_CARET := "  "
 
 
+## THE OUTLINE IS NOT STYLING, AND IT IS APPLIED HERE SO NO PANEL CAN FORGET IT.
+##
+## game/ui/hud.gd's own _style_label() says it first: this game draws its text over a bright
+## green field under a bright sky, and unoutlined white text on that is genuinely unreadable.
+## Every menu panel in the game is translucent (see the MenuPanel StyleBoxFlat every .tscn
+## carries, alpha 0.88), so the field shows through them too. game/ui/build_menu.gd carried
+## exactly this pairing and exactly this reasoning in a _style_label() of its own until the
+## menus were folded onto this file, and folding them lost it: three panels shipped their
+## titles with no outline at all. Putting it in the one function every menu already calls is
+## what makes "all menus inherit it" a fact rather than a convention.
+##
+## THE NUMBERS ARE build_menu.gd's, verbatim: 75% black at 5 px.
+const OUTLINE_COLOR := Color(0.0, 0.0, 0.0, 0.75)
+const OUTLINE_SIZE := 5
+
+
 static func style_label(label: Label, size: int, colour: Color) -> void:
 	if label == null:
 		return
 	label.add_theme_font_size_override("font_size", size)
 	label.add_theme_color_override("font_color", colour)
+	label.add_theme_color_override("font_outline_color", OUTLINE_COLOR)
+	label.add_theme_constant_override("outline_size", OUTLINE_SIZE)
 
 
 static func caret(picked: bool) -> String:

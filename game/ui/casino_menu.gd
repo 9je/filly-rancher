@@ -29,13 +29,22 @@ enum Row { CAGE, SLOTS, WHEEL, BLACKJACK, RACING, RULES }
 ## ONE LINE PER ROOM, AND EVERY ONE OF THEM SAYS WHAT IT IS FOR. "Slots" is a noun a player
 ## already knows; "Wheel" is not, and neither is "Cage". The second half of each row is the
 ## whole of the onboarding this building needs.
+##
+## NOT PADDED INTO COLUMNS ANY MORE (Ruling 26). These rows shipped with runs of spaces
+## lining the descriptions up under each other, which lines nothing up: the panel draws them
+## in the project's proportional UI font, where a space is narrower than an average glyph
+## and every row is a different length in pixels. What the padding actually bought was a
+## ragged second column plus a caret that shifts the whole row when it lands on one. A
+## colon and one space says the same thing and says it truthfully; the grid pattern
+## game/ui/hud.gd's _build_hints() uses is the other way to get real columns, and it is what
+## a panel that genuinely needs them should reach for.
 const LOBBY_ROWS: Array[String] = [
-	"Cage            turn bits into chips, and chips back into bits",
-	"Slots           three reels, one lever, the fast one",
-	"The Wheel       back a colour or back a number",
-	"Blackjack       get closer to 21 than the dealer, without going over",
-	"Racing          enter one of your own ponies and back her to win",
-	"House rules     exactly how much we keep, printed by us",
+	"Cage: turn bits into chips, and chips back into bits",
+	"Slots: three reels, one lever, the fast one",
+	"The Wheel: back a colour or back a number",
+	"Blackjack: get closer to 21 than the dealer, without going over",
+	"Racing: enter one of your own ponies and back her to win",
+	"House rules: exactly how much we keep, printed by us",
 ]
 
 const TAB_NAMES: Array[String] = ["Lobby", "Cage", "House rules"]

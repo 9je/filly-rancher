@@ -1638,6 +1638,12 @@ func _penned(uid: StringName) -> Dictionary:
 ## once, so the cache is a dictionary and the guarantee is wider: the field a race settles
 ## against is exactly the field whose odds were on the screen when she pressed the button.
 ## _clear_race_bet() empties it with the rest of the bet.
+##
+## NOT THE ONE WHO IS ALREADY OUT ON THE TRACK (Ruling 27). start_race() refuses her, so a
+## row offering her was a row that could only ever refuse, and the Depot's Deliver tab and
+## its Pay tab both learned that lesson already: a row that always refuses is a row that
+## lies (see _penned_rows() and DepotMenu.pay_amounts()). She comes back to the guide the
+## moment the wire settles, exactly as she comes back to the Deliver tab.
 func race_entrants() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var runners: CompanyRunners = CompanyRunnersScript.load_shipped()
@@ -1647,6 +1653,8 @@ func race_entrants() -> Array[Dictionary]:
 		if pen == null:
 			continue
 		for inst: PonyInstance in pen.ponies():
+			if is_racing(inst.uid):
+				continue
 			var field: Array[Dictionary] = RaceCardScript.build_field(
 				RaceCardScript.entrant_from(inst), runners)
 			_quoted_fields[inst.uid] = field

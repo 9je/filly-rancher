@@ -176,3 +176,23 @@ func test_a_race_can_only_ever_be_backed_on_the_player_s_own_lane() -> void:
 	assert_almost_eq(float(race["odds"]),
 		RaceCardScript.decimal_odds(race["field"], RaceCardScript.PLAYER_LANE), 0.0001,
 		"the quoted price and the settled price are the same number")
+
+
+## A ROW THAT ALWAYS REFUSES IS A ROW THAT LIES (Ruling 27). start_race() refuses a pony who
+## is already out on the track, so the form guide offering her was an entry that could only
+## ever bounce. _penned_rows() has excluded her from the Depot's Deliver tab for exactly this
+## reason since the racing slice landed; this is the same rule on the same pony, said in the
+## other panel she appears in.
+func test_the_pony_already_on_the_track_is_not_offered_a_second_race() -> void:
+	var built := _ranch_with_pony(FakeTrackThatAccepts.new())
+	var ranch: RanchScript = built["ranch"]
+	var before: Array[Dictionary] = ranch.race_entrants()
+	assert_eq(before.size(), 1, "one pony penned, one row")
+	var uid := StringName(before[0]["uid"])
+	assert_true(bool(ranch.start_race(uid, 10)["ok"]), "she goes out on the track")
+	assert_true(ranch.is_racing(uid), "sanity: the ranch says she is racing")
+	for row in ranch.race_entrants():
+		assert_ne(StringName(row["uid"]), uid,
+			"the guide is still offering the pony who is already running")
+	assert_eq(ranch.race_entrants().size(), 0,
+		"she was the only pony penned, so the guide is empty until the wire settles")
