@@ -155,6 +155,7 @@ const StockPaletteScript := preload("res://systems/stock_palette.gd")
 const PlayerLookScript := preload("res://systems/player_look.gd")
 const StripScript := preload("res://world/strip.gd")
 const CasinoSignScript := preload("res://systems/casino_sign.gd")
+const BuildingScript := preload("res://world/building.gd")
 
 ## Headless watchdog ceiling. A normal run (assets present) finishes in under 2s on
 ## this machine; 30s leaves a wide margin for a slower box while still failing in
@@ -600,6 +601,15 @@ func _ready() -> void:
 	var strip_region: RegionData = _regions_registry().by_id(StripScript.REGION_ID)
 	if strip != null and strip_region != null:
 		strip.configure(strip_region, Callable(terrain, "height_at"))
+		# KEEP THE LIGHT RING OFF THE PALACE. The ring is centred on the region, the Palace
+		# is not (see PALACE_MAX_RELIEF's comment), so one ring position falls inside its
+		# footprint; read straight off the live node rather than a second copy of its
+		# position and size, so a later re-siting of the Palace cannot leave this stale.
+		var palace_building: Building = get_node_or_null(^"Buildings/Palace") as BuildingScript
+		if palace_building != null:
+			strip.avoid_footprint(
+				Vector2(palace_building.global_position.x, palace_building.global_position.z),
+				Vector2(palace_building.width * 0.5, palace_building.depth * 0.5))
 		strip.build()
 
 	# EVERY PONY WHO EVER REACHES THE MAP, at boot and at every later change of sky (see
@@ -2350,9 +2360,17 @@ func _rebuild_request_board() -> void:
 	if _game_state == null:
 		_board = null
 		return
+	# PRICED REGIONS ONLY, the seventh site: the Strip has no ZoneMarker (Zones/ in
+	# ranch.tscn only names the four priced regions, the ones a pony can actually be spawned
+	# into), so "Bring a <personality> pony from The Strip" would be a request on_caught()
+	# can never match -- on_caught() checks the caught pony's own zone against the request's
+	# zone exactly, and no pony is ever tagged &"strip". Handing the board a permanently
+	# uncompletable favour is worse than never offering it.
 	var region_ids: Array[StringName] = []
 	var region_names := {}
 	for region: RegionData in _regions_registry().all():
+		if region.permit_cost <= 0:
+			continue
 		region_ids.append(region.id)
 		region_names[region.id] = region.display_name
 
@@ -3353,6 +3371,31 @@ func _report(pony_count: int, prop_count: int) -> void:
 		% [palace_position().x, palace_position().z, palace_relief])
 	_set_check(checks, "the Palace stands on ground flat enough to seat it",
 		palace != null and palace_relief <= PALACE_MAX_RELIEF)
+
+	# THE LIGHT RING CLEARS THE PALACE. game/world/strip.gd's avoid_footprint() is what
+	# skips a lamp that would otherwise stand inside or against the building (the ring is
+	# centred on the region, not on the Palace, which sits off centre -- see
+	# PALACE_MAX_RELIEF's comment above -- so one ring position falls inside its footprint
+	# without it). This re-checks that work independently, against the Palace's own live
+	# position, so a later re-siting of either the Palace or the ring cannot silently let a
+	# lamp back into the wall.
+	var lamps_clear := true
+	var lamp_count := 0
+	if strip != null and palace != null:
+		var p_at: Vector3 = palace.global_position
+		var margin: float = StripScript.PALACE_CLEARANCE
+		var p_min := Vector2(p_at.x - 7.0 - margin, p_at.z - 4.5 - margin)
+		var p_max := Vector2(p_at.x + 7.0 + margin, p_at.z + 4.5 + margin)
+		var positions: Array[Vector3] = (strip as StripScript).light_positions()
+		lamp_count = positions.size()
+		for pos: Vector3 in positions:
+			if pos.x >= p_min.x and pos.x <= p_max.x and pos.z >= p_min.y and pos.z <= p_max.y:
+				lamps_clear = false
+				push_error(("ranch: a Strip lamp at (%.1f, %.1f) stands within its own " +
+					"%.1f m margin of the Palace") % [pos.x, pos.z, margin])
+	print("RANCH strip lamps=%d clear=%s" % [lamp_count, lamps_clear])
+	_set_check(checks, "every Strip lamp clears the Palace footprint by its own margin",
+		lamps_clear)
 
 	var gate_probe: Dictionary = await _probe_region_gate()
 	print("RANCH region gate ran=%s solid=%s opened=%s hit=%s"

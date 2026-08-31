@@ -95,6 +95,29 @@ func test_seed_tutorial_creates_three_requests_in_exact_order_with_exact_text_an
 		assert_false(bool(r.paid))
 
 
+# --- reading -----------------------------------------------------------------------------
+
+## The board's own account of what BRING_PERSONALITY_FROM_ZONE can draw next is exactly
+## what it was constructed with -- a copy, so a caller (ranch.gd) can check what it fed the
+## board without being able to reach in and change it. This is what let the ranch-level
+## regression (game/scenes/test/region_test.gd: the board must never draw a zone with no
+## spawn marker in it) assert against something the board itself reports, rather than
+## against a hard-coded expectation of ranch.gd's own filtering.
+func test_drawable_zones_is_a_copy_of_the_regions_it_was_built_with() -> void:
+	var board := _board(3)
+	assert_eq(board.drawable_zones(), REGIONS)
+	board.drawable_zones().clear()
+	assert_eq(board.drawable_zones(), REGIONS, "the getter must not hand out the live array")
+
+
+func test_drawable_zones_survives_a_round_trip_through_from_array() -> void:
+	var written := _board(9)
+	written.fill()
+	var reloaded := RequestBoardScript.from_array(written.to_array(), registry, REGIONS,
+		REGION_NAMES)
+	assert_eq(reloaded.drawable_zones(), REGIONS)
+
+
 # --- fill() ---------------------------------------------------------------------------------
 
 func test_fill_reaches_three_active_requests_from_an_empty_board() -> void:

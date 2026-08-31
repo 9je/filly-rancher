@@ -29,11 +29,20 @@ const CasinoSignScript := preload("res://systems/casino_sign.gd")
 const REGION_ID := &"strip"
 
 ## Lamps, and the ring they stand on. The ring sits inside the region rim and outside the
-## track's far lane, so the track is lit from around its edge.
+## track's far lane, so the track is lit from around its edge. Centred on the REGION, not
+## on Buildings/Palace: the Palace sits off centre (see PALACE_MAX_RELIEF's comment in
+## ranch.gd), so one point on this ring falls inside its footprint; avoid_footprint()
+## below is what keeps a post from standing in the wall.
 const LIGHT_COUNT := 10
 const LIGHT_RING_RADIUS := 21.0
 const POST_HEIGHT := 4.2
 const POST_THICKNESS := 0.18
+
+## Extra clearance kept past whatever AABB avoid_footprint() is handed, on top of that
+## footprint's own half-width and half-depth. Bigger than the roof's own eave overhang
+## (Building.eave_overhang, 0.45 m by default) so a kept lamp reads as placed on purpose
+## rather than as a near miss.
+const PALACE_CLEARANCE := 1.5
 
 ## The marquee, in world space: just south of the Palace's door, at first floor height, facing
 ## the walk up from the homestead. Tied to Buildings/Palace's actual transform in ranch.tscn
@@ -53,6 +62,12 @@ var _ground := Callable()
 var _lights: Array[Node3D] = []
 var _built := false
 
+## The rectangle, in world XZ, no lamp may stand inside. Empty (min == max == ZERO with
+## _has_avoid false) until avoid_footprint() is called; nothing is skipped in that case.
+var _avoid_min := Vector2.ZERO
+var _avoid_max := Vector2.ZERO
+var _has_avoid := false
+
 
 ## Hand over the region this strip paves and a way to ask the terrain how high it is. Both
 ## before build(), the same contract RegionFence.configure() has.
@@ -61,7 +76,29 @@ func configure(region: RegionData, ground_sampler: Callable) -> void:
 	_ground = ground_sampler
 
 
-## Stand the lamps and hang the marquee. Idempotent.
+## A footprint, in world XZ, that no lamp may stand inside or against: `centre_xz` and
+## `half_extents` (half-width, half-depth) of whatever is standing on the Strip's own
+## ground -- today, only Buildings/Palace. PALACE_CLEARANCE is added past those edges on
+## every side. Call before build(), same as configure(); a no-op call is safe (nothing is
+## skipped) so a caller with nothing to avoid can simply not call it.
+##
+## Not folded into configure() itself: RegionFence's contract, the one configure()
+## deliberately matches, has no such thing to hand over, and every other region's fence
+## never needs one. Kept as world-space XZ rather than a Building reference so this file
+## does not have to know what a Building is; ranch.gd reads the Palace's own global_position
+## and width/depth and hands over the rectangle, not the node.
+func avoid_footprint(centre_xz: Vector2, half_extents: Vector2) -> void:
+	var pad: Vector2 = half_extents + Vector2(PALACE_CLEARANCE, PALACE_CLEARANCE)
+	_avoid_min = centre_xz - pad
+	_avoid_max = centre_xz + pad
+	_has_avoid = true
+
+
+## Stand the lamps and hang the marquee. Idempotent. Ten lamps unless avoid_footprint() was
+## called and one ring position lands inside it, in which case that one is skipped rather
+## than moved: a gap in the ring exactly where a wall already blocks the view from outside
+## reads as intentional, and nudging a post risks landing it somewhere else that clips
+## something else instead.
 func build() -> void:
 	if _built or _region == null:
 		return
@@ -70,12 +107,24 @@ func build() -> void:
 		var angle: float = TAU * float(i) / float(LIGHT_COUNT)
 		var x: float = _region.centre.x + cos(angle) * LIGHT_RING_RADIUS
 		var z: float = _region.centre.y + sin(angle) * LIGHT_RING_RADIUS
+		if _has_avoid and x >= _avoid_min.x and x <= _avoid_max.x \
+				and z >= _avoid_min.y and z <= _avoid_max.y:
+			continue
 		_lights.append(_lamp("Lamp%d" % i, Vector3(x, _y(x, z), z)))
 	_marquee()
 
 
 func light_count() -> int:
 	return _lights.size()
+
+
+## Every built lamp's own world position, for a caller (the ranch gate) that wants to
+## confirm none of them stands inside or against something else -- see avoid_footprint().
+func light_positions() -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	for l in _lights:
+		out.append(l.global_position)
+	return out
 
 
 func marquee_text() -> String:

@@ -114,6 +114,19 @@ func _ready() -> void:
 	_set_check("there is one fence for every priced region", fences.size() == priced)
 	_set_check("the free region has no fence and needs none",
 		ranch.is_region_open(&"strip") and priced == fences.size())
+
+	# THE SEVENTH SITE: a free region has no ZoneMarker (Zones/ in ranch.tscn only names
+	# the priced regions, the ones a pony can actually spawn into), so the request board
+	# must never draw "Bring a <personality> pony from The Strip" -- on_caught() matches a
+	# request's zone against the caught pony's own zone exactly, and no pony is ever tagged
+	# &"strip", so that request could never be completed. drawable_zones() is the board's
+	# own account of what it might ask for next; it must match the priced-region count
+	# exactly and must never name the Strip.
+	var board: RequestBoard = ranch.get_request_board()
+	var drawable: Array[StringName] = board.drawable_zones() if board != null else []
+	_set_check("the request board only draws zones a pony can be caught in",
+		board != null and not drawable.has(&"strip") and drawable.size() == priced)
+
 	var zones: Array[StringName] = []
 	var all_shut := true
 	for fence in fences:
