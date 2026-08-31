@@ -496,11 +496,20 @@ tools/bin/godot --headless --audio-driver Dummy --path game world/ranch.tscn -- 
 
 Phase names are `dawn`, `day`, `dusk`, `night` and weathers are `clear`,
 `rain`, `fog`, `storm`, matched case-insensitively; `--world-time=` takes
-seconds. Expect the same `RANCH_OK ponies=49 props=59 assets=present` as an
+seconds. Expect the same `RANCH_OK ponies=49 props=60 assets=present` as an
 unpinned run, with the `RANCH world` line naming the hour that was pinned. Both
 counts moved once more in Phase 3 slice 1: the crowd fills every region with
 stock ponies alongside the named roster, and the Depot is one more prop beside
 the Market and the request board.
+
+`props` moved again, from 59 to 60, in Phase 3 slice 2: the Spectra Palace is a
+sixth building under `Buildings`, seated and counted the same way the barn and
+the Depot are. Its own lamp posts are NOT in that count -- they are children of
+the `Strip` node, not of `Buildings` or `Props`, because a lamp is scenery the
+gate has no claim on. The Strip is also the map's first region with no permit
+and no price, which moves what the ranch gate's `RANCH regions=` line checks:
+"every region has a fence" is now "every priced region has a fence", because a
+free region has nothing to unlock and ranch.tscn carries no `Fence_strip`.
 
 **Looking at the sky.** The gate checks numbers; only a person can say whether a
 stormy dusk *looks* like one. `bash tools/sky_sheet.sh` renders the ranch once

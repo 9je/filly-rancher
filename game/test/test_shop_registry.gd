@@ -75,7 +75,12 @@ func test_every_permit_names_a_region_that_exists_and_matches_its_price() -> voi
 	var regions: RegionRegistry = RegionRegistryScript.new()
 	regions.load_all(RegionRegistryScript.REGION_DIR)
 	var permits := _registry().of_kind(ShopItemScript.Kind.PERMIT)
-	assert_eq(permits.size(), regions.all().size(), "one permit per region")
+	var priced := 0
+	for region: RegionData in regions.all():
+		if region.permit_cost > 0:
+			priced += 1
+	assert_eq(permits.size(), priced,
+		"one permit per PRICED region; a free region has nothing to sell")
 	for item in permits:
 		var region: RegionData = regions.by_id(item.permit_zone)
 		assert_not_null(region, "%s names zone '%s', which is not a region" % [item.id, item.permit_zone])

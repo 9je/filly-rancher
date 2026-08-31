@@ -246,6 +246,16 @@ func test_the_zone_tallies_put_the_ranch_before_the_regions() -> void:
 	])
 
 
+## The Strip is a region with nobody living on it, so its tally reads as a real zero rather
+## than being hidden. Pinned rather than left to chance: a paved strip with no wild ponies on
+## it is a true thing for the Compendium to say.
+func test_the_free_region_tallies_as_a_zone_with_nobody_in_it() -> void:
+	_wire_book()
+	_menu.open_page(PauseMenu.Page.COMPENDIUM)
+	var rows: Array[String] = _menu.compendium_region_rows()
+	assert_true(rows.has("The Strip: 0 of 0"), "rows were: %s" % ", ".join(rows))
+
+
 func test_the_character_list_scrolls_a_window_and_wraps_round_the_whole_roster() -> void:
 	_wire_book()
 	_menu.open_page(PauseMenu.Page.COMPENDIUM)

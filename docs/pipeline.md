@@ -1270,7 +1270,7 @@ tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/smoke.ts
 # raycast onto real ground inside their zones, camera spring arm pulling in against
 # an actual building). Prints the marker ONLY if all of them held.
 tools/bin/godot --headless --audio-driver Dummy --path game world/ranch.tscn
-# -> RANCH_OK ponies=49 props=59 assets=present   exit 0
+# -> RANCH_OK ponies=49 props=60 assets=present   exit 0
 # (assets=absent + zero counts on a checkout that has not run the asset pipeline)
 # Both counts moved from an earlier build's 22/58: the crowd (Phase 3 slice 1) fills every
 # region with stock ponies alongside the named roster, and the Depot building (the same
@@ -1478,7 +1478,7 @@ Task 7 the main scene is `res://world/ranch.tscn` (`game/project.godot`), not
 `res://scenes/test/smoke.tscn`. The Linux binary prints:
 
 ```
-RANCH_OK ponies=49 props=59 assets=present
+RANCH_OK ponies=49 props=60 assets=present
 ```
 
 exit 0 — the same line the headless scene run prints, confirming the exported

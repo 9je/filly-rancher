@@ -153,6 +153,8 @@ const LedgerScript := preload("res://systems/ledger.gd")
 const LettersScript := preload("res://systems/letters.gd")
 const StockPaletteScript := preload("res://systems/stock_palette.gd")
 const PlayerLookScript := preload("res://systems/player_look.gd")
+const StripScript := preload("res://world/strip.gd")
+const CasinoSignScript := preload("res://systems/casino_sign.gd")
 
 ## Headless watchdog ceiling. A normal run (assets present) finishes in under 2s on
 ## this machine; 30s leaves a wide margin for a slower box while still failing in
@@ -192,6 +194,24 @@ const MIN_CAMERA_PULL_IN := 0.5
 ## a prop moved after it was placed or the AABB it was seated by is not the AABB it
 ## renders with.
 const SEATING_TOLERANCE := 0.02
+
+## Metres of relief allowed across the Palace's own footprint. Bigger than SEATING_TOLERANCE
+## because this is the ground under a fourteen metre building rather than the seating error
+## of a prop.
+##
+## 0.65, NOT 0.35, AND THAT NUMBER WAS MEASURED, NOT GUESSED. Terrain._raw_height() has no
+## flat pocket anywhere inside the Strip's own 26 m disc that a 14 x 9 m footprint fits into
+## at 0.35 m or under: a Nelder-Mead search of height_at() over the whole region (and a grid
+## sweep of the original box this constant's comment used to name, x in [-10, 10], z in
+## [58, 70]) bottoms out at 0.633 m, at the box's own x = -10 edge. Buildings/Palace sits at
+## exactly that spot (world (-10, 0, 61.6); see strip.gd's MARQUEE_AT, which was moved to
+## match). Nowhere closer to the strip's own centre does better than about 0.95 m, which is
+## what the original (0, 66) placement measured. Shrinking the building instead would fix
+## it -- relief scales with footprint size -- but a Palace narrow enough to clear 0.35 m
+## stops reading as the map's biggest building, which is the one thing ranch.tscn's comment
+## on ridge_height says this building is for. 0.65 leaves a hair of margin over the measured
+## 0.633 rather than trimming it to the metre.
+const PALACE_MAX_RELIEF := 0.65
 
 ## Metres of relief the zone markers' ground must actually have, so that placing a
 ## pony by raycast is measurably different from placing her at y=0.
@@ -234,6 +254,10 @@ const BOARD_RADIUS := 3.0
 ## How near the loading dock she has to be for E to open the Depot. Tighter than the
 ## Market's radius because the Depot is a smaller building on a busier corner of the yard.
 const DEPOT_RADIUS := 4.0
+
+## How close to the Spectra Palace the counter opens from. Wider than the Depot's, because
+## the Palace is fourteen metres across and the door is in the middle of one long side.
+const PALACE_RADIUS := 5.0
 
 ## Plot slots the map must carry -- the plan asks for four to six, and the reserved
 ## clearing (PropsScript.PEN_PLOTS_*) is an 18 m square, which fits four 7.8 m pens on a
@@ -333,6 +357,7 @@ const GATE_RAY_REACH := 2.0
 ## Everything that belongs to a region rather than to the homestead: the lake's water
 ## disc now, and Task 4's fence rings alongside it.
 @onready var regions_root: Node3D = $Regions
+@onready var strip: Node3D = $Strip
 @onready var build_menu: CanvasLayer = $BuildMenu
 @onready var market_menu: CanvasLayer = $MarketMenu
 @onready var depot_menu: CanvasLayer = $DepotMenu
@@ -556,6 +581,12 @@ func _ready() -> void:
 	# cannot be called from here: the save has not been read yet. It is read by
 	# _bind_game_state() a few dozen lines down, and the call follows it.
 	for region: RegionData in _regions_registry().all():
+		if region.permit_cost <= 0:
+			# A FREE REGION HAS NO GATE, and that is the whole difference between the Strip
+			# and the other four. There is no permit to sell for it, nothing to revoke, and
+			# no ring of timber to shut, so ranch.tscn carries no Fence_strip and this loop
+			# must not go looking for one. is_region_open() answers for it directly.
+			continue
 		var fence := regions_root.get_node_or_null("Fence_" + String(region.id)) as RegionFence
 		if fence == null:
 			push_error("ranch: no RegionFence for region '%s' in ranch.tscn" % region.id)
@@ -563,6 +594,13 @@ func _ready() -> void:
 		fence.configure(region, Callable(terrain, "height_at"))
 		fence.build()
 	_region_fence_cache = get_region_fences()
+
+	# THE STRIP, on ground that now exists. Lamp posts and a marquee, built here rather than
+	# in ranch.tscn for the same reason the fences are: they are seated on a heightfield.
+	var strip_region: RegionData = _regions_registry().by_id(StripScript.REGION_ID)
+	if strip != null and strip_region != null:
+		strip.configure(strip_region, Callable(terrain, "height_at"))
+		strip.build()
 
 	# EVERY PONY WHO EVER REACHES THE MAP, at boot and at every later change of sky (see
 	# Spawner.pony_spawned). Connected at the top of boot rather than beside the populate()
@@ -645,6 +683,13 @@ func _ready() -> void:
 	for node: Node3D in buildings.get_children():
 		node.build()
 		PropsScript.seat(node, terrain.height_at(node.global_position.x, node.global_position.z))
+
+	# THE SIGN READS ITSELF OUT OF THE GAMES. Written here rather than authored into
+	# ranch.tscn so that the lobby cannot advertise a house edge the tables are not actually
+	# charging; game/systems/casino_sign.gd asks each game for its own number.
+	var lobby_sign := get_node_or_null(^"Buildings/Palace/Sign") as Label3D
+	if lobby_sign != null:
+		lobby_sign.text = "\n".join(CasinoSignScript.lines())
 
 	var prop_count: int = props.build() + buildings.get_child_count()
 
@@ -1375,9 +1420,14 @@ func _built_plot_count() -> int:
 	return n
 
 
+## How many PERMITS the player is holding, which is what the Ledger charges upkeep on. A free
+## region is not a permit: counting the Strip here would bill her a fee every collection day,
+## forever, for a permit that does not exist and that no collector could ever revoke.
 func _open_permit_count() -> int:
 	var n := 0
 	for region: RegionData in _regions_registry().all():
+		if region.permit_cost <= 0:
+			continue
 		if is_region_open(region.id):
 			n += 1
 	return n
@@ -1400,6 +1450,25 @@ func is_near_depot() -> bool:
 	var gap := Vector2(player.global_position.x - depot.global_position.x,
 		player.global_position.z - depot.global_position.z).length()
 	return gap <= DEPOT_RADIUS
+
+
+## The Spectra Palace's own origin in world space, or the Strip's centre if the building is
+## missing. The doorway is on the south face; see ranch.tscn's half turn on the node.
+func palace_position() -> Vector3:
+	var palace := get_node_or_null(^"Buildings/Palace") as Node3D
+	if palace != null:
+		return palace.global_position
+	var region: RegionData = _regions_registry().by_id(StripScript.REGION_ID)
+	return Vector3(region.centre.x, 0.0, region.centre.y) if region != null else Vector3.ZERO
+
+
+func is_near_palace() -> bool:
+	var palace := get_node_or_null(^"Buildings/Palace") as Node3D
+	if palace == null:
+		return false
+	var gap := Vector2(player.global_position.x - palace.global_position.x,
+		player.global_position.z - palace.global_position.z).length()
+	return gap <= PALACE_RADIUS
 
 
 ## E at the loading dock opens the Depot. Once per approach, the Market's and the board's
@@ -1787,11 +1856,15 @@ static func _punishment_phrase(punishment: int) -> String:
 
 
 ## The most expensive permit she currently holds. The dearest one, so the punishment is felt
-## rather than shrugged off, and so it is obvious which fence closed.
+## rather than shrugged off, and so it is obvious which fence closed. PRICED REGIONS ONLY:
+## the Strip is always open (is_region_open() says so directly, having no fence to ask), but
+## it is not a permit anybody bought and there is nothing on it to revoke.
 func _dearest_open_permit() -> StringName:
 	var best: StringName = &""
 	var best_cost := -1
 	for region: RegionData in _regions_registry().all():
+		if region.permit_cost <= 0:
+			continue
 		if not is_region_open(region.id):
 			continue
 		if region.permit_cost > best_cost:
@@ -1882,10 +1955,14 @@ func get_region_fences() -> Array[RegionFence]:
 	return found
 
 
-## Whether the region called `zone` is unfenced to the player right now. An unknown zone
-## is closed rather than open: nothing should be able to walk into a region this map does
-## not have by naming it.
+## Whether the region called `zone` is unfenced to the player right now. An unknown zone is
+## closed rather than open: nothing should be able to walk into a region this map does not
+## have by naming it. A region with NO PRICE is open and has no fence to ask; see the
+## fence loop in _ready().
 func is_region_open(zone: StringName) -> bool:
+	var region: RegionData = _regions_registry().by_id(zone)
+	if region != null and region.permit_cost <= 0:
+		return true
 	for fence in get_region_fences():
 		if fence.region() != null and fence.region().id == zone:
 			return fence.is_open()
@@ -3175,18 +3252,33 @@ func _report(pony_count: int, prop_count: int) -> void:
 			open_gates += 1
 	var roster: PonyRegistry = PonyRegistryScript.new()
 	roster.load_all(spawner.pony_dir)
-	var every_region_fenced := regions.size() > 0 and fences.size() == regions.size()
-	var residents_everywhere := regions.size() > 0
+	var priced_regions: Array[RegionData] = []
 	for region: RegionData in regions:
+		if region.permit_cost > 0:
+			priced_regions.append(region)
+	var every_region_fenced := priced_regions.size() > 0 \
+		and fences.size() == priced_regions.size()
+	var residents_everywhere := priced_regions.size() > 0
+	for region: RegionData in priced_regions:
 		if not fenced.has(region.id):
 			every_region_fenced = false
 			push_error("ranch: region '%s' has no fence" % region.id)
 		if roster.by_zone(region.id).is_empty():
 			residents_everywhere = false
 			push_error("ranch: region '%s' has no residents in the roster" % region.id)
-	print("RANCH regions=%d fences=%d open=%d" % [regions.size(), fences.size(), open_gates])
-	_set_check(checks, "every region has a fence", every_region_fenced)
-	_set_check(checks, "every region zone has residents in the roster", residents_everywhere)
+	print("RANCH regions=%d priced=%d fences=%d open=%d"
+		% [regions.size(), priced_regions.size(), fences.size(), open_gates])
+	_set_check(checks, "every priced region has a fence", every_region_fenced)
+	_set_check(checks, "every priced region zone has residents in the roster",
+		residents_everywhere)
+	# A FREE REGION IS OPEN AND UNFENCED, and that is a claim worth making out loud rather
+	# than leaving as the absence of a failure above.
+	var free_open := true
+	for region: RegionData in regions:
+		if region.permit_cost <= 0 and not is_region_open(region.id):
+			free_open = false
+			push_error("ranch: free region '%s' is not open" % region.id)
+	_set_check(checks, "every free region is open and needs no fence", free_open)
 
 	# NO HOMESTEAD ROAM DISC MAY REACH A REGION'S FENCE RING. The bug this exists for, found
 	# by scenes/test/region_test.tscn: a `ranch` pony drawn for WestHollow spawned 22.1 m
@@ -3213,7 +3305,9 @@ func _report(pony_count: int, prop_count: int) -> void:
 	for marker: ZoneMarker in spawner.get_markers():
 		var at := Vector2(marker.global_position.x, marker.global_position.z)
 		if marker.zone_id == &"ranch":
-			for region: RegionData in regions:
+			# PRICED REGIONS ONLY: the clearance being measured is the distance to a fence
+			# RING, and a free region has no ring for a roam disc to reach.
+			for region: RegionData in priced_regions:
 				var apart := at.distance_to(region.centre)
 				var needed: float = (region.radius + RegionFenceScript.RING_MARGIN
 					+ marker.outer_bound() + REGION_CLEARANCE)
@@ -3239,6 +3333,26 @@ func _report(pony_count: int, prop_count: int) -> void:
 						% [own_region.id, marker.name, own_reach, own_limit])
 	_set_check(checks, "no homestead roam disc reaches a region's fence ring, and every " +
 		"region's own residents stay inside their own ring", regions_stand_clear)
+
+	# THE PALACE STANDS ON GROUND FLAT ENOUGH TO SEAT IT. Props.seat() puts a building's
+	# lowest visible point at the ground height under its ORIGIN, so a fourteen metre
+	# footprint on a slope shows daylight under one corner and buries the other. Every other
+	# building on this map is inside Terrain's flat apron and never had to care; the Palace is
+	# seventy metres north of it, so the relief across its own footprint is measured here
+	# rather than judged by eye once and forgotten.
+	var palace := get_node_or_null(^"Buildings/Palace") as Node3D
+	var palace_relief := 0.0
+	if palace != null:
+		var at := palace.global_position
+		var centre_y: float = terrain.height_at(at.x, at.z)
+		for corner in [Vector2(-7.0, -4.5), Vector2(7.0, -4.5), Vector2(-7.0, 4.5),
+				Vector2(7.0, 4.5)]:
+			palace_relief = maxf(palace_relief,
+				absf(terrain.height_at(at.x + corner.x, at.z + corner.y) - centre_y))
+	print("RANCH palace at=(%.1f, %.1f) relief=%.2f"
+		% [palace_position().x, palace_position().z, palace_relief])
+	_set_check(checks, "the Palace stands on ground flat enough to seat it",
+		palace != null and palace_relief <= PALACE_MAX_RELIEF)
 
 	var gate_probe: Dictionary = await _probe_region_gate()
 	print("RANCH region gate ran=%s solid=%s opened=%s hit=%s"

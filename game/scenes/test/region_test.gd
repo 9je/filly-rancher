@@ -1,6 +1,6 @@
 extends Node
 ## THE REGION GATE. Proves the whole of slice 3's unlock loop on the real map, in one run:
-## four rings of timber stand shut around four regions, the ponies who live in each one
+## a ring of timber stands shut around every region that has a price on it, the ponies who live in each one
 ## spawned inside it and nobody else did, the orchard's gateway is a wall the player cannot
 ## walk through, the permit for it is in the Market and unaffordable while the wallet is
 ## empty, selling two legendary gems pays for it, buying it swings that one gate open and
@@ -107,7 +107,13 @@ func _ready() -> void:
 		return
 
 	# --- four rings, all shut ------------------------------------------------------------
-	_set_check("there is one fence for every region", fences.size() == 4)
+	var priced := 0
+	for region: RegionData in ranch._regions_registry().all():
+		if region.permit_cost > 0:
+			priced += 1
+	_set_check("there is one fence for every priced region", fences.size() == priced)
+	_set_check("the free region has no fence and needs none",
+		ranch.is_region_open(&"strip") and priced == fences.size())
 	var zones: Array[StringName] = []
 	var all_shut := true
 	for fence in fences:
