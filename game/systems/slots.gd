@@ -114,13 +114,29 @@ static func house_edge() -> float:
 
 
 ## One line per winning combination, for the machine's own paytable panel.
+##
+## "RETURNS n FOR 1", NOT "PAYS n TO 1", AND THE DIFFERENCE IS THE PLAYER'S MONEY.
+## TRIPLE_PAYS and TWO_RAINBOW_PAY are TOTAL RETURN multipliers: payout() hands back the
+## whole of `pay * stake`, the stake included. "n to 1" is the other convention, the one a
+## racecourse uses, where the winner takes n PLUS her stake back; printing these constants
+## that way overstated every line on the wall by one stake (an "Apple Apple Apple pays 4 to
+## 1" that actually returns 4x, a net 3 to 1). "for 1" is the total return wording, and it
+## is already this project's own precedent: RaceCard.odds_text() prints its decimal odds,
+## which are total return by the same contract, as "%.2f for 1".
+##
+## game/test/test_published_payouts.gd parses the number back out of every line here, the
+## Wheel's rules and Blackjack's placard and applies it to a stake, so no wording on any
+## wall in the Palace can drift from what the dealer actually pays again.
 static func paytable_lines() -> Array[String]:
 	var lines: Array[String] = []
 	for symbol in SYMBOL_NAMES.size():
-		lines.append("%s %s %s pays %d to 1"
+		lines.append("%s %s %s returns %d for 1"
 			% [SYMBOL_NAMES[symbol], SYMBOL_NAMES[symbol], SYMBOL_NAMES[symbol],
 				TRIPLE_PAYS[symbol]])
-	lines.append("Two Rainbows anywhere pays %d to 1" % TWO_RAINBOW_PAY)
+	lines.append("Two Rainbows anywhere returns %d for 1" % TWO_RAINBOW_PAY)
+	# ONE_RAINBOW_PAY is 1, so this line is already true under either convention: the whole
+	# of what comes back is the stake. Left in words because "returns 1 for 1" is a sentence
+	# nobody reads as "you broke even".
 	lines.append("One Rainbow anywhere hands your stake back")
 	return lines
 
