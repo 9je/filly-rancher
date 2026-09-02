@@ -31,6 +31,10 @@ const PROP_FLOOR := 30
 ## The model MLP_SCALE is derived from. See Props.MLP_TARGET_BARN_RIDGE.
 const SCALE_REFERENCE := "saa_barn.glb"
 
+## The five id prefixes tools/prop_manifest.txt actually names. See _build_props_row()'s
+## doc comment for why kenney_ files (present in the same directory) are not scanned.
+const PROP_PREFIXES := ["saa_", "pv_", "mlp_", "school_", "lp_"]
+
 func _ready() -> void:
     if "--stock" in OS.get_cmdline_user_args():
         _build_stock_row()
@@ -140,6 +144,13 @@ func _build_mark_row() -> void:
 ## validate_gltf.py --props only asks whether meshes exist. Second, how big these models
 ## actually are, which is where Props.MLP_SCALE comes from. Show scale is not Kenney
 ## scale, and guessing at it is how a barn ends up the size of a hay bale.
+##
+## SCOPED TO PROP_PREFIXES, NOT EVERY .glb IN THE DIRECTORY. kenney_*.glb files live in the
+## same PROP_DIR but never went through tools/convert_props.sh; they use flat material
+## colors instead of albedo textures by design (Kenney's Nature Kit, docs/pipeline.md
+## section 4 quirk 6), and their placement/seating/collision is already proven by
+## game/world/ranch.gd's own gate. Counting them here would fail this gate on a texture
+## convention this pipeline never touched.
 func _build_props_row() -> void:
     GateWatchdogScript.arm(self, "GALLERY")
     var camera := $PropCamera as Camera3D
@@ -161,6 +172,13 @@ func _build_props_row() -> void:
     files.sort()
     for file: String in files:
         if file.get_extension() != "glb":
+            continue
+        var known := false
+        for prefix: String in PROP_PREFIXES:
+            if file.begins_with(prefix):
+                known = true
+                break
+        if not known:
             continue
         var scene: PackedScene = load(PROP_DIR + file)
         var inst: Node3D = scene.instantiate()
