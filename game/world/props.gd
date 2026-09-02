@@ -70,6 +70,35 @@ const BASE_SCALE := 1.5
 ## shows a hairline of daylight under its uphill edge.
 const SINK_BIAS := 0.05
 
+## A PROP WIDER THAN THIS, STANDING OFF THE FLAT APRON, GETS A PLINTH OF ITS OWN.
+##
+## seat() puts the bottom of a model's AABB SINK_BIAS below the ground height at ONE point.
+## That is right for a tree and wrong for a barn: the flattest 13 by 10 m rectangle anywhere
+## on this map outside the homestead apron still has 0.366 m of relief across it, and the
+## barn's own site has 0.643 m. Seated at one point, a wide model shows daylight under one
+## corner and buries the other, and the terrain passes through its floor plane, which is a
+## horizontal face and therefore z fights.
+##
+## game/world/building.gd solved exactly this for the procedural buildings on 2026-08-31
+## (FLOOR_TOP, SKIRT_DEPTH, PLINTH_INSET). A mesh prop cannot use that answer, because a
+## Building BUILDS its own plinth and a .glb's floor is whatever the modeller drew. So the
+## prop gets a solid box under it instead: seated against the LOWEST of nine samples across
+## its own footprint, deep enough to bridge the measured relief, inset on every side so its
+## own outer face is never coplanar with the model's. The terrain then always passes through
+## the SIDE of an opaque box, which is the property the Building plinth buys.
+##
+## SKIRT_INSET is PLINTH_INSET's number for PLINTH_INSET's reason. SKIRT_MIN_DEPTH is what
+## the box has UNDER the relief it is bridging, so a 0.64 m dip gets a 1.54 m box.
+## WIDE_FOOTPRINT is the longer side at which one point seating stops being good enough.
+const SKIRT_INSET := 0.06
+const SKIRT_MIN_DEPTH := 0.90
+const WIDE_FOOTPRINT := 4.0
+
+## Turned earth, and deliberately not a colour any of the models use: a skirt that reads as
+## part of the building is a building with a strangely tall base, while a skirt that reads
+## as ground the building is standing in is what it actually is.
+const SKIRT_COLOUR := Color(0.21, 0.17, 0.13)
+
 ## Per-file multiplier ON TOP of BASE_SCALE. Only ever for a prop whose shipped
 ## asset is at a known-wrong scale.
 const SCALE_FIX := {
@@ -101,6 +130,33 @@ const MLP_TARGET_BARN_RIDGE := 7.0
 ## 13.479 m tall as converted, so MLP_TARGET_BARN_RIDGE / 13.479 = 0.5193. Re-run
 ## that gate and redo this division if tools/convert_props.sh's export ever changes shape.
 const MLP_SCALE := 0.5193
+
+## THE FAMILY A LAYOUT ENTRY BELONGS TO, and the base scale each family is built at.
+##
+## Three, and they are three different measuring conventions rather than three tastes:
+## a Kenney kit piece (BASE_SCALE, derived from a 2 unit door module), a Kenney Nature Kit
+## tree (BASE_SCALE again, then TREE_SCALE on top, because the kit's trees are stylised
+## shorter than a pony), and an MLP prop converted out of a Source model (MLP_SCALE, which
+## replaces BASE_SCALE outright: see its own comment).
+##
+## An entry may name its family explicitly. An entry that does not is a Kenney piece,
+## unless its file begins with "kenney_tree", which is the rule the shipped treeline
+## already follows and which is why 50 layout entries did not have to be edited to say so.
+const FAMILY_KENNEY := &"kenney"
+const FAMILY_TREE := &"tree"
+const FAMILY_MLP := &"mlp"
+
+const FAMILY_SCALE := {
+	&"kenney": BASE_SCALE,
+	&"tree": BASE_SCALE * TREE_SCALE,
+	&"mlp": MLP_SCALE,
+}
+
+## Node name prefixes that are foliage rather than structure. ranch.gd frames its shots and
+## runs its camera-against-a-wall probe against "every prop that is not one of these": a
+## canopy is a bad obstacle to prove a camera with, because the arm may be stopping on a
+## leaf a player would walk straight under.
+const FOLIAGE_PREFIXES := ["kenney_tree", "mlp_apple_tree"]
 
 ## THE OPEN GROUND, reserved for Phase 1B's pen plots. Centre and half-extent in
 ## metres, on XZ. Nothing is placed here, no pony spawns here, and ranch.gd asserts
@@ -213,6 +269,9 @@ const LAYOUT := [
 var _placed: Array[Node3D] = []
 var _shape_count := 0
 var _missing: Array[String] = []
+var _entries: Array[Dictionary] = []
+var _skirts: Array[MeshInstance3D] = []
+var _seat_grounds: Dictionary = {}
 
 
 ## True if ANY prop in the layout has a converted asset on this machine.
@@ -266,22 +325,34 @@ func build() -> int:
 			continue
 
 		var at: Vector2 = entry["at"]
-		var scale_factor: float = BASE_SCALE * float(SCALE_FIX.get(file, 1.0)) \
-			* float(entry.get("s", 1.0))
-		if file.begins_with("kenney_tree"):
-			scale_factor *= TREE_SCALE
-
 		inst.name = "%s_%d" % [file.get_basename(), _placed.size()]
-		inst.scale = Vector3.ONE * scale_factor
+		inst.scale = Vector3.ONE * scale_for(entry)
 		inst.rotation.y = deg_to_rad(float(entry["yaw"]))
 		var ground := _ground_height(at.x, at.y)
 		inst.position = Vector3(at.x, ground, at.y)
 		add_child(inst)
 
+		# Measured AFTER the scale and the yaw are applied and the node is in the tree:
+		# world_aabb() is a world space measurement, and a footprint is the footprint of
+		# the model as it will actually stand.
+		var box := world_aabb(inst)
+		var centre := Vector2(box.get_center().x, box.get_center().z)
+		var half := Vector2(box.size.x * 0.5, box.size.z * 0.5)
+		var relief := Vector2(ground, ground)
+		var skirted: bool = bool(entry.get("skirt", false))
+		if skirted:
+			relief = footprint_relief(centre, half, Callable(self, "_ground_height"))
+			ground = relief.x
+
 		seat(inst, ground)
+		_seat_grounds[inst] = ground
+
+		if skirted:
+			_add_skirt(inst, centre, half, relief.y - relief.x, ground)
 
 		_shape_count += _add_collision(inst)
 		_placed.append(inst)
+		_entries.append(entry)
 
 	if not _missing.is_empty():
 		push_warning("Props: %d layout entries have no converted asset: %s"
@@ -305,6 +376,32 @@ func get_shape_count() -> int:
 
 func get_placed() -> Array[Node3D]:
 	return _placed
+
+
+## The LAYOUT entry a placed prop came from, or {} for anything Props did not place.
+func entry_of(node: Node3D) -> Dictionary:
+	var index := _placed.find(node)
+	return _entries[index] if index >= 0 else {}
+
+
+## True if Props seated `node` and recorded the height it used.
+func has_seat_ground(node: Node3D) -> bool:
+	return _seat_grounds.has(node)
+
+
+## The ground height `node` was actually seated against: the height under its origin for
+## an ordinary prop, the lowest of nine footprint samples for a skirted one. ranch.gd's
+## seating check reads this rather than re-deriving it, for the same reason it reads
+## Building.seat_ground() for a building: the number a prop was seated by and the number
+## the gate checks it against must not be able to drift apart.
+func seat_ground_of(node: Node3D) -> float:
+	return float(_seat_grounds.get(node, 0.0))
+
+
+## Every skirt box standing under a wide prop. Not props, not in the census; ranch.gd
+## checks their collision layer alongside the props' own.
+func get_skirts() -> Array[MeshInstance3D]:
+	return _skirts
 
 
 ## Layout entries whose asset file is missing on this machine.
@@ -335,6 +432,34 @@ static func world_aabb(root: Node3D) -> AABB:
 	return result
 
 
+## Ground height at the four corners, the four edge midpoints and the centre of the
+## rectangle `centre` plus or minus `half`, sampled through `ground_sampler`. Returns
+## (lowest, highest).
+##
+## Nine points and not one, for the reason game/world/building.gd's footprint_relief() takes
+## nine: the height under a wide model's ORIGIN says nothing about the corner that is going
+## to hang in the air. Deliberately the same shape as that function, so a reviewer reading
+## one has read both; it is a free function here because a prop has no footprint of its own
+## to ask, only the AABB of whatever the modeller drew.
+static func footprint_relief(centre: Vector2, half: Vector2, ground_sampler: Callable) -> Vector2:
+	var lowest := INF
+	var highest := -INF
+	for dx: float in [-half.x, 0.0, half.x]:
+		for dz: float in [-half.y, 0.0, half.y]:
+			var h: float = float(ground_sampler.call(centre.x + dx, centre.y + dz))
+			lowest = minf(lowest, h)
+			highest = maxf(highest, h)
+	return Vector2(lowest, highest)
+
+
+## True if a prop with this world AABB, standing on ground that is `flat` or not, has to be
+## seated by its footprint and given a skirt. ranch.gd asks this of every LIVE placed prop
+## and fails the gate if an entry that needs one does not carry `"skirt": true`, so the rule
+## is checked against measurements rather than remembered.
+static func needs_skirt(box: AABB, flat: bool) -> bool:
+	return not flat and maxf(box.size.x, box.size.z) > WIDE_FOOTPRINT
+
+
 ## Shift `node` vertically until the bottom of what you can actually SEE sits
 ## SINK_BIAS below `ground`, whatever the asset thinks its own origin is. The one
 ## seating rule on the ranch -- ranch.gd applies it to the hand-built buildings too,
@@ -352,6 +477,33 @@ static func seat(node: Node3D, ground: float) -> void:
 static func is_in_pen_plots(x: float, z: float) -> bool:
 	return absf(x - PEN_PLOTS_CENTRE.x) <= PEN_PLOTS_HALF_EXTENT \
 		and absf(z - PEN_PLOTS_CENTRE.y) <= PEN_PLOTS_HALF_EXTENT
+
+
+## The family `entry` belongs to. See FAMILY_SCALE.
+static func family_of(entry: Dictionary) -> StringName:
+	if entry.has("family"):
+		return StringName(entry["family"])
+	var file: String = entry["file"]
+	if file.begins_with("kenney_tree"):
+		return FAMILY_TREE
+	return FAMILY_KENNEY
+
+
+## The uniform scale `entry` is built at: its family's base, times any per-file correction
+## in SCALE_FIX, times the entry's own `s` jitter. The one place these three multiply, so
+## nothing can apply two of them and forget the third.
+static func scale_for(entry: Dictionary) -> float:
+	var file: String = entry["file"]
+	var base: float = float(FAMILY_SCALE.get(family_of(entry), BASE_SCALE))
+	return base * float(SCALE_FIX.get(file, 1.0)) * float(entry.get("s", 1.0))
+
+
+## True if `node_name` is one of the foliage families. See FOLIAGE_PREFIXES.
+static func is_foliage(node_name: String) -> bool:
+	for prefix: String in FOLIAGE_PREFIXES:
+		if node_name.begins_with(prefix):
+			return true
+	return false
 
 
 func _ground_height(x: float, z: float) -> float:
@@ -384,3 +536,37 @@ func _add_collision(inst: Node3D) -> int:
 		body.collision_mask = 0
 
 	return created
+
+
+## A solid box under a wide prop, so the terrain always passes through the SIDE of
+## something opaque instead of through a horizontal face. See SKIRT_INSET above for the
+## whole argument, and game/world/building.gd's PLINTH_INSET for the same fix on the
+## procedural buildings.
+##
+## PARENTED TO Props, NOT TO THE PROP, and that is load bearing. world_aabb() is what
+## seat() and ranch.gd's seating check both measure, and a box hanging below the model
+## would move the bottom they read: every skirted prop would report itself sunk by the
+## skirt's whole depth and the gate would go red on a correctly placed barn. As a sibling
+## it is collided and layered like any prop and is deliberately absent from _placed, so it
+## never enters the census either.
+func _add_skirt(inst: Node3D, centre: Vector2, half: Vector2, relief: float,
+		top: float) -> MeshInstance3D:
+	var depth: float = relief + SKIRT_MIN_DEPTH
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(maxf(0.2, (half.x - SKIRT_INSET) * 2.0), depth,
+		maxf(0.2, (half.y - SKIRT_INSET) * 2.0))
+	var material := StandardMaterial3D.new()
+	material.albedo_color = SKIRT_COLOUR
+	material.roughness = 0.95
+	mesh.material = material
+
+	var skirt := MeshInstance3D.new()
+	skirt.name = "%s_skirt" % inst.name
+	skirt.mesh = mesh
+	add_child(skirt)
+	# Its top face meets the model's own floor, which seat() has just put SINK_BIAS below
+	# the lowest footprint sample.
+	skirt.global_position = Vector3(centre.x, top - SINK_BIAS - depth * 0.5, centre.y)
+	_shape_count += _add_collision(skirt)
+	_skirts.append(skirt)
+	return skirt
