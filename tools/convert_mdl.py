@@ -48,6 +48,9 @@ argv = sys.argv[sys.argv.index("--") + 1:]
 p = argparse.ArgumentParser()
 p.add_argument("--mdl", required=True)
 p.add_argument("--out", required=True)
+p.add_argument("--max-texture", type=int, default=0,
+               help="downscale any packed image whose longest side exceeds N pixels; "
+                    "0 (the default) leaves every image at its native VTF resolution")
 args = p.parse_args(argv)
 
 mdl_path = os.path.abspath(args.mdl)
@@ -61,9 +64,19 @@ if result != {"FINISHED"}:
     print(f"MDL_IMPORT_FAILED {result}")
     sys.exit(1)
 
-for img in bpy.data.images:               # Source textures arrive as VTF-decoded images; pack them
-    if img.source == "FILE":
-        img.pack()
+# Source textures arrive as VTF-decoded images. Shrink them BEFORE packing: the glTF
+# exporter bakes whatever the image currently holds into the .glb, so a resize after the
+# pack costs the same bytes it was meant to save. barn_base.glb measured 34 MB at native
+# resolution in the tier c prop probe, almost all of it baked PNG.
+for img in bpy.data.images:
+    if img.source != "FILE":
+        continue
+    if args.max_texture > 0 and max(img.size) > args.max_texture:
+        was_w, was_h = img.size
+        factor = args.max_texture / float(max(was_w, was_h))
+        img.scale(max(1, int(round(was_w * factor))), max(1, int(round(was_h * factor))))
+        print(f"MDL_TEXTURE_SCALED {img.name} {was_w}x{was_h} -> {img.size[0]}x{img.size[1]}")
+    img.pack()
 
 bpy.ops.export_scene.gltf(filepath=args.out, export_format="GLB",
                           export_animations=True, export_skins=True, export_yup=True)

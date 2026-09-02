@@ -990,6 +990,62 @@ reVAmped name match cannot see.
 
 ---
 
+## 5c. The prop pipeline: `tools/convert_props.sh`
+
+Section 5 converts one `.mdl` by hand. This is the batch, and it is the command a
+fresh clone runs to get the map's MLP scenery back.
+
+```bash
+bash tools/convert_props.sh
+# -> CONVERTED saa_barn
+# -> ...
+# -> PROP_CONVERT ok=35 failed=0 skipped=0 refused=0
+tools/bin/godot --headless --path game --import
+```
+
+`tools/prop_manifest.txt` is the curation and the only place it lives: 35 lines of
+`id|source`, `source` relative to `assets-inbox/`. The id is the name the map uses,
+so `game/world/props.gd`'s `LAYOUT` and `ranch.gd`'s report both speak it.
+
+**Two whole families of model are refused by name, and a refusal fails the run.**
+
+* `gb_` prefixed and `_gb` suffixed models are **ground patches**, not buildings:
+  `barn_gb` renders as a dirt and grass patch with a paddock fence and worn path
+  rings, meant to sit under the barn. Every building in `ponysfm-environments` has
+  one. A glob would convert about fifty flat planes believing they were buildings
+  while missing the ten real ones.
+* `_m` suffixed models are **mirrored duplicates**. `barn_base.mdl` and
+  `barn_base_m.mdl` are both 3,108 bytes with their own `.vvd` and `.dx90.vtx`
+  siblings.
+
+**`--max-texture` is not optional at this scale.** `convert_mdl.py` gained the flag
+for this driver, which passes 1024 by default. Without it `barn_base.glb` alone is
+34 MB of baked PNG at native VTF resolution.
+
+`tools/test_convert_props.sh` exercises the driver against stub exporter and
+validator scripts in seconds with no Blender, including both refusal rules, the
+cap being passed through, and the removal of a `.glb` that exported but failed
+validation (left in place it would be skipped forever, because its existence is
+what makes the next run think the model is done).
+
+### The output is gitignored, and worktrees share one copy
+
+`game/assets/converted/` is gitignored in full (§4 of `docs/ci.md` explains what the
+project builds on that), so these 35 `.glb` files are not in the repository and a
+fresh clone has no props, exactly as it has no ponies.
+
+**`.claude/worktrees/*/game/assets/converted` is a symlink to the main checkout's
+`game/assets/converted`.** That is why a worktree has ponies without running the
+pipeline, and it has two consequences worth knowing before you convert anything in
+one:
+
+* converting inside a worktree writes into the MAIN checkout's tree, so the
+  conversion is only ever paid once, from wherever you happen to be standing;
+* an abandoned branch that converted something leaves it behind on master's disk.
+  Nothing breaks: `Props.build()` ignores any file `LAYOUT` does not name.
+
+---
+
 ## 6. Animation strategy — verdict, and how to add animations to a new character
 
 **Verdict: CANONICAL RIG**, for the tier-a (CreatorOfPony/MythicSpeed)

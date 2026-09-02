@@ -1,0 +1,60 @@
+# The curated MLP prop set: id|source, source relative to assets-inbox/.
+#
+# THE CURATION LIVES HERE AND NOWHERE ELSE. tools/convert_props.sh converts exactly what
+# this file names, game/world/props.gd places exactly what it converts, and
+# game/test/test_ranch_world.gd asserts nothing else can appear in the layout. Six packs
+# ship about 330 models between them; these are the 35 that dress the six places the map
+# actually has. See docs/pipeline.md section 5c.
+#
+# NOT HERE ON PURPOSE: anything named gb_* or *_gb (a ground patch: a flat dirt and grass
+# decal meant to sit under a building, not a building), anything named *_m (a mirrored
+# duplicate of its unsuffixed sibling), and the whole ponysfm-schoolhouse GMOD/ tree (a
+# second copy of its own SFM/ tree). convert_props.sh refuses the first two by name so a
+# later hand edit cannot quietly reintroduce one.
+
+# --- Sweet Apple Acres ------------------------------------------------------------------
+saa_barn|ponysfm-sweet-apple-acres/models/Sweet_Apple_Acres/barn_base.mdl
+saa_shed|ponysfm-sweet-apple-acres/models/Sweet_Apple_Acres/shed.mdl
+saa_wagon|ponysfm-sweet-apple-acres/models/Sweet_Apple_Acres/wagon.mdl
+saa_hay_pile|ponysfm-sweet-apple-acres/models/Sweet_Apple_Acres/hay_pile.mdl
+saa_hay_block|ponysfm-sweet-apple-acres/models/Sweet_Apple_Acres/hay_block.mdl
+saa_wire_arch|ponysfm-sweet-apple-acres/models/Sweet_Apple_Acres/wire_arch.mdl
+saa_water_chute|ponysfm-sweet-apple-acres/models/Sweet_Apple_Acres/water_chute.mdl
+saa_seed_bag|ponysfm-sweet-apple-acres/models/Sweet_Apple_Acres/seed_bag.mdl
+saa_fence_old|ponysfm-sweet-apple-acres/models/Sweet_Apple_Acres/fence_old.mdl
+saa_corn_plant|ponysfm-sweet-apple-acres/models/Sweet_Apple_Acres/corn_plant.mdl
+saa_corn_plant_dead|ponysfm-sweet-apple-acres/models/Sweet_Apple_Acres/corn_plant_dead.mdl
+
+# --- Scenebuild props: apples, hedging and yard clutter ---------------------------------
+mlp_apple_tree|ponysfm-scenebuild/MLP Scenebuild Props/models/props_pony/apple_tree.mdl
+mlp_apple_tree_bare|ponysfm-scenebuild/MLP Scenebuild Props/models/props_pony/apple_tree_noapples.mdl
+mlp_bush|ponysfm-scenebuild/MLP Scenebuild Props/models/props_pony/bush.mdl
+mlp_crate|ponysfm-scenebuild/MLP Scenebuild Props/models/props_pony/crate_empy.mdl
+mlp_basket|ponysfm-scenebuild/MLP Scenebuild Props/models/props_pony/basket.mdl
+mlp_farm_well|ponysfm-scenebuild/MLP Scenebuild Props/models/props_pony/farm_well.mdl
+mlp_chicken_coop|ponysfm-scenebuild/MLP Scenebuild Props/models/props_pony/chicken_coop.mdl
+
+# --- Ponyville General ------------------------------------------------------------------
+pv_general|ponysfm-general-building/models/MLP_Props/Ponyville_General/Building/ponyville_general_building.mdl
+pv_general_sign|ponysfm-general-building/models/MLP_Props/Ponyville_General/Building/ponyville_general_sign.mdl
+
+# --- the Ponyville town row -------------------------------------------------------------
+pv_tower_b|ponysfm-environments/models/Ponyville_Environments/tower_b.mdl
+pv_wide_b|ponysfm-environments/models/Ponyville_Environments/wide_b.mdl
+pv_pink_b|ponysfm-environments/models/Ponyville_Environments/pink_b.mdl
+pv_courtyard_b|ponysfm-environments/models/Ponyville_Environments/courtyard_b.mdl
+pv_balcony_b|ponysfm-environments/models/Ponyville_Environments/balcony_b.mdl
+pv_bridged_b|ponysfm-environments/models/Ponyville_Environments/bridged_b.mdl
+
+# --- the schoolyard. THE PACK SHIPS NO SCHOOLHOUSE; see the probe findings above. -------
+school_belltower|ponysfm-schoolhouse/SFM/models/belltower.mdl
+school_sign|ponysfm-schoolhouse/SFM/models/school_sign.mdl
+school_swingframe|ponysfm-schoolhouse/SFM/models/swingframe.mdl
+school_horseshoe|ponysfm-schoolhouse/SFM/models/playgroundhorseshoe.mdl
+school_tetherball_pole|ponysfm-schoolhouse/SFM/models/teatherpoll.mdl
+school_picnic_table|ponysfm-schoolhouse/SFM/models/picnictable.mdl
+school_cone|ponysfm-schoolhouse/SFM/models/school_cone.mdl
+
+# --- Las Pegasus ------------------------------------------------------------------------
+lp_skeeball|ponysfm-las-pegasus/models/mlp_props/las_pegasus/games/skeeball_game.mdl
+lp_dance_game|ponysfm-las-pegasus/models/mlp_props/las_pegasus/games/dance_game.mdl
