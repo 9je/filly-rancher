@@ -162,6 +162,24 @@ func test_the_prop_scale_factor_is_the_one_the_pipeline_validated() -> void:
 		"docs/pipeline.md section 4 derives 1.5x -- changing it needs a doc change too")
 
 
+func test_the_mlp_family_has_its_own_base_scale_and_it_is_not_the_kenney_one() -> void:
+	# The whole point of the family key: a Source model is not a Kenney kit piece and must
+	# not be multiplied by a number derived from a Kenney door module. If these two ever
+	# come out equal it is a coincidence worth looking at, not a pass.
+	assert_gt(PropsScript.MLP_SCALE, 0.0, "MLP_SCALE must be a positive multiplier")
+	assert_lt(PropsScript.MLP_SCALE, 100.0,
+		"MLP_SCALE above 100 means the measurement was read off the wrong model")
+
+
+func test_the_sweet_apple_acres_barn_has_a_target_ridge_to_be_scaled_against() -> void:
+	# 7.0 m: about two metres over the homestead barn's own 4.9 m ridge (authored in
+	# game/world/ranch.tscn), and under Terrain.BOUNDARY_HEIGHT. ranch.gd measures the
+	# seated barn against this same constant, so a scale that stopped producing it fails
+	# a gate rather than only looking wrong.
+	assert_almost_eq(PropsScript.MLP_TARGET_BARN_RIDGE, 7.0, 0.0001,
+		"the target ridge is quoted in props.gd's MLP_SCALE derivation and in ranch.gd")
+
+
 # --- zone markers ----------------------------------------------------------------
 
 func test_a_zones_outer_bound_allows_for_the_flee_overshoot() -> void:

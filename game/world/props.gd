@@ -83,6 +83,25 @@ const SCALE_FIX := {
 ## comment.
 const TREE_SCALE := 3.0
 
+## THE MLP FAMILY'S OWN BASE SCALE, and it REPLACES BASE_SCALE rather than multiplying it.
+## BASE_SCALE is a Kenney kit number (docs/pipeline.md section 4 derives it from a 2 unit
+## Kenney door module); a Source engine model converted by tools/convert_props.sh arrives
+## with the inch to metre conversion already baked into its vertex data by SourceIO, at
+## whatever size a 2015 SFM modeller drew it. Those are two unrelated conventions and
+## multiplying one by the other has no meaning.
+##
+## MEASURED, NOT CHOSEN. scenes/test/model_gallery.tscn -- --props loads every converted
+## prop and prints the world AABB of each; MLP_SCALE is MLP_TARGET_BARN_RIDGE divided by
+## the native height that gate reported for saa_barn.glb. ranch.gd then measures the
+## seated barn and fails if it does not stand at the target, so the number below and the
+## barn on the map cannot drift apart silently.
+const MLP_TARGET_BARN_RIDGE := 7.0
+
+## From the run above: scenes/test/model_gallery.tscn -- --props reported saa_barn.glb at
+## 13.479 m tall as converted, so MLP_TARGET_BARN_RIDGE / 13.479 = 0.5193. Re-run
+## that gate and redo this division if tools/convert_props.sh's export ever changes shape.
+const MLP_SCALE := 0.5193
+
 ## THE OPEN GROUND, reserved for Phase 1B's pen plots. Centre and half-extent in
 ## metres, on XZ. Nothing is placed here, no pony spawns here, and ranch.gd asserts
 ## both -- an "open area" that quietly grew a tree in it is exactly the kind of
