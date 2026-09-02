@@ -156,7 +156,10 @@ func test_every_prop_stands_clear_of_every_priced_region_fence_ring() -> void:
 	# props.gd's own rule: at least 4 m past the ring, which RegionFence puts at
 	# radius + RING_MARGIN. A trunk ON the ring is a tree growing through a fence rail, and
 	# a prop INSIDE it is something a resident can spawn on top of.
-	for region: RegionData in _priced_regions():
+	var priced: Array[RegionData] = _priced_regions()
+	assert_gt(priced.size(), 0,
+		"no priced regions on disk; this sweep would be asserting nothing at all")
+	for region: RegionData in priced:
 		var ring: float = region.radius + RegionFenceScript.RING_MARGIN + REGION_PROP_MARGIN
 		for entry: Dictionary in PropsScript.LAYOUT:
 			var at: Vector2 = entry["at"]
