@@ -70,10 +70,99 @@ const BASE_SCALE := 1.5
 ## shows a hairline of daylight under its uphill edge.
 const SINK_BIAS := 0.05
 
+## A PROP WIDER THAN THIS, STANDING OFF THE FLAT APRON, GETS A PLINTH OF ITS OWN.
+##
+## seat() puts the bottom of a model's AABB SINK_BIAS below the ground height at ONE point.
+## That is right for a tree and wrong for a barn: the flattest 13 by 10 m rectangle anywhere
+## on this map outside the homestead apron still has 0.366 m of relief across it, and the
+## barn's own site has 0.643 m. Seated at one point, a wide model shows daylight under one
+## corner and buries the other, and the terrain passes through its floor plane, which is a
+## horizontal face and therefore z fights.
+##
+## game/world/building.gd solved exactly this for the procedural buildings on 2026-08-31
+## (FLOOR_TOP, SKIRT_DEPTH, PLINTH_INSET). A mesh prop cannot use that answer, because a
+## Building BUILDS its own plinth and a .glb's floor is whatever the modeller drew. So the
+## prop gets a solid box under it instead: seated against the LOWEST of nine samples across
+## its own footprint, deep enough to bridge the measured relief, inset on every side so its
+## own outer face is never coplanar with the model's. The terrain then always passes through
+## the SIDE of an opaque box, which is the property the Building plinth buys.
+##
+## SKIRT_INSET is PLINTH_INSET's number for PLINTH_INSET's reason. SKIRT_MIN_DEPTH is what
+## the box has UNDER the relief it is bridging, so a 0.64 m dip gets a 1.54 m box.
+## WIDE_FOOTPRINT is the longer side at which one point seating stops being good enough.
+const SKIRT_INSET := 0.06
+const SKIRT_MIN_DEPTH := 0.90
+const WIDE_FOOTPRINT := 4.0
+
+## Turned earth, and deliberately not a colour any of the models use: a skirt that reads as
+## part of the building is a building with a strangely tall base, while a skirt that reads
+## as ground the building is standing in is what it actually is.
+const SKIRT_COLOUR := Color(0.21, 0.17, 0.13)
+
 ## Per-file multiplier ON TOP of BASE_SCALE. Only ever for a prop whose shipped
 ## asset is at a known-wrong scale.
+##
+## kenney_survival_structure.glb IS NO LONGER IN LAYOUT and its entry below stays anyway.
+## docs/pipeline.md section 4 quirk 5 calls it an open timber frame that "reads as farm
+## equipment abandoned in a field"; the Ponyville General store stands where it used to,
+## across the Market yard. The correction is a MEASUREMENT of a defect in that pack's FBX
+## branch (2.0 units as Kenney's own GLB, 0.50 after the round trip), not a decoration on
+## a layout line, so it is kept for anyone who re places the prop and so the doc that
+## records the defect still has something to point at.
+##
+## THE MLP ROWS BELOW ARE THE SAME KIND OF MEASUREMENT, and they exist because MLP_SCALE
+## was divided out of ONE model. saa_barn.glb is an SFM hero set piece drawn at 13.479 m;
+## the rest of the six packs is authored at real world metres, which the gallery says
+## plainly: an eight foot picnic table measures 2.438 m, a four foot bell housing 1.219 m,
+## a skeeball cabinet 2.450 m. Multiplying those by 0.5193 gave a 9 cm basket, a knee high
+## bell tower and an orchard whose trees stood shorter than the ponies under them.
+##
+## So the DEFAULT correction is 1.93, which is 1 / MLP_SCALE: it restores the metres the
+## model was drawn at. Every model whose native size already reads correctly for the thing
+## it depicts carries exactly that number. Any OTHER number means the shipped model is not
+## the size of the thing its filename names, and the comment beside it says what it was
+## targeted at instead. The yardstick throughout is the one the renders are judged by: a
+## pony is 2.138 m to the horn tip, the homestead barn ridge is 4.9 m, saa_barn is 7.0 m.
+##
+## saa_barn.glb, pv_general.glb, pv_general_sign.glb and the six pv_*_b town buildings
+## carry NO row on purpose, and that is a measurement too. The barn is the model the scale
+## was derived from and ranch.gd fails if it stops standing at 7.00 m; the sign is authored
+## to hang on the General and has to keep its own building's scale; the town row already
+## measures 3.6 m to 7.4 m. school_cone.glb is left alone for the same reason: 0.95 m is
+## already a traffic cone standing beside a 2.138 m pony.
+##
+## Every number below is target_height / (native_height * MLP_SCALE), with native_height
+## read off scenes/test/model_gallery.tscn in its props mode.
 const SCALE_FIX := {
 	"kenney_survival_structure.glb": 4.0,  # FBX unit-conversion defect, quirk 4.
+	# --- Sweet Apple Acres: the farm on the walk to the Orchard ----------------------
+	"saa_shed.glb": 1.93,  # 3.51 m: native metres, half the height of the barn beside it.
+	"saa_hay_pile.glb": 1.93,  # 2.11 m: native metres, a pile a pony cannot see over.
+	"saa_hay_block.glb": 1.93,  # 0.70 m: native metres, one bale.
+	"saa_wagon.glb": 1.93,  # 0.98 m at 3.25 m long: native metres, a farm cart.
+	"saa_seed_bag.glb": 1.93,  # 0.65 m: native metres, a sack a pony could drag.
+	"saa_water_chute.glb": 1.93,  # 0.83 m: native metres.
+	"saa_wire_arch.glb": 1.93,  # 2.74 m: native metres, and a pony walks under it.
+	"saa_fence_old.glb": 1.93,  # 0.75 m rail, 4.06 m long: native metres. Skirted.
+	"saa_corn_plant.glb": 3.83,  # 2.40 m: a stalk over a pony; native 1.21 m is a seedling.
+	"saa_corn_plant_dead.glb": 3.83,  # the live stalk's number, so the row matches.
+	"mlp_apple_tree.glb": 3.21,  # 5.60 m before jitter; the Kenney trees stood 6.2 m.
+	"mlp_apple_tree_bare.glb": 3.36,  # 5.60 m: the same target, the same species.
+	"mlp_bush.glb": 1.93,  # 0.80 m: native metres.
+	"mlp_chicken_coop.glb": 1.93,  # 1.57 m: native metres.
+	"mlp_farm_well.glb": 1.93,  # 1.42 m: native metres, a well a pony leans over.
+	"mlp_crate.glb": 3.40,  # 0.70 m: native 0.40 m is a doll's crate.
+	"mlp_basket.glb": 5.70,  # 0.50 m: native 0.17 m seats at 9 cm, effectively invisible.
+	# --- the schoolyard --------------------------------------------------------------
+	"school_belltower.glb": 4.33,  # 2.40 m: the pack ships the bell HOUSING, a 1.07 m cube.
+	"school_sign.glb": 3.56,  # 2.20 m: a yard sign at pony eye height, not a 1.19 m plaque.
+	"school_swingframe.glb": 1.93,  # 3.14 m: native metres, and a pony swings under it.
+	"school_horseshoe.glb": 1.93,  # 1.22 m: native metres.
+	"school_tetherball_pole.glb": 1.28,  # 3.60 m: native 5.43 m is a mast, not a pole.
+	"school_picnic_table.glb": 3.03,  # 0.90 m: a 0.76 m table taken to pony scale. Skirted.
+	# --- Las Pegasus, on the Strip ---------------------------------------------------
+	"lp_skeeball.glb": 1.93,  # 2.46 m: native metres, a cabinet a pony can reach.
+	"lp_dance_game.glb": 1.93,  # 2.53 m: native metres.
 }
 
 ## Category-wide multiplier ON TOP of BASE_SCALE, applied to every "kenney_tree_*"
@@ -82,6 +171,52 @@ const SCALE_FIX := {
 ## read as trees once ponies and a real barn are standing next to them. See the class
 ## comment.
 const TREE_SCALE := 3.0
+
+## THE MLP FAMILY'S OWN BASE SCALE, and it REPLACES BASE_SCALE rather than multiplying it.
+## BASE_SCALE is a Kenney kit number (docs/pipeline.md section 4 derives it from a 2 unit
+## Kenney door module); a Source engine model converted by tools/convert_props.sh arrives
+## with the inch to metre conversion already baked into its vertex data by SourceIO, at
+## whatever size a 2015 SFM modeller drew it. Those are two unrelated conventions and
+## multiplying one by the other has no meaning.
+##
+## MEASURED, NOT CHOSEN. scenes/test/model_gallery.tscn -- --props loads every converted
+## prop and prints the world AABB of each; MLP_SCALE is MLP_TARGET_BARN_RIDGE divided by
+## the native height that gate reported for saa_barn.glb. ranch.gd then measures the
+## seated barn and fails if it does not stand at the target, so the number below and the
+## barn on the map cannot drift apart silently.
+const MLP_TARGET_BARN_RIDGE := 7.0
+
+## From the run above: scenes/test/model_gallery.tscn -- --props reported saa_barn.glb at
+## 13.479 m tall as converted, so MLP_TARGET_BARN_RIDGE / 13.479 = 0.5193. Re-run
+## that gate and redo this division if tools/convert_props.sh's export ever changes shape.
+const MLP_SCALE := 0.5193
+
+## THE FAMILY A LAYOUT ENTRY BELONGS TO, and the base scale each family is built at.
+##
+## Three, and they are three different measuring conventions rather than three tastes:
+## a Kenney kit piece (BASE_SCALE, derived from a 2 unit door module), a Kenney Nature Kit
+## tree (BASE_SCALE again, then TREE_SCALE on top, because the kit's trees are stylised
+## shorter than a pony), and an MLP prop converted out of a Source model (MLP_SCALE, which
+## replaces BASE_SCALE outright: see its own comment).
+##
+## An entry may name its family explicitly. An entry that does not is a Kenney piece,
+## unless its file begins with "kenney_tree", which is the rule the shipped treeline
+## already follows and which is why 50 layout entries did not have to be edited to say so.
+const FAMILY_KENNEY := &"kenney"
+const FAMILY_TREE := &"tree"
+const FAMILY_MLP := &"mlp"
+
+const FAMILY_SCALE := {
+	&"kenney": BASE_SCALE,
+	&"tree": BASE_SCALE * TREE_SCALE,
+	&"mlp": MLP_SCALE,
+}
+
+## Node name prefixes that are foliage rather than structure. ranch.gd frames its shots and
+## runs its camera-against-a-wall probe against "every prop that is not one of these": a
+## canopy is a bad obstacle to prove a camera with, because the arm may be stopping on a
+## leaf a player would walk straight under.
+const FOLIAGE_PREFIXES := ["kenney_tree", "mlp_apple_tree"]
 
 ## THE OPEN GROUND, reserved for Phase 1B's pen plots. Centre and half-extent in
 ## metres, on XZ. Nothing is placed here, no pony spawns here, and ranch.gd asserts
@@ -93,40 +228,38 @@ const PEN_PLOTS_HALF_EXTENT := 9.0
 ## The homestead layout, hand-composed rather than scattered randomly.
 ##
 ## Read as a picture: the windmill is the tall thing you see from anywhere on the
-## map and steer by; the watermill is the farmhouse you spawn facing; the survival
-## structure is the barn beside the yard; the stall is the clutter that makes a yard
-## look lived in. Trees ring the open country and thin out toward the buildings, so
-## the homestead reads as a clearing somebody made rather than a field with objects
-## dropped on it. `y` is never specified -- every prop is sat on height_at() so
+## map and steer by; the watermill is the farmhouse you spawn facing; the stall is the
+## clutter that makes a yard look lived in; Ponyville General stands across the yard where
+## an open Kenney timber frame used to. Trees ring the open country and thin out toward the
+## buildings, so the homestead reads as a clearing somebody made rather than a field with
+## objects dropped on it. `y` is never specified -- every prop is sat on height_at() so
 ## nothing floats and nothing sinks.
 ##
 ## `s` is an optional per-entry size jitter, applied on top of BASE_SCALE (and of
 ## SCALE_FIX). Fixed values rather than an RNG draw: a hand-varied treeline is
 ## reproducible, and reproducibility is what makes a screenshot regression legible.
-## Note what is NOT here: a house or a barn. The kit has none -- see
-## game/world/building.gd, which is why the ranch's two actual buildings are
-## assembled from primitives instead. The Kenney pieces below are yard fixtures.
+## The ranch's OWN buildings are still not in here and still not meshes: game/world/
+## building.gd assembles them from primitives, because they are in git, they exist in CI
+## and in a fresh clone, and their doorways are asserted against MIN_DOOR_CLEARANCE. What
+## the MLP props below are is scenery: a farm on the walk to the Orchard, a shop across the
+## yard, a town on the road north. Nothing here is ever walked into.
 const LAYOUT := [
 	# --- yard fixtures, all inside Terrain's flat apron ---------------------------
 	{"file": "kenney_windmill.glb", "at": Vector2(3.5, -17.5), "yaw": 10.0},
 	{"file": "kenney_watermill.glb", "at": Vector2(-17.0, -4.0), "yaw": 90.0},
-	{"file": "kenney_survival_structure.glb", "at": Vector2(14.0, 2.0), "yaw": 90.0},
 	{"file": "kenney_market_stall.glb", "at": Vector2(2.0, 3.0), "yaw": 200.0},
 	# --- treeline ----------------------------------------------------------------
 	{"file": "kenney_tree_oak.glb", "at": Vector2(-19.0, -19.0), "yaw": 0.0, "s": 1.15},
 	{"file": "kenney_tree_pine.glb", "at": Vector2(-26.0, -8.0), "yaw": 40.0, "s": 1.25},
-	{"file": "kenney_tree_default.glb", "at": Vector2(-22.0, 27.0), "yaw": 120.0, "s": 1.05},
 	{"file": "kenney_tree_fat.glb", "at": Vector2(-5.0, -27.0), "yaw": 200.0, "s": 1.20},
 	{"file": "kenney_tree_oak.glb", "at": Vector2(8.0, -28.0), "yaw": 75.0, "s": 0.95},
 	{"file": "kenney_tree_pine.glb", "at": Vector2(24.0, -20.0), "yaw": 150.0, "s": 1.30},
 	{"file": "kenney_tree_default.glb", "at": Vector2(31.0, -2.0), "yaw": 20.0, "s": 1.10},
 	{"file": "kenney_tree_fat.glb", "at": Vector2(26.0, 14.0), "yaw": 260.0, "s": 1.00},
 	{"file": "kenney_tree_oak.glb", "at": Vector2(14.0, 27.0), "yaw": 300.0, "s": 1.20},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-2.0, 31.0), "yaw": 90.0, "s": 1.15},
 	{"file": "kenney_tree_default.glb", "at": Vector2(-33.0, 10.0), "yaw": 210.0, "s": 1.25},
 	{"file": "kenney_tree_fat.glb", "at": Vector2(-31.0, -25.0), "yaw": 15.0, "s": 1.10},
 	{"file": "kenney_tree_oak.glb", "at": Vector2(37.0, -31.0), "yaw": 130.0, "s": 1.05},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(21.0, 36.0), "yaw": 55.0, "s": 1.20},
 	{"file": "kenney_tree_default.glb", "at": Vector2(-17.0, -32.0), "yaw": 245.0, "s": 0.95},
 	# Copses rather than an even scatter: two or three trunks together read as
 	# woodland, evenly-spaced singles read as a car park.
@@ -137,11 +270,11 @@ const LAYOUT := [
 	{"file": "kenney_tree_fat.glb", "at": Vector2(-12.0, -36.0), "yaw": 140.0, "s": 1.15},
 	{"file": "kenney_tree_oak.glb", "at": Vector2(45.0, -12.0), "yaw": 310.0, "s": 1.20},
 	{"file": "kenney_tree_pine.glb", "at": Vector2(-42.0, -6.0), "yaw": 80.0, "s": 1.30},
-	{"file": "kenney_tree_default.glb", "at": Vector2(12.0, 42.0), "yaw": 200.0, "s": 1.10},
 	{"file": "kenney_tree_fat.glb", "at": Vector2(-40.0, 24.0), "yaw": 45.0, "s": 1.20},
 	{"file": "kenney_tree_oak.glb", "at": Vector2(-43.0, 20.0), "yaw": 260.0, "s": 1.00},
-	# Two inside the clearing, for shade and to break up the yard.
-	{"file": "kenney_tree_fat.glb", "at": Vector2(17.0, 7.5), "yaw": 35.0, "s": 1.05},
+	# One inside the clearing, for shade and to break up the yard. Its neighbour at
+	# (17, 7.5) came out when the yard grew crates, a basket, a well and a coop; a shade
+	# tree in the middle of that is a tree in the middle of a yard.
 	{"file": "kenney_tree_oak.glb", "at": Vector2(-20.0, 1.0), "yaw": 165.0, "s": 1.10},
 	# --- the regions -------------------------------------------------------------
 	# Slice 3's four regions (game/data/regions/*.tres) are 60 m and more from the
@@ -159,12 +292,19 @@ const LAYOUT := [
 	# through a fence rail. Planted outside, they read as the country the fence is the
 	# edge of, which is the whole job a boundary fence has on a map this size.
 	# The Orchard, (72, 40) r 22: apples on the high ground, none across the west gate.
-	{"file": "kenney_tree_oak.glb", "at": Vector2(101.1, 50.6), "yaw": 25.0, "s": 1.20},
-	{"file": "kenney_tree_fat.glb", "at": Vector2(87.5, 66.8), "yaw": 140.0, "s": 1.10},
-	{"file": "kenney_tree_oak.glb", "at": Vector2(66.6, 70.5), "yaw": 265.0, "s": 1.25},
-	{"file": "kenney_tree_fat.glb", "at": Vector2(48.3, 59.9), "yaw": 60.0, "s": 1.05},
-	{"file": "kenney_tree_oak.glb", "at": Vector2(87.5, 13.2), "yaw": 195.0, "s": 1.15},
-	{"file": "kenney_tree_fat.glb", "at": Vector2(98.8, 24.5), "yaw": 310.0, "s": 1.20},
+	# APPLE TREES, ON THE SAME SIX POINTS. The Kenney Nature Kit's foliage is a flat
+	# cyan/mint swatch (docs/pipeline.md section 4 quirk 6: it is Kenney's authored
+	# "leafsGreen" colour, checked and not a colour space bug), which read as a lawn
+	# ornament in an orchard the player pays a permit to reach. These six coordinates are
+	# unchanged on purpose: each sits at exactly radius 31 from the region centre, which is
+	# the fence ring plus the 4 m every planted tree clears it by, and reusing them cannot
+	# break a clearance that was already verified.
+	{"file": "mlp_apple_tree.glb", "at": Vector2(101.1, 50.6), "yaw": 25.0, "s": 1.20, "family": &"mlp"},
+	{"file": "mlp_apple_tree.glb", "at": Vector2(87.5, 66.8), "yaw": 140.0, "s": 1.10, "family": &"mlp"},
+	{"file": "mlp_apple_tree_bare.glb", "at": Vector2(66.6, 70.5), "yaw": 265.0, "s": 1.25, "family": &"mlp"},
+	{"file": "mlp_apple_tree.glb", "at": Vector2(48.3, 59.9), "yaw": 60.0, "s": 1.05, "family": &"mlp"},
+	{"file": "mlp_apple_tree.glb", "at": Vector2(87.5, 13.2), "yaw": 195.0, "s": 1.15, "family": &"mlp"},
+	{"file": "mlp_apple_tree_bare.glb", "at": Vector2(98.8, 24.5), "yaw": 310.0, "s": 1.20, "family": &"mlp"},
 	# The Everfree Edge, (-74, -49) r 24: the densest planting on the map, and the
 	# darkest, so the corner of the world the palette already made gloomy also LOOKS
 	# like woodland rather than like a lawn at dusk.
@@ -189,11 +329,142 @@ const LAYOUT := [
 	{"file": "kenney_tree_pine.glb", "at": Vector2(-81.6, 93.5), "yaw": 210.0, "s": 1.20},
 	{"file": "kenney_tree_pine.glb", "at": Vector2(-93.0, 69.0), "yaw": 285.0, "s": 1.25},
 	{"file": "kenney_tree_pine.glb", "at": Vector2(-81.6, 44.5), "yaw": 355.0, "s": 1.15},
+	# --- Sweet Apple Acres, on the walk out to the Orchard --------------------------
+	# APPLEJACK'S FARM, NOT THE PLAYER'S. The homestead keeps its own procedural red barn
+	# (game/world/building.gd says why it is code and not a mesh, and both reasons still
+	# hold); this is the farm the orchard belongs to, on the walk out to it. Nothing here
+	# is walked into: an MLP mesh prop is SCENERY. No attendant stands at one, no dock
+	# marker sits on one, and ranch.gd checks that no prop's collider reaches inside a
+	# building's interaction radius, so the only doors the game opens stay procedural.
+	#
+	# The barn, the shed and the town row carry "skirt": true. So do the four old fence
+	# rails: at their corrected scale each is 4.06 m long, which is past WIDE_FOOTPRINT,
+	# and a rail seated at one point across four metres of sloping pasture is exactly the
+	# case the skirt exists for. Everything within 29 m of the Orchard centre (72, 40) is
+	# inside its fence ring plus the 4 m margin every prop clears it by, so nothing below
+	# is: test_props.gd checks that on every entry.
+	{"file": "saa_barn.glb", "at": Vector2(41.0, 51.3), "yaw": 205.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_shed.glb", "at": Vector2(34.0, 45.0), "yaw": 160.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_wagon.glb", "at": Vector2(46.0, 58.0), "yaw": 75.0, "family": &"mlp"},
+	{"file": "saa_hay_pile.glb", "at": Vector2(35.0, 42.0), "yaw": 20.0, "family": &"mlp"},
+	{"file": "saa_hay_pile.glb", "at": Vector2(37.5, 40.5), "yaw": 200.0, "family": &"mlp", "s": 0.90},
+	{"file": "saa_wire_arch.glb", "at": Vector2(32.0, 52.0), "yaw": 115.0, "family": &"mlp"},
+	{"file": "saa_water_chute.glb", "at": Vector2(34.0, 66.0), "yaw": 250.0, "family": &"mlp"},
+	{"file": "saa_seed_bag.glb", "at": Vector2(33.0, 47.0), "yaw": 40.0, "family": &"mlp"},
+	{"file": "saa_fence_old.glb", "at": Vector2(30.0, 48.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_fence_old.glb", "at": Vector2(30.0, 54.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_fence_old.glb", "at": Vector2(49.0, 63.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_fence_old.glb", "at": Vector2(48.0, 67.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
+	# The corn patch: two rows of six. The two dead stalks are placed, not drawn from an
+	# RNG, for the same reason the treeline's size jitter is: a hand varied row is
+	# reproducible, and reproducibility is what makes a screenshot regression legible.
+	{"file": "saa_corn_plant.glb", "at": Vector2(30.0, 58.0), "yaw": 10.0, "family": &"mlp"},
+	{"file": "saa_corn_plant.glb", "at": Vector2(33.0, 58.0), "yaw": 200.0, "family": &"mlp"},
+	{"file": "saa_corn_plant.glb", "at": Vector2(36.0, 58.0), "yaw": 95.0, "family": &"mlp"},
+	{"file": "saa_corn_plant.glb", "at": Vector2(39.0, 58.0), "yaw": 280.0, "family": &"mlp"},
+	{"file": "saa_corn_plant.glb", "at": Vector2(42.0, 58.0), "yaw": 150.0, "family": &"mlp"},
+	{"file": "saa_corn_plant_dead.glb", "at": Vector2(45.0, 58.0), "yaw": 25.0, "family": &"mlp"},
+	{"file": "saa_corn_plant.glb", "at": Vector2(30.0, 61.0), "yaw": 320.0, "family": &"mlp"},
+	{"file": "saa_corn_plant.glb", "at": Vector2(33.0, 61.0), "yaw": 60.0, "family": &"mlp"},
+	{"file": "saa_corn_plant.glb", "at": Vector2(36.0, 61.0), "yaw": 240.0, "family": &"mlp"},
+	{"file": "saa_corn_plant_dead.glb", "at": Vector2(39.0, 61.0), "yaw": 130.0, "family": &"mlp"},
+	{"file": "saa_corn_plant.glb", "at": Vector2(42.0, 61.0), "yaw": 300.0, "family": &"mlp"},
+	{"file": "saa_corn_plant.glb", "at": Vector2(45.0, 61.0), "yaw": 175.0, "family": &"mlp"},
+	# Hedging, so the yard has an edge that is not a fence.
+	{"file": "mlp_bush.glb", "at": Vector2(38.0, 43.5), "yaw": 0.0, "family": &"mlp"},
+	{"file": "mlp_bush.glb", "at": Vector2(42.0, 42.0), "yaw": 140.0, "family": &"mlp"},
+	{"file": "mlp_bush.glb", "at": Vector2(33.0, 56.0), "yaw": 260.0, "family": &"mlp"},
+	# Apple trees along the walk itself, so the orchard starts before the fence does.
+	{"file": "mlp_apple_tree.glb", "at": Vector2(30.0, 40.0), "yaw": 75.0, "family": &"mlp", "s": 1.05},
+	{"file": "mlp_apple_tree.glb", "at": Vector2(30.0, 44.0), "yaw": 30.0, "family": &"mlp", "s": 1.10},
+	{"file": "mlp_apple_tree.glb", "at": Vector2(33.0, 50.0), "yaw": 150.0, "family": &"mlp", "s": 1.00},
+	{"file": "mlp_apple_tree.glb", "at": Vector2(47.0, 60.0), "yaw": 245.0, "family": &"mlp", "s": 1.15},
+	{"file": "mlp_apple_tree.glb", "at": Vector2(38.0, 64.0), "yaw": 300.0, "family": &"mlp", "s": 1.05},
+	{"file": "mlp_apple_tree_bare.glb", "at": Vector2(27.0, 64.0), "yaw": 100.0, "family": &"mlp", "s": 1.10},
+	# --- Ponyville General, across the Market yard ----------------------------------
+	# WHERE kenney_survival_structure USED TO STAND, and the Market itself is untouched.
+	# Replacing the Market with a mesh would drop it out of buildings.get_child_count() and
+	# therefore out of the census, lose the door apron ATTENDANT_CLEARANCE steps the vendor
+	# sideways out of, and put a 58,034 triangle two storey shop where a 4.5 m radius
+	# interaction check expects an origin. So the General stands BESIDE it: 21.0 m from the
+	# Market's origin, 10.8 m from the Depot's, 11.2 m from the Farmhouse's, and inside
+	# Terrain's flat apron, where the relief across its footprint is exactly zero and it
+	# needs no skirt. Its sign stands 6.1 m out from the Market door: past MARKET_RADIUS
+	# and past the 2.8 m door apron, so it dresses the door without standing in it.
+	{"file": "pv_general.glb", "at": Vector2(19.0, -2.0), "yaw": 250.0, "family": &"mlp"},
+	{"file": "pv_general_sign.glb", "at": Vector2(-1.0, 5.0), "yaw": 200.0, "family": &"mlp"},
+	# --- the town row, on the road north --------------------------------------------
+	# SIX PONYVILLE ENVIRONMENTS BUILDINGS, three a side, facing the road. They are
+	# scenery: none has a door the game opens, none is an interaction candidate, and
+	# ranch.gd fails if any of their colliders reaches inside a building's interaction
+	# radius. All six carry a skirt: they are wide and they stand well outside Terrain's
+	# flat apron, which is exactly the case Props.needs_skirt() names.
+	#
+	# The pack ships a gb_ ground decal and an _m mirror for every one of these;
+	# tools/convert_props.sh refuses both by name, so nothing in this block can be one.
+	{"file": "pv_tower_b.glb", "at": Vector2(15.0, 36.0), "yaw": 270.0, "family": &"mlp", "skirt": true},
+	{"file": "pv_wide_b.glb", "at": Vector2(15.0, 43.0), "yaw": 270.0, "family": &"mlp", "skirt": true},
+	{"file": "pv_pink_b.glb", "at": Vector2(15.0, 50.0), "yaw": 270.0, "family": &"mlp", "skirt": true},
+	{"file": "pv_courtyard_b.glb", "at": Vector2(-12.0, 36.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
+	{"file": "pv_balcony_b.glb", "at": Vector2(-12.0, 43.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
+	{"file": "pv_bridged_b.glb", "at": Vector2(-12.0, 50.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
+	# --- the schoolyard, west of the road --------------------------------------------
+	# A SCHOOLYARD AND NO SCHOOL, and that is the pack rather than an omission.
+	# ponysfm-schoolhouse ships school_roof, school_door, school_window, school_sign,
+	# porchroof, porchtop, support_beam_school and belltower: a modular kit for a Source
+	# map with no assembled building in it, the same trap docs/pipeline.md section 4 quirk
+	# 5 records for the Kenney Fantasy Town Kit. So the bell tower stands over a yard with
+	# swings, a horseshoe pit, a tetherball pole, a picnic table and a cone, and the
+	# schoolhouse is a building this project does not have an asset for.
+	#
+	# The pack's swingseat.mdl is not converted: Props.seat() puts the bottom of a model on
+	# the ground, so a seat meant to hang from the frame would be placed standing on it.
+	#
+	# The picnic table carries a skirt and nothing else here does. At 0.90 m tall it is
+	# 3.84 m by 2.70 m on the ground, and turned 45 degrees that is a 4.62 m world AABB,
+	# past WIDE_FOOTPRINT on a yard that is nowhere near the flat apron.
+	{"file": "school_belltower.glb", "at": Vector2(-26.0, 58.0), "yaw": 100.0, "family": &"mlp", "skirt": true},
+	{"file": "school_sign.glb", "at": Vector2(-22.0, 54.0), "yaw": 120.0, "family": &"mlp"},
+	{"file": "school_swingframe.glb", "at": Vector2(-30.0, 55.0), "yaw": 20.0, "family": &"mlp"},
+	{"file": "school_horseshoe.glb", "at": Vector2(-30.0, 61.0), "yaw": 0.0, "family": &"mlp"},
+	{"file": "school_tetherball_pole.glb", "at": Vector2(-23.0, 61.0), "yaw": 0.0, "family": &"mlp"},
+	{"file": "school_picnic_table.glb", "at": Vector2(-27.0, 63.0), "yaw": 45.0, "family": &"mlp", "skirt": true},
+	{"file": "school_cone.glb", "at": Vector2(-21.0, 58.0), "yaw": 0.0, "family": &"mlp"},
+	# --- Las Pegasus, on the Strip -----------------------------------------------------
+	# THE CLEAR BAND BETWEEN THE PALACE AND THE RACE TRACK: x in [-2, 18], z in [67, 72].
+	# The Palace's own rectangle is x in [-17, -3], z in [57.1, 66.1]; race_track.gd's south
+	# rail is at z = 87.8 with the near one at z = 72.2; strip.gd's lamp ring is radius 21
+	# about (0, 74), so both of these stand inside the ring rather than in it, and
+	# Strip.avoid_footprint() is not asked to drop a lamp for them.
+	#
+	# They are cabinets, not tables: the games the player actually plays are casino_menu's,
+	# and nothing here is an interaction candidate. They are what makes the Strip look like
+	# somewhere people go.
+	{"file": "lp_skeeball.glb", "at": Vector2(4.0, 69.0), "yaw": 180.0, "family": &"mlp", "skirt": true},
+	{"file": "lp_dance_game.glb", "at": Vector2(11.0, 69.0), "yaw": 180.0, "family": &"mlp", "skirt": true},
+	# --- the homestead yard ------------------------------------------------------------
+	# INSIDE TERRAIN'S FLAT APRON, where the ground is exactly y = 0 by construction, so
+	# none of these needs a skirt. Every one stands clear of the pen plot clearing
+	# (PEN_PLOTS_CENTRE (-14, 13), half extent 9) and outside MARKET_RADIUS 4.5,
+	# BOARD_RADIUS 3.0 and DEPOT_RADIUS 4.0 from the buildings they sit between; ranch.gd
+	# measures both of those against the LIVE colliders rather than against these origins.
+	{"file": "saa_hay_block.glb", "at": Vector2(-3.5, -14.0), "yaw": 15.0, "family": &"mlp"},
+	{"file": "saa_wagon.glb", "at": Vector2(7.5, -13.5), "yaw": 200.0, "family": &"mlp"},
+	{"file": "mlp_crate.glb", "at": Vector2(4.0, 7.0), "yaw": 30.0, "family": &"mlp"},
+	{"file": "mlp_basket.glb", "at": Vector2(2.5, 6.0), "yaw": 0.0, "family": &"mlp"},
+	{"file": "mlp_farm_well.glb", "at": Vector2(-3.0, 5.0), "yaw": 60.0, "family": &"mlp"},
+	# The coop moved a metre west when its scale was corrected: at 2.49 m across instead of
+	# 1.29 m its near corner came 4 cm inside MARKET_RADIUS, and ranch.gd's door check said
+	# so. Scenery does not stand in a doorway, so the prop moves rather than the check.
+	{"file": "mlp_chicken_coop.glb", "at": Vector2(-9.0, -2.0), "yaw": 250.0, "family": &"mlp"},
 ]
 
 var _placed: Array[Node3D] = []
 var _shape_count := 0
 var _missing: Array[String] = []
+var _entries: Array[Dictionary] = []
+var _skirts: Array[MeshInstance3D] = []
+var _seat_grounds: Dictionary = {}
 
 
 ## True if ANY prop in the layout has a converted asset on this machine.
@@ -247,22 +518,34 @@ func build() -> int:
 			continue
 
 		var at: Vector2 = entry["at"]
-		var scale_factor: float = BASE_SCALE * float(SCALE_FIX.get(file, 1.0)) \
-			* float(entry.get("s", 1.0))
-		if file.begins_with("kenney_tree"):
-			scale_factor *= TREE_SCALE
-
 		inst.name = "%s_%d" % [file.get_basename(), _placed.size()]
-		inst.scale = Vector3.ONE * scale_factor
+		inst.scale = Vector3.ONE * scale_for(entry)
 		inst.rotation.y = deg_to_rad(float(entry["yaw"]))
 		var ground := _ground_height(at.x, at.y)
 		inst.position = Vector3(at.x, ground, at.y)
 		add_child(inst)
 
+		# Measured AFTER the scale and the yaw are applied and the node is in the tree:
+		# world_aabb() is a world space measurement, and a footprint is the footprint of
+		# the model as it will actually stand.
+		var box := world_aabb(inst)
+		var centre := Vector2(box.get_center().x, box.get_center().z)
+		var half := Vector2(box.size.x * 0.5, box.size.z * 0.5)
+		var relief := Vector2(ground, ground)
+		var skirted: bool = bool(entry.get("skirt", false))
+		if skirted:
+			relief = footprint_relief(centre, half, Callable(self, "_ground_height"))
+			ground = relief.x
+
 		seat(inst, ground)
+		_seat_grounds[inst] = ground
+
+		if skirted:
+			_add_skirt(inst, centre, half, relief.y - relief.x, ground)
 
 		_shape_count += _add_collision(inst)
 		_placed.append(inst)
+		_entries.append(entry)
 
 	if not _missing.is_empty():
 		push_warning("Props: %d layout entries have no converted asset: %s"
@@ -286,6 +569,32 @@ func get_shape_count() -> int:
 
 func get_placed() -> Array[Node3D]:
 	return _placed
+
+
+## The LAYOUT entry a placed prop came from, or {} for anything Props did not place.
+func entry_of(node: Node3D) -> Dictionary:
+	var index := _placed.find(node)
+	return _entries[index] if index >= 0 else {}
+
+
+## True if Props seated `node` and recorded the height it used.
+func has_seat_ground(node: Node3D) -> bool:
+	return _seat_grounds.has(node)
+
+
+## The ground height `node` was actually seated against: the height under its origin for
+## an ordinary prop, the lowest of nine footprint samples for a skirted one. ranch.gd's
+## seating check reads this rather than re-deriving it, for the same reason it reads
+## Building.seat_ground() for a building: the number a prop was seated by and the number
+## the gate checks it against must not be able to drift apart.
+func seat_ground_of(node: Node3D) -> float:
+	return float(_seat_grounds.get(node, 0.0))
+
+
+## Every skirt box standing under a wide prop. Not props, not in the census; ranch.gd
+## checks their collision layer alongside the props' own.
+func get_skirts() -> Array[MeshInstance3D]:
+	return _skirts
 
 
 ## Layout entries whose asset file is missing on this machine.
@@ -316,6 +625,34 @@ static func world_aabb(root: Node3D) -> AABB:
 	return result
 
 
+## Ground height at the four corners, the four edge midpoints and the centre of the
+## rectangle `centre` plus or minus `half`, sampled through `ground_sampler`. Returns
+## (lowest, highest).
+##
+## Nine points and not one, for the reason game/world/building.gd's footprint_relief() takes
+## nine: the height under a wide model's ORIGIN says nothing about the corner that is going
+## to hang in the air. Deliberately the same shape as that function, so a reviewer reading
+## one has read both; it is a free function here because a prop has no footprint of its own
+## to ask, only the AABB of whatever the modeller drew.
+static func footprint_relief(centre: Vector2, half: Vector2, ground_sampler: Callable) -> Vector2:
+	var lowest := INF
+	var highest := -INF
+	for dx: float in [-half.x, 0.0, half.x]:
+		for dz: float in [-half.y, 0.0, half.y]:
+			var h: float = float(ground_sampler.call(centre.x + dx, centre.y + dz))
+			lowest = minf(lowest, h)
+			highest = maxf(highest, h)
+	return Vector2(lowest, highest)
+
+
+## True if a prop with this world AABB, standing on ground that is `flat` or not, has to be
+## seated by its footprint and given a skirt. ranch.gd asks this of every LIVE placed prop
+## and fails the gate if an entry that needs one does not carry `"skirt": true`, so the rule
+## is checked against measurements rather than remembered.
+static func needs_skirt(box: AABB, flat: bool) -> bool:
+	return not flat and maxf(box.size.x, box.size.z) > WIDE_FOOTPRINT
+
+
 ## Shift `node` vertically until the bottom of what you can actually SEE sits
 ## SINK_BIAS below `ground`, whatever the asset thinks its own origin is. The one
 ## seating rule on the ranch -- ranch.gd applies it to the hand-built buildings too,
@@ -333,6 +670,33 @@ static func seat(node: Node3D, ground: float) -> void:
 static func is_in_pen_plots(x: float, z: float) -> bool:
 	return absf(x - PEN_PLOTS_CENTRE.x) <= PEN_PLOTS_HALF_EXTENT \
 		and absf(z - PEN_PLOTS_CENTRE.y) <= PEN_PLOTS_HALF_EXTENT
+
+
+## The family `entry` belongs to. See FAMILY_SCALE.
+static func family_of(entry: Dictionary) -> StringName:
+	if entry.has("family"):
+		return StringName(entry["family"])
+	var file: String = entry["file"]
+	if file.begins_with("kenney_tree"):
+		return FAMILY_TREE
+	return FAMILY_KENNEY
+
+
+## The uniform scale `entry` is built at: its family's base, times any per-file correction
+## in SCALE_FIX, times the entry's own `s` jitter. The one place these three multiply, so
+## nothing can apply two of them and forget the third.
+static func scale_for(entry: Dictionary) -> float:
+	var file: String = entry["file"]
+	var base: float = float(FAMILY_SCALE.get(family_of(entry), BASE_SCALE))
+	return base * float(SCALE_FIX.get(file, 1.0)) * float(entry.get("s", 1.0))
+
+
+## True if `node_name` is one of the foliage families. See FOLIAGE_PREFIXES.
+static func is_foliage(node_name: String) -> bool:
+	for prefix: String in FOLIAGE_PREFIXES:
+		if node_name.begins_with(prefix):
+			return true
+	return false
 
 
 func _ground_height(x: float, z: float) -> float:
@@ -365,3 +729,37 @@ func _add_collision(inst: Node3D) -> int:
 		body.collision_mask = 0
 
 	return created
+
+
+## A solid box under a wide prop, so the terrain always passes through the SIDE of
+## something opaque instead of through a horizontal face. See SKIRT_INSET above for the
+## whole argument, and game/world/building.gd's PLINTH_INSET for the same fix on the
+## procedural buildings.
+##
+## PARENTED TO Props, NOT TO THE PROP, and that is load bearing. world_aabb() is what
+## seat() and ranch.gd's seating check both measure, and a box hanging below the model
+## would move the bottom they read: every skirted prop would report itself sunk by the
+## skirt's whole depth and the gate would go red on a correctly placed barn. As a sibling
+## it is collided and layered like any prop and is deliberately absent from _placed, so it
+## never enters the census either.
+func _add_skirt(inst: Node3D, centre: Vector2, half: Vector2, relief: float,
+		top: float) -> MeshInstance3D:
+	var depth: float = relief + SKIRT_MIN_DEPTH
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(maxf(0.2, (half.x - SKIRT_INSET) * 2.0), depth,
+		maxf(0.2, (half.y - SKIRT_INSET) * 2.0))
+	var material := StandardMaterial3D.new()
+	material.albedo_color = SKIRT_COLOUR
+	material.roughness = 0.95
+	mesh.material = material
+
+	var skirt := MeshInstance3D.new()
+	skirt.name = "%s_skirt" % inst.name
+	skirt.mesh = mesh
+	add_child(skirt)
+	# Its top face meets the model's own floor, which seat() has just put SINK_BIAS below
+	# the lowest footprint sample.
+	skirt.global_position = Vector3(centre.x, top - SINK_BIAS - depth * 0.5, centre.y)
+	_shape_count += _add_collision(skirt)
+	_skirts.append(skirt)
+	return skirt

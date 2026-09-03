@@ -172,6 +172,7 @@ const RaceCardScript := preload("res://systems/race_card.gd")
 const RaceTrackScript := preload("res://world/race_track.gd")
 const CompanyRunnersScript := preload("res://systems/company_runners.gd")
 const AttendantScript := preload("res://world/attendant.gd")
+const HudScript := preload("res://ui/hud.gd")
 
 ## Headless watchdog ceiling. A normal run (assets present) finishes in under 2s on
 ## this machine; 30s leaves a wide margin for a slower box while still failing in
@@ -211,6 +212,14 @@ const MIN_CAMERA_PULL_IN := 0.5
 ## a prop moved after it was placed or the AABB it was seated by is not the AABB it
 ## renders with.
 const SEATING_TOLERANCE := 0.02
+
+## The model Props.MLP_SCALE was derived from, and how far its seated height may drift from
+## Props.MLP_TARGET_BARN_RIDGE before that derivation is stale. The arithmetic is exact
+## (MLP_SCALE is the target divided by the measured native height), so this tolerance is
+## not slack for the division: it is what catches the barn's layout entry quietly growing
+## an `s` jitter, or a re-conversion coming out at a different size.
+const BARN_MODEL := "saa_barn.glb"
+const MLP_RIDGE_TOLERANCE := 0.25
 
 ## Metres of relief allowed across the Palace's own footprint. Bigger than SEATING_TOLERANCE
 ## because this is the ground under a fourteen metre building rather than the seating error
@@ -3827,11 +3836,19 @@ func _report(pony_count: int, prop_count: int) -> void:
 
 	# --- props ------------------------------------------------------------------
 	var all_props := _all_props()
+	var doors := _interaction_doors()
 	var total_shapes := 0
 	var uncollided: Array[String] = []
 	var prop_layers_ok := true
 	var props_seated := true
 	var pen_intrusions: Array[String] = []
+	var skirtless: Array[String] = []
+	var door_intrusions: Array[String] = []
+	var mlp_props := 0
+	var skirted_props := 0
+	var barn_ridge := 0.0
+	var tightest_door := "-"
+	var tightest_slack := INF
 	for prop: Node3D in all_props:
 		var box: AABB = PropsScript.world_aabb(prop)
 		# Measured off the live scene tree rather than from a counter kept during
@@ -3845,32 +3862,117 @@ func _report(pony_count: int, prop_count: int) -> void:
 				prop_layers_ok = false
 		if PropsScript.is_in_pen_plots(prop.global_position.x, prop.global_position.z):
 			pen_intrusions.append(prop.name)
-		# How far the bottom of the visible model sits from where props.gd seated it.
-		# Zero means the prop is standing ON the ground, not floating over it and not
-		# buried in it -- the assertion the eye would otherwise have to make. A Building
-		# was not seated against the single point under its own origin (see the seating
-		# loop above and Building.SEAT_CLEARANCE's comment); its expected ground is the
-		# same seat_ground() reading ranch.gd actually handed Props.seat() for it.
+
+		# A Building is not a layout entry and has no family; everything Props placed has
+		# both. entry_of() returns {} for the former, which is what tells the two apart
+		# without asking any node what class it is.
+		var entry: Dictionary = props.entry_of(prop)
+		var family: StringName = &"building"
+		var skirted := false
+		if not entry.is_empty():
+			family = PropsScript.family_of(entry)
+			skirted = bool(entry.get("skirt", false))
+			if family == PropsScript.FAMILY_MLP:
+				mlp_props += 1
+			if skirted:
+				skirted_props += 1
+			# THE SKIRT RULE, CHECKED AGAINST THE MEASURED MODEL AND NOT AGAINST MEMORY.
+			# A prop wider than WIDE_FOOTPRINT standing off Terrain's flat apron is seated
+			# at one point across a footprint the ground is not flat under; see props.gd's
+			# SKIRT_INSET comment for the whole argument. The layout says which props have
+			# a skirt, and this is what says which ones NEED one.
+			#
+			# Foliage is excluded, and that is not a loophole: props.gd's own SKIRT_INSET
+			# comment says seating at one point "is right for a tree and wrong for a barn",
+			# because a tree's wide AABB is a sparse canopy, not a solid floor plane the
+			# terrain can z fight against. needs_skirt() measures the whole AABB and cannot
+			# tell a canopy from a wall, so a Kenney tree scaled up by TREE_SCALE reads as
+			# wide by that measurement alone. Props.is_foliage() is the same list
+			# _buildings_by_height() already trusts for the matching reason.
+			if not PropsScript.is_foliage(prop.name) and PropsScript.needs_skirt(box,
+					terrain.is_flat_at(prop.global_position.x, prop.global_position.z)) \
+					and not skirted:
+				skirtless.append(prop.name)
+			if String(entry["file"]) == BARN_MODEL:
+				barn_ridge = box.size.y
+			# NOTHING THE MLP PACKS PUT ON THIS MAP IS EVER WALKED INTO. They are scenery:
+			# no attendant stands at one, no dock marker sits on one, and no interaction
+			# candidate names one. That only stays true if none of them is standing in a
+			# doorway the player walks up to, which is measured here rather than judged by
+			# eye once. Scoped to the MLP family on purpose: the four Kenney yard fixtures
+			# were placed before this rule existed and the market stall in particular is
+			# deliberately clutter beside the request board. Its gap is printed below with
+			# everything else's, so widening the rule later is a decision with a number
+			# next to it rather than a guess.
+			for door: Dictionary in doors:
+				var gap: float = _footprint_gap(box, door["at"])
+				var slack: float = gap - float(door["radius"])
+				if slack < tightest_slack:
+					tightest_slack = slack
+					tightest_door = "%s/%s" % [prop.name, door["name"]]
+				if slack < 0.0 and family == PropsScript.FAMILY_MLP:
+					door_intrusions.append("%s/%s" % [prop.name, door["name"]])
+
+		# How far the bottom of the visible model sits from where it was seated. Zero means
+		# the prop is standing ON the ground, not floating over it and not buried in it.
+		# THREE SEATING RULES, and each prop is checked against the one it was actually
+		# placed by: a Building against its own footprint's lowest corner, a skirted prop
+		# against the lowest of nine samples across its measured footprint (which Props
+		# recorded when it seated it), and everything else against the height under its
+		# origin. Re-deriving instead of reading is how the number a prop was seated by and
+		# the number the gate checks it against come to drift apart.
 		var expected_ground: float = terrain.height_at(
 			prop.global_position.x, prop.global_position.z)
 		var checked_building: Building = prop as BuildingScript
 		if checked_building != null:
 			expected_ground = checked_building.seat_ground(Callable(terrain, "height_at"))
+		elif props.has_seat_ground(prop):
+			expected_ground = props.seat_ground_of(prop)
 		var sunk: float = box.position.y - (expected_ground - PropsScript.SINK_BIAS)
 		if absf(sunk) > SEATING_TOLERANCE:
 			props_seated = false
-		print("RANCH prop %-34s pos=(%6.1f, %5.2f, %6.1f) height=%.2f seat_error=%+.3f"
+		print(("RANCH prop %-34s pos=(%6.1f, %5.2f, %6.1f) height=%.2f seat_error=%+.3f " +
+			"family=%s skirt=%s")
 			% [prop.name, prop.global_position.x, prop.global_position.y,
-				prop.global_position.z, box.size.y, sunk])
+				prop.global_position.z, box.size.y, sunk, family, skirted])
+
+	# The skirts are not props and are not in the census: they are boxes under wide props,
+	# parented to Props so they cannot move the AABB the seating check reads. They still
+	# have to be solid and still have to be on the PROPS layer, so they are walked here.
+	var skirt_shapes := 0
+	for skirt: MeshInstance3D in props.get_skirts():
+		skirt_shapes += skirt.find_children("*", "CollisionShape3D", true, false).size()
+		for body: StaticBody3D in _bodies_of(skirt):
+			if body.collision_layer != LayersScript.PROPS:
+				prop_layers_ok = false
+
 	print("RANCH props placed=%d expected=%d shapes=%d missing=%s"
 		% [prop_count, expected_props, total_shapes,
 			", ".join(props.get_missing()) if not props.get_missing().is_empty() else "-"])
+	print("RANCH props mlp=%d skirted=%d skirt_shapes=%d barn_ridge=%.2f mlp_scale=%.4f"
+		% [mlp_props, skirted_props, skirt_shapes, barn_ridge, PropsScript.MLP_SCALE])
+	print("RANCH prop doors intrusions=%s tightest=%s slack=%.2f"
+		% [", ".join(door_intrusions) if not door_intrusions.is_empty() else "-",
+			tightest_door, tightest_slack])
 	_set_check(checks, "every layout entry with an asset was placed", prop_count == expected_props)
 	_set_check(checks, "every prop got at least one collision shape", uncollided.is_empty())
 	if not uncollided.is_empty():
 		push_error("ranch: props with NO collision shape: %s" % ", ".join(uncollided))
 	_set_check(checks, "every prop collider is on the PROPS layer", prop_layers_ok)
 	_set_check(checks, "every prop is seated on the ground (none floats or sinks)", props_seated)
+	_set_check(checks, "every wide prop off the flat apron stands on a skirt",
+		skirtless.is_empty())
+	if not skirtless.is_empty():
+		push_error(("ranch: wide props seated at one point with no skirt under them: %s; " +
+			"add \"skirt\": true to their LAYOUT entries")
+			% ", ".join(skirtless))
+	_set_check(checks, "no MLP prop's collider reaches inside a building's interaction radius",
+		door_intrusions.is_empty())
+	if not door_intrusions.is_empty():
+		push_error("ranch: props standing in a doorway: %s" % ", ".join(door_intrusions))
+	_set_check(checks, "the Sweet Apple Acres barn stands at the height MLP_SCALE was derived for",
+		barn_ridge <= 0.0
+			or absf(barn_ridge - PropsScript.MLP_TARGET_BARN_RIDGE) <= MLP_RIDGE_TOLERANCE)
 
 	# --- ponies -----------------------------------------------------------------
 	var ponies: Array[CharacterBody3D] = spawner.get_spawned()
@@ -4627,7 +4729,7 @@ func _report(pony_count: int, prop_count: int) -> void:
 		# unreachable; it is not. It is exactly the path CI runs (assets are always
 		# absent in CI -- see docs/ci.md section 4), so a reviewer disabling both
 		# buildings' colliders sailed straight through: this whole check silently did
-		# not exist for that run, `RANCH_OK ponies=0 props=2 assets=absent` printed,
+		# not exist for that run, `RANCH_OK ponies=0 props=6 assets=absent` printed,
 		# exit 0. A missing dictionary entry is not visible in the "every check held"
 		# loop below the way `false` is -- so a silent SKIP here is worse than a wrong
 		# answer, it's a gate CI runs that cannot fail this way at all.
@@ -5191,6 +5293,48 @@ func _bodies_of(prop: Node3D) -> Array[StaticBody3D]:
 	return result
 
 
+## Shortest XZ distance from `point` to the footprint rectangle of `box`; 0 when the point
+## is inside it.
+##
+## Asked of the footprint and not of the origin, because the question the door check is
+## really asking is "how close does this prop's SOLID come to the spot the interact verb
+## measures from". An origin-to-origin distance says a twelve metre building is far away
+## right up until its wall is in the doorway. The prop's world AABB is a bound on its
+## trimesh collider, so this is conservative in the safe direction: it can call a prop too
+## close, never too far.
+func _footprint_gap(box: AABB, point: Vector2) -> float:
+	var min_x: float = box.position.x
+	var max_x: float = box.position.x + box.size.x
+	var min_z: float = box.position.z
+	var max_z: float = box.position.z + box.size.z
+	var dx: float = maxf(maxf(min_x - point.x, 0.0), point.x - max_x)
+	var dz: float = maxf(maxf(min_z - point.y, 0.0), point.y - max_z)
+	return Vector2(dx, dz).length()
+
+
+## The four building origins the interact verb measures from, each with the radius it opens
+## at. Read off the live scene rather than from typed-in coordinates, so a building moved in
+## ranch.tscn moves its own door with it and this check cannot go stale silently.
+func _interaction_doors() -> Array[Dictionary]:
+	var radii := {
+		"Buildings/Market": MARKET_RADIUS,
+		"Buildings/Board": BOARD_RADIUS,
+		"Buildings/Depot": DEPOT_RADIUS,
+		"Buildings/Palace": PALACE_RADIUS,
+	}
+	var doors: Array[Dictionary] = []
+	for path: String in radii:
+		var node := get_node_or_null(NodePath(path)) as Node3D
+		if node == null:
+			continue
+		doors.append({
+			"name": String(node.name),
+			"at": Vector2(node.global_position.x, node.global_position.z),
+			"radius": float(radii[path]),
+		})
+	return doors
+
+
 ## True if `pony`'s own collision capsule, at its CURRENT global transform, overlaps
 ## ANY prop's collider (buildings included -- see _all_props()/_bodies_of()).
 ##
@@ -5289,14 +5433,22 @@ func _probe_camera_against_building() -> Dictionary:
 	return result
 
 
-## Buildings (never trees -- a canopy is a bad camera obstacle to prove anything
-## with; the arm could be stopping on a leaf a player would happily walk under),
-## tallest first.
+## Candidates for the camera's wall-collision probe, tallest first, with two exclusions:
+## foliage by name (a canopy is a bad camera obstacle to prove anything with -- the arm
+## could be stopping on a leaf a player would happily walk under) and the whole MLP family
+## by entry (an MLP mesh prop is scenery the player is never meant to walk into, so the wall
+## the probe presses against must be a wall the game actually owns -- a real Building, or a
+## Kenney yard fixture). Props.is_foliage() and the family key are the one place both lists
+## live, so this stays in step with LAYOUT rather than re-deriving its own name rules.
 func _buildings_by_height() -> Array[Node3D]:
 	var result: Array[Node3D] = []
 	for prop: Node3D in _all_props():
-		if not prop.name.begins_with("kenney_tree"):
-			result.append(prop)
+		if PropsScript.is_foliage(prop.name):
+			continue
+		var entry: Dictionary = props.entry_of(prop)
+		if not entry.is_empty() and PropsScript.family_of(entry) == PropsScript.FAMILY_MLP:
+			continue
+		result.append(prop)
 	result.sort_custom(func(a: Node3D, b: Node3D) -> bool:
 		return PropsScript.world_aabb(a).size.y > PropsScript.world_aabb(b).size.y)
 	return result
@@ -5411,6 +5563,14 @@ func _capture_all() -> void:
 		capture_camera.make_current()
 		await _capture("05_scale_at_the_barn")
 
+	# THE PROP SHOTS GO FIRST, and the order is load bearing rather than tidy. The plot
+	# pass drives the real build loop, so it raises a toast ("That pen is full.") that is
+	# still on screen frames later; taken after it, three of the five prop shots were
+	# stamped with a line of HUD text across the top of a picture whose whole job is to
+	# show what the place looks like. The props pass touches no world state, so nothing
+	# downstream of it cares that it ran first. The catch pass leaves toasts too, and
+	# _capture_props() waits those out itself; see _let_the_hud_finish_talking().
+	await _capture_props()
 	await _capture_plots()
 
 
@@ -5501,6 +5661,68 @@ func _capture_plots() -> void:
 	capture_camera.look_at(at + Vector3(0.0, 1.05, 0.0), Vector3.UP)
 	capture_camera.make_current()
 	await _capture("09b_pen_scale_at_the_fence")
+
+
+## 13 to 17: THE FIVE PLACES THIS SLICE DRESSED, each framed on the thing it added.
+##
+## Screenshot runs only, like everything below the headless quit. These are the only
+## judgement a prop layout can get: no assertion in this project can say whether a barn at
+## MLP_SCALE reads as a barn, whether a town row reads as a street or as six buildings
+## standing in a field, or whether a skirt reads as ground the building is set into or as a
+## plinth somebody forgot to hide. The gates say the props are placed, solid, seated and
+## out of the doorways; these say whether the place is any good.
+func _capture_props() -> void:
+	await _let_the_hud_finish_talking()
+	await _frame_on(Vector2(41.0, 51.3), Vector3(-14.0, 11.0, -16.0), 4.0, "13_sweet_apple_acres")
+	await _frame_on(Vector2(19.0, -2.0), Vector3(-13.0, 8.0, -12.0), 3.0, "14_ponyville_general")
+	await _frame_on(Vector2(1.5, 43.0), Vector3(0.0, 10.0, -22.0), 3.5, "15_town_row_north_road")
+	# 16 stands off the yard's SOUTH WEST corner and looks up its diagonal, and every part
+	# of that is a measurement. The subject is (-25.5, 58.5), the centroid of the seven
+	# schoolyard props rather than the bell tower alone; the old offset put the eye at
+	# (-17, 45), which is 5.4 m from pv_balcony_b and 7.1 m from pv_bridged_b, so a
+	# building the shot was not about filled the left third of frame while the yard sat in
+	# the far distance. From (-36, 49) the whole yard lies between 8.5 m and 17.7 m out and
+	# inside 22 degrees of the axis, nearest prop first, and the road's buildings are
+	# behind the lens. The Palace stands off to the right at 21 m, which is context: the
+	# schoolyard IS next to it, and a shot that pretended otherwise would be a lie about
+	# the map.
+	await _frame_on(Vector2(-25.5, 58.5), Vector3(-10.5, 6.0, -9.5), 1.6, "16_schoolyard")
+	await _frame_on(Vector2(7.5, 69.0), Vector3(0.0, 7.0, -13.0), 2.0, "17_strip_arcade")
+
+
+## HOLD UNTIL THE HUD HAS STOPPED SAYING THINGS, because a picture of a place is spoiled by
+## a line of text about the last pony somebody caught. The catch pass above raises one toast
+## per catch and hud.gd QUEUES them rather than writing over them, so "Caught Berry Punch!"
+## was still on screen five shots later.
+##
+## The wait is derived from the HUD's own two constants and its own count of what it has
+## left to say, not from a number typed in here: one line takes TOAST_HOLD + TOAST_FADE, and
+## pending_toasts() says how many are still waiting behind the one on screen. Rounding UP by
+## a whole line covers the one already showing. Screenshot runs only, so seconds are cheap.
+func _let_the_hud_finish_talking() -> void:
+	var hud := get_node_or_null(^"HUD")
+	if hud == null or not hud.has_method("pending_toasts"):
+		return
+	var queued: Array = hud.call("pending_toasts")
+	var lines: int = queued.size() + 1
+	var seconds: float = (HudScript.TOAST_HOLD + HudScript.TOAST_FADE) * float(lines)
+	print("RANCH capture: waiting %.1f s for %d toast line(s) to clear" % [seconds, lines])
+	await get_tree().create_timer(seconds).timeout
+
+
+## Point the capture camera at world XZ `at`, standing `offset.x`/`offset.z` metres away and
+## `offset.y` metres above the ground under the eye, aiming `look_height` metres above the
+## ground under the target. Every shot above keeps the horizon in frame on purpose: a prop
+## photographed from straight above says nothing about whether it is standing on the ground
+## correctly, which is half of what these pictures are for.
+func _frame_on(at: Vector2, offset: Vector3, look_height: float, shot_name: String) -> void:
+	var target := Vector3(at.x, terrain.height_at(at.x, at.y) + look_height, at.y)
+	var eye := target + offset
+	eye.y = terrain.height_at(eye.x, eye.z) + offset.y
+	capture_camera.global_position = eye
+	capture_camera.look_at(target, Vector3.UP)
+	capture_camera.make_current()
+	await _capture(shot_name)
 
 
 ## THE SHOTS THE PLAYTEST ASKED FOR: the core loop, through the player's own camera, with

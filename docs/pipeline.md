@@ -394,7 +394,7 @@ pack ships flat named materials (`leafsGreen`, `woodBark`, solid
 | 2 | **Godot's importer doesn't retroactively notice a newly-added dependency.** Running the editor import pass *before* `Textures/colormap.png` existed baked a texture-less import for the three affected `.glb`s into `.godot/imported/`; adding the PNG afterward and re-running the editor pass did **not** relink them — their `.import` mtime hadn't changed, so Godot skipped reimporting them. | Buildings render flat grey/white even though the texture file is now present on disk and imports cleanly on its own. | Delete the affected `.glb.import` files (forces a fresh import) before rerunning the editor pass, once every referenced texture is actually in place. Order matters: get all dependent files present *first*, then do the one editor pass. |
 | 3 | **`blender -b` with no `.blend` argument opens Blender's default startup scene** (a Cube + Camera + Light), not an empty one — relevant only to the new `--fbx-in` path, which by design runs with no `.blend`. Exporting afterward with no `--object` filter (`use_selection=False`) included that leftover default Cube alongside the real imported prop. | `kenney_survival_structure.glb` silently came out with **two** meshes: an untextured 2×2×2 "Cube" plus the real "structure" mesh. This passed `validate_gltf.py --props` (`meshes>=1`) without complaint — only a rendered frame showed a flat grey box sitting on top of the real prop. | `export_blend.py`'s `--fbx-in` handling now snapshots `bpy.data.objects` before import and deletes exactly that snapshot's objects afterward, so only what the FBX import actually added survives to export. Safe because this `.blend` is never saved back to disk. |
 | 4 | **FBX unit conversion is not reliable for this pack.** The same `structure` model exists as both a Kenney-authored `.glb` (already correctly scaled to the pack's 2-unit module grid: `2×2×2`) and an `.fbx` (imported via Blender's automatic cm→m unit conversion). After quirk 3's fix, the FBX path's `structure` mesh measures **0.5 units tall in Godot — 4× smaller** than the GLB sibling's 2.0. | A prop converted via the FBX path can silently land at the wrong scale relative to the same pack's other (GLB-sourced) props, with no validator check catching it (structural gates don't know what size is "correct"). | Not fixed in-place (documented, not patched, per this doc's own "record quirks, don't paper over them" convention) — kept as `kenney_survival_structure.glb` at its native (undersized) scale. **Recommendation:** prefer the direct-GLB path whenever a pack offers one; if only FBX is available, sanity-check the imported scale against a known reference (another model from the same pack, or the pack's own stated grid unit) rather than trusting Blender's automatic FBX unit conversion. |
-| 5 | **Three of the four "buildings" in this set are not buildings.** Discovered in Phase 1A task 7, the first time any of them was rendered from ground level rather than measured. `kenney_windmill.glb` is the Fantasy Town Kit's SAILS module -- a bare X of blades, no tower behind it. `kenney_watermill.glb` is a bare waterwheel, no mill. `kenney_survival_structure.glb` is an open timber frame. Only `kenney_market_stall.glb` is a complete object. These kits are MODULAR: their houses are assembled from wall/roof/door pieces, and the files whose names sound like buildings are the decorative attachments. | A homestead composed from them reads as farm equipment abandoned in a field. Nothing structural notices: they import, they validate (`meshes>=1`), they measure a plausible height, and they collide. The §4 scale table above lists windmill and watermill under "buildings/structures" purely on the strength of those numbers. | Not fixed at the asset level (task 7 was scoped away from `game/assets/`). The ranch's actual barn and farmhouse are assembled from primitives in `game/world/building.gd`, and the Kenney pieces are placed as yard fixtures. **The real fix is an asset task:** convert the Fantasy Town Kit's wall / roof / door / window modules and assemble a house from them, or find a pack that ships whole buildings. Until then, look at a prop before trusting its filename. |
+| 5 | **Three of the four "buildings" in this set are not buildings.** Discovered in Phase 1A task 7, the first time any of them was rendered from ground level rather than measured. `kenney_windmill.glb` is the Fantasy Town Kit's SAILS module -- a bare X of blades, no tower behind it. `kenney_watermill.glb` is a bare waterwheel, no mill. `kenney_survival_structure.glb` is an open timber frame. Only `kenney_market_stall.glb` is a complete object. These kits are MODULAR: their houses are assembled from wall/roof/door pieces, and the files whose names sound like buildings are the decorative attachments. | A homestead composed from them reads as farm equipment abandoned in a field. Nothing structural notices: they import, they validate (`meshes>=1`), they measure a plausible height, and they collide. The §4 scale table above lists windmill and watermill under "buildings/structures" purely on the strength of those numbers. | Not fixed at the asset level (task 7 was scoped away from `game/assets/`). The ranch's actual barn and farmhouse are assembled from primitives in `game/world/building.gd`, and the Kenney pieces are placed as yard fixtures. **The real fix is an asset task:** convert the Fantasy Town Kit's wall / roof / door / window modules and assemble a house from them, or find a pack that ships whole buildings. Until then, look at a prop before trusting its filename. **Resolved 2026-09-01.** `tools/prop_manifest.txt` and §5c convert the Sweet Apple Acres barn and shed, Ponyville General and six Ponyville Environments town buildings out of the PonySFM packs, and `game/world/props.gd` stands them on the map. The Kenney kit still ships no buildings; the ranch's own barn, farmhouse, Market, board, Depot and Palace are still `game/world/building.gd` primitives, and still are for the reasons that file's class comment gives. |
 | 6 | **The Nature Kit trees render cyan/mint, not green — and it is NOT the terrain's `vertex_color_is_srgb` bug repeating.** Checked in the Task 7 fix round after a reviewer flagged the colour from a render. The trees carry no vertex colours at all (`COLOR_0` absent from every mesh primitive) — their colour comes entirely from each material's glTF `baseColorFactor`, a completely different code path from `terrain.gd`'s hand-rolled vertex-colour mesh. `leafsGreen`'s factor is `[0.161, 0.788, 0.671]`: byte-identical, confirmed by diffing the converted `.glb` against the untouched file straight out of Kenney's own `kenney_nature-kit.zip` (`assets_raw/props/kenney-nature-kit/`) — nothing in this project's pipeline altered it. That RGB triple's hue is ~169° (cyan/teal) whether read as linear (glTF's own convention) or converted to sRGB for display (~172°) — it is a teal swatch by construction, not an artefact of which colour space you read it in. | None — a render shows real cyan/mint foliage, exactly as a reviewer described it, but it is Kenney's authored "leafsGreen"/"leafsDark" swatch, not a bug. | **Not fixed — this is Kenney's shipped palette, left as-is per this doc's "record quirks, don't paper over them" convention.** Confirmed visually in the same `xvfb-run` + llvmpipe render pass used for the tree-scale fix above (`05_scale_at_the_barn.png` and the establishing shot). If a future task wants true green foliage, the fix is sourcing a different tree pack or hand-editing the material colour at map-build time (`game/world/props.gd`), not chasing a colour-space bug that was checked for and ruled out here. |
 
 ### Scale finding — props vs. the converted ponies
@@ -990,6 +990,62 @@ reVAmped name match cannot see.
 
 ---
 
+## 5c. The prop pipeline: `tools/convert_props.sh`
+
+Section 5 converts one `.mdl` by hand. This is the batch, and it is the command a
+fresh clone runs to get the map's MLP scenery back.
+
+```bash
+bash tools/convert_props.sh
+# -> CONVERTED saa_barn
+# -> ...
+# -> PROP_CONVERT ok=35 failed=0 skipped=0 refused=0
+tools/bin/godot --headless --path game --import
+```
+
+`tools/prop_manifest.txt` is the curation and the only place it lives: 35 lines of
+`id|source`, `source` relative to `assets-inbox/`. The id is the name the map uses,
+so `game/world/props.gd`'s `LAYOUT` and `ranch.gd`'s report both speak it.
+
+**Two whole families of model are refused by name, and a refusal fails the run.**
+
+* `gb_` prefixed and `_gb` suffixed models are **ground patches**, not buildings:
+  `barn_gb` renders as a dirt and grass patch with a paddock fence and worn path
+  rings, meant to sit under the barn. Every building in `ponysfm-environments` has
+  one. A glob would convert about fifty flat planes believing they were buildings
+  while missing the ten real ones.
+* `_m` suffixed models are **mirrored duplicates**. `barn_base.mdl` and
+  `barn_base_m.mdl` are both 3,108 bytes with their own `.vvd` and `.dx90.vtx`
+  siblings.
+
+**`--max-texture` is not optional at this scale.** `convert_mdl.py` gained the flag
+for this driver, which passes 1024 by default. Without it `barn_base.glb` alone is
+34 MB of baked PNG at native VTF resolution.
+
+`tools/test_convert_props.sh` exercises the driver against stub exporter and
+validator scripts in seconds with no Blender, including both refusal rules, the
+cap being passed through, and the removal of a `.glb` that exported but failed
+validation (left in place it would be skipped forever, because its existence is
+what makes the next run think the model is done).
+
+### The output is gitignored, and worktrees share one copy
+
+`game/assets/converted/` is gitignored in full (§4 of `docs/ci.md` explains what the
+project builds on that), so these 35 `.glb` files are not in the repository and a
+fresh clone has no props, exactly as it has no ponies.
+
+**`.claude/worktrees/*/game/assets/converted` is a symlink to the main checkout's
+`game/assets/converted`.** That is why a worktree has ponies without running the
+pipeline, and it has two consequences worth knowing before you convert anything in
+one:
+
+* converting inside a worktree writes into the MAIN checkout's tree, so the
+  conversion is only ever paid once, from wherever you happen to be standing;
+* an abandoned branch that converted something leaves it behind on master's disk.
+  Nothing breaks: `Props.build()` ignores any file `LAYOUT` does not name.
+
+---
+
 ## 6. Animation strategy — verdict, and how to add animations to a new character
 
 **Verdict: CANONICAL RIG**, for the tier-a (CreatorOfPony/MythicSpeed)
@@ -1280,7 +1336,7 @@ tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/smoke.ts
 # raycast onto real ground inside their zones, camera spring arm pulling in against
 # an actual building). Prints the marker ONLY if all of them held.
 tools/bin/godot --headless --audio-driver Dummy --path game world/ranch.tscn
-# -> RANCH_OK ponies=49 props=60 assets=present   exit 0
+# -> RANCH_OK ponies=49 props=110 assets=present   exit 0
 # (assets=absent + zero counts on a checkout that has not run the asset pipeline)
 # Both counts moved from an earlier build's 22/58: the crowd (Phase 3 slice 1) fills every
 # region with stock ponies alongside the named roster, and the Depot building (the same
@@ -1488,7 +1544,7 @@ Task 7 the main scene is `res://world/ranch.tscn` (`game/project.godot`), not
 `res://scenes/test/smoke.tscn`. The Linux binary prints:
 
 ```
-RANCH_OK ponies=49 props=60 assets=present
+RANCH_OK ponies=49 props=110 assets=present
 ```
 
 exit 0 — the same line the headless scene run prints, confirming the exported

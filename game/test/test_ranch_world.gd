@@ -142,10 +142,25 @@ func test_the_pen_plot_clearing_is_clear_in_the_layout() -> void:
 			"'%s' at %s sits in the ground reserved for the pen plots" % [entry["file"], at])
 
 
+## THE TWO KITS THE MAP IS DRESSED FROM. Kenney for the yard fixtures and the treeline;
+## the converted PonySFM props for Sweet Apple Acres, Ponyville General, the town row, the
+## schoolyard and the Strip. Every prefix here is an id prefix in tools/prop_manifest.txt,
+## which is the only thing tools/convert_props.sh will produce. A file with any other
+## prefix is one nothing converts, so it would never load on any machine: it would quietly
+## lower expected_count() instead of failing, and the layout would be one prop short
+## everywhere with nothing saying so.
+const PROP_PREFIXES := ["kenney_", "saa_", "pv_", "mlp_", "school_", "lp_"]
+
+
 func test_every_layout_entry_names_a_prop_from_the_converted_kit() -> void:
 	for entry: Dictionary in PropsScript.LAYOUT:
 		var file: String = entry["file"]
-		assert_true(file.begins_with("kenney_"), "unexpected prop source: %s" % file)
+		var known := false
+		for prefix: String in PROP_PREFIXES:
+			if file.begins_with(prefix):
+				known = true
+				break
+		assert_true(known, "unexpected prop source: %s" % file)
 		assert_eq(file.get_extension(), "glb", "props are loaded as .glb: %s" % file)
 
 
@@ -160,6 +175,24 @@ func test_the_undersized_fbx_prop_still_carries_its_scale_correction() -> void:
 func test_the_prop_scale_factor_is_the_one_the_pipeline_validated() -> void:
 	assert_almost_eq(PropsScript.BASE_SCALE, 1.5, 0.0001,
 		"docs/pipeline.md section 4 derives 1.5x -- changing it needs a doc change too")
+
+
+func test_the_mlp_family_has_its_own_base_scale_and_it_is_not_the_kenney_one() -> void:
+	# The whole point of the family key: a Source model is not a Kenney kit piece and must
+	# not be multiplied by a number derived from a Kenney door module. If these two ever
+	# come out equal it is a coincidence worth looking at, not a pass.
+	assert_gt(PropsScript.MLP_SCALE, 0.0, "MLP_SCALE must be a positive multiplier")
+	assert_lt(PropsScript.MLP_SCALE, 100.0,
+		"MLP_SCALE above 100 means the measurement was read off the wrong model")
+
+
+func test_the_sweet_apple_acres_barn_has_a_target_ridge_to_be_scaled_against() -> void:
+	# 7.0 m: about two metres over the homestead barn's own 4.9 m ridge (authored in
+	# game/world/ranch.tscn), and under Terrain.BOUNDARY_HEIGHT. ranch.gd measures the
+	# seated barn against this same constant, so a scale that stopped producing it fails
+	# a gate rather than only looking wrong.
+	assert_almost_eq(PropsScript.MLP_TARGET_BARN_RIDGE, 7.0, 0.0001,
+		"the target ridge is quoted in props.gd's MLP_SCALE derivation and in ranch.gd")
 
 
 # --- zone markers ----------------------------------------------------------------

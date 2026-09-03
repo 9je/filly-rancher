@@ -266,7 +266,7 @@ under Proton:
 RANCH save user_dir=C:/users/steamuser/AppData/Roaming/Godot/app_userdata/Filly Rancher
   file=C:/users/steamuser/AppData/Roaming/Godot/app_userdata/Filly Rancher/saves/slot_9.json
   wrote=true reloaded=true loaded_at_boot=false owned=0
-RANCH_OK ponies=49 props=60 assets=present
+RANCH_OK ponies=49 props=110 assets=present
 ```
 
 and the file was there on the host filesystem afterwards, at exactly the path

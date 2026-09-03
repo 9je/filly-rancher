@@ -378,7 +378,8 @@ restoring the cache) turns the suite green again.
 | `game/scenes/test/depot_test.gd` | The depot gate (see below) |
 | `game/scenes/test/creation_test.gd` | The creation gate (see below) |
 | `game/scenes/test/casino_test.gd` | The casino gate (see below) |
-| `game/scenes/test/model_gallery.gd` | The model gallery, and its `--stock` and `--mark` rows (see below) |
+| `game/scenes/test/model_gallery.gd` | The model gallery, and its `--stock`, `--mark` and `--props` rows (see below) |
+| `game/test/test_props.gd` | The prop layout as data: family scales, the footprint sampler, the skirt rule, and the clearances the whole shipped layout has to hold |
 | `game/world/interaction.gd` | The interact resolver. The collection gate drives its pen step through it, standing the player on the plot and asking `ranch.current_interaction()` what the key means there before calling `ranch.perform_interaction()`; the depot gate still calls `_move_pony_into_pen()` directly |
 | `tools/setup_env.sh` | Installs/pins GUT (`GUT_VER`/`GUT_SHA256`, near the SourceIO block) |
 
@@ -499,7 +500,7 @@ tools/bin/godot --headless --audio-driver Dummy --path game world/ranch.tscn -- 
 
 Phase names are `dawn`, `day`, `dusk`, `night` and weathers are `clear`,
 `rain`, `fog`, `storm`, matched case-insensitively; `--world-time=` takes
-seconds. Expect the same `RANCH_OK ponies=49 props=60 assets=present` as an
+seconds. Expect the same `RANCH_OK ponies=49 props=110 assets=present` as an
 unpinned run, with the `RANCH world` line naming the hour that was pinned. Both
 counts moved once more in Phase 3 slice 1: the crowd fills every region with
 stock ponies alongside the named roster, and the Depot is one more prop beside
@@ -525,6 +526,41 @@ four checks: that both are standing, that neither is a `Pony` (which is exactly
 what `MagicBeam._is_grabbable()` tests, so it is also the claim that the beam has
 nothing there to take), that both are dressed unless the assets are absent, and
 that neither is in the spawned herd.
+
+**Three checks landed with the MLP scenery, and two new lines beside them.**
+
+`RANCH props mlp=<n> skirted=<n> skirt_shapes=<n> barn_ridge=<m> mlp_scale=<f>` and
+`RANCH prop doors intrusions=<list> tightest=<prop/building> slack=<m>`.
+
+* **"every wide prop off the flat apron stands on a skirt"** measures each placed
+  prop's live AABB and asks `Props.needs_skirt()`. A prop whose longer footprint
+  side clears `WIDE_FOOTPRINT` (4.0 m) and which stands outside
+  `Terrain.is_flat_at()` is being seated at one point across ground that is not
+  flat under it: the flattest 13 by 10 m rectangle anywhere off the homestead apron
+  still has 0.366 m of relief across it. The layout says which props carry
+  `"skirt": true`; this says which ones need it. Foliage is excluded from this
+  check: `Props.is_foliage()` is the same list `_buildings_by_height()` already
+  trusts, and for the matching reason -- a tree's wide AABB is a sparse canopy
+  measured by TREE_SCALE, not a solid footprint the ground could z fight against,
+  and props.gd's own SKIRT_INSET comment says seating at one point "is right for
+  a tree and wrong for a barn."
+* **"no MLP prop's collider reaches inside a building's interaction radius"** is
+  what keeps "MLP mesh props are scenery and are never walked into" true. It is
+  measured from each prop's footprint rectangle to each building's origin, not
+  origin to origin, because an origin distance says a twelve metre building is far
+  away right up until its wall is in the doorway. Scoped to the MLP family: the
+  four Kenney yard fixtures predate the rule and the market stall is deliberately
+  clutter beside the request board. Every gap is printed, MLP or not, so widening
+  the rule later is a decision with a number attached.
+* **"the Sweet Apple Acres barn stands at the height MLP_SCALE was derived for"**
+  closes the loop on the gallery's measurement, within
+  `MLP_RIDGE_TOLERANCE` (0.25 m) of `Props.MLP_TARGET_BARN_RIDGE` (7.0 m).
+
+The seating check also learned a third rule. It already knew a `Building` is seated
+against the lowest corner of its own footprint rather than the point under its
+origin; a skirted prop is seated against the lowest of nine samples across its
+measured footprint, and the gate reads the height `Props` recorded when it seated
+it rather than re-deriving one, so the two cannot drift apart.
 
 **Looking at the sky.** The gate checks numbers; only a person can say whether a
 stormy dusk *looks* like one. `bash tools/sky_sheet.sh` renders the ranch once
@@ -837,6 +873,39 @@ at it, and the two flanks reading the SAME, because the right flank repeats the
 drawing rather than mirroring it (a mark you cannot read from one side is not a
 cutie mark). Headless it prints `GALLERY_MARK_OK count=3` and the exit code is the
 verdict.
+
+**And a third row, for the props.**
+`tools/bin/godot --path game scenes/test/model_gallery.tscn -- --props` loads the
+`.glb` files in `game/assets/converted/props/` whose names begin with one of the
+five manifest prefixes (`saa_`, `pv_`, `mlp_`, `school_`, `lp_`), stands them in a
+line spaced by their own measured widths, and prints one `PROP <file> size=(x, y,
+z) meshes=N materials=N textured=N` line each. Headless it prints `GALLERY_OK
+count=35` and the exit code is the verdict: it fails if fewer than 30 loaded, if
+any model measured an empty AABB, or if any model came back with no textured
+surface at all.
+
+**The prefix scope is the point, not a shortcut.** Eight `kenney_*.glb` files sit
+in the same directory and are deliberately skipped. They never went through
+`tools/convert_props.sh`: they are Kenney kit models that colour their surfaces
+with flat material colours instead of albedo textures (docs/pipeline.md section 4
+quirk 6), so the textured-surface check would fail them for a convention this
+pipeline never touched. What they DO have (placement, seating, collision) is
+already proven by `world/ranch.tscn`'s own gate. `count=35` is the size of the
+prop manifest, and it is 35 rather than 43 for exactly this reason;
+`model_gallery.gd`'s `PROP_PREFIXES` is the same list `test_ranch_world.gd`
+already holds the layout to.
+
+That last one is the reason this mode exists rather than just running
+`validate_gltf.py --props` over the directory. The validator parses the GLB's JSON
+chunk and asks whether meshes exist; it cannot tell you that
+`tools/convert_props.sh --max-texture` dropped an image on the floor and left a
+fully structured model that renders flat white.
+
+It also prints one `PROP_SCALE model=saa_barn.glb native_height=... target=...
+mlp_scale=...` line, which is where `Props.MLP_SCALE` comes from: the target ridge
+height divided by the height the converted barn actually measured. `ranch.gd` then
+measures the seated barn against the same `Props.MLP_TARGET_BARN_RIDGE` and fails
+if the two have drifted, so that division cannot go stale quietly.
 
 It hosts `world/ranch.tscn` exactly the way the other hosted gates do, and for
 the same reasons.

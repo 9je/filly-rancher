@@ -34,7 +34,7 @@ but they remain the one gate that proves the engine boots with no content
 involved at all.
 
 Verified by exporting and running the build: it prints
-`RANCH_OK ponies=49 props=60 assets=present` and exits 0.
+`RANCH_OK ponies=49 props=110 assets=present` and exits 0.
 
 Effect measured on this machine (a full local export, real assets present):
 
@@ -67,7 +67,7 @@ produces exactly one file per platform:
 Verified locally: `file build/filly-rancher-windows.exe` reports a normal
 PE32+ executable, `ls build/*.pck` finds nothing, and
 `./build/filly-rancher-linux.x86_64 --headless --quit-after 600` prints
-`RANCH_OK ponies=49 props=60 assets=present` and exits 0 (it was `SMOKE_OK` until
+`RANCH_OK ponies=49 props=110 assets=present` and exits 0 (it was `SMOKE_OK` until
 Phase 1A task 7 changed the main scene). The Windows side of that same assertion runs for real
 on `windows-latest` in CI (`.github/workflows/build-and-smoke.yml`) — this
 machine has no Wine and can't execute the `.exe` itself.

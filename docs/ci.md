@@ -256,7 +256,7 @@ when absent:
   still has real geometry to test the camera's collision pull-in against, rather than
   an empty plane.
 
-The result on an assetless checkout is `RANCH_OK ponies=0 props=2 assets=absent`,
+The result on an assetless checkout is `RANCH_OK ponies=0 props=6 assets=absent`,
 exit 0 — verified locally by running the scene against a copy of the tree with
 `game/assets/converted/` removed.
 
