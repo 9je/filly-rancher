@@ -174,6 +174,7 @@ const RaceTrackScript := preload("res://world/race_track.gd")
 const CompanyRunnersScript := preload("res://systems/company_runners.gd")
 const AttendantScript := preload("res://world/attendant.gd")
 const HudScript := preload("res://ui/hud.gd")
+const MailboxScript := preload("res://world/mailbox.gd")
 
 ## Headless watchdog ceiling. A normal run (assets present) finishes in under 2s on
 ## this machine; 30s leaves a wide margin for a slower box while still failing in
@@ -282,6 +283,11 @@ const BOARD_RADIUS := 3.0
 ## How near the loading dock she has to be for E to open the Depot. Tighter than the
 ## Market's radius because the Depot is a smaller building on a busier corner of the yard.
 const DEPOT_RADIUS := 4.0
+
+## How close to the mailbox E opens the Mail page from. Narrower than the Depot's, because a
+## mailbox is a small thing on a post and a wide radius would put its prompt on top of the
+## farmhouse door the player walks past to reach it.
+const MAILBOX_RADIUS := 2.6
 
 ## How close to the Spectra Palace the counter opens from. Wider than the Depot's, because
 ## the Palace is fourteen metres across and the door is in the middle of one long side.
@@ -1005,6 +1011,8 @@ func _ready() -> void:
 	_restored_ponies = restore_owned_ponies()
 
 	_bind_build_menu()
+
+	_refresh_mailbox_flag()
 
 	await _report(pony_count, prop_count)
 
@@ -1910,6 +1918,43 @@ func is_near_depot() -> bool:
 	var gap := Vector2(player.global_position.x - depot.global_position.x,
 		player.global_position.z - depot.global_position.z).length()
 	return gap <= DEPOT_RADIUS
+
+
+func get_mailbox() -> Mailbox:
+	return get_node_or_null(^"Buildings/Mailbox") as MailboxScript
+
+
+## Is the player standing at the mailbox?
+func is_near_mailbox() -> bool:
+	var box: Node3D = get_mailbox()
+	if box == null or player == null:
+		return false
+	var gap := Vector2(player.global_position.x - box.global_position.x,
+		player.global_position.z - box.global_position.z).length()
+	return gap <= MAILBOX_RADIUS
+
+
+## THE FLAG SAYS WHETHER ANYTHING IS WAITING, and it is the only thing in the world that
+## says so. Pushed from here rather than pulled by the mailbox, because game/world/ is not
+## allowed to reach into GameState any more than game/ui/ is.
+func _refresh_mailbox_flag() -> void:
+	var box: Mailbox = get_mailbox()
+	if box == null or _game_state == null:
+		return
+	box.set_flag_up(_game_state.story.unread_count() > 0)
+
+
+## OPEN THE MAIL, the same way the request board opens its own page: the page number is
+## fetched out of PauseMenu's own constant map rather than written here, so a build whose
+## pause menu has no MAIL page opens the pause menu itself rather than failing to compile.
+func open_mail_page() -> void:
+	if pause_menu == null or not pause_menu.has_method("open"):
+		return
+	var page_id := _pause_menu_page("MAIL")
+	if page_id >= 0 and pause_menu.has_method("open_page"):
+		pause_menu.call("open_page", page_id)
+		return
+	pause_menu.open()
 
 
 ## The Spectra Palace's own origin in world space, or the Strip's centre if the building is
@@ -3518,6 +3563,9 @@ func interaction_candidates() -> Array[Dictionary]:
 	if is_near_board():
 		out.append(InteractionScript.candidate(
 			InteractionScript.Kind.BOARD, _flat_gap_to(^"Buildings/Board")))
+	if is_near_mailbox():
+		out.append(InteractionScript.candidate(
+			InteractionScript.Kind.MAILBOX, _flat_gap_to(^"Buildings/Mailbox")))
 	if is_near_depot():
 		out.append(InteractionScript.candidate(
 			InteractionScript.Kind.DEPOT, _flat_gap_to(^"Buildings/Depot")))
@@ -3593,6 +3641,9 @@ func perform_interaction(action: Dictionary) -> bool:
 			return bool(market_menu.open())
 		InteractionScript.Kind.BOARD:
 			_open_request_page()
+			return true
+		InteractionScript.Kind.MAILBOX:
+			open_mail_page()
 			return true
 		InteractionScript.Kind.DEPOT:
 			if depot_menu == null or not depot_menu.has_method("open"):
@@ -4898,7 +4949,7 @@ func _report(pony_count: int, prop_count: int) -> void:
 		# unreachable; it is not. It is exactly the path CI runs (assets are always
 		# absent in CI -- see docs/ci.md section 4), so a reviewer disabling both
 		# buildings' colliders sailed straight through: this whole check silently did
-		# not exist for that run, `RANCH_OK ponies=0 props=6 assets=absent` printed,
+		# not exist for that run, `RANCH_OK ponies=0 props=7 assets=absent` printed,
 		# exit 0. A missing dictionary entry is not visible in the "every check held"
 		# loop below the way `false` is -- so a silent SKIP here is worse than a wrong
 		# answer, it's a gate CI runs that cannot fail this way at all.
@@ -5488,6 +5539,7 @@ func _interaction_doors() -> Array[Dictionary]:
 	var radii := {
 		"Buildings/Market": MARKET_RADIUS,
 		"Buildings/Board": BOARD_RADIUS,
+		"Buildings/Mailbox": MAILBOX_RADIUS,
 		"Buildings/Depot": DEPOT_RADIUS,
 		"Buildings/Palace": PALACE_RADIUS,
 	}

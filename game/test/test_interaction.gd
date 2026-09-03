@@ -223,3 +223,22 @@ func test_an_open_menu_empties_the_verb_entirely() -> void:
 	menu.open = false
 	assert_false(ranch.current_interaction().is_empty(),
 		"closing the menu hands the verb straight back, with no latch in between")
+
+
+func test_the_mailbox_is_ranked_and_beats_the_depot_when_both_are_in_reach() -> void:
+	var mailbox: Dictionary = InteractionScript.candidate(
+		InteractionScript.Kind.MAILBOX, 2.0)
+	var depot: Dictionary = InteractionScript.candidate(InteractionScript.Kind.DEPOT, 1.0)
+	assert_gte(InteractionScript.rank_of(InteractionScript.Kind.MAILBOX), 0,
+		"a kind outside PRIORITY can never win")
+	var winner: Dictionary = InteractionScript.resolve([depot, mailbox] as Array[Dictionary])
+	assert_eq(int(winner["kind"]), InteractionScript.Kind.MAILBOX,
+		"a small thing in front of a big building wins the ground")
+
+
+func test_the_mailbox_prompt_names_the_verb_and_carries_no_dash() -> void:
+	var prompt: String = InteractionScript.prompt_for(
+		InteractionScript.candidate(InteractionScript.Kind.MAILBOX, 1.0), "E")
+	assert_true(prompt.contains("mail"))
+	assert_false(prompt.contains("--"))
+	assert_false(prompt.contains(char(0x2014)))

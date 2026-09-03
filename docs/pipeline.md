@@ -1336,11 +1336,12 @@ tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/smoke.ts
 # raycast onto real ground inside their zones, camera spring arm pulling in against
 # an actual building). Prints the marker ONLY if all of them held.
 tools/bin/godot --headless --audio-driver Dummy --path game world/ranch.tscn
-# -> RANCH_OK ponies=49 props=110 assets=present   exit 0
+# -> RANCH_OK ponies=49 props=111 assets=present   exit 0
 # (assets=absent + zero counts on a checkout that has not run the asset pipeline)
 # Both counts moved from an earlier build's 22/58: the crowd (Phase 3 slice 1) fills every
 # region with stock ponies alongside the named roster, and the Depot building (the same
-# slice) is one more prop beside the Market and the request board.
+# slice) is one more prop beside the Market and the request board. The Company's mailbox
+# by the ranch door (Phase 3 slice 3) is one more prop again.
 
 # Hair follow-through: measures how far the mane/tail trail the body, against a
 # rigid-hair baseline, over a scripted start-and-stop (see docs/notes-hair-sim.md)
@@ -1546,6 +1547,9 @@ Task 7 the main scene is `res://world/ranch.tscn` (`game/project.godot`), not
 ```
 RANCH_OK ponies=49 props=110 assets=present
 ```
+
+This is a verbatim capture from the export run on 2026-09-02, at props=110; the
+live gate has moved since (see §7 above for the current count).
 
 exit 0 — the same line the headless scene run prints, confirming the exported
 binary boots the packed ranch, builds its terrain, loads its props, spawns its

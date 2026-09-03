@@ -1,4 +1,4 @@
-[gd_scene load_steps=28 format=3]
+[gd_scene load_steps=29 format=3]
 
 [ext_resource type="Script" path="res://world/ranch.gd" id="1"]
 [ext_resource type="Script" path="res://world/terrain.gd" id="2"]
@@ -24,6 +24,7 @@
 [ext_resource type="Script" path="res://world/race_track.gd" id="22"]
 [ext_resource type="PackedScene" path="res://ui/race_menu.tscn" id="23"]
 [ext_resource type="PackedScene" path="res://ui/letter_panel.tscn" id="24"]
+[ext_resource type="Script" path="res://world/mailbox.gd" id="25"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
 sky_top_color = Color(0.309804, 0.505882, 0.760784, 1)
@@ -198,6 +199,10 @@ trim_metallic = 0.45
 
 [node name="Cage" type="Marker3D" parent="Buildings/Palace"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -3.4)
+
+[node name="Mailbox" type="StaticBody3D" parent="Buildings"]
+transform = Transform3D(-0.9063078, 0, -0.42261824, 0, 1, 0, 0.42261824, 0, -0.9063078, 8, 0, -2.5)
+script = ExtResource("25")
 
 [node name="Attendants" type="Node3D" parent="."]
 

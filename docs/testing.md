@@ -523,11 +523,12 @@ tools/bin/godot --headless --audio-driver Dummy --path game world/ranch.tscn -- 
 
 Phase names are `dawn`, `day`, `dusk`, `night` and weathers are `clear`,
 `rain`, `fog`, `storm`, matched case-insensitively; `--world-time=` takes
-seconds. Expect the same `RANCH_OK ponies=49 props=110 assets=present` as an
+seconds. Expect the same `RANCH_OK ponies=49 props=111 assets=present` as an
 unpinned run, with the `RANCH world` line naming the hour that was pinned. Both
 counts moved once more in Phase 3 slice 1: the crowd fills every region with
 stock ponies alongside the named roster, and the Depot is one more prop beside
-the Market and the request board.
+the Market and the request board, and the Company's mailbox by the ranch door
+is one more in slice 3.
 
 `props` moved again, from 59 to 60, in Phase 3 slice 2: the Spectra Palace is a
 sixth building under `Buildings`, seated and counted the same way the barn and
