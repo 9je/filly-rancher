@@ -307,10 +307,19 @@ const PALACE_RADIUS := 6.0
 ## sits ABOVE the Palace's local y = 0 (which is its plinth top, not the ground) so nothing on
 ## it drags the building's world AABB down past what ranch.gd's own seating check expects, and
 ## the standoff clears the wall by more than the trim's own thickness.
-const LOBBY_SIGN_WIDTH_FRACTION := 0.26
+##
+## THE WIDTH CAME DOWN FROM 0.26 BECAUSE THE BOARD HAS TO FIT BESIDE THE MARQUEE, not merely
+## on the building. Strip's marquee board is MARQUEE_WIDTH_FRACTION (0.62) of the same wall,
+## trimmed, standing 0.25 m further out than this board and across the SAME height band, so
+## the two are stacked in depth wherever they overlap in x and the nearer one wins. At 0.26
+## this board was 3.64 m wide, the free wall outboard of the marquee's trim is 2.56 m, and
+## 2.42 m of the board (both its lines, all but the last two letters of the headline) stood
+## behind the marquee. LOBBY_SIGN_GAP is the daylight left between the two trims.
+const LOBBY_SIGN_WIDTH_FRACTION := 0.16
 const LOBBY_SIGN_HEIGHT := 1.10
 const LOBBY_SIGN_BASE := 1.05
 const LOBBY_SIGN_STANDOFF := 0.30
+const LOBBY_SIGN_GAP := 0.10
 
 ## THE TWO PONIES BEHIND COUNTERS, and where they stand.
 ##
@@ -931,15 +940,29 @@ func _ready() -> void:
 		var lobby_sign := LobbySignScript.new()
 		lobby_sign.name = "LobbySign"
 		palace_for_sign.add_child(lobby_sign)
-		# Beside the door rather than in front of it: a quarter of the building's width along
-		# its own side axis, and clear of the door apron the vendor and the player walk up.
+		var sign_width: float = palace_for_sign.width * LOBBY_SIGN_WIDTH_FRACTION
+		var sign_half: float = sign_width * 0.5 + LobbySignScript.TRIM
+		# BESIDE THE DOOR, AND OUTBOARD OF THE MARQUEE, which is the harder of the two and the
+		# one that was got wrong: the marquee stands 0.25 m further off the same wall across
+		# the same height band, so anywhere the two boards share an x they are stacked in
+		# depth and the marquee is the one you see. The offset is therefore taken from the
+		# marquee's OWN measured half width rather than from a fraction typed here, so a
+		# marquee resized in strip.gd pushes this board along instead of quietly swallowing
+		# it, and it is clamped to keep the trim on the wall it is mounted to.
 		var side: Vector3 = palace_for_sign.global_transform.basis * Vector3(1.0, 0.0, 0.0)
+		var sign_offset: float = palace_for_sign.width * 0.28
+		if strip != null and strip.has_method("marquee_board_size"):
+			var marquee_half: float = (strip.call("marquee_board_size") as Vector2).x * 0.5 \
+				+ StripScript.MARQUEE_TRIM
+			sign_offset = maxf(sign_offset,
+				marquee_half + LOBBY_SIGN_GAP + sign_half)
+		sign_offset = minf(sign_offset, palace_for_sign.width * 0.5 - sign_half)
 		lobby_sign.position = Vector3(0.0, LOBBY_SIGN_BASE, 0.0) \
 			+ palace_for_sign.to_local(palace_for_sign.global_position
-				+ side * (palace_for_sign.width * 0.28)
+				+ side * sign_offset
 				+ sign_out * (palace_for_sign.depth * 0.5 + LOBBY_SIGN_STANDOFF))
-		lobby_sign.build(palace_for_sign.width * LOBBY_SIGN_WIDTH_FRACTION,
-			LOBBY_SIGN_HEIGHT, sign_out, LobbySignScript.HEADLINE, LobbySignScript.SUBLINE)
+		lobby_sign.build(sign_width, LOBBY_SIGN_HEIGHT, sign_out,
+			LobbySignScript.HEADLINE, LobbySignScript.SUBLINE)
 
 	var prop_count: int = props.build() + buildings.get_child_count()
 
@@ -5845,8 +5868,25 @@ func _capture_props() -> void:
 ## Palace's gold glints or smears, or whether a lane colour on a saddlecloth is legible from
 ## the rail. These are what a person looks at.
 func _capture_look() -> void:
-	await _frame_on(Vector2(-10.0, 61.6), Vector3(0.0, 3.0, -11.0), 2.2,
-		"18_palace_lobby_sign")
+	# THE HUD IS OFF FOR ALL FOUR, the same way it is off for shot 12 and for the same
+	# reason: the hints card is about 45 percent of a 1600 by 900 frame and it sits over the
+	# bottom right quadrant, which is where three of these four subjects land. The evidence
+	# shot for the lobby sign was previously unreadable for exactly that reason, so a board
+	# that rendered as a blank gold slab survived three rounds of render eyeballing. These
+	# shots photograph the PLACE; the HUD belongs on the shots of the MECHANIC below.
+	var hud := $HUD as CanvasLayer
+	var hud_was_visible: bool = hud.visible
+	hud.visible = false
+
+	# 18 IS AIMED AT THE BOARD ITSELF, taken off the live node rather than off a pair of
+	# numbers typed here, so a Palace that moves in ranch.tscn takes its own evidence shot
+	# with it. Eye level with the board and five metres back is the distance a player
+	# actually reads it from.
+	var sign_at := Vector2(-10.0, 61.6)
+	var lobby_sign := get_node_or_null(^"Buildings/Palace/LobbySign") as Node3D
+	if lobby_sign != null:
+		sign_at = Vector2(lobby_sign.global_position.x, lobby_sign.global_position.z)
+	await _frame_on(sign_at, Vector3(0.0, 1.7, -5.0), 1.7, "18_palace_lobby_sign")
 	await _frame_on(Vector2(-10.0, 61.6), Vector3(0.0, 6.0, -22.0), 4.0,
 		"19_marquee_and_gold_trim")
 	# 20's ORIGINAL `at` (58, -46) sat 16 m from the lake region's own centre (60, -62) --
@@ -5865,6 +5905,8 @@ func _capture_look() -> void:
 		race_track.call("dress", _capture_race_field())
 	await _frame_on(Vector2(0.0, 80.0), Vector3(-24.0, 6.0, -14.0), 1.6,
 		"21_race_lane_colours")
+
+	hud.visible = hud_was_visible
 
 
 ## A six-lane field for the screenshot pass, built the same way race_entrants() builds one for

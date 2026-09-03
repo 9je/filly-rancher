@@ -47,6 +47,10 @@ const FONT_SIZE := 96
 
 var _size := Vector2.ZERO
 var _facing := Vector3(0.0, 0.0, 1.0)
+## The same direction expressed in THIS node's own space, which is the space every child
+## position and child yaw below is written in. See build() for why the two are not the same
+## vector on the shipped Palace.
+var _local_facing := Vector3(0.0, 0.0, 1.0)
 
 
 static func lines() -> Array[String]:
@@ -57,13 +61,29 @@ func board_size() -> Vector2:
 	return _size
 
 
-## Stand the board. `facing` is the direction the letters look, normally the building's own
-## outward axis; `board_width` and `board_height` are metres.
+## Stand the board. `facing` is the direction the letters look IN WORLD SPACE, normally the
+## building's own outward axis; `board_width` and `board_height` are metres.
 func build(board_width: float, board_height: float, facing: Vector3,
 		headline: String, subline: String) -> void:
 	_size = Vector2(board_width, board_height)
 	var flat := Vector3(facing.x, 0.0, facing.z)
 	_facing = flat.normalized() if flat.length_squared() > 0.0 else Vector3(0.0, 0.0, 1.0)
+
+	# TWO SPACES, CONVERTED ONCE, HERE. `facing` arrives in WORLD space (ranch.gd derives it
+	# from the Palace's own basis) but every child below is positioned and yawed in THIS
+	# node's space, and this node hangs under Buildings/Palace, which ranch.tscn stands yawed
+	# half a turn. Using the world vector directly as a local offset and a local yaw is what
+	# put the gold Trim in FRONT of the Board and both lines, and left the letters' own plus Z
+	# pointing away from the approach with double_sided off: a blank gold slab beside the door.
+	# Converting once and building everything off the converted vector keeps the assembly
+	# correct for ANY yaw the building is stood at, which is the same promise the yaw itself
+	# was written to keep. orthonormalized() so a scaled parent cannot skew the direction, and
+	# global_transform is final at this point because ranch.gd adds the child and sets its
+	# position before calling build().
+	var converted: Vector3 = global_transform.basis.orthonormalized().inverse() * _facing
+	converted.y = 0.0
+	_local_facing = converted.normalized() if converted.length_squared() > 0.0 \
+		else Vector3(0.0, 0.0, 1.0)
 
 	# The whole assembly's vertical anchor sits TRIM above local y = 0, so the Trim slab
 	# (which extends TRIM past the board's own edge on every side, including the bottom) never
@@ -74,13 +94,13 @@ func build(board_width: float, board_height: float, facing: Vector3,
 	_slab("Trim", Vector3(board_width + TRIM * 2.0, board_height + TRIM * 2.0, THICKNESS),
 		Vector3(0.0, anchor, 0.0), TRIM_COLOR)
 	_slab("Board", Vector3(board_width, board_height, THICKNESS * 0.6),
-		Vector3(0.0, anchor, 0.0) + _facing * 0.03, BOARD_COLOR)
+		Vector3(0.0, anchor, 0.0) + _local_facing * 0.03, BOARD_COLOR)
 
 	var headline_height: float = board_height * HEADLINE_FRACTION
 	_label("Headline", headline, headline_height,
-		Vector3(0.0, anchor + board_height * 0.18, 0.0) + _facing * 0.07)
+		Vector3(0.0, anchor + board_height * 0.18, 0.0) + _local_facing * 0.07)
 	_label("Subline", subline, headline_height * SUBLINE_SCALE,
-		Vector3(0.0, anchor - board_height * 0.20, 0.0) + _facing * 0.07)
+		Vector3(0.0, anchor - board_height * 0.20, 0.0) + _local_facing * 0.07)
 
 
 func _slab(slab_name: String, size: Vector3, at: Vector3, colour: Color) -> void:
@@ -96,11 +116,12 @@ func _slab(slab_name: String, size: Vector3, at: Vector3, colour: Color) -> void
 	mesh.mesh = box
 	add_child(mesh)
 	mesh.position = at
-	mesh.rotation.y = atan2(_facing.x, _facing.z)
+	mesh.rotation.y = atan2(_local_facing.x, _local_facing.z)
 
 
 ## One line, `cap_height` metres tall, FITTED to the board's width. Label3D's own text faces
-## its local plus Z, so the yaw that points that at `_facing` is atan2(x, z) of the facing.
+## its local plus Z, so the yaw that points that at the facing is atan2(x, z) of the facing
+## AS SEEN IN THE PARENT'S SPACE, which is the space rotation.y is written in.
 func _label(label_name: String, text: String, cap_height: float, at: Vector3) -> void:
 	var label := Label3D.new()
 	label.name = label_name
@@ -119,4 +140,4 @@ func _label(label_name: String, text: String, cap_height: float, at: Vector3) ->
 	label.shaded = false
 	add_child(label)
 	label.position = at
-	label.rotation.y = atan2(_facing.x, _facing.z)
+	label.rotation.y = atan2(_local_facing.x, _local_facing.z)

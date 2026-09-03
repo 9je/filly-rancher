@@ -26,8 +26,24 @@ uniform float fine_metres = 0.9;
 uniform float coarse_metres = 4.5;
 uniform float fine_amount = 0.055;
 uniform float coarse_amount = 0.030;
-uniform float slope_low = 0.30;
-uniform float slope_high = 0.68;
+// TUNED TO THIS HEIGHTFIELD, NOT TO A TEXTBOOK. slope here is 1.0 - normal.y, and this map is
+// gentle: sampling Terrain.height_at() at the mesh's own 2 m cell over all 220 m, the STEEPEST
+// point on the whole map measures 0.0442 (16.8 degrees), on the lake basin's own rim. The
+// shipped 0.30 / 0.68 pair wanted a 45 degree bank to begin and a 71 degree cliff to finish, so
+// smoothstep returned exactly 0.0 at every point in the game and not one pixel of dirt was ever
+// drawn.
+//
+// A WIDE 0.010 / 0.055 BAND WAS TRIED FIRST AND REJECTED BY EYE: it never saturates anywhere on
+// this map (0.055 sits past the map's own worst slope), so even the lake basin's steepest rim
+// mixed in at under half strength, and a brown this muted at that fraction reads as a shadow on
+// the grass rather than as a second surface. 0.012 / 0.035 is narrower and sits UNDER the map's
+// worst slope on purpose: the basin's own rim (0.042 to 0.044) then clears slope_high and gets
+// full-strength dirt, the gentler shoulders around it (0.02 to 0.035) shade in partway, and
+// nothing below about 7 degrees (0.012) takes any earth at all, which keeps the flat majority of
+// the map pure grass. Confirmed by re-rendering the lake basin (shot 20, day and dusk): a
+// visible dirt ring around the water that reads as a second surface, not a brown hillside.
+uniform float slope_low = 0.012;
+uniform float slope_high = 0.035;
 uniform float ridge_lift = 0.06;
 uniform float ridge_low = -6.0;
 uniform float ridge_high = 6.0;

@@ -24,6 +24,15 @@ const LobbySignScript := preload("res://world/lobby_sign.gd")
 const BOARD_WIDTH := 3.6
 const BOARD_HEIGHT := 1.1
 
+## The direction the player walks in from on the shipped map, in WORLD terms. ranch.tscn
+## stands Buildings/Palace yawed half a turn, so its outward axis is world minus Z and the
+## approach comes up the z axis toward it.
+const APPROACH := Vector3(0.0, 0.0, -1.0)
+
+## Every yaw the parent building might be stood at, in degrees. The half turn is the one
+## ranch.tscn actually uses and the one the blank gold slab shipped under.
+const PARENT_YAWS: Array[float] = [0.0, 90.0, 180.0, -90.0, 37.0]
+
 
 func _built() -> LobbySign:
 	var sign_node: LobbySign = LobbySignScript.new()
@@ -31,6 +40,33 @@ func _built() -> LobbySign:
 	sign_node.build(BOARD_WIDTH, BOARD_HEIGHT, Vector3(0.0, 0.0, 1.0),
 		LobbySignScript.HEADLINE, LobbySignScript.SUBLINE)
 	return sign_node
+
+
+## A sign hung under a building yawed `yaw_deg`, told to face APPROACH in world terms. This
+## is the shape ranch.gd builds it in: the node is a child of the Building, it carries no yaw
+## of its own, and the facing it is handed is a world vector off the Building's basis.
+func _built_under_a_building_yawed(yaw_deg: float) -> LobbySign:
+	var building := Node3D.new()
+	add_child_autofree(building)
+	building.rotation.y = deg_to_rad(yaw_deg)
+	var sign_node: LobbySign = LobbySignScript.new()
+	building.add_child(sign_node)
+	sign_node.build(BOARD_WIDTH, BOARD_HEIGHT, APPROACH,
+		LobbySignScript.HEADLINE, LobbySignScript.SUBLINE)
+	return sign_node
+
+
+## How far a mesh's frontmost corner reaches along `direction`, in WORLD space. Taken off the
+## eight corners of the world AABB rather than off the node's origin, because what occludes
+## what is decided by the near FACE of a slab, not by its centre: the Trim is thicker than
+## the Board and a centre only comparison would call the right order on the wrong evidence.
+func _front_reach(mesh: MeshInstance3D, direction: Vector3) -> float:
+	var box: AABB = mesh.get_aabb()
+	var xform: Transform3D = mesh.global_transform
+	var reach: float = -INF
+	for i in range(8):
+		reach = maxf(reach, (xform * box.get_endpoint(i)).dot(direction))
+	return reach
 
 
 func test_the_board_and_its_trim_are_standing_behind_the_letters() -> void:
@@ -66,6 +102,36 @@ func test_nothing_on_the_board_hangs_below_the_signs_own_origin() -> void:
 		var box: AABB = mesh.get_aabb()
 		assert_gte(mesh.position.y + box.position.y, -0.001,
 			"%s hangs below the sign's origin" % mesh.name)
+
+
+## THE BUG THIS FILE COULD NOT SEE, AND THE ONE THE OWNER WOULD HAVE. Every earlier test here
+## built the sign straight onto the test root facing world plus Z: the single configuration
+## in which local space and world space coincide, so a build() that used a WORLD facing as a
+## LOCAL offset and a LOCAL yaw passed cleanly while the shipped Palace, yawed half a turn,
+## put its gold Trim in front of the Board and both lines and turned the letters around to
+## face inside the building. So this asks the question in WORLD space, under a parent yawed
+## the way ranch.tscn stands the Palace, and under four other yaws for good measure: along
+## the approach, the letters must be in front of the board and the board in front of the
+## trim, and the letters must actually be looking back down the approach.
+func test_the_board_assembles_front_to_back_under_a_yawed_building() -> void:
+	for yaw_deg: float in PARENT_YAWS:
+		var sign_node: LobbySign = _built_under_a_building_yawed(yaw_deg)
+		var trim := sign_node.get_node(^"Trim") as MeshInstance3D
+		var board := sign_node.get_node(^"Board") as MeshInstance3D
+		var trim_reach: float = _front_reach(trim, APPROACH)
+		var board_reach: float = _front_reach(board, APPROACH)
+		assert_gt(board_reach, trim_reach,
+			"at yaw %.0f the trim stands in front of the board and hides it" % yaw_deg)
+		for path: NodePath in [^"Headline", ^"Subline"]:
+			var label := sign_node.get_node(path) as Label3D
+			var depth: float = label.global_position.dot(APPROACH)
+			assert_gt(depth, board_reach,
+				"at yaw %.0f %s is buried in the board" % [yaw_deg, path])
+			var looks: Vector3 = label.global_transform.basis * Vector3(0.0, 0.0, 1.0)
+			assert_gt(looks.dot(APPROACH), 0.99,
+				"at yaw %.0f %s has its back to the approach" % [yaw_deg, path])
+			assert_eq(label.double_sided, false,
+				"a one sided label must be the side the player is on")
 
 
 func test_neither_line_carries_a_dash() -> void:

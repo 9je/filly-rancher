@@ -195,3 +195,18 @@ func test_the_staged_list_is_honest() -> void:
 			"%s claims STAGED but its stage width is wrong" % path)
 		assert_gt(size.y, 100.0, "%s claims STAGED but its stage height is wrong" % path)
 	pass_test("STAGED has %d honest entries" % STAGED.size())
+
+
+## THE OTHER HALF OF HONEST: STAGED must COVER the five, not merely be a true subset of them.
+## The ruling that made this file's contract conditional named the risk it was accepting, that
+## a task could forget to append its path and ship an unasserted stage, and closed it with the
+## final task's all five expectation. This is that expectation. Without it, deleting one entry
+## weakens four tests in this file AND the casino gate's stage block to their base state
+## branch, all of them still green: the safety net would quietly grow a hole rather than tear
+## loudly. Set equality both ways, so neither a missing path nor a stray one can pass.
+func test_every_known_menu_is_staged() -> void:
+	assert_eq(STAGED.size(), MenuScenes.size(),
+		"STAGED must carry all five known menus, not a subset")
+	for path: String in MenuScenes:
+		assert_true(STAGED.has(path),
+			"%s is a known menu that nothing in this file asserts a stage for" % path)
