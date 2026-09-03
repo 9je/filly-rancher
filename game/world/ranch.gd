@@ -5639,6 +5639,7 @@ func _capture_all() -> void:
 	# _capture_props() waits those out itself; see _let_the_hud_finish_talking().
 	await _capture_props()
 	await _capture_plots()
+	await _capture_look()
 
 
 ## 06 to 09: the plot loop, photographed by DRIVING IT rather than by staging it.
@@ -5755,6 +5756,24 @@ func _capture_props() -> void:
 	# the map.
 	await _frame_on(Vector2(-25.5, 58.5), Vector3(-10.5, 6.0, -9.5), 1.6, "16_schoolyard")
 	await _frame_on(Vector2(7.5, 69.0), Vector3(0.0, 7.0, -13.0), 2.0, "17_strip_arcade")
+
+
+## 18 to 21: THE FOUR THINGS THE LOOK PASS CHANGED THAT NO ASSERTION CAN JUDGE.
+##
+## Screenshot runs only, like everything below the headless quit. A gate can say the terrain
+## wears a ShaderMaterial and that the shader has srgb_to_linear() in it; it cannot say whether
+## the ground reads as grass, whether a penumbra at 0.9 degrees is soft or mushy, whether the
+## Palace's gold glints or smears, or whether a lane colour on a saddlecloth is legible from
+## the rail. These are what a person looks at.
+func _capture_look() -> void:
+	await _frame_on(Vector2(-10.0, 61.6), Vector3(0.0, 3.0, -11.0), 2.2,
+		"18_palace_lobby_sign")
+	await _frame_on(Vector2(-10.0, 61.6), Vector3(0.0, 6.0, -22.0), 4.0,
+		"19_marquee_and_gold_trim")
+	await _frame_on(Vector2(58.0, -46.0), Vector3(-16.0, 12.0, -18.0), 2.0,
+		"20_ground_slope_and_dirt")
+	await _frame_on(Vector2(0.0, 80.0), Vector3(-24.0, 6.0, -14.0), 1.6,
+		"21_race_lane_colours")
 
 
 ## HOLD UNTIL THE HUD HAS STOPPED SAYING THINGS, because a picture of a place is spoiled by

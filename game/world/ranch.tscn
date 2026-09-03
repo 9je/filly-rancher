@@ -45,11 +45,36 @@ ambient_light_color = Color(0.729412, 0.803922, 0.878431, 1)
 ambient_light_sky_contribution = 0.35
 ambient_light_energy = 0.32
 tonemap_mode = 3
-tonemap_white = 3.0
+tonemap_white = 1.8
+ssao_enabled = true
+ssao_radius = 0.9
+ssao_intensity = 1.35
+ssao_power = 1.5
+ssao_detail = 0.5
+ssao_horizon = 0.06
+ssao_sharpness = 0.98
+ssao_light_affect = 0.15
+ssao_ao_channel_affect = 0.0
+glow_enabled = true
+glow_levels/2 = 0.0
+glow_levels/3 = 0.55
+glow_levels/4 = 0.85
+glow_levels/5 = 0.45
+glow_intensity = 0.55
+glow_strength = 1.0
+glow_bloom = 0.03
+glow_blend_mode = 0
+glow_hdr_threshold = 1.05
+glow_hdr_scale = 2.0
 fog_enabled = true
 fog_light_color = Color(0.741176, 0.803922, 0.858824, 1)
 fog_density = 0.0011
 fog_sky_affect = 0.35
+fog_aerial_perspective = 0.35
+adjustment_enabled = true
+adjustment_brightness = 1.0
+adjustment_contrast = 1.05
+adjustment_saturation = 1.14
 
 [node name="Ranch" type="Node3D"]
 script = ExtResource("1")
@@ -62,8 +87,16 @@ transform = Transform3D(0.7071068, -0.3535534, 0.6123724, 0, 0.8660254, 0.5, -0.
 light_color = Color(1, 0.968627, 0.905882, 1)
 light_energy = 1.15
 shadow_enabled = true
-shadow_bias = 0.05
-directional_shadow_max_distance = 240.0
+shadow_bias = 0.02
+shadow_normal_bias = 1.2
+shadow_blur = 1.1
+light_angular_distance = 0.9
+directional_shadow_max_distance = 85.0
+directional_shadow_split_1 = 0.06
+directional_shadow_split_2 = 0.17
+directional_shadow_split_3 = 0.42
+directional_shadow_blend_splits = true
+directional_shadow_fade_start = 0.92
 
 [node name="SkyRig" type="Node3D" parent="."]
 script = ExtResource("14")
@@ -161,6 +194,7 @@ door_height = 3.0
 wall_color = Color(0.36, 0.16, 0.42, 1)
 roof_color = Color(0.95, 0.78, 0.28, 1)
 trim_color = Color(0.98, 0.86, 0.45, 1)
+trim_metallic = 0.45
 
 [node name="Cage" type="Marker3D" parent="Buildings/Palace"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -3.4)

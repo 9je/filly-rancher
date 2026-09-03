@@ -90,3 +90,44 @@ func test_a_deferred_terrain_has_no_ground_until_build_is_called() -> void:
 	terrain.build()
 	assert_not_null(terrain.get_node_or_null("Mesh"), "build() shapes the ground")
 	assert_not_null(terrain.get_node_or_null("CollisionShape3D"), "and gives it a collider")
+
+
+## THE GROUND IS A SHADER NOW, AND THE ONE FAILURE MODE THAT MATTERS IS INVISIBLE OTHERWISE.
+## Godot compiles shaders lazily and the headless renderer never rasterises, so a
+## ShaderMaterial on a mesh in a headless run is inert: a shader that fails to PARSE prints an
+## error at load and every gate that only checks RANCH_OK still goes green. So the mesh is
+## asked what material it is actually wearing.
+func test_the_ground_wears_a_shader_with_code_in_it() -> void:
+	var terrain: Terrain = _bare_terrain()
+	var mesh := terrain.get_node(^"Mesh") as MeshInstance3D
+	var mat := mesh.mesh.surface_get_material(0) as ShaderMaterial
+	assert_not_null(mat, "surface 0 is a ShaderMaterial")
+	assert_not_null(mat.shader, "the ShaderMaterial carries a shader")
+	assert_gt(mat.shader.code.length(), 0, "the shader has code in it")
+
+
+## THE sRGB TRAP, PINNED BY NAME. vertex_color_is_srgb is a StandardMaterial3D flag with NO
+## shader equivalent: the shader has to do the conversion itself or Godot treats the vertex
+## colours as already linear and the ground comes out roughly twice as bright as authored.
+## terrain.gd's own comment records what that looked like the first time: "a pale mint sheet,
+## not grass". This is the one trap in the whole slice most likely to be missed, so it is
+## asserted by name rather than left to whoever looks at the next render.
+func test_the_shader_converts_its_vertex_colour_out_of_srgb() -> void:
+	var terrain: Terrain = _bare_terrain()
+	var mesh := terrain.get_node(^"Mesh") as MeshInstance3D
+	var mat := mesh.mesh.surface_get_material(0) as ShaderMaterial
+	assert_true(mat.shader.code.contains("srgb_to_linear"),
+		"drop this and the ground renders as a pale mint sheet")
+	assert_true(mat.shader.code.contains("COLOR"),
+		"grass_at() and the region palettes stay the single authority on ground colour")
+
+
+## THE HEIGHTFIELD IS UNTOUCHED. Moving CELL, HALF, FLAT_RADIUS or height_at() would move the
+## mesh, the collider, the props, the pens, the spawner and every gate that reads them, and
+## the look pass has no business anywhere near any of that.
+func test_the_heightfield_is_exactly_what_it_was() -> void:
+	assert_eq(TerrainScript.HALF, 110.0)
+	assert_eq(TerrainScript.CELL, 2.0)
+	assert_eq(TerrainScript.FLAT_RADIUS, 30.0)
+	assert_eq(TerrainScript.GRASS_LOW, Color(0.239, 0.408, 0.196))
+	assert_eq(TerrainScript.GRASS_HIGH, Color(0.443, 0.541, 0.271))
