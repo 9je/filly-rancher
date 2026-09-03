@@ -165,15 +165,6 @@ trim_color = Color(0.98, 0.86, 0.45, 1)
 [node name="Cage" type="Marker3D" parent="Buildings/Palace"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -3.4)
 
-[node name="Sign" type="Label3D" parent="Buildings/Palace"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.1, -4.1)
-pixel_size = 0.0032
-font_size = 48
-outline_size = 6
-modulate = Color(1, 0.94, 0.74, 1)
-shaded = false
-billboard = 0
-
 [node name="Attendants" type="Node3D" parent="."]
 
 [node name="Regions" type="Node3D" parent="."]

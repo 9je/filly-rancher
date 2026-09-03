@@ -160,6 +160,7 @@ const StockPaletteScript := preload("res://systems/stock_palette.gd")
 const PlayerLookScript := preload("res://systems/player_look.gd")
 const StripScript := preload("res://world/strip.gd")
 const CasinoSignScript := preload("res://systems/casino_sign.gd")
+const LobbySignScript := preload("res://world/lobby_sign.gd")
 const InteractionScript := preload("res://world/interaction.gd")
 const BuildingScript := preload("res://world/building.gd")
 const CasinoScript := preload("res://systems/casino.gd")
@@ -301,6 +302,15 @@ const DEPOT_RADIUS := 4.0
 ## Nothing else on the map is affected: the Palace stands alone on the Strip, seventy metres
 ## from the nearest other interactable, and Interaction.PRIORITY ranks it last regardless.
 const PALACE_RADIUS := 6.0
+
+## THE BOARD BESIDE THE PALACE DOOR. Its width is a fraction of the building's own, its base
+## sits ABOVE the Palace's local y = 0 (which is its plinth top, not the ground) so nothing on
+## it drags the building's world AABB down past what ranch.gd's own seating check expects, and
+## the standoff clears the wall by more than the trim's own thickness.
+const LOBBY_SIGN_WIDTH_FRACTION := 0.26
+const LOBBY_SIGN_HEIGHT := 1.10
+const LOBBY_SIGN_BASE := 1.05
+const LOBBY_SIGN_STANDOFF := 0.30
 
 ## THE TWO PONIES BEHIND COUNTERS, and where they stand.
 ##
@@ -858,12 +868,35 @@ func _ready() -> void:
 		crate_marker.global_position.y = terrain.height_at(
 			crate_marker.global_position.x, crate_marker.global_position.z)
 
-	# THE SIGN READS ITSELF OUT OF THE GAMES. Written here rather than authored into
-	# ranch.tscn so that the lobby cannot advertise a house edge the tables are not actually
-	# charging; game/systems/casino_sign.gd asks each game for its own number.
-	var lobby_sign := get_node_or_null(^"Buildings/Palace/Sign") as Label3D
-	if lobby_sign != null:
-		lobby_sign.text = "\n".join(CasinoSignScript.lines())
+	# THE PUBLISHED EDGES MOVED INSIDE, AND THE PROMISE CAME WITH THEM. This used to write all
+	# eleven lines of CasinoSign.lines() into a Label3D hanging unbacked in the air outside the
+	# door: about 1.7 m of text stack at a cap height of 0.15 m per line, which is what the
+	# owner saw and called "very poor". The eleven lines are now the casino lobby's House rules
+	# page, drawn as a plate and reachable from the picker she walks into, and CasinoMenu's
+	# sign_provider is still CasinoSign.lines(), so the numbers still come from the games
+	# themselves. What stands outside is a board with two fitted lines pointing at them.
+	#
+	# SIZED OFF THE PALACE'S OWN NUMBERS, the way strip.gd's mount_marquee() is, so a Palace
+	# resized in ranch.tscn resizes its own signage instead of leaving a board floating beside
+	# a building that moved.
+	var palace_for_sign := get_node_or_null(^"Buildings/Palace") as Building
+	if palace_for_sign != null:
+		var sign_out: Vector3 = palace_for_sign.global_transform.basis * Vector3(0.0, 0.0, 1.0)
+		sign_out.y = 0.0
+		sign_out = sign_out.normalized() if sign_out.length_squared() > 0.0 \
+			else Vector3(0.0, 0.0, 1.0)
+		var lobby_sign := LobbySignScript.new()
+		lobby_sign.name = "LobbySign"
+		palace_for_sign.add_child(lobby_sign)
+		# Beside the door rather than in front of it: a quarter of the building's width along
+		# its own side axis, and clear of the door apron the vendor and the player walk up.
+		var side: Vector3 = palace_for_sign.global_transform.basis * Vector3(1.0, 0.0, 0.0)
+		lobby_sign.position = Vector3(0.0, LOBBY_SIGN_BASE, 0.0) \
+			+ palace_for_sign.to_local(palace_for_sign.global_position
+				+ side * (palace_for_sign.width * 0.28)
+				+ sign_out * (palace_for_sign.depth * 0.5 + LOBBY_SIGN_STANDOFF))
+		lobby_sign.build(palace_for_sign.width * LOBBY_SIGN_WIDTH_FRACTION,
+			LOBBY_SIGN_HEIGHT, sign_out, LobbySignScript.HEADLINE, LobbySignScript.SUBLINE)
 
 	var prop_count: int = props.build() + buildings.get_child_count()
 

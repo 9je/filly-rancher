@@ -25,23 +25,46 @@ const PonyVisualsScript := preload("res://actors/pony/pony_visuals.gd")
 const StockTintScript := preload("res://systems/stock_tint.gd")
 const StockPaletteScript := preload("res://systems/stock_palette.gd")
 const GaitScript := preload("res://systems/gait.gd")
+const PaintScript := preload("res://ui/casino_paint.gd")
+const RaceCardScript := preload("res://systems/race_card.gd")
 
-const NAMEPLATE_HEIGHT := 2.5
-const NAMEPLATE_SIZE := 0.28
+## THE SIX NAMES ARE GONE AND THEIR INFORMATION IS IN GEOMETRY. They existed for a real
+## reason, stated here before: "so the player can tell six recoloured ponies apart from the
+## rail". Six billboarded names bobbing over six galloping ponies is also the most Roblox
+## looking thing in a 3D scene, and the two questions they answered ("which one is which" and
+## "which one is mine") are both better answered by colour.
+##
+## ONE RAINBOW, THREE PLACES. CasinoPaint.BAND_COLORS is the wheel's six bands, the six race
+## lanes and the slot machine's RAINBOW symbol. The preload is CONSTANT ONLY and one
+## directional: game/world/ reads the palette, and nothing under game/ui/ has ever read
+## anything under game/world/.
+const SADDLECLOTH_SIZE := Vector3(0.62, 0.02, 0.52)
+const SADDLECLOTH_HEIGHT := 1.02
+
+## A gold chevron over the pony the player has money on, and over nobody else. Geometry, not
+## text, bobbing on a sine so it reads at a distance without turning to face the camera.
+const CHEVRON_HEIGHT := 2.4
+const CHEVRON_BOB := 0.12
+const CHEVRON_PERIOD := 1.6
+const CHEVRON_SIZE := 0.28
 
 var _model: Node3D = null
 var _anim: AnimationPlayer = null
-var _plate: Label3D = null
 var _runner_name := ""
+var _lane := -1
+var _chevron: MeshInstance3D = null
 
 
 ## Give this lane a body and a name. Returns whether a model was actually built; false on a
 ## checkout with no converted assets, which is a reported state and not an error (see
 ## docs/ci.md section 4). Safe to call again: the previous model is replaced.
-func dress(data: PonyData, triple: Dictionary, display: String) -> bool:
+##
+## `lane` is the lane this runner is standing in, or -1 for a runner not on the card (a
+## gallery, a unit test). A lane gives her a saddlecloth in that lane's colour; RaceCard's own
+## PLAYER_LANE also gets the chevron, because that is the only lane a player's bet can be on.
+func dress(data: PonyData, triple: Dictionary, display: String, lane := -1) -> bool:
 	_runner_name = display
-	_ensure_plate()
-	_plate.text = display
+	_lane = lane
 	if _model != null:
 		# Removed from the tree AND freed immediately, not just marked: dress() can be
 		# called twice in the same frame (a re-entered race), and a model only
@@ -66,7 +89,12 @@ func dress(data: PonyData, triple: Dictionary, display: String) -> bool:
 		StockTintScript.apply(_model, StockPaletteScript.load_stock(), triple)
 	_anim = _model.get_node_or_null(PonyVisualsScript.ANIMATION_PLAYER_PATH) as AnimationPlayer
 	rest()
+	_dress_lane()
 	return true
+
+
+func lane() -> int:
+	return _lane
 
 
 func runner_name() -> String:
@@ -102,16 +130,54 @@ func rest() -> void:
 	_anim.speed_scale = 1.0
 
 
-## The name above her, so the player can tell six recoloured ponies apart from the rail.
-func _ensure_plate() -> void:
-	if _plate != null and is_instance_valid(_plate):
+## The colour instead of the name. `dress()` can be called again on a re-entered race, so any
+## saddlecloth or chevron from a previous dressing is cleared before this one is built, the
+## same way a previous _model is freed rather than stacked.
+func _dress_lane() -> void:
+	var old_cloth := get_node_or_null(^"Saddlecloth")
+	if old_cloth != null:
+		remove_child(old_cloth)
+		old_cloth.free()
+	if _chevron != null and is_instance_valid(_chevron):
+		remove_child(_chevron)
+		_chevron.free()
+	_chevron = null
+	if _lane < 0 or _lane >= PaintScript.BAND_COLORS.size():
 		return
-	_plate = Label3D.new()
-	_plate.name = "Nameplate"
-	_plate.font_size = 48
-	_plate.pixel_size = NAMEPLATE_SIZE / 48.0
-	_plate.position = Vector3(0.0, NAMEPLATE_HEIGHT, 0.0)
-	_plate.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_plate.shaded = false
-	_plate.outline_size = 8
-	add_child(_plate)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = PaintScript.BAND_COLORS[_lane]
+	mat.roughness = 0.8
+	var box := BoxMesh.new()
+	box.size = SADDLECLOTH_SIZE
+	box.material = mat
+	var cloth := MeshInstance3D.new()
+	cloth.name = "Saddlecloth"
+	cloth.mesh = box
+	cloth.position = Vector3(0.0, SADDLECLOTH_HEIGHT, 0.0)
+	add_child(cloth)
+	if _lane != RaceCardScript.PLAYER_LANE:
+		return
+	var cone := CylinderMesh.new()
+	cone.top_radius = 0.0
+	cone.bottom_radius = CHEVRON_SIZE
+	cone.height = CHEVRON_SIZE * 1.4
+	var gold := StandardMaterial3D.new()
+	gold.albedo_color = PaintScript.GOLD
+	gold.emission_enabled = true
+	gold.emission = PaintScript.GOLD
+	gold.emission_energy_multiplier = 1.4
+	cone.material = gold
+	_chevron = MeshInstance3D.new()
+	_chevron.name = "Chevron"
+	_chevron.mesh = cone
+	# Point down at her, which is the whole message: this one is yours.
+	_chevron.rotation.z = PI
+	_chevron.position = Vector3(0.0, CHEVRON_HEIGHT, 0.0)
+	add_child(_chevron)
+
+
+func _process(_delta: float) -> void:
+	if _chevron == null or not is_instance_valid(_chevron):
+		return
+	_chevron.position.y = CHEVRON_HEIGHT \
+		+ sin(Time.get_ticks_msec() / 1000.0 * TAU / CHEVRON_PERIOD) * CHEVRON_BOB

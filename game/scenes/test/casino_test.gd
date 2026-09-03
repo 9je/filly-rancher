@@ -274,23 +274,45 @@ func _drive_the_palace() -> void:
 		and strip_region.contains(Vector2(palace.global_position.x, palace.global_position.z)))
 	_set_check("the cage counter is in the lobby",
 		ranch.get_node_or_null(^"Buildings/Palace/Cage") != null)
-	var lobby_sign := ranch.get_node_or_null(^"Buildings/Palace/Sign") as Label3D
-	_set_check("the lobby sign is hanging", lobby_sign != null)
-	var sign_text: String = lobby_sign.text if lobby_sign != null else ""
+	# THE PUBLISHED EDGES MOVED FROM A LABEL IN THE AIR TO A PAGE INSIDE THE BUILDING, and this
+	# check moved with them. It is strictly better than the one it replaces: it now asserts the
+	# surface a PLAYER ACTUALLY READS rather than a node that happened to hold a string, and it
+	# reads it through CasinoMenu.drawn_lines(), which is the same model the no dash sweeps and
+	# test_casino_menu.gd walk.
+	var lobby_board := ranch.get_node_or_null(^"Buildings/Palace/LobbySign") as Node3D
+	_set_check("the lobby's board is standing beside the door", lobby_board != null)
+	var board_clean := true
+	if lobby_board != null:
+		for label in lobby_board.find_children("*", "Label3D", true, false):
+			var line: Label3D = label
+			if line.text.contains("--") or line.text.contains("—"):
+				board_clean = false
+			if line.width <= 0.0:
+				board_clean = false
+				push_error("casino: %s is not fitted to its board" % line.name)
+	_set_check("both lines on the board are fitted and carry no dash", board_clean)
+
+	var rules_menu: CanvasLayer = ranch.get_casino_menu()
+	var rules_lines: Array[String] = []
+	if rules_menu != null:
+		rules_menu.call("set_tab", CasinoMenuScript.Tab.RULES)
+		rules_lines = rules_menu.call("drawn_lines")
+	var rules_text: String = "\n".join(rules_lines)
 	var publishes_everything := true
 	for pair in [["Slots", SlotsScript.house_edge()], ["The Wheel", WheelScript.house_edge()],
 			["Blackjack", BlackjackScript.house_edge()], ["Racing", RaceCardScript.TAKEOUT]]:
-		if not sign_text.contains(CasinoSignScript.edge_line(String(pair[0]),
+		if not rules_text.contains(CasinoSignScript.edge_line(String(pair[0]),
 				float(pair[1]))):
 			publishes_everything = false
-			push_error("casino: the lobby sign does not publish %s" % pair[0])
-	print("CASINO sign lines=%d" % sign_text.split("\n").size())
-	_set_check("the lobby sign publishes every game's real house edge", publishes_everything)
+			push_error("casino: the house rules page does not publish %s" % pair[0])
+	print("CASINO sign lines=%d" % rules_lines.size())
+	_set_check("the house rules page publishes every game's real house edge",
+		publishes_everything)
 	var sign_clean := true
-	for line in sign_text.split("\n"):
+	for line: String in rules_lines:
 		if line.contains("--") or line.contains("—"):
 			sign_clean = false
-	_set_check("nothing on the sign carries a dash", sign_clean)
+	_set_check("nothing on the house rules page carries a dash", sign_clean)
 
 	# --- the track -------------------------------------------------------------------------
 	var track := ranch.get_race_track()

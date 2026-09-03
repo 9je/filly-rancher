@@ -85,6 +85,24 @@ const MARQUEE_COLOR := Color(1.0, 0.92, 0.62)
 const LAMP_ENERGY := 2.2
 const LAMP_RANGE := 16.0
 
+## TEN BULBS ROUND THE MARQUEE TRIM, as ONE MultiMeshInstance3D: ten instances and one draw
+## call. With glow on (the Environment gains it in the look pass) they bloom gently at dusk
+## and night, which is the whole point of a marquee.
+##
+## NOT IN _lights, DELIBERATELY. Strip.light_count() answers how many LAMP POSTS are standing
+## on the ring, the strip gate asserts it is LIGHT_COUNT minus the one skipped clear of the
+## Palace, and a bulb rail counted among them would break that check for a reason that has
+## nothing to do with lamp posts.
+const MARQUEE_BULBS := 10
+const MARQUEE_BULB_RADIUS := 0.055
+
+## One soft wash on the board's own face. shadow_enabled off for the reason this file already
+## gives about its lamp ring: a light out in the open has nothing to leak through, and a
+## shadow map on it is a cost with no picture attached.
+const MARQUEE_WASH_ENERGY := 2.4
+const MARQUEE_WASH_ANGLE := 38.0
+const MARQUEE_WASH_RANGE := 6.0
+
 var _region: RegionData = null
 var _ground := Callable()
 var _lights: Array[Node3D] = []
@@ -308,6 +326,8 @@ func _marquee() -> void:
 		headline_height * MARQUEE_SPONSOR_SCALE,
 		_marquee_centre + Vector3(0.0, -_marquee_size.y * 0.24, 0.0)
 			+ _marquee_facing * 0.09)
+	_marquee_bulbs()
+	_marquee_wash()
 
 
 ## One line of the sign, `cap_height` metres tall, fitted to the board's width and hung at
@@ -345,3 +365,56 @@ func _flat_material(colour: Color) -> StandardMaterial3D:
 	mat.roughness = 0.85
 	mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
 	return mat
+
+
+func marquee_bulb_count() -> int:
+	return MARQUEE_BULBS
+
+
+## Ten emissive spheres spaced round the trim's perimeter, built as one MultiMesh so the whole
+## rail is one draw call.
+func _marquee_bulbs() -> void:
+	var sphere := SphereMesh.new()
+	sphere.radius = MARQUEE_BULB_RADIUS
+	sphere.height = MARQUEE_BULB_RADIUS * 2.0
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = MARQUEE_TRIM_COLOR
+	mat.emission_enabled = true
+	mat.emission = MARQUEE_TRIM_COLOR
+	mat.emission_energy_multiplier = 2.2
+	sphere.material = mat
+
+	var multi := MultiMesh.new()
+	multi.transform_format = MultiMesh.TRANSFORM_3D
+	multi.mesh = sphere
+	multi.instance_count = MARQUEE_BULBS
+
+	var half := Vector2(_marquee_size.x * 0.5 + MARQUEE_TRIM * 0.5,
+		_marquee_size.y * 0.5 + MARQUEE_TRIM * 0.5)
+	var right := Vector3(-_marquee_facing.z, 0.0, _marquee_facing.x)
+	for i in MARQUEE_BULBS:
+		# Round the rim: five across the top and five across the bottom, which is the shape a
+		# marquee's bulb rail actually has.
+		var across: float = -1.0 + 2.0 * (float(i % 5) / 4.0)
+		var up: float = 1.0 if i < 5 else -1.0
+		var at: Vector3 = _marquee_centre + right * (half.x * across) \
+			+ Vector3(0.0, half.y * up, 0.0) + _marquee_facing * 0.06
+		multi.set_instance_transform(i, Transform3D(Basis(), at))
+
+	var node := MultiMeshInstance3D.new()
+	node.name = "MarqueeBulbs"
+	node.multimesh = multi
+	add_child(node)
+
+
+func _marquee_wash() -> void:
+	var light := SpotLight3D.new()
+	light.name = "MarqueeWash"
+	light.light_color = LAMP_COLOR
+	light.light_energy = MARQUEE_WASH_ENERGY
+	light.spot_range = MARQUEE_WASH_RANGE
+	light.spot_angle = MARQUEE_WASH_ANGLE
+	light.shadow_enabled = false
+	add_child(light)
+	light.global_position = _marquee_centre + _marquee_facing * 2.2 + Vector3(0.0, 1.1, 0.0)
+	light.look_at(_marquee_centre, Vector3.UP)

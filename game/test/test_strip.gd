@@ -182,3 +182,20 @@ func test_the_marquee_letters_turn_with_the_board() -> void:
 		var looks: Vector3 = headline.global_transform.basis * Vector3(0.0, 0.0, 1.0)
 		assert_almost_eq(Vector3(looks.x, 0.0, looks.z).normalized().dot(out_dir), 1.0,
 			0.001, "the letters read from the approach, not from inside the building")
+
+
+## THE BULB RAIL IS NOT A LAMP POST. light_count() answers how many lamp posts are standing on
+## the ring; this file already pins that at LIGHT_COUNT minus the one skipped clear of the
+## Palace, and a bulb rail counted among them would break that check for a reason that has
+## nothing to do with lamp posts.
+func test_the_marquee_bulbs_and_wash_are_not_counted_among_the_lamp_posts() -> void:
+	var strip: Strip = _built_strip()
+	assert_not_null(strip.get_node_or_null(^"MarqueeBulbs"))
+	assert_not_null(strip.get_node_or_null(^"MarqueeWash"))
+	assert_eq(strip.marquee_bulb_count(), StripScript.MARQUEE_BULBS)
+	# _built_strip() calls no avoid_footprint(), so all ten ring positions stand: the claim
+	# here is only that ten bulbs did not become twenty lamps. The shipped Palace's own
+	# "LIGHT_COUNT minus one" case is pinned by this file's existing avoidance tests, which
+	# are untouched.
+	assert_eq(strip.light_count(), StripScript.LIGHT_COUNT,
+		"a bulb rail is not a lamp post and must not be counted as one")
