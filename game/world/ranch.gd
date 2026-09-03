@@ -175,6 +175,9 @@ const CompanyRunnersScript := preload("res://systems/company_runners.gd")
 const AttendantScript := preload("res://world/attendant.gd")
 const HudScript := preload("res://ui/hud.gd")
 const MailboxScript := preload("res://world/mailbox.gd")
+const StoryScript := preload("res://systems/story.gd")
+const StoryBeatScript := preload("res://systems/story_beat.gd")
+const StoryLibraryScript := preload("res://systems/story_library.gd")
 
 ## Headless watchdog ceiling. A normal run (assets present) finishes in under 2s on
 ## this machine; 30s leaves a wide margin for a slower box while still failing in
@@ -288,6 +291,11 @@ const DEPOT_RADIUS := 4.0
 ## mailbox is a small thing on a post and a wide radius would put its prompt on top of the
 ## farmhouse door the player walks past to reach it.
 const MAILBOX_RADIUS := 2.6
+
+## WHAT ARRIVAL SOUNDS LIKE, and it is said once per batch rather than once per letter: two
+## letters landing on the same collection day are one trip to the mailbox. The flag on the
+## box is the state; this is the moment.
+const MAIL_ARRIVED := "Post! The flag is up on your mailbox."
 
 ## How close to the Spectra Palace the counter opens from. Wider than the Depot's, because
 ## the Palace is fourteen metres across and the door is in the middle of one long side.
@@ -636,6 +644,10 @@ var _quoted_fields: Dictionary = {}
 ## replaces GameState.requests wholesale, and a board still holding the previous session's
 ## Dictionaries would be paying out requests nobody on this save was ever given.
 var _board: RequestBoard = null
+
+## The authored letters, loaded once for the life of the process (they are identical on
+## every machine, like the pony roster and the region catalogue).
+var _story_library: StoryLibrary = null
 
 ## The whole character roster, loaded once and kept, because the board is rebuilt on every
 ## load and re-reading 45 .tres files each time would be a disk scan per load. _report()
@@ -1012,7 +1024,10 @@ func _ready() -> void:
 
 	_bind_build_menu()
 
-	_refresh_mailbox_flag()
+	# THE FIRST POST, before the gate reports. A brand new ranch has a letter waiting in the
+	# mailbox by the time the player takes her first step, which is what makes the flag mean
+	# something on the very first frame.
+	advance_story()
 
 	await _report(pony_count, prop_count)
 
@@ -1529,6 +1544,7 @@ func _on_world_changed() -> void:
 	# "the herd changes with the hour" has to ride the connection that is already there.
 	_refresh_herd()
 	_maybe_run_collection_day()
+	advance_story()
 	_maybe_serve_collector()
 
 
@@ -2002,12 +2018,16 @@ func _bind_pause_menu() -> void:
 		pause_menu.set("board", get_request_board())
 		pause_menu.set("world_state", get_world_state())
 		pause_menu.set("statement_provider", func() -> Array[String]: return _statement())
+		pause_menu.set("mail_provider", func() -> Array[Dictionary]: return mail_rows())
+		pause_menu.set("mail_ponies_provider",
+			func() -> Array[Dictionary]: return owned_rows())
 	inject_pages.call()
 	if _game_state != null and not _game_state.state_loaded.is_connected(inject_pages):
 		_game_state.state_loaded.connect(inject_pages)
 	for pair in [["opened", _on_pause_opened], ["closed", _on_menu_closed],
 			["save_requested", _on_pause_save], ["quit_requested", _on_pause_quit],
-			["settings_changed", _on_settings_changed]]:
+			["settings_changed", _on_settings_changed],
+			["mail_opened", _on_mail_opened], ["mail_reply", _on_mail_reply]]:
 		if not pause_menu.is_connected(pair[0], pair[1]):
 			pause_menu.connect(pair[0], pair[1])
 
@@ -2263,6 +2283,8 @@ func run_collection_day() -> Dictionary:
 	var cycle: int = _world.cycle_index() if _world != null else 0
 	var summary: Dictionary = ledger.run_collection_day(cycle, _built_plot_count(),
 		_open_permit_count())
+	if _game_state != null:
+		_game_state.story.note_collection_day()
 	var letter: Dictionary = LettersScript.render(LettersScript.Id.COLLECTION_NOTICE, {
 		"name": _player_name(), "balance": int(summary["balance"]),
 		"upkeep": int(summary["upkeep"])})
@@ -2638,6 +2660,11 @@ func deliver_pony(uid: StringName) -> Dictionary:
 	if named:
 		_game_state.compendium.mark_processed(inst.data_id)
 
+	# THE STORY COUNTS HER TOO, and it counts her by the same event the Company's receipt
+	# does. A named pony's display name and her character id travel into the story here
+	# because the letter that lists her beside a colour is written long after she has gone.
+	_game_state.story.note_delivery(named, inst.display_name(), inst.data_id)
+
 	# credit_delivery() has already counted her, so the ledger's own running total IS the
 	# number this receipt should carry.
 	var shipments: int = _game_state.ledger.shipments
@@ -2651,6 +2678,7 @@ func deliver_pony(uid: StringName) -> Dictionary:
 	if depot_menu != null and depot_menu.has_method("refresh"):
 		depot_menu.refresh()
 	_relieve_if_paid_down()
+	advance_story()
 	return {"ok": true, "credit": credit, "named": named, "name": inst.display_name()}
 
 
@@ -3130,6 +3158,190 @@ func _update_gate_prompt() -> void:
 	if fence != null:
 		_toast("This is %s. The permit costs %d bits at the market."
 			% [fence.region().display_name, fence.region().permit_cost])
+
+
+# --- the story, the post, and the survey -------------------------------------------------
+
+func story_library() -> StoryLibrary:
+	if _story_library == null:
+		_story_library = StoryLibraryScript.new()
+		_story_library.load_all()
+	return _story_library
+
+
+## The player's story, or null when there is no GameState. Read off the state rather than
+## cached here, for rebind_economy()'s reason: a load replaces it.
+func get_story() -> Story:
+	return _game_state.story if _game_state != null else null
+
+
+## THE CHAPTER, THEN THE POST. Called at boot, at every phase change, after a delivery and
+## after a collection day: the four moments any of the story's counters can have moved.
+## Returns how many letters actually landed, so a gate can assert on the number rather than
+## on a toast.
+func advance_story() -> int:
+	var story: Story = get_story()
+	if story == null:
+		return 0
+	story.advance()
+	return _post_due_mail()
+
+
+## Post everything the library says is owed, oldest rung first. One toast for the batch, the
+## flag up, and the pause menu re-drawn if she happens to be looking at the page.
+func _post_due_mail() -> int:
+	var story: Story = get_story()
+	if story == null:
+		return 0
+	var posted := 0
+	for beat: StoryBeat in story_library().due(story):
+		if not story.post(beat.id):
+			continue
+		posted += 1
+		if beat.id == &"weather_requisition":
+			# ARMED HERE, SERVED AT A LATER DAWN. The cycle is written down for the same
+			# reason Ledger.pending_punishment_cycle is: the letter has to land before the
+			# knock, and a collector who called in the same frame as his own notice is not
+			# the beat the spec describes.
+			story.set_flag("requisition_posted")
+			story.requisition_cycle = _world.cycle_index() if _world != null else 0
+	if posted > 0:
+		_toast(MAIL_ARRIVED)
+	_refresh_mailbox_flag()
+	# A LETTER THAT LANDS WHILE SHE IS LOOKING AT THE PAGE APPEARS ON IT. The page draws from
+	# a provider, so it only needs telling to draw again; the push is ranch.gd's, the same way
+	# the Depot's refresh() is.
+	if pause_menu != null and pause_menu.has_method("refresh_page"):
+		pause_menu.call("refresh_page")
+	return posted
+
+
+## WHAT A LETTER IS RENDERED AGAINST. Every placeholder any authored letter may carry, in
+## one dictionary, so a beat written next year cannot find a parameter missing. The pony and
+## the colour come off the story rather than out of the world, because the pony a receipt
+## names left by the departure path some sessions ago and is not in the world to ask.
+func _story_params() -> Dictionary:
+	var story: Story = get_story()
+	var chosen: String = ""
+	var named: String = ""
+	var colour: String = ""
+	if story != null:
+		chosen = String(story.survey_choice.get("name", ""))
+		named = String(story.last_named.get("name", ""))
+		colour = String(story.last_named.get("colour", ""))
+	var pony: String = chosen if not chosen.is_empty() else named
+	return {
+		"name": _player_name(),
+		"pony": pony if not pony.is_empty() else StoryBeatScript.DEFAULTS["pony"],
+		"colour": colour if not colour.is_empty() else StoryBeatScript.DEFAULTS["colour"],
+		"count": _game_state.ledger.shipments if _game_state != null else 0,
+		"quota": _game_state.ledger.quota if _game_state != null else 0,
+		"balance": _game_state.ledger.balance if _game_state != null else 0,
+	}
+
+
+## THE MAILBOX, RENDERED. Oldest first, which is the order Story.mail keeps; the page turns
+## it round for display. A posted id the library no longer carries is SKIPPED rather than
+## drawn as a blank: a letter this build cannot render is not a letter, and dropping her
+## whole mailbox over one of them would be worse.
+func mail_rows() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var story: Story = get_story()
+	if story == null:
+		return out
+	var params: Dictionary = _story_params()
+	for id: StringName in story.mail_ids():
+		var beat: StoryBeat = story_library().by_id(id)
+		if beat == null:
+			continue
+		var letter: Dictionary = beat.render(params)
+		out.append({
+			"id": String(id),
+			"sender": String(letter["sender"]),
+			"title": String(letter["title"]),
+			"body": letter["body"],
+			"read": story.is_read(id),
+			"replied": story.replied_to(id),
+			"reply": beat.reply_index(),
+		})
+	return out
+
+
+## EVERY PONY SHE OWNS, for the Survey's picker: the ones in pens, the ones in the
+## saddlebag, all of them, because the question is "which of your ponies", not "which of the
+## ponies you happen to have penned".
+func owned_rows() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if _game_state == null:
+		return out
+	for inst: PonyInstance in _game_state.get_ponies():
+		out.append({
+			"uid": String(inst.uid),
+			"name": inst.display_name(),
+			"coat": _coat_word(inst),
+		})
+	return out
+
+
+func _on_mail_opened(id: StringName) -> void:
+	var story: Story = get_story()
+	if story == null:
+		return
+	if story.mark_read(id):
+		_refresh_mailbox_flag()
+
+
+func _on_mail_reply(id: StringName, choice: String) -> void:
+	answer_mail(id, choice)
+
+
+## SHE ANSWERED A LETTER. Returns whether anything happened. The menu emitted the choice;
+## this is the only place it becomes bits, hay and a line in the save.
+##
+## THE ORDER IS THE SAFETY. The answer is recorded FIRST and the reward paid second, and
+## record_reply() refuses a letter that already carries an answer, so there is no ordering
+## in which the bonus is paid twice. Answering is optional forever: nothing here fires
+## unless she presses the key.
+func answer_mail(id: StringName, choice: String) -> bool:
+	var story: Story = get_story()
+	if story == null or choice.is_empty():
+		return false
+	var beat: StoryBeat = story_library().by_id(id)
+	if beat == null or beat.reply_index() == StoryBeatScript.Reply.NONE:
+		return false
+	if beat.reply_index() == StoryBeatScript.Reply.PICK_PONY:
+		var picked: PonyInstance = _game_state.find_pony(StringName(choice)) \
+			if _game_state != null else null
+		if picked == null:
+			return false
+		if not story.record_reply(id, choice):
+			return false
+		story.answer_survey({
+			"uid": choice,
+			"data_id": String(picked.data_id),
+			"name": picked.display_name(),
+			"coat": _coat_word(picked),
+		})
+		_pay_survey(picked.display_name())
+		save_game()
+		return true
+	if not story.record_reply(id, choice):
+		return false
+	save_game()
+	return true
+
+
+## THE SURVEY'S THANK YOU, through the seams every other reward in the game uses:
+## Economy.grant() for the bits and Inventory.add() for the hay. No arithmetic of its own,
+## and nothing under game/systems/ that computes money is touched.
+func _pay_survey(who: String) -> void:
+	if _economy != null:
+		_economy.grant(StoryScript.SURVEY_BONUS_BITS)
+	var bag: Inventory = _current_inventory()
+	if bag != null:
+		bag.add(StoryScript.SURVEY_COUPON_ITEM, StoryScript.SURVEY_COUPON_COUNT)
+	_toast("Thank you for naming %s! %d bits and a hay coupon, with our appreciation."
+		% [who, StoryScript.SURVEY_BONUS_BITS])
 
 
 # --- the compendium, the board and the payouts -------------------------------------------

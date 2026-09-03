@@ -736,6 +736,14 @@ func _refresh() -> void:
 			_draw_main()
 
 
+## Redraw whatever page is up. ranch.gd calls this when something the open page is drawing
+## has changed under it (a letter arriving while the Mail page is open), which is the same
+## push the Depot's refresh() takes.
+func refresh_page() -> void:
+	if _open:
+		_refresh()
+
+
 func _draw_main() -> void:
 	_title.text = "PAUSED"
 	_footer.text = MenuStyleScript.footer_rows("select", "resume")
