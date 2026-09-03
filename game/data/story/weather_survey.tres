@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="StoryBeat" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/story_beat.gd" id="1_beat"]
+
+[resource]
+script = ExtResource("1_beat")
+id = &"weather_survey"
+chapter = &"WEATHER"
+trigger = &"CHAPTER"
+threshold = 0
+sender = "Cloudsdale Weather Corporation"
+title = "Employee Appreciation Survey"
+body = PackedStringArray("Dear {name},", "", "You work so hard, and we do notice.", "One question, and it is not a difficult one.", "", "Which of your ponies is most special to you?", "", "Answer below and we will add 50 bits to your", "account, with a coupon for three bales of hay", "by way of thanks.", "", "Answering is entirely optional.", "", "With appreciation, Partner Wellbeing")
+reveals = PackedStringArray()
+evidence = false
+reply = &"PICK_PONY"

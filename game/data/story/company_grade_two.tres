@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="StoryBeat" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/story_beat.gd" id="1_beat"]
+
+[resource]
+script = ExtResource("1_beat")
+id = &"company_grade_two"
+chapter = &"COMPANY"
+trigger = &"DELIVERIES"
+threshold = 12
+sender = "Cloudsdale Weather Corporation"
+title = "Grade two, and a warmer welcome"
+body = PackedStringArray("Dear {name},", "", "Your account has been raised to grade two.", "Yield attributable to your ranch: 6%.", "", "Market discounts apply from today, and the", "Palace has been told to look after you.", "", "You are one of our very favourite partners.", "", "Warmly, Sponsorship Services")
+reveals = PackedStringArray()
+evidence = false
+reply = &"NONE"

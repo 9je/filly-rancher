@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="StoryBeat" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/story_beat.gd" id="1_beat"]
+
+[resource]
+script = ExtResource("1_beat")
+id = &"company_promotion"
+chapter = &"COMPANY"
+trigger = &"CHAPTER"
+threshold = 0
+sender = "Cloudsdale Weather Corporation"
+title = "A promotion, and our thanks"
+body = PackedStringArray("Dear {name},", "", "Thank you for your report. The irregular", "employee has been processed and her access has", "been withdrawn.", "", "Please accept the enclosed promotion. Yield is", "up across the region this month, and we both", "know who to thank for it.", "", "Warmly, Sponsorship Services")
+reveals = PackedStringArray()
+evidence = false
+reply = &"NONE"

@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="StoryBeat" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/story_beat.gd" id="1_beat"]
+
+[resource]
+script = ExtResource("1_beat")
+id = &"company_grade_three"
+chapter = &"COMPANY"
+trigger = &"DELIVERIES"
+threshold = 20
+sender = "Cloudsdale Weather Corporation"
+title = "Grade three, and a bounty list"
+body = PackedStringArray("Dear {name},", "", "Grade three. Yield attributable: 11%.", "", "Enclosed: comps at the Palace, and a list of", "registered arrivals we would particularly like", "to see. The bonuses on it are not small.", "", "We think of you as family, and we mean that in", "the way you would prefer.", "", "Warmly, Sponsorship Services")
+reveals = PackedStringArray()
+evidence = false
+reply = &"NONE"
