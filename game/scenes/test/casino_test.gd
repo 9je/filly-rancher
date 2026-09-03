@@ -33,6 +33,21 @@ const CasinoSignScript := preload("res://systems/casino_sign.gd")
 const CompanyRunnersScript := preload("res://systems/company_runners.gd")
 const CasinoMenuScript := preload("res://ui/casino_menu.gd")
 const WheelMenuScript := preload("res://ui/wheel_menu.gd")
+
+## THE ONE SOURCE OF TRUTH FOR WHICH SCREENS ARE STAGED. Read directly off
+## game/test/test_casino_stages.gd's own STAGED constant rather than kept as a second copy
+## here, so the gate and that test file can never quietly disagree about which menu has grown
+## a real stage. See the stage block in _drive_the_palace() for how it is used.
+const CasinoStagesTestScript := preload("res://test/test_casino_stages.gd")
+
+## Maps a CasinoMenu.Row game table value to the .tscn path CasinoStagesTestScript.STAGED
+## names it by. Local to the stage block below.
+const StageScenePaths: Dictionary = {
+	CasinoMenuScript.Row.SLOTS: "res://ui/slots_menu.tscn",
+	CasinoMenuScript.Row.WHEEL: "res://ui/wheel_menu.tscn",
+	CasinoMenuScript.Row.BLACKJACK: "res://ui/blackjack_menu.tscn",
+	CasinoMenuScript.Row.RACING: "res://ui/race_menu.tscn",
+}
 const RaceTrackScript := preload("res://world/race_track.gd")
 const StripScript := preload("res://world/strip.gd")
 const EconomyScript := preload("res://systems/economy.gd")
@@ -239,15 +254,18 @@ func _drive_the_palace() -> void:
 			strip_fenced = true
 	_set_check("the Strip has no fence, because it has no price", not strip_fenced)
 	var strip_node := ranch.get_node_or_null(^"Strip")
-	# ONE OF TEN LAMPS IS DELIBERATELY MISSING. The ring is centred on the Strip region, not
+	# TWO OF TEN LAMPS ARE DELIBERATELY MISSING. The ring is centred on the Strip region, not
 	# on the Palace, which sits off centre (see PALACE_MAX_RELIEF's comment in ranch.gd), so
 	# one ring position falls inside the Palace's own footprint; strip.gd's avoid_footprint()
-	# skips that one rather than moving it. ranch.gd's own boot report re-checks this
-	# independently and prints "RANCH strip lamps=9 clear=true"; this line matches it rather
-	# than asserting the un-skipped count.
-	_set_check("the Strip's lamps are standing, minus the one skipped clear of the Palace",
+	# skips that one rather than moving it. A second ring position clears the wall but stands
+	# inside the door apron reaching past it (Building.DOOR_APRON_RUN) -- a lamp cannot stand
+	# in the doorway, so the look pass's own review made avoid_footprint() drop that one too.
+	# ranch.gd's own boot report re-checks both independently and prints
+	# "RANCH strip lamps=8 clear=true"; this line matches it rather than asserting the
+	# un-skipped count.
+	_set_check("the Strip's lamps are standing, minus the two skipped clear of the Palace",
 		strip_node != null
-		and int(strip_node.call("light_count")) == StripScript.LIGHT_COUNT - 1)
+		and int(strip_node.call("light_count")) == StripScript.LIGHT_COUNT - 2)
 	_set_check("the marquee names the Palace and its sponsor",
 		strip_node != null and ", ".join(strip_node.call("marquee_lines") as Array[String])
 			.contains("Cloudsdale Weather Corporation"))
@@ -259,23 +277,45 @@ func _drive_the_palace() -> void:
 		and strip_region.contains(Vector2(palace.global_position.x, palace.global_position.z)))
 	_set_check("the cage counter is in the lobby",
 		ranch.get_node_or_null(^"Buildings/Palace/Cage") != null)
-	var lobby_sign := ranch.get_node_or_null(^"Buildings/Palace/Sign") as Label3D
-	_set_check("the lobby sign is hanging", lobby_sign != null)
-	var sign_text: String = lobby_sign.text if lobby_sign != null else ""
+	# THE PUBLISHED EDGES MOVED FROM A LABEL IN THE AIR TO A PAGE INSIDE THE BUILDING, and this
+	# check moved with them. It is strictly better than the one it replaces: it now asserts the
+	# surface a PLAYER ACTUALLY READS rather than a node that happened to hold a string, and it
+	# reads it through CasinoMenu.drawn_lines(), which is the same model the no dash sweeps and
+	# test_casino_menu.gd walk.
+	var lobby_board := ranch.get_node_or_null(^"Buildings/Palace/LobbySign") as Node3D
+	_set_check("the lobby's board is standing beside the door", lobby_board != null)
+	var board_clean := true
+	if lobby_board != null:
+		for label in lobby_board.find_children("*", "Label3D", true, false):
+			var line: Label3D = label
+			if line.text.contains("--") or line.text.contains("—"):
+				board_clean = false
+			if line.width <= 0.0:
+				board_clean = false
+				push_error("casino: %s is not fitted to its board" % line.name)
+	_set_check("both lines on the board are fitted and carry no dash", board_clean)
+
+	var rules_menu: CanvasLayer = ranch.get_casino_menu()
+	var rules_lines: Array[String] = []
+	if rules_menu != null:
+		rules_menu.call("set_tab", CasinoMenuScript.Tab.RULES)
+		rules_lines = rules_menu.call("drawn_lines")
+	var rules_text: String = "\n".join(rules_lines)
 	var publishes_everything := true
 	for pair in [["Slots", SlotsScript.house_edge()], ["The Wheel", WheelScript.house_edge()],
 			["Blackjack", BlackjackScript.house_edge()], ["Racing", RaceCardScript.TAKEOUT]]:
-		if not sign_text.contains(CasinoSignScript.edge_line(String(pair[0]),
+		if not rules_text.contains(CasinoSignScript.edge_line(String(pair[0]),
 				float(pair[1]))):
 			publishes_everything = false
-			push_error("casino: the lobby sign does not publish %s" % pair[0])
-	print("CASINO sign lines=%d" % sign_text.split("\n").size())
-	_set_check("the lobby sign publishes every game's real house edge", publishes_everything)
+			push_error("casino: the house rules page does not publish %s" % pair[0])
+	print("CASINO sign lines=%d" % rules_lines.size())
+	_set_check("the house rules page publishes every game's real house edge",
+		publishes_everything)
 	var sign_clean := true
-	for line in sign_text.split("\n"):
+	for line: String in rules_lines:
 		if line.contains("--") or line.contains("—"):
 			sign_clean = false
-	_set_check("nothing on the sign carries a dash", sign_clean)
+	_set_check("nothing on the house rules page carries a dash", sign_clean)
 
 	# --- the track -------------------------------------------------------------------------
 	var track := ranch.get_race_track()
@@ -410,6 +450,71 @@ func _drive_the_palace() -> void:
 		pause.call("close")
 	_set_check("the lobby refuses to open over another menu, so its can_open is consulted",
 		refused_over_pause)
+
+	# --- the drawn stages --------------------------------------------------------------------
+	# THE CASINO'S SCREENS CANNOT BE SCREENSHOTTED. ranch.tscn's render pass drives a
+	# Camera3D through the world; a CanvasLayer menu is not on that path and never appears in
+	# a shot, so the only judgement these five screens can get from a gate is their GEOMETRY.
+	# That is what the *_rect() layout functions on each stage are for: they are pure, they
+	# are the same numbers paint() draws with, and a rect that has walked off its own stage is
+	# the failure that actually happens when a screen is laid out by eye.
+	#
+	# THE CONTRACT IS CONDITIONAL, THE SAME WAY test_casino_stages.gd's IS, AND FOR THE SAME
+	# REASON: a red gate between tasks would mask a real regression the next task introduces.
+	# CasinoStagesTestScript.STAGED (declared at the top of this file, preloaded from that
+	# test) is the one list that says which of these four menus has a real stage; a menu not
+	# yet in it is only asked to still be reserving nothing, which is the true, correct state
+	# for it until its own task lands.
+	var stages_ok := true
+	var stage_focus_ok := true
+	for row: int in [CasinoMenuScript.Row.SLOTS, CasinoMenuScript.Row.WHEEL,
+			CasinoMenuScript.Row.BLACKJACK, CasinoMenuScript.Row.RACING]:
+		var stage_table: CanvasLayer = ranch.get_table_menu(row)
+		if stage_table == null:
+			stages_ok = false
+			continue
+		var staged: bool = CasinoStagesTestScript.STAGED.has(StageScenePaths.get(row, ""))
+		stage_table.call("open")
+		await get_tree().process_frame
+		var size: Vector2 = stage_table.call("stage_size")
+		if staged:
+			if size.x <= 0.0 or size.y <= 0.0:
+				stages_ok = false
+				push_error("casino: %s claims a stage but reserved none" % stage_table.name)
+		elif size != Vector2.ZERO:
+			stages_ok = false
+			push_error("casino: %s reserves a stage before its own task landed"
+				% stage_table.name)
+		var rect: Rect2 = stage_table.call("focus_rect")
+		# HAS ANYTHING TO FOCUS. Every table but the race guide always has a stake row, so
+		# row_count() is always > 0 for them and this changes nothing about their check. The
+		# race guide is checked here with nobody yet in a pen (the pony this gate races is not
+		# entered until further down), so row_count() is legitimately 0 and focus_rect()'s own
+		# empty Rect2() is the correct answer for a screen with no cursor to draw, the same
+		# principle CasinoMenu's own tabs with zero rows already follow.
+		var has_rows: bool = int(stage_table.call("row_count")) > 0
+		if staged and has_rows and (rect.size.x <= 0.0 or rect.size.y <= 0.0):
+			stage_focus_ok = false
+			push_error("casino: %s painted no focus ring" % stage_table.name)
+		print("CASINO stage %-14s size=(%.0f, %.0f) focus=(%.0f, %.0f) id=%s staged=%s"
+			% [stage_table.name, size.x, size.y, rect.size.x, rect.size.y,
+				String(stage_table.call("focused_id")), staged])
+		stage_table.call("close")
+		await get_tree().process_frame
+	_set_check("every staged table reserves a drawn stage and no other table reserves one early",
+		stages_ok)
+	_set_check("every staged table paints its focus ring somewhere real", stage_focus_ok)
+
+	var lobby_stage: CanvasLayer = ranch.get_casino_menu()
+	if lobby_stage != null:
+		lobby_stage.call("open")
+		await get_tree().process_frame
+		var lobby_size: Vector2 = lobby_stage.call("stage_size")
+		_set_check("the lobby draws a floor plan rather than a list",
+			lobby_size.x > 0.0 and lobby_size.y > 0.0
+				and String(lobby_stage.call("focused_id")) == "tile:0")
+		lobby_stage.call("close")
+		await get_tree().process_frame
 
 	# --- the race, on the real track ------------------------------------------------------------
 	var census_before: int = ranch.spawner.get_spawned().size()

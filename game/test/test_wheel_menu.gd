@@ -16,6 +16,7 @@ func before_each() -> void:
 	_menu.can_open = func() -> bool: return true
 	_menu.chips_provider = func() -> int: return _chips
 	_menu.open()
+	await get_tree().process_frame
 
 
 func test_it_opens_on_the_colour_bet() -> void:
@@ -158,3 +159,90 @@ func test_the_footer_documents_where_the_stake_actually_lives() -> void:
 		"the footer now comes from the shared builder, not a hand written line")
 	assert_true("\n".join(_menu.drawn_lines()).to_lower().contains("stake"),
 		"the stake row itself must still say what it is, even off the footer")
+
+
+const PaintScript := preload("res://ui/casino_paint.gd")
+## The file already preloads the SCENE as WheelMenuScene; the SCRIPT is what carries the Tab
+## enum and the new constants, and a preload by path is how this project reaches either.
+const WheelMenuScript := preload("res://ui/wheel_menu.gd")
+
+
+## THE DEAD FOOTER IS GONE. It was assigned in _ready() and overwritten by refresh() before
+## any player could see it, and it hard coded both input schemes at once, which is precisely
+## what MenuStyle.footer() exists to prevent.
+func test_the_wheel_has_no_footer_of_its_own_and_shows_one_scheme() -> void:
+	assert_false("WHEEL_FOOTER" in _menu, "the dead constant is deleted, not left lying")
+	var footer := _menu.get_node(^"Centre/Panel/Margin/Column/Footer") as Label
+	assert_false(footer.text.contains("Enter / A"),
+		"one scheme, never both: the footer comes from MenuStyle now")
+	assert_false(footer.text.contains("Esc / B"))
+
+
+## TWENTY FIVE POCKETS ON THE WHEEL AND TWENTY FOUR PADS ON THE FELT. The house pocket is on
+## the wheel and not on the felt, which is what makes it the house's.
+func test_the_number_felt_has_a_pad_per_number_and_none_for_the_house() -> void:
+	_menu.set_tab(WheelMenuScript.Tab.NUMBER)
+	assert_eq(_menu.guess_count(), WheelScript.NUMBERS)
+	var stage := Rect2(Vector2.ZERO, _menu.stage_size())
+	for i: int in WheelScript.NUMBERS:
+		assert_true(stage.encloses(_menu.pad_rect(i)),
+			"number pad %d leaves the stage: %s" % [i, _menu.pad_rect(i)])
+
+
+func test_the_colour_felt_has_a_pad_per_colour_and_none_overlaps() -> void:
+	_menu.set_tab(WheelMenuScript.Tab.COLOUR)
+	assert_eq(_menu.guess_count(), int(WheelScript.Colour.HOUSE))
+	for a: int in _menu.guess_count():
+		for b: int in _menu.guess_count():
+			if a >= b:
+				continue
+			assert_false(_menu.pad_rect(a).intersects(_menu.pad_rect(b)),
+				"colour pads %d and %d overlap" % [a, b])
+
+
+## THE WHEEL AND THE FELT DO NOT SIT ON TOP OF EACH OTHER, and neither leaves the stage.
+func test_the_wheel_and_the_rules_plate_stay_inside_the_stage() -> void:
+	var stage := Rect2(Vector2.ZERO, _menu.stage_size())
+	var centre: Vector2 = _menu.wheel_centre()
+	var r: float = _menu.wheel_outer()
+	assert_true(stage.encloses(Rect2(centre - Vector2(r, r), Vector2(r, r) * 2.0)),
+		"the wheel leaves the stage")
+	assert_true(stage.encloses(_menu.rules_rect()), "the rules plate leaves the stage")
+	assert_gt(_menu.wheel_outer(), _menu.wheel_inner(), "the ring has a width")
+
+
+## A SPIN STOPS WITH THE PUSHED POCKET UNDER THE POINTER, and the number of turns is a
+## constant. A spin whose length varied would be a generator under game/ui/.
+func test_a_pushed_spin_stops_with_that_pocket_under_the_pointer() -> void:
+	_menu.show_spin(13, 0, 10)
+	assert_true(_menu.animating())
+	# Run the tween out rather than waiting on wall clock. A fixed frame count tied to an
+	# assumed frame rate is exactly the flake this avoids: headless CI has been observed well
+	# north of 100 fps here, so a bound on FRAMES rather than on seconds still settles the
+	# spin quickly and a genuinely stuck tween still trips the 2000 frame cap instead of
+	# hanging the suite.
+	var frames := 0
+	while _menu.animating() and frames < 2000:
+		await get_tree().process_frame
+		frames += 1
+	assert_false(_menu.animating(), "the wheel has stopped")
+	assert_eq(_menu.pocket_under_pointer(), 13,
+		"the wheel stopped on the pocket ranch.gd already spun")
+
+
+func test_an_impossible_pocket_starts_no_spin() -> void:
+	var before: float = _menu.wheel_angle()
+	_menu.show_spin(99, 0, 10)
+	assert_false(_menu.animating())
+	assert_eq(_menu.wheel_angle(), before)
+	_menu.show_spin(-2, 0, 10)
+	assert_false(_menu.animating())
+
+
+## THE CURSOR MODEL IS UNCHANGED: the guesses, then one more position which is the stake.
+func test_the_focus_walks_the_guesses_and_then_the_stake() -> void:
+	_menu.set_tab(WheelMenuScript.Tab.COLOUR)
+	assert_eq(String(_menu.focused_id()), "guess:0")
+	_menu.move_selection(int(WheelScript.Colour.HOUSE))
+	assert_eq(String(_menu.focused_id()), "stake:%d" % _menu.stake_index())
+	assert_eq(_menu.row_count(), _menu.guess_count() + 1)

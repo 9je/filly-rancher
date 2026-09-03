@@ -382,6 +382,29 @@ restoring the cache) turns the suite green again.
 | `game/test/test_props.gd` | The prop layout as data: family scales, the footprint sampler, the skirt rule, and the clearances the whole shipped layout has to hold |
 | `game/world/interaction.gd` | The interact resolver. The collection gate drives its pen step through it, standing the player on the plot and asking `ranch.current_interaction()` what the key means there before calling `ranch.perform_interaction()`; the depot gate still calls `_move_pony_into_pen()` directly |
 | `tools/setup_env.sh` | Installs/pins GUT (`GUT_VER`/`GUT_SHA256`, near the SourceIO block) |
+| `game/test/test_casino_paint.gd` | The casino's drawing kit as geometry: every glyph inside its box, and the sweep that keeps a random generator out of `game/ui/` |
+| `game/test/test_casino_stages.gd` | The contract every drawn casino screen holds: a stage of the shared width, a printed line that is still in the model, and the focus following the cursor across every row of every tab |
+| `game/test/test_lobby_sign.gd` | The board that replaced the eleven line label outside the Palace: fitted lines, nothing hanging below its own origin, no dash |
+| `game/world/terrain.gdshader` | The ground: sRGB decode, two octaves of hash noise, a slope mask to dirt, a ridge lift and a distance fade |
+
+---
+
+## The terrain shader
+
+**The ground wears a shader, and one assertion is doing all the work.**
+
+Godot compiles shaders lazily and the headless renderer never rasterises, so a
+`ShaderMaterial` on a mesh in a headless run is inert. The one real risk is a
+shader that fails to PARSE: that prints an error at load and is invisible to a
+gate checking only `RANCH_OK`. So `game/test/test_terrain.gd` asks the built
+mesh what material it is actually wearing, that the shader is non null, that
+its code is non empty, and that the code contains `srgb_to_linear` by name.
+
+That last one is the trap. `vertex_color_is_srgb` is a `StandardMaterial3D`
+flag with no shader equivalent; drop the conversion and Godot treats the vertex
+colours as already linear, and the ground comes out roughly twice as bright as
+authored. `terrain.gd`'s own comment records what that looked like the first
+time: "a pale mint sheet, not grass".
 
 ---
 
@@ -1017,7 +1040,31 @@ Run it with:
 tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/casino_test.tscn
 ```
 
-Expect `CASINO_OK checks=72`; the exit code is the verdict.
+Expect `CASINO_OK checks=76`; the exit code is the verdict.
+
+**The sign checks moved, and they are strictly better than the ones they replaced.**
+
+`Buildings/Palace/Sign` was a `Label3D` holding eleven lines of published house
+edges, and the gate asserted on its `.text`. The label is gone; a `LobbySign`
+board with two fitted lines stands beside the door and the eleven lines are the
+casino lobby's House rules page. So the gate now asserts:
+
+* **"the lobby's board is standing beside the door"** and **"both lines on the
+  board are fitted and carry no dash"**, which is what stops a sign quietly
+  going back to being unbacked letters in the air.
+* **"the house rules page publishes every game's real house edge"**, read off
+  `CasinoMenu.drawn_lines()` on `Tab.RULES`. This is the surface a player
+  actually reads, and it is the same model the no dash sweeps walk.
+
+`CASINO sign lines=<n>` keeps printing and now counts the rules page's lines.
+`CasinoSign.lines()` is untouched and still asks each game for its own number,
+so the promise the sign was making is unchanged; only where it is kept moved.
+
+**Two stage checks landed with the drawn screens.** `CASINO stage <menu>
+size=(w, h) focus=(w, h) id=<id>` prints one line per table. These five screens
+are `CanvasLayer` menus and can never appear in a screenshot, so their geometry
+is the only judgement a gate can give them: every table reserves a stage of the
+shared 1120 px width, and every one paints its focus ring somewhere real.
 
 ---
 

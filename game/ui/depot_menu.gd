@@ -73,6 +73,7 @@ var _confirming_name := ""
 
 
 func _ready() -> void:
+	MenuStyleScript.apply_panel($Centre/Panel as PanelContainer)
 	visible = false
 	_title.text = TITLE
 
@@ -283,14 +284,17 @@ func refresh() -> void:
 	_tabs.text = MenuStyleScript.tab_strip(TAB_NAMES, _tab)
 	for child in _rows.get_children():
 		child.queue_free()
+	MenuStyleScript.apply_title(_title)
 	var lines: Array[String] = drawn_lines()
 	for i in lines.size():
-		var label := Label.new()
 		var picked: bool = i == _selected and _tab != Tab.STATEMENT
+		var label := Label.new()
 		label.text = MenuStyleScript.caret(picked) + lines[i]
 		label.add_theme_color_override("font_color",
 			MenuStyleScript.COLOR_VALUE if picked else MenuStyleScript.COLOR_NAME)
-		_rows.add_child(label)
+		var holder: PanelContainer = MenuStyleScript.row_panel(picked)
+		holder.add_child(label)
+		_rows.add_child(holder)
 
 
 func _row_count() -> int:

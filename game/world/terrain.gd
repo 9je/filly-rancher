@@ -29,6 +29,7 @@ extends StaticBody3D
 const LayersScript := preload("res://world/collision_layers.gd")
 const RegionRegistryScript := preload("res://systems/region_registry.gd")
 const RegionDataScript := preload("res://systems/region_data.gd")
+const GroundShader := preload("res://world/terrain.gdshader")
 
 ## Half-width of the map, in metres. The ground spans [-HALF, HALF] on both X and Z.
 ##
@@ -66,6 +67,10 @@ const BOUNDARY_THICKNESS := 2.0
 ## sun reads as plastic.
 const GRASS_LOW := Color(0.239, 0.408, 0.196)
 const GRASS_HIGH := Color(0.443, 0.541, 0.271)
+
+## What a hillside is made of. Turned earth, and deliberately not any green: the point of the
+## slope mask is that a slope reads as a different SURFACE rather than as darker grass.
+const DIRT := Color(0.36, 0.28, 0.19)
 
 ## When true this node builds NOTHING in _ready() beyond its collision layers, and the
 ## ground is shaped by an explicit build() instead.
@@ -313,17 +318,19 @@ func _build_mesh() -> ArrayMesh:
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color.WHITE
-	mat.vertex_color_use_as_albedo = true
-	# NOT optional. Godot renders in linear space and treats vertex colours as
-	# ALREADY linear unless told otherwise, so the sRGB-looking constants above come
-	# out roughly twice as bright as authored: the first render of this terrain was a
-	# pale mint sheet, not grass. Every colour a human picks by eye is an sRGB
-	# colour, so this flag is what makes GRASS_LOW/GRASS_HIGH mean what they say.
-	mat.vertex_color_is_srgb = true
-	mat.roughness = 0.95
-	mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+	# THE GROUND WEARS A SHADER, AND THE VERTEX COLOURS STILL DECIDE ITS COLOUR. grass_at() and
+	# every region palette are unchanged and are still the single authority on what colour the
+	# ground is at a point; world/terrain.gdshader adds the break up, the slope mask and the
+	# ridge lift on top of what this mesh already carries.
+	#
+	# vertex_color_is_srgb HAS NO SHADER EQUIVALENT, so the conversion moved INTO the shader.
+	# See its srgb_to_linear() and the comment above it; game/test/test_terrain.gd asserts the
+	# function is in there by name, because dropping it renders a pale mint sheet and nothing
+	# headless can see that.
+	var mat := ShaderMaterial.new()
+	mat.shader = GroundShader
+	mat.set_shader_parameter(&"grass_high", GRASS_HIGH)
+	mat.set_shader_parameter(&"dirt_color", DIRT)
 	mesh.surface_set_material(0, mat)
 	return mesh
 

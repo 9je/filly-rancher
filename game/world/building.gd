@@ -188,6 +188,14 @@ const GROUND_DROP := SKIRT_DEPTH - SEAT_CLEARANCE - PropsScript.SINK_BIAS
 ## how the first render of the barn looked.
 @export var trim_color := Color(0.309804, 0.219608, 0.176471)
 
+## How metallic this building's TRIM is. Zero for every building on the map except the Palace,
+## which ranch.tscn sets to 0.45. A lot of "this building is special" for one exported float.
+@export_range(0.0, 1.0) var trim_metallic := 0.0
+
+const WALL_ROUGHNESS := 0.88
+const ROOF_ROUGHNESS := 0.70
+const TRIM_ROUGHNESS := 0.45
+
 var _built := false
 
 
@@ -210,9 +218,18 @@ func build() -> void:
 	if ridge_height <= wall_height:
 		push_error("Building '%s': ridge_height must exceed wall_height" % name)
 
-	var wall_mat := _material(wall_color)
-	var roof_mat := _material(roof_color)
-	var trim_mat := _material(trim_color)
+	var wall_mat := _material(wall_color, WALL_ROUGHNESS)
+	var roof_mat := _material(roof_color, ROOF_ROUGHNESS)
+	var trim_mat := _material(trim_color, TRIM_ROUGHNESS, trim_metallic)
+	# THE PLINTH IS WALKED ON AND STOOD ON, NOT WORN. Floor and DoorApron are the same trim
+	# colour as the lintel, but trim_metallic is for a doorway beam catching the sun, not for a
+	# ground-level ramp: at a grazing sun angle the sloped DoorApron caught the light across its
+	# whole face and blew out to a flat gold wash covering a third of the Palace's own render
+	# (18_palace_lobby_sign, 19_marquee_and_gold_trim), which is a worse trade than the glint
+	# trim_metallic was added for. metallic is left at _material()'s own default (0.0) here on
+	# purpose, so this material never reads trim_metallic at all -- not "0.0 for now", but
+	# structurally exempt, on every building including the Palace.
+	var plinth_mat := _material(trim_color, TRIM_ROUGHNESS)
 
 	var half_w := width * 0.5
 	var half_d := depth * 0.5
@@ -227,7 +244,7 @@ func build() -> void:
 	# pair that made.
 	var plinth: float = FLOOR_TOP + SKIRT_DEPTH
 	_slab("Floor", Vector3(width - PLINTH_INSET * 2.0, plinth, depth - PLINTH_INSET * 2.0),
-		Vector3(0.0, FLOOR_TOP - plinth * 0.5, 0.0), trim_mat)
+		Vector3(0.0, FLOOR_TOP - plinth * 0.5, 0.0), plinth_mat)
 
 	# --- walls -------------------------------------------------------------------
 	_slab("WallBack", Vector3(width, wall_height, t),
@@ -275,7 +292,7 @@ func build() -> void:
 		var apron_top_z: float = half_d - PLINTH_INSET
 		_slab("DoorApron", Vector3(door_width, DOOR_APRON_THICKNESS, apron_slope),
 			Vector3(0.0, FLOOR_TOP - apron_rise * 0.5, apron_top_z + apron_run * 0.5),
-			trim_mat, 0.0, apron_angle)
+			plinth_mat, 0.0, apron_angle)
 
 	# --- roof ---------------------------------------------------------------------
 	# Two slabs leaning against each other. Built as rotated BoxMeshes rather than as
@@ -309,7 +326,7 @@ func build() -> void:
 	arrays[Mesh.ARRAY_VERTEX] = verts
 	arrays[Mesh.ARRAY_INDEX] = PackedInt32Array([0, 1, 2, 3, 4, 5])
 	gable.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	var gable_mat := _material(wall_color)
+	var gable_mat := _material(wall_color, WALL_ROUGHNESS)
 	gable_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	gable.surface_set_material(0, gable_mat)
 	var gable_node := MeshInstance3D.new()
@@ -408,11 +425,24 @@ func _add_interior_light() -> void:
 	add_child(light)
 
 
-func _material(colour: Color) -> StandardMaterial3D:
+## THREE SURFACES, THREE ROUGHNESSES, and the whole difference is one exported float.
+##
+## Every surface of every building shipped at roughness 0.9 with specular disabled, so nothing
+## in the world had a highlight and the Palace's gold trim could not glint. A roof slightly
+## less rough than its wall reads as a different material without a texture, which is the
+## cheapest material variation there is.
+##
+## trim_metallic IS OPT IN AND DEFAULTS TO ZERO, so every building except the one that asks
+## renders byte for byte as it does today. Only Buildings/Palace asks (ranch.tscn sets 0.45),
+## and the result is that the casino's gold catches the sun and the marquee bulbs and nothing
+## else in the game changes at all.
+func _material(colour: Color, surface_roughness := 0.88, metallic := 0.0) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = colour
-	mat.roughness = 0.9
-	mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+	mat.roughness = surface_roughness
+	mat.metallic = metallic
+	if metallic <= 0.0:
+		mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
 	return mat
 
 

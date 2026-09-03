@@ -10,11 +10,13 @@ extends Node3D
 ## as somewhere at night: a ring of lamp posts and one lit marquee facing the walk up from
 ## the homestead.
 ##
-## NINE LAMPS ON A TEN POSITION RING. LIGHT_COUNT is the number of points build() walks, not
+## EIGHT LAMPS ON A TEN POSITION RING. LIGHT_COUNT is the number of points build() walks, not
 ## the number of posts that end up standing: avoid_footprint() skips any position that lands
-## inside the Palace's own footprint, and on this map exactly one does, so a built Strip
-## reports light_count() of 9. See build() and avoid_footprint() for why the position is
-## dropped rather than nudged.
+## inside an excluded rectangle, and on this map two do -- one inside the Palace's own walls,
+## and one inside its door apron, which reaches Building.DOOR_APRON_RUN past those walls and
+## caught a lamp PALACE_CLEARANCE alone did not (a lamp standing in the doorway, found and
+## fixed in the look pass's own review) -- so a built Strip reports light_count() of 8. See
+## build() and avoid_footprint() for why a position is dropped rather than nudged.
 ##
 ## ITS CHILDREN ARE DELIBERATELY NOT COUNTED AS PROPS. ranch.gd's prop census is
 ## Props.expected_count() plus the Buildings children, and lamp posts are under neither. A
@@ -85,6 +87,47 @@ const MARQUEE_COLOR := Color(1.0, 0.92, 0.62)
 const LAMP_ENERGY := 2.2
 const LAMP_RANGE := 16.0
 
+## TEN BULBS ROUND THE MARQUEE TRIM, as ONE MultiMeshInstance3D: ten instances and one draw
+## call. With glow on (the Environment gains it in the look pass) they bloom gently at dusk
+## and night, which is the whole point of a marquee.
+##
+## NOT IN _lights, DELIBERATELY. Strip.light_count() answers how many LAMP POSTS are standing
+## on the ring, the strip gate asserts it is LIGHT_COUNT minus the two skipped clear of the
+## Palace (its walls, and since the look pass its door apron), and a bulb rail counted among
+## them would break that check for a reason that has nothing to do with lamp posts.
+const MARQUEE_BULBS := 10
+const MARQUEE_BULB_RADIUS := 0.055
+
+## One soft wash on the board's own face. shadow_enabled off for the reason this file already
+## gives about its lamp ring: a light out in the open has nothing to leak through, and a
+## shadow map on it is a cost with no picture attached.
+##
+## RANGE AND ANGLE ARE A HARD CUTOFF, NOT A SUGGESTION, AND THAT IS THE POINT. The headline
+## and sponsor labels are `shaded = false` (unlit, always readable off their own modulate) and
+## the ten bulbs are emissive, so this light's entire job is keeping the board's own dark panel
+## and gold trim from reading as a black hole -- it was never what makes the marquee "read as
+## lit". At the old 38 degrees and 6.0 m, aimed back at the board's dead centre from 2.2 m out
+## and 1.1 m up, MEASURED (not guessed) against the built scene: the closest point on the
+## Palace's own DoorApron was only 1.03 m from this light, because the door, its apron and the
+## sign above it all sit on the same wall centreline. Godot's spot_range is a hard sphere and
+## the apron was well inside it either way, so the fix could not be range or angle ALONE --
+## the board's own bottom edge (2.65 m up) sits BELOW the apron's own top edge (2.92 m up), so
+## any cone wide enough to reach the board's centre from straight out front necessarily swept
+## through the apron's own airspace on the way, at any angle or range that still lit the board.
+##
+## AIMED HIGH INSTEAD. Aiming at the board's UPPER portion (0.7 m above its own centre, close
+## to the headline) rather than its dead centre lets the light sit high enough, and its aim
+## tilt down gently enough, that its cone's own lower edge never dips as far as the apron's own
+## airspace -- verified by sampling the built DoorApron's, the Floor's and the board's own
+## meshes directly (a throwaway probe script, not eyeballed): 0 of 961 sample points anywhere
+## on the apron's six faces or the Floor's own top face fall inside this cone at these numbers,
+## while roughly a third of the board's own face still does (down from about two fifths at the
+## old numbers -- a real loss, paid for keeping the door apron out of the beam entirely rather
+## than merely dimmer).
+const MARQUEE_WASH_ENERGY := 2.4
+const MARQUEE_WASH_ANGLE := 36.0
+const MARQUEE_WASH_RANGE := 3.0
+
 var _region: RegionData = null
 var _ground := Callable()
 var _lights: Array[Node3D] = []
@@ -99,11 +142,13 @@ var _marquee_size := Vector2.ZERO
 var _marquee_ceiling := 0.0
 var _has_marquee := false
 
-## The rectangle, in world XZ, no lamp may stand inside. Empty (min == max == ZERO with
-## _has_avoid false) until avoid_footprint() is called; nothing is skipped in that case.
-var _avoid_min := Vector2.ZERO
-var _avoid_max := Vector2.ZERO
-var _has_avoid := false
+## The rectangles, in world XZ, no lamp may stand inside. Empty until avoid_footprint() is
+## called; nothing is skipped in that case. EACH CALL ADDS ONE MORE RECTANGLE rather than
+## replacing the last one -- see avoid_footprint()'s own comment for why the Palace's own
+## footprint and its door apron are now two separate calls rather than one shape wide enough
+## to cover both (which would also exclude ground on the building's BACK side that no lamp
+## was ever standing on).
+var _avoid_rects: Array[Rect2] = []
 
 
 ## Hand over the region this strip paves and a way to ask the terrain how high it is. Both
@@ -115,20 +160,22 @@ func configure(region: RegionData, ground_sampler: Callable) -> void:
 
 ## A footprint, in world XZ, that no lamp may stand inside or against: `centre_xz` and
 ## `half_extents` (half-width, half-depth) of whatever is standing on the Strip's own
-## ground; today, only Buildings/Palace. PALACE_CLEARANCE is added past those edges on
-## every side. Call before build(), same as configure(); a no-op call is safe (nothing is
-## skipped) so a caller with nothing to avoid can simply not call it.
+## ground -- a building's own walls, or (since the door apron joined this rule) something
+## that only projects past them. PALACE_CLEARANCE is added past those edges on every side.
+## Call before build(), same as configure(); safe to call zero, one or several times, and
+## each call ADDS one more excluded rectangle rather than replacing the last, which is what
+## lets a caller hand over a building's walls and its door apron as two separate rectangles
+## instead of forcing one shape to cover both (see ranch.gd's own two calls for the Palace).
 ##
 ## Not folded into configure() itself: RegionFence's contract, the one configure()
 ## deliberately matches, has no such thing to hand over, and every other region's fence
 ## never needs one. Kept as world-space XZ rather than a Building reference so this file
-## does not have to know what a Building is; ranch.gd reads the Palace's own global_position
-## and width/depth and hands over the rectangle, not the node.
+## does not have to know what a Building is; ranch.gd reads the Palace's own global_position,
+## width, depth and door apron reach straight off the live node and hands over the
+## rectangles, not the node.
 func avoid_footprint(centre_xz: Vector2, half_extents: Vector2) -> void:
 	var pad: Vector2 = half_extents + Vector2(PALACE_CLEARANCE, PALACE_CLEARANCE)
-	_avoid_min = centre_xz - pad
-	_avoid_max = centre_xz + pad
-	_has_avoid = true
+	_avoid_rects.append(Rect2(centre_xz - pad, pad * 2.0))
 
 
 ## WHERE THE SIGN GOES, in the building's own terms. `front_centre` is the middle of the
@@ -201,8 +248,12 @@ func build() -> void:
 		var angle: float = TAU * float(i) / float(LIGHT_COUNT)
 		var x: float = _region.centre.x + cos(angle) * LIGHT_RING_RADIUS
 		var z: float = _region.centre.y + sin(angle) * LIGHT_RING_RADIUS
-		if _has_avoid and x >= _avoid_min.x and x <= _avoid_max.x \
-				and z >= _avoid_min.y and z <= _avoid_max.y:
+		var blocked := false
+		for rect: Rect2 in _avoid_rects:
+			if rect.has_point(Vector2(x, z)):
+				blocked = true
+				break
+		if blocked:
 			continue
 		_lights.append(_lamp("Lamp%d" % i, Vector3(x, _y(x, z), z)))
 	_marquee()
@@ -308,6 +359,8 @@ func _marquee() -> void:
 		headline_height * MARQUEE_SPONSOR_SCALE,
 		_marquee_centre + Vector3(0.0, -_marquee_size.y * 0.24, 0.0)
 			+ _marquee_facing * 0.09)
+	_marquee_bulbs()
+	_marquee_wash()
 
 
 ## One line of the sign, `cap_height` metres tall, fitted to the board's width and hung at
@@ -345,3 +398,58 @@ func _flat_material(colour: Color) -> StandardMaterial3D:
 	mat.roughness = 0.85
 	mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
 	return mat
+
+
+func marquee_bulb_count() -> int:
+	return MARQUEE_BULBS
+
+
+## Ten emissive spheres spaced round the trim's perimeter, built as one MultiMesh so the whole
+## rail is one draw call.
+func _marquee_bulbs() -> void:
+	var sphere := SphereMesh.new()
+	sphere.radius = MARQUEE_BULB_RADIUS
+	sphere.height = MARQUEE_BULB_RADIUS * 2.0
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = MARQUEE_TRIM_COLOR
+	mat.emission_enabled = true
+	mat.emission = MARQUEE_TRIM_COLOR
+	mat.emission_energy_multiplier = 2.2
+	sphere.material = mat
+
+	var multi := MultiMesh.new()
+	multi.transform_format = MultiMesh.TRANSFORM_3D
+	multi.mesh = sphere
+	multi.instance_count = MARQUEE_BULBS
+
+	var half := Vector2(_marquee_size.x * 0.5 + MARQUEE_TRIM * 0.5,
+		_marquee_size.y * 0.5 + MARQUEE_TRIM * 0.5)
+	var right := Vector3(-_marquee_facing.z, 0.0, _marquee_facing.x)
+	for i in MARQUEE_BULBS:
+		# Round the rim: five across the top and five across the bottom, which is the shape a
+		# marquee's bulb rail actually has.
+		var across: float = -1.0 + 2.0 * (float(i % 5) / 4.0)
+		var up: float = 1.0 if i < 5 else -1.0
+		var at: Vector3 = _marquee_centre + right * (half.x * across) \
+			+ Vector3(0.0, half.y * up, 0.0) + _marquee_facing * 0.06
+		multi.set_instance_transform(i, Transform3D(Basis(), at))
+
+	var node := MultiMeshInstance3D.new()
+	node.name = "MarqueeBulbs"
+	node.multimesh = multi
+	add_child(node)
+
+
+func _marquee_wash() -> void:
+	var light := SpotLight3D.new()
+	light.name = "MarqueeWash"
+	light.light_color = LAMP_COLOR
+	light.light_energy = MARQUEE_WASH_ENERGY
+	light.spot_range = MARQUEE_WASH_RANGE
+	light.spot_angle = MARQUEE_WASH_ANGLE
+	light.shadow_enabled = false
+	add_child(light)
+	# 2.0 m out and 1.4 m up, aimed 0.7 m ABOVE the board's own centre rather than at it: see
+	# MARQUEE_WASH_RANGE's own comment for the measured geometry this keeps the beam out of.
+	light.global_position = _marquee_centre + _marquee_facing * 2.0 + Vector3(0.0, 1.4, 0.0)
+	light.look_at(_marquee_centre + Vector3(0.0, 0.7, 0.0), Vector3.UP)

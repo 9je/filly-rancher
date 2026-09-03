@@ -45,6 +45,7 @@ var _letter: Dictionary = {}
 
 
 func _ready() -> void:
+	MenuStyleScript.apply_panel($Centre/Panel as PanelContainer)
 	visible = false
 
 

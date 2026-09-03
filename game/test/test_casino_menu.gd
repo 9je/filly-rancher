@@ -176,3 +176,49 @@ func test_nothing_the_lobby_draws_carries_a_dash() -> void:
 		_menu.set_tab(tab)
 		for line: String in _menu.drawn_lines() + [_menu.header_line()]:
 			assert_false(line.contains("--") or line.contains("—"), line)
+
+
+const PaintScript := preload("res://ui/casino_paint.gd")
+## The file already preloads the SCENE as CasinoMenuScene; the SCRIPT is what carries
+## LOBBY_ROWS and the Tab enum.
+const CasinoMenuScript := preload("res://ui/casino_menu.gd")
+
+
+## SIX TILES IN A 3 BY 2 GRID, none overlapping, none off the stage. The lobby is the first
+## screen a player sees in this building and it used to be six sentences in a column.
+func test_the_six_lobby_tiles_tile_the_stage_without_overlapping() -> void:
+	var stage := Rect2(Vector2.ZERO, _menu.stage_size())
+	for i: int in CasinoMenuScript.LOBBY_ROWS.size():
+		assert_true(stage.encloses(_menu.tile_rect(i)), "tile %d leaves the stage" % i)
+		for j: int in CasinoMenuScript.LOBBY_ROWS.size():
+			if i >= j:
+				continue
+			assert_false(_menu.tile_rect(i).intersects(_menu.tile_rect(j)),
+				"tiles %d and %d overlap" % [i, j])
+
+
+## LOBBY_ROWS IS NOT REWRITTEN. The six strings are what the tiles are TITLED and DESCRIBED
+## from, split at their own colon, and the wording is already good.
+func test_the_lobby_rows_are_unchanged_and_every_one_splits_at_a_colon() -> void:
+	assert_eq(CasinoMenuScript.LOBBY_ROWS.size(), 6)
+	assert_eq(CasinoMenuScript.LOBBY_ROWS[1], "Slots: three reels, one lever, the fast one")
+	for row: String in CasinoMenuScript.LOBBY_ROWS:
+		assert_true(row.contains(": "), "'%s' has no title and description to split" % row)
+		assert_false(row.contains("--"), "'%s' carries a dash" % row)
+
+
+## THE HOUSE RULES PAGE IS WHERE THE PUBLISHED EDGES LIVE NOW. This is the surface the sign
+## outside used to be, and it is reachable from the lobby's own picker.
+func test_the_rules_tab_still_returns_every_line_the_sign_publishes() -> void:
+	_menu.set_tab(CasinoMenuScript.Tab.RULES)
+	var model: Array[String] = _menu.drawn_lines()
+	assert_eq(model.size(), CasinoSignScript.lines().size())
+	for line: String in CasinoSignScript.lines():
+		assert_true(model.has(line), "the rules page still carries '%s'" % line)
+
+
+func test_the_focus_id_names_the_tile_the_cursor_is_on() -> void:
+	_menu.set_tab(CasinoMenuScript.Tab.LOBBY)
+	assert_eq(String(_menu.focused_id()), "tile:0")
+	_menu.move_selection(2)
+	assert_eq(String(_menu.focused_id()), "tile:2")

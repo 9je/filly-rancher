@@ -109,13 +109,81 @@ func test_every_styled_label_gets_the_outline_that_makes_it_readable() -> void:
 ## THE PANELS THEMSELVES, not just the helper: every menu that draws a row draws it through
 ## style_label(), so opening one and reading a Label straight off it is the check that the
 ## inheritance is real rather than merely available.
+##
+## THE CAGE TAB, NOT THE LOBBY. Phase 3 polish moved the lobby's six rows onto its own drawn
+## stage (CasinoMenu.paint()'s LOBBY case), so the Rows VBox column is empty on that tab now;
+## the cage still prints its three line explainer into that same column
+## (CasinoMenu.printed_lines()'s CAGE case), which is what this test needs a real row from.
 func test_a_real_panel_draws_its_rows_with_the_outline() -> void:
 	var menu: CasinoMenu = load("res://ui/casino_menu.tscn").instantiate()
 	add_child_autofree(menu)
 	menu.bits_provider = func() -> int: return 500
 	menu.chips_provider = func() -> int: return 0
 	assert_true(menu.open())
+	menu.set_tab(CasinoMenu.Tab.CAGE)
 	var rows := menu.get_node(^"Centre/Panel/Margin/Column/Rows") as VBoxContainer
-	assert_gt(rows.get_child_count(), 0, "the lobby drew rows to check")
-	var row := rows.get_child(0) as Label
+	assert_gt(rows.get_child_count(), 0, "the cage drew rows to check")
+	var holder := rows.get_child(0) as PanelContainer
+	assert_not_null(holder)
+	var row := holder.get_child(0) as Label
 	assert_eq(row.get_theme_constant("outline_size"), MenuStyleScript.OUTLINE_SIZE)
+
+
+## ONE PANEL STYLE, NOT TEN COPIES. The MenuPanel StyleBoxFlat was duplicated verbatim into
+## every menu .tscn in the game, so "change the look of a panel" meant editing ten scene
+## files and getting one of them wrong.
+func test_the_panel_style_is_one_shared_instance_with_the_shipped_numbers() -> void:
+	var a: StyleBoxFlat = MenuStyleScript.panel_style()
+	var b: StyleBoxFlat = MenuStyleScript.panel_style()
+	assert_eq(a, b, "cached: every panel in the game points at the same box")
+	assert_eq(a.bg_color, Color(0.0392157, 0.0470588, 0.0784314, 0.88))
+	assert_eq(a.border_color, Color(1, 0.858824, 0.552941, 0.32))
+	assert_eq(a.corner_radius_top_left, 12)
+	assert_eq(a.border_width_top, 1)
+
+
+## THE ROW TREATMENT THE STYLE FILE ALREADY INTENDED. These four constants shipped declared
+## and unread, because every row in the game was a bare Label with a two character caret.
+func test_the_row_box_uses_the_declared_row_colours_and_differs_when_picked() -> void:
+	var picked: StyleBoxFlat = MenuStyleScript.row_box(true)
+	var idle: StyleBoxFlat = MenuStyleScript.row_box(false)
+	assert_eq(picked.bg_color, MenuStyleScript.ROW_SELECTED_BG)
+	assert_eq(picked.border_color, MenuStyleScript.ROW_SELECTED_BORDER)
+	assert_eq(idle.bg_color, MenuStyleScript.ROW_IDLE_BG)
+	assert_eq(idle.border_color, MenuStyleScript.ROW_IDLE_BORDER)
+	assert_ne(picked.bg_color, idle.bg_color,
+		"a highlight nobody can see is not a highlight")
+
+
+## A WEIGHT HIERARCHY FOR ZERO ASSETS. There is no .ttf in this project and this slice does
+## not add one; a FontVariation over the engine default is constructed in code, ships no file
+## and needs no import.
+func test_the_title_font_is_bolder_than_the_engine_default_and_is_cached() -> void:
+	var font: FontVariation = MenuStyleScript.title_font()
+	assert_eq(font, MenuStyleScript.title_font(), "cached")
+	assert_gt(font.variation_embolden, 0.0)
+	assert_gt(MenuStyleScript.title_font().variation_embolden,
+		MenuStyleScript.numeral_font().variation_embolden,
+		"a title is heavier than a number, and a number is heavier than prose")
+
+
+func test_the_subtitle_size_sits_under_the_row_size() -> void:
+	assert_lt(MenuStyleScript.SUBTITLE_SIZE, MenuStyleScript.ROW_SIZE)
+
+
+## THE PANELS THEMSELVES. This existing test opened the ONE menu that was already outlining
+## its rows, which is why every table in the Palace shipped with unoutlined rows over a
+## translucent panel for a whole phase. It now asks a table as well.
+func test_a_table_draws_its_rows_with_the_outline_and_in_a_row_box() -> void:
+	var menu: CanvasLayer = load("res://ui/slots_menu.tscn").instantiate()
+	add_child_autofree(menu)
+	menu.set("can_open", func() -> bool: return true)
+	menu.set("chips_provider", func() -> int: return 500)
+	assert_true(bool(menu.call("open")))
+	var rows := menu.get_node(^"Centre/Panel/Margin/Column/Rows") as VBoxContainer
+	assert_gt(rows.get_child_count(), 0, "the table drew rows to check")
+	var holder := rows.get_child(0) as PanelContainer
+	assert_not_null(holder, "every cursor driven row sits in a PanelContainer now")
+	var label := holder.get_child(0) as Label
+	assert_not_null(label)
+	assert_eq(label.get_theme_constant("outline_size"), MenuStyleScript.OUTLINE_SIZE)

@@ -160,6 +160,7 @@ const StockPaletteScript := preload("res://systems/stock_palette.gd")
 const PlayerLookScript := preload("res://systems/player_look.gd")
 const StripScript := preload("res://world/strip.gd")
 const CasinoSignScript := preload("res://systems/casino_sign.gd")
+const LobbySignScript := preload("res://world/lobby_sign.gd")
 const InteractionScript := preload("res://world/interaction.gd")
 const BuildingScript := preload("res://world/building.gd")
 const CasinoScript := preload("res://systems/casino.gd")
@@ -302,6 +303,24 @@ const DEPOT_RADIUS := 4.0
 ## from the nearest other interactable, and Interaction.PRIORITY ranks it last regardless.
 const PALACE_RADIUS := 6.0
 
+## THE BOARD BESIDE THE PALACE DOOR. Its width is a fraction of the building's own, its base
+## sits ABOVE the Palace's local y = 0 (which is its plinth top, not the ground) so nothing on
+## it drags the building's world AABB down past what ranch.gd's own seating check expects, and
+## the standoff clears the wall by more than the trim's own thickness.
+##
+## THE WIDTH CAME DOWN FROM 0.26 BECAUSE THE BOARD HAS TO FIT BESIDE THE MARQUEE, not merely
+## on the building. Strip's marquee board is MARQUEE_WIDTH_FRACTION (0.62) of the same wall,
+## trimmed, standing 0.25 m further out than this board and across the SAME height band, so
+## the two are stacked in depth wherever they overlap in x and the nearer one wins. At 0.26
+## this board was 3.64 m wide, the free wall outboard of the marquee's trim is 2.56 m, and
+## 2.42 m of the board (both its lines, all but the last two letters of the headline) stood
+## behind the marquee. LOBBY_SIGN_GAP is the daylight left between the two trims.
+const LOBBY_SIGN_WIDTH_FRACTION := 0.16
+const LOBBY_SIGN_HEIGHT := 1.10
+const LOBBY_SIGN_BASE := 1.05
+const LOBBY_SIGN_STANDOFF := 0.30
+const LOBBY_SIGN_GAP := 0.10
+
 ## THE TWO PONIES BEHIND COUNTERS, and where they stand.
 ##
 ## AT THE DOOR AND FACING OUT. "Facing the counter" is resolved as standing at the counter
@@ -341,6 +360,15 @@ const ATTENDANT_CLEARANCE := AttendantScript.BODY_RADIUS + 0.10
 ## picture twice.
 const VENDOR_LOOK := {"coat": 2, "mane": 5, "eyes": 1, "mane_style": 1}
 const TELLER_LOOK := {"coat": 6, "mane": 0, "eyes": 3, "mane_style": 3}
+
+## THE SILKS A NAMED PONY RUNS IN. game/systems/pony_data.gd carries no coat and no mane
+## colour: a named character's look is her MODEL and her skin texture, and there is no Color
+## anywhere on her record to read. A stock pony has three palette indices and therefore two
+## real colours; a named one has none, so she runs in the Palace's own two rather than in a
+## colour somebody guessed for her. She is also the pony the form guide can already tell
+## apart, because she has a name and a stock pony does not.
+const NAMED_COAT := Color(0.86, 0.84, 0.90)
+const NAMED_MANE := Color(0.36, 0.16, 0.42)
 
 ## Plot slots the map must carry -- the plan asks for four to six, and the reserved
 ## clearing (PropsScript.PEN_PLOTS_*) is an 18 m square, which fits four 7.8 m pens on a
@@ -723,6 +751,49 @@ func _ready() -> void:
 			palace_out.y = 0.0
 			palace_out = palace_out.normalized() if palace_out.length_squared() > 0.0 \
 				else Vector3(0.0, 0.0, 1.0)
+
+			# THE DOOR APRON JOINED THE FOOTPRINT RULE. A lamp that clears the Palace's own
+			# walls can still stand in the doorway: the apron reaches Building.DOOR_APRON_RUN
+			# past the wall it is built from (see apron_foot_z()), well past
+			# PALACE_CLEARANCE's own 1.5 m margin on its own, and a lamp measured (not
+			# guessed) at four metres from the apron on the shipped map still cleared the
+			# door leaf's own narrow width (door_width, 3.2 m) plus that same margin by 0.41 m
+			# -- a corner a walking player never sees as "clear of the doorway" the way this
+			# rule's name promises. So the rectangle's WIDTH is the building's own width, the
+			# same one the wall rectangle above already uses, rather than the door leaf's:
+			# an entrance a player walks up to reads as wide as the building it is set into,
+			# not as the leaf hung inside the wall. The DEPTH is still the door's own reach,
+			# because that dimension is what the apron actually adds past the wall and
+			# nothing past its own foot needs excluding.
+			#
+			# DERIVED FROM THE LIVE NODE, exactly like the wall rectangle above it, rather
+			# than typed as a second set of world coordinates: near and far reach are
+			# apron_foot_z() and apron_foot_z() minus Building.DOOR_APRON_RUN, put through
+			# the building's own basis, the same two axes palace_out and the marquee's
+			# placement already use, so a re sited or re proportioned Palace moves its own
+			# excluded doorway with it.
+			if palace_building.door_width > 0.001:
+				var palace_right: Vector3 = palace_building.global_transform.basis \
+					* Vector3(1.0, 0.0, 0.0)
+				palace_right.y = 0.0
+				palace_right = palace_right.normalized() if palace_right.length_squared() > 0.0 \
+					else Vector3(1.0, 0.0, 0.0)
+				var apron_far: float = palace_building.apron_foot_z()
+				var apron_near: float = apron_far - BuildingScript.DOOR_APRON_RUN
+				var half_door: float = palace_building.width * 0.5
+				var apron_min := Vector2(INF, INF)
+				var apron_max := Vector2(-INF, -INF)
+				for lx in [-half_door, half_door]:
+					for lz in [apron_near, apron_far]:
+						var corner: Vector3 = palace_building.global_position \
+							+ palace_right * lx + palace_out * lz
+						apron_min.x = minf(apron_min.x, corner.x)
+						apron_min.y = minf(apron_min.y, corner.z)
+						apron_max.x = maxf(apron_max.x, corner.x)
+						apron_max.y = maxf(apron_max.y, corner.z)
+				strip.avoid_footprint((apron_min + apron_max) * 0.5,
+					(apron_max - apron_min) * 0.5)
+
 			strip.mount_marquee(
 				palace_building.global_position
 					+ palace_out * (palace_building.depth * 0.5),
@@ -849,12 +920,49 @@ func _ready() -> void:
 		crate_marker.global_position.y = terrain.height_at(
 			crate_marker.global_position.x, crate_marker.global_position.z)
 
-	# THE SIGN READS ITSELF OUT OF THE GAMES. Written here rather than authored into
-	# ranch.tscn so that the lobby cannot advertise a house edge the tables are not actually
-	# charging; game/systems/casino_sign.gd asks each game for its own number.
-	var lobby_sign := get_node_or_null(^"Buildings/Palace/Sign") as Label3D
-	if lobby_sign != null:
-		lobby_sign.text = "\n".join(CasinoSignScript.lines())
+	# THE PUBLISHED EDGES MOVED INSIDE, AND THE PROMISE CAME WITH THEM. This used to write all
+	# eleven lines of CasinoSign.lines() into a Label3D hanging unbacked in the air outside the
+	# door: about 1.7 m of text stack at a cap height of 0.15 m per line, which is what the
+	# owner saw and called "very poor". The eleven lines are now the casino lobby's House rules
+	# page, drawn as a plate and reachable from the picker she walks into, and CasinoMenu's
+	# sign_provider is still CasinoSign.lines(), so the numbers still come from the games
+	# themselves. What stands outside is a board with two fitted lines pointing at them.
+	#
+	# SIZED OFF THE PALACE'S OWN NUMBERS, the way strip.gd's mount_marquee() is, so a Palace
+	# resized in ranch.tscn resizes its own signage instead of leaving a board floating beside
+	# a building that moved.
+	var palace_for_sign := get_node_or_null(^"Buildings/Palace") as Building
+	if palace_for_sign != null:
+		var sign_out: Vector3 = palace_for_sign.global_transform.basis * Vector3(0.0, 0.0, 1.0)
+		sign_out.y = 0.0
+		sign_out = sign_out.normalized() if sign_out.length_squared() > 0.0 \
+			else Vector3(0.0, 0.0, 1.0)
+		var lobby_sign := LobbySignScript.new()
+		lobby_sign.name = "LobbySign"
+		palace_for_sign.add_child(lobby_sign)
+		var sign_width: float = palace_for_sign.width * LOBBY_SIGN_WIDTH_FRACTION
+		var sign_half: float = sign_width * 0.5 + LobbySignScript.TRIM
+		# BESIDE THE DOOR, AND OUTBOARD OF THE MARQUEE, which is the harder of the two and the
+		# one that was got wrong: the marquee stands 0.25 m further off the same wall across
+		# the same height band, so anywhere the two boards share an x they are stacked in
+		# depth and the marquee is the one you see. The offset is therefore taken from the
+		# marquee's OWN measured half width rather than from a fraction typed here, so a
+		# marquee resized in strip.gd pushes this board along instead of quietly swallowing
+		# it, and it is clamped to keep the trim on the wall it is mounted to.
+		var side: Vector3 = palace_for_sign.global_transform.basis * Vector3(1.0, 0.0, 0.0)
+		var sign_offset: float = palace_for_sign.width * 0.28
+		if strip != null and strip.has_method("marquee_board_size"):
+			var marquee_half: float = (strip.call("marquee_board_size") as Vector2).x * 0.5 \
+				+ StripScript.MARQUEE_TRIM
+			sign_offset = maxf(sign_offset,
+				marquee_half + LOBBY_SIGN_GAP + sign_half)
+		sign_offset = minf(sign_offset, palace_for_sign.width * 0.5 - sign_half)
+		lobby_sign.position = Vector3(0.0, LOBBY_SIGN_BASE, 0.0) \
+			+ palace_for_sign.to_local(palace_for_sign.global_position
+				+ side * sign_offset
+				+ sign_out * (palace_for_sign.depth * 0.5 + LOBBY_SIGN_STANDOFF))
+		lobby_sign.build(sign_width, LOBBY_SIGN_HEIGHT, sign_out,
+			LobbySignScript.HEADLINE, LobbySignScript.SUBLINE)
 
 	var prop_count: int = props.build() + buildings.get_child_count()
 
@@ -1710,12 +1818,25 @@ func race_entrants() -> Array[Dictionary]:
 				RaceCardScript.entrant_from(inst), runners)
 			_quoted_fields[inst.uid] = field
 			var chances: Array[float] = RaceCardScript.win_chances(field)
+			# HER COLOURS, FOR THE FORM GUIDE'S SILKS SWATCH, AND NOTHING ELSE. Resolved here and
+			# not in the menu, for the reason race_menu.gd's class comment gives: the menu never
+			# sees a PonyInstance, never reads a pen and cannot compute anything. Two Colors in a
+			# row dictionary is data, the same way "odds" and "chance" already are.
+			var coat: Color = NAMED_COAT
+			var mane: Color = NAMED_MANE
+			if inst.is_stock():
+				if _stock_palette == null:
+					_stock_palette = StockPaletteScript.load_stock()
+				coat = _stock_palette.coat_at(int(inst.stock.get("coat", 0)))
+				mane = _stock_palette.mane_at(int(inst.stock.get("mane", 0)))
 			out.append({
 				"uid": inst.uid,
 				"name": inst.display_name(),
 				"happiness": inst.happiness,
 				"odds": RaceCardScript.decimal_odds(field, RaceCardScript.PLAYER_LANE),
 				"chance": chances[RaceCardScript.PLAYER_LANE] if not chances.is_empty() else 0.0,
+				"coat": coat,
+				"mane": mane,
 			})
 	return out
 
@@ -2578,6 +2699,14 @@ func play_slots(stake: int) -> Dictionary:
 		var lines: Array[String] = [SlotsScript.line_text(reels),
 			"You win %d chips." % won if won > 0 else "Nothing this time."]
 		slots_menu.call("show_result", lines)
+	# THE STAGE IS TOLD, NEVER ASKED, and it is told LAST. Everything above this line has
+	# already happened: the stake came out, Slots.spin() rolled and the win was settled. So
+	# there is no path by which the drawing can influence the outcome, because the outcome is
+	# a value that arrives after the chips have already moved. Same has_method() guard as
+	# show_result() above, so a menu whose script failed to parse is a FAILED check in
+	# _report() rather than a crash mid bet.
+	if slots_menu != null and slots_menu.has_method("show_spin"):
+		slots_menu.call("show_spin", reels, won, stake)
 	_refresh_casino_menus()
 	return {"ok": true, "reels": reels, "won": won, "stake": stake}
 
@@ -2598,6 +2727,8 @@ func play_wheel(kind: int, guess: int, stake: int) -> Dictionary:
 		var lines: Array[String] = [WheelScript.pocket_text(pocket),
 			"You win %d chips." % won if won > 0 else "The house takes that one."]
 		wheel_menu.call("show_result", lines)
+	if wheel_menu != null and wheel_menu.has_method("show_spin"):
+		wheel_menu.call("show_spin", pocket, won, stake)
 	_refresh_casino_menus()
 	return {"ok": true, "pocket": pocket, "won": won, "stake": stake}
 
@@ -2621,6 +2752,8 @@ func play_blackjack(stake: int) -> Dictionary:
 			BlackjackScript.outcome_text(hand),
 		]
 		blackjack_menu.call("show_result", lines)
+	if blackjack_menu != null and blackjack_menu.has_method("show_hand"):
+		blackjack_menu.call("show_hand", hand, won, stake)
 	_refresh_casino_menus()
 	return {"ok": true, "hand": hand, "won": won, "stake": stake}
 
@@ -4446,29 +4579,65 @@ func _report(pony_count: int, prop_count: int) -> void:
 	_set_check(checks, "the Palace stands on ground flat enough to seat it",
 		palace != null and palace_relief <= PALACE_MAX_RELIEF)
 
-	# THE LIGHT RING CLEARS THE PALACE. game/world/strip.gd's avoid_footprint() is what
-	# skips a lamp that would otherwise stand inside or against the building (the ring is
-	# centred on the region, not on the Palace, which sits off centre; see
-	# PALACE_MAX_RELIEF's comment above, so one ring position falls inside its footprint
-	# without it). This re-checks that work independently, against the Palace's own live
-	# position, so a later re-siting of either the Palace or the ring cannot silently let a
-	# lamp back into the wall.
+	# THE LIGHT RING CLEARS THE PALACE, ITS WALL AND ITS DOOR APRON BOTH.
+	# game/world/strip.gd's avoid_footprint() is what skips a lamp that would otherwise stand
+	# inside the building or inside its doorway (the ring is centred on the region, not on
+	# the Palace, which sits off centre; see PALACE_MAX_RELIEF's comment above, so one ring
+	# position falls inside its footprint without it -- and a second clears the wall but
+	# stands inside the door apron reaching Building.DOOR_APRON_RUN past it, a lamp four
+	# metres off the door leaf's own centreline on the shipped map, found in the look pass's
+	# own review: a lamp cannot stand in the doorway). This re-checks BOTH independently,
+	# against the Palace's own live position, so a later re-siting of either the Palace or
+	# the ring cannot silently let a lamp back into the wall or the doorway.
 	var lamps_clear := true
 	var lamp_count := 0
-	if strip != null and palace != null:
-		var p_at: Vector3 = palace.global_position
+	var palace_building_check: Building = palace as BuildingScript
+	if strip != null and palace_building_check != null:
+		var p_at: Vector3 = palace_building_check.global_position
 		var margin: float = StripScript.PALACE_CLEARANCE
-		var p_min := Vector2(p_at.x - 7.0 - margin, p_at.z - 4.5 - margin)
-		var p_max := Vector2(p_at.x + 7.0 + margin, p_at.z + 4.5 + margin)
+		var half_w: float = palace_building_check.width * 0.5
+		var p_min := Vector2(p_at.x - half_w - margin, p_at.z - palace_building_check.depth * 0.5 - margin)
+		var p_max := Vector2(p_at.x + half_w + margin, p_at.z + palace_building_check.depth * 0.5 + margin)
+		# The apron rectangle, re-derived independently of ranch.gd's own build-time
+		# computation above, the same way the wall rectangle already is: empty (a_max never
+		# exceeding a_min) if the Palace has no door.
+		var a_min := Vector2(INF, INF)
+		var a_max := Vector2(-INF, -INF)
+		if palace_building_check.door_width > 0.001:
+			var out_dir: Vector3 = palace_building_check.global_transform.basis \
+				* Vector3(0.0, 0.0, 1.0)
+			out_dir.y = 0.0
+			out_dir = out_dir.normalized() if out_dir.length_squared() > 0.0 \
+				else Vector3(0.0, 0.0, 1.0)
+			var right_dir: Vector3 = palace_building_check.global_transform.basis \
+				* Vector3(1.0, 0.0, 0.0)
+			right_dir.y = 0.0
+			right_dir = right_dir.normalized() if right_dir.length_squared() > 0.0 \
+				else Vector3(1.0, 0.0, 0.0)
+			var far: float = palace_building_check.apron_foot_z()
+			var near: float = far - BuildingScript.DOOR_APRON_RUN
+			for lx in [-half_w, half_w]:
+				for lz in [near, far]:
+					var corner: Vector3 = p_at + right_dir * lx + out_dir * lz
+					a_min.x = minf(a_min.x, corner.x)
+					a_min.y = minf(a_min.y, corner.z)
+					a_max.x = maxf(a_max.x, corner.x)
+					a_max.y = maxf(a_max.y, corner.z)
+			a_min -= Vector2(margin, margin)
+			a_max += Vector2(margin, margin)
 		var positions: Array[Vector3] = (strip as StripScript).light_positions()
 		lamp_count = positions.size()
 		for pos: Vector3 in positions:
-			if pos.x >= p_min.x and pos.x <= p_max.x and pos.z >= p_min.y and pos.z <= p_max.y:
+			var in_wall := pos.x >= p_min.x and pos.x <= p_max.x \
+				and pos.z >= p_min.y and pos.z <= p_max.y
+			var in_apron := a_max.x > a_min.x and pos.x >= a_min.x and pos.x <= a_max.x \
+				and pos.z >= a_min.y and pos.z <= a_max.y
+			if in_wall or in_apron:
 				lamps_clear = false
 				push_error(("ranch: a Strip lamp at (%.1f, %.1f) stands within its own " +
-					"%.1f m margin of the Palace") % [pos.x, pos.z, margin])
+					"%.1f m margin of the Palace or its door apron") % [pos.x, pos.z, margin])
 	print("RANCH strip lamps=%d clear=%s" % [lamp_count, lamps_clear])
-	_set_check(checks, "every Strip lamp clears the Palace footprint by its own margin",
+	_set_check(checks, "every Strip lamp clears the Palace footprint and its door apron by their own margin",
 		lamps_clear)
 
 	var gate_probe: Dictionary = await _probe_region_gate()
@@ -5572,6 +5741,7 @@ func _capture_all() -> void:
 	# _capture_props() waits those out itself; see _let_the_hud_finish_talking().
 	await _capture_props()
 	await _capture_plots()
+	await _capture_look()
 
 
 ## 06 to 09: the plot loop, photographed by DRIVING IT rather than by staging it.
@@ -5688,6 +5858,73 @@ func _capture_props() -> void:
 	# the map.
 	await _frame_on(Vector2(-25.5, 58.5), Vector3(-10.5, 6.0, -9.5), 1.6, "16_schoolyard")
 	await _frame_on(Vector2(7.5, 69.0), Vector3(0.0, 7.0, -13.0), 2.0, "17_strip_arcade")
+
+
+## 18 to 21: THE FOUR THINGS THE LOOK PASS CHANGED THAT NO ASSERTION CAN JUDGE.
+##
+## Screenshot runs only, like everything below the headless quit. A gate can say the terrain
+## wears a ShaderMaterial and that the shader has srgb_to_linear() in it; it cannot say whether
+## the ground reads as grass, whether a penumbra at 0.9 degrees is soft or mushy, whether the
+## Palace's gold glints or smears, or whether a lane colour on a saddlecloth is legible from
+## the rail. These are what a person looks at.
+func _capture_look() -> void:
+	# THE HUD IS OFF FOR ALL FOUR, the same way it is off for shot 12 and for the same
+	# reason: the hints card is about 45 percent of a 1600 by 900 frame and it sits over the
+	# bottom right quadrant, which is where three of these four subjects land. The evidence
+	# shot for the lobby sign was previously unreadable for exactly that reason, so a board
+	# that rendered as a blank gold slab survived three rounds of render eyeballing. These
+	# shots photograph the PLACE; the HUD belongs on the shots of the MECHANIC below.
+	var hud := $HUD as CanvasLayer
+	var hud_was_visible: bool = hud.visible
+	hud.visible = false
+
+	# 18 IS AIMED AT THE BOARD ITSELF, taken off the live node rather than off a pair of
+	# numbers typed here, so a Palace that moves in ranch.tscn takes its own evidence shot
+	# with it. Eye level with the board and five metres back is the distance a player
+	# actually reads it from.
+	var sign_at := Vector2(-10.0, 61.6)
+	var lobby_sign := get_node_or_null(^"Buildings/Palace/LobbySign") as Node3D
+	if lobby_sign != null:
+		sign_at = Vector2(lobby_sign.global_position.x, lobby_sign.global_position.z)
+	await _frame_on(sign_at, Vector3(0.0, 1.7, -5.0), 1.7, "18_palace_lobby_sign")
+	await _frame_on(Vector2(-10.0, 61.6), Vector3(0.0, 6.0, -22.0), 4.0,
+		"19_marquee_and_gold_trim")
+	# 20's ORIGINAL `at` (58, -46) sat 16 m from the lake region's own centre (60, -62) --
+	# inside its 24 m radius and inside the water disc's own 16.8 m (radius * 0.7), so the
+	# frame was mostly water. (58, -33) is 29 m out: past the rim, on flat grass, with the
+	# slope's dirt band (12 to 24 m out, where height_at() feathers the basin in) and the
+	# water beyond it both further from the eye than the aim point, so both read as
+	# background rather than as the subject.
+	await _frame_on(Vector2(58.0, -33.0), Vector3(0.0, 8.0, 12.0), 2.0,
+		"20_ground_slope_and_dirt")
+	# THE TRACK IS DRESSED FIRST, because an empty gate post is not a saddlecloth. dress()
+	# needs no stake and no live race (RaceTrack.dress()'s own comment); it only needs a
+	# field shaped the way RaceCard.build_field() shapes one, which is what
+	# _capture_race_field() below hands it.
+	if race_track != null and race_track.has_method("dress"):
+		race_track.call("dress", _capture_race_field())
+	await _frame_on(Vector2(0.0, 80.0), Vector3(-24.0, 6.0, -14.0), 1.6,
+		"21_race_lane_colours")
+
+	hud.visible = hud_was_visible
+
+
+## A six-lane field for the screenshot pass, built the same way race_entrants() builds one for
+## the form guide: a penned pony's own entrant_from() if one is standing in a pen (the plot
+## pass above may have put one there), and RaceCard's own "Your pony" default otherwise, so
+## this never depends on the capture order finding a resident. The Company fills the other
+## five lanes exactly as a real race does.
+func _capture_race_field() -> Array[Dictionary]:
+	var entrant: Dictionary = {}
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen == null:
+			continue
+		var ponies: Array[PonyInstance] = pen.ponies()
+		if not ponies.is_empty():
+			entrant = RaceCardScript.entrant_from(ponies[0])
+			break
+	return RaceCardScript.build_field(entrant, CompanyRunnersScript.load_shipped())
 
 
 ## HOLD UNTIL THE HUD HAS STOPPED SAYING THINGS, because a picture of a place is spoiled by

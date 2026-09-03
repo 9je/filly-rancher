@@ -23,6 +23,18 @@ extends CanvasLayer
 const MenuStyleScript := preload("res://ui/menu_style.gd")
 const InputDeviceScript := preload("res://systems/input_device.gd")
 
+## DECLARED HERE AND NOWHERE ELSE ON A TABLE. The base itself paints nothing, but every table
+## that extends this one paints through the kit, and GDScript refuses a const that shadows one
+## declared on the parent class (the same rule WHEEL_FOOTER's own comment records). So
+## slots_menu.gd, wheel_menu.gd, blackjack_menu.gd and race_menu.gd inherit this and must not
+## re-declare it; casino_menu.gd is not a TableMenu and declares its own.
+const PaintScript := preload("res://ui/casino_paint.gd")
+
+## The stage's width in 1920x1080 base pixels: the Panel's 1180 minus the Margin node's
+## 30 either side. Every drawn screen in the building is laid out against this one number, so
+## a rect computed on the slot machine and a rect computed on the wheel mean the same thing.
+const STAGE_WIDTH := 1120.0
+
 ## What the tables let her bet. Even numbers, always: Blackjack.payout() pays three to two
 ## with integer division and an odd stake would round the bonus down by half a chip.
 const STAKES: Array[int] = [10, 50, 200]
@@ -38,15 +50,27 @@ var _selected := 0
 var _stake_index := 0
 var _result: Array[String] = []
 
+## Seconds since this menu opened, advanced in _process while it is up. Read by paint() for
+## the focus ring's breath and by every stage's own animation. NOT a clock: it is reset on
+## open() so a screen looks the same the second time you walk up to it.
+var _anim_t := 0.0
+
 @onready var _title: Label = $Centre/Panel/Margin/Column/Title
 @onready var _tabs: Label = $Centre/Panel/Margin/Column/Tabs
 @onready var _rows: VBoxContainer = $Centre/Panel/Margin/Column/Rows
 @onready var _footer: Label = $Centre/Panel/Margin/Column/Footer
+@onready var _stage: Control = get_node_or_null(^"Centre/Panel/Margin/Column/Stage")
 
 
 func _ready() -> void:
+	MenuStyleScript.apply_panel($Centre/Panel as PanelContainer)
 	visible = false
 	_title.text = title_text()
+	if _stage != null:
+		_stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_stage.custom_minimum_size = stage_size()
+		_stage.draw.connect(_paint_stage)
+	set_process(false)
 
 
 func open() -> bool:
@@ -58,6 +82,8 @@ func open() -> bool:
 	_selected = 0
 	_stake_index = 0
 	_result = []
+	_anim_t = 0.0
+	set_process(true)
 	visible = true
 	refresh()
 	opened.emit()
@@ -69,6 +95,7 @@ func close() -> void:
 		return
 	_open = false
 	visible = false
+	set_process(false)
 	closed.emit()
 
 
@@ -182,15 +209,26 @@ func refresh() -> void:
 	_tabs.text = tabs_text()
 	for child in _rows.get_children():
 		child.queue_free()
-	var lines: Array[String] = drawn_lines()
+	MenuStyleScript.apply_title(_title)
+	if _stage != null:
+		_stage.custom_minimum_size = stage_size()
+		_stage.queue_redraw()
+	var lines: Array[String] = printed_lines()
 	var caret: int = _selected + first_row_line_index()
 	for i in lines.size():
-		var label := Label.new()
 		var picked: bool = i == caret and row_count() > 0
+		var label := Label.new()
 		label.text = MenuStyleScript.caret(picked) + lines[i]
-		label.add_theme_color_override("font_color",
+		# style_label() AND NOT A BARE font_color OVERRIDE. This line used to set the colour
+		# alone, so every row on every table in the Palace shipped with no outline, over a
+		# translucent panel, over a bright green field: exactly the readability failure
+		# MenuStyle.OUTLINE_COLOR's own comment exists to prevent. CasinoMenu was already
+		# doing it correctly, which is why the shared test never caught this one.
+		MenuStyleScript.style_label(label, MenuStyleScript.ROW_SIZE,
 			MenuStyleScript.COLOR_VALUE if picked else MenuStyleScript.COLOR_NAME)
-		_rows.add_child(label)
+		var holder: PanelContainer = MenuStyleScript.row_panel(picked)
+		holder.add_child(label)
+		_rows.add_child(holder)
 
 
 # --- what a table fills in ---------------------------------------------------------------
@@ -234,6 +272,93 @@ func confirm() -> bool:
 
 func switch_tab(_step: int) -> void:
 	pass
+
+
+# --- the stage ------------------------------------------------------------------------------
+
+## THE MENU REDRAWS WHILE IT IS OPEN AND NEVER WHILE IT IS SHUT. Every casino screen has at
+## least one thing moving on it the whole time it is up (the focus ring breathes, so a still
+## screenshot and a live screen say the same thing about where the cursor is), and the world
+## is paused behind it, so "while open" IS the window in which an animation is live. Closed,
+## set_process(false) stops it dead: a menu nobody is looking at must cost nothing, which is
+## the same discipline SkyRig._needs_ticks() follows.
+func _process(delta: float) -> void:
+	if not _open or _stage == null:
+		return
+	_anim_t += delta
+	_stage.queue_redraw()
+
+
+func _paint_stage() -> void:
+	if _stage != null:
+		paint(_stage)
+
+
+func anim_time() -> float:
+	return _anim_t
+
+
+## What this table paints. Overridden by each table; the base paints nothing, which is the
+## right answer for a table that has no stage yet.
+func paint(_ci: Control) -> void:
+	pass
+
+
+## THE SIZE THE STAGE NODE RESERVES. Overridden per table; a table with no stage reserves
+## nothing and its column closes over the gap.
+func stage_size() -> Vector2:
+	return Vector2.ZERO
+
+
+## Whether an animation is running RIGHT NOW, as opposed to the idle breath. While this is
+## true confirm() refuses and move_selection() is ignored, so a spin cannot be started twice
+## or re staked halfway through; ui_cancel still closes, because a player who wants out of a
+## spinning reel gets out.
+func animating() -> bool:
+	return false
+
+
+## THE LINES THE Rows VBOX ACTUALLY PRINTS. drawn_lines() stays the whole text model of the
+## screen and is what the tests and game/test/test_published_payouts.gd read; a table whose
+## stage already SHOWS a line overrides this to leave it out of the column, so the panel does
+## not say the same thing twice.
+func printed_lines() -> Array[String]:
+	return drawn_lines()
+
+
+## WHERE THE FOCUS RING WAS LAST ACTUALLY PAINTED, in VIEWPORT coordinates, and what it was
+## painted on. For the caret test, which must keep asking the DRAWING where the cursor is
+## rather than asking the number; see game/test/test_table_caret.gd for the defect that rule
+## exists for.
+##
+## VIEWPORT AND NOT STAGE LOCAL, because the answer can come from either of two coordinate
+## spaces: a stage computes its rects in its own, and a table with no stage yet reports the
+## row PanelContainer refresh() marked, which is in the Rows column's. A caller that had to
+## know which one it was looking at is a caller that can be wrong.
+func focus_rect() -> Rect2:
+	for holder in _rows.get_children():
+		if holder.is_queued_for_deletion():
+			continue
+		var panel := holder as PanelContainer
+		if panel == null:
+			continue
+		for child in panel.get_children():
+			var label := child as Label
+			if label != null and label.text.begins_with(MenuStyleScript.CARET):
+				return panel.get_global_rect()
+	return Rect2()
+
+
+func focused_id() -> StringName:
+	return StringName("row:%d" % _selected) if row_count() > 0 else &""
+
+
+## The stage's own rect in viewport coordinates, so a stage can hand a local rect back out
+## through focus_rect() without every stage repeating the conversion.
+func to_viewport(local: Rect2) -> Rect2:
+	if _stage == null:
+		return Rect2()
+	return Rect2(_stage.get_global_rect().position + local.position, local.size)
 
 
 func _unhandled_input(event: InputEvent) -> void:

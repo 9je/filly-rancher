@@ -137,3 +137,57 @@ func test_nothing_it_draws_carries_a_dash() -> void:
 		_menu.set_tab(tab)
 		for line in _menu.drawn_lines():
 			assert_false(line.contains("--") or line.contains("—"), line)
+
+
+const PaintScript := preload("res://ui/casino_paint.gd")
+## The file already preloads the SCENE as RaceMenuScene; the SCRIPT is what carries
+## CARDS_VISIBLE and the Tab enum.
+const RaceMenuScript := preload("res://ui/race_menu.gd")
+
+
+## ONE CARD PER ENTRANT, STACKED, NONE OVERLAPPING, NONE OFF THE STAGE.
+func test_the_form_cards_stack_without_overlapping() -> void:
+	var stage := Rect2(Vector2.ZERO, _menu.stage_size())
+	for i: int in mini(_menu.entrants().size(), RaceMenuScript.CARDS_VISIBLE):
+		assert_true(stage.encloses(_menu.card_rect(i)), "card %d leaves the stage" % i)
+		if i == 0:
+			continue
+		assert_false(_menu.card_rect(i - 1).intersects(_menu.card_rect(i)),
+			"cards %d and %d overlap" % [i - 1, i])
+
+
+## THE WINDOW FOLLOWS THE CURSOR. More ponies than CARDS_VISIBLE is an ordinary state (a pen
+## holds more than five), and a cursor that walked off the bottom of a fixed window would be a
+## cursor the player cannot see.
+func test_the_visible_window_keeps_the_focused_card_on_screen() -> void:
+	var many: Array[Dictionary] = []
+	for i: int in 9:
+		many.append({"uid": StringName("p%d" % i), "name": "Pony %d" % i,
+			"happiness": 0.5, "odds": 4.0, "chance": 0.2})
+	_menu.entrants_provider = func() -> Array[Dictionary]: return many
+	_menu.refresh()
+	for row: int in 9:
+		_menu.move_selection(1 if row > 0 else 0)
+		var first: int = _menu.first_visible_card()
+		assert_between(_menu.selected_index() - first, 0,
+			RaceMenuScript.CARDS_VISIBLE - 1,
+			"row %d is outside the visible window starting at %d" % [row, first])
+
+
+## form_lines() IS UNCHANGED, and that is what keeps this file's older tests and the odds
+## parser green. The swatch is drawn from two NEW keys and nothing else moved.
+func test_the_form_lines_are_unchanged_and_a_missing_swatch_falls_back() -> void:
+	var lines: Array[String] = _menu.form_lines()
+	assert_gt(lines.size(), 0)
+	for line: String in lines:
+		assert_true(line.contains(" pays "), "'%s' still reads as the shipped sentence" % line)
+		assert_true(line.contains("spirits"))
+	# The fixture's entrants carry no coat or mane; the card still draws.
+	_menu.refresh()
+	assert_ne(String(_menu.focused_id()), "", "a colourless entrant still gets a card")
+
+
+func test_the_focus_walks_the_cards_and_then_the_stake() -> void:
+	assert_eq(String(_menu.focused_id()), "entrant:0")
+	_menu.move_selection(_menu.entrants().size())
+	assert_eq(String(_menu.focused_id()), "stake:%d" % _menu.stake_index())

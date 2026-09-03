@@ -21,6 +21,7 @@ const RaceCardScript := preload("res://systems/race_card.gd")
 const RaceRunnerScript := preload("res://world/race_runner.gd")
 const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const LayersScript := preload("res://world/collision_layers.gd")
+const PaintScript := preload("res://ui/casino_paint.gd")
 
 const LANES := 6
 const LANE_WIDTH := 2.2
@@ -73,6 +74,7 @@ func build() -> void:
 	_rail(lane_z(0) - LANE_WIDTH * 0.5 - RAIL_MARGIN, "RailSouth")
 	_rail(lane_z(LANES - 1) + LANE_WIDTH * 0.5 + RAIL_MARGIN, "RailNorth")
 	_wire()
+	_gate_posts()
 
 
 func runner_count() -> int:
@@ -117,7 +119,7 @@ func dress(field: Array[Dictionary]) -> int:
 		if body == null:
 			continue
 		var data: PonyData = PonyInstanceScript.resolve_data(StringName(entry["data_id"]))
-		if body.dress(data, entry["stock"] as Dictionary, String(entry["name"])):
+		if body.dress(data, entry["stock"] as Dictionary, String(entry["name"]), lane):
 			dressed += 1
 		body.set_pose(_paddock_point(lane), Vector3(1.0, 0.0, 0.0), 0.0)
 	return dressed
@@ -207,6 +209,30 @@ func _wire() -> void:
 		_slab(body, "WirePost%s" % ("N" if side > 0.0 else "S"),
 			Vector3(0.22, 3.0, 0.22), Vector3(FINISH_X, _y(FINISH_X, z) + 1.5, z),
 			FINISH_COLOR)
+
+
+## SIX STARTING POSTS, ONE PER LANE, EACH IN ITS LANE'S COLOUR. The colour on the pony matches
+## the colour on the gate she left and the colour on her card in the form guide, which is the
+## whole of what the six removed nameplates were carrying. See game/world/race_runner.gd.
+const GATE_POST_SIZE := Vector3(0.18, 1.6, 0.18)
+const GATE_POST_OFFSET := 0.9
+
+
+func _gate_posts() -> void:
+	# One body for the six, the same shape _rail() and _wire() have: a StaticBody3D on the
+	# PROPS layer with mask 0, so the player leans on a gate post rather than walking through
+	# it and nothing detects anything with it.
+	var body := StaticBody3D.new()
+	body.name = "GatePosts"
+	body.collision_layer = LayersScript.PROPS
+	body.collision_mask = 0
+	add_child(body)
+	for lane in LANES:
+		var z: float = lane_z(lane)
+		var x: float = START_X - GATE_POST_OFFSET
+		_slab(body, "GatePost%d" % lane, GATE_POST_SIZE,
+			Vector3(x, _y(x, z) + GATE_POST_SIZE.y * 0.5, z),
+			PaintScript.BAND_COLORS[lane])
 
 
 ## One box with a matching collider, the same shape game/world/building.gd's _slab() has, so
