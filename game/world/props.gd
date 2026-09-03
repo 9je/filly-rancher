@@ -199,18 +199,15 @@ const LAYOUT := [
 	# --- treeline ----------------------------------------------------------------
 	{"file": "kenney_tree_oak.glb", "at": Vector2(-19.0, -19.0), "yaw": 0.0, "s": 1.15},
 	{"file": "kenney_tree_pine.glb", "at": Vector2(-26.0, -8.0), "yaw": 40.0, "s": 1.25},
-	{"file": "kenney_tree_default.glb", "at": Vector2(-22.0, 27.0), "yaw": 120.0, "s": 1.05},
 	{"file": "kenney_tree_fat.glb", "at": Vector2(-5.0, -27.0), "yaw": 200.0, "s": 1.20},
 	{"file": "kenney_tree_oak.glb", "at": Vector2(8.0, -28.0), "yaw": 75.0, "s": 0.95},
 	{"file": "kenney_tree_pine.glb", "at": Vector2(24.0, -20.0), "yaw": 150.0, "s": 1.30},
 	{"file": "kenney_tree_default.glb", "at": Vector2(31.0, -2.0), "yaw": 20.0, "s": 1.10},
 	{"file": "kenney_tree_fat.glb", "at": Vector2(26.0, 14.0), "yaw": 260.0, "s": 1.00},
 	{"file": "kenney_tree_oak.glb", "at": Vector2(14.0, 27.0), "yaw": 300.0, "s": 1.20},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-2.0, 31.0), "yaw": 90.0, "s": 1.15},
 	{"file": "kenney_tree_default.glb", "at": Vector2(-33.0, 10.0), "yaw": 210.0, "s": 1.25},
 	{"file": "kenney_tree_fat.glb", "at": Vector2(-31.0, -25.0), "yaw": 15.0, "s": 1.10},
 	{"file": "kenney_tree_oak.glb", "at": Vector2(37.0, -31.0), "yaw": 130.0, "s": 1.05},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(21.0, 36.0), "yaw": 55.0, "s": 1.20},
 	{"file": "kenney_tree_default.glb", "at": Vector2(-17.0, -32.0), "yaw": 245.0, "s": 0.95},
 	# Copses rather than an even scatter: two or three trunks together read as
 	# woodland, evenly-spaced singles read as a car park.
@@ -221,11 +218,11 @@ const LAYOUT := [
 	{"file": "kenney_tree_fat.glb", "at": Vector2(-12.0, -36.0), "yaw": 140.0, "s": 1.15},
 	{"file": "kenney_tree_oak.glb", "at": Vector2(45.0, -12.0), "yaw": 310.0, "s": 1.20},
 	{"file": "kenney_tree_pine.glb", "at": Vector2(-42.0, -6.0), "yaw": 80.0, "s": 1.30},
-	{"file": "kenney_tree_default.glb", "at": Vector2(12.0, 42.0), "yaw": 200.0, "s": 1.10},
 	{"file": "kenney_tree_fat.glb", "at": Vector2(-40.0, 24.0), "yaw": 45.0, "s": 1.20},
 	{"file": "kenney_tree_oak.glb", "at": Vector2(-43.0, 20.0), "yaw": 260.0, "s": 1.00},
-	# Two inside the clearing, for shade and to break up the yard.
-	{"file": "kenney_tree_fat.glb", "at": Vector2(17.0, 7.5), "yaw": 35.0, "s": 1.05},
+	# One inside the clearing, for shade and to break up the yard. Its neighbour at
+	# (17, 7.5) came out when the yard grew crates, a basket, a well and a coop; a shade
+	# tree in the middle of that is a tree in the middle of a yard.
 	{"file": "kenney_tree_oak.glb", "at": Vector2(-20.0, 1.0), "yaw": 165.0, "s": 1.10},
 	# --- the regions -------------------------------------------------------------
 	# Slice 3's four regions (game/data/regions/*.tres) are 60 m and more from the
@@ -341,6 +338,63 @@ const LAYOUT := [
 	# and past the 2.8 m door apron, so it dresses the door without standing in it.
 	{"file": "pv_general.glb", "at": Vector2(19.0, -2.0), "yaw": 250.0, "family": &"mlp"},
 	{"file": "pv_general_sign.glb", "at": Vector2(-1.0, 5.0), "yaw": 200.0, "family": &"mlp"},
+	# --- the town row, on the road north --------------------------------------------
+	# SIX PONYVILLE ENVIRONMENTS BUILDINGS, three a side, facing the road. They are
+	# scenery: none has a door the game opens, none is an interaction candidate, and
+	# ranch.gd fails if any of their colliders reaches inside a building's interaction
+	# radius. All six carry a skirt: they are wide and they stand well outside Terrain's
+	# flat apron, which is exactly the case Props.needs_skirt() names.
+	#
+	# The pack ships a gb_ ground decal and an _m mirror for every one of these;
+	# tools/convert_props.sh refuses both by name, so nothing in this block can be one.
+	{"file": "pv_tower_b.glb", "at": Vector2(15.0, 36.0), "yaw": 270.0, "family": &"mlp", "skirt": true},
+	{"file": "pv_wide_b.glb", "at": Vector2(15.0, 43.0), "yaw": 270.0, "family": &"mlp", "skirt": true},
+	{"file": "pv_pink_b.glb", "at": Vector2(15.0, 50.0), "yaw": 270.0, "family": &"mlp", "skirt": true},
+	{"file": "pv_courtyard_b.glb", "at": Vector2(-12.0, 36.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
+	{"file": "pv_balcony_b.glb", "at": Vector2(-12.0, 43.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
+	{"file": "pv_bridged_b.glb", "at": Vector2(-12.0, 50.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
+	# --- the schoolyard, west of the road --------------------------------------------
+	# A SCHOOLYARD AND NO SCHOOL, and that is the pack rather than an omission.
+	# ponysfm-schoolhouse ships school_roof, school_door, school_window, school_sign,
+	# porchroof, porchtop, support_beam_school and belltower: a modular kit for a Source
+	# map with no assembled building in it, the same trap docs/pipeline.md section 4 quirk
+	# 5 records for the Kenney Fantasy Town Kit. So the bell tower stands over a yard with
+	# swings, a horseshoe pit, a tetherball pole, a picnic table and a cone, and the
+	# schoolhouse is a building this project does not have an asset for.
+	#
+	# The pack's swingseat.mdl is not converted: Props.seat() puts the bottom of a model on
+	# the ground, so a seat meant to hang from the frame would be placed standing on it.
+	{"file": "school_belltower.glb", "at": Vector2(-26.0, 58.0), "yaw": 100.0, "family": &"mlp", "skirt": true},
+	{"file": "school_sign.glb", "at": Vector2(-22.0, 54.0), "yaw": 120.0, "family": &"mlp"},
+	{"file": "school_swingframe.glb", "at": Vector2(-30.0, 55.0), "yaw": 20.0, "family": &"mlp"},
+	{"file": "school_horseshoe.glb", "at": Vector2(-30.0, 61.0), "yaw": 0.0, "family": &"mlp"},
+	{"file": "school_tetherball_pole.glb", "at": Vector2(-23.0, 61.0), "yaw": 0.0, "family": &"mlp"},
+	{"file": "school_picnic_table.glb", "at": Vector2(-27.0, 63.0), "yaw": 45.0, "family": &"mlp"},
+	{"file": "school_cone.glb", "at": Vector2(-21.0, 58.0), "yaw": 0.0, "family": &"mlp"},
+	# --- Las Pegasus, on the Strip -----------------------------------------------------
+	# THE CLEAR BAND BETWEEN THE PALACE AND THE RACE TRACK: x in [-2, 18], z in [67, 72].
+	# The Palace's own rectangle is x in [-17, -3], z in [57.1, 66.1]; race_track.gd's south
+	# rail is at z = 87.8 with the near one at z = 72.2; strip.gd's lamp ring is radius 21
+	# about (0, 74), so both of these stand inside the ring rather than in it, and
+	# Strip.avoid_footprint() is not asked to drop a lamp for them.
+	#
+	# They are cabinets, not tables: the games the player actually plays are casino_menu's,
+	# and nothing here is an interaction candidate. They are what makes the Strip look like
+	# somewhere people go.
+	{"file": "lp_skeeball.glb", "at": Vector2(4.0, 69.0), "yaw": 180.0, "family": &"mlp", "skirt": true},
+	{"file": "lp_dance_game.glb", "at": Vector2(11.0, 69.0), "yaw": 180.0, "family": &"mlp", "skirt": true},
+	# --- the homestead yard ------------------------------------------------------------
+	# INSIDE TERRAIN'S FLAT APRON, where the ground is exactly y = 0 by construction, so
+	# none of these needs a skirt. Every one stands clear of the pen plot clearing
+	# (PEN_PLOTS_CENTRE (-14, 13), half extent 9) and outside MARKET_RADIUS 4.5,
+	# BOARD_RADIUS 3.0 and DEPOT_RADIUS 4.0 from the buildings they sit between; ranch.gd
+	# measures both of those against the LIVE colliders rather than against these origins.
+	{"file": "saa_hay_block.glb", "at": Vector2(-3.5, -14.0), "yaw": 15.0, "family": &"mlp"},
+	{"file": "saa_wagon.glb", "at": Vector2(7.5, -13.5), "yaw": 200.0, "family": &"mlp"},
+	{"file": "mlp_crate.glb", "at": Vector2(4.0, 7.0), "yaw": 30.0, "family": &"mlp"},
+	{"file": "mlp_basket.glb", "at": Vector2(2.5, 6.0), "yaw": 0.0, "family": &"mlp"},
+	{"file": "mlp_farm_well.glb", "at": Vector2(-3.0, 5.0), "yaw": 60.0, "family": &"mlp"},
+	{"file": "mlp_chicken_coop.glb", "at": Vector2(-8.0, -2.0), "yaw": 250.0, "family": &"mlp"},
 ]
 
 var _placed: Array[Node3D] = []
