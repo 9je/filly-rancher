@@ -109,8 +109,60 @@ const SKIRT_COLOUR := Color(0.21, 0.17, 0.13)
 ## branch (2.0 units as Kenney's own GLB, 0.50 after the round trip), not a decoration on
 ## a layout line, so it is kept for anyone who re places the prop and so the doc that
 ## records the defect still has something to point at.
+##
+## THE MLP ROWS BELOW ARE THE SAME KIND OF MEASUREMENT, and they exist because MLP_SCALE
+## was divided out of ONE model. saa_barn.glb is an SFM hero set piece drawn at 13.479 m;
+## the rest of the six packs is authored at real world metres, which the gallery says
+## plainly: an eight foot picnic table measures 2.438 m, a four foot bell housing 1.219 m,
+## a skeeball cabinet 2.450 m. Multiplying those by 0.5193 gave a 9 cm basket, a knee high
+## bell tower and an orchard whose trees stood shorter than the ponies under them.
+##
+## So the DEFAULT correction is 1.93, which is 1 / MLP_SCALE: it restores the metres the
+## model was drawn at. Every model whose native size already reads correctly for the thing
+## it depicts carries exactly that number. Any OTHER number means the shipped model is not
+## the size of the thing its filename names, and the comment beside it says what it was
+## targeted at instead. The yardstick throughout is the one the renders are judged by: a
+## pony is 2.138 m to the horn tip, the homestead barn ridge is 4.9 m, saa_barn is 7.0 m.
+##
+## saa_barn.glb, pv_general.glb, pv_general_sign.glb and the six pv_*_b town buildings
+## carry NO row on purpose, and that is a measurement too. The barn is the model the scale
+## was derived from and ranch.gd fails if it stops standing at 7.00 m; the sign is authored
+## to hang on the General and has to keep its own building's scale; the town row already
+## measures 3.6 m to 7.4 m. school_cone.glb is left alone for the same reason: 0.95 m is
+## already a traffic cone standing beside a 2.138 m pony.
+##
+## Every number below is target_height / (native_height * MLP_SCALE), with native_height
+## read off scenes/test/model_gallery.tscn in its props mode.
 const SCALE_FIX := {
 	"kenney_survival_structure.glb": 4.0,  # FBX unit-conversion defect, quirk 4.
+	# --- Sweet Apple Acres: the farm on the walk to the Orchard ----------------------
+	"saa_shed.glb": 1.93,  # 3.51 m: native metres, half the height of the barn beside it.
+	"saa_hay_pile.glb": 1.93,  # 2.11 m: native metres, a pile a pony cannot see over.
+	"saa_hay_block.glb": 1.93,  # 0.70 m: native metres, one bale.
+	"saa_wagon.glb": 1.93,  # 0.98 m at 3.25 m long: native metres, a farm cart.
+	"saa_seed_bag.glb": 1.93,  # 0.65 m: native metres, a sack a pony could drag.
+	"saa_water_chute.glb": 1.93,  # 0.83 m: native metres.
+	"saa_wire_arch.glb": 1.93,  # 2.74 m: native metres, and a pony walks under it.
+	"saa_fence_old.glb": 1.93,  # 0.75 m rail, 4.06 m long: native metres. Skirted.
+	"saa_corn_plant.glb": 3.83,  # 2.40 m: a stalk over a pony; native 1.21 m is a seedling.
+	"saa_corn_plant_dead.glb": 3.83,  # the live stalk's number, so the row matches.
+	"mlp_apple_tree.glb": 3.21,  # 5.60 m before jitter; the Kenney trees stood 6.2 m.
+	"mlp_apple_tree_bare.glb": 3.36,  # 5.60 m: the same target, the same species.
+	"mlp_bush.glb": 1.93,  # 0.80 m: native metres.
+	"mlp_chicken_coop.glb": 1.93,  # 1.57 m: native metres.
+	"mlp_farm_well.glb": 1.93,  # 1.42 m: native metres, a well a pony leans over.
+	"mlp_crate.glb": 3.40,  # 0.70 m: native 0.40 m is a doll's crate.
+	"mlp_basket.glb": 5.70,  # 0.50 m: native 0.17 m seats at 9 cm, effectively invisible.
+	# --- the schoolyard --------------------------------------------------------------
+	"school_belltower.glb": 4.33,  # 2.40 m: the pack ships the bell HOUSING, a 1.07 m cube.
+	"school_sign.glb": 3.56,  # 2.20 m: a yard sign at pony eye height, not a 1.19 m plaque.
+	"school_swingframe.glb": 1.93,  # 3.14 m: native metres, and a pony swings under it.
+	"school_horseshoe.glb": 1.93,  # 1.22 m: native metres.
+	"school_tetherball_pole.glb": 1.28,  # 3.60 m: native 5.43 m is a mast, not a pole.
+	"school_picnic_table.glb": 3.03,  # 0.90 m: a 0.76 m table taken to pony scale. Skirted.
+	# --- Las Pegasus, on the Strip ---------------------------------------------------
+	"lp_skeeball.glb": 1.93,  # 2.46 m: native metres, a cabinet a pony can reach.
+	"lp_dance_game.glb": 1.93,  # 2.53 m: native metres.
 }
 
 ## Category-wide multiplier ON TOP of BASE_SCALE, applied to every "kenney_tree_*"
@@ -285,9 +337,12 @@ const LAYOUT := [
 	# marker sits on one, and ranch.gd checks that no prop's collider reaches inside a
 	# building's interaction radius, so the only doors the game opens stay procedural.
 	#
-	# The barn, the shed and the town row carry "skirt": true. Everything within 29 m of
-	# the Orchard centre (72, 40) is inside its fence ring plus the 4 m margin every prop
-	# clears it by, so nothing below is: test_props.gd checks that on every entry.
+	# The barn, the shed and the town row carry "skirt": true. So do the four old fence
+	# rails: at their corrected scale each is 4.06 m long, which is past WIDE_FOOTPRINT,
+	# and a rail seated at one point across four metres of sloping pasture is exactly the
+	# case the skirt exists for. Everything within 29 m of the Orchard centre (72, 40) is
+	# inside its fence ring plus the 4 m margin every prop clears it by, so nothing below
+	# is: test_props.gd checks that on every entry.
 	{"file": "saa_barn.glb", "at": Vector2(41.0, 51.3), "yaw": 205.0, "family": &"mlp", "skirt": true},
 	{"file": "saa_shed.glb", "at": Vector2(34.0, 45.0), "yaw": 160.0, "family": &"mlp", "skirt": true},
 	{"file": "saa_wagon.glb", "at": Vector2(46.0, 58.0), "yaw": 75.0, "family": &"mlp"},
@@ -296,10 +351,10 @@ const LAYOUT := [
 	{"file": "saa_wire_arch.glb", "at": Vector2(32.0, 52.0), "yaw": 115.0, "family": &"mlp"},
 	{"file": "saa_water_chute.glb", "at": Vector2(34.0, 66.0), "yaw": 250.0, "family": &"mlp"},
 	{"file": "saa_seed_bag.glb", "at": Vector2(33.0, 47.0), "yaw": 40.0, "family": &"mlp"},
-	{"file": "saa_fence_old.glb", "at": Vector2(30.0, 48.0), "yaw": 0.0, "family": &"mlp"},
-	{"file": "saa_fence_old.glb", "at": Vector2(30.0, 54.0), "yaw": 0.0, "family": &"mlp"},
-	{"file": "saa_fence_old.glb", "at": Vector2(49.0, 63.0), "yaw": 90.0, "family": &"mlp"},
-	{"file": "saa_fence_old.glb", "at": Vector2(48.0, 67.0), "yaw": 90.0, "family": &"mlp"},
+	{"file": "saa_fence_old.glb", "at": Vector2(30.0, 48.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_fence_old.glb", "at": Vector2(30.0, 54.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_fence_old.glb", "at": Vector2(49.0, 63.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_fence_old.glb", "at": Vector2(48.0, 67.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
 	# The corn patch: two rows of six. The two dead stalks are placed, not drawn from an
 	# RNG, for the same reason the treeline's size jitter is: a hand varied row is
 	# reproducible, and reproducibility is what makes a screenshot regression legible.
@@ -364,12 +419,16 @@ const LAYOUT := [
 	#
 	# The pack's swingseat.mdl is not converted: Props.seat() puts the bottom of a model on
 	# the ground, so a seat meant to hang from the frame would be placed standing on it.
+	#
+	# The picnic table carries a skirt and nothing else here does. At 0.90 m tall it is
+	# 3.84 m by 2.70 m on the ground, and turned 45 degrees that is a 4.62 m world AABB,
+	# past WIDE_FOOTPRINT on a yard that is nowhere near the flat apron.
 	{"file": "school_belltower.glb", "at": Vector2(-26.0, 58.0), "yaw": 100.0, "family": &"mlp", "skirt": true},
 	{"file": "school_sign.glb", "at": Vector2(-22.0, 54.0), "yaw": 120.0, "family": &"mlp"},
 	{"file": "school_swingframe.glb", "at": Vector2(-30.0, 55.0), "yaw": 20.0, "family": &"mlp"},
 	{"file": "school_horseshoe.glb", "at": Vector2(-30.0, 61.0), "yaw": 0.0, "family": &"mlp"},
 	{"file": "school_tetherball_pole.glb", "at": Vector2(-23.0, 61.0), "yaw": 0.0, "family": &"mlp"},
-	{"file": "school_picnic_table.glb", "at": Vector2(-27.0, 63.0), "yaw": 45.0, "family": &"mlp"},
+	{"file": "school_picnic_table.glb", "at": Vector2(-27.0, 63.0), "yaw": 45.0, "family": &"mlp", "skirt": true},
 	{"file": "school_cone.glb", "at": Vector2(-21.0, 58.0), "yaw": 0.0, "family": &"mlp"},
 	# --- Las Pegasus, on the Strip -----------------------------------------------------
 	# THE CLEAR BAND BETWEEN THE PALACE AND THE RACE TRACK: x in [-2, 18], z in [67, 72].
@@ -394,7 +453,10 @@ const LAYOUT := [
 	{"file": "mlp_crate.glb", "at": Vector2(4.0, 7.0), "yaw": 30.0, "family": &"mlp"},
 	{"file": "mlp_basket.glb", "at": Vector2(2.5, 6.0), "yaw": 0.0, "family": &"mlp"},
 	{"file": "mlp_farm_well.glb", "at": Vector2(-3.0, 5.0), "yaw": 60.0, "family": &"mlp"},
-	{"file": "mlp_chicken_coop.glb", "at": Vector2(-8.0, -2.0), "yaw": 250.0, "family": &"mlp"},
+	# The coop moved a metre west when its scale was corrected: at 2.49 m across instead of
+	# 1.29 m its near corner came 4 cm inside MARKET_RADIUS, and ranch.gd's door check said
+	# so. Scenery does not stand in a doorway, so the prop moves rather than the check.
+	{"file": "mlp_chicken_coop.glb", "at": Vector2(-9.0, -2.0), "yaw": 250.0, "family": &"mlp"},
 ]
 
 var _placed: Array[Node3D] = []
