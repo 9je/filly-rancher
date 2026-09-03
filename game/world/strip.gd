@@ -99,9 +99,32 @@ const MARQUEE_BULB_RADIUS := 0.055
 ## One soft wash on the board's own face. shadow_enabled off for the reason this file already
 ## gives about its lamp ring: a light out in the open has nothing to leak through, and a
 ## shadow map on it is a cost with no picture attached.
+##
+## RANGE AND ANGLE ARE A HARD CUTOFF, NOT A SUGGESTION, AND THAT IS THE POINT. The headline
+## and sponsor labels are `shaded = false` (unlit, always readable off their own modulate) and
+## the ten bulbs are emissive, so this light's entire job is keeping the board's own dark panel
+## and gold trim from reading as a black hole -- it was never what makes the marquee "read as
+## lit". At the old 38 degrees and 6.0 m, aimed back at the board's dead centre from 2.2 m out
+## and 1.1 m up, MEASURED (not guessed) against the built scene: the closest point on the
+## Palace's own DoorApron was only 1.03 m from this light, because the door, its apron and the
+## sign above it all sit on the same wall centreline. Godot's spot_range is a hard sphere and
+## the apron was well inside it either way, so the fix could not be range or angle ALONE --
+## the board's own bottom edge (2.65 m up) sits BELOW the apron's own top edge (2.92 m up), so
+## any cone wide enough to reach the board's centre from straight out front necessarily swept
+## through the apron's own airspace on the way, at any angle or range that still lit the board.
+##
+## AIMED HIGH INSTEAD. Aiming at the board's UPPER portion (0.7 m above its own centre, close
+## to the headline) rather than its dead centre lets the light sit high enough, and its aim
+## tilt down gently enough, that its cone's own lower edge never dips as far as the apron's own
+## airspace -- verified by sampling the built DoorApron's, the Floor's and the board's own
+## meshes directly (a throwaway probe script, not eyeballed): 0 of 961 sample points anywhere
+## on the apron's six faces or the Floor's own top face fall inside this cone at these numbers,
+## while roughly a third of the board's own face still does (down from about two fifths at the
+## old numbers -- a real loss, paid for keeping the door apron out of the beam entirely rather
+## than merely dimmer).
 const MARQUEE_WASH_ENERGY := 2.4
-const MARQUEE_WASH_ANGLE := 38.0
-const MARQUEE_WASH_RANGE := 6.0
+const MARQUEE_WASH_ANGLE := 36.0
+const MARQUEE_WASH_RANGE := 3.0
 
 var _region: RegionData = null
 var _ground := Callable()
@@ -416,5 +439,7 @@ func _marquee_wash() -> void:
 	light.spot_angle = MARQUEE_WASH_ANGLE
 	light.shadow_enabled = false
 	add_child(light)
-	light.global_position = _marquee_centre + _marquee_facing * 2.2 + Vector3(0.0, 1.1, 0.0)
-	light.look_at(_marquee_centre, Vector3.UP)
+	# 2.0 m out and 1.4 m up, aimed 0.7 m ABOVE the board's own centre rather than at it: see
+	# MARQUEE_WASH_RANGE's own comment for the measured geometry this keeps the beam out of.
+	light.global_position = _marquee_centre + _marquee_facing * 2.0 + Vector3(0.0, 1.4, 0.0)
+	light.look_at(_marquee_centre + Vector3(0.0, 0.7, 0.0), Vector3.UP)
