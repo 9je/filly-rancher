@@ -411,6 +411,39 @@ func _drive_the_palace() -> void:
 	_set_check("the lobby refuses to open over another menu, so its can_open is consulted",
 		refused_over_pause)
 
+	# --- the drawn stages --------------------------------------------------------------------
+	# THE CASINO'S SCREENS CANNOT BE SCREENSHOTTED. ranch.tscn's render pass drives a
+	# Camera3D through the world; a CanvasLayer menu is not on that path and never appears in
+	# a shot, so the only judgement these five screens can get from a gate is their GEOMETRY.
+	# That is what the *_rect() layout functions on each stage are for: they are pure, they
+	# are the same numbers paint() draws with, and a rect that has walked off its own stage is
+	# the failure that actually happens when a screen is laid out by eye.
+	var stages_ok := true
+	var stage_focus_ok := true
+	for row: int in [CasinoMenuScript.Row.SLOTS, CasinoMenuScript.Row.WHEEL,
+			CasinoMenuScript.Row.BLACKJACK, CasinoMenuScript.Row.RACING]:
+		var stage_table: CanvasLayer = ranch.get_table_menu(row)
+		if stage_table == null:
+			stages_ok = false
+			continue
+		stage_table.call("open")
+		await get_tree().process_frame
+		var size: Vector2 = stage_table.call("stage_size")
+		if size.x <= 0.0 or size.y <= 0.0:
+			stages_ok = false
+			push_error("casino: %s reserved no stage" % stage_table.name)
+		var rect: Rect2 = stage_table.call("focus_rect")
+		if rect.size.x <= 0.0 or rect.size.y <= 0.0:
+			stage_focus_ok = false
+			push_error("casino: %s painted no focus ring" % stage_table.name)
+		print("CASINO stage %-14s size=(%.0f, %.0f) focus=(%.0f, %.0f) id=%s"
+			% [stage_table.name, size.x, size.y, rect.size.x, rect.size.y,
+				String(stage_table.call("focused_id"))])
+		stage_table.call("close")
+		await get_tree().process_frame
+	_set_check("every table reserves a drawn stage", stages_ok)
+	_set_check("every table paints its focus ring somewhere real", stage_focus_ok)
+
 	# --- the race, on the real track ------------------------------------------------------------
 	var census_before: int = ranch.spawner.get_spawned().size()
 	var bodies: Array[WeakRef] = []

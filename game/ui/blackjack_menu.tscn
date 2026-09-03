@@ -25,7 +25,7 @@ grow_vertical = 2
 mouse_filter = 2
 
 [node name="Panel" type="PanelContainer" parent="Centre"]
-custom_minimum_size = Vector2(860, 0)
+custom_minimum_size = Vector2(1180, 0)
 layout_mode = 2
 mouse_filter = 2
 
@@ -47,6 +47,10 @@ layout_mode = 2
 mouse_filter = 2
 
 [node name="Tabs" type="Label" parent="Centre/Panel/Margin/Column"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Stage" type="Control" parent="Centre/Panel/Margin/Column"]
 layout_mode = 2
 mouse_filter = 2
 
