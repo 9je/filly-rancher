@@ -30,6 +30,7 @@ const SlotsMenuScene := preload("res://ui/slots_menu.tscn")
 const WheelMenuScene := preload("res://ui/wheel_menu.tscn")
 const BlackjackMenuScene := preload("res://ui/blackjack_menu.tscn")
 const WheelScript := preload("res://systems/wheel.gd")
+const BlackjackScript := preload("res://systems/blackjack.gd")
 const CasinoStagesTestScript := preload("res://test/test_casino_stages.gd")
 
 const CHIPS := 500
@@ -77,14 +78,23 @@ func test_the_slot_machine_marks_the_stake_it_is_backing_before_and_after_a_spin
 		"after a spin the focus must still be on the same stake, not up in the result")
 
 
-func test_the_blackjack_table_marks_the_stake_row_before_and_after_a_hand() -> void:
+## THE BLACKJACK TABLE'S STAKE ROW MOVED ONTO ITS STAGE TOO (Task 6), the same shape as the
+## slot machine's own test above: focused_id() is asked unconditionally (real on every screen,
+## staged or not) and the literal "stake:<n>" vocabulary is only checked once
+## blackjack_menu.tscn is actually in STAGED.
+func test_the_blackjack_table_marks_the_stake_it_is_backing_before_and_after_a_hand() -> void:
 	var menu: CanvasLayer = await _open(BlackjackMenuScene)
-	assert_true(_caret_line(menu).begins_with("Stake:"),
-		"before any hand the caret is on the stake row: '%s'" % _caret_line(menu))
-	var dealt: Array[String] = ["You: Ace, King", "Dealer: Nine, Seven", "Blackjack."]
-	menu.call("show_result", dealt)
-	assert_true(_caret_line(menu).begins_with("Stake:"),
-		"after a hand the caret must still be on the stake row: '%s'" % _caret_line(menu))
+	var before_id: String = String(menu.call("focused_id"))
+	assert_ne(before_id, "",
+		"before any hand the blackjack table is already focused on something real")
+	if CasinoStagesTestScript.STAGED.has("res://ui/blackjack_menu.tscn"):
+		assert_eq(before_id, "stake:0", "before any hand the focus is on the first stake")
+	var hand: Dictionary = {"player": [0, 12] as Array[int], "dealer": [7, 20] as Array[int],
+		"outcome": BlackjackScript.Outcome.PLAYER_WIN}
+	menu.call("show_hand", hand, 20, 10)
+	var after_id: String = String(menu.call("focused_id"))
+	assert_eq(after_id, before_id,
+		"after a hand the focus must still be on the same stake, not up in the result")
 
 
 func test_the_wheel_marks_the_guess_it_is_backing_before_and_after_a_spin() -> void:

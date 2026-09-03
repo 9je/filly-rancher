@@ -35,7 +35,8 @@ const MenuScenes: Array[String] = [
 ## THIS IS THE ONE SOURCE OF TRUTH. game/scenes/test/casino_test.gd's gate block preloads
 ## this very script and reads STAGED directly off it rather than keeping a second copy, so
 ## the two can never quietly drift apart; see that file's own comment on the stage block.
-const STAGED: Array[String] = ["res://ui/slots_menu.tscn", "res://ui/wheel_menu.tscn"]
+const STAGED: Array[String] = ["res://ui/slots_menu.tscn", "res://ui/wheel_menu.tscn",
+	"res://ui/blackjack_menu.tscn"]
 
 const CHIPS := 500
 const BITS := 500

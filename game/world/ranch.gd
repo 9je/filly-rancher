@@ -2631,6 +2631,8 @@ func play_blackjack(stake: int) -> Dictionary:
 			BlackjackScript.outcome_text(hand),
 		]
 		blackjack_menu.call("show_result", lines)
+	if blackjack_menu != null and blackjack_menu.has_method("show_hand"):
+		blackjack_menu.call("show_hand", hand, won, stake)
 	_refresh_casino_menus()
 	return {"ok": true, "hand": hand, "won": won, "stake": stake}
 
