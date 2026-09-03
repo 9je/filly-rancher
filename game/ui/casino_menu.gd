@@ -75,6 +75,7 @@ var _open := false
 
 
 func _ready() -> void:
+	MenuStyleScript.apply_panel($Centre/Panel as PanelContainer)
 	visible = false
 	_title.text = TITLE
 
@@ -229,15 +230,18 @@ func refresh() -> void:
 	_tabs.text = MenuStyleScript.tab_strip(TAB_NAMES, _tab) + "      " + header_line()
 	for child in _rows.get_children():
 		child.queue_free()
+	MenuStyleScript.apply_title(_title)
 	var lines: Array[String] = drawn_lines()
 	var caret: int = _selected + first_row_line_index()
 	for i in lines.size():
-		var label := Label.new()
 		var picked: bool = i == caret and _row_count() > 0
+		var label := Label.new()
 		label.text = MenuStyleScript.caret(picked) + lines[i]
 		MenuStyleScript.style_label(label, MenuStyleScript.ROW_SIZE,
 			MenuStyleScript.COLOR_VALUE if picked else MenuStyleScript.COLOR_NAME)
-		_rows.add_child(label)
+		var holder: PanelContainer = MenuStyleScript.row_panel(picked)
+		holder.add_child(label)
+		_rows.add_child(holder)
 
 
 func _row_count() -> int:

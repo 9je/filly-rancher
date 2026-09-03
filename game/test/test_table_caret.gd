@@ -20,6 +20,9 @@ extends GutTest
 ## Nodes already queue_free()d are skipped: refresh() frees the previous row of labels and
 ## builds new ones in the same call, and a freed child is still among get_children() until
 ## the next idle frame.
+##
+## EACH ROW IS A PanelContainer NOW (MenuStyle.row_panel()), carrying the Label rather than
+## being one, so the walk below opens the holder before it reads the text.
 
 const SlotsMenuScene := preload("res://ui/slots_menu.tscn")
 const WheelMenuScene := preload("res://ui/wheel_menu.tscn")
@@ -34,7 +37,8 @@ func _caret_line(menu: CanvasLayer) -> String:
 	for child in menu._rows.get_children():
 		if child.is_queued_for_deletion():
 			continue
-		var label := child as Label
+		var holder := child as PanelContainer
+		var label: Label = (holder.get_child(0) as Label) if holder != null else null
 		if label != null and label.text.begins_with("> "):
 			return label.text.substr(2)
 	return ""

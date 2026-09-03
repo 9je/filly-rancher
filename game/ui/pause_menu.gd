@@ -117,6 +117,7 @@ var _open := false
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	MenuStyleScript.apply_panel($Centre/Panel as PanelContainer)
 	MenuStyleScript.style_label(_title, MenuStyleScript.TITLE_SIZE, MenuStyleScript.COLOR_TITLE)
 	_title.text = "PAUSED"
 	visible = false

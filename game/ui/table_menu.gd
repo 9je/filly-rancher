@@ -45,6 +45,7 @@ var _result: Array[String] = []
 
 
 func _ready() -> void:
+	MenuStyleScript.apply_panel($Centre/Panel as PanelContainer)
 	visible = false
 	_title.text = title_text()
 
@@ -182,15 +183,23 @@ func refresh() -> void:
 	_tabs.text = tabs_text()
 	for child in _rows.get_children():
 		child.queue_free()
+	MenuStyleScript.apply_title(_title)
 	var lines: Array[String] = drawn_lines()
 	var caret: int = _selected + first_row_line_index()
 	for i in lines.size():
-		var label := Label.new()
 		var picked: bool = i == caret and row_count() > 0
+		var label := Label.new()
 		label.text = MenuStyleScript.caret(picked) + lines[i]
-		label.add_theme_color_override("font_color",
+		# style_label() AND NOT A BARE font_color OVERRIDE. This line used to set the colour
+		# alone, so every row on every table in the Palace shipped with no outline, over a
+		# translucent panel, over a bright green field: exactly the readability failure
+		# MenuStyle.OUTLINE_COLOR's own comment exists to prevent. CasinoMenu was already
+		# doing it correctly, which is why the shared test never caught this one.
+		MenuStyleScript.style_label(label, MenuStyleScript.ROW_SIZE,
 			MenuStyleScript.COLOR_VALUE if picked else MenuStyleScript.COLOR_NAME)
-		_rows.add_child(label)
+		var holder: PanelContainer = MenuStyleScript.row_panel(picked)
+		holder.add_child(label)
+		_rows.add_child(holder)
 
 
 # --- what a table fills in ---------------------------------------------------------------

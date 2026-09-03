@@ -1,22 +1,6 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=2 format=3]
 
 [ext_resource type="Script" path="res://ui/slots_menu.gd" id="1"]
-
-[sub_resource type="StyleBoxFlat" id="MenuPanel"]
-bg_color = Color(0.0392157, 0.0470588, 0.0784314, 0.88)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(1, 0.858824, 0.552941, 0.32)
-corner_radius_top_left = 12
-corner_radius_top_right = 12
-corner_radius_bottom_right = 12
-corner_radius_bottom_left = 12
-content_margin_left = 0.0
-content_margin_top = 0.0
-content_margin_right = 0.0
-content_margin_bottom = 0.0
 
 [node name="SlotsMenu" type="CanvasLayer"]
 layer = 2
@@ -44,7 +28,6 @@ mouse_filter = 2
 custom_minimum_size = Vector2(860, 0)
 layout_mode = 2
 mouse_filter = 2
-theme_override_styles/panel = SubResource("MenuPanel")
 
 [node name="Margin" type="MarginContainer" parent="Centre/Panel"]
 layout_mode = 2

@@ -103,6 +103,7 @@ func _ready() -> void:
 	# ALWAYS, because the ranch pauses the tree while this is up and this is the node that
 	# has to keep running to read the input that closes it again. See the class comment.
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	MenuStyleScript.apply_panel(_panel)
 	_registry = PlotRegistryScript.new()
 	_registry.load_all(PlotRegistryScript.PLOT_DIR)
 	_plots = _registry.all()

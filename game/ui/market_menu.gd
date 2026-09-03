@@ -59,6 +59,7 @@ var _open := false
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	MenuStyleScript.apply_panel($Centre/Panel as PanelContainer)
 	var registry: ShopRegistry = ShopRegistryScript.new()
 	registry.load_all(ShopRegistryScript.SHOP_DIR)
 	_catalogue = registry.all()

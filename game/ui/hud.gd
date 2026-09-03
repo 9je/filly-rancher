@@ -77,6 +77,7 @@ const PonyDataScript := preload("res://systems/pony_data.gd")
 const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const MagicBeamScript := preload("res://actors/player/magic_beam.gd")
 const InputDeviceScript := preload("res://systems/input_device.gd")
+const MenuStyleScript := preload("res://ui/menu_style.gd")
 
 ## Radius of the reticle ring, in (1920x1080-base) pixels. Small: it has to mark a point
 ## precisely, and a big one would obscure the pony it is resting on.
@@ -237,16 +238,16 @@ func _ready() -> void:
 	_crosshair.draw.connect(_draw_crosshair)
 	_pips.draw.connect(_draw_pips)
 
-	_style_label(_bag_title, 20, Color(1.0, 1.0, 1.0, 0.62))
-	_style_label(_bag_count, 26, Color(1.0, 1.0, 1.0, 0.92))
-	_style_label(_bits, 22, Color(1.00, 0.80, 0.25, 1.0))
+	MenuStyleScript.style_label(_bag_title, 20, Color(1.0, 1.0, 1.0, 0.62))
+	MenuStyleScript.style_label(_bag_count, 26, Color(1.0, 1.0, 1.0, 0.92))
+	MenuStyleScript.style_label(_bits, 22, Color(1.00, 0.80, 0.25, 1.0))
 	_bits.text = "0 bits"
-	_style_label(_balance, 16, COLOR_WORLD_LINE)
-	_style_label(_world_line, 22, COLOR_WORLD_LINE)
+	MenuStyleScript.style_label(_balance, 16, COLOR_WORLD_LINE)
+	MenuStyleScript.style_label(_world_line, 22, COLOR_WORLD_LINE)
 	_world_line.text = ""
-	_style_label(_prompt, 26, COLOR_PROMPT)
+	MenuStyleScript.style_label(_prompt, 26, COLOR_PROMPT)
 	_prompt.text = ""
-	_style_label(_toast, 40, Color(1.0, 0.96, 0.86, 1.0))
+	MenuStyleScript.style_label(_toast, 40, Color(1.0, 0.96, 0.86, 1.0))
 
 	_bag_title.text = "SADDLEBAG"
 	_build_hints()
@@ -390,7 +391,7 @@ func set_tasks(rows: Array) -> void:
 		if i > 0:
 			colour = COLOR_TASK_DONE if _task_lines[i].begins_with(TASK_DONE) \
 				else COLOR_TASK_OPEN
-		_style_label(label, 24 if i == 0 else 20, colour)
+		MenuStyleScript.style_label(label, 24 if i == 0 else 20, colour)
 		_tasks.add_child(label)
 
 
@@ -621,16 +622,6 @@ func _ring(centre: Vector2, radius: float, color: Color, width: float) -> void:
 
 # --- text ------------------------------------------------------------------------
 
-## Every label gets the same treatment: a size, a colour, and a black outline. The
-## outline is not styling -- this HUD is drawn over a bright green field under a bright
-## sky, and unoutlined white text on the sky is genuinely unreadable.
-func _style_label(label: Label, size: int, color: Color) -> void:
-	label.add_theme_font_size_override(&"font_size", size)
-	label.add_theme_color_override(&"font_color", color)
-	label.add_theme_color_override(&"font_outline_color", Color(0.0, 0.0, 0.0, 0.75))
-	label.add_theme_constant_override(&"outline_size", 6)
-
-
 ## The wallet line under the saddlebag. Driven by ranch.gd off Economy.bits_changed, so
 ## it repaints on a change and never per frame.
 func set_bits(total: int) -> void:
@@ -752,6 +743,6 @@ func _build_hints() -> void:
 		for pair: Array in [[label_text, 0.60], [String(row[column if not note else 1]), 0.92]]:
 			var label := Label.new()
 			label.text = String(pair[0])
-			_style_label(label, 20, Color(1.0, 1.0, 1.0, float(pair[1])))
+			MenuStyleScript.style_label(label, 20, Color(1.0, 1.0, 1.0, float(pair[1])))
 			_hints_grid.add_child(label)
 	_hints_device = InputDeviceScript.last()
