@@ -2578,6 +2578,14 @@ func play_slots(stake: int) -> Dictionary:
 		var lines: Array[String] = [SlotsScript.line_text(reels),
 			"You win %d chips." % won if won > 0 else "Nothing this time."]
 		slots_menu.call("show_result", lines)
+	# THE STAGE IS TOLD, NEVER ASKED, and it is told LAST. Everything above this line has
+	# already happened: the stake came out, Slots.spin() rolled and the win was settled. So
+	# there is no path by which the drawing can influence the outcome, because the outcome is
+	# a value that arrives after the chips have already moved. Same has_method() guard as
+	# show_result() above, so a menu whose script failed to parse is a FAILED check in
+	# _report() rather than a crash mid bet.
+	if slots_menu != null and slots_menu.has_method("show_spin"):
+		slots_menu.call("show_spin", reels, won, stake)
 	_refresh_casino_menus()
 	return {"ok": true, "reels": reels, "won": won, "stake": stake}
 

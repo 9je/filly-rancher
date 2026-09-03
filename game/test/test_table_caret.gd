@@ -58,15 +58,23 @@ func _open(scene: PackedScene) -> CanvasLayer:
 	return menu
 
 
-func test_the_slot_machine_marks_the_stake_row_before_and_after_a_spin() -> void:
+## THE SLOT MACHINE'S STAKE ROW MOVED ONTO ITS STAGE (Task 4), so there is no "Stake:" Label
+## left in the Rows column to read a caret off of any more -- the cursor is a drawn chip. Same
+## conditional shape as the wheel's own test below: focused_id() is asked unconditionally
+## (real on every screen, staged or not) and the literal "stake:<n>" vocabulary is only
+## checked once slots_menu.tscn is actually in STAGED.
+func test_the_slot_machine_marks_the_stake_it_is_backing_before_and_after_a_spin() -> void:
 	var menu: CanvasLayer = await _open(SlotsMenuScene)
-	assert_true(_caret_line(menu).begins_with("Stake:"),
-		"before any spin the caret is on the stake row: '%s'" % _caret_line(menu))
+	var before_id: String = String(menu.call("focused_id"))
+	assert_ne(before_id, "",
+		"before any spin the slot machine is already focused on something real")
+	if CasinoStagesTestScript.STAGED.has("res://ui/slots_menu.tscn"):
+		assert_eq(before_id, "stake:0", "before any spin the focus is on the first stake")
 	var spun: Array[String] = ["Apple Apple Apple", "You win 40 chips."]
 	menu.call("show_result", spun)
-	assert_true(_caret_line(menu).begins_with("Stake:"),
-		"after a spin the caret must still be on the stake row, not up in the result: '%s'"
-			% _caret_line(menu))
+	var after_id: String = String(menu.call("focused_id"))
+	assert_eq(after_id, before_id,
+		"after a spin the focus must still be on the same stake, not up in the result")
 
 
 func test_the_blackjack_table_marks_the_stake_row_before_and_after_a_hand() -> void:
