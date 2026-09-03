@@ -101,6 +101,14 @@ const SKIRT_COLOUR := Color(0.21, 0.17, 0.13)
 
 ## Per-file multiplier ON TOP of BASE_SCALE. Only ever for a prop whose shipped
 ## asset is at a known-wrong scale.
+##
+## kenney_survival_structure.glb IS NO LONGER IN LAYOUT and its entry below stays anyway.
+## docs/pipeline.md section 4 quirk 5 calls it an open timber frame that "reads as farm
+## equipment abandoned in a field"; the Ponyville General store stands where it used to,
+## across the Market yard. The correction is a MEASUREMENT of a defect in that pack's FBX
+## branch (2.0 units as Kenney's own GLB, 0.50 after the round trip), not a decoration on
+## a layout line, so it is kept for anyone who re places the prop and so the doc that
+## records the defect still has something to point at.
 const SCALE_FIX := {
 	"kenney_survival_structure.glb": 4.0,  # FBX unit-conversion defect, quirk 4.
 }
@@ -168,24 +176,25 @@ const PEN_PLOTS_HALF_EXTENT := 9.0
 ## The homestead layout, hand-composed rather than scattered randomly.
 ##
 ## Read as a picture: the windmill is the tall thing you see from anywhere on the
-## map and steer by; the watermill is the farmhouse you spawn facing; the survival
-## structure is the barn beside the yard; the stall is the clutter that makes a yard
-## look lived in. Trees ring the open country and thin out toward the buildings, so
-## the homestead reads as a clearing somebody made rather than a field with objects
-## dropped on it. `y` is never specified -- every prop is sat on height_at() so
+## map and steer by; the watermill is the farmhouse you spawn facing; the stall is the
+## clutter that makes a yard look lived in; Ponyville General stands across the yard where
+## an open Kenney timber frame used to. Trees ring the open country and thin out toward the
+## buildings, so the homestead reads as a clearing somebody made rather than a field with
+## objects dropped on it. `y` is never specified -- every prop is sat on height_at() so
 ## nothing floats and nothing sinks.
 ##
 ## `s` is an optional per-entry size jitter, applied on top of BASE_SCALE (and of
 ## SCALE_FIX). Fixed values rather than an RNG draw: a hand-varied treeline is
 ## reproducible, and reproducibility is what makes a screenshot regression legible.
-## Note what is NOT here: a house or a barn. The kit has none -- see
-## game/world/building.gd, which is why the ranch's two actual buildings are
-## assembled from primitives instead. The Kenney pieces below are yard fixtures.
+## The ranch's OWN buildings are still not in here and still not meshes: game/world/
+## building.gd assembles them from primitives, because they are in git, they exist in CI
+## and in a fresh clone, and their doorways are asserted against MIN_DOOR_CLEARANCE. What
+## the MLP props below are is scenery: a farm on the walk to the Orchard, a shop across the
+## yard, a town on the road north. Nothing here is ever walked into.
 const LAYOUT := [
 	# --- yard fixtures, all inside Terrain's flat apron ---------------------------
 	{"file": "kenney_windmill.glb", "at": Vector2(3.5, -17.5), "yaw": 10.0},
 	{"file": "kenney_watermill.glb", "at": Vector2(-17.0, -4.0), "yaw": 90.0},
-	{"file": "kenney_survival_structure.glb", "at": Vector2(14.0, 2.0), "yaw": 90.0},
 	{"file": "kenney_market_stall.glb", "at": Vector2(2.0, 3.0), "yaw": 200.0},
 	# --- treeline ----------------------------------------------------------------
 	{"file": "kenney_tree_oak.glb", "at": Vector2(-19.0, -19.0), "yaw": 0.0, "s": 1.15},
@@ -234,12 +243,19 @@ const LAYOUT := [
 	# through a fence rail. Planted outside, they read as the country the fence is the
 	# edge of, which is the whole job a boundary fence has on a map this size.
 	# The Orchard, (72, 40) r 22: apples on the high ground, none across the west gate.
-	{"file": "kenney_tree_oak.glb", "at": Vector2(101.1, 50.6), "yaw": 25.0, "s": 1.20},
-	{"file": "kenney_tree_fat.glb", "at": Vector2(87.5, 66.8), "yaw": 140.0, "s": 1.10},
-	{"file": "kenney_tree_oak.glb", "at": Vector2(66.6, 70.5), "yaw": 265.0, "s": 1.25},
-	{"file": "kenney_tree_fat.glb", "at": Vector2(48.3, 59.9), "yaw": 60.0, "s": 1.05},
-	{"file": "kenney_tree_oak.glb", "at": Vector2(87.5, 13.2), "yaw": 195.0, "s": 1.15},
-	{"file": "kenney_tree_fat.glb", "at": Vector2(98.8, 24.5), "yaw": 310.0, "s": 1.20},
+	# APPLE TREES, ON THE SAME SIX POINTS. The Kenney Nature Kit's foliage is a flat
+	# cyan/mint swatch (docs/pipeline.md section 4 quirk 6: it is Kenney's authored
+	# "leafsGreen" colour, checked and not a colour space bug), which read as a lawn
+	# ornament in an orchard the player pays a permit to reach. These six coordinates are
+	# unchanged on purpose: each sits at exactly radius 31 from the region centre, which is
+	# the fence ring plus the 4 m every planted tree clears it by, and reusing them cannot
+	# break a clearance that was already verified.
+	{"file": "mlp_apple_tree.glb", "at": Vector2(101.1, 50.6), "yaw": 25.0, "s": 1.20, "family": &"mlp"},
+	{"file": "mlp_apple_tree.glb", "at": Vector2(87.5, 66.8), "yaw": 140.0, "s": 1.10, "family": &"mlp"},
+	{"file": "mlp_apple_tree_bare.glb", "at": Vector2(66.6, 70.5), "yaw": 265.0, "s": 1.25, "family": &"mlp"},
+	{"file": "mlp_apple_tree.glb", "at": Vector2(48.3, 59.9), "yaw": 60.0, "s": 1.05, "family": &"mlp"},
+	{"file": "mlp_apple_tree.glb", "at": Vector2(87.5, 13.2), "yaw": 195.0, "s": 1.15, "family": &"mlp"},
+	{"file": "mlp_apple_tree_bare.glb", "at": Vector2(98.8, 24.5), "yaw": 310.0, "s": 1.20, "family": &"mlp"},
 	# The Everfree Edge, (-74, -49) r 24: the densest planting on the map, and the
 	# darkest, so the corner of the world the palette already made gloomy also LOOKS
 	# like woodland rather than like a lawn at dusk.
@@ -264,6 +280,67 @@ const LAYOUT := [
 	{"file": "kenney_tree_pine.glb", "at": Vector2(-81.6, 93.5), "yaw": 210.0, "s": 1.20},
 	{"file": "kenney_tree_pine.glb", "at": Vector2(-93.0, 69.0), "yaw": 285.0, "s": 1.25},
 	{"file": "kenney_tree_pine.glb", "at": Vector2(-81.6, 44.5), "yaw": 355.0, "s": 1.15},
+	# --- Sweet Apple Acres, on the walk out to the Orchard --------------------------
+	# APPLEJACK'S FARM, NOT THE PLAYER'S. The homestead keeps its own procedural red barn
+	# (game/world/building.gd says why it is code and not a mesh, and both reasons still
+	# hold); this is the farm the orchard belongs to, on the walk out to it. Nothing here
+	# is walked into: an MLP mesh prop is SCENERY. No attendant stands at one, no dock
+	# marker sits on one, and ranch.gd checks that no prop's collider reaches inside a
+	# building's interaction radius, so the only doors the game opens stay procedural.
+	#
+	# The barn, the shed and the town row carry "skirt": true. Everything within 29 m of
+	# the Orchard centre (72, 40) is inside its fence ring plus the 4 m margin every prop
+	# clears it by, so nothing below is: test_props.gd checks that on every entry.
+	{"file": "saa_barn.glb", "at": Vector2(41.0, 51.3), "yaw": 205.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_shed.glb", "at": Vector2(34.0, 45.0), "yaw": 160.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_wagon.glb", "at": Vector2(46.0, 58.0), "yaw": 75.0, "family": &"mlp"},
+	{"file": "saa_hay_pile.glb", "at": Vector2(35.0, 42.0), "yaw": 20.0, "family": &"mlp"},
+	{"file": "saa_hay_pile.glb", "at": Vector2(37.5, 40.5), "yaw": 200.0, "family": &"mlp", "s": 0.90},
+	{"file": "saa_wire_arch.glb", "at": Vector2(32.0, 52.0), "yaw": 115.0, "family": &"mlp"},
+	{"file": "saa_water_chute.glb", "at": Vector2(34.0, 66.0), "yaw": 250.0, "family": &"mlp"},
+	{"file": "saa_seed_bag.glb", "at": Vector2(33.0, 47.0), "yaw": 40.0, "family": &"mlp"},
+	{"file": "saa_fence_old.glb", "at": Vector2(30.0, 48.0), "yaw": 0.0, "family": &"mlp"},
+	{"file": "saa_fence_old.glb", "at": Vector2(30.0, 54.0), "yaw": 0.0, "family": &"mlp"},
+	{"file": "saa_fence_old.glb", "at": Vector2(49.0, 63.0), "yaw": 90.0, "family": &"mlp"},
+	{"file": "saa_fence_old.glb", "at": Vector2(48.0, 67.0), "yaw": 90.0, "family": &"mlp"},
+	# The corn patch: two rows of six. The two dead stalks are placed, not drawn from an
+	# RNG, for the same reason the treeline's size jitter is: a hand varied row is
+	# reproducible, and reproducibility is what makes a screenshot regression legible.
+	{"file": "saa_corn_plant.glb", "at": Vector2(30.0, 58.0), "yaw": 10.0, "family": &"mlp"},
+	{"file": "saa_corn_plant.glb", "at": Vector2(33.0, 58.0), "yaw": 200.0, "family": &"mlp"},
+	{"file": "saa_corn_plant.glb", "at": Vector2(36.0, 58.0), "yaw": 95.0, "family": &"mlp"},
+	{"file": "saa_corn_plant.glb", "at": Vector2(39.0, 58.0), "yaw": 280.0, "family": &"mlp"},
+	{"file": "saa_corn_plant.glb", "at": Vector2(42.0, 58.0), "yaw": 150.0, "family": &"mlp"},
+	{"file": "saa_corn_plant_dead.glb", "at": Vector2(45.0, 58.0), "yaw": 25.0, "family": &"mlp"},
+	{"file": "saa_corn_plant.glb", "at": Vector2(30.0, 61.0), "yaw": 320.0, "family": &"mlp"},
+	{"file": "saa_corn_plant.glb", "at": Vector2(33.0, 61.0), "yaw": 60.0, "family": &"mlp"},
+	{"file": "saa_corn_plant.glb", "at": Vector2(36.0, 61.0), "yaw": 240.0, "family": &"mlp"},
+	{"file": "saa_corn_plant_dead.glb", "at": Vector2(39.0, 61.0), "yaw": 130.0, "family": &"mlp"},
+	{"file": "saa_corn_plant.glb", "at": Vector2(42.0, 61.0), "yaw": 300.0, "family": &"mlp"},
+	{"file": "saa_corn_plant.glb", "at": Vector2(45.0, 61.0), "yaw": 175.0, "family": &"mlp"},
+	# Hedging, so the yard has an edge that is not a fence.
+	{"file": "mlp_bush.glb", "at": Vector2(38.0, 43.5), "yaw": 0.0, "family": &"mlp"},
+	{"file": "mlp_bush.glb", "at": Vector2(42.0, 42.0), "yaw": 140.0, "family": &"mlp"},
+	{"file": "mlp_bush.glb", "at": Vector2(33.0, 56.0), "yaw": 260.0, "family": &"mlp"},
+	# Apple trees along the walk itself, so the orchard starts before the fence does.
+	{"file": "mlp_apple_tree.glb", "at": Vector2(30.0, 40.0), "yaw": 75.0, "family": &"mlp", "s": 1.05},
+	{"file": "mlp_apple_tree.glb", "at": Vector2(30.0, 44.0), "yaw": 30.0, "family": &"mlp", "s": 1.10},
+	{"file": "mlp_apple_tree.glb", "at": Vector2(33.0, 50.0), "yaw": 150.0, "family": &"mlp", "s": 1.00},
+	{"file": "mlp_apple_tree.glb", "at": Vector2(47.0, 60.0), "yaw": 245.0, "family": &"mlp", "s": 1.15},
+	{"file": "mlp_apple_tree.glb", "at": Vector2(38.0, 64.0), "yaw": 300.0, "family": &"mlp", "s": 1.05},
+	{"file": "mlp_apple_tree_bare.glb", "at": Vector2(27.0, 64.0), "yaw": 100.0, "family": &"mlp", "s": 1.10},
+	# --- Ponyville General, across the Market yard ----------------------------------
+	# WHERE kenney_survival_structure USED TO STAND, and the Market itself is untouched.
+	# Replacing the Market with a mesh would drop it out of buildings.get_child_count() and
+	# therefore out of the census, lose the door apron ATTENDANT_CLEARANCE steps the vendor
+	# sideways out of, and put a 58,034 triangle two storey shop where a 4.5 m radius
+	# interaction check expects an origin. So the General stands BESIDE it: 21.0 m from the
+	# Market's origin, 10.8 m from the Depot's, 11.2 m from the Farmhouse's, and inside
+	# Terrain's flat apron, where the relief across its footprint is exactly zero and it
+	# needs no skirt. Its sign stands 6.1 m out from the Market door: past MARKET_RADIUS
+	# and past the 2.8 m door apron, so it dresses the door without standing in it.
+	{"file": "pv_general.glb", "at": Vector2(19.0, -2.0), "yaw": 250.0, "family": &"mlp"},
+	{"file": "pv_general_sign.glb", "at": Vector2(-1.0, 5.0), "yaw": 200.0, "family": &"mlp"},
 ]
 
 var _placed: Array[Node3D] = []

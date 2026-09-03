@@ -142,10 +142,25 @@ func test_the_pen_plot_clearing_is_clear_in_the_layout() -> void:
 			"'%s' at %s sits in the ground reserved for the pen plots" % [entry["file"], at])
 
 
+## THE TWO KITS THE MAP IS DRESSED FROM. Kenney for the yard fixtures and the treeline;
+## the converted PonySFM props for Sweet Apple Acres, Ponyville General, the town row, the
+## schoolyard and the Strip. Every prefix here is an id prefix in tools/prop_manifest.txt,
+## which is the only thing tools/convert_props.sh will produce. A file with any other
+## prefix is one nothing converts, so it would never load on any machine: it would quietly
+## lower expected_count() instead of failing, and the layout would be one prop short
+## everywhere with nothing saying so.
+const PROP_PREFIXES := ["kenney_", "saa_", "pv_", "mlp_", "school_", "lp_"]
+
+
 func test_every_layout_entry_names_a_prop_from_the_converted_kit() -> void:
 	for entry: Dictionary in PropsScript.LAYOUT:
 		var file: String = entry["file"]
-		assert_true(file.begins_with("kenney_"), "unexpected prop source: %s" % file)
+		var known := false
+		for prefix: String in PROP_PREFIXES:
+			if file.begins_with(prefix):
+				known = true
+				break
+		assert_true(known, "unexpected prop source: %s" % file)
 		assert_eq(file.get_extension(), "glb", "props are loaded as .glb: %s" % file)
 
 
