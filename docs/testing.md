@@ -875,12 +875,25 @@ cutie mark). Headless it prints `GALLERY_MARK_OK count=3` and the exit code is t
 verdict.
 
 **And a third row, for the props.**
-`tools/bin/godot --path game scenes/test/model_gallery.tscn -- --props` loads every
-`.glb` in `game/assets/converted/props/`, stands them in a line spaced by their own
-measured widths, and prints one `PROP <file> size=(x, y, z) meshes=N materials=N
-textured=N` line each. Headless it prints `GALLERY_OK count=35` and the exit code
-is the verdict: it fails if fewer than 30 loaded, if any model measured an empty
-AABB, or if any model came back with no textured surface at all.
+`tools/bin/godot --path game scenes/test/model_gallery.tscn -- --props` loads the
+`.glb` files in `game/assets/converted/props/` whose names begin with one of the
+five manifest prefixes (`saa_`, `pv_`, `mlp_`, `school_`, `lp_`), stands them in a
+line spaced by their own measured widths, and prints one `PROP <file> size=(x, y,
+z) meshes=N materials=N textured=N` line each. Headless it prints `GALLERY_OK
+count=35` and the exit code is the verdict: it fails if fewer than 30 loaded, if
+any model measured an empty AABB, or if any model came back with no textured
+surface at all.
+
+**The prefix scope is the point, not a shortcut.** Eight `kenney_*.glb` files sit
+in the same directory and are deliberately skipped. They never went through
+`tools/convert_props.sh`: they are Kenney kit models that colour their surfaces
+with flat material colours instead of albedo textures (docs/pipeline.md section 4
+quirk 6), so the textured-surface check would fail them for a convention this
+pipeline never touched. What they DO have (placement, seating, collision) is
+already proven by `world/ranch.tscn`'s own gate. `count=35` is the size of the
+prop manifest, and it is 35 rather than 43 for exactly this reason;
+`model_gallery.gd`'s `PROP_PREFIXES` is the same list `test_ranch_world.gd`
+already holds the layout to.
 
 That last one is the reason this mode exists rather than just running
 `validate_gltf.py --props` over the directory. The validator parses the GLB's JSON

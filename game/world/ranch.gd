@@ -172,6 +172,7 @@ const RaceCardScript := preload("res://systems/race_card.gd")
 const RaceTrackScript := preload("res://world/race_track.gd")
 const CompanyRunnersScript := preload("res://systems/company_runners.gd")
 const AttendantScript := preload("res://world/attendant.gd")
+const HudScript := preload("res://ui/hud.gd")
 
 ## Headless watchdog ceiling. A normal run (assets present) finishes in under 2s on
 ## this machine; 30s leaves a wide margin for a slower box while still failing in
@@ -5562,8 +5563,15 @@ func _capture_all() -> void:
 		capture_camera.make_current()
 		await _capture("05_scale_at_the_barn")
 
-	await _capture_plots()
+	# THE PROP SHOTS GO FIRST, and the order is load bearing rather than tidy. The plot
+	# pass drives the real build loop, so it raises a toast ("That pen is full.") that is
+	# still on screen frames later; taken after it, three of the five prop shots were
+	# stamped with a line of HUD text across the top of a picture whose whole job is to
+	# show what the place looks like. The props pass touches no world state, so nothing
+	# downstream of it cares that it ran first. The catch pass leaves toasts too, and
+	# _capture_props() waits those out itself; see _let_the_hud_finish_talking().
 	await _capture_props()
+	await _capture_plots()
 
 
 ## 06 to 09: the plot loop, photographed by DRIVING IT rather than by staging it.
@@ -5664,11 +5672,42 @@ func _capture_plots() -> void:
 ## plinth somebody forgot to hide. The gates say the props are placed, solid, seated and
 ## out of the doorways; these say whether the place is any good.
 func _capture_props() -> void:
+	await _let_the_hud_finish_talking()
 	await _frame_on(Vector2(41.0, 51.3), Vector3(-14.0, 11.0, -16.0), 4.0, "13_sweet_apple_acres")
 	await _frame_on(Vector2(19.0, -2.0), Vector3(-13.0, 8.0, -12.0), 3.0, "14_ponyville_general")
 	await _frame_on(Vector2(1.5, 43.0), Vector3(0.0, 10.0, -22.0), 3.5, "15_town_row_north_road")
-	await _frame_on(Vector2(-26.0, 58.0), Vector3(9.0, 8.0, -13.0), 3.0, "16_schoolyard")
+	# 16 stands off the yard's SOUTH WEST corner and looks up its diagonal, and every part
+	# of that is a measurement. The subject is (-25.5, 58.5), the centroid of the seven
+	# schoolyard props rather than the bell tower alone; the old offset put the eye at
+	# (-17, 45), which is 5.4 m from pv_balcony_b and 7.1 m from pv_bridged_b, so a
+	# building the shot was not about filled the left third of frame while the yard sat in
+	# the far distance. From (-36, 49) the whole yard lies between 8.5 m and 17.7 m out and
+	# inside 22 degrees of the axis, nearest prop first, and the road's buildings are
+	# behind the lens. The Palace stands off to the right at 21 m, which is context: the
+	# schoolyard IS next to it, and a shot that pretended otherwise would be a lie about
+	# the map.
+	await _frame_on(Vector2(-25.5, 58.5), Vector3(-10.5, 6.0, -9.5), 1.6, "16_schoolyard")
 	await _frame_on(Vector2(7.5, 69.0), Vector3(0.0, 7.0, -13.0), 2.0, "17_strip_arcade")
+
+
+## HOLD UNTIL THE HUD HAS STOPPED SAYING THINGS, because a picture of a place is spoiled by
+## a line of text about the last pony somebody caught. The catch pass above raises one toast
+## per catch and hud.gd QUEUES them rather than writing over them, so "Caught Berry Punch!"
+## was still on screen five shots later.
+##
+## The wait is derived from the HUD's own two constants and its own count of what it has
+## left to say, not from a number typed in here: one line takes TOAST_HOLD + TOAST_FADE, and
+## pending_toasts() says how many are still waiting behind the one on screen. Rounding UP by
+## a whole line covers the one already showing. Screenshot runs only, so seconds are cheap.
+func _let_the_hud_finish_talking() -> void:
+	var hud := get_node_or_null(^"HUD")
+	if hud == null or not hud.has_method("pending_toasts"):
+		return
+	var queued: Array = hud.call("pending_toasts")
+	var lines: int = queued.size() + 1
+	var seconds: float = (HudScript.TOAST_HOLD + HudScript.TOAST_FADE) * float(lines)
+	print("RANCH capture: waiting %.1f s for %d toast line(s) to clear" % [seconds, lines])
+	await get_tree().create_timer(seconds).timeout
 
 
 ## Point the capture camera at world XZ `at`, standing `offset.x`/`offset.z` metres away and
