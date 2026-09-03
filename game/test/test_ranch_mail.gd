@@ -128,3 +128,33 @@ func test_the_mail_page_is_reachable_by_the_verb_at_the_mailbox() -> void:
 	assert_true(menu.is_open())
 	assert_eq(menu.page(), PauseMenuScript.Page.MAIL)
 	menu.close()
+
+
+func test_the_requisition_does_nothing_at_all_until_it_has_been_posted() -> void:
+	var result: Dictionary = _ranch.serve_requisition()
+	assert_false(bool(result["served"]))
+	assert_false(_state.story.has_flag("requisition_served"))
+
+
+func test_a_requisition_for_a_pony_she_no_longer_has_closes_itself_quietly() -> void:
+	_state.story.set_flag("requisition_posted")
+	_state.story.requisition_cycle = -1
+	_state.story.survey_choice = {"uid": "gone", "data_id": "trixie", "name": "Trixie",
+		"coat": ""}
+	var result: Dictionary = _ranch.serve_requisition()
+	assert_false(bool(result["served"]), "there was nobody to walk over")
+	assert_true(_state.story.has_flag("requisition_served"),
+		"and it does not sit armed forever waiting for a pony who is not coming back")
+
+
+func test_a_requisition_waits_for_a_pony_who_is_in_the_saddlebag_rather_than_a_pen() -> void:
+	var instance = PonyInstanceScript.create(&"trixie")
+	_state.add_pony(instance)
+	_state.story.set_flag("requisition_posted")
+	_state.story.requisition_cycle = -1
+	_state.story.survey_choice = {"uid": String(instance.uid), "data_id": "trixie",
+		"name": "Trixie", "coat": ""}
+	var result: Dictionary = _ranch.serve_requisition()
+	assert_false(bool(result["served"]))
+	assert_false(_state.story.has_flag("requisition_served"),
+		"she is still hers; the collector calls again when she is in a pen")

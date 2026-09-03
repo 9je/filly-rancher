@@ -1545,6 +1545,7 @@ func _on_world_changed() -> void:
 	_refresh_herd()
 	_maybe_run_collection_day()
 	advance_story()
+	_maybe_serve_requisition()
 	_maybe_serve_collector()
 
 
@@ -2021,6 +2022,11 @@ func _bind_pause_menu() -> void:
 		pause_menu.set("mail_provider", func() -> Array[Dictionary]: return mail_rows())
 		pause_menu.set("mail_ponies_provider",
 			func() -> Array[Dictionary]: return owned_rows())
+		pause_menu.set("story_chapter",
+			_game_state.story.chapter if _game_state != null else 0)
+		pause_menu.set("employees_choice", StringName(
+			String(_game_state.story.survey_choice.get("data_id", ""))
+			if _game_state != null else ""))
 	inject_pages.call()
 	if _game_state != null and not _game_state.state_loaded.is_connected(inject_pages):
 		_game_state.state_loaded.connect(inject_pages)
@@ -3184,7 +3190,14 @@ func advance_story() -> int:
 	if story == null:
 		return 0
 	story.advance()
-	return _post_due_mail()
+	var posted: int = _post_due_mail()
+	# THE BOOK IS READ IN THE CURRENT CHAPTER'S WORDS. inject_pages() is re-run on a load;
+	# a chapter that turns mid session has to push the same two fields itself.
+	if pause_menu != null:
+		pause_menu.set("story_chapter", story.chapter)
+		pause_menu.set("employees_choice",
+			StringName(String(story.survey_choice.get("data_id", ""))))
+	return posted
 
 
 ## Post everything the library says is owed, oldest rung first. One toast for the batch, the
@@ -3214,6 +3227,72 @@ func _post_due_mail() -> int:
 	if pause_menu != null and pause_menu.has_method("refresh_page"):
 		pause_menu.call("refresh_page")
 	return posted
+
+
+## THE PRIORITY REQUISITION, SERVED. A collector calls at the first DAWN of a cycle LATER
+## than the one the letter landed on, walks the pony the player named from her pen, and she
+## leaves by the departure path into the crate: the SAME path a Depot delivery uses, because
+## it is the only path a pony ever leaves the ranch by. Returns
+## {"served": bool, "name": String, "credit": int} so a gate can assert on what happened
+## rather than on a toast.
+##
+## THIS IS THE ONE PLACE BEFORE THE FORK WHERE THE COMPANY REACHES INTO A PEN, and the spec
+## names it as the single scripted exception (see "The ledger": "No pony is ever taken from a
+## pen by a collector before the fork, with one scripted exception, the Survey's Priority
+## Requisition"). Nothing about it is a new transaction: deliver_pony() applies the credit,
+## counts the quota, marks the Compendium and posts the receipt, exactly as the counter does.
+##
+## THREE ENDINGS, and each is deliberate:
+##   she is in a pen        she walks, and the requisition is served.
+##   she is not owned at all she has already gone (delivered, or never kept); the
+##                          requisition closes itself so it cannot sit armed forever.
+##   she is owned but not penned  nothing happens and it stays armed: she is in the
+##                          saddlebag, and a collector does not take a pony out of a pocket.
+func serve_requisition() -> Dictionary:
+	var refused := {"served": false, "name": "", "credit": 0}
+	var story: Story = get_story()
+	if story == null or _game_state == null:
+		return refused
+	if not story.has_flag("requisition_posted") or story.has_flag("requisition_served"):
+		return refused
+	var uid := StringName(String(story.survey_choice.get("uid", "")))
+	if String(uid).is_empty():
+		story.set_flag("requisition_served")
+		return refused
+	if _game_state.find_pony(uid) == null:
+		# She is not on the ranch any more. Close it quietly: there is nobody to walk over
+		# and nothing to say that would not be worse than saying nothing.
+		story.set_flag("requisition_served")
+		return refused
+	if _penned(uid).is_empty():
+		return refused
+
+	var who: String = String(story.survey_choice.get("name", ""))
+	var result: Dictionary = deliver_pony(uid)
+	if not bool(result.get("ok", false)):
+		return refused
+	story.set_flag("requisition_served")
+	_toast("An associate called for %s and walked her over himself. Most efficient!" % who)
+	_refresh_mailbox_flag()
+	save_game()
+	return {"served": true, "name": String(result.get("name", who)),
+		"credit": int(result.get("credit", 0))}
+
+
+## THE KNOCK, ONE FULL CYCLE AFTER THE LETTER, and only ever at DAWN. Same shape as
+## _maybe_serve_collector(), and the arming cycle lives on the story so it travels with the
+## save: quitting between the Requisition and the dawn comes back owing the same visit.
+func _maybe_serve_requisition() -> void:
+	if _world == null or _world.phase() != WorldStateScript.Phase.DAWN:
+		return
+	var story: Story = get_story()
+	if story == null or not story.has_flag("requisition_posted"):
+		return
+	if story.has_flag("requisition_served"):
+		return
+	if _world.cycle_index() <= story.requisition_cycle:
+		return
+	serve_requisition()
 
 
 ## WHAT A LETTER IS RENDERED AGAINST. Every placeholder any authored letter may carry, in

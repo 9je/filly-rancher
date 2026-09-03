@@ -49,6 +49,7 @@ const PaintScript := preload("res://ui/casino_paint.gd")
 # and 2. This is a data resource, not game state: the page still never learns what a Story
 # is, exactly as it preloads CompendiumScript for State without ever owning a Compendium.
 const StoryBeatScript := preload("res://systems/story_beat.gd")
+const StoryWordingScript := preload("res://systems/story_wording.gd")
 
 enum Page { MAIN, SETTINGS, COMPENDIUM, REQUESTS, MAIL, LEDGER }
 enum Row { RESUME, COMPENDIUM, REQUESTS, MAIL, LEDGER, SAVE, SETTINGS, QUIT }
@@ -138,6 +139,13 @@ var world_state: WorldState = null
 ## were injected alongside it for a while and never read, because the statement they would
 ## have been read for arrives already rendered. See ledger_rows().
 var statement_provider := Callable()
+
+## WHICH CHAPTER THE BOOK IS BEING READ IN, and who the player named on the Survey. Both are
+## pushed by ranch.gd exactly as the five sources above are, and both are allowed to stay at
+## their defaults forever: a menu with no ranch behind it reads the book in SUNNY's words,
+## which is the state a new game is in anyway.
+var story_chapter: int = 0
+var employees_choice: StringName = &""
 
 var _page: int = Page.MAIN
 var _selected := 0
@@ -515,9 +523,11 @@ func _entry_value(data: PonyData) -> String:
 	if compendium == null:
 		return ""
 	if compendium.state_of(data.id) == CompendiumScript.State.PROCESSED:
-		# The Company's word for it, in the Company's tone, until the story teaches the
-		# player what it means. See game/systems/compendium.gd.
-		return "Delivered :)"
+		# The Company's word for it, in the Company's tone, and the tone moves with the
+		# chapter. See game/systems/story_wording.gd; game/systems/compendium.gd's class
+		# comment has said this is how it would read since the state was added.
+		return StoryWordingScript.processed_value(story_chapter,
+			data.id == employees_choice)
 	if compendium.state_of(data.id) != CompendiumScript.State.CAUGHT:
 		return ""
 	return "when: %s, %s" % [_phases_text(data), _weathers_text(data)]

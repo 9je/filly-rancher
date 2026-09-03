@@ -644,3 +644,27 @@ func test_nothing_the_mail_page_draws_carries_a_dash() -> void:
 	for line: String in lines:
 		assert_false(line.contains("--"), "double hyphen: %s" % line)
 		assert_false(line.contains(char(0x2014)), "em dash: %s" % line)
+
+
+func test_a_delivered_pony_reads_in_the_words_of_the_chapter_she_was_delivered_in() -> void:
+	_wire_book()
+	var wording = preload("res://systems/story_wording.gd")
+	var story = preload("res://systems/story.gd")
+	var first: PonyData = _menu.roster()[0]
+	_compendium.mark_processed(first.id)
+	_menu.story_chapter = story.Chapter.SUNNY
+	_menu.open()
+	_menu.open_page(PauseMenu.Page.COMPENDIUM)
+	var rows: Array[String] = _menu.compendium_rows()
+	assert_true(rows[0].contains(wording.processed_label(story.Chapter.SUNNY)))
+
+
+func test_the_pony_she_named_on_the_survey_carries_her_star_in_the_book() -> void:
+	_wire_book()
+	var wording = preload("res://systems/story_wording.gd")
+	var first: PonyData = _menu.roster()[0]
+	_compendium.mark_processed(first.id)
+	_menu.employees_choice = first.id
+	_menu.open()
+	_menu.open_page(PauseMenu.Page.COMPENDIUM)
+	assert_true(_menu.compendium_rows()[0].contains(wording.EMPLOYEES_CHOICE))
