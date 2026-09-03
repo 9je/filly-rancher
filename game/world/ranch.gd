@@ -3856,6 +3856,8 @@ func _report(pony_count: int, prop_count: int) -> void:
 		var checked_building: Building = prop as BuildingScript
 		if checked_building != null:
 			expected_ground = checked_building.seat_ground(Callable(terrain, "height_at"))
+		elif props.has_seat_ground(prop):
+			expected_ground = props.seat_ground_of(prop)
 		var sunk: float = box.position.y - (expected_ground - PropsScript.SINK_BIAS)
 		if absf(sunk) > SEATING_TOLERANCE:
 			props_seated = false
@@ -5289,14 +5291,22 @@ func _probe_camera_against_building() -> Dictionary:
 	return result
 
 
-## Buildings (never trees -- a canopy is a bad camera obstacle to prove anything
-## with; the arm could be stopping on a leaf a player would happily walk under),
-## tallest first.
+## Candidates for the camera's wall-collision probe, tallest first, with two exclusions:
+## foliage by name (a canopy is a bad camera obstacle to prove anything with -- the arm
+## could be stopping on a leaf a player would happily walk under) and the whole MLP family
+## by entry (an MLP mesh prop is scenery the player is never meant to walk into, so the wall
+## the probe presses against must be a wall the game actually owns -- a real Building, or a
+## Kenney yard fixture). Props.is_foliage() and the family key are the one place both lists
+## live, so this stays in step with LAYOUT rather than re-deriving its own name rules.
 func _buildings_by_height() -> Array[Node3D]:
 	var result: Array[Node3D] = []
 	for prop: Node3D in _all_props():
-		if not prop.name.begins_with("kenney_tree"):
-			result.append(prop)
+		if PropsScript.is_foliage(prop.name):
+			continue
+		var entry: Dictionary = props.entry_of(prop)
+		if not entry.is_empty() and PropsScript.family_of(entry) == PropsScript.FAMILY_MLP:
+			continue
+		result.append(prop)
 	result.sort_custom(func(a: Node3D, b: Node3D) -> bool:
 		return PropsScript.world_aabb(a).size.y > PropsScript.world_aabb(b).size.y)
 	return result
