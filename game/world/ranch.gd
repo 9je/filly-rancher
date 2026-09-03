@@ -5770,10 +5770,40 @@ func _capture_look() -> void:
 		"18_palace_lobby_sign")
 	await _frame_on(Vector2(-10.0, 61.6), Vector3(0.0, 6.0, -22.0), 4.0,
 		"19_marquee_and_gold_trim")
-	await _frame_on(Vector2(58.0, -46.0), Vector3(-16.0, 12.0, -18.0), 2.0,
+	# 20's ORIGINAL `at` (58, -46) sat 16 m from the lake region's own centre (60, -62) --
+	# inside its 24 m radius and inside the water disc's own 16.8 m (radius * 0.7), so the
+	# frame was mostly water. (58, -33) is 29 m out: past the rim, on flat grass, with the
+	# slope's dirt band (12 to 24 m out, where height_at() feathers the basin in) and the
+	# water beyond it both further from the eye than the aim point, so both read as
+	# background rather than as the subject.
+	await _frame_on(Vector2(58.0, -33.0), Vector3(0.0, 8.0, 12.0), 2.0,
 		"20_ground_slope_and_dirt")
+	# THE TRACK IS DRESSED FIRST, because an empty gate post is not a saddlecloth. dress()
+	# needs no stake and no live race (RaceTrack.dress()'s own comment); it only needs a
+	# field shaped the way RaceCard.build_field() shapes one, which is what
+	# _capture_race_field() below hands it.
+	if race_track != null and race_track.has_method("dress"):
+		race_track.call("dress", _capture_race_field())
 	await _frame_on(Vector2(0.0, 80.0), Vector3(-24.0, 6.0, -14.0), 1.6,
 		"21_race_lane_colours")
+
+
+## A six-lane field for the screenshot pass, built the same way race_entrants() builds one for
+## the form guide: a penned pony's own entrant_from() if one is standing in a pen (the plot
+## pass above may have put one there), and RaceCard's own "Your pony" default otherwise, so
+## this never depends on the capture order finding a resident. The Company fills the other
+## five lanes exactly as a real race does.
+func _capture_race_field() -> Array[Dictionary]:
+	var entrant: Dictionary = {}
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen == null:
+			continue
+		var ponies: Array[PonyInstance] = pen.ponies()
+		if not ponies.is_empty():
+			entrant = RaceCardScript.entrant_from(ponies[0])
+			break
+	return RaceCardScript.build_field(entrant, CompanyRunnersScript.load_shipped())
 
 
 ## HOLD UNTIL THE HUD HAS STOPPED SAYING THINGS, because a picture of a place is spoiled by

@@ -221,6 +221,15 @@ func build() -> void:
 	var wall_mat := _material(wall_color, WALL_ROUGHNESS)
 	var roof_mat := _material(roof_color, ROOF_ROUGHNESS)
 	var trim_mat := _material(trim_color, TRIM_ROUGHNESS, trim_metallic)
+	# THE PLINTH IS WALKED ON AND STOOD ON, NOT WORN. Floor and DoorApron are the same trim
+	# colour as the lintel, but trim_metallic is for a doorway beam catching the sun, not for a
+	# ground-level ramp: at a grazing sun angle the sloped DoorApron caught the light across its
+	# whole face and blew out to a flat gold wash covering a third of the Palace's own render
+	# (18_palace_lobby_sign, 19_marquee_and_gold_trim), which is a worse trade than the glint
+	# trim_metallic was added for. metallic is left at _material()'s own default (0.0) here on
+	# purpose, so this material never reads trim_metallic at all -- not "0.0 for now", but
+	# structurally exempt, on every building including the Palace.
+	var plinth_mat := _material(trim_color, TRIM_ROUGHNESS)
 
 	var half_w := width * 0.5
 	var half_d := depth * 0.5
@@ -235,7 +244,7 @@ func build() -> void:
 	# pair that made.
 	var plinth: float = FLOOR_TOP + SKIRT_DEPTH
 	_slab("Floor", Vector3(width - PLINTH_INSET * 2.0, plinth, depth - PLINTH_INSET * 2.0),
-		Vector3(0.0, FLOOR_TOP - plinth * 0.5, 0.0), trim_mat)
+		Vector3(0.0, FLOOR_TOP - plinth * 0.5, 0.0), plinth_mat)
 
 	# --- walls -------------------------------------------------------------------
 	_slab("WallBack", Vector3(width, wall_height, t),
@@ -283,7 +292,7 @@ func build() -> void:
 		var apron_top_z: float = half_d - PLINTH_INSET
 		_slab("DoorApron", Vector3(door_width, DOOR_APRON_THICKNESS, apron_slope),
 			Vector3(0.0, FLOOR_TOP - apron_rise * 0.5, apron_top_z + apron_run * 0.5),
-			trim_mat, 0.0, apron_angle)
+			plinth_mat, 0.0, apron_angle)
 
 	# --- roof ---------------------------------------------------------------------
 	# Two slabs leaning against each other. Built as rotated BoxMeshes rather than as

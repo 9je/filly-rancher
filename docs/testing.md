@@ -1040,7 +1040,7 @@ Run it with:
 tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/casino_test.tscn
 ```
 
-Expect `CASINO_OK checks=72`; the exit code is the verdict.
+Expect `CASINO_OK checks=76`; the exit code is the verdict.
 
 **The sign checks moved, and they are strictly better than the ones they replaced.**
 
