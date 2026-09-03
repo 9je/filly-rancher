@@ -2606,6 +2606,8 @@ func play_wheel(kind: int, guess: int, stake: int) -> Dictionary:
 		var lines: Array[String] = [WheelScript.pocket_text(pocket),
 			"You win %d chips." % won if won > 0 else "The house takes that one."]
 		wheel_menu.call("show_result", lines)
+	if wheel_menu != null and wheel_menu.has_method("show_spin"):
+		wheel_menu.call("show_spin", pocket, won, stake)
 	_refresh_casino_menus()
 	return {"ok": true, "pocket": pocket, "won": won, "stake": stake}
 
