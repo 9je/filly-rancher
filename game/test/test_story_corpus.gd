@@ -94,10 +94,13 @@ func test_no_letter_renders_an_unfilled_placeholder() -> void:
 func test_every_revealed_id_is_a_character_this_build_carries() -> void:
 	var registry = PonyRegistryScript.new()
 	registry.load_all(PONY_DIR)
+	var revealed_total: int = 0
 	for beat: StoryBeat in _library.all():
 		for revealed in beat.reveals:
+			revealed_total += 1
 			assert_not_null(registry.by_id(StringName(String(revealed))),
 				"%s reveals '%s', who is not on the roster" % [beat.id, revealed])
+	assert_eq(revealed_total, 0, "this slice authors no reveals; slice 4 raises this count on purpose")
 
 
 func test_each_chapter_opens_with_something_to_read() -> void:
