@@ -254,15 +254,18 @@ func _drive_the_palace() -> void:
 			strip_fenced = true
 	_set_check("the Strip has no fence, because it has no price", not strip_fenced)
 	var strip_node := ranch.get_node_or_null(^"Strip")
-	# ONE OF TEN LAMPS IS DELIBERATELY MISSING. The ring is centred on the Strip region, not
+	# TWO OF TEN LAMPS ARE DELIBERATELY MISSING. The ring is centred on the Strip region, not
 	# on the Palace, which sits off centre (see PALACE_MAX_RELIEF's comment in ranch.gd), so
 	# one ring position falls inside the Palace's own footprint; strip.gd's avoid_footprint()
-	# skips that one rather than moving it. ranch.gd's own boot report re-checks this
-	# independently and prints "RANCH strip lamps=9 clear=true"; this line matches it rather
-	# than asserting the un-skipped count.
-	_set_check("the Strip's lamps are standing, minus the one skipped clear of the Palace",
+	# skips that one rather than moving it. A second ring position clears the wall but stands
+	# inside the door apron reaching past it (Building.DOOR_APRON_RUN) -- a lamp cannot stand
+	# in the doorway, so the look pass's own review made avoid_footprint() drop that one too.
+	# ranch.gd's own boot report re-checks both independently and prints
+	# "RANCH strip lamps=8 clear=true"; this line matches it rather than asserting the
+	# un-skipped count.
+	_set_check("the Strip's lamps are standing, minus the two skipped clear of the Palace",
 		strip_node != null
-		and int(strip_node.call("light_count")) == StripScript.LIGHT_COUNT - 1)
+		and int(strip_node.call("light_count")) == StripScript.LIGHT_COUNT - 2)
 	_set_check("the marquee names the Palace and its sponsor",
 		strip_node != null and ", ".join(strip_node.call("marquee_lines") as Array[String])
 			.contains("Cloudsdale Weather Corporation"))

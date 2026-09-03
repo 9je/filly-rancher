@@ -10,11 +10,13 @@ extends Node3D
 ## as somewhere at night: a ring of lamp posts and one lit marquee facing the walk up from
 ## the homestead.
 ##
-## NINE LAMPS ON A TEN POSITION RING. LIGHT_COUNT is the number of points build() walks, not
+## EIGHT LAMPS ON A TEN POSITION RING. LIGHT_COUNT is the number of points build() walks, not
 ## the number of posts that end up standing: avoid_footprint() skips any position that lands
-## inside the Palace's own footprint, and on this map exactly one does, so a built Strip
-## reports light_count() of 9. See build() and avoid_footprint() for why the position is
-## dropped rather than nudged.
+## inside an excluded rectangle, and on this map two do -- one inside the Palace's own walls,
+## and one inside its door apron, which reaches Building.DOOR_APRON_RUN past those walls and
+## caught a lamp PALACE_CLEARANCE alone did not (a lamp standing in the doorway, found and
+## fixed in the look pass's own review) -- so a built Strip reports light_count() of 8. See
+## build() and avoid_footprint() for why a position is dropped rather than nudged.
 ##
 ## ITS CHILDREN ARE DELIBERATELY NOT COUNTED AS PROPS. ranch.gd's prop census is
 ## Props.expected_count() plus the Buildings children, and lamp posts are under neither. A
@@ -90,9 +92,9 @@ const LAMP_RANGE := 16.0
 ## and night, which is the whole point of a marquee.
 ##
 ## NOT IN _lights, DELIBERATELY. Strip.light_count() answers how many LAMP POSTS are standing
-## on the ring, the strip gate asserts it is LIGHT_COUNT minus the one skipped clear of the
-## Palace, and a bulb rail counted among them would break that check for a reason that has
-## nothing to do with lamp posts.
+## on the ring, the strip gate asserts it is LIGHT_COUNT minus the two skipped clear of the
+## Palace (its walls, and since the look pass its door apron), and a bulb rail counted among
+## them would break that check for a reason that has nothing to do with lamp posts.
 const MARQUEE_BULBS := 10
 const MARQUEE_BULB_RADIUS := 0.055
 
@@ -140,11 +142,13 @@ var _marquee_size := Vector2.ZERO
 var _marquee_ceiling := 0.0
 var _has_marquee := false
 
-## The rectangle, in world XZ, no lamp may stand inside. Empty (min == max == ZERO with
-## _has_avoid false) until avoid_footprint() is called; nothing is skipped in that case.
-var _avoid_min := Vector2.ZERO
-var _avoid_max := Vector2.ZERO
-var _has_avoid := false
+## The rectangles, in world XZ, no lamp may stand inside. Empty until avoid_footprint() is
+## called; nothing is skipped in that case. EACH CALL ADDS ONE MORE RECTANGLE rather than
+## replacing the last one -- see avoid_footprint()'s own comment for why the Palace's own
+## footprint and its door apron are now two separate calls rather than one shape wide enough
+## to cover both (which would also exclude ground on the building's BACK side that no lamp
+## was ever standing on).
+var _avoid_rects: Array[Rect2] = []
 
 
 ## Hand over the region this strip paves and a way to ask the terrain how high it is. Both
@@ -156,20 +160,22 @@ func configure(region: RegionData, ground_sampler: Callable) -> void:
 
 ## A footprint, in world XZ, that no lamp may stand inside or against: `centre_xz` and
 ## `half_extents` (half-width, half-depth) of whatever is standing on the Strip's own
-## ground; today, only Buildings/Palace. PALACE_CLEARANCE is added past those edges on
-## every side. Call before build(), same as configure(); a no-op call is safe (nothing is
-## skipped) so a caller with nothing to avoid can simply not call it.
+## ground -- a building's own walls, or (since the door apron joined this rule) something
+## that only projects past them. PALACE_CLEARANCE is added past those edges on every side.
+## Call before build(), same as configure(); safe to call zero, one or several times, and
+## each call ADDS one more excluded rectangle rather than replacing the last, which is what
+## lets a caller hand over a building's walls and its door apron as two separate rectangles
+## instead of forcing one shape to cover both (see ranch.gd's own two calls for the Palace).
 ##
 ## Not folded into configure() itself: RegionFence's contract, the one configure()
 ## deliberately matches, has no such thing to hand over, and every other region's fence
 ## never needs one. Kept as world-space XZ rather than a Building reference so this file
-## does not have to know what a Building is; ranch.gd reads the Palace's own global_position
-## and width/depth and hands over the rectangle, not the node.
+## does not have to know what a Building is; ranch.gd reads the Palace's own global_position,
+## width, depth and door apron reach straight off the live node and hands over the
+## rectangles, not the node.
 func avoid_footprint(centre_xz: Vector2, half_extents: Vector2) -> void:
 	var pad: Vector2 = half_extents + Vector2(PALACE_CLEARANCE, PALACE_CLEARANCE)
-	_avoid_min = centre_xz - pad
-	_avoid_max = centre_xz + pad
-	_has_avoid = true
+	_avoid_rects.append(Rect2(centre_xz - pad, pad * 2.0))
 
 
 ## WHERE THE SIGN GOES, in the building's own terms. `front_centre` is the middle of the
@@ -242,8 +248,12 @@ func build() -> void:
 		var angle: float = TAU * float(i) / float(LIGHT_COUNT)
 		var x: float = _region.centre.x + cos(angle) * LIGHT_RING_RADIUS
 		var z: float = _region.centre.y + sin(angle) * LIGHT_RING_RADIUS
-		if _has_avoid and x >= _avoid_min.x and x <= _avoid_max.x \
-				and z >= _avoid_min.y and z <= _avoid_max.y:
+		var blocked := false
+		for rect: Rect2 in _avoid_rects:
+			if rect.has_point(Vector2(x, z)):
+				blocked = true
+				break
+		if blocked:
 			continue
 		_lights.append(_lamp("Lamp%d" % i, Vector3(x, _y(x, z), z)))
 	_marquee()

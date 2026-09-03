@@ -742,6 +742,49 @@ func _ready() -> void:
 			palace_out.y = 0.0
 			palace_out = palace_out.normalized() if palace_out.length_squared() > 0.0 \
 				else Vector3(0.0, 0.0, 1.0)
+
+			# THE DOOR APRON JOINED THE FOOTPRINT RULE. A lamp that clears the Palace's own
+			# walls can still stand in the doorway: the apron reaches Building.DOOR_APRON_RUN
+			# past the wall it is built from (see apron_foot_z()), well past
+			# PALACE_CLEARANCE's own 1.5 m margin on its own, and a lamp measured (not
+			# guessed) at four metres from the apron on the shipped map still cleared the
+			# door leaf's own narrow width (door_width, 3.2 m) plus that same margin by 0.41 m
+			# -- a corner a walking player never sees as "clear of the doorway" the way this
+			# rule's name promises. So the rectangle's WIDTH is the building's own width, the
+			# same one the wall rectangle above already uses, rather than the door leaf's:
+			# an entrance a player walks up to reads as wide as the building it is set into,
+			# not as the leaf hung inside the wall. The DEPTH is still the door's own reach,
+			# because that dimension is what the apron actually adds past the wall and
+			# nothing past its own foot needs excluding.
+			#
+			# DERIVED FROM THE LIVE NODE, exactly like the wall rectangle above it, rather
+			# than typed as a second set of world coordinates: near and far reach are
+			# apron_foot_z() and apron_foot_z() minus Building.DOOR_APRON_RUN, put through
+			# the building's own basis, the same two axes palace_out and the marquee's
+			# placement already use, so a re sited or re proportioned Palace moves its own
+			# excluded doorway with it.
+			if palace_building.door_width > 0.001:
+				var palace_right: Vector3 = palace_building.global_transform.basis \
+					* Vector3(1.0, 0.0, 0.0)
+				palace_right.y = 0.0
+				palace_right = palace_right.normalized() if palace_right.length_squared() > 0.0 \
+					else Vector3(1.0, 0.0, 0.0)
+				var apron_far: float = palace_building.apron_foot_z()
+				var apron_near: float = apron_far - BuildingScript.DOOR_APRON_RUN
+				var half_door: float = palace_building.width * 0.5
+				var apron_min := Vector2(INF, INF)
+				var apron_max := Vector2(-INF, -INF)
+				for lx in [-half_door, half_door]:
+					for lz in [apron_near, apron_far]:
+						var corner: Vector3 = palace_building.global_position \
+							+ palace_right * lx + palace_out * lz
+						apron_min.x = minf(apron_min.x, corner.x)
+						apron_min.y = minf(apron_min.y, corner.z)
+						apron_max.x = maxf(apron_max.x, corner.x)
+						apron_max.y = maxf(apron_max.y, corner.z)
+				strip.avoid_footprint((apron_min + apron_max) * 0.5,
+					(apron_max - apron_min) * 0.5)
+
 			strip.mount_marquee(
 				palace_building.global_position
 					+ palace_out * (palace_building.depth * 0.5),
@@ -4513,29 +4556,65 @@ func _report(pony_count: int, prop_count: int) -> void:
 	_set_check(checks, "the Palace stands on ground flat enough to seat it",
 		palace != null and palace_relief <= PALACE_MAX_RELIEF)
 
-	# THE LIGHT RING CLEARS THE PALACE. game/world/strip.gd's avoid_footprint() is what
-	# skips a lamp that would otherwise stand inside or against the building (the ring is
-	# centred on the region, not on the Palace, which sits off centre; see
-	# PALACE_MAX_RELIEF's comment above, so one ring position falls inside its footprint
-	# without it). This re-checks that work independently, against the Palace's own live
-	# position, so a later re-siting of either the Palace or the ring cannot silently let a
-	# lamp back into the wall.
+	# THE LIGHT RING CLEARS THE PALACE, ITS WALL AND ITS DOOR APRON BOTH.
+	# game/world/strip.gd's avoid_footprint() is what skips a lamp that would otherwise stand
+	# inside the building or inside its doorway (the ring is centred on the region, not on
+	# the Palace, which sits off centre; see PALACE_MAX_RELIEF's comment above, so one ring
+	# position falls inside its footprint without it -- and a second clears the wall but
+	# stands inside the door apron reaching Building.DOOR_APRON_RUN past it, a lamp four
+	# metres off the door leaf's own centreline on the shipped map, found in the look pass's
+	# own review: a lamp cannot stand in the doorway). This re-checks BOTH independently,
+	# against the Palace's own live position, so a later re-siting of either the Palace or
+	# the ring cannot silently let a lamp back into the wall or the doorway.
 	var lamps_clear := true
 	var lamp_count := 0
-	if strip != null and palace != null:
-		var p_at: Vector3 = palace.global_position
+	var palace_building_check: Building = palace as BuildingScript
+	if strip != null and palace_building_check != null:
+		var p_at: Vector3 = palace_building_check.global_position
 		var margin: float = StripScript.PALACE_CLEARANCE
-		var p_min := Vector2(p_at.x - 7.0 - margin, p_at.z - 4.5 - margin)
-		var p_max := Vector2(p_at.x + 7.0 + margin, p_at.z + 4.5 + margin)
+		var half_w: float = palace_building_check.width * 0.5
+		var p_min := Vector2(p_at.x - half_w - margin, p_at.z - palace_building_check.depth * 0.5 - margin)
+		var p_max := Vector2(p_at.x + half_w + margin, p_at.z + palace_building_check.depth * 0.5 + margin)
+		# The apron rectangle, re-derived independently of ranch.gd's own build-time
+		# computation above, the same way the wall rectangle already is: empty (a_max never
+		# exceeding a_min) if the Palace has no door.
+		var a_min := Vector2(INF, INF)
+		var a_max := Vector2(-INF, -INF)
+		if palace_building_check.door_width > 0.001:
+			var out_dir: Vector3 = palace_building_check.global_transform.basis \
+				* Vector3(0.0, 0.0, 1.0)
+			out_dir.y = 0.0
+			out_dir = out_dir.normalized() if out_dir.length_squared() > 0.0 \
+				else Vector3(0.0, 0.0, 1.0)
+			var right_dir: Vector3 = palace_building_check.global_transform.basis \
+				* Vector3(1.0, 0.0, 0.0)
+			right_dir.y = 0.0
+			right_dir = right_dir.normalized() if right_dir.length_squared() > 0.0 \
+				else Vector3(1.0, 0.0, 0.0)
+			var far: float = palace_building_check.apron_foot_z()
+			var near: float = far - BuildingScript.DOOR_APRON_RUN
+			for lx in [-half_w, half_w]:
+				for lz in [near, far]:
+					var corner: Vector3 = p_at + right_dir * lx + out_dir * lz
+					a_min.x = minf(a_min.x, corner.x)
+					a_min.y = minf(a_min.y, corner.z)
+					a_max.x = maxf(a_max.x, corner.x)
+					a_max.y = maxf(a_max.y, corner.z)
+			a_min -= Vector2(margin, margin)
+			a_max += Vector2(margin, margin)
 		var positions: Array[Vector3] = (strip as StripScript).light_positions()
 		lamp_count = positions.size()
 		for pos: Vector3 in positions:
-			if pos.x >= p_min.x and pos.x <= p_max.x and pos.z >= p_min.y and pos.z <= p_max.y:
+			var in_wall := pos.x >= p_min.x and pos.x <= p_max.x \
+				and pos.z >= p_min.y and pos.z <= p_max.y
+			var in_apron := a_max.x > a_min.x and pos.x >= a_min.x and pos.x <= a_max.x \
+				and pos.z >= a_min.y and pos.z <= a_max.y
+			if in_wall or in_apron:
 				lamps_clear = false
 				push_error(("ranch: a Strip lamp at (%.1f, %.1f) stands within its own " +
-					"%.1f m margin of the Palace") % [pos.x, pos.z, margin])
+					"%.1f m margin of the Palace or its door apron") % [pos.x, pos.z, margin])
 	print("RANCH strip lamps=%d clear=%s" % [lamp_count, lamps_clear])
-	_set_check(checks, "every Strip lamp clears the Palace footprint by its own margin",
+	_set_check(checks, "every Strip lamp clears the Palace footprint and its door apron by their own margin",
 		lamps_clear)
 
 	var gate_probe: Dictionary = await _probe_region_gate()

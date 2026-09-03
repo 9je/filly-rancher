@@ -94,15 +94,30 @@ func test_a_footprint_over_a_ring_position_skips_that_lamp_and_no_other() -> voi
 			"lamp at (%.2f, %.2f) does not clear the footprint by PALACE_CLEARANCE" % [pos.x, pos.z])
 
 
-## The regression this whole file exists for: built with the SHIPPED region geometry and
-## the SHIPPED Palace footprint (game/world/ranch.tscn's Buildings/Palace transform and
-## Building width/depth, restated here as literals because this file does not load .tscn),
-## no lamp stands inside or against the wall.
-func test_the_shipped_palace_footprint_costs_exactly_one_lamp() -> void:
+## The regression this whole file exists for: built with the SHIPPED region geometry, the
+## SHIPPED Palace footprint AND its door apron (game/world/ranch.tscn's Buildings/Palace
+## transform, Building width/depth/door_width and DOOR_APRON_RUN, restated here as literals
+## because this file does not load .tscn or building.gd), no lamp stands inside or against
+## the wall OR inside the doorway the apron reaches out into.
+##
+## THE APRON RECTANGLE, SPELLED OUT, because ranch.gd derives it rather than typing it and
+## this file cannot follow that derivation without loading building.gd. Centre (-10, 55.76)
+## is the Palace's own X (-10, the same centre the wall rectangle above uses) and the
+## midpoint, in world Z, between the apron's near and far reach measured along the
+## Palace's own local +Z (apron_foot_z() - DOOR_APRON_RUN = 4.44, and apron_foot_z() = 7.24)
+## -- which the shipped Palace's half turn points at world minus Z, so
+## 61.6 - (4.44 + 7.24) / 2 = 55.76. Half extents are the BUILDING's own half width (7.0, the
+## same half width the wall rectangle uses) by half of DOOR_APRON_RUN (1.4) -- the width is
+## deliberately the building's, not the door leaf's own half width (1.6): a lamp reviewed on
+## the shipped map stood four metres off the door leaf's own centreline, clearing a
+## leaf-width rectangle by 0.41 m while still standing in the doorway a walking player sees.
+func test_the_shipped_palace_footprint_and_apron_cost_exactly_two_lamps() -> void:
 	var s := _strip()
 	s.avoid_footprint(Vector2(-10.0, 61.6), Vector2(7.0, 4.5))
+	s.avoid_footprint(Vector2(-10.0, 55.76), Vector2(7.0, 1.4))
 	s.build()
-	assert_eq(s.light_count(), 9, "the shipped Palace sits on exactly one of the ten ring spots")
+	assert_eq(s.light_count(), 8,
+		"the shipped Palace's wall and its door apron together cost two of the ten ring spots -- a lamp cannot stand in the doorway")
 
 
 func test_avoid_footprint_called_after_build_has_no_effect_on_an_idempotent_second_build() -> void:
@@ -185,9 +200,9 @@ func test_the_marquee_letters_turn_with_the_board() -> void:
 
 
 ## THE BULB RAIL IS NOT A LAMP POST. light_count() answers how many lamp posts are standing on
-## the ring; this file already pins that at LIGHT_COUNT minus the one skipped clear of the
-## Palace, and a bulb rail counted among them would break that check for a reason that has
-## nothing to do with lamp posts.
+## the ring; this file already pins that at LIGHT_COUNT minus the two skipped clear of the
+## Palace (its wall, and since the look pass its door apron), and a bulb rail counted among
+## them would break that check for a reason that has nothing to do with lamp posts.
 func test_the_marquee_bulbs_and_wash_are_not_counted_among_the_lamp_posts() -> void:
 	var strip: Strip = _built_strip()
 	assert_not_null(strip.get_node_or_null(^"MarqueeBulbs"))
@@ -195,7 +210,7 @@ func test_the_marquee_bulbs_and_wash_are_not_counted_among_the_lamp_posts() -> v
 	assert_eq(strip.marquee_bulb_count(), StripScript.MARQUEE_BULBS)
 	# _built_strip() calls no avoid_footprint(), so all ten ring positions stand: the claim
 	# here is only that ten bulbs did not become twenty lamps. The shipped Palace's own
-	# "LIGHT_COUNT minus one" case is pinned by this file's existing avoidance tests, which
+	# "LIGHT_COUNT minus two" case is pinned by this file's existing avoidance tests, which
 	# are untouched.
 	assert_eq(strip.light_count(), StripScript.LIGHT_COUNT,
 		"a bulb rail is not a lamp post and must not be counted as one")
