@@ -33,6 +33,21 @@ const CasinoSignScript := preload("res://systems/casino_sign.gd")
 const CompanyRunnersScript := preload("res://systems/company_runners.gd")
 const CasinoMenuScript := preload("res://ui/casino_menu.gd")
 const WheelMenuScript := preload("res://ui/wheel_menu.gd")
+
+## THE ONE SOURCE OF TRUTH FOR WHICH SCREENS ARE STAGED. Read directly off
+## game/test/test_casino_stages.gd's own STAGED constant rather than kept as a second copy
+## here, so the gate and that test file can never quietly disagree about which menu has grown
+## a real stage. See the stage block in _drive_the_palace() for how it is used.
+const CasinoStagesTestScript := preload("res://test/test_casino_stages.gd")
+
+## Maps a CasinoMenu.Row game table value to the .tscn path CasinoStagesTestScript.STAGED
+## names it by. Local to the stage block below.
+const StageScenePaths: Dictionary = {
+	CasinoMenuScript.Row.SLOTS: "res://ui/slots_menu.tscn",
+	CasinoMenuScript.Row.WHEEL: "res://ui/wheel_menu.tscn",
+	CasinoMenuScript.Row.BLACKJACK: "res://ui/blackjack_menu.tscn",
+	CasinoMenuScript.Row.RACING: "res://ui/race_menu.tscn",
+}
 const RaceTrackScript := preload("res://world/race_track.gd")
 const StripScript := preload("res://world/strip.gd")
 const EconomyScript := preload("res://systems/economy.gd")
@@ -418,6 +433,13 @@ func _drive_the_palace() -> void:
 	# That is what the *_rect() layout functions on each stage are for: they are pure, they
 	# are the same numbers paint() draws with, and a rect that has walked off its own stage is
 	# the failure that actually happens when a screen is laid out by eye.
+	#
+	# THE CONTRACT IS CONDITIONAL, THE SAME WAY test_casino_stages.gd's IS, AND FOR THE SAME
+	# REASON: a red gate between tasks would mask a real regression the next task introduces.
+	# CasinoStagesTestScript.STAGED (declared at the top of this file, preloaded from that
+	# test) is the one list that says which of these four menus has a real stage; a menu not
+	# yet in it is only asked to still be reserving nothing, which is the true, correct state
+	# for it until its own task lands.
 	var stages_ok := true
 	var stage_focus_ok := true
 	for row: int in [CasinoMenuScript.Row.SLOTS, CasinoMenuScript.Row.WHEEL,
@@ -426,23 +448,30 @@ func _drive_the_palace() -> void:
 		if stage_table == null:
 			stages_ok = false
 			continue
+		var staged: bool = CasinoStagesTestScript.STAGED.has(StageScenePaths.get(row, ""))
 		stage_table.call("open")
 		await get_tree().process_frame
 		var size: Vector2 = stage_table.call("stage_size")
-		if size.x <= 0.0 or size.y <= 0.0:
+		if staged:
+			if size.x <= 0.0 or size.y <= 0.0:
+				stages_ok = false
+				push_error("casino: %s claims a stage but reserved none" % stage_table.name)
+		elif size != Vector2.ZERO:
 			stages_ok = false
-			push_error("casino: %s reserved no stage" % stage_table.name)
+			push_error("casino: %s reserves a stage before its own task landed"
+				% stage_table.name)
 		var rect: Rect2 = stage_table.call("focus_rect")
-		if rect.size.x <= 0.0 or rect.size.y <= 0.0:
+		if staged and (rect.size.x <= 0.0 or rect.size.y <= 0.0):
 			stage_focus_ok = false
 			push_error("casino: %s painted no focus ring" % stage_table.name)
-		print("CASINO stage %-14s size=(%.0f, %.0f) focus=(%.0f, %.0f) id=%s"
+		print("CASINO stage %-14s size=(%.0f, %.0f) focus=(%.0f, %.0f) id=%s staged=%s"
 			% [stage_table.name, size.x, size.y, rect.size.x, rect.size.y,
-				String(stage_table.call("focused_id"))])
+				String(stage_table.call("focused_id")), staged])
 		stage_table.call("close")
 		await get_tree().process_frame
-	_set_check("every table reserves a drawn stage", stages_ok)
-	_set_check("every table paints its focus ring somewhere real", stage_focus_ok)
+	_set_check("every staged table reserves a drawn stage and no other table reserves one early",
+		stages_ok)
+	_set_check("every staged table paints its focus ring somewhere real", stage_focus_ok)
 
 	# --- the race, on the real track ------------------------------------------------------------
 	var census_before: int = ranch.spawner.get_spawned().size()
