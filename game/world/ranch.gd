@@ -342,6 +342,15 @@ const ATTENDANT_CLEARANCE := AttendantScript.BODY_RADIUS + 0.10
 const VENDOR_LOOK := {"coat": 2, "mane": 5, "eyes": 1, "mane_style": 1}
 const TELLER_LOOK := {"coat": 6, "mane": 0, "eyes": 3, "mane_style": 3}
 
+## THE SILKS A NAMED PONY RUNS IN. game/systems/pony_data.gd carries no coat and no mane
+## colour: a named character's look is her MODEL and her skin texture, and there is no Color
+## anywhere on her record to read. A stock pony has three palette indices and therefore two
+## real colours; a named one has none, so she runs in the Palace's own two rather than in a
+## colour somebody guessed for her. She is also the pony the form guide can already tell
+## apart, because she has a name and a stock pony does not.
+const NAMED_COAT := Color(0.86, 0.84, 0.90)
+const NAMED_MANE := Color(0.36, 0.16, 0.42)
+
 ## Plot slots the map must carry -- the plan asks for four to six, and the reserved
 ## clearing (PropsScript.PEN_PLOTS_*) is an 18 m square, which fits four 7.8 m pens on a
 ## 9 m grid with room to walk between them. A range rather than an exact number so a later
@@ -1710,12 +1719,25 @@ func race_entrants() -> Array[Dictionary]:
 				RaceCardScript.entrant_from(inst), runners)
 			_quoted_fields[inst.uid] = field
 			var chances: Array[float] = RaceCardScript.win_chances(field)
+			# HER COLOURS, FOR THE FORM GUIDE'S SILKS SWATCH, AND NOTHING ELSE. Resolved here and
+			# not in the menu, for the reason race_menu.gd's class comment gives: the menu never
+			# sees a PonyInstance, never reads a pen and cannot compute anything. Two Colors in a
+			# row dictionary is data, the same way "odds" and "chance" already are.
+			var coat: Color = NAMED_COAT
+			var mane: Color = NAMED_MANE
+			if inst.is_stock():
+				if _stock_palette == null:
+					_stock_palette = StockPaletteScript.load_stock()
+				coat = _stock_palette.coat_at(int(inst.stock.get("coat", 0)))
+				mane = _stock_palette.mane_at(int(inst.stock.get("mane", 0)))
 			out.append({
 				"uid": inst.uid,
 				"name": inst.display_name(),
 				"happiness": inst.happiness,
 				"odds": RaceCardScript.decimal_odds(field, RaceCardScript.PLAYER_LANE),
 				"chance": chances[RaceCardScript.PLAYER_LANE] if not chances.is_empty() else 0.0,
+				"coat": coat,
+				"mane": mane,
 			})
 	return out
 

@@ -64,6 +64,24 @@ const TITLE := "Spectra Palace"
 ## The amounts the cage offers before they are cut down to what she is holding.
 const CAGE_STEPS: Array[int] = [100, 500, 2000, 10000]
 
+## PaintScript is NOT re-declared here: the class comment above already carries it, and
+## GDScript refuses a const that shadows one already declared on this same class.
+const CasinoScript := preload("res://systems/casino.gd")
+
+# --- the floor plan, in stage local pixels ----------------------------------------------------
+const STAGE_HEIGHT := 510.0
+const WALLET := Rect2(20.0, 8.0, 1080.0, 54.0)
+const TILE_SIZE := Vector2(340.0, 200.0)
+const TILE_ORIGIN := Vector2(30.0, 80.0)
+const TILE_PITCH := Vector2(360.0, 216.0)
+const TILE_ART_HEIGHT := 120.0
+const RULES_PAGE := Rect2(40.0, 80.0, 1040.0, 410.0)
+const EXCHANGE := Rect2(40.0, 80.0, 1040.0, 130.0)
+const CAGE_ROW_ORIGIN := Vector2(60.0, 240.0)
+const CAGE_ROW_SIZE := Vector2(500.0, 52.0)
+const CAGE_ROW_PITCH := 60.0
+const CAGE_ROWS_PER_COLUMN := 4
+
 signal opened()
 signal closed()
 signal buy_chips_requested(bits: int)
@@ -305,16 +323,30 @@ func anim_time() -> float:
 	return _anim_t
 
 
-## What this screen paints. Overridden by the lobby's own stage; the base paints nothing,
-## which is the right answer for a screen that has no stage yet.
-func paint(_ci: Control) -> void:
-	pass
-
-
-## THE SIZE THE STAGE NODE RESERVES. Overridden per screen; a screen with no stage reserves
-## nothing and its column closes over the gap.
 func stage_size() -> Vector2:
-	return Vector2.ZERO
+	return Vector2(STAGE_WIDTH, STAGE_HEIGHT)
+
+
+func tile_rect(index: int) -> Rect2:
+	var lift: float = 6.0 if (index == _selected and _tab == Tab.LOBBY) else 0.0
+	return Rect2(TILE_ORIGIN + Vector2(TILE_PITCH.x * float(index % 3),
+		TILE_PITCH.y * float(index / 3)) - Vector2(0.0, lift), TILE_SIZE)
+
+
+func wallet_rect() -> Rect2:
+	return WALLET
+
+
+func rules_rect() -> Rect2:
+	return RULES_PAGE
+
+
+## The cage's rows are the buys followed by the cashes, drawn as one list in two columns
+## because the player is standing at one window. confirm()'s index arithmetic is unchanged.
+func cage_row_rect(index: int) -> Rect2:
+	return Rect2(CAGE_ROW_ORIGIN + Vector2(
+		(CAGE_ROW_SIZE.x + 20.0) * float(index / CAGE_ROWS_PER_COLUMN),
+		CAGE_ROW_PITCH * float(index % CAGE_ROWS_PER_COLUMN)), CAGE_ROW_SIZE)
 
 
 ## Whether an animation is running RIGHT NOW, as opposed to the idle breath. While this is
@@ -325,39 +357,146 @@ func animating() -> bool:
 	return false
 
 
-## THE LINES THE Rows VBOX ACTUALLY PRINTS. drawn_lines() stays the whole text model of the
-## screen and is what the tests and game/test/test_published_payouts.gd read; a screen whose
-## stage already SHOWS a line overrides this to leave it out of the column, so the panel does
-## not say the same thing twice.
+## THE STAGE SHOWS EVERY LOBBY ROW AND EVERY CAGE ROW, so the column under it keeps only the
+## cage's three line explainer. drawn_lines() is unchanged and still returns all of it.
 func printed_lines() -> Array[String]:
-	return drawn_lines()
+	if _tab != Tab.CAGE:
+		return [] as Array[String]
+	var lines: Array[String] = []
+	for line in CasinoSignScript.cage_explainer():
+		lines.append(line)
+	return lines
 
 
-## WHERE THE FOCUS RING WAS LAST ACTUALLY PAINTED, in VIEWPORT coordinates, and what it was
-## painted on. For the caret test, which must keep asking the DRAWING where the cursor is
-## rather than asking the number; see game/test/test_table_caret.gd for the defect that rule
-## exists for.
-##
-## VIEWPORT AND NOT STAGE LOCAL, because the answer can come from either of two coordinate
-## spaces: a stage computes its rects in its own, and a screen with no stage yet reports the
-## row PanelContainer refresh() marked, which is in the Rows column's. A caller that had to
-## know which one it was looking at is a caller that can be wrong.
 func focus_rect() -> Rect2:
-	for holder in _rows.get_children():
-		if holder.is_queued_for_deletion():
-			continue
-		var panel := holder as PanelContainer
-		if panel == null:
-			continue
-		for child in panel.get_children():
-			var label := child as Label
-			if label != null and label.text.begins_with(MenuStyleScript.CARET):
-				return panel.get_global_rect()
+	match _tab:
+		Tab.LOBBY:
+			return to_viewport(tile_rect(clampi(_selected, 0, LOBBY_ROWS.size() - 1)))
+		Tab.CAGE:
+			if _row_count() <= 0:
+				return Rect2()
+			return to_viewport(cage_row_rect(clampi(_selected, 0, _row_count() - 1)))
 	return Rect2()
 
 
 func focused_id() -> StringName:
-	return StringName("row:%d" % _selected) if _row_count() > 0 else &""
+	match _tab:
+		Tab.LOBBY:
+			return StringName("tile:%d" % clampi(_selected, 0, LOBBY_ROWS.size() - 1))
+		Tab.CAGE:
+			if _row_count() <= 0:
+				return &""
+			return StringName("cage:%d" % clampi(_selected, 0, _row_count() - 1))
+	return &""
+
+
+func paint(ci: Control) -> void:
+	var font: Font = ThemeDB.fallback_font
+	var t: float = anim_time()
+
+	# --- the wallet strip, on every page of the building ---------------------------------------
+	# What she is holding, continuously, and the two side by side is what makes "one for one"
+	# mean something. header_line() keeps returning its sentence for drawn_lines().
+	PaintScript.rounded(ci, WALLET, 12.0, Color(PaintScript.PLUM_DARK, 0.9),
+		PaintScript.GOLD_DIM, 2.0)
+	var bits: int = int(bits_provider.call()) if bits_provider.is_valid() else 0
+	var chips: int = int(chips_provider.call()) if chips_provider.is_valid() else 0
+	PaintScript.draw_bit(ci, Rect2(WALLET.position + Vector2(18.0, 15.0), Vector2(24.0, 24.0)))
+	PaintScript.text(ci, MenuStyleScript.numeral_font(),
+		WALLET.position + Vector2(52.0, 37.0), "%d bits" % bits, MenuStyleScript.ROW_SIZE,
+		PaintScript.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1.0)
+	PaintScript.draw_chip_icon(ci,
+		Rect2(WALLET.position + Vector2(200.0, 15.0), Vector2(24.0, 24.0)))
+	PaintScript.text(ci, MenuStyleScript.numeral_font(),
+		WALLET.position + Vector2(234.0, 37.0), "%d chips" % chips, MenuStyleScript.ROW_SIZE,
+		PaintScript.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1.0)
+	PaintScript.text(ci, font, WALLET.position + Vector2(400.0, 37.0),
+		"one for one at the cage", MenuStyleScript.SUBTITLE_SIZE, MenuStyleScript.COLOR_DIM,
+		HORIZONTAL_ALIGNMENT_LEFT, -1.0)
+	MenuStyleScript.rule(ci, Vector2(20.0, 70.0), Vector2(STAGE_WIDTH - 20.0, 70.0))
+
+	match _tab:
+		Tab.LOBBY:
+			for i: int in LOBBY_ROWS.size():
+				var tile: Rect2 = tile_rect(i)
+				var picked: bool = i == _selected
+				PaintScript.rounded(ci, tile, 14.0,
+					Color(PaintScript.PLUM_DARK, 1.0 if picked else 0.74),
+					PaintScript.GOLD if picked else PaintScript.GOLD_DIM, 2.0)
+				PaintScript.draw_room(ci, Rect2(tile.position + Vector2(16.0, 10.0),
+					Vector2(tile.size.x - 32.0, TILE_ART_HEIGHT)), i)
+				# SPLIT AT THE COLON OF ITS OWN LOBBY_ROWS ENTRY. The six strings are not
+				# rewritten: game/test/test_casino_menu.gd and the no dash sweeps read them,
+				# and the wording is already good.
+				var halves: PackedStringArray = LOBBY_ROWS[i].split(": ", true, 1)
+				PaintScript.text(ci, MenuStyleScript.title_font(),
+					tile.position + Vector2(18.0, TILE_ART_HEIGHT + 44.0), halves[0], 26,
+					MenuStyleScript.COLOR_TITLE, HORIZONTAL_ALIGNMENT_LEFT, tile.size.x - 36.0)
+				if halves.size() > 1:
+					PaintScript.text(ci, font,
+						tile.position + Vector2(18.0, TILE_ART_HEIGHT + 72.0), halves[1],
+						MenuStyleScript.SUBTITLE_SIZE, MenuStyleScript.COLOR_DIM,
+						HORIZONTAL_ALIGNMENT_LEFT, tile.size.x - 36.0)
+				if picked:
+					PaintScript.focus_ring(ci, tile, 14.0, t)
+		Tab.CAGE:
+			PaintScript.rounded(ci, EXCHANGE, 12.0, Color(PaintScript.FELT_DARK, 0.85),
+				PaintScript.GOLD_DIM, 2.0)
+			PaintScript.chip_stack(ci, EXCHANGE.position + Vector2(140.0, 104.0), 5,
+				PaintScript.GOLD, 9.0)
+			PaintScript.chip_stack(ci, EXCHANGE.position + Vector2(900.0, 104.0), 5,
+				PaintScript.CHIP_COLORS[1], 9.0)
+			for direction: float in [-1.0, 1.0]:
+				var y: float = EXCHANGE.position.y + 62.0
+				ci.draw_line(Vector2(EXCHANGE.position.x + 240.0, y),
+					Vector2(EXCHANGE.position.x + 800.0, y), PaintScript.GOLD, 3.0, true)
+				var tip_x: float = EXCHANGE.position.x + (800.0 if direction > 0.0 else 240.0)
+				ci.draw_colored_polygon(PackedVector2Array([
+					Vector2(tip_x + 18.0 * direction, y),
+					Vector2(tip_x, y - 12.0), Vector2(tip_x, y + 12.0)]), PaintScript.GOLD)
+			PaintScript.text(ci, MenuStyleScript.numeral_font(),
+				EXCHANGE.position + Vector2(520.0, 48.0),
+				"%d for %d" % [CasinoScript.CHIP_RATE, CasinoScript.CHIP_RATE],
+				MenuStyleScript.ROW_SIZE, PaintScript.GOLD, HORIZONTAL_ALIGNMENT_CENTER, -1.0)
+			var buys: Array[int] = buy_amounts()
+			var cashes: Array[int] = cash_amounts()
+			var index := 0
+			for amount: int in buys:
+				_paint_cage_row(ci, font, index, "Buy %d chips for %d bits" % [amount, amount],
+					PaintScript.CHIP_COLORS[1], t)
+				index += 1
+			for amount: int in cashes:
+				_paint_cage_row(ci, font, index,
+					"Cash out %d chips for %d bits" % [amount, amount], PaintScript.GOLD, t)
+				index += 1
+			if buys.is_empty() and cashes.is_empty():
+				PaintScript.text(ci, font, CAGE_ROW_ORIGIN + Vector2(0.0, 34.0),
+					"Come back when you have something to play with.",
+					MenuStyleScript.ROW_SIZE, MenuStyleScript.COLOR_DIM,
+					HORIZONTAL_ALIGNMENT_LEFT, -1.0)
+		Tab.RULES:
+			# THE PUBLISHED EDGES LIVE HERE NOW. sign_provider is ranch.gd's own lambda over
+			# CasinoSign.lines(), which asks each game for its real number; nothing about that
+			# promise changed when the board outside stopped being a paragraph in the air.
+			var rules: Array[String] = []
+			if sign_provider.is_valid():
+				for line in sign_provider.call():
+					rules.append(String(line))
+			PaintScript.plate(ci, RULES_PAGE, font, "", rules)
+
+
+func _paint_cage_row(ci: Control, font: Font, index: int, label: String, colour: Color,
+		t: float) -> void:
+	var rect: Rect2 = cage_row_rect(index)
+	var picked: bool = index == _selected
+	PaintScript.rounded(ci, rect, 8.0, Color(PaintScript.FELT_DARK, 0.8),
+		PaintScript.GOLD_DIM, 1.0)
+	PaintScript.chip(ci, rect.position + Vector2(30.0, rect.size.y * 0.5), 18.0, colour, false)
+	PaintScript.text(ci, font, rect.position + Vector2(62.0, 34.0), label,
+		MenuStyleScript.ROW_SIZE, MenuStyleScript.COLOR_NAME, HORIZONTAL_ALIGNMENT_LEFT,
+		rect.size.x - 80.0)
+	if picked:
+		PaintScript.focus_ring(ci, rect, 8.0, t)
 
 
 ## The stage's own rect in viewport coordinates, so a stage can hand a local rect back out

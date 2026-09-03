@@ -461,7 +461,14 @@ func _drive_the_palace() -> void:
 			push_error("casino: %s reserves a stage before its own task landed"
 				% stage_table.name)
 		var rect: Rect2 = stage_table.call("focus_rect")
-		if staged and (rect.size.x <= 0.0 or rect.size.y <= 0.0):
+		# HAS ANYTHING TO FOCUS. Every table but the race guide always has a stake row, so
+		# row_count() is always > 0 for them and this changes nothing about their check. The
+		# race guide is checked here with nobody yet in a pen (the pony this gate races is not
+		# entered until further down), so row_count() is legitimately 0 and focus_rect()'s own
+		# empty Rect2() is the correct answer for a screen with no cursor to draw, the same
+		# principle CasinoMenu's own tabs with zero rows already follow.
+		var has_rows: bool = int(stage_table.call("row_count")) > 0
+		if staged and has_rows and (rect.size.x <= 0.0 or rect.size.y <= 0.0):
 			stage_focus_ok = false
 			push_error("casino: %s painted no focus ring" % stage_table.name)
 		print("CASINO stage %-14s size=(%.0f, %.0f) focus=(%.0f, %.0f) id=%s staged=%s"
@@ -472,6 +479,17 @@ func _drive_the_palace() -> void:
 	_set_check("every staged table reserves a drawn stage and no other table reserves one early",
 		stages_ok)
 	_set_check("every staged table paints its focus ring somewhere real", stage_focus_ok)
+
+	var lobby_stage: CanvasLayer = ranch.get_casino_menu()
+	if lobby_stage != null:
+		lobby_stage.call("open")
+		await get_tree().process_frame
+		var lobby_size: Vector2 = lobby_stage.call("stage_size")
+		_set_check("the lobby draws a floor plan rather than a list",
+			lobby_size.x > 0.0 and lobby_size.y > 0.0
+				and String(lobby_stage.call("focused_id")) == "tile:0")
+		lobby_stage.call("close")
+		await get_tree().process_frame
 
 	# --- the race, on the real track ------------------------------------------------------------
 	var census_before: int = ranch.spawner.get_spawned().size()

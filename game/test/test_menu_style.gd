@@ -109,14 +109,20 @@ func test_every_styled_label_gets_the_outline_that_makes_it_readable() -> void:
 ## THE PANELS THEMSELVES, not just the helper: every menu that draws a row draws it through
 ## style_label(), so opening one and reading a Label straight off it is the check that the
 ## inheritance is real rather than merely available.
+##
+## THE CAGE TAB, NOT THE LOBBY. Phase 3 polish moved the lobby's six rows onto its own drawn
+## stage (CasinoMenu.paint()'s LOBBY case), so the Rows VBox column is empty on that tab now;
+## the cage still prints its three line explainer into that same column
+## (CasinoMenu.printed_lines()'s CAGE case), which is what this test needs a real row from.
 func test_a_real_panel_draws_its_rows_with_the_outline() -> void:
 	var menu: CasinoMenu = load("res://ui/casino_menu.tscn").instantiate()
 	add_child_autofree(menu)
 	menu.bits_provider = func() -> int: return 500
 	menu.chips_provider = func() -> int: return 0
 	assert_true(menu.open())
+	menu.set_tab(CasinoMenu.Tab.CAGE)
 	var rows := menu.get_node(^"Centre/Panel/Margin/Column/Rows") as VBoxContainer
-	assert_gt(rows.get_child_count(), 0, "the lobby drew rows to check")
+	assert_gt(rows.get_child_count(), 0, "the cage drew rows to check")
 	var holder := rows.get_child(0) as PanelContainer
 	assert_not_null(holder)
 	var row := holder.get_child(0) as Label
