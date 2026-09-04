@@ -90,6 +90,7 @@ func open() -> bool:
 	visible = true
 	refresh()
 	opened.emit()
+	MenuStyleScript.tick_open()
 	return true
 
 
@@ -100,6 +101,7 @@ func close() -> void:
 	_cancel_confirm()
 	visible = false
 	closed.emit()
+	MenuStyleScript.tick_back()
 
 
 func is_open() -> bool:
@@ -119,6 +121,7 @@ func set_tab(value: int) -> void:
 
 func switch_tab(step: int) -> void:
 	set_tab(posmod(_tab + step, Tab.STATEMENT + 1))
+	MenuStyleScript.tick_page()
 
 
 func selected_index() -> int:
@@ -132,6 +135,7 @@ func move_selection(step: int) -> void:
 		return
 	_selected = posmod(_selected + step, n)
 	refresh()
+	MenuStyleScript.tick_move()
 
 
 ## The pens, as the Deliver tab shows them: stock first, then named, each with her credit.

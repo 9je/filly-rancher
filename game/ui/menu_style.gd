@@ -243,3 +243,69 @@ static func rule(ci: CanvasItem, from: Vector2, to: Vector2) -> void:
 	ci.draw_line(from, mid_a, faded, 2.0, true)
 	ci.draw_line(mid_a, mid_b, bright, 2.0, true)
 	ci.draw_line(mid_b, to, faded, 2.0, true)
+
+
+# --- the menu tick kit --------------------------------------------------------------------
+#
+# THE ONE PLACE THAT DECIDES WHAT A MENU SOUNDS LIKE. Nine files under game/ui/ call these
+# six functions and none of them names a sound id, a level or a bus. Changing the character
+# of every menu in the game is changing six lines here.
+#
+# THESE ARE THE ONLY AUDIO CALLS ALLOWED UNDER game/ui/ THAT NAME AN ID. A menu calls
+# MenuStyle.tick_move(); it never calls Sound.play(&"ui_move") itself. The RNG rule is
+# untouched either way: every variation decision is made inside game/systems/sound.gd.
+
+const SoundScript := preload("res://systems/sound.gd")
+
+
+## THE BARE `Sound` IDENTIFIER FAILS THE PARSE SWEEP HERE. tools/run_tests.sh parses every
+## script through Godot's check-only, script-only pass, which loads project.godot's
+## autoload list but never boots a SceneTree, so an autoload's global name resolves to
+## nothing there (see game/test/test_sound.gd's own comment on the same limitation;
+## verified directly: a bare `Sound.play()` added to this file raised "Identifier not
+## found: Sound" under that pass, though it runs fine in the game or under GUT). A test
+## script can shadow the name with `get_node()` inside a method body; a static function has
+## no `self` and no instance to call `get_node()` on, so this goes through the active
+## SceneTree instead. `Engine` is a builtin singleton, not an autoload, so it resolves on
+## both passes. The two guards mirror game/actors/player/magic_beam.gd's own `_sound_call`:
+## no loop (that parse pass, or a tool script run outside the game) and no `Sound` node
+## registered (a bare test fixture) both fall through as a silent no-op rather than an
+## error.
+static func _sound_call(method: StringName, args: Array) -> void:
+	var loop: MainLoop = Engine.get_main_loop()
+	if loop == null or not (loop is SceneTree):
+		return
+	var tree: SceneTree = loop as SceneTree
+	var node: Node = tree.root.get_node_or_null(^"/root/Sound")
+	if node != null:
+		node.callv(method, args)
+
+
+## The selection cursor moved.
+static func tick_move() -> void:
+	_sound_call(&"play", [&"ui_move"])
+
+
+## An action was taken.
+static func tick_confirm() -> void:
+	_sound_call(&"play", [&"ui_confirm"])
+
+
+## A panel or a page was left.
+static func tick_back() -> void:
+	_sound_call(&"play", [&"ui_back"])
+
+
+## A panel was opened.
+static func tick_open() -> void:
+	_sound_call(&"play", [&"ui_open"])
+
+
+## An action was refused: a row that cannot be taken, a price she cannot pay.
+static func tick_denied() -> void:
+	_sound_call(&"play", [&"ui_denied"])
+
+
+## A page turned inside a panel that was already open.
+static func tick_page() -> void:
+	_sound_call(&"play", [&"ui_page"])

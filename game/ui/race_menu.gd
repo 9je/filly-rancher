@@ -95,8 +95,10 @@ func set_tab(value: int) -> void:
 func switch_tab(step: int) -> void:
 	if _tab == Tab.ENTER and _on_stake_row():
 		_step_stake(step)
+		MenuStyleScript.tick_page()
 		return
 	set_tab(posmod(_tab + step, Tab.CARD + 1))
+	MenuStyleScript.tick_page()
 
 
 func entrants() -> Array[Dictionary]:
@@ -340,12 +342,17 @@ func confirm() -> bool:
 		return false
 	if _on_stake_row():
 		_step_stake(1)
+		# A stake nudge, not a bet: the same tick a stake shift makes everywhere else on
+		# this table (see switch_tab() and move_selection() on the other tables).
+		MenuStyleScript.tick_move()
 		return true
 	if _selected < 0 or _selected >= list.size():
 		return false
 	if selected_stake() <= 0:
 		return false
 	_entrant = StringName(list[_selected]["uid"])
+	MenuStyleScript.tick_confirm()
+	_sound_call(&"play", [&"chip_clink"])
 	race_requested.emit(_entrant, selected_stake())
 	return true
 

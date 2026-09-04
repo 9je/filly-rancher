@@ -118,8 +118,10 @@ func switch_tab(step: int) -> void:
 		var available: Array[int] = stakes()
 		if not available.is_empty():
 			set_stake_index(posmod(stake_index() + step, available.size()))
+		MenuStyleScript.tick_page()
 		return
 	set_tab(posmod(_tab + step, Tab.NUMBER + 1))
+	MenuStyleScript.tick_page()
 
 
 ## Cycles the guesses and, right after the last one, one more position: the stake. Only
@@ -134,6 +136,7 @@ func move_selection(step: int) -> void:
 	if _selected < guess_count():
 		_guess_row = _selected
 	refresh()
+	MenuStyleScript.tick_move()
 
 
 func tabs_text() -> String:
@@ -190,6 +193,8 @@ func row_count() -> int:
 func confirm() -> bool:
 	if selected_stake() <= 0:
 		return false
+	MenuStyleScript.tick_confirm()
+	_sound_call(&"play", [&"chip_clink"])
 	bet_requested.emit(_tab, selected_guess(), selected_stake())
 	return true
 
@@ -299,7 +304,9 @@ func show_spin(pocket: int, won: int, stake: int) -> void:
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	_tween.tween_property(self, "_glow", 1.0, 0.12)
 	_tween.tween_property(self, "_glow", 0.0, LANDED_GLOW_SECONDS)
-	_tween.tween_callback(func() -> void: _spinning = false)
+	_tween.tween_callback(func() -> void:
+		_spinning = false
+		_sound_call(&"play", [&"wheel_settle"]))
 	# `won` and `stake` are not used to decide anything; they are here so a later slice can
 	# slide the winning chips to the player without changing this call's shape, and so the
 	# signature matches SlotsMenu.show_spin()'s.
@@ -348,6 +355,8 @@ func paint(ci: Control) -> void:
 	if now != _last_pocket:
 		_last_pocket = now
 		_ratchet = 1.0
+		if _spinning:
+			_sound_call(&"play", [&"wheel_ratchet"])
 	_ratchet = maxf(0.0, _ratchet - get_process_delta_time() / RATCHET_SECONDS)
 	var kick: float = deg_to_rad(RATCHET_DEGREES) * _ratchet
 	var tip: Vector2 = WHEEL_CENTRE + Vector2(sin(kick), -cos(kick)) * (WHEEL_OUTER - 6.0)

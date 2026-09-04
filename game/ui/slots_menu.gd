@@ -62,12 +62,21 @@ const SPIN_TURNS := 3
 
 signal spin_requested(stake: int)
 
+## Below this many symbols per second a reel counts as landed. The spin runs at REEL_SPEED
+## and the landing tween eases to a stop, so anything this slow is the settle and not the
+## run.
+const REEL_LANDED_SPEED := 1.2
+
 var _reel_offset: Array[float] = [0.0, 0.0, 0.0]
 var _lever := 0.0
 var _flash := 0.0
 var _shown_chips := 0.0
 var _spinning := false
 var _tween: Tween = null
+
+var _reel_step: Array[int] = [-1, -1, -1]
+var _reel_prev: Array[float] = [0.0, 0.0, 0.0]
+var _reel_landed: Array[bool] = [true, true, true]
 
 
 func title_text() -> String:
@@ -121,11 +130,14 @@ func move_selection(step: int) -> void:
 	if n <= 0:
 		return
 	set_stake_index(posmod(stake_index() + step, n))
+	MenuStyleScript.tick_move()
 
 
 func confirm() -> bool:
 	if _spinning or selected_stake() <= 0:
 		return false
+	MenuStyleScript.tick_confirm()
+	_sound_call(&"play", [&"chip_clink"])
 	spin_requested.emit(selected_stake())
 	return true
 
@@ -136,6 +148,36 @@ func animating() -> bool:
 
 func reel_offset(index: int) -> float:
 	return _reel_offset[clampi(index, 0, SlotsScript.REELS - 1)]
+
+
+## super(delta) FIRST, ALWAYS. TableMenu's own _process is what advances _anim_t and queues
+## the stage redraw; an override that forgot it would leave the whole cabinet's paint frozen
+## the moment this file added one, with no error anywhere to say why.
+func _process(delta: float) -> void:
+	super(delta)
+	_sound_reels(delta)
+
+
+## ONE TICK PER SYMBOL WHILE A REEL RUNS, ONE CLUNK WHEN IT STOPS. Derived from the ribbon
+## position the paint pass already reads, so no timing, no state and no tween changes shape
+## because the machine now makes a noise. THE MATH DOES NOT CHANGE: nothing here touches
+## Slots, the stake, or any generator.
+func _sound_reels(delta: float) -> void:
+	if not is_open() or delta <= 0.0:
+		return
+	for reel: int in SlotsScript.REELS:
+		var offset: float = _reel_offset[reel]
+		var speed: float = absf(offset - _reel_prev[reel]) / delta
+		_reel_prev[reel] = offset
+		if speed > REEL_LANDED_SPEED:
+			_reel_landed[reel] = false
+			var step: int = int(floor(offset))
+			if step != _reel_step[reel]:
+				_reel_step[reel] = step
+				_sound_call(&"play", [&"reel_tick"])
+		elif not _reel_landed[reel]:
+			_reel_landed[reel] = true
+			_sound_call(&"play", [&"reel_stop"])
 
 
 # --- the layout, pure, and the same numbers paint() draws with -------------------------------
@@ -192,6 +234,9 @@ func show_spin(reels: Array[int], won: int, stake: int) -> void:
 	if _tween != null and _tween.is_valid():
 		_tween.kill()
 	_spinning = true
+	for reel: int in SlotsScript.REELS:
+		_reel_prev[reel] = _reel_offset[reel]
+		_reel_landed[reel] = true
 	_flash = 0.0
 	var strip: Array[int] = SlotsScript.strip()
 	# The tween runs on the menu node, which is process_mode 3 (PROCESS_MODE_ALWAYS) in every
@@ -238,6 +283,8 @@ func show_spin(reels: Array[int], won: int, stake: int) -> void:
 	# real seconds when the constants above only promise 1.75.
 	_tween.set_parallel(false)
 	_tween.tween_callback(func() -> void: _spinning = false)
+	if won > 0:
+		_tween.tween_callback(func() -> void: _sound_call(&"play", [&"slots_win"]))
 
 
 ## The first strip position carrying `symbol`. Any position carrying it would do; the first is

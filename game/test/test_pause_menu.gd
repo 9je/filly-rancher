@@ -119,13 +119,13 @@ func test_settings_page_adjusts_the_settings_object() -> void:
 	assert_true(_menu.confirm())
 	assert_eq(_menu.page(), PauseMenu.Page.SETTINGS)
 	watch_signals(_menu)
-	# row 0 volume, row 1 sensitivity, row 2 invert
+	# row 0 volume, row 1 ambient, row 2 effects, row 3 sensitivity, row 4 invert
 	_menu.adjust(-1)
 	assert_almost_eq(_settings.master_volume, 0.9, 0.0001)
-	_menu.move_selection(1)
+	_menu.move_selection(PauseMenu.SettingRow.SENSITIVITY)
 	_menu.adjust(1)
 	assert_gt(_settings.mouse_sensitivity, SettingsScript.SENSITIVITY_DEFAULT)
-	_menu.move_selection(1)
+	_menu.move_selection(PauseMenu.SettingRow.INVERT - PauseMenu.SettingRow.SENSITIVITY)
 	_menu.adjust(1)
 	assert_true(_settings.invert_look)
 	assert_signal_emitted(_menu, "settings_changed")
@@ -683,3 +683,20 @@ func test_the_requests_page_carries_the_boards_note_for_this_chapter() -> void:
 	_menu.open()
 	_menu.open_page(PauseMenu.Page.REQUESTS)
 	assert_eq(_menu.board_note(), wording.board_note(story.Chapter.WEATHER))
+
+
+func test_the_settings_page_has_five_rows_now() -> void:
+	assert_eq(PauseMenu.SettingRow.size(), 5)
+	assert_eq(PauseMenu.SettingRow.VOLUME, 0)
+	assert_eq(PauseMenu.SettingRow.AMBIENT, 1)
+	assert_eq(PauseMenu.SettingRow.EFFECTS, 2)
+
+
+func test_adjusting_the_ambient_row_moves_the_ambient_volume_and_nothing_else() -> void:
+	_menu.open_page(PauseMenu.Page.SETTINGS)
+	_menu.move_selection(PauseMenu.SettingRow.AMBIENT)
+	var master_before: float = _settings.master_volume
+	_menu.adjust(-1)
+	assert_lt(_settings.ambient_volume, 1.0)
+	assert_almost_eq(_settings.master_volume, master_before, 0.0001)
+	assert_almost_eq(_settings.effects_volume, 1.0, 0.0001)
