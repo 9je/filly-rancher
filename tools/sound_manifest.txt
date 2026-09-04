@@ -1,0 +1,56 @@
+# THE SOUND CURATION, AND IT LIVES HERE AND NOWHERE ELSE. tools/fetch_sounds.sh fetches and
+# processes exactly what this file names, game/systems/sound.gd's LIBRARY plays exactly what
+# it produces, and game/test/test_sound_library.gd asserts the two sets match with no orphan
+# on either side. See docs/testing.md, section "The sound pipeline".
+#
+# ROW FORMAT: dest|source_url|recipe
+#   dest        path under game/assets/audio/, e.g. world/gate_open.wav
+#   source_url  a direct file URL, OR a zip URL with a #member fragment naming one file
+#               inside it, e.g. https://.../kenney_interface-sounds.zip#Audio/click_002.ogg
+#   recipe      comma separated verbs, applied in the script's own fixed order:
+#                 rate=N        resample (default 44100)
+#                 mono          downmix to one channel (default: keep stereo)
+#                 trim=A-B      seconds, from A to B of the source
+#                 pick=N        take the Nth non silent segment of the source (1 based).
+#                               Use this rather than trim= whenever the wanted event is one
+#                               strike inside a long take; it is reproducible and it does
+#                               not drift when a source is re-downloaded.
+#                 pick=N@G:D    the same, with the silence detector tuned for this row:
+#                               G is the noise floor in dB (default -45) and D the minimum
+#                               silence in seconds (default 0.12). A walking horse's
+#                               hoofbeats are 0.4s apart with room tone between them and
+#                               need something like pick=3@-38:0.05; a single dry creak in
+#                               a quiet take is fine on the defaults.
+#                 speed=F       tape speed change: pitch and duration together
+#                 loop=S        seamless butt loop: take S seconds and crossfade the tail
+#                               into the head. Beds only; implies an ogg dest.
+#                 fade=IN:OUT   seconds of fade at each end
+#                 gain=L        normalise to L LUFS integrated (the report checks it)
+#                 gain_db=N     flat gain in dB instead of a loudness pass. The escape
+#                               hatch for a one shot too short for EBU gating to measure
+#                               honestly; a row using it is exempted from the LUFS check
+#                               but never from the true peak ceiling.
+#
+# LOUDNESS TARGETS: ambient beds -24 LUFS, world and casino SFX -18, UI -20. True peak
+# ceiling -1.5 dBTP everywhere, and a row over it FAILS the run.
+#
+# EVERY SLOT RECORDS ITS ALTERNATES in the comment above it, so the owner can swap a sound
+# by editing one URL and re-running the script. That is the whole point of this file.
+#
+# SOURCES, all fetched with no account and no login:
+#   BBC Sound Effects  https://sound-effects.bbcrewind.co.uk , media at
+#                      https://sound-effects-media.bbcrewind.co.uk/wav/<ID>.wav
+#   Kenney             https://kenney.nl , direct zips, CC0
+
+# --- world ------------------------------------------------------------------------------
+
+# gate_open: BBC 07037342, "Wooden Creak." 13.3s stereo 44.1k. One dry creak, no room, no
+# voices. Alternates: 07037352 "Wooden Door Creak." 8.4s; 07037341 "Wooden Creak." 6.1s.
+world/gate_open.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07037342.wav|rate=44100,mono,pick=1,fade=0.01:0.12,gain=-18
+
+# --- ui ---------------------------------------------------------------------------------
+
+# ui_move: Kenney Interface Sounds, click_002. A short woody tick, not a beep; the softest
+# of the five clicks in the pack by file size and by envelope. Alternates: click_004.ogg;
+# select_002.ogg.
+ui/ui_move.wav|https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip#Audio/click_002.ogg|rate=44100,mono,fade=0.002:0.02,gain_db=0
