@@ -143,7 +143,7 @@ InputDevice="*res://systems/input_device.gd"
 - Consumes: nothing from a later task.
 - Produces, and every later task depends on these exact names:
   - `Sound.BUS_MASTER := &"Master"`, `Sound.BUS_AMBIENT := &"Ambient"`, `Sound.BUS_EFFECTS := &"Effects"`, `Sound.BUS_UI := &"UI"`
-  - `Sound.POOL_2D := 12`, `Sound.POOL_3D := 8`, `Sound.BED_VOICES := 6`, `Sound.CROSSFADE_SECONDS := 4.0`, `Sound.SILENT_DB := -60.0`, `Sound.ATTENUATION_METRES := 22.0`
+  - `Sound.POOL_2D := 12`, `Sound.POOL_3D := 8`, `Sound.BED_VOICES := 10`, `Sound.CROSSFADE_SECONDS := 4.0`, `Sound.SILENT_DB := -60.0`, `Sound.ATTENUATION_METRES := 22.0`
   - `Sound.LIBRARY: Dictionary` mapping `StringName` id to an entry `{"paths": PackedStringArray, "bus": StringName, "volume_db": float, "pitch_min": float, "pitch_max": float, "loop": bool}` (empty in this task; Tasks 3, 4 and 5 fill it)
   - `Sound.BEDS: Dictionary` mapping `WorldState.Phase` int to `Array[Dictionary]` of `{"id": StringName, "volume_db": float}` (empty here; Task 3 fills it)
   - `Sound.ZONE_BEDS: Dictionary` mapping zone `StringName` to the same array shape (empty here; Task 3 fills it)
