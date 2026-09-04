@@ -89,15 +89,18 @@ func test_no_orphans_in_either_direction() -> void:
 
 
 func test_variant_sets_are_contiguous_from_one() -> void:
+	var checked: int = 0
 	for id: StringName in SoundScript.LIBRARY.keys():
 		var entry: Dictionary = SoundScript.LIBRARY[id]
 		var paths: PackedStringArray = entry.get("paths", PackedStringArray())
+		checked += 1
 		if paths.size() < 2:
 			continue
 		for index in paths.size():
 			var stem: String = paths[index].get_file().get_basename()
 			assert_eq(stem, "%s_%d" % [String(id), index + 1],
 				"variant %d of '%s' must be named %s_%d" % [index + 1, id, id, index + 1])
+	assert_gt(checked, 0, "the rule ran over a real library; variant sets arrive with Task 4")
 
 
 func test_pitch_ranges_are_sane() -> void:
