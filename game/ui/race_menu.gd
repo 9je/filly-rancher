@@ -95,7 +95,10 @@ func set_tab(value: int) -> void:
 func switch_tab(step: int) -> void:
 	if _tab == Tab.ENTER and _on_stake_row():
 		_step_stake(step)
-		MenuStyleScript.tick_page()
+		# tick_move(), not tick_page(): a stake nudge is the same gesture confirm() ticks
+		# below, and the same one move_selection() ticks on every other table
+		# (slots_menu.gd, wheel_menu.gd, blackjack_menu.gd). This is not a page turn.
+		MenuStyleScript.tick_move()
 		return
 	set_tab(posmod(_tab + step, Tab.CARD + 1))
 	MenuStyleScript.tick_page()

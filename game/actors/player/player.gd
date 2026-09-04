@@ -99,7 +99,6 @@ const PonyVisualsScript := preload("res://actors/pony/pony_visuals.gd")
 const StockPaletteScript := preload("res://systems/stock_palette.gd")
 const StockTintScript := preload("res://systems/stock_tint.gd")
 const CutieMarkScript := preload("res://systems/cutie_mark.gd")
-const SoundScript := preload("res://systems/sound.gd")
 
 ## The input action held to WALK instead of running. Named `sneak` rather than `walk`
 ## because slowness is not what it is FOR -- see is_sneaking() and Pony.SNEAK_NOTICE_FACTOR.

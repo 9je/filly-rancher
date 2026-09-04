@@ -255,8 +255,6 @@ static func rule(ci: CanvasItem, from: Vector2, to: Vector2) -> void:
 # MenuStyle.tick_move(); it never calls Sound.play(&"ui_move") itself. The RNG rule is
 # untouched either way: every variation decision is made inside game/systems/sound.gd.
 
-const SoundScript := preload("res://systems/sound.gd")
-
 
 ## THE BARE `Sound` IDENTIFIER FAILS THE PARSE SWEEP HERE. tools/run_tests.sh parses every
 ## script through Godot's check-only, script-only pass, which loads project.godot's

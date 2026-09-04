@@ -88,7 +88,6 @@ const PonyScript := preload("res://actors/pony/pony.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const StorageScript := preload("res://systems/storage.gd")
-const SoundScript := preload("res://systems/sound.gd")
 
 ## Emitted after a pony's record has gone into storage and her node has been freed.
 ##
@@ -1390,7 +1389,12 @@ func _sound_call(method: StringName, args: Array) -> void:
 func _begin_hold(body: Node3D) -> void:
 	_held = body
 	_hold_seconds = 0.0
-	_sound_call(&"play_at", [&"capture_charge", global_position])
+	# play_loop, not play_at: a pooled one-shot cannot be individually addressed, so a grab
+	# released before the clip's 1.19s ran out used to ring on regardless. A dedicated,
+	# stoppable voice fixes that; see _take_back_physics(), which stops it on every path a
+	# hold can end. Not spatial, unlike the play_at() this replaces, but the beam is always
+	# within a stride of the player who is holding it, so the loss is negligible.
+	_sound_call(&"play_loop", [&"capture_charge"])
 	_hold_offset = Vector3.ZERO
 	_wrenching = false
 
@@ -1490,6 +1494,10 @@ func _lose(body: Node3D, reason: int) -> void:
 ## spinning by the beam would offset every facing she computes for the rest of her life.
 ## The beam borrows that yaw for the float and hands it back at zero.
 func _take_back_physics(body: Node3D) -> void:
+	# UNCONDITIONAL, ahead of the body check below: every path a hold can end (a settle, an
+	# escape, a wrench, the tree tearing down) runs through here, and capture_charge started
+	# regardless of what _held turned out to be, so the sound stops the same way regardless.
+	_sound_call(&"stop_loop", [&"capture_charge"])
 	if body == null or not is_instance_valid(body):
 		return
 	if body is PonyScript:

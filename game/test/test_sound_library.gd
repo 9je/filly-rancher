@@ -209,6 +209,39 @@ func test_every_library_file_passed_the_loudness_report() -> void:
 		assert_true(bool(passed.get(dest, false)), "'%s' FAILED the loudness report" % dest)
 
 
+## M10. gain_db= is the escape hatch for a one shot too short for EBU gating to measure
+## honestly (manifest header, lines 30-32), so every such row reads target=none and the
+## test above never checks it at all -- LUFS aside, nothing stopped one from landing far
+## under its neighbours the way world/mail_open.wav did before the final review (I=-37.7,
+## 15 LU under mail_arrive, effectively inaudible over a bed at default slider positions).
+## True peak is the one number a gain_db row still reports, so it is the floor this pins:
+## not a taste knob (the review's own accepted spread runs from ui_denied's -3.7 dBTP down
+## to ui_open's -13.8, and ui_open is deliberately the quietest tick in the kit), but a
+## backstop against a row falling FAR below that, the way a mis-set gain_db could.
+const GAIN_DB_TRUE_PEAK_FLOOR := -16.0
+
+func test_gain_db_rows_carry_a_true_peak_sanity_floor() -> void:
+	var file := FileAccess.open(REPORT, FileAccess.READ)
+	assert_not_null(file, "no report at %s; run bash tools/fetch_sounds.sh" % REPORT)
+	if file == null:
+		return
+	var checked := 0
+	while not file.eof_reached():
+		var line: String = file.get_line().strip_edges()
+		if line.is_empty() or line.begins_with("#"):
+			continue
+		var fields: PackedStringArray = line.split(" ", false)
+		if fields.size() < 6 or fields[5] != "target=none":
+			continue
+		var tp_field: String = fields[4].trim_prefix("TP=")
+		var tp: float = tp_field.to_float()
+		checked += 1
+		assert_gte(tp, GAIN_DB_TRUE_PEAK_FLOOR,
+			"'%s' (a gain_db row) measures TP=%s, under the %.1f dBTP sanity floor"
+				% [fields[1], tp_field, GAIN_DB_TRUE_PEAK_FLOOR])
+	assert_gt(checked, 0, "the rule ran over a real report; gain_db rows arrive with Task 4")
+
+
 func test_no_id_and_no_path_carries_a_dash_of_either_kind() -> void:
 	# The house rule, checked on the one corpus a hand edit is most likely to slip into.
 	for id: StringName in SoundScript.LIBRARY.keys():

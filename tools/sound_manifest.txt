@@ -119,8 +119,14 @@ world/mail_arrive.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07011078.w
 # is an isolated event inside it. The sanding pass never dips below -40dB so pick=2@-40:0.20
 # found nothing; walked to -20dB and pick=4 lands a clean 1.02s fold, whose own attack sits
 # near 0dBFS raw, so even gain='s small computed boost clipped hard; gain_db instead.
+# gain_db was -8 through Task 4's review, which parked the row 15 LU under mail_arrive as an
+# owner taste knob; the final review reread it as a level error rather than a taste knob (at
+# that gap it is simply inaudible under an ambient bed at default slider positions) and asked
+# for roughly mail_arrive's level. Walked up in steps against the true peak ceiling: +14 (to
+# 6) measured TP=+0.4, well over; +3 lands I=-26.7 (was -37.7, mail_arrive is -22.8) at
+# TP=-2.6, the most this near-0dBFS attack (see the note above) clears without clipping.
 # Alternates: 07047018 (243.5s, sorting newspaper cuttings); Kenney Interface scratch_002.ogg.
-world/mail_open.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07045125.wav|rate=44100,mono,pick=4@-20:0.15,fade=0.01:0.18,gain_db=-8
+world/mail_open.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07045125.wav|rate=44100,mono,pick=4@-20:0.15,fade=0.01:0.18,gain_db=3
 
 # mail_stamp: the primary (BBC 07040153, "Mail Sorting Office, letter stamping machine
 # operating." 55.7s) is one continuous run with no gap the detector can find at any noise
@@ -134,8 +140,12 @@ world/mail_stamp.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07013135.wa
 # capture_charge: BBC 07043314, "Generator hum. (Futuristic Spot Effect.)" 98.6s. speed=1.35
 # lifts it a fifth and shortens it, which is what turns an industrial hum into something
 # magical instead of ominous; the register note in the spec is explicit about that.
+# .ogg, not .wav (the final review's fix for a grab released before the clip finished): no
+# loop= here, this is the same one shot content as always, just re-encoded so magic_beam.gd
+# can hold it on a dedicated play_loop()/stop_loop() voice and cut it short. See sound.gd's
+# LIBRARY comment on the capture_charge entry.
 # Alternates: 07004188 "A varying electrical hum" 134.4s; 07024189 "Electrical: Fan" 64.9s.
-world/capture_charge.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07043314.wav|rate=44100,mono,trim=20-21.6,speed=1.35,fade=0.06:0.30,gain=-18
+world/capture_charge.ogg|https://sound-effects-media.bbcrewind.co.uk/wav/07043314.wav|rate=44100,mono,trim=20-21.6,speed=1.35,fade=0.06:0.30,gain=-18
 
 # capture_success: Kenney Interface Sounds, confirmation_001. The one world slot the spec
 # allows a designed sound for; there is no recording of a pony going into a bag.

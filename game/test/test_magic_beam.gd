@@ -804,6 +804,31 @@ func test_catching_a_named_pony_leaves_her_stock_empty() -> void:
 	assert_eq(beam.get_storage().contents()[0].stock, {})
 
 
+# --- the charge sound tracks the hold, not the clip -------------------------------------
+
+## M8. capture_charge used to be a pooled one shot: unaddressable once fired, so releasing
+## the beam a frame after grabbing left it ringing to the end of its 1.19s clip regardless.
+## It now runs on play_loop()/stop_loop(), a dedicated voice _take_back_physics() can
+## always reach; this pins that a released grab stops it rather than letting it finish.
+func test_capture_charge_stops_when_the_grab_is_released_before_it_secures() -> void:
+	var beam: MagicBeam = _beam()
+	var Sound := get_node("/root/Sound")
+	var pony: Pony = PonyScene.instantiate()
+	add_child_autofree(pony)
+	pony.setup(_stock_data())
+	beam._begin_hold(pony)
+	assert_true(Sound.looping_ids().has(&"capture_charge"),
+		"the charge sound must start with the hold")
+	beam.release()
+	assert_false(Sound.looping_ids().has(&"capture_charge"),
+		"an aborted grab must not let the charge ring out")
+
+
+func after_each() -> void:
+	var Sound := get_node("/root/Sound")
+	Sound.stop_all()
+
+
 # --- the collector's recall (game/systems/ledger.gd's ladder) --------------------------
 
 func test_a_recalled_beam_refuses_to_start() -> void:

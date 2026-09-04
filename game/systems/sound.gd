@@ -16,9 +16,21 @@ extends Node
 ## to Master, so that one mute covers the lot. Autoloads run in declaration order, so
 ## AudioSafety is finished before the first player here exists.
 ##
-## PAUSE. UI sounds run PROCESS_MODE_ALWAYS because menus are open while the tree is
-## paused. World sounds, casino sounds and every ambient bed run PROCESS_MODE_PAUSABLE, so
-## opening the pause menu stills the world's noise exactly as it stills its motion.
+## PAUSE. UI sounds and every ambient bed run PROCESS_MODE_ALWAYS: menus and casino panels
+## are open while the tree is paused, and a bed exists to be heard behind the panel that
+## pauses it, so ambience keeps breathing under a menu the same way the panel itself keeps
+## animating. World and casino one shots run PROCESS_MODE_PAUSABLE, which stills a sound
+## already ringing when the pause lands, exactly like the visuals -- but the real contract
+## is the other half, and it is NOT what a PAUSABLE voice sounds like it should do:
+## AudioStreamPlayer.play() clears the node's sticky stream_paused flag, so a one shot
+## STARTED while the tree is paused plays out at full volume on a PAUSABLE voice regardless.
+## Every casino SFX (chip_clink, card_slide, card_flip, reel_tick, reel_stop, slots_win,
+## wheel_ratchet, wheel_settle) and the pause menu's mail_open / mail_stamp are fired while
+## get_tree().paused is true and are audible ONLY because of this. A one shot that was
+## already sounding when the pause landed stills with the world, same as a bed would without
+## its ALWAYS override; a one shot that starts under the pause ignores it entirely.
+## Pinned by test_sound.gd's pause-contract regression: play an Effects id while paused,
+## assert playing and get_playback_position() advancing.
 
 const BUS_MASTER := &"Master"
 const BUS_AMBIENT := &"Ambient"
@@ -115,9 +127,15 @@ const LIBRARY: Dictionary = {
 	&"mail_stamp": {
 		"paths": ["res://assets/audio/world/mail_stamp.wav"],
 		"bus": BUS_EFFECTS, "volume_db": 0.0, "pitch_min": 0.96, "pitch_max": 1.04, "loop": false},
+	# loop: true, not because the file butt-loops (it does not; see the manifest recipe), but
+	# because a hold can end before the clip finishes and play_loop()/stop_loop() is the only
+	# verb pair that gives magic_beam.gd a voice it can address and cut short. pitch_min and
+	# pitch_max sit at 1.0 rather than the one-shot spread they used to carry, because
+	# _loop_player_for() does not call pick_pitch(); a spread here would be a knob that read
+	# as live and did nothing.
 	&"capture_charge": {
-		"paths": ["res://assets/audio/world/capture_charge.wav"],
-		"bus": BUS_EFFECTS, "volume_db": -3.0, "pitch_min": 0.98, "pitch_max": 1.06, "loop": false},
+		"paths": ["res://assets/audio/world/capture_charge.ogg"],
+		"bus": BUS_EFFECTS, "volume_db": -3.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": true},
 	&"capture_success": {
 		"paths": ["res://assets/audio/world/capture_success.wav"],
 		"bus": BUS_EFFECTS, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": false},
@@ -143,7 +161,7 @@ const LIBRARY: Dictionary = {
 		"bus": BUS_EFFECTS, "volume_db": 0.0, "pitch_min": 0.97, "pitch_max": 1.05, "loop": false},
 	&"neigh_real": {
 		"paths": ["res://assets/audio/world/neigh_real.wav"],
-		"bus": BUS_EFFECTS, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": false},
+		"bus": BUS_EFFECTS, "volume_db": -9.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": false},
 	# --- casino ---
 	&"chip_clink": {
 		"paths": [
@@ -317,7 +335,10 @@ func _build_pools() -> void:
 		var bed := AudioStreamPlayer.new()
 		bed.name = "Bed_%d" % i
 		bed.bus = String(BUS_AMBIENT)
-		bed.process_mode = Node.PROCESS_MODE_PAUSABLE
+		# ALWAYS, not PAUSABLE: the casino panels pause the tree for every visit, and the
+		# casino bed exists precisely to be heard inside the casino. Ambience keeps
+		# breathing behind an open panel the same way the panels themselves keep animating.
+		bed.process_mode = Node.PROCESS_MODE_ALWAYS
 		bed.volume_db = SILENT_DB
 		add_child(bed)
 		_bed_voices.append(bed)
@@ -534,7 +555,9 @@ func active_bed_ids() -> Array[StringName]:
 	var out: Array[StringName] = []
 	for id: StringName in _bed_playing.keys():
 		out.append(id)
-	out.sort()
+	# sort_custom rather than plain sort(): see the same fix and note on ids() and
+	# looping_ids() above; StringName's default comparator is not reliably lexicographic.
+	out.sort_custom(func(a: StringName, b: StringName) -> bool: return String(a) < String(b))
 	return out
 
 
@@ -683,10 +706,14 @@ func _apply_beds() -> void:
 ## same level every time, so without this check every such change would silently churn
 ## every bed in the mix, not just the one the zone actually touches.
 func _fade_bed_in(id: StringName, target_db: float) -> void:
-	if _bed_playing.has(id) and _bed_wanted_db.has(id):
-		var current_voice: AudioStreamPlayer = _bed_voices[int(_bed_playing[id])]
-		if current_voice.playing and is_equal_approx(float(_bed_wanted_db[id]), target_db):
-			return
+	# Read the bookkeeping, not the engine: _bed_playing / _bed_wanted_db already answer
+	# "is this bed live, at the level we last asked for". Asking voice.playing instead used
+	# to reintroduce exactly the pause-sensitivity this bookkeeping exists to avoid --
+	# AudioStreamPlayer.playing reports false for a paused-but-current voice, which made a
+	# zone push onto a paused tree misread every settled bed as needing a restart.
+	if _bed_playing.has(id) and _bed_wanted_db.has(id) \
+			and is_equal_approx(float(_bed_wanted_db[id]), target_db):
+		return
 	var entry_data: Dictionary = entry(id)
 	if entry_data.is_empty():
 		push_error("Sound: bed id '%s' is not in LIBRARY" % id)
@@ -698,7 +725,10 @@ func _fade_bed_in(id: StringName, target_db: float) -> void:
 	if stream == null:
 		return
 	var level: float = target_db + float(entry_data.get("volume_db", 0.0))
-	if not voice.playing:
+	# stream_paused hardens the same seam: a voice mid-fade on a tree that is paused for
+	# some other reason is still sounding, not merely not-playing, and must not be restarted
+	# from position zero.
+	if not voice.playing and not voice.stream_paused:
 		voice.stream = stream
 		voice.volume_db = SILENT_DB
 		voice.play()
@@ -732,6 +762,10 @@ func _fade_bed_out(id: StringName) -> void:
 	if previous_release is Tween and previous_release.is_valid():
 		previous_release.kill()
 	var tween: Tween = create_tween()
+	# PROCESS_PROCESS, matching the bed voices' own PROCESS_MODE_ALWAYS: a departure that
+	# starts under a paused tree (leaving the casino, panel still closing) still has to
+	# reach SILENT_DB and hand its voice back, not freeze mid-fade.
+	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	tween.tween_property(voice, "volume_db", SILENT_DB, CROSSFADE_SECONDS)
 	tween.tween_callback(func() -> void: _release_now(index))
 	_bed_release_tweens[index] = tween
@@ -746,6 +780,10 @@ func _tween_bed(id: StringName, voice: AudioStreamPlayer, target_db: float) -> v
 	if previous is Tween and previous.is_valid():
 		previous.kill()
 	var tween: Tween = create_tween()
+	# PROCESS_PROCESS: an arrival that starts under a paused tree (the casino bed, pushed
+	# the moment a panel opens) has to keep climbing toward target_db while the panel is
+	# open, not sit frozen at SILENT_DB for the whole visit.
+	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	tween.tween_property(voice, "volume_db", target_db, CROSSFADE_SECONDS)
 	_bed_tweens[id] = tween
 

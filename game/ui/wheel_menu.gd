@@ -314,6 +314,26 @@ func show_spin(pocket: int, won: int, stake: int) -> void:
 		return
 
 
+## super(delta) FIRST, ALWAYS: see slots_menu.gd's own comment on the same line, which this
+## mirrors. TableMenu's _process is what advances anim_time() and queues the stage redraw.
+##
+## THE RATCHET STATE LIVES HERE, NOT IN paint(). A _draw pass is not a frame tick: it runs
+## only when something queues a redraw, and paint() used to detect the pocket crossing and
+## fire wheel_ratchet itself, which meant the ratchet stopped ticking whenever the stage
+## was not being redrawn. Detection and the sound trigger move here, driven once per
+## physics-independent process frame exactly like _sound_reels() on the slots cabinet;
+## paint() below only reads _last_pocket and _ratchet to draw the kick.
+func _process(delta: float) -> void:
+	super(delta)
+	var now: int = pocket_under_pointer()
+	if now != _last_pocket:
+		_last_pocket = now
+		_ratchet = 1.0
+		if _spinning:
+			_sound_call(&"play", [&"wheel_ratchet"])
+	_ratchet = maxf(0.0, _ratchet - delta / RATCHET_SECONDS)
+
+
 func paint(ci: Control) -> void:
 	var font: Font = ThemeDB.fallback_font
 	var t: float = anim_time()
@@ -351,13 +371,8 @@ func paint(ci: Control) -> void:
 	ci.draw_arc(WHEEL_CENTRE, WHEEL_OUTER, 0.0, TAU, 96, PaintScript.GOLD_DIM, 5.0, true)
 
 	# --- the pointer, ratcheting -------------------------------------------------------------
-	var now: int = pocket_under_pointer()
-	if now != _last_pocket:
-		_last_pocket = now
-		_ratchet = 1.0
-		if _spinning:
-			_sound_call(&"play", [&"wheel_ratchet"])
-	_ratchet = maxf(0.0, _ratchet - get_process_delta_time() / RATCHET_SECONDS)
+	# _last_pocket and _ratchet are read only here; _process() above owns writing both, so
+	# a redraw draws whatever the last process frame decided rather than deciding it itself.
 	var kick: float = deg_to_rad(RATCHET_DEGREES) * _ratchet
 	var tip: Vector2 = WHEEL_CENTRE + Vector2(sin(kick), -cos(kick)) * (WHEEL_OUTER - 6.0)
 	var base: Vector2 = WHEEL_CENTRE + Vector2(sin(kick), -cos(kick)) * (WHEEL_OUTER + 26.0)

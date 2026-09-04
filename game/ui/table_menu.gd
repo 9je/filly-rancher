@@ -22,7 +22,6 @@ extends CanvasLayer
 
 const MenuStyleScript := preload("res://ui/menu_style.gd")
 const InputDeviceScript := preload("res://systems/input_device.gd")
-const SoundScript := preload("res://systems/sound.gd")
 
 ## DECLARED HERE AND NOWHERE ELSE ON A TABLE. The base itself paints nothing, but every table
 ## that extends this one paints through the kit, and GDScript refuses a const that shadows one

@@ -20,7 +20,6 @@ extends CanvasLayer
 
 const MenuStyleScript := preload("res://ui/menu_style.gd")
 const CasinoSignScript := preload("res://systems/casino_sign.gd")
-const SoundScript := preload("res://systems/sound.gd")
 
 ## DECLARED HERE AND NOWHERE ELSE ON THE LOBBY. `CasinoMenu` is not a `TableMenu`: same scene
 ## tree, same stage mechanism, but its own `CanvasLayer`, so it carries its own copy of this
@@ -265,8 +264,15 @@ func confirm() -> bool:
 		Tab.LOBBY:
 			if _selected < 0 or _selected >= LOBBY_ROWS.size():
 				return false
+			# CAGE and RULES turn a tab on this same panel; the four games open their own
+			# panel over the top of it, which already fires its own tick_open() (see
+			# table_menu.gd's open()). Ticking tick_confirm() here too made one keypress
+			# fire two sounds on those four rows, so only the tab-turn rows get one here.
+			var opens_a_table: bool = _selected == Row.SLOTS or _selected == Row.WHEEL \
+				or _selected == Row.BLACKJACK or _selected == Row.RACING
 			room_requested.emit(_selected)
-			MenuStyleScript.tick_confirm()
+			if not opens_a_table:
+				MenuStyleScript.tick_confirm()
 			return true
 		Tab.CAGE:
 			var buys: Array[int] = buy_amounts()

@@ -50,7 +50,6 @@ const PaintScript := preload("res://ui/casino_paint.gd")
 # is, exactly as it preloads CompendiumScript for State without ever owning a Compendium.
 const StoryBeatScript := preload("res://systems/story_beat.gd")
 const StoryWordingScript := preload("res://systems/story_wording.gd")
-const SoundScript := preload("res://systems/sound.gd")
 
 enum Page { MAIN, SETTINGS, COMPENDIUM, REQUESTS, MAIL, LEDGER }
 enum Row { RESUME, COMPENDIUM, REQUESTS, MAIL, LEDGER, SAVE, SETTINGS, QUIT }
@@ -315,21 +314,34 @@ func move_selection(step: int) -> void:
 
 ## Left or right on a settings row. Nothing on any other page: the compendium and the
 ## request board have no adjustable anything, and this is the one place that decides so.
+## TICKS ONLY WHEN SOMETHING ACTUALLY MOVED: a slider already at its floor or ceiling is a
+## refused adjustment, not a move, so it stays silent rather than lying with tick_move().
 func adjust(direction: int) -> void:
 	if _page != Page.SETTINGS or settings == null:
 		return
+	var moved: bool = false
 	match _selected:
 		SettingRow.VOLUME:
+			var before: float = settings.master_volume
 			settings.step_volume(direction)
+			moved = not is_equal_approx(settings.master_volume, before)
 		SettingRow.AMBIENT:
+			var before: float = settings.ambient_volume
 			settings.step_ambient(direction)
+			moved = not is_equal_approx(settings.ambient_volume, before)
 		SettingRow.EFFECTS:
+			var before: float = settings.effects_volume
 			settings.step_effects(direction)
+			moved = not is_equal_approx(settings.effects_volume, before)
 		SettingRow.SENSITIVITY:
+			var before: float = settings.mouse_sensitivity
 			settings.step_sensitivity(direction)
+			moved = not is_equal_approx(settings.mouse_sensitivity, before)
 		SettingRow.INVERT:
 			settings.toggle_invert()
-	MenuStyleScript.tick_move()
+			moved = true
+	if moved:
+		MenuStyleScript.tick_move()
 	settings_changed.emit()
 	_refresh()
 
@@ -366,7 +378,12 @@ func confirm() -> bool:
 		return true
 	if _page == Page.SETTINGS:
 		if _selected == SettingRow.INVERT:
-			adjust(1)
+			# Toggle directly rather than through adjust(): adjust() already ticks its own
+			# tick_move() on a real change, and confirm ticking too made one keypress fire
+			# two sounds. A confirm on this row gets exactly the one tick_confirm() below.
+			settings.toggle_invert()
+			settings_changed.emit()
+			_refresh()
 			MenuStyleScript.tick_confirm()
 			return true
 		MenuStyleScript.tick_denied()

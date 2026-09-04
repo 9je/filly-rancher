@@ -32,7 +32,10 @@ func test_the_zone_names_are_the_ones_the_bed_table_carries() -> void:
 
 
 func test_ranch_declares_a_sound_zone_reader() -> void:
-	assert_true(RanchScript.new().has_method("sound_zone"))
+	# M9. autofree(), not a bare .new(): an un-added, un-freed Ranch is exactly the kind of
+	# orphan Godot's own leak detector counts at process exit, and this is where the
+	# suite's stray one lived.
+	assert_true(autofree(RanchScript.new()).has_method("sound_zone"))
 
 
 func test_every_id_the_ranch_fires_is_in_the_library() -> void:

@@ -24,6 +24,10 @@ func _sound_autoload() -> Node:
 func after_each() -> void:
 	var Sound := _sound_autoload()
 	Sound.stop_all()
+	# Defensive: the pause-contract tests below pause the live tree on purpose. A failed
+	# assertion partway through one must never leave every later test in the suite running
+	# under a paused SceneTree, so this puts it back regardless of how the test ended.
+	get_tree().paused = false
 
 
 func test_the_four_buses_exist_and_route_into_master() -> void:
@@ -237,6 +241,11 @@ func test_the_gag_id_is_rare_and_never_leaks_into_an_unrelated_sound() -> void:
 	# (the one internal path play() and play_at() both share) proves the gag both fires and
 	# stays rare without touching any other RNG stream in the game.
 	var Sound := _sound_autoload()
+	# Save and restore the live autoload's private seed: this test is the one place in the
+	# suite that has to pin it for a deterministic distribution, but the class comment
+	# promises "seeded from entropy at boot" for every test that runs after this one, and a
+	# permanent reseed here would quietly make that false for the rest of the process.
+	var saved_seed: int = Sound._rng.seed
 	Sound._rng.seed = 1234
 	var gag_hits: int = 0
 	for i in range(2000):
@@ -247,6 +256,7 @@ func test_the_gag_id_is_rare_and_never_leaks_into_an_unrelated_sound() -> void:
 	for i in range(2000):
 		assert_ne(Sound._resolve_play_id(&"gate_open"), SoundScript.GAG_ID,
 			"only GAG_SOURCE may ever resolve to the gag")
+	Sound._rng.seed = saved_seed
 
 
 func test_every_casino_and_ui_sound_plays() -> void:
@@ -313,3 +323,114 @@ func test_ui_sounds_are_the_only_ones_that_survive_a_pause() -> void:
 		assert_true(Sound.play(id))
 		assert_eq(Sound.last_process_mode() == Node.PROCESS_MODE_ALWAYS, is_ui,
 			"'%s' has the wrong pause behaviour" % id)
+
+
+## C1 + I1's regression test, reproducing the final review's exact scenario end to end.
+## ranch.gd pauses the tree for every casino panel (_on_menu_opened_any -> get_tree().paused
+## = true) one line before _update_interaction() falls through to _update_sound_zone(),
+## which pushes ambient_set_zone(&"casino") into a tree that is already paused
+## (ranch.gd:4279-4284). Before the fix, _fade_bed_in()'s idempotency guard read
+## AudioStreamPlayer.playing, which reports false for a paused-but-current voice, so this
+## exact sequence slammed every settled phase bed to SILENT_DB and left the casino's own
+## bed frozen there for the whole visit (see final-review.md, C1 and I1). The ruling: bed
+## voices are PROCESS_MODE_ALWAYS and their tweens TWEEN_PAUSE_PROCESS, so a bed already
+## sounding survives the push untouched and the casino bed can still climb to its target
+## while the panel is open. This also closes the Task 6 parked gap for the zone hook path.
+func test_a_zone_push_onto_a_paused_tree_leaves_the_phase_beds_alone_and_reaches_the_casino_bed() -> void:
+	var Sound := _sound_autoload()
+	Sound.stop_all()
+	Sound.ambient_set_phase(1)  # DAY: bed_day_meadow, bed_wind_soft
+	var phase_ids: Array[StringName] = Sound.active_bed_ids()
+	assert_eq(phase_ids, [&"bed_day_meadow", &"bed_wind_soft"] as Array[StringName])
+	# Settle every phase bed's arrival tween to its target, deterministically and with no
+	# real waiting, exactly as test_a_bed_that_re_enters... does above.
+	for id: StringName in phase_ids:
+		var arrival: Variant = Sound._bed_tweens.get(id, null)
+		if arrival is Tween and arrival.is_valid():
+			arrival.custom_step(SoundScript.CROSSFADE_SECONDS + 1.0)
+	var settled_db: Dictionary = {}
+	for id: StringName in phase_ids:
+		settled_db[id] = Sound._bed_voices[Sound.voice_index_for(id)].volume_db
+
+	get_tree().paused = true
+	Sound.ambient_set_zone(SoundScript.ZONE_CASINO)
+
+	for id: StringName in phase_ids:
+		var voice: AudioStreamPlayer = Sound._bed_voices[Sound.voice_index_for(id)]
+		assert_false(is_equal_approx(voice.volume_db, SoundScript.SILENT_DB),
+			"'%s' must not be slammed to silence by a zone push onto a paused tree" % id)
+		assert_almost_eq(voice.volume_db, float(settled_db[id]), 0.01,
+			"'%s' must be left entirely alone by an unchanged phase bed re-ask" % id)
+
+	# The casino bed must have a voice and an arrival tween that can advance WHILE the tree
+	# stays paused -- TWEEN_PAUSE_PROCESS is what makes that possible.
+	var casino_index: int = Sound.voice_index_for(&"bed_casino_room")
+	assert_true(casino_index >= 0, "the casino bed must have been handed a voice")
+	var casino_arrival: Variant = Sound._bed_tweens.get(&"bed_casino_room", null)
+	assert_true(casino_arrival is Tween and casino_arrival.is_valid(),
+		"the casino bed must own an arrival tween")
+	var casino_voice: AudioStreamPlayer = Sound._bed_voices[casino_index]
+	var db_before_ticking: float = casino_voice.volume_db
+	# get_tree().process_frame fires every frame regardless of pause (an engine level
+	# signal, not gated by any node's process_mode), so two real ticks proves the tween is
+	# advancing on its OWN, automatically, while the tree stays paused -- the actual
+	# behaviour TWEEN_PAUSE_PROCESS buys, not merely that a manual step can still move it
+	# (custom_step() would succeed on a frozen TWEEN_PAUSE_BOUND tween too, and would prove
+	# nothing about this ruling).
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert_true(get_tree().paused, "the tree must still be paused at this point")
+	assert_gt(casino_voice.volume_db, db_before_ticking,
+		"the casino bed's arrival must advance on its own while the tree is paused")
+	# Fast forward the rest deterministically, with no real waiting, to pin the destination.
+	(casino_arrival as Tween).custom_step(SoundScript.CROSSFADE_SECONDS + 1.0)
+	assert_almost_eq(casino_voice.volume_db, -3.0, 0.01,
+		"the casino bed must reach its target while the tree is still paused")
+
+	# Unpause, and check the steady state the visit leaves behind.
+	get_tree().paused = false
+	assert_false(Sound.is_voice_releasing(casino_index),
+		"nothing should be mid-departure after a settled arrival")
+	var after: Array[StringName] = Sound.active_bed_ids()
+	assert_true(after.has(&"bed_day_meadow") and after.has(&"bed_wind_soft")
+		and after.has(&"bed_casino_room"), "all three beds must still read as playing")
+
+
+## I2's regression test: the real pause contract play()'s PAUSABLE voices actually deliver,
+## pinned so a future cleanup cannot silence the casino table SFX and the pause menu's mail
+## sounds, all of which are fired while get_tree().paused is already true and are audible
+## only because AudioStreamPlayer.play() clears the node's sticky stream_paused flag.
+func test_a_one_shot_started_under_pause_plays_out_on_a_pausable_voice() -> void:
+	var Sound := _sound_autoload()
+	Sound.stop_all()
+	get_tree().paused = true
+	assert_true(Sound.play(&"chip_clink"), "'chip_clink' would not play")
+	assert_eq(Sound.last_process_mode(), Node.PROCESS_MODE_PAUSABLE,
+		"chip_clink is a world/casino sound; it must stay on a PAUSABLE voice")
+	var voice: AudioStreamPlayer = Sound._pool_2d[(Sound._next_2d - 1 + Sound._pool_2d.size())
+		% Sound._pool_2d.size()]
+	assert_true(voice.playing, "a one shot started under pause must actually be playing")
+	# THE MECHANISM, pinned directly: AudioStreamPlayer.play() clears the node's sticky
+	# stream_paused flag regardless of the tree's own paused state, which is the entire
+	# reason a PAUSABLE voice started under pause sounds at all. stream_paused is also what
+	# actually gates the audio server's mix, independently of any node's process_mode, so
+	# this one flag is the whole contract -- not an inference from watching it play out.
+	assert_false(voice.stream_paused,
+		"play() must clear the sticky stream_paused flag; that is the whole contract")
+	var position_a: float = voice.get_playback_position()
+	# get_playback_position() is fed by the audio server's own mix thread, not by the
+	# SceneTree's per-frame delta the way a Tween is, so proving it moves needs real
+	# wall-clock time to actually pass rather than a queued engine frame. Polled, with a
+	# hard cap, rather than one blind sleep: the first mix tick that lands wins the loop
+	# immediately, and a build where mixing genuinely stalled fails after POLL_CAP real
+	# tries instead of hanging.
+	var poll_cap := 20
+	var advanced := false
+	for i in poll_cap:
+		OS.delay_msec(25)
+		if voice.get_playback_position() > position_a:
+			advanced = true
+			break
+	assert_true(advanced,
+		"a one shot started under pause must actually advance, not sit frozen at 0")
+	get_tree().paused = false

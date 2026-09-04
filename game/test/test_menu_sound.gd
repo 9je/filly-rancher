@@ -63,7 +63,9 @@ func test_no_menu_constructs_a_generator() -> void:
 			continue
 		var text: String = FileAccess.get_file_as_string(UI_DIR + name)
 		if text.contains("RandomNumberGenerator") or text.contains("randi(") \
-				or text.contains("randf("):
+				or text.contains("randf(") or text.contains("randi_range(") \
+				or text.contains("randf_range(") or text.contains("randomize()") \
+				or text.contains(".pick_random()") or text.contains(".shuffle()"):
 			offenders.append(name)
 	assert_eq(offenders, [] as Array[String], "no RNG may live under game/ui/")
 
