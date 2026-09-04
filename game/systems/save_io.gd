@@ -78,7 +78,10 @@ extends RefCounted
 ## Version 5 (Phase 3 slice 1) adds "ledger" and "player"; ledger defaults to {} (a brand
 ## new sponsorship balance) and player defaults to {} (the name Twilight and the shipped
 ## look). Both are read through their own from_dict(), each of which fills every missing
-## field from its own default, so a version 4 file needs nothing else.
+## field from its own default, so a version 4 file needs nothing else. Slice 2 added
+## "casino" and slice 3 "story" at the SAME version and for the same reason: a key whose
+## absence is indistinguishable from its default is a key that needs no version bump. See
+## migrate()'s from_version < 5 branch, which states the whole shape.
 ##
 ## --- JSON HAS NO INTEGER TYPE ---------------------------------------------------------
 ##
@@ -362,6 +365,12 @@ static func migrate(data: Dictionary, from_version: int) -> Dictionary:
 			# from before the Palace opened should load as. Stated here rather than left to
 			# that default so migrate()'s OUTPUT states the whole version 5 shape.
 			out["casino"] = {}
+		if not out.has("story"):
+			# Story.from_dict({}) is chapter SUNNY with nothing counted and no mail, which
+			# is exactly what a save from before the Company started writing should load
+			# as. Stated here rather than left to that default so migrate()'s OUTPUT
+			# states the whole version 5 shape.
+			out["story"] = {}
 	return out
 
 

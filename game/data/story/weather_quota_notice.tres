@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="StoryBeat" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/story_beat.gd" id="1_beat"]
+
+[resource]
+script = ExtResource("1_beat")
+id = &"weather_quota_notice"
+chapter = &"WEATHER"
+trigger = &"COLLECTION_DAYS"
+threshold = 3
+sender = "Cloudsdale Weather Corporation"
+title = "A friendly reminder"
+body = PackedStringArray("Dear {name},", "", "Ponies expected this period: {quota}.", "Ponies received this period: 0.", "Ponies processed this period: 3.", "", "Our figures balance, so there is nothing at all", "for you to do about this notice.", "", "Thank you for choosing Cloudsdale!", "", "Yours in weather, Sponsorship Services")
+reveals = PackedStringArray()
+evidence = true
+reply = &"NONE"

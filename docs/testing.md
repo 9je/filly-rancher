@@ -378,6 +378,7 @@ restoring the cache) turns the suite green again.
 | `game/scenes/test/depot_test.gd` | The depot gate (see below) |
 | `game/scenes/test/creation_test.gd` | The creation gate (see below) |
 | `game/scenes/test/casino_test.gd` | The casino gate (see below) |
+| `game/scenes/test/story_test.gd` | The story gate (see below) |
 | `game/scenes/test/model_gallery.gd` | The model gallery, and its `--stock`, `--mark` and `--props` rows (see below) |
 | `game/test/test_props.gd` | The prop layout as data: family scales, the footprint sampler, the skirt rule, and the clearances the whole shipped layout has to hold |
 | `game/world/interaction.gd` | The interact resolver. The collection gate drives its pen step through it, standing the player on the plot and asking `ranch.current_interaction()` what the key means there before calling `ranch.perform_interaction()`; the depot gate still calls `_move_pony_into_pen()` directly |
@@ -523,11 +524,12 @@ tools/bin/godot --headless --audio-driver Dummy --path game world/ranch.tscn -- 
 
 Phase names are `dawn`, `day`, `dusk`, `night` and weathers are `clear`,
 `rain`, `fog`, `storm`, matched case-insensitively; `--world-time=` takes
-seconds. Expect the same `RANCH_OK ponies=49 props=110 assets=present` as an
+seconds. Expect the same `RANCH_OK ponies=49 props=111 assets=present` as an
 unpinned run, with the `RANCH world` line naming the hour that was pinned. Both
 counts moved once more in Phase 3 slice 1: the crowd fills every region with
 stock ponies alongside the named roster, and the Depot is one more prop beside
-the Market and the request board.
+the Market and the request board, and the Company's mailbox by the ranch door
+is one more in slice 3.
 
 `props` moved again, from 59 to 60, in Phase 3 slice 2: the Spectra Palace is a
 sixth building under `Buildings`, seated and counted the same way the barn and
@@ -1065,6 +1067,48 @@ size=(w, h) focus=(w, h) id=<id>` prints one line per table. These five screens
 are `CanvasLayer` menus and can never appear in a screenshot, so their geometry
 is the only judgement a gate can give them: every table reserves a stage of the
 shared 1120 px width, and every one paints its focus ring somewhere real.
+
+---
+
+## The story gate
+
+`scenes/test/story_test.tscn` hosts the real ranch, exactly the way the depot and casino
+gates do, and proves the paper channel end to end:
+
+* every `StoryBeat` in `game/data/story/` names a chapter that exists, a trigger the game
+  can emit and a reply control this build has; every letter fits `Letters.LINE_WIDTH` with
+  the longest legal player name in it; none of them carries an em dash or a double hyphen.
+* the chapter ladder is walkable by firing triggers, and arriving in a chapter always puts
+  something in the mailbox.
+* the Employee Appreciation Survey fires the Priority Requisition **only if answered**: an
+  ignored Survey is walked through thirty collection days and never produces one.
+* answering it pays 50 bits and a hay coupon exactly once, and the choice is saved.
+* the Requisition's serve path is proved on all three of its edges: it refuses a pony who
+  is not in a pen (`Ranch.serve_requisition()`'s "owned but not penned" ending, exercised
+  by pulling the named pony back out of her pen with `Pen.remove_pony()` before calling it:
+  her `GameState` record stays put, only her tenancy does, which is what keeps this the
+  "not penned" ending and not the "not owned at all" one that closes the letter outright);
+  it then takes exactly the pony she named, by the departure path, once she is penned and
+  the letter is armed; and it never serves twice, the flag holding after the one successful
+  call the way the Survey's own "answering twice pays nothing twice" does. The world loses
+  precisely that one pony and no other; her Compendium entry reads `PROCESSED`.
+* the mailbox verb opens the Mail page, the page holds every letter ever sent, newest
+  first, and nothing on it carries a dash.
+
+**A real bug this gate's own construction avoided.** The gate's `chosen_ref` weak
+reference and its whole-world census have to be taken *after* the not-penned edge is
+proved, not before: `Pen.remove_pony()` despawns her body outright (`Pen.add_pony()`
+spawns a fresh one on the way back in), so a census or a weak reference taken earlier
+would be measuring a body this gate itself just freed on purpose, not the one that
+actually walks to the crate.
+
+Run it with:
+
+```
+tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/story_test.tscn
+```
+
+Expect `STORY_OK checks=55`; the exit code is the verdict.
 
 ---
 

@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="StoryBeat" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/story_beat.gd" id="1_beat"]
+
+[resource]
+script = ExtResource("1_beat")
+id = &"sunny_first_receipt"
+chapter = &"SUNNY"
+trigger = &"DELIVERIES"
+threshold = 1
+sender = "Cloudsdale Weather Corporation"
+title = "Thank you for your first shipment"
+body = PackedStringArray("Dear {name},", "", "Your first shipment arrived safe and sound.", "Condition on arrival: excellent.", "Processing: routine.", "", "Credit has been applied to your balance, and a", "little note has been made in your file.", "", "Partners who ship early ship often!", "", "Warmly, Intake")
+reveals = PackedStringArray()
+evidence = false
+reply = &"NONE"

@@ -52,6 +52,7 @@ const CompendiumScript := preload("res://systems/compendium.gd")
 const LedgerScript := preload("res://systems/ledger.gd")
 const PlayerLookScript := preload("res://systems/player_look.gd")
 const CasinoScript := preload("res://systems/casino.gd")
+const StoryScript := preload("res://systems/story.gd")
 
 ## Where the authored character roster is read from. The same directory the spawner and
 ## PonyInstance use; named here because this is now the one place it is loaded.
@@ -87,6 +88,7 @@ const KEY_REQUESTS := "requests"
 const KEY_LEDGER := "ledger"
 const KEY_PLAYER := "player"
 const KEY_CASINO := "casino"
+const KEY_STORY := "story"
 
 ## Emitted after from_dict() or load_from_slot() has replaced the world. A HUD or a pen
 ## that cached anything out of here has to rebuild on this.
@@ -163,6 +165,13 @@ var player: PlayerLook = PlayerLookScript.default_look()
 ## follow: a listener holding the old purse is holding the chips of a ranch nobody is
 ## playing any more.
 var casino: Casino = CasinoScript.new()
+
+## WHERE SHE IS IN THE ARC (game/systems/story.gd): the chapter, the flags, the counters the
+## letters are timed off and the mail she has been sent. REPLACED, NOT MUTATED, by
+## from_dict() and reset(), the same rule `gems`, `compendium`, `ledger`, `player` and
+## `casino` follow: a listener holding the old object is holding the story of a ranch nobody
+## is playing any more.
+var story: Story = StoryScript.new()
 
 ## Pending requests, as plain Dictionaries whose shape this file does not know or check;
 ## a later task defines it and reads/writes it. Untyped for the same reason `unlocks` is:
@@ -299,6 +308,7 @@ func to_dict() -> Dictionary:
 		KEY_LEDGER: ledger.to_dict(),
 		KEY_PLAYER: player.to_dict(),
 		KEY_CASINO: casino.to_dict(),
+		KEY_STORY: story.to_dict(),
 	}
 
 
@@ -367,6 +377,10 @@ func from_dict(data: Dictionary) -> void:
 	casino = CasinoScript.from_dict(
 		saved_casino if typeof(saved_casino) == TYPE_DICTIONARY else {})
 
+	var saved_story: Variant = data.get(KEY_STORY, {})
+	story = StoryScript.from_dict(
+		saved_story if typeof(saved_story) == TYPE_DICTIONARY else {})
+
 	state_loaded.emit()
 
 
@@ -385,6 +399,7 @@ func reset() -> void:
 	ledger = LedgerScript.new()
 	player = PlayerLookScript.default_look()
 	casino = CasinoScript.new()
+	story = StoryScript.new()
 
 
 # --- disk ---------------------------------------------------------------------------------

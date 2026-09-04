@@ -602,3 +602,9 @@ func test_migrating_a_version_4_save_states_the_casino_key() -> void:
 	var migrated := SaveIOScript.migrate({"bits": 10}, 4)
 	assert_true(migrated.has("casino"), "migrate's output states the whole version 5 shape")
 	assert_eq(migrated["casino"], {})
+
+
+func test_migrate_states_the_story_key_in_the_version_five_shape() -> void:
+	var migrated: Dictionary = SaveIOScript.migrate({"bits": 10}, 4)
+	assert_true(migrated.has("story"), "migrate() states the whole v5 shape")
+	assert_eq(migrated["story"], {})

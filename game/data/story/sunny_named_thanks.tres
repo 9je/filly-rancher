@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="StoryBeat" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/story_beat.gd" id="1_beat"]
+
+[resource]
+script = ExtResource("1_beat")
+id = &"sunny_named_thanks"
+chapter = &"SUNNY"
+trigger = &"NAMED_DELIVERIES"
+threshold = 1
+sender = "Cloudsdale Weather Corporation"
+title = "A registered arrival, and our thanks"
+body = PackedStringArray("Dear {name},", "", "{pony} arrived this morning and was logged as a", "registered arrival. What a find!", "", "Shipment quality: excellent.", "Registered arrivals are worth a great deal more", "to us than unregistered stock, as your balance", "will already have noticed.", "", "Do keep an eye out for more like her.", "", "Warmly, Intake")
+reveals = PackedStringArray()
+evidence = false
+reply = &"NONE"

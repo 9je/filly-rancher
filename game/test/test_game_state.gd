@@ -527,3 +527,26 @@ func test_reset_empties_the_purse_and_replaces_it() -> void:
 	state.reset()
 	assert_eq(state.casino.chips, 0)
 	assert_ne(state.casino, before, "replaced, not mutated; a listener on the old one is stale")
+
+
+# --- the story in the save file -----------------------------------------------------------
+
+func test_the_story_survives_a_round_trip_and_an_older_save_loads_at_sunny() -> void:
+	var state = _state()
+	state.story.note_delivery(true, "Trixie", &"trixie")
+	state.story.note_collection_day()
+	state.story.advance()
+	state.story.post(&"weather_survey")
+	var data: Dictionary = state.to_dict()
+	assert_true(data.has("story"), "the story is written by hand like every other key")
+
+	state.from_dict(data)
+	assert_eq(state.story.deliveries, 1)
+	assert_eq(state.story.collection_days, 1)
+	assert_true(state.story.has_mail(&"weather_survey"))
+
+	data.erase("story")
+	state.from_dict(data)
+	assert_eq(state.story.chapter, preload("res://systems/story.gd").Chapter.SUNNY,
+		"a save written before the story existed opens on SUNNY with an empty mailbox")
+	assert_eq(state.story.mail_ids().size(), 0)

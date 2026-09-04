@@ -142,7 +142,7 @@ func test_cancel_on_settings_returns_to_main_and_on_main_closes() -> void:
 	assert_false(_menu.is_open())
 
 
-## Both pages, as the name promises. The two have DIFFERENT row counts (seven on MAIN,
+## Both pages, as the name promises. The two have DIFFERENT row counts (eight on MAIN,
 ## three on SETTINGS) and _row_count() is the one thing that knows which, so a wrap that is
 ## only exercised on MAIN would let the settings page wrap past its last row into a fourth
 ## that is not drawn.
@@ -317,8 +317,8 @@ func test_the_requests_page_lists_exactly_the_active_requests() -> void:
 		assert_eq(String(rows[i]["text"]), String(request["text"]),
 			"a request that only needs one of anything carries no progress")
 		assert_eq(String(rows[i]["value"]), "%d bits" % int(request["reward_bits"]))
-	assert_true(_menu.footer_text().contains("Finish one to get a new one."),
-		"the footer says where the next one comes from")
+	assert_eq(_menu.board_note(), "Finish one to get a new one.",
+		"the note at the top of the board says where the next one comes from")
 
 
 ## A finished request has already been paid by ranch.gd, so it drops off the page the moment
@@ -515,8 +515,171 @@ func test_a_half_wired_compendium_reads_as_empty() -> void:
 
 func test_a_delivered_character_reads_as_delivered_and_still_counts_as_caught() -> void:
 	_wire_book()
+	# THROUGH StoryWording.processed_label(), not the literal string: this used to pass
+	# only because story_chapter defaults to 0 and PROCESSED_LABELS[0] happens to be
+	# "Delivered :)", so a reword of the SUNNY label would have failed this test and the two
+	# below it in two different ways (final review, MINOR 5).
+	var wording = preload("res://systems/story_wording.gd")
 	var first: PonyData = _registry.all()[0]
 	_compendium.mark_processed(first.id)
 	_menu.open_page(PauseMenu.Page.COMPENDIUM)
 	assert_true(_menu.compendium_header().contains("1 of"))
-	assert_true(_row_for(first.id).contains("Delivered :)"))
+	assert_true(_row_for(first.id).contains(wording.processed_label(_menu.story_chapter)))
+
+
+# --- the Mail page ---------------------------------------------------------------------
+
+## The rows ranch.gd hands the page, in exactly the shape it builds them in (Task 6's
+## Ranch.mail_rows()), so this file tests the page against the contract rather than against
+## a story it built for itself.
+func _wire_mail() -> void:
+	var rows: Array[Dictionary] = [
+		{"id": "sunny_mailbox", "sender": "Cloudsdale Weather Corporation",
+			"title": "Your mailbox is installed",
+			"body": ["Dear Moonbeam,", "", "The flag goes up when something is waiting."],
+			"read": true, "replied": "", "reply": 0},
+		{"id": "weather_survey", "sender": "Cloudsdale Weather Corporation",
+			"title": "Employee Appreciation Survey",
+			"body": ["Dear Moonbeam,", "", "Which of your ponies is most special to you?"],
+			"read": false, "replied": "", "reply": 1},
+	]
+	_menu.mail_provider = func() -> Array[Dictionary]: return rows
+	_menu.mail_ponies_provider = func() -> Array[Dictionary]:
+		return [{"uid": "u1", "name": "Trixie", "coat": ""},
+			{"uid": "u2", "name": "Pony", "coat": "Butter"}]
+
+
+func test_the_mail_page_lists_the_newest_letter_first() -> void:
+	_wire_mail()
+	_menu.open()
+	assert_true(_menu.open_page(PauseMenu.Page.MAIL))
+	var rows: Array[Dictionary] = _menu.mail_rows()
+	assert_eq(rows.size(), 2)
+	assert_eq(String(rows[0]["id"]), "weather_survey", "newest first")
+	assert_false(bool(rows[0]["read"]))
+
+
+func test_a_bare_mail_page_says_so_rather_than_drawing_nothing() -> void:
+	_menu.open()
+	_menu.open_page(PauseMenu.Page.MAIL)
+	assert_eq(_menu.mail_rows().size(), 0)
+	assert_true(PauseMenu.EMPTY_TEXT in _menu.mail_lines())
+
+
+func test_confirming_on_an_envelope_opens_it_and_says_it_was_opened() -> void:
+	_wire_mail()
+	_menu.open()
+	_menu.open_page(PauseMenu.Page.MAIL)
+	watch_signals(_menu)
+	assert_true(_menu.confirm())
+	assert_eq(_menu.open_letter_id(), &"weather_survey")
+	assert_signal_emitted_with_parameters(_menu, "mail_opened", [&"weather_survey"])
+	var lines: Array[String] = _menu.letter_lines()
+	assert_true("Which of your ponies is most special to you?" in lines)
+
+
+func test_cancel_walks_back_out_of_a_letter_and_then_out_of_the_page() -> void:
+	_wire_mail()
+	_menu.open()
+	_menu.open_page(PauseMenu.Page.MAIL)
+	_menu.confirm()
+	assert_eq(_menu.open_letter_id(), &"weather_survey")
+	_menu.back()
+	assert_eq(_menu.open_letter_id(), &"", "back closes the letter, not the page")
+	assert_eq(_menu.page(), PauseMenu.Page.MAIL)
+	_menu.back()
+	assert_eq(_menu.page(), PauseMenu.Page.MAIN)
+	assert_eq(_menu.selected_index(), PauseMenu.Row.MAIL, "the cursor lands on its own row")
+
+
+func test_a_letter_with_a_picker_offers_every_pony_she_owns() -> void:
+	_wire_mail()
+	_menu.open()
+	_menu.open_page(PauseMenu.Page.MAIL)
+	_menu.confirm()
+	var rows: Array[Dictionary] = _menu.reply_rows()
+	assert_eq(rows.size(), 2)
+	assert_eq(String(rows[0]["label"]), "Trixie")
+	assert_eq(String(rows[1]["label"]), "Butter Pony", "the crowd share a name; the coat sorts them")
+	assert_eq(String(rows[1]["choice"]), "u2")
+
+
+func test_answering_the_picker_emits_the_choice_once_and_leaves_the_letter() -> void:
+	_wire_mail()
+	_menu.open()
+	_menu.open_page(PauseMenu.Page.MAIL)
+	_menu.confirm()
+	watch_signals(_menu)
+	_menu.move_selection(1)
+	assert_true(_menu.confirm())
+	assert_signal_emitted_with_parameters(_menu, "mail_reply", [&"weather_survey", "u2"])
+	assert_eq(_menu.open_letter_id(), &"", "answering hands the page back to the list")
+
+
+func test_a_letter_with_no_reply_control_has_no_rows_to_sit_on() -> void:
+	_wire_mail()
+	_menu.open()
+	_menu.open_page(PauseMenu.Page.MAIL)
+	_menu.move_selection(1)
+	assert_true(_menu.confirm())
+	assert_eq(_menu.open_letter_id(), &"sunny_mailbox")
+	assert_eq(_menu.reply_rows().size(), 0)
+	assert_false(_menu.confirm(), "there is nothing on this page to confirm")
+
+
+func test_the_mail_row_on_main_opens_the_page() -> void:
+	_wire_mail()
+	_menu.open()
+	for i in range(PauseMenu.Row.MAIL):
+		_menu.move_selection(1)
+	assert_eq(_menu.selected_index(), PauseMenu.Row.MAIL)
+	assert_true(_menu.confirm())
+	assert_eq(_menu.page(), PauseMenu.Page.MAIL)
+
+
+func test_nothing_the_mail_page_draws_carries_a_dash() -> void:
+	_wire_mail()
+	_menu.open()
+	_menu.open_page(PauseMenu.Page.MAIL)
+	var lines: Array[String] = _menu.mail_lines()
+	_menu.confirm()
+	lines.append_array(_menu.letter_lines())
+	for row: Dictionary in _menu.reply_rows():
+		lines.append(String(row["label"]))
+	for line: String in lines:
+		assert_false(line.contains("--"), "double hyphen: %s" % line)
+		assert_false(line.contains(char(0x2014)), "em dash: %s" % line)
+
+
+func test_a_delivered_pony_reads_in_the_words_of_the_chapter_she_was_delivered_in() -> void:
+	_wire_book()
+	var wording = preload("res://systems/story_wording.gd")
+	var story = preload("res://systems/story.gd")
+	var first: PonyData = _menu.roster()[0]
+	_compendium.mark_processed(first.id)
+	_menu.story_chapter = story.Chapter.SUNNY
+	_menu.open()
+	_menu.open_page(PauseMenu.Page.COMPENDIUM)
+	var rows: Array[String] = _menu.compendium_rows()
+	assert_true(rows[0].contains(wording.processed_label(story.Chapter.SUNNY)))
+
+
+func test_the_pony_she_named_on_the_survey_carries_her_star_in_the_book() -> void:
+	_wire_book()
+	var wording = preload("res://systems/story_wording.gd")
+	var first: PonyData = _menu.roster()[0]
+	_compendium.mark_processed(first.id)
+	_menu.employees_choice = first.id
+	_menu.open()
+	_menu.open_page(PauseMenu.Page.COMPENDIUM)
+	assert_true(_menu.compendium_rows()[0].contains(wording.EMPLOYEES_CHOICE))
+
+
+func test_the_requests_page_carries_the_boards_note_for_this_chapter() -> void:
+	_wire_book()
+	var wording = preload("res://systems/story_wording.gd")
+	var story = preload("res://systems/story.gd")
+	_board.set_chapter(story.Chapter.WEATHER)
+	_menu.open()
+	_menu.open_page(PauseMenu.Page.REQUESTS)
+	assert_eq(_menu.board_note(), wording.board_note(story.Chapter.WEATHER))

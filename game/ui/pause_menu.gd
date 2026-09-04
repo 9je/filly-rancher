@@ -43,13 +43,20 @@ const PonyDataScript := preload("res://systems/pony_data.gd")
 const WorldStateScript := preload("res://systems/world_state.gd")
 const HudScript := preload("res://ui/hud.gd")
 const MenuStyleScript := preload("res://ui/menu_style.gd")
+const PaperPaintScript := preload("res://ui/paper_paint.gd")
+const PaintScript := preload("res://ui/casino_paint.gd")
+# THE RESOURCE'S OWN ENUM, so reply_rows() matches on a name rather than on the numbers 1
+# and 2. This is a data resource, not game state: the page still never learns what a Story
+# is, exactly as it preloads CompendiumScript for State without ever owning a Compendium.
+const StoryBeatScript := preload("res://systems/story_beat.gd")
+const StoryWordingScript := preload("res://systems/story_wording.gd")
 
-enum Page { MAIN, SETTINGS, COMPENDIUM, REQUESTS, LEDGER }
-enum Row { RESUME, COMPENDIUM, REQUESTS, LEDGER, SAVE, SETTINGS, QUIT }
+enum Page { MAIN, SETTINGS, COMPENDIUM, REQUESTS, MAIL, LEDGER }
+enum Row { RESUME, COMPENDIUM, REQUESTS, MAIL, LEDGER, SAVE, SETTINGS, QUIT }
 enum SettingRow { VOLUME, SENSITIVITY, INVERT }
 
-const MAIN_ROWS := ["Resume", "Compendium", "Requests", "The ledger", "Save the ranch",
-	"Settings", "Quit to desktop"]
+const MAIN_ROWS := ["Resume", "Compendium", "Requests", "Mail", "The ledger",
+	"Save the ranch", "Settings", "Quit to desktop"]
 
 ## How many character rows of the compendium are on screen at once. The roster is 43 long
 ## and the panel is not, so the list is a window over it rather than the whole thing.
@@ -72,6 +79,20 @@ const RANCH_NAME := "Ranch"
 ## this menu is instantiated without a ranch by its own tests and by the boot shutter.
 const EMPTY_TEXT := "Nothing to show yet."
 
+## THE MAIL PAGE IS DRAWN, NOT PRINTED. The stage is 660 wide: the Panel's 720 minus the
+## Margin node's 30 either side, the same arithmetic TableMenu.STAGE_WIDTH does for the
+## casino's 1180 wide panels. Every rect on this page is laid out against these numbers.
+const MAIL_STAGE_WIDTH := 660.0
+const ENVELOPE_HEIGHT := 68.0
+const ENVELOPE_GAP := 10.0
+const ENVELOPES_ON_SCREEN := 5
+const LETTER_LINE_HEIGHT := 26.0
+const REPLY_ROW_HEIGHT := 34.0
+const REPLY_ROW_GAP := 6.0
+
+## What the Mail page says with nothing in the mailbox yet.
+const MAIL_EMPTY_TEXT := "Nothing in the mailbox yet."
+
 ## Both halves of a character's "when" line when she has no restriction on that half.
 ## PonyData carries an EMPTY array to mean "any" in each of `phases` and `weathers`
 ## independently (game/systems/pony_data.gd), so the two are answered separately.
@@ -81,12 +102,23 @@ const ANY_TEXT := "any"
 @onready var _title: Label = $Centre/Panel/Margin/Column/Title
 @onready var _rows: VBoxContainer = $Centre/Panel/Margin/Column/Rows
 @onready var _footer: Label = $Centre/Panel/Margin/Column/Footer
+@onready var _stage: Control = get_node_or_null(^"Centre/Panel/Margin/Column/Stage")
 
 signal opened()
 signal closed()
 signal save_requested()
 signal quit_requested()
 signal settings_changed()
+
+## THE MAIL PAGE'S TWO PROVIDERS, injected by ranch.gd exactly as the five above are. This
+## menu never loads a StoryBeat, never renders one and never learns what a Story is: it is
+## handed rendered rows and the ponies she owns, and it hands back "she opened this" and
+## "she answered this". Same split as every other panel in the game.
+var mail_provider := Callable()
+var mail_ponies_provider := Callable()
+
+signal mail_opened(id: StringName)
+signal mail_reply(id: StringName, choice: String)
 
 var settings: Settings = null
 ## `func() -> bool`. Invalid means "always allowed".
@@ -108,11 +140,36 @@ var world_state: WorldState = null
 ## have been read for arrives already rendered. See ledger_rows().
 var statement_provider := Callable()
 
+## WHICH CHAPTER THE BOOK IS BEING READ IN, and who the player named on the Survey. Both are
+## pushed by ranch.gd exactly as the five sources above are, and both are allowed to stay at
+## their defaults forever: a menu with no ranch behind it reads the book in SUNNY's words,
+## which is the state a new game is in anyway.
+var story_chapter: int = 0
+var employees_choice: StringName = &""
+
 var _page: int = Page.MAIN
 var _selected := 0
 ## First roster index drawn on the COMPENDIUM page. Follows `_selected`; see _sync_scroll().
 var _scroll := 0
 var _open := false
+
+## The letter currently open on the MAIL page, or &"" while the list is showing.
+var _letter_id: StringName = &""
+
+## mail_rows()'s answer, taken once per _refresh() rather than once per call. The Mail
+## page's stage redraws every frame it is up (_process()), and every draw call used to walk
+## the provider and duplicate(true) every letter ever posted -- O(letters) allocation every
+## frame, growing with playtime, for a page nothing had touched since the last _refresh()
+## (final review, MINOR 3). _refresh() is the one place anything that could change what
+## mail_rows() answers already runs through (open, close, cursor move, a letter arriving),
+## so recomputing there and reading the cache everywhere else costs nothing correctness can
+## notice.
+var _mail_rows_cache: Array[Dictionary] = []
+var _mail_rows_dirty := true
+
+## Seconds since this menu opened, advanced in _process while it is up. Read by the stage
+## for the focus ring's breath, the same field and the same purpose as TableMenu._anim_t.
+var _anim_t := 0.0
 
 
 func _ready() -> void:
@@ -121,6 +178,10 @@ func _ready() -> void:
 	MenuStyleScript.style_label(_title, MenuStyleScript.TITLE_SIZE, MenuStyleScript.COLOR_TITLE)
 	_title.text = "PAUSED"
 	visible = false
+	if _stage != null:
+		_stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_stage.draw.connect(_paint_stage)
+	set_process(false)
 
 
 func open() -> bool:
@@ -133,6 +194,9 @@ func open() -> bool:
 	_page = Page.MAIN
 	_selected = Row.RESUME
 	_scroll = 0
+	_letter_id = &""
+	_anim_t = 0.0
+	set_process(true)
 	_open = true
 	visible = true
 	_refresh()
@@ -155,6 +219,7 @@ func open_page(page: int) -> bool:
 	_page = page
 	_selected = 0
 	_scroll = 0
+	_letter_id = &""
 	_refresh()
 	return true
 
@@ -164,6 +229,7 @@ func close() -> void:
 		return
 	_open = false
 	visible = false
+	set_process(false)
 	closed.emit()
 
 
@@ -179,6 +245,14 @@ func selected_index() -> int:
 	return _selected
 
 
+## THE BREATH ON THE FOCUS RING, and nothing else. The stage is redrawn only while the MAIL
+## page is actually up, so a paused ranch with the compendium open costs nothing.
+func _process(delta: float) -> void:
+	_anim_t += delta
+	if _open and _page == Page.MAIL and _stage != null:
+		_stage.queue_redraw()
+
+
 func _row_count() -> int:
 	match _page:
 		Page.SETTINGS:
@@ -191,6 +265,12 @@ func _row_count() -> int:
 			return maxi(1, compendium_rows().size())
 		Page.REQUESTS:
 			return maxi(1, request_rows().size())
+		Page.MAIL:
+			# On the list, one row per envelope. Inside a letter, one row per reply option,
+			# and a letter with no reply control has exactly one cursor position: nowhere.
+			if _letter_id.is_empty():
+				return maxi(1, mail_rows().size())
+			return maxi(1, reply_rows().size())
 		Page.LEDGER:
 			# The ledger page draws only notes (_draw_ledger(), _add_note()), never a
 			# selectable row, so there is exactly one cursor position on it: nowhere.
@@ -221,6 +301,25 @@ func adjust(direction: int) -> void:
 
 
 func confirm() -> bool:
+	if _page == Page.MAIL:
+		if _letter_id.is_empty():
+			var rows: Array[Dictionary] = mail_rows()
+			if _selected < 0 or _selected >= rows.size():
+				return false
+			return open_letter(StringName(String(rows[_selected].get("id", ""))))
+		var replies: Array[Dictionary] = reply_rows()
+		if _selected < 0 or _selected >= replies.size():
+			return false
+		var answered: StringName = _letter_id
+		var choice: String = String(replies[_selected]["choice"])
+		close_letter()
+		mail_reply.emit(answered, choice)
+		# REFRESH AGAIN, AFTER THE EMIT: close_letter()'s own _refresh() ran BEFORE
+		# ranch.gd's answer_mail() had a chance to mark the letter read, so the mail_rows()
+		# cache it primed would otherwise hold the pre-reply snapshot (stale wax dot, no
+		# "ANSWERED" stamp) until some unrelated interaction happened to refresh the page.
+		_refresh()
+		return true
 	if _page == Page.SETTINGS:
 		if _selected == SettingRow.INVERT:
 			adjust(1)
@@ -236,6 +335,8 @@ func confirm() -> bool:
 			open_page(Page.COMPENDIUM)
 		Row.REQUESTS:
 			open_page(Page.REQUESTS)
+		Row.MAIL:
+			open_page(Page.MAIL)
 		Row.LEDGER:
 			open_page(Page.LEDGER)
 		Row.SAVE:
@@ -259,6 +360,11 @@ func back() -> void:
 			_return_to_main(Row.COMPENDIUM)
 		Page.REQUESTS:
 			_return_to_main(Row.REQUESTS)
+		Page.MAIL:
+			if not _letter_id.is_empty():
+				close_letter()
+			else:
+				_return_to_main(Row.MAIL)
 		Page.LEDGER:
 			_return_to_main(Row.LEDGER)
 		_:
@@ -433,9 +539,11 @@ func _entry_value(data: PonyData) -> String:
 	if compendium == null:
 		return ""
 	if compendium.state_of(data.id) == CompendiumScript.State.PROCESSED:
-		# The Company's word for it, in the Company's tone, until the story teaches the
-		# player what it means. See game/systems/compendium.gd.
-		return "Delivered :)"
+		# The Company's word for it, in the Company's tone, and the tone moves with the
+		# chapter. See game/systems/story_wording.gd; game/systems/compendium.gd's class
+		# comment has said this is how it would read since the state was added.
+		return StoryWordingScript.processed_value(story_chapter,
+			data.id == employees_choice)
 	if compendium.state_of(data.id) != CompendiumScript.State.CAUGHT:
 		return ""
 	return "when: %s, %s" % [_phases_text(data), _weathers_text(data)]
@@ -470,7 +578,13 @@ func _rarity_color(rarity: int) -> Color:
 ## One entry per ACTIVE request, in board order, as {"text": String, "value": String}: the
 ## request as the board words it (with its progress appended when it takes more than one of
 ## anything) and what finishing it pays. Empty when no board was injected.
-##
+
+## The line at the top of the board, in the chapter it is being read in. Empty when no board
+## was injected, which is the state a bare menu is in.
+func board_note() -> String:
+	return board.note() if board != null else ""
+
+
 ## active() rather than requests(): a finished request has already been paid by ranch.gd and
 ## is on its way off the board, so showing it would be asking for something twice.
 func request_rows() -> Array[Dictionary]:
@@ -516,15 +630,143 @@ func ledger_rows() -> Array[String]:
 	return lines if not lines.is_empty() else [EMPTY_TEXT]
 
 
+# --- the mailbox ---------------------------------------------------------------------------
+
+## Every letter she has been sent, NEWEST FIRST. The provider hands them over oldest first
+## (Story.mail is a log), and the list shows the new one at the top, because that is the one
+## she came to read. Nothing is ever removed: re-reading old mail is the whole point of the
+## paper channel.
+func mail_rows() -> Array[Dictionary]:
+	if _mail_rows_dirty:
+		_mail_rows_cache = _fetch_mail_rows()
+		_mail_rows_dirty = false
+	var out: Array[Dictionary] = []
+	for row: Dictionary in _mail_rows_cache:
+		out.append(row.duplicate(true))
+	return out
+
+
+func _fetch_mail_rows() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if not mail_provider.is_valid():
+		return out
+	for entry in mail_provider.call():
+		out.append((entry as Dictionary).duplicate(true))
+	out.reverse()
+	return out
+
+
+func open_letter_id() -> StringName:
+	return _letter_id
+
+
+## Open the letter with this id. Says so with `mail_opened`, which is how ranch.gd marks it
+## read; the menu does not own read state any more than it owns bits.
+func open_letter(id: StringName) -> bool:
+	for row: Dictionary in mail_rows():
+		if StringName(String(row.get("id", ""))) == id:
+			_letter_id = id
+			_selected = 0
+			mail_opened.emit(id)
+			_refresh()
+			return true
+	return false
+
+
+func close_letter() -> void:
+	_letter_id = &""
+	_selected = 0
+	_refresh()
+
+
+## The open letter's row, or an empty dictionary.
+func _open_row() -> Dictionary:
+	for row: Dictionary in mail_rows():
+		if StringName(String(row.get("id", ""))) == _letter_id:
+			return row
+	return {}
+
+
+## The body of the open letter, line by line. Empty when the list is showing.
+func letter_lines() -> Array[String]:
+	var row: Dictionary = _open_row()
+	if row.is_empty():
+		return []
+	var out: Array[String] = []
+	for line in row.get("body", []):
+		out.append(String(line))
+	return out
+
+
+## The rows a reply control offers: {"label": String, "choice": String}. Empty for a letter
+## with no reply control, and empty for one already answered, so a bonus cannot be claimed
+## twice from the menu side either.
+func reply_rows() -> Array[Dictionary]:
+	var row: Dictionary = _open_row()
+	if row.is_empty():
+		return []
+	if not String(row.get("replied", "")).is_empty():
+		return []
+	var out: Array[Dictionary] = []
+	match int(row.get("reply", 0)):
+		StoryBeatScript.Reply.PICK_PONY:
+			if not mail_ponies_provider.is_valid():
+				return out
+			for entry in mail_ponies_provider.call():
+				var pony: Dictionary = entry
+				var coat: String = String(pony.get("coat", ""))
+				var who: String = String(pony.get("name", ""))
+				out.append({
+					"label": "%s %s" % [coat, who] if not coat.is_empty() else who,
+					"choice": String(pony.get("uid", "")),
+				})
+		StoryBeatScript.Reply.YES_NO:
+			out.append({"label": "Yes", "choice": "yes"})
+			out.append({"label": "No", "choice": "no"})
+	return out
+
+
+## THE PAGE'S SEMANTIC MODEL, which survives the drawing rather than being replaced by it.
+## The stage paints; this says what is on the page, so a test can sweep it for a dash and a
+## stage that failed to instantiate still has something to print. Same rule the casino's
+## drawn_lines() follows.
+func mail_lines() -> Array[String]:
+	if not _letter_id.is_empty():
+		var row: Dictionary = _open_row()
+		var out: Array[String] = [String(row.get("sender", "")), String(row.get("title", ""))]
+		out.append_array(letter_lines())
+		for reply: Dictionary in reply_rows():
+			out.append(String(reply["label"]))
+		return out
+	var rows: Array[Dictionary] = mail_rows()
+	if rows.is_empty():
+		return [EMPTY_TEXT, MAIL_EMPTY_TEXT]
+	var lines: Array[String] = []
+	for row: Dictionary in rows:
+		lines.append("%s   %s" % [String(row.get("title", "")),
+			"new" if not bool(row.get("read", false)) else ""])
+	return lines
+
+
 # --- drawing -------------------------------------------------------------------------------
 
 func _refresh() -> void:
+	# Every state change that could move what mail_rows() answers runs through here (open,
+	# close, cursor move, ranch.gd's refresh_page() when a letter arrives), so this is the
+	# one place the cache needs invalidating; see _mail_rows_cache's own comment.
+	_mail_rows_dirty = true
 	# remove_child BEFORE queue_free: a queued node is still a child until the end of the
 	# frame, so freeing alone would leave the old rows laid out underneath the new ones for
 	# one frame every time the cursor moves. Same fix as market_menu.gd's refresh().
 	for child in _rows.get_children():
 		_rows.remove_child(child)
 		child.queue_free()
+	# THE STAGE IS THE MAIL PAGE'S AND NOBODY ELSE'S. A Control left visible with a minimum
+	# size on the compendium would be a blank band above the roster.
+	if _stage != null:
+		_stage.visible = _page == Page.MAIL
+		if _page != Page.MAIL:
+			_stage.custom_minimum_size = Vector2.ZERO
 	match _page:
 		Page.SETTINGS:
 			_draw_settings()
@@ -532,10 +774,20 @@ func _refresh() -> void:
 			_draw_compendium()
 		Page.REQUESTS:
 			_draw_requests()
+		Page.MAIL:
+			_draw_mail()
 		Page.LEDGER:
 			_draw_ledger()
 		_:
 			_draw_main()
+
+
+## Redraw whatever page is up. ranch.gd calls this when something the open page is drawing
+## has changed under it (a letter arriving while the Mail page is open), which is the same
+## push the Depot's refresh() takes.
+func refresh_page() -> void:
+	if _open:
+		_refresh()
 
 
 func _draw_main() -> void:
@@ -578,8 +830,11 @@ func _draw_compendium() -> void:
 
 func _draw_requests() -> void:
 	_title.text = "REQUESTS"
-	_footer.text = MenuStyleScript.footer_reading("back") + "      Finish one to get a new one."
+	_footer.text = MenuStyleScript.footer_reading("back")
 	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
+	var note: String = board_note()
+	if not note.is_empty():
+		_add_note(note)
 	var rows := request_rows()
 	if rows.is_empty():
 		_add_note(EMPTY_TEXT)
@@ -641,3 +896,122 @@ func _row_style(selected: bool) -> StyleBoxFlat:
 	box.set_border_width_all(2 if selected else 1)
 	box.set_corner_radius_all(8)
 	return box
+
+
+## THE MAIL PAGE IS THE STAGE. The Rows column prints nothing while a stage is present: the
+## page IS the drawing, the way the casino's tables are. A menu instantiated without the
+## Stage node (an older scene, a test tree built by hand) falls back to printing
+## mail_lines(), so the page is never blank and never a lie about what is in the mailbox.
+func _draw_mail() -> void:
+	_title.text = "MAIL"
+	MenuStyleScript.apply_title(_title)
+	_footer.text = _mail_footer()
+	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
+	if _stage == null:
+		for line in mail_lines():
+			_add_note(line)
+		return
+	_stage.custom_minimum_size = Vector2(MAIL_STAGE_WIDTH, _mail_stage_height())
+	_stage.queue_redraw()
+
+
+func _mail_footer() -> String:
+	if _letter_id.is_empty():
+		return MenuStyleScript.footer([[&"menu_rows", "choose"], [&"ui_accept", "read"],
+			[&"ui_cancel", "back"]])
+	if reply_rows().is_empty():
+		return MenuStyleScript.footer_reading("back")
+	return MenuStyleScript.footer([[&"menu_rows", "choose"], [&"ui_accept", "answer"],
+		[&"ui_cancel", "back"]])
+
+
+func _mail_stage_height() -> float:
+	if _letter_id.is_empty():
+		var count: int = maxi(1, mini(mail_rows().size(), ENVELOPES_ON_SCREEN))
+		return float(count) * (ENVELOPE_HEIGHT + ENVELOPE_GAP) + 12.0
+	var lines: int = letter_lines().size()
+	var replies: int = reply_rows().size()
+	return 96.0 + float(lines) * LETTER_LINE_HEIGHT \
+		+ float(replies) * (REPLY_ROW_HEIGHT + REPLY_ROW_GAP) + 40.0
+
+
+## THE ONLY draw_* CONTEXT IN THIS FILE. Connected to the Stage Control's `draw` signal in
+## _ready(), which is what makes these calls legal at all.
+func _paint_stage() -> void:
+	if _stage == null or _page != Page.MAIL:
+		return
+	var font: Font = MenuStyleScript.title_font()
+	var box := Rect2(Vector2.ZERO, _stage.size)
+	if _letter_id.is_empty():
+		_paint_envelopes(font, box)
+	else:
+		_paint_letter(font, box)
+
+
+func _paint_envelopes(font: Font, box: Rect2) -> void:
+	var rows: Array[Dictionary] = mail_rows()
+	if rows.is_empty():
+		PaperPaintScript.sheet(_stage, Rect2(box.position, Vector2(box.size.x, 84.0)))
+		PaintScript.text(_stage, font, box.position + Vector2(24.0, 50.0), MAIL_EMPTY_TEXT,
+			MenuStyleScript.ROW_SIZE, PaperPaintScript.INK_DIM, HORIZONTAL_ALIGNMENT_LEFT,
+			box.size.x - 48.0)
+		return
+	# A WINDOW OVER THE LIST, not the whole of it: the mailbox fills up forever and the panel
+	# does not. Follows the cursor exactly as the compendium's window does.
+	var first: int = clampi(_selected - ENVELOPES_ON_SCREEN + 1, 0,
+		maxi(0, rows.size() - ENVELOPES_ON_SCREEN))
+	if _selected < first:
+		first = _selected
+	var y: float = box.position.y + 6.0
+	for i in range(first, mini(rows.size(), first + ENVELOPES_ON_SCREEN)):
+		var row: Dictionary = rows[i]
+		PaperPaintScript.envelope(_stage,
+			Rect2(Vector2(box.position.x, y), Vector2(box.size.x, ENVELOPE_HEIGHT)), font,
+			String(row.get("sender", "")), String(row.get("title", "")),
+			not bool(row.get("read", false)), i == _selected, _anim_t)
+		y += ENVELOPE_HEIGHT + ENVELOPE_GAP
+
+
+func _paint_letter(font: Font, box: Rect2) -> void:
+	var row: Dictionary = _open_row()
+	PaperPaintScript.sheet(_stage, box)
+	PaperPaintScript.letterhead(_stage, box, font, String(row.get("sender", "")))
+	var x: float = box.position.x + 28.0
+	var width: float = box.size.x - 56.0
+	var y: float = box.position.y + 88.0
+	PaintScript.text(_stage, font, Vector2(x, y), String(row.get("title", "")),
+		MenuStyleScript.TITLE_SIZE, PaperPaintScript.INK, HORIZONTAL_ALIGNMENT_LEFT, width)
+	# 20 px below a TITLE_SIZE (30) baseline clears its descender box; 12 sat inside it and
+	# the gold rule cut the tails of letters like "p" and "y" (final review, MINOR 1).
+	y += 20.0
+	MenuStyleScript.rule(_stage, Vector2(x, y), Vector2(x + width, y))
+	y += 30.0
+	for line: String in letter_lines():
+		PaintScript.text(_stage, font, Vector2(x, y), line, MenuStyleScript.ROW_SIZE,
+			PaperPaintScript.INK, HORIZONTAL_ALIGNMENT_LEFT, width)
+		y += LETTER_LINE_HEIGHT
+	var replies: Array[Dictionary] = reply_rows()
+	if not replies.is_empty():
+		y += 8.0
+		# Where the picker starts, kept so the coupon can sit BESIDE it rather than at a
+		# typed in height that would slide under a long title.
+		var reply_top: float = y
+		for i in replies.size():
+			var pick := Rect2(Vector2(x, y), Vector2(width * 0.62, REPLY_ROW_HEIGHT))
+			PaintScript.rounded(_stage, pick, 6.0, Color(PaperPaintScript.STAMP_INK, 0.08),
+				Color(PaperPaintScript.STAMP_INK, 0.55), 1.0)
+			PaintScript.text(_stage, font, pick.position + Vector2(14.0, 24.0),
+				String(replies[i]["label"]), MenuStyleScript.ROW_SIZE, PaperPaintScript.INK,
+				HORIZONTAL_ALIGNMENT_LEFT, pick.size.x - 28.0)
+			if i == _selected:
+				PaintScript.focus_ring(_stage, pick, 6.0, _anim_t)
+			y += REPLY_ROW_HEIGHT + REPLY_ROW_GAP
+		# The coupon, drawn on the paper beside the picker, so the thing she is being paid
+		# is a thing on the page rather than a sentence about a thing.
+		PaperPaintScript.coupon(_stage,
+			Rect2(Vector2(x + width * 0.66, reply_top),
+				Vector2(width * 0.34, 46.0)), font, "HAY COUPON", PaperPaintScript.PAPER)
+	elif not String(row.get("replied", "")).is_empty():
+		PaperPaintScript.stamp(_stage,
+			Rect2(Vector2(x + width * 0.60, y + 6.0), Vector2(width * 0.36, 44.0)), font,
+			"ANSWERED")

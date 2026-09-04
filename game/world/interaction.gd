@@ -21,7 +21,7 @@ extends RefCounted
 ## Static only, no state. Preload by path.
 
 ## The verbs E can carry. NONE is the absence of a candidate and never appears in PRIORITY.
-enum Kind { NONE, PLOT_BUILD, PEN_MOVE_IN, MARKET, BOARD, DEPOT, PALACE }
+enum Kind { NONE, PLOT_BUILD, PEN_MOVE_IN, MARKET, BOARD, MAILBOX, DEPOT, PALACE }
 
 ## THE ORDER, HIGHEST FIRST, and every one of these positions is a decision.
 ##
@@ -39,8 +39,13 @@ enum Kind { NONE, PLOT_BUILD, PEN_MOVE_IN, MARKET, BOARD, DEPOT, PALACE }
 ## two widest radii (4.0 m and 5.0 m), so if a future map ever does overlap one of them
 ## with something smaller, the smaller thing wins, which is the answer a player expects
 ## from a big building with a small thing in front of it.
+##
+## THE MAILBOX SITS ABOVE THE DEPOT for the reason the note above already gives: the Depot
+## and the Palace are last because they are the two biggest buildings with the two widest
+## radii, so a smaller thing standing in front of one of them wins the ground. A mailbox is
+## the smallest thing on the map.
 const PRIORITY: Array[int] = [Kind.PLOT_BUILD, Kind.PEN_MOVE_IN, Kind.MARKET, Kind.BOARD,
-	Kind.DEPOT, Kind.PALACE]
+	Kind.MAILBOX, Kind.DEPOT, Kind.PALACE]
 
 ## What the pen prompt says when the saddlebag is empty. THE PEN STILL WINS THE GROUND in
 ## that state, deliberately: a pen that dropped out of the running with an empty bag would
@@ -112,6 +117,8 @@ static func prompt_for(action: Dictionary, key: String) -> String:
 			return "%s: Market, sell gems" % key
 		Kind.BOARD:
 			return "%s: read the board" % key
+		Kind.MAILBOX:
+			return "%s: read your mail" % key
 		Kind.DEPOT:
 			return "%s: Depot, deliver and pay" % key
 		Kind.PALACE:

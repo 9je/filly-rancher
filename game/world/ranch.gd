@@ -174,6 +174,10 @@ const RaceTrackScript := preload("res://world/race_track.gd")
 const CompanyRunnersScript := preload("res://systems/company_runners.gd")
 const AttendantScript := preload("res://world/attendant.gd")
 const HudScript := preload("res://ui/hud.gd")
+const MailboxScript := preload("res://world/mailbox.gd")
+const StoryScript := preload("res://systems/story.gd")
+const StoryBeatScript := preload("res://systems/story_beat.gd")
+const StoryLibraryScript := preload("res://systems/story_library.gd")
 
 ## Headless watchdog ceiling. A normal run (assets present) finishes in under 2s on
 ## this machine; 30s leaves a wide margin for a slower box while still failing in
@@ -282,6 +286,16 @@ const BOARD_RADIUS := 3.0
 ## How near the loading dock she has to be for E to open the Depot. Tighter than the
 ## Market's radius because the Depot is a smaller building on a busier corner of the yard.
 const DEPOT_RADIUS := 4.0
+
+## How close to the mailbox E opens the Mail page from. Narrower than the Depot's, because a
+## mailbox is a small thing on a post and a wide radius would put its prompt on top of the
+## farmhouse door the player walks past to reach it.
+const MAILBOX_RADIUS := 2.6
+
+## WHAT ARRIVAL SOUNDS LIKE, and it is said once per batch rather than once per letter: two
+## letters landing on the same collection day are one trip to the mailbox. The flag on the
+## box is the state; this is the moment.
+const MAIL_ARRIVED := "Post! The flag is up on your mailbox."
 
 ## How close to the Spectra Palace the counter opens from. Wider than the Depot's, because
 ## the Palace is fourteen metres across and the door is in the middle of one long side.
@@ -630,6 +644,10 @@ var _quoted_fields: Dictionary = {}
 ## replaces GameState.requests wholesale, and a board still holding the previous session's
 ## Dictionaries would be paying out requests nobody on this save was ever given.
 var _board: RequestBoard = null
+
+## The authored letters, loaded once for the life of the process (they are identical on
+## every machine, like the pony roster and the region catalogue).
+var _story_library: StoryLibrary = null
 
 ## The whole character roster, loaded once and kept, because the board is rebuilt on every
 ## load and re-reading 45 .tres files each time would be a disk scan per load. _report()
@@ -1005,6 +1023,11 @@ func _ready() -> void:
 	_restored_ponies = restore_owned_ponies()
 
 	_bind_build_menu()
+
+	# THE FIRST POST, before the gate reports. A brand new ranch has a letter waiting in the
+	# mailbox by the time the player takes her first step, which is what makes the flag mean
+	# something on the very first frame.
+	advance_story()
 
 	await _report(pony_count, prop_count)
 
@@ -1521,6 +1544,8 @@ func _on_world_changed() -> void:
 	# "the herd changes with the hour" has to ride the connection that is already there.
 	_refresh_herd()
 	_maybe_run_collection_day()
+	advance_story()
+	_maybe_serve_requisition()
 	_maybe_serve_collector()
 
 
@@ -1912,6 +1937,43 @@ func is_near_depot() -> bool:
 	return gap <= DEPOT_RADIUS
 
 
+func get_mailbox() -> Mailbox:
+	return get_node_or_null(^"Buildings/Mailbox") as MailboxScript
+
+
+## Is the player standing at the mailbox?
+func is_near_mailbox() -> bool:
+	var box: Node3D = get_mailbox()
+	if box == null or player == null:
+		return false
+	var gap := Vector2(player.global_position.x - box.global_position.x,
+		player.global_position.z - box.global_position.z).length()
+	return gap <= MAILBOX_RADIUS
+
+
+## THE FLAG SAYS WHETHER ANYTHING IS WAITING, and it is the only thing in the world that
+## says so. Pushed from here rather than pulled by the mailbox, because game/world/ is not
+## allowed to reach into GameState any more than game/ui/ is.
+func _refresh_mailbox_flag() -> void:
+	var box: Mailbox = get_mailbox()
+	if box == null or _game_state == null:
+		return
+	box.set_flag_up(_game_state.story.unread_count() > 0)
+
+
+## OPEN THE MAIL, the same way the request board opens its own page: the page number is
+## fetched out of PauseMenu's own constant map rather than written here, so a build whose
+## pause menu has no MAIL page opens the pause menu itself rather than failing to compile.
+func open_mail_page() -> void:
+	if pause_menu == null or not pause_menu.has_method("open"):
+		return
+	var page_id := _pause_menu_page("MAIL")
+	if page_id >= 0 and pause_menu.has_method("open_page"):
+		pause_menu.call("open_page", page_id)
+		return
+	pause_menu.open()
+
+
 ## The Spectra Palace's own origin in world space, or the Strip's centre if the building is
 ## missing. The doorway is on the south face; see ranch.tscn's half turn on the node.
 func palace_position() -> Vector3:
@@ -1957,12 +2019,19 @@ func _bind_pause_menu() -> void:
 		pause_menu.set("board", get_request_board())
 		pause_menu.set("world_state", get_world_state())
 		pause_menu.set("statement_provider", func() -> Array[String]: return _statement())
+		pause_menu.set("mail_provider", func() -> Array[Dictionary]: return mail_rows())
+		pause_menu.set("mail_ponies_provider",
+			func() -> Array[Dictionary]: return owned_rows())
+		pause_menu.set("story_chapter",
+			_game_state.story.chapter if _game_state != null else 0)
+		pause_menu.set("employees_choice", _employees_choice_id())
 	inject_pages.call()
 	if _game_state != null and not _game_state.state_loaded.is_connected(inject_pages):
 		_game_state.state_loaded.connect(inject_pages)
 	for pair in [["opened", _on_pause_opened], ["closed", _on_menu_closed],
 			["save_requested", _on_pause_save], ["quit_requested", _on_pause_quit],
-			["settings_changed", _on_settings_changed]]:
+			["settings_changed", _on_settings_changed],
+			["mail_opened", _on_mail_opened], ["mail_reply", _on_mail_reply]]:
 		if not pause_menu.is_connected(pair[0], pair[1]):
 			pause_menu.connect(pair[0], pair[1])
 
@@ -2218,6 +2287,8 @@ func run_collection_day() -> Dictionary:
 	var cycle: int = _world.cycle_index() if _world != null else 0
 	var summary: Dictionary = ledger.run_collection_day(cycle, _built_plot_count(),
 		_open_permit_count())
+	if _game_state != null:
+		_game_state.story.note_collection_day()
 	var letter: Dictionary = LettersScript.render(LettersScript.Id.COLLECTION_NOTICE, {
 		"name": _player_name(), "balance": int(summary["balance"]),
 		"upkeep": int(summary["upkeep"])})
@@ -2593,6 +2664,21 @@ func deliver_pony(uid: StringName) -> Dictionary:
 	if named:
 		_game_state.compendium.mark_processed(inst.data_id)
 
+	# THE STORY COUNTS HER TOO, and it counts her by the same event the Company's receipt
+	# does. A named pony's display name and her character id travel into the story here
+	# because the letter that lists her beside a colour is written long after she has gone.
+	_game_state.story.note_delivery(named, inst.display_name(), inst.data_id)
+
+	# THE COMPENDIUM'S "EMPLOYEE'S CHOICE" STAR IS EARNED, NOT PROMISED. survey_choice
+	# carries a data_id the moment she answers the Survey, long before anyone has been
+	# delivered, and the Compendium is keyed by CHARACTER rather than by instance -- so
+	# comparing against the data_id alone (what _employees_choice_id() used to do on its
+	# own) would star a STOCK pony of the same species the moment she is processed. This
+	# flag is set here, gated on the UID actually delivered matching the one she named, so
+	# the star tracks the one pony rather than her whole species.
+	if named and String(inst.uid) == String(_game_state.story.survey_choice.get("uid", "")):
+		_game_state.story.set_flag("employees_choice_delivered")
+
 	# credit_delivery() has already counted her, so the ledger's own running total IS the
 	# number this receipt should carry.
 	var shipments: int = _game_state.ledger.shipments
@@ -2606,6 +2692,7 @@ func deliver_pony(uid: StringName) -> Dictionary:
 	if depot_menu != null and depot_menu.has_method("refresh"):
 		depot_menu.refresh()
 	_relieve_if_paid_down()
+	advance_story()
 	return {"ok": true, "credit": credit, "named": named, "name": inst.display_name()}
 
 
@@ -3087,6 +3174,308 @@ func _update_gate_prompt() -> void:
 			% [fence.region().display_name, fence.region().permit_cost])
 
 
+# --- the story, the post, and the survey -------------------------------------------------
+
+func story_library() -> StoryLibrary:
+	if _story_library == null:
+		_story_library = StoryLibraryScript.new()
+		_story_library.load_all()
+	return _story_library
+
+
+## The player's story, or null when there is no GameState. Read off the state rather than
+## cached here, for rebind_economy()'s reason: a load replaces it.
+func get_story() -> Story:
+	return _game_state.story if _game_state != null else null
+
+
+## THE CHAPTER, THEN THE POST. Called at boot, at every phase change, after a delivery and
+## after a collection day: the four moments any of the story's counters can have moved.
+## Returns how many letters actually landed, so a gate can assert on the number rather than
+## on a toast.
+func advance_story() -> int:
+	var story: Story = get_story()
+	if story == null:
+		return 0
+	story.advance()
+	var posted: int = _post_due_mail()
+	# THE BOOK IS READ IN THE CURRENT CHAPTER'S WORDS. inject_pages() is re-run on a load;
+	# a chapter that turns mid session has to push the same two fields itself.
+	if pause_menu != null:
+		pause_menu.set("story_chapter", story.chapter)
+		pause_menu.set("employees_choice", _employees_choice_id())
+	if _board != null:
+		_board.set_chapter(story.chapter)
+	return posted
+
+
+## THE COMPENDIUM'S "EMPLOYEE'S CHOICE" ROW ID, or empty until she has earned it. Empty
+## while the flag deliver_pony() sets is unset, even though survey_choice.data_id exists the
+## moment she answers the Survey: a data_id alone would star every stock pony of the same
+## species the instant one is processed, since the Compendium is keyed by character, not by
+## instance. See deliver_pony()'s own comment on the flag.
+func _employees_choice_id() -> StringName:
+	var story: Story = get_story()
+	if story == null or not story.has_flag("employees_choice_delivered"):
+		return &""
+	return StringName(String(story.survey_choice.get("data_id", "")))
+
+
+## Post everything the library says is owed, oldest rung first. One toast for the batch, the
+## flag up, and the pause menu re-drawn if she happens to be looking at the page.
+func _post_due_mail() -> int:
+	var story: Story = get_story()
+	if story == null:
+		return 0
+	var posted := 0
+	# FROZEN ONCE, FOR THE WHOLE BATCH: nothing between here and the loop's end changes
+	# last_named or survey_choice (no delivery happens mid post), so one snapshot is
+	# honestly what every beat posted this call is "about" right now.
+	var params: Dictionary = _story_params()
+	for beat: StoryBeat in story_library().due(story):
+		if not story.post(beat.id, params):
+			continue
+		posted += 1
+		if beat.id == &"weather_requisition":
+			# ARMED HERE, SERVED AT A LATER DAWN. The cycle is written down for the same
+			# reason Ledger.pending_punishment_cycle is: the letter has to land before the
+			# knock, and a collector who called in the same frame as his own notice is not
+			# the beat the spec describes.
+			story.set_flag("requisition_posted")
+			story.requisition_cycle = _world.cycle_index() if _world != null else 0
+	if posted > 0:
+		_toast(MAIL_ARRIVED)
+	_refresh_mailbox_flag()
+	# A LETTER THAT LANDS WHILE SHE IS LOOKING AT THE PAGE APPEARS ON IT. The page draws from
+	# a provider, so it only needs telling to draw again; the push is ranch.gd's, the same way
+	# the Depot's refresh() is.
+	if pause_menu != null and pause_menu.has_method("refresh_page"):
+		pause_menu.call("refresh_page")
+	return posted
+
+
+## THE PRIORITY REQUISITION, SERVED. A collector calls at the first DAWN of a cycle LATER
+## than the one the letter landed on, walks the pony the player named from her pen, and she
+## leaves by the departure path into the crate: the SAME path a Depot delivery uses, because
+## it is the only path a pony ever leaves the ranch by. Returns
+## {"served": bool, "name": String, "credit": int} so a gate can assert on what happened
+## rather than on a toast.
+##
+## THIS IS THE ONE PLACE BEFORE THE FORK WHERE THE COMPANY REACHES INTO A PEN, and the spec
+## names it as the single scripted exception (see "The ledger": "No pony is ever taken from a
+## pen by a collector before the fork, with one scripted exception, the Survey's Priority
+## Requisition"). Nothing about it is a new transaction: deliver_pony() applies the credit,
+## counts the quota, marks the Compendium and posts the receipt, exactly as the counter does.
+##
+## THREE ENDINGS, and each is deliberate:
+##   she is in a pen        she walks, and the requisition is served.
+##   she is not owned at all she has already gone (delivered, or never kept); the
+##                          requisition closes itself so it cannot sit armed forever.
+##   she is owned but not penned  nothing happens and it stays armed: she is in the
+##                          saddlebag, and a collector does not take a pony out of a pocket.
+func serve_requisition() -> Dictionary:
+	var refused := {"served": false, "name": "", "credit": 0}
+	var story: Story = get_story()
+	if story == null or _game_state == null:
+		return refused
+	if not story.has_flag("requisition_posted") or story.has_flag("requisition_served"):
+		return refused
+	var uid := StringName(String(story.survey_choice.get("uid", "")))
+	if String(uid).is_empty():
+		story.set_flag("requisition_served")
+		return refused
+	if _game_state.find_pony(uid) == null:
+		# She is not on the ranch any more. Close it quietly: there is nobody to walk over
+		# and nothing to say that would not be worse than saying nothing.
+		story.set_flag("requisition_served")
+		return refused
+	if _penned(uid).is_empty():
+		return refused
+
+	var who: String = String(story.survey_choice.get("name", ""))
+	var result: Dictionary = deliver_pony(uid)
+	if not bool(result.get("ok", false)):
+		return refused
+	story.set_flag("requisition_served")
+	_toast("An associate called for %s and walked her over himself. Most efficient!" % who)
+	_refresh_mailbox_flag()
+	save_game()
+	return {"served": true, "name": String(result.get("name", who)),
+		"credit": int(result.get("credit", 0))}
+
+
+## THE KNOCK, ONE FULL CYCLE AFTER THE LETTER, and only ever at DAWN. Same shape as
+## _maybe_serve_collector(), and the arming cycle lives on the story so it travels with the
+## save: quitting between the Requisition and the dawn comes back owing the same visit.
+func _maybe_serve_requisition() -> void:
+	if _world == null or _world.phase() != WorldStateScript.Phase.DAWN:
+		return
+	var story: Story = get_story()
+	if story == null or not story.has_flag("requisition_posted"):
+		return
+	if story.has_flag("requisition_served"):
+		return
+	if _world.cycle_index() <= story.requisition_cycle:
+		return
+	serve_requisition()
+
+
+## WHAT A LETTER IS RENDERED AGAINST. Every placeholder any authored letter may carry, in
+## one dictionary, so a beat written next year cannot find a parameter missing. The pony and
+## the colour come off the story rather than out of the world, because the pony a receipt
+## names left by the departure path some sessions ago and is not in the world to ask.
+##
+## {pony} AND {chosen} ARE NOT THE SAME PONY, and conflating them was CRITICAL 2 of the
+## final review: `{pony}` is `last_named`, the pony a delivery receipt is actually about;
+## `{chosen}` is `survey_choice`, the pony she named on the Survey. Once the Survey is
+## answered `chosen` never empties again, so a `{pony}` that fell back to it would name the
+## Survey's pony in every letter forever, including a receipt for somebody else entirely.
+## CALLED ONLY TO BUILD A FRESH SNAPSHOT: _post_due_mail() freezes this into the mail log at
+## POST time, and mail_rows() renders a posted letter against that frozen copy, not against
+## a fresh call here, so a letter's meaning cannot change after the fact. A live call here
+## is for a letter that has never been posted (there is none in this slice) or for a
+## pre-fix save's letters, which have no frozen params to fall back on.
+func _story_params() -> Dictionary:
+	var story: Story = get_story()
+	var chosen: String = ""
+	var named: String = ""
+	var colour: String = ""
+	if story != null:
+		chosen = String(story.survey_choice.get("name", ""))
+		named = String(story.last_named.get("name", ""))
+		colour = String(story.last_named.get("colour", ""))
+	return {
+		"name": _player_name(),
+		"pony": named if not named.is_empty() else StoryBeatScript.DEFAULTS["pony"],
+		"chosen": chosen if not chosen.is_empty() else StoryBeatScript.DEFAULTS["chosen"],
+		"colour": colour if not colour.is_empty() else StoryBeatScript.DEFAULTS["colour"],
+		"count": _game_state.ledger.shipments if _game_state != null else 0,
+		"quota": _game_state.ledger.quota if _game_state != null else 0,
+		"balance": _game_state.ledger.balance if _game_state != null else 0,
+	}
+
+
+## THE MAILBOX, RENDERED. Oldest first, which is the order Story.mail keeps; the page turns
+## it round for display. A posted id the library no longer carries is SKIPPED rather than
+## drawn as a blank: a letter this build cannot render is not a letter, and dropping her
+## whole mailbox over one of them would be worse.
+##
+## EACH LETTER RENDERS AGAINST ITS OWN FROZEN PARAMS, captured by _post_due_mail() the
+## moment it landed, not against a single live snapshot shared by the whole mailbox: that
+## sharing is exactly what CRITICAL 2 of the final review found (every letter rendered
+## against whatever the Survey and the last delivery say RIGHT NOW, so an old receipt
+## rewrote itself the moment she answered the Survey). A letter with no frozen params (a
+## pre-fix save's mail, posted before this field existed) falls back to a live render, which
+## is how it has always looked; every letter posted from here on freezes its own.
+func mail_rows() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var story: Story = get_story()
+	if story == null:
+		return out
+	var live_params: Dictionary = _story_params()
+	for id: StringName in story.mail_ids():
+		var beat: StoryBeat = story_library().by_id(id)
+		if beat == null:
+			continue
+		var frozen: Dictionary = story.mail_params(id)
+		var params: Dictionary = frozen if not frozen.is_empty() else live_params
+		var letter: Dictionary = beat.render(params)
+		out.append({
+			"id": String(id),
+			"sender": String(letter["sender"]),
+			"title": String(letter["title"]),
+			"body": letter["body"],
+			"read": story.is_read(id),
+			"replied": story.replied_to(id),
+			"reply": beat.reply_index(),
+		})
+	return out
+
+
+## EVERY PONY SHE OWNS, for the Survey's picker: the ones in pens, the ones in the
+## saddlebag, all of them, because the question is "which of your ponies", not "which of the
+## ponies you happen to have penned".
+func owned_rows() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if _game_state == null:
+		return out
+	for inst: PonyInstance in _game_state.get_ponies():
+		out.append({
+			"uid": String(inst.uid),
+			"name": inst.display_name(),
+			"coat": _coat_word(inst),
+		})
+	return out
+
+
+func _on_mail_opened(id: StringName) -> void:
+	var story: Story = get_story()
+	if story == null:
+		return
+	if story.mark_read(id):
+		_refresh_mailbox_flag()
+
+
+func _on_mail_reply(id: StringName, choice: String) -> void:
+	answer_mail(id, choice)
+
+
+## SHE ANSWERED A LETTER. Returns whether anything happened. The menu emitted the choice;
+## this is the only place it becomes bits, hay and a line in the save.
+##
+## THE ORDER IS THE SAFETY. The answer is recorded FIRST and the reward paid second, and
+## record_reply() refuses a letter that already carries an answer, so there is no ordering
+## in which the bonus is paid twice. Answering is optional forever: nothing here fires
+## unless she presses the key.
+func answer_mail(id: StringName, choice: String) -> bool:
+	var story: Story = get_story()
+	if story == null or choice.is_empty():
+		return false
+	var beat: StoryBeat = story_library().by_id(id)
+	if beat == null or beat.reply_index() == StoryBeatScript.Reply.NONE:
+		return false
+	if beat.reply_index() == StoryBeatScript.Reply.PICK_PONY:
+		var picked: PonyInstance = _game_state.find_pony(StringName(choice)) \
+			if _game_state != null else null
+		if picked == null:
+			return false
+		if not story.record_reply(id, choice):
+			return false
+		# ANSWERING IS READING. A letter she just replied to is a letter she has seen the
+		# whole of; leaving it unread until she happened to reopen it would keep the
+		# mailbox flag up over mail she has already acted on.
+		story.mark_read(id)
+		_refresh_mailbox_flag()
+		story.answer_survey({
+			"uid": choice,
+			"data_id": String(picked.data_id),
+			"name": picked.display_name(),
+			"coat": _coat_word(picked),
+		})
+		_pay_survey(picked.display_name())
+		save_game()
+		return true
+	if not story.record_reply(id, choice):
+		return false
+	story.mark_read(id)
+	_refresh_mailbox_flag()
+	save_game()
+	return true
+
+
+## THE SURVEY'S THANK YOU, through the seams every other reward in the game uses:
+## Economy.grant() for the bits and Inventory.add() for the hay. No arithmetic of its own,
+## and nothing under game/systems/ that computes money is touched.
+func _pay_survey(who: String) -> void:
+	if _economy != null:
+		_economy.grant(StoryScript.SURVEY_BONUS_BITS)
+	var bag: Inventory = _current_inventory()
+	if bag != null:
+		bag.add(StoryScript.SURVEY_COUPON_ITEM, StoryScript.SURVEY_COUPON_COUNT)
+	_toast("Thank you for naming %s! %d bits and a hay coupon, with our appreciation."
+		% [who, StoryScript.SURVEY_BONUS_BITS])
+
+
 # --- the compendium, the board and the payouts -------------------------------------------
 
 ## Subscribe to the beam's catches. ONE CONNECTION, made once at boot, rather than a hook
@@ -3241,6 +3630,8 @@ func _rebuild_request_board() -> void:
 		_board.seed_tutorial()
 	else:
 		_board = RequestBoardScript.from_array(saved, _pony_roster(), region_ids, region_names)
+	if _board != null and _game_state != null:
+		_board.set_chapter(_game_state.story.chapter)
 	_board.fill(_seen_ids())
 	_refresh_tasks()
 
@@ -3518,6 +3909,9 @@ func interaction_candidates() -> Array[Dictionary]:
 	if is_near_board():
 		out.append(InteractionScript.candidate(
 			InteractionScript.Kind.BOARD, _flat_gap_to(^"Buildings/Board")))
+	if is_near_mailbox():
+		out.append(InteractionScript.candidate(
+			InteractionScript.Kind.MAILBOX, _flat_gap_to(^"Buildings/Mailbox")))
 	if is_near_depot():
 		out.append(InteractionScript.candidate(
 			InteractionScript.Kind.DEPOT, _flat_gap_to(^"Buildings/Depot")))
@@ -3593,6 +3987,9 @@ func perform_interaction(action: Dictionary) -> bool:
 			return bool(market_menu.open())
 		InteractionScript.Kind.BOARD:
 			_open_request_page()
+			return true
+		InteractionScript.Kind.MAILBOX:
+			open_mail_page()
 			return true
 		InteractionScript.Kind.DEPOT:
 			if depot_menu == null or not depot_menu.has_method("open"):
@@ -4898,7 +5295,7 @@ func _report(pony_count: int, prop_count: int) -> void:
 		# unreachable; it is not. It is exactly the path CI runs (assets are always
 		# absent in CI -- see docs/ci.md section 4), so a reviewer disabling both
 		# buildings' colliders sailed straight through: this whole check silently did
-		# not exist for that run, `RANCH_OK ponies=0 props=6 assets=absent` printed,
+		# not exist for that run, `RANCH_OK ponies=0 props=7 assets=absent` printed,
 		# exit 0. A missing dictionary entry is not visible in the "every check held"
 		# loop below the way `false` is -- so a silent SKIP here is worse than a wrong
 		# answer, it's a gate CI runs that cannot fail this way at all.
@@ -5488,6 +5885,7 @@ func _interaction_doors() -> Array[Dictionary]:
 	var radii := {
 		"Buildings/Market": MARKET_RADIUS,
 		"Buildings/Board": BOARD_RADIUS,
+		"Buildings/Mailbox": MAILBOX_RADIUS,
 		"Buildings/Depot": DEPOT_RADIUS,
 		"Buildings/Palace": PALACE_RADIUS,
 	}
