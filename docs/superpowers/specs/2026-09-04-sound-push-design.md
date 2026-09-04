@@ -12,6 +12,8 @@ Register: the world SOUNDS as cute as it looks. Real birdsong, real wind, real c
 
 **Quality bar (binding):** natural recordings over synthesized blips wherever a real-world source exists. UI ticks and casino jingle stingers may be designed sounds; everything ambient or physical is a recording.
 
+**Register rule (binding, owner 2026-09-04):** the ponies are cartoon characters, not livestock -- "the mlp ponies dont make realistic horse noises." No realistic horse VOCALIZATIONS anywhere (no whinny, neigh, snort, nicker). Physical horse sound is still correct and wanted: hoofsteps ("walking is the big one we do need"), gallops under the race crowd. Moments that would have used a whinny use the capture chime or nothing. If pony vocal personality is ever added, it comes from a cute designed/voice source, a later owner-taste pass -- never from a farm recording.
+
 ## 2. Sourcing (proven feasible 2026-09-04)
 
 Owner has waived usage-rights vetting ("i again dont care about usage rights"). Standing constraints still bind: **record the source URL for every file** in the manifest, **never create accounts**, **never use the owner's email**. All three sources below verified working with zero login:
@@ -84,8 +86,6 @@ Every slot below is a manifest row (or several, for variant sets). BBC search te
 | `mail_stamp` | Survey answered / ANSWERED stamp | rubber stamp thump |
 | `capture_charge` | beam charging | BBC "electrical hum rising" (pitch-shifted magical, not scary) |
 | `capture_success` | pony captured | soft chime + pop (Kenney jingle acceptable here) |
-| `pony_whinny_1..3` | capture, delivery, pen interactions | BBC "horse whinny" / "pony neigh" (variant set) |
-| `pony_snort_1..2` | idle pen proximity | BBC "horse snort" |
 | `hoofsteps_grass_1..4` | player footsteps, surface grass | BBC "horse walking grass" (variant set, clipped single strikes) |
 | `hoofsteps_hard_1..4` | player footsteps, Strip/boards | BBC "horse hooves cobbles" (variant set) |
 | `gate_open` | pen gate interactions | BBC "wooden gate creak" |
