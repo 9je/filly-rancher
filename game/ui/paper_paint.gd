@@ -48,6 +48,12 @@ const SHEET_RADIUS := 10.0
 const CARD_RADIUS := 8.0
 const SHADOW_OFFSET := Vector2(3.0, 4.0)
 
+## THE ENVELOPE FLAP'S APEX, as a fraction of the card's height. Confined to the top band
+## deliberately: a card this wide (660 x 68 on the Mail page) reads the flap as a hairline
+## through the sender line and the title the moment it reaches anywhere near either baseline
+## (final review, IMPORTANT 2). Kept well clear of both by staying inside the top third.
+const FLAP_APEX_FRACTION := 0.28
+
 ## The cloud in the Company's mark, as a closed polygon: three lobes over a flat base.
 ## Authored against the normalised box it is handed, so it works at 22 px on an envelope
 ## card and at 60 px on a letterhead.
@@ -79,6 +85,17 @@ static func bolt_points(box: Rect2) -> PackedVector2Array:
 	var out := PackedVector2Array()
 	for point: Vector2 in _BOLT:
 		out.append(_at(box, point))
+	return out
+
+
+## THE ENVELOPE FLAP: a triangle from the card's top corners down to a single apex, confined
+## to FLAP_APEX_FRACTION of the box's height. Pure and box relative, like logo_points() and
+## bolt_points() above, so test_paper_paint.gd can pin the shape without a viewport.
+static func flap_points(box: Rect2) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	out.append(box.position + Vector2(10.0, 2.0))
+	out.append(box.position + Vector2(box.size.x - 10.0, 2.0))
+	out.append(box.position + Vector2(box.size.x * 0.5, box.size.y * FLAP_APEX_FRACTION))
 	return out
 
 
@@ -118,16 +135,18 @@ static func envelope(ci: CanvasItem, rect: Rect2, font: Font, sender: String, ti
 		unread: bool, picked: bool, t: float) -> void:
 	PaintScript.rounded(ci, rect, CARD_RADIUS, PAPER if unread else Color(PAPER, 0.82),
 		PAPER_EDGE, 1.0)
-	# THE FLAP. Two lines from the top corners to the middle of the top edge: the whole
-	# reason a card reads as an envelope rather than as a button.
-	var left: Vector2 = rect.position + Vector2(10.0, 2.0)
-	var right: Vector2 = rect.position + Vector2(rect.size.x - 10.0, 2.0)
-	var point: Vector2 = rect.position + Vector2(rect.size.x * 0.5, rect.size.y * 0.52)
-	ci.draw_line(left, point, PAPER_EDGE, 1.0, true)
-	ci.draw_line(right, point, PAPER_EDGE, 1.0, true)
-	PaintScript.text(ci, font, rect.position + Vector2(16.0, 26.0), sender,
+	# THE FLAP. A filled triangle over the top band, not two lines crossing the whole card:
+	# on a card this wide a pair of near horizontal strokes read as a scratch through the
+	# sender line and the title rather than as a flap (final review, IMPORTANT 2). A fill
+	# reads as a shape at a glance regardless of how shallow the angle a card this shape can
+	# afford actually is; the two edge strokes are kept on top of it for definition.
+	var flap: PackedVector2Array = flap_points(rect)
+	ci.draw_colored_polygon(flap, Color(PAPER_EDGE, 0.25))
+	ci.draw_line(flap[0], flap[2], PAPER_EDGE, 1.0, true)
+	ci.draw_line(flap[1], flap[2], PAPER_EDGE, 1.0, true)
+	PaintScript.text(ci, font, rect.position + Vector2(16.0, 36.0), sender,
 		MenuStyleScript.SUBTITLE_SIZE, INK_DIM, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 70.0)
-	PaintScript.text(ci, font, rect.position + Vector2(16.0, 52.0), title,
+	PaintScript.text(ci, font, rect.position + Vector2(16.0, 58.0), title,
 		MenuStyleScript.ROW_SIZE, INK, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 70.0)
 	if unread:
 		PaintScript.ellipse(ci, rect.position + Vector2(rect.size.x - 28.0, 30.0), 11.0, 11.0,

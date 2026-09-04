@@ -156,6 +156,17 @@ var _open := false
 ## The letter currently open on the MAIL page, or &"" while the list is showing.
 var _letter_id: StringName = &""
 
+## mail_rows()'s answer, taken once per _refresh() rather than once per call. The Mail
+## page's stage redraws every frame it is up (_process()), and every draw call used to walk
+## the provider and duplicate(true) every letter ever posted -- O(letters) allocation every
+## frame, growing with playtime, for a page nothing had touched since the last _refresh()
+## (final review, MINOR 3). _refresh() is the one place anything that could change what
+## mail_rows() answers already runs through (open, close, cursor move, a letter arriving),
+## so recomputing there and reading the cache everywhere else costs nothing correctness can
+## notice.
+var _mail_rows_cache: Array[Dictionary] = []
+var _mail_rows_dirty := true
+
 ## Seconds since this menu opened, advanced in _process while it is up. Read by the stage
 ## for the focus ring's breath, the same field and the same purpose as TableMenu._anim_t.
 var _anim_t := 0.0
@@ -303,6 +314,11 @@ func confirm() -> bool:
 		var choice: String = String(replies[_selected]["choice"])
 		close_letter()
 		mail_reply.emit(answered, choice)
+		# REFRESH AGAIN, AFTER THE EMIT: close_letter()'s own _refresh() ran BEFORE
+		# ranch.gd's answer_mail() had a chance to mark the letter read, so the mail_rows()
+		# cache it primed would otherwise hold the pre-reply snapshot (stale wax dot, no
+		# "ANSWERED" stamp) until some unrelated interaction happened to refresh the page.
+		_refresh()
 		return true
 	if _page == Page.SETTINGS:
 		if _selected == SettingRow.INVERT:
@@ -562,7 +578,7 @@ func _rarity_color(rarity: int) -> Color:
 ## One entry per ACTIVE request, in board order, as {"text": String, "value": String}: the
 ## request as the board words it (with its progress appended when it takes more than one of
 ## anything) and what finishing it pays. Empty when no board was injected.
-##
+
 ## The line at the top of the board, in the chapter it is being read in. Empty when no board
 ## was injected, which is the state a bare menu is in.
 func board_note() -> String:
@@ -621,6 +637,16 @@ func ledger_rows() -> Array[String]:
 ## she came to read. Nothing is ever removed: re-reading old mail is the whole point of the
 ## paper channel.
 func mail_rows() -> Array[Dictionary]:
+	if _mail_rows_dirty:
+		_mail_rows_cache = _fetch_mail_rows()
+		_mail_rows_dirty = false
+	var out: Array[Dictionary] = []
+	for row: Dictionary in _mail_rows_cache:
+		out.append(row.duplicate(true))
+	return out
+
+
+func _fetch_mail_rows() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	if not mail_provider.is_valid():
 		return out
@@ -725,6 +751,10 @@ func mail_lines() -> Array[String]:
 # --- drawing -------------------------------------------------------------------------------
 
 func _refresh() -> void:
+	# Every state change that could move what mail_rows() answers runs through here (open,
+	# close, cursor move, ranch.gd's refresh_page() when a letter arrives), so this is the
+	# one place the cache needs invalidating; see _mail_rows_cache's own comment.
+	_mail_rows_dirty = true
 	# remove_child BEFORE queue_free: a queued node is still a child until the end of the
 	# frame, so freeing alone would leave the old rows laid out underneath the new ones for
 	# one frame every time the cursor moves. Same fix as market_menu.gd's refresh().
@@ -951,9 +981,11 @@ func _paint_letter(font: Font, box: Rect2) -> void:
 	var y: float = box.position.y + 88.0
 	PaintScript.text(_stage, font, Vector2(x, y), String(row.get("title", "")),
 		MenuStyleScript.TITLE_SIZE, PaperPaintScript.INK, HORIZONTAL_ALIGNMENT_LEFT, width)
-	y += 12.0
+	# 20 px below a TITLE_SIZE (30) baseline clears its descender box; 12 sat inside it and
+	# the gold rule cut the tails of letters like "p" and "y" (final review, MINOR 1).
+	y += 20.0
 	MenuStyleScript.rule(_stage, Vector2(x, y), Vector2(x + width, y))
-	y += 26.0
+	y += 30.0
 	for line: String in letter_lines():
 		PaintScript.text(_stage, font, Vector2(x, y), line, MenuStyleScript.ROW_SIZE,
 			PaperPaintScript.INK, HORIZONTAL_ALIGNMENT_LEFT, width)

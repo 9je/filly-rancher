@@ -515,11 +515,16 @@ func test_a_half_wired_compendium_reads_as_empty() -> void:
 
 func test_a_delivered_character_reads_as_delivered_and_still_counts_as_caught() -> void:
 	_wire_book()
+	# THROUGH StoryWording.processed_label(), not the literal string: this used to pass
+	# only because story_chapter defaults to 0 and PROCESSED_LABELS[0] happens to be
+	# "Delivered :)", so a reword of the SUNNY label would have failed this test and the two
+	# below it in two different ways (final review, MINOR 5).
+	var wording = preload("res://systems/story_wording.gd")
 	var first: PonyData = _registry.all()[0]
 	_compendium.mark_processed(first.id)
 	_menu.open_page(PauseMenu.Page.COMPENDIUM)
 	assert_true(_menu.compendium_header().contains("1 of"))
-	assert_true(_row_for(first.id).contains("Delivered :)"))
+	assert_true(_row_for(first.id).contains(wording.processed_label(_menu.story_chapter)))
 
 
 # --- the Mail page ---------------------------------------------------------------------

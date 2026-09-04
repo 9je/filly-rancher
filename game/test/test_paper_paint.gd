@@ -22,6 +22,22 @@ func test_the_bolt_is_a_polygon_inside_its_box() -> void:
 		assert_true(BOX.has_point(p))
 
 
+## THE FLAP STAYS IN THE TOP BAND, CLEAR OF THE TEXT BELOW IT (final review, IMPORTANT 2:
+## the old two line flap crossed the sender line and clipped the title). Pinned here rather
+## than only by eye, so a future change to FLAP_APEX_FRACTION cannot silently deepen it back
+## into the text.
+func test_the_envelope_flap_is_a_triangle_confined_to_the_top_band() -> void:
+	var points: PackedVector2Array = PaperPaintScript.flap_points(BOX)
+	assert_eq(points.size(), 3, "a flap is a triangle, not a scratch across the whole card")
+	for p: Vector2 in points:
+		assert_true(BOX.has_point(p))
+	var apex_y: float = points[2].y
+	assert_lt(apex_y, BOX.position.y + BOX.size.y * 0.35,
+		"the flap has to stay clear of the sender and title text drawn below it")
+	assert_gt(apex_y, points[0].y,
+		"a flap with no depth at all reads as a straight line, not a V")
+
+
 func test_the_mark_scales_with_its_box_rather_than_assuming_one() -> void:
 	var small: PackedVector2Array = PaperPaintScript.logo_points(Rect2(0, 0, 10, 6))
 	var large: PackedVector2Array = PaperPaintScript.logo_points(Rect2(0, 0, 100, 60))
