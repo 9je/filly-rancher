@@ -16,7 +16,7 @@
 #                               strike inside a long take; it is reproducible and it does
 #                               not drift when a source is re-downloaded.
 #                 pick=N@G:D    the same, with the silence detector tuned for this row:
-#                               G is the noise floor in dB (default -45) and D the minimum
+#                               G is the noise floor in dB (default -30) and D the minimum
 #                               silence in seconds (default 0.12). A walking horse's
 #                               hoofbeats are 0.4s apart with room tone between them and
 #                               need something like pick=3@-38:0.05; a single dry creak in
@@ -33,6 +33,10 @@
 #
 # LOUDNESS TARGETS: ambient beds -24 LUFS, world and casino SFX -18, UI -20. True peak
 # ceiling -1.5 dBTP everywhere, and a row over it FAILS the run.
+#
+# SWAPPING A SOUND: the fetch script skips any dest whose file already exists, so after
+# editing a row run `bash tools/fetch_sounds.sh --only <dest>` (or --force for everything);
+# a bare re run keeps the old file.
 #
 # EVERY SLOT RECORDS ITS ALTERNATES in the comment above it, so the owner can swap a sound
 # by editing one URL and re-running the script. That is the whole point of this file.
