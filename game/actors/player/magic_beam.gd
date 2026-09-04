@@ -88,6 +88,7 @@ const PonyScript := preload("res://actors/pony/pony.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const StorageScript := preload("res://systems/storage.gd")
+const SoundScript := preload("res://systems/sound.gd")
 
 ## Emitted after a pony's record has gone into storage and her node has been freed.
 ##
@@ -1369,9 +1370,27 @@ func _exclusions() -> Array[RID]:
 
 # --- holding --------------------------------------------------------------------------
 
+## get_node(), not the bare `Sound` identifier: tools/run_tests.sh's parse sweep runs every
+## .gd file through `--check-only --script`, and that pass never boots the scene tree, so
+## an autoload's name is never registered as a resolvable global identifier there, even
+## though it resolves fine in a real run (the game, or GUT's own actual test pass). See
+## game/test/test_sound.gd's own comment on the same limitation.
+##
+## is_inside_tree() first, so a beam built with `.new()` and never added anywhere (a purely
+## static test fixture, if one is ever written) gets a silent no-op rather than the engine
+## error get_node() prints on a treeless node.
+func _sound_call(method: StringName, args: Array) -> void:
+	if not is_inside_tree():
+		return
+	var node: Node = get_node_or_null(^"/root/Sound")
+	if node != null:
+		node.callv(method, args)
+
+
 func _begin_hold(body: Node3D) -> void:
 	_held = body
 	_hold_seconds = 0.0
+	_sound_call(&"play_at", [&"capture_charge", global_position])
 	_hold_offset = Vector3.ZERO
 	_wrenching = false
 
@@ -1517,6 +1536,7 @@ func _settle_pony(pony: Node3D) -> void:
 		pony.notify_captured()
 		pony.queue_free()
 		_play_first_capture_voice()
+		_sound_call(&"play_at", [&"capture_success", global_position])
 		captured.emit(instance)
 		return
 

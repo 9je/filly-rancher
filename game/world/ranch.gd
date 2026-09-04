@@ -178,6 +178,7 @@ const MailboxScript := preload("res://world/mailbox.gd")
 const StoryScript := preload("res://systems/story.gd")
 const StoryBeatScript := preload("res://systems/story_beat.gd")
 const StoryLibraryScript := preload("res://systems/story_library.gd")
+const SoundScript := preload("res://systems/sound.gd")
 
 ## Headless watchdog ceiling. A normal run (assets present) finishes in under 2s on
 ## this machine; 30s leaves a wide margin for a slower box while still failing in
@@ -665,6 +666,10 @@ var _herd_ready := false
 ## The region id rather than a bool because there are four gates: walking from one to
 ## another must produce a second prompt, and a bool would swallow it.
 var _gate_prompted: StringName = &""
+
+## The ambient zone last pushed to Sound. Kept here rather than asked of Sound every frame
+## so the region lookup below runs only when the answer could have changed.
+var _sound_zone: StringName = &""
 
 ## Whether the cursor is currently meant to be captured to the game, mirroring the
 ## CAPTURED/VISIBLE split _set_cursor_captured() drives Input.mouse_mode with. Tracked as a
@@ -1488,6 +1493,10 @@ func _rebuild_world_state() -> void:
 	if sky_rig != null and sky_rig.has_method("apply_immediately"):
 		sky_rig.apply_immediately(_world)
 	_show_world_line()
+	# The bed for the hour she loaded into, before her first step rather than after her
+	# first phase change three minutes later.
+	if _world != null:
+		_sound_call(&"ambient_set_phase", [_world.phase()])
 
 
 ## A CLOCK BUILT FROM GameState'S OWN NUMBERS, WIRED TO NOTHING. What a save loaded at this
@@ -1535,6 +1544,9 @@ func _on_world_weather_changed(_weather: int) -> void:
 
 
 func _on_world_changed() -> void:
+	# THE SKY AND THE SOUND TURN OVER TOGETHER, off the one connection this handler is.
+	if _world != null:
+		_sound_call(&"ambient_set_phase", [_world.phase()])
 	if sky_rig != null and sky_rig.has_method("apply"):
 		sky_rig.apply(_world)
 	_show_world_line()
@@ -2688,7 +2700,10 @@ func deliver_pony(uid: StringName) -> Dictionary:
 			"pony": inst.display_name()})
 	_toast("%s: %s shipment received, %d bits credited."
 		% [letter["sender"], LettersScript.ordinal(shipments), credit])
-
+	# The crate goes down and that is the whole of it. She says nothing, on purpose: the
+	# pony voice slots are cut by owner directive, and a real mare's neigh here would be
+	# the loudest wrong note in the game.
+	_sound_call(&"play_at", [&"delivery_thud", crate_position()])
 	if depot_menu != null and depot_menu.has_method("refresh"):
 		depot_menu.refresh()
 	_relieve_if_paid_down()
@@ -2920,6 +2935,11 @@ func start_race(uid: StringName, stake: int) -> Dictionary:
 			% [field.size(), dressed])
 		return refused
 
+	# THE TRACK IS AUDIBLE WHILE IT RUNS AND SILENT WHEN IT DOES NOT. Held loops, not one
+	# shots: _on_race_finished() below is the only thing that stops them, and it is the only
+	# way a race ever ends.
+	_sound_call(&"play_loop", [&"race_crowd_loop"])
+	_sound_call(&"play_loop", [&"race_gallop"])
 	_race_entrant = uid
 	_race_lane = RaceCardScript.PLAYER_LANE
 	_race_stake = stake
@@ -2951,6 +2971,9 @@ func _on_race_finished(_order: Array, winner: int) -> void:
 	else:
 		_toast("%s takes it. Your pony was not in front today." % winner_name)
 	_refresh_casino_menus()
+	_sound_call(&"stop_loop", [&"race_gallop"])
+	_sound_call(&"stop_loop", [&"race_crowd_loop"])
+	_sound_call(&"play", [&"race_cheer"])
 	race_settled.emit(won, winner)
 	_clear_race_bet()
 
@@ -3174,6 +3197,53 @@ func _update_gate_prompt() -> void:
 			% [fence.region().display_name, fence.region().permit_cost])
 
 
+## WHICH AMBIENT ZONE SHE IS STANDING IN. Presentation only; nothing here decides anything
+## the game already decided. The Palace interior wins over the Strip, because a player at a
+## table is indoors even though the building is on the Strip's own disc.
+##
+## THE REGION IS THE ONE THE MAP ALREADY DRAWS. Strip.REGION_ID's RegionData carries the
+## centre and radius the lamps were placed around, so "on the Strip" here means exactly what
+## it means everywhere else in this file rather than a second circle typed out beside it.
+## get_node(), not the bare `Sound` identifier: tools/run_tests.sh's parse sweep runs every
+## .gd file through `--check-only --script`, and that pass never boots the scene tree, so
+## an autoload's name is never registered as a resolvable global identifier there, even
+## though it resolves fine in a real run (the game, or GUT's own actual test pass). See
+## game/test/test_sound.gd's own comment on the same limitation.
+##
+## is_inside_tree() FIRST, because several of this file's own tests build a Ranch that
+## never enters one on purpose (see test_ranch_race.gd's class comment): get_node() on a
+## detached node does not return null, it prints an engine error, which GUT counts as a
+## test failure. A Sound call from a detached Ranch is a silent no-op instead, exactly like
+## every other optional collaborator this file already guards with a null check.
+func _sound_call(method: StringName, args: Array) -> void:
+	if not is_inside_tree():
+		return
+	var node: Node = get_node_or_null(^"/root/Sound")
+	if node != null:
+		node.callv(method, args)
+
+
+func _update_sound_zone() -> void:
+	var zone: StringName = SoundScript.ZONE_NONE
+	if casino_menu != null and casino_menu.has_method("is_open") and bool(casino_menu.is_open()):
+		zone = SoundScript.ZONE_CASINO
+	elif player != null:
+		var region: RegionData = _regions_registry().by_id(StripScript.REGION_ID)
+		if region != null and region.contains(
+				Vector2(player.global_position.x, player.global_position.z)):
+			zone = SoundScript.ZONE_STRIP
+	if zone == _sound_zone:
+		return
+	_sound_zone = zone
+	_sound_call(&"ambient_set_zone", [zone])
+
+
+## The zone this ranch last pushed. Read by the sound gate and by the suite; nothing in the
+## game reads it.
+func sound_zone() -> StringName:
+	return _sound_zone
+
+
 # --- the story, the post, and the survey -------------------------------------------------
 
 func story_library() -> StoryLibrary:
@@ -3245,6 +3315,9 @@ func _post_due_mail() -> int:
 			story.requisition_cycle = _world.cycle_index() if _world != null else 0
 	if posted > 0:
 		_toast(MAIL_ARRIVED)
+		var box: Mailbox = get_mailbox()
+		if box != null:
+			_sound_call(&"play_at", [&"mail_arrive", box.global_position])
 	_refresh_mailbox_flag()
 	# A LETTER THAT LANDS WHILE SHE IS LOOKING AT THE PAGE APPEARS ON IT. The page draws from
 	# a provider, so it only needs telling to draw again; the push is ranch.gd's, the same way
@@ -3469,6 +3542,7 @@ func answer_mail(id: StringName, choice: String) -> bool:
 func _pay_survey(who: String) -> void:
 	if _economy != null:
 		_economy.grant(StoryScript.SURVEY_BONUS_BITS)
+		_sound_call(&"play", [&"coins_grant"])
 	var bag: Inventory = _current_inventory()
 	if bag != null:
 		bag.add(StoryScript.SURVEY_COUPON_ITEM, StoryScript.SURVEY_COUPON_COUNT)
@@ -3698,6 +3772,7 @@ func _pay_out(completed: Array) -> void:
 		var reward_food_count := int(claimed.get("reward_food_count", 0))
 		if _economy != null and reward_bits > 0:
 			_economy.grant(reward_bits)
+			_sound_call(&"play", [&"coins_grant"])
 		if _game_state != null and not reward_food.is_empty() and reward_food_count > 0:
 			_game_state.inventory.add(StringName(reward_food), reward_food_count)
 		# THE TOAST NAMES THE FOOD. "+40 bits" for a favour that also handed over two hay is
@@ -3876,6 +3951,7 @@ func _move_pony_into_pen(slot: PlotSlot) -> bool:
 	# never happened.
 	if _board != null:
 		_pay_out(_board.on_penned(instance.data()))
+	_sound_call(&"play_at", [&"gate_open", pen.global_position])
 	return true
 
 
@@ -4199,6 +4275,7 @@ func _physics_process(delta: float) -> void:
 	# would otherwise have just opened. See enforce_casino_ban().
 	enforce_casino_ban()
 	_update_gate_prompt()
+	_update_sound_zone()
 	if _game_state == null:
 		return
 	var house := get_node_or_null(^"Buildings/Farmhouse") as Node3D
