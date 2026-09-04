@@ -82,7 +82,27 @@ var _bed_playing: Dictionary = {}
 ## Voice indices whose bed has been released and is still fading out. Held apart from
 ## _bed_playing so a departing bed cannot have its voice reassigned mid fade.
 var _bed_releasing: Dictionary = {}
+## Id to that id's own ARRIVAL tween (the fade toward its wanted level on the voice
+## _bed_playing currently credits it with). Keyed by id, not by voice, because an id owns
+## at most one arrival tween at a time.
 var _bed_tweens: Dictionary = {}
+## Voice index to that voice's own DEPARTURE tween (the fade to SILENT_DB queued by
+## _fade_bed_out, whose tween_callback is the only path that clears _bed_releasing and
+## frees the voice). Deliberately a SEPARATE dictionary from _bed_tweens and keyed by
+## voice rather than id: an id that drops out and is requested again inside
+## CROSSFADE_SECONDS is handed a DIFFERENT voice by _bed_voice_for (the old one is still
+## _bed_releasing), and the new arrival's _tween_bed call must never be able to reach
+## into, and stop, the old voice's own departure tween. One shared id keyed dictionary for
+## both jobs was exactly that bug: the arrival's own cleanup would abort whichever tween
+## was sitting at _bed_tweens[id], including the departing one, and its queued
+## _release_now() callback would never fire, stranding the voice in _bed_releasing
+## forever.
+var _bed_release_tweens: Dictionary = {}
+## Id to the last wanted_db _apply_beds() asked _fade_bed_in() for. Lets a repeat request
+## at an unchanged level (a zone change under a steady phase, say) be recognised and
+## skipped rather than restarting the bed's tween and spending an RNG draw on a stream
+## pick nothing will use.
+var _bed_wanted_db: Dictionary = {}
 var _phase := -1
 var _zone: StringName = ZONE_NONE
 var _rng: RandomNumberGenerator = null
@@ -286,11 +306,17 @@ func stop_all() -> void:
 		if tween != null and tween.is_valid():
 			tween.kill()
 	_bed_tweens.clear()
+	for index: int in _bed_release_tweens.keys():
+		var release_tween: Tween = _bed_release_tweens[index]
+		if release_tween != null and release_tween.is_valid():
+			release_tween.kill()
+	_bed_release_tweens.clear()
 	for bed: AudioStreamPlayer in _bed_voices:
 		bed.stop()
 		bed.volume_db = SILENT_DB
 	_bed_playing.clear()
 	_bed_releasing.clear()
+	_bed_wanted_db.clear()
 	_phase = -1
 	_zone = ZONE_NONE
 
@@ -328,6 +354,37 @@ func active_bed_ids() -> Array[StringName]:
 		out.append(id)
 	out.sort()
 	return out
+
+
+## Voice indices still fading toward SILENT_DB after their bed departed. Empty in the
+## resting state; a voice lingering here after its own departure tween's
+## CROSSFADE_SECONDS has elapsed is exactly the stranded voice bug the flip flop test
+## guards against.
+func releasing_voice_indices() -> Array[int]:
+	var out: Array[int] = []
+	for index: int in _bed_releasing.keys():
+		out.append(index)
+	out.sort()
+	return out
+
+
+func is_voice_releasing(index: int) -> bool:
+	return _bed_releasing.has(index)
+
+
+## The Tween carrying a releasing voice toward SILENT_DB, or null. Test introspection: it
+## lets a test drive that Tween's own custom_step() to prove its queued _release_now()
+## callback still fires after a same id arrival, deterministically and without an await.
+func release_tween_for(index: int) -> Tween:
+	var found: Variant = _bed_release_tweens.get(index, null)
+	return found if found is Tween else null
+
+
+## The voice index currently crediting this bed as playing, or -1 if none does. Test
+## introspection alongside active_bed_ids(); ranch code has no legitimate reason to care
+## which physical voice a bed lives on.
+func voice_index_for(id: StringName) -> int:
+	return int(_bed_playing.get(id, -1))
 
 
 func pool_2d_size() -> int:
@@ -418,7 +475,16 @@ func _apply_beds() -> void:
 		_fade_bed_in(id, float(wanted[id]))
 
 
+## Idempotent: a bed already in _bed_playing at the level _apply_beds() last asked for is
+## left entirely alone, spending no RNG draw on a stream pick nothing will use and
+## restarting no tween. A zone change under a steady phase re-asks every phase bed at the
+## same level every time, so without this check every such change would silently churn
+## every bed in the mix, not just the one the zone actually touches.
 func _fade_bed_in(id: StringName, target_db: float) -> void:
+	if _bed_playing.has(id) and _bed_wanted_db.has(id):
+		var current_voice: AudioStreamPlayer = _bed_voices[int(_bed_playing[id])]
+		if current_voice.playing and is_equal_approx(float(_bed_wanted_db[id]), target_db):
+			return
 	var entry_data: Dictionary = entry(id)
 	if entry_data.is_empty():
 		push_error("Sound: bed id '%s' is not in LIBRARY" % id)
@@ -434,6 +500,7 @@ func _fade_bed_in(id: StringName, target_db: float) -> void:
 		voice.stream = stream
 		voice.volume_db = SILENT_DB
 		voice.play()
+	_bed_wanted_db[id] = target_db
 	_tween_bed(id, voice, level)
 
 
@@ -444,21 +511,34 @@ func _fade_bed_in(id: StringName, target_db: float) -> void:
 func _fade_bed_out(id: StringName) -> void:
 	var index: int = int(_bed_playing.get(id, -1))
 	_bed_playing.erase(id)
+	_bed_wanted_db.erase(id)
+	# This id's own arrival tween, if one was still running, belongs to the voice being
+	# vacated; it has nothing left to animate toward once that voice starts releasing.
+	var previous_arrival: Variant = _bed_tweens.get(id, null)
+	if previous_arrival is Tween and previous_arrival.is_valid():
+		previous_arrival.kill()
+	_bed_tweens.erase(id)
 	if index < 0 or index >= _bed_voices.size():
 		return
 	var voice: AudioStreamPlayer = _bed_voices[index]
 	_bed_releasing[index] = true
-	var previous: Variant = _bed_tweens.get(id, null)
-	if previous is Tween and previous.is_valid():
-		previous.kill()
+	# Keyed by VOICE, not by id: see _bed_release_tweens' own comment. A later arrival of
+	# this same id is handed a different voice and its _tween_bed call only ever touches
+	# _bed_tweens[id], so it can never reach in here and stop this departure tween out
+	# from under the voice that is still fading.
+	var previous_release: Variant = _bed_release_tweens.get(index, null)
+	if previous_release is Tween and previous_release.is_valid():
+		previous_release.kill()
 	var tween: Tween = create_tween()
 	tween.tween_property(voice, "volume_db", SILENT_DB, CROSSFADE_SECONDS)
 	tween.tween_callback(func() -> void: _release_now(index))
-	_bed_tweens[id] = tween
+	_bed_release_tweens[index] = tween
 
 
-## One tween per bed id, stopped and replaced rather than stacked; a phase that flips twice
-## inside four seconds otherwise leaves two tweens arguing over one voice's volume.
+## One ARRIVAL tween per bed id, stopped and replaced rather than stacked; a phase that
+## flips twice inside four seconds otherwise leaves two tweens arguing over one voice's
+## volume. Only ever touches _bed_tweens, never _bed_release_tweens, so an arrival can
+## never stop a different voice's departure fade; see _bed_release_tweens' comment.
 func _tween_bed(id: StringName, voice: AudioStreamPlayer, target_db: float) -> void:
 	var previous: Variant = _bed_tweens.get(id, null)
 	if previous is Tween and previous.is_valid():
@@ -468,13 +548,21 @@ func _tween_bed(id: StringName, voice: AudioStreamPlayer, target_db: float) -> v
 	_bed_tweens[id] = tween
 
 
-## Stop a releasing voice at once and put it back in the pool.
+## Stop a releasing voice at once and put it back in the pool. The normal caller is this
+## voice's own departure tween's queued callback (the fade already reached SILENT_DB); the
+## other is _bed_voice_for's steal-a-releasing-voice fallback, which calls this BEFORE that
+## tween has finished, so its still-running Tween is stopped here too rather than left to
+## keep animating a voice that has since been handed to someone else.
 func _release_now(index: int) -> void:
 	if index < 0 or index >= _bed_voices.size():
 		return
 	var voice: AudioStreamPlayer = _bed_voices[index]
 	voice.stop()
 	voice.volume_db = SILENT_DB
+	var release_tween: Variant = _bed_release_tweens.get(index, null)
+	if release_tween is Tween and release_tween.is_valid():
+		release_tween.kill()
+	_bed_release_tweens.erase(index)
 	_bed_releasing.erase(index)
 
 

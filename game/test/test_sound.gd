@@ -99,3 +99,37 @@ func test_the_generator_is_its_own_and_is_seeded() -> void:
 	# generator it may touch is its own, and it must not be sitting on the default seed.
 	assert_true(Sound.has_private_rng())
 	assert_ne(Sound.rng_seed(), 0)
+
+
+func test_a_bed_that_re_enters_during_its_own_release_does_not_strand_its_voice() -> void:
+	# _bed_voice_for and _tween_bed never touch LIBRARY (only _fade_bed_in and _pick_stream
+	# do), so the crossfade state machine below can be driven directly even though LIBRARY
+	# is empty in this task; the real content tasks exercise the same machine through
+	# ambient_set_phase()/ambient_set_zone() once it has real beds to work with. This is
+	# the "a phase that flips twice inside four seconds" scenario _tween_bed's own
+	# docstring calls out: a bed drops out, then is asked for again before its departing
+	# voice has finished fading to silence.
+	var Sound := _sound_autoload()
+	var id: StringName = &"__test_flip_flop_bed__"
+	var voice_out: AudioStreamPlayer = Sound._bed_voice_for(id)
+	Sound._tween_bed(id, voice_out, 0.0)
+	var index_out: int = Sound.voice_index_for(id)
+	Sound._fade_bed_out(id)
+	assert_true(Sound.is_voice_releasing(index_out),
+		"the departing voice must be marked releasing")
+	var release_tween: Tween = Sound.release_tween_for(index_out)
+	assert_not_null(release_tween, "a departing voice must own its own release tween")
+	var voice_in: AudioStreamPlayer = Sound._bed_voice_for(id)
+	var index_in: int = Sound.voice_index_for(id)
+	assert_ne(index_in, index_out,
+		"a still releasing voice must never be handed back to the bed that just vacated it")
+	Sound._tween_bed(id, voice_in, 0.0)
+	# THE BUG: the arrival's own tween and the voice it just vacated's departure tween used
+	# to share one dictionary keyed by id, so this call would stop the departure tween too.
+	assert_true(release_tween.is_valid(),
+		"an arrival must never stop the departure tween of the voice it just vacated")
+	# Advance the departure tween to completion deterministically, with no real waiting.
+	release_tween.custom_step(SoundScript.CROSSFADE_SECONDS + 1.0)
+	assert_false(Sound.is_voice_releasing(index_out),
+		"a voice must be released once its own departure fade actually finishes")
+	assert_eq(Sound.releasing_voice_indices().size(), 0)
