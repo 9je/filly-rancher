@@ -2,9 +2,11 @@ extends GutTest
 ## The ranch's own sound seams, tested without booting the ranch: the zone rule is a pure
 ## function of a position, an open casino panel and a region disc, so it is tested as one.
 ##
-## THE HOOK SITES THEMSELVES are proved by the gate (game/scenes/test/sound_test.gd) and by
-## the ranch gate, which boots the whole scene. What is here is the part that has a right
-## and a wrong answer independent of a scene.
+## THE HOOK SITES THEMSELVES are one line calls beside existing anchors and no test in the
+## repo fires them end to end: the sound gate hosts no ranch on purpose (saves), and the
+## ranch gate never reads Sound state. A deleted hook line is caught by review, not by CI;
+## that gap is recorded in the slice ledger. What is here is the part that has a right and
+## a wrong answer independent of a scene.
 
 const SoundScript := preload("res://systems/sound.gd")
 const RegionDataScript := preload("res://systems/region_data.gd")
