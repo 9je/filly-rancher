@@ -144,7 +144,7 @@ Source: Kenney Interface Sounds, chosen for softness (woody/paper ticks, not bee
 ## 8. Non-goals (this slice)
 
 - **Music.** No composed/looped music tracks. The Strip hum, casino room bed, and slot jingles carry the casino; the ranch is carried by nature. A music pass is a parked owner knob.
-- **Voice.** The placeholder Twilight line stays untouched; per the standing verdict the fix is a better source take, a separate effort.
+- **Voice.** Stays out of THIS slice, but its direction is now set (owner 2026-09-04): ponies talk -- pony vocal personality comes from AI-generated spoken dialogue, not chimes forever. The playable character is an OC, so the Twilight greeting line gets replaced with an OC voice; core show ponies get short spoken lines (barks: greetings, pen idle, capture reactions) and slice 4's talk box consumes the same pipeline for NPC dialogue. The VOICE SLICE follows this one: it opens with an ear-test bake-off (same line rendered through 2-3 pipelines: expressive TTS source -> PPP RVC, show-audio RVC source, plain expressive TTS for the OC) that the owner judges by ear BEFORE any mass production, per the standing verdict on the flat Twilight take. In this slice, moments that want a voice use the capture chime or stay silent.
 - **Factory interior sound** -- budgeted in Phase 3 slice 6 where its cold register belongs.
 - **Reverb/occlusion zones, doppler, dynamic mixing/ducking.** Park; plain distance attenuation is enough at this world scale.
 
