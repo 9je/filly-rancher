@@ -32,9 +32,13 @@ const BOX_SIZE := Vector3(0.34, 0.26, 0.52)
 ## The flag on its side.
 const FLAG_SIZE := Vector3(0.04, 0.24, 0.03)
 
-## How far the flag turns when it goes up. Ninety degrees about Z takes it from lying flat
-## along the box to standing off its side, which is the shape everybody reads instantly.
-const FLAG_UP_DEGREES := 90.0
+## How far the flag turns to LIE DOWN when nothing is waiting. FLAG_SIZE's long axis (Y,
+## 0.24 m) is built standing off the box at rotation 0, which is the pose everybody reads as
+## "up" instantly; turning it -90 about Z lays that same long axis flat along the box's
+## side at lid height, where the box hides most of it. Reviewed and reversed once already:
+## the pair used to be backwards (the "up" state was the flat, hidden one), which is why
+## test_mailbox.gd now measures world-space height rather than trusting this number alone.
+const FLAG_DOWN_DEGREES := -90.0
 
 ## The Company's own colours, the Depot's walls and roof from game/world/ranch.tscn, so the
 ## box at the door and the building across the yard are the same company.
@@ -83,7 +87,7 @@ func is_flag_up() -> bool:
 func _apply_flag() -> void:
 	if _flag == null:
 		return
-	_flag.rotation_degrees.z = FLAG_UP_DEGREES if _flag_up else 0.0
+	_flag.rotation_degrees.z = 0.0 if _flag_up else FLAG_DOWN_DEGREES
 
 
 ## One box: a mesh, a matching collision shape, and a material. Returns the node so the flag
@@ -110,6 +114,9 @@ func _slab(part_name: String, size: Vector3, at: Vector3, colour: Color) -> Node
 	var box_shape := BoxShape3D.new()
 	box_shape.size = size
 	shape.shape = box_shape
-	shape.position = at
-	add_child(shape)
+	# A CHILD OF THE HOLDER, not of this body directly, so the shape moves and turns with
+	# whatever the holder does. The flag's holder is the one part that ever turns
+	# (set_flag_up()), and a collider that stayed at its rest position describes a part of
+	# the assembly that no longer exists once the flag is up.
+	holder.add_child(shape)
 	return holder

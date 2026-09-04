@@ -43,16 +43,51 @@ func test_it_stands_high_enough_to_see_and_low_enough_to_be_a_mailbox() -> void:
 	assert_lt(MailboxScript.POST_HEIGHT, 1.6, "a mailbox is not a signpost")
 
 
-func test_the_flag_starts_down_and_goes_up_when_something_is_waiting() -> void:
+func test_the_flag_starts_down() -> void:
 	var box: Mailbox = _built()
 	assert_false(box.is_flag_up())
 	box.set_flag_up(true)
 	assert_true(box.is_flag_up())
-	var flag := box.get_node("Flag") as Node3D
-	assert_almost_eq(flag.rotation_degrees.z, MailboxScript.FLAG_UP_DEGREES, 0.01)
 	box.set_flag_up(false)
 	assert_false(box.is_flag_up())
-	assert_almost_eq(flag.rotation_degrees.z, 0.0, 0.01)
+
+
+## THE THING A PLAYER ACTUALLY SEES, not the rotation number. A prior version of this test
+## asserted `flag.rotation_degrees.z == FLAG_UP_DEGREES`, which was true of the geometry
+## even while the two states were built exactly backwards (the review that caught it:
+## final-review.md CRITICAL 1). Measured here off the flag mesh's own world-space AABB, the
+## same way test_lobby_sign.gd decides what occludes what, so an inversion like that fails
+## this test regardless of which constant carries which name.
+func _mesh_top_y(mesh: MeshInstance3D) -> float:
+	var box: AABB = mesh.get_aabb()
+	var xform: Transform3D = mesh.global_transform
+	var top: float = -INF
+	for i in range(8):
+		top = maxf(top, (xform * box.get_endpoint(i)).y)
+	return top
+
+
+func _mesh_of(holder: Node) -> MeshInstance3D:
+	var found: Array = holder.find_children("*", "MeshInstance3D", true, false)
+	return found[0] as MeshInstance3D
+
+
+func test_the_flag_stands_proud_above_the_box_when_raised_and_does_not_when_rested() -> void:
+	var box: Mailbox = _built()
+	var box_top: float = _mesh_top_y(_mesh_of(box.get_node("Box")))
+	var flag_mesh: MeshInstance3D = _mesh_of(box.get_node("Flag"))
+
+	box.set_flag_up(true)
+	var raised_top: float = _mesh_top_y(flag_mesh)
+	assert_gt(raised_top, box_top + 0.05,
+		"a raised flag has to stand visibly proud above the box, readable at a distance")
+
+	box.set_flag_up(false)
+	var rested_top: float = _mesh_top_y(flag_mesh)
+	assert_lt(rested_top, box_top + 0.02,
+		"a rested flag must not read as standing above the box")
+	assert_lt(rested_top, raised_top - 0.05,
+		"the two states have to be visually distinct, not both proud")
 
 
 func test_the_flag_is_a_mesh_and_never_a_label() -> void:
