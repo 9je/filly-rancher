@@ -14,6 +14,8 @@ Register: the world SOUNDS as cute as it looks. Real birdsong, real wind, real c
 
 **Register rule (binding, owner 2026-09-04):** the ponies are cartoon characters, not livestock -- "the mlp ponies dont make realistic horse noises." No realistic horse VOCALIZATIONS anywhere (no whinny, neigh, snort, nicker). Physical horse sound is still correct and wanted: hoofsteps ("walking is the big one we do need"), gallops under the race crowd. Moments that would have used a whinny use the capture chime or nothing. If pony vocal personality is ever added, it comes from a cute designed/voice source, a later owner-taste pass -- never from a farm recording.
 
+**The one sanctioned exception (owner 2026-09-04: "slipping in a single realistic horse neigh in a comedic point could be pretty funny"):** exactly one realistic neigh exists in the game, as a rare deadpan gag. When a capture lands, a 1-in-24 roll on Sound's private RNG plays `neigh_real` (BBC NHU05084168, "Snort and neigh of mare", trimmed to the neigh) INSTEAD of the `capture_success` chime; the pastel pony emits one fully realistic horse neigh and the game does not comment. The joke works because the no-realistic-vocals rule holds everywhere else; a second use would kill it. Placement and rate are parked owner knobs.
+
 ## 2. Sourcing (proven feasible 2026-09-04)
 
 Owner has waived usage-rights vetting ("i again dont care about usage rights"). Standing constraints still bind: **record the source URL for every file** in the manifest, **never create accounts**, **never use the owner's email**. All three sources below verified working with zero login:

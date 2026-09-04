@@ -2282,6 +2282,58 @@ MSG
 )"
 ```
 
+### Task 4 AMENDMENT (owner directive 2026-09-04, added mid-build): the one sanctioned neigh
+
+The owner, after cutting realistic pony vocalizations: "slipping in a single realistic horse neigh in a comedic point could be pretty funny." Exactly ONE realistic neigh enters the game, as a rare deadpan gag on capture. The joke works because the no-vocals rule holds everywhere else; nothing else may ever use this id.
+
+- [ ] **Amendment step A: one more manifest row**
+
+Append to `tools/sound_manifest.txt` in the world block:
+
+```
+# THE ONE SANCTIONED NEIGH. A rare gag on capture: the pastel pony emits one fully
+# realistic mare neigh instead of the chime, and the game does not comment. Owner
+# directive 2026-09-04. Alternates: NHU05083084 (mare answered by foal), NHU05078167
+# (threatening neigh, 18.0 s).
+world/neigh_real.wav|https://sound-effects-media.bbcrewind.co.uk/wav/NHU05084168.wav|pick=2@-38:0.10,rate=44100,fade=0.01:0.15,gain_db=-4
+```
+
+`NHU05084168` is "Snort and neigh of mare", 27.9 s: the snort is the first event, the neigh the second, so `pick=2` takes the neigh. If the segment picker lands wrong (a snort is quieter and may merge into room tone), fall back to a `trim=` window found by reading `ffprobe -f lavfi -i "amovie=<cache file>,astats=metadata=1:reset=1"` peaks, exactly as the Task 4 hoofstep walk-it procedure describes; the deliverable is one clean neigh of roughly 1.5 to 3.5 s. `gain_db` not `gain=` because the clip is too short for EBU gating; the peak ceiling still applies.
+
+- [ ] **Amendment step B: the entry and the gag constants in `game/systems/sound.gd`**
+
+Add `neigh_real` to the world block of `LIBRARY`, on `BUS_EFFECTS`, `pitch_min` and `pitch_max` both `1.0` (the joke is deadpan; a pitch-shifted neigh is a different, worse joke):
+
+```gdscript
+	&"neigh_real": {
+		"paths": PackedStringArray(["res://assets/audio/world/neigh_real.wav"]),
+		"bus": BUS_EFFECTS, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0,
+		"loop": false,
+	},
+```
+
+Below the pool constants add:
+
+```gdscript
+# --- the one sanctioned neigh -------------------------------------------------------------
+#
+# Exactly one realistic horse vocalization exists in this game, by owner directive: a rare
+# gag where a landed capture plays a fully deadpan mare neigh instead of the chime. The
+# roll happens on the private RNG, so THE MATH DOES NOT CHANGE. Nothing else may reference
+# GAG_ID, and the corpus test holds both facts.
+const GAG_SOURCE := &"capture_success"
+const GAG_ID := &"neigh_real"
+const GAG_CHANCE := 0.042
+```
+
+In the one internal resolution path both `play()` and `play_at()` share, before the entry lookup: if the requested id equals `GAG_SOURCE` and `_rng.randf() < GAG_CHANCE`, the id becomes `GAG_ID`. One site, both verbs covered.
+
+- [ ] **Amendment step C: tests**
+
+All in `game/test/test_sound.gd` (the same file Step 4 appends to). Step 4's `test_no_pony_voice_ever_entered_the_library` sweep gains its one exemption: skip the id that equals `SoundScript.GAG_ID` literally (the constant, never the string `"neigh_real"`, so a rename breaks the test), and the same test then asserts `Sound.has_id(SoundScript.GAG_ID)`, `Sound.has_id(SoundScript.GAG_SOURCE)`, and `SoundScript.GAG_CHANCE > 0.0 and SoundScript.GAG_CHANCE <= 0.1` (rare stays rare). Add one more test: seed the private generator directly (`Sound._rng.seed = 1234`), resolve `GAG_SOURCE` 2000 times through the internal resolution helper, and assert the gag id came up at least once and fewer than 400 times, and that 2000 resolutions of `&"gate_open"` never yield `GAG_ID`.
+
+Fold these into Task 4's existing steps (the manifest row fetches with Step 2's batch, the entry with Step 3, the tests run and commit with Steps 5 and 6; the commit message gains one line: "Plus the one sanctioned neigh, a rare deadpan gag on capture, by owner directive.").
+
 ---
 
 ## Task 5: The casino and UI SFX
