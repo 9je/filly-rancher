@@ -49,6 +49,16 @@ const ZONE_NONE := &""
 const ZONE_STRIP := &"strip"
 const ZONE_CASINO := &"casino"
 
+# --- the one sanctioned neigh -------------------------------------------------------------
+#
+# Exactly one realistic horse vocalization exists in this game, by owner directive: a rare
+# gag where a landed capture plays a fully deadpan mare neigh instead of the chime. The
+# roll happens on the private RNG, so THE MATH DOES NOT CHANGE. Nothing else may reference
+# GAG_ID, and the corpus test holds both facts.
+const GAG_SOURCE := &"capture_success"
+const GAG_ID := &"neigh_real"
+const GAG_CHANCE := 0.042
+
 ## Sound id to entry. Filled by the content tasks; see game/test/test_sound_library.gd for
 ## the rules every entry is held to.
 ##   paths      PackedStringArray, one or more res:// paths. Size > 1 is a variant set and
@@ -96,6 +106,44 @@ const LIBRARY: Dictionary = {
 	&"gate_open": {
 		"paths": ["res://assets/audio/world/gate_open.wav"],
 		"bus": BUS_EFFECTS, "volume_db": 0.0, "pitch_min": 0.94, "pitch_max": 1.06, "loop": false},
+	&"mail_arrive": {
+		"paths": ["res://assets/audio/world/mail_arrive.wav"],
+		"bus": BUS_EFFECTS, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": false},
+	&"mail_open": {
+		"paths": ["res://assets/audio/world/mail_open.wav"],
+		"bus": BUS_EFFECTS, "volume_db": 0.0, "pitch_min": 0.97, "pitch_max": 1.03, "loop": false},
+	&"mail_stamp": {
+		"paths": ["res://assets/audio/world/mail_stamp.wav"],
+		"bus": BUS_EFFECTS, "volume_db": 0.0, "pitch_min": 0.96, "pitch_max": 1.04, "loop": false},
+	&"capture_charge": {
+		"paths": ["res://assets/audio/world/capture_charge.wav"],
+		"bus": BUS_EFFECTS, "volume_db": -3.0, "pitch_min": 0.98, "pitch_max": 1.06, "loop": false},
+	&"capture_success": {
+		"paths": ["res://assets/audio/world/capture_success.wav"],
+		"bus": BUS_EFFECTS, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": false},
+	&"hoofsteps_grass": {
+		"paths": [
+			"res://assets/audio/world/hoofsteps_grass_1.wav",
+			"res://assets/audio/world/hoofsteps_grass_2.wav",
+			"res://assets/audio/world/hoofsteps_grass_3.wav",
+			"res://assets/audio/world/hoofsteps_grass_4.wav"],
+		"bus": BUS_EFFECTS, "volume_db": -8.0, "pitch_min": 0.90, "pitch_max": 1.12, "loop": false},
+	&"hoofsteps_hard": {
+		"paths": [
+			"res://assets/audio/world/hoofsteps_hard_1.wav",
+			"res://assets/audio/world/hoofsteps_hard_2.wav",
+			"res://assets/audio/world/hoofsteps_hard_3.wav",
+			"res://assets/audio/world/hoofsteps_hard_4.wav"],
+		"bus": BUS_EFFECTS, "volume_db": -8.0, "pitch_min": 0.90, "pitch_max": 1.12, "loop": false},
+	&"delivery_thud": {
+		"paths": ["res://assets/audio/world/delivery_thud.wav"],
+		"bus": BUS_EFFECTS, "volume_db": 0.0, "pitch_min": 0.94, "pitch_max": 1.06, "loop": false},
+	&"coins_grant": {
+		"paths": ["res://assets/audio/world/coins_grant.wav"],
+		"bus": BUS_EFFECTS, "volume_db": 0.0, "pitch_min": 0.97, "pitch_max": 1.05, "loop": false},
+	&"neigh_real": {
+		"paths": ["res://assets/audio/world/neigh_real.wav"],
+		"bus": BUS_EFFECTS, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": false},
 	# --- ui ---
 	&"ui_move": {
 		"paths": ["res://assets/audio/ui/ui_move.wav"],
@@ -244,6 +292,7 @@ func _load_streams() -> void:
 ## place. UI ticks and the capture stinger. Returns false when the id is unknown or its
 ## file failed to load, so a gate can assert on the refusal.
 func play(id: StringName) -> bool:
+	id = _resolve_play_id(id)
 	# NOT `var entry :=`: a local of that name would shadow this class's own entry()
 	# method, which GDScript reports as a parse error on the dependency compile path the
 	# suite's sweep runs. Every reader in this file uses entry_data for the same reason.
@@ -272,6 +321,7 @@ func play(id: StringName) -> bool:
 
 ## A 3D one shot at a world position: hooves, a gate, a crate set down, a letterbox flap.
 func play_at(id: StringName, pos: Vector3) -> bool:
+	id = _resolve_play_id(id)
 	var entry_data: Dictionary = entry(id)
 	if entry_data.is_empty():
 		push_error("Sound.play_at: unknown id '%s'" % id)
@@ -491,6 +541,17 @@ func bus_index_for(bus: StringName) -> int:
 
 
 # --- the private generator, and nothing else ----------------------------------------------
+
+## THE ONE INTERNAL RESOLUTION PATH play() and play_at() both share, before either does its
+## entry lookup. The only place GAG_ID can ever be substituted in: a request for GAG_SOURCE
+## rolls _rng.randf() against GAG_CHANCE and, on a hit, becomes a request for GAG_ID instead.
+## Every other id passes through untouched. The roll spends _rng, Sound's own private
+## generator, so THE MATH DOES NOT CHANGE for anything outside this file.
+func _resolve_play_id(id: StringName) -> StringName:
+	if id == GAG_SOURCE and _rng != null and _rng.randf() < GAG_CHANCE:
+		return GAG_ID
+	return id
+
 
 ## Which variant. Always in range, always on _rng, never on a shared stream.
 func pick_variant(count: int) -> int:

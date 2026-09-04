@@ -172,3 +172,78 @@ func test_leaving_a_zone_never_disturbs_the_phase_beds() -> void:
 	Sound.ambient_set_zone(SoundScript.ZONE_CASINO)
 	Sound.ambient_set_zone(SoundScript.ZONE_NONE)
 	assert_eq(Sound.active_bed_ids(), before)
+
+
+func test_every_world_sound_plays_and_reports_that_it_did() -> void:
+	var Sound := _sound_autoload()
+	for id: StringName in [&"mail_arrive", &"mail_open", &"mail_stamp", &"capture_charge",
+			&"capture_success", &"hoofsteps_grass", &"hoofsteps_hard", &"gate_open",
+			&"delivery_thud", &"coins_grant"]:
+		assert_true(Sound.has_id(id), "'%s' is missing from LIBRARY" % id)
+		assert_true(Sound.play_at(id, Vector3(1.0, 0.0, 2.0)), "'%s' would not play" % id)
+
+
+func test_the_variant_sets_are_the_sizes_the_plan_asked_for() -> void:
+	var Sound := _sound_autoload()
+	assert_eq(PackedStringArray(Sound.entry(&"hoofsteps_grass").get("paths")).size(), 4)
+	assert_eq(PackedStringArray(Sound.entry(&"hoofsteps_hard").get("paths")).size(), 4)
+
+
+func test_no_pony_voice_ever_entered_the_library() -> void:
+	# Owner directive: these ponies are cartoon characters, not livestock. A realistic
+	# whinny or snort would break the register the whole slice exists to protect. The one
+	# exemption is SoundScript.GAG_ID itself, the one sanctioned neigh, held to its own
+	# rarity and provenance asserts below rather than skipped silently.
+	var Sound := _sound_autoload()
+	for id: StringName in Sound.ids():
+		if id == SoundScript.GAG_ID:
+			continue
+		assert_false(String(id).contains("whinny"), "'%s' is a pony voice" % id)
+		assert_false(String(id).contains("snort"), "'%s' is a pony voice" % id)
+		assert_false(String(id).contains("neigh"), "'%s' is a pony voice" % id)
+	assert_true(Sound.has_id(SoundScript.GAG_ID))
+	assert_true(Sound.has_id(SoundScript.GAG_SOURCE))
+	assert_true(SoundScript.GAG_CHANCE > 0.0 and SoundScript.GAG_CHANCE <= 0.1,
+		"the gag must stay rare")
+
+
+func test_hoofsteps_are_mixed_well_under_everything_else() -> void:
+	# The most heard sound in the game. If it sits at the same level as a slots stinger the game
+	# is exhausting inside a minute; the owner's knob for this is parked in the plan.
+	var Sound := _sound_autoload()
+	for id: StringName in [&"hoofsteps_grass", &"hoofsteps_hard"]:
+		assert_lte(float(Sound.entry(id).get("volume_db", 0.0)), -6.0)
+
+
+func test_the_3d_pool_steals_its_oldest_voice_rather_than_growing() -> void:
+	var Sound := _sound_autoload()
+	Sound.stop_all()
+	for i in range(SoundScript.POOL_3D + 5):
+		assert_true(Sound.play_at(&"hoofsteps_grass", Vector3(float(i), 0.0, 0.0)))
+	assert_eq(Sound.pool_3d_size(), SoundScript.POOL_3D)
+
+
+func test_the_2d_pool_steals_its_oldest_voice_rather_than_growing() -> void:
+	var Sound := _sound_autoload()
+	Sound.stop_all()
+	for i in range(SoundScript.POOL_2D + 5):
+		assert_true(Sound.play(&"ui_move"))
+	assert_eq(Sound.pool_2d_size(), SoundScript.POOL_2D)
+
+
+func test_the_gag_id_is_rare_and_never_leaks_into_an_unrelated_sound() -> void:
+	# The one sanctioned neigh: seeded so the distribution is deterministic. THE MATH DOES
+	# NOT CHANGE means the roll lives entirely on _rng, so driving _resolve_play_id() directly
+	# (the one internal path play() and play_at() both share) proves the gag both fires and
+	# stays rare without touching any other RNG stream in the game.
+	var Sound := _sound_autoload()
+	Sound._rng.seed = 1234
+	var gag_hits: int = 0
+	for i in range(2000):
+		if Sound._resolve_play_id(SoundScript.GAG_SOURCE) == SoundScript.GAG_ID:
+			gag_hits += 1
+	assert_gt(gag_hits, 0, "the gag must be able to come up")
+	assert_lt(gag_hits, 400, "the gag must stay rare")
+	for i in range(2000):
+		assert_ne(Sound._resolve_play_id(&"gate_open"), SoundScript.GAG_ID,
+			"only GAG_SOURCE may ever resolve to the gag")
