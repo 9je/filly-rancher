@@ -144,10 +144,64 @@ const LIBRARY: Dictionary = {
 	&"neigh_real": {
 		"paths": ["res://assets/audio/world/neigh_real.wav"],
 		"bus": BUS_EFFECTS, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": false},
+	# --- casino ---
+	&"chip_clink": {
+		"paths": [
+			"res://assets/audio/casino/chip_clink_1.wav",
+			"res://assets/audio/casino/chip_clink_2.wav",
+			"res://assets/audio/casino/chip_clink_3.wav"],
+		"bus": BUS_EFFECTS, "volume_db": -4.0, "pitch_min": 0.94, "pitch_max": 1.08, "loop": false},
+	&"card_slide": {
+		"paths": [
+			"res://assets/audio/casino/card_slide_1.wav",
+			"res://assets/audio/casino/card_slide_2.wav"],
+		"bus": BUS_EFFECTS, "volume_db": -4.0, "pitch_min": 0.95, "pitch_max": 1.07, "loop": false},
+	&"card_flip": {
+		"paths": ["res://assets/audio/casino/card_flip.wav"],
+		"bus": BUS_EFFECTS, "volume_db": -3.0, "pitch_min": 0.96, "pitch_max": 1.05, "loop": false},
+	&"reel_tick": {
+		"paths": ["res://assets/audio/casino/reel_tick.wav"],
+		"bus": BUS_EFFECTS, "volume_db": -14.0, "pitch_min": 0.96, "pitch_max": 1.06, "loop": false},
+	&"reel_stop": {
+		"paths": ["res://assets/audio/casino/reel_stop.wav"],
+		"bus": BUS_EFFECTS, "volume_db": -4.0, "pitch_min": 0.96, "pitch_max": 1.04, "loop": false},
+	&"slots_win": {
+		"paths": ["res://assets/audio/casino/slots_win.wav"],
+		"bus": BUS_EFFECTS, "volume_db": -2.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": false},
+	&"wheel_ratchet": {
+		"paths": ["res://assets/audio/casino/wheel_ratchet.wav"],
+		"bus": BUS_EFFECTS, "volume_db": -12.0, "pitch_min": 0.96, "pitch_max": 1.06, "loop": false},
+	&"wheel_settle": {
+		"paths": ["res://assets/audio/casino/wheel_settle.wav"],
+		"bus": BUS_EFFECTS, "volume_db": -3.0, "pitch_min": 0.97, "pitch_max": 1.04, "loop": false},
+	&"race_crowd_loop": {
+		"paths": ["res://assets/audio/casino/race_crowd_loop.ogg"],
+		"bus": BUS_EFFECTS, "volume_db": -6.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": true},
+	&"race_gallop": {
+		"paths": ["res://assets/audio/casino/race_gallop.ogg"],
+		"bus": BUS_EFFECTS, "volume_db": -8.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": true},
+	&"race_cheer": {
+		"paths": ["res://assets/audio/casino/race_cheer.wav"],
+		"bus": BUS_EFFECTS, "volume_db": -2.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": false},
 	# --- ui ---
 	&"ui_move": {
 		"paths": ["res://assets/audio/ui/ui_move.wav"],
 		"bus": BUS_UI, "volume_db": 0.0, "pitch_min": 0.97, "pitch_max": 1.03, "loop": false},
+	&"ui_confirm": {
+		"paths": ["res://assets/audio/ui/ui_confirm.wav"],
+		"bus": BUS_UI, "volume_db": 0.0, "pitch_min": 0.98, "pitch_max": 1.02, "loop": false},
+	&"ui_back": {
+		"paths": ["res://assets/audio/ui/ui_back.wav"],
+		"bus": BUS_UI, "volume_db": 0.0, "pitch_min": 0.98, "pitch_max": 1.02, "loop": false},
+	&"ui_open": {
+		"paths": ["res://assets/audio/ui/ui_open.wav"],
+		"bus": BUS_UI, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": false},
+	&"ui_denied": {
+		"paths": ["res://assets/audio/ui/ui_denied.wav"],
+		"bus": BUS_UI, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": false},
+	&"ui_page": {
+		"paths": ["res://assets/audio/ui/ui_page.wav"],
+		"bus": BUS_UI, "volume_db": -2.0, "pitch_min": 0.98, "pitch_max": 1.02, "loop": false},
 }
 
 ## WorldState.Phase int to the beds that phase runs. The ints are written out rather than
@@ -375,7 +429,10 @@ func looping_ids() -> Array[StringName]:
 		var player: AudioStreamPlayer = _loops[id]
 		if player.playing:
 			out.append(id)
-	out.sort()
+	# sort_custom rather than plain sort(): StringName's default comparator is not reliably
+	# lexicographic once other scripts have interned the same names first, so compare as
+	# String, the same fix game/systems/inventory.gd's ids() carries for the same reason.
+	out.sort_custom(func(a: StringName, b: StringName) -> bool: return String(a) < String(b))
 	return out
 
 
@@ -451,7 +508,8 @@ func ids() -> Array[StringName]:
 	var out: Array[StringName] = []
 	for id: StringName in LIBRARY.keys():
 		out.append(id)
-	out.sort()
+	# sort_custom rather than plain sort(): see the same fix and note on looping_ids() above.
+	out.sort_custom(func(a: StringName, b: StringName) -> bool: return String(a) < String(b))
 	return out
 
 
@@ -538,6 +596,15 @@ func stream_for(path: String) -> AudioStream:
 
 func bus_index_for(bus: StringName) -> int:
 	return AudioServer.get_bus_index(String(bus))
+
+
+## The process mode the most recent play() set on its voice. Exists for the test that
+## asserts UI ticks outlive a pause and world sounds do not; nothing in the game reads it.
+func last_process_mode() -> int:
+	if _pool_2d.is_empty():
+		return Node.PROCESS_MODE_INHERIT
+	var last: int = (_next_2d - 1 + _pool_2d.size()) % _pool_2d.size()
+	return _pool_2d[last].process_mode
 
 
 # --- the private generator, and nothing else ----------------------------------------------

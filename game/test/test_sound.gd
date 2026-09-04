@@ -247,3 +247,69 @@ func test_the_gag_id_is_rare_and_never_leaks_into_an_unrelated_sound() -> void:
 	for i in range(2000):
 		assert_ne(Sound._resolve_play_id(&"gate_open"), SoundScript.GAG_ID,
 			"only GAG_SOURCE may ever resolve to the gag")
+
+
+func test_every_casino_and_ui_sound_plays() -> void:
+	var Sound := _sound_autoload()
+	for id: StringName in [&"chip_clink", &"card_slide", &"card_flip", &"reel_tick",
+			&"reel_stop", &"slots_win", &"wheel_ratchet", &"wheel_settle",
+			&"race_crowd_loop", &"race_gallop", &"race_cheer"]:
+		assert_true(Sound.play(id), "'%s' would not play" % id)
+	for id: StringName in [&"ui_move", &"ui_confirm", &"ui_back", &"ui_open", &"ui_denied",
+			&"ui_page"]:
+		assert_true(Sound.play(id), "'%s' would not play" % id)
+
+
+func test_a_held_loop_starts_once_and_stops_when_told() -> void:
+	var Sound := _sound_autoload()
+	Sound.stop_all()
+	assert_true(Sound.play_loop(&"race_crowd_loop"))
+	assert_true(Sound.play_loop(&"race_gallop"))
+	# Asking twice must not stack a second voice on the same id.
+	assert_true(Sound.play_loop(&"race_crowd_loop"))
+	assert_eq(Sound.looping_ids(), [&"race_crowd_loop", &"race_gallop"] as Array[StringName])
+	Sound.stop_loop(&"race_crowd_loop")
+	assert_eq(Sound.looping_ids(), [&"race_gallop"] as Array[StringName])
+	Sound.stop_all()
+	assert_eq(Sound.looping_ids().size(), 0)
+
+
+func test_a_one_shot_is_refused_as_a_held_loop() -> void:
+	var Sound := _sound_autoload()
+	# play_loop() on a wav would start something nothing ever stops. push_error is expected
+	# here, the same house rule test_an_unknown_id_is_refused_and_does_not_crash follows.
+	assert_false(Sound.play_loop(&"chip_clink"))
+	assert_push_error(1, "a non looping id passed to play_loop() has to be reported")
+
+
+func test_the_rapid_triggers_are_mixed_far_down() -> void:
+	# reel_tick fires per symbol step and wheel_ratchet per pocket; at the level of a chip
+	# clink either one is a drill. This is a mix decision the plan makes on purpose.
+	var reel_tick_entry: Dictionary = SoundScript.LIBRARY[&"reel_tick"]
+	var wheel_ratchet_entry: Dictionary = SoundScript.LIBRARY[&"wheel_ratchet"]
+	assert_lte(float(reel_tick_entry.get("volume_db", 0.0)), -10.0)
+	assert_lte(float(wheel_ratchet_entry.get("volume_db", 0.0)), -10.0)
+
+
+func test_there_is_exactly_one_slots_celebration() -> void:
+	# The spec: ONE stinger, not escalating fanfares. Anything matching slots_win_ or
+	# slots_jackpot would be the beginning of a skinner box.
+	var celebrations := 0
+	for id: StringName in SoundScript.LIBRARY.keys():
+		if String(id).begins_with("slots_") and String(id).ends_with("win"):
+			celebrations += 1
+		assert_false(String(id).contains("jackpot"))
+	assert_eq(celebrations, 1)
+
+
+func test_ui_sounds_are_the_only_ones_that_survive_a_pause() -> void:
+	# Sound.play() gives a UI bus entry PROCESS_MODE_ALWAYS and everything else PAUSABLE,
+	# because menus are open while the tree is paused and the world is not.
+	var Sound := _sound_autoload()
+	for id: StringName in SoundScript.LIBRARY.keys():
+		var entry: Dictionary = SoundScript.LIBRARY[id]
+		var is_ui: bool = StringName(entry.get("bus", &"")) == SoundScript.BUS_UI
+		Sound.stop_all()
+		assert_true(Sound.play(id))
+		assert_eq(Sound.last_process_mode() == Node.PROCESS_MODE_ALWAYS, is_ui,
+			"'%s' has the wrong pause behaviour" % id)

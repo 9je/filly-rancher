@@ -191,9 +191,101 @@ world/coins_grant.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07005178.w
 # foal).
 world/neigh_real.wav|https://sound-effects-media.bbcrewind.co.uk/wav/NHU05078167.wav|rate=44100,mono,trim=1.85-3.90,fade=0.01:0.20,gain_db=-4
 
+# --- casino -----------------------------------------------------------------------------
+#
+# Kenney Casino Audio is CC0 and RECORDED rather than synthesized, which is why the chips
+# and cards come from it rather than from a designed pack. The reels and the wheel come
+# from BBC recordings of the real machines, because those exist and are better.
+
+# chip_clink_1..3: Kenney Casino Audio, chip-lay-1..3. A chip laid down, three takes, which
+# is exactly the gesture a bet is. Alternates: chips-stack-1..3.ogg; chips-collide-1..3.ogg.
+# Walked gain_db from 0 to -3: the source is close to full scale and the alimiter's sample
+# peak ceiling let true peak (intersample) overshoot past -1.5 dBTP on every take.
+casino/chip_clink_1.wav|https://kenney.nl/media/pages/assets/casino-audio/2472606a04-1721639069/kenney_casino-audio.zip#Audio/chip-lay-1.ogg|rate=44100,mono,fade=0.002:0.04,gain_db=-3
+casino/chip_clink_2.wav|https://kenney.nl/media/pages/assets/casino-audio/2472606a04-1721639069/kenney_casino-audio.zip#Audio/chip-lay-2.ogg|rate=44100,mono,fade=0.002:0.04,gain_db=-3
+casino/chip_clink_3.wav|https://kenney.nl/media/pages/assets/casino-audio/2472606a04-1721639069/kenney_casino-audio.zip#Audio/chip-lay-3.ogg|rate=44100,mono,fade=0.002:0.04,gain_db=-3
+
+# card_slide_1..2: Kenney Casino Audio, card-slide-1..2. Eight takes in the pack; these two
+# are the driest. Alternates: card-slide-3..8.ogg.
+# Walked gain_db from 0 to -3 for the same true peak overshoot as the chips.
+casino/card_slide_1.wav|https://kenney.nl/media/pages/assets/casino-audio/2472606a04-1721639069/kenney_casino-audio.zip#Audio/card-slide-1.ogg|rate=44100,mono,fade=0.002:0.04,gain_db=-3
+casino/card_slide_2.wav|https://kenney.nl/media/pages/assets/casino-audio/2472606a04-1721639069/kenney_casino-audio.zip#Audio/card-slide-2.ogg|rate=44100,mono,fade=0.002:0.04,gain_db=-3
+
+# card_flip: Kenney Casino Audio, card-place-1. A card set face up on felt.
+# Alternates: card-place-2.ogg; card-shove-1.ogg.
+# Walked gain_db from 0 to -3 for the same true peak overshoot as the chips and slides.
+casino/card_flip.wav|https://kenney.nl/media/pages/assets/casino-audio/2472606a04-1721639069/kenney_casino-audio.zip#Audio/card-place-1.ogg|rate=44100,mono,fade=0.002:0.04,gain_db=-3
+
+# reel_tick: BBC 07032188, "1960 Fruit Machine operating." 123.5s of a real mechanical slot
+# machine. Alternates: Kenney Interface tick_001.ogg; click_003.ogg.
+# Walked twice. pick=4 landed on a near silent artifact of the silence detector's own
+# pairing (a 0.001s sliver), not a real tick, so walked the index to pick=17, the first
+# real isolated single tick under 0.25s. gain= then chased the segment's EBU gate to a
+# huge boost (a real tick is too short for honest gating) and blew the true peak ceiling
+# the same way delivery_thud did; switched to the same gain_db escape hatch.
+casino/reel_tick.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07032188.wav|rate=44100,mono,pick=17@-36:0.04,fade=0.002:0.04,gain_db=24
+
+# reel_stop: the same machine, a later and heavier landing, so tick and stop belong to one
+# object. Alternates: Kenney Interface drop_003.ogg; switch_003.ogg.
+# Walked pick=9 to pick=112 (a real 0.43s clunk much later in the take, matching "a later
+# segment of the same take") and gain= to gain_db for the same reason as reel_tick.
+casino/reel_stop.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07032188.wav|rate=44100,mono,pick=112@-36:0.04,fade=0.002:0.10,gain_db=17
+
+# slots_win: Kenney Interface Sounds, confirmation_002. ONE stinger; the spec is explicit
+# that this is not an escalating fanfare. Alternates: confirmation_004.ogg; bong_001.ogg.
+casino/slots_win.wav|https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip#Audio/confirmation_002.ogg|rate=44100,mono,fade=0.002:0.06,gain_db=0
+
+# wheel_ratchet: BBC 07021009, "A roulette wheel spun several times. (Close perspective, no
+# background)." 82.4s; the cleanest wheel in the archive. Alternates: 07051027 (small ball,
+# 17.3s); 07051026 (large ball, 23.7s).
+# Walked pick=3 to pick=137: index 3 was the 5s spin up itself, not one click, because the
+# noise floor kept the whole spin up above threshold. gain= to gain_db for the same true
+# peak overshoot on a real transient that reel_tick and reel_stop hit.
+casino/wheel_ratchet.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07021009.wav|rate=44100,mono,pick=137@-36:0.03,fade=0.002:0.03,gain_db=27
+
+# wheel_settle: the settle at the end of a spin on the same wheel; the last audible activity
+# in the take before it runs out into room tone. Walked pick= to trim=79.85-81.10: the pick
+# index landed on a single sub millisecond blip inside the settle rather than the settle's
+# own last several bounces, so this uses the same measured window approach neigh_real does.
+# gain_db for the same true peak reason as the ticks. Alternates: Kenney Interface
+# switch_004.ogg; BBC 07051026.
+casino/wheel_settle.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07021009.wav|rate=44100,mono,trim=79.85-81.10,fade=0.01:0.15,gain_db=27
+
+# race_crowd_loop: BBC 07035148, "Italian crowd, exterior, murmuring crowd." 194.0s. A
+# murmur, not a roar; the roar is race_cheer's job. Alternates: 00008065 "Large restless
+# crowd" 29.0s mono 48k; 07031045 (fete crowd, 364.1s).
+casino/race_crowd_loop.ogg|https://sound-effects-media.bbcrewind.co.uk/wav/07035148.wav|rate=44100,trim=40-71,loop=30,gain=-22
+
+# race_gallop: BBC 07039304, "Troop of horses galloping on turf." 149.8s, which loops.
+# Alternates: 07024162 "Horse On Turf: Galloping past" 12.8s; 07039336 (two horses, 18.0s).
+casino/race_gallop.ogg|https://sound-effects-media.bbcrewind.co.uk/wav/07039304.wav|rate=44100,trim=40-61,loop=20,gain=-22
+
+# race_cheer: BBC 07035069, "100 men, prolonged cheer." 12.8s. Alternates: 07035070 "100
+# men, single cheer" 10.6s; 07031059 (large cheer outside St Paul's, 48.7s).
+casino/race_cheer.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07035069.wav|rate=44100,mono,pick=1,fade=0.05:0.60,gain=-18
+
 # --- ui ---------------------------------------------------------------------------------
 
 # ui_move: Kenney Interface Sounds, click_002. A short woody tick, not a beep; the softest
 # of the five clicks in the pack by file size and by envelope. Alternates: click_004.ogg;
 # select_002.ogg.
 ui/ui_move.wav|https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip#Audio/click_002.ogg|rate=44100,mono,fade=0.002:0.02,gain_db=0
+
+# ui_confirm: Kenney Interface Sounds, select_003. Woody, not a beep.
+# Alternates: confirmation_001.ogg; click_005.ogg.
+ui/ui_confirm.wav|https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip#Audio/select_003.ogg|rate=44100,mono,fade=0.002:0.03,gain_db=-2
+
+# ui_back: Kenney Interface Sounds, back_002. Alternates: back_001.ogg; close_001.ogg.
+ui/ui_back.wav|https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip#Audio/back_002.ogg|rate=44100,mono,fade=0.002:0.03,gain_db=-2
+
+# ui_open: Kenney Interface Sounds, open_004. Alternates: open_002.ogg; maximize_006.ogg.
+ui/ui_open.wav|https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip#Audio/open_004.ogg|rate=44100,mono,fade=0.002:0.04,gain_db=-2
+
+# ui_denied: Kenney Interface Sounds, error_004. The shortest and least shrill of the eight
+# errors in the pack. Alternates: error_002.ogg; glitch_002.ogg.
+ui/ui_denied.wav|https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip#Audio/error_004.ogg|rate=44100,mono,fade=0.002:0.04,gain_db=-4
+
+# ui_page: Kenney Interface Sounds, scratch_003. The paper turn that ties into the
+# stationery look the Mail page already has. Alternates: scratch_001.ogg; BBC 07045125,
+# the paper fold world/mail_open.wav comes from.
+ui/ui_page.wav|https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip#Audio/scratch_003.ogg|rate=44100,mono,fade=0.002:0.05,gain_db=-3
