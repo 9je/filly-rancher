@@ -73,3 +73,83 @@ func test_apply_audio_sets_the_master_bus() -> void:
 	# Put the bus back so this test does not change the rest of the run.
 	AudioServer.set_bus_mute(master, was_muted)
 	AudioServer.set_bus_volume_db(master, was_db)
+
+
+func test_the_two_new_volumes_default_open() -> void:
+	var s = SettingsScript.new()
+	assert_almost_eq(s.ambient_volume, 1.0, 0.0001)
+	assert_almost_eq(s.effects_volume, 1.0, 0.0001)
+
+
+func test_the_two_new_volumes_round_trip_through_a_file() -> void:
+	var s = SettingsScript.new()
+	s.ambient_volume = 0.3
+	s.effects_volume = 0.7
+	assert_true(s.save_to(SCRATCH))
+	var back = SettingsScript.new()
+	back.load_from(SCRATCH)
+	assert_almost_eq(back.ambient_volume, 0.3, 0.0001)
+	assert_almost_eq(back.effects_volume, 0.7, 0.0001)
+
+
+func test_ambient_steps_clamp_at_both_ends_and_signal() -> void:
+	var s = SettingsScript.new()
+	watch_signals(s)
+	for i in range(20):
+		s.step_ambient(-1)
+	assert_almost_eq(s.ambient_volume, 0.0, 0.0001)
+	for i in range(20):
+		s.step_ambient(1)
+	assert_almost_eq(s.ambient_volume, 1.0, 0.0001)
+	assert_signal_emitted(s, "changed")
+
+
+func test_effects_steps_clamp_at_both_ends() -> void:
+	var s = SettingsScript.new()
+	for i in range(20):
+		s.step_effects(-1)
+	assert_almost_eq(s.effects_volume, 0.0, 0.0001)
+	for i in range(20):
+		s.step_effects(1)
+	assert_almost_eq(s.effects_volume, 1.0, 0.0001)
+
+
+func test_a_step_that_changes_nothing_emits_nothing() -> void:
+	var s = SettingsScript.new()
+	s.ambient_volume = 1.0
+	watch_signals(s)
+	s.step_ambient(1)
+	assert_signal_emit_count(s, "changed", 0)
+
+
+func test_apply_audio_pushes_all_three_sliders_and_zero_mutes() -> void:
+	var s = SettingsScript.new()
+	s.master_volume = 1.0
+	s.ambient_volume = 0.5
+	s.effects_volume = 0.0
+	s.apply_audio()
+	var ambient: int = AudioServer.get_bus_index("Ambient")
+	var effects: int = AudioServer.get_bus_index("Effects")
+	var ui: int = AudioServer.get_bus_index("UI")
+	assert_gt(ambient, 0)
+	assert_false(AudioServer.is_bus_mute(ambient))
+	assert_almost_eq(AudioServer.get_bus_volume_db(ambient), linear_to_db(0.5), 0.01)
+	# Zero mutes rather than setting -inf dB, and the UI bus rides the effects slider.
+	assert_true(AudioServer.is_bus_mute(effects))
+	assert_true(AudioServer.is_bus_mute(ui))
+	# Put the buses back so a later test in the same run is not reading this one's leavings.
+	s.effects_volume = 1.0
+	s.apply_audio()
+
+
+func test_a_loaded_file_missing_the_new_keys_keeps_the_defaults() -> void:
+	# A settings.cfg written before this slice has no ambient_volume key at all; it must
+	# load as "wide open", not as silence.
+	var cfg := ConfigFile.new()
+	cfg.set_value("settings", "master_volume", 0.8)
+	assert_eq(cfg.save(SCRATCH), OK)
+	var s = SettingsScript.new()
+	s.load_from(SCRATCH)
+	assert_almost_eq(s.master_volume, 0.8, 0.0001)
+	assert_almost_eq(s.ambient_volume, 1.0, 0.0001)
+	assert_almost_eq(s.effects_volume, 1.0, 0.0001)
