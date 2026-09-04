@@ -27,6 +27,7 @@ func _worst_params() -> Dictionary:
 	return {
 		"name": "W".repeat(LettersScript.MAX_NAME_LENGTH),
 		"pony": "Wwwwwwwwwwwwwwww",
+		"chosen": "Wwwwwwwwwwwwwwww",
 		"colour": "viridian",
 		"count": 999,
 		"quota": 12,
@@ -64,6 +65,30 @@ func test_no_beat_carries_an_em_dash_or_a_double_hyphen() -> void:
 		var joined: String = String(letter["title"]) + "\n" + "\n".join(letter["body"])
 		assert_false(joined.contains("--"), "%s carries a double hyphen" % beat.id)
 		assert_false(joined.contains(char(0x2014)), "%s carries an em dash" % beat.id)
+
+
+## THE GATE'S OWN SOURCE, NOT JUST THE DATA IT SWEEPS. game/scenes/test/story_test.gd
+## checks every authored letter and every drawn Mail page line for a dash, but nothing swept
+## its own comments; three ` -- `s survived nine task reviews there for exactly that reason
+## (final review, IMPORTANT 1). This is the fix: the corpus sweep now covers the gate file
+## itself, the same way every other test_*.gd in this project sweeps its own subject's
+## source (test_mailbox.gd on mailbox.gd, test_paper_paint.gd on paper_paint.gd, and so on).
+func test_no_line_of_the_gate_itself_carries_a_dash() -> void:
+	var source: String = FileAccess.get_file_as_string("res://scenes/test/story_test.gd")
+	assert_false(source.is_empty(), "the gate file has to actually be there to sweep")
+	for line in source.split("\n"):
+		# strip_edges(), not begins_with() on the raw line: the gate's own banners sit
+		# inside functions and so carry leading tabs, unlike story.gd's module level ones.
+		var text: String = String(line).strip_edges()
+		if text.begins_with("# ---") or text.begins_with("## ---"):
+			continue
+		# THE GATE'S OWN DASH DETECTOR IS A QUOTED "--" LITERAL, exempt the same way a CLI
+		# flag or a banner is: the two characters inside the quotes are what the line is
+		# checking FOR, not prose that happens to carry a double hyphen.
+		if text.contains("\"--\""):
+			continue
+		assert_false(text.contains("--"), "double hyphen: %s" % text)
+		assert_false(text.contains(char(0x2014)), "em dash: %s" % text)
 
 
 func test_no_beat_uses_the_word_this_project_does_not_use() -> void:
@@ -192,15 +217,28 @@ func test_the_survey_is_the_only_letter_in_this_slice_that_asks_for_an_answer() 
 		assert_eq(beat.reply_index(), StoryBeatScript.Reply.PICK_PONY)
 
 
-func test_the_requisition_and_the_colour_receipt_name_the_pony_they_are_about() -> void:
+## {pony} AND {chosen} ARE DELIBERATELY DIFFERENT PLACEHOLDERS (final review, CRITICAL 2):
+## the Requisition names whoever she CHOSE on the Survey, which is settled the moment she
+## answers it; the receipts name whoever was actually DELIVERED, which the Requisition
+## itself has not happened yet when they are written. Conflating the two into one {pony} is
+## the exact bug this test now pins against: it would let the Requisition and a receipt for
+## somebody else silently agree on a name that is only sometimes the same pony.
+func test_the_requisition_names_who_she_chose_and_the_receipts_name_who_was_delivered() -> void:
 	var requisition: StoryBeat = _library.by_id(&"weather_requisition")
 	assert_not_null(requisition)
-	assert_true("\n".join(requisition.body_lines()).contains("{pony}"))
-	var receipt: StoryBeat = _library.by_id(&"weather_colour_receipt")
-	assert_not_null(receipt)
-	var receipt_body: String = "\n".join(receipt.body_lines())
-	assert_true(receipt_body.contains("{pony}"))
-	assert_true(receipt_body.contains("{colour}"),
+	var requisition_body: String = "\n".join(requisition.body_lines())
+	assert_true(requisition_body.contains("{chosen}"),
+		"the Requisition is about the pony she chose, not the last one delivered")
+	assert_false(requisition_body.contains("{pony}"),
+		"{pony} is the delivered pony's placeholder; the Requisition has not delivered anybody yet")
+	for beat_id: StringName in [&"weather_colour_receipt", &"sunny_named_thanks"]:
+		var receipt: StoryBeat = _library.by_id(beat_id)
+		assert_not_null(receipt)
+		var receipt_body: String = "\n".join(receipt.body_lines())
+		assert_true(receipt_body.contains("{pony}"), "%s names the pony delivered" % beat_id)
+	var colour_receipt_body: String = "\n".join(
+		_library.by_id(&"weather_colour_receipt").body_lines())
+	assert_true(colour_receipt_body.contains("{colour}"),
 		"the receipt that lists her beside a colour")
 
 

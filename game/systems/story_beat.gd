@@ -37,6 +37,12 @@ const REPLY_NAMES: Array[String] = ["NONE", "PICK_PONY", "YES_NO"]
 const DEFAULTS := {
 	"name": "Valued Partner",
 	"pony": "your pony",
+	# THE SURVEY'S PONY, KEPT SEPARATE FROM THE DELIVERED ONE. {pony} always names whoever
+	# a receipt is actually about (Story.last_named); {chosen} names whoever she named on
+	# the Survey (Story.survey_choice). The two can diverge the moment she answers the
+	# Survey and then delivers somebody else, and a Requisition letter that used {pony} for
+	# this would silently start naming the wrong pony the instant they did.
+	"chosen": "your pony",
 	"colour": "a colour",
 	"count": 1,
 	"quota": 2,

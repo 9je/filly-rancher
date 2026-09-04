@@ -2024,9 +2024,7 @@ func _bind_pause_menu() -> void:
 			func() -> Array[Dictionary]: return owned_rows())
 		pause_menu.set("story_chapter",
 			_game_state.story.chapter if _game_state != null else 0)
-		pause_menu.set("employees_choice", StringName(
-			String(_game_state.story.survey_choice.get("data_id", ""))
-			if _game_state != null else ""))
+		pause_menu.set("employees_choice", _employees_choice_id())
 	inject_pages.call()
 	if _game_state != null and not _game_state.state_loaded.is_connected(inject_pages):
 		_game_state.state_loaded.connect(inject_pages)
@@ -2671,6 +2669,16 @@ func deliver_pony(uid: StringName) -> Dictionary:
 	# because the letter that lists her beside a colour is written long after she has gone.
 	_game_state.story.note_delivery(named, inst.display_name(), inst.data_id)
 
+	# THE COMPENDIUM'S "EMPLOYEE'S CHOICE" STAR IS EARNED, NOT PROMISED. survey_choice
+	# carries a data_id the moment she answers the Survey, long before anyone has been
+	# delivered, and the Compendium is keyed by CHARACTER rather than by instance -- so
+	# comparing against the data_id alone (what _employees_choice_id() used to do on its
+	# own) would star a STOCK pony of the same species the moment she is processed. This
+	# flag is set here, gated on the UID actually delivered matching the one she named, so
+	# the star tracks the one pony rather than her whole species.
+	if named and String(inst.uid) == String(_game_state.story.survey_choice.get("uid", "")):
+		_game_state.story.set_flag("employees_choice_delivered")
+
 	# credit_delivery() has already counted her, so the ledger's own running total IS the
 	# number this receipt should carry.
 	var shipments: int = _game_state.ledger.shipments
@@ -3195,11 +3203,22 @@ func advance_story() -> int:
 	# a chapter that turns mid session has to push the same two fields itself.
 	if pause_menu != null:
 		pause_menu.set("story_chapter", story.chapter)
-		pause_menu.set("employees_choice",
-			StringName(String(story.survey_choice.get("data_id", ""))))
+		pause_menu.set("employees_choice", _employees_choice_id())
 	if _board != null:
 		_board.set_chapter(story.chapter)
 	return posted
+
+
+## THE COMPENDIUM'S "EMPLOYEE'S CHOICE" ROW ID, or empty until she has earned it. Empty
+## while the flag deliver_pony() sets is unset, even though survey_choice.data_id exists the
+## moment she answers the Survey: a data_id alone would star every stock pony of the same
+## species the instant one is processed, since the Compendium is keyed by character, not by
+## instance. See deliver_pony()'s own comment on the flag.
+func _employees_choice_id() -> StringName:
+	var story: Story = get_story()
+	if story == null or not story.has_flag("employees_choice_delivered"):
+		return &""
+	return StringName(String(story.survey_choice.get("data_id", "")))
 
 
 ## Post everything the library says is owed, oldest rung first. One toast for the batch, the
@@ -3209,8 +3228,12 @@ func _post_due_mail() -> int:
 	if story == null:
 		return 0
 	var posted := 0
+	# FROZEN ONCE, FOR THE WHOLE BATCH: nothing between here and the loop's end changes
+	# last_named or survey_choice (no delivery happens mid post), so one snapshot is
+	# honestly what every beat posted this call is "about" right now.
+	var params: Dictionary = _story_params()
 	for beat: StoryBeat in story_library().due(story):
-		if not story.post(beat.id):
+		if not story.post(beat.id, params):
 			continue
 		posted += 1
 		if beat.id == &"weather_requisition":
@@ -3301,6 +3324,17 @@ func _maybe_serve_requisition() -> void:
 ## one dictionary, so a beat written next year cannot find a parameter missing. The pony and
 ## the colour come off the story rather than out of the world, because the pony a receipt
 ## names left by the departure path some sessions ago and is not in the world to ask.
+##
+## {pony} AND {chosen} ARE NOT THE SAME PONY, and conflating them was CRITICAL 2 of the
+## final review: `{pony}` is `last_named`, the pony a delivery receipt is actually about;
+## `{chosen}` is `survey_choice`, the pony she named on the Survey. Once the Survey is
+## answered `chosen` never empties again, so a `{pony}` that fell back to it would name the
+## Survey's pony in every letter forever, including a receipt for somebody else entirely.
+## CALLED ONLY TO BUILD A FRESH SNAPSHOT: _post_due_mail() freezes this into the mail log at
+## POST time, and mail_rows() renders a posted letter against that frozen copy, not against
+## a fresh call here, so a letter's meaning cannot change after the fact. A live call here
+## is for a letter that has never been posted (there is none in this slice) or for a
+## pre-fix save's letters, which have no frozen params to fall back on.
 func _story_params() -> Dictionary:
 	var story: Story = get_story()
 	var chosen: String = ""
@@ -3310,10 +3344,10 @@ func _story_params() -> Dictionary:
 		chosen = String(story.survey_choice.get("name", ""))
 		named = String(story.last_named.get("name", ""))
 		colour = String(story.last_named.get("colour", ""))
-	var pony: String = chosen if not chosen.is_empty() else named
 	return {
 		"name": _player_name(),
-		"pony": pony if not pony.is_empty() else StoryBeatScript.DEFAULTS["pony"],
+		"pony": named if not named.is_empty() else StoryBeatScript.DEFAULTS["pony"],
+		"chosen": chosen if not chosen.is_empty() else StoryBeatScript.DEFAULTS["chosen"],
 		"colour": colour if not colour.is_empty() else StoryBeatScript.DEFAULTS["colour"],
 		"count": _game_state.ledger.shipments if _game_state != null else 0,
 		"quota": _game_state.ledger.quota if _game_state != null else 0,
@@ -3325,16 +3359,26 @@ func _story_params() -> Dictionary:
 ## it round for display. A posted id the library no longer carries is SKIPPED rather than
 ## drawn as a blank: a letter this build cannot render is not a letter, and dropping her
 ## whole mailbox over one of them would be worse.
+##
+## EACH LETTER RENDERS AGAINST ITS OWN FROZEN PARAMS, captured by _post_due_mail() the
+## moment it landed, not against a single live snapshot shared by the whole mailbox: that
+## sharing is exactly what CRITICAL 2 of the final review found (every letter rendered
+## against whatever the Survey and the last delivery say RIGHT NOW, so an old receipt
+## rewrote itself the moment she answered the Survey). A letter with no frozen params (a
+## pre-fix save's mail, posted before this field existed) falls back to a live render, which
+## is how it has always looked; every letter posted from here on freezes its own.
 func mail_rows() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var story: Story = get_story()
 	if story == null:
 		return out
-	var params: Dictionary = _story_params()
+	var live_params: Dictionary = _story_params()
 	for id: StringName in story.mail_ids():
 		var beat: StoryBeat = story_library().by_id(id)
 		if beat == null:
 			continue
+		var frozen: Dictionary = story.mail_params(id)
+		var params: Dictionary = frozen if not frozen.is_empty() else live_params
 		var letter: Dictionary = beat.render(params)
 		out.append({
 			"id": String(id),
@@ -3397,6 +3441,11 @@ func answer_mail(id: StringName, choice: String) -> bool:
 			return false
 		if not story.record_reply(id, choice):
 			return false
+		# ANSWERING IS READING. A letter she just replied to is a letter she has seen the
+		# whole of; leaving it unread until she happened to reopen it would keep the
+		# mailbox flag up over mail she has already acted on.
+		story.mark_read(id)
+		_refresh_mailbox_flag()
 		story.answer_survey({
 			"uid": choice,
 			"data_id": String(picked.data_id),
@@ -3408,6 +3457,8 @@ func answer_mail(id: StringName, choice: String) -> bool:
 		return true
 	if not story.record_reply(id, choice):
 		return false
+	story.mark_read(id)
+	_refresh_mailbox_flag()
 	save_game()
 	return true
 

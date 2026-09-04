@@ -30,6 +30,19 @@ extends RefCounted
 ##
 ## NOTHING HERE EVER FREES, HARMS OR MOVES A PONY. It records that one left by the
 ## departure path and what the Company chose to call the colour on the receipt.
+##
+## A LETTER NEVER CHANGES MEANING AFTER IT IS POSTED. post() may carry an optional `params`
+## dictionary, frozen into the mail log entry at that moment; mail_params() hands it back
+## unchanged. Ranch.mail_rows() renders a posted letter against its own frozen params rather
+## than against whatever the world says right now, which is what keeps a receipt naming the
+## pony it was actually about instead of whichever pony the Survey happens to name today.
+## Absent (the field a save written before this existed has none of) defaults to an empty
+## dictionary, which from_dict() tolerates the same way it tolerates every other optional
+## field.
+##
+## Preloaded by path rather than by the global class_name, per the convention at the top of
+## game/scripts/pony_rig.gd: the class cache lives in the gitignored game/.godot/ and a
+## fresh clone has not built it yet.
 
 ## Chapters, in order. The save holds the INDEX; the authored letters name the STRING, so a
 ## .tres that names a chapter this build does not have is a loud failure in story_test
@@ -194,11 +207,13 @@ func has_mail(id: StringName) -> bool:
 
 
 ## Post `id`, unread. Returns false, changing nothing, for a beat already in the log: a
-## letter arrives exactly once.
-func post(id: StringName) -> bool:
+## letter arrives exactly once. `params` is frozen into the entry AS OF THIS MOMENT and
+## handed back unchanged by mail_params(): the caller's snapshot of the world at post time,
+## not a live reference to it.
+func post(id: StringName, params: Dictionary = {}) -> bool:
 	if String(id).is_empty() or has_mail(id):
 		return false
-	mail.append({"id": String(id), "read": false, "reply": ""})
+	mail.append({"id": String(id), "read": false, "reply": "", "params": params.duplicate(true)})
 	mail_posted.emit(id)
 	return true
 
@@ -221,6 +236,18 @@ func unread_count() -> int:
 func is_read(id: StringName) -> bool:
 	var entry: Variant = _entry(id)
 	return entry != null and bool((entry as Dictionary).get("read", false))
+
+
+## What `id` was rendered against at post time, or an empty dictionary for a letter posted
+## before this field existed (a pre-fix save) or posted with none. Empty is a real answer,
+## not an error: the caller falls back to a live render for it, the same as this letter has
+## always rendered.
+func mail_params(id: StringName) -> Dictionary:
+	var entry: Variant = _entry(id)
+	if entry == null:
+		return {}
+	var raw: Variant = (entry as Dictionary).get("params", {})
+	return (raw as Dictionary).duplicate(true) if typeof(raw) == TYPE_DICTIONARY else {}
 
 
 ## Returns whether THIS call is the one that marked it, so a caller can tell "she just
@@ -289,10 +316,13 @@ func to_dict() -> Dictionary:
 	var entries: Array = []
 	for entry in mail:
 		var row: Dictionary = entry
+		var params: Variant = row.get("params", {})
 		entries.append({
 			"id": String(row.get("id", "")),
 			"read": bool(row.get("read", false)),
 			"reply": String(row.get("reply", "")),
+			"params": (params as Dictionary).duplicate(true) if typeof(params) == TYPE_DICTIONARY
+				else {},
 		})
 	var saved_flags: Dictionary = {}
 	for key in flags:
@@ -347,6 +377,7 @@ static func from_dict(d: Dictionary) -> Story:
 				"id": id,
 				"read": bool(row.get("read", false)),
 				"reply": String(row.get("reply", "")),
+				"params": _params_map(row.get("params", {})),
 			})
 	return out
 
@@ -357,4 +388,23 @@ static func _string_map(value: Variant) -> Dictionary:
 		return out
 	for key in (value as Dictionary):
 		out[String(key)] = String((value as Dictionary)[key])
+	return out
+
+
+## A frozen letter's params, off JSON.parse_string's answer or off to_dict()'s own. Every
+## number a StoryBeat renders (count/quota/balance) travels as a whole float once it has
+## been through JSON, so it is cast back to int here; a String stays a String. Not TYPED to
+## a fixed key set, because Story does not know StoryBeat's placeholder names and should
+## not have to: an unrecognised key is simply carried through, the same tolerance
+## _string_map() and the rest of from_dict() give every other optional field.
+static func _params_map(value: Variant) -> Dictionary:
+	var out: Dictionary = {}
+	if typeof(value) != TYPE_DICTIONARY:
+		return out
+	for key in (value as Dictionary):
+		var v: Variant = (value as Dictionary)[key]
+		if typeof(v) == TYPE_FLOAT and v == floorf(v):
+			out[String(key)] = int(v)
+		else:
+			out[String(key)] = v
 	return out

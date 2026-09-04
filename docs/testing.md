@@ -1085,8 +1085,8 @@ gates do, and proves the paper channel end to end:
 * answering it pays 50 bits and a hay coupon exactly once, and the choice is saved.
 * the Requisition's serve path is proved on all three of its edges: it refuses a pony who
   is not in a pen (`Ranch.serve_requisition()`'s "owned but not penned" ending, exercised
-  by pulling the named pony back out of her pen with `Pen.remove_pony()` before calling it
-  -- her `GameState` record stays put, only her tenancy does, which is what keeps this the
+  by pulling the named pony back out of her pen with `Pen.remove_pony()` before calling it:
+  her `GameState` record stays put, only her tenancy does, which is what keeps this the
   "not penned" ending and not the "not owned at all" one that closes the letter outright);
   it then takes exactly the pony she named, by the departure path, once she is penned and
   the letter is armed; and it never serves twice, the flag holding after the one successful

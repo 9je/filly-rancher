@@ -147,6 +147,81 @@ func test_a_requisition_for_a_pony_she_no_longer_has_closes_itself_quietly() -> 
 		"and it does not sit armed forever waiting for a pony who is not coming back")
 
 
+## CRITICAL 2 OF THE FINAL REVIEW, REPRODUCED. `Ranch._story_params()` used to fall back to
+## `survey_choice` for `{pony}` whenever it was non empty, which is forever once she answers
+## the Survey; every receipt after that named her Survey pony instead of whoever the receipt
+## was actually about. Reproduces the review's own scenario exactly: a named delivery before
+## the Survey is answered (sunny_named_thanks, which must never rewrite itself once posted),
+## the Survey answered naming a pony who is never delivered, and a second named delivery of
+## somebody else entirely (weather_colour_receipt, which must name HER, not the Survey's
+## pony).
+func test_a_receipt_names_the_pony_delivered_not_the_one_named_on_the_survey() -> void:
+	# Fluttershy, delivered and thanked BEFORE the Survey even exists.
+	_state.story.note_delivery(true, "Fluttershy", &"fluttershy")
+	assert_gt(_ranch.advance_story(), 0)
+	assert_true(_state.story.has_mail(&"sunny_named_thanks"))
+	var thanks_before: String = _letter_body(&"sunny_named_thanks")
+	assert_true(thanks_before.contains("Fluttershy"))
+
+	# The chapter turns, and she names Trixie on the Survey. Trixie is never delivered.
+	for i in range(StoryScript.WEATHER_DELIVERIES - 1):
+		_state.story.note_delivery(false, "Pony", &"")
+	_ranch.advance_story()
+	assert_eq(_state.story.chapter, StoryScript.Chapter.WEATHER)
+	var trixie = PonyInstanceScript.create(&"trixie")
+	_state.add_pony(trixie)
+	assert_true(_ranch.answer_mail(&"weather_survey", String(trixie.uid)))
+	assert_eq(String(_state.story.survey_choice.get("name", "")), "Trixie")
+
+	# THE OLDER LETTER MUST NOT HAVE MOVED. Re reading it now, with the Survey answered,
+	# has to show exactly what it showed the day it arrived.
+	assert_eq(_letter_body(&"sunny_named_thanks"), thanks_before,
+		"a posted letter's meaning must never change under her")
+
+	# A second named delivery, of Rarity, never of Trixie.
+	_state.story.note_delivery(true, "Rarity", &"rarity")
+	_ranch.advance_story()
+	assert_true(_state.story.has_mail(&"weather_colour_receipt"))
+	var receipt_body: String = _letter_body(&"weather_colour_receipt")
+	assert_true(receipt_body.contains("Rarity"), "the receipt names who was actually delivered")
+	assert_false(receipt_body.contains("Trixie"),
+		"the Survey's pony must never be named as processed by a receipt that is not about her")
+
+
+## MINOR 2 OF THE FINAL REVIEW. `employees_choice` used to be read straight off
+## survey_choice.data_id the moment she answered, so it starred her whole CHARACTER, not the
+## one instance she named: any other pony of the same species reaching PROCESSED would
+## carry the star too. Now it waits on Story's "employees_choice_delivered" flag, which
+## deliver_pony() sets only when the uid actually delivered matches the one she named.
+func test_the_employees_choice_star_waits_for_the_named_pony_herself_not_just_her_species() -> void:
+	for i in range(StoryScript.WEATHER_DELIVERIES):
+		_state.story.note_delivery(false, "Pony", &"")
+	_ranch.advance_story()
+	var fluttershy = PonyInstanceScript.create(&"fluttershy")
+	_state.add_pony(fluttershy)
+	assert_true(_ranch.answer_mail(&"weather_survey", String(fluttershy.uid)))
+
+	assert_eq(_ranch._employees_choice_id(), &"",
+		"answering the Survey names nobody as delivered until somebody actually is")
+
+	# A different instance of the same character, processed some other way: the Compendium
+	# is keyed by character, and this must not be mistaken for the one she named.
+	_state.compendium.mark_processed(&"fluttershy")
+	assert_eq(_ranch._employees_choice_id(), &"",
+		"a different instance of the same species reaching PROCESSED is not the pony she chose")
+
+	# Only the flag deliver_pony() sets when the delivered uid matches earns it.
+	_state.story.set_flag("employees_choice_delivered")
+	assert_eq(_ranch._employees_choice_id(), &"fluttershy")
+
+
+func _letter_body(id: StringName) -> String:
+	for row: Dictionary in _ranch.mail_rows():
+		if String(row["id"]) == String(id):
+			return "\n".join(row["body"])
+	return ""
+
+
 func test_a_requisition_waits_for_a_pony_who_is_in_the_saddlebag_rather_than_a_pen() -> void:
 	var instance = PonyInstanceScript.create(&"trixie")
 	_state.add_pony(instance)

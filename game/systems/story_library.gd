@@ -18,7 +18,6 @@ extends RefCounted
 ## own; nothing here is a singleton and nothing here caches across processes.
 
 const StoryBeatScript := preload("res://systems/story_beat.gd")
-const StoryScript := preload("res://systems/story.gd")
 
 ## The directory the shipped letters live in. Committed, unlike game/assets/converted/, so
 ## it is present on every machine and in every export (docs/ci.md section 4).

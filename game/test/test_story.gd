@@ -116,10 +116,15 @@ func test_the_whole_story_round_trips_through_a_dictionary() -> void:
 	story.advance()
 	story.post(&"weather_survey")
 	story.mark_read(&"weather_survey")
-	story.answer_survey({"uid": "u1", "data_id": "trixie", "name": "Trixie", "coat": ""})
+	story.answer_survey({"uid": "u1", "data_id": "trixie", "name": "Trixie", "coat": "shy"})
 	story.record_reply(&"weather_survey", "u1")
 	story.set_flag("requisition_posted")
 	story.requisition_cycle = 4
+	# A FROZEN LETTER, the field CRITICAL 2 of the final review added: params captured at
+	# post time have to survive the trip unchanged, ints included, even though
+	# JSON.parse_string (what from_dict() also has to tolerate) hands every number back as a
+	# float.
+	story.post(&"weather_colour_receipt", {"pony": "Trixie", "colour": "rose", "count": 3})
 
 	var back = StoryScript.from_dict(story.to_dict())
 	assert_eq(back.chapter, story.chapter)
@@ -131,8 +136,23 @@ func test_the_whole_story_round_trips_through_a_dictionary() -> void:
 	assert_true(back.has_flag("requisition_posted"))
 	assert_true(back.is_read(&"weather_survey"))
 	assert_eq(back.replied_to(&"weather_survey"), "u1")
+
+	# survey_choice and last_named are checked subfield by subfield, not just "name": a
+	# round trip that dropped uid or coat while keeping name would still pass a "name" only
+	# assertion, and uid is exactly the field the Requisition and the Compendium star both
+	# address her by.
+	assert_eq(String(back.survey_choice.get("uid", "")), "u1")
+	assert_eq(String(back.survey_choice.get("data_id", "")), "trixie")
 	assert_eq(String(back.survey_choice.get("name", "")), "Trixie")
+	assert_eq(String(back.survey_choice.get("coat", "")), "shy")
 	assert_eq(String(back.last_named.get("name", "")), "Trixie")
+	assert_eq(String(back.last_named.get("colour", "")),
+		StoryScript.spectra_colour(&"trixie"))
+
+	var frozen: Dictionary = back.mail_params(&"weather_colour_receipt")
+	assert_eq(String(frozen.get("pony", "")), "Trixie")
+	assert_eq(String(frozen.get("colour", "")), "rose")
+	assert_eq(int(frozen.get("count", -1)), 3)
 
 
 func test_a_hand_edited_file_cannot_fabricate_a_chapter_this_build_does_not_have() -> void:

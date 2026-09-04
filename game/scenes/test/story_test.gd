@@ -20,7 +20,7 @@ extends Node
 ## while she is out of a pen (Ranch.serve_requisition()'s own "owned but not penned" ending,
 ## the third of the three its class comment names), she is served exactly once she is
 ## penned and the Requisition is armed, and calling the seam again afterwards pays nothing
-## and takes nobody -- the same "answering twice pays nothing twice" discipline the Survey
+## and takes nobody: the same "answering twice pays nothing twice" discipline the Survey
 ## above it is held to.
 ##
 ## NOBODY DIES HERE. The one pony who leaves does it by Pony.leave_toward(), the same
@@ -92,8 +92,8 @@ func _ready() -> void:
 	var registry = PonyRegistryScript.new()
 	registry.load_all("res://data/ponies")
 	var params := {"name": "W".repeat(LettersScript.MAX_NAME_LENGTH),
-		"pony": "Wwwwwwwwwwwwwwww", "colour": "viridian", "count": 999, "quota": 12,
-		"balance": 40000}
+		"pony": "Wwwwwwwwwwwwwwww", "chosen": "Wwwwwwwwwwwwwwww", "colour": "viridian",
+		"count": 999, "quota": 12, "balance": 40000}
 	var chapters_ok := true
 	var triggers_ok := true
 	var dashes_ok := true
@@ -235,7 +235,7 @@ func _ready() -> void:
 	# Ranch.serve_requisition()'s own class comment names three endings; this is the third
 	# ("she is owned but not penned  nothing happens and it stays armed"). Pen.remove_pony()
 	# takes her body and her address off the pen's own books WITHOUT touching GameState's
-	# record of her, which is exactly the "owned but not penned" shape -- had it also dropped
+	# record of her, which is exactly the "owned but not penned" shape: had it also dropped
 	# her from GameState this would exercise the "not owned at all" ending instead, which
 	# closes the Requisition rather than leaving it armed.
 	var evicted: PonyInstance = pen.remove_pony(chosen_uid)
