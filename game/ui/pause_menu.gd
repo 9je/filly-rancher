@@ -563,6 +563,12 @@ func _rarity_color(rarity: int) -> Color:
 ## request as the board words it (with its progress appended when it takes more than one of
 ## anything) and what finishing it pays. Empty when no board was injected.
 ##
+## The line at the top of the board, in the chapter it is being read in. Empty when no board
+## was injected, which is the state a bare menu is in.
+func board_note() -> String:
+	return board.note() if board != null else ""
+
+
 ## active() rather than requests(): a finished request has already been paid by ranch.gd and
 ## is on its way off the board, so showing it would be asking for something twice.
 func request_rows() -> Array[Dictionary]:
@@ -794,8 +800,11 @@ func _draw_compendium() -> void:
 
 func _draw_requests() -> void:
 	_title.text = "REQUESTS"
-	_footer.text = MenuStyleScript.footer_reading("back") + "      Finish one to get a new one."
+	_footer.text = MenuStyleScript.footer_reading("back")
 	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
+	var note: String = board_note()
+	if not note.is_empty():
+		_add_note(note)
 	var rows := request_rows()
 	if rows.is_empty():
 		_add_note(EMPTY_TEXT)

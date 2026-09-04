@@ -71,6 +71,7 @@ const PonyDataScript := preload("res://systems/pony_data.gd")
 const RegionRegistryScript := preload("res://systems/region_registry.gd")
 const EconomyScript := preload("res://systems/economy.gd")
 const SpawnTableScript := preload("res://systems/spawn_table.gd")
+const StoryWordingScript := preload("res://systems/story_wording.gd")
 
 enum Kind { CATCH_ANY, PEN_ANY, SELL_ANY, BRING_PERSONALITY_FROM_ZONE, SELL_GEMS_OF_RARITY, SEE_CHARACTER }
 
@@ -112,6 +113,19 @@ var _region_registry: RegionRegistry = null
 var _requests: Array = []
 var _draw_counter: int = 0
 
+## WHICH CHAPTER THIS BOARD IS BEING READ IN. Set by ranch.gd from the story; a board nobody
+## has told reads in SUNNY, which is where every board starts.
+##
+## THE TEXT IS A FUNCTION OF THIS, NOT A THING STORED AGAINST THE REQUEST. The spec: "the
+## same request reads differently in SUNNY and in COMPANY". A sentence baked in at draw time
+## could only ever say what the board thought a year ago, so requests() and active() word
+## each row as they hand it over, from the request's own `subject` and `count`. The stored
+## `text` survives as the fallback for a save written before `subject` existed.
+##
+## NOTHING ELSE ABOUT A REQUEST MOVES: not its id, kind, count, progress, rewards or the
+## seeded draw that produced it. test_request_board.gd asserts exactly that.
+var chapter: int = 0
+
 
 ## `region_names` is an optional {id -> display name} lookup used to build
 ## BRING_PERSONALITY_FROM_ZONE's text without touching disk; see the class comment. When a
@@ -125,23 +139,51 @@ func _init(seed: int, registry: PonyRegistry, regions: Array[StringName], region
 	_region_names = region_names.duplicate()
 
 
+func set_chapter(value: int) -> void:
+	chapter = maxi(0, value)
+
+
+## The line at the top of the board, for the page that draws it.
+func note() -> String:
+	return StoryWordingScript.board_note(chapter)
+
+
 # --- reading -------------------------------------------------------------------------------
 
-## Every request on the board, done or not, as copies; mutating the result never touches
-## the board's own state.
+## Every request on the board, done or not, as copies, worded for the chapter this board is
+## being read in; mutating the result never touches the board's own state.
 func requests() -> Array:
 	var out: Array = []
 	for r in _requests:
-		out.append((r as Dictionary).duplicate(true))
+		out.append(_worded(r))
 	return out
 
 
-## Requests that have not yet reached their target count, as copies.
+## Requests that have not yet reached their target count, as copies worded for this chapter.
 func active() -> Array:
 	var out: Array = []
 	for r in _requests:
 		if not bool(r.get("done", false)):
-			out.append((r as Dictionary).duplicate(true))
+			out.append(_worded(r))
+	return out
+
+
+## A COPY OF `req`, WORDED FOR THIS CHAPTER. A request whose kind has no template, or one
+## restored from a save written before `subject` existed, keeps the text it was saved with:
+## an old row that suddenly said "Bring a ." would be worse than an old row that says what
+## it always said.
+func _worded(req: Dictionary) -> Dictionary:
+	var out: Dictionary = req.duplicate(true)
+	# THE ABSENCE OF THE KEY IS THE TEST, not an empty string: a tutorial request HAS a
+	# subject and it is empty, while a request restored from a save written before this field
+	# existed has no key at all. Rewording the second one from a subject it does not carry is
+	# how "Bring a shy pony from The Orchard." becomes "Bring a .".
+	if not out.has("subject"):
+		return out
+	var line: String = StoryWordingScript.board_text(int(out.get("kind", -1)), chapter,
+		String(out.get("subject", "")), int(out.get("count", 1)))
+	if not line.is_empty():
+		out["text"] = line
 	return out
 
 
@@ -186,7 +228,7 @@ func tutorial_rows() -> Array[Dictionary]:
 				continue
 			out.append({
 				"id": id,
-				"text": String(req.get("text", "")),
+				"text": String(_worded(req)["text"]),
 				"done": bool(req.get("done", false)),
 				"paid": bool(req.get("paid", false)),
 				"reward_bits": int(req.get("reward_bits", 0)),
@@ -211,6 +253,7 @@ func _blank_request(id: String, kind: int, reward_bits: int, reward_food: String
 		"done": false,
 		"paid": false,
 		"text": text,
+		"subject": "",
 	}
 
 
@@ -305,6 +348,7 @@ func _draw_bring(rng: RandomNumberGenerator, this_draw: int) -> Dictionary:
 		"Bring a %s pony from %s." % [personality_name, region_name])
 	r["personality"] = personality
 	r["zone"] = String(zone_id)
+	r["subject"] = "%s pony from %s" % [personality_name, region_name]
 	return r
 
 
@@ -319,6 +363,7 @@ func _draw_sell_gems(rng: RandomNumberGenerator, this_draw: int) -> Dictionary:
 		"Sell %d %s gems." % [count, rarity_name])
 	r["rarity"] = rarity
 	r["count"] = count
+	r["subject"] = "%s gems" % rarity_name
 	return r
 
 
@@ -349,6 +394,7 @@ func _draw_see_character(rng: RandomNumberGenerator, this_draw: int, excluded_ch
 	var r := _blank_request("req_%d" % this_draw, Kind.SEE_CHARACTER, 40, SEE_CHARACTER_FOOD_ID,
 		SEE_CHARACTER_FOOD_COUNT, "Find %s and get a good look at her." % data.display_name)
 	r["character"] = String(data.id)
+	r["subject"] = data.display_name
 	return r
 
 

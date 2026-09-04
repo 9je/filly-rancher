@@ -624,3 +624,61 @@ func test_the_tutorial_ids_are_the_ids_seed_tutorial_actually_writes() -> void:
 		seeded.append(String((r as Dictionary)["id"]))
 	assert_eq(seeded, RequestBoardScript.TUTORIAL_IDS,
 		"a constant that has drifted from the seeder pins the wrong three")
+
+
+# --- the board reads differently by chapter ----------------------------------------------
+
+func test_the_board_words_itself_in_the_chapter_it_is_read_in() -> void:
+	var wording = preload("res://systems/story_wording.gd")
+	var story = preload("res://systems/story.gd")
+	var board: RequestBoard = _board()
+	board.seed_tutorial()
+	assert_eq(String(board.requests()[0]["text"]),
+		wording.board_text(RequestBoardScript.Kind.CATCH_ANY, story.Chapter.SUNNY, "", 1))
+	board.set_chapter(story.Chapter.WEATHER)
+	assert_eq(String(board.requests()[0]["text"]),
+		wording.board_text(RequestBoardScript.Kind.CATCH_ANY, story.Chapter.WEATHER, "", 1),
+		"an EXISTING request rereads in the new chapter; it is not reworded only at draw")
+
+
+func test_the_chapter_changes_the_words_and_never_the_rewards_or_the_draw() -> void:
+	var story = preload("res://systems/story.gd")
+	var sunny: RequestBoard = _board()
+	sunny.seed_tutorial()
+	sunny.fill([])
+	var weather: RequestBoard = _board()
+	weather.set_chapter(story.Chapter.WEATHER)
+	weather.seed_tutorial()
+	weather.fill([])
+	var a: Array = sunny.requests()
+	var b: Array = weather.requests()
+	assert_eq(a.size(), b.size(), "the same board, drawn the same way")
+	for i in a.size():
+		var one: Dictionary = a[i]
+		var two: Dictionary = b[i]
+		assert_eq(String(one["id"]), String(two["id"]), "the seeded draw is untouched")
+		assert_eq(int(one["kind"]), int(two["kind"]))
+		assert_eq(int(one["count"]), int(two["count"]))
+		assert_eq(int(one["reward_bits"]), int(two["reward_bits"]), "THE MATH DOES NOT CHANGE")
+		assert_eq(int(one["reward_food_count"]), int(two["reward_food_count"]))
+
+
+func test_a_saved_board_from_before_the_subject_field_keeps_its_own_words() -> void:
+	var board: RequestBoard = _board()
+	board.seed_tutorial()
+	var saved: Array = board.to_array()
+	for i in range(1, saved.size()):
+		(saved[i] as Dictionary).erase("subject")
+		(saved[i] as Dictionary)["text"] = "An older sentence."
+	var back := RequestBoardScript.from_array(saved, registry, REGIONS, REGION_NAMES)
+	assert_eq(String(back.requests()[0]["text"]), "An older sentence.",
+		"a request with no subject to reword from keeps the text it was saved with")
+
+
+func test_the_board_carries_a_note_for_the_chapter_it_is_in() -> void:
+	var wording = preload("res://systems/story_wording.gd")
+	var story = preload("res://systems/story.gd")
+	var board: RequestBoard = _board()
+	assert_eq(board.note(), wording.board_note(story.Chapter.SUNNY))
+	board.set_chapter(story.Chapter.WEATHER)
+	assert_eq(board.note(), wording.board_note(story.Chapter.WEATHER))

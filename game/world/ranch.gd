@@ -3197,6 +3197,8 @@ func advance_story() -> int:
 		pause_menu.set("story_chapter", story.chapter)
 		pause_menu.set("employees_choice",
 			StringName(String(story.survey_choice.get("data_id", ""))))
+	if _board != null:
+		_board.set_chapter(story.chapter)
 	return posted
 
 
@@ -3577,6 +3579,8 @@ func _rebuild_request_board() -> void:
 		_board.seed_tutorial()
 	else:
 		_board = RequestBoardScript.from_array(saved, _pony_roster(), region_ids, region_names)
+	if _board != null and _game_state != null:
+		_board.set_chapter(_game_state.story.chapter)
 	_board.fill(_seen_ids())
 	_refresh_tasks()
 

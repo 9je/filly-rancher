@@ -317,8 +317,8 @@ func test_the_requests_page_lists_exactly_the_active_requests() -> void:
 		assert_eq(String(rows[i]["text"]), String(request["text"]),
 			"a request that only needs one of anything carries no progress")
 		assert_eq(String(rows[i]["value"]), "%d bits" % int(request["reward_bits"]))
-	assert_true(_menu.footer_text().contains("Finish one to get a new one."),
-		"the footer says where the next one comes from")
+	assert_eq(_menu.board_note(), "Finish one to get a new one.",
+		"the note at the top of the board says where the next one comes from")
 
 
 ## A finished request has already been paid by ranch.gd, so it drops off the page the moment
@@ -668,3 +668,13 @@ func test_the_pony_she_named_on_the_survey_carries_her_star_in_the_book() -> voi
 	_menu.open()
 	_menu.open_page(PauseMenu.Page.COMPENDIUM)
 	assert_true(_menu.compendium_rows()[0].contains(wording.EMPLOYEES_CHOICE))
+
+
+func test_the_requests_page_carries_the_boards_note_for_this_chapter() -> void:
+	_wire_book()
+	var wording = preload("res://systems/story_wording.gd")
+	var story = preload("res://systems/story.gd")
+	_board.set_chapter(story.Chapter.WEATHER)
+	_menu.open()
+	_menu.open_page(PauseMenu.Page.REQUESTS)
+	assert_eq(_menu.board_note(), wording.board_note(story.Chapter.WEATHER))
