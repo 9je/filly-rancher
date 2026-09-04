@@ -46,6 +46,61 @@
 #                      https://sound-effects-media.bbcrewind.co.uk/wav/<ID>.wav
 #   Kenney             https://kenney.nl , direct zips, CC0
 
+# --- ambient beds -----------------------------------------------------------------------
+#
+# Every bed is a 45 second seamless loop at -24 LUFS, except the strip hum, which is 30
+# (a hum has nothing in it that a longer window would reveal). loop= crossfades the tail
+# into the head so the file butt loops with no seam; Godot loops it with loop=true in the
+# committed .import sidecar. The trim window is one second longer than the loop, which is
+# the overlap the crossfade eats.
+#
+# THE WINDOWS ARE INTO THE MIDDLE OF EACH TAKE, never the first seconds: BBC recordings
+# routinely open with a slate, a level check or a recordist walking away from the mic.
+
+# bed_dawn_chorus: BBC NHU05104268, "Song thrush, blackbird, wren, carrion crow, distant
+# rooster, hedge sparrow, wood pigeon, robin, rooks. recorded at height of chorus." 362.4s.
+# Alternates: NHU05104269 (367.9s, a tawny owl at the edge of it); NHU05104271 (109.5s).
+ambient/bed_dawn_chorus.ogg|https://sound-effects-media.bbcrewind.co.uk/wav/NHU05104268.wav|rate=44100,trim=60-106,loop=45,gain=-24
+
+# bed_day_meadow: BBC 07013003, "Countryside atmosphere in summer with birdsong." 892.8s.
+# Alternates: 07059030 (274.3s, use at low level); 0009033 (29.6s, summer skylarks).
+ambient/bed_day_meadow.ogg|https://sound-effects-media.bbcrewind.co.uk/wav/07013003.wav|rate=44100,trim=200-246,loop=45,gain=-24
+
+# bed_dusk_calm: BBC 07030055, "Countryside: Dusk Atmosphere, March, (For use at low
+# level)." 390.3s. Alternates: 07030062 (211.4s, blackbirds, evening calls); 07052037
+# (195.9s, Spain countryside with birdsong).
+ambient/bed_dusk_calm.ogg|https://sound-effects-media.bbcrewind.co.uk/wav/07030055.wav|rate=44100,trim=120-166,loop=45,gain=-24
+
+# bed_night_insects: BBC NHU05035029, "Night. Many crickets and other insects." 259.0s.
+# Alternates: NHU05068084 (126.0s, tree crickets and wind in trees); NHU05079182 (240.1s,
+# crickets and frogs).
+ambient/bed_night_insects.ogg|https://sound-effects-media.bbcrewind.co.uk/wav/NHU05035029.wav|rate=44100,trim=80-126,loop=45,gain=-24
+
+# bed_night_owl: BBC NHU05053051, "Adult sleeping, with occasional Tawny Owl calls." 132.1s.
+# Sparse on purpose; this layer is meant to be noticed twice a night, not held.
+# Alternates: NHU05074178 (100.3s, chorus with very distant tawny owl); NHU05053052 (327.0s,
+# rooks and occasional tawny owl).
+ambient/bed_night_owl.ogg|https://sound-effects-media.bbcrewind.co.uk/wav/NHU05053051.wav|rate=44100,trim=80-126,loop=45,gain=-30
+
+# bed_wind_soft: BBC 07027032, "Weather: Wind in trees." 380.5s. The constant floor under
+# every phase; the BEDS table sets how far under. Alternates: 07005205 (356.0s, wind in
+# trees); 07061034 (243.0s, soft sea breeze, light, wispy gentle wind).
+ambient/bed_wind_soft.ogg|https://sound-effects-media.bbcrewind.co.uk/wav/07027032.wav|rate=44100,trim=100-146,loop=45,gain=-24
+
+# bed_strip_hum: BBC 07059070, "Strip lighting hum." 96.4s. Alternates: 07004188 (134.4s,
+# a varying electrical hum); 07027236 (295.3s, refrigerator hum, for use at low level).
+ambient/bed_strip_hum.ogg|https://sound-effects-media.bbcrewind.co.uk/wav/07059070.wav|rate=44100,trim=20-51,loop=30,gain=-24
+
+# bed_strip_crowd: BBC 07072151, "General fairground atmosphere, Nov 1980, recorded
+# Battersea Funfair." 192.0s. Alternates: 07072168 (288.6s, roundabouts with fairground
+# atmosphere); 07031045 (364.1s, fete crowd with distant birdsong).
+ambient/bed_strip_crowd.ogg|https://sound-effects-media.bbcrewind.co.uk/wav/07072151.wav|rate=44100,trim=60-106,loop=45,gain=-24
+
+# bed_casino_room: BBC 07044043, "Amusement Arcade atmosphere, with electronic games, fruit
+# machines and musical jingles." 246.4s. Alternates: 07025131 (422.1s, amusement arcade);
+# 07062096 (305.6s, arcade atmosphere 1985).
+ambient/bed_casino_room.ogg|https://sound-effects-media.bbcrewind.co.uk/wav/07044043.wav|rate=44100,trim=60-106,loop=45,gain=-24
+
 # --- world ------------------------------------------------------------------------------
 
 # gate_open: BBC 07037342, "Wooden Creak." 13.3s stereo 44.1k. One dry creak, no room, no

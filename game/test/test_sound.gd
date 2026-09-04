@@ -133,3 +133,42 @@ func test_a_bed_that_re_enters_during_its_own_release_does_not_strand_its_voice(
 	assert_false(Sound.is_voice_releasing(index_out),
 		"a voice must be released once its own departure fade actually finishes")
 	assert_eq(Sound.releasing_voice_indices().size(), 0)
+
+
+func test_a_phase_brings_its_beds_up_and_takes_the_previous_ones_down() -> void:
+	var Sound := _sound_autoload()
+	Sound.stop_all()
+	Sound.ambient_set_phase(SoundScript.BEDS.keys()[0])
+	var dawn: Array[StringName] = Sound.active_bed_ids()
+	assert_true(dawn.has(&"bed_dawn_chorus"))
+	assert_true(dawn.has(&"bed_wind_soft"))
+	Sound.ambient_set_phase(3)
+	var night: Array[StringName] = Sound.active_bed_ids()
+	assert_true(night.has(&"bed_night_insects"))
+	assert_false(night.has(&"bed_dawn_chorus"),
+		"the dawn chorus must be released the moment night takes over")
+
+
+func test_a_zone_overlays_the_phase_rather_than_replacing_it() -> void:
+	var Sound := _sound_autoload()
+	Sound.stop_all()
+	Sound.ambient_set_phase(1)
+	Sound.ambient_set_zone(SoundScript.ZONE_STRIP)
+	var beds: Array[StringName] = Sound.active_bed_ids()
+	assert_true(beds.has(&"bed_day_meadow"), "the meadow is still out there behind the lamps")
+	assert_true(beds.has(&"bed_strip_hum"))
+	assert_true(beds.has(&"bed_strip_crowd"))
+	Sound.ambient_set_zone(SoundScript.ZONE_NONE)
+	beds = Sound.active_bed_ids()
+	assert_true(beds.has(&"bed_day_meadow"))
+	assert_false(beds.has(&"bed_strip_hum"))
+
+
+func test_leaving_a_zone_never_disturbs_the_phase_beds() -> void:
+	var Sound := _sound_autoload()
+	Sound.stop_all()
+	Sound.ambient_set_phase(3)
+	var before: Array[StringName] = Sound.active_bed_ids()
+	Sound.ambient_set_zone(SoundScript.ZONE_CASINO)
+	Sound.ambient_set_zone(SoundScript.ZONE_NONE)
+	assert_eq(Sound.active_bed_ids(), before)

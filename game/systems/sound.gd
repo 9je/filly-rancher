@@ -58,13 +58,87 @@ const ZONE_CASINO := &"casino"
 ##   pitch_min  lower bound of the per play pitch roll.
 ##   pitch_max  upper bound; equal to pitch_min means "never vary".
 ##   loop       true only for the ogg beds; every wav one shot is false.
-const LIBRARY: Dictionary = {}
+## "paths" is written as a plain array literal rather than a PackedStringArray(...) call:
+## Godot 4.5.2's parser refuses to fold that constructor call as a constant expression
+## inside a const Dictionary, so the call form fails to parse here even though it is legal
+## at runtime. Every reader still gets a PackedStringArray back, because Dictionary.get()
+## into a statically typed PackedStringArray local converts the plain array for it.
+const LIBRARY: Dictionary = {
+	# --- ambient beds ---
+	&"bed_dawn_chorus": {
+		"paths": ["res://assets/audio/ambient/bed_dawn_chorus.ogg"],
+		"bus": BUS_AMBIENT, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": true},
+	&"bed_day_meadow": {
+		"paths": ["res://assets/audio/ambient/bed_day_meadow.ogg"],
+		"bus": BUS_AMBIENT, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": true},
+	&"bed_dusk_calm": {
+		"paths": ["res://assets/audio/ambient/bed_dusk_calm.ogg"],
+		"bus": BUS_AMBIENT, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": true},
+	&"bed_night_insects": {
+		"paths": ["res://assets/audio/ambient/bed_night_insects.ogg"],
+		"bus": BUS_AMBIENT, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": true},
+	&"bed_night_owl": {
+		"paths": ["res://assets/audio/ambient/bed_night_owl.ogg"],
+		"bus": BUS_AMBIENT, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": true},
+	&"bed_wind_soft": {
+		"paths": ["res://assets/audio/ambient/bed_wind_soft.ogg"],
+		"bus": BUS_AMBIENT, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": true},
+	&"bed_strip_hum": {
+		"paths": ["res://assets/audio/ambient/bed_strip_hum.ogg"],
+		"bus": BUS_AMBIENT, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": true},
+	&"bed_strip_crowd": {
+		"paths": ["res://assets/audio/ambient/bed_strip_crowd.ogg"],
+		"bus": BUS_AMBIENT, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": true},
+	&"bed_casino_room": {
+		"paths": ["res://assets/audio/ambient/bed_casino_room.ogg"],
+		"bus": BUS_AMBIENT, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": true},
+	# --- world ---
+	&"gate_open": {
+		"paths": ["res://assets/audio/world/gate_open.wav"],
+		"bus": BUS_EFFECTS, "volume_db": 0.0, "pitch_min": 0.94, "pitch_max": 1.06, "loop": false},
+	# --- ui ---
+	&"ui_move": {
+		"paths": ["res://assets/audio/ui/ui_move.wav"],
+		"bus": BUS_UI, "volume_db": 0.0, "pitch_min": 0.97, "pitch_max": 1.03, "loop": false},
+}
 
-## WorldState.Phase int to the beds that phase runs. Filled in Task 3.
-const BEDS: Dictionary = {}
+## WorldState.Phase int to the beds that phase runs. The ints are written out rather than
+## read off WorldState.Phase because a const initialiser cannot preload a script; the
+## corpus test asserts these four keys are exactly WorldState's four phases, so the two
+## cannot drift apart in silence.
+const BEDS: Dictionary = {
+	0: [  # DAWN
+		{"id": &"bed_dawn_chorus", "volume_db": 0.0},
+		{"id": &"bed_wind_soft", "volume_db": -6.0},
+	],
+	1: [  # DAY
+		{"id": &"bed_day_meadow", "volume_db": 0.0},
+		{"id": &"bed_wind_soft", "volume_db": -8.0},
+	],
+	2: [  # DUSK
+		{"id": &"bed_dusk_calm", "volume_db": 0.0},
+		{"id": &"bed_wind_soft", "volume_db": -6.0},
+	],
+	3: [  # NIGHT
+		{"id": &"bed_night_insects", "volume_db": 0.0},
+		{"id": &"bed_night_owl", "volume_db": -4.0},
+		{"id": &"bed_wind_soft", "volume_db": -4.0},
+	],
+}
 
-## Zone StringName to the beds that zone overlays on top of the phase. Filled in Task 3.
-const ZONE_BEDS: Dictionary = {}
+## Zone StringName to the beds that zone overlays ON TOP of the phase's, never instead of
+## them: the Strip is outdoors and the meadow is still out there behind the lamps. The
+## worst case is NIGHT plus strip, which is five simultaneous beds against BED_VOICES of 10
+## (the extra five are headroom for the outgoing set, which holds its voices while it fades).
+const ZONE_BEDS: Dictionary = {
+	ZONE_STRIP: [
+		{"id": &"bed_strip_hum", "volume_db": -3.0},
+		{"id": &"bed_strip_crowd", "volume_db": -8.0},
+	],
+	ZONE_CASINO: [
+		{"id": &"bed_casino_room", "volume_db": -3.0},
+	],
+}
 
 
 # --- state ------------------------------------------------------------------------------

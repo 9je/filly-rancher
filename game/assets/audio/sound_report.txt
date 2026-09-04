@@ -2,5 +2,14 @@
 # Loudness targets: ambient beds -24 LUFS, world and casino SFX -18, UI -20.
 # True peak ceiling -1.5 dBTP; LUFS tolerance 2.0 LU.
 # A row reading FAIL fails the run, and game/test/test_sound_library.gd fails too.
+PASS  ambient/bed_casino_room.ogg         dur=45.00     I=-22.6     TP=-9.8     target=-24
+PASS  ambient/bed_dawn_chorus.ogg         dur=45.00     I=-22.7     TP=-9.9     target=-24
+PASS  ambient/bed_day_meadow.ogg          dur=45.00     I=-22.6     TP=-10.1    target=-24
+PASS  ambient/bed_dusk_calm.ogg           dur=45.00     I=-22.6     TP=-6.2     target=-24
+PASS  ambient/bed_night_insects.ogg       dur=45.00     I=-22.8     TP=-10.2    target=-24
+PASS  ambient/bed_night_owl.ogg           dur=45.00     I=-28.9     TP=-2.3     target=-30
+PASS  ambient/bed_strip_crowd.ogg         dur=45.00     I=-22.6     TP=-7.4     target=-24
+PASS  ambient/bed_strip_hum.ogg           dur=30.00     I=-22.5     TP=-13.3    target=-24
+PASS  ambient/bed_wind_soft.ogg           dur=45.00     I=-22.6     TP=-3.7     target=-24
 PASS  ui/ui_move.wav                      dur=0.01      I=-70.0     TP=-5.3     target=none
 PASS  world/gate_open.wav                 dur=2.03      I=-16.5     TP=-7.2     target=-18
