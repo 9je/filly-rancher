@@ -109,12 +109,20 @@ func row_count() -> int:
 	return stakes().size() if _tab == Tab.TABLE else 0
 
 
+## ROW AND STAKE ARE THE SAME NUMBER AT THIS TABLE: see slots_menu.gd's own comment on the
+## identical pair of overrides, which this mirrors for exactly the same reason.
 func move_selection(step: int) -> void:
 	var n: int = row_count()
 	if n <= 0:
 		return
 	set_stake_index(posmod(stake_index() + step, n))
+	_selected = stake_index()
 	MenuStyleScript.tick_move()
+
+
+func point_at_row(index: int) -> void:
+	super.point_at_row(index)
+	_stake_index = _selected
 
 
 func confirm() -> bool:
@@ -192,6 +200,13 @@ func _stake_chip_rect(index: int) -> Rect2:
 	var centre := Vector2(STAKE.position.x + 34.0 + 78.0 * float(index),
 		STAKE.position.y + STAKE.size.y - 30.0 - (8.0 if index == stake_index() else 0.0))
 	return Rect2(centre - Vector2(30.0, 30.0) * 1.1, Vector2(30.0, 30.0) * 2.2)
+
+
+## THE ONE ROW ON THIS TABLE THE POINTER CAN TAKE: the stake she is about to deal for. Not a
+## new rect: _stake_chip_rect() is what paint() and focus_rect() already draw and highlight,
+## given a public name so the pointer kit can share it.
+func row_rect(index: int) -> Rect2:
+	return _stake_chip_rect(index)
 
 
 ## TOLD, NEVER ASKED. ranch.gd's play_blackjack() has taken the stake, run
@@ -351,3 +366,16 @@ func paint(ci: Control) -> void:
 			rect.position + Vector2(rect.size.x * 0.5, 50.0),
 			BlackjackScript.outcome_text(_hand), MenuStyleScript.TITLE_SIZE,
 			Color(PaintScript.GOLD, _outcome_rise), HORIZONTAL_ALIGNMENT_CENTER, -1.0)
+
+
+## ONE HIT PER STAKE CHIP. The placard tab has no row to click at all: row_count() already
+## answers 0 there, so this returns empty on its own without a special case.
+func stage_hit_rects() -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	for i in row_count():
+		out.append(row_rect(i))
+	return out
+
+
+func on_stage_hit(index: int) -> void:
+	take_row(index)

@@ -36,6 +36,15 @@ const STAKE_ROW_Y := 452.0
 const STAKE_PITCH := 96.0
 const CHIP_RADIUS := 30.0
 
+## THE LEVER'S HIT BOX AND THE THREE REEL WINDOWS' BOUNDING BAND, in the same stage local
+## pixels paint() draws into. The lever swings from LEVER_X, 120.0 out to a 35 degree ball at
+## radius 90 (see paint()'s own pivot and ball), so this box is generous enough to cover the
+## knob at rest and at full swing without reaching into the paytable beside it. The band is
+## reel_rect(0) through reel_rect(2), unioned by hand rather than at runtime because a const
+## cannot call a function.
+const LEVER_RECT := Rect2(655.0, 100.0, 100.0, 140.0)
+const REEL_BAND := Rect2(40.0, 86.0, 612.0, 300.0)
+
 ## Nine bulbs whose alpha chases left to right on this loop. The ONLY thing that moves while
 ## nothing is happening, which is what makes the cabinet read as a machine that is switched on
 ## rather than as a picture of one.
@@ -123,6 +132,10 @@ func row_count() -> int:
 	return stakes().size()
 
 
+## ROW AND STAKE ARE THE SAME NUMBER ON THIS CABINET: every selectable row IS a stake amount,
+## so _selected (the pointer's cursor) and _stake_index (what selected_stake() actually pays
+## out) are kept equal in both directions. See point_at_row()'s own override below for the
+## other direction.
 func move_selection(step: int) -> void:
 	if _spinning:
 		return
@@ -130,7 +143,17 @@ func move_selection(step: int) -> void:
 	if n <= 0:
 		return
 	set_stake_index(posmod(stake_index() + step, n))
+	_selected = stake_index()
 	MenuStyleScript.tick_move()
+
+
+## super() FIRST: table_menu.gd's own point_at_row() is what actually moves _selected and
+## _hovered and ticks the sound. _stake_index has to follow it here or a chip clicked with the
+## mouse would highlight while confirm() still paid out whatever the keyboard last left in
+## _stake_index.
+func point_at_row(index: int) -> void:
+	super.point_at_row(index)
+	_stake_index = _selected
 
 
 func confirm() -> bool:
@@ -393,3 +416,15 @@ func paint(ci: Control) -> void:
 			PaintScript.text(ci, font, Vector2(PAYTABLE.position.x + 16.0, y), lines[i],
 				MenuStyleScript.SUBTITLE_SIZE, MenuStyleScript.COLOR_DIM,
 				HORIZONTAL_ALIGNMENT_LEFT, PAYTABLE.size.x - 32.0)
+
+
+## THE LEVER AND THE THREE REELS. Clicking the lever is spinning; clicking a reel is the
+## same, because a player who clicks the machine means play. The rects are the ones paint()
+## already draws into, taken from the same constants, so the drawing and the hit test cannot
+## disagree.
+func stage_hit_rects() -> Array[Rect2]:
+	return [LEVER_RECT, REEL_BAND]
+
+
+func on_stage_hit(_index: int) -> void:
+	take_row(row_count() - 1)

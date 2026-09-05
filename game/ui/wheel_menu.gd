@@ -242,6 +242,19 @@ func stake_chip_rect(index: int) -> Rect2:
 		Vector2(CHIP_RADIUS, CHIP_RADIUS) * 2.2)
 
 
+## THE FELT'S BETTING BOX FOR ROW `index`: a guess pad for every guess, and the whole stake
+## row for the one position past the last guess (row_count() is guess_count() + 1; see the
+## class comment on where the stake actually lives). Same list stage_hit_rects() walks, in
+## the same order, so a click on the felt and a keyboard confirm at that row are the same act.
+func bet_rect(index: int) -> Rect2:
+	if index < guess_count():
+		return pad_rect(index)
+	var available: Array[int] = stakes()
+	if available.is_empty():
+		return Rect2()
+	return stake_chip_rect(0).merge(stake_chip_rect(available.size() - 1))
+
+
 ## WHICH POCKET IS UNDER THE POINTER RIGHT NOW, derived from the live angle rather than
 ## remembered from the push, so the test that asks it is asking the drawing.
 func pocket_under_pointer() -> int:
@@ -444,3 +457,19 @@ func paint(ci: Control) -> void:
 				clampi(stake_index(), 0, available.size() - 1)).grow(6.0), 40.0, t)
 	else:
 		PaintScript.focus_ring(ci, pad_rect(clampi(_selected, 0, guess_count() - 1)), 8.0, t)
+
+
+## THE FELT'S BETTING BOXES, one per row of the panel and in the panel's own row order, so
+## clicking red on the felt and pressing confirm on the red row are the same act. The order
+## mattering is the point: game/scenes/test/casino_test.gd already drives one wheel bet end
+## to end through the felt precisely because a swap between the felt's order and Wheel.Bet's
+## would silently mispay a colour bet at number odds.
+func stage_hit_rects() -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	for i in row_count():
+		out.append(bet_rect(i))
+	return out
+
+
+func on_stage_hit(index: int) -> void:
+	take_row(index)

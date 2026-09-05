@@ -30,6 +30,8 @@ const InputDeviceScript := preload("res://systems/input_device.gd")
 ## re-declare it; casino_menu.gd is not a TableMenu and declares its own.
 const PaintScript := preload("res://ui/casino_paint.gd")
 
+const MouseRowsScript := preload("res://ui/mouse_rows.gd")
+
 ## The stage's width in 1920x1080 base pixels: the Panel's 1180 minus the Margin node's
 ## 30 either side. Every drawn screen in the building is laid out against this one number, so
 ## a rect computed on the slot machine and a rect computed on the wheel mean the same thing.
@@ -54,6 +56,14 @@ var _result: Array[String] = []
 ## the focus ring's breath and by every stage's own animation. NOT a clock: it is reset on
 ## open() so a screen looks the same the second time you walk up to it.
 var _anim_t := 0.0
+
+## The row the pointer is resting on, or -1. Distinct from _selected: the cursor is where
+## she IS, this is where the pointer merely is, and a screenshot has to be able to show both.
+var _hovered := -1
+
+## The close button _ready() appends under the footer. Kept so a test and a subclass can
+## reach it without walking the column.
+var _close: Button = null
 
 @onready var _title: Label = $Centre/Panel/Margin/Column/Title
 @onready var _tabs: Label = $Centre/Panel/Margin/Column/Tabs
@@ -81,10 +91,21 @@ func _ready() -> void:
 	MenuStyleScript.apply_panel($Centre/Panel as PanelContainer)
 	visible = false
 	_title.text = title_text()
+	# THE DIM IS A SHUTTER, NOT A DECORATION. It used to ignore the mouse, so a click beside
+	# the panel fell through to the paused world behind it.
+	var dim := get_node_or_null(^"Dim") as Control
+	if dim != null:
+		dim.mouse_filter = Control.MOUSE_FILTER_STOP
 	if _stage != null:
-		_stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# STOP, not IGNORE: this is the felt, and the felt is where the game is.
+		_stage.mouse_filter = Control.MOUSE_FILTER_STOP
+		_stage.focus_mode = Control.FOCUS_NONE
 		_stage.custom_minimum_size = stage_size()
 		_stage.draw.connect(_paint_stage)
+		_stage.gui_input.connect(_on_stage_input)
+	_close = MouseRowsScript.close_button(MouseRowsScript.CLOSE_TEXT,
+		func(_index: int) -> void: close())
+	$Centre/Panel/Margin/Column.add_child(_close)
 	set_process(false)
 
 
@@ -95,6 +116,7 @@ func open() -> bool:
 		return false
 	_open = true
 	_selected = 0
+	_hovered = -1
 	_stake_index = 0
 	_result = []
 	_anim_t = 0.0
@@ -110,6 +132,7 @@ func close() -> void:
 	if not _open:
 		return
 	_open = false
+	_hovered = -1
 	visible = false
 	set_process(false)
 	closed.emit()
@@ -233,10 +256,21 @@ func refresh() -> void:
 		_stage.queue_redraw()
 	var lines: Array[String] = printed_lines()
 	var caret: int = _selected + first_row_line_index()
+	# A TABLE THAT DRAWS ITS ROWS ON THE STAGE STILL NEEDS A MOUSE TARGET FOR EACH OF THEM.
+	# slots_menu.gd and wheel_menu.gd both print nothing for their rows (the stake chips and
+	# the felt draw them instead), so first_row_line_index() sits past the end of
+	# printed_lines() and this loop would otherwise never reach a row at all. Padding with
+	# empty text keeps every row clickable without putting a second copy of its words in the
+	# column; MouseRows.row()'s own stylebox is the only thing that shows, exactly as it does
+	# on the chips and keys lines above it.
+	while lines.size() < first_row_line_index() + row_count():
+		lines.append("")
 	for i in lines.size():
 		var picked: bool = i == caret and row_count() > 0
+		var row: int = _row_at_line(i)
 		var label := Label.new()
 		label.text = MenuStyleScript.caret(picked) + lines[i]
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		# style_label() AND NOT A BARE font_color OVERRIDE. This line used to set the colour
 		# alone, so every row on every table in the Palace shipped with no outline, over a
 		# translucent panel, over a bright green field: exactly the readability failure
@@ -244,7 +278,14 @@ func refresh() -> void:
 		# doing it correctly, which is why the shared test never caught this one.
 		MenuStyleScript.style_label(label, MenuStyleScript.ROW_SIZE,
 			MenuStyleScript.COLOR_VALUE if picked else MenuStyleScript.COLOR_NAME)
-		var holder: PanelContainer = MenuStyleScript.row_panel(picked)
+		var holder: PanelContainer
+		if row >= 0:
+			holder = MouseRowsScript.row(row, picked, row == _hovered,
+				point_at_row, take_row)
+		else:
+			# A PRINTED LINE THAT IS NOT A ROW. The result block and the chips line are text
+			# the panel prints above its rows; nothing may pick them, so nothing arms them.
+			holder = MenuStyleScript.row_panel(picked)
 		holder.add_child(label)
 		_rows.add_child(holder)
 
@@ -397,3 +438,71 @@ func _unhandled_input(event: InputEvent) -> void:
 	else:
 		return
 	get_viewport().set_input_as_handled()
+
+
+# --- the pointer ----------------------------------------------------------------------------
+#
+# ONE CURSOR, TWO WAYS TO MOVE IT. point_at_row() is move_selection() with an absolute
+# destination instead of a step, and it makes the same sound, because a player who moves the
+# cursor with the mouse and a player who moves it with the arrow keys have done the same
+# thing and should hear the same thing.
+
+
+## Which drawn line is selectable row `index`, or -1 for a line nothing may pick. The
+## printed column and the selectable rows are not the same list; see first_row_line_index().
+func _row_at_line(line: int) -> int:
+	var index: int = line - first_row_line_index()
+	return index if index >= 0 and index < row_count() else -1
+
+
+func hovered_index() -> int:
+	return _hovered
+
+
+func close_button_node() -> Button:
+	return _close
+
+
+## Put the cursor on `index`. Refuses while an animation is running, exactly as
+## move_selection() is refused by every table that overrides it, so a spinning reel cannot be
+## re staked with the pointer either.
+func point_at_row(index: int) -> void:
+	if not _open or animating():
+		return
+	if index < 0 or index >= row_count():
+		return
+	if index == _selected and index == _hovered:
+		return
+	_hovered = index
+	if index != _selected:
+		_selected = index
+		MenuStyleScript.tick_move()
+	refresh()
+
+
+func take_row(index: int) -> void:
+	point_at_row(index)
+	if _selected == index:
+		confirm()
+
+
+## THE STAGE'S OWN CLICKABLE RECTS, in stage local coordinates. Empty on the base, which is
+## the right answer for a table that paints nothing worth pointing at.
+func stage_hit_rects() -> Array[Rect2]:
+	return []
+
+
+## What a click on stage rect `_index` does. Overridden by the tables that have one.
+func on_stage_hit(_index: int) -> void:
+	pass
+
+
+func _on_stage_input(event: InputEvent) -> void:
+	if not _open or _stage == null or not MouseRowsScript.is_left_click(event):
+		return
+	var button := event as InputEventMouseButton
+	var index: int = MouseRowsScript.hit(stage_hit_rects(), button.position)
+	if index < 0:
+		return
+	on_stage_hit(index)
+	_stage.accept_event()
