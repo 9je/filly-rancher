@@ -298,7 +298,7 @@ GUT's own default of not descending into subdirectories without
 **And a floor on the test count**, for the half the script count cannot see: a
 file that still parses but has lost most of its tests (a mass rename, a bad
 merge, a `func test_x` that became `func x`). `MIN_TESTS` in
-`tools/run_tests.sh` — currently **299** — is a deliberate FLOOR rather than an
+`tools/run_tests.sh` — currently **1420** — is a deliberate FLOOR rather than an
 exact count, so adding tests never breaks the build. Raise it when the suite
 grows; never lower it without saying in the same commit which tests went away
 and why. (It was 194 through Phase 1A and was raised to the suite's real size in
@@ -1222,6 +1222,39 @@ direct zips) for the menu ticks and the casino chips and cards.
 and the report one list: a manifest row nobody plays is a file that was
 downloaded and forgotten, and a `LIBRARY` path with no manifest row is a file
 nobody can reproduce on a clean checkout.
+
+---
+
+## Proving the saves are safe (a thing a unit test cannot do)
+
+`game/systems/save_io.gd` reads `FILLY_TEST_SAVE_DIR` once, at class load. A
+unit test can prove the resolver's policy (`game/test/test_save_io.gd`) and
+that `_static_init` wired it, but it cannot prove the thing that actually
+matters: that booting a real gate, which instances the real
+`world/ranch.tscn`, leaves the player's own directory alone.
+
+```bash
+bash tools/prove_save_safety.sh                     # the proof
+bash tools/prove_save_safety.sh --negative-control  # prove the proof can fail
+```
+
+The proof seeds a decoy `slot_0.json`, takes a `sha256sum` manifest of the live
+directory, boots `scenes/test/market_test.tscn` with the variable set, and
+requires three things: the gate passed, the manifest did not move, and the
+redirected directory actually received files. That third one is the one worth
+explaining -- a gate that wrote nothing anywhere would otherwise look exactly
+like a redirect that worked.
+
+The negative control boots the same gate with the variable unset and requires
+the manifest to MOVE. Without it, a comparison that passed on anything at all
+would look like a passing proof.
+
+**Neither run can reach the real `user://saves`.** Both point `XDG_DATA_HOME`
+at a temporary directory, which is where Godot resolves `user://` from on
+Linux, so the "live" directory being measured is a sandboxed one seeded with a
+decoy. That matters most for the negative control, whose whole job is to write
+the live directory: running it against the owner's own saves to prove a point
+would be exactly the accident this slice exists to prevent.
 
 ---
 
