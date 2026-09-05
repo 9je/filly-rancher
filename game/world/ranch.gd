@@ -1074,6 +1074,9 @@ func _ready() -> void:
 ## it into the spawner from _rebuild_world_state(), and _sync_game_state() never writes it
 ## back; the two directions used to fight, and the loser was the loaded save.
 func _bind_game_state() -> void:
+	# Consumed BEFORE the autoload null-check on purpose: a latch that survives this early
+	# return would replay "new game" on a later scene load that never asked for one.
+	_new_game = BootIntentScript.consume_new_game()
 	_game_state = get_node_or_null(^"/root/GameState")
 	if _game_state == null:
 		# Not fatal here -- it is a FAILED check in _report(), which is a better place for
@@ -1090,9 +1093,9 @@ func _bind_game_state() -> void:
 	# every non-interactive run (see _interactive below).
 	#
 	# AND NEITHER DOES A NEW GAME. The title screen's New game row latches BootIntent, which
-	# is consumed exactly here, so the creation screen opens over an empty ranch rather than
-	# over the ranch she was already playing.
-	_new_game = BootIntentScript.consume_new_game()
+	# was consumed at the top of this function (before the autoload null-check, so the latch
+	# cannot outlive a broken boot), and the creation screen opens over an empty ranch rather
+	# than over the ranch she was already playing.
 	if _hosted or _new_game:
 		_game_state.reset()
 		_save_loaded = false

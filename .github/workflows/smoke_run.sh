@@ -18,8 +18,11 @@ BIN="${1:?usage: smoke_run.sh <path-to-exported-binary>}"
 # ---------------------------------------------------------------------------
 # Accepted startup marker -- exactly one, enumerated explicitly, on purpose.
 #
-#   RANCH_OK  printed by game/world/ranch.gd, the main scene since Phase 1A Task 7
-#             (game/project.godot: run/main_scene = res://world/ranch.tscn). It is
+#   RANCH_OK  printed by game/world/ranch.gd. The main scene is the title screen since
+#             the R1 ui overhaul (game/project.godot: run/main_scene =
+#             res://ui/title_screen.tscn), and a non-interactive boot hands straight
+#             through to the ranch (TitleScreen.is_interactive()), so this marker still
+#             arrives on a bare binary boot. It is
 #             printed ONLY when every check that scene runs actually held; the same
 #             scene prints RANCH_FAILED and exits 1 otherwise, which fails this
 #             script on the exit code as well as on the marker.
