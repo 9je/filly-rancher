@@ -549,6 +549,19 @@ func _wire_mail() -> void:
 			{"uid": "u2", "name": "Pony", "coat": "Butter"}]
 
 
+## `count` LETTERS, IDS "letter_0".."letter_(count-1)" IN POSTING ORDER, so mail_rows()'s
+## newest-first reversal hands them back as "letter_(count-1)" down to "letter_0" -- built for
+## the windowing regression below, which needs more than ENVELOPES_ON_SCREEN of them.
+func _wire_many_mail(count: int) -> void:
+	var rows: Array[Dictionary] = []
+	for i in count:
+		rows.append({"id": "letter_%d" % i, "sender": "Cloudsdale Weather Corporation",
+			"title": "Letter %d" % i, "body": ["Dear Moonbeam,"],
+			"read": true, "replied": "", "reply": 0})
+	_menu.mail_provider = func() -> Array[Dictionary]: return rows
+	_menu.mail_ponies_provider = func() -> Array[Dictionary]: return []
+
+
 func test_the_mail_page_lists_the_newest_letter_first() -> void:
 	_wire_mail()
 	_menu.open()
@@ -765,3 +778,22 @@ func test_the_mail_envelopes_are_clickable_and_open_the_letter_they_name() -> vo
 		"one hit rect per envelope on the page")
 	_menu.on_stage_hit(0)
 	assert_eq(_menu.open_letter_id(), &"weather_survey", "the newest envelope is the top one")
+
+
+## FIX ROUND 1, THE REGRESSION THIS PINS: _paint_envelopes() windows the stack on `first`,
+## which follows the keyboard cursor past the first screenful; on_stage_hit() used to map a
+## click through `_scroll`, which _sync_scroll() holds at 0 on every page but the compendium
+## -- so a click after scrolling opened whatever was at the UNSCROLLED position instead of
+## what was actually drawn under the pointer. Seven letters is two past ENVELOPES_ON_SCREEN
+## (5), enough to force the window to shift.
+func test_a_scrolled_mail_page_opens_the_envelope_the_click_actually_landed_on() -> void:
+	_wire_many_mail(7)
+	_menu.open()
+	_menu.open_page(PauseMenu.Page.MAIL)
+	for i in 6:
+		_menu.move_selection(1)
+	assert_eq(_menu.selected_index(), 6, "the keyboard walked to the last row")
+	# The window is now [2..6] of mail_rows(); screen row 0 is mail_rows()[2] == "letter_4".
+	_menu.on_stage_hit(0)
+	assert_eq(_menu.open_letter_id(), &"letter_4",
+		"row 0 on screen is whichever envelope the scrolled window actually put there")

@@ -1020,16 +1020,6 @@ func _add_row(index: int, row_name: String, value: String,
 	_rows.add_child(row)
 
 
-func _row_style(selected: bool) -> StyleBoxFlat:
-	var box := StyleBoxFlat.new()
-	box.bg_color = MenuStyleScript.ROW_SELECTED_BG if selected else MenuStyleScript.ROW_IDLE_BG
-	box.border_color = MenuStyleScript.ROW_SELECTED_BORDER if selected \
-		else MenuStyleScript.ROW_IDLE_BORDER
-	box.set_border_width_all(2 if selected else 1)
-	box.set_corner_radius_all(8)
-	return box
-
-
 ## THE MAIL PAGE IS THE STAGE. The Rows column prints nothing while a stage is present: the
 ## page IS the drawing, the way the casino's tables are. A menu instantiated without the
 ## Stage node (an older scene, a test tree built by hand) falls back to printing
@@ -1080,6 +1070,21 @@ func _paint_stage() -> void:
 		_paint_letter(font, box)
 
 
+## THE ONE WINDOW OFFSET THE MAIL PAGE HAS, shared by the paint, the hit-test rects and the
+## click handler so the three cannot disagree about which envelope sits at screen row 0.
+## Follows the cursor exactly as the compendium's own window does, but kept here rather than
+## folded into `_scroll`: `_sync_scroll()` hard-resets `_scroll` to 0 on every page but
+## COMPENDIUM, so a click handler reading `_scroll` on the Mail page was always reading 0
+## while this window had already followed the keyboard cursor past the first screenful --
+## keyboard past row 4, then a click, opened the wrong letter (fix round 1).
+func _mail_window_first(rows: Array[Dictionary]) -> int:
+	var first: int = clampi(_selected - ENVELOPES_ON_SCREEN + 1, 0,
+		maxi(0, rows.size() - ENVELOPES_ON_SCREEN))
+	if _selected < first:
+		first = _selected
+	return first
+
+
 func _paint_envelopes(font: Font, box: Rect2) -> void:
 	var rows: Array[Dictionary] = mail_rows()
 	if rows.is_empty():
@@ -1090,10 +1095,7 @@ func _paint_envelopes(font: Font, box: Rect2) -> void:
 		return
 	# A WINDOW OVER THE LIST, not the whole of it: the mailbox fills up forever and the panel
 	# does not. Follows the cursor exactly as the compendium's window does.
-	var first: int = clampi(_selected - ENVELOPES_ON_SCREEN + 1, 0,
-		maxi(0, rows.size() - ENVELOPES_ON_SCREEN))
-	if _selected < first:
-		first = _selected
+	var first: int = _mail_window_first(rows)
 	var y: float = box.position.y + ENVELOPE_TOP_PAD
 	for i in range(first, mini(rows.size(), first + ENVELOPES_ON_SCREEN)):
 		var row: Dictionary = rows[i]
@@ -1180,29 +1182,32 @@ func take_row(index: int) -> void:
 
 ## THE MAIL PAGE IS A DRAWING, so its rows are rects rather than PanelContainers. The
 ## envelope rects are the ones _paint_envelopes() lays out, computed here from the same
-## constants so the drawing and the hit test cannot disagree. ENVELOPE_TOP_PAD is the one
-## the drawing folds into its start-of-stack `y` too, so the top rect and the top envelope
-## share an origin.
+## constants -- ENVELOPE_TOP_PAD and _mail_window_first() -- so the drawing and the hit test
+## cannot disagree, on origin or on which page of the list is on screen.
 func stage_hit_rects() -> Array[Rect2]:
 	var out: Array[Rect2] = []
 	if _page != Page.MAIL or not _letter_id.is_empty():
 		return out
 	var rows: Array[Dictionary] = mail_rows()
-	var shown: int = mini(rows.size(), ENVELOPES_ON_SCREEN)
+	var first: int = _mail_window_first(rows)
+	var shown: int = mini(rows.size() - first, ENVELOPES_ON_SCREEN)
 	for i in shown:
 		out.append(Rect2(0.0, ENVELOPE_TOP_PAD + float(i) * (ENVELOPE_HEIGHT + ENVELOPE_GAP),
 			MAIL_STAGE_WIDTH, ENVELOPE_HEIGHT))
 	return out
 
 
+## `index` IS A SCREEN ROW, NOT A LIST INDEX: rect 0 is whichever envelope _mail_window_first()
+## put at the top of the stack, which is the same offset _paint_envelopes() drew it at.
 func on_stage_hit(index: int) -> void:
 	if _page != Page.MAIL:
 		return
 	var rows: Array[Dictionary] = mail_rows()
-	if index < 0 or index >= rows.size():
+	var first: int = _mail_window_first(rows)
+	if index < 0 or first + index >= rows.size():
 		return
-	_selected = index + _scroll
-	open_letter(StringName(String(rows[index + _scroll]["id"])))
+	_selected = first + index
+	open_letter(StringName(String(rows[first + index]["id"])))
 
 
 func _on_stage_input(event: InputEvent) -> void:
