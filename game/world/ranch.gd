@@ -2070,10 +2070,14 @@ func open_mailbox_letter() -> bool:
 		row = rows[rows.size() - 1]
 	var id := StringName(String(row.get("id", "")))
 	if int(row.get("reply", 0)) != StoryBeatScript.Reply.NONE:
+		# The bool travels the whole branch: open_mail_page() can refuse (another menu holds
+		# the tree), and a refusal that reported true would eat the player's press silently.
 		open_mail_page()
-		if pause_menu != null and pause_menu.has_method("open_letter"):
-			pause_menu.call("open_letter", id)
-		return true
+		if pause_menu == null or not pause_menu.has_method("open_letter"):
+			return false
+		if not bool(pause_menu.call("is_open")):
+			return false
+		return bool(pause_menu.call("open_letter", id))
 	if letter_panel == null or not letter_panel.has_method("open"):
 		return false
 	var letter := {"sender": String(row.get("sender", "")),
