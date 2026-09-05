@@ -81,6 +81,7 @@ func set_tab(value: int) -> void:
 
 func switch_tab(step: int) -> void:
 	set_tab(posmod(_tab + step, Tab.PLACARD + 1))
+	MenuStyleScript.tick_page()
 
 
 func tabs_text() -> String:
@@ -113,11 +114,14 @@ func move_selection(step: int) -> void:
 	if n <= 0:
 		return
 	set_stake_index(posmod(stake_index() + step, n))
+	MenuStyleScript.tick_move()
 
 
 func confirm() -> bool:
 	if _tab != Tab.TABLE or selected_stake() <= 0:
 		return false
+	MenuStyleScript.tick_confirm()
+	_sound_call(&"play", [&"chip_clink"])
 	deal_requested.emit(selected_stake())
 	return true
 
@@ -224,6 +228,9 @@ func show_hand(hand: Dictionary, won: int, stake: int) -> void:
 		var side: int = order[step]
 		_tween.tween_callback(func() -> void:
 			_dealt = step + 1
+			# The first four cards are the deal; everything past them is a card turned over
+			# in the open, which is a different gesture and a different sound.
+			_sound_call(&"play", [&"card_slide" if step < 4 else &"card_flip"])
 			# THE CARD IS PLAYED IN THE OPEN. Every card past the first four is a decision the
 			# strategy card made on her behalf, so it is stamped as one: the player watches
 			# the placard's own rules being executed rather than reading three lines

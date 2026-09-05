@@ -24,11 +24,22 @@ config/features=PackedStringArray("4.5", "Forward Plus")
 ; It does NOT write anything by itself: autosave is off until a scene turns it on (see
 ; game/world/ranch.gd), so gates, the exported smoke run and `bash tools/run_tests.sh`
 ; cannot overwrite a real save just by booting the main scene.
+;
+; Sound (game/systems/sound.gd): the one gateway to audio playback. Owns the player
+; pools, the ambient beds and the private RandomNumberGenerator that makes every
+; variation choice, so no menu and no gameplay path ever has to. Registered LAST of the
+; four because it is the only autoload that can make noise, and AudioSafety above has to
+; have muted Master before this one's _ready() builds a single player.
 [autoload]
 
 AudioSafety="*res://systems/audio_safety.gd"
 GameState="*res://systems/game_state.gd"
 InputDevice="*res://systems/input_device.gd"
+Sound="*res://systems/sound.gd"
+
+[audio]
+
+buses/default_bus_layout="res://default_bus_layout.tres"
 
 [rendering]
 renderer/rendering_method="forward_plus"

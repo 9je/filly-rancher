@@ -118,8 +118,10 @@ func switch_tab(step: int) -> void:
 		var available: Array[int] = stakes()
 		if not available.is_empty():
 			set_stake_index(posmod(stake_index() + step, available.size()))
+		MenuStyleScript.tick_page()
 		return
 	set_tab(posmod(_tab + step, Tab.NUMBER + 1))
+	MenuStyleScript.tick_page()
 
 
 ## Cycles the guesses and, right after the last one, one more position: the stake. Only
@@ -134,6 +136,7 @@ func move_selection(step: int) -> void:
 	if _selected < guess_count():
 		_guess_row = _selected
 	refresh()
+	MenuStyleScript.tick_move()
 
 
 func tabs_text() -> String:
@@ -190,6 +193,8 @@ func row_count() -> int:
 func confirm() -> bool:
 	if selected_stake() <= 0:
 		return false
+	MenuStyleScript.tick_confirm()
+	_sound_call(&"play", [&"chip_clink"])
 	bet_requested.emit(_tab, selected_guess(), selected_stake())
 	return true
 
@@ -299,12 +304,34 @@ func show_spin(pocket: int, won: int, stake: int) -> void:
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	_tween.tween_property(self, "_glow", 1.0, 0.12)
 	_tween.tween_property(self, "_glow", 0.0, LANDED_GLOW_SECONDS)
-	_tween.tween_callback(func() -> void: _spinning = false)
+	_tween.tween_callback(func() -> void:
+		_spinning = false
+		_sound_call(&"play", [&"wheel_settle"]))
 	# `won` and `stake` are not used to decide anything; they are here so a later slice can
 	# slide the winning chips to the player without changing this call's shape, and so the
 	# signature matches SlotsMenu.show_spin()'s.
 	if won < 0 or stake < 0:
 		return
+
+
+## super(delta) FIRST, ALWAYS: see slots_menu.gd's own comment on the same line, which this
+## mirrors. TableMenu's _process is what advances anim_time() and queues the stage redraw.
+##
+## THE RATCHET STATE LIVES HERE, NOT IN paint(). A _draw pass is not a frame tick: it runs
+## only when something queues a redraw, and paint() used to detect the pocket crossing and
+## fire wheel_ratchet itself, which meant the ratchet stopped ticking whenever the stage
+## was not being redrawn. Detection and the sound trigger move here, driven once per
+## physics-independent process frame exactly like _sound_reels() on the slots cabinet;
+## paint() below only reads _last_pocket and _ratchet to draw the kick.
+func _process(delta: float) -> void:
+	super(delta)
+	var now: int = pocket_under_pointer()
+	if now != _last_pocket:
+		_last_pocket = now
+		_ratchet = 1.0
+		if _spinning:
+			_sound_call(&"play", [&"wheel_ratchet"])
+	_ratchet = maxf(0.0, _ratchet - delta / RATCHET_SECONDS)
 
 
 func paint(ci: Control) -> void:
@@ -344,11 +371,8 @@ func paint(ci: Control) -> void:
 	ci.draw_arc(WHEEL_CENTRE, WHEEL_OUTER, 0.0, TAU, 96, PaintScript.GOLD_DIM, 5.0, true)
 
 	# --- the pointer, ratcheting -------------------------------------------------------------
-	var now: int = pocket_under_pointer()
-	if now != _last_pocket:
-		_last_pocket = now
-		_ratchet = 1.0
-	_ratchet = maxf(0.0, _ratchet - get_process_delta_time() / RATCHET_SECONDS)
+	# _last_pocket and _ratchet are read only here; _process() above owns writing both, so
+	# a redraw draws whatever the last process frame decided rather than deciding it itself.
 	var kick: float = deg_to_rad(RATCHET_DEGREES) * _ratchet
 	var tip: Vector2 = WHEEL_CENTRE + Vector2(sin(kick), -cos(kick)) * (WHEEL_OUTER - 6.0)
 	var base: Vector2 = WHEEL_CENTRE + Vector2(sin(kick), -cos(kick)) * (WHEEL_OUTER + 26.0)

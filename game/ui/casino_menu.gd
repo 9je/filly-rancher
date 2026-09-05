@@ -109,6 +109,19 @@ var _anim_t := 0.0
 @onready var _stage: Control = get_node_or_null(^"Centre/Panel/Margin/Column/Stage")
 
 
+## get_node_or_null(), not the bare `Sound` identifier: see game/ui/menu_style.gd's own
+## comment, and game/actors/player/magic_beam.gd's _sound_call, on why an autoload's name
+## does not resolve under the parse sweep's check-only, script-only pass. is_inside_tree()
+## first, so a menu built with .new() and never added anywhere gets a silent no-op rather
+## than the engine error get_node() prints on a treeless node.
+func _sound_call(method: StringName, args: Array) -> void:
+	if not is_inside_tree():
+		return
+	var node: Node = get_node_or_null(^"/root/Sound")
+	if node != null:
+		node.callv(method, args)
+
+
 func _ready() -> void:
 	MenuStyleScript.apply_panel($Centre/Panel as PanelContainer)
 	visible = false
@@ -133,6 +146,7 @@ func open() -> bool:
 	visible = true
 	refresh()
 	opened.emit()
+	MenuStyleScript.tick_open()
 	return true
 
 
@@ -143,6 +157,7 @@ func close() -> void:
 	visible = false
 	set_process(false)
 	closed.emit()
+	MenuStyleScript.tick_back()
 
 
 func is_open() -> bool:
@@ -161,6 +176,7 @@ func set_tab(value: int) -> void:
 
 func switch_tab(step: int) -> void:
 	set_tab(posmod(_tab + step, Tab.RULES + 1))
+	MenuStyleScript.tick_page()
 
 
 func selected_index() -> int:
@@ -174,6 +190,7 @@ func move_selection(step: int) -> void:
 		return
 	_selected = posmod(_selected + step, n)
 	refresh()
+	MenuStyleScript.tick_move()
 
 
 ## What the cage will sell her, cut to the bits she is holding, plus an "everything" row when
@@ -247,7 +264,15 @@ func confirm() -> bool:
 		Tab.LOBBY:
 			if _selected < 0 or _selected >= LOBBY_ROWS.size():
 				return false
+			# CAGE and RULES turn a tab on this same panel; the four games open their own
+			# panel over the top of it, which already fires its own tick_open() (see
+			# table_menu.gd's open()). Ticking tick_confirm() here too made one keypress
+			# fire two sounds on those four rows, so only the tab-turn rows get one here.
+			var opens_a_table: bool = _selected == Row.SLOTS or _selected == Row.WHEEL \
+				or _selected == Row.BLACKJACK or _selected == Row.RACING
 			room_requested.emit(_selected)
+			if not opens_a_table:
+				MenuStyleScript.tick_confirm()
 			return true
 		Tab.CAGE:
 			var buys: Array[int] = buy_amounts()
@@ -256,10 +281,14 @@ func confirm() -> bool:
 				return false
 			if _selected < buys.size():
 				buy_chips_requested.emit(buys[_selected])
+				MenuStyleScript.tick_confirm()
+				_sound_call(&"play", [&"chip_clink"])
 				return true
 			var index: int = _selected - buys.size()
 			if index < cashes.size():
 				cash_out_requested.emit(cashes[index])
+				MenuStyleScript.tick_confirm()
+				_sound_call(&"play", [&"chip_clink"])
 				return true
 			return false
 	return false

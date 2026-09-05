@@ -53,7 +53,7 @@ const StoryWordingScript := preload("res://systems/story_wording.gd")
 
 enum Page { MAIN, SETTINGS, COMPENDIUM, REQUESTS, MAIL, LEDGER }
 enum Row { RESUME, COMPENDIUM, REQUESTS, MAIL, LEDGER, SAVE, SETTINGS, QUIT }
-enum SettingRow { VOLUME, SENSITIVITY, INVERT }
+enum SettingRow { VOLUME, AMBIENT, EFFECTS, SENSITIVITY, INVERT }
 
 const MAIN_ROWS := ["Resume", "Compendium", "Requests", "Mail", "The ledger",
 	"Save the ranch", "Settings", "Quit to desktop"]
@@ -184,6 +184,22 @@ func _ready() -> void:
 	set_process(false)
 
 
+## get_node_or_null(), not the bare `Sound` identifier: see game/ui/menu_style.gd's own
+## comment, and game/actors/player/magic_beam.gd's _sound_call, on why an autoload's name
+## does not resolve under the parse sweep's check-only, script-only pass. This is for the
+## two sites that play a world sound directly (open_letter's mail_open, confirm()'s
+## mail_stamp) rather than through a MenuStyle tick, exactly as magic_beam.gd's own
+## capture sounds do. is_inside_tree() first, so a menu built with .new() and never added
+## anywhere (this file's own tests construct it that way) gets a silent no-op rather than
+## the engine error get_node() prints on a treeless node.
+func _sound_call(method: StringName, args: Array) -> void:
+	if not is_inside_tree():
+		return
+	var node: Node = get_node_or_null(^"/root/Sound")
+	if node != null:
+		node.callv(method, args)
+
+
 func open() -> bool:
 	if _open:
 		return false
@@ -201,6 +217,7 @@ func open() -> bool:
 	visible = true
 	_refresh()
 	opened.emit()
+	MenuStyleScript.tick_open()
 	return true
 
 
@@ -211,9 +228,17 @@ func open() -> bool:
 ##
 ## Returns false, and changes nothing, if `can_open` refuses or `page` is not a real Page;
 ## an unknown page number must not leave the menu on a blank it cannot draw.
+##
+## THE TICK IS EARNED ONE OF TWO WAYS, NEVER BOTH. When the panel was closed, `open()`
+## below already fires tick_open() on its own success path, so this function only adds
+## tick_page() for the other case, a page switch inside a panel that was already open. A
+## caller reaching this from confirm() (the panel is always open there, by construction)
+## always takes the tick_page() branch; ranch.gd's request board shortcut is the one
+## caller that can take either branch, depending on whether the panel was already up.
 func open_page(page: int) -> bool:
 	if not (page in Page.values()):
 		return false
+	var was_open: bool = _open
 	if not _open and not open():
 		return false
 	_page = page
@@ -221,6 +246,8 @@ func open_page(page: int) -> bool:
 	_scroll = 0
 	_letter_id = &""
 	_refresh()
+	if was_open:
+		MenuStyleScript.tick_page()
 	return true
 
 
@@ -282,20 +309,39 @@ func move_selection(step: int) -> void:
 	_selected = posmod(_selected + step, _row_count())
 	_sync_scroll()
 	_refresh()
+	MenuStyleScript.tick_move()
 
 
 ## Left or right on a settings row. Nothing on any other page: the compendium and the
 ## request board have no adjustable anything, and this is the one place that decides so.
+## TICKS ONLY WHEN SOMETHING ACTUALLY MOVED: a slider already at its floor or ceiling is a
+## refused adjustment, not a move, so it stays silent rather than lying with tick_move().
 func adjust(direction: int) -> void:
 	if _page != Page.SETTINGS or settings == null:
 		return
+	var moved: bool = false
 	match _selected:
 		SettingRow.VOLUME:
+			var before: float = settings.master_volume
 			settings.step_volume(direction)
+			moved = not is_equal_approx(settings.master_volume, before)
+		SettingRow.AMBIENT:
+			var before: float = settings.ambient_volume
+			settings.step_ambient(direction)
+			moved = not is_equal_approx(settings.ambient_volume, before)
+		SettingRow.EFFECTS:
+			var before: float = settings.effects_volume
+			settings.step_effects(direction)
+			moved = not is_equal_approx(settings.effects_volume, before)
 		SettingRow.SENSITIVITY:
+			var before: float = settings.mouse_sensitivity
 			settings.step_sensitivity(direction)
+			moved = not is_equal_approx(settings.mouse_sensitivity, before)
 		SettingRow.INVERT:
 			settings.toggle_invert()
+			moved = true
+	if moved:
+		MenuStyleScript.tick_move()
 	settings_changed.emit()
 	_refresh()
 
@@ -305,15 +351,25 @@ func confirm() -> bool:
 		if _letter_id.is_empty():
 			var rows: Array[Dictionary] = mail_rows()
 			if _selected < 0 or _selected >= rows.size():
+				MenuStyleScript.tick_denied()
 				return false
-			return open_letter(StringName(String(rows[_selected].get("id", ""))))
+			var opened_ok: bool = open_letter(StringName(String(rows[_selected].get("id", ""))))
+			if opened_ok:
+				MenuStyleScript.tick_confirm()
+			else:
+				MenuStyleScript.tick_denied()
+			return opened_ok
 		var replies: Array[Dictionary] = reply_rows()
 		if _selected < 0 or _selected >= replies.size():
+			MenuStyleScript.tick_denied()
 			return false
 		var answered: StringName = _letter_id
 		var choice: String = String(replies[_selected]["choice"])
 		close_letter()
 		mail_reply.emit(answered, choice)
+		# THE ANSWERED STAMP COMING DOWN: a world sound on the Effects bus, not a UI tick,
+		# for the same reason open_letter() plays mail_open directly; see _sound_call.
+		_sound_call(&"play", [&"mail_stamp"])
 		# REFRESH AGAIN, AFTER THE EMIT: close_letter()'s own _refresh() ran BEFORE
 		# ranch.gd's answer_mail() had a chance to mark the letter read, so the mail_rows()
 		# cache it primed would otherwise hold the pre-reply snapshot (stale wax dot, no
@@ -322,16 +378,28 @@ func confirm() -> bool:
 		return true
 	if _page == Page.SETTINGS:
 		if _selected == SettingRow.INVERT:
-			adjust(1)
+			# Toggle directly rather than through adjust(): adjust() already ticks its own
+			# tick_move() on a real change, and confirm ticking too made one keypress fire
+			# two sounds. A confirm on this row gets exactly the one tick_confirm() below.
+			settings.toggle_invert()
+			settings_changed.emit()
+			_refresh()
+			MenuStyleScript.tick_confirm()
 			return true
+		MenuStyleScript.tick_denied()
 		return false
 	if _page == Page.COMPENDIUM or _page == Page.REQUESTS or _page == Page.LEDGER:
 		# Read only pages; see the class comment.
+		MenuStyleScript.tick_denied()
 		return false
 	match _selected:
 		Row.RESUME:
 			close()
+			MenuStyleScript.tick_confirm()
 		Row.COMPENDIUM:
+			# open_page() is always taking its "already open" branch here (confirm() only
+			# runs while the panel is open), so it fires tick_page() on its own; see its
+			# own comment.
 			open_page(Page.COMPENDIUM)
 		Row.REQUESTS:
 			open_page(Page.REQUESTS)
@@ -341,18 +409,22 @@ func confirm() -> bool:
 			open_page(Page.LEDGER)
 		Row.SAVE:
 			save_requested.emit()
+			MenuStyleScript.tick_confirm()
 		Row.SETTINGS:
 			_page = Page.SETTINGS
 			_selected = 0
 			_refresh()
+			MenuStyleScript.tick_page()
 		Row.QUIT:
 			quit_requested.emit()
+			MenuStyleScript.tick_confirm()
 	return true
 
 
 ## Cancel: a sub page goes back to main WITH ITS OWN ROW SELECTED, so cancelling out of the
 ## compendium leaves the cursor on "Compendium" rather than back at the top; main closes.
 func back() -> void:
+	MenuStyleScript.tick_back()
 	match _page:
 		Page.SETTINGS:
 			_return_to_main(Row.SETTINGS)
@@ -668,6 +740,9 @@ func open_letter(id: StringName) -> bool:
 			_letter_id = id
 			_selected = 0
 			mail_opened.emit(id)
+			# THE ENVELOPE ITSELF: a world sound on the Effects bus, not a UI tick; see
+			# _sound_call.
+			_sound_call(&"play", [&"mail_open"])
 			_refresh()
 			return true
 	return false
@@ -803,9 +878,15 @@ func _draw_settings() -> void:
 	_footer.text = MenuStyleScript.footer([[&"menu_rows", "choose"],
 		[&"menu_tabs", "adjust"], [&"ui_cancel", "back"]])
 	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
-	_add_row(0, "Master volume", "%d%%" % int(round(settings.master_volume * 100.0)))
-	_add_row(1, "Mouse sensitivity", "%.1f" % (settings.mouse_sensitivity * 1000.0))
-	_add_row(2, "Invert look", "On" if settings.invert_look else "Off")
+	_add_row(SettingRow.VOLUME, "Master volume",
+		"%d%%" % int(round(settings.master_volume * 100.0)))
+	_add_row(SettingRow.AMBIENT, "Ambience",
+		"%d%%" % int(round(settings.ambient_volume * 100.0)))
+	_add_row(SettingRow.EFFECTS, "Effects and menus",
+		"%d%%" % int(round(settings.effects_volume * 100.0)))
+	_add_row(SettingRow.SENSITIVITY, "Mouse sensitivity",
+		"%.1f" % (settings.mouse_sensitivity * 1000.0))
+	_add_row(SettingRow.INVERT, "Invert look", "On" if settings.invert_look else "Off")
 
 
 func _draw_compendium() -> void:

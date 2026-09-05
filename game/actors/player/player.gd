@@ -136,6 +136,17 @@ const RUN_SPEED := 5.2
 ## strictly a way of not making her flee in the first place.
 const SNEAK_SPEED := 2.0 * GaitScript.WALK_CLIP_SPEED
 
+## HOOFSTEPS ARE A FUNCTION OF DISTANCE, NOT OF TIME. One step every STEP_STRIDE metres
+## actually travelled, so sneaking gives a walk and running gives a gallop out of one
+## constant instead of two that would drift apart. At RUN_SPEED this is roughly five steps
+## a second across four hooves.
+const STEP_STRIDE := 1.1
+## Below this she is shuffling, not walking, and a sound there is a sound with no gesture
+## behind it.
+const STEP_MIN_SPEED := 0.4
+const SURFACE_GRASS := &"hoofsteps_grass"
+const SURFACE_HARD := &"hoofsteps_hard"
+
 ## Peak of a standing jump, in metres. 0.9 m is about three quarters of her withers
 ## height (1.163 m) -- a pony-sized hop rather than a platformer leap.
 const JUMP_HEIGHT := 0.9
@@ -185,6 +196,8 @@ var _anim: AnimationPlayer
 var _visual_yaw := 0.0
 var _coyote_left := 0.0
 var _jump_buffered := 0.0
+var _step_distance := 0.0
+var _step_surface: StringName = SURFACE_GRASS
 
 ## The mane style the body currently standing in Visuals was built from. apply_look()
 ## compares against it: a tint can be re-applied to a body that already exists, a different
@@ -277,6 +290,54 @@ func _rebuild_visuals(mane_style: int) -> void:
 	_build_visuals(mane_style)
 
 
+## Which surface she is walking on. Set by ranch.gd, which is the only thing that knows
+## what a region is; an unknown id is refused so a typo cannot turn every step in the rest
+## of the session into a push_error.
+func set_step_surface(id: StringName) -> void:
+	if id != SURFACE_GRASS and id != SURFACE_HARD:
+		push_error("Player.set_step_surface: '%s' is not a surface" % id)
+		return
+	_step_surface = id
+
+
+func step_surface() -> StringName:
+	return _step_surface
+
+
+func step_distance() -> float:
+	return _step_distance
+
+
+## Roll the accumulator forward and answer whether a hoof landed this frame. Pure: it makes
+## no sound and reads no node, which is what lets the suite drive it with numbers.
+func accumulate_step(speed: float, delta: float, on_floor: bool) -> bool:
+	if not on_floor or speed < STEP_MIN_SPEED or delta <= 0.0:
+		_step_distance = 0.0
+		return false
+	_step_distance += speed * delta
+	if _step_distance < STEP_STRIDE:
+		return false
+	_step_distance -= STEP_STRIDE
+	return true
+
+
+## get_node(), not the bare `Sound` identifier: tools/run_tests.sh's parse sweep runs every
+## .gd file through `--check-only --script`, and that pass never boots the scene tree, so
+## an autoload's name is never registered as a resolvable global identifier there, even
+## though it resolves fine in a real run (the game, or GUT's own actual test pass). See
+## magic_beam.gd's own copy of this same dispatcher.
+##
+## is_inside_tree() first, so a player built with `.new()` and never added anywhere (this
+## file's own suite) gets a silent no-op rather than the engine error get_node() prints on
+## a treeless node.
+func _sound_call(method: StringName, args: Array) -> void:
+	if not is_inside_tree():
+		return
+	var node: Node = get_node_or_null(^"/root/Sound")
+	if node != null:
+		node.callv(method, args)
+
+
 func _physics_process(delta: float) -> void:
 	var on_floor := is_on_floor()
 
@@ -324,6 +385,8 @@ func _physics_process(delta: float) -> void:
 
 	_update_facing(direction, delta)
 	_update_animation(get_ground_speed())
+	if accumulate_step(get_ground_speed(), delta, is_on_floor()):
+		_sound_call(&"play_at", [_step_surface, global_position])
 
 
 ## Basis whose -Z is "forward" for input purposes: the current camera's facing,

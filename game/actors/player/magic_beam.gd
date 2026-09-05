@@ -1369,9 +1369,32 @@ func _exclusions() -> Array[RID]:
 
 # --- holding --------------------------------------------------------------------------
 
+## get_node(), not the bare `Sound` identifier: tools/run_tests.sh's parse sweep runs every
+## .gd file through `--check-only --script`, and that pass never boots the scene tree, so
+## an autoload's name is never registered as a resolvable global identifier there, even
+## though it resolves fine in a real run (the game, or GUT's own actual test pass). See
+## game/test/test_sound.gd's own comment on the same limitation.
+##
+## is_inside_tree() first, so a beam built with `.new()` and never added anywhere (a purely
+## static test fixture, if one is ever written) gets a silent no-op rather than the engine
+## error get_node() prints on a treeless node.
+func _sound_call(method: StringName, args: Array) -> void:
+	if not is_inside_tree():
+		return
+	var node: Node = get_node_or_null(^"/root/Sound")
+	if node != null:
+		node.callv(method, args)
+
+
 func _begin_hold(body: Node3D) -> void:
 	_held = body
 	_hold_seconds = 0.0
+	# play_loop, not play_at: a pooled one-shot cannot be individually addressed, so a grab
+	# released before the clip's 1.19s ran out used to ring on regardless. A dedicated,
+	# stoppable voice fixes that; see _take_back_physics(), which stops it on every path a
+	# hold can end. Not spatial, unlike the play_at() this replaces, but the beam is always
+	# within a stride of the player who is holding it, so the loss is negligible.
+	_sound_call(&"play_loop", [&"capture_charge"])
 	_hold_offset = Vector3.ZERO
 	_wrenching = false
 
@@ -1471,6 +1494,10 @@ func _lose(body: Node3D, reason: int) -> void:
 ## spinning by the beam would offset every facing she computes for the rest of her life.
 ## The beam borrows that yaw for the float and hands it back at zero.
 func _take_back_physics(body: Node3D) -> void:
+	# UNCONDITIONAL, ahead of the body check below: every path a hold can end (a settle, an
+	# escape, a wrench, the tree tearing down) runs through here, and capture_charge started
+	# regardless of what _held turned out to be, so the sound stops the same way regardless.
+	_sound_call(&"stop_loop", [&"capture_charge"])
 	if body == null or not is_instance_valid(body):
 		return
 	if body is PonyScript:
@@ -1517,6 +1544,7 @@ func _settle_pony(pony: Node3D) -> void:
 		pony.notify_captured()
 		pony.queue_free()
 		_play_first_capture_voice()
+		_sound_call(&"play_at", [&"capture_success", global_position])
 		captured.emit(instance)
 		return
 

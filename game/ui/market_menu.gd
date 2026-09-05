@@ -93,6 +93,7 @@ func open() -> bool:
 	visible = true
 	refresh()
 	opened.emit()
+	MenuStyleScript.tick_open()
 	return true
 
 
@@ -102,6 +103,7 @@ func close() -> void:
 	_open = false
 	visible = false
 	closed.emit()
+	MenuStyleScript.tick_back()
 
 
 func is_open() -> bool:
@@ -118,6 +120,7 @@ func set_tab(next: int) -> void:
 	_tab = next
 	_selected = 0
 	refresh()
+	MenuStyleScript.tick_page()
 
 
 func selected_index() -> int:
@@ -173,6 +176,7 @@ func move_selection(step: int) -> void:
 		return
 	_selected = posmod(_selected + step, n)
 	refresh()
+	MenuStyleScript.tick_move()
 
 
 ## Confirm the row under the cursor. Emits a request; returns false and explains in the

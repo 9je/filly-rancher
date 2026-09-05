@@ -62,6 +62,21 @@ var _anim_t := 0.0
 @onready var _stage: Control = get_node_or_null(^"Centre/Panel/Margin/Column/Stage")
 
 
+## get_node_or_null(), not the bare `Sound` identifier: see game/ui/menu_style.gd's own
+## comment, and game/actors/player/magic_beam.gd's _sound_call, on why an autoload's name
+## does not resolve under the parse sweep's check-only, script-only pass. Every table
+## inherits this for the one direct sound a bet makes, chip_clink, which rides the same
+## bus as the rest of the room's ambience rather than the UI bus MenuStyle's ticks use.
+## is_inside_tree() first, so a table built with .new() and never added anywhere gets a
+## silent no-op rather than the engine error get_node() prints on a treeless node.
+func _sound_call(method: StringName, args: Array) -> void:
+	if not is_inside_tree():
+		return
+	var node: Node = get_node_or_null(^"/root/Sound")
+	if node != null:
+		node.callv(method, args)
+
+
 func _ready() -> void:
 	MenuStyleScript.apply_panel($Centre/Panel as PanelContainer)
 	visible = false
@@ -87,6 +102,7 @@ func open() -> bool:
 	visible = true
 	refresh()
 	opened.emit()
+	MenuStyleScript.tick_open()
 	return true
 
 
@@ -97,6 +113,7 @@ func close() -> void:
 	visible = false
 	set_process(false)
 	closed.emit()
+	MenuStyleScript.tick_back()
 
 
 func is_open() -> bool:
@@ -140,6 +157,7 @@ func move_selection(step: int) -> void:
 		return
 	_selected = posmod(_selected + step, n)
 	refresh()
+	MenuStyleScript.tick_move()
 
 
 ## Push the lines describing what just happened. Replaces whatever was there, so the panel
@@ -271,7 +289,7 @@ func confirm() -> bool:
 
 
 func switch_tab(_step: int) -> void:
-	pass
+	MenuStyleScript.tick_page()
 
 
 # --- the stage ------------------------------------------------------------------------------

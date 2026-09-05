@@ -131,6 +131,7 @@ func open(slot: PlotSlot) -> bool:
 	visible = true
 	_refresh()
 	opened.emit(slot)
+	MenuStyleScript.tick_open()
 	return true
 
 
@@ -141,6 +142,7 @@ func close() -> void:
 	_slot = null
 	visible = false
 	closed.emit()
+	MenuStyleScript.tick_back()
 
 
 func is_open() -> bool:
@@ -191,6 +193,7 @@ func move_selection(step: int) -> void:
 		return
 	_selected = posmod(_selected + step, _plots.size())
 	_refresh()
+	MenuStyleScript.tick_move()
 
 
 ## Try to build what is under the cursor. Returns false if it is unaffordable -- and says

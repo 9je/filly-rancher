@@ -1,4 +1,8 @@
 assets_raw/
+# Raw sound downloads. tools/fetch_sounds.sh caches every source file here and processes
+# out of it; only the processed results under game/assets/audio/ are committed, exactly as
+# assets_raw/ holds the raw models and game/assets/converted/ the converted ones.
+tools/sound_cache/
 assets-inbox/
 tools/bin/
 game/assets/converted/

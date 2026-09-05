@@ -379,6 +379,7 @@ restoring the cache) turns the suite green again.
 | `game/scenes/test/creation_test.gd` | The creation gate (see below) |
 | `game/scenes/test/casino_test.gd` | The casino gate (see below) |
 | `game/scenes/test/story_test.gd` | The story gate (see below) |
+| `game/scenes/test/sound_test.gd` | The sound gate (see below) |
 | `game/scenes/test/model_gallery.gd` | The model gallery, and its `--stock`, `--mark` and `--props` rows (see below) |
 | `game/test/test_props.gd` | The prop layout as data: family scales, the footprint sampler, the skirt rule, and the clearances the whole shipped layout has to hold |
 | `game/world/interaction.gd` | The interact resolver. The collection gate drives its pen step through it, standing the player on the plot and asking `ranch.current_interaction()` what the key means there before calling `ranch.perform_interaction()`; the depot gate still calls `_move_pony_into_pen()` directly |
@@ -1109,6 +1110,86 @@ tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/story_te
 ```
 
 Expect `STORY_OK checks=55`; the exit code is the verdict.
+
+---
+
+## The sound gate
+
+`game/scenes/test/sound_test.tscn` is the one gate in this project that hosts
+nothing. Every other gate instances `world/ranch.tscn`, because what it is
+checking is a ranch. This one is checking four autoloads and a directory of
+files, and there is a second reason to keep the ranch out of it: a gate that
+boots the ranch is a gate that can write a live save, which is a defect this
+project already has parked. The gate proves its own innocence rather than
+promising it, by listing `user://saves` on the way in and on the way out and
+asserting the two listings match.
+
+What it checks that a unit test cannot see:
+
+* the four buses actually came out of `game/default_bus_layout.tres` and all
+  three sub buses send into Master, which is what makes `AudioSafety`'s single
+  Master mute cover the whole game
+* every file named by `Sound.LIBRARY` decoded into a real `AudioStream`; a
+  truncated download or a corrupt ogg fails here and nowhere else
+* every bed imported with `loop=true` and every one shot with `loop=false`.
+  This flag lives in the committed `.import` sidecar, not in the source file
+  and not in `LIBRARY`, so no unit test can reach it. A bed that imported
+  without it plays its forty five seconds once and then leaves the ranch
+  silent for the rest of the phase.
+* all five verbs accept every id, and every phase crossed with every zone
+  wants no more simultaneous beds than there are bed voices
+* the player pools steal their oldest voice rather than growing. A pool that
+  grew would allocate a player per trigger for as long as the session lasted,
+  and the symptom would be a machine getting slower over an hour rather than
+  anything that looks like a bug
+* the two new volume sliders reach their buses, zero on the effects slider
+  takes the menu ticks down with it, and nothing in the settings path undoes
+  `AudioSafety`'s mute on an automated run
+
+Run it with:
+
+```
+tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/sound_test.tscn
+```
+
+Expect `SOUND_OK ids=37`; the exit code is the verdict.
+
+## The sound pipeline
+
+`tools/sound_manifest.txt` is the curation and the only place a sound is
+chosen. One row per file, `dest|source_url|recipe`, with the source's own
+description and two or three alternate candidates in the comment above it, so
+swapping any sound in the game is editing one URL and running one command:
+
+```
+bash tools/fetch_sounds.sh --only ambient/bed_dawn_chorus.ogg
+```
+
+`tools/fetch_sounds.sh` is the only thing that downloads. It caches raw
+sources in `tools/sound_cache/` (gitignored), runs each row's ffmpeg recipe,
+writes the processed file under `game/assets/audio/`, and regenerates
+`game/assets/audio/sound_report.txt`. It is idempotent: a dest that already
+exists is skipped unless `--force` or `--only` names it.
+
+The report is the verdict, not a log. Every processed file is measured with
+`ebur128` and written as PASS or FAIL against the row's own loudness target,
+under a true peak ceiling of -1.5 dBTP. A FAIL row exits the script non zero,
+and `game/test/test_sound_library.gd` asserts that every file the game plays
+appears in that report with PASS, so a clipping sound cannot be committed and
+forgotten.
+
+Loudness targets: ambient beds -24 LUFS, world and casino SFX -18, UI -20.
+
+Sources, all fetched with no account and no login: the BBC Sound Effects
+archive (`https://sound-effects.bbcrewind.co.uk`, media at
+`https://sound-effects-media.bbcrewind.co.uk/wav/<ID>.wav`) for everything
+ambient, animal, mechanical and crowd; Kenney (`https://kenney.nl`, CC0
+direct zips) for the menu ticks and the casino chips and cards.
+
+`game/test/test_sound_library.gd` is what keeps the manifest, `Sound.LIBRARY`
+and the report one list: a manifest row nobody plays is a file that was
+downloaded and forgotten, and a `LIBRARY` path with no manifest row is a file
+nobody can reproduce on a clean checkout.
 
 ---
 
