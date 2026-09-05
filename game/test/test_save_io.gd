@@ -65,7 +65,10 @@ func before_each() -> void:
 
 func after_each() -> void:
 	_wipe()
-	SaveIOScript.save_dir = SaveIOScript.DEFAULT_SAVE_DIR
+	# session_save_dir, NOT DEFAULT_SAVE_DIR: on a harness run the process was redirected off
+	# the player's slots at class load, and restoring the default would walk every test that
+	# runs after this one straight back onto them.
+	SaveIOScript.save_dir = SaveIOScript.session_save_dir
 
 
 ## Remove the whole scratch directory between tests -- the directory itself as well as its
@@ -608,3 +611,48 @@ func test_migrate_states_the_story_key_in_the_version_five_shape() -> void:
 	var migrated: Dictionary = SaveIOScript.migrate({"bits": 10}, 4)
 	assert_true(migrated.has("story"), "migrate() states the whole v5 shape")
 	assert_eq(migrated["story"], {})
+
+
+# --- THE TEST MODE REDIRECT ----------------------------------------------------------------
+#
+# resolve_save_dir() is the whole of the policy, and it is pure for the only reason that
+# matters here: the environment is read ONCE, at class load, and a test cannot restart the
+# engine to make it be read again. Splitting the decision out of the read is what makes the
+# decision testable at all.
+
+func test_an_unset_environment_leaves_the_saves_where_the_player_keeps_them() -> void:
+	assert_eq(SaveIOScript.resolve_save_dir(""), SaveIOScript.DEFAULT_SAVE_DIR,
+		"nobody asked for a redirect, so this is the player's own directory")
+
+
+func test_a_blank_environment_value_names_no_directory() -> void:
+	assert_eq(SaveIOScript.resolve_save_dir("   "), SaveIOScript.DEFAULT_SAVE_DIR,
+		"a variable exported empty must not send saves into a directory named ' '")
+
+
+func test_a_user_path_is_taken_literally() -> void:
+	assert_eq(SaveIOScript.resolve_save_dir("user://gate_scratch"), "user://gate_scratch",
+		"a user:// redirect is used exactly as given")
+
+
+func test_a_native_absolute_path_is_taken_literally() -> void:
+	# tools/run_tests.sh exports a `mktemp -d` directory, which is a native path and not a
+	# user:// one. Godot's FileAccess and DirAccess take either, and the harness depends on it.
+	assert_eq(SaveIOScript.resolve_save_dir("/tmp/filly-saves-1234"), "/tmp/filly-saves-1234",
+		"the harness exports a native temp directory, so a native path must survive")
+
+
+## THE WIRING, not the policy: that _static_init() really ran and really assigned. It claims
+## something in BOTH directions on purpose -- under tools/run_tests.sh the variable is set and
+## the answer must NOT be the player's directory, and run bare it is unset and the answer must
+## BE the player's directory -- so there is no way to run this test and have it assert nothing.
+func test_the_session_directory_is_the_one_the_environment_named() -> void:
+	var named := OS.get_environment(SaveIOScript.TEST_SAVE_DIR_ENV)
+	assert_eq(SaveIOScript.session_save_dir, SaveIOScript.resolve_save_dir(named),
+		"_static_init() must resolve the session directory through resolve_save_dir()")
+	if named.strip_edges().is_empty():
+		assert_eq(SaveIOScript.session_save_dir, SaveIOScript.DEFAULT_SAVE_DIR,
+			"nothing was exported, so this process saves where the player does")
+	else:
+		assert_ne(SaveIOScript.session_save_dir, SaveIOScript.DEFAULT_SAVE_DIR,
+			"a redirected process must not be able to reach the player's own slots")

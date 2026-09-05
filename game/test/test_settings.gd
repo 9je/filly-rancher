@@ -4,6 +4,7 @@ extends GutTest
 ## must not carry someone else's mouse sensitivity.
 
 const SettingsScript := preload("res://systems/settings.gd")
+const SaveIOScript := preload("res://systems/save_io.gd")
 const SCRATCH := "user://test_scratch/settings_test.cfg"
 
 
@@ -153,3 +154,35 @@ func test_a_loaded_file_missing_the_new_keys_keeps_the_defaults() -> void:
 	assert_almost_eq(s.master_volume, 0.8, 0.0001)
 	assert_almost_eq(s.ambient_volume, 1.0, 0.0001)
 	assert_almost_eq(s.effects_volume, 1.0, 0.0001)
+
+
+# --- THE TEST MODE REDIRECT ----------------------------------------------------------------
+#
+# settings.cfg is the same class of defect as the save slots: a gate boot that opened the pause
+# menu and changed a knob rewrote the player's own settings file. It follows SaveIO's session
+# directory rather than reading the environment a second time, so there is exactly one read of
+# FILLY_TEST_SAVE_DIR in the whole project.
+
+func test_a_redirected_save_directory_takes_the_settings_file_with_it() -> void:
+	assert_eq(SettingsScript.resolve_settings_path("/tmp/filly-saves-1234"),
+		"/tmp/filly-saves-1234/settings.cfg",
+		"a run that saves elsewhere must not be able to rewrite the player's own knobs")
+
+
+func test_the_default_directory_leaves_the_settings_file_where_it_was() -> void:
+	assert_eq(SettingsScript.resolve_settings_path(SaveIOScript.DEFAULT_SAVE_DIR),
+		SettingsScript.PATH,
+		"settings.cfg sits beside saves/, not inside it, when nothing was redirected")
+
+
+## The wiring, in both directions, exactly like test_save_io.gd's session directory test.
+func test_the_session_settings_path_follows_the_session_save_directory() -> void:
+	assert_eq(SettingsScript.settings_path,
+		SettingsScript.resolve_settings_path(SaveIOScript.session_save_dir),
+		"_static_init() must resolve the settings path from SaveIO's session directory")
+	if SaveIOScript.session_save_dir == SaveIOScript.DEFAULT_SAVE_DIR:
+		assert_eq(SettingsScript.settings_path, SettingsScript.PATH,
+			"nothing was exported, so the settings file is the player's own")
+	else:
+		assert_ne(SettingsScript.settings_path, SettingsScript.PATH,
+			"a redirected process must not be able to reach the player's settings file")

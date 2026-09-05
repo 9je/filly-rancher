@@ -5,10 +5,45 @@ extends RefCounted
 ## save file: a save is a ranch two players trade by pasting; a setting is about one
 ## person's hand and one machine's speakers.
 ##
+## ON AN AUTOMATED RUN IT MOVES WITH THE SAVES. FILLY_TEST_SAVE_DIR redirects SaveIO's save
+## directory for one process (see game/systems/save_io.gd), and settings.cfg follows it into
+## that directory. Same defect, same fix: a gate boot that opened the pause menu and nudged a
+## slider used to rewrite the settings file of whoever owns the machine.
+##
 ## RefCounted and file-backed, testable without a scene (game/test/test_settings.gd).
 ## apply_audio() is the only method that touches the engine.
 
+## Where the settings file lives when nothing has been redirected. Kept as the literal it has
+## always been: it is the path bug reports and docs name.
 const PATH := "user://settings.cfg"
+
+## The file name on its own, for the redirected case below.
+const FILE_NAME := "settings.cfg"
+
+## The settings file this process actually reads and writes. Resolved once, at class load, from
+## SaveIO's already-resolved session directory -- NOT by reading the environment a second time,
+## so there is exactly one read of FILLY_TEST_SAVE_DIR in the project and no way for two
+## systems to disagree about whether this run is a test run.
+static var settings_path := PATH
+
+
+## Where settings.cfg belongs given the directory the saves are going to. The player's own save
+## directory leaves it exactly where it has always been, beside saves/ rather than inside it;
+## any other directory takes it along, because a redirected run must not be able to rewrite the
+## volume and sensitivity of whoever owns the machine.
+static func resolve_settings_path(save_directory: String) -> String:
+	if save_directory == SaveIO.DEFAULT_SAVE_DIR:
+		return PATH
+	return save_directory.path_join(FILE_NAME)
+
+
+## Referenced by class_name rather than by preload on purpose: SaveIO is a global class, so it
+## resolves under tools/run_tests.sh's --check-only parse sweep, which an autoload identifier
+## would not. Touching SaveIO here is what loads it, which is what runs its own _static_init and
+## fills session_save_dir before this line reads it.
+static func _static_init() -> void:
+	settings_path = resolve_settings_path(SaveIO.session_save_dir)
+
 const SECTION := "settings"
 
 const VOLUME_STEP := 0.1
@@ -28,9 +63,12 @@ var mouse_sensitivity := SENSITIVITY_DEFAULT
 var invert_look := false
 
 
-func load_from(path: String = PATH) -> void:
+## An empty path means "this process's settings file" (settings_path). A caller that names one
+## -- the tests do -- is taken at its word.
+func load_from(path: String = "") -> void:
+	var target := settings_path if path.is_empty() else path
 	var cfg := ConfigFile.new()
-	if cfg.load(path) != OK:
+	if cfg.load(target) != OK:
 		return
 	master_volume = clampf(float(cfg.get_value(SECTION, "master_volume", master_volume)), 0.0, 1.0)
 	ambient_volume = clampf(float(cfg.get_value(SECTION, "ambient_volume", ambient_volume)), 0.0, 1.0)
@@ -41,14 +79,16 @@ func load_from(path: String = PATH) -> void:
 	changed.emit()
 
 
-func save_to(path: String = PATH) -> bool:
+## Same rule as load_from(): empty means this process's settings file.
+func save_to(path: String = "") -> bool:
+	var target := settings_path if path.is_empty() else path
 	var cfg := ConfigFile.new()
 	cfg.set_value(SECTION, "master_volume", master_volume)
 	cfg.set_value(SECTION, "ambient_volume", ambient_volume)
 	cfg.set_value(SECTION, "effects_volume", effects_volume)
 	cfg.set_value(SECTION, "mouse_sensitivity", mouse_sensitivity)
 	cfg.set_value(SECTION, "invert_look", invert_look)
-	return cfg.save(path) == OK
+	return cfg.save(target) == OK
 
 
 func step_volume(direction: int) -> void:
