@@ -177,16 +177,21 @@ world/capture_success.wav|https://kenney.nl/media/pages/assets/interface-sounds/
 # escape hatch delivery_thud and neigh_real use. Alternate: 07039304 "Troop of horses
 # galloping on turf" 149.8s.
 #
-# R1, 2026-09-04, owner's ear pass: "terrible footsteps". Every strike came down 14 dB
-# (20/21/13/13 to 6/7/-1/-1, the relative balance between the four kept exactly) and the
-# tail went from 0.09 to 0.14 s, which is what turns a click into a hoof on turf. The
-# sources did not move: 07024157 and 07024158 are the two softest turf walks in the
-# archive, and this row's own alternate, 07039304, is a troop of horses galloping, which
-# is not a walk and is not softer.
-world/hoofsteps_grass_1.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07024157.wav|rate=44100,mono,pick=4@-25:0.08,fade=0.003:0.14,gain_db=6
-world/hoofsteps_grass_2.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07024157.wav|rate=44100,mono,pick=13@-25:0.08,fade=0.003:0.14,gain_db=7
-world/hoofsteps_grass_3.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07024158.wav|rate=44100,mono,pick=4@-25:0.08,fade=0.003:0.14,gain_db=-1
-world/hoofsteps_grass_4.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07024158.wav|rate=44100,mono,pick=7@-25:0.08,fade=0.003:0.14,gain_db=-1
+# R1, 2026-09-04, owner's ear pass: "terrible footsteps". The tail went from 0.09 to
+# 0.14 s, which is what turns a click into a hoof on turf. A brief that asked for the
+# full 14 dB cut (20/21/13/13 to 6/7/-1/-1) was tried first and reverted: at that level
+# every strike measures TP -22 to -25 dBTP, well under test_sound_library.gd's own
+# GAIN_DB_TRUE_PEAK_FLOOR (-16.0, a deliberate hard backstop against a gain_db row
+# landing far under its neighbours, not a taste knob to move for one row). The relative
+# balance between the four is kept exactly; the uniform cut that clears the floor with a
+# safety margin (measured TP -12.7 to -14.9) is 4 dB, not 14: 16/17/9/9. The sources did
+# not move: 07024157 and 07024158 are the two softest turf walks in the archive, and this
+# row's own alternate, 07039304, is a troop of horses galloping, which is not a walk and
+# is not softer.
+world/hoofsteps_grass_1.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07024157.wav|rate=44100,mono,pick=4@-25:0.08,fade=0.003:0.14,gain_db=16
+world/hoofsteps_grass_2.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07024157.wav|rate=44100,mono,pick=13@-25:0.08,fade=0.003:0.14,gain_db=17
+world/hoofsteps_grass_3.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07024158.wav|rate=44100,mono,pick=4@-25:0.08,fade=0.003:0.14,gain_db=9
+world/hoofsteps_grass_4.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07024158.wav|rate=44100,mono,pick=7@-25:0.08,fade=0.003:0.14,gain_db=9
 
 # hoofsteps_hard_1..4: BBC 07039310, "Horse walking on cobblestones." 60.7s of one horse
 # walking evenly. -38dB never dipped either (background traffic sits above it, one 60s

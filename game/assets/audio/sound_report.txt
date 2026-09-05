@@ -36,10 +36,10 @@ PASS  world/capture_success.wav           dur=0.29      I=-70.0     TP=-5.6     
 PASS  world/coins_grant.wav               dur=0.56      I=-16.4     TP=-2.4     target=-18
 PASS  world/delivery_thud.wav             dur=0.79      I=-26.2     TP=-9.4     target=none
 PASS  world/gate_open.wav                 dur=2.03      I=-16.5     TP=-7.2     target=-18
-PASS  world/hoofsteps_grass_1.wav         dur=0.12      I=-70.0     TP=-22.7    target=none
-PASS  world/hoofsteps_grass_2.wav         dur=0.13      I=-70.0     TP=-23.3    target=none
-PASS  world/hoofsteps_grass_3.wav         dur=0.25      I=-70.0     TP=-24.9    target=none
-PASS  world/hoofsteps_grass_4.wav         dur=0.35      I=-70.0     TP=-22.4    target=none
+PASS  world/hoofsteps_grass_1.wav         dur=0.12      I=-70.0     TP=-12.7    target=none
+PASS  world/hoofsteps_grass_2.wav         dur=0.13      I=-70.0     TP=-13.3    target=none
+PASS  world/hoofsteps_grass_3.wav         dur=0.25      I=-70.0     TP=-14.9    target=none
+PASS  world/hoofsteps_grass_4.wav         dur=0.35      I=-70.0     TP=-12.4    target=none
 PASS  world/hoofsteps_hard_1.wav          dur=0.35      I=-70.0     TP=-7.6     target=none
 PASS  world/hoofsteps_hard_2.wav          dur=0.29      I=-70.0     TP=-7.9     target=none
 PASS  world/hoofsteps_hard_3.wav          dur=0.19      I=-70.0     TP=-7.7     target=none
