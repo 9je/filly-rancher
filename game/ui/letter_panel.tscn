@@ -14,7 +14,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 color = Color(0, 0, 0, 0.42)
-mouse_filter = 2
+mouse_filter = 0
 
 [node name="Centre" type="CenterContainer" parent="."]
 anchors_preset = 15
@@ -40,6 +40,10 @@ mouse_filter = 2
 [node name="Column" type="VBoxContainer" parent="Centre/Panel/Margin"]
 layout_mode = 2
 theme_override_constants/separation = 10
+mouse_filter = 2
+
+[node name="Stage" type="Control" parent="Centre/Panel/Margin/Column"]
+layout_mode = 2
 mouse_filter = 2
 
 [node name="Title" type="Label" parent="Centre/Panel/Margin/Column"]
