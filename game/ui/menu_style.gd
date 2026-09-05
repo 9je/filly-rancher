@@ -191,6 +191,14 @@ static func apply_panel(panel: PanelContainer) -> void:
 	panel.add_theme_stylebox_override(&"panel", panel_style())
 
 
+## apply_panel() with the box named rather than assumed. The letter and the creation screen
+## are paper and wood; every list in the game is still the navy panel apply_panel() applies.
+static func apply_panel_box(panel: PanelContainer, box: StyleBoxFlat) -> void:
+	if panel == null or box == null:
+		return
+	panel.add_theme_stylebox_override(&"panel", box)
+
+
 ## THE ROW TREATMENT THIS FILE ALREADY SPECIFIED AND NOTHING DREW. ROW_SELECTED_BG,
 ## ROW_SELECTED_BORDER, ROW_IDLE_BG and ROW_IDLE_BORDER shipped declared and unread, because
 ## every row in the game was a bare Label carrying a two character caret and a colour swap.
@@ -385,6 +393,19 @@ static func theme_resource() -> Theme:
 		return null
 	_theme = load(THEME_PATH) as Theme
 	return _theme
+
+
+## A BUTTON'S TEXT, OUTLINED THE WAY EVERY LABEL IN THIS GAME IS OUTLINED. The generated
+## Theme sets this for every Button in the project; a Button carrying per state StyleBox
+## overrides keeps the Theme's font settings, so this is belt and braces for the ones built
+## in code before the tree hands them a theme.
+static func style_label_button(button: Button) -> void:
+	if button == null:
+		return
+	button.add_theme_font_size_override("font_size", ROW_SIZE)
+	button.add_theme_color_override("font_color", COLOR_NAME)
+	button.add_theme_color_override("font_outline_color", OUTLINE_COLOR)
+	button.add_theme_constant_override("outline_size", OUTLINE_SIZE)
 
 
 # --- the menu tick kit --------------------------------------------------------------------

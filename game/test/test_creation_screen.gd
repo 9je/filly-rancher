@@ -125,7 +125,7 @@ func test_the_ink_buttons_exist_and_are_wired_to_the_canvas() -> void:
 	var canvas: MarkCanvas = _screen.canvas()
 	for index in CreationScreen.ink_count():
 		var button := _screen.get_node_or_null(
-			NodePath("Panel/Column/InkRow/Ink%d" % index)) as BaseButton
+			NodePath("Layout/Panel/Margin/Column/InkRow/Ink%d" % index)) as BaseButton
 		assert_not_null(button, "ink %d has no button to press" % index)
 		if button == null:
 			continue
@@ -185,3 +185,115 @@ func test_the_mane_style_survives_confirm() -> void:
 	_screen.cycle_mane_style(2)
 	_screen.confirm()
 	assert_eq(_screen.look().mane_style, 2)
+
+
+# --- the rebuilt screen -----------------------------------------------------------------
+
+## THE OWNER'S TWO COMPLAINTS, PINNED. Acceptance item 1: "New save: no frame of raw world,
+## CC full-screen, pony clearly visible." Acceptance item 2: "CC layout reads industry
+## standard, mouse-driven."
+
+const SwatchGridScript := preload("res://ui/swatch_grid.gd")
+const CreationBackdropScript := preload("res://ui/creation_backdrop.gd")
+const MouseRowsScript := preload("res://ui/mouse_rows.gd")
+
+
+func test_the_backdrop_is_opaque_and_covers_the_whole_screen() -> void:
+	var backdrop := _screen.get_node("Backdrop") as Control
+	assert_true(backdrop is CreationBackdrop,
+		"a Panel with a colour is not a show style stage")
+	assert_eq(backdrop.mouse_filter, Control.MOUSE_FILTER_STOP)
+	assert_eq(backdrop.anchor_right, 1.0)
+	assert_eq(backdrop.anchor_bottom, 1.0)
+
+
+func test_the_backdrop_can_be_raised_before_the_rest_of_the_screen_exists() -> void:
+	_screen.raise_backdrop()
+	assert_true(_screen.visible, "the veil is up")
+	assert_true(_screen.backdrop_only(), "and nothing else is showing yet")
+	assert_false(_screen.is_open(), "raising the veil is not opening the screen")
+
+
+func test_opening_over_a_raised_backdrop_shows_the_whole_screen() -> void:
+	_screen.raise_backdrop()
+	_screen.open(null)
+	assert_true(_screen.is_open())
+	assert_false(_screen.backdrop_only())
+
+
+func test_the_turntable_fills_a_real_share_of_the_screen() -> void:
+	var viewport := _screen.get_node("Layout/Stage/Viewport") as SubViewportContainer
+	assert_gte(viewport.size_flags_stretch_ratio, 1.0,
+		"the pony is the point of this screen and has to be big enough to see")
+
+
+func test_the_three_colour_rows_are_swatch_grids_and_not_steppers() -> void:
+	var checked := 0
+	for name: String in ["CoatGrid", "ManeGrid", "EyesGrid"]:
+		var grid := _screen.find_child(name, true, false)
+		assert_true(grid is SwatchGrid, "%s is not a SwatchGrid" % name)
+		assert_gt((grid as SwatchGrid).cell_count(), 1, "%s has a palette in it" % name)
+		checked += 1
+	assert_eq(checked, 3)
+
+
+func test_the_mane_style_row_is_a_card_grid_carrying_the_style_names() -> void:
+	var grid := _screen.find_child("ManeStyleGrid", true, false) as SwatchGrid
+	assert_not_null(grid)
+	assert_eq(grid.cell_count(), StockPalette.mane_style_count())
+	assert_eq(grid.cell(0).text, StockPalette.mane_style_label(0))
+
+
+func test_clicking_a_coat_swatch_sets_that_coat_on_the_look() -> void:
+	var grid := _screen.find_child("CoatGrid", true, false) as SwatchGrid
+	grid.cell(2).pressed.emit()
+	assert_eq(_screen.look().coat, 2, "the swatch she clicked is the coat she gets")
+
+
+func test_set_coat_and_cycle_coat_agree_so_the_gate_keeps_working() -> void:
+	_screen.set_coat(0)
+	_screen.cycle_coat(1)
+	assert_eq(_screen.look().coat, 1,
+		"scenes/test/creation_test.gd drives cycle_coat and must keep working")
+
+
+func test_the_mark_canvas_is_its_own_step() -> void:
+	assert_eq(_screen.step(), CreationScreen.Step.LOOK, "she meets her pony first")
+	_screen.set_step(CreationScreen.Step.MARK)
+	assert_eq(_screen.step(), CreationScreen.Step.MARK)
+	assert_true(_screen.canvas().visible, "the canvas is on screen on its own step")
+
+
+func test_dragging_the_turntable_turns_the_pony() -> void:
+	_screen.open(null)
+	var turntable := _screen.get_node("Layout/Stage/Viewport/SubViewport/Turntable") as Node3D
+	var before: float = turntable.rotation.y
+	var drag := InputEventMouseMotion.new()
+	drag.relative = Vector2(40.0, 0.0)
+	drag.button_mask = MOUSE_BUTTON_MASK_LEFT
+	_screen._on_stage_input(drag)
+	assert_ne(turntable.rotation.y, before, "drag to rotate, on top of the auto spin")
+
+
+func test_the_screen_offers_a_pointer_usable_confirm_and_close() -> void:
+	assert_eq(_screen._confirm.focus_mode, Control.FOCUS_NONE)
+	assert_false(_screen._confirm.text.is_empty())
+
+
+func test_every_string_the_screen_draws_is_still_in_drawn_lines() -> void:
+	var lines: Array[String] = _screen.drawn_lines()
+	for text: String in [CreationScreen.TITLE, CreationScreen.NAME_LABEL,
+			CreationScreen.COAT_LABEL, CreationScreen.MANE_LABEL,
+			CreationScreen.MANE_STYLE_LABEL, CreationScreen.EYES_LABEL,
+			CreationScreen.MARK_LABEL, CreationScreen.CONFIRM_LABEL,
+			CreationScreen.STEP_LOOK_LABEL, CreationScreen.STEP_MARK_LABEL]:
+		assert_true(text in lines, "'%s' is drawn but not declared" % text)
+
+
+func test_nothing_the_rebuilt_screen_draws_carries_a_dash() -> void:
+	var checked := 0
+	for line: String in _screen.drawn_lines():
+		assert_false(line.contains("--"), line)
+		assert_false(line.contains(char(0x2014)), line)
+		checked += 1
+	assert_gt(checked, 0, "the copy list was actually walked")
