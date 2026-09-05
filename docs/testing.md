@@ -1153,8 +1153,9 @@ gates do, and proves the paper channel end to end:
   the letter is armed; and it never serves twice, the flag holding after the one successful
   call the way the Survey's own "answering twice pays nothing twice" does. The world loses
   precisely that one pony and no other; her Compendium entry reads `PROCESSED`.
-* the mailbox verb opens the Mail page, the page holds every letter ever sent, newest
-  first, and nothing on it carries a dash.
+* the mailbox verb opens the letter reader on the newest letter she has not read, reading it
+  there marks it read, and the pause menu's own Mail page (the archive) still holds every
+  letter ever sent, newest first, with nothing on it carrying a dash.
 
 **A real bug this gate's own construction avoided.** The gate's `chosen_ref` weak
 reference and its whole-world census have to be taken *after* the not-penned edge is
@@ -1169,7 +1170,7 @@ Run it with:
 FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/story_test.tscn
 ```
 
-Expect `STORY_OK checks=55`; the exit code is the verdict.
+Expect `STORY_OK checks=58`; the exit code is the verdict.
 
 ---
 

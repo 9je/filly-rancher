@@ -294,6 +294,10 @@ const DEPOT_RADIUS := 4.0
 ## farmhouse door the player walks past to reach it.
 const MAILBOX_RADIUS := 2.6
 
+## What the mailbox says when there is genuinely nothing in it. A verb that does nothing at
+## all reads as a broken key, which is the same defect the race panel's dead stake row was.
+const MAILBOX_EMPTY_TOAST := "Nothing in the mailbox yet."
+
 ## WHAT ARRIVAL SOUNDS LIKE, and it is said once per batch rather than once per letter: two
 ## letters landing on the same collection day are one trip to the mailbox. The flag on the
 ## box is the state; this is the moment.
@@ -2030,6 +2034,54 @@ func open_mail_page() -> void:
 		pause_menu.call("open_page", page_id)
 		return
 	pause_menu.open()
+
+
+## THE NEWEST LETTER SHE HAS NOT READ, or {} when she has read them all. mail_rows() is
+## oldest first, so this walks backwards.
+func newest_unread_row() -> Dictionary:
+	var rows: Array[Dictionary] = mail_rows()
+	for i in range(rows.size() - 1, -1, -1):
+		if not bool(rows[i].get("read", false)):
+			return rows[i]
+	return {}
+
+
+## E AT THE MAILBOX OPENS THE LETTER. The owner, on her first full playtest: "it says it's by
+## my house but it's in the pause menu". The letter told her where her mailbox was and the
+## verb at the mailbox then opened a menu, which is the whole of the confusion; the pause
+## page is the archive now ("Saddlebag copies") and this is the mailbox.
+##
+## THE NEWEST UNREAD ONE, AND THE NEWEST ONE OTHERWISE. A mailbox with post in it is never a
+## dead key: a player who has read everything and walks back to it gets the last letter again,
+## which is what opening a real mailbox with a letter still in it does.
+##
+## A LETTER THAT ASKS A QUESTION GOES TO THE PAGE THAT CAN ANSWER IT. game/ui/letter_panel.gd
+## is read only by design and says so at length in its own class comment; the Employee
+## Appreciation Survey needs the PICK_PONY picker, which lives on the archive page. That page
+## is still her own mailbox, so the fiction holds, and this slice does not rebuild the reader
+## into a form that transacts.
+func open_mailbox_letter() -> bool:
+	var rows: Array[Dictionary] = mail_rows()
+	if rows.is_empty():
+		_toast(MAILBOX_EMPTY_TOAST)
+		return false
+	var row: Dictionary = newest_unread_row()
+	if row.is_empty():
+		row = rows[rows.size() - 1]
+	var id := StringName(String(row.get("id", "")))
+	if int(row.get("reply", 0)) != StoryBeatScript.Reply.NONE:
+		open_mail_page()
+		if pause_menu != null and pause_menu.has_method("open_letter"):
+			pause_menu.call("open_letter", id)
+		return true
+	if letter_panel == null or not letter_panel.has_method("open"):
+		return false
+	var letter := {"sender": String(row.get("sender", "")),
+		"title": String(row.get("title", "")), "body": row.get("body", [])}
+	if not bool(letter_panel.call("open", letter)):
+		return false
+	_on_mail_opened(id)
+	return true
 
 
 ## The Spectra Palace's own origin in world space, or the Strip's centre if the building is
@@ -4142,8 +4194,7 @@ func perform_interaction(action: Dictionary) -> bool:
 			_open_request_page()
 			return true
 		InteractionScript.Kind.MAILBOX:
-			open_mail_page()
-			return true
+			return open_mailbox_letter()
 		InteractionScript.Kind.DEPOT:
 			if depot_menu == null or not depot_menu.has_method("open"):
 				return false

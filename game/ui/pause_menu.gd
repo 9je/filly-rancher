@@ -107,6 +107,11 @@ const REPLY_ROW_GAP := 6.0
 ## What the Mail page says with nothing in the mailbox yet.
 const MAIL_EMPTY_TEXT := "Nothing in the mailbox yet."
 
+## THE PAGE IS THE ARCHIVE NOW, AND IT SAYS SO. The originals are read at the mailbox by the
+## door from R1 on; this is the drawer she keeps the copies in, which is why the row that
+## opens it says "Saddlebag copies" rather than "Mail".
+const MAIL_ARCHIVE_NOTE := "Copies of everything the Company has sent you. The originals are in the mailbox by your door."
+
 ## Both halves of a character's "when" line when she has no restriction on that half.
 ## PonyData carries an EMPTY array to mean "any" in each of `phases` and `weathers`
 ## independently (game/systems/pony_data.gd), so the two are answered separately.
@@ -1025,8 +1030,9 @@ func _add_row(index: int, row_name: String, value: String,
 ## Stage node (an older scene, a test tree built by hand) falls back to printing
 ## mail_lines(), so the page is never blank and never a lie about what is in the mailbox.
 func _draw_mail() -> void:
-	_title.text = "MAIL"
+	_title.text = "SADDLEBAG COPIES"
 	MenuStyleScript.apply_title(_title)
+	_add_note(MAIL_ARCHIVE_NOTE)
 	_footer.text = _mail_footer()
 	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
 	if _stage == null:
