@@ -46,19 +46,6 @@ mouse_filter = 2
 layout_mode = 2
 mouse_filter = 2
 
-[node name="Title" type="Label" parent="Centre/Panel/Margin/Column"]
-layout_mode = 2
-mouse_filter = 2
-
-[node name="Sender" type="Label" parent="Centre/Panel/Margin/Column"]
-layout_mode = 2
-mouse_filter = 2
-
-[node name="Rows" type="VBoxContainer" parent="Centre/Panel/Margin/Column"]
-layout_mode = 2
-theme_override_constants/separation = 2
-mouse_filter = 2
-
 [node name="Footer" type="Label" parent="Centre/Panel/Margin/Column"]
 layout_mode = 2
 mouse_filter = 2

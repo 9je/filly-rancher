@@ -29,6 +29,16 @@ extends CanvasLayer
 ## PROCESS_MODE_ALWAYS (set in letter_panel.tscn, like every sibling panel): the tree is
 ## paused for exactly as long as this is on screen, so it has to be the thing still awake to
 ## read the key that closes it again.
+##
+## FIX ROUND 1 (review CRITICAL 1). Task 6 first shipped with a Stage drawn UNDER a
+## Title/Sender/Rows/Footer Label stack that still rendered the same sender, title and body
+## a second time, so the sheet reserved height for the drawing AND for a second, Label
+## shaped copy of the letter stacked beneath it -- for the WELCOME letter that meant a
+## panel roughly 1.4x an 1080 viewport tall. The Stage is now the ONLY surface any of that
+## text is drawn on: paint() prints the title and the body straight onto the paper, the
+## Title/Sender/Rows Labels are gone from the scene entirely, and stage_size() reserves
+## height for exactly the one drawing that exists. Footer and the Close button stay as
+## Controls below the sheet; they are page furniture, not the letter.
 
 const MenuStyleScript := preload("res://ui/menu_style.gd")
 const MouseRowsScript := preload("res://ui/mouse_rows.gd")
@@ -45,6 +55,10 @@ const SHEET_MARGIN := 44.0
 const HEAD_HEIGHT := 76.0
 const SEAL_SIZE := 46.0
 
+## THE TITLE'S OWN ROW, in the same LINE_HEIGHT grid as the body: half again as tall,
+## because TITLE_SIZE (30) is half again ROW_SIZE (22). One row is all a title ever needs.
+const TITLE_HEIGHT := LINE_HEIGHT * 1.5
+
 signal opened()
 signal closed()
 
@@ -52,9 +66,6 @@ var _open := false
 var _letter: Dictionary = {}
 var _close: Button = null
 
-@onready var _title: Label = $Centre/Panel/Margin/Column/Title
-@onready var _sender: Label = $Centre/Panel/Margin/Column/Sender
-@onready var _rows: VBoxContainer = $Centre/Panel/Margin/Column/Rows
 @onready var _footer: Label = $Centre/Panel/Margin/Column/Footer
 @onready var _stage: Control = get_node_or_null(^"Centre/Panel/Margin/Column/Stage")
 
@@ -134,33 +145,13 @@ func drawn_lines() -> Array[String]:
 func refresh() -> void:
 	if not is_node_ready():
 		return
-	_title.text = title_text()
-	MenuStyleScript.style_label(_title, MenuStyleScript.TITLE_SIZE,
-		MenuStyleScript.COLOR_INK)
-	_title.add_theme_constant_override(&"outline_size", 0)
-	_sender.text = sender_text()
-	MenuStyleScript.style_label(_sender, MenuStyleScript.ROW_SIZE,
-		MenuStyleScript.COLOR_INK)
-	_sender.add_theme_constant_override(&"outline_size", 0)
 	# THE FOOTER STILL PRINTS THE KEY. The mouse was added; the key hint stays, and it now
-	# names the pointer's way out beside it.
+	# names the pointer's way out beside it. THE FOOTER IS NOT THE LETTER: the sender, the
+	# title and the body are drawn once, on the Stage, by paint() below.
 	_footer.text = MenuStyleScript.footer([[&"ui_accept", "close"]])
 	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE,
 		MenuStyleScript.COLOR_INK)
 	_footer.add_theme_constant_override(&"outline_size", 0)
-	for child in _rows.get_children():
-		child.queue_free()
-	for line in drawn_lines():
-		var label := Label.new()
-		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		# A BLANK LINE IS A BLANK LINE. Letters use them to break the body into paragraphs,
-		# and a Label with an empty string collapses to nothing, which would close the gaps
-		# the letter was written with. One space keeps the row at its font's height.
-		label.text = line if not line.is_empty() else " "
-		MenuStyleScript.style_label(label, MenuStyleScript.ROW_SIZE,
-			MenuStyleScript.COLOR_INK)
-		label.add_theme_constant_override(&"outline_size", 0)
-		_rows.add_child(label)
 	if _stage != null:
 		_stage.custom_minimum_size = stage_size()
 		_stage.queue_redraw()
@@ -176,22 +167,49 @@ func refresh() -> void:
 
 
 ## How tall a sheet this letter needs. Grows with the body rather than clipping it, which is
-## the whole difference between a page and a text box.
+## the whole difference between a page and a text box. Reserves height for exactly what
+## paint() draws below: the letterhead, one row for the title, one row per body line, and
+## the seal -- nothing here is reserved twice.
 func stage_size() -> Vector2:
 	var lines: int = maxi(drawn_lines().size(), 1)
 	return Vector2(SHEET_WIDTH,
-		HEAD_HEIGHT + SHEET_MARGIN + float(lines) * LINE_HEIGHT + SEAL_SIZE + SHEET_MARGIN)
+		HEAD_HEIGHT + SHEET_MARGIN + TITLE_HEIGHT + float(lines) * LINE_HEIGHT
+			+ SEAL_SIZE + SHEET_MARGIN)
 
 
+## THE WHOLE LETTER, DRAWN ONCE. Sheet, letterhead (which prints the sender itself), the
+## title, every body line and the seal all land on `ci` here and nowhere else -- there is no
+## Label anywhere in this scene printing any of the same words a second time.
 func paint(ci: Control) -> void:
 	if ci == null:
 		return
 	var box := Rect2(Vector2.ZERO, ci.size)
 	PaperPaintScript.sheet(ci, box)
 	var font: Font = ThemeDB.fallback_font
-	PaperPaintScript.letterhead(ci, Rect2(box.position.x + SHEET_MARGIN,
-		box.position.y + SHEET_MARGIN * 0.4, box.size.x - SHEET_MARGIN * 2.0, HEAD_HEIGHT),
+	var text_left: float = box.position.x + SHEET_MARGIN
+	var text_width: float = box.size.x - SHEET_MARGIN * 2.0
+	var head_top: float = box.position.y + SHEET_MARGIN * 0.4
+	PaperPaintScript.letterhead(ci, Rect2(text_left, head_top, text_width, HEAD_HEIGHT),
 		font, sender_text())
+
+	# THE TITLE, THEN THE BODY, straight onto the paper in ink -- no outline, the same call
+	# a stamp or a coupon's word would use, minus the outline pass casino_paint.gd's own
+	# text() always adds: ink on cream reads fine without one, and an outline meant for a
+	# translucent menu panel is exactly the "week" look this task exists to remove.
+	var row_top: float = head_top + HEAD_HEIGHT
+	ci.draw_string(font, Vector2(text_left, row_top + TITLE_HEIGHT * 0.75), title_text(),
+		HORIZONTAL_ALIGNMENT_LEFT, text_width, MenuStyleScript.TITLE_SIZE,
+		MenuStyleScript.COLOR_INK)
+	row_top += TITLE_HEIGHT
+	for line in drawn_lines():
+		# A BLANK LINE IS A PARAGRAPH BREAK: it still advances row_top, it just has
+		# nothing to draw, which is the drawn equivalent of the old space-holding Label.
+		if not line.is_empty():
+			ci.draw_string(font, Vector2(text_left, row_top + LINE_HEIGHT * 0.75), line,
+				HORIZONTAL_ALIGNMENT_LEFT, text_width, MenuStyleScript.ROW_SIZE,
+				MenuStyleScript.COLOR_INK)
+		row_top += LINE_HEIGHT
+
 	# THE SEAL SITS UNDER THE SIGN OFF, bottom right, where a seal goes.
 	var seal := Rect2(box.size.x - SHEET_MARGIN - SEAL_SIZE,
 		box.size.y - SHEET_MARGIN - SEAL_SIZE, SEAL_SIZE, SEAL_SIZE)

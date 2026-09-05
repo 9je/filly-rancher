@@ -52,31 +52,29 @@ func test_it_shows_the_sender_the_title_and_every_line_of_the_body() -> void:
 
 ## THE BODY IS ON THE SCREEN, not merely in a getter. drawn_lines() would answer correctly
 ## for a panel that drew nothing at all, which is exactly the failure this whole file is
-## about, so the Label nodes themselves are counted and read.
-func test_the_body_reaches_the_labels_rather_than_only_the_getter() -> void:
+## about (Ruling 25). FIX ROUND 1: there is no longer a Rows VBox of Labels to count -- the
+## body is painted straight onto the Stage (game/ui/letter_panel.gd's paint()) -- so this
+## routes the real WELCOME letter (the one Ruling 25 is about, CATCH/PEN/COLLECT/SELL and
+## all) through an actual NOTIFICATION_DRAW the same way test_painting_the_sheet... below
+## does: a paint() that silently dropped the body, choked on its 20 lines, or regressed to
+## throwing on a real (not stub) letter would fail here as an engine error, the same class
+## of proof this file's own review already accepted for the paint-probe test.
+func test_the_real_welcome_letter_paints_clean_through_a_real_draw_call() -> void:
 	var panel := _panel
 	var letter: Dictionary = _welcome()
 	panel.open(letter)
-	var rows := panel.get_node(^"Centre/Panel/Margin/Column/Rows") as VBoxContainer
-	assert_eq(rows.get_child_count(), panel.drawn_lines().size(),
-		"one Label per line of the letter")
-	var drawn: Array[String] = []
-	for child in rows.get_children():
-		drawn.append((child as Label).text)
-	var joined: String = "\n".join(drawn)
+	assert_gt(panel.drawn_lines().size(), 10, "sanity: the welcome letter is a page")
+	var joined: String = panel.title_text() + "\n" + "\n".join(panel.drawn_lines())
 	for step: String in ["CATCH", "PEN", "COLLECT", "SELL"]:
-		assert_true(joined.contains(step), "the drawn page must name '%s'" % step)
-
-
-## A BLANK LINE IS A PARAGRAPH BREAK. An empty Label collapses to nothing and would close
-## the gaps the letter was written with, so an empty line is drawn as a space.
-func test_the_blank_lines_between_paragraphs_survive() -> void:
-	var panel := _panel
-	panel.open(LettersScript.render(LettersScript.Id.WELCOME, {"name": "M", "quota": 1}))
-	var rows := panel.get_node(^"Centre/Panel/Margin/Column/Rows") as VBoxContainer
-	for child in rows.get_children():
-		assert_false((child as Label).text.is_empty(),
-			"a Label with no text at all has no height and closes the paragraph gap")
+		assert_true(joined.contains(step), "the letter this test paints must name '%s'" % step)
+	var probe := Control.new()
+	probe.size = panel.stage_size()
+	add_child_autofree(probe)
+	probe.draw.connect(func() -> void: panel.paint(probe))
+	probe.queue_redraw()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert_true(true, "the real welcome letter painted, blank paragraph breaks and all")
 
 
 func test_confirm_closes_it() -> void:
@@ -155,14 +153,17 @@ func test_nothing_it_draws_carries_a_dash() -> void:
 ## docstring means by "the one menu style". A letter sits on a paper sheet it can always read
 ## against, so refresh() calls style_label() for its sizing and then dials the outline back
 ## to 0; asserting the old OUTLINE_SIZE here would be asserting the "week" look back in.
-func test_it_wears_the_one_menu_style_like_every_other_panel() -> void:
+##
+## FIX ROUND 1: the Title Label is gone (paint() draws the title straight onto the sheet at
+## MenuStyleScript.TITLE_SIZE, in TITLE_HEIGHT's own row -- see stage_size()/paint()), so the
+## Footer is the only Label left on this panel and the only one this test can still read.
+func test_the_footer_wears_the_one_menu_style_like_every_other_panel() -> void:
 	var panel := _panel
 	panel.open(_welcome())
-	var title := panel.get_node(^"Centre/Panel/Margin/Column/Title") as Label
-	assert_eq(title.get_theme_font_size("font_size"), MenuStyleScript.TITLE_SIZE)
-	assert_eq(title.get_theme_constant("outline_size"), 0,
-		"paper is read against itself, not against the world; no outline needed")
 	var footer := panel.get_node(^"Centre/Panel/Margin/Column/Footer") as Label
+	assert_eq(footer.get_theme_font_size("font_size"), MenuStyleScript.FOOTER_SIZE)
+	assert_eq(footer.get_theme_constant("outline_size"), 0,
+		"paper is read against itself, not against the world; no outline needed")
 	assert_ne(footer.text.strip_edges(), "", "the page says how to leave it")
 
 
@@ -174,6 +175,23 @@ func test_it_wears_the_one_menu_style_like_every_other_panel() -> void:
 
 const MouseRowsScript := preload("res://ui/mouse_rows.gd")
 const PaperPaintScript := preload("res://ui/paper_paint.gd")
+const StoryLibraryScript := preload("res://systems/story_library.gd")
+
+## VIEWPORT HEIGHT, IN THE SAME 1920x1080 BASE PIXELS letter_panel.gd's own SHEET_WIDTH
+## comment measures in (game/project.godot's base viewport; see game/ui/hud.gd's docstring).
+const VIEWPORT_HEIGHT := 1080.0
+
+## THE SAME WORST CASE SUBSTITUTIONS test_story_corpus.gd's _worst_params() uses: the
+## longest name the creation screen accepts, in the widest glyph, and the longest pony name
+## a receipt can carry. Shared across both corpora here (game/systems/letters.gd's fixed six
+## and every StoryBeat under game/data/story/) because LetterPanel reads either shape
+## (story_beat.gd's own docstring: "one reader, two senders") and an unsupplied key on
+## either side simply falls back to its own default rather than erroring.
+const _WORST_PARAMS := {
+	"name": "Wwwwwwwwwwwwwwww", "pony": "Wwwwwwwwwwwwwwww", "chosen": "Wwwwwwwwwwwwwwww",
+	"colour": "viridian", "count": 999, "quota": 12, "balance": 40000, "credit": 999999,
+	"upkeep": 999999, "punishment": "a fee of 999999 bits",
+}
 
 
 func _letter() -> Dictionary:
@@ -226,6 +244,43 @@ func test_painting_the_sheet_reaches_the_stationery_kit_without_an_error() -> vo
 	await get_tree().process_frame
 	await get_tree().process_frame
 	assert_true(true, "paint() ran over a real Control with no error")
+
+
+## THE WHOLE PANEL, FOOTER AND CLOSE BUTTON INCLUDED, FITS ON SCREEN FOR THE TALLEST LETTER
+## THIS BUILD CAN ACTUALLY OPEN. Review CRITICAL 1: a Stage sized for the letter PLUS a
+## second, Label shaped copy of the same letter stacked under it pushed the WELCOME letter
+## to roughly 1.4x an 1080 viewport. Fix round 1 removed the second copy; this is the test
+## that would have caught it -- it renders every letter in both corpora LetterPanel actually
+## reads (game/systems/letters.gd's fixed six, and every StoryBeat resource under
+## game/data/story/, per story_beat.gd's own "one reader, two senders" docstring) with the
+## same worst case substitutions test_story_corpus.gd's _worst_params() uses, takes the one
+## with the most body lines, opens it for real, lets a frame settle (Panel/Column layout is
+## only valid after one, same as test_casino_stages.gd's own note on this), and asserts the
+## real Panel control's real height still fits inside the 1920x1080 base viewport.
+func test_the_tallest_authored_letter_still_fits_the_1080_viewport() -> void:
+	var tallest_lines := 0
+	var tallest_letter: Dictionary = {}
+	for id: int in LettersScript.ids():
+		var letter: Dictionary = LettersScript.render(id, _WORST_PARAMS)
+		if (letter["body"] as Array).size() > tallest_lines:
+			tallest_lines = (letter["body"] as Array).size()
+			tallest_letter = letter
+	var library := StoryLibraryScript.new()
+	library.load_all()
+	for beat: StoryBeat in library.all():
+		var letter: Dictionary = beat.render(_WORST_PARAMS)
+		if (letter["body"] as Array).size() > tallest_lines:
+			tallest_lines = (letter["body"] as Array).size()
+			tallest_letter = letter
+	assert_gt(tallest_lines, 0, "the corpus has to have produced at least one letter to measure")
+
+	assert_true(_panel.open(tallest_letter))
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var panel := _panel.get_node("Centre/Panel") as PanelContainer
+	assert_lte(panel.size.y, VIEWPORT_HEIGHT,
+		"the tallest authored letter (%d body lines) must leave its footer and Close button on screen"
+			% tallest_lines)
 
 
 func test_the_letter_offers_the_pointer_a_way_out() -> void:
