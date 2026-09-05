@@ -34,7 +34,6 @@ const MarkStampsScript := preload("res://systems/mark_stamps.gd")
 const MarkPaintScript := preload("res://systems/mark_paint.gd")
 const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 const PonyVisualsScript := preload("res://actors/pony/pony_visuals.gd")
-const MouseRowsScript := preload("res://ui/mouse_rows.gd")
 const MenuStyleScript := preload("res://ui/menu_style.gd")
 const SwatchGridScript := preload("res://ui/swatch_grid.gd")
 
@@ -88,6 +87,24 @@ const INK_COLOURS: Array[Color] = [
 ## flanks (and both cutie marks) inside a few seconds.
 const TURN_DEGREES_PER_SECOND := 24.0
 
+## THE KEYBOARD'S OWN CURSOR, RUN BY THIS FILE, THE SAME IDIOM game/ui/build_menu.gd's
+## move_selection()/confirm() USE. Godot's own focus walk is never turned on anywhere in
+## this screen (every Button on it, and every SwatchGrid cell, is FOCUS_NONE) -- a Tab
+## walking real engine focus onto a Button would be a second, uncoordinated cursor racing
+## this one. Every region below is instead a plain list of BaseButtons this file already
+## knows how to press, so _unhandled_input() below never invents behaviour a mouse click
+## does not already have a wire for; it only chooses which wire to pull.
+##
+## ui_focus_next/ui_focus_prev (Tab / Shift+Tab) MOVE BETWEEN REGIONS; ui_left/ui_right/
+## ui_up/ui_down MOVE THE HIGHLIGHT INSIDE ONE. A region's "columns" is a SwatchGrid's own
+## column count for a grid, or its own button count for a plain row (which makes ui_up/
+## ui_down a no-op there: posmod(index + count, count) is index again), so one pair of
+## helpers below drives a two column stepper and a six column swatch grid the same way.
+const LOOK_REGIONS: Array[StringName] = [&"name", &"step", &"coat", &"mane", &"eyes",
+	&"mane_style", &"confirm"]
+const MARK_REGIONS: Array[StringName] = [&"step", &"ink", &"stamp", &"tool", &"action",
+	&"confirm"]
+
 signal confirmed(look: PlayerLook)
 
 var _look: PlayerLook = null
@@ -97,6 +114,17 @@ var _open := false
 var _step: int = Step.LOOK
 var _backdrop_only := false
 var _drag_rest := 0.0
+
+## Which region has the keyboard cursor, and where inside it. `_kb_region` indexes
+## `_regions()`; `_kb_item` indexes that region's own `_region_buttons()`.
+var _kb_region := 0
+var _kb_item := 0
+
+## The one Control currently drawn as the keyboard cursor's target, so the next move can
+## clear exactly that highlight rather than walking every region hunting for one.
+var _kb_grid: SwatchGrid = null
+var _kb_button: BaseButton = null
+var _kb_on_name := false
 
 @onready var _backdrop: Control = get_node_or_null(^"Backdrop")
 @onready var _layout: Control = get_node_or_null(^"Layout")
@@ -148,6 +176,12 @@ func _ready() -> void:
 	_hint_label.text = HINT
 	_confirm.text = CONFIRM_LABEL
 	_name_box.text_changed.connect(set_name_text)
+	# ENTER SUBMITS AND RELEASES. A LineEdit with focus consumes ui_accept itself (that is
+	# what text_submitted IS), so this is the one region where _unhandled_input below never
+	# sees the key at all; it still has to give the focus back afterward, or Tab/the arrow
+	# keys would keep typing into the name instead of moving the cursor.
+	_name_box.text_submitted.connect(func(_text: String) -> void: _name_box.release_focus())
+	_name_box.focus_exited.connect(func() -> void: _apply_kb_highlight())
 	_confirm.pressed.connect(func() -> void: confirm())
 	_canvas.changed.connect(func() -> void: _sync_mark())
 	set_ink(0)
@@ -167,6 +201,38 @@ func _ready() -> void:
 	set_step(Step.LOOK)
 
 
+func _unhandled_input(event: InputEvent) -> void:
+	if not _open:
+		return
+	if _name_box != null and _name_box.has_focus():
+		# WHILE SHE IS TYPING, THIS FILE TOUCHES NOTHING ELSE. Every printable key and the
+		# LineEdit's own arrow-key text-cursor movement is already consumed by its _gui_input
+		# before an unhandled_input ever fires, so the only key that reaches here at all is
+		# one the LineEdit itself does not handle -- Escape -- and that is the one that gives
+		# the highlight back without typing anything.
+		if event.is_action_pressed(&"ui_cancel"):
+			release_name_edit()
+			get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed(&"ui_left"):
+		move_highlight(-1)
+	elif event.is_action_pressed(&"ui_right"):
+		move_highlight(1)
+	elif event.is_action_pressed(&"ui_up"):
+		move_highlight(-_region_columns(_regions()[_kb_region]))
+	elif event.is_action_pressed(&"ui_down"):
+		move_highlight(_region_columns(_regions()[_kb_region]))
+	elif event.is_action_pressed(&"ui_focus_next"):
+		switch_region(1)
+	elif event.is_action_pressed(&"ui_focus_prev"):
+		switch_region(-1)
+	elif event.is_action_pressed(&"ui_accept"):
+		activate_highlight()
+	else:
+		return
+	get_viewport().set_input_as_handled()
+
+
 ## Show the screen on `look` and pause the world behind it.
 func open(look: PlayerLook) -> void:
 	_look = look if look != null else PlayerLookScript.default_look()
@@ -183,6 +249,8 @@ func open(look: PlayerLook) -> void:
 	_build_model()
 	_restyle()
 	_refresh_swatches()
+	_retint_mane_style_grid()
+	_enter_kb_region(0)
 
 
 func is_open() -> bool:
@@ -220,15 +288,29 @@ func _build_grids() -> void:
 		_eyes_grid.set_swatches(_palette.eyes, [] as Array[String])
 		_eyes_grid.picked.connect(set_eyes)
 	if _mane_style_grid != null:
-		var swatches: Array[Color] = []
-		var labels: Array[String] = []
-		for i in StockPaletteScript.mane_style_count():
-			# THE CARD IS TINTED BY THE MANE COLOUR SHE IS ON, so the cards read as manes
-			# rather than as four identical grey buttons with words on them.
-			swatches.append(_palette.mane_at(_look.mane if _look != null else 0))
-			labels.append(StockPaletteScript.mane_style_label(i))
-		_mane_style_grid.set_swatches(swatches, labels)
+		_retint_mane_style_grid()
 		_mane_style_grid.picked.connect(set_mane_style)
+
+
+## THE CARDS ARE TINTED BY THE MANE COLOUR SHE IS ON, so they read as manes rather than as
+## four identical grey buttons with words on them -- called from _build_grids() (before
+## _look exists; mane index 0 stands in) and again every time set_mane()/cycle_mane() change
+## which mane she is on, so the cards never fall out of step with her actual pick.
+##
+## A FULL REBUILD, NOT A RECOLOUR IN PLACE. SwatchGrid has no per cell "just change the
+## colour" entry point and does not need one for four cards picked a few times a session;
+## set_swatches() replaces the Buttons but leaves the grid's own _selected/_highlighted and
+## its `picked` connection untouched, so nothing above this has to rewire afterward.
+func _retint_mane_style_grid() -> void:
+	if _mane_style_grid == null:
+		return
+	var swatches: Array[Color] = []
+	var labels: Array[String] = []
+	var mane_index: int = _look.mane if _look != null else 0
+	for i in StockPaletteScript.mane_style_count():
+		swatches.append(_palette.mane_at(mane_index))
+		labels.append(StockPaletteScript.mane_style_label(i))
+	_mane_style_grid.set_swatches(swatches, labels)
 
 
 ## THE FOUR ABSOLUTE SETTERS THE GRIDS CALL. cycle_*() stays and is now written in terms of
@@ -245,6 +327,7 @@ func set_mane(index: int) -> void:
 	_look.mane = posmod(index, maxi(1, _palette.manes.size()))
 	_restyle()
 	_refresh_swatches()
+	_retint_mane_style_grid()
 
 
 func set_eyes(index: int) -> void:
@@ -373,6 +456,11 @@ func set_step(value: int) -> void:
 		if node != null:
 			node.visible = not on_look
 	MenuStyleScript.tick_page()
+	# THE CURSOR MOVES WITH THE STEP. The two steps do not share a region list (MARK has no
+	# name field or colour grids; LOOK has no ink/stamp/tool/action rows), so a cursor left
+	# on the last step's region index would either point at a hidden control or an unrelated
+	# one now sitting at that index.
+	_enter_kb_region(0)
 
 
 func _wire_steps() -> void:
@@ -386,6 +474,201 @@ func _wire_steps() -> void:
 		button.focus_mode = Control.FOCUS_NONE
 		var target: int = int(pair[1])
 		button.pressed.connect(func() -> void: set_step(target))
+
+
+# --- the keyboard's own cursor -----------------------------------------------------------
+##
+## CHARACTER CREATION IS FINISHABLE WITH ZERO MOUSE. Every Button on this screen, and every
+## SwatchGrid cell, sets FOCUS_NONE (see swatch_grid.gd's own class comment); this section
+## is the compensating cursor that FOCUS_NONE always implies is somebody else's job to
+## build, the same way build_menu.gd's move_selection()/confirm() are. It never invents an
+## action a mouse click could not already reach -- every branch below ends in either
+## `.pressed.emit()` on a Button this file already wired, or `_name_box.grab_focus()`.
+
+func _regions() -> Array[StringName]:
+	return MARK_REGIONS if _step == Step.MARK else LOOK_REGIONS
+
+
+func _region_grid(region: StringName) -> SwatchGrid:
+	match region:
+		&"coat":
+			return _coat_grid
+		&"mane":
+			return _mane_grid
+		&"eyes":
+			return _eyes_grid
+		&"mane_style":
+			return _mane_style_grid
+	return null
+
+
+## Every BaseButton `region` offers the cursor, in the order the cursor visits them. A grid
+## region's buttons are its cells, read straight off the SwatchGrid so this never keeps a
+## second list a rebuilt grid (see _retint_mane_style_grid()) could fall out of step with.
+func _region_buttons(region: StringName) -> Array[BaseButton]:
+	var grid := _region_grid(region)
+	if grid != null:
+		var cells: Array[BaseButton] = []
+		for i in grid.cell_count():
+			cells.append(grid.cell(i))
+		return cells
+	var paths: Array[NodePath] = []
+	match region:
+		&"step":
+			paths = [^"Layout/Panel/Margin/Column/StepRow/StepLook",
+				^"Layout/Panel/Margin/Column/StepRow/StepMark"]
+		&"ink":
+			for i in ink_count():
+				paths.append(NodePath("Layout/Panel/Margin/Column/InkRow/Ink%d" % i))
+		&"stamp":
+			for id: int in MarkStampsScript.ids():
+				paths.append(NodePath("Layout/Panel/Margin/Column/StampRow/Stamp%d" % id))
+		&"tool":
+			for radius: int in MarkPaintScript.BRUSHES:
+				paths.append(NodePath("Layout/Panel/Margin/Column/ToolRow/Brush%d" % radius))
+			paths.append(^"Layout/Panel/Margin/Column/ToolRow/Eraser")
+		&"action":
+			paths = [^"Layout/Panel/Margin/Column/ActionRow/Undo",
+				^"Layout/Panel/Margin/Column/ActionRow/Clear"]
+		&"confirm":
+			paths = [^"Layout/Panel/Margin/Column/Confirm"]
+	var out: Array[BaseButton] = []
+	for path: NodePath in paths:
+		var button := get_node_or_null(path) as BaseButton
+		if button != null:
+			out.append(button)
+	return out
+
+
+## A grid's own column count for a grid region; the region's whole button count for a row
+## (StepRow, InkRow, and the rest are all one row wide), which is what makes ui_up/ui_down a
+## no-op on a row region: posmod(index +/- count, count) always answers index back.
+func _region_columns(region: StringName) -> int:
+	var grid := _region_grid(region)
+	if grid != null:
+		return maxi(1, grid.columns)
+	return maxi(1, _region_buttons(region).size())
+
+
+## Which region the cursor is on ("name", "step", "coat", ...; see LOOK_REGIONS/MARK_REGIONS).
+func kb_region() -> StringName:
+	var regions := _regions()
+	if _kb_region < 0 or _kb_region >= regions.size():
+		return &""
+	return regions[_kb_region]
+
+
+## Which item inside that region the cursor is on.
+func kb_item() -> int:
+	return _kb_item
+
+
+## Whether the name field currently holds real engine keyboard focus. Typing in it is the
+## one thing on this screen that is NOT driven through a Button; a test that wants to prove
+## the cursor never steals a letter checks this rather than reading LineEdit internals.
+func is_editing_name() -> bool:
+	return _name_box != null and _name_box.has_focus()
+
+
+## ESCAPE, WHILE TYPING. Hands the highlight back to the name region without touching what
+## she has typed so far -- the same "give up the field, keep the cursor here" contract the
+## coordinator's ruling asked for. A no-op if nothing has focus, so a stray call is cheap.
+func release_name_edit() -> void:
+	if _name_box != null:
+		_name_box.release_focus()
+
+
+## TAB / SHIFT+TAB. Move to the region `delta` steps away (wraps), and put the item cursor
+## somewhere sensible inside it: a grid's own current pick, so pressing Enter right after
+## switching in re-confirms what she already chose rather than landing on cell zero.
+func switch_region(delta: int) -> void:
+	if is_editing_name():
+		return
+	var regions := _regions()
+	if regions.is_empty():
+		return
+	_enter_kb_region(_kb_region + delta)
+
+
+func _enter_kb_region(index: int) -> void:
+	var regions := _regions()
+	if regions.is_empty():
+		_kb_region = 0
+		_kb_item = 0
+		_apply_kb_highlight()
+		return
+	_kb_region = posmod(index, regions.size())
+	var grid := _region_grid(regions[_kb_region])
+	_kb_item = grid.selected() if grid != null and grid.cell_count() > 0 else 0
+	_apply_kb_highlight()
+
+
+## THE ARROW KEYS. `delta` is +/-1 from ui_left/ui_right, or +/- the region's own column
+## count from ui_up/ui_down -- see _unhandled_input(). The name region has no items to move
+## across (there is exactly one field, and Enter is how she gets into it), so this is a
+## deliberate no-op there rather than a special case the caller has to know about.
+func move_highlight(delta: int) -> void:
+	if is_editing_name():
+		return
+	var region := kb_region()
+	if region == &"" or region == &"name":
+		return
+	var buttons := _region_buttons(region)
+	if buttons.is_empty():
+		return
+	_kb_item = posmod(_kb_item + delta, buttons.size())
+	_apply_kb_highlight()
+
+
+## ENTER. Presses whatever the cursor is on -- literally: `.pressed.emit()` on the same
+## Button a click would fire, which is what lets every region below reuse the wiring
+## _wire_controls()/_wire_steps()/_build_grids() already built rather than duplicating it.
+## The name region is the one exception, because there is no Button behind it to press.
+func activate_highlight() -> void:
+	if is_editing_name():
+		return
+	var region := kb_region()
+	if region == &"name":
+		_name_box.grab_focus()
+		_apply_kb_highlight()
+		return
+	var buttons := _region_buttons(region)
+	if _kb_item >= 0 and _kb_item < buttons.size():
+		buttons[_kb_item].pressed.emit()
+
+
+## REDRAW THE CURSOR. Clears whatever was highlighted before (a grid's border, a button's
+## override, or the name field's) and marks the new one -- at most one Control is ever
+## highlighted at a time, so clearing is always exactly the three lines below rather than a
+## walk over every region hunting for a stale mark.
+func _apply_kb_highlight() -> void:
+	if _kb_grid != null:
+		_kb_grid.set_highlighted(-1)
+		_kb_grid = null
+	if _kb_button != null:
+		_kb_button.remove_theme_stylebox_override(&"normal")
+		_kb_button = null
+	if _kb_on_name and _name_box != null:
+		_name_box.remove_theme_stylebox_override(&"normal")
+	_kb_on_name = false
+	if not _open:
+		return
+	var region := kb_region()
+	if region == &"name":
+		if _name_box != null and not _name_box.has_focus():
+			_name_box.add_theme_stylebox_override(&"normal", MenuStyleScript.field_box(true))
+			_kb_on_name = true
+		return
+	var grid := _region_grid(region)
+	if grid != null:
+		grid.set_highlighted(_kb_item)
+		_kb_grid = grid
+		return
+	var buttons := _region_buttons(region)
+	if _kb_item >= 0 and _kb_item < buttons.size():
+		buttons[_kb_item].add_theme_stylebox_override(&"normal",
+			MenuStyleScript.button_box(&"hover"))
+		_kb_button = buttons[_kb_item]
 
 
 ## THE VEIL, RAISED BEFORE THE WORLD HAS FINISHED BUILDING. Acceptance item 1: "New save: no

@@ -27,6 +27,7 @@ const CARD_SIZE := Vector2(168.0, 96.0)
 const CELL_RADIUS := 8
 const IDLE_BORDER := 2
 const CHOSEN_BORDER := 5
+const CURSOR_BORDER := 4
 
 const DEFAULT_COLUMNS := 6
 
@@ -34,6 +35,11 @@ var _colours: Array[Color] = []
 var _labels: Array[String] = []
 var _cells: Array[Button] = []
 var _selected := 0
+
+## THE KEYBOARD CURSOR, SEPARATE FROM THE PICK. -1 when nothing outside a mouse is pointing
+## at this grid. creation_screen.gd's own cursor sets this as she moves the highlight with
+## the arrow keys; it is not the chosen swatch (_selected) until Enter says so.
+var _highlighted := -1
 
 
 func _ready() -> void:
@@ -56,7 +62,12 @@ func set_swatches(colours: Array[Color], labels: Array[String]) -> void:
 		_labels = [] as Array[String]
 	for child in get_children():
 		remove_child(child)
-		child.queue_free()
+		# free(), NOT queue_free(). A rebuilt grid's old Buttons are never referenced again
+		# the instant they leave _cells below, and a deferred free left them as orphans GUT
+		# still counted at the end of a synchronous test (test_swatch_grid.gd's own rebuild
+		# test): freeing the moment they are detached is the same node lifetime with no gap
+		# for a test's assertions to run inside.
+		child.free()
 	_cells = []
 	for i in _colours.size():
 		var cell := Button.new()
@@ -96,22 +107,46 @@ func selected() -> int:
 	return _selected
 
 
+## THE KEYBOARD CURSOR. Set by creation_screen.gd as its own _unhandled_input moves the
+## highlight across whichever grid is the active region; -1 clears it (leaving the tree, or
+## another region taking the cursor). Wraps like set_selected() when the grid is not empty,
+## so a caller's off-by-one lands on a real cell rather than reading off the end.
+func set_highlighted(index: int) -> void:
+	_highlighted = -1 if (index < 0 or _colours.is_empty()) else posmod(index, _colours.size())
+	_restyle()
+
+
+func highlighted() -> int:
+	return _highlighted
+
+
 ## THE SWATCH IS ITS OWN COLOUR IN EVERY STATE, and the STATE is the border. A hover that
 ## changed the fill would change the colour the player is trying to judge, which is the one
 ## thing a swatch may never do.
+##
+## THREE TIERS OF BORDER, WIDEST WINS. Chosen (CHOSEN_BORDER, gold) is what she picked;
+## cursor (CURSOR_BORDER, the same hover gold at one tier down) is only where the keyboard
+## is pointing right now and says nothing about what she picked; idle is everything else. A
+## cell can be both at once (the cursor usually starts on the current pick), and chosen
+## always wins the width so pressing an arrow key never reads as "she changed her coat".
 func _restyle() -> void:
 	for i in _cells.size():
 		var chosen: bool = i == _selected
+		var cursor: bool = i == _highlighted
 		for state: StringName in [&"normal", &"hover", &"pressed", &"focus", &"disabled"]:
 			var box := StyleBoxFlat.new()
 			box.bg_color = _colours[i]
 			box.set_corner_radius_all(CELL_RADIUS)
-			var border: int = CHOSEN_BORDER if chosen else IDLE_BORDER
+			var border: int = IDLE_BORDER
+			if chosen:
+				border = CHOSEN_BORDER
+			elif cursor:
+				border = CURSOR_BORDER
 			if state == &"hover" or state == &"pressed":
 				border = maxi(border, CHOSEN_BORDER - 1)
 			box.set_border_width_all(border)
 			box.border_color = MenuStyleScript.COLOR_TAB_ON if chosen \
-				else (MenuStyleScript.COLOR_HOVER_BORDER if state == &"hover" \
+				else (MenuStyleScript.COLOR_HOVER_BORDER if (cursor or state == &"hover") \
 					else MenuStyleScript.ROW_IDLE_BORDER)
 			_cells[i].add_theme_stylebox_override(state, box)
 		MenuStyleScript.style_label_button(_cells[i])

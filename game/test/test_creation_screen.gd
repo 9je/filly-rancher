@@ -195,7 +195,6 @@ func test_the_mane_style_survives_confirm() -> void:
 
 const SwatchGridScript := preload("res://ui/swatch_grid.gd")
 const CreationBackdropScript := preload("res://ui/creation_backdrop.gd")
-const MouseRowsScript := preload("res://ui/mouse_rows.gd")
 
 
 func test_the_backdrop_is_opaque_and_covers_the_whole_screen() -> void:
@@ -297,3 +296,104 @@ func test_nothing_the_rebuilt_screen_draws_carries_a_dash() -> void:
 		assert_false(line.contains(char(0x2014)), line)
 		checked += 1
 	assert_gt(checked, 0, "the copy list was actually walked")
+
+
+# --- the keyboard's own cursor, fix round 1 -----------------------------------------------
+##
+## CONTROLLER RULING: the spec's global "keyboard must remain FULLY functional on every
+## screen" outranks task-8-brief.md's own Step 8.4, which left `_confirm`, the step buttons
+## and every SwatchGrid cell FOCUS_NONE with nothing to compensate. Every test below drives
+## the screen through the same small set of public methods _unhandled_input() itself calls
+## (switch_region/move_highlight/activate_highlight/release_name_edit), never through a
+## mouse position or a simulated InputEvent -- exactly test_build_menu.gd's own convention
+## for move_selection()/confirm(), which the class comment on creation_screen.gd's cursor
+## section names directly. Every one of these calls the pre fix-round build did not have at
+## all: run against that build, the very first `_screen.kb_region()` below is a call to a
+## method that does not exist, which GUT reports as an error and a failed test, not a
+## silent pass -- this is what "must fail if the keyboard path breaks" means in practice.
+
+## Walk Tab-equivalents (switch_region(1)) until the cursor reaches `region`, and fail
+## loudly with a bounded loop rather than hanging if it never arrives -- a region that Tab
+## cannot reach is exactly the bug finding 1 described.
+func _goto_region(region: StringName) -> void:
+	var guard := 0
+	while _screen.kb_region() != region and guard < 20:
+		_screen.switch_region(1)
+		guard += 1
+	assert_eq(_screen.kb_region(), region, "region '%s' reachable by Tab alone" % region)
+
+
+func test_a_full_keyboard_walkthrough_can_finish_creation_with_no_mouse() -> void:
+	_screen.open(PlayerLookScript.default_look())
+	assert_eq(_screen.step(), CreationScreen.Step.LOOK, "she meets her pony first")
+	assert_eq(_screen.kb_region(), &"name", "the cursor opens on the name field")
+
+	# --- pick a coat, purely by keyboard ----------------------------------------------------
+	# Pinned to a known starting swatch first: the cursor opens a grid region on its current
+	# pick (see _enter_kb_region()'s own comment), and the default look's own coat index is
+	# not necessarily 0, so "ui_right x2" only lands on index 2 from a known index 0.
+	_screen.set_coat(0)
+	_goto_region(&"coat")
+	_screen.move_highlight(2)
+	assert_eq(_screen.kb_item(), 2, "ui_right x2 moved the highlight, not the pick")
+	_screen.activate_highlight()
+	assert_eq(_screen.look().coat, 2, "ui_accept on the highlighted swatch is the coat she gets")
+
+	# --- reach the MARK step, purely by keyboard --------------------------------------------
+	_goto_region(&"step")
+	_screen.move_highlight(1)
+	_screen.activate_highlight()
+	assert_eq(_screen.step(), CreationScreen.Step.MARK,
+		"the LOOK/MARK switch is keyboard reachable")
+
+	# --- stamp a shape, purely by keyboard ---------------------------------------------------
+	_goto_region(&"stamp")
+	assert_true(MarkPaintScript.is_blank(_screen.canvas().image()), "precondition: a clean canvas")
+	_screen.activate_highlight()
+	assert_false(MarkPaintScript.is_blank(_screen.canvas().image()),
+		"a keyboard stamp actually reaches the canvas, not only the highlight")
+
+	# --- confirm, purely by keyboard ---------------------------------------------------------
+	_goto_region(&"confirm")
+	watch_signals(_screen)
+	_screen.activate_highlight()
+	assert_false(_screen.is_open(), "confirm reached with no mouse click anywhere in this test")
+	assert_signal_emitted(_screen, "confirmed")
+
+
+func test_the_name_field_keeps_typing_and_the_cursor_leaves_it_alone() -> void:
+	assert_eq(_screen.kb_region(), &"name")
+	_screen.activate_highlight()
+	assert_true(_screen.is_editing_name(), "ui_accept on the name region grabs real focus")
+	# A stray nav call while she is typing must not release the field or move the cursor:
+	# these are exactly the calls _unhandled_input() itself never makes while has_focus() is
+	# true, exercised here directly so the guard is proven even if that early return breaks.
+	_screen.move_highlight(1)
+	_screen.switch_region(1)
+	assert_true(_screen.is_editing_name(), "a nav call mid-edit must not release the field")
+	assert_eq(_screen.kb_region(), &"name", "...nor move the region cursor")
+	_screen.release_name_edit()
+	assert_false(_screen.is_editing_name(), "Escape gives the field back")
+
+
+func test_the_mane_style_cards_retint_when_the_mane_changes() -> void:
+	var grid := _screen.find_child("ManeStyleGrid", true, false) as SwatchGrid
+	assert_not_null(grid)
+	var palette: StockPalette = StockPaletteScript.load_player()
+	_screen.set_mane(0)
+	var before: Color = (grid.cell(0).get_theme_stylebox(&"normal") as StyleBoxFlat).bg_color
+	assert_eq(before, palette.mane_at(0), "the cards open tinted by the mane she is on")
+	_screen.set_mane(1)
+	var after: Color = (grid.cell(0).get_theme_stylebox(&"normal") as StyleBoxFlat).bg_color
+	assert_ne(before, after, "picking a different mane has to retint the cards")
+	assert_eq(after, palette.mane_at(1), "...to the mane she actually picked")
+
+
+func test_cycle_mane_also_retints_the_mane_style_cards() -> void:
+	var grid := _screen.find_child("ManeStyleGrid", true, false) as SwatchGrid
+	_screen.set_mane(0)
+	_screen.cycle_mane(1)
+	var palette: StockPalette = StockPaletteScript.load_player()
+	var tint: Color = (grid.cell(0).get_theme_stylebox(&"normal") as StyleBoxFlat).bg_color
+	assert_eq(tint, palette.mane_at(_screen.look().mane),
+		"cycle_mane() is set_mane() with a step added; the retint has to come along with it")
