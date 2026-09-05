@@ -65,12 +65,28 @@ const BOUNDARY_THICKNESS := 2.0
 
 ## Grass. Slightly desaturated and very rough -- a shiny lawn under a directional
 ## sun reads as plastic.
-const GRASS_LOW := Color(0.239, 0.408, 0.196)
-const GRASS_HIGH := Color(0.443, 0.541, 0.271)
+##
+## TUNED AGAINST THE PONYSFM PALETTE, NOT PICKED BY EYE A SECOND TIME. The foliage the map
+## is full of now measures hue 0.265 at saturation 0.358 (HLS, averaged across
+## mlp_apple_tree_leaves.png and mlp_bush_leaves.png, 64x64 downsample); the shipped grass sat
+## at hue 0.300 / saturation 0.351 for GRASS_LOW and hue 0.227 / saturation 0.333 for
+## GRASS_HIGH, which is why the ground read as a different production's grass under an MLP
+## tree. Value is deliberately held within 0.03 of the shipped numbers (0.408 -> 0.410 and
+## 0.541 -> 0.551, both Color.v): what was wrong was the hue and the saturation, and moving
+## the brightness as well would change how the map reads at dusk for a reason that has
+## nothing to do with the palette.
+const GRASS_LOW := Color(0.283, 0.410, 0.194)
+const GRASS_HIGH := Color(0.381, 0.551, 0.261)
 
 ## What a hillside is made of. Turned earth, and deliberately not any green: the point of the
 ## slope mask is that a slope reads as a different SURFACE rather than as darker grass.
-const DIRT := Color(0.36, 0.28, 0.19)
+##
+## TUNED AGAINST THE PONYSFM PALETTE. mlp_apple_tree_tree_wood.png measures hue 0.121 at
+## saturation 0.430 (HLS, 64x64 downsample); the shipped dirt sat at hue 0.088 / saturation
+## 0.309, paler and greyer than the bark the ground is meant to read next to. Hue stays under
+## 0.14 either way, so this was never at risk of reading as another green -- it just wasn't
+## earth-coloured enough to read as bark's own colour rather than a generic brown.
+const DIRT := Color(0.393, 0.329, 0.157)
 
 ## When true this node builds NOTHING in _ready() beyond its collision layers, and the
 ## ground is shaped by an explicit build() instead.

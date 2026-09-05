@@ -124,10 +124,47 @@ func test_the_shader_converts_its_vertex_colour_out_of_srgb() -> void:
 
 ## THE HEIGHTFIELD IS UNTOUCHED. Moving CELL, HALF, FLAT_RADIUS or height_at() would move the
 ## mesh, the collider, the props, the pens, the spawner and every gate that reads them, and
-## the look pass has no business anywhere near any of that.
+## the look pass has no business anywhere near any of that. The palette is deliberately NOT
+## pinned here any more: GRASS_LOW/GRASS_HIGH are what task 9 tunes, and the tests below
+## (test_the_grass_gradient_still_runs_from_shade_to_light and its neighbours) are what
+## actually cover the palette's shape rather than freezing today's exact numbers.
 func test_the_heightfield_is_exactly_what_it_was() -> void:
 	assert_eq(TerrainScript.HALF, 110.0)
 	assert_eq(TerrainScript.CELL, 2.0)
 	assert_eq(TerrainScript.FLAT_RADIUS, 30.0)
-	assert_eq(TerrainScript.GRASS_LOW, Color(0.239, 0.408, 0.196))
-	assert_eq(TerrainScript.GRASS_HIGH, Color(0.443, 0.541, 0.271))
+
+
+## THE GROUND AND THE THINGS STANDING ON IT SHARE LIGHT, OR THEY DO NOT LOOK LIKE ONE PLACE.
+## This cannot say whether the grass is pretty. It can say the two ends of the gradient still
+## bracket each other, that the dirt is still earth rather than grass, and that the numbers a
+## human tuned in terrain.gd are the numbers the shader is actually handed -- which is the
+## pair that silently drifts.
+
+## A Terrain built plain (no registry), with its Mesh node handed back rather than the
+## Terrain itself: every test below wants the rendered surface, not the body it rides on.
+func _built_terrain_mesh() -> MeshInstance3D:
+	var terrain := _bare_terrain()
+	return terrain.get_node(^"Mesh") as MeshInstance3D
+
+
+func test_the_grass_gradient_still_runs_from_shade_to_light() -> void:
+	assert_lt(TerrainScript.GRASS_LOW.v, TerrainScript.GRASS_HIGH.v,
+		"GRASS_LOW is the shaded end and GRASS_HIGH the lit one")
+	assert_gt(TerrainScript.GRASS_LOW.s, 0.35, "grass at either end is grass, not a grey")
+	assert_gt(TerrainScript.GRASS_HIGH.s, 0.35, "grass at either end is grass, not a grey")
+
+
+func test_the_dirt_is_earth_and_never_another_green() -> void:
+	var h: float = TerrainScript.DIRT.h
+	assert_true(h < 0.14 or h > 0.95,
+		"a hue in the greens would make the slope mask invisible")
+
+
+func test_the_shader_is_handed_the_colours_terrain_gd_holds() -> void:
+	var mesh := _built_terrain_mesh()
+	var mat := mesh.mesh.surface_get_material(0) as ShaderMaterial
+	assert_not_null(mat, "the ground wears the shader")
+	assert_eq(mat.get_shader_parameter(&"grass_high"), TerrainScript.GRASS_HIGH,
+		"the lit end of the gradient is one number in one place")
+	assert_eq(mat.get_shader_parameter(&"dirt_color"), TerrainScript.DIRT,
+		"the earth is one number in one place")

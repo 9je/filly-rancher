@@ -19,8 +19,8 @@ render_mode cull_back, diffuse_burley;
 // picked by eye live in ONE place. Plain uniforms and not source_color hints: the conversion
 // out of sRGB happens once, below, for the vertex colour and for these, through the same
 // function, so there is exactly one code path and no question about who converted what.
-uniform vec4 grass_high = vec4(0.443, 0.541, 0.271, 1.0);
-uniform vec4 dirt_color = vec4(0.36, 0.28, 0.19, 1.0);
+uniform vec4 grass_high = vec4(0.381, 0.551, 0.261, 1.0);
+uniform vec4 dirt_color = vec4(0.393, 0.329, 0.157, 1.0);
 
 uniform float fine_metres = 0.9;
 uniform float coarse_metres = 4.5;

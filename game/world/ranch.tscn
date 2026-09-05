@@ -75,7 +75,7 @@ fog_aerial_perspective = 0.35
 adjustment_enabled = true
 adjustment_brightness = 1.0
 adjustment_contrast = 1.05
-adjustment_saturation = 1.14
+adjustment_saturation = 1.08
 
 [node name="Ranch" type="Node3D"]
 script = ExtResource("1")
