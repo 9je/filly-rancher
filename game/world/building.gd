@@ -468,8 +468,7 @@ func _stand_model() -> bool:
 	# Centre it on the shell in XZ and put its floor on the plinth's top face. global_position
 	# is used because world_aabb() is a world space measurement and the parent may be turned.
 	var centre: Vector3 = box.get_center()
-	holder.global_position += global_transform.basis * Vector3.ZERO \
-		+ Vector3(0.0, FLOOR_TOP - box.position.y, 0.0)
+	holder.global_position += Vector3(0.0, FLOOR_TOP - box.position.y, 0.0)
 	holder.global_position -= Vector3(centre.x - global_position.x, 0.0,
 		centre.z - global_position.z)
 	return true
