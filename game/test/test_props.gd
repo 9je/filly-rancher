@@ -213,15 +213,15 @@ func test_every_tree_in_the_layout_carries_a_scale_correction() -> void:
 # --- the placement pass -------------------------------------------------------------------
 
 ## THE ACCEPTANCE BAR IS "THOUGHTFULLY PLACED" AND ONLY A PERSON CAN JUDGE THAT. What a test
-## can hold is the half of it that is arithmetic: two props whose footprint rectangles
-## overlap are two props intersecting, and no amount of taste makes that read as composed.
+## can hold is a duplicate guard: two entries closer than this stand on the same spot, and
+## no amount of taste makes that read as composed.
 const BREATHING_ROOM := 0.15
 
 
 func test_no_two_props_in_the_layout_stand_inside_each_other() -> void:
-	# Footprint half extents are conservative: the entry's own scale times a nominal one
-	# metre model, which under-reports a wide model and so never produces a false failure.
-	# The real overlap check is the ranch gate's, against the LIVE colliders.
+	# A point-distance duplicate guard, nothing more: it reads no footprints and no AABBs,
+	# so two wide models can pass it while overlapping. The real overlap check is the ranch
+	# gate's, against the LIVE colliders.
 	var seen: Array[Dictionary] = []
 	for entry: Dictionary in PropsScript.LAYOUT:
 		var at: Vector2 = entry["at"]

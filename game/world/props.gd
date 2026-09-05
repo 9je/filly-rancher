@@ -436,9 +436,13 @@ const LAYOUT := [
 	{"file": "pv_pink_b.glb", "at": Vector2(15.0, 36.0), "yaw": 270.0, "family": &"mlp", "skirt": true},
 	{"file": "pv_ogb_1.glb", "at": Vector2(15.0, 43.0), "yaw": 270.0, "family": &"mlp", "skirt": true},
 	{"file": "pv_courtyard_b.glb", "at": Vector2(15.0, 50.0), "yaw": 270.0, "family": &"mlp", "skirt": true},
-	{"file": "pv_balcony_b.glb", "at": Vector2(-12.0, 36.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
+	# The tall courtyard-balcony block stands at z 36, BEHIND shot 19's camera (aim
+	# (-10, 61.6), eye offset -22 puts the lens near z 39.6): at z 50 it cropped the
+	# marquee out of the one screenshot that exists to showcase it. The shorter
+	# balcony_b takes z 50; the street keeps all three buildings either way.
+	{"file": "pv_courtyard_b_balcony.glb", "at": Vector2(-12.0, 36.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
 	{"file": "pv_ogb_2.glb", "at": Vector2(-12.0, 43.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
-	{"file": "pv_courtyard_b_balcony.glb", "at": Vector2(-12.0, 50.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
+	{"file": "pv_balcony_b.glb", "at": Vector2(-12.0, 50.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
 	# --- the schoolyard, west of the road --------------------------------------------
 	# A SCHOOLYARD AND NO SCHOOL, and that is the pack rather than an omission.
 	# ponysfm-schoolhouse ships school_roof, school_door, school_window, school_sign,
