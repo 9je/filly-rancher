@@ -149,7 +149,7 @@ func test_the_pen_plot_clearing_is_clear_in_the_layout() -> void:
 ## prefix is one nothing converts, so it would never load on any machine: it would quietly
 ## lower expected_count() instead of failing, and the layout would be one prop short
 ## everywhere with nothing saying so.
-const PROP_PREFIXES := ["kenney_", "saa_", "pv_", "mlp_", "school_", "lp_"]
+const PROP_PREFIXES := ["kenney_", "saa_", "pv_", "mlp_", "school_", "lp_", "neon_"]
 
 
 func test_every_layout_entry_names_a_prop_from_the_converted_kit() -> void:

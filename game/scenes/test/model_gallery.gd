@@ -33,7 +33,7 @@ const SCALE_REFERENCE := "saa_barn.glb"
 
 ## The five id prefixes tools/prop_manifest.txt actually names. See _build_props_row()'s
 ## doc comment for why kenney_ files (present in the same directory) are not scanned.
-const PROP_PREFIXES := ["saa_", "pv_", "mlp_", "school_", "lp_"]
+const PROP_PREFIXES := ["saa_", "pv_", "mlp_", "school_", "lp_", "neon_"]
 
 func _ready() -> void:
     if "--stock" in OS.get_cmdline_user_args():

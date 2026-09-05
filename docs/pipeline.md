@@ -999,11 +999,11 @@ fresh clone runs to get the map's MLP scenery back.
 bash tools/convert_props.sh
 # -> CONVERTED saa_barn
 # -> ...
-# -> PROP_CONVERT ok=35 failed=0 skipped=0 refused=0
+# -> PROP_CONVERT ok=45 failed=0 skipped=0 refused=0
 tools/bin/godot --headless --path game --import
 ```
 
-`tools/prop_manifest.txt` is the curation and the only place it lives: 35 lines of
+`tools/prop_manifest.txt` is the curation and the only place it lives: 45 lines of
 `id|source`, `source` relative to `assets-inbox/`. The id is the name the map uses,
 so `game/world/props.gd`'s `LAYOUT` and `ranch.gd`'s report both speak it.
 

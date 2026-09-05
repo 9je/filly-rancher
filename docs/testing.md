@@ -969,10 +969,10 @@ verdict.
 **And a third row, for the props.**
 `FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --path game scenes/test/model_gallery.tscn -- --props` loads the
 `.glb` files in `game/assets/converted/props/` whose names begin with one of the
-five manifest prefixes (`saa_`, `pv_`, `mlp_`, `school_`, `lp_`), stands them in a
+six manifest prefixes (`saa_`, `pv_`, `mlp_`, `school_`, `lp_`, `neon_`), stands them in a
 line spaced by their own measured widths, and prints one `PROP <file> size=(x, y,
 z) meshes=N materials=N textured=N` line each. Headless it prints `GALLERY_OK
-count=35` and the exit code is the verdict: it fails if fewer than 30 loaded, if
+count=45` and the exit code is the verdict: it fails if fewer than 30 loaded, if
 any model measured an empty AABB, or if any model came back with no textured
 surface at all.
 
@@ -982,8 +982,11 @@ in the same directory and are deliberately skipped. They never went through
 with flat material colours instead of albedo textures (docs/pipeline.md section 4
 quirk 6), so the textured-surface check would fail them for a convention this
 pipeline never touched. What they DO have (placement, seating, collision) is
-already proven by `world/ranch.tscn`'s own gate. `count=35` is the size of the
-prop manifest, and it is 35 rather than 43 for exactly this reason;
+already proven by `world/ranch.tscn`'s own gate. `count=45` is the size of the
+prop manifest, and it is 45 rather than 53 for exactly this reason (the `neon_`
+prefix is in the list for Task 5's authorized fallback but names zero rows today --
+the Neon Lights Pack turned out to be a pony character skin, not signage; see
+`tools/prop_manifest.txt`'s Neon Lights section);
 `model_gallery.gd`'s `PROP_PREFIXES` is the same list `test_ranch_world.gd`
 already holds the layout to.
 
