@@ -256,3 +256,43 @@ func test_the_company_ladder_is_authored_and_unreachable_in_this_slice() -> void
 		if beat.chapter_index() == StoryScript.Chapter.COMPANY:
 			ladder += 1
 	assert_gte(ladder, 4, "the Company's letters are written and waiting for slice 4")
+
+
+## THE REWRITE, PINNED. The owner, on her first full playtest, called the letters' language
+## "a bit weird". The register did not change (dark corporate cheer, an HR poster with the
+## wrong number on it); the phrasing did. These are the lines that had to go, so that a later
+## edit cannot quietly bring the clunky ones back.
+func test_the_letters_no_longer_carry_the_phrasings_the_owner_flagged() -> void:
+	# Every entry is a phrase that was actually in game/data/story/ before this task, checked
+	# against the old files rather than guessed at, so this test failed before the rewrite and
+	# passes after it.
+	var banned: Array[String] = ["We put a lot of care into them",
+		"as your balance will already have noticed", "ponies each period",
+		"No action is required from you at all", "which is high praise from him",
+		"and it is not a difficult one", "The bonuses on it are not small",
+		"they think about where", "negligible and within", "from one ranch!"]
+	var checked := 0
+	for beat: StoryBeat in _library.all():
+		var joined: String = "\n".join(beat.body_lines())
+		for phrase: String in banned:
+			assert_false(joined.contains(phrase),
+				"%s still carries '%s'" % [beat.id, phrase])
+		checked += 1
+	assert_eq(checked, 15, "all fifteen letters were actually swept")
+
+
+## EVERY LETTER IS SIGNED, and by a department rather than by a person. The joke only works
+## if the Company is an organisation nobody in it is responsible to.
+func test_every_letter_is_signed_off_by_a_department() -> void:
+	var senders: Array[String] = ["Sponsorship Services", "Intake", "Partner Wellbeing",
+		"Logistics", "Yield Assurance"]
+	var checked := 0
+	for beat: StoryBeat in _library.all():
+		var last: String = beat.body_lines()[beat.body_lines().size() - 1]
+		var signed := false
+		for department: String in senders:
+			if last.ends_with(department):
+				signed = true
+		assert_true(signed, "%s ends on '%s', which signs nothing" % [beat.id, last])
+		checked += 1
+	assert_eq(checked, 15)
