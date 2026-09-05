@@ -57,6 +57,36 @@ exit code `0`.
 
 ---
 
+## The boot path, and why a title screen does not get in front of a gate
+
+`game/project.godot`'s `run/main_scene` is `res://ui/title_screen.tscn` from R1 on.
+Nothing about how gates are run changed, and it cannot have: **every gate names its
+own scene on the command line**, for instance
+
+```
+tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/story_test.tscn
+```
+
+so the main scene is never consulted for any of them. The pinned-hour and screenshot
+runs name `world/ranch.tscn` explicitly for the same reason.
+
+The one path that DOES consult it is a bare boot with no scene argument, which is what
+`.github/workflows/smoke_run.sh` and the Windows export smoke do, and both require a
+`RANCH_OK` line. `game/ui/title_screen.gd`'s `is_interactive()` asks exactly the
+question `game/world/ranch.gd`'s own `_interactive` asks (not headless, and no
+`--screenshot*` user arg) and, on any answer but "a person at a keyboard", changes
+straight to `world/ranch.tscn` without setting the boot latch. So a bare headless boot
+still prints `RANCH_OK`, and a bare interactive boot opens the main menu.
+
+Prove it with:
+
+```
+FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dummy \
+  --quit-after 600 --path game
+```
+
+---
+
 ## Where an automated run writes its saves
 
 **`FILLY_TEST_SAVE_DIR` moves the save directory for one process.**

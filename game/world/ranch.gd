@@ -159,6 +159,7 @@ const LettersScript := preload("res://systems/letters.gd")
 const StockPaletteScript := preload("res://systems/stock_palette.gd")
 const PlayerLookScript := preload("res://systems/player_look.gd")
 const StripScript := preload("res://world/strip.gd")
+const BootIntentScript := preload("res://world/boot_intent.gd")
 const CasinoSignScript := preload("res://systems/casino_sign.gd")
 const LobbySignScript := preload("res://world/lobby_sign.gd")
 const InteractionScript := preload("res://world/interaction.gd")
@@ -531,6 +532,11 @@ var _interactive := false
 ## Whether a save was found and loaded at boot. Printed, so a log says which world this is.
 var _save_loaded := false
 
+## Whether the title screen asked for a NEW game rather than a continued one. Consumed once,
+## in _bind_game_state(). False for every gate, every screenshot run and every export smoke,
+## because none of them goes through the title screen; see game/world/boot_intent.gd.
+var _new_game := false
+
 ## THE CLOCK. Elapsed play time, and the phase and weather it implies
 ## (game/systems/world_state.gd). Owned here rather than in an autoload because it is a
 ## property of the SAVE, not of the process: it is built from GameState.world_seed and
@@ -884,6 +890,19 @@ func _ready() -> void:
 	# you left.
 	_bind_game_state()
 
+	# NO FRAME OF RAW WORLD ON A NEW GAME. Acceptance item 1. Boot takes about two and a half
+	# seconds from here (the physics warmup, the settle frames, the pen containment probe) and
+	# every one of those frames used to be a frame of the map, the farmhouse and whatever the
+	# camera happened to be inside. The creation screen's opaque backdrop goes up FIRST and
+	# the world builds behind it; _maybe_open_creation() at the end of _ready() then fills in
+	# the pony and the panel over a sky that has been there since the first frame.
+	#
+	# THE TREE IS NOT PAUSED HERE. The awaits below need physics frames and a paused tree
+	# never delivers one. CreationScreen.open() pauses, as it always has.
+	if _new_game and _interactive and creation_screen != null \
+			and creation_screen.has_method("raise_backdrop"):
+		creation_screen.call("raise_backdrop")
+
 	# THE RAIN NEEDS SOMEBODY TO FALL ON. _bind_game_state() above built the WorldState and
 	# has already handed it to the rig (apply_immediately, so boot has no eight second ramp
 	# from a sky nobody saw), which leaves only this: the rain is a small column overhead
@@ -1069,7 +1088,12 @@ func _bind_game_state() -> void:
 	# every machine, and whatever slot 0 happens to hold on this one is not that; nor is a
 	# gate entitled to a real save file. Nothing is written back either: autosave is off for
 	# every non-interactive run (see _interactive below).
-	if _hosted:
+	#
+	# AND NEITHER DOES A NEW GAME. The title screen's New game row latches BootIntent, which
+	# is consumed exactly here, so the creation screen opens over an empty ranch rather than
+	# over the ranch she was already playing.
+	_new_game = BootIntentScript.consume_new_game()
+	if _hosted or _new_game:
 		_game_state.reset()
 		_save_loaded = false
 	else:
@@ -1112,6 +1136,13 @@ func _bind_game_state() -> void:
 	# it does. Nothing happens on the boot load: this connect comes after load_from_slot().
 	if not _game_state.state_loaded.is_connected(_refresh_herd):
 		_game_state.state_loaded.connect(_refresh_herd)
+
+
+## Whether this boot came through the title screen's New game row. For the gates and for
+## game/test/test_ranch_creation.gd, which otherwise cannot tell a new ranch from a loaded one
+## without reading a private field.
+func is_new_game() -> bool:
+	return _new_game
 
 
 ## Put the owned ponies back where they live after a load.
