@@ -1336,12 +1336,15 @@ FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dum
 # raycast onto real ground inside their zones, camera spring arm pulling in against
 # an actual building). Prints the marker ONLY if all of them held.
 FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dummy --path game world/ranch.tscn
-# -> RANCH_OK ponies=49 props=111 assets=present   exit 0
+# -> RANCH_OK ponies=49 props=128 assets=present   exit 0
 # (assets=absent + zero counts on a checkout that has not run the asset pipeline)
 # Both counts moved from an earlier build's 22/58: the crowd (Phase 3 slice 1) fills every
 # region with stock ponies alongside the named roster, and the Depot building (the same
 # slice) is one more prop beside the Market and the request board. The Company's mailbox
-# by the ranch door (Phase 3 slice 3) is one more prop again.
+# by the ranch door (Phase 3 slice 3) is one more prop again. `props` moved once more in
+# slice R2, from 111 to 128: the replanted treeline, the removed windmill/watermill/
+# standalone Ponyville General, and the placement pass's road and shed (see
+# `docs/testing.md` for the full account).
 
 # Hair follow-through: measures how far the mane/tail trail the body, against a
 # rigid-hair baseline, over a scripted start-and-stop (see docs/notes-hair-sim.md)
