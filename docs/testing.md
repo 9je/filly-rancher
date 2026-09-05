@@ -600,7 +600,19 @@ is one more in slice 3.
 
 `props` moved again, from 59 to 60, in Phase 3 slice 2: the Spectra Palace is a
 sixth building under `Buildings`, seated and counted the same way the barn and
-the Depot are. Its own lamp posts are NOT in that count; they are children of
+the Depot are.
+
+`props` did NOT move in slice R2's building pass, and that is the point of how it was done:
+the six `Building` nodes kept their names, their origins and their place in
+`buildings.get_child_count()`, and only their meshes changed. `game/world/building.gd` now
+wears a converted `.glb` (`model_file`) and hides its own walls, roof, gables and lintel
+behind it, keeping the plinth and the door apron -- so the interact verb, which is a flat XZ
+distance from each building's own origin, and the attendants, which are derived from `depth`
+and `door_width`, are the same measurements they always were. On a checkout with no
+converted props the primitive shell renders exactly as before, which is what keeps CI, the
+export smoke and a fresh clone looking at a map rather than at invisible collision.
+
+Its own lamp posts are NOT in that count; they are children of
 the `Strip` node, not of `Buildings` or `Props`, because a lamp is scenery the
 gate has no claim on. The Strip is also the map's first region with no permit
 and no price, which moves what the ranch gate's `RANCH regions=` line checks:
