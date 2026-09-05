@@ -26,6 +26,17 @@ SCRIPT=scripts/prove_atomic_save.gd
 NEGATIVE=0
 [ "${1:-}" = "--negative-control" ] && NEGATIVE=1
 
+# Belt and braces: the script under test assigns SaveIO.save_dir itself (PROOF_DIR, below),
+# so this redirect is not what keeps it off the player's saves -- but every godot boot this
+# project documents carries it, and there is no reason for this one to be the exception.
+FILLY_TEST_SAVE_DIR="$(mktemp -d)"
+export FILLY_TEST_SAVE_DIR
+# PROOF_DIR is "user://atomic_write_proof", which Godot resolves under the real app_userdata
+# directory regardless of FILLY_TEST_SAVE_DIR, so this script leaves that folder behind in the
+# player's own data dir unless it is swept up here.
+PROOF_APPDATA="${XDG_DATA_HOME:-$HOME/.local/share}/godot/app_userdata/Filly Rancher/atomic_write_proof"
+trap 'rm -rf "$FILLY_TEST_SAVE_DIR" "$PROOF_APPDATA"' EXIT
+
 run_phase() {
   local phase="$1"
   "$GODOT" --headless --audio-driver Dummy --path game -s "$SCRIPT" -- "--phase=$phase"

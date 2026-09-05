@@ -12,6 +12,16 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
+# Every render boots a scene out of this project, and a boot can write a save. Redirected off
+# the player's slots the same way tools/run_tests.sh does it; see game/systems/save_io.gd.
+# A sheet is not worth somebody's ranch.
+FILLY_TEST_SAVE_DIR_GIVEN="${FILLY_TEST_SAVE_DIR:-}"
+FILLY_TEST_SAVE_DIR="${FILLY_TEST_SAVE_DIR:-$(mktemp -d)}"
+[ -n "$FILLY_TEST_SAVE_DIR" ] || { echo "ERROR: mktemp -d produced no directory; refusing to run against the player's own saves." >&2; exit 1; }
+export FILLY_TEST_SAVE_DIR
+# Only ours to clean up if we made it; a caller-supplied directory is the caller's to keep.
+[ -n "$FILLY_TEST_SAVE_DIR_GIVEN" ] || trap 'rm -rf "$FILLY_TEST_SAVE_DIR"' EXIT
+
 OUT="${1:-build/roster_shots}"
 mkdir -p "$OUT" build
 # Resolve to an absolute path: Godot runs with --path game, so a relative out= would

@@ -101,6 +101,17 @@ extends RefCounted
 ## helpfully overwrote it on the next boot. Callers must therefore distinguish the two by
 ## asking has_slot() rather than by treating {} as "no save".
 ##
+## --- WHERE THE SAVES GO ON AN AUTOMATED RUN --------------------------------------------
+##
+## FILLY_TEST_SAVE_DIR, read once at class load, moves the whole save directory for one
+## process. tools/run_tests.sh exports a fresh mktemp -d for the suite, the sheet scripts
+## (tools/sky_sheet.sh, tools/roster_sheet.sh) do the same for the boots they drive, and every
+## gate command documented in docs/testing.md and docs/pipeline.md carries it as a prefix.
+## A gate boots the real world/ranch.tscn, the ranch writes a save while it boots, and the
+## owner plays out of this same checkout -- so before this existed, running the gates cost the
+## owner their slots. See resolve_save_dir() for the policy and tools/prove_save_safety.sh for
+## the proof that a gate boot with it set leaves user://saves byte-identical.
+##
 ## RefCounted with only static members: nothing here needs a tree, a frame or an instance,
 ## so it is all callable as SaveIO.save(...) and testable in milliseconds
 ## (game/test/test_save_io.gd), the pattern every system under game/systems/ follows.
@@ -120,6 +131,18 @@ const VERSION_KEY := "version"
 ## confirmation of the Windows one, taken under Proton).
 const DEFAULT_SAVE_DIR := "user://saves"
 
+## The environment variable that moves every save off the player's own slots for the length
+## of one process. Exported by tools/run_tests.sh and by every documented gate command, and
+## read exactly ONCE, at class load (see _static_init below).
+##
+## THE DEFECT THIS CLOSES. A headless gate scene under game/scenes/test/ instances the real
+## world/ranch.tscn, and the ranch writes a save on the way through its own boot probe. Until
+## this existed, only the GUT suite redirected save_dir, by assigning it; every gate boot went
+## to user://saves and wrote the slots the owner plays out of. Reading the variable at class
+## initialization rather than at each call site is what makes the fix total: there is no
+## consumer anywhere -- gate, test, or the live game -- that has to remember to opt in.
+const TEST_SAVE_DIR_ENV := "FILLY_TEST_SAVE_DIR"
+
 const SLOT_PREFIX := "slot_"
 const SLOT_EXTENSION := ".json"
 ## Extensions of the two files that live BESIDE a save: the in-flight write and the
@@ -132,11 +155,41 @@ const BACKUP_EXTENSION := ".json.bak"
 ## anything, including a chat window with a pony blob pasted into it.
 const INDENT := "  "
 
-## The directory saves are read from and written to. A plain static var rather than a
-## constant for exactly one reason: the test suite points it at a scratch directory under
-## user:// so that running `bash tools/run_tests.sh` can never overwrite the developer's
-## own game. Production code never assigns it.
+## What TEST_SAVE_DIR_ENV named for this process, or DEFAULT_SAVE_DIR when it named nothing.
+## Resolved once and never again: two consumers that each re-read the environment could
+## disagree about where the saves are, and the one that lost would write into the player's own
+## directory, which is the whole failure being fixed. Tests restore save_dir to THIS rather
+## than to DEFAULT_SAVE_DIR -- restoring the default is how a redirected process quietly finds
+## its way back to the player's slots.
+static var session_save_dir := DEFAULT_SAVE_DIR
+
+## The directory saves are read from and written to. A plain static var rather than a constant
+## for exactly one reason: a test points it at its own scratch directory for the length of one
+## test (game/test/test_save_io.gd). Production code never assigns it -- it starts at
+## session_save_dir and stays there.
 static var save_dir := DEFAULT_SAVE_DIR
+
+
+## Which directory an environment value names, and the whole of the policy. An unset or blank
+## value is the player's own directory; anything else is taken literally, whether it is a
+## user:// path or a native absolute one (the harness exports a `mktemp -d`, which is native).
+##
+## PURE, AND SEPARATE FROM THE READ BELOW ON PURPOSE. A value read once per process cannot be
+## tested any other way: a test cannot restart the engine to read a different environment. The
+## decision is the part worth testing, so the decision is the part that is a function.
+static func resolve_save_dir(env_value: String) -> String:
+	var named := env_value.strip_edges()
+	if named.is_empty():
+		return DEFAULT_SAVE_DIR
+	return named
+
+
+## THE ONE READ OF THE ENVIRONMENT. Godot calls this once, when the class is loaded, before any
+## caller can reach a static member of it, which is what lets the redirect cover every consumer
+## in the project with no call site changes at all.
+static func _static_init() -> void:
+	session_save_dir = resolve_save_dir(OS.get_environment(TEST_SAVE_DIR_ENV))
+	save_dir = session_save_dir
 
 
 ## The file a slot lives in, e.g. `user://saves/slot_0.json`.

@@ -46,7 +46,10 @@ func before_each() -> void:
 
 func after_each() -> void:
 	_wipe()
-	SaveIOScript.save_dir = SaveIOScript.DEFAULT_SAVE_DIR
+	# session_save_dir, NOT DEFAULT_SAVE_DIR: on a harness run the process was redirected off
+	# the player's slots at class load, and restoring the default would walk every test that
+	# runs after this one straight back onto them.
+	SaveIOScript.save_dir = SaveIOScript.session_save_dir
 
 
 func _wipe() -> void:

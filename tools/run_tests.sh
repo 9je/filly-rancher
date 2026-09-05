@@ -39,6 +39,20 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
+# EVERY GODOT THIS SCRIPT STARTS WRITES ITS SAVES SOMEWHERE ELSE. game/systems/save_io.gd reads
+# FILLY_TEST_SAVE_DIR once, at class load, so exporting it here moves the save directory and the
+# settings file for the parse sweep, for GUT, and for anything either of them boots -- without a
+# single call site having to remember. Before this, a suite run wrote the player's own slots:
+# only the tests that assigned SaveIO.save_dir themselves were safe, and the ones that did not
+# (game/test/test_pen.gd, game/test/test_ranch_collection.gd) went straight to user://saves.
+# A fresh directory per run, so nothing a previous run left can make a test pass.
+FILLY_TEST_SAVE_DIR="$(mktemp -d)"
+[ -n "$FILLY_TEST_SAVE_DIR" ] || { echo "ERROR: mktemp -d produced no directory; refusing to run against the player's own saves." >&2; exit 1; }
+export FILLY_TEST_SAVE_DIR
+out=""
+trap 'rm -f "$out"; rm -rf "$FILLY_TEST_SAVE_DIR"' EXIT
+echo "Saves for this run: $FILLY_TEST_SAVE_DIR (FILLY_TEST_SAVE_DIR). The player's own are untouched."
+
 GUT_TEST_DIR="${GUT_TEST_DIR:-res://test}"
 
 if [ ! -f game/addons/gut/plugin.cfg ]; then
@@ -94,8 +108,10 @@ else
   echo "Parse sweep: $sweep_count GDScript file(s) parse cleanly."
 fi
 
+# The trap that removes this was installed at the top of the script, beside the save directory
+# it also removes: a parse sweep failure exits long before this line, and a temp directory left
+# behind by every failed run is a slow leak nobody notices.
 out="$(mktemp)"
-trap 'rm -f "$out"' EXIT
 
 tools/bin/godot --headless --audio-driver Dummy --path game \
   -s addons/gut/gut_cmdln.gd \
@@ -183,7 +199,7 @@ fi
 # is a hand-maintained number, deliberately a FLOOR rather than an exact count so adding
 # tests never breaks the build -- raise it when the suite grows, and never lower it
 # without saying in a commit message which tests went away and why.
-MIN_TESTS="${FILLY_MIN_TESTS:-1412}"
+MIN_TESTS="${FILLY_MIN_TESTS:-1420}"
 if [ "$tests_run" -lt "$MIN_TESTS" ]; then
   echo "ERROR: GUT ran $tests_run tests, below this suite's floor of $MIN_TESTS -- tests have gone missing. Failing regardless of GUT's own exit code ($gut_exit)." >&2
   echo "  If tests were deliberately removed, lower MIN_TESTS in tools/run_tests.sh in the same commit and say why." >&2

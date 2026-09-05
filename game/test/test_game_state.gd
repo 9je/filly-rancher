@@ -16,8 +16,10 @@ extends GutTest
 ## anything _ready() does is factored into a method the tests call explicitly
 ## (ensure_registry()) rather than hidden in the callback.
 ##
-## Saves go to a scratch directory under user:// (SaveIO.save_dir is redirected in
-## before_each), so running the suite can never overwrite the developer's real game.
+## Saves go to a scratch directory (SaveIO.save_dir is redirected in before_each), and the
+## whole process is already redirected off the player's slots by FILLY_TEST_SAVE_DIR, which
+## tools/run_tests.sh exports -- so running the suite can never overwrite the developer's real
+## game, whether a test remembered to redirect or not.
 ##
 ## Preloads by path rather than by the global class_name, matching the convention
 ## documented at the top of game/scripts/pony_rig.gd.
@@ -44,7 +46,10 @@ func before_each() -> void:
 
 func after_each() -> void:
 	_wipe()
-	SaveIOScript.save_dir = SaveIOScript.DEFAULT_SAVE_DIR
+	# session_save_dir, NOT DEFAULT_SAVE_DIR: on a harness run the process was redirected off
+	# the player's slots at class load, and restoring the default would walk every test that
+	# runs after this one straight back onto them.
+	SaveIOScript.save_dir = SaveIOScript.session_save_dir
 	# The resolver registry is a process-wide static (game/systems/pony_instance.gd), so a
 	# test that injected one must not leak it into the next test or the next file.
 	PonyInstanceScript.set_registry(null)
