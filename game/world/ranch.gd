@@ -341,6 +341,17 @@ const LOBBY_SIGN_BASE := 1.05
 const LOBBY_SIGN_STANDOFF := 0.30
 const LOBBY_SIGN_GAP := 0.10
 
+## THE REQUEST BOARD'S OWN BOARD. Buildings/Board wears a Ponyville Environments cottage now
+## (slice R2), which is a fine little building and says nothing at all about favours for
+## hire. So the same fitted board the Palace's lobby sign is made of stands on its front
+## wall, sized off the building's own numbers the way every other sign on this map is.
+const REQUEST_BOARD_WIDTH_FRACTION := 0.72
+const REQUEST_BOARD_HEIGHT := 0.95
+const REQUEST_BOARD_BASE := 1.15
+const REQUEST_BOARD_STANDOFF := 0.30
+const REQUEST_BOARD_HEADLINE := "Favours"
+const REQUEST_BOARD_SUBLINE := "ask inside, paid on delivery"
+
 ## THE TWO PONIES BEHIND COUNTERS, and where they stand.
 ##
 ## AT THE DOOR AND FACING OUT. "Facing the counter" is resolved as standing at the counter
@@ -1007,6 +1018,8 @@ func _ready() -> void:
 				+ sign_out * (palace_for_sign.depth * 0.5 + LOBBY_SIGN_STANDOFF))
 		lobby_sign.build(sign_width, LOBBY_SIGN_HEIGHT, sign_out,
 			LobbySignScript.HEADLINE, LobbySignScript.SUBLINE)
+
+	_stand_request_board()
 
 	var prop_count: int = props.build() + buildings.get_child_count()
 
@@ -4474,6 +4487,33 @@ func _stand_attendants() -> void:
 		VENDOR_LOOK, -1.0)
 	_stand_one(registry, "Teller", ^"Buildings/Palace", StockPaletteScript.IDS[2],
 		TELLER_LOOK, 1.0)
+
+
+## THE BOARD ON THE BOARD. Sized, placed and faced off the live Buildings/Board node, the
+## same way the Palace's lobby sign is off the Palace, so a re sited or re proportioned
+## notice board takes its own lettering with it instead of leaving a panel in a field.
+##
+## NOTHING HERE HANGS BELOW THE BUILDING'S OWN ORIGIN. LobbySign anchors its whole assembly
+## TRIM above its local zero for exactly this reason, and REQUEST_BOARD_BASE puts that
+## assembly above Building.FLOOR_TOP besides: ranch.gd's own seating check re-measures every
+## MeshInstance3D under a building, so a board reaching below the plinth would fail the gate
+## on a correctly seated building.
+func _stand_request_board() -> void:
+	var board := get_node_or_null(^"Buildings/Board") as Building
+	if board == null:
+		return
+	var out_dir: Vector3 = board.global_transform.basis * Vector3(0.0, 0.0, 1.0)
+	out_dir.y = 0.0
+	out_dir = out_dir.normalized() if out_dir.length_squared() > 0.0 \
+		else Vector3(0.0, 0.0, 1.0)
+	var panel := LobbySignScript.new()
+	panel.name = "RequestBoard"
+	board.add_child(panel)
+	panel.position = Vector3(0.0, REQUEST_BOARD_BASE, 0.0) \
+		+ board.to_local(board.global_position
+			+ out_dir * (board.depth * 0.5 + REQUEST_BOARD_STANDOFF))
+	panel.build(board.width * REQUEST_BOARD_WIDTH_FRACTION, REQUEST_BOARD_HEIGHT, out_dir,
+		REQUEST_BOARD_HEADLINE, REQUEST_BOARD_SUBLINE)
 
 
 func _stand_one(registry: PonyRegistry, who: String, building_path: NodePath,

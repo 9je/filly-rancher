@@ -240,3 +240,11 @@ func test_a_building_is_taller_at_the_ridge_than_at_the_eaves() -> void:
 	assert_gt(b.ridge_height, b.wall_height, "an inside-out roof")
 	assert_gt(b.width, b.door_width, "the doorway is wider than the wall it is cut into")
 	b.free()
+
+
+func test_the_request_board_is_a_board_and_not_only_a_building() -> void:
+	var ranch: Node3D = preload("res://world/ranch.tscn").instantiate()
+	var board := ranch.get_node_or_null(^"Buildings/Board") as Building
+	assert_not_null(board, "the request board building stands")
+	assert_eq(board.door_width, 0.0, "a notice board has no doorway and stands no ramp")
+	ranch.free()
