@@ -104,6 +104,37 @@ func test_a_left_click_on_a_row_holder_reaches_take_row() -> void:
 	assert_eq(_menu.selected_index(), MouseRowsScript.row_index(holders[1]))
 
 
+## I8, final-review.md I6 (controller ruling): CLICKING THE LEVER PLAYS THE STAKE THAT IS
+## SHOWING, NOT THE MAXIMUM AFFORDABLE. Before this fix on_stage_hit() re-staked to
+## row_count() - 1 (the biggest chip she could cover) and only THEN spun, so a player who set
+## the smallest stake with the arrow keys and reached for the lever with the mouse bet her
+## whole affordable maximum instead. stage_hit_rects() returns [LEVER_RECT, REEL_BAND] in that
+## order, so index 0 is the lever.
+func test_clicking_the_lever_spins_at_the_current_stake_not_the_maximum() -> void:
+	assert_gt(_menu.row_count(), 1, "the fixture needs more than one affordable stake")
+	_menu.set_stake_index(_menu.row_count() - 1)
+	var max_stake: int = _menu.selected_stake()
+	_menu.set_stake_index(0)
+	var current_stake: int = _menu.selected_stake()
+	assert_ne(current_stake, max_stake, "the fixture needs a real gap between the two")
+	watch_signals(_menu)
+	_menu.on_stage_hit(0)
+	assert_eq(_menu.stake_index(), 0,
+		"the lever must not silently re-stake to the maximum before it spins")
+	assert_true(get_signal_parameters(_menu, "spin_requested", 0)[0] == current_stake,
+		"the spin must be played at the stake that was actually showing")
+
+
+func test_the_reel_band_also_spins_at_the_current_stake() -> void:
+	assert_gt(_menu.row_count(), 1, "the fixture needs more than one affordable stake")
+	_menu.set_stake_index(0)
+	var current_stake: int = _menu.selected_stake()
+	watch_signals(_menu)
+	_menu.on_stage_hit(1)
+	assert_true(get_signal_parameters(_menu, "spin_requested", 0)[0] == current_stake,
+		"the reel band is the same lever, played the same way")
+
+
 func test_the_close_button_exists_says_close_and_closes() -> void:
 	var button: Button = _menu.close_button_node()
 	assert_not_null(button, "every screen gets a pointer usable way out")

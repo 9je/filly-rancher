@@ -109,7 +109,7 @@ var _close: Button = null
 var _anim_t := 0.0
 
 @onready var _title: Label = $Centre/Panel/Margin/Column/Title
-@onready var _tabs: Label = $Centre/Panel/Margin/Column/Tabs
+@onready var _tabs: HBoxContainer = $Centre/Panel/Margin/Column/Tabs
 @onready var _rows: VBoxContainer = $Centre/Panel/Margin/Column/Rows
 @onready var _footer: Label = $Centre/Panel/Margin/Column/Footer
 @onready var _stage: Control = get_node_or_null(^"Centre/Panel/Margin/Column/Stage")
@@ -192,6 +192,21 @@ func set_tab(value: int) -> void:
 
 func switch_tab(step: int) -> void:
 	set_tab(posmod(_tab + step, Tab.RULES + 1))
+	MenuStyleScript.tick_page()
+
+
+## I5: THE MOUSE'S OWN DOOR INTO A TAB, beside switch_tab()'s keyboard one. A click direct on
+## the tab it names is unambiguous, so this skips straight to set_tab() rather than walking
+## switch_tab()'s step-by-step posmod -- the same relationship take_row() has to
+## move_selection().
+func point_at_tab(_index: int) -> void:
+	pass
+
+
+func take_tab(index: int) -> void:
+	if index == _tab:
+		return
+	set_tab(index)
 	MenuStyleScript.tick_page()
 
 
@@ -315,7 +330,12 @@ func refresh() -> void:
 		return
 	_footer.text = MenuStyleScript.footer_tabs_and_rows("confirm", "leave")
 	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
-	_tabs.text = MenuStyleScript.tab_strip(TAB_NAMES, _tab) + "      " + header_line()
+	MouseRowsScript.tab_strip(_tabs, TAB_NAMES, _tab, point_at_tab, take_tab)
+	var wallet_note := Label.new()
+	wallet_note.text = "      " + header_line()
+	wallet_note.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	MenuStyleScript.style_label(wallet_note, MenuStyleScript.ROW_SIZE, MenuStyleScript.COLOR_NAME)
+	_tabs.add_child(wallet_note)
 	for child in _rows.get_children():
 		child.queue_free()
 	MenuStyleScript.apply_title(_title)

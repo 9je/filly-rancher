@@ -80,6 +80,13 @@ func _ready() -> void:
 	var dim := get_node_or_null(^"Dim") as Control
 	if dim != null:
 		dim.mouse_filter = Control.MOUSE_FILTER_STOP
+		# M10, final-review.md M2: A CLICK ON THE DIM CLOSES THE LETTER, FOR REAL THIS TIME.
+		# Every Control between here and the sheet (Centre, Panel, Margin, Column, Stage,
+		# Footer) is MOUSE_FILTER_IGNORE, so a click anywhere on this panel -- on the sheet
+		# included -- falls straight through to Dim, which is STOP and swallowed it with
+		# nothing connected. _unhandled_input() below never saw a mouse click at all; its own
+		# "a click anywhere off the sheet closes the letter" branch was dead on arrival.
+		dim.gui_input.connect(_on_dim_input)
 	if _stage != null:
 		_stage.mouse_filter = Control.MOUSE_FILTER_STOP
 		_stage.focus_mode = Control.FOCUS_NONE
@@ -218,21 +225,23 @@ func paint(ci: Control) -> void:
 		Color(1.0, 1.0, 1.0, 0.85), Color(1.0, 0.92, 0.55, 0.95))
 
 
+## M10, final-review.md M2: A CLICK ON THE DIM CLOSES THE LETTER. Wired to Dim's own
+## gui_input in _ready() -- Dim is MOUSE_FILTER_STOP and everything between it and the sheet
+## is IGNORE, so every click on this panel, sheet included, reaches Dim and nowhere else. The
+## Close button under the footer is the discoverable version of the same act.
+func _on_dim_input(event: InputEvent) -> void:
+	if not _open or not MouseRowsScript.is_left_click(event):
+		return
+	close()
+	get_viewport().set_input_as_handled()
+
+
 ## CONFIRM AND CANCEL BOTH CLOSE IT, and that is not laziness. There is nothing on this page
 ## to confirm, so a player who presses the confirm key on a letter she has finished reading
 ## means "done"; a page that answered that with silence would be the same class of dead
 ## control the race panel's old stake row was.
-##
-## AND SO DOES A CLICK ANYWHERE OFF THE SHEET, which is what a person does with a letter she
-## has read. The Close button under the footer is the discoverable version of the same act.
 func _unhandled_input(event: InputEvent) -> void:
-	if not _open:
-		return
-	if MouseRowsScript.is_left_click(event):
-		close()
-		get_viewport().set_input_as_handled()
-		return
-	if not event.is_pressed():
+	if not _open or not event.is_pressed():
 		return
 	if event.is_action(&"ui_accept") or event.is_action(&"ui_cancel"):
 		close()

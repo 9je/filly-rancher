@@ -132,6 +132,71 @@ func test_hit_on_an_empty_list_is_a_miss_and_not_an_error() -> void:
 	assert_eq(MouseRowsScript.hit([] as Array[Rect2], Vector2.ZERO), -1)
 
 
+## M14, final-review.md M6: the last-hovered row used to keep its hover box after the pointer
+## left it, until some unrelated refresh happened to rebuild it idle. row() now reverts it
+## the moment mouse_exited fires.
+func test_a_hovered_rows_box_reverts_to_idle_when_the_pointer_leaves_it() -> void:
+	var hovered: PanelContainer = MouseRowsScript.row(2, false, true, _hover, _click)
+	var hover_box: StyleBoxFlat = hovered.get_theme_stylebox(&"panel") as StyleBoxFlat
+	assert_eq(hover_box.bg_color, MenuStyleScript.row_box_hover().bg_color,
+		"built hovered, it must start on the hover box")
+	hovered.mouse_exited.emit()
+	assert_eq(hovered.get_theme_stylebox(&"panel"), MenuStyleScript.row_box(false),
+		"the pointer left; nothing here says this row is still hovered")
+	hovered.free()
+
+
+## THE PICKED ROW IS NEVER TOUCHED BY AN EXIT. Its box says what is taken, and leaving it
+## with the mouse must not read as un-choosing it.
+func test_a_picked_rows_box_is_unchanged_when_the_pointer_leaves_it() -> void:
+	var picked: PanelContainer = MouseRowsScript.row(1, true, true, _hover, _click)
+	picked.mouse_exited.emit()
+	assert_eq(picked.get_theme_stylebox(&"panel"), MenuStyleScript.row_box(true),
+		"the pick is the pick, pointer or no pointer")
+	picked.free()
+
+
+func test_arm_with_no_on_exit_leaves_mouse_exited_unconnected() -> void:
+	var holder := PanelContainer.new()
+	MouseRowsScript.arm(holder, 0, _hover, _click)
+	assert_false(holder.mouse_exited.get_connections().size() > 0,
+		"an invalid on_exit must arm nothing extra, exactly as an invalid on_hover/on_click")
+	holder.free()
+
+
+## I5, final-review.md I3: MouseRows.tab_strip() is the shared helper casino_menu.gd,
+## depot_menu.gd and table_menu.gd all swapped their `_tabs.text = tab_strip(...)` for.
+func test_tab_strip_builds_one_focus_none_button_per_name_bracketing_the_active_one() -> void:
+	var container := HBoxContainer.new()
+	add_child_autofree(container)
+	var pointed: Array[int] = []
+	var taken: Array[int] = []
+	MouseRowsScript.tab_strip(container, ["Lobby", "Cage", "House rules"], 1,
+		func(i: int) -> void: pointed.append(i), func(i: int) -> void: taken.append(i))
+	assert_eq(container.get_child_count(), 3)
+	var buttons: Array[Button] = []
+	for child in container.get_children():
+		buttons.append(child as Button)
+	assert_eq(buttons[0].text, " Lobby ")
+	assert_eq(buttons[1].text, "[Cage]", "index 1 is the active tab")
+	assert_eq(buttons[2].text, " House rules ")
+	for button: Button in buttons:
+		assert_eq(button.focus_mode, Control.FOCUS_NONE)
+	var event := InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.pressed = true
+	buttons[2].gui_input.emit(event)
+	assert_eq(taken, [2] as Array[int])
+
+
+func test_tab_strip_rebuilds_rather_than_accumulates_on_a_second_call() -> void:
+	var container := HBoxContainer.new()
+	add_child_autofree(container)
+	MouseRowsScript.tab_strip(container, ["A", "B"], 0, _hover, _click)
+	MouseRowsScript.tab_strip(container, ["A", "B"], 1, _hover, _click)
+	assert_eq(container.get_child_count(), 2, "a second build must not stack onto the first")
+
+
 func test_is_left_click_reads_only_a_left_press() -> void:
 	var left := InputEventMouseButton.new()
 	left.button_index = MOUSE_BUTTON_LEFT

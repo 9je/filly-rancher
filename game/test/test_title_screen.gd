@@ -19,7 +19,22 @@ var _title: TitleScreen
 func before_each() -> void:
 	BootIntentScript.clear()
 	_title = preload("res://ui/title_screen.tscn").instantiate()
+	# C2's default-row fix reads can_continue() in _ready(), before a test gets a chance to
+	# set has_save_provider on the instance -- so this has to be set before the node enters
+	# the tree, not after. false keeps every pre-existing test's assumption that the cursor
+	# starts on row 0 (New game) true; tests that care about the other branch build their own
+	# TitleScreen through _new_title() below instead of reaching for this shared one.
+	_title.has_save_provider = func() -> bool: return false
 	add_child_autofree(_title)
+
+
+## A TitleScreen with its own has_save_provider, set before it ever enters the tree, so
+## _ready()'s can_continue() read (C2's default-row pick) sees exactly what this test wants.
+func _new_title(has_save: bool) -> TitleScreen:
+	var title: TitleScreen = preload("res://ui/title_screen.tscn").instantiate()
+	title.has_save_provider = func() -> bool: return has_save
+	add_child_autofree(title)
+	return title
 
 
 func after_each() -> void:
@@ -106,3 +121,80 @@ func test_every_row_is_armed_for_the_pointer() -> void:
 func test_the_footer_still_prints_the_keys() -> void:
 	var footer := _title.get_node("Centre/Panel/Margin/Column/Footer") as Label
 	assert_false(footer.text.strip_edges().is_empty())
+
+
+# --- C2: the default row, and the second confirm on New game ------------------------------
+
+func test_the_default_row_is_new_game_when_there_is_no_save() -> void:
+	var title := _new_title(false)
+	assert_eq(title.selected_index(), TitleScreen.Row.NEW_GAME,
+		"nothing to lose, so New game starts selected, exactly as before this fix")
+
+
+func test_the_default_row_is_continue_when_a_save_exists() -> void:
+	var title := _new_title(true)
+	assert_eq(title.selected_index(), TitleScreen.Row.CONTINUE,
+		"a returning player must not land one Enter away from erasing her ranch")
+
+
+func test_a_single_press_on_new_game_does_not_latch_when_a_save_exists() -> void:
+	var title := _new_title(true)
+	title.point_at_row(TitleScreen.Row.NEW_GAME)
+	assert_true(title.confirm(), "the first press is not a refusal, it is an arm")
+	assert_false(BootIntentScript.peek_new_game(),
+		"one press must not be enough to destroy the owner's save")
+
+
+func test_a_double_press_on_new_game_latches_when_a_save_exists() -> void:
+	var title := _new_title(true)
+	title.point_at_row(TitleScreen.Row.NEW_GAME)
+	title.confirm()
+	assert_true(title.confirm(), "the second press is the real confirm")
+	assert_true(BootIntentScript.peek_new_game())
+
+
+func test_a_single_press_on_new_game_still_latches_with_no_save_to_lose() -> void:
+	var title := _new_title(false)
+	title.point_at_row(TitleScreen.Row.NEW_GAME)
+	assert_true(title.confirm())
+	assert_true(BootIntentScript.peek_new_game(),
+		"a fresh machine has nothing to arm a confirmation over")
+
+
+func test_moving_off_new_game_disarms_the_second_confirm() -> void:
+	var title := _new_title(true)
+	title.point_at_row(TitleScreen.Row.NEW_GAME)
+	title.confirm()
+	title.move_selection(1)
+	title.point_at_row(TitleScreen.Row.NEW_GAME)
+	assert_true(title.confirm(), "moving away and back must ask for a fresh second press")
+	assert_false(BootIntentScript.peek_new_game())
+
+
+func test_escape_disarms_new_game_instead_of_quitting() -> void:
+	var title := _new_title(true)
+	title.point_at_row(TitleScreen.Row.NEW_GAME)
+	title.confirm()
+	var escape := InputEventAction.new()
+	escape.action = &"ui_cancel"
+	escape.pressed = true
+	title._unhandled_input(escape)
+	title.point_at_row(TitleScreen.Row.NEW_GAME)
+	assert_true(title.confirm(), "escape must clear the arm, not spend the second press")
+	assert_false(BootIntentScript.peek_new_game())
+
+
+# --- I4: a click on a settings row adjusts it, on both doors into Settings -----------------
+
+func test_clicking_a_title_settings_row_adjusts_it_and_does_not_leave_the_page() -> void:
+	_title.point_at_row(TitleScreen.Row.SETTINGS)
+	_title.confirm()
+	assert_true(_title.on_settings_page())
+	# Ambience defaults to 0.5 (Settings.AMBIENT_DEFAULT), mid range, so either half of the
+	# row's click test moves it -- master volume defaults to 1.0 and a click that resolves to
+	# "increment" (no laid-out holder yet, this test never awaits a frame) would clamp to a
+	# no-op there.
+	var before: float = _title.settings.ambient_volume
+	_title.take_row(TitleScreen.SettingRow.AMBIENT)
+	assert_true(_title.on_settings_page(), "a settings row click must not leave the page")
+	assert_ne(_title.settings.ambient_volume, before, "the click must have changed the value")

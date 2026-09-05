@@ -298,6 +298,29 @@ func test_the_dim_behind_the_letter_swallows_stray_clicks() -> void:
 	assert_eq(dim.mouse_filter, Control.MOUSE_FILTER_STOP)
 
 
+## M10, final-review.md M2: A CLICK ON THE DIM ACTUALLY CLOSES THE LETTER NOW. Every Control
+## between Dim and the sheet is MOUSE_FILTER_IGNORE, so a click landing anywhere on this
+## panel -- the sheet included -- reaches Dim's own gui_input and nowhere else.
+func test_a_click_on_the_dim_closes_the_letter() -> void:
+	_panel.open(_letter())
+	var dim := _panel.get_node("Dim") as Control
+	var event := InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.pressed = true
+	dim.gui_input.emit(event)
+	assert_false(_panel.is_open(), "the click on the dim must close the letter")
+
+
+func test_a_right_click_on_the_dim_does_nothing() -> void:
+	_panel.open(_letter())
+	var dim := _panel.get_node("Dim") as Control
+	var event := InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_RIGHT
+	event.pressed = true
+	dim.gui_input.emit(event)
+	assert_true(_panel.is_open(), "only a left click closes it")
+
+
 func test_the_key_that_closed_it_still_closes_it() -> void:
 	_panel.open(_letter())
 	var event := InputEventAction.new()

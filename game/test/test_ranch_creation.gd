@@ -108,6 +108,29 @@ func test_confirming_recaptures_the_cursor() -> void:
 		"confirming must hand the mouse back to the game")
 
 
+## M17, final-review.md M9: THE BOOT VEIL MUST NOT HOLD A CAPTURED CURSOR. camera_rig.gd
+## captures the mouse in its own _ready(), before ranch.gd's ever runs, and _raise_creation_
+## veil() used to only raise the backdrop -- so a new game sat on an opaque sky for the ~2.5 s
+## boot takes with the pointer grabbed over nothing.
+func test_raising_the_creation_veil_frees_the_cursor() -> void:
+	var built := _ranch_with_screen(true)
+	built["ranch"]._new_game = true
+	assert_true(built["ranch"]._cursor_captured, "sanity: camera_rig.gd captured it first")
+	built["ranch"]._raise_creation_veil()
+	assert_true(built["screen"].backdrop_only(), "sanity: the veil actually went up")
+	assert_false(built["ranch"]._cursor_captured,
+		"the ~2.5 s boot behind the veil must not hold the pointer hostage")
+
+
+func test_the_veil_does_not_free_the_cursor_on_a_continued_game() -> void:
+	var built := _ranch_with_screen(true)
+	built["ranch"]._new_game = false
+	built["ranch"]._raise_creation_veil()
+	assert_false(built["screen"].backdrop_only(), "Continue never raises the veil")
+	assert_true(built["ranch"]._cursor_captured,
+		"a session with nothing to look at yet has nothing to free the cursor for")
+
+
 func test_a_non_interactive_session_never_touches_the_cursor() -> void:
 	# A hosted/headless/screenshot run must not fight whatever the host already set --
 	# see _set_cursor_captured()'s _interactive guard.

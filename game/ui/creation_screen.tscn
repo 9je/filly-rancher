@@ -119,7 +119,7 @@ layout_mode = 2
 
 [node name="CoatGrid" type="GridContainer" parent="Layout/Panel/Margin/Column"]
 layout_mode = 2
-columns = 6
+columns = 8
 script = ExtResource("4")
 
 [node name="ManeLabel" type="Label" parent="Layout/Panel/Margin/Column"]
@@ -127,7 +127,7 @@ layout_mode = 2
 
 [node name="ManeGrid" type="GridContainer" parent="Layout/Panel/Margin/Column"]
 layout_mode = 2
-columns = 6
+columns = 8
 script = ExtResource("4")
 
 [node name="EyesLabel" type="Label" parent="Layout/Panel/Margin/Column"]
@@ -135,7 +135,7 @@ layout_mode = 2
 
 [node name="EyesGrid" type="GridContainer" parent="Layout/Panel/Margin/Column"]
 layout_mode = 2
-columns = 6
+columns = 8
 script = ExtResource("4")
 
 [node name="ManeStyleLabel" type="Label" parent="Layout/Panel/Margin/Column"]
@@ -143,7 +143,7 @@ layout_mode = 2
 
 [node name="ManeStyleGrid" type="GridContainer" parent="Layout/Panel/Margin/Column"]
 layout_mode = 2
-columns = 3
+columns = 4
 script = ExtResource("4")
 
 [node name="MarkLabel" type="Label" parent="Layout/Panel/Margin/Column"]

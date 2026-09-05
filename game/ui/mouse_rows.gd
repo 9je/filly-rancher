@@ -35,8 +35,15 @@ static func is_left_click(event: InputEvent) -> bool:
 
 ## Make `holder` answer the pointer as row `index`. Safe to call on a Control already in a
 ## tree and on one that is not; safe with invalid callables, which simply arm nothing.
-static func arm(holder: Control, index: int, on_hover: Callable,
-		on_click: Callable) -> void:
+##
+## M14, final-review.md M6: `on_exit`, called with no arguments other than `index` when the
+## pointer LEAVES `holder`, same as `on_hover` fires when it arrives. Optional (an invalid
+## Callable arms nothing extra) because the two direct callers that keep one Control armed
+## across a rebuild (build_menu.gd, table_menu.gd) have no per-row idle stylebox to fall
+## back to here; `row()` below, which is what almost every menu in the game calls, supplies
+## one.
+static func arm(holder: Control, index: int, on_hover: Callable, on_click: Callable,
+		on_exit: Callable = Callable()) -> void:
 	if holder == null:
 		return
 	holder.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -49,6 +56,8 @@ static func arm(holder: Control, index: int, on_hover: Callable,
 			if is_left_click(event):
 				on_click.call(index)
 				holder.accept_event())
+	if on_exit.is_valid():
+		holder.mouse_exited.connect(func() -> void: on_exit.call(index))
 
 
 ## Which row `holder` is, or -1 if nothing armed it.
@@ -70,7 +79,16 @@ static func row(index: int, picked: bool, hovered: bool, on_hover: Callable,
 	var box: StyleBoxFlat = MenuStyleScript.row_box(true) if picked \
 		else (MenuStyleScript.row_box_hover() if hovered else MenuStyleScript.row_box(false))
 	holder.add_theme_stylebox_override(&"panel", box)
-	arm(holder, index, on_hover, on_click)
+	# M14: A ROW THAT IS NOT THE PICK REVERTS TO IDLE WHEN THE POINTER LEAVES IT, rather than
+	# keeping whatever box it was built with (row_box_hover() when `hovered` said this was
+	# the last row the pointer touched) until some unrelated interaction forces a full
+	# _refresh(). The picked row is left alone: its box says what is TAKEN, not where the
+	# pointer is, and leaving it must not touch that.
+	var on_exit := Callable()
+	if not picked:
+		on_exit = func(_index: int) -> void:
+			holder.add_theme_stylebox_override(&"panel", MenuStyleScript.row_box(false))
+	arm(holder, index, on_hover, on_click, on_exit)
 	return holder
 
 
@@ -84,6 +102,36 @@ static func close_button(label: String, on_click: Callable) -> Button:
 	if on_click.is_valid():
 		button.pressed.connect(func() -> void: on_click.call(-1))
 	return button
+
+
+## I5, final-review.md I3: A TAB STRIP THE POINTER CAN TAKE. `container` is the same `Tabs`
+## node every tabbed panel already carries (a Label until this fix, an HBoxContainer since);
+## `names[i]` becomes a FOCUS_NONE Button reading exactly what MenuStyle.tab_strip() would
+## have printed for that index -- "[Name]" when `i == active`, " Name " otherwise -- so the
+## caret/screenshot contract that string carried is unchanged, it is just spread across
+## `names.size()` Controls now instead of baked into one Label's text. Rebuilds `container`'s
+## children on every call, the same discipline every menu's own refresh() already applies to
+## its Rows column.
+##
+## queue_free(), NOT free(). A click on a tab runs take_take() -> set_tab() -> refresh() ->
+## straight back into THIS function, from inside the very Button's own gui_input signal that
+## is still on the call stack -- freeing that Button synchronously here is freeing a locked
+## object mid-emission, which the engine refuses. SwatchGrid.set_swatches() can free()
+## immediately because nothing there ever rebuilds the grid a cell's own click just fired
+## from; a tab strip is exactly that case.
+static func tab_strip(container: Control, names: Array[String], active: int,
+		on_point: Callable, on_take: Callable) -> void:
+	if container == null:
+		return
+	for child in container.get_children():
+		container.remove_child(child)
+		child.queue_free()
+	for i in names.size():
+		var button := Button.new()
+		button.text = "[%s]" % names[i] if i == active else " %s " % names[i]
+		button.flat = true
+		arm(button, i, on_point, on_take)
+		container.add_child(button)
 
 
 ## WHICH RECT THE POINTER IS IN, for the screens that paint their rows instead of stacking

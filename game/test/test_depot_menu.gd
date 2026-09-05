@@ -50,6 +50,24 @@ func test_confirming_a_row_emits_the_uid_and_pays_for_nothing_itself() -> void:
 	assert_signal_emitted_with_parameters(_menu, "deliver_requested", [&"stock_shy#000001"])
 
 
+## I5, final-review.md I3: the Tabs strip is a row of clickable Buttons now, one per
+## DepotMenu.TAB_NAMES, the same MouseRows-armed shape casino_menu.gd's own strip has.
+func test_clicking_a_tab_button_switches_to_it() -> void:
+	_menu.open()
+	var buttons: Array[Button] = []
+	for child in _menu.get_node("Centre/Panel/Margin/Column/Tabs").get_children():
+		var button := child as Button
+		if button != null:
+			buttons.append(button)
+	assert_eq(buttons.size(), DepotMenu.TAB_NAMES.size())
+	var event := InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.pressed = true
+	buttons[DepotMenu.Tab.STATEMENT].gui_input.emit(event)
+	assert_eq(_menu.tab(), DepotMenu.Tab.STATEMENT,
+		"a click on Statement must open the statement, not just select the pens list")
+
+
 func test_the_pay_tab_offers_amounts_the_wallet_can_actually_cover() -> void:
 	_menu.open()
 	_menu.switch_tab(1)

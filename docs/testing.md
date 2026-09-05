@@ -328,15 +328,16 @@ GUT's own default of not descending into subdirectories without
 **And a floor on the test count**, for the half the script count cannot see: a
 file that still parses but has lost most of its tests (a mass rename, a bad
 merge, a `func test_x` that became `func x`). `MIN_TESTS` in
-`tools/run_tests.sh` — currently **1535** — is a deliberate FLOOR rather than an
+`tools/run_tests.sh` -- currently **1571** -- is a deliberate FLOOR rather than an
 exact count, so adding tests never breaks the build. Raise it when the suite
 grows; never lower it without saying in the same commit which tests went away
 and why. (It was 194 through Phase 1A and was raised to the suite's real size in
-Phase 1B Task 3 — a floor a hundred tests below the actual count could not have
+Phase 1B Task 3 -- a floor a hundred tests below the actual count could not have
 caught a whole test script going missing, which is exactly the failure the
 paragraph above describes. It was raised again, from 1420 to 1535, by slice R1's
-own growth, and proved both ways per the section below at the new number: the
-suite passes at 1535 and a `FILLY_MIN_TESTS=99999` run still fails on it.)
+own growth, and again, from 1535 to 1571, by the R1 final-review fix wave's own
+growth, proved both ways per the section below at the new number: the suite
+passes at 1571 and a `FILLY_MIN_TESTS=99999` run still fails on it.)
 
 **Proving both guards, safely:**
 

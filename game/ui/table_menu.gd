@@ -66,7 +66,7 @@ var _hovered := -1
 var _close: Button = null
 
 @onready var _title: Label = $Centre/Panel/Margin/Column/Title
-@onready var _tabs: Label = $Centre/Panel/Margin/Column/Tabs
+@onready var _tabs: HBoxContainer = $Centre/Panel/Margin/Column/Tabs
 @onready var _rows: VBoxContainer = $Centre/Panel/Margin/Column/Rows
 @onready var _footer: Label = $Centre/Panel/Margin/Column/Footer
 @onready var _stage: Control = get_node_or_null(^"Centre/Panel/Margin/Column/Stage")
@@ -247,7 +247,14 @@ func refresh() -> void:
 	_footer.text = MenuStyleScript.footer_tabs_and_rows("confirm", "leave")
 	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
 	_title.text = title_text()
-	_tabs.text = tabs_text()
+	MouseRowsScript.tab_strip(_tabs, tab_names(), tab(), point_at_tab, take_tab)
+	var note_text := tabs_text()
+	if not note_text.is_empty():
+		var note := Label.new()
+		note.text = ("      " if not tab_names().is_empty() else "") + note_text
+		note.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		MenuStyleScript.style_label(note, MenuStyleScript.ROW_SIZE, MenuStyleScript.COLOR_NAME)
+		_tabs.add_child(note)
 	for child in _rows.get_children():
 		child.queue_free()
 	MenuStyleScript.apply_title(_title)
@@ -306,6 +313,43 @@ func refresh() -> void:
 
 func title_text() -> String:
 	return "Table"
+
+
+## I5, final-review.md I3: the names on the tab strip, in tab-index order. Empty by default
+## -- slots_menu.gd never overrides this, because the felt is the only screen the lever and
+## the reels open onto -- so MouseRows.tab_strip() below builds nothing for it, exactly as an
+## empty Tabs Label used to draw nothing. wheel_menu.gd, blackjack_menu.gd and race_menu.gd
+## each override this with their own two names and keep tabs_text() for the note beside them
+## ("the house keeps X% ...").
+func tab_names() -> Array[String]:
+	return []
+
+
+## Which tab is current. Every table that HAS tabs already defines this with exactly this
+## signature (wheel_menu.gd, blackjack_menu.gd, race_menu.gd); this default is only ever
+## reached by a table, like slots_menu.gd, whose tab_names() is empty, so nothing ever asks.
+func tab() -> int:
+	return 0
+
+
+func set_tab(_value: int) -> void:
+	pass
+
+
+## I5: the mouse's own door into a tab, beside switch_tab()'s keyboard one. A click direct on
+## the tab it names is unambiguous, so this skips straight to set_tab() rather than
+## switch_tab()'s step-by-step posmod -- and, on race_menu.gd and wheel_menu.gd, rather than
+## switch_tab()'s stake-row special case, which exists only to disambiguate an OVERLOADED
+## arrow key and has nothing to disambiguate when the click already named the tab.
+func point_at_tab(_index: int) -> void:
+	pass
+
+
+func take_tab(index: int) -> void:
+	if index == tab():
+		return
+	set_tab(index)
+	MenuStyleScript.tick_page()
 
 
 func tabs_text() -> String:

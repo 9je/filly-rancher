@@ -797,3 +797,111 @@ func test_a_scrolled_mail_page_opens_the_envelope_the_click_actually_landed_on()
 	_menu.on_stage_hit(0)
 	assert_eq(_menu.open_letter_id(), &"letter_4",
 		"row 0 on screen is whichever envelope the scrolled window actually put there")
+
+
+func _wheel(button_index: int) -> InputEventMouseButton:
+	var event := InputEventMouseButton.new()
+	event.button_index = button_index
+	event.pressed = true
+	return event
+
+
+# --- M9: the Close button mirrors Escape -----------------------------------------------
+
+func test_the_close_button_goes_back_one_layer_on_a_sub_page() -> void:
+	_menu.open()
+	_menu.move_selection(PauseMenu.Row.SETTINGS)
+	_menu.confirm()
+	assert_eq(_menu.page(), PauseMenu.Page.SETTINGS)
+	_menu.close_button_node().pressed.emit()
+	assert_eq(_menu.page(), PauseMenu.Page.MAIN,
+		"Close on a sub-page must match Escape: one layer back, not the whole menu")
+	assert_true(_menu.is_open())
+
+
+func test_the_close_button_closes_the_whole_menu_on_the_main_page() -> void:
+	_menu.open()
+	assert_eq(_menu.page(), PauseMenu.Page.MAIN)
+	_menu.close_button_node().pressed.emit()
+	assert_false(_menu.is_open(), "Close on MAIN must match Escape there too: close")
+
+
+# --- M11: hover does not survive a page switch ---------------------------------------------
+
+func test_hover_is_cleared_on_a_page_switch() -> void:
+	_wire_book()
+	_menu.open()
+	_menu.point_at_row(PauseMenu.Row.COMPENDIUM)
+	assert_eq(_menu.hovered_index(), PauseMenu.Row.COMPENDIUM)
+	_menu.open_page(PauseMenu.Page.COMPENDIUM)
+	assert_eq(_menu.hovered_index(), -1,
+		"a roster row must not be drawn hovered under a pointer nowhere near it")
+
+
+func test_hover_is_cleared_returning_to_main() -> void:
+	_wire_book()
+	_menu.open_page(PauseMenu.Page.COMPENDIUM)
+	_menu.point_at_row(0)
+	assert_eq(_menu.hovered_index(), 0)
+	_menu.back()
+	assert_eq(_menu.page(), PauseMenu.Page.MAIN)
+	assert_eq(_menu.hovered_index(), -1)
+
+
+# --- I4: a click on a settings row adjusts it, it does not confirm/leave ------------------
+
+func test_clicking_a_settings_row_adjusts_it_and_stays_on_the_page() -> void:
+	_menu.open()
+	_menu.move_selection(PauseMenu.Row.SETTINGS)
+	_menu.confirm()
+	assert_eq(_menu.page(), PauseMenu.Page.SETTINGS)
+	# Ambience defaults to 0.5 (Settings.AMBIENT_DEFAULT), mid range, so a click's default
+	# "increment" resolution (no laid out holder yet in this test) is never a clamped no-op --
+	# master volume, at its 1.0 ceiling by default, would be.
+	var before: float = _settings.ambient_volume
+	watch_signals(_menu)
+	_menu.take_row(PauseMenu.SettingRow.AMBIENT)
+	assert_eq(_menu.page(), PauseMenu.Page.SETTINGS,
+		"a settings row click must not leave the page (I2, final-review.md)")
+	assert_ne(_settings.ambient_volume, before, "the click must have changed the value")
+	assert_signal_emitted(_menu, "settings_changed")
+
+
+func test_clicking_the_invert_row_toggles_it() -> void:
+	_menu.open()
+	_menu.move_selection(PauseMenu.Row.SETTINGS)
+	_menu.confirm()
+	var before: bool = _settings.invert_look
+	_menu.take_row(PauseMenu.SettingRow.INVERT)
+	assert_ne(_settings.invert_look, before)
+
+
+# --- I6: the wheel scrolls the compendium and the mail archive ---------------------------
+
+func test_the_wheel_moves_the_compendium_selection() -> void:
+	_wire_book()
+	_menu.open_page(PauseMenu.Page.COMPENDIUM)
+	assert_eq(_menu.selected_index(), 0)
+	_menu._on_rows_input(_wheel(MOUSE_BUTTON_WHEEL_DOWN))
+	assert_eq(_menu.selected_index(), 1, "wheel down must step the selection forward")
+	_menu._on_rows_input(_wheel(MOUSE_BUTTON_WHEEL_UP))
+	assert_eq(_menu.selected_index(), 0, "and wheel up must step it back")
+
+
+func test_the_wheel_follows_the_same_window_the_keyboard_does() -> void:
+	_wire_book()
+	_menu.open_page(PauseMenu.Page.COMPENDIUM)
+	for i in PauseMenu.PAGE_ROWS:
+		_menu._on_rows_input(_wheel(MOUSE_BUTTON_WHEEL_DOWN))
+	assert_eq(_menu.selected_index(), PauseMenu.PAGE_ROWS,
+		"PAGE_ROWS wheel ticks must land exactly where PAGE_ROWS move_selection(1) calls would")
+	assert_true(_menu.compendium_window().has(PauseMenu.PAGE_ROWS),
+		"the window must have followed the wheel past the first screenful")
+
+
+func test_the_wheel_moves_the_mail_archive_selection() -> void:
+	_wire_many_mail(7)
+	_menu.open_page(PauseMenu.Page.MAIL)
+	assert_eq(_menu.selected_index(), 0)
+	_menu._on_stage_input(_wheel(MOUSE_BUTTON_WHEEL_DOWN))
+	assert_eq(_menu.selected_index(), 1, "the stage's own wheel branch must move it too")

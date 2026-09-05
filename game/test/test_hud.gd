@@ -503,23 +503,38 @@ func test_the_if_else_hoisted_local_pattern_survives_the_dynamic_call_on_both_br
 ## HER TOGGLE IS REMEMBERED. A player who had the card up before opening a menu gets it back
 ## when she closes the menu; a player who had it down does not suddenly get it.
 
+## I7, final-review.md I5: THE CARD IS UP THE MOMENT THE HUD ENTERS THE TREE, WITH NO
+## OVERLAY AND NO KEYPRESS. Before this fix `_hints_wanted` initialised false and the card
+## never appeared unless a player who was never told the key happened to press it anyway.
+func test_the_control_card_is_visible_by_default_on_a_fresh_hud() -> void:
+	assert_true(_hud.hints_visible())
+
+
+func test_pressing_h_dismisses_the_default_visible_card() -> void:
+	_hud._unhandled_input(_hints_key())
+	assert_false(_hud.hints_visible(), "H toggles it, whichever state it starts in")
+
+
+## I7, final-review.md I5: THE CARD IS THE PRE-BRANCH DEFAULT -- visible on a fresh
+## interactive game (`_hints_wanted` starts true, hud.gd's own _ready()) until dismissed
+## with H, and it still hides under an overlay per Task 7's bleed-through fix.
 func test_an_overlay_hides_the_card_and_closing_the_overlay_gives_it_back() -> void:
 	_hud.set_overlay_open(false)
-	_hud._unhandled_input(_hints_key())
-	assert_true(_hud.hints_visible(), "she asked for the card")
+	assert_true(_hud.hints_visible(), "visible by default; nothing has dismissed it")
 	_hud.set_overlay_open(true)
 	assert_false(_hud.hints_visible(), "and it is gone while she reads a letter")
 	assert_true(_hud.overlay_open())
 	_hud.set_overlay_open(false)
-	assert_true(_hud.hints_visible(), "and it comes back, because she had asked for it")
+	assert_true(_hud.hints_visible(), "and it comes back once the overlay closes")
 
 
-func test_an_overlay_does_not_conjure_a_card_she_never_asked_for() -> void:
+func test_an_overlay_does_not_conjure_a_card_she_dismissed() -> void:
 	_hud.set_overlay_open(false)
-	assert_false(_hud.hints_visible())
+	_hud._unhandled_input(_hints_key())
+	assert_false(_hud.hints_visible(), "she pressed H once and dismissed the default card")
 	_hud.set_overlay_open(true)
 	_hud.set_overlay_open(false)
-	assert_false(_hud.hints_visible())
+	assert_false(_hud.hints_visible(), "an overlay opening and closing must not bring it back")
 
 
 func test_the_card_key_does_nothing_while_an_overlay_is_up() -> void:

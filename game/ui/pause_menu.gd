@@ -216,9 +216,15 @@ func _ready() -> void:
 		_stage.focus_mode = Control.FOCUS_NONE
 		_stage.gui_input.connect(_on_stage_input)
 		_stage.draw.connect(_paint_stage)
+	# M9, final-review.md M1: THE CLOSE BUTTON MIRRORS ESCAPE. back() already does exactly
+	# this -- one layer back on a sub-page, close() on MAIN (its own match falls to the `_`
+	# case) -- so wiring the button straight to close() was the one place in the game where
+	# a click and Escape disagreed about what "leave" means.
 	_close = MouseRowsScript.close_button(MouseRowsScript.CLOSE_TEXT,
-		func(_index: int) -> void: close())
+		func(_index: int) -> void: back())
 	$Centre/Panel/Margin/Column.add_child(_close)
+	if _rows != null:
+		_rows.gui_input.connect(_on_rows_input)
 	set_process(false)
 
 
@@ -284,6 +290,10 @@ func open_page(page: int) -> bool:
 	_selected = 0
 	_scroll = 0
 	_letter_id = &""
+	# M11, final-review.md M3: open() already clears this; a page switch that skipped it left
+	# whichever roster row the pointer was resting on when Compendium was chosen drawn
+	# hovered on the page that opened, under a pointer nowhere near it.
+	_hovered = -1
 	_refresh()
 	if was_open:
 		MenuStyleScript.tick_page()
@@ -499,6 +509,7 @@ func _return_to_main(row: int) -> void:
 	_page = Page.MAIN
 	_selected = row
 	_scroll = 0
+	_hovered = -1
 	_refresh()
 
 
@@ -1180,10 +1191,62 @@ func point_at_row(index: int) -> void:
 	_refresh()
 
 
+## I4, final-review.md I2: A CLICK ON A SETTINGS ROW ADJUSTS IT. confirm() on Page.SETTINGS
+## refuses every row but INVERT (":428-431" in the review's own line numbers, before this
+## fix), so a mouse-only player could select "Master volume" and then do nothing to it. Left
+## half of the row decrements, right half increments -- the same split
+## game/ui/title_screen.gd's own settings page now uses, so the two doors into one Settings
+## object agree on what a click means.
 func take_row(index: int) -> void:
 	point_at_row(index)
-	if _selected == index:
-		confirm()
+	if _selected != index:
+		return
+	if _page == Page.SETTINGS:
+		_click_adjust_row(index)
+		return
+	confirm()
+
+
+func _click_adjust_row(index: int) -> void:
+	var holder := _row_holder(index)
+	var direction := 1
+	if holder != null and holder.size.x > 0.0:
+		direction = -1 if holder.get_local_mouse_position().x < holder.size.x * 0.5 else 1
+	adjust(direction)
+
+
+func _row_holder(index: int) -> Control:
+	for child in _rows.get_children():
+		var control := child as Control
+		if control != null and MouseRowsScript.row_index(control) == index:
+			return control
+	return null
+
+
+## I6, final-review.md I4: THE WHEEL MOVES THE SAME CURSOR THE ARROW KEYS DO, on any page
+## whose rows can overflow the panel -- the compendium (43 entries, PAGE_ROWS on screen) and
+## the mail archive list (behind _on_stage_input below, ENVELOPES_ON_SCREEN on screen). No
+## tick: a spun wheel is not a keypress, and MenuStyleScript.tick_move() firing once per
+## detent would make scrolling a fast list sound like a rattle.
+func _on_rows_input(event: InputEvent) -> void:
+	var button := event as InputEventMouseButton
+	if button == null or not button.pressed:
+		return
+	if button.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+		_scroll_by(1)
+		_rows.accept_event()
+	elif button.button_index == MOUSE_BUTTON_WHEEL_UP:
+		_scroll_by(-1)
+		_rows.accept_event()
+
+
+## move_selection() without the tick -- see _on_rows_input()'s own comment on why.
+func _scroll_by(step: int) -> void:
+	if _row_count() <= 0:
+		return
+	_selected = posmod(_selected + step, _row_count())
+	_sync_scroll()
+	_refresh()
 
 
 ## THE MAIL PAGE IS A DRAWING, so its rows are rects rather than PanelContainers. The
@@ -1217,9 +1280,23 @@ func on_stage_hit(index: int) -> void:
 
 
 func _on_stage_input(event: InputEvent) -> void:
-	if not _open or _stage == null or not MouseRowsScript.is_left_click(event):
+	if not _open or _stage == null:
 		return
 	var button := event as InputEventMouseButton
+	# I6: THE WHEEL, ON THE MAIL PAGE'S ENVELOPE STACK. Same _scroll_by() the Rows column's
+	# own wheel branch uses; the stage is a drawing rather than a column of Controls, so it
+	# needs its own gui_input branch rather than inheriting the Rows one.
+	if button != null and button.pressed:
+		if button.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			_scroll_by(1)
+			_stage.accept_event()
+			return
+		elif button.button_index == MOUSE_BUTTON_WHEEL_UP:
+			_scroll_by(-1)
+			_stage.accept_event()
+			return
+	if not MouseRowsScript.is_left_click(event):
+		return
 	var index: int = MouseRowsScript.hit(stage_hit_rects(), button.position)
 	if index < 0:
 		return

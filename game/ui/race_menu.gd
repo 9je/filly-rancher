@@ -75,9 +75,14 @@ func title_text() -> String:
 	return TITLE
 
 
+## I5, final-review.md I3: the bracket text itself is now MouseRows.tab_strip()'s job (see
+## table_menu.gd's refresh()); this is only the note beside it.
+func tab_names() -> Array[String]:
+	return ["Form guide", "The card"]
+
+
 func tabs_text() -> String:
-	return MenuStyleScript.tab_strip(["Form guide", "The card"], _tab) \
-		+ "      the house keeps %.1f bits of every 100" % (RaceCardScript.TAKEOUT * 100.0)
+	return "the house keeps %.1f bits of every 100" % (RaceCardScript.TAKEOUT * 100.0)
 
 
 func tab() -> int:

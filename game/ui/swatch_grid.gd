@@ -21,7 +21,11 @@ const MenuStyleScript := preload("res://ui/menu_style.gd")
 signal picked(index: int)
 
 ## In 1920x1080 base pixels, the size the project's canvas_items stretch is measured against.
-const CELL_SIZE := Vector2(72.0, 72.0)
+## 56, not 72: C1's fix. The LOOK step's four grids stacked at 72 with 6 columns put the
+## column at 1281 px in a 1080 px viewport (final-review.md, C1); 56 with 8 columns (4 for
+## the mane-style cards) is the cheapest correct change that keeps every cell a real click
+## target and brings the whole column back inside the base viewport.
+const CELL_SIZE := Vector2(56.0, 56.0)
 const CARD_SIZE := Vector2(168.0, 96.0)
 
 const CELL_RADIUS := 8
@@ -77,7 +81,14 @@ func set_swatches(colours: Array[Color], labels: Array[String]) -> void:
 		cell.text = _labels[i] if not _labels.is_empty() else ""
 		cell.clip_text = true
 		var index := i
-		cell.pressed.connect(func() -> void: picked.emit(index))
+		# M12, final-review.md M4: THE STANDARD MenuStyle TICK. Every other screen's rows
+		# tick on the gesture that picks them; this grid was the one silent exception. Not
+		# tick_confirm(): a click here is a pick within a screen still open, the tier
+		# set_step()'s own tick_page() call is already in -- move_highlight()'s own tick, not
+		# activate_highlight()'s.
+		cell.pressed.connect(func() -> void:
+			MenuStyleScript.tick_move()
+			picked.emit(index))
 		_cells.append(cell)
 		add_child(cell)
 	_restyle()

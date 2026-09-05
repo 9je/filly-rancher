@@ -266,8 +266,16 @@ func _ready() -> void:
 
 	_bag_title.text = "SADDLEBAG"
 	_build_hints()
-	_hints.visible = false
-	_hints_wanted = false
+	# I7, final-review.md I5: THE CARD IS THE PRE-BRANCH DEFAULT -- visible on a fresh
+	# interactive game until dismissed with H. `_hints_wanted` starting true is not enough
+	# on its own: ranch.gd only ever calls set_overlay_open() from its own menu opened/
+	# closed handlers, so a Continue boot that opens no menu at all would leave `_hints.
+	# visible` stuck at whatever this line set it to, forever. set_overlay_open(false) is
+	# the one function that already knows how to compute it (_hints_wanted and not
+	# _overlay_open, and _overlay_open starts false, the state boot is actually in), so
+	# this calls that rather than hard-coding a value a second place.
+	_hints_wanted = true
+	set_overlay_open(false)
 	_toast.modulate.a = 0.0
 
 	_bind()

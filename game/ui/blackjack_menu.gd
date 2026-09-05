@@ -84,11 +84,15 @@ func switch_tab(step: int) -> void:
 	MenuStyleScript.tick_page()
 
 
+## I5, final-review.md I3: the bracket text itself is now MouseRows.tab_strip()'s job (see
+## table_menu.gd's refresh()); this is only the note beside it.
+func tab_names() -> Array[String]:
+	return ["Table", "Placard"]
+
+
 func tabs_text() -> String:
-	var left: String = "[Table]" if _tab == Tab.TABLE else " Table "
-	var right: String = "[Placard]" if _tab == Tab.PLACARD else " Placard "
-	return "%s   %s      the house keeps %.1f bits of every 100 against the card" \
-		% [left, right, BlackjackScript.house_edge() * 100.0]
+	return "the house keeps %.1f bits of every 100 against the card" \
+		% (BlackjackScript.house_edge() * 100.0)
 
 
 func drawn_lines() -> Array[String]:

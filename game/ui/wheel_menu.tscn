@@ -46,7 +46,7 @@ mouse_filter = 2
 layout_mode = 2
 mouse_filter = 2
 
-[node name="Tabs" type="Label" parent="Centre/Panel/Margin/Column"]
+[node name="Tabs" type="HBoxContainer" parent="Centre/Panel/Margin/Column"]
 layout_mode = 2
 mouse_filter = 2
 

@@ -139,11 +139,14 @@ func move_selection(step: int) -> void:
 	MenuStyleScript.tick_move()
 
 
+## I5, final-review.md I3: the bracket text itself is now MouseRows.tab_strip()'s job (see
+## table_menu.gd's refresh()); this is only the note beside it.
+func tab_names() -> Array[String]:
+	return ["Colour", "Number"]
+
+
 func tabs_text() -> String:
-	var left: String = "[Colour]" if _tab == Tab.COLOUR else " Colour "
-	var right: String = "[Number]" if _tab == Tab.NUMBER else " Number "
-	return "%s   %s      the house keeps %.1f bits of every 100 on either" \
-		% [left, right, WheelScript.house_edge() * 100.0]
+	return "the house keeps %.1f bits of every 100 on either" % (WheelScript.house_edge() * 100.0)
 
 
 ## How many things she may back on this tab.

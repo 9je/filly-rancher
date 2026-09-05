@@ -191,6 +191,7 @@ func _ready() -> void:
 		MenuStyleScript.paper_box())
 	MenuStyleScript.apply_panel_box(get_node_or_null(^"Layout/Stage") as PanelContainer,
 		MenuStyleScript.frame_box())
+	_style_paper()
 	_build_grids()
 	_wire_steps()
 	if _viewport != null:
@@ -199,6 +200,66 @@ func _ready() -> void:
 		_viewport.gui_input.connect(_on_stage_input)
 	_confirm.focus_mode = Control.FOCUS_NONE
 	set_step(Step.LOOK)
+
+
+## I3, final-review.md I1: THE PAPER WITH THE INK, NOT THE DARK THEME'S WHITE ON IT. The
+## panel took `paper_box()` in `_ready()` above, but nothing ever told the eight Labels or
+## any Button on it to stop inheriting the project Theme's dark-panel palette (near-white
+## text, a 5 px black outline) -- on cream that reads as the exact "floating text / roblox"
+## register the owner already rejected once (see menu_style.gd's own COLOR_INK comment).
+## Fix: every Label reads ink, no outline, through the same `style_label()` every other
+## paper page (letter_panel.gd's own footer) already uses; every Button on the panel takes
+## `field_box()` -- the Task 1 factory built for the one other paper control on this screen,
+## the NameBox -- as its chrome, and ink text to match.
+const _PAPER_LABEL_PATHS: Array[NodePath] = [^"Layout/Panel/Margin/Column/Title",
+	^"Layout/Panel/Margin/Column/NameLabel", ^"Layout/Panel/Margin/Column/CoatLabel",
+	^"Layout/Panel/Margin/Column/ManeLabel", ^"Layout/Panel/Margin/Column/ManeStyleLabel",
+	^"Layout/Panel/Margin/Column/EyesLabel", ^"Layout/Panel/Margin/Column/MarkLabel",
+	^"Layout/Panel/Margin/Column/HintLabel"]
+
+const _PAPER_BUTTON_PATHS: Array[NodePath] = [
+	^"Layout/Panel/Margin/Column/StepRow/StepLook",
+	^"Layout/Panel/Margin/Column/StepRow/StepMark",
+	^"Layout/Panel/Margin/Column/InkRow/Ink0", ^"Layout/Panel/Margin/Column/InkRow/Ink1",
+	^"Layout/Panel/Margin/Column/InkRow/Ink2", ^"Layout/Panel/Margin/Column/InkRow/Ink3",
+	^"Layout/Panel/Margin/Column/InkRow/Ink4", ^"Layout/Panel/Margin/Column/InkRow/Ink5",
+	^"Layout/Panel/Margin/Column/StampRow/Stamp0",
+	^"Layout/Panel/Margin/Column/StampRow/Stamp1",
+	^"Layout/Panel/Margin/Column/StampRow/Stamp2",
+	^"Layout/Panel/Margin/Column/StampRow/Stamp3",
+	^"Layout/Panel/Margin/Column/StampRow/Stamp4",
+	^"Layout/Panel/Margin/Column/StampRow/Stamp5",
+	^"Layout/Panel/Margin/Column/ToolRow/Brush1",
+	^"Layout/Panel/Margin/Column/ToolRow/Brush2",
+	^"Layout/Panel/Margin/Column/ToolRow/Brush4",
+	^"Layout/Panel/Margin/Column/ToolRow/Brush8",
+	^"Layout/Panel/Margin/Column/ToolRow/Eraser",
+	^"Layout/Panel/Margin/Column/ActionRow/Undo",
+	^"Layout/Panel/Margin/Column/ActionRow/Clear",
+	^"Layout/Panel/Margin/Column/Confirm"]
+
+
+func _style_paper() -> void:
+	for path: NodePath in _PAPER_LABEL_PATHS:
+		var label := get_node_or_null(path) as Label
+		if label == null:
+			continue
+		MenuStyleScript.style_label(label, MenuStyleScript.ROW_SIZE, MenuStyleScript.COLOR_INK)
+		label.add_theme_constant_override(&"outline_size", 0)
+	_title_label.add_theme_font_size_override("font_size", MenuStyleScript.TITLE_SIZE)
+	for path: NodePath in _PAPER_BUTTON_PATHS:
+		var button := get_node_or_null(path) as Button
+		if button == null:
+			continue
+		for state: StringName in [&"normal", &"hover", &"pressed", &"focus", &"disabled"]:
+			button.add_theme_stylebox_override(state, MenuStyleScript.field_box(
+				state == &"hover" or state == &"pressed" or state == &"focus"))
+		button.add_theme_color_override("font_color", MenuStyleScript.COLOR_INK)
+		button.add_theme_color_override("font_hover_color", MenuStyleScript.COLOR_INK)
+		button.add_theme_color_override("font_pressed_color", MenuStyleScript.COLOR_INK)
+		button.add_theme_color_override("font_focus_color", MenuStyleScript.COLOR_INK)
+		button.add_theme_color_override("font_outline_color", MenuStyleScript.OUTLINE_COLOR)
+		button.add_theme_constant_override("outline_size", 0)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -618,6 +679,10 @@ func move_highlight(delta: int) -> void:
 		return
 	_kb_item = posmod(_kb_item + delta, buttons.size())
 	_apply_kb_highlight()
+	# M12, final-review.md M4: THE STANDARD MenuStyle TICKS. Every other screen ticks on
+	# hover-move, on confirm and on a step switch (set_step() already does, above); this
+	# screen shipped silent on the two the arrow keys and Enter drive.
+	MenuStyleScript.tick_move()
 
 
 ## ENTER. Presses whatever the cursor is on -- literally: `.pressed.emit()` on the same
@@ -631,7 +696,15 @@ func activate_highlight() -> void:
 	if region == &"name":
 		_name_box.grab_focus()
 		_apply_kb_highlight()
+		MenuStyleScript.tick_confirm()
 		return
+	# M12, final-review.md M4: TICK_CONFIRM(), NOT ON THE STEP REGION. set_step() already
+	# ticks tick_page() (every other menu's own "a page turned inside a panel that was
+	# already open" tick), and ticking here too would make one Enter press fire two sounds --
+	# the same double tick casino_menu.gd's own confirm() takes care not to make on the rows
+	# that open a table, which already ticks tick_open() on its own.
+	if region != &"step":
+		MenuStyleScript.tick_confirm()
 	var buttons := _region_buttons(region)
 	if _kb_item >= 0 and _kb_item < buttons.size():
 		buttons[_kb_item].pressed.emit()

@@ -431,5 +431,11 @@ func stage_hit_rects() -> Array[Rect2]:
 	return [LEVER_RECT, REEL_BAND]
 
 
+## I8, final-review.md I6 (controller ruling overrides the plan text): THE LEVER PLAYS THE
+## STAKE THAT IS SHOWING. take_row(row_count() - 1) mirrored the click into the LAST stake
+## row before spinning, so a player who picked the smallest chip with the arrow keys and then
+## reached for the lever with the mouse bet her whole affordable maximum instead -- the worst
+## possible mouse gesture to ship in the one part of the game whose math is published and
+## tested. _selected is exactly what the keyboard's own confirm() on the stake row plays.
 func on_stage_hit(_index: int) -> void:
-	take_row(row_count() - 1)
+	take_row(_selected)

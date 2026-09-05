@@ -209,7 +209,16 @@ func test_the_other_sliders_still_start_open() -> void:
 
 
 func test_a_saved_ambient_setting_still_wins_over_the_new_default() -> void:
-	var path := "user://test_settings_ambient.cfg"
+	# M15, final-review.md M7: SaveIO.session_save_dir, NOT A HARD-CODED user:// PATH.
+	# FILLY_TEST_SAVE_DIR redirects SaveIO.save_dir and Settings.settings_path, not a literal
+	# "user://" string, so the old path was the one hole left in R0's "a sweep leaves the
+	# player's directory alone" property: this file was created for real, on every suite run,
+	# in ~/.local/share/godot/app_userdata/Filly Rancher/. session_save_dir is exactly the
+	# directory every other test in this file already trusts (see
+	# test_the_session_settings_path_follows_the_session_save_directory above), and it is a
+	# real native mktemp path on any run that sets FILLY_TEST_SAVE_DIR, which every documented
+	# gate and suite command does.
+	var path := SaveIOScript.session_save_dir.path_join("test_settings_ambient.cfg")
 	var s: Settings = SettingsScript.new()
 	s.ambient_volume = 1.0
 	assert_true(s.save_to(path))

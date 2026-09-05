@@ -30,6 +30,12 @@ const TITLE := "Filly Rancher"
 const SETTINGS_TITLE := "Settings"
 const NO_SAVE_NOTE := "No saved ranch on this machine yet."
 
+## C2, final-review.md: New game is one Enter away from `_game_state.reset()` with no way
+## back, on a screen that used to default its cursor to it. This is the second confirm the
+## armed row asks for -- printed where the footer already lives, since that is the one line
+## on this screen that is always on screen and always read before a key is pressed.
+const NEW_GAME_CONFIRM_TEXT := "Really start over? Enter again to confirm"
+
 ## The five settings rows, in SettingRow order. Same five the pause menu edits, because there
 ## is one Settings object and two doors into it.
 enum SettingRow { VOLUME, AMBIENT, EFFECTS, SENSITIVITY, INVERT }
@@ -48,6 +54,12 @@ var _selected := 0
 var _hovered := -1
 var _on_settings := false
 var _return_row := 0
+
+## C2: whether the New game row's first confirm has been taken and is waiting on a second
+## one. Only ever true while `_selected == Row.NEW_GAME` and `not _on_settings`; every path
+## that leaves that state -- moving the cursor, opening Settings, Escape, a second confirm
+## itself -- clears it.
+var _new_game_armed := false
 
 @onready var _title: Label = $Centre/Panel/Margin/Column/Title
 @onready var _rows: VBoxContainer = $Centre/Panel/Margin/Column/Rows
@@ -69,6 +81,12 @@ func _ready() -> void:
 	settings = SettingsScript.new()
 	settings.load_from()
 	settings.apply_audio()
+	# C2: THE CURSOR STARTS ON CONTINUE WHENEVER THERE IS SOMETHING TO CONTINUE. Before this
+	# the cursor defaulted to row 0, New game, one Enter away from `_game_state.reset()` with
+	# no confirmation -- the exact keypress a returning player makes out of habit on every
+	# other prompt this game has ever shown her. `can_continue()` asks the same question
+	# Row.CONTINUE's own confirm() branch asks, so the two can never disagree.
+	_selected = Row.CONTINUE if can_continue() else Row.NEW_GAME
 	# DRAWN EVEN ON A NON-INTERACTIVE BOOT. Nothing below reads a save or sets the boot latch,
 	# and a GUT test instantiates this scene under exactly the same headless conditions a real
 	# non-interactive boot runs under -- test_every_row_is_armed_for_the_pointer and
@@ -109,7 +127,7 @@ func can_continue() -> bool:
 
 
 func drawn_lines() -> Array[String]:
-	var out: Array[String] = [TITLE, SETTINGS_TITLE, NO_SAVE_NOTE]
+	var out: Array[String] = [TITLE, SETTINGS_TITLE, NO_SAVE_NOTE, NEW_GAME_CONFIRM_TEXT]
 	out.append_array(ROWS)
 	out.append_array(SETTING_ROWS)
 	return out
@@ -119,6 +137,7 @@ func move_selection(step: int) -> void:
 	var n: int = row_count()
 	if n <= 0:
 		return
+	_disarm_new_game()
 	_selected = posmod(_selected + step, n)
 	MenuStyleScript.tick_move()
 	_refresh()
@@ -129,6 +148,8 @@ func point_at_row(index: int) -> void:
 		return
 	if index == _selected and index == _hovered:
 		return
+	if index != _selected:
+		_disarm_new_game()
 	_hovered = index
 	if index != _selected:
 		_selected = index
@@ -136,10 +157,36 @@ func point_at_row(index: int) -> void:
 	_refresh()
 
 
+## I4, final-review.md I2: A CLICK ON A SETTINGS ROW ADJUSTS, IT DOES NOT LEAVE. Before this,
+## every click on this page ran confirm(), which is back() on _on_settings -- the only thing
+## a mouse-only player could do to a setting was leave the page she was trying to change one.
+## Left half of the row decrements, right half increments, the same split
+## game/ui/pause_menu.gd's own settings page now uses, so the two doors into one Settings
+## object agree on what a click means.
 func take_row(index: int) -> void:
 	point_at_row(index)
-	if _selected == index:
-		confirm()
+	if _selected != index:
+		return
+	if _on_settings:
+		_click_adjust_row(index)
+		return
+	confirm()
+
+
+func _click_adjust_row(index: int) -> void:
+	var holder := _row_holder(index)
+	var direction := 1
+	if holder != null and holder.size.x > 0.0:
+		direction = -1 if holder.get_local_mouse_position().x < holder.size.x * 0.5 else 1
+	adjust(direction)
+
+
+func _row_holder(index: int) -> Control:
+	for child in _rows.get_children():
+		var control := child as Control
+		if control != null and MouseRowsScript.row_index(control) == index:
+			return control
+	return null
 
 
 func confirm() -> bool:
@@ -149,8 +196,19 @@ func confirm() -> bool:
 		# slider means.
 		back()
 		return true
+	if _selected != Row.NEW_GAME:
+		_disarm_new_game()
 	match _selected:
 		Row.NEW_GAME:
+			# C2: THE SECOND CONFIRM. can_continue() is exactly the condition under which
+			# this row can destroy something -- a fresh machine has nothing to lose and
+			# starts on the first press, same as before this fix.
+			if can_continue() and not _new_game_armed:
+				_new_game_armed = true
+				MenuStyleScript.tick_page()
+				_refresh()
+				return true
+			_new_game_armed = false
 			MenuStyleScript.tick_confirm()
 			BootIntentScript.request_new_game()
 			_enter_world()
@@ -190,6 +248,7 @@ func back() -> void:
 ## Left and right on a settings row, exactly as the pause menu does it, through the same
 ## Settings object's own step methods so there is one place a volume step is decided.
 func adjust(direction: int) -> void:
+	_disarm_new_game()
 	if not _on_settings or settings == null:
 		return
 	match _selected:
@@ -239,13 +298,27 @@ func _setting_value(index: int) -> String:
 	return ""
 
 
+## C2: CLEAR THE ARMED ROW. Called from every path that is "some other input" once New game
+## has taken its first confirm: the cursor moving (keyboard or mouse), a settings adjust, and
+## the central catch-all in _unhandled_input for Escape. A no-op, and no redraw, when nothing
+## was armed -- so calling it defensively costs nothing on the vastly more common path.
+func _disarm_new_game() -> void:
+	if not _new_game_armed:
+		return
+	_new_game_armed = false
+	_refresh()
+
+
 func _refresh() -> void:
 	if not is_node_ready():
 		return
 	_title.text = SETTINGS_TITLE if _on_settings else TITLE
 	MenuStyleScript.apply_title(_title)
-	_footer.text = MenuStyleScript.footer_rows("choose", "back") if _on_settings \
-		else MenuStyleScript.footer_rows("choose", "quit")
+	if _new_game_armed and not _on_settings:
+		_footer.text = MenuStyleScript.NO_CARET + NEW_GAME_CONFIRM_TEXT
+	else:
+		_footer.text = MenuStyleScript.footer_rows("choose", "back") if _on_settings \
+			else MenuStyleScript.footer_rows("choose", "quit")
 	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE,
 		MenuStyleScript.COLOR_DIM)
 	for child in _rows.get_children():
@@ -281,22 +354,30 @@ func _refresh() -> void:
 		_rows.add_child(holder)
 
 
+## M13: is_action_pressed(), NOT is_pressed() + is_action(). Every other menu in the game
+## reads its keys this way (see creation_screen.gd's own _unhandled_input); is_action_pressed
+## suppresses OS key-repeat echo by default (allow_echo defaults false) where is_pressed() +
+## is_action() does not, which is why this screen used to run its cursor round the list at
+## the OS repeat rate on a held key (M5, final-review.md) where no other menu in the project
+## does.
 func _unhandled_input(event: InputEvent) -> void:
-	if not event.is_pressed():
-		return
-	if event.is_action(&"ui_up"):
+	if event.is_action_pressed(&"ui_up"):
 		move_selection(-1)
-	elif event.is_action(&"ui_down"):
+	elif event.is_action_pressed(&"ui_down"):
 		move_selection(1)
-	elif event.is_action(&"ui_left"):
+	elif event.is_action_pressed(&"ui_left"):
 		adjust(-1)
-	elif event.is_action(&"ui_right"):
+	elif event.is_action_pressed(&"ui_right"):
 		adjust(1)
-	elif event.is_action(&"ui_accept"):
+	elif event.is_action_pressed(&"ui_accept"):
 		confirm()
-	elif event.is_action(&"ui_cancel"):
+	elif event.is_action_pressed(&"ui_cancel"):
 		if _on_settings:
 			back()
+		elif _new_game_armed:
+			# C2: Escape while the row is armed cancels the confirmation rather than
+			# quitting the game out from under a player who only meant "not that".
+			_disarm_new_game()
 		else:
 			get_tree().quit()
 	else:

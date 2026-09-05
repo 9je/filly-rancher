@@ -73,7 +73,7 @@ var _confirming: StringName = &""
 var _confirming_name := ""
 
 @onready var _title: Label = $Centre/Panel/Margin/Column/Title
-@onready var _tabs: Label = $Centre/Panel/Margin/Column/Tabs
+@onready var _tabs: HBoxContainer = $Centre/Panel/Margin/Column/Tabs
 @onready var _rows: VBoxContainer = $Centre/Panel/Margin/Column/Rows
 @onready var _footer: Label = $Centre/Panel/Margin/Column/Footer
 
@@ -135,6 +135,19 @@ func set_tab(value: int) -> void:
 
 func switch_tab(step: int) -> void:
 	set_tab(posmod(_tab + step, Tab.STATEMENT + 1))
+	MenuStyleScript.tick_page()
+
+
+## I5: the mouse's own door into a tab, beside switch_tab()'s keyboard one. See
+## casino_menu.gd's own point_at_tab()/take_tab() for why this skips straight to set_tab().
+func point_at_tab(_index: int) -> void:
+	pass
+
+
+func take_tab(index: int) -> void:
+	if index == _tab:
+		return
+	set_tab(index)
 	MenuStyleScript.tick_page()
 
 
@@ -299,7 +312,7 @@ func refresh() -> void:
 	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
 	var count: int = _row_count()
 	_selected = clampi(_selected, 0, maxi(0, count - 1)) if count > 0 else 0
-	_tabs.text = MenuStyleScript.tab_strip(TAB_NAMES, _tab)
+	MouseRowsScript.tab_strip(_tabs, TAB_NAMES, _tab, point_at_tab, take_tab)
 	for child in _rows.get_children():
 		child.queue_free()
 	MenuStyleScript.apply_title(_title)

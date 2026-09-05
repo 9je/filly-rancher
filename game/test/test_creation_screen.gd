@@ -7,6 +7,10 @@ const StockPaletteScript := preload("res://systems/stock_palette.gd")
 const MarkPaintScript := preload("res://systems/mark_paint.gd")
 const MarkStampsScript := preload("res://systems/mark_stamps.gd")
 
+## Matches test_letter_panel.gd's own VIEWPORT_HEIGHT: game/project.godot's base viewport,
+## the size the LOOK step's column has to fit inside with margin (C1, final-review.md).
+const VIEWPORT_HEIGHT := 1080.0
+
 var _screen: CreationScreen = null
 
 
@@ -224,6 +228,45 @@ func test_the_turntable_fills_a_real_share_of_the_screen() -> void:
 	var viewport := _screen.get_node("Layout/Stage/Viewport") as SubViewportContainer
 	assert_gte(viewport.size_flags_stretch_ratio, 1.0,
 		"the pony is the point of this screen and has to be big enough to see")
+
+
+## C1, final-review.md: the LOOK step's four grids at 72 px cells and 6/3 columns put the
+## column at 1281 px in a 1080 px viewport -- off screen, no scrollbar, no wheel handler.
+##
+## MEASURES THE COLUMN'S OWN MINIMUM SIZE, NOT A LIVE Panel.size. The report's own
+## reproduction did the same ("column_min = (512.0, 1281.0)", instantiating the screen and
+## reading get_combined_minimum_size() on Layout/Panel/Margin/Column) rather than reading a
+## laid-out Panel.size the way test_letter_panel.gd's own viewport test does -- and for a
+## reason specific to this screen: Layout is a full-rect HBoxContainer, not letter_panel.gd's
+## CenterContainer, so a live Panel.size here is however much of the ACTUAL window the
+## engine's "expand" stretch mode hands the layout, which is not 1920x1080 under every
+## headless test runner's own default window shape. The column's intrinsic minimum size is
+## content driven and answers the same question ("does this fit 1080 with margin") without
+## depending on what shape window happens to be running the test.
+func test_the_look_and_mark_steps_both_fit_the_1080_viewport() -> void:
+	for step: int in [CreationScreen.Step.LOOK, CreationScreen.Step.MARK]:
+		_screen.set_step(step)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		var column := _screen.get_node("Layout/Panel/Margin/Column") as VBoxContainer
+		var column_min: Vector2 = column.get_combined_minimum_size()
+		assert_lte(column_min.y, VIEWPORT_HEIGHT,
+			"step %d's column must leave its confirm button on screen, got %f"
+				% [step, column_min.y])
+
+
+## The regression C1 pins directly: the LOOK column's OWN minimum height (not the panel it
+## sits in, which a MarginContainer can clip) has to be comfortably under the viewport so a
+## palette entry added later has headroom before it reproduces C1.
+func test_the_look_columns_minimum_height_leaves_margin_under_1080() -> void:
+	_screen.set_step(CreationScreen.Step.LOOK)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var column := _screen.get_node("Layout/Panel/Margin/Column") as VBoxContainer
+	var column_min: Vector2 = column.get_combined_minimum_size()
+	assert_lt(column_min.y, 1000.0,
+		"the LOOK column's real minimum height must clear the 1080 viewport with margin, got %f"
+			% column_min.y)
 
 
 func test_the_three_colour_rows_are_swatch_grids_and_not_steppers() -> void:

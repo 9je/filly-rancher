@@ -903,9 +903,7 @@ func _ready() -> void:
 	#
 	# THE TREE IS NOT PAUSED HERE. The awaits below need physics frames and a paused tree
 	# never delivers one. CreationScreen.open() pauses, as it always has.
-	if _new_game and _interactive and creation_screen != null \
-			and creation_screen.has_method("raise_backdrop"):
-		creation_screen.call("raise_backdrop")
+	_raise_creation_veil()
 
 	# THE RAIN NEEDS SOMEBODY TO FALL ON. _bind_game_state() above built the WorldState and
 	# has already handed it to the rig (apply_immediately, so boot has no eight second ramp
@@ -2170,6 +2168,24 @@ func _no_menu_but(menu: CanvasLayer) -> bool:
 		if other.has_method("is_open") and other.is_open():
 			return false
 	return true
+
+
+## THE VEIL GOES UP, AND THE CURSOR LETS GO WITH IT. M17, final-review.md M9: raising the
+## backdrop used to be the whole of this call; camera_rig.gd had already captured the mouse
+## in its own _ready() (children before parents, so before this ever runs), and nothing here
+## told it to let go. So a new game sat on an opaque sky for the ~2.5 s the physics warmup,
+## the settle frames and the pen containment probe below take, with the pointer grabbed over
+## a screen with nothing on it to look at yet -- nothing was clickable during it either way,
+## but a captured cursor is a captured cursor regardless of whether there is anything to
+## click. _maybe_open_creation() re-asserts the same false the moment there is something to.
+## Split out of _ready() so a detached Ranch (test_ranch_creation.gd's own fixture) can call
+## this directly, the same way it already calls _maybe_open_creation().
+func _raise_creation_veil() -> void:
+	if not (_new_game and _interactive and creation_screen != null
+			and creation_screen.has_method("raise_backdrop")):
+		return
+	creation_screen.call("raise_backdrop")
+	_set_cursor_captured(false)
 
 
 ## A NEW GAME OPENS ON THE CREATION SCREEN. Only for somebody actually playing: a hosted
