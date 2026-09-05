@@ -43,6 +43,7 @@ mkdir -p "$LIVE"
 # A decoy that stands in for the owner's ranch. "Untouched" is only a claim worth making about
 # a directory that had something in it to touch.
 printf '{\n  "bits": 4242,\n  "marker": "OWNER_SAVE",\n  "version": 5\n}\n' > "$LIVE/slot_0.json"
+files_before="$(find "$LIVE" -type f | wc -l)"
 
 manifest() {
   ( cd "$LIVE" && find . -type f -print0 | sort -z | xargs -0 -r sha256sum )
@@ -72,7 +73,22 @@ fi
 after="$(manifest)"
 redirected_files="$(find "$REDIRECT_DIR" -type f | wc -l)"
 live_files="$(find "$LIVE" -type f | wc -l)"
-echo "PROOF live_dir='$LIVE' files_before=1 files_after=$live_files redirected_files=$redirected_files"
+echo "PROOF live_dir='$LIVE' files_before=$files_before files_after=$live_files redirected_files=$redirected_files"
+
+# The whole proof rests on XDG_DATA_HOME actually moving user:// onto the sandbox. Require
+# godot-created residue under it beyond the seeded saves/slot_0.json -- logs/godot.log is
+# written on every boot, seed or no seed -- before trusting either manifest comparison below.
+# Without this, a machine where XDG_DATA_HOME stopped moving user:// would measure a directory
+# the engine never opened, and both halves of this script would pass having proved nothing.
+SANDBOX_APPDATA="$SANDBOX_HOME/godot/app_userdata/Filly Rancher"
+if [ ! -d "$SANDBOX_APPDATA/logs" ]; then
+  if [ "$NEGATIVE" -eq 1 ]; then
+    echo "FAIL: XDG_DATA_HOME never engaged the sandbox -- this unredirected boot may have written the REAL live user://saves instead of this script's decoy. Stop and check the owner's actual saves by hand." >&2
+  else
+    echo "FAIL: XDG_DATA_HOME never engaged the sandbox -- this run measured a directory the engine never opened, so it proves nothing about the redirect." >&2
+  fi
+  exit 1
+fi
 
 if [ "$NEGATIVE" -eq 1 ]; then
   if [ "$before" = "$after" ]; then

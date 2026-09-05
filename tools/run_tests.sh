@@ -47,6 +47,7 @@ cd "$(dirname "$0")/.."
 # (game/test/test_pen.gd, game/test/test_ranch_collection.gd) went straight to user://saves.
 # A fresh directory per run, so nothing a previous run left can make a test pass.
 FILLY_TEST_SAVE_DIR="$(mktemp -d)"
+[ -n "$FILLY_TEST_SAVE_DIR" ] || { echo "ERROR: mktemp -d produced no directory; refusing to run against the player's own saves." >&2; exit 1; }
 export FILLY_TEST_SAVE_DIR
 out=""
 trap 'rm -f "$out"; rm -rf "$FILLY_TEST_SAVE_DIR"' EXIT

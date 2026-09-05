@@ -368,7 +368,7 @@ with the bob, and the tail's vertical motion is driven mostly by that pitch.
 Both traps are documented in the scene's header so they are not walked into
 again.)
 
-**Result — Twilight, `tools/bin/godot --headless --path game
+**Result — Twilight, `FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --path game
 scenes/test/hair_lag_test.tscn`, byte-identical across two runs:**
 
 ```

@@ -104,8 +104,9 @@ extends RefCounted
 ## --- WHERE THE SAVES GO ON AN AUTOMATED RUN --------------------------------------------
 ##
 ## FILLY_TEST_SAVE_DIR, read once at class load, moves the whole save directory for one
-## process. Every automated boot of this game sets it: tools/run_tests.sh exports a fresh
-## mktemp -d for the suite, and every gate command in docs/testing.md carries it as a prefix.
+## process. tools/run_tests.sh exports a fresh mktemp -d for the suite, the sheet scripts
+## (tools/sky_sheet.sh, tools/roster_sheet.sh) do the same for the boots they drive, and every
+## gate command documented in docs/testing.md and docs/pipeline.md carries it as a prefix.
 ## A gate boots the real world/ranch.tscn, the ranch writes a save while it boots, and the
 ## owner plays out of this same checkout -- so before this existed, running the gates cost the
 ## owner their slots. See resolve_save_dir() for the policy and tools/prove_save_safety.sh for

@@ -46,6 +46,9 @@ func _sound_autoload() -> Node:
 
 func _ready() -> void:
 	GateWatchdogScript.arm(self, "SOUND", 120.0)
+	# The two innocence checks below are only independent when the run is redirected; on a
+	# bare manual boot they name the same directory and can only ever agree with each other.
+	var redirected: bool = SaveIOScript.save_dir != SaveIOScript.DEFAULT_SAVE_DIR
 	var live_before: PackedStringArray = _save_listing(SaveIOScript.DEFAULT_SAVE_DIR)
 	var session_before: PackedStringArray = _save_listing(SaveIOScript.save_dir)
 	print("SOUND saves live=%s session=%s" % [SaveIOScript.DEFAULT_SAVE_DIR,
@@ -56,10 +59,14 @@ func _ready() -> void:
 	_check_the_verbs()
 	_check_the_pools()
 	_check_the_volume_sliders()
-	_set_check("the gate wrote nothing into the player's own save directory",
-		_save_listing(SaveIOScript.DEFAULT_SAVE_DIR) == live_before)
-	_set_check("the gate wrote nothing into this run's save directory",
-		_save_listing(SaveIOScript.save_dir) == session_before)
+	if redirected:
+		_set_check("the gate wrote nothing into the player's own save directory",
+			_save_listing(SaveIOScript.DEFAULT_SAVE_DIR) == live_before)
+		_set_check("the gate wrote nothing into this run's save directory",
+			_save_listing(SaveIOScript.save_dir) == session_before)
+	else:
+		_set_check("the gate wrote nothing into the player's own save directory (run was not redirected)",
+			_save_listing(SaveIOScript.DEFAULT_SAVE_DIR) == live_before)
 	_finish()
 
 

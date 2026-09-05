@@ -1223,7 +1223,7 @@ the model root) and a `SECONDARY_MOTION_FILTERED n` line with a plausible bone
 count. Then run the lag scene against the new character:
 
 ```bash
-tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/hair_lag_test.tscn -- character=<name>
+FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/hair_lag_test.tscn -- character=<name>
 ```
 
 Every hair chain it finds should appear in the `CHAIN` listing and every leaf
@@ -1315,27 +1315,27 @@ python3 tools/validate_gltf.py game/assets/converted/ponies/twilight.glb
 python3 tools/validate_gltf.py game/assets/converted/ponies/twilight.glb --require-anims
 
 # Gallery: loads every pony .glb in the folder, verifies skeleton + bone count
-tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/model_gallery.tscn
+FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/model_gallery.tscn
 # -> LOADED <name>.glb skeleton=true bones=<n>   (one line per pony)
 # -> GALLERY_OK count=3   exit 0   (the three converted tier-a characters;
 #    the tier-c probe lives in probe/, not ponies/, so it is not counted)
 
 # Animated walk test: Twilight walks a 4-waypoint square using the 'walk' clip
-tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/walk_test.tscn
+FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/walk_test.tscn
 # -> ANIMS ["gallop", "idle", "walk"]
 # -> WALK_OK laps_progress=<n>   exit 0
 
 # Baseline smoke test. NO LONGER the main scene -- since Phase 1A task 7 that is
 # world/ranch.tscn (§9). Still kept and still run: it is the one gate that proves the
 # engine boots with no content at all involved.
-tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/smoke.tscn
+FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/smoke.tscn
 # -> SMOKE_OK renderer=forward_plus   exit 0
 
 # The ranch: the game's main scene. Terrain + homestead + herd, and every check
 # game/world/ranch.gd runs (player on the ground, props seated and collided, ponies
 # raycast onto real ground inside their zones, camera spring arm pulling in against
 # an actual building). Prints the marker ONLY if all of them held.
-tools/bin/godot --headless --audio-driver Dummy --path game world/ranch.tscn
+FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dummy --path game world/ranch.tscn
 # -> RANCH_OK ponies=49 props=111 assets=present   exit 0
 # (assets=absent + zero counts on a checkout that has not run the asset pipeline)
 # Both counts moved from an earlier build's 22/58: the crowd (Phase 3 slice 1) fills every
@@ -1345,7 +1345,7 @@ tools/bin/godot --headless --audio-driver Dummy --path game world/ranch.tscn
 
 # Hair follow-through: measures how far the mane/tail trail the body, against a
 # rigid-hair baseline, over a scripted start-and-stop (see docs/notes-hair-sim.md)
-tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/hair_lag_test.tscn
+FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/hair_lag_test.tscn
 # -> CHAIN <tip> root=<..> joints=<n> leaf=<bool> stiffness=.. drag=.. gravity=..
 # -> HAIRLAG <tip> leaf trails body by +N ticks (+M ms) ...   (one line per chain)
 # -> HAIRLAG_OK leaf_chains=6 passing=6 bob_retention=56%..199% worst_self_gain=1.16
@@ -1380,21 +1380,21 @@ tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/hair_lag
 
 # Map-props probe (Task 8, §4): scatters every converted prop plus Twilight
 # on a grass ground plane
-tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/terrain_probe.tscn
+FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/terrain_probe.tscn
 # -> LOADED <name>.glb pos=<Vector3> native_height=<n>   (one line per prop)
 # -> PONY twilight height=<n>
 # -> PROBE_OK count=<n>   exit 0
 
 # Registry/visuals path (Phase 1A task 3): builds all three ponies through
 # PonyRegistry -> PonyVisuals, the only sanctioned way to spawn one
-tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/registry_gallery.tscn
+FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/registry_gallery.tscn
 # -> BUILT <id> anim_ok=true hair_ok=true   (one line per pony)
 # -> REGISTRY_OK count=3   exit 0
 
 # Player controller (Phase 1A task 4): drives the player one second forward and
 # one second with no input at all, then gates on distance, heading, floor contact
 # and the animation state. Windowed, this is the scene you play to judge feel.
-tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/playground.tscn
+FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/playground.tscn
 # -> PLAYER drive dist=<m> travel=(x, y, z) speed=<m/s> on_floor=true clip=walk scale=<n>
 # -> PLAYER coast dist=<m> residual_speed=<m/s> y=<m> clip=idle
 # -> PLAYER_OK dist=<m>   exit 0
@@ -1429,7 +1429,7 @@ above was green through.
 at**, `scenes/test/visual_review.tscn`. It asserts nothing — read the PNGs.
 
 ```bash
-xvfb-run -a tools/bin/godot --path game --audio-driver Dummy \
+FILLY_TEST_SAVE_DIR="$(mktemp -d)" xvfb-run -a tools/bin/godot --path game --audio-driver Dummy \
   --resolution 1280x720 scenes/test/visual_review.tscn -- \
   mode=face character=fluttershy out=/tmp/shots
 # -> SHOT /tmp/shots/fluttershy_face_front.png  (+ threequarter, eye closeup, head wide)

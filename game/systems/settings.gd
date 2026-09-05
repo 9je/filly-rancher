@@ -26,6 +26,14 @@ const FILE_NAME := "settings.cfg"
 ## systems to disagree about whether this run is a test run.
 static var settings_path := PATH
 
+const SECTION := "settings"
+
+const VOLUME_STEP := 0.1
+const SENSITIVITY_MIN := 0.001
+const SENSITIVITY_MAX := 0.010
+const SENSITIVITY_STEP := 0.0005
+const SENSITIVITY_DEFAULT := 0.0035  # camera_rig.gd's exported default
+
 
 ## Where settings.cfg belongs given the directory the saves are going to. The player's own save
 ## directory leaves it exactly where it has always been, beside saves/ rather than inside it;
@@ -43,14 +51,6 @@ static func resolve_settings_path(save_directory: String) -> String:
 ## fills session_save_dir before this line reads it.
 static func _static_init() -> void:
 	settings_path = resolve_settings_path(SaveIO.session_save_dir)
-
-const SECTION := "settings"
-
-const VOLUME_STEP := 0.1
-const SENSITIVITY_MIN := 0.001
-const SENSITIVITY_MAX := 0.010
-const SENSITIVITY_STEP := 0.0005
-const SENSITIVITY_DEFAULT := 0.0035  # camera_rig.gd's exported default
 
 signal changed()
 
