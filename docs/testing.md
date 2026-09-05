@@ -619,12 +619,17 @@ and no price, which moves what the ranch gate's `RANCH regions=` line checks:
 "every region has a fence" is now "every priced region has a fence", because a
 free region has nothing to unlock and ranch.tscn carries no `Fence_strip`.
 
-`props` moved again in slice R2, from 111 to 107: the thirty nine Kenney blob trees
+`props` moved again in slice R2, from 111 to 128: the thirty nine Kenney blob trees
 were replanted as Sweet Apple Acres trees on the same thirty nine coordinates (so every
 fence ring and zone clearance already proved stays proved), the windmill and the watermill
 came off the map (`game/world/building.gd`'s own header calls them a bare X of sails and a
 bare waterwheel), and the standalone Ponyville General and its sign came out because the
-Market building wears that model itself now.
+Market building wears that model itself now (this alone put the count at 107, the number
+the ranch gate printed after that pass). The placement pass that followed put it back up to
+128: a real `saa_dirt_road` road under the town row and a `saa_shed` beside the Barn in the
+homestead yard, plus a boardwalk of the same road piece running north and turning into the
+Palace's own approach, each entry composed against its neighbours rather than dropped in a
+gap.
 
 **`props` and `ponies` did NOT move when the Market got a vendor and the Palace got
 a teller, and that is deliberate.** Both are `Attendant` nodes: `PonyVisuals.build`

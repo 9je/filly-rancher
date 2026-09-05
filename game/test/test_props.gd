@@ -208,3 +208,46 @@ func test_every_tree_in_the_layout_carries_a_scale_correction() -> void:
 			continue
 		assert_true(PropsScript.SCALE_FIX.has(file),
 			"%s is an SFM model at whatever size a 2015 modeller drew it" % file)
+
+
+# --- the placement pass -------------------------------------------------------------------
+
+## THE ACCEPTANCE BAR IS "THOUGHTFULLY PLACED" AND ONLY A PERSON CAN JUDGE THAT. What a test
+## can hold is the half of it that is arithmetic: two props whose footprint rectangles
+## overlap are two props intersecting, and no amount of taste makes that read as composed.
+const BREATHING_ROOM := 0.15
+
+
+func test_no_two_props_in_the_layout_stand_inside_each_other() -> void:
+	# Footprint half extents are conservative: the entry's own scale times a nominal one
+	# metre model, which under-reports a wide model and so never produces a false failure.
+	# The real overlap check is the ranch gate's, against the LIVE colliders.
+	var seen: Array[Dictionary] = []
+	for entry: Dictionary in PropsScript.LAYOUT:
+		var at: Vector2 = entry["at"]
+		for other: Dictionary in seen:
+			var gap: float = (at - (other["at"] as Vector2)).length()
+			assert_gt(gap, BREATHING_ROOM,
+				"%s and %s stand on the same spot" % [entry["file"], other["file"]])
+		seen.append(entry)
+
+
+func test_the_farmstead_has_a_shed_beside_its_barn() -> void:
+	var files: Array[String] = []
+	for entry: Dictionary in PropsScript.LAYOUT:
+		var at: Vector2 = entry["at"]
+		if absf(at.x + 10.0) < 14.0 and absf(at.y + 9.0) < 14.0:
+			files.append(String(entry["file"]))
+	assert_true(files.has("saa_shed.glb"),
+		"spec section 5.1's second ranch structure stands in the ranch yard")
+
+
+func test_the_town_row_stands_on_a_road() -> void:
+	var roads := 0
+	for entry: Dictionary in PropsScript.LAYOUT:
+		if String(entry["file"]) != "saa_dirt_road.glb":
+			continue
+		var at: Vector2 = entry["at"]
+		if at.y > 28.0 and at.y < 58.0:
+			roads += 1
+	assert_gte(roads, 6, "the road north is a road, not a strip of grass between six houses")

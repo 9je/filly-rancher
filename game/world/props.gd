@@ -162,6 +162,7 @@ const SCALE_FIX := {
 	# --- Las Pegasus, on the Strip ---------------------------------------------------
 	"lp_skeeball.glb": 1.93,  # 2.46 m: native metres, a cabinet a pony can reach.
 	"lp_dance_game.glb": 1.93,  # 2.53 m: native metres.
+	"saa_small_dirt_pile.glb": 9.91,  # 0.35 m: native 0.068 m is a smear on the grass.
 	# --- the treeline, which is MLP now ------------------------------------------------
 	# THE KENNEY NATURE KIT'S FOLIAGE IS A FLAT CYAN SWATCH. docs/pipeline.md section 4
 	# quirk 6 checked it: "leafsGreen" is the colour Kenney authored, not a colour space
@@ -409,21 +410,35 @@ const LAYOUT := [
 	# from that point on. Removed rather than left as clutter: the Market wears the model
 	# now, and the census counts it once, under Buildings, the way it always counted the
 	# barn.
-	# --- the town row, on the road north --------------------------------------------
-	# SIX PONYVILLE ENVIRONMENTS BUILDINGS, three a side, facing the road. They are
-	# scenery: none has a door the game opens, none is an interaction candidate, and
-	# ranch.gd fails if any of their colliders reaches inside a building's interaction
-	# radius. All six carry a skirt: they are wide and they stand well outside Terrain's
-	# flat apron, which is exactly the case Props.needs_skirt() names.
+	# --- the town row, on the road north -------------------------------------------------
+	# A ROAD, AND SIX BUILDINGS THAT ARE NOT THE RANCH'S OWN. The Farmhouse, the Board and
+	# the Depot wear pv_wide_b, pv_bridged_b and pv_tower_b now (slice R2, ranch.tscn), so
+	# the row uses the three that are left plus the three new pieces
+	# tools/prop_manifest.txt gained, and nothing on the map is its own twin.
 	#
-	# The pack ships a gb_ ground decal and an _m mirror for every one of these;
-	# tools/convert_props.sh refuses both by name, so nothing in this block can be one.
-	{"file": "pv_tower_b.glb", "at": Vector2(15.0, 36.0), "yaw": 270.0, "family": &"mlp", "skirt": true},
-	{"file": "pv_wide_b.glb", "at": Vector2(15.0, 43.0), "yaw": 270.0, "family": &"mlp", "skirt": true},
-	{"file": "pv_pink_b.glb", "at": Vector2(15.0, 50.0), "yaw": 270.0, "family": &"mlp", "skirt": true},
-	{"file": "pv_courtyard_b.glb", "at": Vector2(-12.0, 36.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
-	{"file": "pv_balcony_b.glb", "at": Vector2(-12.0, 43.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
-	{"file": "pv_bridged_b.glb", "at": Vector2(-12.0, 50.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
+	# The road tiles are spaced by saa_dirt_road's own seated length so they abut: native
+	# size (20.254, 0.298, 4.385), so at yaw 0 the seated length along z is
+	# 4.385 * MLP_SCALE = 2.28 m, which is also a road-sized 10.52 m wide beside a 2.138 m
+	# pony -- no SCALE_FIX row needed. All 10.52 m of that width is past WIDE_FOOTPRINT and
+	# the road stands well outside Terrain's flat apron here, so every tile carries a skirt
+	# (ranch.gd's own "skirtless" check said so).
+	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 31.5), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 33.78), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 36.06), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 38.34), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 40.62), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 42.9), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 45.18), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 47.46), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 49.74), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 52.02), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 54.3), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "pv_pink_b.glb", "at": Vector2(15.0, 36.0), "yaw": 270.0, "family": &"mlp", "skirt": true},
+	{"file": "pv_ogb_1.glb", "at": Vector2(15.0, 43.0), "yaw": 270.0, "family": &"mlp", "skirt": true},
+	{"file": "pv_courtyard_b.glb", "at": Vector2(15.0, 50.0), "yaw": 270.0, "family": &"mlp", "skirt": true},
+	{"file": "pv_balcony_b.glb", "at": Vector2(-12.0, 36.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
+	{"file": "pv_ogb_2.glb", "at": Vector2(-12.0, 43.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
+	{"file": "pv_courtyard_b_balcony.glb", "at": Vector2(-12.0, 50.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
 	# --- the schoolyard, west of the road --------------------------------------------
 	# A SCHOOLYARD AND NO SCHOOL, and that is the pack rather than an omission.
 	# ponysfm-schoolhouse ships school_roof, school_door, school_window, school_sign,
@@ -458,21 +473,41 @@ const LAYOUT := [
 	# somewhere people go.
 	{"file": "lp_skeeball.glb", "at": Vector2(4.0, 69.0), "yaw": 180.0, "family": &"mlp", "skirt": true},
 	{"file": "lp_dance_game.glb", "at": Vector2(11.0, 69.0), "yaw": 180.0, "family": &"mlp", "skirt": true},
-	# --- the homestead yard ------------------------------------------------------------
-	# INSIDE TERRAIN'S FLAT APRON, where the ground is exactly y = 0 by construction, so
-	# none of these needs a skirt. Every one stands clear of the pen plot clearing
-	# (PEN_PLOTS_CENTRE (-14, 13), half extent 9) and outside MARKET_RADIUS 4.5,
-	# BOARD_RADIUS 3.0 and DEPOT_RADIUS 4.0 from the buildings they sit between; ranch.gd
-	# measures both of those against the LIVE colliders rather than against these origins.
-	{"file": "saa_hay_block.glb", "at": Vector2(-3.5, -14.0), "yaw": 15.0, "family": &"mlp"},
-	{"file": "saa_wagon.glb", "at": Vector2(7.5, -13.5), "yaw": 200.0, "family": &"mlp"},
+	# --- the boardwalk up to the Palace -------------------------------------------------
+	# THE APPROACH IS THE HALF OF A DESTINATION NOBODY BUILDS. The Palace's door faces world
+	# minus Z at (-10, 57.1), which sits INSIDE its own PALACE_RADIUS (6.0 from (-10, 61.6)):
+	# a solid road tile cannot pave the last stretch to the door without ranch.gd calling it
+	# an intrusion, so the boardwalk runs a narrow lane south of the building instead --
+	# each tile at yaw 0 is only 2.28 m wide here rather than the town row's 10.52 m, because
+	# it is spaced ALONG its own long axis instead of across it -- and stops at a small
+	# clearing a few strides short of the door, which the bushes dress as the entrance. Every
+	# tile clears the Palace's own rectangle (x in [-17, -3], z in [57.1, 66.1]), the arcade
+	# band (x in [-2, 18], z in [67, 72]) and PALACE_RADIUS itself, the last with room to
+	# spare (gap 7.65 m and 10.46 m respectively, both past the 6.0 m the door opens at).
+	{"file": "saa_dirt_road.glb", "at": Vector2(2.5, 58.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_dirt_road.glb", "at": Vector2(-9.0, 50.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "mlp_bush.glb", "at": Vector2(-3.0, 54.0), "yaw": 200.0, "family": &"mlp"},
+	{"file": "mlp_bush.glb", "at": Vector2(-9.0, 53.5), "yaw": 40.0, "family": &"mlp"},
+	# --- the homestead yard: a farmstead, not a field with objects dropped in it ---------
+	# READ AS A PICTURE. The shed stands beside the barn with the wagon between them and hay
+	# stacked against the shed's wall, which is what a working yard looks like; the well and
+	# the coop sit on the house side; the crates and the basket cluster by the market stall
+	# so the shop has a delivery corner rather than a scatter of clutter. Every coordinate
+	# clears the Market's own new footprint (10.62 m wide at 45 degrees about (-2, -1),
+	# reaching 5.9 m on the diagonal) by at least 0.6 m, and clears every interaction radius
+	# on the map by more.
+	{"file": "saa_shed.glb", "at": Vector2(-14.5, -13.5), "yaw": 205.0, "family": &"mlp"},
+	{"file": "saa_wagon.glb", "at": Vector2(-12.0, -14.5), "yaw": 200.0, "family": &"mlp"},
+	{"file": "saa_hay_block.glb", "at": Vector2(-16.0, -11.0), "yaw": 15.0, "family": &"mlp"},
+	{"file": "saa_hay_pile.glb", "at": Vector2(-17.5, -13.0), "yaw": 40.0, "family": &"mlp"},
+	{"file": "saa_seed_bag.glb", "at": Vector2(-15.0, -10.0), "yaw": 300.0, "family": &"mlp"},
+	{"file": "mlp_farm_well.glb", "at": Vector2(5.0, -11.5), "yaw": 60.0, "family": &"mlp"},
+	{"file": "mlp_chicken_coop.glb", "at": Vector2(12.5, -11.0), "yaw": 250.0, "family": &"mlp"},
 	{"file": "mlp_crate.glb", "at": Vector2(4.0, 7.0), "yaw": 30.0, "family": &"mlp"},
 	{"file": "mlp_basket.glb", "at": Vector2(2.5, 6.0), "yaw": 0.0, "family": &"mlp"},
-	{"file": "mlp_farm_well.glb", "at": Vector2(-3.0, 5.0), "yaw": 60.0, "family": &"mlp"},
-	# The coop moved a metre west when its scale was corrected: at 2.49 m across instead of
-	# 1.29 m its near corner came 4 cm inside MARKET_RADIUS, and ranch.gd's door check said
-	# so. Scenery does not stand in a doorway, so the prop moves rather than the check.
-	{"file": "mlp_chicken_coop.glb", "at": Vector2(-9.0, -2.0), "yaw": 250.0, "family": &"mlp"},
+	{"file": "mlp_bush.glb", "at": Vector2(-6.5, -12.0), "yaw": 120.0, "family": &"mlp"},
+	{"file": "mlp_bush.glb", "at": Vector2(13.5, -6.0), "yaw": 20.0, "family": &"mlp"},
+	{"file": "saa_small_dirt_pile.glb", "at": Vector2(-11.5, -4.5), "yaw": 0.0, "family": &"mlp"},
 ]
 
 var _placed: Array[Node3D] = []
