@@ -214,3 +214,46 @@ func test_the_marquee_bulbs_and_wash_are_not_counted_among_the_lamp_posts() -> v
 	# are untouched.
 	assert_eq(strip.light_count(), StripScript.LIGHT_COUNT,
 		"a bulb rail is not a lamp post and must not be counted as one")
+
+
+func test_the_marquee_stands_a_real_arch_over_the_board() -> void:
+	var strip: Strip = _built_strip()
+	var arch := strip.get_node_or_null(^"MarqueeArch") as MultiMeshInstance3D
+	assert_not_null(arch, "the marquee is geometry now, not a label on a slab")
+	assert_eq(arch.multimesh.instance_count, StripScript.MARQUEE_ARCH_SEGMENTS,
+		"every segment of the arch is drawn")
+	assert_eq(strip.marquee_arch_segments(), StripScript.MARQUEE_ARCH_SEGMENTS)
+
+
+## MEASURED THROUGH marquee_arch_peak_y() RATHER THAN THE MULTIMESH ITSELF. A MultiMesh's
+## instance transforms are RenderingServer state, and the headless dummy driver this suite is
+## required to run under (see tools/run_tests.sh) never allocates that buffer:
+## get_instance_transform() reads back all zeroes here even right after
+## set_instance_transform() wrote real numbers, confirmed against the same code run under a
+## real Vulkan context, where the readback is correct. marquee_arch_peak_y() answers the same
+## question in plain GDScript, which a headless run can actually hold.
+func test_the_arch_rises_above_the_board_and_stays_under_the_roofline() -> void:
+	var strip: Strip = _built_strip()
+	assert_not_null(strip.get_node_or_null(^"MarqueeArch"))
+	var peak: float = strip.marquee_arch_peak_y()
+	assert_gt(peak, strip.marquee_top_y(), "the arch crowns the board")
+	assert_lt(peak, PALACE_ORIGIN.y + PALACE_RIDGE_Y + 0.01, "and stays off the roof")
+
+
+func test_the_bulb_rail_rings_the_whole_arch_rather_than_two_straight_rows() -> void:
+	var strip: Strip = _built_strip()
+	assert_eq(strip.marquee_bulb_count(), StripScript.MARQUEE_BULBS)
+	assert_gte(StripScript.MARQUEE_BULBS, 18, "a marquee's rail is a ring, not five and five")
+
+
+func test_the_board_and_its_trim_are_never_within_a_hair_of_coplanar() -> void:
+	var strip: Strip = _built_strip()
+	var board := strip.get_node(^"MarqueeBoard") as MeshInstance3D
+	var trim := strip.get_node(^"MarqueeTrim") as MeshInstance3D
+	var facing: Vector3 = strip.marquee_facing()
+	var board_face: float = board.global_position.dot(facing) \
+		+ (board.mesh as BoxMesh).size.z * 0.5
+	var trim_face: float = trim.global_position.dot(facing) \
+		+ (trim.mesh as BoxMesh).size.z * 0.5
+	assert_gt(board_face - trim_face, StripScript.MARQUEE_STANDOFF_LAYER - 0.001,
+		"one centimetre of separation is what the flickering gold was")

@@ -70,6 +70,33 @@ const MARQUEE_BOARD_COLOR := Color(0.16, 0.07, 0.20)
 const MARQUEE_TRIM_COLOR := Color(0.98, 0.86, 0.45)
 const MARQUEE_TRIM := 0.10
 
+## HOW FAR EACH LAYER OF THE SIGN STANDS IN FRONT OF THE ONE BEHIND IT.
+##
+## THE BUG THIS CLOSES. The trim slab is 0.08 deep hung 0.03 in front of a 0.12 deep board:
+## the trim's front face landed at +0.07 and the board's at +0.06, one centimetre apart
+## across two full sized quads, which is two surfaces fighting for the same pixels at every
+## distance a player looks at this sign from. Five centimetres is small enough that nobody
+## reads it as a design change and large enough that the depth buffer is never asked to
+## choose. game/world/lobby_sign.gd's STANDOFF is the same number for the same reason.
+const MARQUEE_STANDOFF_LAYER := 0.05
+
+## THE ARCH OVER THE BOARD: how many segments it is drawn from and how far it rises above
+## the board's own top edge.
+##
+## A MARQUEE IS AN ARCH WITH BULBS ROUND IT. What stood here was a flat slab with a Label3D
+## in front of it and five bulbs along the top and five along the bottom, which is a notice
+## board with lights on it. Nine segments is enough that a semicircle at this size reads as a
+## curve rather than as a polygon at the distance the walk up to the door actually offers,
+## and it is one MultiMesh either way, so the cost is one draw call for the whole arch.
+const MARQUEE_ARCH_SEGMENTS := 9
+
+## KEPT UNDER MARQUEE_TOP_GAP (0.35), not merely small. The board's own top edge already sits
+## exactly TOP_GAP below the ridge -- mount_marquee() spends that whole gap positioning the
+## board -- so an arch that rises MORE than what is left over pokes through the roof no matter
+## how the board itself is placed. 0.30 leaves a nickel's width of clearance.
+const MARQUEE_ARCH_RISE := 0.30
+const MARQUEE_ARCH_THICKNESS := 0.16
+
 ## The headline fills this much of the board's height; the sponsor line under it is
 ## SPONSOR_SCALE of that. Both are a FRACTION OF THE BOARD, which is what "fitted text"
 ## means: change the board and the letters follow it.
@@ -87,15 +114,19 @@ const MARQUEE_COLOR := Color(1.0, 0.92, 0.62)
 const LAMP_ENERGY := 2.2
 const LAMP_RANGE := 16.0
 
-## TEN BULBS ROUND THE MARQUEE TRIM, as ONE MultiMeshInstance3D: ten instances and one draw
-## call. With glow on (the Environment gains it in the look pass) they bloom gently at dusk
-## and night, which is the whole point of a marquee.
+## THE BULB RAIL, as ONE MultiMeshInstance3D so the whole ring is one draw call. With glow on
+## (the Environment gains it in the look pass) they bloom gently at dusk and night, which is
+## the whole point of a marquee.
 ##
 ## NOT IN _lights, DELIBERATELY. Strip.light_count() answers how many LAMP POSTS are standing
 ## on the ring, the strip gate asserts it is LIGHT_COUNT minus the two skipped clear of the
 ## Palace (its walls, and since the look pass its door apron), and a bulb rail counted among
 ## them would break that check for a reason that has nothing to do with lamp posts.
-const MARQUEE_BULBS := 10
+##
+## EIGHTEEN, ROUND THE ARCH AND ALONG THE BOARD'S FOOT. Ten in two straight rows was the
+## board's shape; a marquee's rail follows its own outline, which here is nine segments of
+## arch plus nine along the bottom edge under them.
+const MARQUEE_BULBS := 18
 const MARQUEE_BULB_RADIUS := 0.055
 
 ## One soft wash on the board's own face. shadow_enabled off for the reason this file already
@@ -348,17 +379,18 @@ func _marquee() -> void:
 	trim_box.material = _flat_material(MARQUEE_TRIM_COLOR)
 	trim.mesh = trim_box
 	add_child(trim)
-	trim.global_position = _marquee_centre + _marquee_facing * 0.03
+	trim.global_position = _marquee_centre - _marquee_facing * MARQUEE_STANDOFF_LAYER
 
 	var lines: Array[String] = marquee_lines()
 	var headline_height: float = _marquee_size.y * MARQUEE_HEADLINE_FRACTION
 	_marquee_label("MarqueeHeadline", lines[0], headline_height,
 		_marquee_centre + Vector3(0.0, _marquee_size.y * 0.20, 0.0)
-			+ _marquee_facing * 0.09)
+			+ _marquee_facing * (MARQUEE_STANDOFF_LAYER * 2.0))
 	_marquee_label("MarqueeSponsor", lines[1],
 		headline_height * MARQUEE_SPONSOR_SCALE,
 		_marquee_centre + Vector3(0.0, -_marquee_size.y * 0.24, 0.0)
-			+ _marquee_facing * 0.09)
+			+ _marquee_facing * (MARQUEE_STANDOFF_LAYER * 2.0))
+	_marquee_arch()
 	_marquee_bulbs()
 	_marquee_wash()
 
@@ -404,8 +436,71 @@ func marquee_bulb_count() -> int:
 	return MARQUEE_BULBS
 
 
-## Ten emissive spheres spaced round the trim's perimeter, built as one MultiMesh so the whole
-## rail is one draw call.
+func marquee_arch_segments() -> int:
+	return MARQUEE_ARCH_SEGMENTS
+
+
+## The highest point any arch segment's centre reaches, in world Y: the board's own top edge
+## plus MARQUEE_ARCH_RISE, which _marquee_arch() below never exceeds.
+##
+## EXPOSED RATHER THAN READ BACK OFF THE MULTIMESH ITSELF. A MultiMesh's instance transforms
+## are RenderingServer state, not a plain node property, and the headless dummy driver this
+## project's own test runs are required to use (see tools/run_tests.sh) never allocates that
+## buffer -- get_instance_transform() reads back all zeroes there even immediately after
+## set_instance_transform() wrote real numbers, verified against the same code run under a
+## real Vulkan context, where it reads back correctly. A public accessor answering the same
+## question in plain GDScript is the only way a headless test can hold this claim.
+func marquee_arch_peak_y() -> float:
+	return marquee_top_y() + MARQUEE_ARCH_RISE
+
+
+## THE GOLD ARCH THAT CROWNS THE BOARD, as one MultiMesh of nine boxes swept round a
+## semicircle from the board's left edge to its right. Boxes rather than a torus for
+## _slab()'s reason in building.gd: Godot's own winding is used rather than re-derived, and a
+## hand wound curve that came out inside out would be an invisible hole rather than a visible
+## mistake. Each segment is turned so its long axis lies along the tangent of the sweep.
+##
+## IT RISES MARQUEE_ARCH_RISE ABOVE THE BOARD'S OWN TOP AND NO FURTHER, so mount_marquee()'s
+## own promise -- that the whole sign hangs clear of the roofline -- still holds without
+## anything here having to know what a Building is.
+func _marquee_arch() -> void:
+	var box := BoxMesh.new()
+	var span: float = _marquee_size.x + MARQUEE_TRIM * 2.0
+	var segment: float = (PI * span * 0.5) / float(MARQUEE_ARCH_SEGMENTS)
+	box.size = Vector3(segment * 1.06, MARQUEE_ARCH_THICKNESS, MARQUEE_ARCH_THICKNESS)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = MARQUEE_TRIM_COLOR
+	mat.metallic = 0.45
+	mat.roughness = 0.35
+	box.material = mat
+
+	var multi := MultiMesh.new()
+	multi.transform_format = MultiMesh.TRANSFORM_3D
+	multi.mesh = box
+	multi.instance_count = MARQUEE_ARCH_SEGMENTS
+
+	var right := Vector3(-_marquee_facing.z, 0.0, _marquee_facing.x)
+	var half_x: float = span * 0.5
+	var base_y: float = _marquee_centre.y + _marquee_size.y * 0.5
+	for i in MARQUEE_ARCH_SEGMENTS:
+		var t: float = (float(i) + 0.5) / float(MARQUEE_ARCH_SEGMENTS)
+		var angle: float = PI * t
+		var at: Vector3 = _marquee_centre \
+			+ right * (-cos(angle) * half_x) \
+			+ Vector3(0.0, (base_y - _marquee_centre.y) + sin(angle) * MARQUEE_ARCH_RISE, 0.0) \
+			+ _marquee_facing * MARQUEE_STANDOFF_LAYER
+		var basis := Basis(Vector3(0.0, 0.0, 1.0), -angle + PI * 0.5)
+		multi.set_instance_transform(i, Transform3D(basis, at))
+
+	var node := MultiMeshInstance3D.new()
+	node.name = "MarqueeArch"
+	node.multimesh = multi
+	add_child(node)
+
+
+## Emissive spheres spaced round the arch and along the board's foot, built as one MultiMesh
+## so the whole rail is one draw call. See _marquee_arch()'s own comment: this is the outline
+## a marquee's bulb rail actually follows, not two straight rows across a slab.
 func _marquee_bulbs() -> void:
 	var sphere := SphereMesh.new()
 	sphere.radius = MARQUEE_BULB_RADIUS
@@ -422,16 +517,26 @@ func _marquee_bulbs() -> void:
 	multi.mesh = sphere
 	multi.instance_count = MARQUEE_BULBS
 
-	var half := Vector2(_marquee_size.x * 0.5 + MARQUEE_TRIM * 0.5,
-		_marquee_size.y * 0.5 + MARQUEE_TRIM * 0.5)
 	var right := Vector3(-_marquee_facing.z, 0.0, _marquee_facing.x)
+	var half_span: float = _marquee_size.x * 0.5 + MARQUEE_TRIM * 0.5
+	var base_y: float = _marquee_centre.y + _marquee_size.y * 0.5
+	var lower_y: float = _marquee_centre.y - _marquee_size.y * 0.5 - MARQUEE_TRIM * 0.5
 	for i in MARQUEE_BULBS:
-		# Round the rim: five across the top and five across the bottom, which is the shape a
-		# marquee's bulb rail actually has.
-		var across: float = -1.0 + 2.0 * (float(i % 5) / 4.0)
-		var up: float = 1.0 if i < 5 else -1.0
-		var at: Vector3 = _marquee_centre + right * (half.x * across) \
-			+ Vector3(0.0, half.y * up, 0.0) + _marquee_facing * 0.06
+		# The first half ride the arch; the second half run the board's own foot under them,
+		# which is the outline a marquee's rail actually follows.
+		var at: Vector3
+		var half_count: int = MARQUEE_BULBS / 2
+		if i < half_count:
+			var t: float = (float(i) + 0.5) / float(half_count)
+			var angle: float = PI * t
+			at = _marquee_centre + right * (-cos(angle) * half_span) \
+				+ Vector3(0.0, (base_y - _marquee_centre.y)
+					+ sin(angle) * MARQUEE_ARCH_RISE, 0.0)
+		else:
+			var t: float = -1.0 + 2.0 * (float(i - half_count) / float(half_count - 1))
+			at = _marquee_centre + right * (half_span * t) \
+				+ Vector3(0.0, lower_y - _marquee_centre.y, 0.0)
+		at += _marquee_facing * (MARQUEE_STANDOFF_LAYER * 1.6)
 		multi.set_instance_transform(i, Transform3D(Basis(), at))
 
 	var node := MultiMeshInstance3D.new()
