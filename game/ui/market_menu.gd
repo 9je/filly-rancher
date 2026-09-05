@@ -16,6 +16,7 @@ const ShopRegistryScript := preload("res://systems/shop_registry.gd")
 const ShopItemScript := preload("res://systems/shop_item.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const MenuStyleScript := preload("res://ui/menu_style.gd")
+const MouseRowsScript := preload("res://ui/mouse_rows.gd")
 
 enum Tab { SELL, BUY }
 
@@ -56,6 +57,11 @@ var _tab: int = Tab.SELL
 var _selected := 0
 var _open := false
 
+## Where the pointer is resting, or -1. Not the cursor: see game/ui/table_menu.gd's own
+## comment on the same pair of fields.
+var _hovered := -1
+var _close: Button = null
+
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -71,6 +77,12 @@ func _ready() -> void:
 	_title.text = "MARKET"
 	_sell_tab.text = "SELL"
 	_buy_tab.text = "BUY"
+	var dim := get_node_or_null(^"Dim") as Control
+	if dim != null:
+		dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	_close = MouseRowsScript.close_button(MouseRowsScript.CLOSE_TEXT,
+		func(_index: int) -> void: close())
+	$Centre/Panel/Margin/Column.add_child(_close)
 	visible = false
 
 
@@ -89,6 +101,7 @@ func open() -> bool:
 		return false
 	_tab = Tab.SELL
 	_selected = 0
+	_hovered = -1
 	_open = true
 	visible = true
 	refresh()
@@ -101,6 +114,7 @@ func close() -> void:
 	if not _open:
 		return
 	_open = false
+	_hovered = -1
 	visible = false
 	closed.emit()
 	MenuStyleScript.tick_back()
@@ -328,33 +342,39 @@ func _sell_all_value() -> int:
 
 
 func _add_row(index: int, row_name: String, blurb: String, price: String, enabled: bool) -> void:
-	var row := PanelContainer.new()
-	row.add_theme_stylebox_override(&"panel", _row_style(index == _selected))
+	var row := MouseRowsScript.row(index, index == _selected, index == _hovered,
+		point_at_row, take_row)
 	var margin := MarginContainer.new()
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	margin.add_theme_constant_override(&"margin_left", 18)
 	margin.add_theme_constant_override(&"margin_right", 18)
 	margin.add_theme_constant_override(&"margin_top", 10)
 	margin.add_theme_constant_override(&"margin_bottom", 10)
 	row.add_child(margin)
 	var column := VBoxContainer.new()
+	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	margin.add_child(column)
 	var head := HBoxContainer.new()
+	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	head.add_theme_constant_override(&"separation", 24)
 	column.add_child(head)
 	var title := Label.new()
 	title.text = row_name
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	MenuStyleScript.style_label(title, 26,
 		MenuStyleScript.COLOR_NAME if enabled else MenuStyleScript.COLOR_DIM)
 	head.add_child(title)
 	var cost := Label.new()
 	cost.text = price
+	cost.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	MenuStyleScript.style_label(cost, 23,
 		MenuStyleScript.COLOR_VALUE if enabled else MenuStyleScript.COLOR_UNAFFORDABLE)
 	head.add_child(cost)
 	if not blurb.is_empty():
 		var sub := Label.new()
 		sub.text = blurb
+		sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		sub.custom_minimum_size = Vector2(720.0, 0.0)
 		MenuStyleScript.style_label(sub, 19, MenuStyleScript.COLOR_DIM)
@@ -376,3 +396,34 @@ func _row_style(selected: bool) -> StyleBoxFlat:
 	box.set_border_width_all(2 if selected else 1)
 	box.set_corner_radius_all(8)
 	return box
+
+
+# --- the pointer ----------------------------------------------------------------------------
+
+
+func hovered_index() -> int:
+	return _hovered
+
+
+func close_button_node() -> Button:
+	return _close
+
+
+## ONE CURSOR, TWO WAYS TO MOVE IT. Absolute where move_selection() is relative, and it makes
+## the same sound, because both are the player choosing a row.
+func point_at_row(index: int) -> void:
+	if index < 0 or index >= _row_count():
+		return
+	if index == _selected and index == _hovered:
+		return
+	_hovered = index
+	if index != _selected:
+		_selected = index
+		MenuStyleScript.tick_move()
+	refresh()
+
+
+func take_row(index: int) -> void:
+	point_at_row(index)
+	if _selected == index:
+		confirm()

@@ -12,6 +12,7 @@ extends CanvasLayer
 ## and the player is standing at one counter.
 
 const MenuStyleScript := preload("res://ui/menu_style.gd")
+const MouseRowsScript := preload("res://ui/mouse_rows.gd")
 
 enum Tab { DELIVER, PAY, STATEMENT }
 
@@ -60,6 +61,11 @@ var _tab: int = Tab.DELIVER
 var _selected := 0
 var _open := false
 
+## Where the pointer is resting, or -1. Not the cursor: see game/ui/table_menu.gd's own
+## comment on the same pair of fields.
+var _hovered := -1
+var _close: Button = null
+
 ## The named pony this menu has asked about and not yet been answered on, or &"" when it is
 ## not asking. While it is set the Deliver tab draws two rows (yes, no) and nothing else,
 ## and _row_count() agrees with that, so the cursor cannot wander off the question.
@@ -76,6 +82,12 @@ func _ready() -> void:
 	MenuStyleScript.apply_panel($Centre/Panel as PanelContainer)
 	visible = false
 	_title.text = TITLE
+	var dim := get_node_or_null(^"Dim") as Control
+	if dim != null:
+		dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	_close = MouseRowsScript.close_button(MouseRowsScript.CLOSE_TEXT,
+		func(_index: int) -> void: close())
+	$Centre/Panel/Margin/Column.add_child(_close)
 
 
 func open() -> bool:
@@ -86,6 +98,7 @@ func open() -> bool:
 	_open = true
 	_tab = Tab.DELIVER
 	_selected = 0
+	_hovered = -1
 	_cancel_confirm()
 	visible = true
 	refresh()
@@ -98,6 +111,7 @@ func close() -> void:
 	if not _open:
 		return
 	_open = false
+	_hovered = -1
 	_cancel_confirm()
 	visible = false
 	closed.emit()
@@ -292,11 +306,17 @@ func refresh() -> void:
 	var lines: Array[String] = drawn_lines()
 	for i in lines.size():
 		var picked: bool = i == _selected and _tab != Tab.STATEMENT
+		var row: int = i if i < count else -1
 		var label := Label.new()
 		label.text = MenuStyleScript.caret(picked) + lines[i]
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		label.add_theme_color_override("font_color",
 			MenuStyleScript.COLOR_VALUE if picked else MenuStyleScript.COLOR_NAME)
-		var holder: PanelContainer = MenuStyleScript.row_panel(picked)
+		var holder: PanelContainer
+		if row >= 0:
+			holder = MouseRowsScript.row(row, picked, row == _hovered, point_at_row, take_row)
+		else:
+			holder = MenuStyleScript.row_panel(picked)
 		holder.add_child(label)
 		_rows.add_child(holder)
 
@@ -335,3 +355,34 @@ func _unhandled_input(event: InputEvent) -> void:
 	else:
 		return
 	get_viewport().set_input_as_handled()
+
+
+# --- the pointer ----------------------------------------------------------------------------
+
+
+func hovered_index() -> int:
+	return _hovered
+
+
+func close_button_node() -> Button:
+	return _close
+
+
+## ONE CURSOR, TWO WAYS TO MOVE IT. Absolute where move_selection() is relative, and it makes
+## the same sound, because both are the player choosing a row.
+func point_at_row(index: int) -> void:
+	if index < 0 or index >= _row_count():
+		return
+	if index == _selected and index == _hovered:
+		return
+	_hovered = index
+	if index != _selected:
+		_selected = index
+		MenuStyleScript.tick_move()
+	refresh()
+
+
+func take_row(index: int) -> void:
+	point_at_row(index)
+	if _selected == index:
+		confirm()

@@ -20,6 +20,7 @@ extends CanvasLayer
 
 const MenuStyleScript := preload("res://ui/menu_style.gd")
 const CasinoSignScript := preload("res://systems/casino_sign.gd")
+const MouseRowsScript := preload("res://ui/mouse_rows.gd")
 
 ## DECLARED HERE AND NOWHERE ELSE ON THE LOBBY. `CasinoMenu` is not a `TableMenu`: same scene
 ## tree, same stage mechanism, but its own `CanvasLayer`, so it carries its own copy of this
@@ -97,6 +98,11 @@ var _tab: int = Tab.LOBBY
 var _selected := 0
 var _open := false
 
+## Where the pointer is resting, or -1. Not the cursor: see game/ui/table_menu.gd's own
+## comment on the same pair of fields.
+var _hovered := -1
+var _close: Button = null
+
 ## Seconds since this menu opened, advanced in _process while it is up. Read by paint() for
 ## the focus ring's breath and by every stage's own animation. NOT a clock: it is reset on
 ## open() so a screen looks the same the second time you walk up to it.
@@ -126,10 +132,18 @@ func _ready() -> void:
 	MenuStyleScript.apply_panel($Centre/Panel as PanelContainer)
 	visible = false
 	_title.text = TITLE
+	var dim := get_node_or_null(^"Dim") as Control
+	if dim != null:
+		dim.mouse_filter = Control.MOUSE_FILTER_STOP
 	if _stage != null:
-		_stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_stage.mouse_filter = Control.MOUSE_FILTER_STOP
+		_stage.focus_mode = Control.FOCUS_NONE
 		_stage.custom_minimum_size = stage_size()
 		_stage.draw.connect(_paint_stage)
+		_stage.gui_input.connect(_on_stage_input)
+	_close = MouseRowsScript.close_button(MouseRowsScript.CLOSE_TEXT,
+		func(_index: int) -> void: close())
+	$Centre/Panel/Margin/Column.add_child(_close)
 	set_process(false)
 
 
@@ -141,6 +155,7 @@ func open() -> bool:
 	_open = true
 	_tab = Tab.LOBBY
 	_selected = 0
+	_hovered = -1
 	_anim_t = 0.0
 	set_process(true)
 	visible = true
@@ -154,6 +169,7 @@ func close() -> void:
 	if not _open:
 		return
 	_open = false
+	_hovered = -1
 	visible = false
 	set_process(false)
 	closed.emit()
@@ -310,11 +326,24 @@ func refresh() -> void:
 	var caret: int = _selected + first_row_line_index()
 	for i in lines.size():
 		var picked: bool = i == caret and _row_count() > 0
+		# THE STAGE ALREADY COVERS EVERY ROW ON BOTH TABS: tile_rect() for the lobby,
+		# cage_row_rect() for the cage (see stage_hit_rects() below), so nothing this loop
+		# prints is ALSO a row nothing else already made clickable. Padding invisible rows
+		# in here the way table_menu.gd does for the tables would draw empty boxes under a
+		# tab (the lobby) whose column is otherwise blank, which is worse than not doing it.
+		var row: int = i - first_row_line_index()
+		if row < 0 or row >= _row_count():
+			row = -1
 		var label := Label.new()
 		label.text = MenuStyleScript.caret(picked) + lines[i]
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		MenuStyleScript.style_label(label, MenuStyleScript.ROW_SIZE,
 			MenuStyleScript.COLOR_VALUE if picked else MenuStyleScript.COLOR_NAME)
-		var holder: PanelContainer = MenuStyleScript.row_panel(picked)
+		var holder: PanelContainer
+		if row >= 0:
+			holder = MouseRowsScript.row(row, picked, row == _hovered, point_at_row, take_row)
+		else:
+			holder = MenuStyleScript.row_panel(picked)
 		holder.add_child(label)
 		_rows.add_child(holder)
 
@@ -376,6 +405,72 @@ func cage_row_rect(index: int) -> Rect2:
 	return Rect2(CAGE_ROW_ORIGIN + Vector2(
 		(CAGE_ROW_SIZE.x + 20.0) * float(index / CAGE_ROWS_PER_COLUMN),
 		CAGE_ROW_PITCH * float(index % CAGE_ROWS_PER_COLUMN)), CAGE_ROW_SIZE)
+
+
+# --- the felt, under the pointer ------------------------------------------------------------
+#
+## THE LOBBY'S TILES AND THE CAGE'S ROWS ARE ALREADY RECTS. tile_rect() and cage_row_rect()
+## are what paint() draws into, so the hit test asks the drawing where things are rather than
+## computing a second opinion. The house rules page is reading matter and offers no hits,
+## which is the correct answer for a page with nothing on it to choose.
+
+
+func stage_hit_rects() -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	match tab():
+		Tab.LOBBY:
+			for i in _row_count():
+				out.append(tile_rect(i))
+		Tab.CAGE:
+			for i in _row_count():
+				out.append(cage_row_rect(i))
+	return out
+
+
+func on_stage_hit(index: int) -> void:
+	take_row(index)
+
+
+func _on_stage_input(event: InputEvent) -> void:
+	if not is_open() or _stage == null or not MouseRowsScript.is_left_click(event):
+		return
+	var button := event as InputEventMouseButton
+	var index: int = MouseRowsScript.hit(stage_hit_rects(), button.position)
+	if index < 0:
+		return
+	on_stage_hit(index)
+	_stage.accept_event()
+
+
+# --- the pointer ----------------------------------------------------------------------------
+
+
+func hovered_index() -> int:
+	return _hovered
+
+
+func close_button_node() -> Button:
+	return _close
+
+
+## ONE CURSOR, TWO WAYS TO MOVE IT. Absolute where move_selection() is relative, and it makes
+## the same sound, because both are the player choosing a row.
+func point_at_row(index: int) -> void:
+	if index < 0 or index >= _row_count():
+		return
+	if index == _selected and index == _hovered:
+		return
+	_hovered = index
+	if index != _selected:
+		_selected = index
+		MenuStyleScript.tick_move()
+	refresh()
+
+
+func take_row(index: int) -> void:
+	point_at_row(index)
+	if _selected == index:
+		confirm()
 
 
 ## Whether an animation is running RIGHT NOW, as opposed to the idle breath. While this is
