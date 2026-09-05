@@ -328,7 +328,7 @@ GUT's own default of not descending into subdirectories without
 **And a floor on the test count**, for the half the script count cannot see: a
 file that still parses but has lost most of its tests (a mass rename, a bad
 merge, a `func test_x` that became `func x`). `MIN_TESTS` in
-`tools/run_tests.sh` -- currently **1571** -- is a deliberate FLOOR rather than an
+`tools/run_tests.sh` -- currently **1572** -- is a deliberate FLOOR rather than an
 exact count, so adding tests never breaks the build. Raise it when the suite
 grows; never lower it without saying in the same commit which tests went away
 and why. (It was 194 through Phase 1A and was raised to the suite's real size in

@@ -225,10 +225,11 @@ func paint(ci: Control) -> void:
 		Color(1.0, 1.0, 1.0, 0.85), Color(1.0, 0.92, 0.55, 0.95))
 
 
-## M10, final-review.md M2: A CLICK ON THE DIM CLOSES THE LETTER. Wired to Dim's own
-## gui_input in _ready() -- Dim is MOUSE_FILTER_STOP and everything between it and the sheet
-## is IGNORE, so every click on this panel, sheet included, reaches Dim and nowhere else. The
-## Close button under the footer is the discoverable version of the same act.
+## M10, final-review.md M2: A CLICK OFF THE SHEET CLOSES THE LETTER. Wired to Dim's own
+## gui_input in _ready(). The Stage is a STOP sibling drawn over Dim, so a click ON the
+## sheet lands there and does nothing -- deliberately: a reader resting her cursor on the
+## page must not lose the letter to a stray click. Only the dimmed margin around the paper
+## reaches Dim and closes. The Close button under the footer is the discoverable version.
 func _on_dim_input(event: InputEvent) -> void:
 	if not _open or not MouseRowsScript.is_left_click(event):
 		return

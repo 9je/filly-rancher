@@ -888,6 +888,15 @@ func test_the_wheel_moves_the_compendium_selection() -> void:
 	assert_eq(_menu.selected_index(), 0, "and wheel up must step it back")
 
 
+func test_the_row_holder_can_actually_hear_the_wheel() -> void:
+	# The re-review's one blocker: the scene bakes Rows at MOUSE_FILTER_IGNORE, and an
+	# IGNORE control never receives gui_input at all, so the two wheel tests beside this
+	# one passed by calling the handler directly while a real pointer could reach nothing.
+	# _ready() must lift the holder to PASS -- this pins the wiring, not the handler.
+	assert_eq(_menu._rows.mouse_filter, Control.MOUSE_FILTER_PASS,
+		"an IGNORE row holder silently disconnects every wheel in the pause menu")
+
+
 func test_the_wheel_follows_the_same_window_the_keyboard_does() -> void:
 	_wire_book()
 	_menu.open_page(PauseMenu.Page.COMPENDIUM)

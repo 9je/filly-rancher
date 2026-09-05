@@ -224,6 +224,11 @@ func _ready() -> void:
 		func(_index: int) -> void: back())
 	$Centre/Panel/Margin/Column.add_child(_close)
 	if _rows != null:
+		# PASS, not the scene's baked IGNORE: an IGNORE control never receives gui_input,
+		# so the wheel handler two lines down was unreachable from a real pointer (the
+		# re-review's one blocker). PASS keeps the printed rows' own IGNORE labels
+		# transparent while the holder finally hears the wheel.
+		_rows.mouse_filter = Control.MOUSE_FILTER_PASS
 		_rows.gui_input.connect(_on_rows_input)
 	set_process(false)
 
