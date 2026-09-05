@@ -491,3 +491,99 @@ func test_the_if_else_hoisted_local_pattern_survives_the_dynamic_call_on_both_br
 		rows_when_present = board.tutorial_rows()
 	_hud.set_tasks(rows_when_present)
 	assert_eq(_hud.task_lines().size(), 4, "a title and the three seeded rows")
+
+
+# --- the card, and the queue ------------------------------------------------------------
+
+## THE BLEED THROUGH. The owner, on her first full playtest: the H control card showed
+## through the letter she was reading. It is a PanelContainer on the HUD's own CanvasLayer,
+## so anything drawn over the world is drawn over it too, and the fix is that the card is not
+## on screen while an overlay is.
+##
+## HER TOGGLE IS REMEMBERED. A player who had the card up before opening a menu gets it back
+## when she closes the menu; a player who had it down does not suddenly get it.
+
+## I7, final-review.md I5: THE CARD IS UP THE MOMENT THE HUD ENTERS THE TREE, WITH NO
+## OVERLAY AND NO KEYPRESS. Before this fix `_hints_wanted` initialised false and the card
+## never appeared unless a player who was never told the key happened to press it anyway.
+func test_the_control_card_is_visible_by_default_on_a_fresh_hud() -> void:
+	assert_true(_hud.hints_visible())
+
+
+func test_pressing_h_dismisses_the_default_visible_card() -> void:
+	_hud._unhandled_input(_hints_key())
+	assert_false(_hud.hints_visible(), "H toggles it, whichever state it starts in")
+
+
+## I7, final-review.md I5: THE CARD IS THE PRE-BRANCH DEFAULT -- visible on a fresh
+## interactive game (`_hints_wanted` starts true, hud.gd's own _ready()) until dismissed
+## with H, and it still hides under an overlay per Task 7's bleed-through fix.
+func test_an_overlay_hides_the_card_and_closing_the_overlay_gives_it_back() -> void:
+	_hud.set_overlay_open(false)
+	assert_true(_hud.hints_visible(), "visible by default; nothing has dismissed it")
+	_hud.set_overlay_open(true)
+	assert_false(_hud.hints_visible(), "and it is gone while she reads a letter")
+	assert_true(_hud.overlay_open())
+	_hud.set_overlay_open(false)
+	assert_true(_hud.hints_visible(), "and it comes back once the overlay closes")
+
+
+func test_an_overlay_does_not_conjure_a_card_she_dismissed() -> void:
+	_hud.set_overlay_open(false)
+	_hud._unhandled_input(_hints_key())
+	assert_false(_hud.hints_visible(), "she pressed H once and dismissed the default card")
+	_hud.set_overlay_open(true)
+	_hud.set_overlay_open(false)
+	assert_false(_hud.hints_visible(), "an overlay opening and closing must not bring it back")
+
+
+func test_the_card_key_does_nothing_while_an_overlay_is_up() -> void:
+	_hud.set_overlay_open(true)
+	_hud._unhandled_input(_hints_key())
+	assert_false(_hud.hints_visible(),
+		"H under a letter would put the card straight back over it")
+
+
+func _hints_key() -> InputEventAction:
+	var event := InputEventAction.new()
+	event.action = HudScript.HINTS_ACTION
+	event.pressed = true
+	return event
+
+
+## THE TOAST LAG. The owner: "text on top lags behind". Three quick actions used to queue
+## three full TOAST_HOLDs, so the third line arrived nine seconds after the thing it was
+## about. A backed up queue now runs short.
+
+func test_a_single_toast_gets_its_full_time() -> void:
+	_hud.toast("Caught somebody!")
+	_hud._process(0.0)
+	assert_almost_eq(_hud.toast_seconds_left(), HudScript.TOAST_HOLD + HudScript.TOAST_FADE, 0.001)
+
+
+func test_a_backed_up_toast_runs_short_so_the_queue_keeps_up() -> void:
+	_hud.toast("one")
+	_hud.toast("two")
+	_hud._process(0.0)
+	assert_lte(_hud.toast_seconds_left(), HudScript.TOAST_HOLD_BUSY + HudScript.TOAST_FADE,
+		"a toast with somebody waiting behind it does not hold the full time")
+	assert_eq(_hud.pending_toasts(), ["two"] as Array[String])
+
+
+func test_the_queue_never_grows_past_its_cap_and_keeps_the_newest() -> void:
+	for i in range(HudScript.TOAST_QUEUE_MAX + 4):
+		_hud.toast("line %d" % i)
+	assert_lte(_hud.pending_toasts().size(), HudScript.TOAST_QUEUE_MAX,
+		"rapid play must not build a backlog nobody will read")
+	assert_eq(_hud.pending_toasts().back(),
+		"line %d" % (HudScript.TOAST_QUEUE_MAX + 3),
+		"the newest line is the one that matters")
+
+
+func test_the_queue_drains_and_the_last_line_still_gets_shown() -> void:
+	_hud.toast("one")
+	_hud.toast("two")
+	for i in range(200):
+		_hud._process(0.05)
+	assert_eq(_hud.pending_toasts(), [] as Array[String], "the queue emptied")
+	assert_eq(_hud.toast_text(), "two", "and the last line was actually shown")

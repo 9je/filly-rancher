@@ -55,9 +55,19 @@ static func _static_init() -> void:
 signal changed()
 
 var master_volume := 1.0
+
+## THE AMBIENCE STARTS SIX DECIBELS DOWN. The owner, on the first full playtest: the beds sit
+## on top of everything. linear_to_db(0.5) is -6.02, which is the number spec section 6 asks
+## for, expressed as the linear the slider and the bus actually take.
+##
+## A DEFAULT AND NOT A CEILING: step_ambient() still walks the whole 0 to 1 range, and a
+## settings.cfg that already carries a value keeps it, because load_from() defaults to the
+## field rather than overwriting it.
+const AMBIENT_DEFAULT := 0.5
+
 ## The two sub mixes, on the Ambient and Effects buses. The UI bus rides effects_volume:
 ## a fourth slider is knob clutter for a channel nobody wants louder than its own game.
-var ambient_volume := 1.0
+var ambient_volume := AMBIENT_DEFAULT
 var effects_volume := 1.0
 var mouse_sensitivity := SENSITIVITY_DEFAULT
 var invert_look := false

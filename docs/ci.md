@@ -62,11 +62,17 @@ and requires **both**:
 * exit code `0`, and
 * a line matching `RANCH_OK` in the captured output.
 
-`RANCH_OK` is what `game/world/ranch.gd` prints — the main scene since **Phase 1A
-Task 7** (`game/project.godot`: `run/main_scene = res://world/ranch.tscn`). It is
-printed *only* when every check that scene runs actually held; otherwise the scene
-prints `RANCH_FAILED` and exits 1, so a broken ranch fails this script on the exit
-code as well as on the marker.
+`RANCH_OK` is what `game/world/ranch.gd` prints. It is printed *only* when every
+check that scene runs actually held; otherwise the scene prints `RANCH_FAILED` and
+exits 1, so a broken ranch fails this script on the exit code as well as on the
+marker. `game/project.godot`'s `run/main_scene` was `res://world/ranch.tscn` from
+**Phase 1A Task 7**; from R1 on it is `res://ui/title_screen.tscn`, the title
+screen the game now opens on for a person at a keyboard. A bare boot with no scene
+argument -- exactly what this script and the Windows export smoke do -- is not a
+person at a keyboard, so `game/ui/title_screen.gd`'s `is_interactive()` says so and
+the title screen hands straight off to `world/ranch.tscn` before a frame of it is
+ever drawn, which is what still prints `RANCH_OK` here. See docs/testing.md, "The
+boot path, and why a title screen does not get in front of a gate".
 
 **`SMOKE_OK` was removed from `MARKERS` when the ranch landed**, as the note that
 used to live here asked. `game/scenes/test/smoke.tscn` still exists and is still run

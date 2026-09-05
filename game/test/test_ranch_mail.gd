@@ -114,7 +114,7 @@ func test_the_pause_menu_is_handed_the_mail_and_the_picker() -> void:
 	assert_eq((menu.mail_provider.call() as Array).size(), 1)
 
 
-func test_the_mail_page_is_reachable_by_the_verb_at_the_mailbox() -> void:
+func test_the_verb_at_the_mailbox_opens_the_letter_there() -> void:
 	var box = _ranch.get_mailbox()
 	_ranch.player.global_position = box.global_position + Vector3(1.0, 0.0, 0.0)
 	_ranch.player.global_position.y = _ranch.terrain.height_at(
@@ -124,10 +124,8 @@ func test_the_mail_page_is_reachable_by_the_verb_at_the_mailbox() -> void:
 	assert_eq(int(action.get("kind", -1)),
 		preload("res://world/interaction.gd").Kind.MAILBOX)
 	assert_true(_ranch.perform_interaction(action))
-	var menu = _ranch.get_pause_menu()
-	assert_true(menu.is_open())
-	assert_eq(menu.page(), PauseMenuScript.Page.MAIL)
-	menu.close()
+	assert_true(_ranch.letter_panel.is_open(), "the reader, not the pause menu")
+	_ranch.letter_panel.close()
 
 
 func test_the_requisition_does_nothing_at_all_until_it_has_been_posted() -> void:
@@ -233,3 +231,58 @@ func test_a_requisition_waits_for_a_pony_who_is_in_the_saddlebag_rather_than_a_p
 	assert_false(bool(result["served"]))
 	assert_false(_state.story.has_flag("requisition_served"),
 		"she is still hers; the collector calls again when she is in a pen")
+
+
+# --- the mailbox is where mail is read --------------------------------------------------
+
+## THE OWNER, ON HER FIRST FULL PLAYTEST: "it says it's by your house but it's in the pause
+## menu". The letter told her where her mailbox was and then the verb at the mailbox opened a
+## menu page. The fiction is consistent from here: the mailbox opens the letter, and the pause
+## page is the archive of what has already come.
+
+func test_the_mailbox_opens_the_newest_unread_letter_in_the_reader() -> void:
+	var row: Dictionary = _ranch.newest_unread_row()
+	assert_false(row.is_empty(), "a fresh ranch has a letter waiting")
+	assert_true(_ranch.open_mailbox_letter())
+	assert_true(_ranch.letter_panel.is_open(), "the reader, not the menu page")
+	assert_eq(_ranch.letter_panel.title_text(), String(row["title"]))
+
+
+func test_reading_at_the_mailbox_marks_the_letter_read() -> void:
+	var row: Dictionary = _ranch.newest_unread_row()
+	_ranch.open_mailbox_letter()
+	assert_true(_state.story.is_read(StringName(String(row["id"]))),
+		"she read it; the flag comes down")
+
+
+func test_a_second_visit_with_nothing_unread_re_reads_the_newest() -> void:
+	_ranch.open_mailbox_letter()
+	_ranch.letter_panel.close()
+	assert_true(_ranch.newest_unread_row().is_empty(), "nothing unread now")
+	assert_true(_ranch.open_mailbox_letter(),
+		"a mailbox with post in it is never a dead key")
+	assert_true(_ranch.letter_panel.is_open())
+
+
+func test_an_empty_mailbox_says_so_rather_than_doing_nothing() -> void:
+	_state.story.mail.clear()
+	assert_false(_ranch.open_mailbox_letter())
+	assert_false(_ranch.letter_panel.is_open())
+
+
+func test_a_letter_that_asks_a_question_goes_to_the_page_that_can_answer_it() -> void:
+	# The Survey carries a PICK_PONY reply control, and the reader is read only by design
+	# (letter_panel.gd's class comment). So the one letter with a question in it opens where
+	# the picker lives, and the fiction holds because that page is still her own mailbox.
+	_state.story.post(&"weather_survey")
+	_ranch.open_mailbox_letter()
+	assert_true(_ranch.get_pause_menu().is_open(),
+		"a letter with a reply opens the page that can take one")
+	assert_eq(_ranch.get_pause_menu().open_letter_id(), &"weather_survey")
+
+
+func test_the_archive_page_says_what_it_is() -> void:
+	assert_eq(PauseMenu.MAIN_ROWS[PauseMenu.Row.MAIL], "Saddlebag copies")
+	assert_false(PauseMenu.MAIL_ARCHIVE_NOTE.is_empty())
+	assert_false(PauseMenu.MAIL_ARCHIVE_NOTE.contains("--"))
+	assert_false(PauseMenu.MAIL_ARCHIVE_NOTE.contains(char(0x2014)))

@@ -59,6 +59,7 @@ const PlotRegistryScript := preload("res://systems/plot_registry.gd")
 const PlotDataScript := preload("res://systems/plot_data.gd")
 const PlotSlotScript := preload("res://world/plot_slot.gd")
 const MenuStyleScript := preload("res://ui/menu_style.gd")
+const MouseRowsScript := preload("res://ui/mouse_rows.gd")
 
 @onready var _dim: ColorRect = $Dim
 @onready var _panel: PanelContainer = $Centre/Panel
@@ -82,6 +83,11 @@ var _row_nodes: Array[PanelContainer] = []
 var _slot: PlotSlot = null
 var _selected := 0
 var _open := false
+
+## Where the pointer is resting, or -1. Not the cursor: see game/ui/table_menu.gd's own
+## comment on the same pair of fields.
+var _hovered := -1
+var _close: Button = null
 
 ## `func() -> int`, the current bits. Injected by game/world/ranch.gd rather than reached
 ## for through the GameState autoload, so this menu is testable with a two-line lambda and
@@ -110,6 +116,10 @@ func _ready() -> void:
 	MenuStyleScript.style_label(_title, MenuStyleScript.TITLE_SIZE, MenuStyleScript.COLOR_TITLE)
 	MenuStyleScript.style_label(_wallet, MenuStyleScript.ROW_SIZE, MenuStyleScript.COLOR_DIM)
 	_title.text = "BUILD"
+	_dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	_close = MouseRowsScript.close_button(MouseRowsScript.CLOSE_TEXT,
+		func(_index: int) -> void: close())
+	$Centre/Panel/Margin/Column.add_child(_close)
 	_build_rows()
 	visible = false
 
@@ -127,6 +137,7 @@ func open(slot: PlotSlot) -> bool:
 		return false
 	_slot = slot
 	_selected = 0
+	_hovered = -1
 	_open = true
 	visible = true
 	_refresh()
@@ -139,6 +150,7 @@ func close() -> void:
 	if not _open:
 		return
 	_open = false
+	_hovered = -1
 	_slot = null
 	visible = false
 	closed.emit()
@@ -242,12 +254,19 @@ func _build_rows() -> void:
 		child.queue_free()
 	_row_nodes.clear()
 
-	for plot in _plots:
+	for i in _plots.size():
+		var plot: PlotData = _plots[i]
+		# ARMED ONCE, HERE, NOT IN _refresh(). MouseRows.arm() carries no double connect
+		# guard; these nodes survive every refresh() this menu ever does (see the class
+		# comment above), so arming them again on every repaint would stack a second
+		# gui_input connection on top of the first and fire take_row() twice per click.
 		var row := PanelContainer.new()
 		row.name = "Row_%s" % String(plot.id)
-		row.add_theme_stylebox_override(&"panel", _row_style(false))
+		MouseRowsScript.arm(row, i, point_at_row, take_row)
+		row.add_theme_stylebox_override(&"panel", MenuStyleScript.row_box(false))
 
 		var margin := MarginContainer.new()
+		margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		margin.add_theme_constant_override(&"margin_left", 18)
 		margin.add_theme_constant_override(&"margin_right", 18)
 		margin.add_theme_constant_override(&"margin_top", 12)
@@ -255,16 +274,19 @@ func _build_rows() -> void:
 		row.add_child(margin)
 
 		var column := VBoxContainer.new()
+		column.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		column.add_theme_constant_override(&"separation", 3)
 		margin.add_child(column)
 
 		var head := HBoxContainer.new()
+		head.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		head.add_theme_constant_override(&"separation", 24)
 		column.add_child(head)
 
 		var title := Label.new()
 		title.name = "Name"
 		title.text = plot.display_name
+		title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		MenuStyleScript.style_label(title, 27, MenuStyleScript.COLOR_NAME)
 		head.add_child(title)
@@ -272,18 +294,21 @@ func _build_rows() -> void:
 		var holds := Label.new()
 		holds.name = "Holds"
 		holds.text = ("holds %d" % plot.capacity) if plot.capacity > 0 else ""
+		holds.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		MenuStyleScript.style_label(holds, 21, MenuStyleScript.COLOR_DIM)
 		head.add_child(holds)
 
 		var price := Label.new()
 		price.name = "Cost"
 		price.text = "FREE" if plot.cost == 0 else "%d bits" % plot.cost
+		price.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		MenuStyleScript.style_label(price, 24, MenuStyleScript.COLOR_VALUE)
 		head.add_child(price)
 
 		var blurb := Label.new()
 		blurb.name = "Description"
 		blurb.text = plot.description
+		blurb.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		blurb.custom_minimum_size = Vector2(720.0, 0.0)
 		MenuStyleScript.style_label(blurb, 19, MenuStyleScript.COLOR_DIM)
@@ -300,7 +325,14 @@ func _refresh() -> void:
 	_wallet.text = "%d bits" % bits()
 	for i in range(_row_nodes.size()):
 		var row := _row_nodes[i]
-		row.add_theme_stylebox_override(&"panel", _row_style(i == _selected))
+		# THE STYLEBOX ONLY, NEVER MouseRows.row() AGAIN HERE. .row() would hand back a new
+		# PanelContainer and arm it a second time; these rows are armed once, in
+		# _build_rows(), and this repaints the same three states row(): picked, hovered,
+		# idle -- MouseRows.row() computes internally.
+		var picked: bool = i == _selected
+		var box: StyleBoxFlat = MenuStyleScript.row_box(true) if picked \
+			else (MenuStyleScript.row_box_hover() if i == _hovered else MenuStyleScript.row_box(false))
+		row.add_theme_stylebox_override(&"panel", box)
 		var affordable := can_afford(_plots[i])
 		var price := row.find_child("Cost", true, false) as Label
 		if price != null:
@@ -312,12 +344,32 @@ func _refresh() -> void:
 				MenuStyleScript.COLOR_NAME if affordable else MenuStyleScript.COLOR_DIM)
 
 
-func _row_style(selected: bool) -> StyleBoxFlat:
-	var box := StyleBoxFlat.new()
-	box.bg_color = MenuStyleScript.ROW_SELECTED_BG if selected else MenuStyleScript.ROW_IDLE_BG
-	box.border_color = MenuStyleScript.ROW_SELECTED_BORDER if selected \
-		else MenuStyleScript.ROW_IDLE_BORDER
-	box.set_border_width_all(2 if selected else 1)
-	box.set_corner_radius_all(8)
-	box.content_margin_left = 0.0
-	return box
+# --- the pointer ----------------------------------------------------------------------------
+
+
+func hovered_index() -> int:
+	return _hovered
+
+
+func close_button_node() -> Button:
+	return _close
+
+
+## ONE CURSOR, TWO WAYS TO MOVE IT. Absolute where move_selection() is relative, and it makes
+## the same sound, because both are the player choosing a row.
+func point_at_row(index: int) -> void:
+	if index < 0 or index >= _plots.size():
+		return
+	if index == _selected and index == _hovered:
+		return
+	_hovered = index
+	if index != _selected:
+		_selected = index
+		MenuStyleScript.tick_move()
+	_refresh()
+
+
+func take_row(index: int) -> void:
+	point_at_row(index)
+	if _selected == index:
+		confirm()

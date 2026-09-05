@@ -175,6 +175,17 @@ const RARITY_COLORS := {
 const TOAST_HOLD := 2.4
 const TOAST_FADE := 0.7
 
+## WHAT A TOAST GETS WHEN SOMEBODY IS WAITING BEHIND IT. The owner, on the first full
+## playtest: "text on top lags behind". Three quick actions queued three full holds, so the
+## line about the third one arrived nine seconds after the thing it described and read as a
+## bug in the game rather than in the overlay. A queue with anything in it now runs the
+## current line short instead, so the text keeps pace with the play.
+const TOAST_HOLD_BUSY := 0.6
+
+## And a ceiling on the backlog itself. Past this the OLDEST waiting line is dropped, not the
+## newest: nine seconds of stale news is worse than a line nobody read.
+const TOAST_QUEUE_MAX := 3
+
 ## Input action that shows/hides the hints card. Bound in game/project.godot to H and to
 ## the gamepad Back button.
 const HINTS_ACTION := &"toggle_hints"
@@ -214,6 +225,10 @@ var _storage: Storage
 var _toast_left := 0.0
 ## Toasts raised while another one is on screen, oldest first. See toast().
 var _toast_queue: Array[String] = []
+## Whether a letter or a menu is on screen right now, and whether the player had asked for
+## the control card before one appeared. See set_overlay_open().
+var _overlay_open := false
+var _hints_wanted := false
 var _task_lines: Array[String] = []
 var _rarities: Array[int] = []
 var _capacity := 0
@@ -251,6 +266,16 @@ func _ready() -> void:
 
 	_bag_title.text = "SADDLEBAG"
 	_build_hints()
+	# I7, final-review.md I5: THE CARD IS THE PRE-BRANCH DEFAULT -- visible on a fresh
+	# interactive game until dismissed with H. `_hints_wanted` starting true is not enough
+	# on its own: ranch.gd only ever calls set_overlay_open() from its own menu opened/
+	# closed handlers, so a Continue boot that opens no menu at all would leave `_hints.
+	# visible` stuck at whatever this line set it to, forever. set_overlay_open(false) is
+	# the one function that already knows how to compute it (_hints_wanted and not
+	# _overlay_open, and _overlay_open starts false, the state boot is actually in), so
+	# this calls that rather than hard-coding a value a second place.
+	_hints_wanted = true
+	set_overlay_open(false)
 	_toast.modulate.a = 0.0
 
 	_bind()
@@ -267,10 +292,15 @@ func _process(delta: float) -> void:
 		_bind()
 
 	if _toast_left > 0.0:
+		# A LINE WITH SOMEBODY BEHIND IT RUNS SHORT. Applied here rather than in toast(),
+		# because the queue can grow after the current line has already started, and the
+		# player who just did three things quickly is the player this is for.
+		if not _toast_queue.is_empty():
+			_toast_left = minf(_toast_left, TOAST_HOLD_BUSY + TOAST_FADE)
 		_toast_left -= delta
 		_toast.modulate.a = clampf(_toast_left / TOAST_FADE, 0.0, 1.0)
 		# The queue is drained here rather than on a timer, so a toast raised while the
-		# world is paused still waits its turn: this _process runs always (see _ready).
+		# world is paused still waits its turn rather than being written over.
 		if _toast_left <= 0.0 and not _toast_queue.is_empty():
 			_show_toast(_toast_queue.pop_front())
 
@@ -289,7 +319,12 @@ func _process(delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(HINTS_ACTION):
-		_hints.visible = not _hints.visible
+		# H UNDER A LETTER WOULD PUT THE CARD STRAIGHT BACK OVER IT. The overlay owns the
+		# screen while it is up; the key is remembered rather than refused, so the card she
+		# asks for arrives the moment the letter closes.
+		_hints_wanted = not _hints_wanted
+		if not _overlay_open:
+			_hints.visible = _hints_wanted
 		get_viewport().set_input_as_handled()
 
 
@@ -304,12 +339,15 @@ func _unhandled_input(event: InputEvent) -> void:
 ## its hold and its fade, and the next one starts the moment it is finished. Nothing is
 ## dropped and nothing jumps the line: the queue is first in, first out.
 ##
-## The wait is bounded by what raises the toasts, not by a cap here. The ranch only ever
-## says one or two things per action, and a cap would have to choose between throwing away
-## the newest message and throwing away the one already promised to the player.
+## THE BACKLOG IS CAPPED, AND THE LINE ALREADY ON SCREEN RUNS SHORT. See TOAST_QUEUE_MAX and
+## TOAST_HOLD_BUSY: rapid play can raise more than anyone reads in time, and nine seconds of
+## stale news is worse than a line nobody saw, so past the cap the OLDEST waiting line goes,
+## never the newest.
 func toast(text: String) -> void:
 	if _toast_left > 0.0:
 		_toast_queue.append(text)
+		while _toast_queue.size() > TOAST_QUEUE_MAX:
+			_toast_queue.pop_front()
 		return
 	_show_toast(text)
 
@@ -328,11 +366,38 @@ func toast_text() -> String:
 	return _toast.text
 
 
+## How long the line on screen has left, holding and fading together. For the tests, which
+## otherwise have to infer the timer from an alpha.
+func toast_seconds_left() -> float:
+	return _toast_left
+
+
 ## The toasts raised but not yet shown, oldest first. A copy: a caller that emptied this
 ## would be silently swallowing something the player was promised. For the tests and gates
 ## that have to tell "queued behind the line on screen" from "never said at all".
 func pending_toasts() -> Array[String]:
 	return _toast_queue.duplicate()
+
+
+## A LETTER OR A MENU IS ON SCREEN, OR IT IS NOT. The owner's playtest, on the welcome
+## letter: the H control card bled through it. Every panel in this game is a CanvasLayer over
+## the world and so is this overlay, so "over the world" was never going to be enough; the
+## card has to be told.
+##
+## HER OWN TOGGLE IS REMEMBERED ACROSS THE OVERLAY. A player who had the card up gets it back
+## when the letter closes; a player who did not is not handed one she never asked for.
+func set_overlay_open(open: bool) -> void:
+	_overlay_open = open
+	if _hints != null:
+		_hints.visible = _hints_wanted and not _overlay_open
+
+
+func overlay_open() -> bool:
+	return _overlay_open
+
+
+func hints_visible() -> bool:
+	return _hints != null and _hints.visible
 
 
 ## The magic beam this HUD is reading, or null if it has not been found yet. Exposed for

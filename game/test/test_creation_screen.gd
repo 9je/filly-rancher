@@ -7,6 +7,10 @@ const StockPaletteScript := preload("res://systems/stock_palette.gd")
 const MarkPaintScript := preload("res://systems/mark_paint.gd")
 const MarkStampsScript := preload("res://systems/mark_stamps.gd")
 
+## Matches test_letter_panel.gd's own VIEWPORT_HEIGHT: game/project.godot's base viewport,
+## the size the LOOK step's column has to fit inside with margin (C1, final-review.md).
+const VIEWPORT_HEIGHT := 1080.0
+
 var _screen: CreationScreen = null
 
 
@@ -125,7 +129,7 @@ func test_the_ink_buttons_exist_and_are_wired_to_the_canvas() -> void:
 	var canvas: MarkCanvas = _screen.canvas()
 	for index in CreationScreen.ink_count():
 		var button := _screen.get_node_or_null(
-			NodePath("Panel/Column/InkRow/Ink%d" % index)) as BaseButton
+			NodePath("Layout/Panel/Margin/Column/InkRow/Ink%d" % index)) as BaseButton
 		assert_not_null(button, "ink %d has no button to press" % index)
 		if button == null:
 			continue
@@ -185,3 +189,254 @@ func test_the_mane_style_survives_confirm() -> void:
 	_screen.cycle_mane_style(2)
 	_screen.confirm()
 	assert_eq(_screen.look().mane_style, 2)
+
+
+# --- the rebuilt screen -----------------------------------------------------------------
+
+## THE OWNER'S TWO COMPLAINTS, PINNED. Acceptance item 1: "New save: no frame of raw world,
+## CC full-screen, pony clearly visible." Acceptance item 2: "CC layout reads industry
+## standard, mouse-driven."
+
+const SwatchGridScript := preload("res://ui/swatch_grid.gd")
+const CreationBackdropScript := preload("res://ui/creation_backdrop.gd")
+
+
+func test_the_backdrop_is_opaque_and_covers_the_whole_screen() -> void:
+	var backdrop := _screen.get_node("Backdrop") as Control
+	assert_true(backdrop is CreationBackdrop,
+		"a Panel with a colour is not a show style stage")
+	assert_eq(backdrop.mouse_filter, Control.MOUSE_FILTER_STOP)
+	assert_eq(backdrop.anchor_right, 1.0)
+	assert_eq(backdrop.anchor_bottom, 1.0)
+
+
+func test_the_backdrop_can_be_raised_before_the_rest_of_the_screen_exists() -> void:
+	_screen.raise_backdrop()
+	assert_true(_screen.visible, "the veil is up")
+	assert_true(_screen.backdrop_only(), "and nothing else is showing yet")
+	assert_false(_screen.is_open(), "raising the veil is not opening the screen")
+
+
+func test_opening_over_a_raised_backdrop_shows_the_whole_screen() -> void:
+	_screen.raise_backdrop()
+	_screen.open(null)
+	assert_true(_screen.is_open())
+	assert_false(_screen.backdrop_only())
+
+
+func test_the_turntable_fills_a_real_share_of_the_screen() -> void:
+	var viewport := _screen.get_node("Layout/Stage/Viewport") as SubViewportContainer
+	assert_gte(viewport.size_flags_stretch_ratio, 1.0,
+		"the pony is the point of this screen and has to be big enough to see")
+
+
+## C1, final-review.md: the LOOK step's four grids at 72 px cells and 6/3 columns put the
+## column at 1281 px in a 1080 px viewport -- off screen, no scrollbar, no wheel handler.
+##
+## MEASURES THE COLUMN'S OWN MINIMUM SIZE, NOT A LIVE Panel.size. The report's own
+## reproduction did the same ("column_min = (512.0, 1281.0)", instantiating the screen and
+## reading get_combined_minimum_size() on Layout/Panel/Margin/Column) rather than reading a
+## laid-out Panel.size the way test_letter_panel.gd's own viewport test does -- and for a
+## reason specific to this screen: Layout is a full-rect HBoxContainer, not letter_panel.gd's
+## CenterContainer, so a live Panel.size here is however much of the ACTUAL window the
+## engine's "expand" stretch mode hands the layout, which is not 1920x1080 under every
+## headless test runner's own default window shape. The column's intrinsic minimum size is
+## content driven and answers the same question ("does this fit 1080 with margin") without
+## depending on what shape window happens to be running the test.
+func test_the_look_and_mark_steps_both_fit_the_1080_viewport() -> void:
+	for step: int in [CreationScreen.Step.LOOK, CreationScreen.Step.MARK]:
+		_screen.set_step(step)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		var column := _screen.get_node("Layout/Panel/Margin/Column") as VBoxContainer
+		var column_min: Vector2 = column.get_combined_minimum_size()
+		assert_lte(column_min.y, VIEWPORT_HEIGHT,
+			"step %d's column must leave its confirm button on screen, got %f"
+				% [step, column_min.y])
+
+
+## The regression C1 pins directly: the LOOK column's OWN minimum height (not the panel it
+## sits in, which a MarginContainer can clip) has to be comfortably under the viewport so a
+## palette entry added later has headroom before it reproduces C1.
+func test_the_look_columns_minimum_height_leaves_margin_under_1080() -> void:
+	_screen.set_step(CreationScreen.Step.LOOK)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var column := _screen.get_node("Layout/Panel/Margin/Column") as VBoxContainer
+	var column_min: Vector2 = column.get_combined_minimum_size()
+	assert_lt(column_min.y, 1000.0,
+		"the LOOK column's real minimum height must clear the 1080 viewport with margin, got %f"
+			% column_min.y)
+
+
+func test_the_three_colour_rows_are_swatch_grids_and_not_steppers() -> void:
+	var checked := 0
+	for name: String in ["CoatGrid", "ManeGrid", "EyesGrid"]:
+		var grid := _screen.find_child(name, true, false)
+		assert_true(grid is SwatchGrid, "%s is not a SwatchGrid" % name)
+		assert_gt((grid as SwatchGrid).cell_count(), 1, "%s has a palette in it" % name)
+		checked += 1
+	assert_eq(checked, 3)
+
+
+func test_the_mane_style_row_is_a_card_grid_carrying_the_style_names() -> void:
+	var grid := _screen.find_child("ManeStyleGrid", true, false) as SwatchGrid
+	assert_not_null(grid)
+	assert_eq(grid.cell_count(), StockPalette.mane_style_count())
+	assert_eq(grid.cell(0).text, StockPalette.mane_style_label(0))
+
+
+func test_clicking_a_coat_swatch_sets_that_coat_on_the_look() -> void:
+	var grid := _screen.find_child("CoatGrid", true, false) as SwatchGrid
+	grid.cell(2).pressed.emit()
+	assert_eq(_screen.look().coat, 2, "the swatch she clicked is the coat she gets")
+
+
+func test_set_coat_and_cycle_coat_agree_so_the_gate_keeps_working() -> void:
+	_screen.set_coat(0)
+	_screen.cycle_coat(1)
+	assert_eq(_screen.look().coat, 1,
+		"scenes/test/creation_test.gd drives cycle_coat and must keep working")
+
+
+func test_the_mark_canvas_is_its_own_step() -> void:
+	assert_eq(_screen.step(), CreationScreen.Step.LOOK, "she meets her pony first")
+	_screen.set_step(CreationScreen.Step.MARK)
+	assert_eq(_screen.step(), CreationScreen.Step.MARK)
+	assert_true(_screen.canvas().visible, "the canvas is on screen on its own step")
+
+
+func test_dragging_the_turntable_turns_the_pony() -> void:
+	_screen.open(null)
+	var turntable := _screen.get_node("Layout/Stage/Viewport/SubViewport/Turntable") as Node3D
+	var before: float = turntable.rotation.y
+	var drag := InputEventMouseMotion.new()
+	drag.relative = Vector2(40.0, 0.0)
+	drag.button_mask = MOUSE_BUTTON_MASK_LEFT
+	_screen._on_stage_input(drag)
+	assert_ne(turntable.rotation.y, before, "drag to rotate, on top of the auto spin")
+
+
+func test_the_screen_offers_a_pointer_usable_confirm_and_close() -> void:
+	assert_eq(_screen._confirm.focus_mode, Control.FOCUS_NONE)
+	assert_false(_screen._confirm.text.is_empty())
+
+
+func test_every_string_the_screen_draws_is_still_in_drawn_lines() -> void:
+	var lines: Array[String] = _screen.drawn_lines()
+	for text: String in [CreationScreen.TITLE, CreationScreen.NAME_LABEL,
+			CreationScreen.COAT_LABEL, CreationScreen.MANE_LABEL,
+			CreationScreen.MANE_STYLE_LABEL, CreationScreen.EYES_LABEL,
+			CreationScreen.MARK_LABEL, CreationScreen.CONFIRM_LABEL,
+			CreationScreen.STEP_LOOK_LABEL, CreationScreen.STEP_MARK_LABEL]:
+		assert_true(text in lines, "'%s' is drawn but not declared" % text)
+
+
+func test_nothing_the_rebuilt_screen_draws_carries_a_dash() -> void:
+	var checked := 0
+	for line: String in _screen.drawn_lines():
+		assert_false(line.contains("--"), line)
+		assert_false(line.contains(char(0x2014)), line)
+		checked += 1
+	assert_gt(checked, 0, "the copy list was actually walked")
+
+
+# --- the keyboard's own cursor, fix round 1 -----------------------------------------------
+##
+## CONTROLLER RULING: the spec's global "keyboard must remain FULLY functional on every
+## screen" outranks task-8-brief.md's own Step 8.4, which left `_confirm`, the step buttons
+## and every SwatchGrid cell FOCUS_NONE with nothing to compensate. Every test below drives
+## the screen through the same small set of public methods _unhandled_input() itself calls
+## (switch_region/move_highlight/activate_highlight/release_name_edit), never through a
+## mouse position or a simulated InputEvent -- exactly test_build_menu.gd's own convention
+## for move_selection()/confirm(), which the class comment on creation_screen.gd's cursor
+## section names directly. Every one of these calls the pre fix-round build did not have at
+## all: run against that build, the very first `_screen.kb_region()` below is a call to a
+## method that does not exist, which GUT reports as an error and a failed test, not a
+## silent pass -- this is what "must fail if the keyboard path breaks" means in practice.
+
+## Walk Tab-equivalents (switch_region(1)) until the cursor reaches `region`, and fail
+## loudly with a bounded loop rather than hanging if it never arrives -- a region that Tab
+## cannot reach is exactly the bug finding 1 described.
+func _goto_region(region: StringName) -> void:
+	var guard := 0
+	while _screen.kb_region() != region and guard < 20:
+		_screen.switch_region(1)
+		guard += 1
+	assert_eq(_screen.kb_region(), region, "region '%s' reachable by Tab alone" % region)
+
+
+func test_a_full_keyboard_walkthrough_can_finish_creation_with_no_mouse() -> void:
+	_screen.open(PlayerLookScript.default_look())
+	assert_eq(_screen.step(), CreationScreen.Step.LOOK, "she meets her pony first")
+	assert_eq(_screen.kb_region(), &"name", "the cursor opens on the name field")
+
+	# --- pick a coat, purely by keyboard ----------------------------------------------------
+	# Pinned to a known starting swatch first: the cursor opens a grid region on its current
+	# pick (see _enter_kb_region()'s own comment), and the default look's own coat index is
+	# not necessarily 0, so "ui_right x2" only lands on index 2 from a known index 0.
+	_screen.set_coat(0)
+	_goto_region(&"coat")
+	_screen.move_highlight(2)
+	assert_eq(_screen.kb_item(), 2, "ui_right x2 moved the highlight, not the pick")
+	_screen.activate_highlight()
+	assert_eq(_screen.look().coat, 2, "ui_accept on the highlighted swatch is the coat she gets")
+
+	# --- reach the MARK step, purely by keyboard --------------------------------------------
+	_goto_region(&"step")
+	_screen.move_highlight(1)
+	_screen.activate_highlight()
+	assert_eq(_screen.step(), CreationScreen.Step.MARK,
+		"the LOOK/MARK switch is keyboard reachable")
+
+	# --- stamp a shape, purely by keyboard ---------------------------------------------------
+	_goto_region(&"stamp")
+	assert_true(MarkPaintScript.is_blank(_screen.canvas().image()), "precondition: a clean canvas")
+	_screen.activate_highlight()
+	assert_false(MarkPaintScript.is_blank(_screen.canvas().image()),
+		"a keyboard stamp actually reaches the canvas, not only the highlight")
+
+	# --- confirm, purely by keyboard ---------------------------------------------------------
+	_goto_region(&"confirm")
+	watch_signals(_screen)
+	_screen.activate_highlight()
+	assert_false(_screen.is_open(), "confirm reached with no mouse click anywhere in this test")
+	assert_signal_emitted(_screen, "confirmed")
+
+
+func test_the_name_field_keeps_typing_and_the_cursor_leaves_it_alone() -> void:
+	assert_eq(_screen.kb_region(), &"name")
+	_screen.activate_highlight()
+	assert_true(_screen.is_editing_name(), "ui_accept on the name region grabs real focus")
+	# A stray nav call while she is typing must not release the field or move the cursor:
+	# these are exactly the calls _unhandled_input() itself never makes while has_focus() is
+	# true, exercised here directly so the guard is proven even if that early return breaks.
+	_screen.move_highlight(1)
+	_screen.switch_region(1)
+	assert_true(_screen.is_editing_name(), "a nav call mid-edit must not release the field")
+	assert_eq(_screen.kb_region(), &"name", "...nor move the region cursor")
+	_screen.release_name_edit()
+	assert_false(_screen.is_editing_name(), "Escape gives the field back")
+
+
+func test_the_mane_style_cards_retint_when_the_mane_changes() -> void:
+	var grid := _screen.find_child("ManeStyleGrid", true, false) as SwatchGrid
+	assert_not_null(grid)
+	var palette: StockPalette = StockPaletteScript.load_player()
+	_screen.set_mane(0)
+	var before: Color = (grid.cell(0).get_theme_stylebox(&"normal") as StyleBoxFlat).bg_color
+	assert_eq(before, palette.mane_at(0), "the cards open tinted by the mane she is on")
+	_screen.set_mane(1)
+	var after: Color = (grid.cell(0).get_theme_stylebox(&"normal") as StyleBoxFlat).bg_color
+	assert_ne(before, after, "picking a different mane has to retint the cards")
+	assert_eq(after, palette.mane_at(1), "...to the mane she actually picked")
+
+
+func test_cycle_mane_also_retints_the_mane_style_cards() -> void:
+	var grid := _screen.find_child("ManeStyleGrid", true, false) as SwatchGrid
+	_screen.set_mane(0)
+	_screen.cycle_mane(1)
+	var palette: StockPalette = StockPaletteScript.load_player()
+	var tint: Color = (grid.cell(0).get_theme_stylebox(&"normal") as StyleBoxFlat).bg_color
+	assert_eq(tint, palette.mane_at(_screen.look().mane),
+		"cycle_mane() is set_mane() with a step added; the retint has to come along with it")

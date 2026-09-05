@@ -324,8 +324,22 @@ func _ready() -> void:
 	var action: Dictionary = ranch.current_interaction()
 	_set_check("the verb at the mailbox is the mail",
 		int(action.get("kind", -1)) == InteractionScript.Kind.MAILBOX)
-	_set_check("pressing it opens the page", ranch.perform_interaction(action))
-	_set_check("and the page is MAIL", menu.is_open() and menu.page() == PauseMenuScript.Page.MAIL)
+	var unread: Dictionary = ranch.newest_unread_row()
+	_set_check("pressing it opens something", ranch.perform_interaction(action))
+	# THE LETTER OPENS AT THE MAILBOX, NOT IN A MENU. The owner read "it says it's by my
+	# house but it's in the pause menu" as a bug, and it was one.
+	_set_check("and what opened is the reader",
+		ranch.letter_panel != null and bool(ranch.letter_panel.call("is_open")))
+	_set_check("holding the newest letter she had not read",
+		unread.is_empty()
+			or String(ranch.letter_panel.call("title_text")) == String(unread["title"]))
+	_set_check("and reading it took the flag down",
+		unread.is_empty() or state.story.is_read(StringName(String(unread["id"]))))
+	ranch.letter_panel.call("close")
+	# THE ARCHIVE IS STILL THERE AND STILL HOLDS EVERYTHING.
+	ranch.open_mail_page()
+	_set_check("the archive page is the pause menu's own",
+		menu.is_open() and menu.page() == PauseMenuScript.Page.MAIL)
 	var rows: Array[Dictionary] = menu.mail_rows()
 	_set_check("the mailbox holds every letter she has ever been sent",
 		rows.size() == state.story.mail_ids().size())

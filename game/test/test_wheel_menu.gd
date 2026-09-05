@@ -30,6 +30,24 @@ func test_the_colour_tab_offers_six_colours_and_never_the_house_pocket() -> void
 		assert_ne(i, WheelScript.Colour.HOUSE)
 
 
+## I5, final-review.md I3: table_menu.gd's shared strip (used by every game in the Palace)
+## builds one clickable Button per tab_names() entry.
+func test_clicking_the_number_tab_button_switches_to_it() -> void:
+	assert_eq(_menu.tab_names(), ["Colour", "Number"])
+	var buttons: Array[Button] = []
+	for child in _menu.get_node("Centre/Panel/Margin/Column/Tabs").get_children():
+		var button := child as Button
+		if button != null:
+			buttons.append(button)
+	assert_eq(buttons.size(), 2)
+	var event := InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.pressed = true
+	buttons[WheelMenu.Tab.NUMBER].gui_input.emit(event)
+	assert_eq(_menu.tab(), WheelMenu.Tab.NUMBER,
+		"a click on the Number tab must not need the stake-row special case switch_tab() has")
+
+
 func test_the_number_tab_offers_every_number_and_no_zero() -> void:
 	_menu.set_tab(WheelMenu.Tab.NUMBER)
 	assert_eq(_menu.guess_count(), WheelScript.NUMBERS)

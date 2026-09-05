@@ -118,6 +118,33 @@ static func footer_reading(leave: String) -> String:
 	return footer([[&"menu_rows", "scroll"], [&"ui_cancel", leave]])
 
 
+## THE PAPER AND THE WOOD. The palette above is the dark navy panel this game has always
+## drawn; these are the two materials the redesign adds, and they are the ones the generated
+## Theme is built out of. The paper numbers are game/ui/paper_paint.gd's own, copied rather
+## than imported so a const can hold them, and game/test/test_theme.gd asserts the two
+## copies agree so they cannot drift apart in silence.
+const COLOR_PAPER := Color(0.96, 0.94, 0.88, 0.97)
+const COLOR_PAPER_EDGE := Color(0.72, 0.68, 0.58, 0.90)
+const COLOR_INK := Color(0.13, 0.12, 0.15, 1.0)
+
+## The frame around a panel: a dark stained board with a lit edge, which is what reads as
+## wood at this size without a texture anywhere near it.
+const COLOR_WOOD := Color(0.31, 0.20, 0.13, 1.0)
+const COLOR_WOOD_LIT := Color(0.49, 0.33, 0.20, 1.0)
+
+## HOVER IS ITS OWN STATE AND IT IS NOT SELECTION. A pointer resting on a row has to say
+## "this is what you would take" without claiming "this is what is taken": weaker than
+## ROW_SELECTED_BG, stronger than ROW_IDLE_BG, and the same hue as both.
+const COLOR_HOVER_BG := Color(1.0, 0.86, 0.55, 0.09)
+const COLOR_HOVER_BORDER := Color(1.0, 0.86, 0.55, 0.40)
+
+## Where the generated Theme lives. Written by game/scripts/make_theme.gd, installed by
+## game/project.godot's gui/theme/custom, read back by theme_resource() below.
+const THEME_PATH := "res://ui/theme/filly_theme.tres"
+
+const BUTTON_RADIUS := 8
+const FRAME_WIDTH := 3
+
 ## A fourth size, for the tile descriptions and the COLOR_DIM second lines the casino's
 ## drawn screens carry. TITLE_SIZE, ROW_SIZE and FOOTER_SIZE are unchanged.
 const SUBTITLE_SIZE := 18
@@ -162,6 +189,14 @@ static func apply_panel(panel: PanelContainer) -> void:
 	if panel == null:
 		return
 	panel.add_theme_stylebox_override(&"panel", panel_style())
+
+
+## apply_panel() with the box named rather than assumed. The letter and the creation screen
+## are paper and wood; every list in the game is still the navy panel apply_panel() applies.
+static func apply_panel_box(panel: PanelContainer, box: StyleBoxFlat) -> void:
+	if panel == null or box == null:
+		return
+	panel.add_theme_stylebox_override(&"panel", box)
 
 
 ## THE ROW TREATMENT THIS FILE ALREADY SPECIFIED AND NOTHING DREW. ROW_SELECTED_BG,
@@ -243,6 +278,134 @@ static func rule(ci: CanvasItem, from: Vector2, to: Vector2) -> void:
 	ci.draw_line(from, mid_a, faded, 2.0, true)
 	ci.draw_line(mid_a, mid_b, bright, 2.0, true)
 	ci.draw_line(mid_b, to, faded, 2.0, true)
+
+
+# --- the boxes the generated Theme is made of ---------------------------------------------
+#
+# ONE SOURCE, TWO CONSUMERS. Every function below is called twice: once by
+# game/scripts/make_theme.gd when it writes game/ui/theme/filly_theme.tres, and once by
+# game/test/test_theme.gd when it checks that the file on disk still says what these say.
+# Nothing here caches, because each of them is called a handful of times per build and a
+# cached StyleBox handed to a Theme and then to a Control is a box three owners can edit.
+
+
+static func _box(bg: Color, border: Color, width: int, radius: int) -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = bg
+	box.border_color = border
+	box.set_border_width_all(width)
+	box.set_corner_radius_all(radius)
+	box.content_margin_left = 14.0
+	box.content_margin_right = 14.0
+	box.content_margin_top = 7.0
+	box.content_margin_bottom = 7.0
+	return box
+
+
+## A BUTTON, IN FIVE STATES, AND THEY LOOK DIFFERENT ON PURPOSE. An unknown state name
+## answers normal rather than null: a Theme entry that came back null would style nothing
+## and say nothing about why.
+static func button_box(state: StringName) -> StyleBoxFlat:
+	match state:
+		&"hover":
+			return _box(COLOR_HOVER_BG, COLOR_HOVER_BORDER, 2, BUTTON_RADIUS)
+		&"pressed":
+			return _box(ROW_SELECTED_BG, ROW_SELECTED_BORDER, 2, BUTTON_RADIUS)
+		&"focus":
+			return _box(Color(0, 0, 0, 0), COLOR_TAB_ON, 2, BUTTON_RADIUS)
+		&"disabled":
+			return _box(Color(1.0, 1.0, 1.0, 0.02), Color(1.0, 1.0, 1.0, 0.06), 1,
+				BUTTON_RADIUS)
+	return _box(ROW_IDLE_BG, ROW_IDLE_BORDER, 1, BUTTON_RADIUS)
+
+
+static func tab_box(state: StringName) -> StyleBoxFlat:
+	match state:
+		&"selected":
+			return _box(ROW_SELECTED_BG, ROW_SELECTED_BORDER, 2, BUTTON_RADIUS)
+		&"hovered":
+			return _box(COLOR_HOVER_BG, COLOR_HOVER_BORDER, 2, BUTTON_RADIUS)
+	return _box(Color(0, 0, 0, 0), COLOR_TAB_OFF, 1, BUTTON_RADIUS)
+
+
+## THE NAME BOX. Ink on paper, because it is the one control in this game somebody types
+## into and dark text on a light field is what a person expects to type into.
+static func field_box(focused: bool) -> StyleBoxFlat:
+	return _box(COLOR_PAPER, COLOR_TAB_ON if focused else COLOR_PAPER_EDGE,
+		2 if focused else 1, 6)
+
+
+static func slider_box(filled: bool) -> StyleBoxFlat:
+	var box := _box(COLOR_VALUE if filled else ROW_IDLE_BG,
+		ROW_SELECTED_BORDER if filled else ROW_IDLE_BORDER, 1, 4)
+	box.content_margin_top = 4.0
+	box.content_margin_bottom = 4.0
+	return box
+
+
+## WARM PAPER, FOR THE PANELS THAT ARE PAGES: the letter, the statement, the house rules.
+static func paper_box() -> StyleBoxFlat:
+	var box := _box(COLOR_PAPER, COLOR_PAPER_EDGE, 1, 10)
+	box.shadow_color = Color(0.0, 0.0, 0.0, 0.28)
+	box.shadow_size = 8
+	box.shadow_offset = Vector2(3.0, 4.0)
+	return box
+
+
+## THE WOODEN FRAME. Used around the turntable and the cutie mark canvas, which are the two
+## things on screen that are pictures rather than text.
+static func frame_box() -> StyleBoxFlat:
+	var box := _box(COLOR_WOOD, COLOR_WOOD_LIT, FRAME_WIDTH, 10)
+	box.content_margin_left = float(FRAME_WIDTH) * 2.0
+	box.content_margin_right = float(FRAME_WIDTH) * 2.0
+	box.content_margin_top = float(FRAME_WIDTH) * 2.0
+	box.content_margin_bottom = float(FRAME_WIDTH) * 2.0
+	return box
+
+
+## THE THIRD ROW STATE. row_box() answers idle and selected; a pointer needs a third, and it
+## is built here rather than inside row_box() so that function's two cached boxes stay two.
+static func row_box_hover() -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = COLOR_HOVER_BG
+	box.border_color = COLOR_HOVER_BORDER
+	box.set_border_width_all(0)
+	box.border_width_left = 2
+	box.set_corner_radius_all(ROW_RADIUS)
+	box.content_margin_left = float(ROW_INSET_LEFT)
+	box.content_margin_top = 2.0
+	box.content_margin_right = 6.0
+	box.content_margin_bottom = 2.0
+	return box
+
+
+static var _theme: Theme = null
+
+
+## The generated Theme, or NULL on a checkout where it has not been generated yet. Null is a
+## supported answer for the reason PonyRegistry.by_id()'s is: a missing resource must not
+## take a boot down, and project.godot installs this file itself, so a screen that asks for
+## it here is asking only so that it can style something by hand.
+static func theme_resource() -> Theme:
+	if _theme != null:
+		return _theme
+	if not ResourceLoader.exists(THEME_PATH):
+		return null
+	_theme = load(THEME_PATH) as Theme
+	return _theme
+
+
+## A BUTTON'S TEXT, OUTLINED THE WAY EVERY LABEL IN THIS GAME IS OUTLINED. The generated
+## Theme sets this for every Button in the project; a Button carrying per state StyleBox
+## overrides keeps the Theme's font settings, so this is belt and braces for the ones built
+## in code before the tree hands them a theme.
+static func style_label_button(button: Button) -> void:
+	if button == null:
+		return
+	button.add_theme_font_size_override("font_size", ROW_SIZE)
+	button.add_theme_color_override("font_color", COLOR_NAME)
+	button.add_theme_color_override("font_outline_color", OUTLINE_COLOR)
+	button.add_theme_constant_override("outline_size", OUTLINE_SIZE)
 
 
 # --- the menu tick kit --------------------------------------------------------------------

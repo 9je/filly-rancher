@@ -159,6 +159,7 @@ const LettersScript := preload("res://systems/letters.gd")
 const StockPaletteScript := preload("res://systems/stock_palette.gd")
 const PlayerLookScript := preload("res://systems/player_look.gd")
 const StripScript := preload("res://world/strip.gd")
+const BootIntentScript := preload("res://world/boot_intent.gd")
 const CasinoSignScript := preload("res://systems/casino_sign.gd")
 const LobbySignScript := preload("res://world/lobby_sign.gd")
 const InteractionScript := preload("res://world/interaction.gd")
@@ -292,6 +293,10 @@ const DEPOT_RADIUS := 4.0
 ## mailbox is a small thing on a post and a wide radius would put its prompt on top of the
 ## farmhouse door the player walks past to reach it.
 const MAILBOX_RADIUS := 2.6
+
+## What the mailbox says when there is genuinely nothing in it. A verb that does nothing at
+## all reads as a broken key, which is the same defect the race panel's dead stake row was.
+const MAILBOX_EMPTY_TOAST := "Nothing in the mailbox yet."
 
 ## WHAT ARRIVAL SOUNDS LIKE, and it is said once per batch rather than once per letter: two
 ## letters landing on the same collection day are one trip to the mailbox. The flag on the
@@ -530,6 +535,11 @@ var _interactive := false
 
 ## Whether a save was found and loaded at boot. Printed, so a log says which world this is.
 var _save_loaded := false
+
+## Whether the title screen asked for a NEW game rather than a continued one. Consumed once,
+## in _bind_game_state(). False for every gate, every screenshot run and every export smoke,
+## because none of them goes through the title screen; see game/world/boot_intent.gd.
+var _new_game := false
 
 ## THE CLOCK. Elapsed play time, and the phase and weather it implies
 ## (game/systems/world_state.gd). Owned here rather than in an autoload because it is a
@@ -884,6 +894,17 @@ func _ready() -> void:
 	# you left.
 	_bind_game_state()
 
+	# NO FRAME OF RAW WORLD ON A NEW GAME. Acceptance item 1. Boot takes about two and a half
+	# seconds from here (the physics warmup, the settle frames, the pen containment probe) and
+	# every one of those frames used to be a frame of the map, the farmhouse and whatever the
+	# camera happened to be inside. The creation screen's opaque backdrop goes up FIRST and
+	# the world builds behind it; _maybe_open_creation() at the end of _ready() then fills in
+	# the pony and the panel over a sky that has been there since the first frame.
+	#
+	# THE TREE IS NOT PAUSED HERE. The awaits below need physics frames and a paused tree
+	# never delivers one. CreationScreen.open() pauses, as it always has.
+	_raise_creation_veil()
+
 	# THE RAIN NEEDS SOMEBODY TO FALL ON. _bind_game_state() above built the WorldState and
 	# has already handed it to the rig (apply_immediately, so boot has no eight second ramp
 	# from a sky nobody saw), which leaves only this: the rain is a small column overhead
@@ -1055,6 +1076,9 @@ func _ready() -> void:
 ## it into the spawner from _rebuild_world_state(), and _sync_game_state() never writes it
 ## back; the two directions used to fight, and the loser was the loaded save.
 func _bind_game_state() -> void:
+	# Consumed BEFORE the autoload null-check on purpose: a latch that survives this early
+	# return would replay "new game" on a later scene load that never asked for one.
+	_new_game = BootIntentScript.consume_new_game()
 	_game_state = get_node_or_null(^"/root/GameState")
 	if _game_state == null:
 		# Not fatal here -- it is a FAILED check in _report(), which is a better place for
@@ -1069,7 +1093,12 @@ func _bind_game_state() -> void:
 	# every machine, and whatever slot 0 happens to hold on this one is not that; nor is a
 	# gate entitled to a real save file. Nothing is written back either: autosave is off for
 	# every non-interactive run (see _interactive below).
-	if _hosted:
+	#
+	# AND NEITHER DOES A NEW GAME. The title screen's New game row latches BootIntent, which
+	# was consumed at the top of this function (before the autoload null-check, so the latch
+	# cannot outlive a broken boot), and the creation screen opens over an empty ranch rather
+	# than over the ranch she was already playing.
+	if _hosted or _new_game:
 		_game_state.reset()
 		_save_loaded = false
 	else:
@@ -1112,6 +1141,13 @@ func _bind_game_state() -> void:
 	# it does. Nothing happens on the boot load: this connect comes after load_from_slot().
 	if not _game_state.state_loaded.is_connected(_refresh_herd):
 		_game_state.state_loaded.connect(_refresh_herd)
+
+
+## Whether this boot came through the title screen's New game row. For the gates and for
+## game/test/test_ranch_creation.gd, which otherwise cannot tell a new ranch from a loaded one
+## without reading a private field.
+func is_new_game() -> bool:
+	return _new_game
 
 
 ## Put the owned ponies back where they live after a load.
@@ -1326,11 +1362,23 @@ func _bind_build_menu() -> void:
 func _on_menu_opened(_slot: PlotSlot) -> void:
 	get_tree().paused = true
 	_set_cursor_captured(false)
+	_set_hud_overlay(true)
 
 
 func _on_menu_closed() -> void:
 	get_tree().paused = false
 	_set_cursor_captured(true)
+	_set_hud_overlay(false)
+
+
+## THE CONTROL CARD IS NOT ON SCREEN WHILE ANYTHING IS OVER THE WORLD. See game/ui/hud.gd's
+## set_overlay_open(). Guarded by has_method() like every other reach into a menu from here:
+## a HUD whose script failed to parse is a FAILED check in _report(), not a crash on the
+## first menu somebody opens.
+func _set_hud_overlay(open: bool) -> void:
+	var overlay := get_node_or_null(^"HUD")
+	if overlay != null and overlay.has_method("set_overlay_open"):
+		overlay.call("set_overlay_open", open)
 
 
 ## THE ONE PLACE THE CURSOR IS SHOWN OR HIDDEN. Split out of _on_menu_opened()/
@@ -1986,6 +2034,58 @@ func open_mail_page() -> void:
 	pause_menu.open()
 
 
+## THE NEWEST LETTER SHE HAS NOT READ, or {} when she has read them all. mail_rows() is
+## oldest first, so this walks backwards.
+func newest_unread_row() -> Dictionary:
+	var rows: Array[Dictionary] = mail_rows()
+	for i in range(rows.size() - 1, -1, -1):
+		if not bool(rows[i].get("read", false)):
+			return rows[i]
+	return {}
+
+
+## E AT THE MAILBOX OPENS THE LETTER. The owner, on her first full playtest: "it says it's by
+## my house but it's in the pause menu". The letter told her where her mailbox was and the
+## verb at the mailbox then opened a menu, which is the whole of the confusion; the pause
+## page is the archive now ("Saddlebag copies") and this is the mailbox.
+##
+## THE NEWEST UNREAD ONE, AND THE NEWEST ONE OTHERWISE. A mailbox with post in it is never a
+## dead key: a player who has read everything and walks back to it gets the last letter again,
+## which is what opening a real mailbox with a letter still in it does.
+##
+## A LETTER THAT ASKS A QUESTION GOES TO THE PAGE THAT CAN ANSWER IT. game/ui/letter_panel.gd
+## is read only by design and says so at length in its own class comment; the Employee
+## Appreciation Survey needs the PICK_PONY picker, which lives on the archive page. That page
+## is still her own mailbox, so the fiction holds, and this slice does not rebuild the reader
+## into a form that transacts.
+func open_mailbox_letter() -> bool:
+	var rows: Array[Dictionary] = mail_rows()
+	if rows.is_empty():
+		_toast(MAILBOX_EMPTY_TOAST)
+		return false
+	var row: Dictionary = newest_unread_row()
+	if row.is_empty():
+		row = rows[rows.size() - 1]
+	var id := StringName(String(row.get("id", "")))
+	if int(row.get("reply", 0)) != StoryBeatScript.Reply.NONE:
+		# The bool travels the whole branch: open_mail_page() can refuse (another menu holds
+		# the tree), and a refusal that reported true would eat the player's press silently.
+		open_mail_page()
+		if pause_menu == null or not pause_menu.has_method("open_letter"):
+			return false
+		if not bool(pause_menu.call("is_open")):
+			return false
+		return bool(pause_menu.call("open_letter", id))
+	if letter_panel == null or not letter_panel.has_method("open"):
+		return false
+	var letter := {"sender": String(row.get("sender", "")),
+		"title": String(row.get("title", "")), "body": row.get("body", [])}
+	if not bool(letter_panel.call("open", letter)):
+		return false
+	_on_mail_opened(id)
+	return true
+
+
 ## The Spectra Palace's own origin in world space, or the Strip's centre if the building is
 ## missing. The doorway is on the south face; see ranch.tscn's half turn on the node.
 func palace_position() -> Vector3:
@@ -2041,11 +2141,13 @@ func _bind_pause_menu() -> void:
 	if _game_state != null and not _game_state.state_loaded.is_connected(inject_pages):
 		_game_state.state_loaded.connect(inject_pages)
 	for pair in [["opened", _on_pause_opened], ["closed", _on_menu_closed],
-			["save_requested", _on_pause_save], ["quit_requested", _on_pause_quit],
+			["save_requested", _on_pause_save], ["load_requested", _on_load_requested],
+			["quit_requested", _on_pause_quit],
 			["settings_changed", _on_settings_changed],
 			["mail_opened", _on_mail_opened], ["mail_reply", _on_mail_reply]]:
 		if not pause_menu.is_connected(pair[0], pair[1]):
 			pause_menu.connect(pair[0], pair[1])
+	pause_menu.set("has_save_provider", func() -> bool: return _can_load())
 
 
 ## Is every menu EXCEPT `menu` closed? Pass null to ask about all three.
@@ -2066,6 +2168,24 @@ func _no_menu_but(menu: CanvasLayer) -> bool:
 		if other.has_method("is_open") and other.is_open():
 			return false
 	return true
+
+
+## THE VEIL GOES UP, AND THE CURSOR LETS GO WITH IT. M17, final-review.md M9: raising the
+## backdrop used to be the whole of this call; camera_rig.gd had already captured the mouse
+## in its own _ready() (children before parents, so before this ever runs), and nothing here
+## told it to let go. So a new game sat on an opaque sky for the ~2.5 s the physics warmup,
+## the settle frames and the pen containment probe below take, with the pointer grabbed over
+## a screen with nothing on it to look at yet -- nothing was clickable during it either way,
+## but a captured cursor is a captured cursor regardless of whether there is anything to
+## click. _maybe_open_creation() re-asserts the same false the moment there is something to.
+## Split out of _ready() so a detached Ranch (test_ranch_creation.gd's own fixture) can call
+## this directly, the same way it already calls _maybe_open_creation().
+func _raise_creation_veil() -> void:
+	if not (_new_game and _interactive and creation_screen != null
+			and creation_screen.has_method("raise_backdrop")):
+		return
+	creation_screen.call("raise_backdrop")
+	_set_cursor_captured(false)
 
 
 ## A NEW GAME OPENS ON THE CREATION SCREEN. Only for somebody actually playing: a hosted
@@ -2249,6 +2369,29 @@ func _on_pause_quit() -> void:
 	# state anything downstream of here should have to reason about.
 	get_tree().paused = false
 	get_tree().quit()
+
+
+## IS THERE ANYTHING ON DISK TO GO BACK TO? Split out of _on_load_requested() so a test can
+## drive the decision without a scene reload taking the test runner's own tree with it.
+func _can_load() -> bool:
+	return _game_state != null and _game_state.has_save()
+
+
+## LOAD GAME. The whole world is rebuilt rather than patched, because a ranch is terrain, a
+## herd, a set of pens and a clock, and half of that being from the save while the other half
+## is from the session is the class of bug that eats an afternoon. reload_current_scene()
+## re-runs _ready(), whose _bind_game_state() reads the slot exactly as a fresh boot does.
+##
+## THE TREE IS UNPAUSED FIRST. The pause menu paused it; a scene reloaded into a paused tree
+## comes back frozen, with nothing left on screen able to unfreeze it.
+func _on_load_requested() -> void:
+	if not _interactive or not _can_load():
+		return
+	if pause_menu != null and pause_menu.has_method("close"):
+		pause_menu.call("close")
+	get_tree().paused = false
+	_set_cursor_captured(true)
+	get_tree().reload_current_scene()
 
 
 func _on_settings_changed() -> void:
@@ -4071,8 +4214,7 @@ func perform_interaction(action: Dictionary) -> bool:
 			_open_request_page()
 			return true
 		InteractionScript.Kind.MAILBOX:
-			open_mail_page()
-			return true
+			return open_mailbox_letter()
 		InteractionScript.Kind.DEPOT:
 			if depot_menu == null or not depot_menu.has_method("open"):
 				return false

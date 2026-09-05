@@ -549,6 +549,19 @@ func _wire_mail() -> void:
 			{"uid": "u2", "name": "Pony", "coat": "Butter"}]
 
 
+## `count` LETTERS, IDS "letter_0".."letter_(count-1)" IN POSTING ORDER, so mail_rows()'s
+## newest-first reversal hands them back as "letter_(count-1)" down to "letter_0" -- built for
+## the windowing regression below, which needs more than ENVELOPES_ON_SCREEN of them.
+func _wire_many_mail(count: int) -> void:
+	var rows: Array[Dictionary] = []
+	for i in count:
+		rows.append({"id": "letter_%d" % i, "sender": "Cloudsdale Weather Corporation",
+			"title": "Letter %d" % i, "body": ["Dear Moonbeam,"],
+			"read": true, "replied": "", "reply": 0})
+	_menu.mail_provider = func() -> Array[Dictionary]: return rows
+	_menu.mail_ponies_provider = func() -> Array[Dictionary]: return []
+
+
 func test_the_mail_page_lists_the_newest_letter_first() -> void:
 	_wire_mail()
 	_menu.open()
@@ -700,3 +713,204 @@ func test_adjusting_the_ambient_row_moves_the_ambient_volume_and_nothing_else() 
 	assert_lt(_settings.ambient_volume, 1.0)
 	assert_almost_eq(_settings.master_volume, master_before, 0.0001)
 	assert_almost_eq(_settings.effects_volume, 1.0, 0.0001)
+
+
+# --- the pointer, and the copy ---------------------------------------------------------
+
+## THE OWNER MISREAD "Save the ranch" AS SOMETHING THAT HAPPENED TO THE RANCH rather than as
+## a file operation. This is the copy fix, pinned so it cannot drift back.
+func test_the_main_page_says_save_game_and_load_game() -> void:
+	assert_eq(PauseMenu.MAIN_ROWS[PauseMenu.Row.SAVE], "Save game")
+	assert_eq(PauseMenu.MAIN_ROWS[PauseMenu.Row.LOAD], "Load game")
+	assert_eq(PauseMenu.MAIN_ROWS[PauseMenu.Row.MAIL], "Saddlebag copies")
+	assert_eq(PauseMenu.MAIN_ROWS.size(), PauseMenu.Row.size())
+
+
+func test_no_row_or_footer_on_this_menu_carries_a_dash() -> void:
+	var checked := 0
+	for text: String in PauseMenu.MAIN_ROWS:
+		assert_false(text.contains("--"), text)
+		assert_false(text.contains(char(0x2014)), text)
+		checked += 1
+	assert_gt(checked, 0, "the row list was actually walked")
+
+
+func test_load_game_asks_the_ranch_to_load_and_only_when_there_is_a_save() -> void:
+	_menu.has_save_provider = func() -> bool: return true
+	_menu.open()
+	watch_signals(_menu)
+	_menu.take_row(PauseMenu.Row.LOAD)
+	assert_signal_emitted(_menu, "load_requested")
+
+
+func test_load_game_refuses_when_no_save_exists() -> void:
+	_menu.has_save_provider = func() -> bool: return false
+	_menu.open()
+	watch_signals(_menu)
+	_menu.take_row(PauseMenu.Row.LOAD)
+	assert_signal_not_emitted(_menu, "load_requested",
+		"a Load row on a machine with no save is a row that must refuse")
+
+
+func test_pointing_moves_the_cursor_and_the_keys_still_work() -> void:
+	_menu.open()
+	_menu.point_at_row(PauseMenu.Row.SETTINGS)
+	assert_eq(_menu.selected_index(), PauseMenu.Row.SETTINGS)
+	assert_eq(_menu.hovered_index(), PauseMenu.Row.SETTINGS)
+	_menu.move_selection(1)
+	assert_eq(_menu.selected_index(), PauseMenu.Row.QUIT,
+		"the mouse must never take the keyboard away")
+
+
+func test_the_pause_menu_offers_the_pointer_a_way_out() -> void:
+	var button: Button = _menu.close_button_node()
+	assert_not_null(button)
+	assert_eq(button.text, preload("res://ui/mouse_rows.gd").CLOSE_TEXT)
+	assert_eq(button.focus_mode, Control.FOCUS_NONE)
+
+
+func test_the_mail_envelopes_are_clickable_and_open_the_letter_they_name() -> void:
+	_wire_mail()
+	_menu.open()
+	_menu.open_page(PauseMenu.Page.MAIL)
+	var rects: Array[Rect2] = _menu.stage_hit_rects()
+	assert_eq(rects.size(), _menu.mail_rows().size(),
+		"one hit rect per envelope on the page")
+	_menu.on_stage_hit(0)
+	assert_eq(_menu.open_letter_id(), &"weather_survey", "the newest envelope is the top one")
+
+
+## FIX ROUND 1, THE REGRESSION THIS PINS: _paint_envelopes() windows the stack on `first`,
+## which follows the keyboard cursor past the first screenful; on_stage_hit() used to map a
+## click through `_scroll`, which _sync_scroll() holds at 0 on every page but the compendium
+## -- so a click after scrolling opened whatever was at the UNSCROLLED position instead of
+## what was actually drawn under the pointer. Seven letters is two past ENVELOPES_ON_SCREEN
+## (5), enough to force the window to shift.
+func test_a_scrolled_mail_page_opens_the_envelope_the_click_actually_landed_on() -> void:
+	_wire_many_mail(7)
+	_menu.open()
+	_menu.open_page(PauseMenu.Page.MAIL)
+	for i in 6:
+		_menu.move_selection(1)
+	assert_eq(_menu.selected_index(), 6, "the keyboard walked to the last row")
+	# The window is now [2..6] of mail_rows(); screen row 0 is mail_rows()[2] == "letter_4".
+	_menu.on_stage_hit(0)
+	assert_eq(_menu.open_letter_id(), &"letter_4",
+		"row 0 on screen is whichever envelope the scrolled window actually put there")
+
+
+func _wheel(button_index: int) -> InputEventMouseButton:
+	var event := InputEventMouseButton.new()
+	event.button_index = button_index
+	event.pressed = true
+	return event
+
+
+# --- M9: the Close button mirrors Escape -----------------------------------------------
+
+func test_the_close_button_goes_back_one_layer_on_a_sub_page() -> void:
+	_menu.open()
+	_menu.move_selection(PauseMenu.Row.SETTINGS)
+	_menu.confirm()
+	assert_eq(_menu.page(), PauseMenu.Page.SETTINGS)
+	_menu.close_button_node().pressed.emit()
+	assert_eq(_menu.page(), PauseMenu.Page.MAIN,
+		"Close on a sub-page must match Escape: one layer back, not the whole menu")
+	assert_true(_menu.is_open())
+
+
+func test_the_close_button_closes_the_whole_menu_on_the_main_page() -> void:
+	_menu.open()
+	assert_eq(_menu.page(), PauseMenu.Page.MAIN)
+	_menu.close_button_node().pressed.emit()
+	assert_false(_menu.is_open(), "Close on MAIN must match Escape there too: close")
+
+
+# --- M11: hover does not survive a page switch ---------------------------------------------
+
+func test_hover_is_cleared_on_a_page_switch() -> void:
+	_wire_book()
+	_menu.open()
+	_menu.point_at_row(PauseMenu.Row.COMPENDIUM)
+	assert_eq(_menu.hovered_index(), PauseMenu.Row.COMPENDIUM)
+	_menu.open_page(PauseMenu.Page.COMPENDIUM)
+	assert_eq(_menu.hovered_index(), -1,
+		"a roster row must not be drawn hovered under a pointer nowhere near it")
+
+
+func test_hover_is_cleared_returning_to_main() -> void:
+	_wire_book()
+	_menu.open_page(PauseMenu.Page.COMPENDIUM)
+	_menu.point_at_row(0)
+	assert_eq(_menu.hovered_index(), 0)
+	_menu.back()
+	assert_eq(_menu.page(), PauseMenu.Page.MAIN)
+	assert_eq(_menu.hovered_index(), -1)
+
+
+# --- I4: a click on a settings row adjusts it, it does not confirm/leave ------------------
+
+func test_clicking_a_settings_row_adjusts_it_and_stays_on_the_page() -> void:
+	_menu.open()
+	_menu.move_selection(PauseMenu.Row.SETTINGS)
+	_menu.confirm()
+	assert_eq(_menu.page(), PauseMenu.Page.SETTINGS)
+	# Ambience defaults to 0.5 (Settings.AMBIENT_DEFAULT), mid range, so a click's default
+	# "increment" resolution (no laid out holder yet in this test) is never a clamped no-op --
+	# master volume, at its 1.0 ceiling by default, would be.
+	var before: float = _settings.ambient_volume
+	watch_signals(_menu)
+	_menu.take_row(PauseMenu.SettingRow.AMBIENT)
+	assert_eq(_menu.page(), PauseMenu.Page.SETTINGS,
+		"a settings row click must not leave the page (I2, final-review.md)")
+	assert_ne(_settings.ambient_volume, before, "the click must have changed the value")
+	assert_signal_emitted(_menu, "settings_changed")
+
+
+func test_clicking_the_invert_row_toggles_it() -> void:
+	_menu.open()
+	_menu.move_selection(PauseMenu.Row.SETTINGS)
+	_menu.confirm()
+	var before: bool = _settings.invert_look
+	_menu.take_row(PauseMenu.SettingRow.INVERT)
+	assert_ne(_settings.invert_look, before)
+
+
+# --- I6: the wheel scrolls the compendium and the mail archive ---------------------------
+
+func test_the_wheel_moves_the_compendium_selection() -> void:
+	_wire_book()
+	_menu.open_page(PauseMenu.Page.COMPENDIUM)
+	assert_eq(_menu.selected_index(), 0)
+	_menu._on_rows_input(_wheel(MOUSE_BUTTON_WHEEL_DOWN))
+	assert_eq(_menu.selected_index(), 1, "wheel down must step the selection forward")
+	_menu._on_rows_input(_wheel(MOUSE_BUTTON_WHEEL_UP))
+	assert_eq(_menu.selected_index(), 0, "and wheel up must step it back")
+
+
+func test_the_row_holder_can_actually_hear_the_wheel() -> void:
+	# The re-review's one blocker: the scene bakes Rows at MOUSE_FILTER_IGNORE, and an
+	# IGNORE control never receives gui_input at all, so the two wheel tests beside this
+	# one passed by calling the handler directly while a real pointer could reach nothing.
+	# _ready() must lift the holder to PASS -- this pins the wiring, not the handler.
+	assert_eq(_menu._rows.mouse_filter, Control.MOUSE_FILTER_PASS,
+		"an IGNORE row holder silently disconnects every wheel in the pause menu")
+
+
+func test_the_wheel_follows_the_same_window_the_keyboard_does() -> void:
+	_wire_book()
+	_menu.open_page(PauseMenu.Page.COMPENDIUM)
+	for i in PauseMenu.PAGE_ROWS:
+		_menu._on_rows_input(_wheel(MOUSE_BUTTON_WHEEL_DOWN))
+	assert_eq(_menu.selected_index(), PauseMenu.PAGE_ROWS,
+		"PAGE_ROWS wheel ticks must land exactly where PAGE_ROWS move_selection(1) calls would")
+	assert_true(_menu.compendium_window().has(PauseMenu.PAGE_ROWS),
+		"the window must have followed the wheel past the first screenful")
+
+
+func test_the_wheel_moves_the_mail_archive_selection() -> void:
+	_wire_many_mail(7)
+	_menu.open_page(PauseMenu.Page.MAIL)
+	assert_eq(_menu.selected_index(), 0)
+	_menu._on_stage_input(_wheel(MOUSE_BUTTON_WHEEL_DOWN))
+	assert_eq(_menu.selected_index(), 1, "the stage's own wheel branch must move it too")

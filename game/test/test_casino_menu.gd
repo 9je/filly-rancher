@@ -99,6 +99,36 @@ func test_switching_tabs_wraps_and_resets_the_selection() -> void:
 	assert_eq(_menu.tab(), CasinoMenu.Tab.LOBBY, "three tabs, and it comes round")
 
 
+## I5, final-review.md I3: THE TABS ARE CLICK TARGETS NOW. MenuStyle.tab_strip() used to
+## render the whole strip into one inert Label; the Tabs node is an HBoxContainer of Buttons
+## since this fix, one per name, each armed through MouseRows.arm() the same way every row in
+## the game is.
+func test_the_tab_strip_is_a_row_of_clickable_buttons() -> void:
+	var buttons: Array[Button] = []
+	for child in _menu.get_node("Centre/Panel/Margin/Column/Tabs").get_children():
+		var button := child as Button
+		if button != null:
+			buttons.append(button)
+	assert_eq(buttons.size(), CasinoMenu.TAB_NAMES.size())
+	for button: Button in buttons:
+		assert_eq(button.focus_mode, Control.FOCUS_NONE,
+			"a focusable tab would steal the arrow keys from the menu cursor")
+
+
+func test_clicking_a_tab_button_switches_to_it() -> void:
+	var buttons: Array[Button] = []
+	for child in _menu.get_node("Centre/Panel/Margin/Column/Tabs").get_children():
+		var button := child as Button
+		if button != null:
+			buttons.append(button)
+	watch_signals(_menu)
+	var event := InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.pressed = true
+	buttons[CasinoMenu.Tab.RULES].gui_input.emit(event)
+	assert_eq(_menu.tab(), CasinoMenu.Tab.RULES, "a click on House rules must open House rules")
+
+
 func test_closing_announces_itself_once() -> void:
 	watch_signals(_menu)
 	_menu.close()

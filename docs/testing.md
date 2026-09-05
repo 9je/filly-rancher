@@ -57,6 +57,36 @@ exit code `0`.
 
 ---
 
+## The boot path, and why a title screen does not get in front of a gate
+
+`game/project.godot`'s `run/main_scene` is `res://ui/title_screen.tscn` from R1 on.
+Nothing about how gates are run changed, and it cannot have: **every gate names its
+own scene on the command line**, for instance
+
+```
+tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/story_test.tscn
+```
+
+so the main scene is never consulted for any of them. The pinned-hour and screenshot
+runs name `world/ranch.tscn` explicitly for the same reason.
+
+The one path that DOES consult it is a bare boot with no scene argument, which is what
+`.github/workflows/smoke_run.sh` and the Windows export smoke do, and both require a
+`RANCH_OK` line. `game/ui/title_screen.gd`'s `is_interactive()` asks exactly the
+question `game/world/ranch.gd`'s own `_interactive` asks (not headless, and no
+`--screenshot*` user arg) and, on any answer but "a person at a keyboard", changes
+straight to `world/ranch.tscn` without setting the boot latch. So a bare headless boot
+still prints `RANCH_OK`, and a bare interactive boot opens the main menu.
+
+Prove it with:
+
+```
+FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dummy \
+  --quit-after 600 --path game
+```
+
+---
+
 ## Where an automated run writes its saves
 
 **`FILLY_TEST_SAVE_DIR` moves the save directory for one process.**
@@ -298,13 +328,16 @@ GUT's own default of not descending into subdirectories without
 **And a floor on the test count**, for the half the script count cannot see: a
 file that still parses but has lost most of its tests (a mass rename, a bad
 merge, a `func test_x` that became `func x`). `MIN_TESTS` in
-`tools/run_tests.sh` — currently **1420** — is a deliberate FLOOR rather than an
+`tools/run_tests.sh` -- currently **1572** -- is a deliberate FLOOR rather than an
 exact count, so adding tests never breaks the build. Raise it when the suite
 grows; never lower it without saying in the same commit which tests went away
 and why. (It was 194 through Phase 1A and was raised to the suite's real size in
-Phase 1B Task 3 — a floor a hundred tests below the actual count could not have
+Phase 1B Task 3 -- a floor a hundred tests below the actual count could not have
 caught a whole test script going missing, which is exactly the failure the
-paragraph above describes.)
+paragraph above describes. It was raised again, from 1420 to 1535, by slice R1's
+own growth, and again, from 1535 to 1571, by the R1 final-review fix wave's own
+growth, proved both ways per the section below at the new number: the suite
+passes at 1571 and a `FILLY_MIN_TESTS=99999` run still fails on it.)
 
 **Proving both guards, safely:**
 
@@ -418,6 +451,9 @@ restoring the cache) turns the suite green again.
 | `game/test/test_casino_stages.gd` | The contract every drawn casino screen holds: a stage of the shared width, a printed line that is still in the model, and the focus following the cursor across every row of every tab |
 | `game/test/test_lobby_sign.gd` | The board that replaced the eleven line label outside the Palace: fitted lines, nothing hanging below its own origin, no dash |
 | `game/world/terrain.gdshader` | The ground: sRGB decode, two octaves of hash noise, a slope mask to dirt, a ridge lift and a distance fade |
+| `game/ui/mouse_rows.gd` | The mouse kit every menu's rows are armed through |
+| `game/ui/theme/filly_theme.tres` | The generated Theme; regenerate with `bash tools/make_theme.sh` |
+| `game/scripts/make_theme.gd` | The script that builds `filly_theme.tres` |
 
 ---
 
@@ -1123,8 +1159,9 @@ gates do, and proves the paper channel end to end:
   the letter is armed; and it never serves twice, the flag holding after the one successful
   call the way the Survey's own "answering twice pays nothing twice" does. The world loses
   precisely that one pony and no other; her Compendium entry reads `PROCESSED`.
-* the mailbox verb opens the Mail page, the page holds every letter ever sent, newest
-  first, and nothing on it carries a dash.
+* the mailbox verb opens the letter reader on the newest letter she has not read, reading it
+  there marks it read, and the pause menu's own Mail page (the archive) still holds every
+  letter ever sent, newest first, with nothing on it carrying a dash.
 
 **A real bug this gate's own construction avoided.** The gate's `chosen_ref` weak
 reference and its whole-world census have to be taken *after* the not-penned edge is
@@ -1139,7 +1176,7 @@ Run it with:
 FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/story_test.tscn
 ```
 
-Expect `STORY_OK checks=55`; the exit code is the verdict.
+Expect `STORY_OK checks=58`; the exit code is the verdict.
 
 ---
 

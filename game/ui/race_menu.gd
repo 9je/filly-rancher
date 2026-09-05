@@ -75,9 +75,14 @@ func title_text() -> String:
 	return TITLE
 
 
+## I5, final-review.md I3: the bracket text itself is now MouseRows.tab_strip()'s job (see
+## table_menu.gd's refresh()); this is only the note beside it.
+func tab_names() -> Array[String]:
+	return ["Form guide", "The card"]
+
+
 func tabs_text() -> String:
-	return MenuStyleScript.tab_strip(["Form guide", "The card"], _tab) \
-		+ "      the house keeps %.1f bits of every 100" % (RaceCardScript.TAKEOUT * 100.0)
+	return "the house keeps %.1f bits of every 100" % (RaceCardScript.TAKEOUT * 100.0)
 
 
 func tab() -> int:
@@ -211,6 +216,19 @@ func stake_chip_rect(index: int) -> Rect2:
 
 func card_page_rect() -> Rect2:
 	return CARD_PAGE
+
+
+## THE ROW FOR SELECTABLE POSITION `index`: an entrant's card, or the whole stake row for the
+## one position past the last entrant (row_count() is entrants().size() + 1 whenever the pens
+## are not empty; see _on_stake_row()). Same list stage_hit_rects() walks, in the same order.
+func row_rect(index: int) -> Rect2:
+	var total: int = entrants().size()
+	if index < total:
+		return card_rect(index)
+	var available: Array[int] = stakes()
+	if available.is_empty():
+		return Rect2()
+	return stake_chip_rect(0).merge(stake_chip_rect(available.size() - 1))
 
 
 ## Every card and the whole card page are on the stage; the column keeps the two lines that
@@ -370,3 +388,16 @@ func _step_stake(step: int) -> void:
 	if available.is_empty():
 		return
 	set_stake_index(posmod(stake_index() + step, available.size()))
+
+
+## THE CARD TAB IS READING MATTER: row_count() already answers 0 there, so this returns empty
+## on its own with no special case.
+func stage_hit_rects() -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	for i in row_count():
+		out.append(row_rect(i))
+	return out
+
+
+func on_stage_hit(index: int) -> void:
+	take_row(index)

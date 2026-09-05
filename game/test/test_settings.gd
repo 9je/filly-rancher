@@ -78,7 +78,7 @@ func test_apply_audio_sets_the_master_bus() -> void:
 
 func test_the_two_new_volumes_default_open() -> void:
 	var s = SettingsScript.new()
-	assert_almost_eq(s.ambient_volume, 1.0, 0.0001)
+	assert_almost_eq(s.ambient_volume, Settings.AMBIENT_DEFAULT, 0.0001)
 	assert_almost_eq(s.effects_volume, 1.0, 0.0001)
 
 
@@ -152,7 +152,7 @@ func test_a_loaded_file_missing_the_new_keys_keeps_the_defaults() -> void:
 	var s = SettingsScript.new()
 	s.load_from(SCRATCH)
 	assert_almost_eq(s.master_volume, 0.8, 0.0001)
-	assert_almost_eq(s.ambient_volume, 1.0, 0.0001)
+	assert_almost_eq(s.ambient_volume, Settings.AMBIENT_DEFAULT, 0.0001)
 	assert_almost_eq(s.effects_volume, 1.0, 0.0001)
 
 
@@ -186,3 +186,44 @@ func test_the_session_settings_path_follows_the_session_save_directory() -> void
 	else:
 		assert_ne(SettingsScript.settings_path, SettingsScript.PATH,
 			"a redirected process must not be able to reach the player's settings file")
+
+
+## THE AMBIENCE STARTS UNDER THE MIX. The owner, on her first full playtest: the beds are too
+## loud. Spec section 6: "ambient beds down (start -6 dB on the Ambient bus default)".
+##
+## A DEFAULT, NOT A CEILING. The slider still reaches 100%; this is only where it starts, so a
+## player who wants the dawn chorus at full can still have it and a player who never opens the
+## settings page is not shouted at.
+func test_the_ambient_bus_starts_six_decibels_down() -> void:
+	var s: Settings = SettingsScript.new()
+	assert_almost_eq(s.ambient_volume, Settings.AMBIENT_DEFAULT, 0.0001)
+	assert_almost_eq(linear_to_db(Settings.AMBIENT_DEFAULT), -6.0, 0.1,
+		"the default is six decibels down, measured rather than asserted")
+
+
+func test_the_other_sliders_still_start_open() -> void:
+	var s: Settings = SettingsScript.new()
+	assert_almost_eq(s.master_volume, 1.0, 0.0001,
+		"only the ambience moved; the master and the effects did not")
+	assert_almost_eq(s.effects_volume, 1.0, 0.0001)
+
+
+func test_a_saved_ambient_setting_still_wins_over_the_new_default() -> void:
+	# M15, final-review.md M7: SaveIO.session_save_dir, NOT A HARD-CODED user:// PATH.
+	# FILLY_TEST_SAVE_DIR redirects SaveIO.save_dir and Settings.settings_path, not a literal
+	# "user://" string, so the old path was the one hole left in R0's "a sweep leaves the
+	# player's directory alone" property: this file was created for real, on every suite run,
+	# in ~/.local/share/godot/app_userdata/Filly Rancher/. session_save_dir is exactly the
+	# directory every other test in this file already trusts (see
+	# test_the_session_settings_path_follows_the_session_save_directory above), and it is a
+	# real native mktemp path on any run that sets FILLY_TEST_SAVE_DIR, which every documented
+	# gate and suite command does.
+	var path := SaveIOScript.session_save_dir.path_join("test_settings_ambient.cfg")
+	var s: Settings = SettingsScript.new()
+	s.ambient_volume = 1.0
+	assert_true(s.save_to(path))
+	var back: Settings = SettingsScript.new()
+	back.load_from(path)
+	assert_almost_eq(back.ambient_volume, 1.0, 0.0001,
+		"a player who already turned it up keeps it turned up")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))

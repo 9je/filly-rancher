@@ -121,7 +121,7 @@ func _ready() -> void:
 	var ink_colours: Array[Color] = []
 	for index in [0, 3]:
 		var button := screen.get_node_or_null(
-			NodePath("Panel/Column/InkRow/Ink%d" % index)) as BaseButton
+			NodePath("Layout/Panel/Margin/Column/InkRow/Ink%d" % index)) as BaseButton
 		_set_check("ink %d has a button on the screen" % index, button != null)
 		if button == null:
 			continue

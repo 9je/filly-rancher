@@ -30,6 +30,8 @@ const InputDeviceScript := preload("res://systems/input_device.gd")
 ## re-declare it; casino_menu.gd is not a TableMenu and declares its own.
 const PaintScript := preload("res://ui/casino_paint.gd")
 
+const MouseRowsScript := preload("res://ui/mouse_rows.gd")
+
 ## The stage's width in 1920x1080 base pixels: the Panel's 1180 minus the Margin node's
 ## 30 either side. Every drawn screen in the building is laid out against this one number, so
 ## a rect computed on the slot machine and a rect computed on the wheel mean the same thing.
@@ -55,8 +57,16 @@ var _result: Array[String] = []
 ## open() so a screen looks the same the second time you walk up to it.
 var _anim_t := 0.0
 
+## The row the pointer is resting on, or -1. Distinct from _selected: the cursor is where
+## she IS, this is where the pointer merely is, and a screenshot has to be able to show both.
+var _hovered := -1
+
+## The close button _ready() appends under the footer. Kept so a test and a subclass can
+## reach it without walking the column.
+var _close: Button = null
+
 @onready var _title: Label = $Centre/Panel/Margin/Column/Title
-@onready var _tabs: Label = $Centre/Panel/Margin/Column/Tabs
+@onready var _tabs: HBoxContainer = $Centre/Panel/Margin/Column/Tabs
 @onready var _rows: VBoxContainer = $Centre/Panel/Margin/Column/Rows
 @onready var _footer: Label = $Centre/Panel/Margin/Column/Footer
 @onready var _stage: Control = get_node_or_null(^"Centre/Panel/Margin/Column/Stage")
@@ -81,10 +91,21 @@ func _ready() -> void:
 	MenuStyleScript.apply_panel($Centre/Panel as PanelContainer)
 	visible = false
 	_title.text = title_text()
+	# THE DIM IS A SHUTTER, NOT A DECORATION. It used to ignore the mouse, so a click beside
+	# the panel fell through to the paused world behind it.
+	var dim := get_node_or_null(^"Dim") as Control
+	if dim != null:
+		dim.mouse_filter = Control.MOUSE_FILTER_STOP
 	if _stage != null:
-		_stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# STOP, not IGNORE: this is the felt, and the felt is where the game is.
+		_stage.mouse_filter = Control.MOUSE_FILTER_STOP
+		_stage.focus_mode = Control.FOCUS_NONE
 		_stage.custom_minimum_size = stage_size()
 		_stage.draw.connect(_paint_stage)
+		_stage.gui_input.connect(_on_stage_input)
+	_close = MouseRowsScript.close_button(MouseRowsScript.CLOSE_TEXT,
+		func(_index: int) -> void: close())
+	$Centre/Panel/Margin/Column.add_child(_close)
 	set_process(false)
 
 
@@ -95,6 +116,7 @@ func open() -> bool:
 		return false
 	_open = true
 	_selected = 0
+	_hovered = -1
 	_stake_index = 0
 	_result = []
 	_anim_t = 0.0
@@ -110,6 +132,7 @@ func close() -> void:
 	if not _open:
 		return
 	_open = false
+	_hovered = -1
 	visible = false
 	set_process(false)
 	closed.emit()
@@ -224,7 +247,14 @@ func refresh() -> void:
 	_footer.text = MenuStyleScript.footer_tabs_and_rows("confirm", "leave")
 	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
 	_title.text = title_text()
-	_tabs.text = tabs_text()
+	MouseRowsScript.tab_strip(_tabs, tab_names(), tab(), point_at_tab, take_tab)
+	var note_text := tabs_text()
+	if not note_text.is_empty():
+		var note := Label.new()
+		note.text = ("      " if not tab_names().is_empty() else "") + note_text
+		note.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		MenuStyleScript.style_label(note, MenuStyleScript.ROW_SIZE, MenuStyleScript.COLOR_NAME)
+		_tabs.add_child(note)
 	for child in _rows.get_children():
 		child.queue_free()
 	MenuStyleScript.apply_title(_title)
@@ -233,18 +263,48 @@ func refresh() -> void:
 		_stage.queue_redraw()
 	var lines: Array[String] = printed_lines()
 	var caret: int = _selected + first_row_line_index()
+	# A TABLE THAT DRAWS ITS ROWS ON THE STAGE STILL NEEDS A MOUSE TARGET FOR EACH OF THEM.
+	# slots_menu.gd and wheel_menu.gd both print nothing for their rows (the stake chips and
+	# the felt draw them instead), so first_row_line_index() sits past the end of
+	# printed_lines() and this loop would otherwise never reach a row at all. printed_count
+	# marks where the real text ends; every index padded on past it is a hit target ONLY --
+	# the stage already paints the selection, so a padded row paints nothing of its own at
+	# rest or picked, and at most the plain hover box while the pointer is actually on it.
+	var printed_count: int = lines.size()
+	while lines.size() < first_row_line_index() + row_count():
+		lines.append("")
 	for i in lines.size():
 		var picked: bool = i == caret and row_count() > 0
+		var row: int = _row_at_line(i)
+		var padded: bool = i >= printed_count
 		var label := Label.new()
-		label.text = MenuStyleScript.caret(picked) + lines[i]
-		# style_label() AND NOT A BARE font_color OVERRIDE. This line used to set the colour
-		# alone, so every row on every table in the Palace shipped with no outline, over a
-		# translucent panel, over a bright green field: exactly the readability failure
-		# MenuStyle.OUTLINE_COLOR's own comment exists to prevent. CasinoMenu was already
-		# doing it correctly, which is why the shared test never caught this one.
-		MenuStyleScript.style_label(label, MenuStyleScript.ROW_SIZE,
-			MenuStyleScript.COLOR_VALUE if picked else MenuStyleScript.COLOR_NAME)
-		var holder: PanelContainer = MenuStyleScript.row_panel(picked)
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var holder: PanelContainer
+		if padded:
+			label.text = ""
+			holder = PanelContainer.new()
+			if row >= 0:
+				MouseRowsScript.arm(holder, row, point_at_row, take_row)
+			holder.add_theme_stylebox_override(&"panel",
+				MenuStyleScript.row_box_hover() if row == _hovered else StyleBoxEmpty.new())
+		else:
+			label.text = MenuStyleScript.caret(picked) + lines[i]
+			# style_label() AND NOT A BARE font_color OVERRIDE. This line used to set the
+			# colour alone, so every row on every table in the Palace shipped with no
+			# outline, over a translucent panel, over a bright green field: exactly the
+			# readability failure MenuStyle.OUTLINE_COLOR's own comment exists to prevent.
+			# CasinoMenu was already doing it correctly, which is why the shared test never
+			# caught this one.
+			MenuStyleScript.style_label(label, MenuStyleScript.ROW_SIZE,
+				MenuStyleScript.COLOR_VALUE if picked else MenuStyleScript.COLOR_NAME)
+			if row >= 0:
+				holder = MouseRowsScript.row(row, picked, row == _hovered,
+					point_at_row, take_row)
+			else:
+				# A PRINTED LINE THAT IS NOT A ROW. The result block and the chips line are
+				# text the panel prints above its rows; nothing may pick them, so nothing
+				# arms them.
+				holder = MenuStyleScript.row_panel(picked)
 		holder.add_child(label)
 		_rows.add_child(holder)
 
@@ -253,6 +313,43 @@ func refresh() -> void:
 
 func title_text() -> String:
 	return "Table"
+
+
+## I5, final-review.md I3: the names on the tab strip, in tab-index order. Empty by default
+## -- slots_menu.gd never overrides this, because the felt is the only screen the lever and
+## the reels open onto -- so MouseRows.tab_strip() below builds nothing for it, exactly as an
+## empty Tabs Label used to draw nothing. wheel_menu.gd, blackjack_menu.gd and race_menu.gd
+## each override this with their own two names and keep tabs_text() for the note beside them
+## ("the house keeps X% ...").
+func tab_names() -> Array[String]:
+	return []
+
+
+## Which tab is current. Every table that HAS tabs already defines this with exactly this
+## signature (wheel_menu.gd, blackjack_menu.gd, race_menu.gd); this default is only ever
+## reached by a table, like slots_menu.gd, whose tab_names() is empty, so nothing ever asks.
+func tab() -> int:
+	return 0
+
+
+func set_tab(_value: int) -> void:
+	pass
+
+
+## I5: the mouse's own door into a tab, beside switch_tab()'s keyboard one. A click direct on
+## the tab it names is unambiguous, so this skips straight to set_tab() rather than
+## switch_tab()'s step-by-step posmod -- and, on race_menu.gd and wheel_menu.gd, rather than
+## switch_tab()'s stake-row special case, which exists only to disambiguate an OVERLOADED
+## arrow key and has nothing to disambiguate when the click already named the tab.
+func point_at_tab(_index: int) -> void:
+	pass
+
+
+func take_tab(index: int) -> void:
+	if index == tab():
+		return
+	set_tab(index)
+	MenuStyleScript.tick_page()
 
 
 func tabs_text() -> String:
@@ -397,3 +494,71 @@ func _unhandled_input(event: InputEvent) -> void:
 	else:
 		return
 	get_viewport().set_input_as_handled()
+
+
+# --- the pointer ----------------------------------------------------------------------------
+#
+# ONE CURSOR, TWO WAYS TO MOVE IT. point_at_row() is move_selection() with an absolute
+# destination instead of a step, and it makes the same sound, because a player who moves the
+# cursor with the mouse and a player who moves it with the arrow keys have done the same
+# thing and should hear the same thing.
+
+
+## Which drawn line is selectable row `index`, or -1 for a line nothing may pick. The
+## printed column and the selectable rows are not the same list; see first_row_line_index().
+func _row_at_line(line: int) -> int:
+	var index: int = line - first_row_line_index()
+	return index if index >= 0 and index < row_count() else -1
+
+
+func hovered_index() -> int:
+	return _hovered
+
+
+func close_button_node() -> Button:
+	return _close
+
+
+## Put the cursor on `index`. Refuses while an animation is running, exactly as
+## move_selection() is refused by every table that overrides it, so a spinning reel cannot be
+## re staked with the pointer either.
+func point_at_row(index: int) -> void:
+	if not _open or animating():
+		return
+	if index < 0 or index >= row_count():
+		return
+	if index == _selected and index == _hovered:
+		return
+	_hovered = index
+	if index != _selected:
+		_selected = index
+		MenuStyleScript.tick_move()
+	refresh()
+
+
+func take_row(index: int) -> void:
+	point_at_row(index)
+	if _selected == index:
+		confirm()
+
+
+## THE STAGE'S OWN CLICKABLE RECTS, in stage local coordinates. Empty on the base, which is
+## the right answer for a table that paints nothing worth pointing at.
+func stage_hit_rects() -> Array[Rect2]:
+	return []
+
+
+## What a click on stage rect `_index` does. Overridden by the tables that have one.
+func on_stage_hit(_index: int) -> void:
+	pass
+
+
+func _on_stage_input(event: InputEvent) -> void:
+	if not _open or _stage == null or not MouseRowsScript.is_left_click(event):
+		return
+	var button := event as InputEventMouseButton
+	var index: int = MouseRowsScript.hit(stage_hit_rects(), button.position)
+	if index < 0:
+		return
+	on_stage_hit(index)
+	_stage.accept_event()
