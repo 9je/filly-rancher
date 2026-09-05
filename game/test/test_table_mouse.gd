@@ -54,6 +54,38 @@ func test_the_arrow_keys_still_move_the_cursor_after_the_mouse_has_touched_it() 
 		"the mouse must never take the keyboard away")
 
 
+## THE STAGE ALREADY SHOWS THE SELECTION. These holders exist to be clicked, not to be
+## looked at: slots_menu.gd prints nothing for its stake rows (the stage draws the chips), so
+## the column's copy of them must stay visually silent -- no caret text, no box at rest, none
+## even while picked, and at most the plain hover box while the pointer is actually on one.
+##
+## await A FRAME BEFORE THE SECOND LOOK. refresh() frees the old holders with queue_free(),
+## which does not actually remove them until the frame ends, so a second refresh() run
+## synchronously right after the first (exactly what point_at_row() does here) leaves both
+## generations of PanelContainer sitting under Rows at once; asking the pending-deletion set
+## about its stylebox is asking last frame's answer, not this one's.
+func test_padded_rows_paint_nothing_until_hovered() -> void:
+	var holders: Array[PanelContainer] = _row_holders()
+	assert_gt(holders.size(), 0)
+	for holder: PanelContainer in holders:
+		var label := holder.get_child(0) as Label
+		assert_not_null(label)
+		assert_eq(label.text, "", "the row already has words on the stage")
+		assert_true(holder.get_theme_stylebox(&"panel") is StyleBoxEmpty,
+			"nothing paints here until the pointer actually rests on the row")
+	_menu.point_at_row(1)
+	await get_tree().process_frame
+	var seen := 0
+	for holder: PanelContainer in _row_holders():
+		var box: StyleBox = holder.get_theme_stylebox(&"panel")
+		if MouseRowsScript.row_index(holder) == _menu.hovered_index():
+			assert_false(box is StyleBoxEmpty, "the hovered row gets the plain hover box")
+		else:
+			assert_true(box is StyleBoxEmpty, "a row nothing is over stays blank")
+		seen += 1
+	assert_eq(seen, _menu.row_count(), "the freed generation is gone, not just outnumbered")
+
+
 func test_clicking_a_row_takes_it() -> void:
 	watch_signals(_menu)
 	_menu.take_row(_menu.row_count() - 1)

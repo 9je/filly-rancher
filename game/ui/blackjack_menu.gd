@@ -110,13 +110,14 @@ func row_count() -> int:
 
 
 ## ROW AND STAKE ARE THE SAME NUMBER AT THIS TABLE: see slots_menu.gd's own comment on the
-## identical pair of overrides, which this mirrors for exactly the same reason.
+## identical pair of overrides, which this mirrors for exactly the same reason, including the
+## sync-before-refresh ordering below.
 func move_selection(step: int) -> void:
 	var n: int = row_count()
 	if n <= 0:
 		return
-	set_stake_index(posmod(stake_index() + step, n))
-	_selected = stake_index()
+	_selected = posmod(stake_index() + step, n)
+	set_stake_index(_selected)
 	MenuStyleScript.tick_move()
 
 

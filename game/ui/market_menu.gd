@@ -388,16 +388,6 @@ func _refuse(text: String) -> void:
 		MenuStyleScript.COLOR_UNAFFORDABLE)
 
 
-func _row_style(selected: bool) -> StyleBoxFlat:
-	var box := StyleBoxFlat.new()
-	box.bg_color = MenuStyleScript.ROW_SELECTED_BG if selected else MenuStyleScript.ROW_IDLE_BG
-	box.border_color = MenuStyleScript.ROW_SELECTED_BORDER if selected \
-		else MenuStyleScript.ROW_IDLE_BORDER
-	box.set_border_width_all(2 if selected else 1)
-	box.set_corner_radius_all(8)
-	return box
-
-
 # --- the pointer ----------------------------------------------------------------------------
 
 

@@ -259,33 +259,45 @@ func refresh() -> void:
 	# A TABLE THAT DRAWS ITS ROWS ON THE STAGE STILL NEEDS A MOUSE TARGET FOR EACH OF THEM.
 	# slots_menu.gd and wheel_menu.gd both print nothing for their rows (the stake chips and
 	# the felt draw them instead), so first_row_line_index() sits past the end of
-	# printed_lines() and this loop would otherwise never reach a row at all. Padding with
-	# empty text keeps every row clickable without putting a second copy of its words in the
-	# column; MouseRows.row()'s own stylebox is the only thing that shows, exactly as it does
-	# on the chips and keys lines above it.
+	# printed_lines() and this loop would otherwise never reach a row at all. printed_count
+	# marks where the real text ends; every index padded on past it is a hit target ONLY --
+	# the stage already paints the selection, so a padded row paints nothing of its own at
+	# rest or picked, and at most the plain hover box while the pointer is actually on it.
+	var printed_count: int = lines.size()
 	while lines.size() < first_row_line_index() + row_count():
 		lines.append("")
 	for i in lines.size():
 		var picked: bool = i == caret and row_count() > 0
 		var row: int = _row_at_line(i)
+		var padded: bool = i >= printed_count
 		var label := Label.new()
-		label.text = MenuStyleScript.caret(picked) + lines[i]
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		# style_label() AND NOT A BARE font_color OVERRIDE. This line used to set the colour
-		# alone, so every row on every table in the Palace shipped with no outline, over a
-		# translucent panel, over a bright green field: exactly the readability failure
-		# MenuStyle.OUTLINE_COLOR's own comment exists to prevent. CasinoMenu was already
-		# doing it correctly, which is why the shared test never caught this one.
-		MenuStyleScript.style_label(label, MenuStyleScript.ROW_SIZE,
-			MenuStyleScript.COLOR_VALUE if picked else MenuStyleScript.COLOR_NAME)
 		var holder: PanelContainer
-		if row >= 0:
-			holder = MouseRowsScript.row(row, picked, row == _hovered,
-				point_at_row, take_row)
+		if padded:
+			label.text = ""
+			holder = PanelContainer.new()
+			if row >= 0:
+				MouseRowsScript.arm(holder, row, point_at_row, take_row)
+			holder.add_theme_stylebox_override(&"panel",
+				MenuStyleScript.row_box_hover() if row == _hovered else StyleBoxEmpty.new())
 		else:
-			# A PRINTED LINE THAT IS NOT A ROW. The result block and the chips line are text
-			# the panel prints above its rows; nothing may pick them, so nothing arms them.
-			holder = MenuStyleScript.row_panel(picked)
+			label.text = MenuStyleScript.caret(picked) + lines[i]
+			# style_label() AND NOT A BARE font_color OVERRIDE. This line used to set the
+			# colour alone, so every row on every table in the Palace shipped with no
+			# outline, over a translucent panel, over a bright green field: exactly the
+			# readability failure MenuStyle.OUTLINE_COLOR's own comment exists to prevent.
+			# CasinoMenu was already doing it correctly, which is why the shared test never
+			# caught this one.
+			MenuStyleScript.style_label(label, MenuStyleScript.ROW_SIZE,
+				MenuStyleScript.COLOR_VALUE if picked else MenuStyleScript.COLOR_NAME)
+			if row >= 0:
+				holder = MouseRowsScript.row(row, picked, row == _hovered,
+					point_at_row, take_row)
+			else:
+				# A PRINTED LINE THAT IS NOT A ROW. The result block and the chips line are
+				# text the panel prints above its rows; nothing may pick them, so nothing
+				# arms them.
+				holder = MenuStyleScript.row_panel(picked)
 		holder.add_child(label)
 		_rows.add_child(holder)
 

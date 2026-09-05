@@ -136,14 +136,19 @@ func row_count() -> int:
 ## so _selected (the pointer's cursor) and _stake_index (what selected_stake() actually pays
 ## out) are kept equal in both directions. See point_at_row()'s own override below for the
 ## other direction.
+##
+## SYNCED BEFORE THE REFRESH, NOT AFTER. set_stake_index() below calls refresh() itself; _selected
+## has to already hold the new value when that happens or the padded row's hover/picked state
+## (and anything else that reads _selected while painting) draws one keypress behind, self
+## perpetuating on every further step since nothing repaints a second time to catch up.
 func move_selection(step: int) -> void:
 	if _spinning:
 		return
 	var n: int = row_count()
 	if n <= 0:
 		return
-	set_stake_index(posmod(stake_index() + step, n))
-	_selected = stake_index()
+	_selected = posmod(stake_index() + step, n)
+	set_stake_index(_selected)
 	MenuStyleScript.tick_move()
 
 
