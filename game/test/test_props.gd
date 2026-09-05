@@ -180,3 +180,31 @@ func _priced_regions() -> Array[RegionData]:
 		if region != null and region.permit_cost > 0:
 			result.append(region)
 	return result
+
+
+# --- the treeline goes MLP ---------------------------------------------------------------
+
+func test_no_kenney_blob_tree_and_no_bare_sail_survives_the_layout() -> void:
+	var banned := ["kenney_tree_", "kenney_windmill", "kenney_watermill"]
+	for entry: Dictionary in PropsScript.LAYOUT:
+		var file: String = entry["file"]
+		for prefix: String in banned:
+			assert_false(file.begins_with(prefix),
+				"%s is the signature Kenney read slice R2 took off the map" % file)
+
+
+func test_every_new_tree_reads_as_foliage_so_the_camera_probe_ignores_it() -> void:
+	for entry: Dictionary in PropsScript.LAYOUT:
+		var file: String = entry["file"]
+		if file.begins_with("saa_tree") or file.begins_with("saa_dead_tree"):
+			assert_true(PropsScript.is_foliage(file),
+				"%s must be foliage, or the camera arm stops on a canopy" % file)
+
+
+func test_every_tree_in_the_layout_carries_a_scale_correction() -> void:
+	for entry: Dictionary in PropsScript.LAYOUT:
+		var file: String = entry["file"]
+		if not (file.begins_with("saa_tree") or file.begins_with("saa_dead_tree")):
+			continue
+		assert_true(PropsScript.SCALE_FIX.has(file),
+			"%s is an SFM model at whatever size a 2015 modeller drew it" % file)
