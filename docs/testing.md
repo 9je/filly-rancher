@@ -57,6 +57,36 @@ exit code `0`.
 
 ---
 
+## Where an automated run writes its saves
+
+**`FILLY_TEST_SAVE_DIR` moves the save directory for one process.**
+`game/systems/save_io.gd` reads it exactly once, at class load
+(`_static_init`), into `SaveIO.session_save_dir` and `SaveIO.save_dir`; an
+unset or blank value resolves to `SaveIO.DEFAULT_SAVE_DIR`, which is
+`user://saves`. `game/systems/settings.gd` follows the same directory, so
+`settings.cfg` moves with the slots.
+
+`tools/run_tests.sh` exports a fresh `mktemp -d` for the whole run and removes
+it afterwards, and every gate command in this file carries the same prefix.
+`tools/sky_sheet.sh` and `tools/roster_sheet.sh` export it too, because every
+cell they render is another boot of the ranch.
+
+**Why this exists.** A gate scene under `game/scenes/test/` instances the real
+`world/ranch.tscn`, and the ranch writes a save while it boots (its own
+`GATE_SAVE_SLOT` probe, slot 9), on top of whatever scratch slot the gate uses
+itself. Only the GUT suite used to redirect `SaveIO.save_dir`, by assigning it,
+and only in the test files that remembered to -- so running the gates, or
+running `test_pen.gd`, wrote the slots the owner actually plays out of, in the
+checkout the owner actually plays from. Reading the variable at class
+initialization is what makes the fix total: there is no call site anywhere that
+has to opt in, and no way for two systems to disagree about whether this is a
+test run.
+
+`bash tools/prove_save_safety.sh` is the proof, and it has a negative control.
+See "Proving the saves are safe" below.
+
+---
+
 ## The parse sweep (runs before GUT)
 
 `tools/run_tests.sh` hands **every** `game/**/*.gd` outside `game/addons/` to
@@ -426,7 +456,7 @@ the player's own save slot.
 Run it with:
 
 ```
-tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/market_test.tscn
+FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/market_test.tscn
 ```
 
 Expect `MARKET_OK checks=69`; the exit code is the verdict.
@@ -462,7 +492,7 @@ shipped terrain, at the shipped radius, with the shipped permit paying for it.
 Run it with:
 
 ```
-tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/region_test.tscn
+FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/region_test.tscn
 ```
 
 Expect `REGION_OK checks=49`; the exit code is the verdict.
@@ -507,7 +537,7 @@ obviously broken sky.
 Run it with:
 
 ```
-tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/world_test.tscn
+FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/world_test.tscn
 ```
 
 Expect `WORLD_OK checks=32`; the exit code is the verdict.
@@ -520,7 +550,7 @@ stormy night. A pinned run never moves the clock and never writes it to
 anybody's save, which the ranch gate itself checks. The pinned invocation is:
 
 ```
-tools/bin/godot --headless --audio-driver Dummy --path game world/ranch.tscn -- --phase=NIGHT --weather=STORM
+FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dummy --path game world/ranch.tscn -- --phase=NIGHT --weather=STORM
 ```
 
 Phase names are `dawn`, `day`, `dusk`, `night` and weathers are `clear`,
@@ -683,7 +713,7 @@ driven from here.
 Run it with:
 
 ```
-tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/collection_test.tscn
+FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/collection_test.tscn
 ```
 
 Expect `COLLECTION_OK checks=73`; the exit code is the verdict. Every line it
@@ -771,7 +801,7 @@ pay-down check is a real crossing rather than a lucky one.
 Run it with:
 
 ```
-tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/ledger_test.tscn
+FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/ledger_test.tscn
 ```
 
 Expect `LEDGER_OK checks=87`; the exit code is the verdict.
@@ -841,7 +871,7 @@ a free it did not cause.
 Run it with:
 
 ```
-tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/depot_test.tscn
+FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/depot_test.tscn
 ```
 
 Expect `DEPOT_OK checks=72`; the exit code is the verdict.
@@ -891,7 +921,7 @@ point down rendered point up.
 
 **And a person still has to look at one.** The numbers above cannot say whether an
 F on a pony's side reads as an F.
-`tools/bin/godot --path game scenes/test/model_gallery.tscn -- --mark` stands three
+`FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --path game scenes/test/model_gallery.tscn -- --mark` stands three
 copies of the base model wearing `MarkPaint.orientation_probe()`, turned to show
 the left flank, the front and the right flank. What to look for is printed by the
 scene itself: the F right way up on both flanks, its spine on the left as you look
@@ -901,7 +931,7 @@ cutie mark). Headless it prints `GALLERY_MARK_OK count=3` and the exit code is t
 verdict.
 
 **And a third row, for the props.**
-`tools/bin/godot --path game scenes/test/model_gallery.tscn -- --props` loads the
+`FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --path game scenes/test/model_gallery.tscn -- --props` loads the
 `.glb` files in `game/assets/converted/props/` whose names begin with one of the
 five manifest prefixes (`saa_`, `pv_`, `mlp_`, `school_`, `lp_`), stands them in a
 line spaced by their own measured widths, and prints one `PROP <file> size=(x, y,
@@ -952,7 +982,7 @@ from every other hosted gate's** (`collection_test.gd`'s 5, `ledger_test.gd`'s
 Run it with:
 
 ```
-tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/creation_test.tscn
+FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/creation_test.tscn
 ```
 
 Expect `CREATION_OK checks=93`; the exit code is the verdict.
@@ -1040,7 +1070,7 @@ gets close.
 Run it with:
 
 ```
-tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/casino_test.tscn
+FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/casino_test.tscn
 ```
 
 Expect `CASINO_OK checks=76`; the exit code is the verdict.
@@ -1106,7 +1136,7 @@ actually walks to the crate.
 Run it with:
 
 ```
-tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/story_test.tscn
+FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/story_test.tscn
 ```
 
 Expect `STORY_OK checks=55`; the exit code is the verdict.
@@ -1118,11 +1148,13 @@ Expect `STORY_OK checks=55`; the exit code is the verdict.
 `game/scenes/test/sound_test.tscn` is the one gate in this project that hosts
 nothing. Every other gate instances `world/ranch.tscn`, because what it is
 checking is a ranch. This one is checking four autoloads and a directory of
-files, and there is a second reason to keep the ranch out of it: a gate that
-boots the ranch is a gate that can write a live save, which is a defect this
-project already has parked. The gate proves its own innocence rather than
-promising it, by listing `user://saves` on the way in and on the way out and
-asserting the two listings match.
+files. It proves its own innocence rather than promising it, about two
+directories at once: it lists `user://saves` (the player's own, which nothing
+on an automated run may touch) and `SaveIO.save_dir` (wherever
+`FILLY_TEST_SAVE_DIR` sent this run) on the way in and on the way out, and
+asserts both listings match. It prints which two directories those were as
+`SOUND saves live=... session=...`, so a log says where the run was pointed
+rather than leaving it to be assumed.
 
 What it checks that a unit test cannot see:
 
@@ -1149,7 +1181,7 @@ What it checks that a unit test cannot see:
 Run it with:
 
 ```
-tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/sound_test.tscn
+FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dummy --path game scenes/test/sound_test.tscn
 ```
 
 Expect `SOUND_OK ids=37`; the exit code is the verdict.

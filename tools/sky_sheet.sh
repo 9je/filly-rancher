@@ -34,6 +34,12 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
+# Sixteen boots of world/ranch.tscn, each of which writes a save on its way through the ranch's
+# own boot probe. Redirected off the player's slots the same way tools/run_tests.sh does it; see
+# game/systems/save_io.gd. A sheet is not worth somebody's ranch.
+FILLY_TEST_SAVE_DIR="${FILLY_TEST_SAVE_DIR:-$(mktemp -d)}"
+export FILLY_TEST_SAVE_DIR
+
 PHASES="dawn day dusk night"
 WEATHERS="clear rain fog storm"
 SHOT="01_establishing"

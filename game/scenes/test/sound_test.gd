@@ -8,9 +8,11 @@ extends Node
 ##
 ## THIS GATE HOSTS NOTHING. No ranch, no player, no save. Every other gate instances
 ## world/ranch.tscn because a ranch is what it is checking; this one is checking four
-## autoloads and a directory, and a gate that boots the ranch is a gate that can write a
-## live save. It proves it rather than promising it: the last check lists user://saves
-## before and after and asserts nothing moved.
+## autoloads and a directory. It proves its innocence rather than promising it, and about TWO
+## directories: the player's own user://saves, which nothing on an automated run may ever
+## touch, and whatever FILLY_TEST_SAVE_DIR redirected this process to, which this gate has no
+## business writing either. The first of those was the parked defect that slice R0 closed --
+## a gate boot used to write the live slots -- and this is the check that keeps it closed.
 ##
 ## AudioSafety has muted Master before this file's _ready() runs, and the command line adds
 ## --audio-driver Dummy on top, so nothing here can make noise on the machine running it.
@@ -25,7 +27,7 @@ const SoundScript := preload("res://systems/sound.gd")
 const WorldStateScript := preload("res://systems/world_state.gd")
 const SettingsScript := preload("res://systems/settings.gd")
 
-const SAVE_DIR := "user://saves"
+const SaveIOScript := preload("res://systems/save_io.gd")
 
 var _checks: Dictionary = {}
 var _duplicates: Array[String] = []
@@ -44,15 +46,20 @@ func _sound_autoload() -> Node:
 
 func _ready() -> void:
 	GateWatchdogScript.arm(self, "SOUND", 120.0)
-	var saves_before: PackedStringArray = _save_listing()
+	var live_before: PackedStringArray = _save_listing(SaveIOScript.DEFAULT_SAVE_DIR)
+	var session_before: PackedStringArray = _save_listing(SaveIOScript.save_dir)
+	print("SOUND saves live=%s session=%s" % [SaveIOScript.DEFAULT_SAVE_DIR,
+		SaveIOScript.save_dir])
 	_check_the_buses()
 	_check_every_stream()
 	_check_the_loop_flags()
 	_check_the_verbs()
 	_check_the_pools()
 	_check_the_volume_sliders()
-	_set_check("the gate wrote nothing into the save directory",
-		_save_listing() == saves_before)
+	_set_check("the gate wrote nothing into the player's own save directory",
+		_save_listing(SaveIOScript.DEFAULT_SAVE_DIR) == live_before)
+	_set_check("the gate wrote nothing into this run's save directory",
+		_save_listing(SaveIOScript.save_dir) == session_before)
 	_finish()
 
 
@@ -201,10 +208,10 @@ func _check_the_volume_sliders() -> void:
 
 # --- plumbing ------------------------------------------------------------------------------
 
-func _save_listing() -> PackedStringArray:
-	if not DirAccess.dir_exists_absolute(SAVE_DIR):
+func _save_listing(dir: String) -> PackedStringArray:
+	if not DirAccess.dir_exists_absolute(dir):
 		return PackedStringArray()
-	return DirAccess.get_files_at(SAVE_DIR)
+	return DirAccess.get_files_at(dir)
 
 
 func _set_check(label: String, ok: bool) -> void:
