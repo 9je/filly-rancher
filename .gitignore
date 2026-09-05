@@ -24,3 +24,4 @@ __pycache__/
 # Logs written into the repo root by .github/workflows/smoke_run.sh when it is run
 # locally (CI runs it in a throwaway checkout, so it never noticed).
 ci_smoke_*.log
+scratchpad/
