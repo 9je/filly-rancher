@@ -1326,11 +1326,23 @@ func _bind_build_menu() -> void:
 func _on_menu_opened(_slot: PlotSlot) -> void:
 	get_tree().paused = true
 	_set_cursor_captured(false)
+	_set_hud_overlay(true)
 
 
 func _on_menu_closed() -> void:
 	get_tree().paused = false
 	_set_cursor_captured(true)
+	_set_hud_overlay(false)
+
+
+## THE CONTROL CARD IS NOT ON SCREEN WHILE ANYTHING IS OVER THE WORLD. See game/ui/hud.gd's
+## set_overlay_open(). Guarded by has_method() like every other reach into a menu from here:
+## a HUD whose script failed to parse is a FAILED check in _report(), not a crash on the
+## first menu somebody opens.
+func _set_hud_overlay(open: bool) -> void:
+	var overlay := get_node_or_null(^"HUD")
+	if overlay != null and overlay.has_method("set_overlay_open"):
+		overlay.call("set_overlay_open", open)
 
 
 ## THE ONE PLACE THE CURSOR IS SHOWN OR HIDDEN. Split out of _on_menu_opened()/
