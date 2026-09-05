@@ -2041,11 +2041,13 @@ func _bind_pause_menu() -> void:
 	if _game_state != null and not _game_state.state_loaded.is_connected(inject_pages):
 		_game_state.state_loaded.connect(inject_pages)
 	for pair in [["opened", _on_pause_opened], ["closed", _on_menu_closed],
-			["save_requested", _on_pause_save], ["quit_requested", _on_pause_quit],
+			["save_requested", _on_pause_save], ["load_requested", _on_load_requested],
+			["quit_requested", _on_pause_quit],
 			["settings_changed", _on_settings_changed],
 			["mail_opened", _on_mail_opened], ["mail_reply", _on_mail_reply]]:
 		if not pause_menu.is_connected(pair[0], pair[1]):
 			pause_menu.connect(pair[0], pair[1])
+	pause_menu.set("has_save_provider", func() -> bool: return _can_load())
 
 
 ## Is every menu EXCEPT `menu` closed? Pass null to ask about all three.
@@ -2249,6 +2251,29 @@ func _on_pause_quit() -> void:
 	# state anything downstream of here should have to reason about.
 	get_tree().paused = false
 	get_tree().quit()
+
+
+## IS THERE ANYTHING ON DISK TO GO BACK TO? Split out of _on_load_requested() so a test can
+## drive the decision without a scene reload taking the test runner's own tree with it.
+func _can_load() -> bool:
+	return _game_state != null and _game_state.has_save()
+
+
+## LOAD GAME. The whole world is rebuilt rather than patched, because a ranch is terrain, a
+## herd, a set of pens and a clock, and half of that being from the save while the other half
+## is from the session is the class of bug that eats an afternoon. reload_current_scene()
+## re-runs _ready(), whose _bind_game_state() reads the slot exactly as a fresh boot does.
+##
+## THE TREE IS UNPAUSED FIRST. The pause menu paused it; a scene reloaded into a paused tree
+## comes back frozen, with nothing left on screen able to unfreeze it.
+func _on_load_requested() -> void:
+	if not _interactive or not _can_load():
+		return
+	if pause_menu != null and pause_menu.has_method("close"):
+		pause_menu.call("close")
+	get_tree().paused = false
+	_set_cursor_captured(true)
+	get_tree().reload_current_scene()
 
 
 func _on_settings_changed() -> void:

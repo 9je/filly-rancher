@@ -50,13 +50,24 @@ const PaintScript := preload("res://ui/casino_paint.gd")
 # is, exactly as it preloads CompendiumScript for State without ever owning a Compendium.
 const StoryBeatScript := preload("res://systems/story_beat.gd")
 const StoryWordingScript := preload("res://systems/story_wording.gd")
+const MouseRowsScript := preload("res://ui/mouse_rows.gd")
 
 enum Page { MAIN, SETTINGS, COMPENDIUM, REQUESTS, MAIL, LEDGER }
-enum Row { RESUME, COMPENDIUM, REQUESTS, MAIL, LEDGER, SAVE, SETTINGS, QUIT }
+enum Row { RESUME, COMPENDIUM, REQUESTS, MAIL, LEDGER, SAVE, LOAD, SETTINGS, QUIT }
 enum SettingRow { VOLUME, AMBIENT, EFFECTS, SENSITIVITY, INVERT }
 
-const MAIN_ROWS := ["Resume", "Compendium", "Requests", "Mail", "The ledger",
-	"Save the ranch", "Settings", "Quit to desktop"]
+## THE ROWS, IN THE ENUM'S OWN ORDER, and the words on them.
+##
+## "Save the ranch" IS GONE. The owner read it, on her first full playtest, as something the
+## game was proposing to do to the ranch rather than as a file operation, and she is right:
+## every other game in the world calls this Save game. Load game is beside it now, which is
+## the row that was missing rather than mislabelled.
+##
+## "Mail" IS "Saddlebag copies". The letters are read at the mailbox by the door from this
+## slice on; this page is the archive of what has already come, and calling it Mail is what
+## made the owner ask why her mail was in a menu when the letter said it was by her house.
+const MAIN_ROWS := ["Resume", "Compendium", "Requests", "Saddlebag copies", "The ledger",
+	"Save game", "Load game", "Settings", "Quit to desktop"]
 
 ## How many character rows of the compendium are on screen at once. The roster is 43 long
 ## and the panel is not, so the list is a window over it rather than the whole thing.
@@ -86,6 +97,9 @@ const MAIL_STAGE_WIDTH := 660.0
 const ENVELOPE_HEIGHT := 68.0
 const ENVELOPE_GAP := 10.0
 const ENVELOPES_ON_SCREEN := 5
+## Clear air above the first envelope, shared by _paint_envelopes() and stage_hit_rects() so
+## the drawing and the pointer's rects cannot disagree about where the stack starts.
+const ENVELOPE_TOP_PAD := 6.0
 const LETTER_LINE_HEIGHT := 26.0
 const REPLY_ROW_HEIGHT := 34.0
 const REPLY_ROW_GAP := 6.0
@@ -107,6 +121,7 @@ const ANY_TEXT := "any"
 signal opened()
 signal closed()
 signal save_requested()
+signal load_requested()
 signal quit_requested()
 signal settings_changed()
 
@@ -123,6 +138,11 @@ signal mail_reply(id: StringName, choice: String)
 var settings: Settings = null
 ## `func() -> bool`. Invalid means "always allowed".
 var can_open := Callable()
+
+## Whether there is a save on disk to load. Injected by ranch.gd, like every other provider
+## on this menu: game/ui/ may not reach SaveIO any more than it may reach Economy. A menu
+## with no provider assumes there is one, which is the answer a test fixture wants.
+var has_save_provider := Callable()
 
 ## The five things the two reading pages draw, all injected by ranch.gd and all allowed to
 ## stay null forever. See the class comment.
@@ -171,6 +191,11 @@ var _mail_rows_dirty := true
 ## for the focus ring's breath, the same field and the same purpose as TableMenu._anim_t.
 var _anim_t := 0.0
 
+## The row the pointer is over, or -1 while nothing on the main page has it. Never the
+## compendium/requests/ledger rows: see point_at_row()'s own comment.
+var _hovered := -1
+var _close: Button = null
+
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -178,9 +203,17 @@ func _ready() -> void:
 	MenuStyleScript.style_label(_title, MenuStyleScript.TITLE_SIZE, MenuStyleScript.COLOR_TITLE)
 	_title.text = "PAUSED"
 	visible = false
+	var dim := get_node_or_null(^"Dim") as Control
+	if dim != null:
+		dim.mouse_filter = Control.MOUSE_FILTER_STOP
 	if _stage != null:
-		_stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_stage.mouse_filter = Control.MOUSE_FILTER_STOP
+		_stage.focus_mode = Control.FOCUS_NONE
+		_stage.gui_input.connect(_on_stage_input)
 		_stage.draw.connect(_paint_stage)
+	_close = MouseRowsScript.close_button(MouseRowsScript.CLOSE_TEXT,
+		func(_index: int) -> void: close())
+	$Centre/Panel/Margin/Column.add_child(_close)
 	set_process(false)
 
 
@@ -212,6 +245,7 @@ func open() -> bool:
 	_scroll = 0
 	_letter_id = &""
 	_anim_t = 0.0
+	_hovered = -1
 	set_process(true)
 	_open = true
 	visible = true
@@ -255,6 +289,7 @@ func close() -> void:
 	if not _open:
 		return
 	_open = false
+	_hovered = -1
 	visible = false
 	set_process(false)
 	closed.emit()
@@ -410,6 +445,18 @@ func confirm() -> bool:
 		Row.SAVE:
 			save_requested.emit()
 			MenuStyleScript.tick_confirm()
+		Row.LOAD:
+			# A LOAD ROW ON A MACHINE WITH NO SAVE MUST REFUSE, and say so the way every
+			# other refusal in this game says so: one soft tick, no signal, nothing moves.
+			var has_save: bool = true
+			if has_save_provider.is_valid():
+				has_save = bool(has_save_provider.call())
+			if not has_save:
+				MenuStyleScript.tick_denied()
+				return false
+			MenuStyleScript.tick_confirm()
+			load_requested.emit()
+			return true
 		Row.SETTINGS:
 			_page = Page.SETTINGS
 			_selected = 0
@@ -946,24 +993,28 @@ func _add_note(text: String) -> void:
 func _add_row(index: int, row_name: String, value: String,
 		name_color: Color = MenuStyleScript.COLOR_NAME,
 		value_color: Color = MenuStyleScript.COLOR_VALUE, compact: bool = false) -> void:
-	var row := PanelContainer.new()
-	row.add_theme_stylebox_override(&"panel", _row_style(index == _selected))
+	var row: PanelContainer = MouseRowsScript.row(index, index == _selected,
+		index == _hovered, point_at_row, take_row)
 	var margin := MarginContainer.new()
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	margin.add_theme_constant_override(&"margin_left", 18)
 	margin.add_theme_constant_override(&"margin_right", 18)
 	margin.add_theme_constant_override(&"margin_top", 4 if compact else 10)
 	margin.add_theme_constant_override(&"margin_bottom", 4 if compact else 10)
 	row.add_child(margin)
 	var head := HBoxContainer.new()
+	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	margin.add_child(head)
 	var title := Label.new()
 	title.text = row_name
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	MenuStyleScript.style_label(title, 22 if compact else 26, name_color)
 	head.add_child(title)
 	if not value.is_empty():
 		var val := Label.new()
 		val.text = value
+		val.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		MenuStyleScript.style_label(val, 20 if compact else 24, value_color)
 		head.add_child(val)
 	_rows.add_child(row)
@@ -1043,7 +1094,7 @@ func _paint_envelopes(font: Font, box: Rect2) -> void:
 		maxi(0, rows.size() - ENVELOPES_ON_SCREEN))
 	if _selected < first:
 		first = _selected
-	var y: float = box.position.y + 6.0
+	var y: float = box.position.y + ENVELOPE_TOP_PAD
 	for i in range(first, mini(rows.size(), first + ENVELOPES_ON_SCREEN)):
 		var row: Dictionary = rows[i]
 		PaperPaintScript.envelope(_stage,
@@ -1096,3 +1147,70 @@ func _paint_letter(font: Font, box: Rect2) -> void:
 		PaperPaintScript.stamp(_stage,
 			Rect2(Vector2(x + width * 0.60, y + 6.0), Vector2(width * 0.36, 44.0)), font,
 			"ANSWERED")
+
+
+# --- the pointer ----------------------------------------------------------------------------
+
+
+func hovered_index() -> int:
+	return _hovered
+
+
+func close_button_node() -> Button:
+	return _close
+
+
+func point_at_row(index: int) -> void:
+	if index < 0 or index >= _row_count():
+		return
+	if index == _selected and index == _hovered:
+		return
+	_hovered = index
+	if index != _selected:
+		_selected = index
+		MenuStyleScript.tick_move()
+	_refresh()
+
+
+func take_row(index: int) -> void:
+	point_at_row(index)
+	if _selected == index:
+		confirm()
+
+
+## THE MAIL PAGE IS A DRAWING, so its rows are rects rather than PanelContainers. The
+## envelope rects are the ones _paint_envelopes() lays out, computed here from the same
+## constants so the drawing and the hit test cannot disagree. ENVELOPE_TOP_PAD is the one
+## the drawing folds into its start-of-stack `y` too, so the top rect and the top envelope
+## share an origin.
+func stage_hit_rects() -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	if _page != Page.MAIL or not _letter_id.is_empty():
+		return out
+	var rows: Array[Dictionary] = mail_rows()
+	var shown: int = mini(rows.size(), ENVELOPES_ON_SCREEN)
+	for i in shown:
+		out.append(Rect2(0.0, ENVELOPE_TOP_PAD + float(i) * (ENVELOPE_HEIGHT + ENVELOPE_GAP),
+			MAIL_STAGE_WIDTH, ENVELOPE_HEIGHT))
+	return out
+
+
+func on_stage_hit(index: int) -> void:
+	if _page != Page.MAIL:
+		return
+	var rows: Array[Dictionary] = mail_rows()
+	if index < 0 or index >= rows.size():
+		return
+	_selected = index + _scroll
+	open_letter(StringName(String(rows[index + _scroll]["id"])))
+
+
+func _on_stage_input(event: InputEvent) -> void:
+	if not _open or _stage == null or not MouseRowsScript.is_left_click(event):
+		return
+	var button := event as InputEventMouseButton
+	var index: int = MouseRowsScript.hit(stage_hit_rects(), button.position)
+	if index < 0:
+		return
+	on_stage_hit(index)
+	_stage.accept_event()

@@ -700,3 +700,68 @@ func test_adjusting_the_ambient_row_moves_the_ambient_volume_and_nothing_else() 
 	assert_lt(_settings.ambient_volume, 1.0)
 	assert_almost_eq(_settings.master_volume, master_before, 0.0001)
 	assert_almost_eq(_settings.effects_volume, 1.0, 0.0001)
+
+
+# --- the pointer, and the copy ---------------------------------------------------------
+
+## THE OWNER MISREAD "Save the ranch" AS SOMETHING THAT HAPPENED TO THE RANCH rather than as
+## a file operation. This is the copy fix, pinned so it cannot drift back.
+func test_the_main_page_says_save_game_and_load_game() -> void:
+	assert_eq(PauseMenu.MAIN_ROWS[PauseMenu.Row.SAVE], "Save game")
+	assert_eq(PauseMenu.MAIN_ROWS[PauseMenu.Row.LOAD], "Load game")
+	assert_eq(PauseMenu.MAIN_ROWS[PauseMenu.Row.MAIL], "Saddlebag copies")
+	assert_eq(PauseMenu.MAIN_ROWS.size(), PauseMenu.Row.size())
+
+
+func test_no_row_or_footer_on_this_menu_carries_a_dash() -> void:
+	var checked := 0
+	for text: String in PauseMenu.MAIN_ROWS:
+		assert_false(text.contains("--"), text)
+		assert_false(text.contains(char(0x2014)), text)
+		checked += 1
+	assert_gt(checked, 0, "the row list was actually walked")
+
+
+func test_load_game_asks_the_ranch_to_load_and_only_when_there_is_a_save() -> void:
+	_menu.has_save_provider = func() -> bool: return true
+	_menu.open()
+	watch_signals(_menu)
+	_menu.take_row(PauseMenu.Row.LOAD)
+	assert_signal_emitted(_menu, "load_requested")
+
+
+func test_load_game_refuses_when_no_save_exists() -> void:
+	_menu.has_save_provider = func() -> bool: return false
+	_menu.open()
+	watch_signals(_menu)
+	_menu.take_row(PauseMenu.Row.LOAD)
+	assert_signal_not_emitted(_menu, "load_requested",
+		"a Load row on a machine with no save is a row that must refuse")
+
+
+func test_pointing_moves_the_cursor_and_the_keys_still_work() -> void:
+	_menu.open()
+	_menu.point_at_row(PauseMenu.Row.SETTINGS)
+	assert_eq(_menu.selected_index(), PauseMenu.Row.SETTINGS)
+	assert_eq(_menu.hovered_index(), PauseMenu.Row.SETTINGS)
+	_menu.move_selection(1)
+	assert_eq(_menu.selected_index(), PauseMenu.Row.QUIT,
+		"the mouse must never take the keyboard away")
+
+
+func test_the_pause_menu_offers_the_pointer_a_way_out() -> void:
+	var button: Button = _menu.close_button_node()
+	assert_not_null(button)
+	assert_eq(button.text, preload("res://ui/mouse_rows.gd").CLOSE_TEXT)
+	assert_eq(button.focus_mode, Control.FOCUS_NONE)
+
+
+func test_the_mail_envelopes_are_clickable_and_open_the_letter_they_name() -> void:
+	_wire_mail()
+	_menu.open()
+	_menu.open_page(PauseMenu.Page.MAIL)
+	var rects: Array[Rect2] = _menu.stage_hit_rects()
+	assert_eq(rects.size(), _menu.mail_rows().size(),
+		"one hit rect per envelope on the page")
+	_menu.on_stage_hit(0)
+	assert_eq(_menu.open_letter_id(), &"weather_survey", "the newest envelope is the top one")
