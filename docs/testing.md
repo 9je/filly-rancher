@@ -328,13 +328,15 @@ GUT's own default of not descending into subdirectories without
 **And a floor on the test count**, for the half the script count cannot see: a
 file that still parses but has lost most of its tests (a mass rename, a bad
 merge, a `func test_x` that became `func x`). `MIN_TESTS` in
-`tools/run_tests.sh` — currently **1420** — is a deliberate FLOOR rather than an
+`tools/run_tests.sh` — currently **1535** — is a deliberate FLOOR rather than an
 exact count, so adding tests never breaks the build. Raise it when the suite
 grows; never lower it without saying in the same commit which tests went away
 and why. (It was 194 through Phase 1A and was raised to the suite's real size in
 Phase 1B Task 3 — a floor a hundred tests below the actual count could not have
 caught a whole test script going missing, which is exactly the failure the
-paragraph above describes.)
+paragraph above describes. It was raised again, from 1420 to 1535, by slice R1's
+own growth, and proved both ways per the section below at the new number: the
+suite passes at 1535 and a `FILLY_MIN_TESTS=99999` run still fails on it.)
 
 **Proving both guards, safely:**
 
@@ -448,6 +450,9 @@ restoring the cache) turns the suite green again.
 | `game/test/test_casino_stages.gd` | The contract every drawn casino screen holds: a stage of the shared width, a printed line that is still in the model, and the focus following the cursor across every row of every tab |
 | `game/test/test_lobby_sign.gd` | The board that replaced the eleven line label outside the Palace: fitted lines, nothing hanging below its own origin, no dash |
 | `game/world/terrain.gdshader` | The ground: sRGB decode, two octaves of hash noise, a slope mask to dirt, a ridge lift and a distance fade |
+| `game/ui/mouse_rows.gd` | The mouse kit every menu's rows are armed through |
+| `game/ui/theme/filly_theme.tres` | The generated Theme; regenerate with `bash tools/make_theme.sh` |
+| `game/scripts/make_theme.gd` | The script that builds `filly_theme.tres` |
 
 ---
 
