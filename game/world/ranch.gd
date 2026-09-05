@@ -162,6 +162,7 @@ const StripScript := preload("res://world/strip.gd")
 const BootIntentScript := preload("res://world/boot_intent.gd")
 const CasinoSignScript := preload("res://systems/casino_sign.gd")
 const LobbySignScript := preload("res://world/lobby_sign.gd")
+const PalaceFacadeScript := preload("res://world/palace_facade.gd")
 const InteractionScript := preload("res://world/interaction.gd")
 const BuildingScript := preload("res://world/building.gd")
 const CasinoScript := preload("res://systems/casino.gd")
@@ -1020,6 +1021,7 @@ func _ready() -> void:
 			LobbySignScript.HEADLINE, LobbySignScript.SUBLINE)
 
 	_stand_request_board()
+	_stand_palace_facade()
 
 	var prop_count: int = props.build() + buildings.get_child_count()
 
@@ -4514,6 +4516,24 @@ func _stand_request_board() -> void:
 			+ out_dir * (board.depth * 0.5 + REQUEST_BOARD_STANDOFF))
 	panel.build(board.width * REQUEST_BOARD_WIDTH_FRACTION, REQUEST_BOARD_HEIGHT, out_dir,
 		REQUEST_BOARD_HEADLINE, REQUEST_BOARD_SUBLINE)
+
+
+## THE PALACE'S OWN FRONT, standing inside the shell it is sized from. Mounted here rather
+## than authored in ranch.tscn for the reason strip.gd and region_fence.gd are both built in
+## code: game/assets/converted/ is gitignored, so a static ext_resource to one of these
+## pieces would fail the export error gate on every CI run (docs/ci.md section 4).
+func _stand_palace_facade() -> void:
+	var palace := get_node_or_null(^"Buildings/Palace") as Building
+	if palace == null:
+		return
+	var out_dir: Vector3 = palace.global_transform.basis * Vector3(0.0, 0.0, 1.0)
+	out_dir.y = 0.0
+	var facade := PalaceFacadeScript.new()
+	facade.name = "Facade"
+	palace.add_child(facade)
+	var stood: int = facade.build(palace.width * 0.5, palace.depth * 0.5,
+		palace.door_width * 0.5, out_dir)
+	print("RANCH palace facade pieces=%d neon=%d" % [stood, facade.neon_count()])
 
 
 func _stand_one(registry: PonyRegistry, who: String, building_path: NodePath,
