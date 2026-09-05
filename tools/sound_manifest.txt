@@ -113,7 +113,10 @@ world/gate_open.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07037342.wav
 # 0dBFS that gain='s loudness match still cleared the true peak ceiling by a hair; gain_db
 # instead. Alternates: 07045094 "Tool box closed" 9.3s (for the metal flag reading);
 # 07037356 "Metal Gate opened & closed" 6.8s.
-world/mail_arrive.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07011078.wav|rate=44100,mono,pick=9,fade=0.01:0.15,gain_db=12
+#
+# R1: down 5 dB. mail_open cannot come up past the true peak ceiling, so the 15 LU gap
+# between the two is closed from this end. They are the same event a second apart.
+world/mail_arrive.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07011078.wav|rate=44100,mono,pick=9,fade=0.01:0.15,gain_db=7
 
 # mail_open: BBC 07045125, "Sanding, paper folded then sheet of plywood." 92.0s; the fold
 # is an isolated event inside it. The sanding pass never dips below -40dB so pick=2@-40:0.20
@@ -126,7 +129,12 @@ world/mail_arrive.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07011078.w
 # 6) measured TP=+0.4, well over; +3 lands I=-26.7 (was -37.7, mail_arrive is -22.8) at
 # TP=-2.6, the most this near-0dBFS attack (see the note above) clears without clipping.
 # Alternates: 07047018 (243.5s, sorting newspaper cuttings); Kenney Interface scratch_002.ogg.
-world/mail_open.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07045125.wav|rate=44100,mono,pick=4@-20:0.15,fade=0.01:0.18,gain_db=3
+#
+# R1: walked one more step to 4. The row's own note above records +6 measuring TP=+0.4,
+# well over the -1.5 dBTP ceiling, so 4 is the last step this near 0dBFS attack has. If
+# the report FAILs on true peak at 4, put it back to 3 and take the balance out of
+# mail_arrive instead, which is 15 LU above it and is the reason this one reads as quiet.
+world/mail_open.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07045125.wav|rate=44100,mono,pick=4@-20:0.15,fade=0.01:0.18,gain_db=4
 
 # mail_stamp: the primary (BBC 07040153, "Mail Sorting Office, letter stamping machine
 # operating." 55.7s) is one continuous run with no gap the detector can find at any noise
@@ -145,7 +153,11 @@ world/mail_stamp.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07013135.wa
 # can hold it on a dedicated play_loop()/stop_loop() voice and cut it short. See sound.gd's
 # LIBRARY comment on the capture_charge entry.
 # Alternates: 07004188 "A varying electrical hum" 134.4s; 07024189 "Electrical: Fan" 64.9s.
-world/capture_charge.ogg|https://sound-effects-media.bbcrewind.co.uk/wav/07043314.wav|rate=44100,mono,trim=20-21.6,speed=1.35,fade=0.06:0.30,gain=-18
+#
+# R1: down 3 LU. This is a held loop under the beam rather than a one shot, so it sits
+# under everything else in the world for as long as a capture takes; -18 put a generator
+# hum on top of the game for four seconds at a time.
+world/capture_charge.ogg|https://sound-effects-media.bbcrewind.co.uk/wav/07043314.wav|rate=44100,mono,trim=20-21.6,speed=1.35,fade=0.06:0.30,gain=-21
 
 # capture_success: Kenney Interface Sounds, confirmation_001. The one world slot the spec
 # allows a designed sound for; there is no recording of a pony going into a bag.
@@ -164,10 +176,17 @@ world/capture_success.wav|https://kenney.nl/media/pages/assets/interface-sounds/
 # for EBU gating to measure honestly, so these use gain_db rather than gain=, the same
 # escape hatch delivery_thud and neigh_real use. Alternate: 07039304 "Troop of horses
 # galloping on turf" 149.8s.
-world/hoofsteps_grass_1.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07024157.wav|rate=44100,mono,pick=4@-25:0.08,fade=0.003:0.09,gain_db=20
-world/hoofsteps_grass_2.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07024157.wav|rate=44100,mono,pick=13@-25:0.08,fade=0.003:0.09,gain_db=21
-world/hoofsteps_grass_3.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07024158.wav|rate=44100,mono,pick=4@-25:0.08,fade=0.003:0.09,gain_db=13
-world/hoofsteps_grass_4.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07024158.wav|rate=44100,mono,pick=7@-25:0.08,fade=0.003:0.09,gain_db=13
+#
+# R1, 2026-09-04, owner's ear pass: "terrible footsteps". Every strike came down 14 dB
+# (20/21/13/13 to 6/7/-1/-1, the relative balance between the four kept exactly) and the
+# tail went from 0.09 to 0.14 s, which is what turns a click into a hoof on turf. The
+# sources did not move: 07024157 and 07024158 are the two softest turf walks in the
+# archive, and this row's own alternate, 07039304, is a troop of horses galloping, which
+# is not a walk and is not softer.
+world/hoofsteps_grass_1.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07024157.wav|rate=44100,mono,pick=4@-25:0.08,fade=0.003:0.14,gain_db=6
+world/hoofsteps_grass_2.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07024157.wav|rate=44100,mono,pick=13@-25:0.08,fade=0.003:0.14,gain_db=7
+world/hoofsteps_grass_3.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07024158.wav|rate=44100,mono,pick=4@-25:0.08,fade=0.003:0.14,gain_db=-1
+world/hoofsteps_grass_4.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07024158.wav|rate=44100,mono,pick=7@-25:0.08,fade=0.003:0.14,gain_db=-1
 
 # hoofsteps_hard_1..4: BBC 07039310, "Horse walking on cobblestones." 60.7s of one horse
 # walking evenly. -38dB never dipped either (background traffic sits above it, one 60s
@@ -233,12 +252,25 @@ casino/card_flip.wav|https://kenney.nl/media/pages/assets/casino-audio/2472606a0
 # real isolated single tick under 0.25s. gain= then chased the segment's EBU gate to a
 # huge boost (a real tick is too short for honest gating) and blew the true peak ceiling
 # the same way delivery_thud did; switched to the same gain_db escape hatch.
+#
+# R1: -30 was tried and reverted. The re-derived index (37, by fraction) landed on a
+# 0.022s sliver, too short to be a strike; stepping to 38 found a 0.43s segment but its
+# report reads TP=+0.3, over the -1.5 dBTP ceiling; stepping to 39 landed on another
+# sub-0.001s sliver. Three tries, no candidate that both lands in 0.03-0.5s and PASSes
+# the report, so this row keeps its original floor and index.
 casino/reel_tick.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07032188.wav|rate=44100,mono,pick=17@-36:0.04,fade=0.002:0.04,gain_db=24
 
 # reel_stop: the same machine, a later and heavier landing, so tick and stop belong to one
 # object. Alternates: Kenney Interface drop_003.ogg; switch_003.ogg.
 # Walked pick=9 to pick=112 (a real 0.43s clunk much later in the take, matching "a later
 # segment of the same take") and gain= to gain_db for the same reason as reel_tick.
+#
+# R1: -30 was tried and reverted. The re-derived index (241, by fraction) is a real 0.17s
+# segment but its report reads I=-70.0 TP=+0.4, over the -1.5 dBTP ceiling on what turned
+# out to be a spike rather than the clunk; stepping to 242 landed on a 1.19s segment, too
+# long to be one strike; stepping to 243 landed on a sub-0.001s sliver. Three tries, no
+# candidate that both lands in 0.03-0.5s and PASSes the report, so this row keeps its
+# original floor and index.
 casino/reel_stop.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07032188.wav|rate=44100,mono,pick=112@-36:0.04,fade=0.002:0.10,gain_db=17
 
 # slots_win: Kenney Interface Sounds, confirmation_002. ONE stinger; the spec is explicit
@@ -251,7 +283,11 @@ casino/slots_win.wav|https://kenney.nl/media/pages/assets/interface-sounds/fa43c
 # Walked pick=3 to pick=137: index 3 was the 5s spin up itself, not one click, because the
 # noise floor kept the whole spin up above threshold. gain= to gain_db for the same true
 # peak overshoot on a real transient that reel_tick and reel_stop hit.
-casino/wheel_ratchet.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07021009.wav|rate=44100,mono,pick=137@-36:0.03,fade=0.002:0.03,gain_db=27
+#
+# R1: pick floor from -36 to -30. At -36 the detector was cutting on room tone, so the
+# indices were deep into a list of near silent fragments; at -30 it cuts on real gaps
+# between strikes. The index below was re-derived after the change, not carried over.
+casino/wheel_ratchet.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07021009.wav|rate=44100,mono,pick=123@-30:0.03,fade=0.002:0.03,gain_db=27
 
 # wheel_settle: the settle at the end of a spin on the same wheel; the last audible activity
 # in the take before it runs out into room tone. Walked pick= to trim=79.85-81.10: the pick
@@ -272,7 +308,15 @@ casino/race_gallop.ogg|https://sound-effects-media.bbcrewind.co.uk/wav/07039304.
 
 # race_cheer: BBC 07035069, "100 men, prolonged cheer." 12.8s. Alternates: 07035070 "100
 # men, single cheer" 10.6s; 07031059 (large cheer outside St Paul's, 48.7s).
-casino/race_cheer.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07035069.wav|rate=44100,mono,pick=1,fade=0.05:0.60,gain=-18
+#
+# R1: trimmed to the first 5.5 s of the take. The whole 12.8 s cheer outlasts the race it
+# celebrates by about eight seconds, which is what made it read as a loop rather than as a
+# result. process_row's cut stage takes pick= over trim= outright when both are set (an
+# elif, not a sequence), so pick=1 was DROPPED rather than kept: with it still in the
+# recipe this row measured byte identical to the pre-R1 file, no shortening at all. trim=
+# alone hard cuts to 0-5.5s before the fade, which is what actually lands the "ends rather
+# than fades out" result.
+casino/race_cheer.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07035069.wav|rate=44100,mono,trim=0-5.5,fade=0.05:0.60,gain=-18
 
 # --- ui ---------------------------------------------------------------------------------
 
