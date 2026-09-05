@@ -13,8 +13,8 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 # Every render boots a scene out of this project, and a boot can write a save. Redirected off
-# own boot probe. Redirected off the player's slots the same way tools/run_tests.sh does it; see
-# game/systems/save_io.gd. A sheet is not worth somebody's ranch.
+# the player's slots the same way tools/run_tests.sh does it; see game/systems/save_io.gd.
+# A sheet is not worth somebody's ranch.
 FILLY_TEST_SAVE_DIR="${FILLY_TEST_SAVE_DIR:-$(mktemp -d)}"
 export FILLY_TEST_SAVE_DIR
 
