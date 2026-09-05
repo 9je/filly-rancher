@@ -216,28 +216,65 @@ func test_the_marquee_bulbs_and_wash_are_not_counted_among_the_lamp_posts() -> v
 		"a bulb rail is not a lamp post and must not be counted as one")
 
 
+## THE ARCH'S OWN BUILT PEAK, measured off its actual child nodes rather than off any
+## accessor: each child's own AABB corners carried through its global_transform, the same
+## corner-projection game/test/test_lobby_sign.gd's own _front_reach() uses for a front face,
+## here for a top one. This is only possible because _marquee_arch() builds plain
+## MeshInstance3D children rather than a MultiMesh: a MultiMesh's instance transforms are
+## RenderingServer state, and the headless dummy driver this suite is required to run under
+## never allocates that buffer -- get_instance_transform() reads back all zeroes there even
+## right after set_instance_transform() wrote real numbers, confirmed against the same code
+## run under a real Vulkan context, where the readback is correct. A MeshInstance3D's own
+## global_transform carries no such gap; it is a plain node property either way.
+func _arch_measured_peak_y(strip: Strip) -> float:
+	var root := strip.get_node(^"MarqueeArch")
+	var highest := -INF
+	for child in root.get_children():
+		var mesh := child as MeshInstance3D
+		var box: AABB = mesh.get_aabb()
+		var xform: Transform3D = mesh.global_transform
+		for i in range(8):
+			highest = maxf(highest, (xform * box.get_endpoint(i)).y)
+	return highest
+
+
 func test_the_marquee_stands_a_real_arch_over_the_board() -> void:
 	var strip: Strip = _built_strip()
-	var arch := strip.get_node_or_null(^"MarqueeArch") as MultiMeshInstance3D
+	var arch := strip.get_node_or_null(^"MarqueeArch")
 	assert_not_null(arch, "the marquee is geometry now, not a label on a slab")
-	assert_eq(arch.multimesh.instance_count, StripScript.MARQUEE_ARCH_SEGMENTS,
-		"every segment of the arch is drawn")
+	var segments: Array = arch.get_children()
+	assert_eq(segments.size(), StripScript.MARQUEE_ARCH_SEGMENTS,
+		"every segment of the arch is drawn, as its own node")
 	assert_eq(strip.marquee_arch_segments(), StripScript.MARQUEE_ARCH_SEGMENTS)
+	for child in segments:
+		assert_true(child is MeshInstance3D,
+			"a plain MeshInstance3D per segment, not a MultiMesh a headless run cannot read back")
 
 
-## MEASURED THROUGH marquee_arch_peak_y() RATHER THAN THE MULTIMESH ITSELF. A MultiMesh's
-## instance transforms are RenderingServer state, and the headless dummy driver this suite is
-## required to run under (see tools/run_tests.sh) never allocates that buffer:
-## get_instance_transform() reads back all zeroes here even right after
-## set_instance_transform() wrote real numbers, confirmed against the same code run under a
-## real Vulkan context, where the readback is correct. marquee_arch_peak_y() answers the same
-## question in plain GDScript, which a headless run can actually hold.
+## MEASURED TWO WAYS ON PURPOSE. marquee_arch_peak_y() is the accessor a caller would use;
+## _arch_measured_peak_y() recomputes the same number independently off the actual built
+## nodes' own global AABBs, so this test cannot pass merely because the accessor and the
+## geometry agree with EACH OTHER while both drift from reality. A prior version of this test
+## asserted only against the accessor, which was a pure `marquee_top_y() + MARQUEE_ARCH_RISE`
+## identity -- it could not fail for any bug in the actual construction loop, including the
+## sunburst overshoot a reviewer found by hand (roughly ridge_y + 0.29m to + 0.55m depending on
+## which segment is checked, against nine long, straight, rigid boxes swept by a CIRCULAR
+## angle formula applied to what is actually a very flat, wide ellipse -- aspect roughly 15:1
+## here, so a circular tangent rotates the shoulder and near-end segments tens of degrees
+## steeper than the ellipse's own nearly-flat true tangent). _marquee_arch() now places each
+## segment's own endpoints ON the true ellipse and rotates it to the ellipse's own derivative,
+## which is what this test actually holds it to.
 func test_the_arch_rises_above_the_board_and_stays_under_the_roofline() -> void:
 	var strip: Strip = _built_strip()
-	assert_not_null(strip.get_node_or_null(^"MarqueeArch"))
-	var peak: float = strip.marquee_arch_peak_y()
-	assert_gt(peak, strip.marquee_top_y(), "the arch crowns the board")
-	assert_lt(peak, PALACE_ORIGIN.y + PALACE_RIDGE_Y + 0.01, "and stays off the roof")
+	var accessor_peak: float = strip.marquee_arch_peak_y()
+	var measured_peak: float = _arch_measured_peak_y(strip)
+	var ridge_y: float = PALACE_ORIGIN.y + PALACE_RIDGE_Y
+	assert_lte(measured_peak, strip.marquee_top_y() + StripScript.MARQUEE_ARCH_RISE + 0.01,
+		"the arch's own built geometry must not overshoot the rise it was budgeted")
+	assert_lt(measured_peak, ridge_y - 0.05,
+		"and clear the roof by a real margin, not merely on paper")
+	assert_almost_eq(accessor_peak, measured_peak, 0.01,
+		"marquee_arch_peak_y() must report the built mesh's own true peak")
 
 
 func test_the_bulb_rail_rings_the_whole_arch_rather_than_two_straight_rows() -> void:
