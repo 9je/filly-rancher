@@ -106,6 +106,10 @@ const PIECES := [
 ##   the flank that has one, and past nothing at all on the flank that does not): full
 ##   height, the way a real marquee runs its biggest letters over the doors it actually
 ##   flanks and smaller accents further down the row.
+##   The z of 4.40 in every row is a REQUEST, not the resting place: build() clamps neon z
+##   to half_depth - 0.2 (4.3 on the shipped shell), so each fixture stands 0.1 closer to
+##   the door than this table reads. The clamp is the authority; the table stays at 4.40 so
+##   a deeper shell would push the neon out with it.
 const NEON := [
 	{"at": Vector2(-3.63, 4.40), "y": 4.10, "height": 0.55, "yaw": 0.0,
 		"color": Color(1.0, 0.16, 0.55)},
