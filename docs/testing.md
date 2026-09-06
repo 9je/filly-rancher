@@ -328,7 +328,7 @@ GUT's own default of not descending into subdirectories without
 **And a floor on the test count**, for the half the script count cannot see: a
 file that still parses but has lost most of its tests (a mass rename, a bad
 merge, a `func test_x` that became `func x`). `MIN_TESTS` in
-`tools/run_tests.sh` -- currently **1607** -- is a deliberate FLOOR rather than an
+`tools/run_tests.sh` -- currently **1610** -- is a deliberate FLOOR rather than an
 exact count, so adding tests never breaks the build. Raise it when the suite
 grows; never lower it without saying in the same commit which tests went away
 and why. (It was 194 through Phase 1A and was raised to the suite's real size in
@@ -342,9 +342,11 @@ raised again, from 1572 to 1606, by slice R2's own growth -- the modelled
 building shell, the palace facade, the marquee arch, the sign standoffs, the
 replanted treeline and the placement pass all brought tests with them. It was
 raised once more, from 1606 to 1607, by the R2 final-review fix wave's own
-growth (the plinth's new ground-contact footprint test) -- proved both ways per
-the section below at the new number: the suite passes at 1607 and a
-`FILLY_MIN_TESTS=99999` run still fails on it.)
+growth (the plinth's new ground-contact footprint test), and again, from 1607
+to 1610, by that fix wave's own round 2 (the painted road's polyline, its
+shader array length and its route, all pinned in `test_terrain.gd`) -- proved
+both ways per the section below at the new number: the suite passes at 1610 and
+a `FILLY_MIN_TESTS=99999` run still fails on it.)
 
 **Proving both guards, safely:**
 
@@ -598,7 +600,7 @@ FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dum
 
 Phase names are `dawn`, `day`, `dusk`, `night` and weathers are `clear`,
 `rain`, `fog`, `storm`, matched case-insensitively; `--world-time=` takes
-seconds. Expect the same `RANCH_OK ponies=49 props=133 assets=present` as an
+seconds. Expect the same `RANCH_OK ponies=49 props=117 assets=present` as an
 unpinned run, with the `RANCH world` line naming the hour that was pinned. Both
 counts moved once more in Phase 3 slice 1: the crowd fills every region with
 stock ponies alongside the named roster, and the Depot is one more prop beside
@@ -638,14 +640,22 @@ homestead yard, plus a boardwalk of the same road piece running north and turnin
 Palace's own approach, each entry composed against its neighbours rather than dropped in a
 gap.
 
-`props` moved once more, from 128 to 133, in the R2 whole-branch review's own fix wave: the
-north road's tiles were spaced by their native seated length (2.28 m) on ground that climbs
-0.70 m across the run, so consecutive tiles' independently-seated tops landed up to 0.20 m
-apart -- a curb at every seam, and grass showing through between them. Tightened to 2.0 m
-spacing (every tile now overlaps its neighbour) and the run extended at both ends -- from
-`z = 31.5-54.3` to `z = 26.0-56.0` -- so it meets the flat yard at `Terrain.FLAT_RADIUS` on
-the south end and overlaps the boardwalk's own first plate on the north end instead of
-standing free in open field on either side (finding F3). 16 tiles now stand where 11 did.
+`props` moved twice more, both times over the north road, before landing at its shipped
+number. The R2 whole-branch review's own fix wave first re-spaced the road's tiles from
+their native seated length (2.28 m, which gapped every seam once the ground crossed 0.70 m
+of relief) to a tighter 2.0 m overlap and extended the run from `z = 31.5-54.3` to
+`z = 26.0-56.0` so it met the flat yard on the south end and the boardwalk's own first plate
+on the north -- 16 tiles where 11 had stood, `props` at 133. The re-review's own render of
+`15_town_row_north_road.png` showed the defect had not actually closed: a rigid, flat plate
+cannot bend to follow ground that climbs under it, so the far half of every tile still sank
+below grade regardless of how tightly the tiles were packed -- the same ladder of
+half-buried plates, at a finer interval. **The tiles came off the road entirely** rather
+than being re-spaced a third time: `game/world/terrain.gd`'s `PATH_POINTS` and
+`terrain.gdshader`'s path mask paint the same route straight into the ground instead, which
+conforms to the real height field by construction because it IS the height field -- no
+plate, no seam, no step, ever. `props` dropped from 133 to 117, the shipped number: the
+sixteen `saa_dirt_road` tiles are gone and nothing replaced them in the census, because a
+painted road is not a `Props.LAYOUT` entry at all.
 
 **`props` and `ponies` did NOT move when the Market got a vendor and the Palace got
 a teller, and that is deliberate.** Both are `Attendant` nodes: `PonyVisuals.build`

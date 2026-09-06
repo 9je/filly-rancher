@@ -168,3 +168,56 @@ func test_the_shader_is_handed_the_colours_terrain_gd_holds() -> void:
 		"the lit end of the gradient is one number in one place")
 	assert_eq(mat.get_shader_parameter(&"dirt_color"), TerrainScript.DIRT,
 		"the earth is one number in one place")
+
+
+## THE ROAD IS PAINTED, NOT LAID: see PATH_POINTS' own comment for the ladder-of-plates
+## defect this replaced. What a test CAN hold is that the polyline, the width and the edge
+## numbers a human tuned in terrain.gd are the exact numbers the shader was actually handed
+## -- the pair that silently drifts is the one no render can catch, because a wrong number
+## still paints SOME road, just not the one terrain.gd says it painted.
+func test_the_path_polyline_reaches_the_shader_padded_to_its_fixed_length() -> void:
+	var mesh := _built_terrain_mesh()
+	var mat := mesh.mesh.surface_get_material(0) as ShaderMaterial
+	var points: PackedVector2Array = mat.get_shader_parameter(&"path_points")
+	assert_eq(points.size(), TerrainScript.PATH_SHADER_SLOTS,
+		"the shader's own array uniform is a fixed length; this must match it exactly")
+	for i in range(TerrainScript.PATH_POINTS.size()):
+		assert_eq(points[i], TerrainScript.PATH_POINTS[i],
+			"slot %d must be the real route, not padding" % i)
+	# EVERY SLOT PAST THE REAL ROUTE REPEATS ITS OWN LAST POINT, a zero-length segment the
+	# shader's own path_distance() treats as inert (see its comment) rather than as a
+	# divide-by-zero: padding with the origin or any other point would draw a second,
+	# spurious road segment from the route's real end to wherever the padding sat.
+	var last: Vector2 = TerrainScript.PATH_POINTS[TerrainScript.PATH_POINTS.size() - 1]
+	for i in range(TerrainScript.PATH_POINTS.size(), TerrainScript.PATH_SHADER_SLOTS):
+		assert_eq(points[i], last, "padding slot %d must repeat the route's last point" % i)
+	assert_eq(mat.get_shader_parameter(&"path_point_count"), TerrainScript.PATH_POINTS.size(),
+		"the shader must stop walking the array at the real route, not its padding")
+	assert_eq(mat.get_shader_parameter(&"path_half_width"), TerrainScript.PATH_HALF_WIDTH)
+	assert_eq(mat.get_shader_parameter(&"path_edge_softness"), TerrainScript.PATH_EDGE_SOFTNESS)
+	assert_eq(mat.get_shader_parameter(&"path_edge_noise"), TerrainScript.PATH_EDGE_NOISE)
+	assert_eq(mat.get_shader_parameter(&"path_glow"), TerrainScript.PATH_GLOW)
+
+
+## THE SHADER'S OWN ARRAY SIZE, PINNED BY NAME so PATH_SHADER_SLOTS cannot drift out of step
+## with terrain.gdshader's `const int PATH_MAX_POINTS` the way test_terrain.gd already pins
+## srgb_to_linear() by name above -- a mismatch here does not error, it silently truncates or
+## under-fills the array, which no render catches either.
+func test_the_shader_array_size_matches_terrain_gd_own_constant() -> void:
+	var mesh := _built_terrain_mesh()
+	var mat := mesh.mesh.surface_get_material(0) as ShaderMaterial
+	assert_true(mat.shader.code.contains(
+			"const int PATH_MAX_POINTS = %d;" % TerrainScript.PATH_SHADER_SLOTS),
+		"terrain.gdshader's PATH_MAX_POINTS must equal terrain.gd's PATH_SHADER_SLOTS")
+
+
+## THE ROUTE ITSELF: along the north road's own centreline, wide enough to read as a track
+## and narrow enough to stay clear of the town row's buildings at x = 15 and x = -12.
+func test_the_path_route_runs_the_north_roads_own_line_clear_of_the_town_row() -> void:
+	for p: Vector2 in TerrainScript.PATH_POINTS:
+		assert_almost_eq(p.x, 1.5, 0.01, "the route stays on the road's own x")
+	var clearance: float = 15.0 - 1.5 - TerrainScript.PATH_HALF_WIDTH \
+		- TerrainScript.PATH_EDGE_SOFTNESS
+	assert_gt(clearance, 0.0,
+		"the painted road's fattest edge must not reach the town row's east side")
+	assert_gt(TerrainScript.PATH_POINTS.size(), 1, "a polyline needs at least two points")

@@ -88,6 +88,54 @@ const GRASS_HIGH := Color(0.381, 0.551, 0.261)
 ## earth-coloured enough to read as bark's own colour rather than a generic brown.
 const DIRT := Color(0.393, 0.329, 0.157)
 
+## THE NORTH ROAD, PAINTED INTO THE GROUND RATHER THAN LAID ON TOP OF IT.
+##
+## THE BUG THIS CLOSES. `game/world/props.gd` used to stand sixteen `saa_dirt_road.glb`
+## plates along this same line, each a rigid 10.52 x 2.28 m slab. The ground climbs about
+## 0.70 m across the run (`FLAT_RADIUS` to `BLEND_RADIUS` and beyond), a flat plate cannot
+## bend to follow it, and sixteen of them in a row read as a ladder of half-buried planks
+## with grass showing through every seam -- the exact defect its own fix wave's re-review
+## caught in the rendered screenshot after tightening the tile spacing did not close it.
+## A road painted onto the terrain's own surface conforms to whatever that surface does, by
+## construction: there is no plate to bury, no seam to gap, no step between neighbours.
+##
+## THE ROUTE. Straight along x = 1.5, the same centreline the tiles stood on, from inside
+## the homestead's own flat apron (z = 10, comfortably short of `FLAT_RADIUS` from
+## `HOMESTEAD_CENTRE`) up through the town row's own corridor (the buildings flank it at
+## x = 15 and x = -12, more than 10 m clear on either side) to z = 58, where the boardwalk's
+## own first plate stands at (2.5, 58.0) -- so a kept boardwalk tile sits on painted ground
+## too, rather than the seam trading one visible edge for another.
+##
+## A STRAIGHT TWO-POINT POLYLINE IS STILL A POLYLINE. The shader (`terrain.gdshader`) walks
+## an arbitrary vertex list, so a future road that bends only has to add points here; nothing
+## about the mask assumes two. Padded out to the shader's fixed-size uniform array by
+## `_path_uniform()` below, repeating this array's own last point (a zero-length segment the
+## shader's own distance walk treats as inert, not as a divide-by-zero).
+const PATH_POINTS: Array[Vector2] = [Vector2(1.5, 10.0), Vector2(1.5, 58.0)]
+
+## Half the path's full-strength core width, in metres -- "a couple of metres wide" per the
+## ruling that replaced the tiled road. `PATH_EDGE_SOFTNESS` is how far past that the dirt
+## fades back to grass, and `PATH_EDGE_NOISE` is how many metres the edge itself wanders by,
+## sampled through the shader's own `value_noise()`, so the border reads as worn rather than
+## as a UI decal with a hard edge. All three are also the ShaderMaterial's own uniforms
+## (`terrain.gdshader`) and are set from here, the one place, in `_build_mesh()`.
+const PATH_HALF_WIDTH := 1.1
+const PATH_EDGE_SOFTNESS := 1.3
+const PATH_EDGE_NOISE := 0.5
+
+## HOW MUCH OF DIRT COMES BACK AS AN AMBIENT-INDEPENDENT EMISSION FLOOR ON THE PATH. Measured
+## against the shipped dawn render: this route runs through the long shadow of the trees and
+## fence posts that line it for most of its length, and DIRT's own albedo (about a fifth of
+## GRASS_HIGH's) crushes toward black under ambient-only light (sRGB (19, 5, 0), against
+## grass two metres away at (92, 123, 32)) -- a scorch mark, not a track. See
+## terrain.gdshader's own fragment() comment for the full account.
+const PATH_GLOW := 5.0
+
+## The shader array uniform's own fixed length. Matches `PATH_MAX_POINTS` in
+## `terrain.gdshader` -- game/test/test_terrain.gd pins both numbers so the two files cannot
+## drift apart silently.
+const PATH_SHADER_SLOTS := 8
+
 ## When true this node builds NOTHING in _ready() beyond its collision layers, and the
 ## ground is shaped by an explicit build() instead.
 ##
@@ -347,8 +395,28 @@ func _build_mesh() -> ArrayMesh:
 	mat.shader = GroundShader
 	mat.set_shader_parameter(&"grass_high", GRASS_HIGH)
 	mat.set_shader_parameter(&"dirt_color", DIRT)
+	mat.set_shader_parameter(&"path_points", _path_uniform())
+	mat.set_shader_parameter(&"path_point_count", PATH_POINTS.size())
+	mat.set_shader_parameter(&"path_half_width", PATH_HALF_WIDTH)
+	mat.set_shader_parameter(&"path_edge_softness", PATH_EDGE_SOFTNESS)
+	mat.set_shader_parameter(&"path_edge_noise", PATH_EDGE_NOISE)
+	mat.set_shader_parameter(&"path_glow", PATH_GLOW)
 	mesh.surface_set_material(0, mat)
 	return mesh
+
+
+## PATH_POINTS, padded out to PATH_SHADER_SLOTS by repeating its own last entry -- the fixed
+## length terrain.gdshader's `path_points` array uniform declares. An empty PATH_POINTS
+## (no road at all) pads with the origin; `path_point_count` staying 0 is what keeps the
+## shader from drawing anything with it, per its own `if (path_point_count > 1)` guard.
+func _path_uniform() -> PackedVector2Array:
+	var out := PackedVector2Array()
+	var last := Vector2.ZERO
+	for i in range(PATH_SHADER_SLOTS):
+		if i < PATH_POINTS.size():
+			last = PATH_POINTS[i]
+		out.append(last)
+	return out
 
 
 ## Four invisible slabs standing just outside the mesh edge. On TERRAIN rather than

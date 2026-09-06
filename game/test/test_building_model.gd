@@ -123,6 +123,16 @@ func test_the_plinth_under_a_model_is_turned_earth_rather_than_timber() -> void:
 ## rectangle this test exists to prove the plinth no longer matches (whole-branch review,
 ## 2026-09-05, F1: a PonySFM roof oversails its walls, and the plinth used to be sized to
 ## the roof line).
+##
+## COMPARED AGAINST THE MODEL'S OWN FULL-HEIGHT WORLD AABB -- ITS EAVE RECTANGLE -- NOT
+## AGAINST _bare()'s ARBITRARY 6 x 4 m SHELL. The re-review of the first version of this test
+## caught exactly the gap that comparison left open: `_bare()`'s width and depth are just
+## numbers this test file picked, unrelated to what saa_shed.glb actually measures, so a
+## regression back to sizing the plinth off the model's WHOLE bounding box (the original
+## defect) would still land comfortably under 5.88 x 3.88 and this test would still pass.
+## `model_box`, PropsScript.world_aabb() over every mesh in `Model`, is what the plinth would
+## equal if that regression happened -- so asserting `box.size` is STRICTLY LESS than
+## `model_box.size` is the one comparison a corner-of-AABB regression cannot slip past.
 func test_the_plinth_under_a_model_shrinks_to_the_models_own_ground_contact() -> void:
 	var b := _bare()
 	b.model_file = "saa_shed.glb"
@@ -132,18 +142,19 @@ func test_the_plinth_under_a_model_shrinks_to_the_models_own_ground_contact() ->
 		return
 	var floor_node := b.get_node_or_null(^"Floor") as MeshInstance3D
 	var box: BoxMesh = floor_node.mesh
-	assert_lt(box.size.x, b.width - BuildingScript.PLINTH_INSET * 2.0 - 0.01,
-		"the plinth under a worn model must be narrower than the shell's own eave-width "
-		+ "footprint, or it is still the black pedestal the review found")
-	assert_lt(box.size.z, b.depth - BuildingScript.PLINTH_INSET * 2.0 - 0.01,
-		"the plinth under a worn model must be shallower than the shell's own eave-width "
-		+ "footprint, or it is still the black pedestal the review found")
-	# The model itself must still stand ON this smaller plinth, not overhang it: the
+	var model := b.get_node_or_null(^"Model") as Node3D
+	var model_box: AABB = PropsScript.world_aabb(model)
+	var margin := 0.05
+	assert_lt(box.size.x, model_box.size.x - margin,
+		"the plinth must be narrower than the WORN MODEL's own full-height AABB (its eave "
+		+ "line), or the ground-contact walk regressed to measuring the whole model again")
+	assert_lt(box.size.z, model_box.size.z - margin,
+		"the plinth must be shallower than the WORN MODEL's own full-height AABB (its eave "
+		+ "line), or the ground-contact walk regressed to measuring the whole model again")
+	# The model itself must still stand ON this smaller plinth, not overhang it outright: the
 	# ground-contact rectangle was measured off the model's own base, so the model's world
 	# AABB (padded by the model's own roof overhang, which the plinth deliberately excludes)
 	# has to reach at least as wide as what the plinth was sized to.
-	var model := b.get_node_or_null(^"Model") as Node3D
-	var model_box: AABB = PropsScript.world_aabb(model)
 	assert_gte(model_box.size.x, box.size.x - 0.01,
 		"the plinth must not be wider than the model actually standing on it")
 	assert_gte(model_box.size.z, box.size.z - 0.01,

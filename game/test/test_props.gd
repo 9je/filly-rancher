@@ -13,6 +13,7 @@ extends GutTest
 
 const PropsScript := preload("res://world/props.gd")
 const RegionFenceScript := preload("res://world/region_fence.gd")
+const TerrainScript := preload("res://world/terrain.gd")
 
 const REGION_DIR := "res://data/regions/"
 
@@ -248,12 +249,20 @@ func test_the_farmstead_has_a_shed_beside_its_barn() -> void:
 		"spec section 5.1's second ranch structure stands in the ranch yard")
 
 
+## THE ROAD NORTH IS PAINTED NOW, NOT TILED. Sixteen `saa_dirt_road.glb` plates used to stand
+## through here; a rigid, flat tile cannot follow the 0.70 m of relief this run climbs, and
+## re-spacing them tighter moved the gap from every 2.28 m to every 2.0 m without closing it
+## (whole-branch review 2026-09-05 F3, re-review 2026-09-06). The controller's ruling replaced
+## the tiles with `game/world/terrain.gd`'s `PATH_POINTS` polyline, painted into the ground by
+## `terrain.gdshader` -- see that constant's own comment for the full account. This test's job
+## moves with it: rather than counting tiles, it checks the painted route actually reaches the
+## town row's own z range on the road's own x, the same claim the tile count used to stand for.
 func test_the_town_row_stands_on_a_road() -> void:
-	var roads := 0
-	for entry: Dictionary in PropsScript.LAYOUT:
-		if String(entry["file"]) != "saa_dirt_road.glb":
-			continue
-		var at: Vector2 = entry["at"]
-		if at.y > 28.0 and at.y < 58.0:
-			roads += 1
-	assert_gte(roads, 6, "the road north is a road, not a strip of grass between six houses")
+	var min_z := INF
+	var max_z := -INF
+	for p: Vector2 in TerrainScript.PATH_POINTS:
+		assert_almost_eq(p.x, 1.5, 0.01, "the painted road stays on its own centreline")
+		min_z = minf(min_z, p.y)
+		max_z = maxf(max_z, p.y)
+	assert_lte(min_z, 28.0, "the painted road must reach south of the town row")
+	assert_gte(max_z, 50.0, "the painted road must reach through the town row, not stop short")

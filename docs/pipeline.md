@@ -1336,7 +1336,7 @@ FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dum
 # raycast onto real ground inside their zones, camera spring arm pulling in against
 # an actual building). Prints the marker ONLY if all of them held.
 FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dummy --path game world/ranch.tscn
-# -> RANCH_OK ponies=49 props=133 assets=present   exit 0
+# -> RANCH_OK ponies=49 props=117 assets=present   exit 0
 # (assets=absent + zero counts on a checkout that has not run the asset pipeline)
 # Both counts moved from an earlier build's 22/58: the crowd (Phase 3 slice 1) fills every
 # region with stock ponies alongside the named roster, and the Depot building (the same
@@ -1344,10 +1344,15 @@ FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dum
 # by the ranch door (Phase 3 slice 3) is one more prop again. `props` moved once more in
 # slice R2, from 111 to 128: the replanted treeline, the removed windmill/watermill/
 # standalone Ponyville General, and the placement pass's road and shed (see
-# `docs/testing.md` for the full account). `props` moved AGAIN, from 128 to 133, in the
-# R2 final-review fix wave: the north road's tiles were re-spaced and the run extended at
-# both ends so it joins the yard and the Palace approach instead of standing free in open
-# field (`game/world/props.gd`'s road entries, whole-branch review 2026-09-05, F3).
+# `docs/testing.md` for the full account). `props` moved twice more after that, both times
+# over the north road (see `docs/testing.md` for the full account): first from 128 to 133,
+# re-spacing the road's tiles and extending the run so it joined the yard and the Palace
+# approach instead of standing free in open field, then from 133 down to 117 once the
+# re-review found that re-spacing had not actually closed F3 -- a rigid tile cannot bend to
+# follow the ground under it no matter how tightly it is packed against its neighbours. The
+# sixteen `saa_dirt_road` tiles came off the road entirely; `game/world/terrain.gd` and
+# `terrain.gdshader` paint the same route into the ground instead, which is not a
+# `Props.LAYOUT` entry and does not appear in this count at all.
 
 # Hair follow-through: measures how far the mane/tail trail the body, against a
 # rigid-hair baseline, over a scripted start-and-stop (see docs/notes-hair-sim.md)

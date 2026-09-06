@@ -6339,11 +6339,20 @@ func _find_wall_stand_point() -> Dictionary:
 # --- offscreen capture ---------------------------------------------------------------
 
 func _capture_all() -> void:
-	# 01 -- does this read as a place at all?
+	# 01 -- does this read as a place at all? HUD OFF, the same way and for the same reason
+	# _capture_props() and _capture_look() take it off: the hints card covers about 45
+	# percent of a 1600 by 900 frame over the bottom right quadrant, and this establishing
+	# shot's whole job is showing the place, not the mechanic (whole-branch review,
+	# 2026-09-05, F14). 02 keeps the HUD -- it is deliberately "what the owner actually sees
+	# the instant the game boots", card and all.
+	var hud_01 := $HUD as CanvasLayer
+	var hud_01_was_visible: bool = hud_01.visible
+	hud_01.visible = false
 	capture_camera.global_position = Vector3(33.0, 18.0, 36.0)
 	capture_camera.look_at(Vector3(-1.0, 2.0, -7.0), Vector3.UP)
 	capture_camera.make_current()
 	await _capture("01_establishing")
+	hud_01.visible = hud_01_was_visible
 
 	# 02 -- what the owner actually sees the instant the game boots.
 	_rig.get_camera().make_current()
@@ -6402,9 +6411,13 @@ func _capture_all() -> void:
 
 	await _capture_the_mechanic()
 
-	# 05 -- eye level in the yard, for judging prop scale against a 1.16 m pony.
+	# 05 -- eye level in the yard, for judging prop scale against a 1.16 m pony. HUD OFF for
+	# the same reason as 01: this is a place-and-scale shot, not a mechanic shot.
 	var barn := _tallest_building()
 	if barn != null:
+		var hud_05 := $HUD as CanvasLayer
+		var hud_05_was_visible: bool = hud_05.visible
+		hud_05.visible = false
 		var box: AABB = PropsScript.world_aabb(barn)
 		var target := box.get_center()
 		var eye := target + Vector3(9.0, 0.0, 11.0)
@@ -6414,6 +6427,7 @@ func _capture_all() -> void:
 			Vector3.UP)
 		capture_camera.make_current()
 		await _capture("05_scale_at_the_barn")
+		hud_05.visible = hud_05_was_visible
 
 	# THE PROP SHOTS GO FIRST, and the order is load bearing rather than tidy. The plot
 	# pass drives the real build loop, so it raises a toast ("That pen is full.") that is

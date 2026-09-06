@@ -426,45 +426,19 @@ const LAYOUT := [
 	# (region clearance, breathing room, pen-plot exclusion) runs on each entry
 	# independently regardless of how many other entries share its file.
 	#
-	# THE TILES USED TO BE SPACED BY saa_dirt_road's OWN SEATED LENGTH (2.28 m) SO THEY
-	# WOULD ABUT ON FLAT GROUND, AND THEY DO NOT ABUT HERE. Native size (20.254, 0.298,
-	# 4.385), so at yaw 0 the seated length along z is 4.385 * MLP_SCALE = 2.28 m -- correct
-	# on the flat apron the abutment maths assumed, but the ground under this run climbs
-	# about 0.70 m from end to end (Terrain's blend apron feathering in past FLAT_RADIUS),
-	# and a flat, rigid, 0.155 m-thick tile cannot tilt to follow it. Seated independently,
-	# abutting tiles' own top surfaces landed up to 0.20 m apart -- a curb at every seam and
-	# grass showing through between them (whole-branch review, 2026-09-05, F3).
-	#
-	# SPACING TIGHTENED TO 2.0 m, so every tile physically OVERLAPS its neighbour by 0.28 m
-	# along z: a seam that used to be a gap of grass is now a seam of dirt on dirt, and the
-	# skirt beneath each tile (see SKIRT_MIN_DEPTH) still bridges whatever step is left
-	# between an overlapping pair's own seated heights.
-	#
-	# THE RUN NOW REACHES BOTH ITS ENDS INSTEAD OF STANDING FREE IN A FIELD. z = 26.0 sits
-	# right at Terrain.FLAT_RADIUS from HOMESTEAD_CENTRE (30.04 m out, at this x), so the
-	# first tile meets the flat yard rather than starting 20 m north of it in open country.
-	# z = 56.0 overlaps the boardwalk's own first plate at (2.5, 58.0) -- see "the boardwalk
-	# up to the Palace" below -- by the same 0.28 m every other seam in this run shares, so
-	# the road north and the walk up to the Palace are now one continuous path rather than
-	# two lanes stopping short of each other 7 m apart. All 10.52 m of the road's own width
-	# is past WIDE_FOOTPRINT and it stands well outside Terrain's flat apron for most of its
-	# run, so every tile still carries a skirt (ranch.gd's own "skirtless" check said so).
-	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 26.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
-	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 28.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
-	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 30.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
-	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 32.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
-	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 34.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
-	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 36.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
-	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 38.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
-	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 40.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
-	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 42.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
-	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 44.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
-	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 46.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
-	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 48.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
-	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 50.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
-	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 52.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
-	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 54.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
-	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 56.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	# THE ROAD ITSELF IS NOT A PROP ANY MORE. Sixteen `saa_dirt_road.glb` tiles used to stand
+	# here, re-spaced to 2.0 m to overlap their own neighbours after the first version (2.28 m,
+	# their native seated length) gapped on the 0.70 m of relief this run climbs. Tightening
+	# the spacing did not fix it: the re-review's own render of `15_town_row_north_road.png`
+	# still showed sixteen half-buried plates with grass between every pair, because a rigid,
+	# flat, 0.155 m-thick tile cannot bend to follow ground that climbs under it -- the far
+	# half of each tile sinks below grade no matter how tightly the tiles are packed. Removed
+	# outright rather than spaced a third way (whole-branch review 2026-09-05 F3, re-review
+	# 2026-09-06): the controller's ruling is that a road on sloped ground is PAINTED into the
+	# terrain instead of laid on top of it. See `game/world/terrain.gd`'s `PATH_POINTS` and
+	# `game/world/terrain.gdshader`'s path mask -- same centreline (x = 1.5), same run,
+	# conforming to the real height field by construction because it IS the height field,
+	# with no plate, no seam and no step to gap.
 	{"file": "pv_pink_b.glb", "at": Vector2(15.0, 36.0), "yaw": 270.0, "family": &"mlp", "skirt": true},
 	{"file": "pv_ogb_1.glb", "at": Vector2(15.0, 43.0), "yaw": 270.0, "family": &"mlp", "skirt": true},
 	{"file": "pv_courtyard_b.glb", "at": Vector2(15.0, 50.0), "yaw": 270.0, "family": &"mlp", "skirt": true},
