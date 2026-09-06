@@ -137,11 +137,22 @@ const RUN_SPEED := 5.2
 ## strictly a way of not making her flee in the first place.
 const SNEAK_SPEED := 2.0 * GaitScript.WALK_CLIP_SPEED
 
-## HOOFSTEPS ARE A FUNCTION OF DISTANCE, NOT OF TIME. One step every STEP_STRIDE metres
-## actually travelled, so sneaking gives a walk and running gives a gallop out of one
-## constant instead of two that would drift apart. At RUN_SPEED this is roughly five steps
-## a second across four hooves.
-const STEP_STRIDE := 1.1
+## HOOFSTEPS ARE A FUNCTION OF THE CLIP, NOT OF DISTANCE AND NOT OF A TIMER. One sound per
+## cycle of whichever locomotion clip is playing, fired at the same phase of that cycle every
+## time, read off the AnimationPlayer's own position. That is what makes the sound land on
+## the animation's footfall at every speed, including the speeds where the hooves skate.
+##
+## It used to be one sound every 1.1 m travelled. At the sneak that was one sound per two
+## strides; at the run it was 4.7 a second against a cycle turning over 2.6 times a second.
+## Neither lined up with anything on screen, which is the whole of the owner's "walk
+## animations seems worse than before" plus "that sound is terrible": the animation had not
+## changed, the audio landing off it had arrived.
+##
+## ONE PER CYCLE AND NOT FOUR: the authored walk cycle is short (Gait's own comment -- the
+## front leg chain is 98.8% extended, so the stride cannot lengthen and the cycle carries
+## only 0.55 m), and sonifying all four beats of it gives 9.6 sounds a second at a creep.
+## One per cycle is one of her four hooves, always the same one, always at the same moment.
+## See game/test/test_player_steps.gd for the cadence this produces at both speeds.
 ## Below this she is shuffling, not walking, and a sound there is a sound with no gesture
 ## behind it.
 const STEP_MIN_SPEED := 0.4
@@ -198,7 +209,8 @@ var _hair: SpringBoneSimulator3D = null
 var _visual_yaw := 0.0
 var _coyote_left := 0.0
 var _jump_buffered := 0.0
-var _step_distance := 0.0
+var _step_clip: StringName = &""
+var _step_position := 0.0
 var _step_surface: StringName = SURFACE_GRASS
 
 ## The mane style the body currently standing in Visuals was built from. apply_look()
@@ -314,21 +326,29 @@ func step_surface() -> StringName:
 	return _step_surface
 
 
-func step_distance() -> float:
-	return _step_distance
+## Where in the current clip the last hoofstep decision was taken, in seconds. For the suite.
+func step_phase() -> float:
+	return _step_position
 
 
-## Roll the accumulator forward and answer whether a hoof landed this frame. Pure: it makes
-## no sound and reads no node, which is what lets the suite drive it with numbers.
-func accumulate_step(speed: float, delta: float, on_floor: bool) -> bool:
-	if not on_floor or speed < STEP_MIN_SPEED or delta <= 0.0:
-		_step_distance = 0.0
+## Roll the clip position forward and answer whether a hoof landed this frame. A cycle has
+## finished when the clip's position falls, which for a looping clip happens once per cycle
+## at exactly the same phase. Pure: it makes no sound and reads no node, which is what lets
+## the suite drive it with numbers.
+##
+## A CHANGE OF CLIP IS NOT A FINISHED CYCLE. Gait.clip_for_speed() swaps walk for gallop
+## mid stride and the position resets to near zero when it does; counting that as a wrap
+## would put a stray sound on the exact frame she breaks into a run, every time.
+func step_on_clip(clip: StringName, position_seconds: float, speed: float,
+		on_floor: bool) -> bool:
+	if not on_floor or absf(speed) < STEP_MIN_SPEED or clip == &"idle" or clip.is_empty():
+		_step_clip = clip
+		_step_position = position_seconds
 		return false
-	_step_distance += speed * delta
-	if _step_distance < STEP_STRIDE:
-		return false
-	_step_distance -= STEP_STRIDE
-	return true
+	var wrapped: bool = clip == _step_clip and position_seconds < _step_position
+	_step_clip = clip
+	_step_position = position_seconds
+	return wrapped
 
 
 ## get_node(), not the bare `Sound` identifier: tools/run_tests.sh's parse sweep runs every
@@ -393,11 +413,13 @@ func _physics_process(delta: float) -> void:
 
 	move_and_slide()
 
+	var ground_speed := get_ground_speed()
 	_update_facing(direction, delta)
-	_update_animation(get_ground_speed())
+	_update_animation(ground_speed)
 	if _hair != null:
-		_hair.influence = PonyRigScript.influence_for_speed(get_ground_speed())
-	if accumulate_step(get_ground_speed(), delta, is_on_floor()):
+		_hair.influence = PonyRigScript.influence_for_speed(ground_speed)
+	if _anim != null and step_on_clip(_anim.current_animation,
+			_anim.current_animation_position, ground_speed, is_on_floor()):
 		_sound_call(&"play_at", [_step_surface, global_position])
 
 

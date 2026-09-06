@@ -75,7 +75,7 @@ func _player() -> Player:
 ## THE PLAYTESTS BOUGHT SPEED WITH FOOT SKATE, ON PURPOSE, AND THIS IS THE RECEIPT. The
 ## owner's sessions said "move speed a bit slow for my liking" and then "running feels
 ## good, maybe a tad too slow still", so the running speed went 4.0 -> 4.8 -> 5.2 m/s,
-## which is past Gait.TOP_SKATE_FREE_SPEED (4.29 m/s) -- the fastest ground speed any
+## which is past Gait.TOP_SKATE_FREE_SPEED (4.785 m/s) -- the fastest ground speed any
 ## authored clip depicts with the hooves planted. Gait's own perceptibility ladder calls a
 ## skate ratio up to ~1.25 imperceptible in motion and 2.0 unmistakable moonwalking.
 ##
@@ -96,9 +96,9 @@ func test_the_two_gameplay_speeds_stay_inside_their_animation_budget() -> void:
 		"running must play the `gallop` clip")
 	var skate: float = GaitScript.skate_ratio(PlayerScript.RUN_SPEED)
 	assert_lte(skate, 1.25,
-		("the run's foot skate must stay inside the imperceptible band -- %.3f m/s " +
-		"against a %.3f m/s ceiling is a ratio of %.3f") % [
-			PlayerScript.RUN_SPEED, GaitScript.TOP_SKATE_FREE_SPEED, skate])
+		("RUN_SPEED %.2f against a %.2f ceiling skates at %.3f; the budget is 1.25 and the "
+			+ "way to buy more is a faster authored cycle, not a bigger number here")
+			% [PlayerScript.RUN_SPEED, GaitScript.TOP_SKATE_FREE_SPEED, skate])
 	assert_gt(PlayerScript.RUN_SPEED, GaitScript.TOP_SKATE_FREE_SPEED,
 		"...and the player must out-run the fastest flee Pony.flee_speed_for() can " +
 		"produce, which that ceiling is exactly what clamps")
@@ -268,7 +268,7 @@ func test_plays_gallop_by_default_and_drops_to_walk_when_sneaking() -> void:
 	assert_eq(anim.current_animation, "gallop", "above the walk band she plays 'gallop'")
 	# Same tautology, same fix, one band up. The second playtest bought running its speed-up
 	# (4.8 -> 5.2 m/s) at the cost of headroom: 5.2 / 3.3 = 1.576x would be the honest rate,
-	# but gait.gd's gallop window tops out at GALLOP_MAX_PLAYBACK (1.3x) before the legs
+	# but gait.gd's gallop window tops out at GALLOP_MAX_PLAYBACK (1.45x) before the legs
 	# start reading as a blur, and player.gd's own comment is explicit that RUN_SPEED is
 	# DEFINED as the clip saturated at that bound, not merely clamped incidentally. The
 	# expected playback is therefore that bound itself -- still a literal, not a call to the
@@ -276,7 +276,7 @@ func test_plays_gallop_by_default_and_drops_to_walk_when_sneaking() -> void:
 	# its own homework here.
 	assert_almost_eq(speed, 5.2, 0.01,
 		"moving with nothing held must settle her at RUN_SPEED, 5.2 m/s")
-	assert_almost_eq(anim.speed_scale, 1.3, 0.01,
+	assert_almost_eq(anim.speed_scale, 1.45, 0.01,
 		"gallop playback must be scaled to ground speed too, not left at 1.0 -- and the "
 		+ "expected rate is a literal (GALLOP_MAX_PLAYBACK), not the helper itself")
 

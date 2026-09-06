@@ -58,7 +58,7 @@ func test_no_skate_anywhere_in_the_honest_band() -> void:
 func test_skate_appears_only_above_the_honest_ceiling() -> void:
 	assert_almost_eq(GaitScript.SKATE_FREE_TOP_SPEED, 1.98, 0.005,
 		"the walk clip's own ceiling is MAX_PLAYBACK x its clip speed")
-	assert_almost_eq(GaitScript.TOP_SKATE_FREE_SPEED, 4.29, 0.005,
+	assert_almost_eq(GaitScript.TOP_SKATE_FREE_SPEED, 4.785, 0.005,
 		"the ladder's ceiling is GALLOP_MAX_PLAYBACK x the gallop clip speed")
 	# 4.0 m/s used to be player.gd's GALLOP_SPEED and is still a fact about the LADDER:
 	# everything up to TOP_SKATE_FREE_SPEED is depicted honestly. Before the `gallop` clip
