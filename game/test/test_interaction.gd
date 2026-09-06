@@ -14,6 +14,7 @@ extends GutTest
 
 const InteractionScript := preload("res://world/interaction.gd")
 const RanchScene := preload("res://world/ranch.tscn")
+const PlotSlotScript := preload("res://world/plot_slot.gd")
 
 
 ## A menu that is open or is not, and says so through the one method _no_menu_but() asks
@@ -242,3 +243,182 @@ func test_the_mailbox_prompt_names_the_verb_and_carries_no_dash() -> void:
 	assert_true(prompt.contains("mail"))
 	assert_false(prompt.contains("--"))
 	assert_false(prompt.contains(char(0x2014)))
+
+
+## THE TWO PLOT VERBS ARE ONE TIER, AND THE OWNER PAID FOR THIS LINE.
+##
+## The four slots are 9 m apart and a slot holds the player until her centre is 4.77 m out
+## (TRIGGER_HALF 4.35 plus her 0.42 capsule). Pressed against a built pen's gate her centre
+## is 4.40 m from that pen and 4.60 m from the empty slot behind her, so she is standing in
+## both triggers at once. While PLOT_BUILD outranked PEN_MOVE_IN outright, E opened the
+## build menu for the plot 20 cm further away instead of pennning the pony in her bag:
+## "when i place ponies in the paddock i press e several times and that sound is terrible"
+## -- the sound being the build menu's own open and back ticks, once per press.
+func test_the_pen_at_your_feet_beats_the_empty_plot_behind_you() -> void:
+	var chosen: Dictionary = InteractionScript.resolve([
+		InteractionScript.candidate(InteractionScript.Kind.PLOT_BUILD, 4.60, "Slot2"),
+		InteractionScript.candidate(InteractionScript.Kind.PEN_MOVE_IN, 4.40, "Buttercup"),
+	])
+	assert_eq(int(chosen["kind"]), InteractionScript.Kind.PEN_MOVE_IN,
+		"the nearer of the two squares of ground she is standing in wins")
+	assert_eq(String(chosen["subject"]), "Buttercup")
+
+
+func test_the_empty_plot_you_are_standing_in_still_beats_the_pen_next_door() -> void:
+	# The mirror, and it is the case the tier must not break: walk into an empty plot to
+	# build and the pen 4.5 m away does not steal the press.
+	var chosen: Dictionary = InteractionScript.resolve([
+		InteractionScript.candidate(InteractionScript.Kind.PLOT_BUILD, 0.30, "Slot2"),
+		InteractionScript.candidate(InteractionScript.Kind.PEN_MOVE_IN, 4.50, "Buttercup"),
+	])
+	assert_eq(int(chosen["kind"]), InteractionScript.Kind.PLOT_BUILD)
+	assert_eq(String(chosen["subject"]), "Slot2")
+
+
+func test_both_plot_verbs_share_one_rank() -> void:
+	assert_eq(InteractionScript.rank_of(InteractionScript.Kind.PLOT_BUILD),
+		InteractionScript.rank_of(InteractionScript.Kind.PEN_MOVE_IN),
+		"same tier, so resolve() settles them on distance and nothing else")
+
+
+## The tier must not have flattened anything ELSE. Ground you stand on still beats ground
+## you stand near, at any distance, which is the doctrine PRIORITY's own comment states.
+func test_the_ground_tier_still_beats_every_building() -> void:
+	for building: int in [InteractionScript.Kind.MARKET, InteractionScript.Kind.BOARD,
+			InteractionScript.Kind.MAILBOX, InteractionScript.Kind.DEPOT,
+			InteractionScript.Kind.PALACE]:
+		for ground: int in InteractionScript.GROUND_TIER:
+			var chosen: Dictionary = InteractionScript.resolve([
+				InteractionScript.candidate(building, 0.10),
+				InteractionScript.candidate(ground, 4.70),
+			])
+			assert_eq(int(chosen["kind"]), ground,
+				"kind %d beat the ground she is standing on" % building)
+
+
+func test_the_ground_tier_is_not_empty_and_is_ranked() -> void:
+	assert_gt(InteractionScript.GROUND_TIER.size(), 1,
+		"a tier of one is not a tier and this whole change would be a no-op")
+	for kind: int in InteractionScript.GROUND_TIER:
+		assert_gte(InteractionScript.rank_of(kind), 0,
+			"a tier member outside PRIORITY can never win anything")
+
+
+## THE WORLD HALF. A pure resolver that is right about dictionaries nobody hands it is a
+## pure resolver that is right about nothing -- this file's own class comment says so. This
+## stands the player where the playtest stood her: at the gate of a built pen, with the
+## empty slot next door inside her reach.
+func test_at_a_built_pen_s_gate_the_ranch_offers_the_pen() -> void:
+	var ranch = RanchScene.instantiate()
+	add_child_autofree(ranch)
+	# See test_standing_in_the_middle_of_an_empty_plot_says_no_three_ways() for why this has
+	# to be set for _paint_plots() to run at all under a headless test.
+	ranch._interactive = true
+	await wait_frames(2)
+	var slots: Array = ranch.plot_slots()
+	assert_gt(slots.size(), 1, "the map has to have at least two slots for this to mean anything")
+	var built = slots[0]
+	var registry = ranch.get_node("/root/GameState").get_registry() \
+		if ranch.has_node("/root/GameState") else null
+	var catalogue = ranch.call("_plots_catalogue")
+	var plot = catalogue.all()[0]
+	assert_true(built.build(plot), "the first slot has to take a pen for this test to mean anything")
+	await wait_physics_frames(2)
+	# Her centre 4.40 m out from the built slot, on the axis pointing at its neighbour.
+	var toward: Vector3 = (slots[1].global_position - built.global_position).normalized()
+	ranch.player.global_position = built.global_position + toward * 4.40 + Vector3.UP * 0.3
+	await wait_physics_frames(4)
+	var kinds: Array[int] = []
+	for entry: Dictionary in ranch.interaction_candidates():
+		kinds.append(int(entry["kind"]))
+	assert_true(kinds.has(InteractionScript.Kind.PEN_MOVE_IN),
+		"she is standing at the pen, so the pen must be on offer")
+	var chosen: Dictionary = ranch.current_interaction()
+	assert_eq(int(chosen.get("kind", -1)), InteractionScript.Kind.PEN_MOVE_IN,
+		"the nearer square of ground she is standing in is the one E means")
+	# FINAL REVIEW F2. A built pen offers PEN_MOVE_IN, never PLOT_BUILD, so no slot should
+	# wear a ghost here at all -- least of all the empty neighbour 4.60 m away, which used to
+	# green a build footprint under a press that would pen a pony instead.
+	for slot in slots:
+		assert_eq(int(slot.ghost_state()), PlotSlotScript.Ghost.OFF,
+			"%s must show no ghost at a built pen's gate" % String(slot.name))
+
+
+## THE GHOST, THE PROMPT AND THE REFUSAL ARE ONE ANSWER. Three places used to be able to
+## disagree about whether a pen could go up: the prompt said "build here" unconditionally,
+## the ground said nothing at all, and the refusal arrived after the catalogue had been read
+## and a pen chosen. This drives the real ranch and asks all three at once.
+func test_standing_in_the_middle_of_an_empty_plot_says_no_three_ways() -> void:
+	var ranch = RanchScene.instantiate()
+	add_child_autofree(ranch)
+	# _update_interaction() (and the ghost paint inside it) only runs while _interactive is
+	# true, which _ready() sets from DisplayServer.get_name() -- false under every headless
+	# test run. Overridden the same way test_ranch_creation.gd's _ranch_with_screen() does,
+	# so the physics frames below actually drive the seam this test is asking about.
+	ranch._interactive = true
+	await wait_frames(2)
+	var slots: Array = ranch.plot_slots()
+	assert_gt(slots.size(), 0)
+	var slot = slots[0]
+	assert_true(slot.is_empty(), "the probe takes its own pen back down before this runs")
+	ranch.player.global_position = slot.global_position + Vector3.UP * 0.3
+	await wait_physics_frames(4)
+	var chosen: Dictionary = ranch.current_interaction()
+	assert_eq(int(chosen.get("kind", -1)), InteractionScript.Kind.PLOT_BUILD)
+	assert_false(String(chosen.get("reason", "")).is_empty(),
+		"she is standing where the fence goes, and the candidate knows it")
+	assert_true(InteractionScript.prompt_for(chosen, "E").contains("cannot build"),
+		"and the line on the HUD says so before she presses anything")
+	assert_eq(slot.ghost_state(), slot.Ghost.REFUSED,
+		"and the ground under her hooves is red")
+	# Step out past the markers and all three flip together.
+	var out_dir: Vector3 = (ranch.player.global_position - slot.global_position)
+	ranch.player.global_position = slot.global_position \
+		+ Vector3(0.0, 0.3, PlotSlotScript.STAKE_INSET + 0.6)
+	await wait_physics_frames(4)
+	var now: Dictionary = ranch.current_interaction()
+	assert_eq(int(now.get("kind", -1)), InteractionScript.Kind.PLOT_BUILD)
+	assert_true(String(now.get("reason", "")).is_empty())
+	assert_eq(slot.ghost_state(), slot.Ghost.VALID)
+
+
+## THE OVERLAP BAND ITSELF (final review F2). Two empty slots are 9 m apart and each
+## trigger reaches 4.77 m, so the legal build band just past one slot's own footprint sits
+## inside BOTH triggers at once -- measured live on the real map at 4.40 m from one slot and
+## 4.60 m from its neighbour, the exact numbers the review's probe renders. Painting off
+## overlap alone greened both squares; painting off the resolver's winner greens exactly the
+## one E would actually build on.
+func test_in_the_overlap_band_exactly_one_slot_is_ghosted() -> void:
+	var ranch = RanchScene.instantiate()
+	add_child_autofree(ranch)
+	ranch._interactive = true
+	await wait_frames(2)
+	var slots: Array = ranch.plot_slots()
+	assert_gt(slots.size(), 1, "the map has to have at least two slots for this to mean anything")
+	var near_slot = slots[0]
+	var far_slot = slots[1]
+	assert_true(near_slot.is_empty() and far_slot.is_empty(),
+		"both slots must still be empty for this to be a PLOT_BUILD overlap")
+	# 4.40 m from near_slot, outside its own footprint (STAKE_INSET 3.9 + a 0.42 m body), and
+	# therefore 4.60 m from far_slot on a 9 m grid -- inside both triggers (each reaches
+	# 4.77 m) but past only one slot's own fence line.
+	var toward: Vector3 = (far_slot.global_position - near_slot.global_position).normalized()
+	ranch.player.global_position = near_slot.global_position + toward * 4.40 + Vector3.UP * 0.3
+	await wait_physics_frames(4)
+	var kinds: Array[int] = []
+	for entry: Dictionary in ranch.interaction_candidates():
+		kinds.append(int(entry["kind"]))
+	assert_eq(kinds.count(InteractionScript.Kind.PLOT_BUILD), 2,
+		"she really is inside both triggers, or this test proves nothing")
+	var chosen: Dictionary = ranch.current_interaction()
+	assert_eq(int(chosen.get("kind", -1)), InteractionScript.Kind.PLOT_BUILD)
+	assert_eq(String(chosen.get("subject", "")), String(near_slot.name),
+		"the nearer slot is the one E would take")
+	assert_eq(int(near_slot.ghost_state()), PlotSlotScript.Ghost.VALID,
+		"the slot E would build on wears the ghost")
+	assert_eq(int(far_slot.ghost_state()), PlotSlotScript.Ghost.OFF,
+		"the slot E would NOT build on wears no ghost, even though she is standing in it too")
+	for slot in slots:
+		if slot != near_slot:
+			assert_eq(int(slot.ghost_state()), PlotSlotScript.Ghost.OFF,
+				"%s must show no ghost -- only the resolver's winner ever does" % String(slot.name))

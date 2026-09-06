@@ -9,17 +9,18 @@ extends RefCounted
 ##
 ## THE SPEED LADDER, at a glance. Two authored locomotion clips, each played through a
 ## bounded playback window, arranged so the windows meet EXACTLY rather than overlap or
-## leave a gap -- so every speed from a standstill to 4.29 m/s has one clip that can
+## leave a gap -- so every speed from a standstill to 4.79 m/s has one clip that can
 ## depict it honestly, and clip_for_speed() is the only thing that has to choose:
 ##
 ##   0.00 - 0.33 m/s   `idle`    (1.0x; she is not really going anywhere)
 ##   0.33 - 1.98 m/s   `walk`    (0.5x - 3.0x of a 0.66 m/s clip)
-##   1.98 - 4.29 m/s   `gallop`  (0.6x - 1.3x of a 3.30 m/s clip)
+##   1.98 - 4.79 m/s   `gallop`  (0.6x - 1.45x of a 3.30 m/s clip)
 ##
 ## The handover at 1.98 is exact, not approximate: MAX_PLAYBACK * WALK_CLIP_SPEED and
 ## GALLOP_MIN_PLAYBACK * GALLOP_CLIP_SPEED are the same number, so the character never
 ## passes through a speed neither clip can depict. Everything in that whole range has
-## skate_ratio() == 1.0. Only above 4.29 m/s does anything skate.
+## skate_ratio() == 1.0. Only above 4.79 m/s does anything skate. (The ceiling was 4.29 m/s
+## -- 1.3x -- until slice R3 retuned GALLOP_MAX_PLAYBACK; see that constant's own comment.)
 ##
 ## WHY THIS FILE EXISTS. The clip's implied ground speed is derived from four
 ## authoring constants that live in tools/author_anims.py and were, until now,
@@ -124,12 +125,23 @@ const GALLOP_CLIP_SPEED := GALLOP_STRIDE / (GALLOP_CYCLE_SECONDS * GALLOP_STANCE
 ## a gap between them. (0.6x of a 0.5 s cycle is a 0.83 s cycle, which reads as an easy
 ## canter -- a plausible thing for the clip to become at the bottom of its range.)
 ##
-## The ceiling is 1.3x because a 0.5 s gallop cycle driven past ~2.6 Hz stops reading as
-## hooves and starts reading as a blur, the same failure MAX_PLAYBACK guards for the
-## walk. It is deliberately not generous: the point of authoring a second clip was to
-## stop buying speed with playback rate.
+## The ceiling was 1.3x because a 0.5 s gallop cycle driven past ~2.6 Hz stops reading as
+## hooves and starts reading as a blur, the same failure MAX_PLAYBACK guards for the walk.
+##
+## RETUNED TO 1.45 IN SLICE R3, AND THE TRADE IS WRITTEN DOWN RATHER THAN HIDDEN. Running
+## became the DEFAULT travel speed in Phase 3, so the 21% of foot skate RUN_SPEED (5.2 m/s)
+## was buying against a 4.29 m/s ceiling stopped being something the player saw while a
+## button was held and became what she sees all the time -- and slice R3's hoofstep rework
+## put a sound on every cycle of the clip, which is exactly what makes a foot/ground
+## mismatch audible rather than merely visible. 1.45 lifts the ceiling to 4.79 m/s and the
+## skate at RUN_SPEED from 1.21 to 1.087, comfortably inside Gait.skate_ratio()'s "not
+## perceptible in motion" band instead of at the top of it, at the cost of a 2.9 Hz stride
+## rate against the ~2.6 Hz caution above. Deliberately NOT taken all the way to the 1.576
+## that would zero the skate: that is 3.15 Hz, a fifth past the blur threshold, and buying
+## the last 9% of skate with it is a bad trade. The honest fix for the whole band remains a
+## faster authored gallop cycle (tools/author_anims.py), which is an animation task.
 const GALLOP_MIN_PLAYBACK := 0.6
-const GALLOP_MAX_PLAYBACK := 1.3
+const GALLOP_MAX_PLAYBACK := 1.45
 
 ## Speed at or above which callers should play `gallop` instead of `walk` (1.98 m/s).
 ## Named separately from SKATE_FREE_TOP_SPEED even though they are equal, because they
@@ -140,8 +152,9 @@ const GALLOP_MAX_PLAYBACK := 1.3
 const GALLOP_HANDOVER_SPEED := GALLOP_MIN_PLAYBACK * GALLOP_CLIP_SPEED
 
 ## Fastest ground speed ANY authored clip can depict with the hooves exactly planted:
-## 4.29 m/s. This is the number a map or a chase should be designed against. Beyond it
-## the gallop clip saturates and skate_ratio() starts climbing again.
+## 4.79 m/s (4.29 until slice R3's retune, see GALLOP_MAX_PLAYBACK above). This is the
+## number a map or a chase should be designed against. Beyond it the gallop clip
+## saturates and skate_ratio() starts climbing again.
 const TOP_SKATE_FREE_SPEED := GALLOP_MAX_PLAYBACK * GALLOP_CLIP_SPEED
 
 

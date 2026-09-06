@@ -299,6 +299,24 @@ const MAILBOX_RADIUS := 2.6
 ## all reads as a broken key, which is the same defect the race panel's dead stake row was.
 const MAILBOX_EMPTY_TOAST := "Nothing in the mailbox yet."
 
+## HOW LONG THE SAME REFUSAL STAYS SAID. A player who presses E against a full pen four
+## times in half a second has been told once; saying it four times raises four toasts into a
+## queue that cannot drain (HUD.toast is first in, first out) and fires four sounds on top of
+## each other. The owner: "when i place ponies in the paddock i press e several times and
+## that sound is terrible".
+##
+## PER MESSAGE, NOT A GLOBAL MUTE. Being told "that pen is full" must never swallow "your
+## saddlebag is empty" a moment later: those are different facts and the second is the one
+## she can act on. And shorter than HUD.TOAST_HOLD, so a player who waits, reads the line,
+## watches it fade and presses again is answered rather than met with silence.
+const DENY_DEBOUNCE_SECONDS := 1.5
+
+## The soft refusal ping. An EXISTING library id, played through this file's own _sound_call
+## dispatcher -- the sound library is frozen and game/systems/sound.gd is read only, so this
+## is the ui_denied that every menu in the game already refuses with, and a refused verb in
+## the world now sounds like a refused row in a menu instead of like nothing at all.
+const DENY_SOUND := &"ui_denied"
+
 ## WHAT ARRIVAL SOUNDS LIKE, and it is said once per batch rather than once per letter: two
 ## letters landing on the same collection day are one trip to the mailbox. The flag on the
 ## box is the state; this is the moment.
@@ -634,6 +652,9 @@ var _penned_ponies := 0
 
 ## Results of the boot-time pen-containment probe -- see _probe_pen_containment().
 var _pen_probe: Dictionary = {}
+
+## The last refusal this ranch spoke, and when. See _deny().
+var _last_denial: Dictionary = {"text": "", "at": -1000.0}
 
 ## The counter the Market menu transacts against. Rebuilt by rebind_economy() rather than
 ## built once, because GameState REPLACES its `gems` and `inventory` objects on every load
@@ -2076,7 +2097,7 @@ func newest_unread_row() -> Dictionary:
 func open_mailbox_letter() -> bool:
 	var rows: Array[Dictionary] = mail_rows()
 	if rows.is_empty():
-		_toast(MAILBOX_EMPTY_TOAST)
+		_deny(MAILBOX_EMPTY_TOAST)
 		return false
 	var row: Dictionary = newest_unread_row()
 	if row.is_empty():
@@ -4052,17 +4073,17 @@ func _on_plot_chosen(plot: PlotData, slot: PlotSlot) -> void:
 	if plot == null or slot == null:
 		return
 	if _economy != null and not _economy.can_afford(plot.cost):
-		_toast("You cannot afford a %s yet." % plot.display_name)
+		_deny("You cannot afford a %s yet." % plot.display_name)
 		return
 	# THE SECOND HALF OF THE PLAYTEST REPORT THE GATE FIXES THE FIRST HALF OF. Checked HERE
 	# as well as at the prompt, because this is the last point before a fence exists and the
 	# prompt is only the last point before a MENU does -- and nothing stops a future caller
 	# reaching _on_plot_chosen by another route.
 	if _player_stands_on_footprint(slot):
-		_toast("Step outside the plot markers first, or you would be fenced in.")
+		_deny("Step outside the plot markers first, or you would be fenced in.")
 		return
 	if not slot.build(plot):
-		_toast("Nothing can go up on that plot.")
+		_deny("Nothing can go up on that plot.")
 		return
 	if _economy != null:
 		_economy.spend(plot.cost)
@@ -4090,10 +4111,10 @@ func _move_pony_into_pen(slot: PlotSlot) -> bool:
 	var storage: Storage = beam.get_storage()
 	var next: PonyInstance = storage.peek()
 	if next == null:
-		_toast("Your saddlebag is empty.")
+		_deny("Your saddlebag is empty.")
 		return false
 	if pen.is_full():
-		_toast("That pen is full.")
+		_deny("That pen is full.")
 		return false
 
 	var instance: PonyInstance = storage.release()
@@ -4107,7 +4128,7 @@ func _move_pony_into_pen(slot: PlotSlot) -> bool:
 		# It stays, because a pony taken out of the bag and refused with nowhere to go is a
 		# pony deleted by bookkeeping, and NO PONY EVER DIES covers that too.
 		storage.store(instance)
-		_toast("She would not go in.")
+		_deny("She would not go in.")
 		return false
 	_toast("%s moved into the pen." % instance.display_name())
 	# AFTER the add succeeded and not before: the two branches above both end with her back
@@ -4138,8 +4159,10 @@ func interaction_candidates() -> Array[Dictionary]:
 		var gap: float = Vector2(at.x - slot.global_position.x,
 			at.z - slot.global_position.z).length()
 		if slot.is_empty():
+			var verdict: Dictionary = slot.placement_check(at, PLAYER_BODY_RADIUS)
 			out.append(InteractionScript.candidate(
-				InteractionScript.Kind.PLOT_BUILD, gap, String(slot.name)))
+				InteractionScript.Kind.PLOT_BUILD, gap, String(slot.name),
+				String(verdict["reason"])))
 		else:
 			out.append(InteractionScript.candidate(
 				InteractionScript.Kind.PEN_MOVE_IN, gap, _next_in_the_bag()))
@@ -4213,7 +4236,7 @@ func perform_interaction(action: Dictionary) -> bool:
 			# to choose a pen and only then being sent to stand somewhere else is a worse
 			# version of the same refusal.
 			if _player_stands_on_footprint(slot):
-				_toast("Step outside the plot markers to build here.")
+				_deny("Step outside the plot markers to build here.")
 				return false
 			if build_menu == null or not build_menu.has_method("open"):
 				return false
@@ -4278,6 +4301,7 @@ func _nearest_occupied_slot() -> PlotSlot:
 ## label now, so there is nothing to fire once and nothing to go stale.
 func _update_interaction() -> void:
 	var action: Dictionary = current_interaction()
+	_paint_plots(action)
 	var hud := get_node_or_null(^"HUD")
 	if hud != null and hud.has_method("set_prompt"):
 		hud.set_prompt(InteractionScript.prompt_for(action,
@@ -4285,6 +4309,39 @@ func _update_interaction() -> void:
 	if action.is_empty() or not Input.is_action_just_pressed(&"interact"):
 		return
 	perform_interaction(action)
+
+
+## THE GROUND ANSWERS BEFORE THE MENU DOES.
+##
+## Exactly one slot ever wears a ghost: the one the RESOLVER picked, not merely one she
+## overlaps. The four slots sit on a 9 m grid and a trigger holds her out to 4.77 m, so the
+## legal build band between two neighbours -- and a built pen's own gate -- routinely put
+## her inside two slots' Area3Ds at once; painting off overlap alone greened both of them
+## (or greened an empty neighbour beside a pen whose gate had already won PEN_MOVE_IN), which
+## is a second version of the thicket this slice exists to fix (final review F2). So this
+## takes the ALREADY-RESOLVED `action` -- the one thing E will actually do -- rather than
+## re-deriving its own opinion from overlap: every slot is OFF, and only the slot named by a
+## resolved PLOT_BUILD candidate is coloured, using the `reason` that candidate already
+## carries so the ground and the refusal can never disagree.
+##
+## Also where every slot's marker fade is driven, every frame: the same walk over
+## _plot_slots() that paints the ghost already has her distance to each one for free, and a
+## fade that lagged the ghost by a frame would be a second, smaller version of the thicket.
+func _paint_plots(action: Dictionary) -> void:
+	if player == null:
+		return
+	var at: Vector3 = player.global_position
+	var winner: PlotSlot = null
+	if int(action.get("kind", InteractionScript.Kind.NONE)) == InteractionScript.Kind.PLOT_BUILD:
+		winner = _slot_named(String(action.get("subject", "")))
+	for slot in _plot_slots():
+		slot.set_marker_focus(Vector2(at.x - slot.global_position.x,
+			at.z - slot.global_position.z).length())
+		if slot != winner:
+			slot.set_ghost(PlotSlotScript.Ghost.OFF)
+			continue
+		var refused: bool = not String(action.get("reason", "")).is_empty()
+		slot.set_ghost(PlotSlotScript.Ghost.REFUSED if refused else PlotSlotScript.Ghost.VALID)
 
 
 ## IS THE PLAYER STANDING WHERE THE FENCE IS ABOUT TO GO UP?
@@ -4317,6 +4374,32 @@ func _toast(text: String) -> void:
 	var hud := get_node_or_null(^"HUD")
 	if hud != null and hud.has_method("toast"):
 		hud.toast(text)
+
+
+## SAY NO ONCE, AND SOFTLY.
+##
+## Every player-facing refusal in this file goes through here rather than calling _toast()
+## directly: one toast, one soft ui_denied, and an identical refusal inside
+## DENY_DEBOUNCE_SECONDS is swallowed whole rather than queued behind the line already on
+## screen. See DENY_DEBOUNCE_SECONDS for why the window is per message and why it is short.
+##
+## THE CLOCK IS THE ENGINE'S, NOT THE WORLD'S. Time.get_ticks_msec() rather than the world
+## clock, because this is about how fast a thumb moves and not about how fast the sun does;
+## a pinned or paused world must not change how a keypress feels.
+func _deny(text: String) -> void:
+	var now: float = float(Time.get_ticks_msec()) / 1000.0
+	if String(_last_denial.get("text", "")) == text \
+			and now - float(_last_denial.get("at", -1000.0)) < DENY_DEBOUNCE_SECONDS:
+		return
+	_last_denial = {"text": text, "at": now}
+	_toast(text)
+	_sound_call(&"play", [DENY_SOUND])
+
+
+## The last refusal spoken and the second it was spoken at. For the suite, which otherwise
+## has to infer a debounce from a toast queue.
+func last_denial() -> Dictionary:
+	return _last_denial.duplicate()
 
 
 ## Copy the live world back into the savable state, immediately before a write.
@@ -4930,6 +5013,13 @@ func _report(pony_count: int, prop_count: int) -> void:
 	var slots_triggered := true
 	var slot_ids := {}
 	var slot_ids_unique := true
+	# WHAT IS STANDING IN THE PEN CLEARING. A screenshot showed the four plots and one fence
+	# reading as a thicket of parallel pale lines and no number anywhere could say whether
+	# that was four marked plots doing their job, a leftover marker set inside a fence, or two
+	# coincident copies of one. Now it can.
+	var marked := 0
+	var stray := 0
+	var duplicated := 0
 	for slot in slots:
 		var at: Vector3 = slot.global_position
 		var slot_ground: float = terrain.height_at(at.x, at.z)
@@ -4951,6 +5041,15 @@ func _report(pony_count: int, prop_count: int) -> void:
 		if slot_ids.has(String(slot.slot_id)) or String(slot.slot_id).is_empty():
 			slot_ids_unique = false
 		slot_ids[String(slot.slot_id)] = true
+		var marker_meshes: int = slot.marker_mesh_count()
+		if slot.is_empty():
+			marked += 1
+			if marker_meshes == 0:
+				stray += 1
+		elif marker_meshes > 0:
+			stray += 1
+		if slot.find_children("PlotMarks", "Node3D", false, false).size() > 1:
+			duplicated += 1
 		print("RANCH plot %-8s pos=(%6.1f, %5.2f, %6.1f) seat_error=%+.3f built=%s"
 			% [String(slot.slot_id), at.x, at.y, at.z, at.y - slot_ground,
 				slot.saved_plot_id() if not slot.is_empty() else "-"])
@@ -5013,9 +5112,21 @@ func _report(pony_count: int, prop_count: int) -> void:
 	# plot cost something, a brand new save could never build anything.
 	_set_check(checks, "at least one plot is buildable with zero bits", free_plots > 0)
 
-	print("RANCH plots slots=%d catalogue=%d restored=%d penned=%d clearing_spread=%.3f bits=%d"
+	print(("RANCH plots slots=%d catalogue=%d restored=%d penned=%d clearing_spread=%.3f " +
+		"bits=%d marked=%d stray=%d duplicated=%d near=%.1f far=%.1f")
 		% [slots.size(), catalogue.size(), _restored_plots, _penned_ponies, clearing_spread,
-			_current_bits()])
+			_current_bits(), marked, stray, duplicated,
+			PlotSlotScript.MARK_NEAR_METRES, PlotSlotScript.MARK_FAR_METRES])
+	_set_check(checks, "every plot slot is either marked or built, never both and never neither",
+		stray == 0)
+	_set_check(checks, "no plot slot carries two sets of markers", duplicated == 0)
+	# HONEST ABOUT WHAT THIS BOUNDS (final review F7): MARK_FAR_METRES < 9.0 only proves the
+	# CENTRE case -- standing in the middle of one plot leaves a 9 m-away neighbour dark. In
+	# the legal build band between two plots, or at a built pen's own gate, two neighbours
+	# can both sit inside MARK_NEAR_METRES at once (measured live: 4.40 m and 4.60 m), so at
+	# most two marked squares ever carry light in that band, not necessarily one.
+	_set_check(checks, "MARK_FAR_METRES stays under the 9 m grid spacing (one square lit from a plot's centre)",
+		PlotSlotScript.MARK_FAR_METRES < 9.0)
 
 	# THE PEN PROBE. See _probe_pen_containment() for why this runs at boot in every mode
 	# and why an empty result is a failure rather than a skip -- the four slots are in
@@ -6460,6 +6571,17 @@ func _capture_plots() -> void:
 		return
 	var slot: PlotSlot = slots[0]
 	var at: Vector3 = slot.global_position
+
+	# STAND HER IN THE PLOT BEFORE SHOOTING IT. set_marker_focus() is normally driven every
+	# frame by _paint_plots(), which only runs from _physics_process() while _interactive is
+	# true (see that guard) -- a screenshot run never takes that path, so every slot's marker
+	# would otherwise sit at its construction-time default (full strength) for the whole
+	# capture, and 06/08/09 would still show the four-plot thicket regardless of what the
+	# fade actually does. One explicit pass, measured from slot 0 the way it would be if she
+	# were standing on it, is what these shots exist to prove.
+	for other in slots:
+		other.set_marker_focus(Vector2(at.x - other.global_position.x,
+			at.z - other.global_position.z).length())
 
 	# 06 -- an empty plot: four corner stakes and nothing else. This is what the player is
 	# looking at when the build prompt appears, and the thing this shot is asked to answer

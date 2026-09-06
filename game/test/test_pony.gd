@@ -171,8 +171,31 @@ func test_flee_speed_clears_the_gallop_handover_rather_than_sitting_on_it() -> v
 		"the roster's slowest pony must flee in the gallop band (got %.3f m/s)" % slowest)
 
 	# And the ceiling still holds at the other end, so no roster edit can buy foot skate.
-	assert_almost_eq(PonyScript.flee_speed_for(500.0), GaitScript.TOP_SKATE_FREE_SPEED,
-		0.0001, "an absurd base_speed must still be capped at TOP_SKATE_FREE_SPEED")
+	# Pinned against PonyScript.FLEE_TOP_SPEED, not Gait.TOP_SKATE_FREE_SPEED (see the
+	# dedicated test right below this one for why that distinction is the whole point).
+	assert_almost_eq(PonyScript.flee_speed_for(500.0), PonyScript.FLEE_TOP_SPEED,
+		0.0001, "an absurd base_speed must still be capped at FLEE_TOP_SPEED")
+
+
+## FLEE_TOP_SPEED IS PINNED AS A LITERAL, NOT READ OFF GAIT (final review F3, controller
+## ruling). Before this test, the assertion above compared flee_speed_for()'s ceiling
+## against Gait.TOP_SKATE_FREE_SPEED -- the very constant flee_speed_for() used to consume,
+## so a retune of GALLOP_MAX_PLAYBACK moved both sides together and the check kept passing
+## through a real capture-balance regression (slice R3's own animation retune, 1.3 -> 1.45,
+## silently raised the fastest fliers' bolt from 4.29 to 4.785 m/s with no test catching
+## it). CAPTURE BALANCE IS GAMEPLAY, NOT ANIMATION, so this pins the number by hand, once,
+## here, and never from the function -- or the file -- under test.
+func test_flee_speed_ceiling_is_pinned_and_does_not_track_the_animation_retune() -> void:
+	assert_almost_eq(PonyScript.flee_speed_for(500.0), 4.29, 0.0001,
+		"an absurd base_speed must still be capped at 4.29 m/s, the pre-slice effective " +
+		"ceiling, whatever GALLOP_MAX_PLAYBACK is set to")
+	assert_almost_eq(PonyScript.FLEE_TOP_SPEED, 4.29, 0.0001,
+		"the constant itself is pinned at the pre-slice effective value")
+	# The fast fliers the review named by name: whatever their base_speed scales to, they
+	# must still clamp at 4.29, not at Gait's animation-driven ceiling.
+	for base_speed in [6.0, 6.2, 6.3]:
+		assert_almost_eq(PonyScript.flee_speed_for(base_speed), 4.29, 0.0001,
+			"base_speed %s must clamp at the pinned ceiling, not Gait's" % base_speed)
 
 
 func test_a_faster_pony_actually_moves_faster() -> void:

@@ -81,6 +81,50 @@ const MARK_WIDTH := 0.24
 const MARK_HEIGHT := 0.12
 const MARK_COLOR := Color(0.745, 0.694, 0.541)
 
+## HOW NEAR SHE HAS TO BE FOR A MARKED PLOT TO BE DRAWN AT ALL.
+##
+## The four slots are on a 9 m grid and each marks a 7.8 m square, so a fence rail and its
+## neighbour's boundary board sit 1.2 m apart and the clearing draws four sets of parallel
+## pale lines whether anybody is looking or not. Add one real 2.25 m fence and the picture is
+## the one the owner reported: "wtf is happening here".
+##
+## MARK_FAR_METRES IS UNDER THE GRID SPACING ON PURPOSE. At 8.0 m, standing at a plot's
+## CENTRE leaves its neighbour 9 m away and therefore dark, so exactly one marked square is
+## lit from there -- which is what makes the centre case read as an answer to "where am I"
+## rather than as scenery. THAT IS NOT THE ONLY POSITION SHE STANDS IN, THOUGH (final review
+## F7): from the legal build band between two plots, or at a built pen's own gate, her
+## distance to each of two neighbours can both fall inside MARK_NEAR_METRES at once (4.40 m
+## and 4.60 m, measured live), so the honest claim is "at most two marked squares ever carry
+## light in that band, and exactly one from a plot's centre" -- an improvement over four
+## permanently lit squares, not a guarantee of one. MARK_NEAR_METRES is the slot's own
+## trigger reach (TRIGGER_HALF plus a body radius, 4.77 m), so the markers are at full
+## strength for precisely as long as the build prompt can be up.
+const MARK_NEAR_METRES := 4.8
+const MARK_FAR_METRES := 8.0
+
+## THE GHOST: WHAT THE GROUND LOOKS LIKE WHILE SHE IS DECIDING.
+##
+## The owner: "finding the right spot to build the paddock can be harder than it should".
+## The rule that was refusing him is older than the complaint (a fence may not materialise
+## through the body of the person who ordered it, PlotSlot.is_on_footprint) but it was only
+## ever spoken after he had walked in, pressed E, read a catalogue and picked a pen. So the
+## answer is shown on the ground, live, before anything is spent: the footprint the fence
+## will stand on, filled green while she is standing somewhere it can go up and red while
+## she is not, with the reason on the HUD prompt she is already reading.
+##
+## Colours are literals rather than imports: game/ui/menu_style.gd is a UI file and a
+## world node must not depend on one. Green-for-take and red-for-refuse in the same
+## register the menus speak, chosen for this ground plane, not copied from any const.
+enum Ghost { OFF, VALID, REFUSED }
+const GHOST_VALID_COLOR := Color(0.443, 0.741, 0.463, 0.34)
+const GHOST_REFUSED_COLOR := Color(0.796, 0.373, 0.361, 0.34)
+## The filled footprint sits a hair above the marker boards so the two never z fight.
+const GHOST_HEIGHT := 0.05
+## A low upstand around the edge, so the footprint reads as a volume the fence will occupy
+## rather than as a stain on the grass, without pretending to be the fence itself.
+const GHOST_WALL_HEIGHT := 0.55
+const GHOST_WALL_WIDTH := 0.14
+
 ## Emitted when something is successfully built here. Carries both halves: the data for a
 ## HUD toast, the node for anything that wants to talk to it.
 signal built(plot: PlotData, node: Node)
@@ -96,6 +140,10 @@ var contents: PlotData = null
 
 var _built_node: Node = null
 var _stakes: Node3D = null
+var _ghost: Node3D = null
+var _ghost_state: int = Ghost.OFF
+var _mark_alpha := 1.0
+var _mark_materials: Array[StandardMaterial3D] = []
 
 
 ## Layers assigned in _init() rather than only in _ready(), so a slot is on the right ones
@@ -174,6 +222,7 @@ func build(plot: PlotData) -> bool:
 	contents = plot
 	_built_node = node
 	_refresh_stakes()
+	set_ghost(Ghost.OFF)
 	built.emit(plot, node)
 	return true
 
@@ -230,6 +279,97 @@ func is_on_footprint(point: Vector3, radius: float) -> bool:
 	return absf(local.x) <= STAKE_INSET + radius and absf(local.z) <= STAKE_INSET + radius
 
 
+## MAY A PEN GO UP HERE, WITH A BODY OF `radius` STANDING AT `point`, AND IF NOT, WHY NOT.
+##
+## The one place the build refusals are stated, so the prompt, the ghost and the actual
+## refusal in game/world/ranch.gd cannot disagree about what the rule is -- which is exactly
+## what a preview is for. Returns {"ok": bool, "reason": String}; `reason` is player-facing
+## copy and is empty on a yes.
+##
+## The reason names the LINE, because the line is drawn on the ground in front of her
+## (_refresh_stakes draws it on STAKE_INSET, the same 3.9 m Pen.HALF_EXTENT stands its fence
+## on) -- which is what makes a refusal actionable instead of mysterious.
+##
+## SHORT, ON PURPOSE (final review F6): the full sentence used to read "cannot build, too
+## close to the fence line, step outside the markers", which at 1280x720 ran the last four
+## words behind the H card. This is the actionable half alone -- what to DO, not the reason
+## she already has a marked square in front of her to tell her.
+func placement_check(point: Vector3, radius: float) -> Dictionary:
+	if not is_empty():
+		return {"ok": false, "reason": "something already stands here"}
+	if is_on_footprint(point, radius):
+		return {"ok": false, "reason": "step outside the markers"}
+	return {"ok": true, "reason": ""}
+
+
+## Show, hide or recolour the preview footprint. A BUILT SLOT REFUSES A GHOST OUTRIGHT: a
+## coloured footprint inside a standing fence is the overlapping-frames picture the owner
+## already reported once, and the way to not draw it is to not be able to.
+func set_ghost(state: int) -> void:
+	var wanted: int = Ghost.OFF if not is_empty() else state
+	if wanted == _ghost_state:
+		return
+	_ghost_state = wanted
+	if _ghost != null:
+		# ADOPT BY REMOVING FIRST, the same hazard _refresh_stakes() below was fixed for:
+		# queue_free() only queues, so a flip VALID<->REFUSED on the same frame would leave
+		# the old ghost still parented beside the new one, and two translucent volumes
+		# would blend over each other for the rest of that frame.
+		remove_child(_ghost)
+		_ghost.queue_free()
+		_ghost = null
+	if _ghost_state == Ghost.OFF:
+		return
+	_ghost = Node3D.new()
+	_ghost.name = "PlotGhost"
+	var colour: Color = GHOST_VALID_COLOR if _ghost_state == Ghost.VALID else GHOST_REFUSED_COLOR
+	var mat := _ghost_material(colour)
+	var span := STAKE_INSET * 2.0
+	_ghost_box("Floor", Vector3(span, GHOST_HEIGHT, span),
+		Vector3(0.0, GHOST_HEIGHT * 0.5, 0.0), mat)
+	for s in [-1.0, 1.0]:
+		_ghost_box("WallX%s" % ("N" if s < 0.0 else "P"),
+			Vector3(GHOST_WALL_WIDTH, GHOST_WALL_HEIGHT, span),
+			Vector3(s * STAKE_INSET, GHOST_WALL_HEIGHT * 0.5, 0.0), mat)
+		_ghost_box("WallZ%s" % ("N" if s < 0.0 else "P"),
+			Vector3(span, GHOST_WALL_HEIGHT, GHOST_WALL_WIDTH),
+			Vector3(0.0, GHOST_WALL_HEIGHT * 0.5, s * STAKE_INSET), mat)
+	add_child(_ghost)
+
+
+func ghost_state() -> int:
+	return _ghost_state
+
+
+## Fade the markers for a player `distance` metres away, in the XZ plane. Full strength
+## inside MARK_NEAR_METRES, gone past MARK_FAR_METRES, linear between. Called every frame by
+## game/world/ranch.gd; cheap because it writes an alpha on two shared materials rather than
+## touching the twelve meshes that wear them.
+func set_marker_focus(distance: float) -> void:
+	var span: float = maxf(0.001, MARK_FAR_METRES - MARK_NEAR_METRES)
+	var alpha: float = clampf(1.0 - (absf(distance) - MARK_NEAR_METRES) / span, 0.0, 1.0)
+	if is_equal_approx(alpha, _mark_alpha):
+		return
+	_mark_alpha = alpha
+	for mat in _mark_materials:
+		mat.albedo_color.a = alpha
+	if _stakes != null:
+		_stakes.visible = alpha > 0.0
+
+
+func marker_alpha() -> float:
+	return _mark_alpha
+
+
+## How many marker meshes this slot is actually drawing. The claim a screenshot could not
+## make: a built slot draws none, an empty one draws one full set, and no sequence of builds
+## and demolitions leaves two coincident copies.
+func marker_mesh_count() -> int:
+	if _stakes == null or not is_instance_valid(_stakes):
+		return 0
+	return _stakes.find_children("*", "MeshInstance3D", true, false).size()
+
+
 ## The plot id stored for this slot in a save, or "" when the slot is empty. The exact
 ## String GameState.plots wants -- see the class comment on why both halves are Strings.
 func saved_plot_id() -> String:
@@ -264,41 +404,56 @@ func _ensure_shape() -> void:
 ## you can trip on is worse than no marker.
 func _refresh_stakes() -> void:
 	var want_marks := is_empty()
-	if want_marks and _stakes == null:
-		_stakes = Node3D.new()
-		_stakes.name = "PlotMarks"
+	# ADOPT BY NAME, NOT BY THE CACHED HANDLE. queue_free() only queues: a build and a
+	# demolish inside one frame would leave the old node still parented while a new one was
+	# added beside it, and the two would z fight forever afterwards. Sweeping every child
+	# called PlotMarks makes the count a fact about the tree rather than about this file's
+	# bookkeeping. The boot-time containment probe does exactly one build-then-demolish on
+	# slot 0 on every single boot (game/world/ranch.gd _probe_pen_containment).
+	for existing in find_children("PlotMarks", "Node3D", false, false):
+		remove_child(existing)
+		existing.queue_free()
+	_stakes = null
+	_mark_materials.clear()
+	if not want_marks:
+		return
 
-		var stake_mat := _mark_material(STAKE_COLOR)
-		for sx in [-1.0, 1.0]:
-			for sz in [-1.0, 1.0]:
-				_mark("Stake%s%s" % ["N" if sx < 0.0 else "P", "N" if sz < 0.0 else "P"],
-					Vector3(STAKE_SIZE, STAKE_HEIGHT, STAKE_SIZE),
-					Vector3(sx * STAKE_INSET, STAKE_HEIGHT * 0.5 - 0.15, sz * STAKE_INSET),
-					stake_mat)
+	_stakes = Node3D.new()
+	_stakes.name = "PlotMarks"
 
-		# The boundary itself: four boards laid flat on the plot's own edge, so the marked
-		# square is exactly the square the fence will stand on.
-		var board_mat := _mark_material(MARK_COLOR)
-		var span := STAKE_INSET * 2.0
-		for s in [-1.0, 1.0]:
-			_mark("EdgeX%s" % ("N" if s < 0.0 else "P"),
-				Vector3(MARK_WIDTH, MARK_HEIGHT, span),
-				Vector3(s * STAKE_INSET, MARK_HEIGHT * 0.5 - 0.02, 0.0), board_mat)
-			_mark("EdgeZ%s" % ("N" if s < 0.0 else "P"),
-				Vector3(span, MARK_HEIGHT, MARK_WIDTH),
-				Vector3(0.0, MARK_HEIGHT * 0.5 - 0.02, s * STAKE_INSET), board_mat)
+	var stake_mat := _mark_material(STAKE_COLOR)
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			_mark("Stake%s%s" % ["N" if sx < 0.0 else "P", "N" if sz < 0.0 else "P"],
+				Vector3(STAKE_SIZE, STAKE_HEIGHT, STAKE_SIZE),
+				Vector3(sx * STAKE_INSET, STAKE_HEIGHT * 0.5 - 0.15, sz * STAKE_INSET),
+				stake_mat)
 
-		add_child(_stakes)
-	elif not want_marks and _stakes != null:
-		_stakes.queue_free()
-		_stakes = null
+	# The boundary itself: four boards laid flat on the plot's own edge, so the marked
+	# square is exactly the square the fence will stand on.
+	var board_mat := _mark_material(MARK_COLOR)
+	var span := STAKE_INSET * 2.0
+	for s in [-1.0, 1.0]:
+		_mark("EdgeX%s" % ("N" if s < 0.0 else "P"),
+			Vector3(MARK_WIDTH, MARK_HEIGHT, span),
+			Vector3(s * STAKE_INSET, MARK_HEIGHT * 0.5 - 0.02, 0.0), board_mat)
+		_mark("EdgeZ%s" % ("N" if s < 0.0 else "P"),
+			Vector3(span, MARK_HEIGHT, MARK_WIDTH),
+			Vector3(0.0, MARK_HEIGHT * 0.5 - 0.02, s * STAKE_INSET), board_mat)
+
+	add_child(_stakes)
+	_stakes.visible = _mark_alpha > 0.0
 
 
 func _mark_material(colour: Color) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = colour
+	mat.albedo_color = Color(colour.r, colour.g, colour.b, _mark_alpha)
 	mat.roughness = 0.95
 	mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+	# Alpha because the markers fade with distance (see MARK_NEAR_METRES). Kept in a list so
+	# set_marker_focus() writes two materials rather than walking twelve meshes a frame.
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_mark_materials.append(mat)
 	return mat
 
 
@@ -311,3 +466,32 @@ func _mark(mark_name: String, size: Vector3, at: Vector3, mat: StandardMaterial3
 	mesh_node.mesh = box
 	mesh_node.position = at
 	_stakes.add_child(mesh_node)
+
+
+## Unshaded and transparent: this is a diagram drawn on the world, not a thing in it, and a
+## lit preview would change colour with the hour and stop meaning yes or no.
+##
+## CULL_BACK, NOT CULL_DISABLED (final review F5). The third-person rig sits behind and low
+## enough that it is routinely inside a neighbouring plot's wall box, and with back-face
+## culling off the inside of those walls rendered too -- a 0.34-alpha slab across the bottom
+## of the frame, tinting the pony and the HUD. Back-face culling means a camera inside the
+## volume looks through the wall it is inside instead of seeing its own lining.
+func _ghost_material(colour: Color) -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = colour
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.cull_mode = BaseMaterial3D.CULL_BACK
+	return mat
+
+
+func _ghost_box(box_name: String, size: Vector3, at: Vector3,
+		mat: StandardMaterial3D) -> void:
+	var box := BoxMesh.new()
+	box.size = size
+	box.material = mat
+	var mesh_node := MeshInstance3D.new()
+	mesh_node.name = box_name
+	mesh_node.mesh = box
+	mesh_node.position = at
+	_ghost.add_child(mesh_node)

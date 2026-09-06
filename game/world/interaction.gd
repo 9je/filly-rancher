@@ -29,6 +29,9 @@ enum Kind { NONE, PLOT_BUILD, PEN_MOVE_IN, MARKET, BOARD, MAILBOX, DEPOT, PALACE
 ## because a slot's trigger box is a square the player deliberately walked into, and a
 ## building's radius is a circle she walked past.
 ##
+## THE TWO PLOT KINDS DO NOT BEAT EACH OTHER -- see GROUND_TIER. They used to, in the order
+## written here, and it cost the owner a playtest verdict.
+##
 ## THE MARKET BEATS THE BOARD, which is the rule ranch.gd's is_near_board() used to carry
 ## as a hard coded "and not is_near_market()" clause. The board stands five metres from the
 ## Market's origin and the two radii meet in the middle; the Market is the older and the
@@ -47,6 +50,25 @@ enum Kind { NONE, PLOT_BUILD, PEN_MOVE_IN, MARKET, BOARD, MAILBOX, DEPOT, PALACE
 const PRIORITY: Array[int] = [Kind.PLOT_BUILD, Kind.PEN_MOVE_IN, Kind.MARKET, Kind.BOARD,
 	Kind.MAILBOX, Kind.DEPOT, Kind.PALACE]
 
+## THE KINDS THAT SHARE ONE RANK, so resolve() settles them on distance instead of on the
+## order they happen to sit in above.
+##
+## THE PLAYTEST THIS FIXES. The four plot slots are 9 m apart and a slot's trigger holds the
+## player until her centre is 4.77 m out (PlotSlot.TRIGGER_HALF 4.35 plus a 0.42 m capsule).
+## Standing at a BUILT pen's gate puts her centre 4.40 m from that pen and 4.60 m from the
+## empty slot behind her -- inside both triggers at once. With PLOT_BUILD strictly above
+## PEN_MOVE_IN, E opened the build menu for the plot 20 cm further away instead of putting
+## the pony in her saddlebag into the pen she was standing at. The owner: "when i place
+## ponies in the paddock i press e several times and that sound is terrible" -- the sound
+## being the build menu's own open and back ticks, once per press.
+##
+## Both are ground she is standing IN, decided by an Area3D overlap rather than by a radius,
+## so there is no doctrine that says either outranks the other; the nearer one is the one
+## she meant. A slot cannot offer both verbs at once (interaction_candidates() offers
+## PLOT_BUILD for an empty slot and PEN_MOVE_IN for a built one), so this is only ever
+## deciding between two DIFFERENT squares of ground.
+const GROUND_TIER: Array[int] = [Kind.PLOT_BUILD, Kind.PEN_MOVE_IN]
+
 ## What the pen prompt says when the saddlebag is empty. THE PEN STILL WINS THE GROUND in
 ## that state, deliberately: a pen that dropped out of the running with an empty bag would
 ## hand E to whatever building is next nearest, so the player standing in her own paddock
@@ -57,14 +79,26 @@ const EMPTY_BAG := "your saddlebag is empty"
 ## One candidate, as ranch.gd hands them over. `distance` is metres in the XZ plane and is
 ## only ever used to settle two candidates of the SAME kind. `subject` is whatever the
 ## prompt needs to name: the pony at the top of the saddlebag, or a slot's name for a test.
-static func candidate(kind: int, distance: float, subject: String = "") -> Dictionary:
-	return {"kind": kind, "distance": distance, "subject": subject}
+## `reason` is a refusal this candidate ALREADY KNOWS ABOUT -- the plot she is standing on
+## that will not take a fence while she is standing on it. It is carried rather than looked
+## up so the prompt, the coloured ghost on the ground and the refusal she gets if she presses
+## anyway are all one answer from one place.
+static func candidate(kind: int, distance: float, subject: String = "",
+		reason: String = "") -> Dictionary:
+	return {"kind": kind, "distance": distance, "subject": subject, "reason": reason}
 
 
 ## Where `kind` sits in PRIORITY, or minus one for a kind that is not in it at all. A kind
 ## outside the list can never win, which is the correct answer for Kind.NONE and a loud one
 ## for a kind somebody adds to the enum and forgets to rank.
+##
+## Every member of GROUND_TIER answers with the SAME rank -- the rank of the tier's first
+## member -- so resolve()'s distance tie-break is what separates them.
 static func rank_of(kind: int) -> int:
+	if PRIORITY.find(kind) < 0:
+		return -1
+	if GROUND_TIER.has(kind):
+		return PRIORITY.find(GROUND_TIER[0])
 	return PRIORITY.find(kind)
 
 
@@ -108,6 +142,9 @@ static func prompt_for(action: Dictionary, key: String) -> String:
 	var subject: String = String(action.get("subject", ""))
 	match int(action.get("kind", Kind.NONE)):
 		Kind.PLOT_BUILD:
+			var reason: String = String(action.get("reason", ""))
+			if not reason.is_empty():
+				return "%s: cannot build, %s" % [key, reason]
 			return "%s: build here" % key
 		Kind.PEN_MOVE_IN:
 			if subject.is_empty():

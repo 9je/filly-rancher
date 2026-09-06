@@ -52,26 +52,32 @@ extends CharacterBody3D
 ##          good, maybe a tad too slow still").
 ##
 ## THE RUN SPENDS FOOT SKATE, ON PURPOSE. Gait.TOP_SKATE_FREE_SPEED -- the fastest speed
-## ANY authored clip can depict with the hooves planted -- is 4.29 m/s, so 5.20 asks the
-## saturated `gallop` clip to carry 21% more ground than it depicts. Gait.skate_ratio()'s
-## perceptibility ladder starts noticing at ~1.25 and calls 2.0 unmistakable moonwalking,
-## so 1.21 is at the top of the "not perceptible in motion" band rather than past it, and
-## game/test/test_player.gd pins that budget at 1.25 so the next "it still feels a bit
-## slow" goes red instead of shipping.
+## ANY authored clip can depict with the hooves planted -- is 4.79 m/s (it was 4.29 until
+## slice R3's GALLOP_MAX_PLAYBACK retune, see gait.gd), so 5.20 asks the saturated `gallop`
+## clip to carry 8.7% more ground than it depicts, down from 21% before the retune.
+## Gait.skate_ratio()'s perceptibility ladder starts noticing at ~1.25 and calls 2.0
+## unmistakable moonwalking, so 1.087 sits comfortably inside the "not perceptible in
+## motion" band rather than at the top of it, and game/test/test_player.gd pins that
+## budget at 1.25 so the next "it still feels a bit slow" goes red instead of shipping.
 ##
-##      It buys two things a skate-free 4.29 could not. First, 4.29 is only 7% up on the
-##      ORIGINAL number and a player cannot feel 7%. Second and more important, 4.29 is
-##      exactly the ceiling Pony.flee_speed_for() clamps a fleeing pony to -- so at 4.29
-##      the fastest possible bolt TIES the player and a chase never closes. At 5.20 the
-##      player is strictly faster than anything that can run from her, by construction,
-##      for any base_speed a future roster invents, with 0.9 m/s of closing speed even in
-##      the worst case. The honest fix for the whole band is a faster authored gallop
-##      cycle (tools/author_anims.py), which is an animation task, not a tuning one.
+##      It buys two things a skate-free 4.79 could not. First, before the retune 4.29 was
+##      only 7% up on the ORIGINAL number (4.00) and a player cannot feel 7% -- the retune
+##      moved the skate-free ceiling to 20% up on that same original, which is no longer
+##      too small to feel, so this half of the argument has weakened; it is reason two that
+##      still carries the decision. Second and more important, the skate-free ceiling is
+##      exactly what Pony.flee_speed_for() clamps a fleeing pony to -- so running at it
+##      TIES the fastest possible bolt and a chase never closes. At 5.20 the player is
+##      strictly faster than anything that can run from her, by construction, for any
+##      base_speed a future roster invents, with 0.42 m/s of closing speed in the worst
+##      case (0.9 m/s before the retune narrowed the ceiling's distance from RUN_SPEED).
+##      The honest fix for the whole band is a faster authored gallop cycle
+##      (tools/author_anims.py), which is an animation task, not a tuning one.
 ##
 ##      Now that running is the DEFAULT, this skate is also what the player sees most of
 ##      the time rather than only while a button is held. That is a real cost and it was
-##      weighed: the alternative is a default travel speed of 4.29 m/s, which is the exact
-##      speed the owner has already called too slow twice.
+##      weighed: the alternative is a default travel speed of 4.79 m/s (formerly 4.29),
+##      close enough to the 4.00 the owner already called too slow that it still risks the
+##      same complaint.
 ##
 ## COLLISION CAPSULE (numbers live in player.tscn, which cannot carry comments).
 ## Twilight measures 1.163 m at the withers and 2.138 m to the tip of her horn --
@@ -94,6 +100,7 @@ extends CharacterBody3D
 ## `CameraPivot` sits at y=1.45 m: just above the head bone, below the ear tips.
 
 const GaitScript := preload("res://systems/gait.gd")
+const PonyRigScript := preload("res://scripts/pony_rig.gd")
 const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 const PonyVisualsScript := preload("res://actors/pony/pony_visuals.gd")
 const StockPaletteScript := preload("res://systems/stock_palette.gd")
@@ -105,9 +112,10 @@ const CutieMarkScript := preload("res://systems/cutie_mark.gd")
 ## It was called `gallop` and meant the opposite until the second playtest.
 const SNEAK_ACTION := &"sneak"
 
-## Ground speed at full stick / any WASD key, with nothing held. THE DEFAULT. Sits 21%
-## past what the `gallop` clip can honestly depict (Gait.TOP_SKATE_FREE_SPEED is 4.29 m/s)
-## -- a deliberate, budgeted amount of foot skate, bought for the reasons the class comment
+## Ground speed at full stick / any WASD key, with nothing held. THE DEFAULT. Sits 8.7%
+## past what the `gallop` clip can honestly depict (Gait.TOP_SKATE_FREE_SPEED is 4.79 m/s,
+## down from 21% past 4.29 m/s before slice R3's GALLOP_MAX_PLAYBACK retune) -- a
+## deliberate, budgeted amount of foot skate, bought for the reasons the class comment
 ## sets out. game/test/test_player.gd pins the size of that budget, so it is a number
 ## somebody chose and not a number that drifted.
 ##
@@ -136,11 +144,22 @@ const RUN_SPEED := 5.2
 ## strictly a way of not making her flee in the first place.
 const SNEAK_SPEED := 2.0 * GaitScript.WALK_CLIP_SPEED
 
-## HOOFSTEPS ARE A FUNCTION OF DISTANCE, NOT OF TIME. One step every STEP_STRIDE metres
-## actually travelled, so sneaking gives a walk and running gives a gallop out of one
-## constant instead of two that would drift apart. At RUN_SPEED this is roughly five steps
-## a second across four hooves.
-const STEP_STRIDE := 1.1
+## HOOFSTEPS ARE A FUNCTION OF THE CLIP, NOT OF DISTANCE AND NOT OF A TIMER. One sound per
+## cycle of whichever locomotion clip is playing, fired at the same phase of that cycle every
+## time, read off the AnimationPlayer's own position. That is what makes the sound land on
+## the animation's footfall at every speed, including the speeds where the hooves skate.
+##
+## It used to be one sound every 1.1 m travelled. At the sneak that was one sound per two
+## strides; at the run it was 4.7 a second against a cycle turning over 2.6 times a second.
+## Neither lined up with anything on screen, which is the whole of the owner's "walk
+## animations seems worse than before" plus "that sound is terrible": the animation had not
+## changed, the audio landing off it had arrived.
+##
+## ONE PER CYCLE AND NOT FOUR: the authored walk cycle is short (Gait's own comment -- the
+## front leg chain is 98.8% extended, so the stride cannot lengthen and the cycle carries
+## only 0.55 m), and sonifying all four beats of it gives 9.6 sounds a second at a creep.
+## One per cycle is one of her four hooves, always the same one, always at the same moment.
+## See game/test/test_player_steps.gd for the cadence this produces at both speeds.
 ## Below this she is shuffling, not walking, and a sound there is a sound with no gesture
 ## behind it.
 const STEP_MIN_SPEED := 0.4
@@ -193,10 +212,12 @@ const ANIM_BLEND := 0.2
 @onready var magic_beam: Node3D = $MagicBeam
 
 var _anim: AnimationPlayer
+var _hair: SpringBoneSimulator3D = null
 var _visual_yaw := 0.0
 var _coyote_left := 0.0
 var _jump_buffered := 0.0
-var _step_distance := 0.0
+var _step_clip: StringName = &""
+var _step_position := 0.0
 var _step_surface: StringName = SURFACE_GRASS
 
 ## The mane style the body currently standing in Visuals was built from. apply_look()
@@ -258,6 +279,14 @@ func get_animation_player() -> AnimationPlayer:
 	return _anim
 
 
+## The influence the hair simulator is being held at right now, or 1.0 for a body with no
+## hair simulation. Exposed so the suite can assert that the speed rule actually reached the
+## node rather than only that the arithmetic is right -- the same seam docs/notes-hair-sim.md
+## section 10.2 was caught on.
+func hair_influence() -> float:
+	return _hair.influence if _hair != null else 1.0
+
+
 ## Wear `look`: the palette tint and the cutie mark, on the body already built. Called by
 ## ranch.gd at boot and again whenever a load replaces GameState.player, so the pony on
 ## screen is always the pony the save describes.
@@ -304,21 +333,29 @@ func step_surface() -> StringName:
 	return _step_surface
 
 
-func step_distance() -> float:
-	return _step_distance
+## Where in the current clip the last hoofstep decision was taken, in seconds. For the suite.
+func step_phase() -> float:
+	return _step_position
 
 
-## Roll the accumulator forward and answer whether a hoof landed this frame. Pure: it makes
-## no sound and reads no node, which is what lets the suite drive it with numbers.
-func accumulate_step(speed: float, delta: float, on_floor: bool) -> bool:
-	if not on_floor or speed < STEP_MIN_SPEED or delta <= 0.0:
-		_step_distance = 0.0
+## Roll the clip position forward and answer whether a hoof landed this frame. A cycle has
+## finished when the clip's position falls, which for a looping clip happens once per cycle
+## at exactly the same phase. Pure: it makes no sound and reads no node, which is what lets
+## the suite drive it with numbers.
+##
+## A CHANGE OF CLIP IS NOT A FINISHED CYCLE. Gait.clip_for_speed() swaps walk for gallop
+## mid stride and the position resets to near zero when it does; counting that as a wrap
+## would put a stray sound on the exact frame she breaks into a run, every time.
+func step_on_clip(clip: StringName, position_seconds: float, speed: float,
+		on_floor: bool) -> bool:
+	if not on_floor or absf(speed) < STEP_MIN_SPEED or clip == &"idle" or clip.is_empty():
+		_step_clip = clip
+		_step_position = position_seconds
 		return false
-	_step_distance += speed * delta
-	if _step_distance < STEP_STRIDE:
-		return false
-	_step_distance -= STEP_STRIDE
-	return true
+	var wrapped: bool = clip == _step_clip and position_seconds < _step_position
+	_step_clip = clip
+	_step_position = position_seconds
+	return wrapped
 
 
 ## get_node(), not the bare `Sound` identifier: tools/run_tests.sh's parse sweep runs every
@@ -383,9 +420,13 @@ func _physics_process(delta: float) -> void:
 
 	move_and_slide()
 
+	var ground_speed := get_ground_speed()
 	_update_facing(direction, delta)
-	_update_animation(get_ground_speed())
-	if accumulate_step(get_ground_speed(), delta, is_on_floor()):
+	_update_animation(ground_speed)
+	if _hair != null:
+		_hair.influence = PonyRigScript.influence_for_speed(ground_speed)
+	if _anim != null and step_on_clip(_anim.current_animation,
+			_anim.current_animation_position, ground_speed, is_on_floor()):
 		_sound_call(&"play_at", [_step_surface, global_position])
 
 
@@ -491,6 +532,9 @@ func _build_visuals(mane_style: int = 0) -> void:
 		push_error("Player: no AnimationPlayer at %s" % PonyVisualsScript.ANIMATION_PLAYER_PATH)
 		return
 	_play("idle")
+	# Re-found on every rebuild rather than kept: apply_look() frees the whole body when the
+	# mane style changes, and a stale simulator reference would be a freed node.
+	_hair = PonyRigScript.hair_simulator(pony)
 
 
 ## Move `BeamOrigin` onto the actual tip of the actual horn of the actual model.

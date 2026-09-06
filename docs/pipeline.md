@@ -1127,7 +1127,7 @@ here. Two rig-specific accommodations make it fit:
 Consumers must not pick or scale these clips by hand: `game/systems/gait.gd`
 owns the speed ladder (which clip at which ground speed, at what playback
 rate), and the two bands are arranged to meet *exactly* at 1.98 m/s so no
-speed between a standstill and 4.29 m/s has to skate.
+speed between a standstill and 4.785 m/s has to skate.
 
 ### Hair is NOT animated — it is simulated, and that takes two halves
 
