@@ -91,9 +91,9 @@ const MARK_COLOR := Color(0.745, 0.694, 0.541)
 ## will stand on, filled green while she is standing somewhere it can go up and red while
 ## she is not, with the reason on the HUD prompt she is already reading.
 ##
-## Colours are the theme's own, copied as literals rather than imported: game/ui/
-## menu_style.gd is a UI file and a world node must not depend on one. They mirror
-## MenuStyle's affordable and unaffordable pair.
+## Colours are literals rather than imports: game/ui/menu_style.gd is a UI file and a
+## world node must not depend on one. Green-for-take and red-for-refuse in the same
+## register the menus speak, chosen for this ground plane, not copied from any const.
 enum Ghost { OFF, VALID, REFUSED }
 const GHOST_VALID_COLOR := Color(0.443, 0.741, 0.463, 0.34)
 const GHOST_REFUSED_COLOR := Color(0.796, 0.373, 0.361, 0.34)
