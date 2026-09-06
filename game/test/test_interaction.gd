@@ -242,3 +242,93 @@ func test_the_mailbox_prompt_names_the_verb_and_carries_no_dash() -> void:
 	assert_true(prompt.contains("mail"))
 	assert_false(prompt.contains("--"))
 	assert_false(prompt.contains(char(0x2014)))
+
+
+## THE TWO PLOT VERBS ARE ONE TIER, AND THE OWNER PAID FOR THIS LINE.
+##
+## The four slots are 9 m apart and a slot holds the player until her centre is 4.77 m out
+## (TRIGGER_HALF 4.35 plus her 0.42 capsule). Pressed against a built pen's gate her centre
+## is 4.40 m from that pen and 4.60 m from the empty slot behind her, so she is standing in
+## both triggers at once. While PLOT_BUILD outranked PEN_MOVE_IN outright, E opened the
+## build menu for the plot 20 cm further away instead of pennning the pony in her bag:
+## "when i place ponies in the paddock i press e several times and that sound is terrible"
+## -- the sound being the build menu's own open and back ticks, once per press.
+func test_the_pen_at_your_feet_beats_the_empty_plot_behind_you() -> void:
+	var chosen: Dictionary = InteractionScript.resolve([
+		InteractionScript.candidate(InteractionScript.Kind.PLOT_BUILD, 4.60, "Slot2"),
+		InteractionScript.candidate(InteractionScript.Kind.PEN_MOVE_IN, 4.40, "Buttercup"),
+	])
+	assert_eq(int(chosen["kind"]), InteractionScript.Kind.PEN_MOVE_IN,
+		"the nearer of the two squares of ground she is standing in wins")
+	assert_eq(String(chosen["subject"]), "Buttercup")
+
+
+func test_the_empty_plot_you_are_standing_in_still_beats_the_pen_next_door() -> void:
+	# The mirror, and it is the case the tier must not break: walk into an empty plot to
+	# build and the pen 4.5 m away does not steal the press.
+	var chosen: Dictionary = InteractionScript.resolve([
+		InteractionScript.candidate(InteractionScript.Kind.PLOT_BUILD, 0.30, "Slot2"),
+		InteractionScript.candidate(InteractionScript.Kind.PEN_MOVE_IN, 4.50, "Buttercup"),
+	])
+	assert_eq(int(chosen["kind"]), InteractionScript.Kind.PLOT_BUILD)
+	assert_eq(String(chosen["subject"]), "Slot2")
+
+
+func test_both_plot_verbs_share_one_rank() -> void:
+	assert_eq(InteractionScript.rank_of(InteractionScript.Kind.PLOT_BUILD),
+		InteractionScript.rank_of(InteractionScript.Kind.PEN_MOVE_IN),
+		"same tier, so resolve() settles them on distance and nothing else")
+
+
+## The tier must not have flattened anything ELSE. Ground you stand on still beats ground
+## you stand near, at any distance, which is the doctrine PRIORITY's own comment states.
+func test_the_ground_tier_still_beats_every_building() -> void:
+	for building: int in [InteractionScript.Kind.MARKET, InteractionScript.Kind.BOARD,
+			InteractionScript.Kind.MAILBOX, InteractionScript.Kind.DEPOT,
+			InteractionScript.Kind.PALACE]:
+		for ground: int in InteractionScript.GROUND_TIER:
+			var chosen: Dictionary = InteractionScript.resolve([
+				InteractionScript.candidate(building, 0.10),
+				InteractionScript.candidate(ground, 4.70),
+			])
+			assert_eq(int(chosen["kind"]), ground,
+				"kind %d beat the ground she is standing on" % building)
+
+
+func test_the_ground_tier_is_not_empty_and_is_ranked() -> void:
+	assert_gt(InteractionScript.GROUND_TIER.size(), 1,
+		"a tier of one is not a tier and this whole change would be a no-op")
+	for kind: int in InteractionScript.GROUND_TIER:
+		assert_gte(InteractionScript.rank_of(kind), 0,
+			"a tier member outside PRIORITY can never win anything")
+
+
+## THE WORLD HALF. A pure resolver that is right about dictionaries nobody hands it is a
+## pure resolver that is right about nothing -- this file's own class comment says so. This
+## stands the player where the playtest stood her: at the gate of a built pen, with the
+## empty slot next door inside her reach.
+func test_at_a_built_pen_s_gate_the_ranch_offers_the_pen() -> void:
+	var ranch = RanchScene.instantiate()
+	add_child_autofree(ranch)
+	await wait_frames(2)
+	var slots: Array = ranch.plot_slots()
+	assert_gt(slots.size(), 1, "the map has to have at least two slots for this to mean anything")
+	var built = slots[0]
+	var registry = ranch.get_node("/root/GameState").get_registry() \
+		if ranch.has_node("/root/GameState") else null
+	var catalogue = ranch.call("_plots_catalogue")
+	var plot = catalogue.all()[0]
+	assert_true(built.build(plot), "the first slot has to take a pen for this test to mean anything")
+	await wait_physics_frames(2)
+	# Her centre 4.40 m out from the built slot, on the axis pointing at its neighbour.
+	var toward: Vector3 = (slots[1].global_position - built.global_position).normalized()
+	ranch.player.global_position = built.global_position + toward * 4.40 + Vector3.UP * 0.3
+	await wait_physics_frames(4)
+	var kinds: Array[int] = []
+	for entry: Dictionary in ranch.interaction_candidates():
+		kinds.append(int(entry["kind"]))
+	assert_true(kinds.has(InteractionScript.Kind.PEN_MOVE_IN),
+		"she is standing at the pen, so the pen must be on offer")
+	var chosen: Dictionary = ranch.current_interaction()
+	assert_eq(int(chosen.get("kind", -1)), InteractionScript.Kind.PEN_MOVE_IN,
+		"the nearer square of ground she is standing in is the one E means")
