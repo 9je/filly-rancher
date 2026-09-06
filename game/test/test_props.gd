@@ -220,8 +220,14 @@ const BREATHING_ROOM := 0.15
 
 func test_no_two_props_in_the_layout_stand_inside_each_other() -> void:
 	# A point-distance duplicate guard, nothing more: it reads no footprints and no AABBs,
-	# so two wide models can pass it while overlapping. The real overlap check is the ranch
-	# gate's, against the LIVE colliders.
+	# so two wide models can pass it while overlapping. THERE IS NO OTHER OVERLAP CHECK
+	# ANYWHERE IN THIS PROJECT: an earlier version of this comment claimed the ranch gate's
+	# live colliders covered it, and that was false (whole-branch review, 2026-09-05, F2 --
+	# ranch.gd's live checks are pony-vs-prop, prop-vs-door-radius, pen intrusion, seating and
+	# skirts, and no building-vs-building or prop-vs-building rectangle test at all). Two
+	# buildings interpenetrating (the Market and the Board did, until Building's plinth
+	# shrank to the model's own ground-contact footprint -- see game/world/building.gd's F1
+	# fix) can still only be caught by eye, on a screenshot, until one of these is written.
 	var seen: Array[Dictionary] = []
 	for entry: Dictionary in PropsScript.LAYOUT:
 		var at: Vector2 = entry["at"]

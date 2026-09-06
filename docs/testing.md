@@ -328,21 +328,23 @@ GUT's own default of not descending into subdirectories without
 **And a floor on the test count**, for the half the script count cannot see: a
 file that still parses but has lost most of its tests (a mass rename, a bad
 merge, a `func test_x` that became `func x`). `MIN_TESTS` in
-`tools/run_tests.sh` -- currently **1606** -- is a deliberate FLOOR rather than an
+`tools/run_tests.sh` -- currently **1607** -- is a deliberate FLOOR rather than an
 exact count, so adding tests never breaks the build. Raise it when the suite
 grows; never lower it without saying in the same commit which tests went away
 and why. (It was 194 through Phase 1A and was raised to the suite's real size in
 Phase 1B Task 3 -- a floor a hundred tests below the actual count could not have
 caught a whole test script going missing, which is exactly the failure the
 paragraph above describes. It was raised again, from 1420 to 1535, by slice R1's
-own growth, and again, from 1535 to 1571, by the R1 final-review fix wave's own
+own growth, and again, from 1535 to 1572, by the R1 final-review fix wave's own
 growth, proved both ways per the section below at the new number: the suite
-passes at 1571 and a `FILLY_MIN_TESTS=99999` run still fails on it. It was
-raised again, from 1571 to 1606, by slice R2's own growth -- the modelled
+passes at 1572 and a `FILLY_MIN_TESTS=99999` run still fails on it. It was
+raised again, from 1572 to 1606, by slice R2's own growth -- the modelled
 building shell, the palace facade, the marquee arch, the sign standoffs, the
-replanted treeline and the placement pass all brought tests with them --
-proved both ways per the section below at the new number: the suite passes at
-1606 and a `FILLY_MIN_TESTS=99999` run still fails on it.)
+replanted treeline and the placement pass all brought tests with them. It was
+raised once more, from 1606 to 1607, by the R2 final-review fix wave's own
+growth (the plinth's new ground-contact footprint test) -- proved both ways per
+the section below at the new number: the suite passes at 1607 and a
+`FILLY_MIN_TESTS=99999` run still fails on it.)
 
 **Proving both guards, safely:**
 
@@ -596,7 +598,7 @@ FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dum
 
 Phase names are `dawn`, `day`, `dusk`, `night` and weathers are `clear`,
 `rain`, `fog`, `storm`, matched case-insensitively; `--world-time=` takes
-seconds. Expect the same `RANCH_OK ponies=49 props=128 assets=present` as an
+seconds. Expect the same `RANCH_OK ponies=49 props=133 assets=present` as an
 unpinned run, with the `RANCH world` line naming the hour that was pinned. Both
 counts moved once more in Phase 3 slice 1: the crowd fills every region with
 stock ponies alongside the named roster, and the Depot is one more prop beside
@@ -635,6 +637,15 @@ the ranch gate printed after that pass). The placement pass that followed put it
 homestead yard, plus a boardwalk of the same road piece running north and turning into the
 Palace's own approach, each entry composed against its neighbours rather than dropped in a
 gap.
+
+`props` moved once more, from 128 to 133, in the R2 whole-branch review's own fix wave: the
+north road's tiles were spaced by their native seated length (2.28 m) on ground that climbs
+0.70 m across the run, so consecutive tiles' independently-seated tops landed up to 0.20 m
+apart -- a curb at every seam, and grass showing through between them. Tightened to 2.0 m
+spacing (every tile now overlaps its neighbour) and the run extended at both ends -- from
+`z = 31.5-54.3` to `z = 26.0-56.0` -- so it meets the flat yard at `Terrain.FLAT_RADIUS` on
+the south end and overlaps the boardwalk's own first plate on the north end instead of
+standing free in open field on either side (finding F3). 16 tiles now stand where 11 did.
 
 **`props` and `ponies` did NOT move when the Market got a vendor and the Palace got
 a teller, and that is deliberate.** Both are `Attendant` nodes: `PonyVisuals.build`

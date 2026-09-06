@@ -111,5 +111,8 @@ lp_dance_game|ponysfm-las-pegasus/models/mlp_props/las_pegasus/games/dance_game.
 # distinct meshes here, not six, and none of the three is usable.)
 
 # NEON IDS: (none). The pack has no usable meshes; see the note above. Task 5's drawn-neon
-# fallback needs the controller's authorization before anything is mounted under this name.
-# game/world/palace_facade.gd mounts these by name. Change one here and change it there.
+# fallback is what the Palace's marquee actually wears (game/world/palace_facade.gd) and it
+# needed no id from this file to do it -- nothing here is mounted by name, and the "neon_"
+# prefix that once guarded that family in model_gallery.gd and test_ranch_world.gd is gone
+# for the same reason (whole-branch review, 2026-09-05, F10: it guarded a family that was
+# never going to have a member).

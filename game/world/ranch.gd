@@ -6525,9 +6525,27 @@ func _capture_plots() -> void:
 ## plinth somebody forgot to hide. The gates say the props are placed, solid, seated and
 ## out of the doorways; these say whether the place is any good.
 func _capture_props() -> void:
+	# THE HUD IS OFF FOR ALL FIVE OF THESE, the same way and for the same reason
+	# _capture_look() takes it off for 18 to 21: the hints card covers about 45 percent of a
+	# 1600 by 900 frame over the bottom right quadrant, which is where several of these
+	# subjects land, and these shots are the placement pass's only evidence -- half-obscured
+	# evidence is not evidence (whole-branch review, 2026-09-05, F14).
+	var hud := $HUD as CanvasLayer
+	var hud_was_visible: bool = hud.visible
+	hud.visible = false
+
 	await _let_the_hud_finish_talking()
 	await _frame_on(Vector2(41.0, 51.3), Vector3(-14.0, 11.0, -16.0), 4.0, "13_sweet_apple_acres")
-	await _frame_on(Vector2(19.0, -2.0), Vector3(-13.0, 8.0, -12.0), 3.0, "14_ponyville_general")
+	# AIMED AT THE LIVE Market NODE, the way 18 already reads the lobby sign off Palace's own
+	# node, rather than at (19, -2), where the free-standing pv_general.glb stood before
+	# commit 6b7a9d1 put that same model on the Market building instead. The old coordinate
+	# photographs an empty field with the Market clipped off the right edge on this branch
+	# (whole-branch review, 2026-09-05, F4); the live node moves with the building it names.
+	var market := get_node_or_null(^"Buildings/Market") as Node3D
+	var market_at := Vector2(-2.0, -1.0)
+	if market != null:
+		market_at = Vector2(market.global_position.x, market.global_position.z)
+	await _frame_on(market_at, Vector3(-13.0, 8.0, -12.0), 3.0, "14_ponyville_market")
 	await _frame_on(Vector2(1.5, 43.0), Vector3(0.0, 10.0, -22.0), 3.5, "15_town_row_north_road")
 	# 16 stands off the yard's SOUTH WEST corner and looks up its diagonal, and every part
 	# of that is a measurement. The subject is (-25.5, 58.5), the centroid of the seven
@@ -6541,6 +6559,8 @@ func _capture_props() -> void:
 	# the map.
 	await _frame_on(Vector2(-25.5, 58.5), Vector3(-10.5, 6.0, -9.5), 1.6, "16_schoolyard")
 	await _frame_on(Vector2(7.5, 69.0), Vector3(0.0, 7.0, -13.0), 2.0, "17_strip_arcade")
+
+	hud.visible = hud_was_visible
 
 
 ## 18 to 21: THE FOUR THINGS THE LOOK PASS CHANGED THAT NO ASSERTION CAN JUDGE.
@@ -6570,7 +6590,15 @@ func _capture_look() -> void:
 	if lobby_sign != null:
 		sign_at = Vector2(lobby_sign.global_position.x, lobby_sign.global_position.z)
 	await _frame_on(sign_at, Vector3(0.0, 1.7, -5.0), 1.7, "18_palace_lobby_sign")
-	await _frame_on(Vector2(-10.0, 61.6), Vector3(0.0, 6.0, -22.0), 4.0,
+	# THE EYE MOVED, NOT THE STREET. The old offset (0, 6, -22) put the lens dead ahead of the
+	# west row's own x = -12 line -- pv_ogb_2 at (-12, 43) sat 3.4 m from the camera and filled
+	# the lower right of frame, with pv_balcony_b at (-12, 50) on the same sightline behind it,
+	# so the marquee and the arch survived above two rooflines but the frontage's lower half
+	# and the door did not (whole-branch review, 2026-09-05, F5). Shifting the eye 6 m EAST and
+	# 2 m closer takes the lens off that line rather than reshuffling the row a second time
+	# (round 1 already moved pv_courtyard_b_balcony behind the camera, at z = 36, and that fix
+	# held -- it is this axis, not that building, that still needed to move).
+	await _frame_on(Vector2(-10.0, 61.6), Vector3(6.0, 6.0, -20.0), 4.0,
 		"19_marquee_and_gold_trim")
 	# 20's ORIGINAL `at` (58, -46) sat 16 m from the lake region's own centre (60, -62) --
 	# inside its 24 m radius and inside the water disc's own 16.8 m (radius * 0.7), so the

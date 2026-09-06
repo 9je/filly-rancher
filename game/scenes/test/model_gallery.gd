@@ -31,9 +31,11 @@ const PROP_FLOOR := 30
 ## The model MLP_SCALE is derived from. See Props.MLP_TARGET_BARN_RIDGE.
 const SCALE_REFERENCE := "saa_barn.glb"
 
-## The six id prefixes tools/prop_manifest.txt actually names. See _build_props_row()'s
+## The five id prefixes tools/prop_manifest.txt actually names. See _build_props_row()'s
 ## doc comment for why kenney_ files (present in the same directory) are not scanned.
-const PROP_PREFIXES := ["saa_", "pv_", "mlp_", "school_", "lp_", "neon_"]
+## "neon_" is not among them: the Neon Lights Pack converted no usable mesh (see
+## tools/prop_manifest.txt's own note), so nothing was ever going to begin with it.
+const PROP_PREFIXES := ["saa_", "pv_", "mlp_", "school_", "lp_"]
 
 func _ready() -> void:
     if "--stock" in OS.get_cmdline_user_args():

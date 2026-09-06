@@ -350,12 +350,15 @@ const LAYOUT := [
 	{"file": "saa_tree_dead_wide.glb", "at": Vector2(-93.0, 69.0), "yaw": 285.0, "s": 1.25, "family": &"mlp"},
 	{"file": "saa_tree_dead_wide.glb", "at": Vector2(-81.6, 44.5), "yaw": 355.0, "s": 1.15, "family": &"mlp"},
 	# --- Sweet Apple Acres, on the walk out to the Orchard --------------------------
-	# APPLEJACK'S FARM, NOT THE PLAYER'S. The homestead keeps its own procedural red barn
-	# (game/world/building.gd says why it is code and not a mesh, and both reasons still
-	# hold); this is the farm the orchard belongs to, on the walk out to it. Nothing here
-	# is walked into: an MLP mesh prop is SCENERY. No attendant stands at one, no dock
-	# marker sits on one, and ranch.gd checks that no prop's collider reaches inside a
-	# building's interaction radius, so the only doors the game opens stay procedural.
+	# APPLEJACK'S FARM, NOT THE PLAYER'S. The homestead's own barn is still the same
+	# procedural shell (game/world/building.gd, `Buildings/Barn` in ranch.tscn) -- it just
+	# wears saa_barn.glb now, the same hero model the Depot, the Market and the Farmhouse
+	# wear their own PonySFM pieces. This is that SAME model standing a second time, 60 m
+	# away at the farm the orchard belongs to, on the walk out to it: a deliberate reuse
+	# (the pack ships one barn), not an accident. This entry is scenery either way: an MLP
+	# mesh prop here is never walked into. No attendant stands at one, no dock marker sits
+	# on one, and ranch.gd checks that no prop's collider reaches inside a building's
+	# interaction radius, so the only doors the game opens stay procedural.
 	#
 	# The barn, the shed and the town row carry "skirt": true. So do the four old fence
 	# rails: at their corrected scale each is 4.06 m long, which is past WIDE_FOOTPRINT,
@@ -414,25 +417,54 @@ const LAYOUT := [
 	# A ROAD, AND SIX BUILDINGS THAT ARE NOT THE RANCH'S OWN. The Farmhouse, the Board and
 	# the Depot wear pv_wide_b, pv_bridged_b and pv_tower_b now (slice R2, ranch.tscn), so
 	# the row uses the three that are left plus the three new pieces
-	# tools/prop_manifest.txt gained, and nothing on the map is its own twin.
+	# tools/prop_manifest.txt gained. SOME OF THESE ARE TWINS, and that is a stated choice
+	# rather than an oversight: pv_tower_b stands here AND on the Depot, pv_courtyard_b and
+	# pv_pink_b each stand here once AND again on the palace facade (game/world/
+	# palace_facade.gd). The packs this map is built from ship one of each hero piece; a
+	# second sighting 30 m and more away reads as the same town's architecture repeating
+	# itself, not as a copy-paste seam, and every placement rule this file already checks
+	# (region clearance, breathing room, pen-plot exclusion) runs on each entry
+	# independently regardless of how many other entries share its file.
 	#
-	# The road tiles are spaced by saa_dirt_road's own seated length so they abut: native
-	# size (20.254, 0.298, 4.385), so at yaw 0 the seated length along z is
-	# 4.385 * MLP_SCALE = 2.28 m, which is also a road-sized 10.52 m wide beside a 2.138 m
-	# pony -- no SCALE_FIX row needed. All 10.52 m of that width is past WIDE_FOOTPRINT and
-	# the road stands well outside Terrain's flat apron here, so every tile carries a skirt
-	# (ranch.gd's own "skirtless" check said so).
-	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 31.5), "yaw": 0.0, "family": &"mlp", "skirt": true},
-	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 33.78), "yaw": 0.0, "family": &"mlp", "skirt": true},
-	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 36.06), "yaw": 0.0, "family": &"mlp", "skirt": true},
-	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 38.34), "yaw": 0.0, "family": &"mlp", "skirt": true},
-	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 40.62), "yaw": 0.0, "family": &"mlp", "skirt": true},
-	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 42.9), "yaw": 0.0, "family": &"mlp", "skirt": true},
-	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 45.18), "yaw": 0.0, "family": &"mlp", "skirt": true},
-	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 47.46), "yaw": 0.0, "family": &"mlp", "skirt": true},
-	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 49.74), "yaw": 0.0, "family": &"mlp", "skirt": true},
-	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 52.02), "yaw": 0.0, "family": &"mlp", "skirt": true},
-	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 54.3), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	# THE TILES USED TO BE SPACED BY saa_dirt_road's OWN SEATED LENGTH (2.28 m) SO THEY
+	# WOULD ABUT ON FLAT GROUND, AND THEY DO NOT ABUT HERE. Native size (20.254, 0.298,
+	# 4.385), so at yaw 0 the seated length along z is 4.385 * MLP_SCALE = 2.28 m -- correct
+	# on the flat apron the abutment maths assumed, but the ground under this run climbs
+	# about 0.70 m from end to end (Terrain's blend apron feathering in past FLAT_RADIUS),
+	# and a flat, rigid, 0.155 m-thick tile cannot tilt to follow it. Seated independently,
+	# abutting tiles' own top surfaces landed up to 0.20 m apart -- a curb at every seam and
+	# grass showing through between them (whole-branch review, 2026-09-05, F3).
+	#
+	# SPACING TIGHTENED TO 2.0 m, so every tile physically OVERLAPS its neighbour by 0.28 m
+	# along z: a seam that used to be a gap of grass is now a seam of dirt on dirt, and the
+	# skirt beneath each tile (see SKIRT_MIN_DEPTH) still bridges whatever step is left
+	# between an overlapping pair's own seated heights.
+	#
+	# THE RUN NOW REACHES BOTH ITS ENDS INSTEAD OF STANDING FREE IN A FIELD. z = 26.0 sits
+	# right at Terrain.FLAT_RADIUS from HOMESTEAD_CENTRE (30.04 m out, at this x), so the
+	# first tile meets the flat yard rather than starting 20 m north of it in open country.
+	# z = 56.0 overlaps the boardwalk's own first plate at (2.5, 58.0) -- see "the boardwalk
+	# up to the Palace" below -- by the same 0.28 m every other seam in this run shares, so
+	# the road north and the walk up to the Palace are now one continuous path rather than
+	# two lanes stopping short of each other 7 m apart. All 10.52 m of the road's own width
+	# is past WIDE_FOOTPRINT and it stands well outside Terrain's flat apron for most of its
+	# run, so every tile still carries a skirt (ranch.gd's own "skirtless" check said so).
+	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 26.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 28.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 30.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 32.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 34.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 36.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 38.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 40.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 42.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 44.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 46.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 48.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 50.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 52.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 54.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	{"file": "saa_dirt_road.glb", "at": Vector2(1.5, 56.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
 	{"file": "pv_pink_b.glb", "at": Vector2(15.0, 36.0), "yaw": 270.0, "family": &"mlp", "skirt": true},
 	{"file": "pv_ogb_1.glb", "at": Vector2(15.0, 43.0), "yaw": 270.0, "family": &"mlp", "skirt": true},
 	{"file": "pv_courtyard_b.glb", "at": Vector2(15.0, 50.0), "yaw": 270.0, "family": &"mlp", "skirt": true},

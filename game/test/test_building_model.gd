@@ -8,6 +8,7 @@ extends GutTest
 
 const BuildingScript := preload("res://world/building.gd")
 const PropsScript := preload("res://world/props.gd")
+const TerrainScript := preload("res://world/terrain.gd")
 
 const SHELL_MESHES := ["WallBack", "WallLeft", "WallRight", "RoofLeft", "RoofRight", "Gables"]
 
@@ -107,8 +108,46 @@ func test_the_plinth_under_a_model_is_turned_earth_rather_than_timber() -> void:
 		return
 	var floor_node := b.get_node_or_null(^"Floor") as MeshInstance3D
 	var mat: StandardMaterial3D = (floor_node.mesh as BoxMesh).material
-	assert_eq(mat.albedo_color, PropsScript.SKIRT_COLOUR,
-		"a plinth under an MLP model reads as ground, not as a base in the wrong wood")
+	assert_eq(mat.albedo_color, TerrainScript.DIRT,
+		"a plinth under an MLP model reads as the terrain's own turned earth, not as "
+		+ "props.gd's near-black skirt colour and not as a base in the wrong wood")
+	var apron := b.get_node_or_null(^"DoorApron") as MeshInstance3D
+	var apron_mat: StandardMaterial3D = (apron.mesh as BoxMesh).material
+	assert_eq(apron_mat.albedo_color, TerrainScript.DIRT,
+		"the threshold in front of a worn model is the same turned earth as the plinth it "
+		+ "leans on")
+
+
+## THE PLINTH SHRINKS TO WHAT THE MODEL ACTUALLY STANDS ON -- MEASURING REAL GEOMETRY,
+## not re-deriving a number from the shell's own width and depth, which is exactly the eave
+## rectangle this test exists to prove the plinth no longer matches (whole-branch review,
+## 2026-09-05, F1: a PonySFM roof oversails its walls, and the plinth used to be sized to
+## the roof line).
+func test_the_plinth_under_a_model_shrinks_to_the_models_own_ground_contact() -> void:
+	var b := _bare()
+	b.model_file = "saa_shed.glb"
+	b.build()
+	if not b.wears_a_model():
+		pass_test("no converted props on this machine")
+		return
+	var floor_node := b.get_node_or_null(^"Floor") as MeshInstance3D
+	var box: BoxMesh = floor_node.mesh
+	assert_lt(box.size.x, b.width - BuildingScript.PLINTH_INSET * 2.0 - 0.01,
+		"the plinth under a worn model must be narrower than the shell's own eave-width "
+		+ "footprint, or it is still the black pedestal the review found")
+	assert_lt(box.size.z, b.depth - BuildingScript.PLINTH_INSET * 2.0 - 0.01,
+		"the plinth under a worn model must be shallower than the shell's own eave-width "
+		+ "footprint, or it is still the black pedestal the review found")
+	# The model itself must still stand ON this smaller plinth, not overhang it: the
+	# ground-contact rectangle was measured off the model's own base, so the model's world
+	# AABB (padded by the model's own roof overhang, which the plinth deliberately excludes)
+	# has to reach at least as wide as what the plinth was sized to.
+	var model := b.get_node_or_null(^"Model") as Node3D
+	var model_box: AABB = PropsScript.world_aabb(model)
+	assert_gte(model_box.size.x, box.size.x - 0.01,
+		"the plinth must not be wider than the model actually standing on it")
+	assert_gte(model_box.size.z, box.size.z - 0.01,
+		"the plinth must not be deeper than the model actually standing on it")
 
 
 const RanchScene := preload("res://world/ranch.tscn")
