@@ -103,13 +103,13 @@ func test_the_debounce_window_is_shorter_than_the_toast_hold() -> void:
 	# A window longer than the line stays on screen would leave a player who waited, read
 	# the line, watched it fade and pressed again with silence. The toast's own hold is the
 	# ceiling this has to sit under.
+	# The constant lives on the script, so read it off the script: instantiating a whole
+	# ranch (twice) to ask a class constant leaked four hundred orphans per run.
 	var hud = load("res://ui/hud.gd")
-	assert_gt(RanchScene.instantiate().get_script().get_script_constant_map()
-		.get("DENY_DEBOUNCE_SECONDS", 0.0), 0.0,
-		"a zero window is no debounce at all")
-	assert_lt(RanchScene.instantiate().get_script().get_script_constant_map()
-		.get("DENY_DEBOUNCE_SECONDS", 99.0),
-		hud.get_script_constant_map().get("TOAST_HOLD", 0.0),
+	var ranch_script = load("res://world/ranch.gd")
+	var window: float = ranch_script.get_script_constant_map().get("DENY_DEBOUNCE_SECONDS", 0.0)
+	assert_gt(window, 0.0, "a zero window is no debounce at all")
+	assert_lt(window, hud.get_script_constant_map().get("TOAST_HOLD", 0.0),
 		"she must never wait out the line and then be met with silence")
 
 
