@@ -124,10 +124,100 @@ func test_the_shader_converts_its_vertex_colour_out_of_srgb() -> void:
 
 ## THE HEIGHTFIELD IS UNTOUCHED. Moving CELL, HALF, FLAT_RADIUS or height_at() would move the
 ## mesh, the collider, the props, the pens, the spawner and every gate that reads them, and
-## the look pass has no business anywhere near any of that.
+## the look pass has no business anywhere near any of that. The palette is deliberately NOT
+## pinned here any more: GRASS_LOW/GRASS_HIGH are what task 9 tunes, and the tests below
+## (test_the_grass_gradient_still_runs_from_shade_to_light and its neighbours) are what
+## actually cover the palette's shape rather than freezing today's exact numbers.
 func test_the_heightfield_is_exactly_what_it_was() -> void:
 	assert_eq(TerrainScript.HALF, 110.0)
 	assert_eq(TerrainScript.CELL, 2.0)
 	assert_eq(TerrainScript.FLAT_RADIUS, 30.0)
-	assert_eq(TerrainScript.GRASS_LOW, Color(0.239, 0.408, 0.196))
-	assert_eq(TerrainScript.GRASS_HIGH, Color(0.443, 0.541, 0.271))
+
+
+## THE GROUND AND THE THINGS STANDING ON IT SHARE LIGHT, OR THEY DO NOT LOOK LIKE ONE PLACE.
+## This cannot say whether the grass is pretty. It can say the two ends of the gradient still
+## bracket each other, that the dirt is still earth rather than grass, and that the numbers a
+## human tuned in terrain.gd are the numbers the shader is actually handed -- which is the
+## pair that silently drifts.
+
+## A Terrain built plain (no registry), with its Mesh node handed back rather than the
+## Terrain itself: every test below wants the rendered surface, not the body it rides on.
+func _built_terrain_mesh() -> MeshInstance3D:
+	var terrain := _bare_terrain()
+	return terrain.get_node(^"Mesh") as MeshInstance3D
+
+
+func test_the_grass_gradient_still_runs_from_shade_to_light() -> void:
+	assert_lt(TerrainScript.GRASS_LOW.v, TerrainScript.GRASS_HIGH.v,
+		"GRASS_LOW is the shaded end and GRASS_HIGH the lit one")
+	assert_gt(TerrainScript.GRASS_LOW.s, 0.35, "grass at either end is grass, not a grey")
+	assert_gt(TerrainScript.GRASS_HIGH.s, 0.35, "grass at either end is grass, not a grey")
+
+
+func test_the_dirt_is_earth_and_never_another_green() -> void:
+	var h: float = TerrainScript.DIRT.h
+	assert_true(h < 0.14 or h > 0.95,
+		"a hue in the greens would make the slope mask invisible")
+
+
+func test_the_shader_is_handed_the_colours_terrain_gd_holds() -> void:
+	var mesh := _built_terrain_mesh()
+	var mat := mesh.mesh.surface_get_material(0) as ShaderMaterial
+	assert_not_null(mat, "the ground wears the shader")
+	assert_eq(mat.get_shader_parameter(&"grass_high"), TerrainScript.GRASS_HIGH,
+		"the lit end of the gradient is one number in one place")
+	assert_eq(mat.get_shader_parameter(&"dirt_color"), TerrainScript.DIRT,
+		"the earth is one number in one place")
+
+
+## THE ROAD IS PAINTED, NOT LAID: see PATH_POINTS' own comment for the ladder-of-plates
+## defect this replaced. What a test CAN hold is that the polyline, the width and the edge
+## numbers a human tuned in terrain.gd are the exact numbers the shader was actually handed
+## -- the pair that silently drifts is the one no render can catch, because a wrong number
+## still paints SOME road, just not the one terrain.gd says it painted.
+func test_the_path_polyline_reaches_the_shader_padded_to_its_fixed_length() -> void:
+	var mesh := _built_terrain_mesh()
+	var mat := mesh.mesh.surface_get_material(0) as ShaderMaterial
+	var points: PackedVector2Array = mat.get_shader_parameter(&"path_points")
+	assert_eq(points.size(), TerrainScript.PATH_SHADER_SLOTS,
+		"the shader's own array uniform is a fixed length; this must match it exactly")
+	for i in range(TerrainScript.PATH_POINTS.size()):
+		assert_eq(points[i], TerrainScript.PATH_POINTS[i],
+			"slot %d must be the real route, not padding" % i)
+	# EVERY SLOT PAST THE REAL ROUTE REPEATS ITS OWN LAST POINT, a zero-length segment the
+	# shader's own path_distance() treats as inert (see its comment) rather than as a
+	# divide-by-zero: padding with the origin or any other point would draw a second,
+	# spurious road segment from the route's real end to wherever the padding sat.
+	var last: Vector2 = TerrainScript.PATH_POINTS[TerrainScript.PATH_POINTS.size() - 1]
+	for i in range(TerrainScript.PATH_POINTS.size(), TerrainScript.PATH_SHADER_SLOTS):
+		assert_eq(points[i], last, "padding slot %d must repeat the route's last point" % i)
+	assert_eq(mat.get_shader_parameter(&"path_point_count"), TerrainScript.PATH_POINTS.size(),
+		"the shader must stop walking the array at the real route, not its padding")
+	assert_eq(mat.get_shader_parameter(&"path_half_width"), TerrainScript.PATH_HALF_WIDTH)
+	assert_eq(mat.get_shader_parameter(&"path_edge_softness"), TerrainScript.PATH_EDGE_SOFTNESS)
+	assert_eq(mat.get_shader_parameter(&"path_edge_noise"), TerrainScript.PATH_EDGE_NOISE)
+	assert_eq(mat.get_shader_parameter(&"path_glow"), TerrainScript.PATH_GLOW)
+
+
+## THE SHADER'S OWN ARRAY SIZE, PINNED BY NAME so PATH_SHADER_SLOTS cannot drift out of step
+## with terrain.gdshader's `const int PATH_MAX_POINTS` the way test_terrain.gd already pins
+## srgb_to_linear() by name above -- a mismatch here does not error, it silently truncates or
+## under-fills the array, which no render catches either.
+func test_the_shader_array_size_matches_terrain_gd_own_constant() -> void:
+	var mesh := _built_terrain_mesh()
+	var mat := mesh.mesh.surface_get_material(0) as ShaderMaterial
+	assert_true(mat.shader.code.contains(
+			"const int PATH_MAX_POINTS = %d;" % TerrainScript.PATH_SHADER_SLOTS),
+		"terrain.gdshader's PATH_MAX_POINTS must equal terrain.gd's PATH_SHADER_SLOTS")
+
+
+## THE ROUTE ITSELF: along the north road's own centreline, wide enough to read as a track
+## and narrow enough to stay clear of the town row's buildings at x = 15 and x = -12.
+func test_the_path_route_runs_the_north_roads_own_line_clear_of_the_town_row() -> void:
+	for p: Vector2 in TerrainScript.PATH_POINTS:
+		assert_almost_eq(p.x, 1.5, 0.01, "the route stays on the road's own x")
+	var clearance: float = 15.0 - 1.5 - TerrainScript.PATH_HALF_WIDTH \
+		- TerrainScript.PATH_EDGE_SOFTNESS
+	assert_gt(clearance, 0.0,
+		"the painted road's fattest edge must not reach the town row's east side")
+	assert_gt(TerrainScript.PATH_POINTS.size(), 1, "a polyline needs at least two points")

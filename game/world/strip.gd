@@ -70,6 +70,53 @@ const MARQUEE_BOARD_COLOR := Color(0.16, 0.07, 0.20)
 const MARQUEE_TRIM_COLOR := Color(0.98, 0.86, 0.45)
 const MARQUEE_TRIM := 0.10
 
+## HOW FAR EACH LAYER OF THE SIGN STANDS IN FRONT OF THE ONE BEHIND IT.
+##
+## THE BUG THIS CLOSES. The trim slab is 0.08 deep hung 0.03 in front of a 0.12 deep board:
+## the trim's front face landed at +0.07 and the board's at +0.06, one centimetre apart
+## across two full sized quads, which is two surfaces fighting for the same pixels at every
+## distance a player looks at this sign from. Five centimetres is small enough that nobody
+## reads it as a design change and large enough that the depth buffer is never asked to
+## choose. game/world/lobby_sign.gd's STANDOFF is the same number for the same reason.
+const MARQUEE_STANDOFF_LAYER := 0.05
+
+## THE ARCH OVER THE BOARD: how many segments it is drawn from and how far it rises above
+## the board's own top edge.
+##
+## A MARQUEE IS AN ARCH WITH BULBS ROUND IT. What stood here was a flat slab with a Label3D
+## in front of it and five bulbs along the top and five along the bottom, which is a notice
+## board with lights on it. Twelve segments, each sized to its own true chord of the board's
+## own ellipse (see _marquee_arch()), reads as a smooth curve at the distance the walk up to
+## the door actually offers, rather than the fan of straight struts a fixed circular sweep
+## drew here before.
+const MARQUEE_ARCH_SEGMENTS := 12
+
+## THE BUDGET, NOT THE BARE AMPLITUDE. _marquee_arch() below shrinks the ellipse's own
+## amplitude so the BUILT mesh's real worst corner -- centre plus the segment's own rotated
+## half length, plus the box's own half thickness on the other two axes -- lands at or under
+## marquee_top_y() + MARQUEE_ARCH_RISE, not merely the bare curve. A box drawn CENTRED on a
+## curve sticks up past that curve by roughly its own half thickness even where the curve is
+## dead flat, so building the curve at the full nominal amplitude and only then measuring
+## would already be over budget before any segment even tilts -- which is exactly the numbers
+## a reviewer found by hand once the previous circular-sweep formula's own overshoot was
+## accounted for (see _marquee_arch()'s own comment). 0.30 here is the budget MARQUEE_TOP_GAP
+## (0.35) leaves under the ridge, not the curve's own visible rise.
+const MARQUEE_ARCH_RISE := 0.30
+const MARQUEE_ARCH_THICKNESS := 0.16
+## A hair over 1.0 so neighbouring segments' own end caps overlap rather than leave a hairline
+## gap at the joint between two straight chords of a curve.
+const MARQUEE_ARCH_OVERLAP := 1.04
+
+## HEADROOM KEPT BELOW MARQUEE_ARCH_RISE ITSELF, on top of whatever _marquee_arch() already
+## shrinks the ellipse's own amplitude by to respect that rise. MARQUEE_ARCH_RISE (0.30) was
+## picked so marquee_top_y() + MARQUEE_ARCH_RISE lands EXACTLY at ridge_y - 0.05 given
+## MARQUEE_TOP_GAP (0.35): a builder that saturates the rise budget therefore also saturates
+## the roof's own safety margin, converging to within fractions of a millimetre of the ridge
+## rather than clearing it by anything a person would call real daylight. This is subtracted
+## from the rise before _marquee_arch() solves for the built peak, so the peak this sign
+## actually ships with sits comfortably under BOTH lines rather than exactly on either.
+const MARQUEE_ARCH_SAFETY_MARGIN := 0.08
+
 ## The headline fills this much of the board's height; the sponsor line under it is
 ## SPONSOR_SCALE of that. Both are a FRACTION OF THE BOARD, which is what "fitted text"
 ## means: change the board and the letters follow it.
@@ -87,15 +134,19 @@ const MARQUEE_COLOR := Color(1.0, 0.92, 0.62)
 const LAMP_ENERGY := 2.2
 const LAMP_RANGE := 16.0
 
-## TEN BULBS ROUND THE MARQUEE TRIM, as ONE MultiMeshInstance3D: ten instances and one draw
-## call. With glow on (the Environment gains it in the look pass) they bloom gently at dusk
-## and night, which is the whole point of a marquee.
+## THE BULB RAIL, as ONE MultiMeshInstance3D so the whole ring is one draw call. With glow on
+## (the Environment gains it in the look pass) they bloom gently at dusk and night, which is
+## the whole point of a marquee.
 ##
 ## NOT IN _lights, DELIBERATELY. Strip.light_count() answers how many LAMP POSTS are standing
 ## on the ring, the strip gate asserts it is LIGHT_COUNT minus the two skipped clear of the
 ## Palace (its walls, and since the look pass its door apron), and a bulb rail counted among
 ## them would break that check for a reason that has nothing to do with lamp posts.
-const MARQUEE_BULBS := 10
+##
+## EIGHTEEN, ROUND THE ARCH AND ALONG THE BOARD'S FOOT. Ten in two straight rows was the
+## board's shape; a marquee's rail follows its own outline, which here is nine segments of
+## arch plus nine along the bottom edge under them.
+const MARQUEE_BULBS := 18
 const MARQUEE_BULB_RADIUS := 0.055
 
 ## One soft wash on the board's own face. shadow_enabled off for the reason this file already
@@ -141,6 +192,9 @@ var _marquee_facing := Vector3(0.0, 0.0, 1.0)
 var _marquee_size := Vector2.ZERO
 var _marquee_ceiling := 0.0
 var _has_marquee := false
+## The arch's own built peak, in world Y, set by _marquee_arch() from the same per-segment
+## transforms it hands the actual nodes -- see marquee_arch_peak_y().
+var _marquee_arch_peak_y := 0.0
 
 ## The rectangles, in world XZ, no lamp may stand inside. Empty until avoid_footprint() is
 ## called; nothing is skipped in that case. EACH CALL ADDS ONE MORE RECTANGLE rather than
@@ -348,17 +402,18 @@ func _marquee() -> void:
 	trim_box.material = _flat_material(MARQUEE_TRIM_COLOR)
 	trim.mesh = trim_box
 	add_child(trim)
-	trim.global_position = _marquee_centre + _marquee_facing * 0.03
+	trim.global_position = _marquee_centre - _marquee_facing * MARQUEE_STANDOFF_LAYER
 
 	var lines: Array[String] = marquee_lines()
 	var headline_height: float = _marquee_size.y * MARQUEE_HEADLINE_FRACTION
 	_marquee_label("MarqueeHeadline", lines[0], headline_height,
 		_marquee_centre + Vector3(0.0, _marquee_size.y * 0.20, 0.0)
-			+ _marquee_facing * 0.09)
+			+ _marquee_facing * (MARQUEE_STANDOFF_LAYER * 2.0))
 	_marquee_label("MarqueeSponsor", lines[1],
 		headline_height * MARQUEE_SPONSOR_SCALE,
 		_marquee_centre + Vector3(0.0, -_marquee_size.y * 0.24, 0.0)
-			+ _marquee_facing * 0.09)
+			+ _marquee_facing * (MARQUEE_STANDOFF_LAYER * 2.0))
+	_marquee_arch()
 	_marquee_bulbs()
 	_marquee_wash()
 
@@ -404,8 +459,168 @@ func marquee_bulb_count() -> int:
 	return MARQUEE_BULBS
 
 
-## Ten emissive spheres spaced round the trim's perimeter, built as one MultiMesh so the whole
-## rail is one draw call.
+func marquee_arch_segments() -> int:
+	return MARQUEE_ARCH_SEGMENTS
+
+
+## The highest point the arch's own BUILT geometry actually reaches, in world Y -- every
+## segment's own centre plus its own rotated half-length and half-thickness, the same
+## per-segment transforms _marquee_arch() hands the real nodes, not a bare identity over two
+## constants. Set by _marquee_arch(); 0.0 before a marquee is mounted.
+##
+## EXPOSED RATHER THAN READ BACK OFF THE NODES THEMSELVES, for a test's sake rather than this
+## file's own: a MultiMesh's instance transforms are RenderingServer state, and the headless
+## dummy driver this project's own test runs are required to use never allocates that buffer
+## -- get_instance_transform() reads back all zeroes there even immediately after
+## set_instance_transform() wrote real numbers, confirmed against the same code under a real
+## Vulkan context, where the readback is correct. _marquee_arch() below therefore builds plain
+## MeshInstance3D children instead, whose own global_transform carries no such gap, so
+## test_strip.gd can and does recompute this same number independently off the live nodes and
+## check it against this accessor rather than trust it blindly.
+func marquee_arch_peak_y() -> float:
+	return _marquee_arch_peak_y
+
+
+## THE GOLD ARCH THAT CROWNS THE BOARD, as a handful of straight MeshInstance3D segments
+## whose own endpoints sit ON the board's true ellipse and whose own long axis is turned to
+## that ellipse's own tangent -- not a circle's. Boxes rather than a torus for _slab()'s reason
+## in building.gd: Godot's own winding is used rather than re-derived, and a hand wound curve
+## that came out inside out would be an invisible hole rather than a visible mistake.
+##
+## PLAIN NODES, NOT ONE MULTIMESH. See marquee_arch_peak_y()'s own comment: a MultiMesh's
+## instance data cannot be read back under this suite's headless runner, so the geometry a
+## test can actually check has to live in ordinary node transforms instead. Twelve boxes is
+## still one draw call each rather than one call for the whole rail, which this sign's own
+## marquee -- a handful of segments, built once, never rebuilt at runtime -- does not need to
+## economise against the way a whole ring of lamps or bulbs does.
+##
+## THE ELLIPSE, NOT THE CIRCLE, AND WHY THAT WAS THE ACTUAL BUG. The board this arch crowns is
+## roughly fifteen times wider than the arch is tall (half width ~4.4 m against a ~0.3 m rise),
+## so it is a very flat, wide ellipse, not a circle. The version that shipped first swept nine
+## EQUAL-LENGTH boxes through equal steps of a CIRCULAR angle and rotated each by that same
+## bare angle: a circle's tangent turns at a constant rate with angle, but this ellipse's own
+## tangent barely turns at all except right at the crown, so segments away from the crown were
+## rotated tens of degrees steeper than the surface they were meant to follow -- a reviewer
+## measured the built result at ridge_y + 0.29 m to as much as ridge_y + 0.55 m depending on
+## which segment is checked (see test_strip.gd's own test for the full derivation), read on
+## screen as a sunburst of diverging struts rather than an arch. Each segment here instead
+## takes its own two ENDPOINTS directly off the ellipse at the angles that bound it (so the
+## chord never drifts from the curve, whatever its length), and its rotation off the ellipse's
+## own derivative (half_x*sin(theta), amplitude*cos(theta)) at its midpoint -- the tangent an
+## ellipse actually has, not a circle's stand-in for one.
+##
+## THE RISE BUDGET COVERS THE WHOLE BUILT SHAPE, NOT JUST THE CURVE'S OWN LINE THROUGH IT. A
+## box drawn CENTRED on a curve sticks up past that curve by roughly half its own thickness
+## even where the curve is dead flat, so building the ellipse at the full nominal
+## MARQUEE_ARCH_RISE amplitude and only then measuring would already be over budget before any
+## segment even tilts. This builds once at the nominal amplitude, measures the true overshoot
+## analytically off the same per-segment transforms it would hand the nodes, and -- only if
+## that overshoot is positive -- shrinks the amplitude by exactly that much and rebuilds once
+## more. The residual left by treating that shrink as a flat offset (rather than re-solving
+## the trig exactly) is second order in a quantity already under a decimetre, well inside the
+## test's own 0.01 m tolerance against marquee_arch_peak_y().
+func _marquee_arch() -> void:
+	var root := Node3D.new()
+	root.name = "MarqueeArch"
+	add_child(root)
+
+	var span: float = _marquee_size.x + MARQUEE_TRIM * 2.0
+	var half_x: float = span * 0.5
+	var right := Vector3(-_marquee_facing.z, 0.0, _marquee_facing.x)
+	var up := Vector3(0.0, 1.0, 0.0)
+	var base_y: float = _marquee_centre.y + _marquee_size.y * 0.5
+
+	# THE CEILING SOLVED AGAINST IS RISE MINUS THE SAFETY MARGIN, not RISE itself: see
+	# MARQUEE_ARCH_SAFETY_MARGIN's own comment for why saturating RISE saturates the roof's
+	# own clearance line too, at these constants.
+	var ceiling: float = MARQUEE_ARCH_RISE - MARQUEE_ARCH_SAFETY_MARGIN
+	var amplitude: float = ceiling
+	var segments: Array = _arch_segments(amplitude, half_x, right, up)
+	var local_peak: float = _arch_local_peak(segments)
+	var overshoot: float = local_peak - ceiling
+	if overshoot > 0.0:
+		amplitude = maxf(ceiling - overshoot, 0.05)
+		segments = _arch_segments(amplitude, half_x, right, up)
+		local_peak = _arch_local_peak(segments)
+
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = MARQUEE_TRIM_COLOR
+	mat.metallic = 0.45
+	mat.roughness = 0.35
+
+	for seg in segments:
+		var box := BoxMesh.new()
+		box.size = Vector3(seg["length"] as float, MARQUEE_ARCH_THICKNESS, MARQUEE_ARCH_THICKNESS)
+		box.material = mat
+		var mesh := MeshInstance3D.new()
+		mesh.name = "ArchSegment%d" % (seg["index"] as int)
+		mesh.mesh = box
+		root.add_child(mesh)
+		mesh.global_position = _marquee_centre + (seg["mid"] as Vector3) \
+			+ Vector3(0.0, base_y - _marquee_centre.y, 0.0) \
+			+ _marquee_facing * MARQUEE_STANDOFF_LAYER
+		mesh.global_transform.basis = seg["basis"]
+
+	_marquee_arch_peak_y = base_y + local_peak
+
+
+## Per-segment placement data for _marquee_arch(), against the ellipse's own PARAMETER theta
+## in [0, PI] (theta = 0 and PI its two ground level ends, PI/2 its crown) at the given
+## amplitude -- the same numbers back both node placement and the peak measurement
+## _marquee_arch() rescales against, so the two can never silently disagree.
+func _arch_segments(amplitude: float, half_x: float, right: Vector3, up: Vector3) -> Array:
+	var result: Array = []
+	var step: float = PI / float(MARQUEE_ARCH_SEGMENTS)
+	for i in MARQUEE_ARCH_SEGMENTS:
+		var theta0: float = float(i) * step
+		var theta1: float = float(i + 1) * step
+		var theta_mid: float = (theta0 + theta1) * 0.5
+		var p0: Vector3 = right * (-cos(theta0) * half_x) + up * (sin(theta0) * amplitude)
+		var p1: Vector3 = right * (-cos(theta1) * half_x) + up * (sin(theta1) * amplitude)
+		var mid: Vector3 = (p0 + p1) * 0.5
+		# A hair over the true chord so neighbouring segments' end caps overlap rather than
+		# leave a hairline gap at the joint; baked in here, once, so the box _marquee_arch()
+		# builds and the half-length _arch_local_peak() measures are the same number rather
+		# than two that could quietly drift apart.
+		var length: float = (p1 - p0).length() * MARQUEE_ARCH_OVERLAP
+		# THE ELLIPSE'S OWN TANGENT: d/dtheta of (-half_x*cos(theta), amplitude*sin(theta)),
+		# not a circle's radius-normal. See _marquee_arch()'s own comment for why the two
+		# differ enormously on a curve this flat.
+		var tangent: Vector3 = right * (half_x * sin(theta_mid)) \
+			+ up * (amplitude * cos(theta_mid))
+		var x_axis: Vector3 = tangent.normalized()
+		var y_axis: Vector3 = _marquee_facing.cross(x_axis).normalized()
+		var z_axis: Vector3 = x_axis.cross(y_axis).normalized()
+		result.append({
+			"index": i,
+			"mid": mid,
+			"length": length,
+			"basis": Basis(x_axis, y_axis, z_axis),
+		})
+	return result
+
+
+## The highest point, measured from the arch's own datum (the board's top edge, y = 0 in this
+## local reckoning) that ANY segment's own half extents reach: half its length along its own
+## tangent, plus half the box's own thickness along each of its other two axes, projected onto
+## world Y -- the standard oriented-box-to-AABB formula, run on the exact same segment data
+## _marquee_arch() hands the real nodes.
+func _arch_local_peak(segments: Array) -> float:
+	var half_thickness: float = MARQUEE_ARCH_THICKNESS * 0.5
+	var peak: float = -INF
+	for seg in segments:
+		var basis: Basis = seg["basis"]
+		var half_length: float = (seg["length"] as float) * 0.5
+		var extent_y: float = absf(basis.x.y) * half_length \
+			+ absf(basis.y.y) * half_thickness \
+			+ absf(basis.z.y) * half_thickness
+		peak = maxf(peak, (seg["mid"] as Vector3).y + extent_y)
+	return peak
+
+
+## Emissive spheres spaced round the arch and along the board's foot, built as one MultiMesh
+## so the whole rail is one draw call. See _marquee_arch()'s own comment: this is the outline
+## a marquee's bulb rail actually follows, not two straight rows across a slab.
 func _marquee_bulbs() -> void:
 	var sphere := SphereMesh.new()
 	sphere.radius = MARQUEE_BULB_RADIUS
@@ -422,16 +637,26 @@ func _marquee_bulbs() -> void:
 	multi.mesh = sphere
 	multi.instance_count = MARQUEE_BULBS
 
-	var half := Vector2(_marquee_size.x * 0.5 + MARQUEE_TRIM * 0.5,
-		_marquee_size.y * 0.5 + MARQUEE_TRIM * 0.5)
 	var right := Vector3(-_marquee_facing.z, 0.0, _marquee_facing.x)
+	var half_span: float = _marquee_size.x * 0.5 + MARQUEE_TRIM * 0.5
+	var base_y: float = _marquee_centre.y + _marquee_size.y * 0.5
+	var lower_y: float = _marquee_centre.y - _marquee_size.y * 0.5 - MARQUEE_TRIM * 0.5
 	for i in MARQUEE_BULBS:
-		# Round the rim: five across the top and five across the bottom, which is the shape a
-		# marquee's bulb rail actually has.
-		var across: float = -1.0 + 2.0 * (float(i % 5) / 4.0)
-		var up: float = 1.0 if i < 5 else -1.0
-		var at: Vector3 = _marquee_centre + right * (half.x * across) \
-			+ Vector3(0.0, half.y * up, 0.0) + _marquee_facing * 0.06
+		# The first half ride the arch; the second half run the board's own foot under them,
+		# which is the outline a marquee's rail actually follows.
+		var at: Vector3
+		var half_count: int = MARQUEE_BULBS / 2
+		if i < half_count:
+			var t: float = (float(i) + 0.5) / float(half_count)
+			var angle: float = PI * t
+			at = _marquee_centre + right * (-cos(angle) * half_span) \
+				+ Vector3(0.0, (base_y - _marquee_centre.y)
+					+ sin(angle) * MARQUEE_ARCH_RISE, 0.0)
+		else:
+			var t: float = -1.0 + 2.0 * (float(i - half_count) / float(half_count - 1))
+			at = _marquee_centre + right * (half_span * t) \
+				+ Vector3(0.0, lower_y - _marquee_centre.y, 0.0)
+		at += _marquee_facing * (MARQUEE_STANDOFF_LAYER * 1.6)
 		multi.set_instance_transform(i, Transform3D(Basis(), at))
 
 	var node := MultiMeshInstance3D.new()

@@ -12,6 +12,19 @@
 # second copy of its own SFM/ tree). convert_props.sh refuses the first two by name so a
 # later hand edit cannot quietly reintroduce one.
 
+# SOURCES, so the URL a model came from is in git rather than only in the gitignored inbox.
+# Every one is a no-login direct download; no account was ever created and no email was used.
+#   Sweet Apple Acres        https://ponysfm.com/sweet-apple-acres-release-page
+#   Ponyville Environments   https://ponysfm.com/ponyville-environments-release-page
+#   Ponyville General        https://ponysfm.com/ponyville-general-building
+#   Ponyville Schoolhouse    https://ponysfm.com/ponyville-schoolhouse-download
+#   MLP Scenebuild Props     https://ponysfm.com/scenebuild-props
+#   Las Pegasus Games PT1    https://ponysfm.com/las-pegasus-games-pt1
+#   Neon Lights Pack         https://ponysfm.com/neon-lights-pack
+#                            rev 1527, direct: https://ponysfm.com/rev/1527/download?token=<rotates per page load>
+#                            downloaded and probed 2026-09-05; NOT USED, see the note below the
+#                            Neon Lights section.
+
 # --- Sweet Apple Acres ------------------------------------------------------------------
 saa_barn|ponysfm-sweet-apple-acres/models/Sweet_Apple_Acres/barn_base.mdl
 saa_shed|ponysfm-sweet-apple-acres/models/Sweet_Apple_Acres/shed.mdl
@@ -24,6 +37,13 @@ saa_seed_bag|ponysfm-sweet-apple-acres/models/Sweet_Apple_Acres/seed_bag.mdl
 saa_fence_old|ponysfm-sweet-apple-acres/models/Sweet_Apple_Acres/fence_old.mdl
 saa_corn_plant|ponysfm-sweet-apple-acres/models/Sweet_Apple_Acres/corn_plant.mdl
 saa_corn_plant_dead|ponysfm-sweet-apple-acres/models/Sweet_Apple_Acres/corn_plant_dead.mdl
+saa_tree_wide|ponysfm-sweet-apple-acres/models/Sweet_Apple_Acres/tree_wide.mdl
+saa_tree_narrow|ponysfm-sweet-apple-acres/models/Sweet_Apple_Acres/tree_narrow.mdl
+saa_tree_dead_wide|ponysfm-sweet-apple-acres/models/Sweet_Apple_Acres/tree_dead_wide.mdl
+saa_tree_dead_narrow|ponysfm-sweet-apple-acres/models/Sweet_Apple_Acres/tree_dead_narrow.mdl
+saa_dead_tree_large|ponysfm-sweet-apple-acres/models/Sweet_Apple_Acres/dead_tree_large.mdl
+saa_dirt_road|ponysfm-sweet-apple-acres/models/Sweet_Apple_Acres/dirt_road.mdl
+saa_small_dirt_pile|ponysfm-sweet-apple-acres/models/Sweet_Apple_Acres/small_dirt_pile.mdl
 
 # --- Scenebuild props: apples, hedging and yard clutter ---------------------------------
 mlp_apple_tree|ponysfm-scenebuild/MLP Scenebuild Props/models/props_pony/apple_tree.mdl
@@ -45,6 +65,11 @@ pv_pink_b|ponysfm-environments/models/Ponyville_Environments/pink_b.mdl
 pv_courtyard_b|ponysfm-environments/models/Ponyville_Environments/courtyard_b.mdl
 pv_balcony_b|ponysfm-environments/models/Ponyville_Environments/balcony_b.mdl
 pv_bridged_b|ponysfm-environments/models/Ponyville_Environments/bridged_b.mdl
+# Three more pieces, so the town row keeps six DISTINCT buildings after the Farmhouse, the
+# Board and the Depot take wide_b, bridged_b and tower_b for themselves.
+pv_ogb_1|ponysfm-environments/models/Ponyville_Environments/ogb_1.mdl
+pv_ogb_2|ponysfm-environments/models/Ponyville_Environments/ogb_2.mdl
+pv_courtyard_b_balcony|ponysfm-environments/models/Ponyville_Environments/courtyard_b_balcony.mdl
 
 # --- the schoolyard. THE PACK SHIPS NO SCHOOLHOUSE; see the probe findings above. -------
 school_belltower|ponysfm-schoolhouse/SFM/models/belltower.mdl
@@ -58,3 +83,36 @@ school_cone|ponysfm-schoolhouse/SFM/models/school_cone.mdl
 # --- Las Pegasus ------------------------------------------------------------------------
 lp_skeeball|ponysfm-las-pegasus/models/mlp_props/las_pegasus/games/skeeball_game.mdl
 lp_dance_game|ponysfm-las-pegasus/models/mlp_props/las_pegasus/games/dance_game.mdl
+
+# --- Neon Lights Pack, the Spectra Palace's dressing ------------------------------------
+# THE PALACE IS A KIT BASH AND THIS IS WHY. scratchpad/ledgers/redesign/palace-sourcing.md
+# searched PonySFM for casino, Las Pegasus, Gladmane, resort, hotel, vegas, gambling, slot,
+# dice, carnival, fairground and boardwalk and found no casino structure anywhere that does
+# not want an account. These are signs, not a building; the building is Ponyville
+# Environments pieces standing shoulder to shoulder.
+#
+# NOT USED: the pack was downloaded and extracted (7,558,433 bytes, matches the page's
+# "7.21 MiB", confirmed Zip archive data) and contains six .mdl paths as the sourcing
+# report's file count predicted (6 MDL, 28 VMT, 34 VTF, 0 BSP), but the report's content
+# guess ("generic neon sign props", written without opening the file) was wrong. The pack
+# is a pony character skin for the background pony OC "Neon Lights": a full pony body rig
+# (mane/tail/ear/jiggle bones) plus a suit accessory and a sunglasses accessory, wearable
+# apparel for SFM/GMod, not scenery. There is no neon signage, no glowing lettering and no
+# freestanding prop of any kind in this pack. Converting a pony torso or a pair of shades
+# as "neon_*" set dressing would be wrong for the same reason the placeholder geometry is
+# being replaced: it does not read as a casino sign. The six .mdl paths, all excluded:
+#   ponysfm-neon-lights/neonlights/gmod/models/props_pony/neonlights_shades.mdl
+#   ponysfm-neon-lights/neonlights/gmod/models/props_pony/neonlights_suit.mdl
+#   ponysfm-neon-lights/neonlights/gmod/models/vn_enh_neonlights.mdl
+#   ponysfm-neon-lights/neonlights/sfm/models/enhanced_ponies/vn_enh_neonlights.mdl
+#   ponysfm-neon-lights/neonlights/sfm/models/props_pony/neonlights_shades.mdl
+#   ponysfm-neon-lights/neonlights/sfm/models/props_pony/neonlights_suit.mdl
+# (the gmod/ and sfm/ trees each ship the same three models twice over, so there are three
+# distinct meshes here, not six, and none of the three is usable.)
+
+# NEON IDS: (none). The pack has no usable meshes; see the note above. Task 5's drawn-neon
+# fallback is what the Palace's marquee actually wears (game/world/palace_facade.gd) and it
+# needed no id from this file to do it -- nothing here is mounted by name, and the "neon_"
+# prefix that once guarded that family in model_gallery.gd and test_ranch_world.gd is gone
+# for the same reason (whole-branch review, 2026-09-05, F10: it guarded a family that was
+# never going to have a member).

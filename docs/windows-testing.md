@@ -277,6 +277,10 @@ this doc predicted:
   Godot/app_userdata/Filly Rancher/saves/slot_9.json
 ```
 
+This is a verbatim capture from that Proton run at the time (Phase 1B Task 2), when the
+census read `props=110`; the live gate has moved twice since (Phase 3's dressing slice, then
+slice R2's replanting and placement passes) -- see `docs/testing.md` for the current count.
+
 with the same human-readable, sorted, `"version": 1` JSON the Linux build
 writes — the save format is byte-for-byte the same shape on both platforms,
 which is what makes the spec's "trade a pony by sending each other a blob" work

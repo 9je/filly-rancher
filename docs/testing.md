@@ -328,16 +328,25 @@ GUT's own default of not descending into subdirectories without
 **And a floor on the test count**, for the half the script count cannot see: a
 file that still parses but has lost most of its tests (a mass rename, a bad
 merge, a `func test_x` that became `func x`). `MIN_TESTS` in
-`tools/run_tests.sh` -- currently **1572** -- is a deliberate FLOOR rather than an
+`tools/run_tests.sh` -- currently **1610** -- is a deliberate FLOOR rather than an
 exact count, so adding tests never breaks the build. Raise it when the suite
 grows; never lower it without saying in the same commit which tests went away
 and why. (It was 194 through Phase 1A and was raised to the suite's real size in
 Phase 1B Task 3 -- a floor a hundred tests below the actual count could not have
 caught a whole test script going missing, which is exactly the failure the
 paragraph above describes. It was raised again, from 1420 to 1535, by slice R1's
-own growth, and again, from 1535 to 1571, by the R1 final-review fix wave's own
+own growth, and again, from 1535 to 1572, by the R1 final-review fix wave's own
 growth, proved both ways per the section below at the new number: the suite
-passes at 1571 and a `FILLY_MIN_TESTS=99999` run still fails on it.)
+passes at 1572 and a `FILLY_MIN_TESTS=99999` run still fails on it. It was
+raised again, from 1572 to 1606, by slice R2's own growth -- the modelled
+building shell, the palace facade, the marquee arch, the sign standoffs, the
+replanted treeline and the placement pass all brought tests with them. It was
+raised once more, from 1606 to 1607, by the R2 final-review fix wave's own
+growth (the plinth's new ground-contact footprint test), and again, from 1607
+to 1610, by that fix wave's own round 2 (the painted road's polyline, its
+shader array length and its route, all pinned in `test_terrain.gd`) -- proved
+both ways per the section below at the new number: the suite passes at 1610 and
+a `FILLY_MIN_TESTS=99999` run still fails on it.)
 
 **Proving both guards, safely:**
 
@@ -591,7 +600,7 @@ FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dum
 
 Phase names are `dawn`, `day`, `dusk`, `night` and weathers are `clear`,
 `rain`, `fog`, `storm`, matched case-insensitively; `--world-time=` takes
-seconds. Expect the same `RANCH_OK ponies=49 props=111 assets=present` as an
+seconds. Expect the same `RANCH_OK ponies=49 props=115 assets=present` as an
 unpinned run, with the `RANCH world` line naming the hour that was pinned. Both
 counts moved once more in Phase 3 slice 1: the crowd fills every region with
 stock ponies alongside the named roster, and the Depot is one more prop beside
@@ -600,12 +609,54 @@ is one more in slice 3.
 
 `props` moved again, from 59 to 60, in Phase 3 slice 2: the Spectra Palace is a
 sixth building under `Buildings`, seated and counted the same way the barn and
-the Depot are. Its own lamp posts are NOT in that count; they are children of
+the Depot are.
+
+`props` did NOT move in slice R2's building pass, and that is the point of how it was done:
+the six `Building` nodes kept their names, their origins and their place in
+`buildings.get_child_count()`, and only their meshes changed. `game/world/building.gd` now
+wears a converted `.glb` (`model_file`) and hides its own walls, roof, gables and lintel
+behind it, keeping the plinth and the door apron -- so the interact verb, which is a flat XZ
+distance from each building's own origin, and the attendants, which are derived from `depth`
+and `door_width`, are the same measurements they always were. On a checkout with no
+converted props the primitive shell renders exactly as before, which is what keeps CI, the
+export smoke and a fresh clone looking at a map rather than at invisible collision.
+
+Its own lamp posts are NOT in that count; they are children of
 the `Strip` node, not of `Buildings` or `Props`, because a lamp is scenery the
 gate has no claim on. The Strip is also the map's first region with no permit
 and no price, which moves what the ranch gate's `RANCH regions=` line checks:
 "every region has a fence" is now "every priced region has a fence", because a
 free region has nothing to unlock and ranch.tscn carries no `Fence_strip`.
+
+`props` moved again in slice R2, from 111 to 128: the thirty nine Kenney blob trees
+were replanted as Sweet Apple Acres trees on the same thirty nine coordinates (so every
+fence ring and zone clearance already proved stays proved), the windmill and the watermill
+came off the map (`game/world/building.gd`'s own header calls them a bare X of sails and a
+bare waterwheel), and the standalone Ponyville General and its sign came out because the
+Market building wears that model itself now (this alone put the count at 107, the number
+the ranch gate printed after that pass). The placement pass that followed put it back up to
+128: a real `saa_dirt_road` road under the town row and a `saa_shed` beside the Barn in the
+homestead yard, plus a boardwalk of the same road piece running north and turning into the
+Palace's own approach, each entry composed against its neighbours rather than dropped in a
+gap.
+
+`props` moved twice more, both times over the north road, before landing at its shipped
+number. The R2 whole-branch review's own fix wave first re-spaced the road's tiles from
+their native seated length (2.28 m, which gapped every seam once the ground crossed 0.70 m
+of relief) to a tighter 2.0 m overlap and extended the run from `z = 31.5-54.3` to
+`z = 26.0-56.0` so it met the flat yard on the south end and the boardwalk's own first plate
+on the north -- 16 tiles where 11 had stood, `props` at 133. The re-review's own render of
+`15_town_row_north_road.png` showed the defect had not actually closed: a rigid, flat plate
+cannot bend to follow ground that climbs under it, so the far half of every tile still sank
+below grade regardless of how tightly the tiles were packed -- the same ladder of
+half-buried plates, at a finer interval. **The tiles came off the road entirely** rather
+than being re-spaced a third time: `game/world/terrain.gd`'s `PATH_POINTS` and
+`terrain.gdshader`'s path mask paint the same route straight into the ground instead, which
+conforms to the real height field by construction because it IS the height field -- no
+plate, no seam, no step, ever. `props` dropped from 133 to 115, the shipped number: all
+eighteen `saa_dirt_road` tiles are gone (sixteen on the road, two on the boardwalk) and
+nothing replaced them in the census, because a painted road is not a `Props.LAYOUT` entry
+at all.
 
 **`props` and `ponies` did NOT move when the Market got a vendor and the Palace got
 a teller, and that is deliberate.** Both are `Attendant` nodes: `PonyVisuals.build`
@@ -969,10 +1020,10 @@ verdict.
 **And a third row, for the props.**
 `FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --path game scenes/test/model_gallery.tscn -- --props` loads the
 `.glb` files in `game/assets/converted/props/` whose names begin with one of the
-five manifest prefixes (`saa_`, `pv_`, `mlp_`, `school_`, `lp_`), stands them in a
+six manifest prefixes (`saa_`, `pv_`, `mlp_`, `school_`, `lp_`, `neon_`), stands them in a
 line spaced by their own measured widths, and prints one `PROP <file> size=(x, y,
 z) meshes=N materials=N textured=N` line each. Headless it prints `GALLERY_OK
-count=35` and the exit code is the verdict: it fails if fewer than 30 loaded, if
+count=45` and the exit code is the verdict: it fails if fewer than 30 loaded, if
 any model measured an empty AABB, or if any model came back with no textured
 surface at all.
 
@@ -982,8 +1033,11 @@ in the same directory and are deliberately skipped. They never went through
 with flat material colours instead of albedo textures (docs/pipeline.md section 4
 quirk 6), so the textured-surface check would fail them for a convention this
 pipeline never touched. What they DO have (placement, seating, collision) is
-already proven by `world/ranch.tscn`'s own gate. `count=35` is the size of the
-prop manifest, and it is 35 rather than 43 for exactly this reason;
+already proven by `world/ranch.tscn`'s own gate. `count=45` is the size of the
+prop manifest, and it is 45 rather than 53 for exactly this reason (the `neon_`
+prefix is in the list for Task 5's authorized fallback but names zero rows today --
+the Neon Lights Pack turned out to be a pony character skin, not signage; see
+`tools/prop_manifest.txt`'s Neon Lights section);
 `model_gallery.gd`'s `PROP_PREFIXES` is the same list `test_ranch_world.gd`
 already holds the layout to.
 

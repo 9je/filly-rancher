@@ -13,6 +13,7 @@ extends GutTest
 
 const PropsScript := preload("res://world/props.gd")
 const RegionFenceScript := preload("res://world/region_fence.gd")
+const TerrainScript := preload("res://world/terrain.gd")
 
 const REGION_DIR := "res://data/regions/"
 
@@ -180,3 +181,88 @@ func _priced_regions() -> Array[RegionData]:
 		if region != null and region.permit_cost > 0:
 			result.append(region)
 	return result
+
+
+# --- the treeline goes MLP ---------------------------------------------------------------
+
+func test_no_kenney_blob_tree_and_no_bare_sail_survives_the_layout() -> void:
+	var banned := ["kenney_tree_", "kenney_windmill", "kenney_watermill"]
+	for entry: Dictionary in PropsScript.LAYOUT:
+		var file: String = entry["file"]
+		for prefix: String in banned:
+			assert_false(file.begins_with(prefix),
+				"%s is the signature Kenney read slice R2 took off the map" % file)
+
+
+func test_every_new_tree_reads_as_foliage_so_the_camera_probe_ignores_it() -> void:
+	for entry: Dictionary in PropsScript.LAYOUT:
+		var file: String = entry["file"]
+		if file.begins_with("saa_tree") or file.begins_with("saa_dead_tree"):
+			assert_true(PropsScript.is_foliage(file),
+				"%s must be foliage, or the camera arm stops on a canopy" % file)
+
+
+func test_every_tree_in_the_layout_carries_a_scale_correction() -> void:
+	for entry: Dictionary in PropsScript.LAYOUT:
+		var file: String = entry["file"]
+		if not (file.begins_with("saa_tree") or file.begins_with("saa_dead_tree")):
+			continue
+		assert_true(PropsScript.SCALE_FIX.has(file),
+			"%s is an SFM model at whatever size a 2015 modeller drew it" % file)
+
+
+# --- the placement pass -------------------------------------------------------------------
+
+## THE ACCEPTANCE BAR IS "THOUGHTFULLY PLACED" AND ONLY A PERSON CAN JUDGE THAT. What a test
+## can hold is a duplicate guard: two entries closer than this stand on the same spot, and
+## no amount of taste makes that read as composed.
+const BREATHING_ROOM := 0.15
+
+
+func test_no_two_props_in_the_layout_stand_inside_each_other() -> void:
+	# A point-distance duplicate guard, nothing more: it reads no footprints and no AABBs,
+	# so two wide models can pass it while overlapping. THERE IS NO OTHER OVERLAP CHECK
+	# ANYWHERE IN THIS PROJECT: an earlier version of this comment claimed the ranch gate's
+	# live colliders covered it, and that was false (whole-branch review, 2026-09-05, F2 --
+	# ranch.gd's live checks are pony-vs-prop, prop-vs-door-radius, pen intrusion, seating and
+	# skirts, and no building-vs-building or prop-vs-building rectangle test at all). Two
+	# buildings interpenetrating (the Market and the Board did, until Building's plinth
+	# shrank to the model's own ground-contact footprint -- see game/world/building.gd's F1
+	# fix) can still only be caught by eye, on a screenshot, until one of these is written.
+	var seen: Array[Dictionary] = []
+	for entry: Dictionary in PropsScript.LAYOUT:
+		var at: Vector2 = entry["at"]
+		for other: Dictionary in seen:
+			var gap: float = (at - (other["at"] as Vector2)).length()
+			assert_gt(gap, BREATHING_ROOM,
+				"%s and %s stand on the same spot" % [entry["file"], other["file"]])
+		seen.append(entry)
+
+
+func test_the_farmstead_has_a_shed_beside_its_barn() -> void:
+	var files: Array[String] = []
+	for entry: Dictionary in PropsScript.LAYOUT:
+		var at: Vector2 = entry["at"]
+		if absf(at.x + 10.0) < 14.0 and absf(at.y + 9.0) < 14.0:
+			files.append(String(entry["file"]))
+	assert_true(files.has("saa_shed.glb"),
+		"spec section 5.1's second ranch structure stands in the ranch yard")
+
+
+## THE ROAD NORTH IS PAINTED NOW, NOT TILED. Sixteen `saa_dirt_road.glb` plates used to stand
+## through here; a rigid, flat tile cannot follow the 0.70 m of relief this run climbs, and
+## re-spacing them tighter moved the gap from every 2.28 m to every 2.0 m without closing it
+## (whole-branch review 2026-09-05 F3, re-review 2026-09-06). The controller's ruling replaced
+## the tiles with `game/world/terrain.gd`'s `PATH_POINTS` polyline, painted into the ground by
+## `terrain.gdshader` -- see that constant's own comment for the full account. This test's job
+## moves with it: rather than counting tiles, it checks the painted route actually reaches the
+## town row's own z range on the road's own x, the same claim the tile count used to stand for.
+func test_the_town_row_stands_on_a_road() -> void:
+	var min_z := INF
+	var max_z := -INF
+	for p: Vector2 in TerrainScript.PATH_POINTS:
+		assert_almost_eq(p.x, 1.5, 0.01, "the painted road stays on its own centreline")
+		min_z = minf(min_z, p.y)
+		max_z = maxf(max_z, p.y)
+	assert_lte(min_z, 28.0, "the painted road must reach south of the town row")
+	assert_gte(max_z, 50.0, "the painted road must reach through the town row, not stop short")

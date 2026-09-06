@@ -162,6 +162,7 @@ const StripScript := preload("res://world/strip.gd")
 const BootIntentScript := preload("res://world/boot_intent.gd")
 const CasinoSignScript := preload("res://systems/casino_sign.gd")
 const LobbySignScript := preload("res://world/lobby_sign.gd")
+const PalaceFacadeScript := preload("res://world/palace_facade.gd")
 const InteractionScript := preload("res://world/interaction.gd")
 const BuildingScript := preload("res://world/building.gd")
 const CasinoScript := preload("res://systems/casino.gd")
@@ -340,6 +341,17 @@ const LOBBY_SIGN_HEIGHT := 1.10
 const LOBBY_SIGN_BASE := 1.05
 const LOBBY_SIGN_STANDOFF := 0.30
 const LOBBY_SIGN_GAP := 0.10
+
+## THE REQUEST BOARD'S OWN BOARD. Buildings/Board wears a Ponyville Environments cottage now
+## (slice R2), which is a fine little building and says nothing at all about favours for
+## hire. So the same fitted board the Palace's lobby sign is made of stands on its front
+## wall, sized off the building's own numbers the way every other sign on this map is.
+const REQUEST_BOARD_WIDTH_FRACTION := 0.72
+const REQUEST_BOARD_HEIGHT := 0.95
+const REQUEST_BOARD_BASE := 1.15
+const REQUEST_BOARD_STANDOFF := 0.30
+const REQUEST_BOARD_HEADLINE := "Favours"
+const REQUEST_BOARD_SUBLINE := "ask inside, paid on delivery"
 
 ## THE TWO PONIES BEHIND COUNTERS, and where they stand.
 ##
@@ -1007,6 +1019,9 @@ func _ready() -> void:
 				+ sign_out * (palace_for_sign.depth * 0.5 + LOBBY_SIGN_STANDOFF))
 		lobby_sign.build(sign_width, LOBBY_SIGN_HEIGHT, sign_out,
 			LobbySignScript.HEADLINE, LobbySignScript.SUBLINE)
+
+	_stand_request_board()
+	_stand_palace_facade()
 
 	var prop_count: int = props.build() + buildings.get_child_count()
 
@@ -4476,6 +4491,51 @@ func _stand_attendants() -> void:
 		TELLER_LOOK, 1.0)
 
 
+## THE BOARD ON THE BOARD. Sized, placed and faced off the live Buildings/Board node, the
+## same way the Palace's lobby sign is off the Palace, so a re sited or re proportioned
+## notice board takes its own lettering with it instead of leaving a panel in a field.
+##
+## NOTHING HERE HANGS BELOW THE BUILDING'S OWN ORIGIN. LobbySign anchors its whole assembly
+## TRIM above its local zero for exactly this reason, and REQUEST_BOARD_BASE puts that
+## assembly above Building.FLOOR_TOP besides: ranch.gd's own seating check re-measures every
+## MeshInstance3D under a building, so a board reaching below the plinth would fail the gate
+## on a correctly seated building.
+func _stand_request_board() -> void:
+	var board := get_node_or_null(^"Buildings/Board") as Building
+	if board == null:
+		return
+	var out_dir: Vector3 = board.global_transform.basis * Vector3(0.0, 0.0, 1.0)
+	out_dir.y = 0.0
+	out_dir = out_dir.normalized() if out_dir.length_squared() > 0.0 \
+		else Vector3(0.0, 0.0, 1.0)
+	var panel := LobbySignScript.new()
+	panel.name = "RequestBoard"
+	board.add_child(panel)
+	panel.position = Vector3(0.0, REQUEST_BOARD_BASE, 0.0) \
+		+ board.to_local(board.global_position
+			+ out_dir * (board.depth * 0.5 + REQUEST_BOARD_STANDOFF))
+	panel.build(board.width * REQUEST_BOARD_WIDTH_FRACTION, REQUEST_BOARD_HEIGHT, out_dir,
+		REQUEST_BOARD_HEADLINE, REQUEST_BOARD_SUBLINE)
+
+
+## THE PALACE'S OWN FRONT, standing inside the shell it is sized from. Mounted here rather
+## than authored in ranch.tscn for the reason strip.gd and region_fence.gd are both built in
+## code: game/assets/converted/ is gitignored, so a static ext_resource to one of these
+## pieces would fail the export error gate on every CI run (docs/ci.md section 4).
+func _stand_palace_facade() -> void:
+	var palace := get_node_or_null(^"Buildings/Palace") as Building
+	if palace == null:
+		return
+	var out_dir: Vector3 = palace.global_transform.basis * Vector3(0.0, 0.0, 1.0)
+	out_dir.y = 0.0
+	var facade := PalaceFacadeScript.new()
+	facade.name = "Facade"
+	palace.add_child(facade)
+	var stood: int = facade.build(palace.width * 0.5, palace.depth * 0.5,
+		palace.door_width * 0.5, out_dir)
+	print("RANCH palace facade pieces=%d neon=%d" % [stood, facade.neon_count()])
+
+
 func _stand_one(registry: PonyRegistry, who: String, building_path: NodePath,
 		record_id: StringName, look: Dictionary, side: float) -> void:
 	var building := get_node_or_null(building_path) as Building
@@ -6279,11 +6339,20 @@ func _find_wall_stand_point() -> Dictionary:
 # --- offscreen capture ---------------------------------------------------------------
 
 func _capture_all() -> void:
-	# 01 -- does this read as a place at all?
+	# 01 -- does this read as a place at all? HUD OFF, the same way and for the same reason
+	# _capture_props() and _capture_look() take it off: the hints card covers about 45
+	# percent of a 1600 by 900 frame over the bottom right quadrant, and this establishing
+	# shot's whole job is showing the place, not the mechanic (whole-branch review,
+	# 2026-09-05, F14). 02 keeps the HUD -- it is deliberately "what the owner actually sees
+	# the instant the game boots", card and all.
+	var hud_01 := $HUD as CanvasLayer
+	var hud_01_was_visible: bool = hud_01.visible
+	hud_01.visible = false
 	capture_camera.global_position = Vector3(33.0, 18.0, 36.0)
 	capture_camera.look_at(Vector3(-1.0, 2.0, -7.0), Vector3.UP)
 	capture_camera.make_current()
 	await _capture("01_establishing")
+	hud_01.visible = hud_01_was_visible
 
 	# 02 -- what the owner actually sees the instant the game boots.
 	_rig.get_camera().make_current()
@@ -6342,9 +6411,13 @@ func _capture_all() -> void:
 
 	await _capture_the_mechanic()
 
-	# 05 -- eye level in the yard, for judging prop scale against a 1.16 m pony.
+	# 05 -- eye level in the yard, for judging prop scale against a 1.16 m pony. HUD OFF for
+	# the same reason as 01: this is a place-and-scale shot, not a mechanic shot.
 	var barn := _tallest_building()
 	if barn != null:
+		var hud_05 := $HUD as CanvasLayer
+		var hud_05_was_visible: bool = hud_05.visible
+		hud_05.visible = false
 		var box: AABB = PropsScript.world_aabb(barn)
 		var target := box.get_center()
 		var eye := target + Vector3(9.0, 0.0, 11.0)
@@ -6354,6 +6427,7 @@ func _capture_all() -> void:
 			Vector3.UP)
 		capture_camera.make_current()
 		await _capture("05_scale_at_the_barn")
+		hud_05.visible = hud_05_was_visible
 
 	# THE PROP SHOTS GO FIRST, and the order is load bearing rather than tidy. The plot
 	# pass drives the real build loop, so it raises a toast ("That pen is full.") that is
@@ -6465,9 +6539,27 @@ func _capture_plots() -> void:
 ## plinth somebody forgot to hide. The gates say the props are placed, solid, seated and
 ## out of the doorways; these say whether the place is any good.
 func _capture_props() -> void:
+	# THE HUD IS OFF FOR ALL FIVE OF THESE, the same way and for the same reason
+	# _capture_look() takes it off for 18 to 21: the hints card covers about 45 percent of a
+	# 1600 by 900 frame over the bottom right quadrant, which is where several of these
+	# subjects land, and these shots are the placement pass's only evidence -- half-obscured
+	# evidence is not evidence (whole-branch review, 2026-09-05, F14).
+	var hud := $HUD as CanvasLayer
+	var hud_was_visible: bool = hud.visible
+	hud.visible = false
+
 	await _let_the_hud_finish_talking()
 	await _frame_on(Vector2(41.0, 51.3), Vector3(-14.0, 11.0, -16.0), 4.0, "13_sweet_apple_acres")
-	await _frame_on(Vector2(19.0, -2.0), Vector3(-13.0, 8.0, -12.0), 3.0, "14_ponyville_general")
+	# AIMED AT THE LIVE Market NODE, the way 18 already reads the lobby sign off Palace's own
+	# node, rather than at (19, -2), where the free-standing pv_general.glb stood before
+	# commit 6b7a9d1 put that same model on the Market building instead. The old coordinate
+	# photographs an empty field with the Market clipped off the right edge on this branch
+	# (whole-branch review, 2026-09-05, F4); the live node moves with the building it names.
+	var market := get_node_or_null(^"Buildings/Market") as Node3D
+	var market_at := Vector2(-2.0, -1.0)
+	if market != null:
+		market_at = Vector2(market.global_position.x, market.global_position.z)
+	await _frame_on(market_at, Vector3(-13.0, 8.0, -12.0), 3.0, "14_ponyville_market")
 	await _frame_on(Vector2(1.5, 43.0), Vector3(0.0, 10.0, -22.0), 3.5, "15_town_row_north_road")
 	# 16 stands off the yard's SOUTH WEST corner and looks up its diagonal, and every part
 	# of that is a measurement. The subject is (-25.5, 58.5), the centroid of the seven
@@ -6481,6 +6573,8 @@ func _capture_props() -> void:
 	# the map.
 	await _frame_on(Vector2(-25.5, 58.5), Vector3(-10.5, 6.0, -9.5), 1.6, "16_schoolyard")
 	await _frame_on(Vector2(7.5, 69.0), Vector3(0.0, 7.0, -13.0), 2.0, "17_strip_arcade")
+
+	hud.visible = hud_was_visible
 
 
 ## 18 to 21: THE FOUR THINGS THE LOOK PASS CHANGED THAT NO ASSERTION CAN JUDGE.
@@ -6510,7 +6604,15 @@ func _capture_look() -> void:
 	if lobby_sign != null:
 		sign_at = Vector2(lobby_sign.global_position.x, lobby_sign.global_position.z)
 	await _frame_on(sign_at, Vector3(0.0, 1.7, -5.0), 1.7, "18_palace_lobby_sign")
-	await _frame_on(Vector2(-10.0, 61.6), Vector3(0.0, 6.0, -22.0), 4.0,
+	# THE EYE MOVED, NOT THE STREET. The old offset (0, 6, -22) put the lens dead ahead of the
+	# west row's own x = -12 line -- pv_ogb_2 at (-12, 43) sat 3.4 m from the camera and filled
+	# the lower right of frame, with pv_balcony_b at (-12, 50) on the same sightline behind it,
+	# so the marquee and the arch survived above two rooflines but the frontage's lower half
+	# and the door did not (whole-branch review, 2026-09-05, F5). Shifting the eye 6 m EAST and
+	# 2 m closer takes the lens off that line rather than reshuffling the row a second time
+	# (round 1 already moved pv_courtyard_b_balcony behind the camera, at z = 36, and that fix
+	# held -- it is this axis, not that building, that still needed to move).
+	await _frame_on(Vector2(-10.0, 61.6), Vector3(6.0, 6.0, -20.0), 4.0,
 		"19_marquee_and_gold_trim")
 	# 20's ORIGINAL `at` (58, -46) sat 16 m from the lake region's own centre (60, -62) --
 	# inside its 24 m radius and inside the water disc's own 16.8 m (radius * 0.7), so the

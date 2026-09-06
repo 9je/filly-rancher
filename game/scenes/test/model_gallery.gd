@@ -24,7 +24,7 @@ const PROP_DIR := "res://assets/converted/props/"
 const PROP_GAP := 1.5
 
 ## The floor on how many props must load before this gate calls itself a pass. Below the
-## manifest's 35 on purpose: a machine mid conversion should not report green, and a
+## manifest's 45 on purpose: a machine mid conversion should not report green, and a
 ## machine with no packs at all should not be told it is broken in a way it can fix.
 const PROP_FLOOR := 30
 
@@ -33,6 +33,8 @@ const SCALE_REFERENCE := "saa_barn.glb"
 
 ## The five id prefixes tools/prop_manifest.txt actually names. See _build_props_row()'s
 ## doc comment for why kenney_ files (present in the same directory) are not scanned.
+## "neon_" is not among them: the Neon Lights Pack converted no usable mesh (see
+## tools/prop_manifest.txt's own note), so nothing was ever going to begin with it.
 const PROP_PREFIXES := ["saa_", "pv_", "mlp_", "school_", "lp_"]
 
 func _ready() -> void:

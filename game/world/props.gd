@@ -23,13 +23,12 @@ extends Node3D
 ## withers -- sizing anything pass-through off the withers figure produces doorways
 ## she cannot walk through).
 ##
-## TREES ARE THE ONE CATEGORY-WIDE EXCEPTION, via TREE_SCALE below. Task 7's own
-## renders showed the Nature Kit trees at BASE_SCALE alone standing 1.7-3.2 m --
-## several of them visibly SHORTER than a 1.16 m pony, and next to the ranch's 5 m
-## barn every one of them reads as a shrub. docs/pipeline.md section 4 recommended
-## "roughly 2x" on top of BASE_SCALE as a starting point, not a settled answer; a 2x
-## tree still tops out below the barn's eave. TREE_SCALE is 3x, confirmed from a
-## render against both the barn and a pony -- see the fix report for what it showed.
+## TREE_SCALE AND FAMILY_TREE ARE KEPT WITH NO LAYOUT ENTRY USING THEM. Slice R2's own
+## placement pass (this file's LAYOUT) replanted every "kenney_tree_*" entry as an MLP
+## species -- the owner's verdict on the Kenney Nature Kit was that its flat cyan canopy
+## clashed with everything else on the map -- so nothing below reads FAMILY_TREE any more.
+## Both stay for the family machinery `game/test/test_props.gd` pins (:32, :63, :127 all
+## name them) and for anyone who ever replants a Kenney tree here again.
 ##
 ## ...WITH ONE PER-PROP EXCEPTION, and it is a documented defect, not a fudge.
 ## kenney_survival_structure.glb came through the FBX branch of the pipeline, and
@@ -163,13 +162,25 @@ const SCALE_FIX := {
 	# --- Las Pegasus, on the Strip ---------------------------------------------------
 	"lp_skeeball.glb": 1.93,  # 2.46 m: native metres, a cabinet a pony can reach.
 	"lp_dance_game.glb": 1.93,  # 2.53 m: native metres.
+	"saa_small_dirt_pile.glb": 9.91,  # 0.35 m: native 0.068 m is a smear on the grass.
+	# --- the treeline, which is MLP now ------------------------------------------------
+	# THE KENNEY NATURE KIT'S FOLIAGE IS A FLAT CYAN SWATCH. docs/pipeline.md section 4
+	# quirk 6 checked it: "leafsGreen" is the colour Kenney authored, not a colour space
+	# bug, and the owner's word for the result was that the clashing asset style looks
+	# terrible. Thirty nine of them stood on this map. These five replace them, at targets
+	# taken from the orchard's own apple trees so the whole map's canopy agrees with itself.
+	"saa_tree_wide.glb": 2.96,  # 6.20 m: the tallest canopy on the map.
+	"saa_tree_narrow.glb": 3.15,  # 5.60 m: the orchard's own number.
+	"saa_tree_dead_wide.glb": 2.77,  # 5.60 m: the same species, dead.
+	"saa_tree_dead_narrow.glb": 2.98,  # 5.20 m: a thinner trunk reads shorter.
+	"saa_dead_tree_large.glb": 4.05,  # 7.20 m: the Everfree's one landmark.
 }
 
-## Category-wide multiplier ON TOP of BASE_SCALE, applied to every "kenney_tree_*"
-## entry in LAYOUT. Not a per-prop scale defect like SCALE_FIX above -- the Nature
-## Kit trees are shipped at their intended scale, they are just stylised too small to
-## read as trees once ponies and a real barn are standing next to them. See the class
-## comment.
+## Category-wide multiplier ON TOP of BASE_SCALE, for a "kenney_tree_*" entry, IF one is
+## ever planted again. No LAYOUT entry uses it now -- see the class comment -- but the
+## number stays: the Nature Kit trees are shipped at their intended scale, they are just
+## stylised too small to read as trees once ponies and a real barn are standing next to
+## them, and that measurement does not stop being true because the map stopped using it.
 const TREE_SCALE := 3.0
 
 ## THE MLP FAMILY'S OWN BASE SCALE, and it REPLACES BASE_SCALE rather than multiplying it.
@@ -216,7 +227,7 @@ const FAMILY_SCALE := {
 ## runs its camera-against-a-wall probe against "every prop that is not one of these": a
 ## canopy is a bad obstacle to prove a camera with, because the arm may be stopping on a
 ## leaf a player would walk straight under.
-const FOLIAGE_PREFIXES := ["kenney_tree", "mlp_apple_tree"]
+const FOLIAGE_PREFIXES := ["kenney_tree", "mlp_apple_tree", "saa_tree", "saa_dead_tree"]
 
 ## THE OPEN GROUND, reserved for Phase 1B's pen plots. Centre and half-extent in
 ## metres, on XZ. Nothing is placed here, no pony spawns here, and ranch.gd asserts
@@ -227,13 +238,12 @@ const PEN_PLOTS_HALF_EXTENT := 9.0
 
 ## The homestead layout, hand-composed rather than scattered randomly.
 ##
-## Read as a picture: the windmill is the tall thing you see from anywhere on the
-## map and steer by; the watermill is the farmhouse you spawn facing; the stall is the
-## clutter that makes a yard look lived in; Ponyville General stands across the yard where
-## an open Kenney timber frame used to. Trees ring the open country and thin out toward the
-## buildings, so the homestead reads as a clearing somebody made rather than a field with
-## objects dropped on it. `y` is never specified -- every prop is sat on height_at() so
-## nothing floats and nothing sinks.
+## Read as a picture: the stall is the clutter that makes a yard look lived in; trees ring
+## the open country and thin out toward the buildings, in MLP species since slice R2 (the
+## Kenney Nature Kit's flat cyan canopy was the owner's own example of a clashing style),
+## so the homestead reads as a clearing somebody made rather than a field with objects
+## dropped on it. `y` is never specified -- every prop is sat on height_at() so nothing
+## floats and nothing sinks.
 ##
 ## `s` is an optional per-entry size jitter, applied on top of BASE_SCALE (and of
 ## SCALE_FIX). Fixed values rather than an RNG draw: a hand-varied treeline is
@@ -245,37 +255,44 @@ const PEN_PLOTS_HALF_EXTENT := 9.0
 ## yard, a town on the road north. Nothing here is ever walked into.
 const LAYOUT := [
 	# --- yard fixtures, all inside Terrain's flat apron ---------------------------
-	{"file": "kenney_windmill.glb", "at": Vector2(3.5, -17.5), "yaw": 10.0},
-	{"file": "kenney_watermill.glb", "at": Vector2(-17.0, -4.0), "yaw": 90.0},
+	# The windmill and the watermill came off the map in slice R2: game/world/building.gd's
+	# own header calls them a bare X of sails and a bare waterwheel, and the owner's verdict
+	# on the clashing Kenney silhouette applied to these two as much as to the treeline.
 	{"file": "kenney_market_stall.glb", "at": Vector2(2.0, 3.0), "yaw": 200.0},
-	# --- treeline ----------------------------------------------------------------
-	{"file": "kenney_tree_oak.glb", "at": Vector2(-19.0, -19.0), "yaw": 0.0, "s": 1.15},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-26.0, -8.0), "yaw": 40.0, "s": 1.25},
-	{"file": "kenney_tree_fat.glb", "at": Vector2(-5.0, -27.0), "yaw": 200.0, "s": 1.20},
-	{"file": "kenney_tree_oak.glb", "at": Vector2(8.0, -28.0), "yaw": 75.0, "s": 0.95},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(24.0, -20.0), "yaw": 150.0, "s": 1.30},
-	{"file": "kenney_tree_default.glb", "at": Vector2(31.0, -2.0), "yaw": 20.0, "s": 1.10},
-	{"file": "kenney_tree_fat.glb", "at": Vector2(26.0, 14.0), "yaw": 260.0, "s": 1.00},
-	{"file": "kenney_tree_oak.glb", "at": Vector2(14.0, 27.0), "yaw": 300.0, "s": 1.20},
-	{"file": "kenney_tree_default.glb", "at": Vector2(-33.0, 10.0), "yaw": 210.0, "s": 1.25},
-	{"file": "kenney_tree_fat.glb", "at": Vector2(-31.0, -25.0), "yaw": 15.0, "s": 1.10},
-	{"file": "kenney_tree_oak.glb", "at": Vector2(37.0, -31.0), "yaw": 130.0, "s": 1.05},
-	{"file": "kenney_tree_default.glb", "at": Vector2(-17.0, -32.0), "yaw": 245.0, "s": 0.95},
+	# --- treeline, replanted MLP in slice R2 --------------------------------------
+	# SAME COORDINATES, SAME YAW, ONLY THE SPECIES AND THE FAMILY CHANGED. Every `at` below
+	# was already verified clear of every region fence ring, every ZoneMarker disc and the
+	# pen-plot clearing (test_props.gd:148 and :155 both assert it); reusing them cannot
+	# break a clearance that was already checked. Oaks and fats, the map's broad canopies,
+	# become saa_tree_wide; the homestead's own default and pine trunks become
+	# saa_tree_narrow, the same species the orchard already plants.
+	{"file": "saa_tree_wide.glb", "at": Vector2(-19.0, -19.0), "yaw": 0.0, "s": 1.15, "family": &"mlp"},
+	{"file": "saa_tree_narrow.glb", "at": Vector2(-26.0, -8.0), "yaw": 40.0, "s": 1.25, "family": &"mlp"},
+	{"file": "saa_tree_wide.glb", "at": Vector2(-5.0, -27.0), "yaw": 200.0, "s": 1.20, "family": &"mlp"},
+	{"file": "saa_tree_wide.glb", "at": Vector2(8.0, -28.0), "yaw": 75.0, "s": 0.95, "family": &"mlp"},
+	{"file": "saa_tree_narrow.glb", "at": Vector2(24.0, -20.0), "yaw": 150.0, "s": 1.30, "family": &"mlp"},
+	{"file": "saa_tree_narrow.glb", "at": Vector2(31.0, -2.0), "yaw": 20.0, "s": 1.10, "family": &"mlp"},
+	{"file": "saa_tree_wide.glb", "at": Vector2(26.0, 14.0), "yaw": 260.0, "s": 1.00, "family": &"mlp"},
+	{"file": "saa_tree_wide.glb", "at": Vector2(14.0, 27.0), "yaw": 300.0, "s": 1.20, "family": &"mlp"},
+	{"file": "saa_tree_narrow.glb", "at": Vector2(-33.0, 10.0), "yaw": 210.0, "s": 1.25, "family": &"mlp"},
+	{"file": "saa_tree_wide.glb", "at": Vector2(-31.0, -25.0), "yaw": 15.0, "s": 1.10, "family": &"mlp"},
+	{"file": "saa_tree_wide.glb", "at": Vector2(37.0, -31.0), "yaw": 130.0, "s": 1.05, "family": &"mlp"},
+	{"file": "saa_tree_narrow.glb", "at": Vector2(-17.0, -32.0), "yaw": 245.0, "s": 0.95, "family": &"mlp"},
 	# Copses rather than an even scatter: two or three trunks together read as
 	# woodland, evenly-spaced singles read as a car park.
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-27.0, -14.0), "yaw": 60.0, "s": 1.20},
-	{"file": "kenney_tree_oak.glb", "at": Vector2(-24.0, -17.0), "yaw": 190.0, "s": 0.95},
-	{"file": "kenney_tree_default.glb", "at": Vector2(30.0, 18.0), "yaw": 100.0, "s": 1.10},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(33.0, 22.0), "yaw": 25.0, "s": 1.25},
-	{"file": "kenney_tree_fat.glb", "at": Vector2(-12.0, -36.0), "yaw": 140.0, "s": 1.15},
-	{"file": "kenney_tree_oak.glb", "at": Vector2(45.0, -12.0), "yaw": 310.0, "s": 1.20},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-42.0, -6.0), "yaw": 80.0, "s": 1.30},
-	{"file": "kenney_tree_fat.glb", "at": Vector2(-40.0, 24.0), "yaw": 45.0, "s": 1.20},
-	{"file": "kenney_tree_oak.glb", "at": Vector2(-43.0, 20.0), "yaw": 260.0, "s": 1.00},
+	{"file": "saa_tree_narrow.glb", "at": Vector2(-27.0, -14.0), "yaw": 60.0, "s": 1.20, "family": &"mlp"},
+	{"file": "saa_tree_wide.glb", "at": Vector2(-24.0, -17.0), "yaw": 190.0, "s": 0.95, "family": &"mlp"},
+	{"file": "saa_tree_narrow.glb", "at": Vector2(30.0, 18.0), "yaw": 100.0, "s": 1.10, "family": &"mlp"},
+	{"file": "saa_tree_narrow.glb", "at": Vector2(33.0, 22.0), "yaw": 25.0, "s": 1.25, "family": &"mlp"},
+	{"file": "saa_tree_wide.glb", "at": Vector2(-12.0, -36.0), "yaw": 140.0, "s": 1.15, "family": &"mlp"},
+	{"file": "saa_tree_wide.glb", "at": Vector2(45.0, -12.0), "yaw": 310.0, "s": 1.20, "family": &"mlp"},
+	{"file": "saa_tree_narrow.glb", "at": Vector2(-42.0, -6.0), "yaw": 80.0, "s": 1.30, "family": &"mlp"},
+	{"file": "saa_tree_wide.glb", "at": Vector2(-40.0, 24.0), "yaw": 45.0, "s": 1.20, "family": &"mlp"},
+	{"file": "saa_tree_wide.glb", "at": Vector2(-43.0, 20.0), "yaw": 260.0, "s": 1.00, "family": &"mlp"},
 	# One inside the clearing, for shade and to break up the yard. Its neighbour at
 	# (17, 7.5) came out when the yard grew crates, a basket, a well and a coop; a shade
 	# tree in the middle of that is a tree in the middle of a yard.
-	{"file": "kenney_tree_oak.glb", "at": Vector2(-20.0, 1.0), "yaw": 165.0, "s": 1.10},
+	{"file": "saa_tree_wide.glb", "at": Vector2(-20.0, 1.0), "yaw": 165.0, "s": 1.10, "family": &"mlp"},
 	# --- the regions -------------------------------------------------------------
 	# Slice 3's four regions (game/data/regions/*.tres) are 60 m and more from the
 	# homestead, and the treeline above stops at about 45 m: without these, a region
@@ -307,35 +324,41 @@ const LAYOUT := [
 	{"file": "mlp_apple_tree_bare.glb", "at": Vector2(98.8, 24.5), "yaw": 310.0, "s": 1.20, "family": &"mlp"},
 	# The Everfree Edge, (-74, -49) r 24: the densest planting on the map, and the
 	# darkest, so the corner of the world the palette already made gloomy also LOOKS
-	# like woodland rather than like a lawn at dusk.
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-62.7, -18.0), "yaw": 15.0, "s": 1.30},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-79.7, -16.5), "yaw": 105.0, "s": 1.20},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-95.2, -23.7), "yaw": 200.0, "s": 1.35},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-105.0, -37.7), "yaw": 285.0, "s": 1.15},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-105.9, -57.5), "yaw": 40.0, "s": 1.30},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-95.2, -74.3), "yaw": 150.0, "s": 1.25},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-76.9, -81.9), "yaw": 230.0, "s": 1.35},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-57.5, -77.6), "yaw": 320.0, "s": 1.20},
+	# like woodland rather than like a lawn at dusk. Dead trunks now, not live pines:
+	# saa_tree_dead_narrow for six of the eight, and saa_dead_tree_large -- the Everfree's
+	# one landmark -- at the two coordinates that stood furthest into the gloom.
+	{"file": "saa_tree_dead_narrow.glb", "at": Vector2(-62.7, -18.0), "yaw": 15.0, "s": 1.30, "family": &"mlp"},
+	{"file": "saa_tree_dead_narrow.glb", "at": Vector2(-79.7, -16.5), "yaw": 105.0, "s": 1.20, "family": &"mlp"},
+	{"file": "saa_dead_tree_large.glb", "at": Vector2(-95.2, -23.7), "yaw": 200.0, "s": 1.35, "family": &"mlp"},
+	{"file": "saa_tree_dead_narrow.glb", "at": Vector2(-105.0, -37.7), "yaw": 285.0, "s": 1.15, "family": &"mlp"},
+	{"file": "saa_tree_dead_narrow.glb", "at": Vector2(-105.9, -57.5), "yaw": 40.0, "s": 1.30, "family": &"mlp"},
+	{"file": "saa_tree_dead_narrow.glb", "at": Vector2(-95.2, -74.3), "yaw": 150.0, "s": 1.25, "family": &"mlp"},
+	{"file": "saa_dead_tree_large.glb", "at": Vector2(-76.9, -81.9), "yaw": 230.0, "s": 1.35, "family": &"mlp"},
+	{"file": "saa_tree_dead_narrow.glb", "at": Vector2(-57.5, -77.6), "yaw": 320.0, "s": 1.20, "family": &"mlp"},
 	# The Lake, (60, -62) r 24: four only, and spread wide. The water is the thing to
 	# look at there, and a ring of trunks around it would be a hedge round a pond.
-	{"file": "kenney_tree_default.glb", "at": Vector2(90.1, -51.1), "yaw": 70.0, "s": 1.15},
-	{"file": "kenney_tree_default.glb", "at": Vector2(29.9, -72.9), "yaw": 185.0, "s": 1.25},
-	{"file": "kenney_tree_default.glb", "at": Vector2(49.1, -92.1), "yaw": 250.0, "s": 1.10},
-	{"file": "kenney_tree_default.glb", "at": Vector2(76.0, -89.7), "yaw": 330.0, "s": 1.20},
+	{"file": "saa_tree_narrow.glb", "at": Vector2(90.1, -51.1), "yaw": 70.0, "s": 1.15, "family": &"mlp"},
+	{"file": "saa_tree_narrow.glb", "at": Vector2(29.9, -72.9), "yaw": 185.0, "s": 1.25, "family": &"mlp"},
+	{"file": "saa_tree_narrow.glb", "at": Vector2(49.1, -92.1), "yaw": 250.0, "s": 1.10, "family": &"mlp"},
+	{"file": "saa_tree_narrow.glb", "at": Vector2(76.0, -89.7), "yaw": 330.0, "s": 1.20, "family": &"mlp"},
 	# The Night Meadow, (-61, 69) r 24: a windbreak along the far side, leaving the
-	# south-east open toward the homestead so the walk out to it has a view.
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-33.3, 85.0), "yaw": 50.0, "s": 1.15},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-55.4, 100.5), "yaw": 125.0, "s": 1.30},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-81.6, 93.5), "yaw": 210.0, "s": 1.20},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-93.0, 69.0), "yaw": 285.0, "s": 1.25},
-	{"file": "kenney_tree_pine.glb", "at": Vector2(-81.6, 44.5), "yaw": 355.0, "s": 1.15},
+	# south-east open toward the homestead so the walk out to it has a view. Dead wide
+	# trunks: the same species as the Everfree, a wider silhouette to break up the skyline.
+	{"file": "saa_tree_dead_wide.glb", "at": Vector2(-33.3, 85.0), "yaw": 50.0, "s": 1.15, "family": &"mlp"},
+	{"file": "saa_tree_dead_wide.glb", "at": Vector2(-55.4, 100.5), "yaw": 125.0, "s": 1.30, "family": &"mlp"},
+	{"file": "saa_tree_dead_wide.glb", "at": Vector2(-81.6, 93.5), "yaw": 210.0, "s": 1.20, "family": &"mlp"},
+	{"file": "saa_tree_dead_wide.glb", "at": Vector2(-93.0, 69.0), "yaw": 285.0, "s": 1.25, "family": &"mlp"},
+	{"file": "saa_tree_dead_wide.glb", "at": Vector2(-81.6, 44.5), "yaw": 355.0, "s": 1.15, "family": &"mlp"},
 	# --- Sweet Apple Acres, on the walk out to the Orchard --------------------------
-	# APPLEJACK'S FARM, NOT THE PLAYER'S. The homestead keeps its own procedural red barn
-	# (game/world/building.gd says why it is code and not a mesh, and both reasons still
-	# hold); this is the farm the orchard belongs to, on the walk out to it. Nothing here
-	# is walked into: an MLP mesh prop is SCENERY. No attendant stands at one, no dock
-	# marker sits on one, and ranch.gd checks that no prop's collider reaches inside a
-	# building's interaction radius, so the only doors the game opens stay procedural.
+	# APPLEJACK'S FARM, NOT THE PLAYER'S. The homestead's own barn is still the same
+	# procedural shell (game/world/building.gd, `Buildings/Barn` in ranch.tscn) -- it just
+	# wears saa_barn.glb now, the same hero model the Depot, the Market and the Farmhouse
+	# wear their own PonySFM pieces. This is that SAME model standing a second time, 60 m
+	# away at the farm the orchard belongs to, on the walk out to it: a deliberate reuse
+	# (the pack ships one barn), not an accident. This entry is scenery either way: an MLP
+	# mesh prop here is never walked into. No attendant stands at one, no dock marker sits
+	# on one, and ranch.gd checks that no prop's collider reaches inside a building's
+	# interaction radius, so the only doors the game opens stay procedural.
 	#
 	# The barn, the shed and the town row carry "skirt": true. So do the four old fence
 	# rails: at their corrected scale each is 4.06 m long, which is past WIDE_FOOTPRINT,
@@ -381,33 +404,51 @@ const LAYOUT := [
 	{"file": "mlp_apple_tree.glb", "at": Vector2(47.0, 60.0), "yaw": 245.0, "family": &"mlp", "s": 1.15},
 	{"file": "mlp_apple_tree.glb", "at": Vector2(38.0, 64.0), "yaw": 300.0, "family": &"mlp", "s": 1.05},
 	{"file": "mlp_apple_tree_bare.glb", "at": Vector2(27.0, 64.0), "yaw": 100.0, "family": &"mlp", "s": 1.10},
-	# --- Ponyville General, across the Market yard ----------------------------------
-	# WHERE kenney_survival_structure USED TO STAND, and the Market itself is untouched.
-	# Replacing the Market with a mesh would drop it out of buildings.get_child_count() and
-	# therefore out of the census, lose the door apron ATTENDANT_CLEARANCE steps the vendor
-	# sideways out of, and put a 58,034 triangle two storey shop where a 4.5 m radius
-	# interaction check expects an origin. So the General stands BESIDE it: 21.0 m from the
-	# Market's origin, 10.8 m from the Depot's, 11.2 m from the Farmhouse's, and inside
-	# Terrain's flat apron, where the relief across its footprint is exactly zero and it
-	# needs no skirt. Its sign stands 6.1 m out from the Market door: past MARKET_RADIUS
-	# and past the 2.8 m door apron, so it dresses the door without standing in it.
-	{"file": "pv_general.glb", "at": Vector2(19.0, -2.0), "yaw": 250.0, "family": &"mlp"},
-	{"file": "pv_general_sign.glb", "at": Vector2(-1.0, 5.0), "yaw": 200.0, "family": &"mlp"},
-	# --- the town row, on the road north --------------------------------------------
-	# SIX PONYVILLE ENVIRONMENTS BUILDINGS, three a side, facing the road. They are
-	# scenery: none has a door the game opens, none is an interaction candidate, and
-	# ranch.gd fails if any of their colliders reaches inside a building's interaction
-	# radius. All six carry a skirt: they are wide and they stand well outside Terrain's
-	# flat apron, which is exactly the case Props.needs_skirt() names.
+	# --- Ponyville General is gone from here in slice R2 -----------------------------
+	# IT NEVER STOOD ALONE AGAIN AFTER TASK 3. It used to stand BESIDE the Market as its
+	# own free-standing pv_general.glb, a stand-in for a shop the Market itself did not
+	# yet wear; task 3 put that same model, resized, on the Market building proper
+	# (game/world/building.gd, ranch.tscn), so the two entries that used to stand here --
+	# pv_general.glb at (19.0, -2.0) and its sign at (-1.0, 5.0) -- were a duplicate store
+	# from that point on. Removed rather than left as clutter: the Market wears the model
+	# now, and the census counts it once, under Buildings, the way it always counted the
+	# barn.
+	# --- the town row, on the road north -------------------------------------------------
+	# A ROAD, AND SIX BUILDINGS THAT ARE NOT THE RANCH'S OWN. The Farmhouse, the Board and
+	# the Depot wear pv_wide_b, pv_bridged_b and pv_tower_b now (slice R2, ranch.tscn), so
+	# the row uses the three that are left plus the three new pieces
+	# tools/prop_manifest.txt gained. SOME OF THESE ARE TWINS, and that is a stated choice
+	# rather than an oversight: pv_tower_b stands here AND on the Depot, pv_courtyard_b and
+	# pv_pink_b each stand here once AND again on the palace facade (game/world/
+	# palace_facade.gd). The packs this map is built from ship one of each hero piece; a
+	# second sighting 30 m and more away reads as the same town's architecture repeating
+	# itself, not as a copy-paste seam, and every placement rule this file already checks
+	# (region clearance, breathing room, pen-plot exclusion) runs on each entry
+	# independently regardless of how many other entries share its file.
 	#
-	# The pack ships a gb_ ground decal and an _m mirror for every one of these;
-	# tools/convert_props.sh refuses both by name, so nothing in this block can be one.
-	{"file": "pv_tower_b.glb", "at": Vector2(15.0, 36.0), "yaw": 270.0, "family": &"mlp", "skirt": true},
-	{"file": "pv_wide_b.glb", "at": Vector2(15.0, 43.0), "yaw": 270.0, "family": &"mlp", "skirt": true},
-	{"file": "pv_pink_b.glb", "at": Vector2(15.0, 50.0), "yaw": 270.0, "family": &"mlp", "skirt": true},
-	{"file": "pv_courtyard_b.glb", "at": Vector2(-12.0, 36.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
-	{"file": "pv_balcony_b.glb", "at": Vector2(-12.0, 43.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
-	{"file": "pv_bridged_b.glb", "at": Vector2(-12.0, 50.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
+	# THE ROAD ITSELF IS NOT A PROP ANY MORE. Sixteen `saa_dirt_road.glb` tiles used to stand
+	# here, re-spaced to 2.0 m to overlap their own neighbours after the first version (2.28 m,
+	# their native seated length) gapped on the 0.70 m of relief this run climbs. Tightening
+	# the spacing did not fix it: the re-review's own render of `15_town_row_north_road.png`
+	# still showed sixteen half-buried plates with grass between every pair, because a rigid,
+	# flat, 0.155 m-thick tile cannot bend to follow ground that climbs under it -- the far
+	# half of each tile sinks below grade no matter how tightly the tiles are packed. Removed
+	# outright rather than spaced a third way (whole-branch review 2026-09-05 F3, re-review
+	# 2026-09-06): the controller's ruling is that a road on sloped ground is PAINTED into the
+	# terrain instead of laid on top of it. See `game/world/terrain.gd`'s `PATH_POINTS` and
+	# `game/world/terrain.gdshader`'s path mask -- same centreline (x = 1.5), same run,
+	# conforming to the real height field by construction because it IS the height field,
+	# with no plate, no seam and no step to gap.
+	{"file": "pv_pink_b.glb", "at": Vector2(15.0, 36.0), "yaw": 270.0, "family": &"mlp", "skirt": true},
+	{"file": "pv_ogb_1.glb", "at": Vector2(15.0, 43.0), "yaw": 270.0, "family": &"mlp", "skirt": true},
+	{"file": "pv_courtyard_b.glb", "at": Vector2(15.0, 50.0), "yaw": 270.0, "family": &"mlp", "skirt": true},
+	# The tall courtyard-balcony block stands at z 36, BEHIND shot 19's camera (aim
+	# (-10, 61.6), eye offset -22 puts the lens near z 39.6): at z 50 it cropped the
+	# marquee out of the one screenshot that exists to showcase it. The shorter
+	# balcony_b takes z 50; the street keeps all three buildings either way.
+	{"file": "pv_courtyard_b_balcony.glb", "at": Vector2(-12.0, 36.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
+	{"file": "pv_ogb_2.glb", "at": Vector2(-12.0, 43.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
+	{"file": "pv_balcony_b.glb", "at": Vector2(-12.0, 50.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
 	# --- the schoolyard, west of the road --------------------------------------------
 	# A SCHOOLYARD AND NO SCHOOL, and that is the pack rather than an omission.
 	# ponysfm-schoolhouse ships school_roof, school_door, school_window, school_sign,
@@ -442,21 +483,42 @@ const LAYOUT := [
 	# somewhere people go.
 	{"file": "lp_skeeball.glb", "at": Vector2(4.0, 69.0), "yaw": 180.0, "family": &"mlp", "skirt": true},
 	{"file": "lp_dance_game.glb", "at": Vector2(11.0, 69.0), "yaw": 180.0, "family": &"mlp", "skirt": true},
-	# --- the homestead yard ------------------------------------------------------------
-	# INSIDE TERRAIN'S FLAT APRON, where the ground is exactly y = 0 by construction, so
-	# none of these needs a skirt. Every one stands clear of the pen plot clearing
-	# (PEN_PLOTS_CENTRE (-14, 13), half extent 9) and outside MARKET_RADIUS 4.5,
-	# BOARD_RADIUS 3.0 and DEPOT_RADIUS 4.0 from the buildings they sit between; ranch.gd
-	# measures both of those against the LIVE colliders rather than against these origins.
-	{"file": "saa_hay_block.glb", "at": Vector2(-3.5, -14.0), "yaw": 15.0, "family": &"mlp"},
-	{"file": "saa_wagon.glb", "at": Vector2(7.5, -13.5), "yaw": 200.0, "family": &"mlp"},
+	# --- the boardwalk up to the Palace -------------------------------------------------
+	# THE APPROACH IS THE HALF OF A DESTINATION NOBODY BUILDS. The Palace's door faces world
+	# minus Z at (-10, 57.1), which sits INSIDE its own PALACE_RADIUS (6.0 from (-10, 61.6)):
+	# a solid road tile cannot pave the last stretch to the door without ranch.gd calling it
+	# an intrusion, so the boardwalk runs a narrow lane south of the building instead --
+	# each tile at yaw 0 is only 2.28 m wide here rather than the town row's 10.52 m, because
+	# it is spaced ALONG its own long axis instead of across it -- and stops at a small
+	# clearing a few strides short of the door, which the bushes dress as the entrance. Every
+	# tile clears the Palace's own rectangle (x in [-17, -3], z in [57.1, 66.1]), the arcade
+	# band (x in [-2, 18], z in [67, 72]) and PALACE_RADIUS itself, the last with room to
+	# spare (gap 7.65 m and 10.46 m respectively, both past the 6.0 m the door opens at).
+	# The boardwalk's own two saa_dirt_road tiles came off with the road's sixteen (round 2
+	# re-review): the terrain-painted path serves the walk up, and a rigid plate on 0.36 to
+	# 0.80 m of relief was the same half-buried plank the road fix exists to end.
+	{"file": "mlp_bush.glb", "at": Vector2(-3.0, 54.0), "yaw": 200.0, "family": &"mlp"},
+	{"file": "mlp_bush.glb", "at": Vector2(-9.0, 53.5), "yaw": 40.0, "family": &"mlp"},
+	# --- the homestead yard: a farmstead, not a field with objects dropped in it ---------
+	# READ AS A PICTURE. The shed stands beside the barn with the wagon between them and hay
+	# stacked against the shed's wall, which is what a working yard looks like; the well and
+	# the coop sit on the house side; the crates and the basket cluster by the market stall
+	# so the shop has a delivery corner rather than a scatter of clutter. Every coordinate
+	# clears the Market's own new footprint (10.62 m wide at 45 degrees about (-2, -1),
+	# reaching 5.9 m on the diagonal) by at least 0.6 m, and clears every interaction radius
+	# on the map by more.
+	{"file": "saa_shed.glb", "at": Vector2(-14.5, -13.5), "yaw": 205.0, "family": &"mlp"},
+	{"file": "saa_wagon.glb", "at": Vector2(-12.0, -14.5), "yaw": 200.0, "family": &"mlp"},
+	{"file": "saa_hay_block.glb", "at": Vector2(-16.0, -11.0), "yaw": 15.0, "family": &"mlp"},
+	{"file": "saa_hay_pile.glb", "at": Vector2(-17.5, -13.0), "yaw": 40.0, "family": &"mlp"},
+	{"file": "saa_seed_bag.glb", "at": Vector2(-15.0, -10.0), "yaw": 300.0, "family": &"mlp"},
+	{"file": "mlp_farm_well.glb", "at": Vector2(5.0, -11.5), "yaw": 60.0, "family": &"mlp"},
+	{"file": "mlp_chicken_coop.glb", "at": Vector2(12.5, -11.0), "yaw": 250.0, "family": &"mlp"},
 	{"file": "mlp_crate.glb", "at": Vector2(4.0, 7.0), "yaw": 30.0, "family": &"mlp"},
 	{"file": "mlp_basket.glb", "at": Vector2(2.5, 6.0), "yaw": 0.0, "family": &"mlp"},
-	{"file": "mlp_farm_well.glb", "at": Vector2(-3.0, 5.0), "yaw": 60.0, "family": &"mlp"},
-	# The coop moved a metre west when its scale was corrected: at 2.49 m across instead of
-	# 1.29 m its near corner came 4 cm inside MARKET_RADIUS, and ranch.gd's door check said
-	# so. Scenery does not stand in a doorway, so the prop moves rather than the check.
-	{"file": "mlp_chicken_coop.glb", "at": Vector2(-9.0, -2.0), "yaw": 250.0, "family": &"mlp"},
+	{"file": "mlp_bush.glb", "at": Vector2(-6.5, -12.0), "yaw": 120.0, "family": &"mlp"},
+	{"file": "mlp_bush.glb", "at": Vector2(13.5, -6.0), "yaw": 20.0, "family": &"mlp"},
+	{"file": "saa_small_dirt_pile.glb", "at": Vector2(-11.5, -4.5), "yaw": 0.0, "family": &"mlp"},
 ]
 
 var _placed: Array[Node3D] = []

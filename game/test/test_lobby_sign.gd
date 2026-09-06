@@ -134,6 +134,34 @@ func test_the_board_assembles_front_to_back_under_a_yawed_building() -> void:
 				"a one sided label must be the side the player is on")
 
 
+## BOTH GAP TESTS MEASURE ALONG APPROACH WITH _front_reach()/dot(), NOT RAW .position.z, FOR
+## THE SAME REASON test_the_board_assembles_front_to_back_under_a_yawed_building ABOVE ALREADY
+## DOES. At yaw 0.0 the building carries no rotation, so build()'s own facing-to-local
+## conversion leaves _local_facing equal to APPROACH itself, i.e. world minus Z: a raw
+## `.position.z + size.z * 0.5` reads the WRONG side of a box whose local facing points into
+## minus Z, and would silently grade the assembly's back instead of its front. Projecting onto
+## the real approach direction is the only measurement that stays correct regardless of which
+## way local_facing happens to point.
+func test_the_trim_and_the_board_are_never_within_a_hair_of_coplanar() -> void:
+	var sign_node: LobbySign = _built_under_a_building_yawed(0.0)
+	var trim := sign_node.get_node(^"Trim") as MeshInstance3D
+	var board := sign_node.get_node(^"Board") as MeshInstance3D
+	var trim_front: float = _front_reach(trim, APPROACH)
+	var board_front: float = _front_reach(board, APPROACH)
+	assert_gt(board_front - trim_front, LobbySignScript.STANDOFF - 0.001,
+		"the board's face must stand clear of the trim's, or the two z fight")
+
+
+func test_the_headline_stands_clear_of_the_board_it_is_written_on() -> void:
+	var sign_node: LobbySign = _built_under_a_building_yawed(0.0)
+	var board := sign_node.get_node(^"Board") as MeshInstance3D
+	var headline := sign_node.get_node(^"Headline") as Label3D
+	var board_front: float = _front_reach(board, APPROACH)
+	var headline_reach: float = headline.global_position.dot(APPROACH)
+	assert_gt(headline_reach - board_front, LobbySignScript.STANDOFF - 0.001,
+		"unlit letters lying on a panel flicker against it")
+
+
 func test_neither_line_carries_a_dash() -> void:
 	for line: String in LobbySignScript.lines():
 		assert_false(line.contains("--"), "'%s' carries a double hyphen" % line)

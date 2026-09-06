@@ -15,10 +15,19 @@ extends StaticBody3D
 ## anywhere in game/assets/converted/props/. A "homestead" composed from them reads
 ## as farm equipment abandoned in a field, which is exactly what the render showed.
 ##
-## Converting the pack's complete building modules is the real fix and it belongs in
-## an asset task (this one is forbidden from touching game/assets/). In the meantime
-## a barn made of boxes is a better visual anchor than a windmill with no windmill,
-## and it buys two things a converted prop could not:
+## Converting the pack's complete building modules WAS the real fix, and slice R2 did it:
+## five of the six ranch buildings below now wear a converted PonySFM/Sweet Apple Acres
+## model (see the Model export group), turned to face the doorway and stood on this
+## shell's own plinth. The Palace is the sixth; game/world/palace_facade.gd kit-bashes it
+## out of several pieces instead, so it names no model_file here.
+##
+## THE PRIMITIVE SHELL IS THE FALLBACK NOW, NOT THE PLAN, and it still builds in full on
+## every machine, model or no model: game/assets/converted/ is gitignored (docs/ci.md
+## section 4), so a CI checkout and a fresh clone have no props at all, and a shell that
+## only stood when its model was present would leave those machines with invisible
+## collision and no skyline. On such a machine a barn made of boxes is still a better
+## visual anchor than a windmill with no windmill, and the fallback path buys two things a
+## converted prop alone could not:
 ##
 ##   1. IT IS IN GIT. Everything under game/assets/converted/ is gitignored, so a CI
 ##      checkout and a fresh clone have no props at all (docs/ci.md section 4). These
@@ -40,6 +49,7 @@ extends StaticBody3D
 
 const LayersScript := preload("res://world/collision_layers.gd")
 const PropsScript := preload("res://world/props.gd")
+const TerrainScript := preload("res://world/terrain.gd")
 
 ## Metres of headroom a doorway must offer. The pony's full 2.138 m plus a hand's
 ## width, so the number in this file is recognisably the horn-tip measurement and not
@@ -192,11 +202,63 @@ const GROUND_DROP := SKIRT_DEPTH - SEAT_CLEARANCE - PropsScript.SINK_BIAS
 ## which ranch.tscn sets to 0.45. A lot of "this building is special" for one exported float.
 @export_range(0.0, 1.0) var trim_metallic := 0.0
 
+@export_group("Model")
+## THE CONVERTED .glb THIS SHELL WEARS, or "" for the primitive shell.
+##
+## WHY THE PRIMITIVE SHELL DID NOT SIMPLY GO. game/assets/converted/ is gitignored
+## (docs/ci.md section 4), so a CI checkout and a fresh clone have no props at all. A shell
+## that only renders when its model is present would leave the CI runner, the export smoke
+## and the Windows build with a map of invisible collision. So the shell stays, in full, and
+## a model hides it only when the file is actually on the machine. `assets=absent` therefore
+## still means what ranch.gd has always printed it to mean.
+##
+## The walls, the roof, the gables and the lintel hide. THE PLINTH AND THE DOOR APRON DO
+## NOT: game/test/test_building_base.gd asserts both by name on every building on the
+## shipped map, they are what stops the terrain z fighting a base seated across a metre of
+## relief (see FLOOR_TOP), and the apron is the threshold a player walks up. What changes is
+## the plinth's COLOUR, to the terrain's own tuned DIRT (game/world/terrain.gd), so it reads
+## as the turned earth a building is set into rather than as dark timber that matches
+## nothing on a hand painted MLP model -- and its FOOTPRINT, to the model's own
+## ground-contact rectangle rather than this shell's eave-width one, so the earth reads as a
+## few centimetres of set-in ground rather than a pedestal reaching past the model on every
+## side (see GROUND_CONTACT_SLICE and _model_ground_contact_footprint()).
+@export var model_file := ""
+## Multiplier ON TOP of Props.MLP_SCALE. One, for every building on the shipped map: the
+## whole point of MLP_SCALE is that every converted Source model on this map is at one
+## scale, and a building at a different one is the clash this slice exists to end. It is an
+## export rather than a constant so a model whose shipped size is a defect (the case
+## Props.SCALE_FIX exists for) can be corrected in the scene beside the model that needs it.
+@export var model_scale := 1.0
+## Degrees the model is turned about Y inside the shell, so its own entrance faces the
+## shell's local plus Z -- which is where the doorway, the apron and the attendants are.
+## The packs do not agree on which way a model faces, so this is a measurement, taken off a
+## rendered shot, not a convention.
+@export var model_yaw := 0.0
+
 const WALL_ROUGHNESS := 0.88
 const ROOF_ROUGHNESS := 0.70
 const TRIM_ROUGHNESS := 0.45
 
+## The mesh parts a worn model hides. Collision is untouched: what the player bumps into is
+## the same box shell it has always been, sized in ranch.tscn to the model standing in front
+## of it.
+const HIDEABLE := ["WallBack", "WallLeft", "WallRight", "WallFrontL", "WallFrontR",
+	"Lintel", "RoofLeft", "RoofRight"]
+
+## HOW FAR ABOVE A WORN MODEL'S OWN FLOOR the plinth's footprint is measured across, when
+## deciding how wide the ground it stands in should be.
+##
+## THE BUG THIS CLOSES. Before this existed the plinth was sized to `width` by `depth`,
+## which Task 3 measured off the model's FULL seated AABB -- for a PonySFM cottage that is
+## the roof's own eave line, a metre or more past the walls it actually stands on. A plinth
+## that size reads as a pedestal the model was set ON rather than ground it was set INTO
+## (whole-branch review, 2026-09-05, F1). A thin slice just above the model's own floor
+## catches the walls -- which run the model's full height and so have a corner inside any
+## slice -- and misses the roof, which overhangs but does not reach down to the ground.
+const GROUND_CONTACT_SLICE := 0.5
+
 var _built := false
+var _wearing := false
 
 
 func _ready() -> void:
@@ -221,15 +283,33 @@ func build() -> void:
 	var wall_mat := _material(wall_color, WALL_ROUGHNESS)
 	var roof_mat := _material(roof_color, ROOF_ROUGHNESS)
 	var trim_mat := _material(trim_color, TRIM_ROUGHNESS, trim_metallic)
-	# THE PLINTH IS WALKED ON AND STOOD ON, NOT WORN. Floor and DoorApron are the same trim
-	# colour as the lintel, but trim_metallic is for a doorway beam catching the sun, not for a
-	# ground-level ramp: at a grazing sun angle the sloped DoorApron caught the light across its
-	# whole face and blew out to a flat gold wash covering a third of the Palace's own render
-	# (18_palace_lobby_sign, 19_marquee_and_gold_trim), which is a worse trade than the glint
-	# trim_metallic was added for. metallic is left at _material()'s own default (0.0) here on
-	# purpose, so this material never reads trim_metallic at all -- not "0.0 for now", but
-	# structurally exempt, on every building including the Palace.
-	var plinth_mat := _material(trim_color, TRIM_ROUGHNESS)
+
+	# THE MODEL GOES UP FIRST WHEN NAMED, so its own ground-contact footprint is known
+	# before the plinth beneath it is sized -- see GROUND_CONTACT_SLICE. An earlier version
+	# stood the model last, after the shell; nothing else in this file depends on that order,
+	# and this is the one thing that now has to happen before the plinth is built.
+	#
+	# THE PLINTH-PAINT DECISION AND `_wearing` GATE ON THE SAME CALL, DELIBERATELY. A file
+	# that exists but fails to load, is not a PackedScene, or measures an empty AABB used to
+	# leave `wearing` (checked only by ResourceLoader.exists()) true while _stand_model()'s
+	# own, more careful result went into _wearing -- painting the plinth as ground for a
+	# model that never actually stood, with the primitive shell still visible on top of it: a
+	# grey box on a black plinth (whole-branch review, 2026-09-05, F11; parked at Task 2's
+	# own review before that). One boolean now feeds both.
+	var wearing: bool = false
+	if model_file != "" and ResourceLoader.exists(PropsScript.PROP_DIR + model_file):
+		wearing = _stand_model()
+	_wearing = wearing
+
+	# A MODEL CHANGES WHAT THE PLINTH IS FOR. Under the primitive shell it is the building's
+	# own boarded floor and matches its lintel; under a hand painted MLP model it is the
+	# ground the model is set into, and the terrain's own tuned DIRT is the colour that
+	# already says so on every sloped hillside on the map (game/world/terrain.gd). It used to
+	# be props.gd's SKIRT_COLOUR -- near black -- which read as a box rather than earth
+	# (whole-branch review, 2026-09-05, F1).
+	var plinth_mat := _material(
+		TerrainScript.DIRT if wearing else trim_color,
+		0.95 if wearing else TRIM_ROUGHNESS)
 
 	var half_w := width * 0.5
 	var half_d := depth * 0.5
@@ -242,30 +322,41 @@ func build() -> void:
 	# PLINTH_INSET on every side so its own outer face is never flush with the wall
 	# plane standing on top of it -- see PLINTH_INSET's own comment for the coplanar
 	# pair that made.
+	#
+	# SIZED TO THE SHELL FOR A PRIMITIVE, TO THE MODEL'S OWN GROUND CONTACT FOR A WORN ONE.
+	# `width` by `depth` is the eave-width rectangle Task 3 measured a model's full seated
+	# AABB to -- right for the collision shell (still that size, see HIDEABLE's own comment)
+	# and wrong for a plinth standing under a model whose roof overhangs its own walls.
+	# See GROUND_CONTACT_SLICE and _model_ground_contact_footprint().
+	var plinth_rect: Rect2 = (_model_ground_contact_footprint()
+		if wearing else Rect2(-half_w, -half_d, width, depth))
+	var plinth_centre: Vector2 = plinth_rect.position + plinth_rect.size * 0.5
+	var plinth_size: Vector2 = plinth_rect.size
 	var plinth: float = FLOOR_TOP + SKIRT_DEPTH
-	_slab("Floor", Vector3(width - PLINTH_INSET * 2.0, plinth, depth - PLINTH_INSET * 2.0),
-		Vector3(0.0, FLOOR_TOP - plinth * 0.5, 0.0), plinth_mat)
+	_slab("Floor",
+		Vector3(plinth_size.x - PLINTH_INSET * 2.0, plinth, plinth_size.y - PLINTH_INSET * 2.0),
+		Vector3(plinth_centre.x, FLOOR_TOP - plinth * 0.5, plinth_centre.y), plinth_mat)
 
 	# --- walls -------------------------------------------------------------------
 	_slab("WallBack", Vector3(width, wall_height, t),
-		Vector3(0.0, wall_height * 0.5, -half_d + t * 0.5), wall_mat)
+		Vector3(0.0, wall_height * 0.5, -half_d + t * 0.5), wall_mat, 0.0, 0.0, true)
 	_slab("WallLeft", Vector3(t, wall_height, depth - t * 2.0),
-		Vector3(-half_w + t * 0.5, wall_height * 0.5, 0.0), wall_mat)
+		Vector3(-half_w + t * 0.5, wall_height * 0.5, 0.0), wall_mat, 0.0, 0.0, true)
 	_slab("WallRight", Vector3(t, wall_height, depth - t * 2.0),
-		Vector3(half_w - t * 0.5, wall_height * 0.5, 0.0), wall_mat)
+		Vector3(half_w - t * 0.5, wall_height * 0.5, 0.0), wall_mat, 0.0, 0.0, true)
 
 	# --- front gable end, with the doorway left out of it -------------------------
 	var panel := maxf((width - door_width) * 0.5, 0.0)
 	var front_z := half_d - t * 0.5
 	if panel > 0.001:
 		_slab("WallFrontL", Vector3(panel, wall_height, t),
-			Vector3(-(width - panel) * 0.5, wall_height * 0.5, front_z), wall_mat)
+			Vector3(-(width - panel) * 0.5, wall_height * 0.5, front_z), wall_mat, 0.0, 0.0, true)
 		_slab("WallFrontR", Vector3(panel, wall_height, t),
-			Vector3((width - panel) * 0.5, wall_height * 0.5, front_z), wall_mat)
+			Vector3((width - panel) * 0.5, wall_height * 0.5, front_z), wall_mat, 0.0, 0.0, true)
 	var lintel := wall_height - door_height
 	if lintel > 0.001:
 		_slab("Lintel", Vector3(door_width, lintel, t),
-			Vector3(0.0, door_height + lintel * 0.5, front_z), trim_mat)
+			Vector3(0.0, door_height + lintel * 0.5, front_z), trim_mat, 0.0, 0.0, true)
 
 	# --- door apron ------------------------------------------------------------------
 	# THE PLINTH'S OWN SOLID FACE, RIGHT WHERE THE DOOR GAP IS, WOULD OTHERWISE BE A SHEER
@@ -288,10 +379,14 @@ func build() -> void:
 		var apron_rise: float = FLOOR_TOP + GROUND_DROP
 		var apron_slope := sqrt(apron_run * apron_run + apron_rise * apron_rise)
 		var apron_angle := atan2(apron_rise, apron_run)
-		# The plinth's front face, not front_z: front_z is the WALL's mid-thickness plane.
-		var apron_top_z: float = half_d - PLINTH_INSET
+		# The plinth's own front face, not front_z (the WALL's mid-thickness plane) and not
+		# half_d (the WALL's own half-depth): for a worn model the plinth's front face has
+		# moved to plinth_centre.y + plinth_size.y * 0.5, the same ground-contact rectangle
+		# Floor was just sized to, so the ramp still starts exactly where the boards end
+		# rather than short of them or floating past their new, smaller edge.
+		var apron_top_z: float = plinth_centre.y + plinth_size.y * 0.5 - PLINTH_INSET
 		_slab("DoorApron", Vector3(door_width, DOOR_APRON_THICKNESS, apron_slope),
-			Vector3(0.0, FLOOR_TOP - apron_rise * 0.5, apron_top_z + apron_run * 0.5),
+			Vector3(plinth_centre.x, FLOOR_TOP - apron_rise * 0.5, apron_top_z + apron_run * 0.5),
 			plinth_mat, 0.0, apron_angle)
 
 	# --- roof ---------------------------------------------------------------------
@@ -305,8 +400,8 @@ func build() -> void:
 	var angle := atan2(rise, run)
 	var slab := Vector3(slope, 0.22, depth + eave_overhang * 2.0)
 	var mid_y := (wall_height + ridge_height) * 0.5
-	_slab("RoofLeft", slab, Vector3(-run * 0.5, mid_y, 0.0), roof_mat, angle)
-	_slab("RoofRight", slab, Vector3(run * 0.5, mid_y, 0.0), roof_mat, -angle)
+	_slab("RoofLeft", slab, Vector3(-run * 0.5, mid_y, 0.0), roof_mat, angle, 0.0, true)
+	_slab("RoofRight", slab, Vector3(run * 0.5, mid_y, 0.0), roof_mat, -angle, 0.0, true)
 
 	# --- gable infill --------------------------------------------------------------
 	# The triangle of wall between the eaves and the ridge, at each end. Two
@@ -334,7 +429,22 @@ func build() -> void:
 	gable_node.mesh = gable
 	add_child(gable_node)
 
-	_add_interior_light()
+	# THE MODEL WENT UP FIRST, before the plinth was even sized, but nothing here hides the
+	# shell it stands in front of until the shell actually exists -- which is now, the walls
+	# and the roof above having just been built. `wearing` answers false on any machine with
+	# no converted props, which is what leaves the primitives visible on CI.
+	if wearing:
+		gable_node.visible = false
+		for part: String in HIDEABLE:
+			var node := get_node_or_null(NodePath(part)) as MeshInstance3D
+			if node != null:
+				node.visible = false
+	else:
+		# NO INTERIOR LIGHT UNDER A MODEL. An invisible MeshInstance3D casts no shadow, so an
+		# OmniLight3D inside hidden walls would light the grass outside them: a glowing barn
+		# in daylight. The spec puts interiors out of scope for this slice (section 9), so the
+		# doorway is a threshold and the room behind it is the model's own business.
+		_add_interior_light()
 
 
 ## The top of the plinth and the bottom of the skirt, in this building's own parent space.
@@ -358,6 +468,128 @@ func apron_foot_z() -> float:
 	if door_width <= 0.001:
 		return depth * 0.5
 	return depth * 0.5 - PLINTH_INSET + DOOR_APRON_RUN
+
+
+## True if this shell actually stands a converted model rather than its own primitives.
+## False before build(), false for a shell with no model_file, and false on any machine
+## where that file has not been converted.
+func wears_a_model() -> bool:
+	return _wearing
+
+
+## Instance model_file, scale it into the MLP family, turn it to face the doorway and stand
+## it on the plinth. Returns true if a model actually went up.
+##
+## SEATED BY ITS OWN BOUNDING BOX, NOT BY ITS ORIGIN, for the reason props.gd's own class
+## comment gives at length: these packs do not agree on where a model's origin is, so the
+## only reliable way to put a floor on a floor is to measure the floor. Measured AFTER the
+## scale and the yaw are applied and the node is in the tree, because a footprint is the
+## footprint of the model as it will actually stand.
+##
+## AND IT LANDS ON FLOOR_TOP RATHER THAN ON LOCAL ZERO. Local y = 0 is nearly a metre inside
+## a solid plinth (see GROUND_DROP); a model dropped there would be half buried, and its
+## bottom would drag the whole building's world AABB down, which is the number ranch.gd
+## seats every building by and then re-checks. Standing it on the plinth's own top face
+## leaves the plinth's underside the lowest thing under this node, exactly as before.
+func _stand_model() -> bool:
+	if model_file.is_empty():
+		return false
+	var path: String = PropsScript.PROP_DIR + model_file
+	if not ResourceLoader.exists(path):
+		return false
+	var scene: Resource = load(path)
+	if scene == null or not (scene is PackedScene):
+		push_error("Building '%s': '%s' did not load as a PackedScene" % [name, path])
+		return false
+	var inst: Node3D = (scene as PackedScene).instantiate()
+	if inst == null:
+		push_error("Building '%s': '%s' failed to instantiate" % [name, path])
+		return false
+	var holder := Node3D.new()
+	holder.name = "Model"
+	add_child(holder)
+	holder.add_child(inst)
+	inst.scale = Vector3.ONE * (PropsScript.MLP_SCALE * model_scale)
+	inst.rotation.y = deg_to_rad(model_yaw)
+
+	var box: AABB = PropsScript.world_aabb(holder)
+	if box.size == Vector3.ZERO:
+		push_error("Building '%s': '%s' measured an empty AABB" % [name, path])
+		holder.queue_free()
+		return false
+	# Centre it on the shell in XZ and put its floor on the plinth's top face. global_position
+	# is used because world_aabb() is a world space measurement and the parent may be turned.
+	var centre: Vector3 = box.get_center()
+	holder.global_position += Vector3(0.0, FLOOR_TOP - box.position.y, 0.0)
+	holder.global_position -= Vector3(centre.x - global_position.x, 0.0,
+		centre.z - global_position.z)
+	return true
+
+
+## THE MODEL'S OWN WALLS, NOT ITS ROOF: a rectangle in THIS BUILDING'S OWN LOCAL FRAME
+## (the frame Floor and DoorApron are both built in), covering only the geometry standing
+## within GROUND_CONTACT_SLICE of the model's own floor. Call only after _stand_model() has
+## returned true, so `Model` exists and already stands on the plinth's top face.
+##
+## WHY A SLICE RATHER THAN THE WHOLE MODEL. A PonySFM cottage's roof oversails its walls the
+## same way this shell's own eave_overhang does; measuring every mesh over its full height
+## reproduces `width` by `depth`, the eave line, which is the black-pedestal defect this
+## function exists to close (F1). A thin band just above the floor catches every VERTEX that
+## actually touches the ground -- a wall runs the model's full height, so it has vertices in
+## any slice -- while the roof, whose lowest point is the eave itself, has none.
+##
+## REAL VERTICES, NOT A MESH'S OWN AABB CORNERS -- unlike every other footprint measurement
+## in this file and in props.gd, which is corner-of-AABB and says so. Measured here (a
+## converted `tools/convert_props.sh` model), every building on the shipped map turned out
+## to be ONE MeshInstance3D per model (walls, roof and all, baked into a single surface by
+## the SFM/glTF export), so a bounding box has exactly one width regardless of which height
+## it is sliced at: a corner-of-AABB version of this function returned the full eave
+## rectangle for every building tried, because the box's own bottom corners span the same
+## width its top corners do. Walking the mesh's actual `ARRAY_VERTEX` data is the only way
+## to tell "the wall passes through this slice" from "the roof's bounding box does" when
+## both live in the same MeshInstance3D. Paid once per building at map-build time, not per
+## frame -- tens of thousands of Vector3 transforms is not free, but it is not a frame
+## budget either.
+##
+## MEASURED IN THIS BUILDING'S OWN LOCAL FRAME (via to_local()), not world space, because
+## Floor and DoorApron are both positioned in that frame and a turned building's world AABB
+## of its own footprint is a LOOSER box than the footprint itself -- test_building_base.gd's
+## own class comment makes the identical argument for the door apron.
+func _model_ground_contact_footprint() -> Rect2:
+	var holder := get_node_or_null(^"Model") as Node3D
+	var fallback := Rect2(-width * 0.5, -depth * 0.5, width, depth)
+	if holder == null:
+		return fallback
+	var meshes: Array = holder.find_children("*", "MeshInstance3D", true, false)
+	var ceiling := FLOOR_TOP + GROUND_CONTACT_SLICE
+	var min_x := INF
+	var max_x := -INF
+	var min_z := INF
+	var max_z := -INF
+	for m: MeshInstance3D in meshes:
+		var mesh: Mesh = m.mesh
+		if mesh == null:
+			continue
+		var xform: Transform3D = m.global_transform
+		for surf in range(mesh.get_surface_count()):
+			if mesh.surface_get_primitive_type(surf) != Mesh.PRIMITIVE_TRIANGLES:
+				continue
+			var arrays: Array = mesh.surface_get_arrays(surf)
+			var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+			for v: Vector3 in verts:
+				var corner: Vector3 = to_local(xform * v)
+				if corner.y > ceiling + 0.001:
+					continue
+				min_x = minf(min_x, corner.x)
+				max_x = maxf(max_x, corner.x)
+				min_z = minf(min_z, corner.z)
+				max_z = maxf(max_z, corner.z)
+	if min_x == INF or max_x - min_x <= 0.001 or max_z - min_z <= 0.001:
+		# No vertex found within the slice -- should not happen for a model that actually
+		# reaches the ground, but a zero-size plinth under a standing model is worse than
+		# the eave rectangle this falls back to.
+		return fallback
+	return Rect2(min_x, min_z, max_x - min_x, max_z - min_z)
 
 
 ## Terrain height at this footprint's four corners, its four edge midpoints and its centre
@@ -450,8 +682,14 @@ func _material(colour: Color, surface_roughness := 0.88, metallic := 0.0) -> Sta
 ## what you see and what you bump into cannot drift apart. `roll` (rotation about Z) is
 ## what the roof slabs lean on; `pitch` (rotation about X) is what the door apron leans
 ## on -- see build()'s door apron block for the rotation this is derived from.
+##
+## `_hideable` marks a slab that a worn model replaces. It is deliberately UNREAD: the
+## hiding happens in build() through the HIDEABLE list, so the set of parts a model covers
+## is one list in one place rather than eight booleans spread down a function. The parameter
+## exists so a reader of the call site knows which slabs are structural (Floor, DoorApron)
+## and which are the shell.
 func _slab(slab_name: String, size: Vector3, at: Vector3, mat: StandardMaterial3D,
-		roll := 0.0, pitch := 0.0) -> void:
+		roll := 0.0, pitch := 0.0, _hideable := false) -> void:
 	var box := BoxMesh.new()
 	box.size = size
 	box.material = mat

@@ -38,6 +38,17 @@ const TEXT_COLOR := Color(1.0, 0.92, 0.62)
 const TRIM := 0.08
 const THICKNESS := 0.10
 
+## HOW FAR EACH LAYER STANDS IN FRONT OF THE ONE BEHIND IT, and why it is not 0.03.
+##
+## THE BUG THIS CLOSES. The trim slab was 0.10 deep centred on the origin (front face at
+## +0.05) and the board 0.06 deep centred 0.03 in front of it (front face at +0.06): one
+## centimetre apart across two full sized quads, which at any distance is two surfaces
+## fighting for the same pixels. The owner's word for it was flickering; the render showed a
+## gold board strobing through a purple one as the camera moved. Five centimetres is small
+## enough that nobody reads it as a design change and large enough that the depth buffer has
+## never been asked to choose at any camera distance this game reaches.
+const STANDOFF := 0.05
+
 ## The headline's cap height as a fraction of the board, and the subline's as a fraction of
 ## the headline. Strip.MARQUEE_HEADLINE_FRACTION's and MARQUEE_SPONSOR_SCALE's numbers, for
 ## the same reason: they were arrived at by looking at a rendered board.
@@ -93,14 +104,25 @@ func build(board_width: float, board_height: float, facing: Vector3,
 	var anchor: float = board_height * 0.5 + TRIM
 	_slab("Trim", Vector3(board_width + TRIM * 2.0, board_height + TRIM * 2.0, THICKNESS),
 		Vector3(0.0, anchor, 0.0), TRIM_COLOR)
-	_slab("Board", Vector3(board_width, board_height, THICKNESS * 0.6),
-		Vector3(0.0, anchor, 0.0) + _local_facing * 0.03, BOARD_COLOR)
 
+	# THE BOARD IS THINNER THAN THE TRIM (0.6x its depth), so a bare STANDOFF added to the
+	# CENTRE offset under-delivers: half of the trim's own depth minus half of the board's own
+	# depth eats into the gap before STANDOFF ever gets a say. Carrying that difference here is
+	# what makes the two FRONT FACES actually land STANDOFF apart, which is the whole promise
+	# the constant's own comment makes.
+	var board_depth: float = THICKNESS * 0.6
+	var board_offset: float = THICKNESS * 0.5 - board_depth * 0.5 + STANDOFF
+	_slab("Board", Vector3(board_width, board_height, board_depth),
+		Vector3(0.0, anchor, 0.0) + _local_facing * board_offset, BOARD_COLOR)
+
+	# THE LETTERS STAND ANOTHER STANDOFF PAST THE BOARD'S OWN FRONT FACE, not past its centre,
+	# for the same reason the board's own offset above is not a bare STANDOFF.
 	var headline_height: float = board_height * HEADLINE_FRACTION
+	var label_offset: float = THICKNESS * 0.5 + STANDOFF * 2.0
 	_label("Headline", headline, headline_height,
-		Vector3(0.0, anchor + board_height * 0.18, 0.0) + _local_facing * 0.07)
+		Vector3(0.0, anchor + board_height * 0.18, 0.0) + _local_facing * label_offset)
 	_label("Subline", subline, headline_height * SUBLINE_SCALE,
-		Vector3(0.0, anchor - board_height * 0.20, 0.0) + _local_facing * 0.07)
+		Vector3(0.0, anchor - board_height * 0.20, 0.0) + _local_facing * label_offset)
 
 
 func _slab(slab_name: String, size: Vector3, at: Vector3, colour: Color) -> void:

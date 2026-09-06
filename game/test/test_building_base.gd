@@ -269,6 +269,7 @@ func test_no_doorway_on_the_shipped_map_is_still_a_sheer_step() -> void:
 		for c: Vector3 in _apron_corners_local(b):
 			apron_world = apron_world.expand(b.global_transform * c)
 		var floor_node := b.get_node_or_null(^"Floor") as MeshInstance3D
+		assert_not_null(floor_node, "%s has a plinth" % b.name)
 		var plinth_box: BoxMesh = floor_node.mesh
 		var plinth_world := AABB(floor_node.global_position, Vector3.ZERO)
 		var ph: Vector3 = plinth_box.size * 0.5
@@ -288,16 +289,21 @@ func test_no_doorway_on_the_shipped_map_is_still_a_sheer_step() -> void:
 			"%s: the apron stops %.3f m above the ground it is supposed to reach (%.3f)"
 				% [b.name, apron_world.position.y - lowest, lowest])
 
-		# 2. OUTSIDE THE FOOTPRINT, in the building's own basis.
-		var front_z: float = b.depth * 0.5 - BuildingScript.PLINTH_INSET
-		var half_w: float = b.width * 0.5 - BuildingScript.PLINTH_INSET
+		# 2. OUTSIDE THE FOOTPRINT, in the building's own basis, MEASURED OFF THE REAL
+		# PLINTH rather than re-derived from width/depth: a worn model's plinth is sized to
+		# its own ground-contact footprint now (Building.build(), whole-branch review,
+		# 2026-09-05, F1), which for a building that wears a model is smaller than the
+		# shell's eave-width rectangle those two properties still describe.
+		var front_z: float = floor_node.position.z + plinth_box.size.z * 0.5
+		var half_w: float = plinth_box.size.x * 0.5
+		var plinth_x: float = floor_node.position.x
 		var furthest := -INF
 		for c: Vector3 in _apron_corners_local(b):
 			furthest = maxf(furthest, c.z)
 			if c.y > BuildingScript.FLOOR_TOP + 0.001:
 				assert_gt(c.z, front_z - 0.001,
 					"%s: an apron corner sits above the boards and inside the plinth" % b.name)
-			assert_lte(absf(c.x), half_w + 0.001,
+			assert_lte(absf(c.x - plinth_x), half_w + 0.001,
 				"%s: the apron is wider than the plinth it leans on" % b.name)
 		assert_gt(furthest, front_z + BuildingScript.DOOR_APRON_RUN * 0.9,
 			"%s: the apron does not leave the plinth's own footprint (reaches %.3f, the "
