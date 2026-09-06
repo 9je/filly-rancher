@@ -88,12 +88,17 @@ const MARK_COLOR := Color(0.745, 0.694, 0.541)
 ## pale lines whether anybody is looking or not. Add one real 2.25 m fence and the picture is
 ## the one the owner reported: "wtf is happening here".
 ##
-## MARK_FAR_METRES IS UNDER THE GRID SPACING ON PURPOSE. At 8.0 m, standing in the middle of
-## one plot leaves its neighbour 9 m away and therefore dark, so exactly one marked square is
-## ever lit -- which is also what makes it read as an answer to "where am I" rather than as
-## scenery. MARK_NEAR_METRES is the slot's own trigger reach (TRIGGER_HALF plus a body
-## radius, 4.77 m), so the markers are at full strength for precisely as long as the build
-## prompt is up.
+## MARK_FAR_METRES IS UNDER THE GRID SPACING ON PURPOSE. At 8.0 m, standing at a plot's
+## CENTRE leaves its neighbour 9 m away and therefore dark, so exactly one marked square is
+## lit from there -- which is what makes the centre case read as an answer to "where am I"
+## rather than as scenery. THAT IS NOT THE ONLY POSITION SHE STANDS IN, THOUGH (final review
+## F7): from the legal build band between two plots, or at a built pen's own gate, her
+## distance to each of two neighbours can both fall inside MARK_NEAR_METRES at once (4.40 m
+## and 4.60 m, measured live), so the honest claim is "at most two marked squares ever carry
+## light in that band, and exactly one from a plot's centre" -- an improvement over four
+## permanently lit squares, not a guarantee of one. MARK_NEAR_METRES is the slot's own
+## trigger reach (TRIGGER_HALF plus a body radius, 4.77 m), so the markers are at full
+## strength for precisely as long as the build prompt can be up.
 const MARK_NEAR_METRES := 4.8
 const MARK_FAR_METRES := 8.0
 
@@ -284,11 +289,16 @@ func is_on_footprint(point: Vector3, radius: float) -> bool:
 ## The reason names the LINE, because the line is drawn on the ground in front of her
 ## (_refresh_stakes draws it on STAKE_INSET, the same 3.9 m Pen.HALF_EXTENT stands its fence
 ## on) -- which is what makes a refusal actionable instead of mysterious.
+##
+## SHORT, ON PURPOSE (final review F6): the full sentence used to read "cannot build, too
+## close to the fence line, step outside the markers", which at 1280x720 ran the last four
+## words behind the H card. This is the actionable half alone -- what to DO, not the reason
+## she already has a marked square in front of her to tell her.
 func placement_check(point: Vector3, radius: float) -> Dictionary:
 	if not is_empty():
 		return {"ok": false, "reason": "something already stands here"}
 	if is_on_footprint(point, radius):
-		return {"ok": false, "reason": "too close to the fence line, step outside the markers"}
+		return {"ok": false, "reason": "step outside the markers"}
 	return {"ok": true, "reason": ""}
 
 
@@ -301,6 +311,11 @@ func set_ghost(state: int) -> void:
 		return
 	_ghost_state = wanted
 	if _ghost != null:
+		# ADOPT BY REMOVING FIRST, the same hazard _refresh_stakes() below was fixed for:
+		# queue_free() only queues, so a flip VALID<->REFUSED on the same frame would leave
+		# the old ghost still parented beside the new one, and two translucent volumes
+		# would blend over each other for the rest of that frame.
+		remove_child(_ghost)
 		_ghost.queue_free()
 		_ghost = null
 	if _ghost_state == Ghost.OFF:
@@ -455,12 +470,18 @@ func _mark(mark_name: String, size: Vector3, at: Vector3, mat: StandardMaterial3
 
 ## Unshaded and transparent: this is a diagram drawn on the world, not a thing in it, and a
 ## lit preview would change colour with the hour and stop meaning yes or no.
+##
+## CULL_BACK, NOT CULL_DISABLED (final review F5). The third-person rig sits behind and low
+## enough that it is routinely inside a neighbouring plot's wall box, and with back-face
+## culling off the inside of those walls rendered too -- a 0.34-alpha slab across the bottom
+## of the frame, tinting the pony and the HUD. Back-face culling means a camera inside the
+## volume looks through the wall it is inside instead of seeing its own lining.
 func _ghost_material(colour: Color) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = colour
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mat.cull_mode = BaseMaterial3D.CULL_BACK
 	return mat
 
 

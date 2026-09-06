@@ -2097,7 +2097,7 @@ func newest_unread_row() -> Dictionary:
 func open_mailbox_letter() -> bool:
 	var rows: Array[Dictionary] = mail_rows()
 	if rows.is_empty():
-		_toast(MAILBOX_EMPTY_TOAST)
+		_deny(MAILBOX_EMPTY_TOAST)
 		return false
 	var row: Dictionary = newest_unread_row()
 	if row.is_empty():
@@ -4073,17 +4073,17 @@ func _on_plot_chosen(plot: PlotData, slot: PlotSlot) -> void:
 	if plot == null or slot == null:
 		return
 	if _economy != null and not _economy.can_afford(plot.cost):
-		_toast("You cannot afford a %s yet." % plot.display_name)
+		_deny("You cannot afford a %s yet." % plot.display_name)
 		return
 	# THE SECOND HALF OF THE PLAYTEST REPORT THE GATE FIXES THE FIRST HALF OF. Checked HERE
 	# as well as at the prompt, because this is the last point before a fence exists and the
 	# prompt is only the last point before a MENU does -- and nothing stops a future caller
 	# reaching _on_plot_chosen by another route.
 	if _player_stands_on_footprint(slot):
-		_toast("Step outside the plot markers first, or you would be fenced in.")
+		_deny("Step outside the plot markers first, or you would be fenced in.")
 		return
 	if not slot.build(plot):
-		_toast("Nothing can go up on that plot.")
+		_deny("Nothing can go up on that plot.")
 		return
 	if _economy != null:
 		_economy.spend(plot.cost)
@@ -4300,8 +4300,8 @@ func _nearest_occupied_slot() -> PlotSlot:
 ## (_prompt_slot) doubled as the mutex the other four consulted. The prompt is a persistent
 ## label now, so there is nothing to fire once and nothing to go stale.
 func _update_interaction() -> void:
-	_paint_plots()
 	var action: Dictionary = current_interaction()
+	_paint_plots(action)
 	var hud := get_node_or_null(^"HUD")
 	if hud != null and hud.has_method("set_prompt"):
 		hud.set_prompt(InteractionScript.prompt_for(action,
@@ -4313,30 +4313,35 @@ func _update_interaction() -> void:
 
 ## THE GROUND ANSWERS BEFORE THE MENU DOES.
 ##
-## Exactly one slot ever wears a ghost: the one she is standing in. Painting every slot she
-## can see would put four coloured footprints in the clearing, which is the thicket this
-## slice is also fixing (see game/world/plot_slot.gd's marker fade), and a preview that is
-## everywhere is a preview that answers nothing.
-##
-## Driven off the same placement_check() the refusal itself uses, so the colour under her
-## hooves and the sentence she gets if she presses anyway can never disagree.
+## Exactly one slot ever wears a ghost: the one the RESOLVER picked, not merely one she
+## overlaps. The four slots sit on a 9 m grid and a trigger holds her out to 4.77 m, so the
+## legal build band between two neighbours -- and a built pen's own gate -- routinely put
+## her inside two slots' Area3Ds at once; painting off overlap alone greened both of them
+## (or greened an empty neighbour beside a pen whose gate had already won PEN_MOVE_IN), which
+## is a second version of the thicket this slice exists to fix (final review F2). So this
+## takes the ALREADY-RESOLVED `action` -- the one thing E will actually do -- rather than
+## re-deriving its own opinion from overlap: every slot is OFF, and only the slot named by a
+## resolved PLOT_BUILD candidate is coloured, using the `reason` that candidate already
+## carries so the ground and the refusal can never disagree.
 ##
 ## Also where every slot's marker fade is driven, every frame: the same walk over
-## _plot_slots() that decides the ghost already has her distance to each one for free, and a
+## _plot_slots() that paints the ghost already has her distance to each one for free, and a
 ## fade that lagged the ghost by a frame would be a second, smaller version of the thicket.
-func _paint_plots() -> void:
+func _paint_plots(action: Dictionary) -> void:
 	if player == null:
 		return
 	var at: Vector3 = player.global_position
+	var winner: PlotSlot = null
+	if int(action.get("kind", InteractionScript.Kind.NONE)) == InteractionScript.Kind.PLOT_BUILD:
+		winner = _slot_named(String(action.get("subject", "")))
 	for slot in _plot_slots():
 		slot.set_marker_focus(Vector2(at.x - slot.global_position.x,
 			at.z - slot.global_position.z).length())
-		if not slot.is_empty() or not (player in slot.get_overlapping_bodies()):
+		if slot != winner:
 			slot.set_ghost(PlotSlotScript.Ghost.OFF)
 			continue
-		var verdict: Dictionary = slot.placement_check(at, PLAYER_BODY_RADIUS)
-		slot.set_ghost(PlotSlotScript.Ghost.VALID if bool(verdict["ok"])
-			else PlotSlotScript.Ghost.REFUSED)
+		var refused: bool = not String(action.get("reason", "")).is_empty()
+		slot.set_ghost(PlotSlotScript.Ghost.REFUSED if refused else PlotSlotScript.Ghost.VALID)
 
 
 ## IS THE PLAYER STANDING WHERE THE FENCE IS ABOUT TO GO UP?
@@ -5115,7 +5120,12 @@ func _report(pony_count: int, prop_count: int) -> void:
 	_set_check(checks, "every plot slot is either marked or built, never both and never neither",
 		stray == 0)
 	_set_check(checks, "no plot slot carries two sets of markers", duplicated == 0)
-	_set_check(checks, "the marked plots do not light each other across the 9 m grid",
+	# HONEST ABOUT WHAT THIS BOUNDS (final review F7): MARK_FAR_METRES < 9.0 only proves the
+	# CENTRE case -- standing in the middle of one plot leaves a 9 m-away neighbour dark. In
+	# the legal build band between two plots, or at a built pen's own gate, two neighbours
+	# can both sit inside MARK_NEAR_METRES at once (measured live: 4.40 m and 4.60 m), so at
+	# most two marked squares ever carry light in that band, not necessarily one.
+	_set_check(checks, "MARK_FAR_METRES stays under the 9 m grid spacing (one square lit from a plot's centre)",
 		PlotSlotScript.MARK_FAR_METRES < 9.0)
 
 	# THE PEN PROBE. See _probe_pen_containment() for why this runs at boot in every mode

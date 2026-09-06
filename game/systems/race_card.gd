@@ -77,7 +77,7 @@ const COMPANY_HAPPINESS := 0.7
 const TRACK_LENGTH := 40.0
 
 ## The band a runner's speed is squashed into, in metres per second. Inside Gait's skate free
-## gallop band (GALLOP_HANDOVER_SPEED 1.98 to TOP_SKATE_FREE_SPEED 4.29) so every lane reads
+## gallop band (GALLOP_HANDOVER_SPEED 1.98 to TOP_SKATE_FREE_SPEED 4.785) so every lane reads
 ## as a gallop and none of them slides.
 const SLOWEST_SPEED := 2.6
 const FASTEST_SPEED := 4.2

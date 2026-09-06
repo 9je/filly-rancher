@@ -179,9 +179,9 @@ const DETECTION_RADIUS := 12.0
 ## is nearly a second of head start on top of the 3.5 m everyone gets), and small enough
 ## that the chase still closes. At RUN_SPEED she is caught after ~2 s of running, not ~1.3.
 ## The lever deliberately used here is her EYESIGHT rather than her flee SPEED: speed is
-## clamped by what the gallop clip can depict (flee_speed_for), so pushing difficulty
-## through it would saturate at 4.29 m/s and leave a chase that closes at 0.9 m/s -- which
-## is not "difficult", it is "long".
+## clamped by flee_speed_for()'s own FLEE_TOP_SPEED (4.29 m/s, pinned for capture balance,
+## not for what the gallop clip can depict), so pushing difficulty through it would saturate
+## there and leave a chase that closes at 0.91 m/s -- which is not "difficult", it is "long".
 const SHY_NOTICE_BONUS := 2.0
 
 ## What a pony's notice radius is MULTIPLIED BY while the player is sneaking (holding
@@ -238,15 +238,25 @@ const MAX_WANDER_PLAYBACK := 2.0
 ## commits to the chase.
 ##
 ## The CEILING is the interesting number, and it is not set here -- flee_speed_for()
-## clamps to Gait.TOP_SKATE_FREE_SPEED (4.29 m/s), the fastest any authored clip can
-## honestly depict. That clamp is what makes the player's 5.20 m/s run strictly faster
-## than ANY wild pony can flee, whatever a roster edit puts in `base_speed`: a SHY Rainbow
-## Dash (base_speed 6.5, which scales to 5.36 m/s) is pinned back to 4.29 and is therefore
-## still catchable. Before the first playtest retune the player's gallop was 4.0 m/s and
-## that same pony would have been 7% FASTER than the player and literally uncatchable in a
-## straight line. She is BOLD on today's roster, so nobody ever hit it -- it was a
-## landmine waiting for a personality edit, not a live bug.
+## clamps to FLEE_TOP_SPEED (4.29 m/s), THIS FILE'S OWN CONSTANT, not Gait's. That clamp is
+## what makes the player's 5.20 m/s run strictly faster than ANY wild pony can flee,
+## whatever a roster edit puts in `base_speed`: a SHY Rainbow Dash (base_speed 6.5, which
+## scales to 5.36 m/s) is pinned back to 4.29 and is therefore still catchable. Before the
+## first playtest retune the player's gallop was 4.0 m/s and that same pony would have been
+## 7% FASTER than the player and literally uncatchable in a straight line. She is BOLD on
+## today's roster, so nobody ever hit it -- it was a landmine waiting for a personality
+## edit, not a live bug.
 const NOMINAL_FLEE_SPEED := GaitScript.GALLOP_CLIP_SPEED
+
+## THE CEILING flee_speed_for() CLAMPS TO -- PINNED HERE, NOT READ OFF GAIT (final review
+## F3, controller ruling). This used to be Gait.TOP_SKATE_FREE_SPEED directly, which slice
+## R3's animation retune (GALLOP_MAX_PLAYBACK 1.3 -> 1.45) silently carried from 4.29 to
+## 4.785: three roster ponies clamp here (soarin 6.0, spitfire 6.2, lightningdust 6.3) and
+## would have started bolting 12% faster with no design decision behind it. CAPTURE BALANCE
+## IS GAMEPLAY, NOT ANIMATION, so this does not track the clip's playback ceiling even
+## though the two happened to be equal before this slice -- a future retune of how fast the
+## legs are allowed to blur must not silently move how fast a pony can outrun the player.
+const FLEE_TOP_SPEED := 4.29
 
 ## How close a CURIOUS pony comes before stopping to watch, in metres. Comfortably
 ## inside her own notice radius even when the player is sneaking (6.0 m -- she would
@@ -608,8 +618,8 @@ static func wander_speed_for(base_speed: float) -> float:
 
 ## Bolting speed for a pony with this `base_speed`, in m/s. Clamped into the `gallop`
 ## clip's band: the floor makes fleeing ALWAYS look like a gallop no matter how timid the
-## record says she is, and the ceiling is Gait.TOP_SKATE_FREE_SPEED, so it never costs
-## foot skate no matter how fast.
+## record says she is, and the ceiling is this file's own FLEE_TOP_SPEED (4.29 m/s), so it
+## never costs foot skate no matter how fast.
 ##
 ## The floor is Gait.GALLOP_HANDOVER_SPEED PLUS FIVE PER CENT, for exactly the reason
 ## wander_speed_for() above sits five per cent over Gait.IDLE_SPEED: the boundary is
@@ -630,8 +640,7 @@ static func wander_speed_for(base_speed: float) -> float:
 ## 2.52, which no character on the current roster has.
 static func flee_speed_for(base_speed: float) -> float:
 	var scaled := NOMINAL_FLEE_SPEED * (base_speed / REFERENCE_BASE_SPEED)
-	return clampf(scaled, GaitScript.GALLOP_HANDOVER_SPEED * 1.05,
-		GaitScript.TOP_SKATE_FREE_SPEED)
+	return clampf(scaled, GaitScript.GALLOP_HANDOVER_SPEED * 1.05, FLEE_TOP_SPEED)
 
 
 ## The magic beam taking or releasing physics control of this pony. While held she runs

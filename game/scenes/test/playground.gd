@@ -89,15 +89,16 @@ const MAX_DRIVE_FRACTION := 1.06
 ## test. Running is the DEFAULT gait since the second playtest, so this phase drives at
 ## player.gd's RUN_SPEED = 5.2 m/s. That is past the gallop handover, so Gait's ladder picks
 ## `gallop`, whose clip depicts 3.30 m/s. The honest rate would be 5.2 / 3.3 = 1.576x, but
-## the gallop window tops out at GALLOP_MAX_PLAYBACK (1.3x) before the legs read as a blur
-## -- and player.gd's own comment is explicit that RUN_SPEED is DEFINED as that clip
-## saturated at the bound, not merely clamped incidentally. So 1.3 is the expected rate, as
+## the gallop window tops out at GALLOP_MAX_PLAYBACK (1.45x, retuned from 1.3x by slice R3
+## -- see that constant's own comment in game/systems/gait.gd) before the legs read as a
+## blur -- and player.gd's own comment is explicit that RUN_SPEED is DEFINED as that clip
+## saturated at the bound, not merely clamped incidentally. So 1.45 is the expected rate, as
 ## a literal. game/test/test_gait.gd pins the clip speeds themselves against the exporter's
 ## printed GALLOP_IMPLIED_SPEED, so a retuned stride goes red THERE first and tells you to
 ## change these.
 const EXPECTED_DRIVE_CLIP := "gallop"
 const EXPECTED_DRIVE_SPEED := 5.2
-const EXPECTED_DRIVE_SCALE := 1.3
+const EXPECTED_DRIVE_SCALE := 1.45
 ## Tolerances: she reaches RUN_SPEED exactly (move_toward clamps to the target) and holds
 ## it, so these only have to absorb float noise, not a ramp.
 const DRIVE_SPEED_TOLERANCE := 0.01
@@ -194,7 +195,7 @@ func _finish() -> void:
 		"played the clip her default running speed calls for": _drive_clip == EXPECTED_DRIVE_CLIP,
 		# Two halves, and both are needed. The speed check is what gives the scale check its
 		# teeth: pinning the rate alone would still pass if she were ambling at some other
-		# speed and the rate happened to saturate at 1.3 anyway.
+		# speed and the rate happened to saturate at 1.45 anyway.
 		"held exactly RUN_SPEED while driving":
 			absf(_drive_speed - EXPECTED_DRIVE_SPEED) <= DRIVE_SPEED_TOLERANCE,
 		"scaled gallop playback to the rate 5.2 m/s saturates at":

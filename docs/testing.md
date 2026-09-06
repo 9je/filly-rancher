@@ -328,7 +328,7 @@ GUT's own default of not descending into subdirectories without
 **And a floor on the test count**, for the half the script count cannot see: a
 file that still parses but has lost most of its tests (a mass rename, a bad
 merge, a `func test_x` that became `func x`). `MIN_TESTS` in
-`tools/run_tests.sh` -- currently **1645** -- is a deliberate FLOOR rather than an
+`tools/run_tests.sh` -- currently **1647** -- is a deliberate FLOOR rather than an
 exact count, so adding tests never breaks the build. Raise it when the suite
 grows; never lower it without saying in the same commit which tests went away
 and why. (It was 194 through Phase 1A and was raised to the suite's real size in
@@ -351,7 +351,12 @@ to 1645, by slice R3's own growth -- the hair speed rule, the clip-phase
 hoofstep cadence, the interact tier, the debounced refusal, the placement check
 and the plot marker census all brought tests with them -- proved both ways per
 the section below at the new number: the suite passes at 1645 and a
-`FILLY_MIN_TESTS=99999` run still fails on it.)
+`FILLY_MIN_TESTS=99999` run still fails on it. It was raised once more, from
+1645 to 1647, by the R3 final review's own fix wave (the ghost's overlap-band
+scenario test and the pinned flee-speed ceiling test) -- proved both ways
+again: the suite passes at 1647 (`Tests 1647 / Passing 1647 / 68506 asserts`)
+and a `FILLY_MIN_TESTS=99999` run against the same real suite still fails with
+`ERROR: GUT ran 1647 tests, below this suite's floor of 99999`.)
 
 **Proving both guards, safely:**
 
@@ -717,15 +722,22 @@ stand 1.2 m apart, and an owner's screenshot of the clearing read as a thicket o
 parallel pale lines rather than four plots and one fence. The markers now fade with
 distance (`PlotSlot.set_marker_focus()`), full strength inside `MARK_NEAR_METRES`
 (4.8 m, the slot's own trigger reach) and gone past `MARK_FAR_METRES` (8.0 m,
-deliberately UNDER the 9 m grid spacing so standing in one plot never lights its
-neighbour). `marked` counts empty slots carrying at least one marker; `stray` counts
+deliberately UNDER the 9 m grid spacing). Standing at a plot's CENTRE that leaves its
+neighbour 9 m away and dark, so exactly one marked square is lit from there. That is
+not the only position she stands in, though (final review F7): from the legal build
+band between two plots, or at a built pen's own gate, her distance to two neighbours
+can both fall inside `MARK_NEAR_METRES` at once, so the honest claim is **at most two
+marked squares ever carry light in that band, and exactly one from a plot's centre** --
+a real improvement over four permanently lit squares, not a guarantee of one.
+`marked` counts empty slots carrying at least one marker; `stray` counts
 any slot caught with the wrong pairing -- an empty slot with no markers, or a built
 slot that still has some -- and should always be zero; `duplicated` counts any slot
 carrying more than one `PlotMarks` node, which is what a build-then-demolish that
 adopted its old node by a cached handle rather than by name would leave behind, and
 should also always be zero. Three checks ride with the numbers: every plot slot is
 either marked or built (never both, never neither), no plot slot carries two sets of
-markers, and `MARK_FAR_METRES` is under the 9 m grid spacing.
+markers, and `MARK_FAR_METRES` is under the 9 m grid spacing (which bounds the centre
+case only, not the band case above).
 
 **Looking at the sky.** The gate checks numbers; only a person can say whether a
 stormy dusk *looks* like one. `bash tools/sky_sheet.sh` renders the ranch once
