@@ -206,6 +206,84 @@ const STACKED_CHAIN_STIFFNESS := 1.0
 const SPAN_REFERENCE_JOINTS := 5
 const SPAN_EXPONENT := 2.5
 
+## HOW MUCH OF THE SPRING SOLVE SURVIVES, AS A FUNCTION OF HOW FAST THE ANCHOR IS MOVING.
+##
+## THE DEFECT. Section 11.1 of docs/notes-hair-sim.md established that `stiffness` is a
+## restoring SPEED in metres per second, and that a chain holds its shape only while that
+## speed comfortably exceeds how fast its anchor is dragged. Measured on the player's own
+## rig (pokeypierce, which is what game/data/hidden/stock_shy.tres names): her tail runs at
+## 4.33 m/s and her six mane locks at 3.70 m/s, against a Player.RUN_SPEED of 5.2 m/s that
+## is now the DEFAULT travel speed rather than a held button. The hair has no authority at
+## the speed the game is played at, and the owner saw exactly that: "my characters tail is
+## glitching out a lot as i move".
+##
+## WHY NOT JUST RAISE THE PROFILES. Because PROFILES is certified on Twilight at 0.66 m/s
+## and section 10.4's sweep is explicit that a forelock at the mane's stiffness goes rigid
+## (0 ms trail, no follow-through at all). Tripling every profile to buy authority at 5.2
+## m/s would kill the follow-through this file exists to provide, on every pony in the
+## game, at every speed.
+##
+## WHY INFLUENCE. `SpringBoneSimulator3D.influence` blends the modifier's output back
+## toward the pose the skeleton had before it ran. For hair bones that pose is the REST
+## pose, because the exporter deliberately keyframes none of them (section 1b), so lowering
+## influence is exactly "pin the hair back toward the rig" -- the spec's own word for the
+## fix -- and it is speed-dependent by construction rather than by retuning a spring.
+##
+## THE BAND. Below SPEED_PIN_START nothing changes at all: a standing pony and a creeping
+## one (Player.SNEAK_SPEED is 1.32 m/s) get the same hair that shipped and the same numbers
+## every measurement in docs/notes-hair-sim.md was taken at. From there it falls linearly
+## to PIN_FLOOR at SPEED_PIN_FULL, which is Player.RUN_SPEED written as a length rather
+## than imported, because game/scripts/ must not depend on game/actors/.
+##
+## PIN_FLOOR IS NOT ZERO AND MUST NEVER BE. Zero influence is the rest pose, which is hair
+## welded to the skull -- the other half of the original "looks off" (section 1b). 0.35
+## keeps a third of the swing, which reads as hair that follows the body firmly.
+##
+## MEASURED, WALKED DOWN FROM 0.35: at 0.35 the six mane locks already clear their 0.66 m/s
+## `offset` (0.0075-0.0086) by a wide margin, but Tail3 -- the long chain, four joints
+## against the locks' one -- did not (0.0679 against a 0.0327 target). 0.30 and 0.25 both
+## still missed it (0.0582, 0.0484). Landed on the 0.20 floor itself: Tail3's offset there
+## is 0.0387, a 4.7x cut from the influence=1.0 defect at 5.2 m/s (0.1806) and inside
+## MAX_WOBBLE (0.034 against 0.060), but still ~18% above the 0.66 m/s number. Not pushed
+## lower to close that last 18%: this floor is the line past which the hair reads as
+## welded rather than trailing, and that is the other half of the defect, so the honest
+## call is to take the floor and record the shortfall rather than trade one glitch for
+## another. Tail3 IS the chain the owner named ("my characters tail is glitching out a
+## lot as i move"), and even the residual 0.0387 is a 4.7x cut from the 0.1806 it measured
+## unpinned at 5.2 m/s -- streaming turned into a short, controlled trail, not eliminated
+## outright. The six mane locks clear their own bar with room to spare at every floor
+## tried.
+const SPEED_PIN_START := 1.5
+const SPEED_PIN_FULL := 5.2
+const PIN_FLOOR := 0.20
+
+
+## The simulator influence to hold at `speed` metres per second. Pure: no node, no tree.
+static func influence_for_speed(speed: float) -> float:
+	var s := absf(speed)
+	if s <= SPEED_PIN_START:
+		return 1.0
+	var t: float = clampf((s - SPEED_PIN_START) / maxf(0.001, SPEED_PIN_FULL - SPEED_PIN_START),
+		0.0, 1.0)
+	# maxf() rather than trusting the lerp outright: at t == 1.0 exactly (speed ==
+	# SPEED_PIN_FULL, which RUN_SPEED hits on the nose) `a + (b - a)` can round a hair
+	# under `b` in floating point, and a caller checking "never below the floor" deserves
+	# an answer that is never below it, not one that is below it by 1e-17.
+	return maxf(PIN_FLOOR, lerpf(1.0, PIN_FLOOR, t))
+
+
+## The hair simulator attached to `pony` by attach_hair_simulation(), or null for a model
+## that has no hair bones at all. Found by NAME under the skeleton rather than cached by the
+## caller, because a body is rebuilt whenever the player changes mane style and a cached
+## reference would be pointing at a freed node.
+static func hair_simulator(pony: Node3D) -> SpringBoneSimulator3D:
+	if pony == null:
+		return null
+	var skeleton := pony.find_child("Skeleton3D", true, false) as Skeleton3D
+	if skeleton == null:
+		return null
+	return skeleton.get_node_or_null(NodePath(SIMULATOR_NAME)) as SpringBoneSimulator3D
+
 const SIMULATOR_NAME := "HairSpring"
 const PONY_DIR := "res://assets/converted/ponies/"
 

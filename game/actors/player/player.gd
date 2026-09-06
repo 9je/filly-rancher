@@ -94,6 +94,7 @@ extends CharacterBody3D
 ## `CameraPivot` sits at y=1.45 m: just above the head bone, below the ear tips.
 
 const GaitScript := preload("res://systems/gait.gd")
+const PonyRigScript := preload("res://scripts/pony_rig.gd")
 const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 const PonyVisualsScript := preload("res://actors/pony/pony_visuals.gd")
 const StockPaletteScript := preload("res://systems/stock_palette.gd")
@@ -193,6 +194,7 @@ const ANIM_BLEND := 0.2
 @onready var magic_beam: Node3D = $MagicBeam
 
 var _anim: AnimationPlayer
+var _hair: SpringBoneSimulator3D = null
 var _visual_yaw := 0.0
 var _coyote_left := 0.0
 var _jump_buffered := 0.0
@@ -256,6 +258,14 @@ func is_sneaking() -> bool:
 ## re-deriving PonyVisuals.ANIMATION_PLAYER_PATH against the model tree.
 func get_animation_player() -> AnimationPlayer:
 	return _anim
+
+
+## The influence the hair simulator is being held at right now, or 1.0 for a body with no
+## hair simulation. Exposed so the suite can assert that the speed rule actually reached the
+## node rather than only that the arithmetic is right -- the same seam docs/notes-hair-sim.md
+## section 10.2 was caught on.
+func hair_influence() -> float:
+	return _hair.influence if _hair != null else 1.0
 
 
 ## Wear `look`: the palette tint and the cutie mark, on the body already built. Called by
@@ -385,6 +395,8 @@ func _physics_process(delta: float) -> void:
 
 	_update_facing(direction, delta)
 	_update_animation(get_ground_speed())
+	if _hair != null:
+		_hair.influence = PonyRigScript.influence_for_speed(get_ground_speed())
 	if accumulate_step(get_ground_speed(), delta, is_on_floor()):
 		_sound_call(&"play_at", [_step_surface, global_position])
 
@@ -491,6 +503,9 @@ func _build_visuals(mane_style: int = 0) -> void:
 		push_error("Player: no AnimationPlayer at %s" % PonyVisualsScript.ANIMATION_PLAYER_PATH)
 		return
 	_play("idle")
+	# Re-found on every rebuild rather than kept: apply_look() frees the whole body when the
+	# mane style changes, and a stale simulator reference would be a freed node.
+	_hair = PonyRigScript.hair_simulator(pony)
 
 
 ## Move `BeamOrigin` onto the actual tip of the actual horn of the actual model.

@@ -870,3 +870,120 @@ nothing. `mode=motion clip=gallop tag=rigid` is the single most useful thing in
 it: the rigid pass is what the model and the clip intend, and "does the
 simulated hair still read as that shape, only late" is the question the owner
 was actually asking. Run it at the gallop, not just the walk.
+
+## 12. Second playtest -- "my characters tail is glitching out a lot" (slice R3)
+
+§11 fixed the shape of the trail at the speed the gate measured it at.
+Between that round and this one, Phase 3 made running the *default* travel
+speed rather than a held button (`Player.RUN_SPEED` = 5.2 m/s; see
+`player.gd`'s own class comment for the full history of that number). The
+owner, second playtest: **"my characters tail is glitching out a lot as i
+move"**. Same mechanism as §11.1, a different number.
+
+### 12.1 The defect, measured at the speed the game is actually played at
+
+`hair_lag_test`'s manoeuvre had never once travelled faster than the `walk`
+clip's own 0.66 m/s. Measured on the player's own rig (`pokeypierce`, what
+`game/data/hidden/stock_shy.tres` names -- the player's body is a hidden
+record, not one of the catchable roster):
+
+```
+CHAIN Tail3        joints=4 stiffness=4.33
+CHAIN jiggle_hair1..6 joints=1 stiffness=3.70
+HAIRLAG_FAIL leaf_chains=7 passing=1
+```
+
+Both restoring speeds sit *below* `Player.RUN_SPEED` (5.2 m/s). §11.1
+established that `stiffness` is a restoring speed in m/s and a chain holds
+its shape only while that speed comfortably exceeds how fast its anchor is
+dragged -- so at the speed the game now defaults to, the hair had no
+authority at all, on every pony, all the time rather than only while a
+button was held.
+
+**Why not just raise `PROFILES` again**, the way §11.2 raised the
+long-chain multiplier: because `PROFILES` is certified on Twilight at
+0.66 m/s, and §10.4's sweep showed a forelock at the mane's stiffness going
+rigid -- zero follow-through. Buying authority at 5.2 m/s by tripling every
+profile would kill the follow-through this file exists to provide, on every
+pony, at every speed, not just fix the one number that changed.
+
+### 12.2 The fix: influence as a function of ground speed
+
+`SpringBoneSimulator3D.influence` blends the modifier's output back toward
+the skeleton's pre-modifier pose, which for hair bones is the rest pose --
+the exporter deliberately keyframes none of them (§1b). Lowering influence
+is exactly "pin the hair back toward the rig," so it is a second knob,
+independent of `stiffness`, and it is speed-dependent by construction
+instead of by retuning a spring that has other jobs.
+
+`PonyRig.influence_for_speed(speed)`: flat at `1.0` (everything §§6–11
+measured) below `SPEED_PIN_START = 1.5` m/s -- a standing pony and one
+creeping at `Player.SNEAK_SPEED` (1.32 m/s) see no change at all -- then
+falls linearly to `PIN_FLOOR` at `SPEED_PIN_FULL = 5.2` m/s (`RUN_SPEED`
+written as a length, because `game/scripts/` must not depend on
+`game/actors/`). `player.gd` drives the live simulator off it every physics
+tick, off `get_ground_speed()`.
+
+`PIN_FLOOR` is not zero and must never be: zero influence is the rest pose,
+i.e. hair welded to the skull, the other half of the original "looks off"
+(§1b). It started at the 0.35 the spec proposed and was walked down when
+Tail3 did not clear its bar there -- see §12.3.
+
+### 12.3 Before / after, at 5.2 m/s, `pokeypierce`
+
+`offset` (the report's static-droop column) at the walking-pace baseline
+this file has always measured at, against the same chain unpinned at
+5.2 m/s (`influence=1.0`, the defect) and pinned at each `PIN_FLOOR` tried:
+
+| chain | 0.66 m/s (baseline) | 5.2 m/s, unpinned | 0.35 | 0.30 | 0.25 | 0.20 (shipped) |
+|---|---|---|---|---|---|---|
+| jiggle_hair1..6 | 0.0075–0.0086 | 0.0044–0.0055 | 0.0014–0.0019 | 0.0012–0.0016 | 0.0010–0.0013 | 0.0007–0.0010 |
+| Tail3 | 0.0327 | 0.1806 | 0.0679 | 0.0582 | 0.0484 | 0.0387 |
+
+`wobble` stayed inside `MAX_WOBBLE` (0.060) at every floor tried
+(0.030–0.036 across the board), so nothing here was bought with jitter.
+
+**The six mane locks clear the acceptance bar at every floor tried** -- the
+walking-pace `offset` they are being held to is 0.0075–0.0086, and even the
+loosest floor (0.35) put them at 0.0014–0.0019, comfortably under it.
+
+**Tail3 does not fully clear it, and that is written down rather than
+hidden.** At the 0.20 floor -- the lowest this task permits, because below
+it the hair reads as welded, which is the *other* half of the original
+defect -- Tail3's `offset` is 0.0387, about 18% above the 0.0327 the same
+chain measures at 0.66 m/s. It is a 4.7x cut from the 0.1806 it measures
+fully unpinned at 5.2 m/s, i.e. streaming-out has become a short, bounded
+trail rather than being eliminated outright. Closing the remaining 18%
+under this rule's linear floor would need `PIN_FLOOR` under 0.18, which
+this task's own floor rule forbids trading for. Tail3 is the chain the
+owner actually named ("my characters tail"), so this is the one number in
+this section that is a documented, bounded improvement rather than a full
+fix -- the honest alternative, per §11.1's own closing line, is a spring
+that gets more restoring speed at length, which is a `PROFILES` change and
+carries the walking-pace risk §11.1 already rejected once.
+
+### 12.4 Twilight's certified numbers, unmoved
+
+The whole point of `SPEED_PIN_START` sitting above every speed §§6–11
+measured at is that the default gate run (no `speed=` override,
+`apply_speed_pin` off) reproduces exactly:
+
+```
+HAIRLAG_OK leaf_chains=6 passing=6 bob_retention=56%..199% worst_self_gain=1.16 worst_wobble=0.036
+```
+
+Byte-identical, before this task and after it, on this checkout -- every
+per-chain trail and prominence to the digit. (This differs in its last
+digits from the `55%..201%` / `1.17` / `0.035` recorded in §10.5 itself;
+confirmed by reverting the working tree and re-running that this drift
+predates this task entirely -- an engine or environment difference since
+§10.5 was written, not something this task moved.)
+
+### 12.5 What §11.4's gate showed at the gallop
+
+`mode=motion clip=gallop character=pokeypierce` (visual_review.tscn does
+not itself apply the speed rule -- it drives the clip at its own 3.30 m/s,
+not `RUN_SPEED` -- so this is corroborating, not the binding check; §12.3's
+measured `offset` table is). Frames: `build/r3_hair/pokeypierce_gallop_move_a_speed_pin.png`,
+`..._move_b_speed_pin.png`, `..._move_c_speed_pin.png`,
+`..._settled_speed_pin.png`.

@@ -61,7 +61,19 @@ const TICK_SECONDS := 1.0 / 60.0
 ## speed the walk clip actually depicts. Travelling at some other speed would be a
 ## different experiment rather than a wrong one, but this keeps the manoeuvre to
 ## something a player would really see.
-const TRAVEL_SPEED := 0.66
+## The clip's own ground speed, which is what every measurement in docs/notes-hair-sim.md
+## sections 6 to 11 was taken at. NOT a const any more: `speed=<m/s>` re-runs the whole
+## manoeuvre at another speed, and `speed=5.2` is the one that matters, because that is
+## Player.RUN_SPEED and it is the DEFAULT travel speed rather than a held button. Section
+## 11.1's blind spot in one line: "the gate only ever walks".
+const TRAVEL_SPEED_DEFAULT := 0.66
+var travel_speed := TRAVEL_SPEED_DEFAULT
+
+## Whether the production speed rule (PonyRig.influence_for_speed) is applied to the
+## simulator for this run. Off by default so every historical measurement reproduces
+## exactly; `speed=` turns it on, because the whole question a fast run asks is what the
+## hair does under the rule the game actually ships.
+var apply_speed_pin := false
 ## Assets face -Z (export_blend.py --rotate-z 180 bakes in Godot's forward convention),
 ## so this is "forwards" and the hair should stream out behind her.
 const TRAVEL_DIRECTION := Vector3(0, 0, -1)
@@ -232,6 +244,11 @@ func _apply_overrides() -> void:
 			stacked_factor = float(parts[1])
 			print("OVERRIDE ", arg)
 			continue
+		if parts[0] == "speed":
+			travel_speed = float(parts[1])
+			apply_speed_pin = true
+			print("OVERRIDE ", arg)
+			continue
 		if parts[0] == "span":
 			# `span=<reference joints>,<exponent>` -- re-runs the chain-length stiffness
 			# correction (PonyRig.SPAN_REFERENCE_JOINTS) at other values. `span=0,0`
@@ -274,6 +291,10 @@ func _begin_pass(which: int) -> void:
 	simulator.influence = 0.0 if which == PASS_RIGID else 1.0
 	_configure(PINNED_STIFFNESS_FACTOR if which == PASS_PINNED else stacked_factor)
 	simulator.reset()
+	# PASS_RIGID is the influence-zero baseline and must stay at zero; the other two passes
+	# wear whatever the production rule says for the speed this run is travelling at.
+	if apply_speed_pin and which != PASS_RIGID:
+		simulator.influence = PonyRigScript.influence_for_speed(travel_speed)
 	pony.position = Vector3.ZERO
 	# Restart the clip so both passes see an identical drive, sample for sample.
 	animation.seek(0.0, true)
@@ -290,7 +311,7 @@ func _physics_process(delta: float) -> void:
 	if finished:
 		return
 	if ticks > SETTLE_TICKS and ticks <= SETTLE_TICKS + TRAVEL_TICKS:
-		pony.position += TRAVEL_DIRECTION * TRAVEL_SPEED * delta
+		pony.position += TRAVEL_DIRECTION * travel_speed * delta
 
 
 func _on_skeleton_updated() -> void:
@@ -518,7 +539,7 @@ func _report() -> void:
 			   deviation, sag, wobble,
 			   "ok" if faults.is_empty() else ",".join(faults)])
 	print("MANOEUVRE settle=%d ticks, travel=%d ticks at %.2f m/s along %v, then %d ticks stationary"
-		% [SETTLE_TICKS, TRAVEL_TICKS, TRAVEL_SPEED, TRAVEL_DIRECTION, COAST_TICKS])
+		% [SETTLE_TICKS, TRAVEL_TICKS, travel_speed, TRAVEL_DIRECTION, COAST_TICKS])
 	print("THRESHOLDS min_deviation=%.4f min_prominence=%.2f bob_retention>=%.2f (<=%.2f at depth 0) max_self_gain=%.2f max_wobble=%.3f lag_window=%d"
 		% [MIN_DEVIATION, MIN_PROMINENCE, MIN_BOB_RETENTION, MAX_BOB_RETENTION,
 		   MAX_SELF_GAIN, MAX_WOBBLE, LAG_WINDOW])
