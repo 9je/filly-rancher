@@ -4159,8 +4159,10 @@ func interaction_candidates() -> Array[Dictionary]:
 		var gap: float = Vector2(at.x - slot.global_position.x,
 			at.z - slot.global_position.z).length()
 		if slot.is_empty():
+			var verdict: Dictionary = slot.placement_check(at, PLAYER_BODY_RADIUS)
 			out.append(InteractionScript.candidate(
-				InteractionScript.Kind.PLOT_BUILD, gap, String(slot.name)))
+				InteractionScript.Kind.PLOT_BUILD, gap, String(slot.name),
+				String(verdict["reason"])))
 		else:
 			out.append(InteractionScript.candidate(
 				InteractionScript.Kind.PEN_MOVE_IN, gap, _next_in_the_bag()))
@@ -4298,6 +4300,7 @@ func _nearest_occupied_slot() -> PlotSlot:
 ## (_prompt_slot) doubled as the mutex the other four consulted. The prompt is a persistent
 ## label now, so there is nothing to fire once and nothing to go stale.
 func _update_interaction() -> void:
+	_paint_plot_ghosts()
 	var action: Dictionary = current_interaction()
 	var hud := get_node_or_null(^"HUD")
 	if hud != null and hud.has_method("set_prompt"):
@@ -4306,6 +4309,28 @@ func _update_interaction() -> void:
 	if action.is_empty() or not Input.is_action_just_pressed(&"interact"):
 		return
 	perform_interaction(action)
+
+
+## THE GROUND ANSWERS BEFORE THE MENU DOES.
+##
+## Exactly one slot ever wears a ghost: the one she is standing in. Painting every slot she
+## can see would put four coloured footprints in the clearing, which is the thicket this
+## slice is also fixing (see game/world/plot_slot.gd's marker fade), and a preview that is
+## everywhere is a preview that answers nothing.
+##
+## Driven off the same placement_check() the refusal itself uses, so the colour under her
+## hooves and the sentence she gets if she presses anyway can never disagree.
+func _paint_plot_ghosts() -> void:
+	if player == null:
+		return
+	var at: Vector3 = player.global_position
+	for slot in _plot_slots():
+		if not slot.is_empty() or not (player in slot.get_overlapping_bodies()):
+			slot.set_ghost(PlotSlotScript.Ghost.OFF)
+			continue
+		var verdict: Dictionary = slot.placement_check(at, PLAYER_BODY_RADIUS)
+		slot.set_ghost(PlotSlotScript.Ghost.VALID if bool(verdict["ok"])
+			else PlotSlotScript.Ghost.REFUSED)
 
 
 ## IS THE PLAYER STANDING WHERE THE FENCE IS ABOUT TO GO UP?

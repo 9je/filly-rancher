@@ -14,6 +14,7 @@ extends GutTest
 
 const InteractionScript := preload("res://world/interaction.gd")
 const RanchScene := preload("res://world/ranch.tscn")
+const PlotSlotScript := preload("res://world/plot_slot.gd")
 
 
 ## A menu that is open or is not, and says so through the one method _no_menu_but() asks
@@ -332,3 +333,41 @@ func test_at_a_built_pen_s_gate_the_ranch_offers_the_pen() -> void:
 	var chosen: Dictionary = ranch.current_interaction()
 	assert_eq(int(chosen.get("kind", -1)), InteractionScript.Kind.PEN_MOVE_IN,
 		"the nearer square of ground she is standing in is the one E means")
+
+
+## THE GHOST, THE PROMPT AND THE REFUSAL ARE ONE ANSWER. Three places used to be able to
+## disagree about whether a pen could go up: the prompt said "build here" unconditionally,
+## the ground said nothing at all, and the refusal arrived after the catalogue had been read
+## and a pen chosen. This drives the real ranch and asks all three at once.
+func test_standing_in_the_middle_of_an_empty_plot_says_no_three_ways() -> void:
+	var ranch = RanchScene.instantiate()
+	add_child_autofree(ranch)
+	# _update_interaction() (and the ghost paint inside it) only runs while _interactive is
+	# true, which _ready() sets from DisplayServer.get_name() -- false under every headless
+	# test run. Overridden the same way test_ranch_creation.gd's _ranch_with_screen() does,
+	# so the physics frames below actually drive the seam this test is asking about.
+	ranch._interactive = true
+	await wait_frames(2)
+	var slots: Array = ranch.plot_slots()
+	assert_gt(slots.size(), 0)
+	var slot = slots[0]
+	assert_true(slot.is_empty(), "the probe takes its own pen back down before this runs")
+	ranch.player.global_position = slot.global_position + Vector3.UP * 0.3
+	await wait_physics_frames(4)
+	var chosen: Dictionary = ranch.current_interaction()
+	assert_eq(int(chosen.get("kind", -1)), InteractionScript.Kind.PLOT_BUILD)
+	assert_false(String(chosen.get("reason", "")).is_empty(),
+		"she is standing where the fence goes, and the candidate knows it")
+	assert_true(InteractionScript.prompt_for(chosen, "E").contains("cannot build"),
+		"and the line on the HUD says so before she presses anything")
+	assert_eq(slot.ghost_state(), slot.Ghost.REFUSED,
+		"and the ground under her hooves is red")
+	# Step out past the markers and all three flip together.
+	var out_dir: Vector3 = (ranch.player.global_position - slot.global_position)
+	ranch.player.global_position = slot.global_position \
+		+ Vector3(0.0, 0.3, PlotSlotScript.STAKE_INSET + 0.6)
+	await wait_physics_frames(4)
+	var now: Dictionary = ranch.current_interaction()
+	assert_eq(int(now.get("kind", -1)), InteractionScript.Kind.PLOT_BUILD)
+	assert_true(String(now.get("reason", "")).is_empty())
+	assert_eq(slot.ghost_state(), slot.Ghost.VALID)

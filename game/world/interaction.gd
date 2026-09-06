@@ -79,8 +79,13 @@ const EMPTY_BAG := "your saddlebag is empty"
 ## One candidate, as ranch.gd hands them over. `distance` is metres in the XZ plane and is
 ## only ever used to settle two candidates of the SAME kind. `subject` is whatever the
 ## prompt needs to name: the pony at the top of the saddlebag, or a slot's name for a test.
-static func candidate(kind: int, distance: float, subject: String = "") -> Dictionary:
-	return {"kind": kind, "distance": distance, "subject": subject}
+## `reason` is a refusal this candidate ALREADY KNOWS ABOUT -- the plot she is standing on
+## that will not take a fence while she is standing on it. It is carried rather than looked
+## up so the prompt, the coloured ghost on the ground and the refusal she gets if she presses
+## anyway are all one answer from one place.
+static func candidate(kind: int, distance: float, subject: String = "",
+		reason: String = "") -> Dictionary:
+	return {"kind": kind, "distance": distance, "subject": subject, "reason": reason}
 
 
 ## Where `kind` sits in PRIORITY, or minus one for a kind that is not in it at all. A kind
@@ -137,6 +142,9 @@ static func prompt_for(action: Dictionary, key: String) -> String:
 	var subject: String = String(action.get("subject", ""))
 	match int(action.get("kind", Kind.NONE)):
 		Kind.PLOT_BUILD:
+			var reason: String = String(action.get("reason", ""))
+			if not reason.is_empty():
+				return "%s: cannot build, %s" % [key, reason]
 			return "%s: build here" % key
 		Kind.PEN_MOVE_IN:
 			if subject.is_empty():

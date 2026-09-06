@@ -191,3 +191,98 @@ func test_a_slot_gets_a_shape_when_it_enters_the_tree() -> void:
 	var shapes: Array = slot.find_children("*", "CollisionShape3D", true, false)
 	assert_eq(shapes.size(), 1, "a slot builds itself exactly one trigger shape")
 	assert_not_null((shapes[0] as CollisionShape3D).shape, "...with a real shape on it")
+
+
+## CAN A PEN GO UP HERE, AND IF NOT, WHY NOT -- ASKED BEFORE ANYTHING IS SPENT.
+##
+## The owner: "finding the right spot to build the paddock can be harder than it should".
+## The rule that refused him already existed (a fence may not go up through the body of the
+## person who ordered it) but it was only ever spoken AFTER he had walked in, pressed E,
+## read a catalogue and chosen a pen. The reason now travels with the candidate, so it is on
+## the HUD before the menu opens and the ground under his hooves is coloured for it.
+func test_a_clear_plot_will_take_a_pen() -> void:
+	var slot := PlotSlotScript.new()
+	add_child_autofree(slot)
+	var outside := Vector3(PlotSlotScript.STAKE_INSET + 1.0, 0.0, 0.0)
+	var verdict: Dictionary = slot.placement_check(outside, 0.42)
+	assert_true(bool(verdict["ok"]), "she is a metre clear of the markers")
+	assert_eq(String(verdict["reason"]), "", "a yes carries no reason")
+
+
+func test_standing_on_the_footprint_is_refused_with_a_reason_she_can_act_on() -> void:
+	var slot := PlotSlotScript.new()
+	add_child_autofree(slot)
+	var verdict: Dictionary = slot.placement_check(Vector3.ZERO, 0.42)
+	assert_false(bool(verdict["ok"]))
+	assert_false(String(verdict["reason"]).is_empty(),
+		"a refusal with no reason is the refusal he already had")
+	assert_false(String(verdict["reason"]).contains("--"),
+		"no em dash and no double dash in player-facing copy")
+
+
+## THE BOUNDARY IS THE LINE ON THE GROUND. is_on_footprint() measures against STAKE_INSET,
+## which is the same 3.9 m the markers are drawn on and the same 3.9 m Pen.HALF_EXTENT
+## stands its fence on, so the line she is asked to step over is a line she can see.
+func test_the_refusal_boundary_is_the_marked_square_plus_her_own_width() -> void:
+	var slot := PlotSlotScript.new()
+	add_child_autofree(slot)
+	var radius := 0.42
+	var just_inside := Vector3(PlotSlotScript.STAKE_INSET + radius - 0.02, 0.0, 0.0)
+	var just_outside := Vector3(PlotSlotScript.STAKE_INSET + radius + 0.02, 0.0, 0.0)
+	assert_false(bool(slot.placement_check(just_inside, radius)["ok"]))
+	assert_true(bool(slot.placement_check(just_outside, radius)["ok"]))
+
+
+func test_an_occupied_plot_refuses_and_says_which_refusal_it_is() -> void:
+	var slot := PlotSlotScript.new()
+	add_child_autofree(slot)
+	var plot := _a_plot()
+	assert_not_null(plot, "the catalogue has to have a plot for this test to mean anything")
+	assert_true(slot.build(plot))
+	var verdict: Dictionary = slot.placement_check(
+		Vector3(PlotSlotScript.STAKE_INSET + 2.0, 0.0, 0.0), 0.42)
+	assert_false(bool(verdict["ok"]))
+	# In the tree, not just newed: is_on_footprint() reads global_transform, which the
+	# engine refuses to give a node outside the tree, and that refusal is itself an error
+	# GUT would fail this test over.
+	var clear_slot: PlotSlot = add_child_autofree(PlotSlotScript.new())
+	assert_ne(String(verdict["reason"]),
+		String(clear_slot.placement_check(Vector3.ZERO, 0.42)["reason"]),
+		"'something is already here' and 'you are standing in it' are different problems")
+
+
+func test_the_ghost_starts_off_and_a_built_slot_can_never_show_one() -> void:
+	var slot := PlotSlotScript.new()
+	add_child_autofree(slot)
+	assert_eq(slot.ghost_state(), PlotSlotScript.Ghost.OFF)
+	slot.set_ghost(PlotSlotScript.Ghost.VALID)
+	assert_eq(slot.ghost_state(), PlotSlotScript.Ghost.VALID)
+	var plot := _a_plot()
+	assert_not_null(plot)
+	assert_true(slot.build(plot))
+	assert_eq(slot.ghost_state(), PlotSlotScript.Ghost.OFF,
+		"a pen stands where the ghost stood; two of them would be the thicket again")
+	slot.set_ghost(PlotSlotScript.Ghost.VALID)
+	assert_eq(slot.ghost_state(), PlotSlotScript.Ghost.OFF,
+		"a built slot refuses a ghost outright rather than drawing one inside its own fence")
+
+
+func test_the_ghost_is_geometry_and_not_a_line_of_text() -> void:
+	# The owner's standing note on this project: visual first, no floating text. The reason
+	# is a HUD line; what stands on the ground is a coloured footprint.
+	var slot := PlotSlotScript.new()
+	add_child_autofree(slot)
+	slot.set_ghost(PlotSlotScript.Ghost.REFUSED)
+	var ghost := slot.get_node_or_null("PlotGhost")
+	assert_not_null(ghost, "the refused state draws something")
+	var meshes := ghost.find_children("*", "MeshInstance3D", true, false)
+	assert_gt(meshes.size(), 0, "and what it draws is meshes")
+	for node in ghost.find_children("*", "Label3D", true, false):
+		fail_test("a Label3D in the world is exactly the floating text this project bans")
+
+
+func _a_plot() -> PlotData:
+	var registry = load("res://systems/plot_registry.gd").new()
+	registry.load_all(load("res://systems/plot_registry.gd").PLOT_DIR)
+	var all: Array = registry.all()
+	return all[0] if not all.is_empty() else null

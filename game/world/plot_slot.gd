@@ -81,6 +81,29 @@ const MARK_WIDTH := 0.24
 const MARK_HEIGHT := 0.12
 const MARK_COLOR := Color(0.745, 0.694, 0.541)
 
+## THE GHOST: WHAT THE GROUND LOOKS LIKE WHILE SHE IS DECIDING.
+##
+## The owner: "finding the right spot to build the paddock can be harder than it should".
+## The rule that was refusing him is older than the complaint (a fence may not materialise
+## through the body of the person who ordered it, PlotSlot.is_on_footprint) but it was only
+## ever spoken after he had walked in, pressed E, read a catalogue and picked a pen. So the
+## answer is shown on the ground, live, before anything is spent: the footprint the fence
+## will stand on, filled green while she is standing somewhere it can go up and red while
+## she is not, with the reason on the HUD prompt she is already reading.
+##
+## Colours are the theme's own, copied as literals rather than imported: game/ui/
+## menu_style.gd is a UI file and a world node must not depend on one. They mirror
+## MenuStyle's affordable and unaffordable pair.
+enum Ghost { OFF, VALID, REFUSED }
+const GHOST_VALID_COLOR := Color(0.443, 0.741, 0.463, 0.34)
+const GHOST_REFUSED_COLOR := Color(0.796, 0.373, 0.361, 0.34)
+## The filled footprint sits a hair above the marker boards so the two never z fight.
+const GHOST_HEIGHT := 0.05
+## A low upstand around the edge, so the footprint reads as a volume the fence will occupy
+## rather than as a stain on the grass, without pretending to be the fence itself.
+const GHOST_WALL_HEIGHT := 0.55
+const GHOST_WALL_WIDTH := 0.14
+
 ## Emitted when something is successfully built here. Carries both halves: the data for a
 ## HUD toast, the node for anything that wants to talk to it.
 signal built(plot: PlotData, node: Node)
@@ -96,6 +119,8 @@ var contents: PlotData = null
 
 var _built_node: Node = null
 var _stakes: Node3D = null
+var _ghost: Node3D = null
+var _ghost_state: int = Ghost.OFF
 
 
 ## Layers assigned in _init() rather than only in _ready(), so a slot is on the right ones
@@ -174,6 +199,7 @@ func build(plot: PlotData) -> bool:
 	contents = plot
 	_built_node = node
 	_refresh_stakes()
+	set_ghost(Ghost.OFF)
 	built.emit(plot, node)
 	return true
 
@@ -228,6 +254,58 @@ func demolish() -> bool:
 func is_on_footprint(point: Vector3, radius: float) -> bool:
 	var local: Vector3 = to_local(point)
 	return absf(local.x) <= STAKE_INSET + radius and absf(local.z) <= STAKE_INSET + radius
+
+
+## MAY A PEN GO UP HERE, WITH A BODY OF `radius` STANDING AT `point`, AND IF NOT, WHY NOT.
+##
+## The one place the build refusals are stated, so the prompt, the ghost and the actual
+## refusal in game/world/ranch.gd cannot disagree about what the rule is -- which is exactly
+## what a preview is for. Returns {"ok": bool, "reason": String}; `reason` is player-facing
+## copy and is empty on a yes.
+##
+## The reason names the LINE, because the line is drawn on the ground in front of her
+## (_refresh_stakes draws it on STAKE_INSET, the same 3.9 m Pen.HALF_EXTENT stands its fence
+## on) -- which is what makes a refusal actionable instead of mysterious.
+func placement_check(point: Vector3, radius: float) -> Dictionary:
+	if not is_empty():
+		return {"ok": false, "reason": "something already stands here"}
+	if is_on_footprint(point, radius):
+		return {"ok": false, "reason": "too close to the fence line, step outside the markers"}
+	return {"ok": true, "reason": ""}
+
+
+## Show, hide or recolour the preview footprint. A BUILT SLOT REFUSES A GHOST OUTRIGHT: a
+## coloured footprint inside a standing fence is the overlapping-frames picture the owner
+## already reported once, and the way to not draw it is to not be able to.
+func set_ghost(state: int) -> void:
+	var wanted: int = Ghost.OFF if not is_empty() else state
+	if wanted == _ghost_state:
+		return
+	_ghost_state = wanted
+	if _ghost != null:
+		_ghost.queue_free()
+		_ghost = null
+	if _ghost_state == Ghost.OFF:
+		return
+	_ghost = Node3D.new()
+	_ghost.name = "PlotGhost"
+	var colour: Color = GHOST_VALID_COLOR if _ghost_state == Ghost.VALID else GHOST_REFUSED_COLOR
+	var mat := _ghost_material(colour)
+	var span := STAKE_INSET * 2.0
+	_ghost_box("Floor", Vector3(span, GHOST_HEIGHT, span),
+		Vector3(0.0, GHOST_HEIGHT * 0.5, 0.0), mat)
+	for s in [-1.0, 1.0]:
+		_ghost_box("WallX%s" % ("N" if s < 0.0 else "P"),
+			Vector3(GHOST_WALL_WIDTH, GHOST_WALL_HEIGHT, span),
+			Vector3(s * STAKE_INSET, GHOST_WALL_HEIGHT * 0.5, 0.0), mat)
+		_ghost_box("WallZ%s" % ("N" if s < 0.0 else "P"),
+			Vector3(span, GHOST_WALL_HEIGHT, GHOST_WALL_WIDTH),
+			Vector3(0.0, GHOST_WALL_HEIGHT * 0.5, s * STAKE_INSET), mat)
+	add_child(_ghost)
+
+
+func ghost_state() -> int:
+	return _ghost_state
 
 
 ## The plot id stored for this slot in a save, or "" when the slot is empty. The exact
@@ -311,3 +389,26 @@ func _mark(mark_name: String, size: Vector3, at: Vector3, mat: StandardMaterial3
 	mesh_node.mesh = box
 	mesh_node.position = at
 	_stakes.add_child(mesh_node)
+
+
+## Unshaded and transparent: this is a diagram drawn on the world, not a thing in it, and a
+## lit preview would change colour with the hour and stop meaning yes or no.
+func _ghost_material(colour: Color) -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = colour
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	return mat
+
+
+func _ghost_box(box_name: String, size: Vector3, at: Vector3,
+		mat: StandardMaterial3D) -> void:
+	var box := BoxMesh.new()
+	box.size = size
+	box.material = mat
+	var mesh_node := MeshInstance3D.new()
+	mesh_node.name = box_name
+	mesh_node.mesh = box
+	mesh_node.position = at
+	_ghost.add_child(mesh_node)
