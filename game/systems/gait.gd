@@ -9,17 +9,18 @@ extends RefCounted
 ##
 ## THE SPEED LADDER, at a glance. Two authored locomotion clips, each played through a
 ## bounded playback window, arranged so the windows meet EXACTLY rather than overlap or
-## leave a gap -- so every speed from a standstill to 4.29 m/s has one clip that can
+## leave a gap -- so every speed from a standstill to 4.79 m/s has one clip that can
 ## depict it honestly, and clip_for_speed() is the only thing that has to choose:
 ##
 ##   0.00 - 0.33 m/s   `idle`    (1.0x; she is not really going anywhere)
 ##   0.33 - 1.98 m/s   `walk`    (0.5x - 3.0x of a 0.66 m/s clip)
-##   1.98 - 4.29 m/s   `gallop`  (0.6x - 1.3x of a 3.30 m/s clip)
+##   1.98 - 4.79 m/s   `gallop`  (0.6x - 1.45x of a 3.30 m/s clip)
 ##
 ## The handover at 1.98 is exact, not approximate: MAX_PLAYBACK * WALK_CLIP_SPEED and
 ## GALLOP_MIN_PLAYBACK * GALLOP_CLIP_SPEED are the same number, so the character never
 ## passes through a speed neither clip can depict. Everything in that whole range has
-## skate_ratio() == 1.0. Only above 4.29 m/s does anything skate.
+## skate_ratio() == 1.0. Only above 4.79 m/s does anything skate. (The ceiling was 4.29 m/s
+## -- 1.3x -- until slice R3 retuned GALLOP_MAX_PLAYBACK; see that constant's own comment.)
 ##
 ## WHY THIS FILE EXISTS. The clip's implied ground speed is derived from four
 ## authoring constants that live in tools/author_anims.py and were, until now,
@@ -151,8 +152,9 @@ const GALLOP_MAX_PLAYBACK := 1.45
 const GALLOP_HANDOVER_SPEED := GALLOP_MIN_PLAYBACK * GALLOP_CLIP_SPEED
 
 ## Fastest ground speed ANY authored clip can depict with the hooves exactly planted:
-## 4.29 m/s. This is the number a map or a chase should be designed against. Beyond it
-## the gallop clip saturates and skate_ratio() starts climbing again.
+## 4.79 m/s (4.29 until slice R3's retune, see GALLOP_MAX_PLAYBACK above). This is the
+## number a map or a chase should be designed against. Beyond it the gallop clip
+## saturates and skate_ratio() starts climbing again.
 const TOP_SKATE_FREE_SPEED := GALLOP_MAX_PLAYBACK * GALLOP_CLIP_SPEED
 
 

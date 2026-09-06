@@ -52,26 +52,32 @@ extends CharacterBody3D
 ##          good, maybe a tad too slow still").
 ##
 ## THE RUN SPENDS FOOT SKATE, ON PURPOSE. Gait.TOP_SKATE_FREE_SPEED -- the fastest speed
-## ANY authored clip can depict with the hooves planted -- is 4.29 m/s, so 5.20 asks the
-## saturated `gallop` clip to carry 21% more ground than it depicts. Gait.skate_ratio()'s
-## perceptibility ladder starts noticing at ~1.25 and calls 2.0 unmistakable moonwalking,
-## so 1.21 is at the top of the "not perceptible in motion" band rather than past it, and
-## game/test/test_player.gd pins that budget at 1.25 so the next "it still feels a bit
-## slow" goes red instead of shipping.
+## ANY authored clip can depict with the hooves planted -- is 4.79 m/s (it was 4.29 until
+## slice R3's GALLOP_MAX_PLAYBACK retune, see gait.gd), so 5.20 asks the saturated `gallop`
+## clip to carry 8.7% more ground than it depicts, down from 21% before the retune.
+## Gait.skate_ratio()'s perceptibility ladder starts noticing at ~1.25 and calls 2.0
+## unmistakable moonwalking, so 1.087 sits comfortably inside the "not perceptible in
+## motion" band rather than at the top of it, and game/test/test_player.gd pins that
+## budget at 1.25 so the next "it still feels a bit slow" goes red instead of shipping.
 ##
-##      It buys two things a skate-free 4.29 could not. First, 4.29 is only 7% up on the
-##      ORIGINAL number and a player cannot feel 7%. Second and more important, 4.29 is
-##      exactly the ceiling Pony.flee_speed_for() clamps a fleeing pony to -- so at 4.29
-##      the fastest possible bolt TIES the player and a chase never closes. At 5.20 the
-##      player is strictly faster than anything that can run from her, by construction,
-##      for any base_speed a future roster invents, with 0.9 m/s of closing speed even in
-##      the worst case. The honest fix for the whole band is a faster authored gallop
-##      cycle (tools/author_anims.py), which is an animation task, not a tuning one.
+##      It buys two things a skate-free 4.79 could not. First, before the retune 4.29 was
+##      only 7% up on the ORIGINAL number (4.00) and a player cannot feel 7% -- the retune
+##      moved the skate-free ceiling to 20% up on that same original, which is no longer
+##      too small to feel, so this half of the argument has weakened; it is reason two that
+##      still carries the decision. Second and more important, the skate-free ceiling is
+##      exactly what Pony.flee_speed_for() clamps a fleeing pony to -- so running at it
+##      TIES the fastest possible bolt and a chase never closes. At 5.20 the player is
+##      strictly faster than anything that can run from her, by construction, for any
+##      base_speed a future roster invents, with 0.42 m/s of closing speed in the worst
+##      case (0.9 m/s before the retune narrowed the ceiling's distance from RUN_SPEED).
+##      The honest fix for the whole band is a faster authored gallop cycle
+##      (tools/author_anims.py), which is an animation task, not a tuning one.
 ##
 ##      Now that running is the DEFAULT, this skate is also what the player sees most of
 ##      the time rather than only while a button is held. That is a real cost and it was
-##      weighed: the alternative is a default travel speed of 4.29 m/s, which is the exact
-##      speed the owner has already called too slow twice.
+##      weighed: the alternative is a default travel speed of 4.79 m/s (formerly 4.29),
+##      close enough to the 4.00 the owner already called too slow that it still risks the
+##      same complaint.
 ##
 ## COLLISION CAPSULE (numbers live in player.tscn, which cannot carry comments).
 ## Twilight measures 1.163 m at the withers and 2.138 m to the tip of her horn --
@@ -106,9 +112,10 @@ const CutieMarkScript := preload("res://systems/cutie_mark.gd")
 ## It was called `gallop` and meant the opposite until the second playtest.
 const SNEAK_ACTION := &"sneak"
 
-## Ground speed at full stick / any WASD key, with nothing held. THE DEFAULT. Sits 21%
-## past what the `gallop` clip can honestly depict (Gait.TOP_SKATE_FREE_SPEED is 4.29 m/s)
-## -- a deliberate, budgeted amount of foot skate, bought for the reasons the class comment
+## Ground speed at full stick / any WASD key, with nothing held. THE DEFAULT. Sits 8.7%
+## past what the `gallop` clip can honestly depict (Gait.TOP_SKATE_FREE_SPEED is 4.79 m/s,
+## down from 21% past 4.29 m/s before slice R3's GALLOP_MAX_PLAYBACK retune) -- a
+## deliberate, budgeted amount of foot skate, bought for the reasons the class comment
 ## sets out. game/test/test_player.gd pins the size of that budget, so it is a number
 ## somebody chose and not a number that drifted.
 ##

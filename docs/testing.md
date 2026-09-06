@@ -328,7 +328,7 @@ GUT's own default of not descending into subdirectories without
 **And a floor on the test count**, for the half the script count cannot see: a
 file that still parses but has lost most of its tests (a mass rename, a bad
 merge, a `func test_x` that became `func x`). `MIN_TESTS` in
-`tools/run_tests.sh` -- currently **1610** -- is a deliberate FLOOR rather than an
+`tools/run_tests.sh` -- currently **1645** -- is a deliberate FLOOR rather than an
 exact count, so adding tests never breaks the build. Raise it when the suite
 grows; never lower it without saying in the same commit which tests went away
 and why. (It was 194 through Phase 1A and was raised to the suite's real size in
@@ -346,7 +346,12 @@ growth (the plinth's new ground-contact footprint test), and again, from 1607
 to 1610, by that fix wave's own round 2 (the painted road's polyline, its
 shader array length and its route, all pinned in `test_terrain.gd`) -- proved
 both ways per the section below at the new number: the suite passes at 1610 and
-a `FILLY_MIN_TESTS=99999` run still fails on it.)
+a `FILLY_MIN_TESTS=99999` run still fails on it. It was raised again, from 1610
+to 1645, by slice R3's own growth -- the hair speed rule, the clip-phase
+hoofstep cadence, the interact tier, the debounced refusal, the placement check
+and the plot marker census all brought tests with them -- proved both ways per
+the section below at the new number: the suite passes at 1645 and a
+`FILLY_MIN_TESTS=99999` run still fails on it.)
 
 **Proving both guards, safely:**
 
