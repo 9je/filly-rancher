@@ -1336,7 +1336,7 @@ FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dum
 # raycast onto real ground inside their zones, camera spring arm pulling in against
 # an actual building). Prints the marker ONLY if all of them held.
 FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dummy --path game world/ranch.tscn
-# -> RANCH_OK ponies=49 props=117 assets=present   exit 0
+# -> RANCH_OK ponies=49 props=115 assets=present   exit 0
 # (assets=absent + zero counts on a checkout that has not run the asset pipeline)
 # Both counts moved from an earlier build's 22/58: the crowd (Phase 3 slice 1) fills every
 # region with stock ponies alongside the named roster, and the Depot building (the same

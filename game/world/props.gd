@@ -494,8 +494,9 @@ const LAYOUT := [
 	# tile clears the Palace's own rectangle (x in [-17, -3], z in [57.1, 66.1]), the arcade
 	# band (x in [-2, 18], z in [67, 72]) and PALACE_RADIUS itself, the last with room to
 	# spare (gap 7.65 m and 10.46 m respectively, both past the 6.0 m the door opens at).
-	{"file": "saa_dirt_road.glb", "at": Vector2(2.5, 58.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
-	{"file": "saa_dirt_road.glb", "at": Vector2(-9.0, 50.0), "yaw": 0.0, "family": &"mlp", "skirt": true},
+	# The boardwalk's own two saa_dirt_road tiles came off with the road's sixteen (round 2
+	# re-review): the terrain-painted path serves the walk up, and a rigid plate on 0.36 to
+	# 0.80 m of relief was the same half-buried plank the road fix exists to end.
 	{"file": "mlp_bush.glb", "at": Vector2(-3.0, 54.0), "yaw": 200.0, "family": &"mlp"},
 	{"file": "mlp_bush.glb", "at": Vector2(-9.0, 53.5), "yaw": 40.0, "family": &"mlp"},
 	# --- the homestead yard: a farmstead, not a field with objects dropped in it ---------

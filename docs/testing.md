@@ -600,7 +600,7 @@ FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dum
 
 Phase names are `dawn`, `day`, `dusk`, `night` and weathers are `clear`,
 `rain`, `fog`, `storm`, matched case-insensitively; `--world-time=` takes
-seconds. Expect the same `RANCH_OK ponies=49 props=117 assets=present` as an
+seconds. Expect the same `RANCH_OK ponies=49 props=115 assets=present` as an
 unpinned run, with the `RANCH world` line naming the hour that was pinned. Both
 counts moved once more in Phase 3 slice 1: the crowd fills every region with
 stock ponies alongside the named roster, and the Depot is one more prop beside
@@ -653,9 +653,10 @@ half-buried plates, at a finer interval. **The tiles came off the road entirely*
 than being re-spaced a third time: `game/world/terrain.gd`'s `PATH_POINTS` and
 `terrain.gdshader`'s path mask paint the same route straight into the ground instead, which
 conforms to the real height field by construction because it IS the height field -- no
-plate, no seam, no step, ever. `props` dropped from 133 to 117, the shipped number: the
-sixteen `saa_dirt_road` tiles are gone and nothing replaced them in the census, because a
-painted road is not a `Props.LAYOUT` entry at all.
+plate, no seam, no step, ever. `props` dropped from 133 to 115, the shipped number: all
+eighteen `saa_dirt_road` tiles are gone (sixteen on the road, two on the boardwalk) and
+nothing replaced them in the census, because a painted road is not a `Props.LAYOUT` entry
+at all.
 
 **`props` and `ponies` did NOT move when the Market got a vendor and the Palace got
 a teller, and that is deliberate.** Both are `Attendant` nodes: `PonyVisuals.build`
