@@ -299,6 +299,24 @@ const MAILBOX_RADIUS := 2.6
 ## all reads as a broken key, which is the same defect the race panel's dead stake row was.
 const MAILBOX_EMPTY_TOAST := "Nothing in the mailbox yet."
 
+## HOW LONG THE SAME REFUSAL STAYS SAID. A player who presses E against a full pen four
+## times in half a second has been told once; saying it four times raises four toasts into a
+## queue that cannot drain (HUD.toast is first in, first out) and fires four sounds on top of
+## each other. The owner: "when i place ponies in the paddock i press e several times and
+## that sound is terrible".
+##
+## PER MESSAGE, NOT A GLOBAL MUTE. Being told "that pen is full" must never swallow "your
+## saddlebag is empty" a moment later: those are different facts and the second is the one
+## she can act on. And shorter than HUD.TOAST_HOLD, so a player who waits, reads the line,
+## watches it fade and presses again is answered rather than met with silence.
+const DENY_DEBOUNCE_SECONDS := 1.5
+
+## The soft refusal ping. An EXISTING library id, played through this file's own _sound_call
+## dispatcher -- the sound library is frozen and game/systems/sound.gd is read only, so this
+## is the ui_denied that every menu in the game already refuses with, and a refused verb in
+## the world now sounds like a refused row in a menu instead of like nothing at all.
+const DENY_SOUND := &"ui_denied"
+
 ## WHAT ARRIVAL SOUNDS LIKE, and it is said once per batch rather than once per letter: two
 ## letters landing on the same collection day are one trip to the mailbox. The flag on the
 ## box is the state; this is the moment.
@@ -634,6 +652,9 @@ var _penned_ponies := 0
 
 ## Results of the boot-time pen-containment probe -- see _probe_pen_containment().
 var _pen_probe: Dictionary = {}
+
+## The last refusal this ranch spoke, and when. See _deny().
+var _last_denial: Dictionary = {"text": "", "at": -1000.0}
 
 ## The counter the Market menu transacts against. Rebuilt by rebind_economy() rather than
 ## built once, because GameState REPLACES its `gems` and `inventory` objects on every load
@@ -4090,10 +4111,10 @@ func _move_pony_into_pen(slot: PlotSlot) -> bool:
 	var storage: Storage = beam.get_storage()
 	var next: PonyInstance = storage.peek()
 	if next == null:
-		_toast("Your saddlebag is empty.")
+		_deny("Your saddlebag is empty.")
 		return false
 	if pen.is_full():
-		_toast("That pen is full.")
+		_deny("That pen is full.")
 		return false
 
 	var instance: PonyInstance = storage.release()
@@ -4107,7 +4128,7 @@ func _move_pony_into_pen(slot: PlotSlot) -> bool:
 		# It stays, because a pony taken out of the bag and refused with nowhere to go is a
 		# pony deleted by bookkeeping, and NO PONY EVER DIES covers that too.
 		storage.store(instance)
-		_toast("She would not go in.")
+		_deny("She would not go in.")
 		return false
 	_toast("%s moved into the pen." % instance.display_name())
 	# AFTER the add succeeded and not before: the two branches above both end with her back
@@ -4213,7 +4234,7 @@ func perform_interaction(action: Dictionary) -> bool:
 			# to choose a pen and only then being sent to stand somewhere else is a worse
 			# version of the same refusal.
 			if _player_stands_on_footprint(slot):
-				_toast("Step outside the plot markers to build here.")
+				_deny("Step outside the plot markers to build here.")
 				return false
 			if build_menu == null or not build_menu.has_method("open"):
 				return false
@@ -4317,6 +4338,32 @@ func _toast(text: String) -> void:
 	var hud := get_node_or_null(^"HUD")
 	if hud != null and hud.has_method("toast"):
 		hud.toast(text)
+
+
+## SAY NO ONCE, AND SOFTLY.
+##
+## Every player-facing refusal in this file goes through here rather than calling _toast()
+## directly: one toast, one soft ui_denied, and an identical refusal inside
+## DENY_DEBOUNCE_SECONDS is swallowed whole rather than queued behind the line already on
+## screen. See DENY_DEBOUNCE_SECONDS for why the window is per message and why it is short.
+##
+## THE CLOCK IS THE ENGINE'S, NOT THE WORLD'S. Time.get_ticks_msec() rather than the world
+## clock, because this is about how fast a thumb moves and not about how fast the sun does;
+## a pinned or paused world must not change how a keypress feels.
+func _deny(text: String) -> void:
+	var now: float = float(Time.get_ticks_msec()) / 1000.0
+	if String(_last_denial.get("text", "")) == text \
+			and now - float(_last_denial.get("at", -1000.0)) < DENY_DEBOUNCE_SECONDS:
+		return
+	_last_denial = {"text": text, "at": now}
+	_toast(text)
+	_sound_call(&"play", [DENY_SOUND])
+
+
+## The last refusal spoken and the second it was spoken at. For the suite, which otherwise
+## has to infer a debounce from a toast queue.
+func last_denial() -> Dictionary:
+	return _last_denial.duplicate()
 
 
 ## Copy the live world back into the savable state, immediately before a write.
