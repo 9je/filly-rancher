@@ -4300,7 +4300,7 @@ func _nearest_occupied_slot() -> PlotSlot:
 ## (_prompt_slot) doubled as the mutex the other four consulted. The prompt is a persistent
 ## label now, so there is nothing to fire once and nothing to go stale.
 func _update_interaction() -> void:
-	_paint_plot_ghosts()
+	_paint_plots()
 	var action: Dictionary = current_interaction()
 	var hud := get_node_or_null(^"HUD")
 	if hud != null and hud.has_method("set_prompt"):
@@ -4320,11 +4320,17 @@ func _update_interaction() -> void:
 ##
 ## Driven off the same placement_check() the refusal itself uses, so the colour under her
 ## hooves and the sentence she gets if she presses anyway can never disagree.
-func _paint_plot_ghosts() -> void:
+##
+## Also where every slot's marker fade is driven, every frame: the same walk over
+## _plot_slots() that decides the ghost already has her distance to each one for free, and a
+## fade that lagged the ghost by a frame would be a second, smaller version of the thicket.
+func _paint_plots() -> void:
 	if player == null:
 		return
 	var at: Vector3 = player.global_position
 	for slot in _plot_slots():
+		slot.set_marker_focus(Vector2(at.x - slot.global_position.x,
+			at.z - slot.global_position.z).length())
 		if not slot.is_empty() or not (player in slot.get_overlapping_bodies()):
 			slot.set_ghost(PlotSlotScript.Ghost.OFF)
 			continue
@@ -5002,6 +5008,13 @@ func _report(pony_count: int, prop_count: int) -> void:
 	var slots_triggered := true
 	var slot_ids := {}
 	var slot_ids_unique := true
+	# WHAT IS STANDING IN THE PEN CLEARING. A screenshot showed the four plots and one fence
+	# reading as a thicket of parallel pale lines and no number anywhere could say whether
+	# that was four marked plots doing their job, a leftover marker set inside a fence, or two
+	# coincident copies of one. Now it can.
+	var marked := 0
+	var stray := 0
+	var duplicated := 0
 	for slot in slots:
 		var at: Vector3 = slot.global_position
 		var slot_ground: float = terrain.height_at(at.x, at.z)
@@ -5023,6 +5036,15 @@ func _report(pony_count: int, prop_count: int) -> void:
 		if slot_ids.has(String(slot.slot_id)) or String(slot.slot_id).is_empty():
 			slot_ids_unique = false
 		slot_ids[String(slot.slot_id)] = true
+		var marker_meshes: int = slot.marker_mesh_count()
+		if slot.is_empty():
+			marked += 1
+			if marker_meshes == 0:
+				stray += 1
+		elif marker_meshes > 0:
+			stray += 1
+		if slot.find_children("PlotMarks", "Node3D", false, false).size() > 1:
+			duplicated += 1
 		print("RANCH plot %-8s pos=(%6.1f, %5.2f, %6.1f) seat_error=%+.3f built=%s"
 			% [String(slot.slot_id), at.x, at.y, at.z, at.y - slot_ground,
 				slot.saved_plot_id() if not slot.is_empty() else "-"])
@@ -5085,9 +5107,16 @@ func _report(pony_count: int, prop_count: int) -> void:
 	# plot cost something, a brand new save could never build anything.
 	_set_check(checks, "at least one plot is buildable with zero bits", free_plots > 0)
 
-	print("RANCH plots slots=%d catalogue=%d restored=%d penned=%d clearing_spread=%.3f bits=%d"
+	print(("RANCH plots slots=%d catalogue=%d restored=%d penned=%d clearing_spread=%.3f " +
+		"bits=%d marked=%d stray=%d duplicated=%d near=%.1f far=%.1f")
 		% [slots.size(), catalogue.size(), _restored_plots, _penned_ponies, clearing_spread,
-			_current_bits()])
+			_current_bits(), marked, stray, duplicated,
+			PlotSlotScript.MARK_NEAR_METRES, PlotSlotScript.MARK_FAR_METRES])
+	_set_check(checks, "every plot slot is either marked or built, never both and never neither",
+		stray == 0)
+	_set_check(checks, "no plot slot carries two sets of markers", duplicated == 0)
+	_set_check(checks, "the marked plots do not light each other across the 9 m grid",
+		PlotSlotScript.MARK_FAR_METRES < 9.0)
 
 	# THE PEN PROBE. See _probe_pen_containment() for why this runs at boot in every mode
 	# and why an empty result is a failure rather than a skip -- the four slots are in
@@ -6532,6 +6561,17 @@ func _capture_plots() -> void:
 		return
 	var slot: PlotSlot = slots[0]
 	var at: Vector3 = slot.global_position
+
+	# STAND HER IN THE PLOT BEFORE SHOOTING IT. set_marker_focus() is normally driven every
+	# frame by _paint_plots(), which only runs from _physics_process() while _interactive is
+	# true (see that guard) -- a screenshot run never takes that path, so every slot's marker
+	# would otherwise sit at its construction-time default (full strength) for the whole
+	# capture, and 06/08/09 would still show the four-plot thicket regardless of what the
+	# fade actually does. One explicit pass, measured from slot 0 the way it would be if she
+	# were standing on it, is what these shots exist to prove.
+	for other in slots:
+		other.set_marker_focus(Vector2(at.x - other.global_position.x,
+			at.z - other.global_position.z).length())
 
 	# 06 -- an empty plot: four corner stakes and nothing else. This is what the player is
 	# looking at when the build prompt appears, and the thing this shot is asked to answer

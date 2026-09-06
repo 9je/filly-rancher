@@ -81,6 +81,22 @@ const MARK_WIDTH := 0.24
 const MARK_HEIGHT := 0.12
 const MARK_COLOR := Color(0.745, 0.694, 0.541)
 
+## HOW NEAR SHE HAS TO BE FOR A MARKED PLOT TO BE DRAWN AT ALL.
+##
+## The four slots are on a 9 m grid and each marks a 7.8 m square, so a fence rail and its
+## neighbour's boundary board sit 1.2 m apart and the clearing draws four sets of parallel
+## pale lines whether anybody is looking or not. Add one real 2.25 m fence and the picture is
+## the one the owner reported: "wtf is happening here".
+##
+## MARK_FAR_METRES IS UNDER THE GRID SPACING ON PURPOSE. At 8.0 m, standing in the middle of
+## one plot leaves its neighbour 9 m away and therefore dark, so exactly one marked square is
+## ever lit -- which is also what makes it read as an answer to "where am I" rather than as
+## scenery. MARK_NEAR_METRES is the slot's own trigger reach (TRIGGER_HALF plus a body
+## radius, 4.77 m), so the markers are at full strength for precisely as long as the build
+## prompt is up.
+const MARK_NEAR_METRES := 4.8
+const MARK_FAR_METRES := 8.0
+
 ## THE GHOST: WHAT THE GROUND LOOKS LIKE WHILE SHE IS DECIDING.
 ##
 ## The owner: "finding the right spot to build the paddock can be harder than it should".
@@ -121,6 +137,8 @@ var _built_node: Node = null
 var _stakes: Node3D = null
 var _ghost: Node3D = null
 var _ghost_state: int = Ghost.OFF
+var _mark_alpha := 1.0
+var _mark_materials: Array[StandardMaterial3D] = []
 
 
 ## Layers assigned in _init() rather than only in _ready(), so a slot is on the right ones
@@ -308,6 +326,35 @@ func ghost_state() -> int:
 	return _ghost_state
 
 
+## Fade the markers for a player `distance` metres away, in the XZ plane. Full strength
+## inside MARK_NEAR_METRES, gone past MARK_FAR_METRES, linear between. Called every frame by
+## game/world/ranch.gd; cheap because it writes an alpha on two shared materials rather than
+## touching the twelve meshes that wear them.
+func set_marker_focus(distance: float) -> void:
+	var span: float = maxf(0.001, MARK_FAR_METRES - MARK_NEAR_METRES)
+	var alpha: float = clampf(1.0 - (absf(distance) - MARK_NEAR_METRES) / span, 0.0, 1.0)
+	if is_equal_approx(alpha, _mark_alpha):
+		return
+	_mark_alpha = alpha
+	for mat in _mark_materials:
+		mat.albedo_color.a = alpha
+	if _stakes != null:
+		_stakes.visible = alpha > 0.0
+
+
+func marker_alpha() -> float:
+	return _mark_alpha
+
+
+## How many marker meshes this slot is actually drawing. The claim a screenshot could not
+## make: a built slot draws none, an empty one draws one full set, and no sequence of builds
+## and demolitions leaves two coincident copies.
+func marker_mesh_count() -> int:
+	if _stakes == null or not is_instance_valid(_stakes):
+		return 0
+	return _stakes.find_children("*", "MeshInstance3D", true, false).size()
+
+
 ## The plot id stored for this slot in a save, or "" when the slot is empty. The exact
 ## String GameState.plots wants -- see the class comment on why both halves are Strings.
 func saved_plot_id() -> String:
@@ -342,41 +389,56 @@ func _ensure_shape() -> void:
 ## you can trip on is worse than no marker.
 func _refresh_stakes() -> void:
 	var want_marks := is_empty()
-	if want_marks and _stakes == null:
-		_stakes = Node3D.new()
-		_stakes.name = "PlotMarks"
+	# ADOPT BY NAME, NOT BY THE CACHED HANDLE. queue_free() only queues: a build and a
+	# demolish inside one frame would leave the old node still parented while a new one was
+	# added beside it, and the two would z fight forever afterwards. Sweeping every child
+	# called PlotMarks makes the count a fact about the tree rather than about this file's
+	# bookkeeping. The boot-time containment probe does exactly one build-then-demolish on
+	# slot 0 on every single boot (game/world/ranch.gd _probe_pen_containment).
+	for existing in find_children("PlotMarks", "Node3D", false, false):
+		remove_child(existing)
+		existing.queue_free()
+	_stakes = null
+	_mark_materials.clear()
+	if not want_marks:
+		return
 
-		var stake_mat := _mark_material(STAKE_COLOR)
-		for sx in [-1.0, 1.0]:
-			for sz in [-1.0, 1.0]:
-				_mark("Stake%s%s" % ["N" if sx < 0.0 else "P", "N" if sz < 0.0 else "P"],
-					Vector3(STAKE_SIZE, STAKE_HEIGHT, STAKE_SIZE),
-					Vector3(sx * STAKE_INSET, STAKE_HEIGHT * 0.5 - 0.15, sz * STAKE_INSET),
-					stake_mat)
+	_stakes = Node3D.new()
+	_stakes.name = "PlotMarks"
 
-		# The boundary itself: four boards laid flat on the plot's own edge, so the marked
-		# square is exactly the square the fence will stand on.
-		var board_mat := _mark_material(MARK_COLOR)
-		var span := STAKE_INSET * 2.0
-		for s in [-1.0, 1.0]:
-			_mark("EdgeX%s" % ("N" if s < 0.0 else "P"),
-				Vector3(MARK_WIDTH, MARK_HEIGHT, span),
-				Vector3(s * STAKE_INSET, MARK_HEIGHT * 0.5 - 0.02, 0.0), board_mat)
-			_mark("EdgeZ%s" % ("N" if s < 0.0 else "P"),
-				Vector3(span, MARK_HEIGHT, MARK_WIDTH),
-				Vector3(0.0, MARK_HEIGHT * 0.5 - 0.02, s * STAKE_INSET), board_mat)
+	var stake_mat := _mark_material(STAKE_COLOR)
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			_mark("Stake%s%s" % ["N" if sx < 0.0 else "P", "N" if sz < 0.0 else "P"],
+				Vector3(STAKE_SIZE, STAKE_HEIGHT, STAKE_SIZE),
+				Vector3(sx * STAKE_INSET, STAKE_HEIGHT * 0.5 - 0.15, sz * STAKE_INSET),
+				stake_mat)
 
-		add_child(_stakes)
-	elif not want_marks and _stakes != null:
-		_stakes.queue_free()
-		_stakes = null
+	# The boundary itself: four boards laid flat on the plot's own edge, so the marked
+	# square is exactly the square the fence will stand on.
+	var board_mat := _mark_material(MARK_COLOR)
+	var span := STAKE_INSET * 2.0
+	for s in [-1.0, 1.0]:
+		_mark("EdgeX%s" % ("N" if s < 0.0 else "P"),
+			Vector3(MARK_WIDTH, MARK_HEIGHT, span),
+			Vector3(s * STAKE_INSET, MARK_HEIGHT * 0.5 - 0.02, 0.0), board_mat)
+		_mark("EdgeZ%s" % ("N" if s < 0.0 else "P"),
+			Vector3(span, MARK_HEIGHT, MARK_WIDTH),
+			Vector3(0.0, MARK_HEIGHT * 0.5 - 0.02, s * STAKE_INSET), board_mat)
+
+	add_child(_stakes)
+	_stakes.visible = _mark_alpha > 0.0
 
 
 func _mark_material(colour: Color) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = colour
+	mat.albedo_color = Color(colour.r, colour.g, colour.b, _mark_alpha)
 	mat.roughness = 0.95
 	mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+	# Alpha because the markers fade with distance (see MARK_NEAR_METRES). Kept in a list so
+	# set_marker_focus() writes two materials rather than walking twelve meshes a frame.
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_mark_materials.append(mat)
 	return mat
 
 

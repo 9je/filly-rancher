@@ -18,6 +18,7 @@ const PropsScript := preload("res://world/props.gd")
 const ZoneMarkerScript := preload("res://world/zone_marker.gd")
 const BuildingScript := preload("res://world/building.gd")
 const CameraRigScript := preload("res://actors/player/camera_rig.gd")
+const RanchScene := preload("res://world/ranch.tscn")
 
 ## The pony's full height, horn tip included (docs/pipeline.md section 3). NOT her
 ## 1.163 m withers height -- the whole point of the doorway test below.
@@ -248,3 +249,25 @@ func test_the_request_board_is_a_board_and_not_only_a_building() -> void:
 	assert_not_null(board, "the request board building stands")
 	assert_eq(board.door_width, 0.0, "a notice board has no doorway and stands no ramp")
 	ranch.free()
+
+
+## WHAT IS ACTUALLY STANDING IN THE PEN CLEARING. The gate prints it; this pins it. A
+## screenshot showed the clearing reading as a thicket of parallel pale lines and nobody
+## could say from any number whether that was four marked plots, a leftover marker set
+## inside a fence, or two coincident copies of one.
+func test_no_slot_carries_markers_and_a_pen_at_the_same_time() -> void:
+	var ranch = RanchScene.instantiate()
+	add_child_autofree(ranch)
+	await wait_frames(2)
+	var slots: Array = ranch.plot_slots()
+	assert_gt(slots.size(), 0, "the map has to have slots for this to mean anything")
+	for slot in slots:
+		if slot.is_empty():
+			assert_gt(slot.marker_mesh_count(), 0,
+				"empty slot '%s' is invisible ground that pops a prompt" % slot.name)
+		else:
+			assert_eq(slot.marker_mesh_count(), 0,
+				"built slot '%s' still has its markers inside its fence" % slot.name)
+		assert_eq(slot.find_children("PlotMarks", "Node3D", false, false).size(),
+			1 if slot.is_empty() else 0,
+			"slot '%s' carries more than one set of markers" % slot.name)

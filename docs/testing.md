@@ -705,6 +705,23 @@ origin; a skirted prop is seated against the lowest of nine samples across its
 measured footprint, and the gate reads the height `Props` recorded when it seated
 it rather than re-deriving one, so the two cannot drift apart.
 
+**`RANCH plots` gained `marked=`, `stray=`, `duplicated=`, `near=` and `far=`.** The
+picture it exists to stop: four plot slots on a 9 m grid each draw a closed pale
+boundary on a 7.8 m square, so a built pen's fence and its neighbour's boundary board
+stand 1.2 m apart, and an owner's screenshot of the clearing read as a thicket of
+parallel pale lines rather than four plots and one fence. The markers now fade with
+distance (`PlotSlot.set_marker_focus()`), full strength inside `MARK_NEAR_METRES`
+(4.8 m, the slot's own trigger reach) and gone past `MARK_FAR_METRES` (8.0 m,
+deliberately UNDER the 9 m grid spacing so standing in one plot never lights its
+neighbour). `marked` counts empty slots carrying at least one marker; `stray` counts
+any slot caught with the wrong pairing -- an empty slot with no markers, or a built
+slot that still has some -- and should always be zero; `duplicated` counts any slot
+carrying more than one `PlotMarks` node, which is what a build-then-demolish that
+adopted its old node by a cached handle rather than by name would leave behind, and
+should also always be zero. Three checks ride with the numbers: every plot slot is
+either marked or built (never both, never neither), no plot slot carries two sets of
+markers, and `MARK_FAR_METRES` is under the 9 m grid spacing.
+
 **Looking at the sky.** The gate checks numbers; only a person can say whether a
 stormy dusk *looks* like one. `bash tools/sky_sheet.sh` renders the ranch once
 for each of the sixteen (phase, weather) pairs and tiles them into

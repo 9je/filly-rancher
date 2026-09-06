@@ -281,6 +281,86 @@ func test_the_ghost_is_geometry_and_not_a_line_of_text() -> void:
 		fail_test("a Label3D in the world is exactly the floating text this project bans")
 
 
+## THE MARKED PLOT IS A SIGN, NOT SCENERY.
+##
+## Four slots on a 9 m grid, each drawing a closed pale boundary on a 7.8 m square plus four
+## 1.05 m corner stakes, all the time, whether anybody is near them or not. A built pen's
+## fence stands on the same 3.9 m half extent, so a fence rail and its neighbour's boundary
+## board are 1.2 m apart, and the screenshot pass's own 08_pen_built frames a real fence with
+## two marked squares receding behind it: four sets of parallel pale lines at 1.2 m spacing.
+## The owner, on that picture: "wtf is happening here".
+##
+## The markers now answer to how near she is. Standing in the clearing she sees the plot she
+## is at; from across the map the clearing is grass and one fence.
+func test_the_markers_are_solid_when_she_is_standing_in_the_plot() -> void:
+	var slot := PlotSlotScript.new()
+	add_child_autofree(slot)
+	slot.set_marker_focus(0.0)
+	assert_almost_eq(slot.marker_alpha(), 1.0, 0.001)
+
+
+func test_the_markers_are_gone_from_across_the_clearing() -> void:
+	var slot := PlotSlotScript.new()
+	add_child_autofree(slot)
+	slot.set_marker_focus(PlotSlotScript.MARK_FAR_METRES + 1.0)
+	assert_almost_eq(slot.marker_alpha(), 0.0, 0.001,
+		"a plot nobody is near contributes no lines to the picture")
+
+
+func test_the_markers_fade_rather_than_snap() -> void:
+	var slot := PlotSlotScript.new()
+	add_child_autofree(slot)
+	var previous := 2.0
+	var seen := 0
+	var d := 0.0
+	while d <= PlotSlotScript.MARK_FAR_METRES + 2.0:
+		slot.set_marker_focus(d)
+		var here: float = slot.marker_alpha()
+		assert_lte(here, previous + 0.001, "the markers got brighter as she walked away")
+		previous = here
+		seen += 1
+		d += 0.5
+	assert_gt(seen, 20, "the sweep has to actually walk the range it claims to")
+
+
+## THE NEIGHBOUR SPACING, WHICH IS THE WHOLE PICTURE. The far cutoff has to be tight enough
+## that standing in one plot does not light the next one 9 m away, or the fade buys nothing.
+func test_standing_in_one_plot_does_not_light_the_next_one() -> void:
+	var slot := PlotSlotScript.new()
+	add_child_autofree(slot)
+	slot.set_marker_focus(9.0)
+	assert_almost_eq(slot.marker_alpha(), 0.0, 0.001,
+		"the slots are on a 9 m grid and only the one she is in may be lit")
+
+
+func test_a_built_slot_carries_no_marker_geometry_at_all() -> void:
+	var slot := PlotSlotScript.new()
+	add_child_autofree(slot)
+	assert_gt(slot.marker_mesh_count(), 0, "an empty slot is marked")
+	var plot := _a_plot()
+	assert_not_null(plot)
+	assert_true(slot.build(plot))
+	assert_eq(slot.marker_mesh_count(), 0,
+		"a fence stands where the markers stood; both at once is the reported picture")
+
+
+func test_building_and_demolishing_never_stacks_a_second_set_of_markers() -> void:
+	# The boot-time containment probe builds a pen on slot 0 and takes it down again
+	# (game/world/ranch.gd _probe_pen_containment). A refresh that created a new marker node
+	# without disposing of the old one would leave two coincident sets, z fighting, forever.
+	var slot := PlotSlotScript.new()
+	add_child_autofree(slot)
+	var plot := _a_plot()
+	assert_not_null(plot)
+	var baseline: int = slot.marker_mesh_count()
+	assert_gt(baseline, 0)
+	for i in range(3):
+		assert_true(slot.build(plot))
+		assert_true(slot.demolish())
+	assert_eq(slot.marker_mesh_count(), baseline,
+		"three build and demolish cycles left exactly one set of markers")
+
+
 func _a_plot() -> PlotData:
 	var registry = load("res://systems/plot_registry.gd").new()
 	registry.load_all(load("res://systems/plot_registry.gd").PLOT_DIR)
