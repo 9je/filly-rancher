@@ -1,0 +1,1 @@
+Read MISSION.md before doing anything. It is the full brief. Keep PROGRESS.md, PLAN.md, and DECISIONS.md current and re-read them after any context reset. Never ask the user questions; make the call and log it in DECISIONS.md.
