@@ -24,15 +24,15 @@ concurrency:
 env:
   # Pinned to match tools/setup_env.sh (GODOT_VER) so CI and the owner's machine
   # build with the same engine. Bumping the engine means bumping it in both places.
-  GODOT_VERSION: 4.5.2-stable
+  GODOT_VERSION: 4.7.2-stable
   # Godot looks for templates in a folder named major.minor.patch.status -- the
   # .tpz's own templates/version.txt reads exactly this. See docs/pipeline.md section 9.
-  GODOT_TEMPLATES_VERSION: 4.5.2.stable
-  # SHA512s published by the release itself (SHA512-SUMS.txt for 4.5.2-stable);
+  GODOT_TEMPLATES_VERSION: 4.7.2.stable
+  # SHA512s published by the release itself (SHA512-SUMS.txt for 4.7.2-stable);
   # the Godot one is the same hash tools/setup_env.sh pins, the templates one the
   # same hash docs/pipeline.md section 9 pins.
-  GODOT_SHA512: e3ce6194b6d4d2dcef5e5b5136752c084d9d8b9071c10bc2d2011b947ec7439a257c8d23c541cb30699f16d9edea6dff36e6e84d2bec14a8fe9b4e9aacbe5a8d
-  TEMPLATES_SHA512: 003aa33743f58fb657717f090fc872ed3975e48d08a6012201a2259970d458a63d4d8a83090585307c23455ebfa4e6e0050e1057761c34863536095e3fcfab6c
+  GODOT_SHA512: 9aa00f7a605200940bce3027a567b782f49bd8e940dd06ae9e987bd65aee1b1467edd56ed84fcdcbdd44354bf613bdbb4e5d2913e925850368e150c59ed54c65
+  TEMPLATES_SHA512: ca4d71c4d7b81dfc15d1a98baa07534aa95b03fdda78a0075b06672e1648d2e5f40980c9adc28d23e1b92e732ee7bf3461997aa804af74ec2fcd7a93ccb84079
   NO_COLOR: "1"   # keep ANSI escapes out of the export log we grep below
 
 jobs:

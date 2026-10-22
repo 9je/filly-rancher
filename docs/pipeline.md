@@ -6,7 +6,7 @@ character or scene prop, without rediscovering anything Phase 0 already
 found the hard way. It documents what was **actually run**, including every
 deviation, quirk, and dead end — not a restatement of the original plan.
 
-Toolchain: portable Godot `4.5.2-stable` + portable Blender `4.2.23` LTS,
+Toolchain: portable Godot `4.7.2-stable` + portable Blender `4.2.23` LTS,
 both under `tools/bin/` (nothing installed system-wide, no sudo). Scripts
 live in `tools/`. Everything under `assets_raw/`, `tools/bin/`,
 `game/assets/converted/`, `game/.godot/`, and `build/` is gitignored — only
@@ -106,7 +106,7 @@ a near-instant no-op once everything is in place (`[ ! -x ... ]` guards).
   of these are load-bearing for the self-healing claim above; don't
   "simplify" either away.
 
-Verify: `tools/bin/godot --version` prints `4.5.2.stable.official....`;
+Verify: `tools/bin/godot --version` prints `4.7.2.stable.official....`;
 `tools/bin/blender/blender --version` prints `Blender 4.2.23 LTS`.
 
 ---
@@ -1505,27 +1505,27 @@ This portable Godot build's `--headless` help lists no
 `--install-export-templates` flag (only `--install-android-build-template`)
 — confirmed by running it and inspecting `--help` output directly, not
 assumed. Fall back to downloading the matching `.tpz` from the same GitHub
-release used for the Godot binary itself (Task 1: `4.5.2-stable`):
+release used for the Godot binary itself (Task 1: `4.7.2-stable`):
 
 ```bash
 curl -fL --connect-timeout 30 --max-time 600 -C - \
-  -o /tmp/Godot_v4.5.2-stable_export_templates.tpz \
-  "https://github.com/godotengine/godot/releases/download/4.5.2-stable/Godot_v4.5.2-stable_export_templates.tpz"
+  -o /tmp/Godot_v4.7.2-stable_export_templates.tpz \
+  "https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_export_templates.tpz"
 
 # Verify against the release's own SHA512-SUMS.txt before unpacking (~1.3GB download):
-sha512sum /tmp/Godot_v4.5.2-stable_export_templates.tpz
-# expected: 003aa33743f58fb657717f090fc872ed3975e48d08a6012201a2259970d458a63d4d8a83090585307c23455ebfa4e6e0050e1057761c34863536095e3fcfab6c
+sha512sum /tmp/Godot_v4.7.2-stable_export_templates.tpz
+# expected: ca4d71c4d7b81dfc15d1a98baa07534aa95b03fdda78a0075b06672e1648d2e5f40980c9adc28d23e1b92e732ee7bf3461997aa804af74ec2fcd7a93ccb84079
 
 mkdir -p ~/.local/share/godot/export_templates
-unzip -oq /tmp/Godot_v4.5.2-stable_export_templates.tpz -d /tmp/tpz_extract
-mv /tmp/tpz_extract/templates ~/.local/share/godot/export_templates/4.5.2.stable
+unzip -oq /tmp/Godot_v4.7.2-stable_export_templates.tpz -d /tmp/tpz_extract
+mv /tmp/tpz_extract/templates ~/.local/share/godot/export_templates/4.7.2.stable
 ```
 
-The `.tpz`'s own `templates/version.txt` reads `4.5.2.stable`, which must
+The `.tpz`'s own `templates/version.txt` reads `4.7.2.stable`, which must
 match the destination folder name exactly (Godot's `--version` output is
-`4.5.2.stable.official.<hash>` — the folder name is the `major.minor.patch.status`
+`4.7.2.stable.official.<hash>` — the folder name is the `major.minor.patch.status`
 prefix only, no build hash). Verify:
-`ls ~/.local/share/godot/export_templates/` shows `4.5.2.stable`.
+`ls ~/.local/share/godot/export_templates/` shows `4.7.2.stable`.
 
 The `-C -` resume flag matters — this is a ~1.3GB download; if it can't
 finish inside a single timeout window, re-running the same command resumes

@@ -26,10 +26,10 @@ verify_checksum() {
   fi
 }
 
-GODOT_VER="4.5.2-stable"   # latest 4.5.x stable as of 2026-08-26
+GODOT_VER="4.7.2-stable"   # latest stable as of 2026-10-22 (v1 overhaul, M0.1)
 # SHA512 pinned from the release's own SHA512-SUMS.txt:
-# https://github.com/godotengine/godot/releases/download/4.5.2-stable/SHA512-SUMS.txt
-GODOT_SHA512="e3ce6194b6d4d2dcef5e5b5136752c084d9d8b9071c10bc2d2011b947ec7439a257c8d23c541cb30699f16d9edea6dff36e6e84d2bec14a8fe9b4e9aacbe5a8d"
+# https://github.com/godotengine/godot/releases/download/4.7.2-stable/SHA512-SUMS.txt
+GODOT_SHA512="9aa00f7a605200940bce3027a567b782f49bd8e940dd06ae9e987bd65aee1b1467edd56ed84fcdcbdd44354bf613bdbb4e5d2913e925850368e150c59ed54c65"
 if [ ! -x godot ]; then
   curl -fL --connect-timeout 30 --max-time 900 -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VER}/Godot_v${GODOT_VER}_linux.x86_64.zip"
   verify_checksum godot.zip "$GODOT_SHA512" sha512sum
@@ -129,15 +129,14 @@ printf '%s\n' "$sourceio_log" | grep -q SOURCEIO_OK || { echo "ERROR: SourceIO e
 # it's loaded via res://addons/gut/..., not from tools/bin/).
 #
 # Version pin: GUT's own README compatibility table (https://github.com/bitwes/Gut/blob/master/README.md,
-# "Version Links" section) lists "9.5.0 | Valid Godot Version 4.5.x" as the row matching our
-# pinned Godot 4.5.2 -- 9.6.1/9.7.1 are for Godot 4.6.x/4.7.x respectively, so 9.5.0 is the
-# correct pin, not merely "latest". Fetched from the tag's GitHub source-archive zip (no
+# "Version Links" section) lists 9.7.1 as the row for Godot 4.7.x, matching our pinned
+# Godot 4.7.2 (9.5.0 was the 4.5.x row, used before the v1 engine upgrade). Fetched from the tag's GitHub source-archive zip (no
 # packaged release asset is published for this repo, only the archive/tarball links the
 # README itself points at). SHA256 below was computed locally on the downloaded bytes and
 # cross-checked by downloading the same URL a second time independently -- both runs produced
 # byte-identical zips and the identical hash.
-GUT_VER="9.5.0"
-GUT_SHA256="7f6197e34096b5ca62c2b84b3d268c3f270317dcbcc19d4acfe788a1d2b5e601"
+GUT_VER="9.7.1"
+GUT_SHA256="14969aa46adc84aa08cdd21b9f6d1a64addd92ae60b36f02d0521ed305aa4086"
 GUT_TARGET="../../game/addons/gut"
 if [ ! -f "$GUT_TARGET/plugin.cfg" ]; then
   curl -fL --connect-timeout 30 --max-time 300 -o gut.zip "https://github.com/bitwes/Gut/archive/refs/tags/v${GUT_VER}.zip"
