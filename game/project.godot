@@ -36,6 +36,7 @@ AudioSafety="*res://systems/audio_safety.gd"
 GameState="*res://systems/game_state.gd"
 InputDevice="*res://systems/input_device.gd"
 Sound="*res://systems/sound.gd"
+Events="*res://systems/events.gd"
 
 [audio]
 
