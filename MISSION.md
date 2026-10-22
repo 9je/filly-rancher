@@ -86,3 +86,8 @@ Execute PLAN.md milestone by milestone. After each milestone, run all tests, cap
 - All tests pass. Linux and Windows builds export and launch.
 - README.md with build/run instructions. CREDITS.md complete.
 - A final REVIEW.md where you critique the game as a skeptical player and reviewer, then fix the top issues before declaring done.
+
+## Addenda (owner, 2026-10-22, mid-session)
+- Use any asset packs in the project as a base and restyle them with the show's shading so they match the ponies.
+- Model, UV, and texture environment and prop meshes in Blender, then export them as .glb into the Godot project. Never ship environments built from primitive shapes or CSG.
+- (A references/ folder was mentioned, then withdrawn by the owner: there are no reference images.)
