@@ -25,3 +25,6 @@ __pycache__/
 # locally (CI runs it in a throwaway checkout, so it never noticed).
 ci_smoke_*.log
 scratchpad/
+
+# Claude Code agent worktrees: separate git checkouts, never project content.
+.claude/worktrees/
