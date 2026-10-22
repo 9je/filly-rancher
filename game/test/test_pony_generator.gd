@@ -9,6 +9,19 @@ const MarkComposerScript := preload("res://systems/mark_composer.gd")
 const PonyPaintScript := preload("res://systems/pony_paint.gd")
 const EYE := preload("res://shaders/pony_eye.gdshader")
 const TOON := preload("res://shaders/toon.gdshader")
+const ToonStylerScript := preload("res://systems/toon_styler.gd")
+
+var _shading_was := true
+
+
+func before_each() -> void:
+	# The material checks below need the real shader swap even in a headless run.
+	_shading_was = ToonStylerScript.shading_enabled
+	ToonStylerScript.shading_enabled = true
+
+
+func after_each() -> void:
+	ToonStylerScript.shading_enabled = _shading_was
 
 
 func test_the_donor_table_covers_all_three_races_and_foals() -> void:

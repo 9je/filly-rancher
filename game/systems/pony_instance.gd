@@ -57,6 +57,7 @@ extends RefCounted
 ## game/scripts/pony_rig.gd: the class cache lives in the gitignored game/.godot/ and a
 ## fresh clone has not built it yet.
 
+const PonyLookScript := preload("res://systems/pony_look.gd")
 const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 
 ## Directory the shared registry lazily loads the roster from, when nobody has injected
@@ -299,7 +300,11 @@ static func from_dict(d: Dictionary) -> PonyInstance:
 	# edited blob cannot fabricate a look this class would not have written.
 	inst.stock = {}
 	var saved_stock: Variant = d.get("stock", {})
-	if typeof(saved_stock) == TYPE_DICTIONARY:
+	if typeof(saved_stock) == TYPE_DICTIONARY and PonyLookScript.is_look_dict(saved_stock):
+		# A v2 look (game/systems/pony_look.gd): normalised through PonyLook so a hand
+		# edited blob comes back as fields that class would have written, nothing else.
+		inst.stock = PonyLookScript.from_dict(saved_stock).to_dict()
+	elif typeof(saved_stock) == TYPE_DICTIONARY:
 		var triple: Dictionary = saved_stock
 		var ok := true
 		for key in ["coat", "mane", "eyes"]:

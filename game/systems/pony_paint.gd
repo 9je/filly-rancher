@@ -76,6 +76,8 @@ static func apply(body: Node3D, look: PonyLook) -> int:
 				mi.visible = look.race == &"pegasus"
 		for i in range(names.size()):
 			var r: int = role_of(names[i], donor)
+			if not ToonStylerScript.shading_enabled:
+				continue
 			if r == Role.HIDE:
 				mi.set_surface_override_material(i, hidden_material())
 				continue

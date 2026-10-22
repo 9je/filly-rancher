@@ -111,6 +111,10 @@ const PonyVisualsScript := preload("res://actors/pony/pony_visuals.gd")
 const PlayerScript := preload("res://actors/player/player.gd")
 const StockPaletteScript := preload("res://systems/stock_palette.gd")
 const StockTintScript := preload("res://systems/stock_tint.gd")
+const PonyLookScript := preload("res://systems/pony_look.gd")
+const PonyPaintScript := preload("res://systems/pony_paint.gd")
+const DonorTableScript := preload("res://systems/donor_table.gd")
+const ToonStylerScript := preload("res://systems/toon_styler.gd")
 
 ## Emitted when a beam hold has become a capture -- i.e. when the beam calls
 ## notify_captured(), immediately before it stores her record and frees this node.
@@ -483,42 +487,32 @@ func is_stock() -> bool:
 ## Recolour the built body from _stock. A no op for a named character and for a body that
 ## failed to build, both of which are ordinary states rather than errors.
 func _apply_stock_tint() -> void:
-	if _stock.is_empty() or visuals.get_child_count() == 0:
+	if visuals.get_child_count() == 0:
 		return
 	var body: Node3D = visuals.get_child(0)
-	StockTintScript.apply(body, StockPaletteScript.load_stock(), _stock)
+	if _stock.is_empty():
+		# A named record (the legacy roster, the hidden records with no look): still the
+		# show's shading, just her own colors.
+		ToonStylerScript.style(body, &"pony", {})
+		return
+	var look := look()
+	PonyPaintScript.apply(body, look)
+	visuals.scale = Vector3.ONE * PonyPaintScript.body_scale(look)
 
 
-## Which base model this pony's body is built from: her own, off her stock look, or the
-## record's for a named character. Empty means "the record's own", which is what
-## PonyVisuals.build() wants for the 43 named ponies.
-##
-## READ BEFORE THE BODY IS BUILT, which is why set_stock() has always had to be called
-## before setup() and now really needs to be: a tint can be re-applied to a body that
-## already exists, a different mesh cannot.
+## Her look as a PonyLook (a v2 record, or a legacy palette triple converted).
+func look() -> PonyLook:
+	return PonyLookScript.from_stock(_stock)
+
+
+## Which donor body her look is built on, or "" for a named record (her own model).
+## READ BEFORE THE BODY IS BUILT, which is why set_stock() must be called before add_child.
 func _base_model_path() -> String:
 	if _stock.is_empty():
 		return ""
-	return StockPaletteScript.mane_style_path(int(_stock.get("mane_style", 0)))
+	return DonorTableScript.model_path(look().donor)
 
 
-## Adopt an INDIVIDUAL: a PonyInstance (game/systems/pony_instance.gd) carrying her uid
-## and her own happiness/hunger, whose `data_id` resolves to the PonyData her body is
-## built from. The instance-aware sibling of setup(), and the path a pony taken back OUT of
-## storage comes through -- MagicBeam.release_stored(), and Task 3's pens.
-##
-## SHE KEEPS THE INSTANCE, which is the whole point. A pony let out of the bag and caught
-## again is the SAME pony -- same uid, same happiness, same however-long she has been
-## hungry -- because magic_beam.gd's capture path asks get_instance() first and only mints
-## a new one for a pony who has never been owned. Without that, a release-and-recapture
-## would quietly reset her to a stranger with the same face, which is exactly the class of
-## bug PonyInstance exists to stop.
-##
-## Same placement rule as setup(): position her BEFORE add_child().
-##
-## An instance whose data_id this build's roster does not carry resolves to null; she is
-## adopted anyway, minus a body, and PonyVisuals push_errors the specific reason. That is
-## deliberate -- see setup()'s note on a build failure being loud but not fatal.
 func adopt(instance: PonyInstance) -> void:
 	_instance = instance
 	if instance == null:

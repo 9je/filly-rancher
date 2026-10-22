@@ -28,6 +28,14 @@ const PRESETS := {
 ## Outline width is multiplied by this; the graphics settings set it (0 disables lines).
 static var outline_scale: float = 1.0
 
+## FALSE UNDER THE HEADLESS DUMMY RENDERER, which cannot host a ShaderMaterial on a skinned
+## body that is built and freed within a frame or two (it logs "material is null" from its
+## material storage, measured on Godot 4.7.2; the Forward+ renderer is fine). Headless runs
+## are logic runs: every non-visual step (race parts, hidden accessories, marks) still
+## happens, only the shader swap is skipped. Tests that check the materials themselves set
+## this true for their own scope.
+static var shading_enabled: bool = DisplayServer.get_name() != "headless"
+
 static var _shared: Dictionary = {}
 
 
@@ -35,7 +43,7 @@ static var _shared: Dictionary = {}
 ## `category` picks a preset; `cache` is the material cache to use (pass {} for a private
 ## one, or omit for the process-wide shared cache).
 static func style(root: Node, category: StringName = &"prop", cache: Variant = null) -> int:
-	if root == null:
+	if root == null or not shading_enabled:
 		return 0
 	var store: Dictionary = _shared if cache == null else cache
 	var preset: Dictionary = PRESETS.get(category, PRESETS[&"prop"])

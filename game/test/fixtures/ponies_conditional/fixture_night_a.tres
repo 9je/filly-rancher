@@ -6,7 +6,7 @@
 script = ExtResource("1")
 id = &"fixture_night_a"
 display_name = "Fixture Night A"
-model_path = "res://assets/converted/ponies/twilight.glb"
+model_path = "res://assets/converted/ponies/pokeypierce.glb"
 rarity = 0
 spawn_zones = Array[StringName]([&"fixture_hollow"])
 favorite_foods = Array[StringName]([&"hay"])

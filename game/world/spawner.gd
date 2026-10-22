@@ -51,6 +51,8 @@ const SpawnTableScript := preload("res://systems/spawn_table.gd")
 const ZoneMarkerScript := preload("res://world/zone_marker.gd")
 const WorldStateScript := preload("res://systems/world_state.gd")
 const StockPaletteScript := preload("res://systems/stock_palette.gd")
+const PonyGeneratorScript := preload("res://systems/pony_generator.gd")
+const DonorTableScript := preload("res://systems/donor_table.gd")
 const RegionRegistryScript := preload("res://systems/region_registry.gd")
 
 ## Real seconds a marker waits before standing a replacement for a stock pony who was
@@ -237,8 +239,6 @@ var _last_weather: int = WorldStateScript.Weather.CLEAR
 ## the moment a replacement is stood.
 var _stock_wait: Dictionary = {}
 
-## Loaded once. Null only until the first stock pony is stood.
-var _palette: StockPalette = null
 var _regions: RegionRegistry = null
 
 ## The registry hidden records resolve through, kept like _entries.
@@ -620,29 +620,43 @@ func named_standing() -> int:
 ## boot but MAY reshuffle across boots; that is fine for anonymous stock, and the named
 ## draw is the one the world seed actually pins.
 func _spawn_stock(marker: ZoneMarker, slot: int, rng: RandomNumberGenerator) -> CharacterBody3D:
-	if _palette == null:
-		_palette = StockPaletteScript.load_stock()
 	var id: StringName = StockPaletteScript.IDS[rng.randi_range(0,
 		StockPaletteScript.IDS.size() - 1)]
-	var look: Dictionary = _palette.draw_look(rng)
 	var data: PonyData = _registry_for_stock().by_id(id)
-	if data == null or data.model_path.is_empty() or not ResourceLoader.exists(data.model_path):
-		# The assetless checkout (docs/ci.md section 4). One calm skip, not a push_error per
-		# pony per marker; ranch.gd's report already says assets=absent at the top.
+	if data == null:
 		return null
-	# AND THE PATH THAT ACTUALLY LOADS. A stock pony's body is NOT built from
-	# data.model_path: Pony._base_model_path() answers StockPalette.mane_style_path() for
-	# her drawn mane style, and PonyVisuals builds from that instead (the record's own path
-	# is what the 43 NAMED characters use). Guarding only the record left the assetless
-	# checkout skipping on the wrong file: the hidden records happen to point at
-	# pokeypierce.glb, which is also pool index 0, so the guard passed or failed by
-	# coincidence and any pool entry that was missing on its own went straight through to a
-	# push_error per pony per marker.
-	var pool_path: String = StockPaletteScript.mane_style_path(
-		int(look.get("mane_style", 0)))
-	if pool_path.is_empty() or not ResourceLoader.exists(pool_path):
+	# EVERY DRIFTER IS GENERATED: a fresh look off the stream, built on whichever donor
+	# body the generator picked. The body that loads is the donor's, so that is the path
+	# the assetless guard checks (docs/ci.md section 4: one calm skip, no push_error).
+	var look := PonyGeneratorScript.generate(rng.randi(), _drifter_opts(marker, rng))
+	var path := DonorTableScript.model_path(look.donor)
+	if not ResourceLoader.exists(path):
 		return null
-	return _spawn_one(data, marker, slot, look)
+	return _spawn_one(data, marker, slot, look.to_dict())
+
+
+## Wild Drifters: mostly adults, a few foals, rare variants by region.
+func _drifter_opts(marker: ZoneMarker, rng: RandomNumberGenerator) -> Dictionary:
+	var opts := {}
+	if rng.randf() < 0.12:
+		opts["foal"] = true
+	var rare: StringName = _rare_variant_for(marker)
+	if rare != &"" and rng.randf() < 0.06:
+		opts["variant"] = rare
+	return opts
+
+
+## The rare variant a marker's region can turn up, if any (GDD 4.2).
+func _rare_variant_for(marker: ZoneMarker) -> StringName:
+	var zone := String(marker.zone_id) if marker != null else ""
+	match zone:
+		"lake":
+			return &"pearl"
+		"nightmeadow":
+			return &"starry"
+		"everfree":
+			return &"ember"
+	return &""
 
 
 ## The registry hidden records resolve through. Loaded once and kept, like _entries.

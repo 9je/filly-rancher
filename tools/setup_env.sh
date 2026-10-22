@@ -129,14 +129,16 @@ printf '%s\n' "$sourceio_log" | grep -q SOURCEIO_OK || { echo "ERROR: SourceIO e
 # it's loaded via res://addons/gut/..., not from tools/bin/).
 #
 # Version pin: GUT's own README compatibility table (https://github.com/bitwes/Gut/blob/master/README.md,
-# "Version Links" section) lists 9.7.1 as the row for Godot 4.7.x, matching our pinned
-# Godot 4.7.2 (9.5.0 was the 4.5.x row, used before the v1 engine upgrade). Fetched from the tag's GitHub source-archive zip (no
+# "Version Links" section) lists 9.5.0 for Godot 4.5.x and 9.7.1 for 4.7.x. We stay on 9.5.0
+# under Godot 4.7.2 deliberately: the full suite runs green on it, while 9.7.1 fails any test
+# that sees an engine error (the headless dummy renderer logs one for every ShaderMaterial)
+# and rejects the suite's assert_push_error form. See DECISIONS.md, 2026-10-22. Fetched from the tag's GitHub source-archive zip (no
 # packaged release asset is published for this repo, only the archive/tarball links the
 # README itself points at). SHA256 below was computed locally on the downloaded bytes and
 # cross-checked by downloading the same URL a second time independently -- both runs produced
 # byte-identical zips and the identical hash.
-GUT_VER="9.7.1"
-GUT_SHA256="14969aa46adc84aa08cdd21b9f6d1a64addd92ae60b36f02d0521ed305aa4086"
+GUT_VER="9.5.0"
+GUT_SHA256="7f6197e34096b5ca62c2b84b3d268c3f270317dcbcc19d4acfe788a1d2b5e601"
 GUT_TARGET="../../game/addons/gut"
 if [ ! -f "$GUT_TARGET/plugin.cfg" ]; then
   curl -fL --connect-timeout 30 --max-time 300 -o gut.zip "https://github.com/bitwes/Gut/archive/refs/tags/v${GUT_VER}.zip"
