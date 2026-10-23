@@ -3589,6 +3589,8 @@ func _post_due_mail() -> int:
 			story.requisition_cycle = _world.cycle_index() if _world != null else 0
 	if posted > 0:
 		_toast(MAIL_ARRIVED)
+		if spike != null:
+			spike.letter_arrived()
 		var box: Mailbox = get_mailbox()
 		if box != null:
 			_sound_call(&"play_at", [&"mail_arrive", box.global_position])
@@ -7569,7 +7571,26 @@ const PonyTraitsScript := preload("res://systems/pony_traits.gd")
 var tools: RanchTools
 
 
+## SPIKE, at the mailbox (world/spike_actor.gd): he burps the post in on green dragonfire.
+const SpikeActorScript := preload("res://world/spike_actor.gd")
+const SPIKE_AT := Vector3(6.9, 0.0, -1.2)
+var spike: SpikeActor
+
+
+func _setup_spike() -> void:
+	if spike != null:
+		return
+	spike = SpikeActorScript.new()
+	spike.name = "Spike"
+	var y := float(terrain.call("height_at", SPIKE_AT.x, SPIKE_AT.z)) if terrain != null else 0.0
+	spike.position = Vector3(SPIKE_AT.x, y, SPIKE_AT.z)
+	spike.rotation.y = deg_to_rad(20.0)
+	spike.player = player
+	add_child(spike)
+
+
 func _setup_tools() -> void:
+	_setup_spike()
 	if tools != null:
 		return
 	tools = RanchToolsScript.new()

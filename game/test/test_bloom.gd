@@ -19,13 +19,13 @@ func test_the_best_case_blooms_on_schedule() -> void:
 
 func test_an_ordinary_fed_pony_takes_much_longer() -> void:
 	var plain := BloomScript.seconds_to_bloom(_kept({"favorite_glow": 0.0, "has_friend": false, "happiness": 0.7}))
-	# 10 to 30 minutes: the v1 fun pass (MISSION.md pacing) brought the first Bloom forward.
-	assert_between(plain, 600.0, 1800.0, "about 10 to 30 minutes without the bonuses")
+	# 8 to 30 minutes: the v1 fun pass (MISSION.md pacing) brought the first Bloom forward.
+	assert_between(plain, 480.0, 1800.0, "about 8 to 30 minutes without the bonuses")
 
 
 func test_nothing_blooms_when_it_should_not() -> void:
 	for blocker in [{"calm_lamp": true}, {"marked": true}, {"hunger": 0.9}, {"happiness": 0.3},
-			{"pen_count": 6}]:
+			{"pen_count": BloomScript.CROWDED_AT}]:
 		assert_eq(BloomScript.gain(_kept(blocker), 10.0), 0.0, "blocked by %s" % blocker)
 
 

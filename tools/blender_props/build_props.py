@@ -35,6 +35,8 @@ PALETTE = {
     "pink": (0.97, 0.62, 0.74), "teal": (0.2, 0.68, 0.66), "lilac": (0.74, 0.62, 0.94),
     "leather": (0.6, 0.38, 0.24), "black": (0.12, 0.11, 0.13), "grey": (0.56, 0.58, 0.62),
     "rose": (0.96, 0.42, 0.52), "stone": (0.74, 0.72, 0.68), "stone_dark": (0.56, 0.55, 0.52),
+    "spike_purple": (0.36, 0.13, 0.58), "spike_belly": (0.5, 0.8, 0.28), "spike_green": (0.08, 0.6, 0.12),
+    "eye_green": (0.04, 0.45, 0.1), "eye_white": (1.0, 1.0, 1.0), "pupil": (0.01, 0.02, 0.01),
     "cloud": (0.98, 0.98, 1.0), "cloud_shade": (0.86, 0.88, 0.96), "cream": (0.99, 0.95, 0.86),
 }
 
@@ -850,6 +852,48 @@ def fx_crates():
         parts.append(box("mark%d" % i, (0.35, 0.02, 0.22), (x, y - w / 2 - 0.01, z + 0.2), "gold", bevel=0.0))
     join(parts, "fx_crates")
     export("fx_crates")
+
+
+@prop("spike")
+def spike():
+    """Spike the baby dragon (for Damon): a big round head and snout, a pear of a body with a
+    pale green belly, stubby arms and legs, a long curling tail with a spade tip, green spines
+    down his head and back, green ear frills, big green eyes. Faces -Y (the front view)."""
+    P, B, G = "spike_purple", "spike_belly", "spike_green"
+    parts = [
+        ball("head", 0.27, (0, 0, 0.8), P, scale=(1.0, 1.0, 0.95), subdiv=3),
+        ball("snout", 0.17, (0, -0.21, 0.73), P, scale=(1.05, 1.0, 0.78), subdiv=3),
+        ball("jaw", 0.13, (0, -0.17, 0.64), B, scale=(1.1, 0.9, 0.55), subdiv=2),
+        ball("body", 0.22, (0, 0.02, 0.42), P, scale=(1.0, 0.9, 1.25), subdiv=3),
+        ball("belly", 0.18, (0, -0.08, 0.4), B, scale=(0.9, 0.62, 1.15), subdiv=3),
+    ]
+    for sx in (-1, 1):
+        parts += [
+            ball("thigh%d" % sx, 0.11, (0.12 * sx, 0.0, 0.2), P, subdiv=2),
+            ball("foot%d" % sx, 0.09, (0.14 * sx, -0.07, 0.05), P, scale=(1.0, 1.55, 0.6), subdiv=2),
+            ball("arm%d" % sx, 0.06, (0.2 * sx, -0.05, 0.47), P, scale=(1.0, 1.0, 1.8), subdiv=2),
+            ball("hand%d" % sx, 0.055, (0.22 * sx, -0.1, 0.36), P, subdiv=2),
+            # Ear frills: green fins swept back from the sides of the head.
+            cyl("frill%d" % sx, 0.09, 0.22, (0.27 * sx, 0.06, 0.88), G, verts=10, r2=0.0,
+                rot=(math.radians(-20), math.radians(70 * sx), 0)),
+            # Eyes: a tall white, a green iris, a black pupil, a highlight.
+            ball("eye%d" % sx, 0.1, (0.11 * sx, -0.215, 0.85), "eye_white", scale=(0.85, 0.45, 1.2), subdiv=2),
+            ball("iris%d" % sx, 0.068, (0.115 * sx, -0.262, 0.84), "eye_green", scale=(0.9, 0.35, 1.15), subdiv=2),
+            ball("pupil%d" % sx, 0.04, (0.118 * sx, -0.286, 0.835), "pupil", scale=(0.9, 0.3, 1.2), subdiv=1),
+            ball("glint%d" % sx, 0.017, (0.138 * sx, -0.3, 0.87), "eye_white", subdiv=1),
+        ]
+    # Spines: down the head and the back, biggest at the crown.
+    for k, (y, z, r, tilt) in enumerate([(0.05, 1.06, 0.07, -10), (0.18, 1.0, 0.065, 20), (0.26, 0.88, 0.055, 45),
+                                         (0.24, 0.62, 0.05, 70), (0.24, 0.47, 0.045, 80), (0.22, 0.33, 0.04, 85)]):
+        parts.append(cyl("spine%d" % k, r, r * 2.6, (0, y, z), G, verts=8, r2=0.0, rot=(math.radians(tilt), 0, 0)))
+    # The tail: a curl of shrinking beads out behind him, a spade at the tip.
+    pts = [(0.0, 0.2, 0.24, 0.085), (0.04, 0.32, 0.17, 0.07), (0.1, 0.43, 0.13, 0.06), (0.17, 0.52, 0.13, 0.05),
+           (0.23, 0.58, 0.17, 0.042), (0.27, 0.6, 0.23, 0.035)]
+    for k, (x, y, z, r) in enumerate(pts):
+        parts.append(ball("tail%d" % k, r, (x, y, z), P, subdiv=2))
+    parts.append(cyl("spade", 0.07, 0.12, (0.29, 0.6, 0.31), G, verts=4, r2=0.0, rot=(0, 0, math.radians(45))))
+    join(parts, "spike")
+    export("spike")
 
 
 def main():

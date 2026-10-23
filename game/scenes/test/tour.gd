@@ -168,6 +168,9 @@ func _ranch_tour() -> void:
 		_view(Vector3(16, 3.5, 2), Vector3(9, 1.5, 3), 60.0)
 		await _frames(20)
 		await _shot("town_depot_mailbox")
+		_view(Vector3(8.2, 1.3, 1.6), Vector3(6.9, 0.6, -1.2), 40.0)
+		await _frames(20)
+		await _shot("town_spike")
 	if _want("gameplay"):
 		_hud(true)
 		var pcam: Camera3D = ranch.get("player").get_camera_pivot().get_node("CameraRig").call("get_camera")

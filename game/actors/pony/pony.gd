@@ -810,7 +810,9 @@ func _physics_process(delta: float) -> void:
 	# animates on every second or fourth tick, carrying the skipped time with her.
 	_detail_timer -= delta
 	if _detail_timer <= 0.0:
-		_detail_timer = DETAIL_CHECK_SECONDS + _rng.randf() * 0.1
+		# The GLOBAL generator, never hers: her own (_rng) is seeded by the spawner and the tests
+		# for a reproducible wander, and a draw here would shift every target after it.
+		_detail_timer = DETAIL_CHECK_SECONDS + randf() * 0.1
 		_update_detail()
 	var stride := 1
 	if detail != Detail.FULL:
@@ -908,7 +910,7 @@ func _set_detail(want: int) -> void:
 	# A RANDOM PHASE IN HER STRIDE, so a crowd that changes tier together (the camera turned)
 	# does not then think, move and animate all on the same tick: the 60-pony check showed a
 	# spike every sixth tick until this was staggered.
-	_tick_count = _rng.randi() % 6
+	_tick_count = randi() % 6
 	_tick_accum = 0.0
 	if visuals == null:
 		return

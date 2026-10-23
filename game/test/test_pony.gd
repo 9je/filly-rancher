@@ -50,6 +50,16 @@ const LEAVE_WATCH_FRAMES := 480
 var _world: Node3D
 
 
+
+## A pony's own behaviour, without her quirk's (game/test/test_pony_traits.gd has those): a
+## Skittish quirk doubles the notice radius these tests measure.
+func before_all() -> void:
+	PonyTraits.quirks_enabled = false
+
+
+func after_all() -> void:
+	PonyTraits.quirks_enabled = true
+
 func before_each() -> void:
 	_world = Node3D.new()
 	add_child_autofree(_world)
