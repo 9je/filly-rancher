@@ -7229,6 +7229,42 @@ func _setup_tone() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--dread="):
 			world_tone.snap(float(arg.substr(8)))
+			_dread_pinned = true
+	if not _dread_pinned and _game_state != null:
+		_story_dread = StoryV1Script.dread(_game_state.story, _game_state.book)
+		world_tone.snap(_story_dread)
+
+
+const StoryV1Script := preload("res://systems/story_v1.gd")
+## True when --dread= set the dial by hand (the shot stage); the story leaves it alone.
+var _dread_pinned := false
+var _story_dread := -1.0
+
+
+## The story's dread (StoryV1.dread) to the dial, whenever it moves.
+func _drive_dread() -> void:
+	if _dread_pinned or _game_state == null:
+		return
+	var d := StoryV1Script.dread(_game_state.story, _game_state.book)
+	if absf(d - _story_dread) < 0.005:
+		return
+	_story_dread = d
+	var bus := get_node_or_null("/root/Events")
+	if bus != null:
+		bus.emit_signal("dread_changed", d)
+
+
+## Home from the Factory (once): what the path means for tomorrow, said plainly.
+func _back_down() -> void:
+	var story: Story = _game_state.story
+	if not StoryV1Script.revealed(story) or story.has_flag("back_down"):
+		return
+	story.set_flag("back_down")
+	match StoryV1Script.path(story):
+		StoryV1Script.PATH_FACTORY:
+			_toast("Senior Steward. Double stipend. Tumble is home, and she will not look at you.")
+		StoryV1Script.PATH_RESCUE:
+			_toast("Tumble is safe, under the porch. The Collectors will come looking.")
 
 
 # --- the Bloom (v1) ----------------------------------------------------------------------
@@ -7275,7 +7311,7 @@ func _bloom_ceremony(inst: PonyInstance) -> void:
 func _after_delivery(inst: PonyInstance) -> void:
 	var look := PonyLookScript.from_stock(inst.stock)
 	var story: Story = _game_state.story
-	var after_reveal: bool = story.chapter >= 3
+	var after_reveal: bool = StoryV1Script.revealed(story)
 	_game_state.book.note_delivery(String(inst.uid), inst.display_name(), look,
 		story.collection_days, after_reveal)
 	# THE POSTCARD COMES A DAY LATER (clue 3): queued now, posted at the next dawn, the same
@@ -7355,6 +7391,8 @@ func _v1_tick(delta: float) -> void:
 	if _tip_t > 0.0:
 		return
 	_tip_t = 0.4
+	_drive_dread()
+	_back_down()
 	var hud := get_node_or_null(^"HUD")
 	if hud != null and hud.has_method("set_tip"):
 		var tip: Dictionary = _game_state.onboarding.current(_onboarding_state(),
