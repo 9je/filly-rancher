@@ -1351,6 +1351,8 @@ func _live_plots() -> Dictionary:
 ## ground rather than at the slot's exact height. (The fence itself is built flat in
 ## pen-local space; PEN_GROUND_FLATNESS above is the check that keeps that honest.)
 func _on_plot_built(_plot: PlotData, node: Node) -> void:
+	if _game_state != null:
+		_game_state.onboarding.note(&"build")
 	var pen := node as Pen
 	if pen != null:
 		pen.ground_sampler = Callable(terrain, "height_at")
@@ -2343,6 +2345,8 @@ func _on_sell_requested(rarity: int, count: int) -> void:
 	var held_before: int = _shop.gem_count(rarity)
 	var earned: int = _shop.sell(rarity, count)
 	var sold_count: int = held_before - _shop.gem_count(rarity)
+	if sold_count > 0 and _game_state != null:
+		_game_state.onboarding.note(&"sell")
 	if earned > 0:
 		_toast("Sold %d %s for %d bits." % [
 			sold_count, "gem" if sold_count == 1 else "gems", earned])
@@ -2664,7 +2668,9 @@ func _apply_beam_recall() -> void:
 	if beam == null or not beam.has_method("set_recalled"):
 		return
 	var cycle: int = _world.cycle_index() if _world != null else 0
-	beam.call("set_recalled", _game_state.ledger.beam_is_recalled(cycle))
+	# v1: a brand new ranch has no Scoop until Marigold hands it over (STORY.md beat 1.1).
+	var no_scoop: bool = _interactive and not _game_state.story.has_flag("has_scoop")
+	beam.call("set_recalled", _game_state.ledger.beam_is_recalled(cycle) or no_scoop)
 
 
 func _push_balance() -> void:
@@ -3813,6 +3819,8 @@ func _on_pony_noticed(data: PonyData) -> void:
 func _on_pony_captured(instance: PonyInstance) -> void:
 	if instance == null or _game_state == null:
 		return
+	_game_state.onboarding.note(&"catch")
+	_game_state.story.flags["_catches"] = int(_game_state.story.flags.get("_catches", 0)) + 1
 	# THE CROWD IS NOT COLLECTED. A stock pony has no Compendium entry and no request ever
 	# names one: she is supply, not a character. Marking her would put an id in the book
 	# that no page can ever show and no count can ever include.
@@ -4159,6 +4167,8 @@ func _move_pony_into_pen(slot: PlotSlot) -> bool:
 	if _board != null:
 		_pay_out(_board.on_penned(instance.data()))
 	_sound_call(&"play_at", [&"gate_open", pen.global_position])
+	if _game_state != null:
+		_game_state.onboarding.note(&"pen")
 	return true
 
 
@@ -4543,6 +4553,7 @@ func _physics_process(delta: float) -> void:
 	# it. The gates call spawner.tick_stock() themselves, deliberately, where they mean to.
 	spawner.tick_stock(delta)
 	_update_interaction()
+	_v1_tick(delta)
 	# AFTER the interaction pass, so a ban that landed this frame shuts a door the resolver
 	# would otherwise have just opened. See enforce_casino_ban().
 	enforce_casino_ban()
@@ -7106,6 +7117,7 @@ func _people_enabled() -> bool:
 func _setup_people() -> void:
 	if not _people_enabled() or people != null:
 		return
+	_migrate_intro_flags()
 	people = PeopleScript.new()
 	people.name = "People"
 	people.player = player
@@ -7169,6 +7181,9 @@ func _on_people_effect(kind: StringName, value: String) -> void:
 	match kind:
 		&"flag":
 			_game_state.story.set_flag(value)
+			_game_state.onboarding.note(&"talk")
+			if value == "has_scoop":
+				_apply_beam_recall()
 		&"event":
 			match value:
 				"tumble_join", "give_scoop":
@@ -7300,3 +7315,88 @@ func _post_pending_postcards() -> void:
 		story.post(StringName("postcard#%d" % n), {"name": _player_name(), "pony": str(pony_name)})
 	story.flags["_postcards"] = []
 	_refresh_mailbox_flag()
+
+
+# --- onboarding and the arrival (v1) -------------------------------------------------------
+
+var _tip_t := 0.0
+var _arrival_started := false
+
+
+## A save from before v1 (anything with progress in it) skips the intro: she already has
+## her Scoop, has met the neighbours, and has been told about the Depot.
+func _migrate_intro_flags() -> void:
+	if _game_state == null:
+		return
+	var story: Story = _game_state.story
+	# `_v1` marks a save v1 has already seen. A save without it predates the intro, so it
+	# loads as if the intro had happened; a new game never gets these for free.
+	if story.has_flag("_v1"):
+		return
+	if not _new_game:
+		for f in ["has_scoop", "tumble_joined", "met_fennel", "met_bramble", "met_pip",
+				"depot_explained"]:
+			story.set_flag(f)
+	story.set_flag("_v1")
+
+
+func _v1_tick(delta: float) -> void:
+	if _game_state == null or people == null:
+		return
+	_arrival(delta)
+	_tip_t -= delta
+	if _tip_t > 0.0:
+		return
+	_tip_t = 0.4
+	var hud := get_node_or_null(^"HUD")
+	if hud != null and hud.has_method("set_tip"):
+		var tip: Dictionary = _game_state.onboarding.current(_onboarding_state(),
+			func(action: StringName) -> String: return InputDeviceScript.hint(action))
+		hud.call("set_tip", str(tip.get("text", "")))
+
+
+## Marigold meets the new steward at the gate: she walks up, and the arrival conversation
+## opens by itself the first time the player is in reach (STORY.md beat 1.1).
+func _arrival(_delta: float) -> void:
+	if _game_state.story.has_flag("has_scoop") or people.is_talking() or not _no_other_menu_open():
+		return
+	var m := people.npc(&"marigold")
+	if m == null:
+		return
+	if not _arrival_started:
+		_arrival_started = true
+		m.set_mode_walk_to(player.global_position + Vector3(1.6, 0, -2.2))
+	if m.global_position.distance_to(player.global_position) < 3.4:
+		people.talk("marigold")
+
+
+## What onboarding.gd's tips read (Onboarding.TIPS' condition keys).
+func _onboarding_state() -> Dictionary:
+	var st := {}
+	var beam: Node3D = player.get_magic_beam()
+	var storage: Storage = beam.get_storage() if beam != null else null
+	var bagged: int = storage.count() if storage != null else 0
+	var has_scoop: bool = _game_state.story.has_flag("has_scoop")
+	var near_wild := false
+	if has_scoop and storage != null and not storage.is_full():
+		for p in spawner.get_spawned():
+			if (p as Node3D).global_position.distance_to(player.global_position) < 18.0:
+				near_wild = true
+				break
+	st["pony_in_view"] = near_wild
+	var pens := _built_pen_count()
+	var near_pen := false
+	for slot in _plot_slots():
+		if not slot.is_empty() and player in slot.get_overlapping_bodies():
+			near_pen = true
+	st["bag_has_pony_near_pen"] = bagged > 0 and near_pen
+	st["bag_has_pony_no_pen"] = bagged > 0 and pens == 0
+	st["gems_in_pouch"] = _game_state.gems.total() > 0 if _game_state.gems.has_method("total") else false
+	st["bag_full"] = storage != null and storage.is_full()
+	var news := false
+	for id: StringName in people.npcs:
+		var n: Node3D = people.npcs[id]
+		if n.global_position.distance_to(player.global_position) < 9.0 and people.has_news(id):
+			news = true
+	st["npc_has_news"] = news and has_scoop
+	return st

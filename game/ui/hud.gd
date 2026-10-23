@@ -899,6 +899,39 @@ func _fit_pill(l: Label) -> void:
 	l.offset_right = centre + w * 0.5
 
 
+## The onboarding tip (game/systems/onboarding.gd): one friendly line in a pill above the
+## bottom of the screen, never blocking, gone when there is nothing to teach.
+var _tip: Label
+
+
+func set_tip(text: String) -> void:
+	if _tip == null:
+		_tip = Label.new()
+		_tip.name = "Tip"
+		_tip.add_theme_stylebox_override("normal", card_box(24, 4))
+		_tip.add_theme_color_override("font_color", INK)
+		_tip.add_theme_font_size_override("font_size", 24)
+		_tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_tip.anchor_left = 0.5
+		_tip.anchor_right = 0.5
+		_tip.anchor_top = 1.0
+		_tip.anchor_bottom = 1.0
+		_tip.offset_left = -300.0
+		_tip.offset_right = 300.0
+		_tip.offset_top = -150.0
+		_tip.offset_bottom = -100.0
+		add_child(_tip)
+	if _tip.text == text:
+		return
+	_tip.text = text
+	_tip.visible = not text.is_empty() and not _overlay_open
+	_fit_pill(_tip)
+
+
+func tip_text() -> String:
+	return _tip.text if _tip != null else ""
+
+
 func set_prompt(text: String) -> void:
 	if _prompt != null:
 		_prompt.text = text
