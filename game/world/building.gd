@@ -390,6 +390,13 @@ func build() -> void:
 			Vector3(plinth_centre.x, FLOOR_TOP - apron_rise * 0.5, apron_top_z + apron_run * 0.5),
 			plinth_mat, 0.0, apron_angle)
 
+	# A WORN MODEL STANDS ON A STONE FOUNDATION, UP A PLANKED RAMP (shaders/stonework.gdshader):
+	# the visual review found plain tinted boxes under every house, which read as the
+	# primitive shell they are. The geometry and its collision are unchanged; only the skin.
+	if wearing:
+		_skin(get_node_or_null(^"Floor") as MeshInstance3D, 0, Vector2.ZERO)
+		_skin(get_node_or_null(^"DoorApron") as MeshInstance3D, 1, Vector2(1.0, 0.0).rotated(-rotation.y))
+
 	# --- roof ---------------------------------------------------------------------
 	# Two slabs leaning against each other. Built as rotated BoxMeshes rather than as
 	# hand-wound triangles so Godot's own (clockwise-front-face) winding is used
@@ -690,6 +697,34 @@ func _material(colour: Color, surface_roughness := 0.88, metallic := 0.0) -> Sta
 ## is one list in one place rather than eight booleans spread down a function. The parameter
 ## exists so a reader of the call site knows which slabs are structural (Floor, DoorApron)
 ## and which are the shell.
+const StoneworkShader := preload("res://shaders/stonework.gdshader")
+static var _stone_mat: ShaderMaterial
+static var _plank_mats: Dictionary = {}
+
+
+func _skin(node: MeshInstance3D, pattern: int, plank_dir: Vector2) -> void:
+	if node == null or DisplayServer.get_name() == "headless":
+		return
+	if pattern == 0:
+		if _stone_mat == null:
+			_stone_mat = ShaderMaterial.new()
+			_stone_mat.shader = StoneworkShader
+			_stone_mat.set_shader_parameter(&"pattern", 0)
+		node.material_override = _stone_mat
+		return
+	var key := "%.2f,%.2f" % [plank_dir.x, plank_dir.y]
+	var m: ShaderMaterial = _plank_mats.get(key)
+	if m == null:
+		m = ShaderMaterial.new()
+		m.shader = StoneworkShader
+		m.set_shader_parameter(&"pattern", 1)
+		m.set_shader_parameter(&"base", Color(0.66, 0.46, 0.3))
+		m.set_shader_parameter(&"joint", Color(0.33, 0.22, 0.15))
+		m.set_shader_parameter(&"plank_dir", plank_dir)
+		_plank_mats[key] = m
+	node.material_override = m
+
+
 func _slab(slab_name: String, size: Vector3, at: Vector3, mat: StandardMaterial3D,
 		roll := 0.0, pitch := 0.0, _hideable := false) -> void:
 	var box := BoxMesh.new()
