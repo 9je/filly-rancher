@@ -1,0 +1,58 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"factory_window"
+speaker = &"marigold"
+priority = 0
+once = false
+bark = false
+when = {
+"flags_all": ["in_factory"]
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "Oh! You found the good part.",
+"who": "marigold",
+"mood": "blank",
+"next": "two"
+}, {
+"id": "two",
+"text": "Don't look so worried. The valley needs weather, weather needs color, and Drifters really don't need theirs. They were never going to use it.",
+"who": "marigold",
+"mood": "happy",
+"next": "three"
+}, {
+"id": "three",
+"text": "It doesn't hurt. Well. Nopony has ever complained.",
+"who": "marigold",
+"mood": "happy",
+"next": "four"
+}, {
+"id": "four",
+"text": "Now. I have a little offer, because Cloudsdale looks after its own. Sign the Senior Steward contract. Double stipend. Better equipment. And your Tumble? Struck right off the lottery. She goes home with you tonight.",
+"who": "marigold",
+"mood": "happy",
+"anim": "nod",
+"choices": [{
+"text": "Sign the contract.",
+"next": "sign"
+}, {
+"text": "Get Tumble out.",
+"next": "run"
+}]
+}, {
+"id": "sign",
+"text": "Wonderful! I knew you were one of us. She'll be waiting at the lift.",
+"who": "marigold",
+"mood": "happy",
+"event": "path_factory"
+}, {
+"id": "run",
+"text": "Oh, {name}. That's a shame.",
+"who": "marigold",
+"mood": "blank",
+"event": "path_rescue"
+}])

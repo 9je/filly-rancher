@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"factory_room_welcome"
+speaker = &"marigold"
+priority = 0
+once = false
+bark = false
+when = {
+"flags_all": ["in_factory"]
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "Our Welcome Hall. Read the posters, they're all true! Every pony has a color. We simply help her find it.",
+"who": "marigold",
+"mood": "happy",
+"anim": "look"
+}])

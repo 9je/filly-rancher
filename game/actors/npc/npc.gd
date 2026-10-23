@@ -95,6 +95,35 @@ func setup(d: CharacterDef) -> void:
 	_play(&"idle")
 
 
+## Fix a prop (a hat, goggles, a satchel) to one of her bones, at `offset` in her model's
+## space from that bone's rest position. Returns the prop, or null.
+func attach_prop(model_path: String, bone_name: String, offset: Vector3,
+		rot_deg: Vector3 = Vector3.ZERO, s: float = 1.0) -> Node3D:
+	if not ResourceLoader.exists(model_path) or _visuals.get_child_count() == 0:
+		return null
+	var sks := _visuals.get_child(0).find_children("*", "Skeleton3D", true, false)
+	if sks.is_empty():
+		return null
+	var sk: Skeleton3D = sks[0]
+	var bone := sk.find_bone(bone_name)
+	if bone < 0:
+		return null
+	var attach := BoneAttachment3D.new()
+	attach.bone_idx = bone
+	sk.add_child(attach)
+	var prop: Node3D = (load(model_path) as PackedScene).instantiate()
+	attach.add_child(prop)
+	ToonStyler.style(prop, &"prop", {})
+	var basis := Basis.from_euler(rot_deg * (PI / 180.0)).scaled(Vector3.ONE * s)
+	prop.global_transform = _visuals.global_transform * Transform3D(basis, offset)
+	return prop
+
+
+## Build her from a CharacterDef made in code (a generated Collector or steward).
+func setup_generated(d: CharacterDef) -> void:
+	setup(d)
+
+
 func face() -> PonyFace:
 	return _face
 

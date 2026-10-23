@@ -1,0 +1,64 @@
+# The Reveal: Color Day at the Rainbow Factory (STORY.md R.1 to R.6). Run by
+# game/world/factory_run.gd with People.talk_id(); `when` is empty because the scene picks.
+
+=== factory_welcome
+speaker: marigold
+once: false
+when: {"flags_all": ["in_factory"]}
+
+start [marigold happy] Welcome to the Rainbow Factory! Mind the step, the clouds are a little springy.
+  -> two
+two [marigold happy nod] Every rainbow over Equestria starts right here. And every pony who comes up the lift helps make it. Follow me!
+
+=== factory_room_welcome
+speaker: marigold
+once: false
+when: {"flags_all": ["in_factory"]}
+
+start [marigold happy look] Our Welcome Hall. Read the posters, they're all true! Every pony has a color. We simply help her find it.
+
+=== factory_room_classroom
+speaker: marigold
+once: false
+when: {"flags_all": ["in_factory"]}
+
+start [marigold happy] And this is the Academy! Well. The Academy wall. The real lessons happen further in, where it's quiet.
+  -> two
+two [marigold happy] Oh, there go the orientation staff with your friend. Don't worry, she'll be right as rain.
+  event: tumble_taken
+
+=== factory_room_giftshop
+speaker: marigold
+once: false
+when: {"flags_all": ["in_factory"]}
+
+start [marigold happy] And the gift shop! Rainbow Dye, every shade named for a pony who's helped. Aren't they lovely?
+  -> two
+two [marigold happy nod] I'll just fetch the next group. Wait right here, {name}. Don't wander. That door is staff only.
+  event: marigold_leaves
+
+=== factory_spotted
+speaker: marigold
+once: false
+when: {"flags_all": ["in_factory"]}
+
+start [marigold happy] There you are! You took a wrong turn, silly. Let's try that again, shall we?
+
+=== factory_window
+speaker: marigold
+once: false
+when: {"flags_all": ["in_factory"]}
+
+start [marigold blank] Oh! You found the good part.
+  -> two
+two [marigold happy] Don't look so worried. The valley needs weather, weather needs color, and Drifters really don't need theirs. They were never going to use it.
+  -> three
+three [marigold happy] It doesn't hurt. Well. Nopony has ever complained.
+  -> four
+four [marigold happy nod] Now. I have a little offer, because Cloudsdale looks after its own. Sign the Senior Steward contract. Double stipend. Better equipment. And your Tumble? Struck right off the lottery. She goes home with you tonight.
+  * Sign the contract. -> sign
+  * Get Tumble out. -> run
+sign [marigold happy] Wonderful! I knew you were one of us. She'll be waiting at the lift.
+  event: path_factory
+run [marigold blank] Oh, {name}. That's a shame.
+  event: path_rescue

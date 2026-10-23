@@ -1,0 +1,46 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"marigold_color_day"
+speaker = &"marigold"
+priority = 120
+once = true
+bark = false
+when = {
+"flags_all": ["invited", "color_day"],
+"flags_none": ["reveal_done"]
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "Happy Color Day, {name}! The lift is waiting, and so is the Rainbow Factory.",
+"who": "marigold",
+"mood": "happy",
+"next": "two"
+}, {
+"id": "two",
+"text": "Your little friend's already aboard. Don't worry, she's in good hooves. Shall we?",
+"who": "marigold",
+"mood": "happy",
+"anim": "nod",
+"choices": [{
+"text": "Let's go.",
+"next": "go"
+}, {
+"text": "Give me a minute.",
+"next": "wait"
+}]
+}, {
+"id": "go",
+"text": "Wonderful! Hold on to your hat.",
+"who": "marigold",
+"mood": "happy",
+"event": "ride_lift"
+}, {
+"id": "wait",
+"text": "Of course. The Factory isn't going anywhere!",
+"who": "marigold",
+"mood": "happy"
+}])

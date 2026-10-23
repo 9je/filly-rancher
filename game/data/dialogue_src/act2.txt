@@ -142,3 +142,19 @@ once: false
 when: {"chapters": [1]}
 
 start [marigold happy] Happy ponies make the brightest colors!
+
+# ----- Color Day (STORY.md R.1): the lift up --------------------------------------------
+
+=== marigold_color_day
+speaker: marigold
+priority: 120
+when: {"flags_all": ["invited", "color_day"], "flags_none": ["reveal_done"]}
+
+start [marigold happy] Happy Color Day, {name}! The lift is waiting, and so is the Rainbow Factory.
+  -> two
+two [marigold happy nod] Your little friend's already aboard. Don't worry, she's in good hooves. Shall we?
+  * Let's go. -> go
+  * Give me a minute. -> wait
+go [marigold happy] Wonderful! Hold on to your hat.
+  event: ride_lift
+wait [marigold happy] Of course. The Factory isn't going anywhere!

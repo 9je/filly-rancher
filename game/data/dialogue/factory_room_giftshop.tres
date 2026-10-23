@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"factory_room_giftshop"
+speaker = &"marigold"
+priority = 0
+once = false
+bark = false
+when = {
+"flags_all": ["in_factory"]
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "And the gift shop! Rainbow Dye, every shade named for a pony who's helped. Aren't they lovely?",
+"who": "marigold",
+"mood": "happy",
+"next": "two"
+}, {
+"id": "two",
+"text": "I'll just fetch the next group. Wait right here, {name}. Don't wander. That door is staff only.",
+"who": "marigold",
+"mood": "happy",
+"anim": "nod",
+"event": "marigold_leaves"
+}])

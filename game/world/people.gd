@@ -140,6 +140,31 @@ func talk(id_or_name: String) -> bool:
 	return true
 
 
+## Run conversation `dialogue_id` with `speaker` regardless of what she would pick (the
+## Factory's scripted lines). Returns false if there is no such conversation.
+func talk_id(speaker: StringName, dialogue_id: StringName) -> bool:
+	if is_talking():
+		return false
+	var d := library.by_id(dialogue_id)
+	if d == null:
+		return false
+	_speaker = speaker
+	runner.start(d, context_provider.call())
+	var bus := get_node_or_null("/root/Events")
+	if bus != null:
+		bus.emit_signal("talk_started", speaker)
+	_show()
+	return true
+
+
+## Adopt an Npc built elsewhere (the Factory's guide, Collectors, stewards) so she can talk.
+func add_npc(id: StringName, n: Npc) -> void:
+	npcs[id] = n
+	if n.get_parent() == null:
+		add_child(n)
+	n.watch = player
+
+
 func is_talking() -> bool:
 	return _speaker != &""
 

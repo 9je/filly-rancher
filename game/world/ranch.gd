@@ -1633,6 +1633,11 @@ func _build_world_state() -> WorldState:
 func _on_world_phase_changed(_phase: int) -> void:
 	if _phase == WorldStateScript.Phase.DAWN:
 		_post_pending_postcards()
+		# COLOR DAY (STORY.md R.1): the dawn after the invitation.
+		if _game_state != null and _game_state.story.has_flag("invited") \
+				and not _game_state.story.has_flag("color_day"):
+			_game_state.story.set_flag("color_day")
+			_toast("Color Day! Marigold is waiting at the Depot with the lift.")
 	_on_world_changed()
 
 
@@ -7191,6 +7196,8 @@ func _on_people_effect(kind: StringName, value: String) -> void:
 					people.populate()
 				"first_mail":
 					advance_story()
+				"ride_lift":
+					_ride_lift_to_factory(&"reveal")
 
 
 # --- tone (v1) -------------------------------------------------------------------------
@@ -7400,3 +7407,19 @@ func _onboarding_state() -> Dictionary:
 			news = true
 	st["npc_has_news"] = news and has_scoop
 	return st
+
+
+# --- to the Rainbow Factory (v1) -------------------------------------------------------
+
+const FACTORY_SCENE := "res://world/factory.tscn"
+
+
+## Save, and go up: the Factory scene runs `mode` (reveal, jubilee, lights_out) and brings
+## the player back down to this ranch, which loads the save it left with.
+func _ride_lift_to_factory(mode: StringName) -> void:
+	if _game_state == null:
+		return
+	save_game()
+	FactoryRun.mode = mode
+	get_tree().paused = false
+	get_tree().change_scene_to_file.call_deferred(FACTORY_SCENE)
