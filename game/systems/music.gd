@@ -58,6 +58,17 @@ func _ready() -> void:
 		play_context(pending)
 
 
+## On the way out, let go of the tracks: a player still holding a playing Ogg at quit leaves
+## its playback objects for the engine to report as leaked.
+func _exit_tree() -> void:
+	if _tween != null:
+		_tween.kill()
+	for p in [_a, _b, _drone]:
+		if p != null:
+			p.stop()
+			p.stream = null
+
+
 func _player(n: String) -> AudioStreamPlayer:
 	var p := AudioStreamPlayer.new()
 	p.name = n
