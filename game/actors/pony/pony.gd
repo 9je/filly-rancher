@@ -1463,7 +1463,8 @@ var _blinked_at := -100.0
 ## further off, a pegasus flutters away faster than a pony can run.
 func _apply_traits() -> void:
 	quirk = PonyTraitsScript.quirk_for(_stock, _data.id if _data != null else &"")
-	race = StringName(str(_stock.get("race", "earth"))) if not _stock.is_empty() else &"earth"
+	race = StringName(str(_stock.get("race", "earth"))) if not _stock.is_empty() \
+		else PonyTraitsScript.canon_race(_data.id if _data != null else &"")
 	if _data != null:
 		_flee_speed = flee_speed_for(_data.base_speed) * PonyTraitsScript.flee_mult(race)
 	if detection_area != null:

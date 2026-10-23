@@ -40,6 +40,19 @@ const CANON := {
 	&"maudpie": &"loner", &"pinkamena": &"loner", &"trixie": &"showoff", &"spitfire": &"showoff", &"applejack": &"glutton",
 }
 
+## The canon cast's races (the show's own): a unicorn blinks from the Scoop, a pegasus outflies
+## you. Anypony not listed is an earth pony.
+const CANON_RACE := {
+	&"twilight": &"unicorn", &"rarity": &"unicorn", &"trixie": &"unicorn", &"lyra": &"unicorn",
+	&"starlightglimmer": &"unicorn", &"sunsetshimmer": &"unicorn", &"vinylscratch": &"unicorn",
+	&"sweetiebelle": &"unicorn", &"shiningarmor": &"unicorn", &"minuette": &"unicorn",
+	&"drwhooves": &"earth", &"pokeypierce": &"unicorn", &"lotusblossom": &"earth",
+	&"rainbowdash": &"pegasus", &"fluttershy": &"pegasus", &"derpyhooves": &"pegasus",
+	&"scootaloo": &"pegasus", &"spitfire": &"pegasus", &"soarin": &"pegasus",
+	&"cloudchaser": &"pegasus", &"flitter": &"pegasus", &"lightningdust": &"pegasus",
+	&"nightlight": &"unicorn", &"milkyway": &"pegasus", &"kerfuffle": &"pegasus",
+}
+
 ## Set by the ranch at each phase change (the night-dependent quirks read it).
 static var night := false
 ## Off: nopony has a quirk. For tests of the pen, production and Bloom rules on their own
@@ -121,8 +134,11 @@ static func race_of(inst: PonyInstance) -> StringName:
 		return &"earth"
 	if inst.is_stock():
 		return StringName(str(inst.stock.get("race", "earth")))
-	var data := inst.data()
-	return StringName(str(data.get("race"))) if data != null and data.get("race") != null else &"earth"
+	return canon_race(inst.data_id)
+
+
+static func canon_race(id: StringName) -> StringName:
+	return CANON_RACE.get(id, &"earth")
 
 
 static func quirk_name(q: StringName) -> String:
