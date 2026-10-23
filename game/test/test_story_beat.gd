@@ -14,7 +14,7 @@ func _beat(id: String, chapter: String, trigger: String, threshold: int) -> Stor
 	beat.chapter = StringName(chapter)
 	beat.trigger = StringName(trigger)
 	beat.threshold = threshold
-	beat.sender = "Cloudsdale Weather Corporation"
+	beat.sender = "Brightsky Weather Company"
 	beat.title = "A letter"
 	beat.body = PackedStringArray(["Dear {name},", "", "Your {count} shipments."])
 	return beat
@@ -40,7 +40,7 @@ func test_a_beat_naming_something_this_build_does_not_have_answers_minus_one() -
 func test_render_fills_the_placeholders_and_answers_the_letter_panel_shape() -> void:
 	var beat: StoryBeat = _beat("t", "SUNNY", "CHAPTER", 0)
 	var letter: Dictionary = beat.render({"name": "Moonbeam", "count": 12})
-	assert_eq(String(letter["sender"]), "Cloudsdale Weather Corporation")
+	assert_eq(String(letter["sender"]), "Brightsky Weather Company")
 	assert_eq(String(letter["title"]), "A letter")
 	var body: Array = letter["body"]
 	assert_eq(String(body[0]), "Dear Moonbeam,")

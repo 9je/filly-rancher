@@ -39,7 +39,7 @@ const COLOUR_PAYS_TO_ONE := 5
 
 ## Player facing, so no dashes. Indexed by Colour, with the house pocket last.
 const COLOUR_NAMES: Array[String] = ["Red", "Orange", "Yellow", "Green", "Blue", "Violet",
-	"Cloudsdale"]
+	"Brightsky"]
 
 
 ## The colour band a pocket belongs to. The house pocket answers Colour.HOUSE, which no bet
@@ -90,7 +90,7 @@ static func house_edge() -> float:
 ## What the ball did, as a line the felt can show.
 static func pocket_text(pocket: int) -> String:
 	if pocket < 1 or pocket > NUMBERS:
-		return "Cloudsdale pocket. The house takes this one."
+		return "Brightsky pocket. The house takes this one."
 	return "%d, %s" % [pocket, COLOUR_NAMES[colour_of(pocket)]]
 
 
@@ -102,5 +102,5 @@ static func rules_lines() -> Array[String]:
 		"A number pays %d to 1. A colour pays %d to 1."
 			% [NUMBER_PAYS_TO_ONE, COLOUR_PAYS_TO_ONE],
 		"Both bets are worth the same; we did the arithmetic so you can check it.",
-		"The Cloudsdale pocket is ours. It comes up one spin in %d." % POCKETS,
+		"The Brightsky pocket is ours. It comes up one spin in %d." % POCKETS,
 	]

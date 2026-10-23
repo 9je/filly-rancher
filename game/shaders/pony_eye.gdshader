@@ -14,6 +14,12 @@ uniform sampler2D eye_texture : source_color, filter_linear_mipmap;
 uniform vec3 iris : source_color = vec3(0.35, 0.55, 0.9);
 uniform float dark_scale : hint_range(0.0, 1.0) = 0.5;
 uniform float highlight_boost : hint_range(0.0, 2.0) = 0.25;
+// The blink, drawn the show's way: the lid sweeps down from the top of the eye (UV v = 0)
+// in the coat's color and ends in a dark lash line. 0 open, 1 shut.
+uniform float lid : hint_range(0.0, 1.0) = 0.0;
+uniform vec3 lid_color : source_color = vec3(0.95, 0.9, 0.85);
+uniform float lid_top = 0.08;
+uniform float lid_bottom = 0.92;
 
 void fragment() {
 	vec3 t = texture(eye_texture, UV).rgb;
@@ -27,8 +33,13 @@ void fragment() {
 	vec3 c = mix(t, ramp, iris_mask);
 	float l2 = dot(c, vec3(0.299, 0.587, 0.114));
 	c = mix(c, vec3(l2), clamp(dread, 0.0, 1.0) * 0.55);
+	float edge = mix(lid_top, lid_bottom, lid);
+	float lidded = 1.0 - smoothstep(edge - 0.01, edge + 0.01, UV.y);
+	float lash = smoothstep(edge - 0.045, edge - 0.01, UV.y) * lidded * step(0.02, lid);
+	vec3 lc = mix(lid_color, lid_color * 0.18, lash);
+	c = mix(c, lc, lidded * step(0.001, lid));
 	ALBEDO = c;
-	EMISSION = c * white * highlight_boost;
+	EMISSION = c * white * highlight_boost * (1.0 - lidded);
 	ROUGHNESS = 1.0;
 }
 

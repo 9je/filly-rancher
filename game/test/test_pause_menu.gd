@@ -253,7 +253,7 @@ func test_the_free_region_tallies_as_a_zone_with_nobody_in_it() -> void:
 	_wire_book()
 	_menu.open_page(PauseMenu.Page.COMPENDIUM)
 	var rows: Array[String] = _menu.compendium_region_rows()
-	assert_true(rows.has("The Strip: 0 of 0"), "rows were: %s" % ", ".join(rows))
+	assert_true(rows.has("Glitter Row: 0 of 0"), "rows were: %s" % ", ".join(rows))
 
 
 func test_the_character_list_scrolls_a_window_and_wraps_round_the_whole_roster() -> void:
@@ -534,11 +534,11 @@ func test_a_delivered_character_reads_as_delivered_and_still_counts_as_caught() 
 ## a story it built for itself.
 func _wire_mail() -> void:
 	var rows: Array[Dictionary] = [
-		{"id": "sunny_mailbox", "sender": "Cloudsdale Weather Corporation",
+		{"id": "sunny_mailbox", "sender": "Brightsky Weather Company",
 			"title": "Your mailbox is installed",
 			"body": ["Dear Moonbeam,", "", "The flag goes up when something is waiting."],
 			"read": true, "replied": "", "reply": 0},
-		{"id": "weather_survey", "sender": "Cloudsdale Weather Corporation",
+		{"id": "weather_survey", "sender": "Brightsky Weather Company",
 			"title": "Employee Appreciation Survey",
 			"body": ["Dear Moonbeam,", "", "Which of your ponies is most special to you?"],
 			"read": false, "replied": "", "reply": 1},
@@ -555,7 +555,7 @@ func _wire_mail() -> void:
 func _wire_many_mail(count: int) -> void:
 	var rows: Array[Dictionary] = []
 	for i in count:
-		rows.append({"id": "letter_%d" % i, "sender": "Cloudsdale Weather Corporation",
+		rows.append({"id": "letter_%d" % i, "sender": "Brightsky Weather Company",
 			"title": "Letter %d" % i, "body": ["Dear Moonbeam,"],
 			"read": true, "replied": "", "reply": 0})
 	_menu.mail_provider = func() -> Array[Dictionary]: return rows

@@ -23,10 +23,10 @@ const RaceCardScript := preload("res://systems/race_card.gd")
 const CasinoScript := preload("res://systems/casino.gd")
 
 const HEADLINE := "Spectra Palace"
-const SPONSOR := "proudly sponsored by Cloudsdale Weather Corporation"
+const SPONSOR := "proudly sponsored by Brightsky Weather Company"
 
 ## What the outdoor marquee says, in one line, for the sign on the approach.
-const MARQUEE := "Spectra Palace, proudly sponsored by Cloudsdale Weather Corporation"
+const MARQUEE := "Spectra Palace, proudly sponsored by Brightsky Weather Company"
 
 
 ## THE MARQUEE, AS TWO LINES RATHER THAN ONE. MARQUEE above is the whole sentence, and it

@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_region")
 id = &"lake"
-display_name = "The Lake"
+display_name = "Mirror Lake"
 centre = Vector2(60, -62)
 radius = 24.0
 permit_cost = 300

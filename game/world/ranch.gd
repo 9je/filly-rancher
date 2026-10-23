@@ -2270,7 +2270,7 @@ func _on_creation_confirmed(look: PlayerLook) -> void:
 ##
 ## AND THE BODY IS SHOWN, NOT TOASTED. The whole of the game's onboarding is in the body of
 ## this letter (catch, pen, collect, sell, then the balance and the quota in a sentence
-## each); toasting the TITLE said "Cloudsdale Weather Corporation: Welcome to the family!"
+## each); toasting the TITLE said "Brightsky Weather Company: Welcome to the family!"
 ## and dropped every word of it. game/ui/letter_panel.gd is the reader, ranch.gd does the
 ## showing, and the pause comes through the same shared handlers every other panel uses.
 ## Ruling 25.
@@ -3340,7 +3340,7 @@ func _relieve_if_paid_down() -> void:
 	_apply_permits()
 	_apply_padlocks()
 	_apply_beam_recall()
-	_toast("Your account is in good standing again. Cloudsdale thanks you!")
+	_toast("Your account is in good standing again. Brightsky thanks you!")
 
 
 func is_near_market() -> bool:

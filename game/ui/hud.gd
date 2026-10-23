@@ -713,8 +713,8 @@ func get_balance_text() -> String:
 ## under zero.
 static func _balance_text(total: int) -> String:
 	if total < 0:
-		return "CWC balance: %d bits in credit" % absi(total)
-	return "CWC balance: %d bits" % total
+		return "Brightsky balance: %d bits in credit" % absi(total)
+	return "Brightsky balance: %d bits" % total
 
 
 ## THE HOUR AND THE SKY, IN WORDS. Set by game/world/ranch.gd from WorldState.describe()

@@ -127,7 +127,9 @@ enum Loss {
 ## rather than PonyData.voice_bank: this is the player character reacting to her own
 ## success, not a line belonging to whoever was caught, and there is exactly one take in
 ## the repo so far. When the voice system lands, this is the one call site to rewrite.
-const VOICE_LINE := "res://assets/audio/voice/twilight/greeting_01.wav"
+## Empty in v1: the canon placeholder take was removed (no canon voices; the player is an
+## OC). The player's voice returns as babble with the talk system.
+const VOICE_LINE := ""
 
 ## How far past the player the beam reaches, in metres.
 ##
@@ -1631,8 +1633,10 @@ func _build_voice() -> void:
 	_voice.name = "CaptureVoice"
 	# load() rather than preload(): a missing take must not be a parse error that takes
 	# the whole beam -- and with it the core mechanic -- down with it.
-	var stream := load(VOICE_LINE)
-	if stream is AudioStream:
+	var stream: Resource = load(VOICE_LINE) if not VOICE_LINE.is_empty() else null
+	if VOICE_LINE.is_empty():
+		pass
+	elif stream is AudioStream:
 		_voice.stream = stream
 	else:
 		push_warning("MagicBeam: no voice line at '%s'; captures will be silent" % VOICE_LINE)

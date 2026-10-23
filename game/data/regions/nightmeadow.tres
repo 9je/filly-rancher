@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_region")
 id = &"nightmeadow"
-display_name = "The Night Meadow"
+display_name = "Moonpetal Meadow"
 centre = Vector2(-61, 69)
 radius = 24.0
 permit_cost = 700

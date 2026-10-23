@@ -112,7 +112,11 @@ func test_clip_for_speed_walks_the_whole_ladder() -> void:
 	assert_eq(GaitScript.clip_for_speed(GaitScript.IDLE_SPEED - 0.01), &"idle")
 	assert_eq(GaitScript.clip_for_speed(GaitScript.IDLE_SPEED), &"walk")
 	assert_eq(GaitScript.clip_for_speed(1.32), &"walk")
-	assert_eq(GaitScript.clip_for_speed(GaitScript.GALLOP_HANDOVER_SPEED - 0.01), &"walk")
+	assert_eq(GaitScript.clip_for_speed(GaitScript.TROT_HANDOVER_SPEED - 0.01), &"walk")
+	assert_eq(GaitScript.clip_for_speed(GaitScript.TROT_HANDOVER_SPEED), &"trot")
+	assert_eq(GaitScript.clip_for_speed(GaitScript.GALLOP_HANDOVER_SPEED - 0.01), &"trot")
+	assert_eq(GaitScript.clip_for_speed(GaitScript.GALLOP_HANDOVER_SPEED - 0.01, false), &"walk",
+		"a body with no trot clip walks the old ladder")
 	assert_eq(GaitScript.clip_for_speed(GaitScript.GALLOP_HANDOVER_SPEED), &"gallop")
 	assert_eq(GaitScript.clip_for_speed(4.0), &"gallop")
 	assert_eq(GaitScript.clip_for_speed(-4.0), &"gallop",
@@ -136,3 +140,14 @@ func test_playback_scale_for_clip_dispatches_to_the_right_band() -> void:
 		"`idle` depicts no ground motion, so it always plays at its authored rate")
 	assert_eq(GaitScript.clip_speed(&"idle"), 0.0,
 		"`idle` has no implied ground speed to scale against")
+
+
+func test_the_trot_matches_the_exporters_implied_speed_and_fills_its_band() -> void:
+	# tools/author_anims.py build_trot(): 0.5 m stride over a 0.42 stance of 16 frames at 24.
+	assert_almost_eq(GaitScript.TROT_CLIP_SPEED, 0.5 / ((16.0 / 24.0) * 0.42), 0.0001)
+	assert_gt(GaitScript.TROT_HANDOVER_SPEED, 1.32, "above every wander speed")
+	assert_lt(GaitScript.TROT_HANDOVER_SPEED, GaitScript.GALLOP_HANDOVER_SPEED)
+	var lo := GaitScript.TROT_HANDOVER_SPEED / GaitScript.TROT_CLIP_SPEED
+	var hi := GaitScript.GALLOP_HANDOVER_SPEED / GaitScript.TROT_CLIP_SPEED
+	assert_between(lo, 0.7, 1.0, "the trot never plays slow-motion at its floor")
+	assert_between(hi, 1.0, 1.25, "nor sped-up at its ceiling")

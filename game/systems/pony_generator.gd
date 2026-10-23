@@ -18,6 +18,20 @@ const PARAMS_PATH := "res://data/pony_gen.tres"
 const RACES: Array[StringName] = [&"earth", &"pegasus", &"unicorn"]
 const VARIANTS: Array[StringName] = [&"pearl", &"starry", &"ember"]
 
+## Coat and mane pairs a player would read as a canon character at a glance (the main six
+## and the wall-eyed mailmare). A draw within CANON_TOLERANCE of one on both coat and mane
+## re-draws its mane; the brief bans canon characters, and color alone can name one.
+const CANON_SIGNATURES: Array = [
+	[Color(0.78, 0.79, 0.84), Color(0.98, 0.93, 0.62)],
+	[Color(0.80, 0.66, 0.90), Color(0.17, 0.20, 0.45)],
+	[Color(0.97, 0.97, 0.98), Color(0.42, 0.30, 0.66)],
+	[Color(1.00, 0.95, 0.62), Color(0.95, 0.68, 0.80)],
+	[Color(0.97, 0.72, 0.86), Color(0.93, 0.27, 0.56)],
+	[Color(0.98, 0.76, 0.42), Color(0.98, 0.93, 0.62)],
+	[Color(0.62, 0.84, 0.98), Color(0.90, 0.25, 0.25)],
+]
+const CANON_TOLERANCE := 0.16
+
 static var _params: PonyGenParams
 
 
@@ -122,6 +136,10 @@ static func _colors(look: PonyLook, rng: RandomNumberGenerator, p: PonyGenParams
 	scored.sort_custom(func(a: Array, b: Array) -> bool: return a[0] > b[0])
 	var top: int = mini(5, scored.size())
 	look.mane = scored[rng.randi_range(0, top - 1)][1]
+	for attempt in range(6):
+		if not reads_as_canon(look.coat, look.mane):
+			break
+		look.mane = scored[rng.randi_range(0, scored.size() - 1)][1]
 	if rng.randf() < 0.55:
 		# A lighter streak of the same hue.
 		look.mane2 = look.mane.lerp(Color.WHITE, rng.randf_range(0.3, 0.5))
@@ -140,6 +158,19 @@ static func _colors(look: PonyLook, rng: RandomNumberGenerator, p: PonyGenParams
 			best = s
 			best_eye = e
 	look.eyes = best_eye
+
+
+## True when coat `c` with mane `m` is one of CANON_SIGNATURES.
+static func reads_as_canon(c: Color, m: Color) -> bool:
+	for sig: Array in CANON_SIGNATURES:
+		if _near(c, sig[0]) and _near(m, sig[1]):
+			return true
+	return false
+
+
+static func _near(a: Color, b: Color) -> bool:
+	return absf(a.r - b.r) < CANON_TOLERANCE and absf(a.g - b.g) < CANON_TOLERANCE \
+		and absf(a.b - b.b) < CANON_TOLERANCE
 
 
 ## How well mane `m` sits on coat `c`. Higher is better.

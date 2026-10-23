@@ -504,6 +504,281 @@ def build_idle(arm):
     return action
 
 
+# --- v1 clips: every pose a pony needs for gameplay and story beats --------------------
+#
+# Built from KEYED POSES rather than per-frame maths: each clip is a short list of
+# (frame, pose) keys and Bezier interpolation does the in-betweens, which is how a hand
+# animator would block them. A pose is: the body (forward and up offset, pitch), the head
+# (pitch, yaw, roll), and any hooves that leave their rest spot (forward, up). Hooves not
+# named stay planted at rest. Signs, measured on the rig: +pitch about SIDE tips the nose
+# DOWN, +yaw about UP turns the head to the pony's own right (+X).
+#
+# Face, ears, tail and wings are not keyed here: the face is layered at runtime by
+# game/actors/pony/pony_face.gd and hair is spring-simulated.
+
+FRONT_L, FRONT_R = "IK_FrontHoof.L", "IK_FrontHoof.R"
+REAR_L, REAR_R = "IK_RearHoof.L", "IK_RearHoof.R"
+ALL_FEET = [FRONT_L, FRONT_R, REAR_L, REAR_R]
+
+
+# The v1 pose distances below were blocked against a 1 m leg-height reference; the SFM
+# donors measure about 2.16 m tall after export_blend.py's --scale 2.0 (legs about 0.9 m),
+# so every pose distance is multiplied by this. Angles are unaffected.
+POSE_SCALE = 2.0
+
+
+def _pose(arm, frame, body=(0.0, 0.0), pitch=0.0, head=(0.0, 0.0, 0.0), feet=None):
+    """Key every animated bone at `frame`. body=(forward, up); pitch radians;
+    head=(pitch, yaw, roll) radians; feet={bone: (forward, up)}. Distances are in the
+    1 m reference and scaled by POSE_SCALE."""
+    feet = feet or {}
+    belly = arm.pose.bones[BELLY]
+    _set_offset(belly, (FORWARD * body[0] + UP * body[1]) * POSE_SCALE)
+    _set_rotation(belly, SIDE, pitch)
+    if pitch == 0.0:
+        belly.rotation_quaternion = (1.0, 0.0, 0.0, 0.0)
+    belly.keyframe_insert("location", frame=frame, group=BELLY)
+    belly.keyframe_insert("rotation_quaternion", frame=frame, group=BELLY)
+    hb = arm.pose.bones[HEAD]
+    q = Quaternion((1.0, 0.0, 0.0, 0.0))
+    for axis, angle in ((UP, head[1]), (SIDE, head[0]), (FORWARD, head[2])):
+        if angle != 0.0:
+            local = _to_bone_space(hb, axis)
+            if local.length > 0.0:
+                q = q @ Quaternion(local.normalized(), angle)
+    hb.rotation_quaternion = q
+    hb.keyframe_insert("rotation_quaternion", frame=frame, group=HEAD)
+    for name in ALL_FEET:
+        pb = arm.pose.bones[name]
+        f, u = feet.get(name, (0.0, 0.0))
+        _set_offset(pb, (FORWARD * f + UP * u) * POSE_SCALE)
+        pb.keyframe_insert("location", frame=frame, group=name)
+
+
+def _clip(arm, name, keys):
+    """keys: [(frame, pose_kwargs)]. The last key should repeat the first for loops."""
+    _require(arm, ANIMATED)
+    _rest(arm, ANIMATED)
+    action = _new_action(arm, name)
+    for frame, kw in keys:
+        _pose(arm, frame, **kw)
+    _rest(arm, ANIMATED)
+    return action
+
+
+D = math.radians
+
+
+def build_trot(arm):
+    """16-frame two-beat trot: diagonal pairs, a short suspension, more bounce than the
+    walk. Same stride geometry as the walk so the gait handover stays skate-free."""
+    _require(arm, ANIMATED)
+    _rest(arm, ANIMATED)
+    action = _new_action(arm, "trot")
+    frames = TROT_FRAMES
+    for i in range(frames + 1):
+        t = (i % frames) / frames
+        for name, phase in FEET:
+            u = (t + phase) % 1.0
+            if u < TROT_STANCE:
+                s = u / TROT_STANCE
+                ahead, lift = TROT_STRIDE * (0.5 - s), 0.0
+            else:
+                s = (u - TROT_STANCE) / (1.0 - TROT_STANCE)
+                ahead = TROT_STRIDE * (_smoothstep(s) - 0.5)
+                lift = TROT_LIFT * 0.5 * (1.0 - math.cos(2.0 * math.pi * s))
+            pb = arm.pose.bones[name]
+            _set_offset(pb, FORWARD * ahead + UP * lift)
+            pb.keyframe_insert("location", frame=i, group=name)
+        belly = arm.pose.bones[BELLY]
+        _set_offset(belly, UP * (TROT_BOB * math.cos(4.0 * math.pi * t) - TROT_CROUCH))
+        _set_rotation(belly, SIDE, D(2.0) * math.sin(4.0 * math.pi * t))
+        belly.keyframe_insert("location", frame=i, group=BELLY)
+        belly.keyframe_insert("rotation_quaternion", frame=i, group=BELLY)
+        head = arm.pose.bones[HEAD]
+        _set_rotation(head, SIDE, D(3.0) * math.sin(4.0 * math.pi * (t - 0.08)))
+        head.keyframe_insert("rotation_quaternion", frame=i, group=HEAD)
+    _rest(arm, ANIMATED)
+    return action
+
+
+TROT_FRAMES = 16
+TROT_STANCE = 0.42
+# Longer than the walk's: 0.5 m over a 0.28 s stance is about 1.79 m/s, the middle of the
+# walk (0.66) to gallop (3.30) band, which is where game/systems/gait.gd hands over.
+TROT_STRIDE = 0.5
+TROT_LIFT = 0.12
+TROT_BOB = 0.03
+TROT_CROUCH = 0.05
+
+
+def build_jump(arm):
+    """One-shot 22 frames: anticipation crouch, push off, tucked air, a squash on landing.
+    The ARC itself comes from the character controller; the clip is the body's shape."""
+    tuck = {FRONT_L: (0.06, 0.16), FRONT_R: (0.06, 0.16), REAR_L: (-0.04, 0.12), REAR_R: (-0.04, 0.12)}
+    reach = {FRONT_L: (0.1, 0.05), FRONT_R: (0.1, 0.05), REAR_L: (-0.08, 0.02), REAR_R: (-0.08, 0.02)}
+    return _clip(arm, "jump", [
+        (0, dict()),
+        (4, dict(body=(0.0, -0.09), pitch=D(-4), head=(D(6), 0, 0))),
+        (7, dict(body=(0.03, 0.04), pitch=D(-10), head=(D(-8), 0, 0), feet=reach)),
+        (12, dict(body=(0.0, 0.02), pitch=D(-2), head=(D(-4), 0, 0), feet=tuck)),
+        (17, dict(body=(0.0, -0.02), pitch=D(6), head=(D(4), 0, 0), feet=reach)),
+        (19, dict(body=(0.0, -0.08), pitch=D(2), head=(D(10), 0, 0))),
+        (22, dict()),
+    ])
+
+
+def build_graze(arm):
+    """Loop, 48 frames: head down to the grass, two little nibbles, a chew."""
+    ff = {FRONT_L: (0.06, 0.0), FRONT_R: (0.02, 0.0)}
+    down = dict(body=(0.05, -0.08), pitch=D(16), head=(D(62), 0, 0), feet=ff)
+    nib = dict(body=(0.05, -0.085), pitch=D(16), head=(D(68), D(4), 0), feet=ff)
+    nib2 = dict(body=(0.05, -0.085), pitch=D(16), head=(D(67), D(-4), 0), feet=ff)
+    chew = dict(body=(0.05, -0.08), pitch=D(15), head=(D(58), 0, D(2)), feet=ff)
+    return _clip(arm, "graze", [
+        (0, down), (10, nib), (16, down), (26, nib2), (32, down), (40, chew), (48, down),
+    ])
+
+
+SIT_FEET = {REAR_L: (0.2, 0.0), REAR_R: (0.2, 0.0), FRONT_L: (0.03, 0.0), FRONT_R: (0.03, 0.0)}
+
+
+def build_sit(arm):
+    """Loop, 48 frames: haunches down, front legs straight, breathing."""
+    a = dict(body=(0.05, -0.16), pitch=D(-30), head=(D(22), 0, 0), feet=SIT_FEET)
+    b = dict(body=(0.05, -0.155), pitch=D(-29), head=(D(20), D(3), 0), feet=SIT_FEET)
+    return _clip(arm, "sit", [(0, a), (24, b), (48, a)])
+
+
+LIE_FEET = {FRONT_L: (-0.12, 0.05), FRONT_R: (-0.1, 0.05), REAR_L: (0.2, 0.03), REAR_R: (0.18, 0.03)}
+
+
+def build_lie(arm):
+    """Loop, 48 frames: lying down, legs folded under, head up, breathing."""
+    a = dict(body=(0.0, -0.3), pitch=D(-2), head=(D(-6), 0, 0), feet=LIE_FEET)
+    b = dict(body=(0.0, -0.295), pitch=D(-2), head=(D(-4), D(2), 0), feet=LIE_FEET)
+    return _clip(arm, "lie", [(0, a), (24, b), (48, a)])
+
+
+def build_sleep(arm):
+    """Loop, 72 frames: lying, head tucked down on the forelegs, slow breaths."""
+    a = dict(body=(0.0, -0.31), pitch=D(0), head=(D(52), D(18), D(8)), feet=LIE_FEET)
+    b = dict(body=(0.0, -0.3), pitch=D(-1), head=(D(49), D(18), D(8)), feet=LIE_FEET)
+    return _clip(arm, "sleep", [(0, a), (36, b), (72, a)])
+
+
+def build_startle(arm):
+    """One-shot 14 frames: a little jump straight up, head snaps up, then braced."""
+    up = {n: (0.0, 0.06) for n in ALL_FEET}
+    return _clip(arm, "startle", [
+        (0, dict()),
+        (3, dict(body=(-0.02, 0.07), pitch=D(-6), head=(D(-18), 0, 0), feet=up)),
+        (7, dict(body=(-0.02, -0.06), pitch=D(-3), head=(D(-12), 0, 0))),
+        (14, dict(body=(-0.01, -0.03), pitch=D(-2), head=(D(-8), 0, 0))),
+    ])
+
+
+def build_cower(arm):
+    """Loop, 24 frames: crouched low, weight back, head ducked, a small tremble."""
+    feet = {FRONT_L: (0.04, 0.0), FRONT_R: (0.04, 0.0)}
+    a = dict(body=(-0.06, -0.16), pitch=D(6), head=(D(30), 0, 0), feet=feet)
+    b = dict(body=(-0.055, -0.165), pitch=D(6.5), head=(D(31), D(2), 0), feet=feet)
+    c = dict(body=(-0.06, -0.158), pitch=D(5.5), head=(D(29), D(-2), 0), feet=feet)
+    return _clip(arm, "cower", [(0, a), (6, b), (12, a), (18, c), (24, a)])
+
+
+def build_hop(arm):
+    """Loop, 14 frames: a happy little bounce on all four hooves."""
+    air = {n: (0.0, 0.1) for n in ALL_FEET}
+    return _clip(arm, "hop", [
+        (0, dict(body=(0.0, -0.06), head=(D(4), 0, 0))),
+        (4, dict(body=(0.0, 0.08), pitch=D(-4), head=(D(-10), 0, 0), feet=air)),
+        (7, dict(body=(0.0, 0.1), pitch=D(-2), head=(D(-8), 0, 0), feet=air)),
+        (10, dict(body=(0.0, -0.02), head=(D(2), 0, 0))),
+        (14, dict(body=(0.0, -0.06), head=(D(4), 0, 0))),
+    ])
+
+
+def build_struggle(arm):
+    """Loop, 12 frames: held in the Scoop, hooves kicking at the air, head shaking."""
+    k1 = {FRONT_L: (0.08, 0.12), FRONT_R: (-0.02, 0.04), REAR_L: (-0.06, 0.03), REAR_R: (0.04, 0.12)}
+    k2 = {FRONT_L: (-0.02, 0.04), FRONT_R: (0.08, 0.12), REAR_L: (0.04, 0.12), REAR_R: (-0.06, 0.03)}
+    return _clip(arm, "struggle", [
+        (0, dict(pitch=D(-6), head=(D(-10), D(14), 0), feet=k1)),
+        (6, dict(pitch=D(-4), head=(D(-6), D(-14), 0), feet=k2)),
+        (12, dict(pitch=D(-6), head=(D(-10), D(14), 0), feet=k1)),
+    ])
+
+
+def build_talk(arm):
+    """Loop, 24 frames: small emphatic head bobs and tilts while speaking."""
+    return _clip(arm, "talk", [
+        (0, dict(head=(D(0), 0, 0))),
+        (6, dict(head=(D(5), D(3), D(3)))),
+        (12, dict(head=(D(-2), D(-2), 0))),
+        (18, dict(head=(D(4), D(-4), D(-3)))),
+        (24, dict(head=(D(0), 0, 0))),
+    ])
+
+
+def build_nod(arm):
+    """One-shot 16 frames: two nods, yes."""
+    return _clip(arm, "nod", [
+        (0, dict()), (4, dict(head=(D(16), 0, 0))), (7, dict(head=(D(-2), 0, 0))),
+        (10, dict(head=(D(12), 0, 0))), (16, dict()),
+    ])
+
+
+def build_shake(arm):
+    """One-shot 18 frames: a head shake, no."""
+    return _clip(arm, "shake", [
+        (0, dict()), (4, dict(head=(D(4), D(-20), 0))), (8, dict(head=(D(4), D(20), 0))),
+        (12, dict(head=(D(4), D(-14), 0))), (18, dict()),
+    ])
+
+
+def build_sad(arm):
+    """Loop, 48 frames: head low, body sagging, slow breaths."""
+    a = dict(body=(0.0, -0.04), pitch=D(3), head=(D(32), 0, 0))
+    b = dict(body=(0.0, -0.05), pitch=D(3.5), head=(D(34), D(-3), 0))
+    return _clip(arm, "sad", [(0, a), (24, b), (48, a)])
+
+
+def build_laugh(arm):
+    """Loop, 16 frames: head tipped back, the body bouncing with it."""
+    a = dict(body=(0.0, -0.02), pitch=D(-3), head=(D(-16), 0, D(4)))
+    b = dict(body=(0.0, 0.0), pitch=D(-5), head=(D(-22), 0, D(-4)))
+    return _clip(arm, "laugh", [(0, a), (4, b), (8, a), (12, b), (16, a)])
+
+
+def build_rear(arm):
+    """One-shot 30 frames: up on the hind legs, forelegs pawing, and down. The Bloom."""
+    up = {FRONT_L: (0.08, 0.3), FRONT_R: (0.05, 0.27), REAR_L: (0.03, 0.0), REAR_R: (0.03, 0.0)}
+    up2 = {FRONT_L: (0.05, 0.27), FRONT_R: (0.08, 0.3), REAR_L: (0.03, 0.0), REAR_R: (0.03, 0.0)}
+    return _clip(arm, "rear", [
+        (0, dict()),
+        (5, dict(body=(-0.04, -0.06), pitch=D(4), head=(D(8), 0, 0))),
+        (12, dict(body=(-0.08, 0.1), pitch=D(-34), head=(D(8), 0, 0), feet=up)),
+        (17, dict(body=(-0.08, 0.11), pitch=D(-36), head=(D(6), 0, 0), feet=up2)),
+        (22, dict(body=(-0.07, 0.09), pitch=D(-32), head=(D(10), 0, 0), feet=up)),
+        (27, dict(body=(0.0, -0.05), pitch=D(2), head=(D(6), 0, 0))),
+        (30, dict()),
+    ])
+
+
+def build_look(arm):
+    """One-shot 72 frames: a curious look around, left, right, and back."""
+    return _clip(arm, "look", [
+        (0, dict()), (14, dict(head=(D(-6), D(-38), D(-6)))), (30, dict(head=(D(-6), D(-38), D(-6)))),
+        (44, dict(head=(D(-4), D(36), D(5)))), (60, dict(head=(D(-4), D(36), D(5)))), (72, dict()),
+    ])
+
+
+V1_BUILDERS = [build_trot, build_jump, build_graze, build_sit, build_lie, build_sleep,
+               build_startle, build_cower, build_hop, build_struggle, build_talk, build_nod,
+               build_shake, build_sad, build_laugh, build_rear, build_look]
+
+
 STANCE_FRACTION = 0.5   # half the cycle planted, half swinging (see _foot_offset)
 
 
@@ -559,6 +834,7 @@ def author(arm):
             f"in Godot (SpringBoneSimulator3D) and must not be keyframed here"
         )
     actions = [build_idle(arm), build_walk(arm), build_gallop(arm)]
+    actions += [b(arm) for b in V1_BUILDERS]
     excluded = secondary_motion_bones(arm)
     print(f"SECONDARY_MOTION_BONES {len(excluded)} excluded from bake: {excluded}")
     fps = bpy.context.scene.render.fps

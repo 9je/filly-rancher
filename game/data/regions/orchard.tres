@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_region")
 id = &"orchard"
-display_name = "The Orchard"
+display_name = "Orchard Hollow"
 centre = Vector2(72, 40)
 radius = 22.0
 permit_cost = 150

@@ -195,7 +195,7 @@ const _WORST_PARAMS := {
 
 
 func _letter() -> Dictionary:
-	return {"sender": "Cloudsdale Weather Corporation", "title": "Your mailbox is installed",
+	return {"sender": "Brightsky Weather Company", "title": "Your mailbox is installed",
 		"body": ["Dear Moonbeam,", "", "The flag goes up when something is waiting.",
 			"", "Warmly, Sponsorship Services"]}
 

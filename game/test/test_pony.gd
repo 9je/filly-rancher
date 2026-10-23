@@ -36,7 +36,7 @@ const WorldStateScript := preload("res://systems/world_state.gd")
 ## personality and speed it is about instead of depending on who is on the roster today.
 ## Cloned rather than authored from scratch so `model_path` stays a real, loadable model
 ## and the visuals actually build.
-const TEMPLATE := preload("res://data/ponies/twilight.tres")
+const TEMPLATE := preload("res://data/ponies/pokeypierce.tres")
 
 ## Big enough that nothing here can walk off it.
 const FLOOR_SIZE := Vector3(60.0, 1.0, 60.0)
@@ -265,7 +265,7 @@ func test_a_pony_left_alone_wanders_off_and_walks_while_she_does() -> void:
 		+ "Gait would have answered for the speed we just read off her")
 
 
-func test_grazing_stands_still_and_plays_idle_then_hands_back_to_idle() -> void:
+func test_grazing_stands_still_and_plays_graze_then_hands_back_to_idle() -> void:
 	# GRAZE is the one routine state wild_ponies.tscn cannot be relied on to reach inside
 	# its window, so it is driven directly here.
 	var pony := _spawn(PonyDataScript.Personality.BOLD, 3.4, Vector3.ZERO)
@@ -276,8 +276,8 @@ func test_grazing_stands_still_and_plays_idle_then_hands_back_to_idle() -> void:
 	assert_eq(pony.state, PonyScript.State.GRAZE, "a graze lasts at least half a second")
 	assert_almost_eq(pony.global_position.distance_to(start), 0.0, 0.02,
 		"a grazing pony stands still")
-	assert_eq(pony.get_animation_player().current_animation, "idle",
-		"a grazing pony plays 'idle'")
+	assert_eq(pony.get_animation_player().current_animation, "graze",
+		"a grazing pony puts her head down")
 
 	# Grazing must END, or a pony who put her head down would never lift it. Polled
 	# rather than sampled once at the far end of GRAZE_SECONDS: by then IDLE may already

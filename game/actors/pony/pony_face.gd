@@ -16,9 +16,14 @@ extends SkeletonModifier3D
 
 enum Mood { NEUTRAL, HAPPY, SAD, SCARED, ANGRY, BLANK }
 
-const LID_AXIS := Vector3(0, 0, 1)
-const LID_CLOSED := deg_to_rad(38.0)
-const EAR_AXIS := Vector3(1, 0, 0)
+## Measured with the rigprobe set in game/scenes/test/shots.gd: +X brings the upper lid down
+## over the eye; +Y swings the left ear out and down (the right ear mirrors it).
+const LID_AXIS := Vector3(1, 0, 0)
+## The bone only squints: the donors' eyeballs are a separate mesh the lid's weights do not
+## reach, so the full blink is drawn by the eye shader's `lid` (game/shaders/pony_eye.gdshader).
+const LID_CLOSED := deg_to_rad(30.0)
+const EYE_SHADER := preload("res://shaders/pony_eye.gdshader")
+const EAR_AXIS := Vector3(0, 1, 0)
 const BROW_AXIS := Vector3(0, 0, 1)
 const JAW_AXIS := Vector3(0, 0, 1)
 const JAW_OPEN := deg_to_rad(11.0)
@@ -42,6 +47,8 @@ var look_target: Vector3 = Vector3.INF
 @export var look_weight: float = 0.0
 ## Max head yaw toward a look target.
 @export var look_max := deg_to_rad(55.0)
+## Held shut (sleeping, a contented sigh, the Bloom's eyes-closed beat). Blinks pause.
+var eyes_closed: bool = false
 ## True while a talk line is revealing: the jaw flaps with `talk_amount`.
 var talking: bool = false
 ## 0..1 syllable envelope from the babble voice; the jaw opens with it.
@@ -60,6 +67,10 @@ var _mood_lid := 0.0
 var _look_yaw := 0.0
 var _last_usec := 0
 var _bones := {}
+var _closed := 0.0
+var _eyes: Array[ShaderMaterial] = []
+var _lid_written := -1.0
+var _delta_last := 0.016
 
 
 func _ready() -> void:
@@ -84,20 +95,45 @@ func _process_modification() -> void:
 	var now := Time.get_ticks_usec()
 	var delta := 0.016 if _last_usec == 0 else clampf((now - _last_usec) / 1_000_000.0, 0.0, 0.1)
 	_last_usec = now
+	_delta_last = delta
 	_tick(delta)
 	var lid := clampf(_mood_lid + _blink_amount(), 0.0, 1.0)
-	_rotate(sk, "LeftEyeLidUpper", LID_AXIS, -lid * LID_CLOSED)
-	_rotate(sk, "RightEyeLidUpper", LID_AXIS, -lid * LID_CLOSED)
+	_closed = move_toward(_closed, 1.0 if eyes_closed else 0.0, _delta_last * 6.0)
+	lid = maxf(lid, _closed)
+	_rotate(sk, "LeftEyeLidUpper", LID_AXIS, minf(lid, 0.5) * LID_CLOSED)
+	_rotate(sk, "RightEyeLidUpper", LID_AXIS, minf(lid, 0.5) * LID_CLOSED)
+	_set_eye_lid(sk, lid)
 	var flick := _ear_flick_amount()
 	_rotate(sk, "LeftEar", EAR_AXIS, _mood_ears + (flick if _ear_side == 0 else 0.0))
-	_rotate(sk, "RightEar", EAR_AXIS, _mood_ears + (flick if _ear_side == 1 else 0.0))
-	_rotate(sk, "LeftEyeBrow", BROW_AXIS, _mood_brow)
-	_rotate(sk, "RightEyeBrow", BROW_AXIS, -_mood_brow)
+	_rotate(sk, "RightEar", EAR_AXIS, -(_mood_ears + (flick if _ear_side == 1 else 0.0)))
+	# The donors' brows are drawn lines with almost no deformation (rigprobe), so the brow
+	# channel stays a whisper; the mood reads through lids and ears.
+	_rotate(sk, "LeftEyeBrow", BROW_AXIS, _mood_brow * 0.3)
+	_rotate(sk, "RightEyeBrow", BROW_AXIS, -_mood_brow * 0.3)
 	if talking or talk_amount > 0.001:
 		_rotate(sk, "Javv", JAW_AXIS, -JAW_OPEN * clampf(talk_amount, 0.0, 1.0))
 	if absf(_look_yaw) > 0.001:
 		_rotate_world_up(sk, "Neck1", _look_yaw * 0.4)
 		_rotate_world_up(sk, "Head", _look_yaw * 0.6)
+
+
+## Push the lid amount into every eye material on this pony (cached on first use).
+func _set_eye_lid(sk: Skeleton3D, lid: float) -> void:
+	if absf(lid - _lid_written) < 0.002:
+		return
+	_lid_written = lid
+	if _eyes.is_empty():
+		var root: Node = sk.get_parent() if sk.get_parent() != null else sk
+		for node: Node in root.find_children("*", "MeshInstance3D", true, false):
+			var mi: MeshInstance3D = node
+			if mi.mesh == null:
+				continue
+			for i in range(mi.mesh.get_surface_count()):
+				var m := mi.get_active_material(i)
+				if m is ShaderMaterial and (m as ShaderMaterial).shader == EYE_SHADER:
+					_eyes.append(m)
+	for m: ShaderMaterial in _eyes:
+		m.set_shader_parameter(&"lid", lid)
 
 
 func _tick(delta: float) -> void:

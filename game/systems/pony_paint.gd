@@ -157,6 +157,7 @@ static func _eye(src: Material, look: PonyLook, donor: Dictionary) -> ShaderMate
 	if tex != null:
 		m.set_shader_parameter(&"eye_texture", tex)
 	m.set_shader_parameter(&"iris", look.eyes)
+	m.set_shader_parameter(&"lid_color", look.coat)
 	return m
 
 

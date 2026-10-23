@@ -161,10 +161,31 @@ const TOP_SKATE_FREE_SPEED := GALLOP_MAX_PLAYBACK * GALLOP_CLIP_SPEED
 ## Which locomotion clip honestly depicts `speed`. The single place the ladder at the
 ## top of this file is encoded -- callers must not re-derive it from the constants, or
 ## the next clip added here will need finding in every one of them.
-static func clip_for_speed(speed: float) -> StringName:
+# --- `trot` (v1) ----------------------------------------------------------------------
+# Authored by build_trot() in tools/author_anims.py: a two-beat diagonal trot with its own
+# longer stride, so the middle of the ladder is a real gait instead of the walk played at
+# up to 3x (the frantic shuffle). The trot takes over from the walk at TROT_HANDOVER_SPEED,
+# which sits above every wander speed pony.gd can produce (at most 2.0x walk, 1.32 m/s),
+# and hands over to the gallop at the unchanged GALLOP_HANDOVER_SPEED, so capture balance
+# and every flee speed stay exactly as they were.
+
+const TROT_STRIDE := 0.5
+const TROT_FRAMES := 16.0
+const TROT_FPS := 24.0
+const TROT_CYCLE_SECONDS := TROT_FRAMES / TROT_FPS
+const TROT_STANCE_FRACTION := 0.42
+const TROT_CLIP_SPEED := TROT_STRIDE / (TROT_CYCLE_SECONDS * TROT_STANCE_FRACTION)
+const TROT_HANDOVER_SPEED := 1.4
+
+
+## `has_trot` is false for a body exported before the trot existed (the five tier-a
+## models): she walks the old ladder, walk straight to gallop.
+static func clip_for_speed(speed: float, has_trot: bool = true) -> StringName:
 	var s := absf(speed)
 	if s < IDLE_SPEED:
 		return &"idle"
+	if has_trot and s >= TROT_HANDOVER_SPEED and s < GALLOP_HANDOVER_SPEED:
+		return &"trot"
 	if s < GALLOP_HANDOVER_SPEED:
 		return &"walk"
 	return &"gallop"
@@ -178,6 +199,8 @@ static func clip_speed(clip: StringName) -> float:
 			return WALK_CLIP_SPEED
 		&"gallop":
 			return GALLOP_CLIP_SPEED
+		&"trot":
+			return TROT_CLIP_SPEED
 		_:
 			return 0.0
 
@@ -201,6 +224,8 @@ static func playback_scale_for_clip(clip: StringName, speed: float) -> float:
 			return playback_scale_for_speed(speed)
 		&"gallop":
 			return gallop_playback_scale_for_speed(speed)
+		&"trot":
+			return absf(speed) / TROT_CLIP_SPEED
 		_:
 			return 1.0
 
@@ -220,4 +245,6 @@ static func skate_ratio(speed: float) -> float:
 		return 1.0
 	if s >= GALLOP_HANDOVER_SPEED:
 		return s / (gallop_playback_scale_for_speed(s) * GALLOP_CLIP_SPEED)
+	if s >= TROT_HANDOVER_SPEED:
+		return 1.0 # The trot plays at exactly s / TROT_CLIP_SPEED.
 	return s / (playback_scale_for_speed(s) * WALK_CLIP_SPEED)

@@ -883,6 +883,11 @@ func _state_approach() -> Vector3:
 ## that decides what a hold of this length means lives in the beam.
 func _state_held(delta: float) -> void:
 	_held_seconds += delta
+	# Kicking at the air in the Scoop. A body exported before v1 has no such clip and
+	# keeps whatever she was playing when the beam took her.
+	if _anim != null and _anim.has_animation(&"struggle"):
+		_play(&"struggle")
+		_anim.speed_scale = 1.0
 
 
 ## Walk away and, once nobody can see it happen, stop existing. See leave() for why this
@@ -1196,9 +1201,19 @@ func _update_facing(direction: Vector3, delta: float) -> void:
 func _update_animation(speed: float) -> void:
 	if _anim == null:
 		return
-	var clip := GaitScript.clip_for_speed(speed)
+	var clip := GaitScript.clip_for_speed(speed, _anim.has_animation(&"trot"))
+	if clip == &"idle":
+		clip = _standing_clip()
 	_play(clip)
 	_anim.speed_scale = GaitScript.playback_scale_for_clip(clip, speed)
+
+
+## What she does while standing still: grazes in GRAZE, otherwise idles. A body exported
+## before the v1 clips (no `graze`) idles either way.
+func _standing_clip() -> StringName:
+	if state == State.GRAZE and _anim.has_animation(&"graze"):
+		return &"graze"
+	return &"idle"
 
 
 ## play() only when the clip actually changes -- calling it every frame would restart

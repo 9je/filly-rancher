@@ -197,3 +197,12 @@ func test_shade_names_read_like_a_dye_label() -> void:
 	var n := GeneratorScript.shade_name(Color(1.0, 0.8, 0.6), 4)
 	assert_string_ends_with(n, "No. 4")
 	assert_eq(n.split(" ").size(), 4)
+
+
+func test_no_generated_pony_wears_a_canon_characters_colors() -> void:
+	for i in range(400):
+		var p := GeneratorScript.generate(i * 31 + 7)
+		assert_false(GeneratorScript.reads_as_canon(p.coat, p.mane),
+			"seed %d drew a canon signature (%s on %s)" % [i * 31 + 7, p.mane.to_html(), p.coat.to_html()])
+	# And the check itself recognises the signature it exists for.
+	assert_true(GeneratorScript.reads_as_canon(Color(0.78, 0.79, 0.84), Color(0.98, 0.93, 0.62)))

@@ -133,11 +133,14 @@ static func shape(name: String, p: Vector2) -> float:
 			return _poly(q, [Vector2(0.06, -0.42), Vector2(-0.2, 0.04), Vector2(-0.02, 0.04),
 				Vector2(-0.1, 0.42), Vector2(0.2, -0.08), Vector2(0.02, -0.08)])
 		"cross":
-			return minf(_box(q - Vector2(0, 0.02), Vector2(0.05, 0.14)), _box(q - Vector2(0, 0.02), Vector2(0.14, 0.05)))
+			return minf(_box(q - Vector2(0, -0.04), Vector2(0.055, 0.16)), _box(q - Vector2(0, -0.04), Vector2(0.16, 0.055)))
 		"apple":
-			return minf(_circle(q - Vector2(-0.1, 0.06), 0.27), _circle(q - Vector2(0.1, 0.06), 0.27))
+			var body := minf(_circle(q - Vector2(-0.11, 0.08), 0.26), _circle(q - Vector2(0.11, 0.08), 0.26))
+			var stem := _box(_rot(q - Vector2(0.0, -0.24), -0.25), Vector2(0.025, 0.08))
+			var leaf := _vesica(_rot(q - Vector2(0.12, -0.27), 1.1), 0.12, 0.055)
+			return minf(body, minf(stem, leaf))
 		"leaf_small":
-			return _vesica(_rot(q - Vector2(0.1, -0.3), 0.7), 0.13, 0.06)
+			return _vesica(_rot(q - Vector2(0.12, -0.27), 1.1), 0.1, 0.035)
 		"leaf":
 			return _vesica(_rot(q, 0.6), 0.4, 0.17)
 		"leaf_vein":
@@ -175,15 +178,21 @@ static func shape(name: String, p: Vector2) -> float:
 		"moon":
 			return maxf(_circle(q, 0.36), -_circle(q - Vector2(0.17, -0.1), 0.3))
 		"clover":
-			var c1 := _heart(_rot(q, 0.0) * Vector2(1, -1) + Vector2(0.0, 0.2), 0.22)
-			var c2 := _heart(_rot(q, 2.094) * Vector2(1, -1) + Vector2(0.0, 0.2), 0.22)
-			var c3 := _heart(_rot(q, -2.094) * Vector2(1, -1) + Vector2(0.0, 0.2), 0.22)
-			return minf(minf(c1, c2), c3)
+			# Three heart-shaped leaves whose points meet at the centre, and a stem.
+			var c := q - Vector2(0.0, -0.04)
+			var best3 := _box(_rot(c - Vector2(0.07, 0.2), 0.4), Vector2(0.028, 0.16))
+			for i in range(3):
+				var lq := c.rotated(-float(i) * TAU / 3.0)
+				best3 = minf(best3, _heart(lq * Vector2(1, -1), 0.24))
+			return best3
 		"carrot":
-			return _poly(q, [Vector2(-0.16, -0.18), Vector2(0.16, -0.18), Vector2(0.0, 0.42)])
+			var root := _poly(q, [Vector2(-0.17, -0.14), Vector2(0.17, -0.14), Vector2(0.0, 0.44)])
+			var tops := minf(minf(_vesica(_rot(q - Vector2(-0.08, -0.28), -0.45), 0.14, 0.045),
+				_vesica(_rot(q - Vector2(0.08, -0.28), 0.45), 0.14, 0.045)),
+				_vesica(q - Vector2(0.0, -0.31), 0.15, 0.045))
+			return minf(root, tops)
 		"carrot_top":
-			return minf(_vesica(_rot(q - Vector2(-0.07, -0.3), -0.4), 0.12, 0.04),
-				_vesica(_rot(q - Vector2(0.07, -0.3), 0.4), 0.12, 0.04))
+			return maxf(shape("carrot", p), -(q.y + 0.15))
 		"flame":
 			return _drop(q + Vector2(0.0, -0.06), 0.3)
 		"flame_core":
@@ -209,8 +218,9 @@ static func shape(name: String, p: Vector2) -> float:
 				best2 = minf(best2, _circle(q - off, 0.15))
 			return best2
 		"cupcake":
-			return minf(_poly(q, [Vector2(-0.24, 0.02), Vector2(0.24, 0.02), Vector2(0.16, 0.36), Vector2(-0.16, 0.36)]),
-				minf(_circle(q - Vector2(-0.12, -0.06), 0.15), minf(_circle(q - Vector2(0.12, -0.06), 0.15), _circle(q - Vector2(0, -0.18), 0.15))))
+			return minf(minf(_poly(q, [Vector2(-0.24, 0.02), Vector2(0.24, 0.02), Vector2(0.16, 0.36), Vector2(-0.16, 0.36)]),
+				minf(_circle(q - Vector2(-0.12, -0.06), 0.15), minf(_circle(q - Vector2(0.12, -0.06), 0.15), _circle(q - Vector2(0, -0.18), 0.15)))),
+				_circle(q - Vector2(0.0, -0.36), 0.075))
 		"cherry":
 			return _circle(q - Vector2(0.0, -0.36), 0.07)
 	return 1.0

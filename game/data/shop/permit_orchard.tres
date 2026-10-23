@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_shop")
 id = &"permit_orchard"
-display_name = "Permit: The Orchard"
+display_name = "Permit: Orchard Hollow"
 description = "Opens the gate east of the homestead. Apple country, and the ponies who farm it."
 cost = 150
 kind = 1

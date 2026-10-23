@@ -27,7 +27,7 @@ const MAX_NAME_LENGTH := 16
 ## template that overflows is a template that gets cut off on somebody's screen.
 const LINE_WIDTH := 58
 
-const SENDER := "Cloudsdale Weather Corporation"
+const SENDER := "Brightsky Weather Company"
 
 
 static func ids() -> Array[int]:
@@ -76,7 +76,7 @@ static func render(id: int, params: Dictionary) -> Dictionary:
 			return _letter("Shipment received", [
 				"Dear %s," % who,
 				"",
-				"Your %s shipment! Cloudsdale thanks you." % ordinal(count),
+				"Your %s shipment! Brightsky thanks you." % ordinal(count),
 				"Unregistered stock, condition: excellent.",
 				"Credit applied to your balance: %d bits." % credit,
 				"",
@@ -110,7 +110,7 @@ static func render(id: int, params: Dictionary) -> Dictionary:
 				"Collection day! Upkeep of %d bits has been" % upkeep,
 				"added to your account, along with the usual",
 				"small service charge. Your balance is now",
-				"%d bits. Thank you for choosing Cloudsdale!" % balance,
+				"%d bits. Thank you for choosing Brightsky!" % balance,
 			])
 		Id.COLLECTOR_VISIT:
 			return _letter("A visit from your account manager", [

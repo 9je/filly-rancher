@@ -101,7 +101,7 @@ const BOARD_NOTES: Array[String] = [
 	"Finish one to get a new one.",
 	"Finish one to get a new one. Notices are filed weekly.",
 	"Finish one to get a new one. Somepony has been reading these.",
-	"Cloudsdale Weather Corporation, Partner Requisitions.",
+	"Brightsky Weather Company, Partner Requisitions.",
 	"Pinned over the Company's notices, in somepony else's hoofwriting.",
 ]
 
