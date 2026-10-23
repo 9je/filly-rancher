@@ -13,18 +13,21 @@ The Steam-specific rules (the microtrailer, no wishlist line) still hold, becaus
 
 ## The jokes and references (staged, not pasted on)
 
+The owner's favorites, and their friends' (the people this is for), each get a moment: Fluttershy (the owner), Spike (Damon), Rainbow Dash (Ben), and also Octavia, Derpy and Trixie.
+
 | Shot | The gag |
 |---|---|
-| Catch | Caption: **"Gotta catch 'em all. Wrong franchise."** |
-| Launch | A pony sails into the pen in an arc. Caption: **"Applied pony-ballistics."** |
-| Rainbow Dash | Rainbow Dash bolts as the Gallop Shoes kick in. Caption: **"20% cooler."** |
-| Escape Artists | Apple Bloom, Sweetie Belle and Scootaloo (the game's Escape Artists) hop the Paddock fence at night. Caption: **"CUTIE MARK CRUSADERS: FENCE HOPPERS, YAY!"** |
-| Pinkie | Pinkie Pie is caught, and the toast reads her quirk: "Social Butterfly". |
-| Derpy | Derpy Hooves (a Glutton) at the pantry. No caption needed. |
-| Fluttershy | Fluttershy, Skittish, spots the player from twice as far off and flees: "...yay." |
-| The letter | Twilight's "Dear Princess Celestia" register, in the welcome letter's paper card: **"Dear Princess Celestia, today I learned... nothing suspicious."** |
-| The twist tease | Over the grey valley, a card: **"No ponies were harmed in the making of this rainbow.\*"** A beat of silence, then a small footnote card: **"\*terms and conditions apply"**. The spectrum tank cut lands on it. |
-| The title card | "Filly Rancher", the rainbow underline, and the tag **"Friendship is Magic. Ranching is Business."** |
+| Catch, the hook | Caption: **"Gotta catch 'em all. Wrong franchise."** |
+| **Fluttershy** (the owner's) | She is Skittish: she spots the player from twice as far and bolts. A tossed treat, and she trots back, calm, into the Scoop. Caption: **"Kindness. And snacks."** |
+| **Rainbow Dash** (Ben's) | A Show-off and a pegasus. The Gallop Shoes chase her down, then she wins a race by a nose. Caption: **"20% cooler."** |
+| **Spike** (Damon's) | At the mailbox, he burps a letter in on green dragonfire, the way he sends Twilight's mail. Caption: **"Spike: express mail."** |
+| **Trixie** | The beam closes on her and she blinks away (a unicorn's trick). Caption: **"The Great and Powerful... gone."** |
+| **Derpy** | A Glutton at the pantry, hay vanishing. No caption needed. |
+| **Octavia** | A Loner under the moonflowers in the Night Meadow at night: the trailer's quiet beauty shot. |
+| Escape Artists | Apple Bloom, Sweetie Belle and Scootaloo hop the Paddock fence at night. Caption: **"CUTIE MARK CRUSADERS FENCE HOPPERS, YAY!"** |
+| Launch | A pony sails into the pen. Caption: **"Applied pony-ballistics."** |
+| The twist tease | Over the grey valley: **"No ponies were harmed in the making of this rainbow.\*"** One beat of silence, then: **"\*terms and conditions apply"**. The spectrum tank cut lands on it. |
+| The title card | "Filly Rancher", the rainbow underline, the tag **"Friendship is Magic. Ranching is Business."** |
 
 ## The hook
 
