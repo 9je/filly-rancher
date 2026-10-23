@@ -267,6 +267,9 @@ func open() -> bool:
 	_letter_id = &""
 	_anim_t = 0.0
 	_hovered = -1
+	# A key capture never outlives the page it was asked on: a stale one would rebind
+	# whatever key the player pressed next, on any page.
+	_capturing = &""
 	set_process(true)
 	_open = true
 	visible = true
@@ -300,6 +303,7 @@ func open_page(page: int) -> bool:
 	_selected = 0
 	_scroll = 0
 	_letter_id = &""
+	_capturing = &""
 	# M11, final-review.md M3: open() already clears this; a page switch that skipped it left
 	# whichever roster row the pointer was resting on when Compendium was chosen drawn
 	# hovered on the page that opened, under a pointer nowhere near it.
@@ -315,6 +319,7 @@ func close() -> void:
 		return
 	_open = false
 	_hovered = -1
+	_capturing = &""
 	visible = false
 	set_process(false)
 	closed.emit()
@@ -538,6 +543,7 @@ func back() -> void:
 
 
 func _return_to_main(row: int) -> void:
+	_capturing = &""
 	_page = Page.MAIN
 	_selected = row
 	_scroll = 0
@@ -557,11 +563,16 @@ func is_capturing() -> bool:
 	return _capturing != &""
 
 
-## The key-capture step: the next key pressed becomes the action's key. Escape cancels.
+## The key-capture step: the next key pressed becomes the action's key. Escape cancels;
+## Backspace puts the default back.
 func capture_key(event: InputEventKey) -> bool:
 	if _capturing == &"" or not event.pressed or event.echo:
 		return false
-	if event.physical_keycode != KEY_ESCAPE and event.keycode != KEY_ESCAPE:
+	if event.physical_keycode == KEY_BACKSPACE or event.keycode == KEY_BACKSPACE:
+		# Backspace puts the action back on its own key.
+		settings.unbind(_capturing)
+		settings_changed.emit()
+	elif event.physical_keycode != KEY_ESCAPE and event.keycode != KEY_ESCAPE:
 		var code := int(event.physical_keycode) if event.physical_keycode != 0 else int(event.keycode)
 		settings.bind(_capturing, code)
 		settings_changed.emit()
@@ -1030,7 +1041,7 @@ func settings_rows() -> Array:
 		["Vsync", "On" if settings.vsync else "Off"],
 	]
 	for action in SettingsScript.REBINDABLE:
-		var value := "press a key..." if _capturing == action else \
+		var value := "press a key (Backspace: default)" if _capturing == action else \
 			SettingsScript.key_label(SettingsScript.key_of(action, settings.bindings))
 		out.append([str(SettingsScript.ACTION_NAMES.get(action, String(action))), value])
 	return out

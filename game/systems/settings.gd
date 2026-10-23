@@ -116,8 +116,9 @@ func load_from(path: String = "") -> void:
 	bindings = {}
 	if b is Dictionary:
 		for k in (b as Dictionary):
-			if StringName(k) in REBINDABLE:
-				bindings[StringName(k)] = int((b as Dictionary)[k])
+			var code := int((b as Dictionary)[k]) if (b as Dictionary)[k] is int or (b as Dictionary)[k] is float else 0
+			if StringName(k) in REBINDABLE and code > 0 and code != KEY_ESCAPE:
+				bindings[StringName(k)] = code
 	changed.emit()
 
 
@@ -209,26 +210,41 @@ func toggle_vsync() -> void:
 ## Bind `action` to `keycode` (physical). A key already bound to another rebindable action
 ## is taken from it (that action falls back to its project default), so no key does two.
 func bind(action: StringName, keycode: int) -> void:
-	if not (action in REBINDABLE):
+	if not (action in REBINDABLE) or keycode <= 0:
 		return
-	for other in bindings.keys():
-		if other != action and int(bindings[other]) == keycode:
-			bindings.erase(other)
+	# A key does one thing: whichever action answered to it (bound, or by the project's
+	# default) takes this action's old key instead, so nothing is left doubled or keyless.
+	var old := key_of(action, bindings)
+	for other in REBINDABLE:
+		if other != action and key_of(other, bindings) == keycode:
+			bindings[other] = old
 	bindings[action] = keycode
 	changed.emit()
+
+
+## Back to the project's own key for `action`.
+func unbind(action: StringName) -> void:
+	if bindings.erase(action):
+		changed.emit()
 
 
 ## The key `action` answers to now (its binding, else the project's first key), or 0.
 static func key_of(action: StringName, binds: Dictionary) -> int:
 	if binds.has(action):
 		return int(binds[action])
-	if not InputMap.has_action(action):
-		return 0
-	for e in InputMap.action_get_events(action):
+	for e in default_events(action):
 		if e is InputEventKey:
 			var k := e as InputEventKey
 			return int(k.physical_keycode) if k.physical_keycode != 0 else int(k.keycode)
 	return 0
+
+
+## The project's own events for `action` (project.godot), whatever the InputMap holds now.
+static func default_events(action: StringName) -> Array:
+	var d: Variant = ProjectSettings.get_setting("input/" + String(action), null)
+	if d is Dictionary:
+		return (d as Dictionary).get("events", [])
+	return []
 
 
 static func key_label(keycode: int) -> String:
@@ -238,18 +254,24 @@ static func key_label(keycode: int) -> String:
 		if DisplayServer.get_name() != "headless" else OS.get_keycode_string(keycode as Key)
 
 
-## Put the bindings into the InputMap: each rebound action's keyboard events are replaced by
-## its one key; mouse and gamepad events stay.
+## Put the bindings into the InputMap. Every rebindable action is rebuilt from the
+## project's own events first, so an action whose key was taken, or that went back to its
+## default, never keeps a key it no longer has; mouse and gamepad events stay as authored.
 func apply_bindings() -> void:
-	for action in bindings:
+	for action in REBINDABLE:
 		if not InputMap.has_action(action):
 			continue
 		for e in InputMap.action_get_events(action):
 			if e is InputEventKey:
 				InputMap.action_erase_event(action, e)
-		var ev := InputEventKey.new()
-		ev.physical_keycode = int(bindings[action]) as Key
-		InputMap.action_add_event(action, ev)
+		if bindings.has(action):
+			var ev := InputEventKey.new()
+			ev.physical_keycode = int(bindings[action]) as Key
+			InputMap.action_add_event(action, ev)
+			continue
+		for e in default_events(action):
+			if e is InputEventKey:
+				InputMap.action_add_event(action, e)
 
 
 ## The graphics preset, the window and vsync, on `viewport` and the scene's environment.
@@ -273,9 +295,13 @@ func apply_graphics(viewport: Viewport) -> void:
 		for we in scene.find_children("*", "WorldEnvironment", true, false):
 			var env := (we as WorldEnvironment).environment
 			if env != null:
-				env.ssao_enabled = quality >= Quality.MEDIUM
-				env.glow_enabled = quality >= Quality.MEDIUM
-				env.sdfgi_enabled = false
+				# The scene's own look is the ceiling: a preset can switch an effect off, never
+				# on where the scene was authored without it.
+				if not env.has_meta(&"authored_ssao"):
+					env.set_meta(&"authored_ssao", env.ssao_enabled)
+					env.set_meta(&"authored_glow", env.glow_enabled)
+				env.ssao_enabled = bool(env.get_meta(&"authored_ssao")) and quality >= Quality.MEDIUM
+				env.glow_enabled = bool(env.get_meta(&"authored_glow")) and quality >= Quality.MEDIUM
 
 
 func toggle_invert() -> void:

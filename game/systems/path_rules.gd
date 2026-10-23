@@ -50,7 +50,13 @@ static func next_contract(done: int) -> Dictionary:
 
 
 static func post_contract(story: Story) -> void:
-	if not contract(story).is_empty() or story.has_flag("jubilee_ready"):
+	if not contract(story).is_empty():
+		return
+	if story.has_flag("climax_done"):
+		# Post-game (STORY.md section 6): gray, rich, and the contracts keep coming.
+		story.set_var("contract", next_contract(int(story.get_var("contracts_done", 0))))
+		return
+	if story.has_flag("jubilee_ready"):
 		return
 	if rank(story) >= DIRECTOR:
 		story.set_var("contract", {"want": JUBILEE_ORDER, "kind": "jubilee", "bonus": 5000,

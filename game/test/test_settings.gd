@@ -248,7 +248,7 @@ func test_v1_fields_round_trip_and_a_key_does_one_thing() -> void:
 	a.vsync = false
 	a.bind(&"jump", KEY_J)
 	a.bind(&"interact", KEY_J)
-	assert_false(a.bindings.has(&"jump"), "J moved to interact")
+	assert_eq(int(a.bindings.get(&"jump", 0)), KEY_E, "J moved to interact, and jump took interact's old E")
 	assert_true(a.save_to(path))
 	var b := SettingsScript.new()
 	b.load_from(path)
@@ -258,4 +258,51 @@ func test_v1_fields_round_trip_and_a_key_does_one_thing() -> void:
 	assert_true(b.fullscreen)
 	assert_false(b.vsync)
 	assert_eq(int(b.bindings.get(&"interact", 0)), KEY_J)
+	DirAccess.remove_absolute(path)
+
+
+## A key taken from an action that only had its project default swaps that action onto the
+## thief's old key, so no key does two things and no action is left without one.
+func test_stealing_a_default_key_swaps_it() -> void:
+	var a := SettingsScript.new()
+	var w := SettingsScript.key_of(&"move_forward", {})
+	var space := SettingsScript.key_of(&"jump", {})
+	assert_gt(w, 0)
+	a.bind(&"jump", w)
+	assert_eq(SettingsScript.key_of(&"jump", a.bindings), w)
+	assert_eq(SettingsScript.key_of(&"move_forward", a.bindings), space)
+	a.unbind(&"jump")
+	assert_eq(SettingsScript.key_of(&"jump", a.bindings), space)
+
+
+## apply_bindings rebuilds from the project's own events: an action back on its default gets
+## its default key again, not whatever the InputMap held last.
+func test_apply_bindings_rebuilds_from_the_defaults() -> void:
+	var a := SettingsScript.new()
+	a.bind(&"jump", KEY_J)
+	a.apply_bindings()
+	var has_j := false
+	for e in InputMap.action_get_events(&"jump"):
+		if e is InputEventKey and (e as InputEventKey).physical_keycode == KEY_J:
+			has_j = true
+	assert_true(has_j)
+	a.unbind(&"jump")
+	a.apply_bindings()
+	var keys: Array[int] = []
+	for e in InputMap.action_get_events(&"jump"):
+		if e is InputEventKey:
+			keys.append(int((e as InputEventKey).physical_keycode))
+	assert_false(KEY_J in keys, "J is gone")
+	assert_true(SettingsScript.key_of(&"jump", {}) in keys, "the default is back")
+
+
+func test_a_saved_binding_that_is_nonsense_is_dropped() -> void:
+	var path := OS.get_temp_dir().path_join("filly_settings_bad_%d.cfg" % randi())
+	var cfg := ConfigFile.new()
+	cfg.set_value(SettingsScript.SECTION, "bindings", {"jump": "banana", "interact": -4,
+		"pause": KEY_ESCAPE, "sneak": KEY_K, "not_an_action": KEY_L})
+	cfg.save(path)
+	var b := SettingsScript.new()
+	b.load_from(path)
+	assert_eq(b.bindings, {&"sneak": KEY_K})
 	DirAccess.remove_absolute(path)

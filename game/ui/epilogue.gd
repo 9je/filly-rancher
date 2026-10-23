@@ -26,6 +26,9 @@ var _title: Label
 var _letter: PanelContainer
 var _credits: VBoxContainer
 var _hint: Label
+## The one tween at a time: a quick reader's clicks cannot leave two fighting one property.
+var _tw: Tween
+var _prev_mouse := Input.MOUSE_MODE_VISIBLE
 
 
 func _ready() -> void:
@@ -35,7 +38,8 @@ func _ready() -> void:
 	_veil = ColorRect.new()
 	_veil.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_veil.color = _veil_color()
-	_veil.mouse_filter = Control.MOUSE_FILTER_STOP
+	# The veil takes no clicks of its own: every click reaches _input below.
+	_veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_veil)
 	_title = Label.new()
 	_title.set_anchors_preset(Control.PRESET_CENTER)
@@ -57,10 +61,23 @@ func _ready() -> void:
 	_build_letter()
 	_build_credits()
 	_fly()
-	var t := create_tween()
+	_prev_mouse = Input.mouse_mode
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	var t := _tween()
 	t.tween_property(_veil, "color:a", 0.18, 2.5)
 	t.parallel().tween_property(_title, "modulate:a", 1.0, 2.5)
 	t.tween_property(_hint, "modulate:a", 1.0, 1.0)
+
+
+func _tween() -> Tween:
+	if _tw != null:
+		_tw.kill()
+	_tw = create_tween()
+	return _tw
+
+
+func is_open() -> bool:
+	return _stage >= 0
 
 
 func _veil_color() -> Color:
@@ -101,7 +118,11 @@ func _process(delta: float) -> void:
 			_finish()
 
 
-func _unhandled_input(event: InputEvent) -> void:
+## _input, not _unhandled_input: the epilogue is over everything, so nothing under it (the
+## pause key, a pen's click) gets a press first.
+func _input(event: InputEvent) -> void:
+	if _stage < 0:
+		return
 	var pressed: bool = (event is InputEventKey and event.pressed and not event.echo) \
 		or (event is InputEventMouseButton and event.pressed) \
 		or (event is InputEventJoypadButton and event.pressed)
@@ -113,16 +134,18 @@ func _unhandled_input(event: InputEvent) -> void:
 
 ## Title, then the letter, then the credits, then done.
 func advance() -> void:
+	if _stage < 0:
+		return
 	_stage += 1
 	match _stage:
 		1:
-			var t := create_tween()
+			var t := _tween()
 			t.tween_property(_title, "modulate:a", 0.0, 0.6)
 			_letter.visible = true
 			_letter.modulate.a = 0.0
 			t.tween_property(_letter, "modulate:a", 1.0, 0.8)
 		2:
-			var t2 := create_tween()
+			var t2 := _tween()
 			t2.tween_property(_letter, "modulate:a", 0.0, 0.6)
 			t2.parallel().tween_property(_veil, "color:a", 0.55, 0.6)
 			_credits.visible = true
@@ -135,6 +158,9 @@ func _finish() -> void:
 	if _stage < 0:
 		return
 	_stage = -1
+	if _tw != null:
+		_tw.kill()
+	Input.mouse_mode = _prev_mouse
 	if _prev_cam != null and is_instance_valid(_prev_cam):
 		_prev_cam.make_current()
 	if _cam != null:

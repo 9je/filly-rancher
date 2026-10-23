@@ -129,6 +129,9 @@ func _guard(at: Vector2, cid: String) -> Npc:
 
 
 func _on_spotted() -> void:
+	# The corral guards walk all day, but their lanterns only count in the dark.
+	if not bool(is_night.call()):
+		return
 	var h := PathRulesScript.add_heat(story, "spotted")
 	_hold = 0.0
 	acted.emit("spotted", {"heat": h, "text": "A Collector's lantern found you. Heat %d." % h})
@@ -248,7 +251,7 @@ func act(id: String) -> Dictionary:
 				PathRulesScript.add_heat(story, "dye")
 				r.text = "%s comes out of the vat a different pony. The registry has lost her." % who
 			else:
-				r.text = "Bring a pony in your saddlebag to the vat."
+				r.text = "Bring a pony in your saddlebag to the vat. One the vat has not had yet."
 	acted.emit(id, r)
 	return r
 
@@ -259,11 +262,13 @@ func _raid(s: Dictionary) -> Dictionary:
 		return {"text": ""}
 	var corral: Node3D = s.node
 	var freed := 0
+	var left := 0
 	for p in corral.get_children():
-		if not p.has_meta(&"penned"):
+		if not p.has_meta(&"penned") or p.is_queued_for_deletion():
 			continue
 		if int(bag_room.call()) <= 0:
-			break
+			left += 1
+			continue
 		var inst := PonyInstance.create(&"stock_shy", int(Time.get_unix_time_from_system() * 1000.0))
 		inst.stock = p.get_stock() if p.has_method("get_stock") else {}
 		if bool(bag_store.call(inst)):
@@ -271,10 +276,14 @@ func _raid(s: Dictionary) -> Dictionary:
 			p.queue_free()
 	if freed == 0:
 		return {"text": "Your saddlebag is full. Empty it before the raid."}
-	raided.append(s.id)
-	story.set_var("raided", raided)
 	story.add_var("raids")
 	PathRulesScript.add_heat(story, "raid", freed)
+	if left > 0:
+		# A bag too small for the whole corral: the rest wait for the next trip.
+		return {"text": "%d Drifters into your saddlebag, %d still inside. Heat %d." % [freed, left,
+			PathRulesScript.heat(story)], "freed": freed}
+	raided.append(s.id)
+	story.set_var("raided", raided)
 	var guard: Node = s.get("guard")
 	if guard != null and is_instance_valid(guard):
 		guard.queue_free()

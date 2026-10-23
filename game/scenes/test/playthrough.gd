@@ -419,7 +419,20 @@ func _placement() -> void:
 		await _pen_bag()
 		act3.act("corral_" + region)
 	while Rules.heat(_story()) < Rules.HEAT_MAX:
-		act3.call("_on_spotted")
+		Rules.add_heat(_story(), "spotted")
 	_step("Heat at the top")
 	ranch.call("run_collection_day")
 	await _tick(10)
+	if reached != "placement":
+		return
+	# Never a softlock: the morning before comes back, and remembers the ending was seen.
+	if not bool(ranch.call("placement_aftermath")):
+		reached = "placement (no morning before kept)"
+		return
+	await _boot_ranch(false)
+	var st := _story()
+	if str(st.get_var("ending", "")) != "" or st.has_flag("placed") \
+			or not ("placement" in (st.get_var("endings_seen", []) as Array)):
+		reached = "placement (the morning before did not come back clean)"
+		return
+	_step("the morning before the collection day is back")

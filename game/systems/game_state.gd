@@ -64,6 +64,9 @@ const ROSTER_DIR := "res://data/ponies"
 ## one (the spec's pony trading wants a place to put a received blob), but the game itself
 ## only ever touches this one until there is UI to choose another.
 const DEFAULT_SLOT := 0
+## The morning before a Rescue path collection day, kept so the Placement ending can hand the
+## player back to it and is never a softlock (STORY.md section 6).
+const BEFORE_COLLECTION_SLOT := 5
 
 ## A new ranch. Zero bits is deliberate: Task 6's economy is supposed to be entered
 ## through selling the first gem, not through a starting float.

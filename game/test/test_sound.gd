@@ -424,8 +424,9 @@ func test_a_one_shot_started_under_pause_plays_out_on_a_pausable_voice() -> void
 	# wall-clock time to actually pass rather than a queued engine frame. Polled, with a
 	# hard cap, rather than one blind sleep: the first mix tick that lands wins the loop
 	# immediately, and a build where mixing genuinely stalled fails after POLL_CAP real
-	# tries instead of hanging.
-	var poll_cap := 20
+	# tries instead of hanging. Three seconds of tries, not half of one: a full-suite run on
+	# a loaded machine starved the mix thread past 500 ms once (it passed alone every time).
+	var poll_cap := 120
 	var advanced := false
 	for i in poll_cap:
 		OS.delay_msec(25)

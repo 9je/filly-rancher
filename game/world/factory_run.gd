@@ -413,12 +413,16 @@ func _lights_out() -> void:
 		window = WindowScript.new()
 		window.line_length = 6
 		floor.add_child(window)
+	# Tumble is beside you this time, not at the end of the line: her place in it stays empty.
+	var tumble_shape: Node3D = window.tumble_body() if window != null else null
+	if tumble_shape != null:
+		tumble_shape.visible = false
 	var hatch := interior.room_origin(&"gallery") + Vector3(InteriorScript.ROOM_SIZE * 0.5 - 1.2, 0, -6.0)
 	await _hold_at(hatch, 3.0, "beam the line out through the hatch")
 	var freed := 0
 	if window != null:
 		for p in floor.get_children():
-			if p is CharacterBody3D and p.visible:
+			if p is CharacterBody3D and p.visible and p != tumble_shape:
 				p.visible = false
 				freed += 1
 	if story != null and freed > 0:

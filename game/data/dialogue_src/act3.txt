@@ -27,7 +27,7 @@ start [static blank] Pylons first. Then the corrals, at night, past the lanterns
 === static_ready
 speaker: static
 priority: 115
-when: {"path": "rescue", "flags_all": ["static_met"], "min": {"pylons": 4}}
+when: {"path": "rescue", "flags_all": ["static_met"], "flags_none": ["climax_done"], "min": {"pylons": 4}}
 
 start [static happy] All four pylons. The rainbow's down to a smudge. They're scrambling up there.
   -> two

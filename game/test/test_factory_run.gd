@@ -83,4 +83,5 @@ func test_lights_out_frees_the_line_and_finds_clover_with_fennel() -> void:
 		assert_has(r[1], s, "Lights Out passes %s" % s)
 	if _gs != null:
 		assert_true(_gs.story.has_flag("clover_rescued"))
-		assert_gt(int(_gs.story.get_var("rescued", 0)), 0, "the freed line counts as rescued")
+		assert_eq(int(_gs.story.get_var("rescued", 0)), 6,
+			"the freed line counts as rescued: six, and never Tumble's empty place at its end")

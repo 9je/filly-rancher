@@ -52,6 +52,7 @@ func _ready() -> void:
 	var events := get_node_or_null("/root/Events")
 	if events != null:
 		events.connect("dread_changed", set_dread)
+	set_dread(dread)
 	if context != &"":
 		var pending := context
 		context = &""
@@ -91,6 +92,10 @@ func play_context(ctx: StringName) -> void:
 	var path: String = TRACKS.get(ctx, "")
 	if _tween != null:
 		_tween.kill()
+	# A fade cut short leaves the player it was fading out still going: stop it now, so a
+	# change of context never leaves a third track playing under the other two.
+	if next.playing:
+		next.stop()
 	_tween = create_tween().set_parallel(true)
 	if path != "" and ResourceLoader.exists(path):
 		var stream: AudioStream = load(path)
@@ -102,13 +107,23 @@ func play_context(ctx: StringName) -> void:
 		_tween.tween_property(next, "volume_db", _track_db(), FADE_SECONDS)
 	_tween.tween_property(_current, "volume_db", SILENT_DB, FADE_SECONDS)
 	_tween.chain().tween_callback(_current.stop)
+	# Dread may have moved during the fade: land on the level it asks for now.
+	_tween.tween_callback(_settle)
 	_current = next
+
+
+func _settle() -> void:
+	if _current != null and _current.playing:
+		_current.volume_db = _track_db()
 
 
 func set_dread(d: float) -> void:
 	dread = clampf(d, 0.0, 1.0)
 	if _current != null and _current.playing and (_tween == null or not _tween.is_running()):
 		_current.volume_db = _track_db()
+	if _drone == null:
+		# Before _ready: the level is kept and applied when the players exist.
+		return
 	if dread > 0.05 and not _drone.playing and ResourceLoader.exists(TRACKS[&"drone"]):
 		var s: AudioStream = load(TRACKS[&"drone"])
 		if s is AudioStreamOggVorbis:
@@ -129,4 +144,5 @@ func _track_db() -> float:
 
 func stop_all() -> void:
 	play_context(&"")
-	_drone.stop()
+	if _drone != null:
+		_drone.stop()

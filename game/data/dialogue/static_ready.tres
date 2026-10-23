@@ -12,6 +12,7 @@ bark = false
 when = {
 "path": "rescue",
 "flags_all": ["static_met"],
+"flags_none": ["climax_done"],
 "min": {
 "pylons": 4
 }

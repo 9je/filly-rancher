@@ -1641,8 +1641,11 @@ func _on_world_phase_changed(_phase: int) -> void:
 				and not _game_state.story.has_flag("color_day"):
 			_game_state.story.set_flag("color_day")
 			_toast("Color Day! Marigold is waiting at the Depot with the lift.")
-		_act3_dawn()
 	_on_world_changed()
+	# After _on_world_changed(), so a collection day that falls on this dawn reads the Heat
+	# the night left, before the dawn cools it (STORY.md: "stays there through a collection day").
+	if _phase == WorldStateScript.Phase.DAWN:
+		_act3_dawn()
 
 
 func _on_world_weather_changed(_weather: int) -> void:
@@ -2226,6 +2229,8 @@ func _no_menu_but(menu: CanvasLayer) -> bool:
 		if other.has_method("is_open") and other.is_open():
 			return false
 	if people != null and people.is_talking():
+		return false
+	if epilogue != null and is_instance_valid(epilogue):
 		return false
 	return true
 
@@ -7496,6 +7501,9 @@ const FACTORY_SCENE := "res://world/factory.tscn"
 func _ride_lift_to_factory(mode: StringName) -> void:
 	if _game_state == null:
 		return
+	if mode != &"reveal" and _game_state.story.has_flag("climax_done"):
+		# The Jubilee and the lever are once a save.
+		return
 	save_game()
 	FactoryRun.mode = mode
 	lift_requested.emit(mode)
@@ -7566,7 +7574,9 @@ func _apply_factory_gear() -> void:
 			pen.calm_lamp = lamp
 
 
-## The Express Chute: unmarked penned ponies go to the Depot at dawn, unseen.
+## The Express Chute: unmarked penned ponies go to the Depot at dawn, unseen, each with a
+## convenience bonus on top of her delivery.
+const EXPRESS_BONUS := 25
 func _express_chute() -> int:
 	var sent := 0
 	for slot in _plot_slots():
@@ -7580,13 +7590,20 @@ func _express_chute() -> int:
 				continue
 			sent += 1
 	if sent > 0:
-		_toast("The Express Chute took %d in the night. A bonus is on your statement." % sent)
+		if _economy != null:
+			_economy.grant(EXPRESS_BONUS * sent)
+		_toast("The Express Chute took %d in the night. +%d bits on your statement." % [sent, EXPRESS_BONUS * sent])
 	return sent
 
 
 ## A collection day on the Rescue path. Returns true if it ended the game (Placement).
 func _act3_collection_day(delivered: int) -> bool:
 	var story: Story = _game_state.story
+	if StoryV1Script.path(story) != StoryV1Script.PATH_RESCUE or str(story.get_var("ending", "")) != "":
+		return false
+	# The morning before, kept: Placement hands the player back to it (STORY.md section 6).
+	if _interactive or BootIntentScript.driven:
+		_game_state.save_to_slot(GameStateScript.BEFORE_COLLECTION_SLOT)
 	var r := PathRulesScript.rescue_collection_day(story, delivered)
 	if r.placed:
 		play_ending(EndingsScript.PLACEMENT)
@@ -7650,6 +7667,7 @@ func play_ending(ending: StringName) -> void:
 	if not _interactive:
 		ending_played.emit(ending)
 		return
+	_set_cursor_captured(false)
 	var music := get_node_or_null("/root/Music")
 	if music != null:
 		music.call("play_context", t.music)
@@ -7660,14 +7678,56 @@ func play_ending(ending: StringName) -> void:
 	ep.ending = ending
 	ep.player_name = _player_name()
 	ep.lines = _epilogue_lines(ending)
+	# The world holds still under it, as under any menu; the epilogue runs while paused.
+	get_tree().paused = true
+	epilogue = ep
 	add_child(ep)
 	ep.done.connect(func() -> void:
+		epilogue = null
+		get_tree().paused = false
 		if hud != null:
 			hud.visible = true
-		ending_played.emit(ending))
+		ending_played.emit(ending)
+		if ending == EndingsScript.PLACEMENT:
+			placement_aftermath()
+		else:
+			_set_cursor_captured(true))
 
 
 signal ending_played(ending: StringName)
+
+## The epilogue on screen, or null (it counts as a menu: see _no_menu_but()).
+var epilogue: CanvasLayer
+
+
+## After Placement: the morning before that collection day comes back (STORY.md section 6),
+## remembering the endings seen. Returns whether it did; with no such morning kept, the save
+## stays playable instead: the ending is lifted and Heat drops below the take line.
+func placement_aftermath() -> bool:
+	var seen: Array = _game_state.story.get_var("endings_seen", [])
+	var before := SaveIOScript.load(GameStateScript.BEFORE_COLLECTION_SLOT)
+	if not before.is_empty():
+		var sd: Dictionary = before.get(GameStateScript.KEY_STORY, {})
+		var vars: Dictionary = sd.get("vars", {})
+		var merged: Array = vars.get("endings_seen", [])
+		for e in seen:
+			if not (e in merged):
+				merged.append(e)
+		vars["endings_seen"] = merged
+		sd["vars"] = vars
+		before[GameStateScript.KEY_STORY] = sd
+		if SaveIOScript.save(GameStateScript.DEFAULT_SLOT, before):
+			print("PLACEMENT_RESTORED")
+			if not BootIntentScript.driven and is_inside_tree():
+				get_tree().paused = false
+				get_tree().reload_current_scene.call_deferred()
+			return true
+	var story: Story = _game_state.story
+	story.set_var("ending", "")
+	story.set_flag("placed", false)
+	story.set_var("heat", PathRulesScript.PADLOCK_AT)
+	save_game()
+	return false
 
 
 ## The last letter, with the names this save earned.
@@ -7763,13 +7823,18 @@ func _send_marked_down_line() -> int:
 	return sent
 
 
-## The Dye Vat: the pony at the top of the saddlebag gets a new coat and mane.
+## The Dye Vat: the first pony in the saddlebag the vat has not had yet gets a new coat
+## and mane. A pony goes in once (the registry loses her once): "" if nopony in the bag can.
 func _dye_one_in_bag() -> String:
 	var st := _bag()
 	if st == null or st.count() == 0:
 		return ""
-	var inst: PonyInstance = st.peek()
-	if inst.stock.is_empty():
+	var inst: PonyInstance = null
+	for candidate in st.contents():
+		if not candidate.stock.is_empty() and not bool(candidate.stock.get("dyed", false)):
+			inst = candidate
+			break
+	if inst == null:
 		return ""
 	var look := PonyLookScript.from_dict(inst.stock)
 	var fresh: PonyLook = PonyGeneratorScript.generate(hash(String(inst.uid)) + int(_game_state.story.get_var("dyed", 0)) * 977)

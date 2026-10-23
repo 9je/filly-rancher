@@ -942,6 +942,40 @@ func test_a_key_row_rebinds_its_action() -> void:
 	assert_eq(_menu.settings_rows().size(), _menu.settings_row_count())
 
 
+
+## A capture asked for and walked away from never rebinds the next key pressed.
+func test_a_key_capture_does_not_outlive_its_page() -> void:
+	_menu.open()
+	_menu.move_selection(PauseMenu.Row.SETTINGS)
+	_menu.confirm()
+	_menu.move_selection(PauseMenu.SettingRow.KEYS + SettingsScript.REBINDABLE.find(&"jump"))
+	assert_true(_menu.confirm())
+	assert_true(_menu.is_capturing())
+	_menu.back()
+	assert_false(_menu.is_capturing(), "back to main drops the capture")
+	_menu.close()
+	_menu.open()
+	assert_false(_menu.is_capturing(), "and a reopened menu has none")
+	var k := InputEventKey.new()
+	k.pressed = true
+	k.physical_keycode = KEY_J
+	assert_false(_menu.capture_key(k))
+	assert_false(_menu.settings.bindings.has(&"jump"))
+
+
+func test_backspace_in_a_capture_puts_the_default_back() -> void:
+	_menu.settings.bind(&"jump", KEY_J)
+	_menu.open()
+	_menu.move_selection(PauseMenu.Row.SETTINGS)
+	_menu.confirm()
+	_menu.move_selection(PauseMenu.SettingRow.KEYS + SettingsScript.REBINDABLE.find(&"jump"))
+	_menu.confirm()
+	var k := InputEventKey.new()
+	k.pressed = true
+	k.physical_keycode = KEY_BACKSPACE
+	assert_true(_menu.capture_key(k))
+	assert_false(_menu.settings.bindings.has(&"jump"))
+
 func test_the_picture_and_sound_rows_adjust() -> void:
 	_menu.open()
 	_menu.move_selection(PauseMenu.Row.SETTINGS)

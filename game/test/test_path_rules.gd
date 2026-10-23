@@ -149,3 +149,18 @@ func test_a_delivery_after_the_jubilee_order_is_filled_is_quiet() -> void:
 	var s := _story("factory")
 	s.set_flag("jubilee_ready")
 	assert_eq(Rules.factory_delivery(s, VIVID), {"bonus": 0, "rank_up": false, "jubilee_ready": false})
+
+
+## Post-game on the Factory path (STORY.md section 6): after the Jubilee, contracts keep coming.
+func test_contracts_keep_coming_after_the_jubilee() -> void:
+	var s := _story("factory")
+	s.set_var("rank", Rules.DIRECTOR)
+	s.set_flag("jubilee_ready")
+	Rules.post_contract(s)
+	assert_true(Rules.contract(s).is_empty(), "nothing between the order and the stage")
+	s.set_flag("climax_done")
+	Rules.post_contract(s)
+	assert_false(Rules.contract(s).is_empty())
+	assert_ne(str(Rules.contract(s).kind), "jubilee")
+	Rules.factory_delivery(s, VIVID)
+	assert_gt(int(Rules.contract(s).got) + int(s.get_var("contracts_done", 0)), 0)
