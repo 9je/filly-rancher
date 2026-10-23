@@ -11,3 +11,4 @@ cost = 750
 kind = 0
 gear_id = &"yield_lens"
 requires_path = "factory"
+verb = true

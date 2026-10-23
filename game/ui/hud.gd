@@ -73,6 +73,7 @@ extends CanvasLayer
 ## `window/stretch/mode="canvas_items"` against a 1920x1080 base viewport, so every size
 ## below is in those units on every screen.
 
+const PonyTraitsScript := preload("res://systems/pony_traits.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const MagicBeamScript := preload("res://actors/player/magic_beam.gd")
@@ -541,7 +542,15 @@ func _on_captured(instance: PonyInstance) -> void:
 	# display_name() falls back nickname -> character's name -> raw data_id, so this line
 	# always names somebody even for a pony whose record is missing on this machine.
 	var who := instance.display_name() if instance != null else "a pony"
-	toast("Caught %s!" % (who if not who.is_empty() else "a pony"))
+	# What she is like comes with her name (game/systems/pony_traits.gd): the catch is also
+	# the moment you learn which pen she wants and what to feed her.
+	if who.is_empty():
+		who = "a pony"
+	var traits := PonyTraitsScript.describe(instance) if instance != null else ""
+	if traits.is_empty():
+		toast("Caught %s!" % who)
+	else:
+		toast("Caught %s! %s." % [who, traits[0].to_upper() + traits.substr(1)])
 
 
 ## The bag was full, so she was set down instead of stored -- the one capture outcome
@@ -920,6 +929,9 @@ func set_tip(text: String) -> void:
 		_tip.offset_right = 300.0
 		_tip.offset_top = -150.0
 		_tip.offset_bottom = -100.0
+		# Hidden until there is something to say: the first call is often "", and the
+		# early return below would otherwise leave an empty pill on screen.
+		_tip.visible = false
 		add_child(_tip)
 	if _tip.text == text:
 		return
@@ -930,6 +942,41 @@ func set_tip(text: String) -> void:
 
 func tip_text() -> String:
 	return _tip.text if _tip != null else ""
+
+
+## THE MONOCLE'S CARD: who is under the crosshair, and what she is like ("Daisy Dapple --
+## Night Owl, loves carrots"). A small pill just under the reticle, gone when nothing is.
+var _target: Label
+
+
+func set_target_info(text: String) -> void:
+	if _target == null:
+		_target = Label.new()
+		_target.name = "TargetInfo"
+		_target.add_theme_stylebox_override("normal", card_box(18, 3))
+		_target.add_theme_color_override("font_color", INK)
+		_target.add_theme_font_size_override("font_size", 20)
+		_target.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_target.anchor_left = 0.5
+		_target.anchor_right = 0.5
+		_target.anchor_top = 0.5
+		_target.anchor_bottom = 0.5
+		_target.offset_left = -220.0
+		_target.offset_right = 220.0
+		_target.offset_top = 46.0
+		_target.offset_bottom = 82.0
+		_target.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_target.visible = false
+		add_child(_target)
+	if _target.text == text:
+		return
+	_target.text = text
+	_target.visible = not text.is_empty() and not _overlay_open
+	_fit_pill(_target)
+
+
+func target_info() -> String:
+	return _target.text if _target != null else ""
 
 
 func set_prompt(text: String) -> void:

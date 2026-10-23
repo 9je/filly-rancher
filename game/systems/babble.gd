@@ -78,10 +78,22 @@ func _syllable(c: String) -> Dictionary:
 		"f2": v.y * lerpf(1.0, pitch, 0.35), "dur": _rng.randf_range(0.06, 0.09), "rise": question}
 
 
+var _silence := PackedVector2Array()
+
+
 func _process(_delta: float) -> void:
 	if _gen == null:
 		return
 	var frames := _gen.get_frames_available()
+	if _queue.is_empty() and envelope <= 0.0:
+		# Nothing to say: the silence goes in as one buffer, not hundreds of push_frame()
+		# calls a frame (that loop was 2.9 ms of every idle frame, scenes/test/perf.gd).
+		if frames > 0:
+			if _silence.size() != frames:
+				_silence.resize(frames)
+				_silence.fill(Vector2.ZERO)
+			_gen.push_buffer(_silence)
+		return
 	while frames > 0:
 		if _queue.is_empty():
 			envelope = move_toward(envelope, 0.0, 0.05)

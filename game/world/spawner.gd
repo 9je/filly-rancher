@@ -902,6 +902,39 @@ func _spawn_one(data: PonyData, marker: ZoneMarker, slot: int,
 	return pony
 
 
+## A GUEST: one pony stood at `at` by something other than the herd's own draw (a rare
+## sighting, a sun shower), built exactly as _spawn_one builds a marker's pony and tracked
+## the same way, so the Scoop, the pens and the HUD treat her like any other wild pony.
+## She belongs to no marker, so refresh() never evicts her.
+func spawn_guest(data: PonyData, look: Dictionary, at: Vector3, roam: float = 7.0) -> CharacterBody3D:
+	if data == null:
+		return null
+	var pony: CharacterBody3D = PonyScene.instantiate()
+	_guest_count += 1
+	pony.name = "Guest%02d_%s" % [_guest_count, data.id]
+	pony.roam_radius = roam
+	var pony_rng := RandomNumberGenerator.new()
+	pony_rng.seed = spawn_seed + 100003 * _guest_count
+	pony.set_rng(pony_rng)
+	pony.collision_layer = LayersScript.PONY
+	pony.collision_mask = LayersScript.PONY_WALKABLE
+	var detection := pony.get_node_or_null("DetectionArea") as Area3D
+	if detection != null:
+		detection.collision_layer = LayersScript.INTERACTION
+		detection.collision_mask = LayersScript.PLAYER
+	pony.position = to_local(at)
+	add_child(pony)
+	if not look.is_empty():
+		pony.set_stock(look)
+	pony.setup(data)
+	_spawned.append(pony)
+	pony_spawned.emit(pony)
+	return pony
+
+
+var _guest_count := 0
+
+
 ## A random point inside `marker`'s disc, on the ground, clear of props and of the
 ## ponies already placed. Uniform over the disc's AREA -- sqrt() on the radius --
 ## because without it every draw crowds the centre and the herd spawns in a knot.

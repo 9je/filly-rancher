@@ -84,10 +84,12 @@ var vsync := true
 ## KEY BINDINGS: action -> physical keycode, for the actions a player may rebind. An action
 ## missing here keeps project.godot's key. Gamepad buttons are never touched.
 const REBINDABLE: Array[StringName] = [&"move_forward", &"move_back", &"move_left",
-	&"move_right", &"jump", &"sneak", &"interact", &"pause", &"toggle_hints"]
+	&"move_right", &"jump", &"sneak", &"gallop", &"interact", &"treat", &"whistle", &"pause",
+	&"toggle_hints"]
 const ACTION_NAMES := {&"move_forward": "Walk forward", &"move_back": "Walk back",
 	&"move_left": "Walk left", &"move_right": "Walk right", &"jump": "Jump",
-	&"sneak": "Sneak", &"interact": "Interact", &"pause": "Pause", &"toggle_hints": "Controls card"}
+	&"sneak": "Sneak", &"gallop": "Gallop", &"interact": "Interact", &"treat": "Toss a treat",
+	&"whistle": "Whistle", &"pause": "Pause", &"toggle_hints": "Controls card"}
 var bindings: Dictionary = {}
 var mouse_sensitivity := SENSITIVITY_DEFAULT
 var invert_look := false

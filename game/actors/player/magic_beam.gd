@@ -1406,6 +1406,9 @@ func _begin_hold(body: Node3D) -> void:
 		var data: PonyData = body.get_data()
 		var personality: int = data.personality if data != null \
 			else PonyDataScript.Personality.BOLD
+		# Her quirk and a treat's calm can make her easier to hold (Pony.hold_personality).
+		if body.has_method("hold_personality"):
+			personality = body.hold_personality()
 		# COUNTED BEFORE THIS HOLD, and counted on HER, which is what makes the wrench
 		# falloff a promise about one particular pony rather than about the session. The
 		# counter lives on the pony (Pony.beam_holds) so it dies with her and cannot leak

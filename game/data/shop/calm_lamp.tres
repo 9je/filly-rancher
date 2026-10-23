@@ -11,3 +11,4 @@ cost = 600
 kind = 0
 gear_id = &"calm_lamp"
 requires_path = "factory"
+verb = true

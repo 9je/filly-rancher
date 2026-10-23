@@ -139,6 +139,7 @@ const PlotSlotScript := preload("res://world/plot_slot.gd")
 const PlotRegistryScript := preload("res://systems/plot_registry.gd")
 const RegionRegistryScript := preload("res://systems/region_registry.gd")
 const RegionFenceScript := preload("res://world/region_fence.gd")
+const RegionDressingScript := preload("res://world/region_dressing.gd")
 const ShopItemScript := preload("res://systems/shop_item.gd")
 const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 const PenScript := preload("res://world/pen.gd")
@@ -762,9 +763,18 @@ func _ready() -> void:
 	# a map that does not exist yet.
 	terrain.regions = _regions_registry()
 	terrain.build()
+	var dressing := RegionDressingScript.new()
+	dressing.name = "Dressing"
+	dressing.height_at = Callable(terrain, "height_at")
 	for region: RegionData in _regions_registry().all():
 		if region.has_lake:
-			regions_root.add_child(terrain.build_water(region))
+			var water: MeshInstance3D = terrain.build_water(region)
+			regions_root.add_child(water)
+			dressing.water_y[region.id] = water.position.y
+	# THE REGIONS' SCENERY (world/region_dressing.gd): a wood, a moonflower meadow, a lake
+	# shore and an orchard, where the visual review found fenced discs of tinted grass.
+	regions_root.add_child(dressing)
+	dressing.dress(_regions_registry().all())
 
 	# THE FENCES, HERE AND NOT IN THE SCENE FILE. A ring of rails has to be seated on the
 	# ground post by post, and the ground does not exist until the two lines above have
@@ -904,7 +914,11 @@ func _ready() -> void:
 				push_error("ranch: --world-time=%s is not a number of seconds; ignored."
 					% seconds)
 
-	_interactive = DisplayServer.get_name() != "headless" and _screenshot_dir == ""
+	_interactive = (DisplayServer.get_name() != "headless" or BootIntentScript.bot) \
+		and _screenshot_dir == ""
+	if _interactive:
+		_start_play_clock()
+	_setup_tools.call_deferred()
 
 	_rig = player.get_camera_pivot().get_node("CameraRig")
 	_spring_arm = _rig.get_node("SpringArm3D")
@@ -1353,6 +1367,10 @@ func _live_plots() -> Dictionary:
 func _on_plot_built(_plot: PlotData, node: Node) -> void:
 	if _game_state != null:
 		_game_state.onboarding.note(&"build")
+		# Only what she builds herself: the paddock a new ranch starts with is not news.
+		if _interactive and _game_state.play_seconds > 5.0 and _plot != null:
+			_novelty("mechanic", "first_pen", "Built the first pen")
+			_novelty("upgrade", "plot_" + String(_plot.id), "Built a %s" % _plot.display_name)
 	var pen := node as Pen
 	if pen != null:
 		pen.ground_sampler = Callable(terrain, "height_at")
@@ -1476,6 +1494,8 @@ func rebind_economy() -> void:
 	if _shop != null:
 		_shop.path_provider = func() -> String:
 			return StoryV1Script.path(_game_state.story) if _game_state != null else ""
+		_shop.flag_provider = func(flag: String) -> bool:
+			return _game_state != null and _game_state.story.has_flag(flag)
 	if market_menu != null:
 		market_menu.set("shop", _shop)
 
@@ -1641,7 +1661,12 @@ func _on_world_phase_changed(_phase: int) -> void:
 				and not _game_state.story.has_flag("color_day"):
 			_game_state.story.set_flag("color_day")
 			_toast("Color Day! Marigold is waiting at the Depot with the lift.")
+	PonyTraitsScript.night = _phase == WorldStateScript.Phase.NIGHT
+	if _phase == WorldStateScript.Phase.NIGHT and _game_state != null:
+		_escape_artists()
 	_on_world_changed()
+	if _phase == WorldStateScript.Phase.DAWN and _game_state != null:
+		_depot_cart()
 	# After _on_world_changed(), so a collection day that falls on this dawn reads the Heat
 	# the night left, before the dawn cools it (STORY.md: "stays there through a collection day").
 	if _phase == WorldStateScript.Phase.DAWN:
@@ -1855,8 +1880,13 @@ func _bind_casino_menus() -> void:
 ## lifts it like every other punishment. That slice changes this one function and nothing
 ## else: every casino menu's can_open already asks it, enforce_casino_ban() shuts whatever
 ## was already open when the answer changed, and start_race() refuses on it too.
+## THE PALACE OPENS ON ITS GRAND OPENING (world/happenings.gd's flyer, about a quarter of an
+## hour in), so the Strip arrives as a beat of its own instead of standing open from the
+## first minute where nobody noticed it. Gates and tests (not interactive) always find it open.
 func casino_can_enter() -> bool:
-	return true
+	if not _interactive or _game_state == null:
+		return true
+	return _game_state.story.has_flag("palace_open")
 
 
 ## THE BAN CLOSES WHAT IS ALREADY OPEN. can_open only guards the DOOR: a ban that landed
@@ -2278,7 +2308,11 @@ func _maybe_open_creation() -> void:
 ## She has made her pony. Keep it, dress the model, and write it down straight away: the
 ## first thing that happens after this is a ranch, and a crash before the first autosave
 ## should not cost her the pony she just spent five minutes on.
+var _creation_done := false
+
+
 func _on_creation_confirmed(look: PlayerLook) -> void:
+	_creation_done = true
 	_set_cursor_captured(true)
 	if _game_state == null:
 		return
@@ -2337,6 +2371,7 @@ func _no_other_menu_open() -> bool:
 
 
 func _on_market_opened() -> void:
+	_novelty("area", "market", "Bramble's market stall")
 	# Swept BEFORE the shelves are drawn, so the Market sells what the pens made a second
 	# ago rather than what they had made by the last save.
 	collect_gems()
@@ -2400,6 +2435,7 @@ func _on_buy_requested(item: ShopItem) -> void:
 	if _shop == null or item == null:
 		return
 	if _shop.buy(item):
+		_novelty_purchase(item)
 		# Gear takes effect the moment it is bought, not on the next load. So does a
 		# permit: the gate she is standing at swings open while she is still standing at
 		# it, which is the only moment the purchase can be SEEN to have done anything.
@@ -3178,6 +3214,7 @@ func start_race(uid: StringName, stake: int) -> Dictionary:
 
 ## The wire. Pay the bet, give the racer back her pen body, and write what running did to her.
 func _on_race_finished(_order: Array, winner: int) -> void:
+	_novelty("mechanic", "first_race", "First race at the track")
 	var won: int = RaceCardScript.payout(_race_field, _race_lane, _race_stake, winner)
 	if _game_state != null and won > 0:
 		_game_state.casino.add_chips(won)
@@ -3296,6 +3333,7 @@ func _on_cash_out_requested(chips: int) -> void:
 
 
 func _on_spin_requested(stake: int) -> void:
+	_novelty("mechanic", "first_casino", "First game at the casino")
 	play_slots(stake)
 
 
@@ -3309,10 +3347,12 @@ func _on_spin_requested(stake: int) -> void:
 func _on_wheel_bet_requested(kind: int, guess: int, stake: int) -> void:
 	var bet_kind: int = WheelScript.Bet.COLOUR if kind == WheelMenuScript.Tab.COLOUR \
 		else WheelScript.Bet.NUMBER
+	_novelty("mechanic", "first_casino", "First game at the casino")
 	play_wheel(bet_kind, guess, stake)
 
 
 func _on_deal_requested(stake: int) -> void:
+	_novelty("mechanic", "first_casino", "First game at the casino")
 	play_blackjack(stake)
 
 
@@ -3537,6 +3577,8 @@ func _post_due_mail() -> int:
 		if not story.post(beat.id, params):
 			continue
 		posted += 1
+		_novelty("clue" if beat.evidence or String(beat.id) in CLUE_LETTERS else "story",
+			"letter_" + String(beat.id), "Letter: %s" % (beat.title if beat.title != "" else String(beat.id)))
 		if beat.id == &"weather_requisition":
 			# ARMED HERE, SERVED AT A LATER DAWN. The cycle is written down for the same
 			# reason Ledger.pending_punishment_cycle is: the letter has to land before the
@@ -3839,6 +3881,7 @@ func _on_pony_captured(instance: PonyInstance) -> void:
 		return
 	_game_state.onboarding.note(&"catch")
 	_game_state.story.add_var("catches")
+	_novelty_catch(instance)
 	# THE CROWD IS NOT COLLECTED. A stock pony has no Compendium entry and no request ever
 	# names one: she is supply, not a character. Marking her would put an id in the book
 	# that no page can ever show and no count can ever include.
@@ -4236,7 +4279,12 @@ func interaction_candidates() -> Array[Dictionary]:
 		out.append(InteractionScript.candidate(
 			InteractionScript.Kind.PALACE, _flat_gap_to(^"Buildings/Palace")))
 	if people != null:
-		out.append_array(people.candidates(at))
+		var talk: Array[Dictionary] = people.candidates(at)
+		var other := not out.is_empty()
+		for c in talk:
+			if bool(c.get("companion", false)) and other:
+				continue
+			out.append(c)
 	return out
 
 
@@ -4357,6 +4405,14 @@ func _update_interaction() -> void:
 	var action: Dictionary = current_interaction()
 	_paint_plots(action)
 	var hud := get_node_or_null(^"HUD")
+	# The Scoop Launcher (world/ranch_tools.gd) speaks only when the ranch has nothing to say.
+	if action.is_empty() and tools != null and _no_other_menu_open():
+		var launch := tools.offer(InputDeviceScript.hint(&"interact"))
+		if launch != "":
+			if hud != null and hud.has_method("set_prompt"):
+				hud.set_prompt(launch)
+			tools.work(Input.is_action_just_pressed(&"interact"))
+			return
 	# Act Three's places (world/act3_world.gd) speak only when the ranch has nothing to say.
 	if action.is_empty() and act3 != null and _no_other_menu_open():
 		var offer := act3.offer(InputDeviceScript.hint(&"interact"))
@@ -7161,6 +7217,7 @@ func _setup_people() -> void:
 		return out
 	add_child(people)
 	people.effect.connect(_on_people_effect)
+	people.talk_finished.connect(_on_talk_finished_novelty)
 	people.populate()
 
 
@@ -7236,6 +7293,8 @@ func _on_people_effect(kind: StringName, value: String) -> void:
 					_ride_lift_to_factory(&"jubilee")
 				"ride_lift_lights_out":
 					_ride_lift_to_factory(&"lights_out")
+				"gift_treat_pouch":
+					_gift(&"treat_pouch", "Fennel's old Treat Pouch", "hay", 6)
 
 
 # --- tone (v1) -------------------------------------------------------------------------
@@ -7318,6 +7377,7 @@ func _on_pony_bloomed(inst: PonyInstance) -> void:
 	if _game_state != null:
 		var story: Story = _game_state.story
 		story.add_var("blooms")
+		_novelty("mechanic", "first_bloom", "First Bloom: %s earns her cutie mark" % inst.display_name())
 		PathRulesScript.rescue_bloom(story, String(inst.uid))
 		var look := PonyLookScript.from_stock(inst.stock)
 		_game_state.book.note_bloom(String(inst.uid), inst.display_name(), look,
@@ -7350,6 +7410,7 @@ func _bloom_ceremony(inst: PonyInstance) -> void:
 ## coat colour rises from the crate into the rainbow, which brightens when it lands. A first
 ## player reads a reward animation; a second player reads her (STORY.md clue 1).
 func _after_delivery(inst: PonyInstance) -> void:
+	_novelty("mechanic", "first_delivery", "First delivery to the Depot")
 	var look := PonyLookScript.from_stock(inst.stock)
 	var story: Story = _game_state.story
 	var after_reveal: bool = StoryV1Script.revealed(story)
@@ -7395,6 +7456,7 @@ func _post_pending_postcards() -> void:
 	var pending: Array = story.get_var("postcards", [])
 	if pending.is_empty():
 		return
+	_novelty("clue", "first_postcard", "A postcard from a delivered pony, in hoofwriting that is not hers")
 	for pony_name in pending:
 		var n := story.add_var("postcard_count")
 		story.post(StringName("postcard#%d" % n), {"name": _player_name(), "pony": str(pony_name)})
@@ -7429,12 +7491,14 @@ func _v1_tick(delta: float) -> void:
 	if _game_state == null or people == null:
 		return
 	_arrival(delta)
+	_novelty_region()
 	_tip_t -= delta
 	if _tip_t > 0.0:
 		return
 	_tip_t = 0.4
 	_drive_dread()
 	_back_down()
+	_announce_stock()
 	_setup_act3()
 	_maybe_ending()
 	var hud := get_node_or_null(^"HUD")
@@ -7448,6 +7512,10 @@ func _v1_tick(delta: float) -> void:
 ## opens by itself the first time the player is in reach (STORY.md beat 1.1).
 func _arrival(_delta: float) -> void:
 	if _game_state.story.has_flag("has_scoop") or people.is_talking() or not _no_other_menu_open():
+		return
+	# Not while she is still making her pony: the creator opens a moment after the ranch,
+	# and Marigold used to start talking underneath it.
+	if _new_game and not _creation_done:
 		return
 	var m := people.npc(&"marigold")
 	if m == null:
@@ -7489,6 +7557,177 @@ func _onboarding_state() -> Dictionary:
 			news = true
 	st["npc_has_news"] = news and has_scoop
 	return st
+
+
+# --- the gear that changes how you play (world/ranch_tools.gd) ---------------------------
+
+const RanchToolsScript := preload("res://world/ranch_tools.gd")
+const HappeningsScript := preload("res://world/happenings.gd")
+var happenings: Happenings
+const PonyTraitsScript := preload("res://systems/pony_traits.gd")
+var tools: RanchTools
+
+
+func _setup_tools() -> void:
+	if tools != null:
+		return
+	tools = RanchToolsScript.new()
+	tools.name = "Tools"
+	tools.ranch = self
+	add_child(tools)
+	happenings = HappeningsScript.new()
+	happenings.name = "Happenings"
+	happenings.ranch = self
+	add_child(happenings)
+
+
+## Somebody hands her a tool (a conversation's event): unlocked, said, and remembered.
+func _gift(gear: StringName, label: String, food: String = "", n: int = 0) -> void:
+	if _game_state == null:
+		return
+	if not _game_state.unlocks.has(String(gear)):
+		_game_state.unlocks.append(String(gear))
+	if food != "" and n > 0:
+		_game_state.inventory.add(StringName(food), n)
+	_apply_unlocks()
+	var key := InputDeviceScript.hint(&"treat") if gear == &"treat_pouch" else ""
+	_toast("Got %s.%s" % [label, (" Press %s to toss a treat." % key) if key != "" else ""])
+	_novelty("tool", "item_" + String(gear), "Got %s" % label)
+
+
+## BRAMBLE'S NEW STOCK, said out loud: an item whose story flag just went up is news.
+func _announce_stock() -> void:
+	if _shop == null or market_menu == null:
+		return
+	var seen: Array = _game_state.story.get_var("stock_seen", [])
+	for it: ShopItem in (market_menu.get("_all_items") as Array):
+		if it.requires_flag.is_empty() or String(it.id) in seen or not _shop.listed(it):
+			continue
+		seen.append(String(it.id))
+		_game_state.story.set_var("stock_seen", seen)
+		_toast("Bramble has new stock in: %s." % it.display_name)
+		_novelty("npc", "stock_" + String(it.id), "Bramble's new stock: %s" % it.display_name)
+
+
+## At nightfall an Escape Artist in a Paddock hops the fence (a Big or Grand Pen holds her).
+func _escape_artists() -> void:
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen == null:
+			continue
+		var plot_id := StringName(slot.saved_plot_id())
+		for inst in pen.ponies():
+			if inst.is_marked() or not PonyTraitsScript.escapes_from(PonyTraitsScript.quirk_of(inst), plot_id, true):
+				continue
+			var body := pen.release_body(inst.uid, self)
+			if body == null:
+				continue
+			_game_state.remove_pony(inst.uid)
+			body.set_meta(&"escaped", true)
+			var out := Vector3(slot.global_position.x + 6.5, 0.0, slot.global_position.z)
+			out.y = float(terrain.call("height_at", out.x, out.z)) + 0.2 if terrain != null else 0.2
+			body.global_position = out
+			body.set("_home", out)
+			_toast("%s hopped the Paddock fence! An Escape Artist needs a Big Pen." % inst.display_name())
+			_novelty("event", "first_escape", "An Escape Artist hopped the Paddock fence")
+			return
+
+
+## THE DEPOT CART, at dawn: a full pen's unmarked ponies go down to the Depot.
+func _depot_cart() -> int:
+	if not _owns(&"depot_cart"):
+		return 0
+	var sent := 0
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen == null or not pen.is_full():
+			continue
+		for inst in pen.ponies():
+			if inst.is_marked():
+				continue
+			if bool(deliver_pony(inst.uid).get("ok", false)):
+				sent += 1
+	if sent > 0:
+		_toast("The Depot cart called at dawn and took %d. Marigold sends her thanks." % sent)
+		_novelty("mechanic", "first_cart", "The Depot cart took ponies at dawn")
+	return sent
+
+
+# --- the novelty log (MISSION.md fun rules; systems/novelty.gd) ---------------------------
+
+## Conversations that are a "something is wrong here" clue (the rest are story beats).
+const CLUE_TALKS: Array[String] = ["fennel_postcards", "pip_cloud_line", "bramble_dye",
+	"tumble_depot", "marigold_vivid", "tumble_rainbow_stripe"]
+## Letters that are clues.
+const CLUE_LETTERS: Array[String] = ["weather_yield", "weather_colour_receipt",
+	"weather_quota_notice", "weather_wellbeing", "weather_requisition"]
+
+
+## The play clock (GameState.play_seconds): runs through menus and talk, which is play time
+## too, so it lives on its own always-processing node rather than in _physics_process.
+func _start_play_clock() -> void:
+	var clock := PlayClock.new()
+	clock.name = "PlayClock"
+	clock.ranch = self
+	add_child(clock)
+
+
+class PlayClock extends Node:
+	var ranch: Node
+
+	func _ready() -> void:
+		process_mode = Node.PROCESS_MODE_ALWAYS
+
+	func _process(delta: float) -> void:
+		var gs: Node = ranch.get("_game_state")
+		if gs != null:
+			gs.set("play_seconds", float(gs.get("play_seconds")) + delta)
+
+
+func _novelty(kind: String, id: String, label: String) -> bool:
+	return _game_state != null and _game_state.note_novelty(kind, id, label)
+
+
+func _novelty_catch(inst: PonyInstance) -> void:
+	_novelty("mechanic", "first_catch", "First catch with the Scoop")
+	if inst.is_stock():
+		var race := str(inst.stock.get("race", ""))
+		if race != "":
+			_novelty("pony", "race_" + race, "First %s Drifter" % race)
+		return
+	var data: PonyData = inst.data()
+	if data != null:
+		_novelty("pony", "named_" + String(data.id), "Caught %s" % data.display_name)
+
+
+func _novelty_purchase(item: ShopItem) -> void:
+	match item.kind:
+		ShopItemScript.Kind.PERMIT:
+			_novelty("area", "permit_" + String(item.id), "Opened %s" % item.display_name)
+		ShopItemScript.Kind.CARE:
+			_novelty("mechanic", "first_food", "Bought feed at the market")
+		_:
+			_novelty("tool" if item.get("verb") != null and bool(item.get("verb")) else "upgrade",
+				"item_" + String(item.id), "Bought %s" % item.display_name)
+
+
+## The first time she stands in each region.
+func _novelty_region() -> void:
+	if player == null:
+		return
+	var here: RegionData = _regions_registry().region_at(
+		Vector2(player.global_position.x, player.global_position.z))
+	if here != null:
+		_novelty("area", "region_" + String(here.id), "First visit: %s" % here.display_name)
+
+
+## Every finished conversation that is not a bark.
+func _on_talk_finished_novelty(speaker: StringName, id: StringName) -> void:
+	var sid := String(id)
+	if "bark" in sid:
+		return
+	_novelty("clue" if sid in CLUE_TALKS else "story", "talk_" + sid,
+		"%s: %s" % [String(speaker).capitalize(), sid.replace("_", " ")])
 
 
 # --- to the Rainbow Factory (v1) -------------------------------------------------------

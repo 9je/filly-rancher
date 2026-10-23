@@ -33,6 +33,13 @@ void vertex() {
 	float fade = 1.0 - smoothstep(fade_start, fade_end, dist);
 	clip.xy += dir * width_px * fade * 2.0 / VIEWPORT_SIZE * clip.w;
 	POSITION = clip;
+	// A line casts no shadow: in a shadow pass EVERY vertex of the hull collapses to one
+	// point, so each triangle is degenerate and the rasterizer drops it. Only a test that is
+	// the same for the whole draw may do this; a per-vertex one (the fade) would collapse
+	// some corners of a triangle and not others and smear it across the screen.
+	if (IN_SHADOW_PASS) {
+		POSITION = vec4(0.0, 0.0, 2.0, 1.0);
+	}
 }
 
 void fragment() {

@@ -53,6 +53,7 @@ const LedgerScript := preload("res://systems/ledger.gd")
 const PlayerLookScript := preload("res://systems/player_look.gd")
 const CasinoScript := preload("res://systems/casino.gd")
 const StoryScript := preload("res://systems/story.gd")
+const NoveltyScript := preload("res://systems/novelty.gd")
 const PonyBookScript := preload("res://systems/pony_book.gd")
 const OnboardingScript := preload("res://systems/onboarding.gd")
 
@@ -97,6 +98,8 @@ const KEY_STORY := "story"
 const KEY_BOOK := "book"
 const KEY_ONBOARDING := "onboarding"
 const KEY_TALK := "talk"
+const KEY_PLAY_SECONDS := "play_seconds"
+const KEY_NOVELTY := "novelty"
 
 ## Emitted after from_dict() or load_from_slot() has replaced the world. A HUD or a pen
 ## that cached anything out of here has to rebuild on this.
@@ -105,6 +108,9 @@ signal state_loaded()
 ## Emitted after a successful write, with the slot written. A "Ranch saved" toast hangs
 ## off this.
 signal state_saved(slot: int)
+
+## Emitted once per new thing the player gets (systems/novelty.gd), with its entry.
+signal novelty_noted(entry: Dictionary)
 
 ## The individuals the player owns. Order is preserved across a save so a future inventory
 ## screen is not reshuffled by reloading.
@@ -186,6 +192,12 @@ var story: Story = StoryScript.new()
 ## (game/systems/talk_library.gd's `seen`). Replaced, not mutated, like the rest.
 var book: PonyBook = PonyBookScript.new()
 var onboarding: Onboarding = OnboardingScript.new()
+## Seconds of play: advanced by the ranch only while somebody is playing and nothing is
+## paused, so it is the clock the pacing rules (MISSION.md) are written in.
+var play_seconds := 0.0
+## Every first-time unlock, discovery and story beat, stamped with play_seconds.
+var novelty: Novelty = NoveltyScript.new()
+
 var talk: Dictionary = {}
 
 ## Pending requests, as plain Dictionaries whose shape this file does not know or check;
@@ -327,6 +339,8 @@ func to_dict() -> Dictionary:
 		KEY_BOOK: book.to_dict(),
 		KEY_ONBOARDING: onboarding.to_dict(),
 		KEY_TALK: talk.duplicate(true),
+		KEY_PLAY_SECONDS: play_seconds,
+		KEY_NOVELTY: novelty.to_array(),
 	}
 
 
@@ -406,6 +420,8 @@ func from_dict(data: Dictionary) -> void:
 		onboarding.from_dict(saved_ob)
 	var saved_talk: Variant = data.get(KEY_TALK, {})
 	talk = (saved_talk as Dictionary).duplicate(true) if saved_talk is Dictionary else {}
+	play_seconds = maxf(0.0, float(data.get(KEY_PLAY_SECONDS, 0.0)))
+	novelty = NoveltyScript.from_array(data.get(KEY_NOVELTY, []))
 
 	state_loaded.emit()
 
@@ -429,6 +445,8 @@ func reset() -> void:
 	book = PonyBookScript.new()
 	onboarding = OnboardingScript.new()
 	talk = {}
+	play_seconds = 0.0
+	novelty = NoveltyScript.new()
 
 
 # --- disk ---------------------------------------------------------------------------------
@@ -471,3 +489,14 @@ func save_on_quit() -> bool:
 		return false
 	_quit_saved = true
 	return save_to_slot(DEFAULT_SLOT)
+
+
+## Something new for the player (see systems/novelty.gd for the kinds). Once per `id`;
+## returns whether this was the first time. Printed, so a bot run's log reads as a timeline.
+func note_novelty(kind: String, id: String, label: String) -> bool:
+	if not novelty.note(play_seconds, kind, id, label):
+		return false
+	var entry: Dictionary = novelty.entries[novelty.entries.size() - 1]
+	print("NOVELTY %s %s %s %s" % [Novelty.clock(play_seconds), kind, id, label])
+	novelty_noted.emit(entry)
+	return true

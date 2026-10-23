@@ -51,10 +51,11 @@ two [fennel neutral] You've got a Drifter in that satchel and nowhere to put her
   flag: met_fennel
   event: tutor_pen
   -> three
-three [fennel happy] Then feed her what she likes. Every pony has a favorite. Watch her ears when you toss it. Ears don't lie.
+three [fennel happy] Then feed her what she likes. Every pony has her own favorite, no two alike. Here. My old treat pouch. Toss one where she can see it and watch her ears.
+  event: gift_treat_pouch
   * How do I tell what she likes? -> likes
   * Anything else? -> else
-likes [fennel neutral] Try things. Hay's safe. Apples if she's an orchard sort. You'll see her perk up.
+likes [fennel neutral] Try things. One who loves what you tossed comes trotting, and she'll sit quiet as a lamb in that Scoop of yours. Hay's safe. Daisies for the fussy ones.
   -> else
 else [fennel happy] A pony who's fed and settled makes gems. A pony who's happy long enough... well. You'll see that too.
 

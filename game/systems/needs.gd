@@ -57,6 +57,7 @@ extends RefCounted
 
 const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const FoodRegistryScript := preload("res://systems/food_registry.gd")
+const PonyTraitsScript := preload("res://systems/pony_traits.gd")
 
 ## Directory the shared food registry lazily loads from when nobody has injected one --
 ## same path convention as PonyInstance's ROSTER_DIR.
@@ -116,6 +117,9 @@ static func resolve_food(food_id: StringName) -> FoodData:
 static func is_favorite(inst: PonyInstance, food_id: StringName) -> bool:
 	if inst == null:
 		return false
+	# A Drifter's favorite is her own (game/systems/pony_traits.gd), not her stock record's.
+	if inst.is_stock():
+		return food_id == PonyTraitsScript.favorite_of(inst)
 	var record := inst.data()
 	if record == null:
 		return false

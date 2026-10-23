@@ -41,3 +41,35 @@ One line of reasoning per call. Newest at the bottom.
 - 2026-10-23 -- The Express Chute pays 25 bits per pony on top of the delivery: "convenience" on the statement, and still cheaper than walking them over.
 - 2026-10-23 -- The review's two "driver bypasses rules" and "rank gating" findings are not defects: the driver proves reachability, and the rules it skips are pinned by unit tests. Recorded in REVIEW.md.
 - 2026-10-23 -- Deferred past v1, recorded in PLAN.md: an Ultra preset and per-effect graphics overrides, controller rebinding, accessibility options, save thumbnails, the 60-pony perf gate, and a Proton smoke run of the Windows build.
+- 2026-10-23 -- **The pacing test plays like a person rather than shortcutting** (`scenes/test/human_bot.gd`, `tools/pacing.sh`).
+  - It runs headless at a fixed 60 fps, so the play clock is simulated real time.
+  - It walks a navmesh baked from the world's colliders, turns the camera toward where it is going, sneaks, aims and holds the Scoop, and presses E at the prompts.
+  - It reads at about 22 characters a second and shops from a wishlist.
+  - The same bot drives FIRST_10_MINUTES.mp4, so the video and the measurement are one thing.
+- 2026-10-23 -- **The gap limits:** a gap in the first hour may not exceed 8 min (the top of the brief's "5 to 8"), a later gap may not exceed 15, and the first clue must come by 15:00. The end of the run counts as a gap, so a run that stops producing novelty fails.
+- 2026-10-23 -- Barks (repeatable one-liners) are not novelty. Every non-bark conversation is a story beat; the Act Two wrongness conversations and letters marked `evidence` are clues. Pens the save starts with are not news; pens the player builds are.
+- 2026-10-23 -- Three bugs found by the bot, each one a human would hit:
+  - Fennel and Clover stood inside plot Slot1, so the first pen built there fenced them in.
+  - Bramble stood inside the Market's footprint and was lifted onto it.
+  - Pip and Tumble answered every E meant for the mailbox. Tumble follows you, and talk outranked buildings. A following companion with nothing new to say now steps aside for a building prompt.
+- 2026-10-23 -- **Traits are derived from the look seed, not stored** (`systems/pony_traits.gd`), so old saves have them too.
+  - Each Drifter gets a favorite food from five, weighted, and one of nine quirks: Glutton, Night Owl, Social Butterfly, Loner, Sparkler, Skittish, Escape Artist, Sleepyhead, Show-off.
+  - Race does something: pegasi flee 1.35x faster, unicorns blink 4.5 m away when startled, earth ponies Bloom 1.2x faster.
+  - Canon ponies have the quirk that is them: Pinkie is Social, Fluttershy Skittish, Rainbow Dash a Show-off, Twilight a Night Owl.
+- 2026-10-23 -- **Verb-changing gear** (`world/ranch_tools.gd`):
+  - Treat Pouch: Fennel's gift in the pen tutorial.
+  - Gallop Shoes.
+  - Steward's Monocle: a target card under the crosshair.
+  - Scoop Launcher.
+  - Pony Whistle.
+  - Gem Chute.
+  - Depot Cart: at dawn it collects full pens' unmarked ponies, so the player can automate the very thing the story indicts.
+  - The Factory path's Lure Post and Yield Lens are now real: the Lure Post draws wild ponies in, and the Yield Lens adds a vividness grade to the target card.
+  - New stock appears on Bramble's shelf as story flags rise (`ShopItem.requires_flag`), and each restock is announced.
+  - Count: 10 of 14 upgrades are verb-changing (`ShopItem.verb`, pinned by test_shop).
+- 2026-10-23 -- **Happenings** (`world/happenings.gd`): each fires once per save, on the play clock and the story.
+  - A sun shower brings pegasi down (9 min).
+  - Tumble spots an uncaught canon pony (13 min, then every 9).
+  - The Palace's grand opening (17 min). The casino was always open before, so nobody ever noticed it arrive. It now opens on a flyer; gates and tests still find it open.
+  - Race day (30 min).
+  - Pip's lost foal (35 min).

@@ -105,6 +105,7 @@ extends CharacterBody3D
 ## game/scripts/pony_rig.gd: the global class cache lives in the gitignored game/.godot/
 ## and a fresh clone has not built it yet.
 
+const PonyTraitsScript := preload("res://systems/pony_traits.gd")
 const GaitScript := preload("res://systems/gait.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const PonyVisualsScript := preload("res://actors/pony/pony_visuals.gd")
@@ -433,6 +434,27 @@ var _player: Node3D
 ## untrue later.
 var _noticed := false
 
+# --- detail tiers (performance) -----------------------------------------------------
+## How much of her runs, from how far the camera is. FULL near the camera (everything,
+## every tick); MID past DETAIL_MID_AT (moves on every second tick, no mane or tail spring,
+## the small parts cast no shadow); FAR past DETAIL_FAR_AT or off screen past
+## DETAIL_OFFSCREEN_AT (every fourth tick, no shadow). Past FULL her animation is advanced
+## by hand on the ticks she runs. A held
+## pony is always FULL. Headless runs never leave FULL, so no test or gate sees a tier.
+enum Detail { FULL, MID, FAR }
+const DETAIL_MID_AT := 26.0
+const DETAIL_FAR_AT := 52.0
+const DETAIL_OFFSCREEN_AT := 12.0
+const DETAIL_CHECK_SECONDS := 0.3
+## Meshes too small to see a shadow from (by name): never cast one.
+const NO_SHADOW_PARTS: Array[String] = ["tongue", "eyebrow", "hooves", "teeth"]
+var detail: int = Detail.FULL
+var _detail_timer := 0.0
+var _tick_count := 0
+var _tick_accum := 0.0
+var _stood_still := false
+static var _headless := -1
+
 
 func _ready() -> void:
 	_visual_yaw = visuals.rotation.y
@@ -474,6 +496,7 @@ func set_stock(triple: Dictionary) -> void:
 	_stock = triple.duplicate()
 	if is_node_ready():
 		_apply_stock_tint()
+		_apply_traits()
 
 
 func get_stock() -> Dictionary:
@@ -774,10 +797,32 @@ func _physics_process(delta: float) -> void:
 	if state == State.HELD:
 		# Everything below -- gravity, steering, move_and_slide -- is exactly what the
 		# beam must not have fighting it, so HELD returns before any of it.
+		if detail != Detail.FULL:
+			_set_detail(Detail.FULL)
 		_state_held(delta)
 		return
 
+	# DETAIL TIERS (see _update_detail): a pony far from the camera thinks, moves and
+	# animates on every second or fourth tick, carrying the skipped time with her.
+	_detail_timer -= delta
+	if _detail_timer <= 0.0:
+		_detail_timer = DETAIL_CHECK_SECONDS + _rng.randf() * 0.1
+		_update_detail()
+	var stride := 1
+	if detail != Detail.FULL:
+		stride = 2 if detail == Detail.MID else 4
+		_tick_accum += delta
+		_tick_count += 1
+		if _tick_count < stride:
+			return
+		_tick_count = 0
+		delta = _tick_accum
+		_tick_accum = 0.0
+		if _anim != null:
+			_anim.advance(delta)
+
 	_state_timer -= delta
+	calm = maxf(0.0, calm - delta)
 	_react_to_player()
 
 	var desired := Vector3.ZERO
@@ -812,10 +857,94 @@ func _physics_process(delta: float) -> void:
 	velocity.x = horizontal.x
 	velocity.z = horizontal.z
 
-	move_and_slide()
+	# STANDING STILL ON THE GROUND COSTS NOTHING. move_and_slide is most of a pony's tick
+	# (about 47 of 67 us measured, game/scenes/test/perf.gd), and a grazing herd is mostly
+	# standing: with no wish to move, no speed and a floor already under her, there is
+	# nothing for it to resolve.
+	var resting := desired == Vector3.ZERO and velocity.length_squared() < 0.0001 \
+		and is_on_floor() and _stood_still
+	if not resting:
+		if stride > 1:
+			# move_and_slide steps by the physics tick, not by `delta`: scale her velocity
+			# for the ticks she skipped, then hand back the velocity she would have had.
+			velocity *= float(stride)
+			move_and_slide()
+			velocity /= float(stride)
+		else:
+			move_and_slide()
+	_stood_still = desired == Vector3.ZERO and velocity.length_squared() < 0.0001 and is_on_floor()
 
 	_update_facing(_facing_direction(desired), delta)
 	_update_animation(get_ground_speed())
+
+
+func _update_detail() -> void:
+	if _headless < 0:
+		_headless = 1 if DisplayServer.get_name() == "headless" else 0
+	var want: int = Detail.FULL
+	var cam := get_viewport().get_camera_3d() if _headless == 0 and is_inside_tree() else null
+	if cam != null:
+		var d := cam.global_position.distance_to(global_position)
+		if d > DETAIL_FAR_AT or (d > DETAIL_OFFSCREEN_AT and not cam.is_position_in_frustum(global_position)):
+			want = Detail.FAR
+		elif d > DETAIL_MID_AT:
+			want = Detail.MID
+	if want != detail:
+		_set_detail(want)
+
+
+func _set_detail(want: int) -> void:
+	detail = want
+	_tick_count = 0
+	_tick_accum = 0.0
+	if visuals == null:
+		return
+	for m in visuals.find_children("*", "SpringBoneSimulator3D", true, false):
+		(m as SkeletonModifier3D).active = detail == Detail.FULL
+	for m in visuals.find_children("*", "MeshInstance3D", true, false):
+		var mi := m as MeshInstance3D
+		var small := false
+		for part in NO_SHADOW_PARTS:
+			if part in String(mi.name).to_lower():
+				small = true
+		var cast := detail == Detail.FULL or (detail == Detail.MID and not small)
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if cast \
+			else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_outline(detail != Detail.FAR)
+	if _anim != null:
+		# Past FULL her skeleton moves only on the ticks she thinks on (30 or 15 a second):
+		# every pose costs a skin update on each of her meshes.
+		_anim.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL \
+			if detail != Detail.FULL else AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_IDLE
+
+
+## FAR: the toon outline (a second pass per surface, invisible at that size) comes off, by
+## swapping each surface to a cached copy of its material without the pass.
+static var _no_outline: Dictionary = {}
+
+
+func _outline(on: bool) -> void:
+	for m in visuals.find_children("*", "MeshInstance3D", true, false):
+		var mi := m as MeshInstance3D
+		if mi.mesh == null:
+			continue
+		for i in mi.mesh.get_surface_count():
+			var key := StringName("lod_mat_%d" % i)
+			if on:
+				if mi.has_meta(key):
+					mi.set_surface_override_material(i, mi.get_meta(key))
+					mi.remove_meta(key)
+				continue
+			var mat := mi.get_surface_override_material(i) as ShaderMaterial
+			if mat == null or mat.next_pass == null or mi.has_meta(key):
+				continue
+			var bare: ShaderMaterial = _no_outline.get(mat.get_instance_id())
+			if bare == null:
+				bare = mat.duplicate() as ShaderMaterial
+				bare.next_pass = null
+				_no_outline[mat.get_instance_id()] = bare
+			mi.set_meta(key, mat)
+			mi.set_surface_override_material(i, bare)
 
 
 # --- states -----------------------------------------------------------------------
@@ -988,6 +1117,8 @@ func _react_to_player() -> void:
 
 
 func _transition_to(next: int) -> void:
+	if next == State.FLEE and state != State.FLEE:
+		_maybe_blink()
 	state = next
 	match state:
 		State.IDLE:
@@ -1001,6 +1132,32 @@ func _transition_to(next: int) -> void:
 		_:
 			# FLEE, APPROACH, HELD and LEAVING all end on a condition, not on a clock.
 			_state_timer = 0.0
+
+
+## A startled unicorn blinks a few metres away (once in a while, never into a wall): she
+## is suddenly not where the Scoop was pointing.
+func _maybe_blink() -> void:
+	if not PonyTraitsScript.blinks(race) or _player == null or not is_inside_tree():
+		return
+	var now := Time.get_ticks_msec() / 1000.0
+	if now - _blinked_at < 15.0:
+		return
+	var away := global_position - _player.global_position
+	away.y = 0.0
+	if away.length_squared() < 0.01:
+		return
+	var hop := away.normalized() * 4.5
+	if test_move(global_transform, hop):
+		return
+	_blinked_at = now
+	global_position += hop + Vector3(0, 0.3, 0)
+	if visuals != null:
+		visuals.scale = Vector3.ONE * 0.2
+		create_tween().tween_property(visuals, "scale", Vector3.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	blinked.emit()
+
+
+signal blinked
 
 
 ## WANDER or GRAZE. The first routine choice a freshly spawned pony makes is always
@@ -1144,7 +1301,9 @@ func _sees_player() -> bool:
 	if _player == null or not is_instance_valid(_player):
 		_player = null
 		return false
-	var radius := notice_radius_for(_personality(), _player_is_sneaking())
+	if calm > 0.0:
+		return false
+	var radius := notice_radius_for(_personality(), _player_is_sneaking()) * PonyTraitsScript.notice_mult(quirk)
 	var seen := global_position.distance_to(_player.global_position) <= radius
 	# ANNOUNCED FROM INSIDE THE PREDICATE, not from _react_to_player(). Every route that
 	# asks whether she can see him already comes through here (the class comment on this
@@ -1272,6 +1431,50 @@ func _apply_data() -> void:
 		return
 	_play(&"idle")
 	_apply_stock_tint()
+	_apply_traits()
+
+
+# --- traits (game/systems/pony_traits.gd) ---------------------------------------------
+
+var quirk: StringName = &""
+var race: StringName = &"earth"
+## Seconds left of the calm a treat gives (she ignores you and holds easy in the Scoop).
+var calm := 0.0
+var _blinked_at := -100.0
+
+
+## What her quirk and race do to her out in the grass: a skittish pony spots you from
+## further off, a pegasus flutters away faster than a pony can run.
+func _apply_traits() -> void:
+	quirk = PonyTraitsScript.quirk_for(_stock, _data.id if _data != null else &"")
+	race = StringName(str(_stock.get("race", "earth"))) if not _stock.is_empty() else &"earth"
+	if _data != null:
+		_flee_speed = flee_speed_for(_data.base_speed) * PonyTraitsScript.flee_mult(race)
+	if detection_area != null:
+		var shape: CollisionShape3D = detection_area.get_node_or_null("CollisionShape3D")
+		if shape != null and shape.shape is SphereShape3D:
+			(shape.shape as SphereShape3D).radius = DETECTION_AREA_RADIUS * PonyTraitsScript.notice_mult(quirk)
+
+
+## The personality the Scoop's struggle is rolled for: a skittish or a treat-calmed pony
+## gives up like a shy one.
+func hold_personality() -> int:
+	if calm > 0.0 or PonyTraitsScript.easy_hold(quirk):
+		return PonyDataScript.Personality.SHY
+	return _personality()
+
+
+## A treat landed by her: if it is her favorite she trots over and is calm for a while.
+func offer_treat(at: Vector3, food: StringName) -> bool:
+	if state == State.HELD or state == State.LEAVING:
+		return false
+	var fav := PonyTraitsScript.favorite_for(_stock, _data)
+	if food != fav and _rng.randf() > 0.35:
+		return false
+	calm = 10.0 if food == fav else 6.0
+	_wander_target = at
+	_transition_to(State.WANDER)
+	return true
 
 
 func _personality() -> int:

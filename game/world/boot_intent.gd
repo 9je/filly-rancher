@@ -41,3 +41,7 @@ static func consume_new_game() -> bool:
 
 static func clear() -> void:
 	_new_game = false
+## A human-paced bot plays this process (scenes/test/human_bot.gd): the ranch runs as it does
+## for a person (interactive: the clock, the herd, prompts, autosave to the bot's own save
+## dir) even headless.
+static var bot := false

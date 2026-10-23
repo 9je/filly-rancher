@@ -388,6 +388,10 @@ func _sound_call(method: StringName, args: Array) -> void:
 		node.callv(method, args)
 
 
+## The Gallop Shoes' burst (world/ranch_tools.gd sets it, and sets it back).
+var speed_mult := 1.0
+
+
 func _physics_process(delta: float) -> void:
 	var on_floor := is_on_floor()
 
@@ -421,7 +425,7 @@ func _physics_process(delta: float) -> void:
 
 	# Analog magnitude scales the target speed, so a gamepad gets the whole range
 	# between a standstill and the top speed rather than an on/off dash.
-	var top_speed := SNEAK_SPEED if is_sneaking() else RUN_SPEED
+	var top_speed := (SNEAK_SPEED if is_sneaking() else RUN_SPEED) * speed_mult
 	var target_velocity := direction * (top_speed * wish_magnitude)
 
 	var rate := acceleration if wish_magnitude > 0.0 else deceleration

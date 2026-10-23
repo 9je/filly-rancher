@@ -204,3 +204,22 @@ func test_factory_gear_needs_the_factory_path() -> void:
 	assert_ne(shop.refusal(item), "")
 	shop.path_provider = func() -> String: return "factory"
 	assert_true(shop.listed(item))
+
+
+## MISSION.md's fun rules: at least half of all upgrades change HOW you play. Every gear and
+## build item in the catalogue counts; food and permits (areas, not upgrades) do not.
+func test_at_least_half_the_upgrades_are_verb_changing() -> void:
+	var registry = load("res://systems/shop_registry.gd").new()
+	registry.load_all()
+	var verbs := 0
+	var total := 0
+	for item: ShopItem in registry.all():
+		if item.kind == ShopItemScript.Kind.GEAR or item.kind == ShopItemScript.Kind.BUILD:
+			total += 1
+			if item.verb:
+				verbs += 1
+	# The two bigger pens are upgrades too (number-only), though they are built, not bought.
+	total += 2
+	assert_gt(total, 0)
+	assert_true(float(verbs) / float(total) >= 0.5,
+		"%d of %d upgrades are verb-changing; the rule is at least half" % [verbs, total])

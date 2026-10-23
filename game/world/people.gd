@@ -23,11 +23,15 @@ const InteractionScript := preload("res://world/interaction.gd")
 ## Where each character stands by default (ranch space), and the way she faces (degrees).
 const SPOTS := {
 	&"marigold": [Vector3(11.5, 0.0, 6.5), 210.0],
-	&"fennel": [Vector3(-9.0, 0.0, 7.5), 120.0],
-	&"bramble": [Vector3(-3.2, 0.0, 0.4), 140.0],
-	&"pip": [Vector3(9.2, 0.0, -1.0), 200.0],
+	# Beside the plots, never on one: a spot inside a slot's footprint was fenced in by the
+	# first pen built there (and the Market's own footprint lifted Bramble onto its plinth).
+	&"fennel": [Vector3(-4.3, 0.0, 10.0), 110.0],
+	&"bramble": [Vector3(-0.7, 0.0, 3.1), 45.0],
+	# Clear of the mailbox (8, -2.5) by more than TALK_RADIUS plus the mailbox's own 2.6 m: a
+	# postmare standing at the box answered every E meant for it.
+	&"pip": [Vector3(13.4, 0.0, -4.6), 240.0],
 	&"static": [Vector3(14.0, 0.0, 12.0), 230.0],
-	&"clover": [Vector3(-10.5, 0.0, 8.5), 120.0],
+	&"clover": [Vector3(-4.9, 0.0, 11.4), 120.0],
 }
 const TALK_RADIUS := 2.8
 const CAST: Array[StringName] = [&"tumble", &"marigold", &"fennel", &"pip", &"bramble", &"static", &"clover"]
@@ -116,8 +120,16 @@ func candidates(at: Vector3) -> Array[Dictionary]:
 			best_d = d
 			best = id
 	if best != &"":
-		out.append(InteractionScript.candidate(InteractionScript.Kind.TALK, best_d,
-			_display_name(best)))
+		var c := InteractionScript.candidate(InteractionScript.Kind.TALK, best_d, _display_name(best))
+		# A COMPANION AT YOUR HEELS IS NOT WHO E IS FOR. Tumble follows the player everywhere,
+		# so she was always the nearest person, and talk outranks every building: E at the
+		# mailbox, the Market or the Depot talked to her instead. With nothing new to say she
+		# steps aside for whatever else is in reach (ranch.gd drops a "companion" talk when a
+		# building is offered too).
+		var n: Node = npcs[best]
+		if int(n.get("mode")) == NpcScript.Mode.FOLLOW and not has_news(best):
+			c["companion"] = true
+		out.append(c)
 	return out
 
 

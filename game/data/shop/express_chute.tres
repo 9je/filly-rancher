@@ -11,3 +11,4 @@ cost = 900
 kind = 0
 gear_id = &"express_chute"
 requires_path = "factory"
+verb = true

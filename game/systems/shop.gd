@@ -86,14 +86,24 @@ func owns_permit(zone: StringName) -> bool:
 
 ## Why `item` cannot be bought right now, as a line for the menu footer, or "" if it can.
 ## Whether the item is on the shelf at all (the Supply Desk's gear only for Stewards).
+## Whether a story flag is up (the ranch answers; nothing is ever listed early).
+var flag_provider: Callable = func(_flag: String) -> bool: return true
+
+
 func listed(item: ShopItem) -> bool:
-	return item != null and (item.requires_path.is_empty() or item.requires_path == str(path_provider.call()))
+	if item == null:
+		return false
+	if not item.requires_path.is_empty() and item.requires_path != str(path_provider.call()):
+		return false
+	return item.requires_flag.is_empty() or bool(flag_provider.call(item.requires_flag))
 
 
 func refusal(item: ShopItem) -> String:
 	if item == null:
 		return "Nothing to buy."
 	if not listed(item):
+		if not item.requires_flag.is_empty():
+			return "Not in stock yet."
 		return "Cloudsdale Supply Desk: Senior Stewards only."
 	match item.kind:
 		ShopItemScript.Kind.CARE:

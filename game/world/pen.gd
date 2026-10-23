@@ -112,6 +112,8 @@ extends StaticBody3D
 ## exercise through a gap in the fence. NO PONY EVER DIES; a neglected one leaves, and
 ## leaving is something the pen does TO its roster, not something she squeezes through.
 
+const PonyTraitsScript := preload("res://systems/pony_traits.gd")
+const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const BloomScript := preload("res://systems/bloom.gd")
 const PonyLookScript := preload("res://systems/pony_look.gd")
 const PonyGeneratorScript := preload("res://systems/pony_generator.gd")
@@ -467,15 +469,33 @@ func tick(delta: float) -> int:
 	if delta <= 0.0 or _residents.is_empty():
 		return 0
 	var produced := 0
+	var night := PonyTraitsScript.night
 	for inst in _residents:
+		# HER QUIRK SHAPES HER DAY (game/systems/pony_traits.gd): a glutton gets hungry twice
+		# as fast, a loner frets in a crowd, a sleepyhead is never sad at night, a night owl
+		# works the dark shift.
+		var q := PonyTraitsScript.quirk_of(inst)
+		var happy_before := inst.happiness
 		NeedsScript.tick(inst, delta)
+		var extra_hunger := PonyTraitsScript.hunger_mult(q) - 1.0
+		if extra_hunger > 0.0:
+			inst.hunger = minf(PonyInstanceScript.STATE_MAX, inst.hunger + NeedsScript.HUNGER_PER_SECOND * delta * extra_hunger)
+		inst.happiness = maxf(PonyInstanceScript.STATE_MIN,
+			inst.happiness - PonyTraitsScript.fret_per_second(q, _residents.size(), night) * delta)
+		if PonyTraitsScript.calm_at_night(q, night):
+			inst.happiness = maxf(inst.happiness, happy_before)
 		_feed_if_hungry(inst)
 		_tick_bloom(inst, delta)
-		var made := 0 if _padlocked else ProductionScript.tick(inst, delta)
+		var made := 0 if _padlocked else ProductionScript.tick(inst, delta * PonyTraitsScript.gem_mult(q, night))
 		if made > 0:
 			var data: PonyData = inst.data()
 			var rarity: int = data.rarity if data != null else PonyDataScript.Rarity.COMMON
-			_gems_by_rarity[rarity] = int(_gems_by_rarity.get(rarity, 0)) + made
+			var chance := PonyTraitsScript.sparkle_chance(q)
+			for g in made:
+				var r := rarity
+				if chance > 0.0 and randf() < chance:
+					r = mini(rarity + 1, PonyDataScript.Rarity.LEGENDARY)
+				_gems_by_rarity[r] = int(_gems_by_rarity.get(r, 0)) + 1
 			produced += made
 	if produced > 0:
 		gems_produced.emit(gems())
@@ -545,7 +565,9 @@ func _tick_bloom(inst: PonyInstance, delta: float) -> void:
 	var c := {"happiness": inst.happiness, "hunger": inst.hunger,
 		"favorite_glow": inst.favorite_glow, "has_friend": _has_friend(inst),
 		"pen_count": _residents.size(), "calm_lamp": calm_lamp, "marked": false}
-	inst.bloom = minf(1.0, inst.bloom + BloomScript.gain(c, delta))
+	var m := PonyTraitsScript.bloom_mult(PonyTraitsScript.quirk_of(inst), PonyTraitsScript.race_of(inst),
+		_residents.size())
+	inst.bloom = minf(1.0, inst.bloom + BloomScript.gain(c, delta) * m)
 	if inst.bloom >= 1.0:
 		bloom_now(inst)
 
@@ -573,8 +595,14 @@ func body_of(uid: StringName) -> Node3D:
 
 func _has_friend(inst: PonyInstance) -> bool:
 	var mine := _personality_of(inst)
+	var social := PonyTraitsScript.is_friend_to_all(PonyTraitsScript.quirk_of(inst))
 	for other in _residents:
-		if other != inst and BloomScript.are_friends(mine, _personality_of(other)):
+		if other == inst:
+			continue
+		# A Social Butterfly is everypony's friend, and everypony is hers.
+		if social or PonyTraitsScript.is_friend_to_all(PonyTraitsScript.quirk_of(other)):
+			return true
+		if BloomScript.are_friends(mine, _personality_of(other)):
 			return true
 	return false
 

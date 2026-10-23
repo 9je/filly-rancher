@@ -30,6 +30,7 @@ const LayersScript := preload("res://world/collision_layers.gd")
 const RegionRegistryScript := preload("res://systems/region_registry.gd")
 const RegionDataScript := preload("res://systems/region_data.gd")
 const GroundShader := preload("res://world/terrain.gdshader")
+const WaterShader := preload("res://shaders/water.gdshader")
 
 ## Half-width of the map, in metres. The ground spans [-HALF, HALF] on both X and Z.
 ##
@@ -300,12 +301,12 @@ func build_water(region: RegionDataScript) -> MeshInstance3D:
 	mesh.bottom_radius = region.radius * 0.7
 	mesh.height = 0.05
 
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.20, 0.42, 0.62, 0.85)
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.roughness = 0.15
-	mat.metallic = 0.1
+	# The show's water (shaders/water.gdshader): shallows, a foam line, drifting sparkle.
+	var mat := ShaderMaterial.new()
+	mat.shader = WaterShader
+	mat.set_shader_parameter(&"radius", region.radius * 0.7)
 	mesh.material = mat
+	mesh.radial_segments = 96
 
 	var node := MeshInstance3D.new()
 	node.name = "Water_" + String(region.id)
@@ -317,6 +318,7 @@ func build_water(region: RegionDataScript) -> MeshInstance3D:
 		region.centre.x,
 		height_at(region.centre.x, region.centre.y) + region.lake_depth * 0.55 - 0.4,
 		region.centre.y)
+	mat.set_shader_parameter(&"centre", node.position)
 	return node
 
 

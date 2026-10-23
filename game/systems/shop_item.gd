@@ -52,6 +52,15 @@ enum Kind { GEAR, PERMIT, BUILD, CARE }
 ## v1: only sold on this story path ("factory": the Cloudsdale Supply Desk). Empty: always.
 @export var requires_path: String = ""
 
+## v1: on the shelf only once this story flag is up (Bramble's "new stock in" beats). Empty:
+## from the first day.
+@export var requires_flag: String = ""
+
+## Changes HOW the player plays (a new verb, movement, option or automation) rather than a
+## number: the MISSION.md fun rules ask for at least half of all upgrades to be this, and
+## game/test/test_shop.gd counts them.
+@export var verb: bool = false
+
 
 func _to_string() -> String:
 	return "ShopItem(%s, %s, cost=%d)" % [String(id), Kind.keys()[kind], cost]

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ShopItem" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/shop_item.gd" id="1_shop"]
+
+[resource]
+script = ExtResource("1_shop")
+id = &"depot_cart"
+display_name = "Depot Cart"
+description = "Every dawn a Depot cart calls at a full pen and takes the ponies who are still looking for their marks. Marigold arranges it personally."
+cost = 320
+kind = 0
+gear_id = &"depot_cart"
+requires_flag = "marigold_vivid"
+verb = true

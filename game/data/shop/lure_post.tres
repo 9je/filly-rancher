@@ -11,3 +11,4 @@ cost = 500
 kind = 0
 gear_id = &"lure_post"
 requires_path = "factory"
+verb = true

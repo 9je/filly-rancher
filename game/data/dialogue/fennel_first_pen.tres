@@ -29,9 +29,10 @@ nodes = Array[Dictionary]([{
 "next": "three"
 }, {
 "id": "three",
-"text": "Then feed her what she likes. Every pony has a favorite. Watch her ears when you toss it. Ears don't lie.",
+"text": "Then feed her what she likes. Every pony has her own favorite, no two alike. Here. My old treat pouch. Toss one where she can see it and watch her ears.",
 "who": "fennel",
 "mood": "happy",
+"event": "gift_treat_pouch",
 "choices": [{
 "text": "How do I tell what she likes?",
 "next": "likes"
@@ -41,7 +42,7 @@ nodes = Array[Dictionary]([{
 }]
 }, {
 "id": "likes",
-"text": "Try things. Hay's safe. Apples if she's an orchard sort. You'll see her perk up.",
+"text": "Try things. One who loves what you tossed comes trotting, and she'll sit quiet as a lamb in that Scoop of yours. Hay's safe. Daisies for the fussy ones.",
 "who": "fennel",
 "mood": "neutral",
 "next": "else"
