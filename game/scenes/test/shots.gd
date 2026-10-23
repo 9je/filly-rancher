@@ -118,6 +118,8 @@ func _run() -> void:
 				await _talk()
 			"creator":
 				await _creator()
+			"player":
+				await _player_shot()
 
 
 func _clear() -> void:
@@ -338,3 +340,23 @@ func _creator() -> void:
 		await get_tree().create_timer(0.6).timeout
 		await _shoot("creator_step%d" % step)
 	screen.queue_free()
+
+
+## The player pony wearing her Scoop, from the side and from the front three-quarter.
+func _player_shot() -> void:
+	await _clear()
+	var p: Node3D = (load("res://actors/player/player.tscn") as PackedScene).instantiate()
+	add_child(p)
+	await get_tree().process_frame
+	var look := PlayerLook.default_look()
+	look.race = PlayerLook.RACE_EARTH
+	p.call("apply_look", look)
+	p.set_physics_process(false)
+	_cam.make_current()
+	_cam.position = Vector3(3.6, 1.8, 0.4)
+	_cam.look_at(Vector3(0, 1.2, -0.2))
+	await _shoot("player_side")
+	_cam.position = Vector3(-2.6, 2.0, -3.6)
+	_cam.look_at(Vector3(0, 1.2, -0.2))
+	await _shoot("player_front")
+	p.queue_free()

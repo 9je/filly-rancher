@@ -540,6 +540,7 @@ func _build_visuals(mane_style: int = 0, donor: StringName = &"") -> void:
 	# for the player too.
 	visuals.move_child(pony, 0)
 	_place_beam_origin(pony)
+	_mount_scoop(pony)
 	_anim = pony.get_node_or_null(PonyVisualsScript.ANIMATION_PLAYER_PATH)
 	if _anim == null:
 		# PonyVisuals.build() refuses to return an instance without one, so this is
@@ -572,6 +573,42 @@ func _build_visuals(mane_style: int = 0, donor: StringName = &"") -> void:
 ## an earth pony or a pegasus has no horn to fire from, and that is a design question,
 ## not a crash. The value in the scene is Twilight's measured tip, so the fallback is at
 ## least a sane place rather than a guess.
+## THE SCOOP (v1): Cloudsdale's capture lantern rides on her right shoulder, pointing ahead,
+## on a BoneAttachment to the chest so it moves with her stride; the beam leaves from its
+## nozzle. Every kind of pony carries one (GDD 4.1), so the horn is no longer the source.
+const SCOOP_MODEL := "res://assets/models/scoop.glb"
+const SCOOP_AT := Vector3(-0.47, 1.12, -0.2)
+const SCOOP_NOZZLE := Vector3(-0.47, 1.16, -0.66)
+const SCOOP_SCALE := 1.35
+
+
+func _mount_scoop(pony: Node3D) -> void:
+	if not ResourceLoader.exists(SCOOP_MODEL):
+		return
+	var sks := pony.find_children("*", "Skeleton3D", true, false)
+	if sks.is_empty():
+		return
+	var sk: Skeleton3D = sks[0]
+	var bone := sk.find_bone("Chest1")
+	if bone < 0:
+		bone = sk.find_bone("Pelvis")
+	if bone < 0:
+		return
+	var attach := BoneAttachment3D.new()
+	attach.name = "ScoopMount"
+	attach.bone_idx = bone
+	sk.add_child(attach)
+	var scoop: Node3D = (load(SCOOP_MODEL) as PackedScene).instantiate()
+	scoop.name = "Scoop"
+	attach.add_child(scoop)
+	ToonStyler.style(scoop, &"prop", {})
+	pony.force_update_transform()
+	# Pointing ahead (the model faces -Z; the Scoop is modelled along +X).
+	var basis := Basis(Vector3.UP, deg_to_rad(90.0)).scaled(Vector3.ONE * SCOOP_SCALE)
+	scoop.global_transform = visuals.global_transform * Transform3D(basis, SCOOP_AT)
+	beam_origin.position = SCOOP_NOZZLE
+
+
 func _place_beam_origin(pony: Node3D) -> void:
 	var horn := pony.find_child("Base_Horn", true, false)
 	if not (horn is MeshInstance3D):
