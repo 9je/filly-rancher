@@ -12,7 +12,8 @@ signal advanced
 signal chose(index: int)
 
 const REVEAL_CPS := 46.0
-const MAX_WIDTH := 620.0
+const MAX_WIDTH := 640.0
+const MIN_WIDTH := 540.0
 
 var anchor: Node3D
 var camera: Camera3D
@@ -37,7 +38,7 @@ func _ready() -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)
 	_panel = PanelContainer.new()
-	_panel.custom_minimum_size = Vector2(360, 0)
+	_panel.custom_minimum_size = Vector2(MIN_WIDTH, 0)
 	root.add_child(_panel)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
@@ -46,7 +47,7 @@ func _ready() -> void:
 	_text.bbcode_enabled = false
 	_text.fit_content = true
 	_text.scroll_active = false
-	_text.custom_minimum_size = Vector2(320, 0)
+	_text.custom_minimum_size = Vector2(MIN_WIDTH - 52.0, 0)
 	_text.add_theme_font_size_override("normal_font_size", 26)
 	_text.add_theme_color_override("default_color", Color(0.22, 0.17, 0.25))
 	_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -135,6 +136,8 @@ func _style() -> void:
 	tab.content_margin_top = 4
 	tab.content_margin_bottom = 6
 	_name_tab.add_theme_stylebox_override("panel", tab)
+	_name_label.add_theme_color_override("font_color",
+		Color.WHITE if outline.get_luminance() < 0.6 else Color(0.18, 0.14, 0.2))
 
 
 func _style_button(b: Button) -> void:
@@ -179,7 +182,7 @@ func _on_revealed() -> void:
 func _place() -> void:
 	var vp := get_viewport().get_visible_rect().size
 	var size := _panel.get_combined_minimum_size()
-	size.x = clampf(size.x, 360.0, MAX_WIDTH)
+	size.x = clampf(size.x, MIN_WIDTH, MAX_WIDTH)
 	_panel.size = size
 	var at := Vector2(vp.x * 0.5, vp.y * 0.2)
 	if anchor != null and is_instance_valid(anchor) and camera != null:

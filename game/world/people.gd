@@ -222,9 +222,15 @@ func _display_name(id: StringName) -> String:
 	return String(id).capitalize()
 
 
+## Her signature colour for the bubble: the most saturated of her coat, mane and eyes,
+## pulled to a mid value so a white mane or a cream coat still gives a visible outline.
 func _color_of(id: StringName) -> Color:
 	var n := npc(id)
-	if n != null and n.def != null:
-		var l := n.def.build_look()
-		return l.mane.darkened(0.15)
-	return Color(0.55, 0.4, 0.75)
+	if n == null or n.def == null:
+		return Color(0.55, 0.4, 0.75)
+	var l := n.def.build_look()
+	var best := l.mane
+	for c: Color in [l.coat, l.mane, l.mane2, l.eyes]:
+		if c.s > best.s:
+			best = c
+	return Color.from_hsv(best.h, clampf(maxf(best.s, 0.45), 0.0, 0.85), 0.62)

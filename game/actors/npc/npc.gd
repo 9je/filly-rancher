@@ -59,7 +59,10 @@ func _ready() -> void:
 	_visuals.name = "Visuals"
 	add_child(_visuals)
 	home = global_position
+	# Her facing lives on the body (Visuals), never on this node: a spot's facing arrives as
+	# this node's rotation and is moved onto the body, so the watch yaw does not stack on it.
 	_yaw = rotation.y
+	rotation.y = 0.0
 	if character_id != &"":
 		setup(load("res://data/characters/%s.tres" % character_id) as CharacterDef)
 

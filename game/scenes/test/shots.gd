@@ -82,6 +82,15 @@ func _build_stage() -> void:
 	ground.material_override = gm
 	add_child(ground)
 	ToonStylerScript.style(ground, &"flat", {})
+	var floor_body := StaticBody3D.new()
+	var floor_shape := CollisionShape3D.new()
+	var floor_box := BoxShape3D.new()
+	floor_box.size = Vector3(80, 0.2, 80)
+	floor_shape.shape = floor_box
+	floor_shape.position = Vector3(0, -0.1, 0)
+	floor_body.add_child(floor_shape)
+	floor_body.collision_layer = 0xFFFF
+	add_child(floor_body)
 	_cam = Camera3D.new()
 	_cam.fov = 40
 	add_child(_cam)
@@ -105,6 +114,8 @@ func _run() -> void:
 				await _cast()
 			"factory":
 				await _factory()
+			"talk":
+				await _talk()
 
 
 func _clear() -> void:
@@ -278,3 +289,32 @@ func _factory() -> void:
 	_tone.snap(0.0)
 	_sun.light_energy = 1.25
 	fi.queue_free()
+
+
+## The talk box over a speaking pony: Marigold's arrival, first line and first choice.
+func _talk() -> void:
+	await _clear()
+	var people: People = load("res://world/people.gd").new()
+	var player := Node3D.new()
+	add_child(player)
+	people.player = player
+	people.camera = _cam
+	people.context_provider = func() -> Dictionary:
+		return {"chapter": 0, "path": "", "flags": {}, "counts": {}, "name": "Juniper", "tumble": "Tumble"}
+	add_child(people)
+	people.populate()
+	var m := people.npc(&"marigold")
+	await get_tree().create_timer(0.5).timeout
+	player.global_position = m.global_position + Vector3(0, 0, 3.0)
+	_cam.position = m.global_position + Vector3(2.2, 2.0, 4.6)
+	_cam.look_at(m.global_position + Vector3(0, 1.3, 0))
+	people.talk("marigold")
+	await get_tree().create_timer(2.5).timeout
+	await _shoot("talk_line")
+	while people.is_talking() and not people.runner.has_choices():
+		people.talk_box.advanced.emit()
+		await get_tree().create_timer(0.1).timeout
+	await get_tree().create_timer(3.0).timeout
+	await _shoot("talk_choice")
+	people.queue_free()
+	player.queue_free()
