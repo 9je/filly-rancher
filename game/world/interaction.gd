@@ -21,7 +21,7 @@ extends RefCounted
 ## Static only, no state. Preload by path.
 
 ## The verbs E can carry. NONE is the absence of a candidate and never appears in PRIORITY.
-enum Kind { NONE, PLOT_BUILD, PEN_MOVE_IN, MARKET, BOARD, MAILBOX, DEPOT, PALACE }
+enum Kind { NONE, PLOT_BUILD, PEN_MOVE_IN, MARKET, BOARD, MAILBOX, DEPOT, PALACE, TALK }
 
 ## THE ORDER, HIGHEST FIRST, and every one of these positions is a decision.
 ##
@@ -47,8 +47,10 @@ enum Kind { NONE, PLOT_BUILD, PEN_MOVE_IN, MARKET, BOARD, MAILBOX, DEPOT, PALACE
 ## and the Palace are last because they are the two biggest buildings with the two widest
 ## radii, so a smaller thing standing in front of one of them wins the ground. A mailbox is
 ## the smallest thing on the map.
-const PRIORITY: Array[int] = [Kind.PLOT_BUILD, Kind.PEN_MOVE_IN, Kind.MARKET, Kind.BOARD,
-	Kind.MAILBOX, Kind.DEPOT, Kind.PALACE]
+## TALK ranks right under the ground tier: a person standing beside you is who the key is
+## for, ahead of any building behind her (Bramble stands at the Market's counter).
+const PRIORITY: Array[int] = [Kind.PLOT_BUILD, Kind.PEN_MOVE_IN, Kind.TALK, Kind.MARKET,
+	Kind.BOARD, Kind.MAILBOX, Kind.DEPOT, Kind.PALACE]
 
 ## THE KINDS THAT SHARE ONE RANK, so resolve() settles them on distance instead of on the
 ## order they happen to sit in above.
@@ -160,4 +162,6 @@ static func prompt_for(action: Dictionary, key: String) -> String:
 			return "%s: Depot, deliver and pay" % key
 		Kind.PALACE:
 			return "%s: Spectra Palace" % key
+		Kind.TALK:
+			return "%s: talk to %s" % [key, subject]
 	return ""

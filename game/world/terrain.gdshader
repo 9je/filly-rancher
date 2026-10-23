@@ -1,5 +1,13 @@
 shader_type spatial;
-render_mode cull_back, diffuse_burley;
+render_mode cull_back, specular_disabled;
+
+// The valley floor shares the toon light model (game/shaders/toon.gdshader) with a softer
+// band, so rolling ground reads as the show's painted backgrounds instead of cutting hard
+// terminator lines across every hill. `dread` greys it with everything else.
+global uniform float dread;
+uniform vec3 shadow_tint : source_color = vec3(0.74, 0.78, 0.92);
+uniform float shadow_fill = 0.42;
+uniform float band_softness = 0.16;
 
 // THE GROUND. The mesh, the vertex colours, grass_at(), height_at(), the regions and the
 // collider are all untouched by this file: game/world/terrain.gd stays the single authority
@@ -204,7 +212,21 @@ void fragment() {
 		EMISSION += dirt * path * path_glow;
 	}
 
+	float lum = dot(base, vec3(0.299, 0.587, 0.114));
+	base = mix(base, vec3(lum) * vec3(0.96, 0.99, 1.02), clamp(dread, 0.0, 1.0) * 0.55);
 	ALBEDO = base;
 	ROUGHNESS = ground_roughness;
 	SPECULAR = 0.0;
+}
+
+void light() {
+	float ndl = dot(NORMAL, LIGHT);
+	float lit = smoothstep(-band_softness, band_softness, ndl);
+	float falloff = 1.0;
+	if (LIGHT_IS_DIRECTIONAL) {
+		lit = min(lit, smoothstep(0.35, 0.65, ATTENUATION));
+	} else {
+		falloff = ATTENUATION;
+	}
+	DIFFUSE_LIGHT += LIGHT_COLOR * mix(shadow_tint * shadow_fill, vec3(1.0), lit) * falloff;
 }

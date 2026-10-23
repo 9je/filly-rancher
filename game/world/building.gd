@@ -47,6 +47,7 @@ extends StaticBody3D
 ## make the rest of the map look like a model railway. Consistency reads as a place;
 ## one correctly-scaled object among stylised ones does not.
 
+const ToonStylerScript := preload("res://systems/toon_styler.gd")
 const LayersScript := preload("res://world/collision_layers.gd")
 const PropsScript := preload("res://world/props.gd")
 const TerrainScript := preload("res://world/terrain.gd")
@@ -505,6 +506,7 @@ func _stand_model() -> bool:
 	if inst == null:
 		push_error("Building '%s': '%s' failed to instantiate" % [name, path])
 		return false
+	ToonStylerScript.style(inst, &"building")
 	var holder := Node3D.new()
 	holder.name = "Model"
 	add_child(holder)

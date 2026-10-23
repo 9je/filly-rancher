@@ -107,6 +107,16 @@ static func make_outline(color: Color, tex: Texture2D, px: float, fade_end: floa
 	return o
 
 
+## The preset a prop file reads best with: soft thin lines for plants, the prop line for
+## everything else.
+static func category_for(file: String) -> StringName:
+	var f := file.to_lower()
+	for k in ["tree", "bush", "grass", "flower", "leaf", "hedge", "plant"]:
+		if f.contains(k):
+			return &"foliage"
+	return &"prop"
+
+
 ## True when `mi` surface `i` carries a toon material (for tests and gates).
 static func is_toon(mi: MeshInstance3D, i: int) -> bool:
 	var m: Material = mi.get_active_material(i)

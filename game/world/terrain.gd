@@ -86,7 +86,7 @@ const GRASS_HIGH := Color(0.381, 0.551, 0.261)
 ## 0.309, paler and greyer than the bark the ground is meant to read next to. Hue stays under
 ## 0.14 either way, so this was never at risk of reading as another green -- it just wasn't
 ## earth-coloured enough to read as bark's own colour rather than a generic brown.
-const DIRT := Color(0.393, 0.329, 0.157)
+const DIRT := Color(0.8, 0.69, 0.52)
 
 ## THE NORTH ROAD, PAINTED INTO THE GROUND RATHER THAN LAID ON TOP OF IT.
 ##
@@ -129,7 +129,7 @@ const PATH_EDGE_NOISE := 0.5
 ## GRASS_HIGH's) crushes toward black under ambient-only light (sRGB (19, 5, 0), against
 ## grass two metres away at (92, 123, 32)) -- a scorch mark, not a track. See
 ## terrain.gdshader's own fragment() comment for the full account.
-const PATH_GLOW := 5.0
+const PATH_GLOW := 0.08
 
 ## The shader array uniform's own fixed length. Matches `PATH_MAX_POINTS` in
 ## `terrain.gdshader` -- game/test/test_terrain.gd pins both numbers so the two files cannot

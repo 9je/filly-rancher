@@ -41,6 +41,7 @@ extends Node3D
 ## AND NOTHING STANDS IN THE DOOR. The door bay is left clear across the front so the apron
 ## the player walks up leads somewhere rather than into a wall.
 
+const ToonStylerScript := preload("res://systems/toon_styler.gd")
 const PropsScript := preload("res://world/props.gd")
 const BuildingScript := preload("res://world/building.gd")
 
@@ -203,6 +204,7 @@ func _stand(file: String, at: Vector3, yaw: float, sit_on_base: bool) -> bool:
 	var inst: Node3D = (scene as PackedScene).instantiate()
 	if inst == null:
 		return false
+	ToonStylerScript.style(inst, &"building")
 	inst.name = "%s_%d" % [file.get_basename(), get_child_count()]
 	inst.scale = Vector3.ONE * PropsScript.MLP_SCALE
 	inst.rotation.y = deg_to_rad(yaw)

@@ -138,9 +138,9 @@ func _style() -> void:
 
 
 func _style_button(b: Button) -> void:
-	for state in ["normal", "hover", "pressed", "focus"]:
+	for state: String in ["normal", "hover", "pressed", "focus"]:
 		var sb := StyleBoxFlat.new()
-		var hot := state != "normal"
+		var hot: bool = state != "normal"
 		sb.bg_color = outline.lightened(0.55) if hot else Color(0.98, 0.95, 0.9)
 		sb.border_color = outline
 		sb.set_border_width_all(3 if hot else 2)

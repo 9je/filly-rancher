@@ -56,6 +56,7 @@ extends Node3D
 ## hulls would have sealed the windmill's arches and a box would have made every
 ## tree a crate.
 
+const ToonStylerScript := preload("res://systems/toon_styler.gd")
 const LayersScript := preload("res://world/collision_layers.gd")
 
 const PROP_DIR := "res://assets/converted/props/"
@@ -578,6 +579,8 @@ func build() -> int:
 		if inst == null:
 			push_error("Props: '%s' failed to instantiate" % path)
 			continue
+		# One light model for the whole valley (game/systems/toon_styler.gd).
+		ToonStylerScript.style(inst, ToonStylerScript.category_for(file))
 
 		var at: Vector2 = entry["at"]
 		inst.name = "%s_%d" % [file.get_basename(), _placed.size()]

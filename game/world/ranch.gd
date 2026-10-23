@@ -164,6 +164,7 @@ const CasinoSignScript := preload("res://systems/casino_sign.gd")
 const LobbySignScript := preload("res://world/lobby_sign.gd")
 const PalaceFacadeScript := preload("res://world/palace_facade.gd")
 const InteractionScript := preload("res://world/interaction.gd")
+const PeopleScript := preload("res://world/people.gd")
 const BuildingScript := preload("res://world/building.gd")
 const CasinoScript := preload("res://systems/casino.gd")
 const SlotsScript := preload("res://systems/slots.gd")
@@ -1085,6 +1086,9 @@ func _ready() -> void:
 	_restored_ponies = restore_owned_ponies()
 
 	_bind_build_menu()
+
+	_setup_people()
+	_setup_tone()
 
 	# THE FIRST POST, before the gate reports. A brand new ranch has a letter waiting in the
 	# mailbox by the time the player takes her first step, which is what makes the flag mean
@@ -2203,6 +2207,8 @@ func _no_menu_but(menu: CanvasLayer) -> bool:
 			continue
 		if other.has_method("is_open") and other.is_open():
 			return false
+	if people != null and people.is_talking():
+		return false
 	return true
 
 
@@ -4185,6 +4191,8 @@ func interaction_candidates() -> Array[Dictionary]:
 	if is_near_palace() and casino_can_enter():
 		out.append(InteractionScript.candidate(
 			InteractionScript.Kind.PALACE, _flat_gap_to(^"Buildings/Palace")))
+	if people != null:
+		out.append_array(people.candidates(at))
 	return out
 
 
@@ -4261,6 +4269,8 @@ func perform_interaction(action: Dictionary) -> bool:
 			if casino_menu == null or not casino_menu.has_method("open"):
 				return false
 			return bool(casino_menu.open())
+		InteractionScript.Kind.TALK:
+			return people != null and people.talk(String(action.get("subject", "")))
 	return false
 
 
@@ -7061,3 +7071,106 @@ func _capture(shot_name: String) -> void:
 	var path: String = _screenshot_dir.path_join("%s.png" % shot_name)
 	image.save_png(path)
 	print("SCREENSHOT_SAVED %s" % path)
+
+
+# --- people (v1) -----------------------------------------------------------------------
+# The story cast in the world and every conversation with them: game/world/people.gd. The
+# ranch only supplies the story context, says who is present, and applies what a
+# conversation does (flags into the Story, events into the systems below).
+
+## Non-null once _setup_people() has run.
+var people: People
+
+## Gates and tests stand the cast only when they ask for it (--people): a pony standing at
+## the Market counter would answer the interact key there, which every Market gate predates.
+func _people_enabled() -> bool:
+	return _interactive or "--people" in OS.get_cmdline_user_args()
+
+
+func _setup_people() -> void:
+	if not _people_enabled() or people != null:
+		return
+	people = PeopleScript.new()
+	people.name = "People"
+	people.player = player
+	people.camera = _rig.get_node_or_null("SpringArm3D/CameraMount/Camera3D") as Camera3D if _rig != null else null
+	if people.camera == null:
+		people.camera = get_viewport().get_camera_3d()
+	people.context_provider = _talk_context
+	people.presence = _is_present
+	add_child(people)
+	people.effect.connect(_on_people_effect)
+	people.populate()
+
+
+## The Dictionary DialogueRunner reads (game/systems/dialogue_runner.gd).
+func _talk_context() -> Dictionary:
+	var story: Story = _game_state.story if _game_state != null else null
+	var flags: Dictionary = story.flags.duplicate() if story != null else {}
+	var counts := {
+		"deliveries": story.deliveries if story != null else 0,
+		"blooms": int(flags.get("_blooms", 0)),
+		"catches": int(flags.get("_catches", 0)),
+		"pens": _built_pen_count(),
+		"days": story.collection_days if story != null else 0,
+	}
+	var name := "friend"
+	if _game_state != null and _game_state.player != null:
+		name = _game_state.player.player_name
+	return {"chapter": story.chapter if story != null else 0, "path": str(flags.get("path", "")),
+		"flags": flags, "counts": counts, "name": name, "tumble": "Tumble"}
+
+
+func _built_pen_count() -> int:
+	var n := 0
+	for slot in _plot_slots():
+		if not slot.is_empty():
+			n += 1
+	return n
+
+
+## Who is in the valley right now (STORY.md section 2).
+func _is_present(id: StringName) -> bool:
+	var story: Story = _game_state.story if _game_state != null else null
+	var f: Dictionary = story.flags if story != null else {}
+	match id:
+		&"tumble":
+			return bool(f.get("has_scoop", false))
+		&"static", &"clover":
+			return false
+	return true
+
+
+func _on_people_effect(kind: StringName, value: String) -> void:
+	if _game_state == null or _game_state.story == null:
+		return
+	match kind:
+		&"flag":
+			_game_state.story.set_flag(value)
+		&"event":
+			match value:
+				"tumble_join", "give_scoop":
+					people.populate()
+				"first_mail":
+					advance_story()
+
+
+# --- tone (v1) -------------------------------------------------------------------------
+# The dread dial (game/world/world_tone.gd) on top of the sky rig: Events.dread_changed
+# moves it; the story decides the value (STORY.md section 9).
+
+const WorldToneScript := preload("res://world/world_tone.gd")
+var world_tone: WorldTone
+
+
+func _setup_tone() -> void:
+	if world_tone != null:
+		return
+	world_tone = WorldToneScript.new()
+	world_tone.name = "WorldTone"
+	world_tone.environment_path = ^"../WorldEnvironment"
+	world_tone.sky_rig_path = ^"../SkyRig"
+	add_child(world_tone)
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--dread="):
+			world_tone.snap(float(arg.substr(8)))

@@ -563,6 +563,17 @@ func _set_targets_from(state: WorldState) -> void:
 	_has_targets = true
 
 
+## The dread grade's multipliers (game/world/world_tone.gd grade()): sun_tint, ambient_mult,
+## fog_mult. Empty means none; the hour and the weather are untouched either way, the tone
+## only scales what they wrote.
+var _tone: Dictionary = {}
+
+
+func set_tone(g: Dictionary) -> void:
+	_tone = g
+	_write_to_scene()
+
+
 func _write_to_scene() -> void:
 	if (_sun == null or _environment == null) and not _resolve_retried:
 		# A rig can be built in code and wired to its siblings AFTER _ready() has run, so
@@ -583,7 +594,8 @@ func _write_to_scene() -> void:
 			float(_current.get(KEY_SUN_AZIMUTH, AZIMUTH_DAY_START)),
 			0.0)
 		_sun.light_energy = float(_current.get(KEY_LIGHT_ENERGY, 1.0))
-		_sun.light_color = _current.get(KEY_LIGHT_COLOR, _sun.light_color)
+		_sun.light_color = (_current.get(KEY_LIGHT_COLOR, _sun.light_color) as Color) \
+			* (_tone.get("sun_tint", Color.WHITE) as Color)
 	var horizon: Color = _current.get(KEY_SKY_HORIZON, Color.WHITE)
 	if _environment != null:
 		if not _ambient_contract_written:
@@ -593,13 +605,15 @@ func _write_to_scene() -> void:
 			_ambient_contract_written = true
 			_environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 			_environment.ambient_light_sky_contribution = AMBIENT_SKY_CONTRIBUTION
-		_environment.ambient_light_energy = float(_current.get(KEY_AMBIENT_ENERGY, 0.32))
+		_environment.ambient_light_energy = float(_current.get(KEY_AMBIENT_ENERGY, 0.32)) \
+			* float(_tone.get("ambient_mult", 1.0))
 		# The fill light's own colour, which is most of the ambient: the scene asks the sky
 		# for only 35% of it, so a night sky at luminance 0.04 can no longer black the ranch
 		# out on its own.
 		_environment.ambient_light_color = _current.get(
 			KEY_AMBIENT_COLOR, _environment.ambient_light_color)
-		_environment.fog_density = float(_current.get(KEY_FOG_DENSITY, WEATHER_FOG_DENSITY[0]))
+		_environment.fog_density = float(_current.get(KEY_FOG_DENSITY, WEATHER_FOG_DENSITY[0])) \
+			* float(_tone.get("fog_mult", 1.0))
 		# The fog is lit by the same air the horizon band is, so it takes that colour and
 		# a night fog goes dark instead of glowing white in the dark.
 		_environment.fog_light_color = horizon
