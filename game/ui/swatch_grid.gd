@@ -77,7 +77,11 @@ func set_swatches(colours: Array[Color], labels: Array[String]) -> void:
 		var cell := Button.new()
 		cell.focus_mode = Control.FOCUS_NONE
 		cell.mouse_filter = Control.MOUSE_FILTER_STOP
-		cell.custom_minimum_size = CARD_SIZE if not _labels.is_empty() else CELL_SIZE
+		# A card only where this cell has a real word on it; a one or two character mark
+		# ("=" for "same as the mane") stays a plain swatch, so one labelled cell does not
+		# blow every swatch in its row up to card size.
+		var worded: bool = not _labels.is_empty() and _labels[i].length() > 2
+		cell.custom_minimum_size = CARD_SIZE if worded else CELL_SIZE
 		cell.text = _labels[i] if not _labels.is_empty() else ""
 		cell.clip_text = true
 		var index := i
@@ -161,3 +165,8 @@ func _restyle() -> void:
 					else MenuStyleScript.ROW_IDLE_BORDER)
 			_cells[i].add_theme_stylebox_override(state, box)
 		MenuStyleScript.style_label_button(_cells[i])
+		# Ink that reads on its own swatch: dark on a light card, white on a dark one.
+		var ink := Color(0.2, 0.14, 0.24) if _colours[i].get_luminance() > 0.5 else Color.WHITE
+		for key in [&"font_color", &"font_hover_color", &"font_pressed_color", &"font_focus_color"]:
+			_cells[i].add_theme_color_override(key, ink)
+		_cells[i].add_theme_constant_override(&"outline_size", 0)

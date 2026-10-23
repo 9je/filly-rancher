@@ -298,6 +298,7 @@ func test_the_player_wears_the_look_she_is_given() -> void:
 	look.set_mark(MarkStamps.build(MarkStamps.Stamp.HEART, Color.RED))
 	player.apply_look(look)
 	var body: Node3D = player.visuals.get_child(0)
-	assert_eq(StockTint.override_of(body, &"body").albedo_color,
-		StockPalette.load_player().coat_at(2))
+	# v1: she wears it through PonyPaint, like every pony (headless runs skip the shader
+	# swap, so the look itself is what is checked; the mark decals apply either way).
+	assert_eq(player.current_look().coat, StockPalette.load_player().coat_at(2))
 	assert_eq(CutieMark.decals_of(body).size(), 2)

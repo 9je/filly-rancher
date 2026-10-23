@@ -50,6 +50,22 @@ var eyes := DEFAULT_EYES
 ## change.
 var mane_style := 0
 
+## v1 CUSTOMIZER. Race (RACE_* below; unicorn is what every pre-v1 save was), a second mane
+## tone and a tail colour as palette indices with -1 meaning "same as the mane", so a v5
+## save loads exactly as it was. `mane_style` indexes styles_for(race).
+const RACE_EARTH := 0
+const RACE_PEGASUS := 1
+const RACE_UNICORN := 2
+const RACE_NAMES: Array[StringName] = [&"earth", &"pegasus", &"unicorn"]
+const RACE_LABELS: Array[String] = ["Earth pony", "Pegasus", "Unicorn"]
+## The four styles every pre-v1 save could pick, first and in their old order, so an old
+## `mane_style` index is the same mane it always was.
+const LEGACY_UNICORN_STYLES: Array[StringName] = [&"pokeypierce", &"vinylscratch",
+	&"shiningarmor", &"nightlight"]
+var race := RACE_UNICORN
+var mane2 := -1
+var tail := -1
+
 var _mark: Image = null
 
 
@@ -59,6 +75,44 @@ static func default_look() -> PlayerLook:
 
 ## Trim, collapse, strip and cap. An empty result is DEFAULT_NAME, so there is no such thing
 ## as a nameless account.
+## The donor bodies a player of `race` can wear, in the order the style picker shows them
+## (adult bodies only; foal donors are for Drifters).
+static func styles_for(r: int) -> Array[StringName]:
+	var table := DonorTable.load_table()
+	var out: Array[StringName] = []
+	if r == RACE_UNICORN:
+		for id in LEGACY_UNICORN_STYLES:
+			if not table.find(id).is_empty():
+				out.append(id)
+	for id in table.for_race(RACE_NAMES[clampi(r, 0, 2)], false):
+		if not id in out:
+			out.append(id)
+	return out
+
+
+static func style_count(r: int) -> int:
+	return maxi(1, styles_for(r).size())
+
+
+## Her whole look for PonyPaint (game/systems/pony_paint.gd), from `palette`.
+func to_pony_look(palette: StockPalette) -> PonyLook:
+	var l := PonyLook.new()
+	var styles := styles_for(race)
+	if not styles.is_empty():
+		l.donor = styles[posmod(mane_style, styles.size())]
+	l.race = RACE_NAMES[clampi(race, 0, 2)]
+	if palette != null and palette.is_valid():
+		l.coat = palette.coat_at(coat)
+		l.mane = palette.mane_at(mane)
+		l.mane2 = palette.mane_at(mane2) if mane2 >= 0 else l.mane
+		l.tail = palette.mane_at(tail) if tail >= 0 else l.mane
+		l.eyes = palette.eye_at(eyes)
+	if has_mark():
+		var png := mark().save_png_to_buffer()
+		l.mark_png = Marshalls.raw_to_base64(png)
+	return l
+
+
 static func sanitize_name(raw: String) -> String:
 	var out := ""
 	for i in raw.length():
@@ -101,6 +155,9 @@ func to_dict() -> Dictionary:
 		"mane": mane,
 		"eyes": eyes,
 		"mane_style": mane_style,
+		"race": race,
+		"mane2": mane2,
+		"tail": tail,
 		"mark_png": _encoded_mark(),
 	}
 
@@ -125,6 +182,9 @@ static func from_dict(d: Dictionary) -> PlayerLook:
 	out.mane = int(d.get("mane", DEFAULT_MANE))
 	out.eyes = int(d.get("eyes", DEFAULT_EYES))
 	out.mane_style = maxi(0, int(d.get("mane_style", 0)))
+	out.race = clampi(int(d.get("race", RACE_UNICORN)), RACE_EARTH, RACE_UNICORN)
+	out.mane2 = maxi(-1, int(d.get("mane2", -1)))
+	out.tail = maxi(-1, int(d.get("tail", -1)))
 	var encoded := str(d.get("mark_png", ""))
 	if encoded.is_empty():
 		return out

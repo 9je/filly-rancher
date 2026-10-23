@@ -40,17 +40,27 @@ const SwatchGridScript := preload("res://ui/swatch_grid.gd")
 const TITLE := "Who are you?"
 const NAME_LABEL := "Your name"
 const COAT_LABEL := "Coat"
-const MANE_LABEL := "Mane and tail"
+const MANE_LABEL := "Mane"
+const RACE_LABEL := "Kind of pony"
+const MANE2_LABEL := "Mane streak"
+const TAIL_LABEL := "Tail"
+## The first cell of the streak and tail rows: no colour of its own, the mane's.
+const SAME_AS_MANE := "="
+const PonyPaintScript := preload("res://systems/pony_paint.gd")
+const DonorTableScript := preload("res://systems/donor_table.gd")
 const MANE_STYLE_LABEL := "Mane style"
 const EYES_LABEL := "Eyes"
 const MARK_LABEL := "Your cutie mark; draw it yourself"
 const CONFIRM_LABEL := "This is me"
 const HINT := "Left click to draw. Pick an ink and a shape to start from, or start with nothing."
 
-enum Step { LOOK, MARK }
+## HAIR is appended (not inserted) so LOOK and MARK keep their values; the tabs show it
+## between them: Your pony, Mane and tail, Your cutie mark.
+enum Step { LOOK, MARK, HAIR }
 
 const STEP_LOOK_LABEL := "Your pony"
 const STEP_MARK_LABEL := "Your cutie mark"
+const STEP_HAIR_LABEL := "Mane and tail"
 
 ## Radians the turntable turns per pixel of horizontal drag, and how long after she lets go
 ## before the auto spin picks up again. The auto spin is what shows both flanks to a player
@@ -100,8 +110,9 @@ const TURN_DEGREES_PER_SECOND := 24.0
 ## column count for a grid, or its own button count for a plain row (which makes ui_up/
 ## ui_down a no-op there: posmod(index + count, count) is index again), so one pair of
 ## helpers below drives a two column stepper and a six column swatch grid the same way.
-const LOOK_REGIONS: Array[StringName] = [&"name", &"step", &"coat", &"mane", &"eyes",
+const LOOK_REGIONS: Array[StringName] = [&"name", &"step", &"race", &"coat", &"eyes",
 	&"mane_style", &"confirm"]
+const HAIR_REGIONS: Array[StringName] = [&"step", &"mane", &"mane2", &"tail", &"confirm"]
 const MARK_REGIONS: Array[StringName] = [&"step", &"ink", &"stamp", &"tool", &"action",
 	&"confirm"]
 
@@ -139,6 +150,9 @@ var _kb_on_name := false
 @onready var _eyes_grid: SwatchGrid = get_node_or_null(^"Layout/Panel/Margin/Column/EyesGrid")
 @onready var _mane_style_grid: SwatchGrid = get_node_or_null(
 	^"Layout/Panel/Margin/Column/ManeStyleGrid")
+@onready var _race_grid: SwatchGrid = get_node_or_null(^"Layout/Panel/Margin/Column/RaceGrid")
+@onready var _mane2_grid: SwatchGrid = get_node_or_null(^"Layout/Panel/Margin/Column/Mane2Grid")
+@onready var _tail_grid: SwatchGrid = get_node_or_null(^"Layout/Panel/Margin/Column/TailGrid")
 
 ## The ink she is drawing in right now, shown beside the ink buttons the same way each
 ## colour row shows its own pick. The canvas is the authority on which ink is loaded; this
@@ -171,6 +185,10 @@ func _ready() -> void:
 	_coat_label.text = COAT_LABEL
 	_mane_label.text = MANE_LABEL
 	_mane_style_label.text = MANE_STYLE_LABEL
+	for pair in [["RaceLabel", RACE_LABEL], ["Mane2Label", MANE2_LABEL], ["TailLabel", TAIL_LABEL]]:
+		var l := get_node_or_null(NodePath("Layout/Panel/Margin/Column/" + pair[0])) as Label
+		if l != null:
+			l.text = pair[1]
 	_eyes_label.text = EYES_LABEL
 	_mark_label.text = MARK_LABEL
 	_hint_label.text = HINT
@@ -186,6 +204,7 @@ func _ready() -> void:
 	_canvas.changed.connect(func() -> void: _sync_mark())
 	set_ink(0)
 	_camera.look_at(Vector3(0.0, 1.0, 0.0), Vector3.UP)
+	_stand_stage()
 	_wire_controls()
 	MenuStyleScript.apply_panel_box(get_node_or_null(^"Layout/Panel") as PanelContainer,
 		MenuStyleScript.paper_box())
@@ -194,6 +213,17 @@ func _ready() -> void:
 	_style_paper()
 	_build_grids()
 	_wire_steps()
+	var prev := get_node_or_null(^"Layout/Panel/Margin/Column/StyleRow/StylePrev") as Button
+	var nxt := get_node_or_null(^"Layout/Panel/Margin/Column/StyleRow/StyleNext") as Button
+	if prev != null and nxt != null:
+		prev.focus_mode = Control.FOCUS_NONE
+		nxt.focus_mode = Control.FOCUS_NONE
+		prev.pressed.connect(func() -> void: cycle_mane_style(-1))
+		nxt.pressed.connect(func() -> void: cycle_mane_style(1))
+		var sn := get_node_or_null(^"Layout/Panel/Margin/Column/StyleRow/StyleName") as Label
+		if sn != null:
+			MenuStyleScript.style_label(sn, 24, Color(0.24, 0.17, 0.3))
+			sn.add_theme_constant_override(&"outline_size", 0)
 	if _viewport != null:
 		_viewport.mouse_filter = Control.MOUSE_FILTER_STOP
 		_viewport.focus_mode = Control.FOCUS_NONE
@@ -219,6 +249,7 @@ const _PAPER_LABEL_PATHS: Array[NodePath] = [^"Layout/Panel/Margin/Column/Title"
 
 const _PAPER_BUTTON_PATHS: Array[NodePath] = [
 	^"Layout/Panel/Margin/Column/StepRow/StepLook",
+	^"Layout/Panel/Margin/Column/StepRow/StepHair",
 	^"Layout/Panel/Margin/Column/StepRow/StepMark",
 	^"Layout/Panel/Margin/Column/InkRow/Ink0", ^"Layout/Panel/Margin/Column/InkRow/Ink1",
 	^"Layout/Panel/Margin/Column/InkRow/Ink2", ^"Layout/Panel/Margin/Column/InkRow/Ink3",
@@ -351,6 +382,26 @@ func _build_grids() -> void:
 	if _mane_style_grid != null:
 		_retint_mane_style_grid()
 		_mane_style_grid.picked.connect(set_mane_style)
+	if _race_grid != null:
+		var race_swatches: Array[Color] = [Color(0.98, 0.84, 0.62), Color(0.74, 0.86, 1.0),
+			Color(0.88, 0.78, 1.0)]
+		var race_labels: Array[String] = []
+		race_labels.assign(PlayerLookScript.RACE_LABELS)
+		_race_grid.set_swatches(race_swatches, race_labels)
+		_race_grid.picked.connect(set_race)
+	for grid: SwatchGrid in [_mane2_grid, _tail_grid]:
+		if grid == null:
+			continue
+		var sw: Array[Color] = [Color(0.95, 0.93, 0.9)]
+		sw.append_array(_palette.manes)
+		var lab: Array[String] = [SAME_AS_MANE]
+		for i in _palette.manes.size():
+			lab.append("")
+		grid.set_swatches(sw, lab)
+	if _mane2_grid != null:
+		_mane2_grid.picked.connect(func(i: int) -> void: set_mane2(i - 1))
+	if _tail_grid != null:
+		_tail_grid.picked.connect(func(i: int) -> void: set_tail(i - 1))
 
 
 ## THE CARDS ARE TINTED BY THE MANE COLOUR SHE IS ON, so they read as manes rather than as
@@ -368,9 +419,11 @@ func _retint_mane_style_grid() -> void:
 	var swatches: Array[Color] = []
 	var labels: Array[String] = []
 	var mane_index: int = _look.mane if _look != null else 0
-	for i in StockPaletteScript.mane_style_count():
+	var race: int = _look.race if _look != null else PlayerLookScript.RACE_UNICORN
+	var count := PlayerLookScript.style_count(race)
+	for i in count:
 		swatches.append(_palette.mane_at(mane_index))
-		labels.append(StockPaletteScript.mane_style_label(i))
+		labels.append(str(i + 1))
 	_mane_style_grid.set_swatches(swatches, labels)
 
 
@@ -399,8 +452,32 @@ func set_eyes(index: int) -> void:
 
 ## THE ONE ROW THAT IS NOT A TINT: a different mesh, so the pony on the turntable is rebuilt.
 func set_mane_style(index: int) -> void:
-	_look.mane_style = posmod(index, maxi(1, StockPaletteScript.mane_style_count()))
+	_look.mane_style = posmod(index, PlayerLookScript.style_count(_look.race))
 	_build_model()
+	_restyle()
+	_refresh_swatches()
+
+
+## Earth pony, pegasus or unicorn: a different set of bodies, so the style resets to the
+## first of that kind and the turntable pony is rebuilt.
+func set_race(index: int) -> void:
+	_look.race = clampi(index, PlayerLookScript.RACE_EARTH, PlayerLookScript.RACE_UNICORN)
+	_look.mane_style = 0
+	_retint_mane_style_grid()
+	_build_model()
+	_restyle()
+	_refresh_swatches()
+
+
+## -1 is "same as the mane".
+func set_mane2(index: int) -> void:
+	_look.mane2 = clampi(index, -1, _palette.manes.size() - 1)
+	_restyle()
+	_refresh_swatches()
+
+
+func set_tail(index: int) -> void:
+	_look.tail = clampi(index, -1, _palette.manes.size() - 1)
 	_restyle()
 	_refresh_swatches()
 
@@ -472,7 +549,8 @@ func confirm() -> bool:
 ## Every string this screen draws, for the copy rule test.
 func drawn_lines() -> Array[String]:
 	var lines: Array[String] = [TITLE, NAME_LABEL, COAT_LABEL, MANE_LABEL, MANE_STYLE_LABEL,
-		EYES_LABEL, MARK_LABEL, CONFIRM_LABEL, HINT, STEP_LOOK_LABEL, STEP_MARK_LABEL]
+		EYES_LABEL, MARK_LABEL, CONFIRM_LABEL, HINT, STEP_LOOK_LABEL, STEP_MARK_LABEL,
+		STEP_HAIR_LABEL, RACE_LABEL, MANE2_LABEL, TAIL_LABEL, SAME_AS_MANE]
 	for i in StockPaletteScript.mane_style_count():
 		lines.append(StockPaletteScript.mane_style_label(i))
 	for id: int in MarkStampsScript.ids():
@@ -491,31 +569,19 @@ func step() -> int:
 ## a canvas, six inks, six stamps, four brushes and four buttons on one column, and the owner
 ## read that as cheap. Meeting the pony is one job; drawing her mark is another.
 func set_step(value: int) -> void:
-	_step = clampi(value, Step.LOOK, Step.MARK)
-	var on_look: bool = _step == Step.LOOK
-	for path: NodePath in [^"Layout/Panel/Margin/Column/CoatLabel",
-			^"Layout/Panel/Margin/Column/CoatGrid",
-			^"Layout/Panel/Margin/Column/ManeLabel",
-			^"Layout/Panel/Margin/Column/ManeGrid",
-			^"Layout/Panel/Margin/Column/EyesLabel",
-			^"Layout/Panel/Margin/Column/EyesGrid",
-			^"Layout/Panel/Margin/Column/ManeStyleLabel",
-			^"Layout/Panel/Margin/Column/ManeStyleGrid",
-			^"Layout/Panel/Margin/Column/NameLabel",
-			^"Layout/Panel/Margin/Column/NameBox"]:
-		var node := get_node_or_null(path) as Control
-		if node != null:
-			node.visible = on_look
-	for path: NodePath in [^"Layout/Panel/Margin/Column/MarkLabel",
-			^"Layout/Panel/Margin/Column/MarkCanvas",
-			^"Layout/Panel/Margin/Column/HintLabel",
-			^"Layout/Panel/Margin/Column/InkRow",
-			^"Layout/Panel/Margin/Column/StampRow",
-			^"Layout/Panel/Margin/Column/ToolRow",
-			^"Layout/Panel/Margin/Column/ActionRow"]:
-		var node := get_node_or_null(path) as Control
-		if node != null:
-			node.visible = not on_look
+	_step = clampi(value, Step.LOOK, Step.HAIR)
+	var shown: Dictionary = {
+		Step.LOOK: ["NameLabel", "NameBox", "RaceLabel", "RaceGrid", "CoatLabel", "CoatGrid",
+			"EyesLabel", "EyesGrid", "ManeStyleLabel", "StyleRow"],
+		Step.HAIR: ["ManeLabel", "ManeGrid", "Mane2Label", "Mane2Grid", "TailLabel", "TailGrid"],
+		Step.MARK: ["MarkLabel", "MarkCanvas", "HintLabel", "InkRow", "StampRow", "ToolRow",
+			"ActionRow"],
+	}
+	for step: int in shown:
+		for n: String in shown[step]:
+			var node := get_node_or_null(NodePath("Layout/Panel/Margin/Column/" + n)) as Control
+			if node != null:
+				node.visible = step == _step
 	MenuStyleScript.tick_page()
 	# THE CURSOR MOVES WITH THE STEP. The two steps do not share a region list (MARK has no
 	# name field or colour grids; LOOK has no ink/stamp/tool/action rows), so a cursor left
@@ -527,6 +593,7 @@ func set_step(value: int) -> void:
 func _wire_steps() -> void:
 	for pair: Array in [[^"Layout/Panel/Margin/Column/StepRow/StepLook", Step.LOOK,
 			STEP_LOOK_LABEL],
+			[^"Layout/Panel/Margin/Column/StepRow/StepHair", Step.HAIR, STEP_HAIR_LABEL],
 			[^"Layout/Panel/Margin/Column/StepRow/StepMark", Step.MARK, STEP_MARK_LABEL]]:
 		var button := get_node_or_null(pair[0] as NodePath) as Button
 		if button == null:
@@ -547,7 +614,12 @@ func _wire_steps() -> void:
 ## `.pressed.emit()` on a Button this file already wired, or `_name_box.grab_focus()`.
 
 func _regions() -> Array[StringName]:
-	return MARK_REGIONS if _step == Step.MARK else LOOK_REGIONS
+	match _step:
+		Step.MARK:
+			return MARK_REGIONS
+		Step.HAIR:
+			return HAIR_REGIONS
+	return LOOK_REGIONS
 
 
 func _region_grid(region: StringName) -> SwatchGrid:
@@ -558,8 +630,12 @@ func _region_grid(region: StringName) -> SwatchGrid:
 			return _mane_grid
 		&"eyes":
 			return _eyes_grid
-		&"mane_style":
-			return _mane_style_grid
+		&"race":
+			return _race_grid
+		&"mane2":
+			return _mane2_grid
+		&"tail":
+			return _tail_grid
 	return null
 
 
@@ -577,6 +653,7 @@ func _region_buttons(region: StringName) -> Array[BaseButton]:
 	match region:
 		&"step":
 			paths = [^"Layout/Panel/Margin/Column/StepRow/StepLook",
+				^"Layout/Panel/Margin/Column/StepRow/StepHair",
 				^"Layout/Panel/Margin/Column/StepRow/StepMark"]
 		&"ink":
 			for i in ink_count():
@@ -591,6 +668,9 @@ func _region_buttons(region: StringName) -> Array[BaseButton]:
 		&"action":
 			paths = [^"Layout/Panel/Margin/Column/ActionRow/Undo",
 				^"Layout/Panel/Margin/Column/ActionRow/Clear"]
+		&"mane_style":
+			paths = [^"Layout/Panel/Margin/Column/StyleRow/StylePrev",
+				^"Layout/Panel/Margin/Column/StyleRow/StyleNext"]
 		&"confirm":
 			paths = [^"Layout/Panel/Margin/Column/Confirm"]
 	var out: Array[BaseButton] = []
@@ -789,6 +869,20 @@ func _sync_mark() -> void:
 		CutieMarkScript.apply(_model, _look.mark())
 
 
+## The grassy hillock she stands on (Blender-built, tools/blender_props/build_props.py), so
+## the turntable pony is on the ground of a little world rather than floating in a void.
+## Static: only the pony on the turntable turns.
+func _stand_stage() -> void:
+	var path := "res://assets/models/creator_stage.glb"
+	if _turntable == null or not ResourceLoader.exists(path):
+		return
+	var stage: Node3D = (load(path) as PackedScene).instantiate()
+	stage.name = "Stage"
+	_turntable.get_parent().add_child(stage)
+	stage.position = _turntable.position
+	ToonStyler.style(stage, &"prop", {})
+
+
 func _build_model() -> void:
 	if _model != null and is_instance_valid(_model):
 		_model.queue_free()
@@ -810,9 +904,8 @@ func _build_model() -> void:
 func _restyle() -> void:
 	if _model == null:
 		return
-	StockTintScript.apply(_model, _palette,
-		{"coat": _look.coat, "mane": _look.mane, "eyes": _look.eyes})
-	CutieMarkScript.apply(_model, _look.mark())
+	# The same paint every pony in the game wears (game/systems/pony_paint.gd).
+	PonyPaintScript.apply(_model, _look.to_pony_look(_palette))
 
 
 func _process(delta: float) -> void:
@@ -878,3 +971,13 @@ func _refresh_swatches() -> void:
 		_eyes_grid.set_selected(_look.eyes)
 	if _mane_style_grid != null:
 		_mane_style_grid.set_selected(_look.mane_style)
+	var style_name := get_node_or_null(^"Layout/Panel/Margin/Column/StyleRow/StyleName") as Label
+	if style_name != null:
+		style_name.text = "Style %d of %d" % [_look.mane_style + 1,
+			PlayerLookScript.style_count(_look.race)]
+	if _race_grid != null:
+		_race_grid.set_selected(_look.race)
+	if _mane2_grid != null:
+		_mane2_grid.set_selected(_look.mane2 + 1)
+	if _tail_grid != null:
+		_tail_grid.set_selected(_look.tail + 1)

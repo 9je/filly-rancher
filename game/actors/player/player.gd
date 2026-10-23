@@ -106,6 +106,8 @@ const PonyVisualsScript := preload("res://actors/pony/pony_visuals.gd")
 const StockPaletteScript := preload("res://systems/stock_palette.gd")
 const StockTintScript := preload("res://systems/stock_tint.gd")
 const CutieMarkScript := preload("res://systems/cutie_mark.gd")
+const PonyPaintScript := preload("res://systems/pony_paint.gd")
+const DonorTableScript := preload("res://systems/donor_table.gd")
 
 ## The input action held to WALK instead of running. Named `sneak` rather than `walk`
 ## because slowness is not what it is FOR -- see is_sneaking() and Pony.SNEAK_NOTICE_FACTOR.
@@ -224,6 +226,14 @@ var _step_surface: StringName = SURFACE_GRASS
 ## compares against it: a tint can be re-applied to a body that already exists, a different
 ## mesh cannot, so a change here means a rebuild.
 var _mane_style_built := 0
+## The donor body standing in Visuals now (v1), so apply_look() rebuilds only on a change.
+var _donor_built: StringName = &""
+var _worn: PonyLook
+
+
+## The look she is wearing now (what PonyPaint was last handed), or null before any.
+func current_look() -> PonyLook:
+	return _worn
 
 
 func _ready() -> void:
@@ -296,27 +306,30 @@ func hair_influence() -> float:
 func apply_look(look: PlayerLook) -> void:
 	if look == null:
 		return
-	if look.mane_style != _mane_style_built:
-		_rebuild_visuals(look.mane_style)
+	# v1: the same PonyPaint path every pony in the game wears (race, two-tone mane, tail,
+	# iris, mark), on whichever donor her race and style pick.
+	var pony_look: PonyLook = look.to_pony_look(StockPaletteScript.load_player())
+	if pony_look.donor != _donor_built:
+		_rebuild_visuals(look.mane_style, pony_look.donor)
+	_mane_style_built = look.mane_style
 	if visuals.get_child_count() == 0:
 		return
 	var body: Node3D = visuals.get_child(0)
-	StockTintScript.apply(body, StockPaletteScript.load_player(),
-		{"coat": look.coat, "mane": look.mane, "eyes": look.eyes})
-	CutieMarkScript.apply(body, look.mark())
+	_worn = pony_look
+	PonyPaintScript.apply(body, pony_look)
 
 
 ## Swap the body for one built from a different base model. Freed outright rather than
 ## queue_free()'d, for game/world/race_runner.gd's reason: a queued node is still among
 ## get_children() until the end of the frame, so the "body is child 0 of Visuals"
 ## convention this whole file rests on would be false for a frame.
-func _rebuild_visuals(mane_style: int) -> void:
+func _rebuild_visuals(mane_style: int, donor: StringName = &"") -> void:
 	if visuals.get_child_count() > 0:
 		var old: Node = visuals.get_child(0)
 		visuals.remove_child(old)
 		old.free()
 	_anim = null
-	_build_visuals(mane_style)
+	_build_visuals(mane_style, donor)
 
 
 ## Which surface she is walking on. Set by ranch.gd, which is the only thing that knows
@@ -497,7 +510,7 @@ func _play(clip: StringName) -> void:
 ## is reported loudly but is not fatal: an invisible player that still walks around is
 ## a far better headless-test and debugging experience than a crash, and PonyVisuals
 ## already push_errors the specific reason.
-func _build_visuals(mane_style: int = 0) -> void:
+func _build_visuals(mane_style: int = 0, donor: StringName = &"") -> void:
 	var registry := PonyRegistryScript.new()
 	registry.load_all(pony_dir)
 	# by_id() rather than the dictionary load_all() returns: the player's own record is a
@@ -509,12 +522,14 @@ func _build_visuals(mane_style: int = 0) -> void:
 			% [pony_id, pony_dir])
 		return
 
-	var pony: Node3D = PonyVisualsScript.build(data,
-		StockPaletteScript.mane_style_path(mane_style))
+	var path := DonorTableScript.model_path(donor) if donor != &"" \
+		else StockPaletteScript.mane_style_path(mane_style)
+	var pony: Node3D = PonyVisualsScript.build(data, path)
 	if pony == null:
 		push_error("Player: PonyVisuals.build failed for '%s'" % pony_id)
 		return
 	_mane_style_built = mane_style
+	_donor_built = donor if donor != &"" else StringName(path.get_file().get_basename())
 
 	visuals.add_child(pony)
 	# INDEX 0, ALWAYS. `Visuals` already carries `BeamOrigin` as a scene-authored child

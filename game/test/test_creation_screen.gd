@@ -79,11 +79,24 @@ func test_the_turntable_holds_a_tinted_pony() -> void:
 	if _screen.model() == null:
 		pass_test("no converted assets on this machine")
 		return
+	# v1: PonyPaint's toon materials. Headless runs skip the shader swap, so it is switched
+	# on for this one check.
+	var was := ToonStyler.shading_enabled
+	ToonStyler.shading_enabled = true
 	_screen.cycle_coat(2)
 	var palette: StockPalette = StockPaletteScript.load_player()
-	assert_eq(StockTint.override_of(_screen.model(), &"body").albedo_color,
-		palette.coat_at(_screen.look().coat),
-		"the swatch she picked is the colour standing on the turntable")
+	var found := false
+	for node in _screen.model().find_children("*", "MeshInstance3D", true, false):
+		var mi := node as MeshInstance3D
+		for i in range(mi.mesh.get_surface_count()):
+			var src := mi.mesh.surface_get_material(i)
+			if src != null and src.resource_name == "body" and mi.get_active_material(i) is ShaderMaterial:
+				var m := mi.get_active_material(i) as ShaderMaterial
+				assert_eq(m.get_shader_parameter(&"albedo"), palette.coat_at(_screen.look().coat),
+					"the swatch she picked is the colour standing on the turntable")
+				found = true
+	ToonStyler.shading_enabled = was
+	assert_true(found, "the turntable pony has a painted coat")
 
 
 func test_nothing_the_screen_draws_carries_a_dash() -> void:
@@ -173,7 +186,8 @@ func test_the_ink_names_are_part_of_what_the_screen_draws() -> void:
 
 
 func test_cycling_the_mane_style_row_walks_the_pool_and_comes_back() -> void:
-	var n: int = StockPaletteScript.mane_style_count()
+	# v1: the pool is her race's donor bodies (PlayerLook.styles_for), not the old four.
+	var n: int = PlayerLookScript.style_count(_screen.look().race)
 	for i in n:
 		assert_eq(_screen.look().mane_style, i)
 		_screen.cycle_mane_style(1)
@@ -182,7 +196,7 @@ func test_cycling_the_mane_style_row_walks_the_pool_and_comes_back() -> void:
 
 func test_cycling_backwards_from_zero_reaches_the_last_style() -> void:
 	_screen.cycle_mane_style(-1)
-	assert_eq(_screen.look().mane_style, StockPaletteScript.mane_style_count() - 1)
+	assert_eq(_screen.look().mane_style, PlayerLookScript.style_count(_screen.look().race) - 1)
 
 
 func test_the_mane_style_survives_confirm() -> void:
@@ -282,8 +296,8 @@ func test_the_three_colour_rows_are_swatch_grids_and_not_steppers() -> void:
 func test_the_mane_style_row_is_a_card_grid_carrying_the_style_names() -> void:
 	var grid := _screen.find_child("ManeStyleGrid", true, false) as SwatchGrid
 	assert_not_null(grid)
-	assert_eq(grid.cell_count(), StockPalette.mane_style_count())
-	assert_eq(grid.cell(0).text, StockPalette.mane_style_label(0))
+	assert_eq(grid.cell_count(), PlayerLookScript.style_count(_screen.look().race))
+	assert_eq(grid.cell(0).text, "1")
 
 
 func test_clicking_a_coat_swatch_sets_that_coat_on_the_look() -> void:
@@ -383,11 +397,12 @@ func test_a_full_keyboard_walkthrough_can_finish_creation_with_no_mouse() -> voi
 	assert_eq(_screen.look().coat, 2, "ui_accept on the highlighted swatch is the coat she gets")
 
 	# --- reach the MARK step, purely by keyboard --------------------------------------------
+	# v1: three tabs, Your pony, Mane and tail, Your cutie mark; the mark is the third.
 	_goto_region(&"step")
-	_screen.move_highlight(1)
+	_screen.move_highlight(2)
 	_screen.activate_highlight()
 	assert_eq(_screen.step(), CreationScreen.Step.MARK,
-		"the LOOK/MARK switch is keyboard reachable")
+		"the step tabs are keyboard reachable")
 
 	# --- stamp a shape, purely by keyboard ---------------------------------------------------
 	_goto_region(&"stamp")
@@ -440,3 +455,33 @@ func test_cycle_mane_also_retints_the_mane_style_cards() -> void:
 	var tint: Color = (grid.cell(0).get_theme_stylebox(&"normal") as StyleBoxFlat).bg_color
 	assert_eq(tint, palette.mane_at(_screen.look().mane),
 		"cycle_mane() is set_mane() with a step added; the retint has to come along with it")
+
+
+func test_the_kind_of_pony_row_changes_her_race_and_her_style_pool() -> void:
+	_screen.set_race(PlayerLookScript.RACE_PEGASUS)
+	assert_eq(_screen.look().race, PlayerLookScript.RACE_PEGASUS)
+	assert_eq(_screen.look().mane_style, 0, "a new kind starts on its first style")
+	var grid := _screen.find_child("ManeStyleGrid", true, false) as SwatchGrid
+	assert_eq(grid.cell_count(), PlayerLookScript.style_count(PlayerLookScript.RACE_PEGASUS))
+	assert_eq(StringName(DonorTable.load_table().find(
+		_screen.look().to_pony_look(StockPalette.load_player()).donor).get("race", "")), &"pegasus")
+
+
+func test_the_streak_and_tail_rows_default_to_the_mane_and_take_their_own_colour() -> void:
+	var pal := StockPalette.load_player()
+	assert_eq(_screen.look().to_pony_look(pal).tail, pal.mane_at(_screen.look().mane))
+	_screen.set_tail(5)
+	_screen.set_mane2(2)
+	var l := _screen.look().to_pony_look(pal)
+	assert_eq(l.tail, pal.mane_at(5))
+	assert_eq(l.mane2, pal.mane_at(2))
+	_screen.set_tail(-1)
+	assert_eq(_screen.look().to_pony_look(pal).tail, pal.mane_at(_screen.look().mane), "-1 is the mane again")
+
+
+func test_the_three_steps_fit_a_1080_screen() -> void:
+	for step in [CreationScreen.Step.LOOK, CreationScreen.Step.HAIR, CreationScreen.Step.MARK]:
+		_screen.set_step(step)
+		await wait_frames(2)
+		var col := _screen.find_child("Column", true, false) as Control
+		assert_lt(col.get_combined_minimum_size().y, 1000.0, "step %d fits" % step)

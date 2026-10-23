@@ -694,6 +694,31 @@ def fx_poster():
     export("fx_poster")
 
 
+@prop("creator_stage")
+def creator_stage():
+    """The character creator's stage: a round grassy hillock with daisies and a scrap of
+    fence, the pony standing on its crown. Wide enough that the turntable's edge never shows."""
+    import random
+    rnd = random.Random(12)
+    mound = blob("mound", 1.0, (0, 0, -0.55), "leaf", seed=900, lumps=0.05, scale=(3.4, 3.4, 0.6))
+    rim = blob("rim", 1.0, (0, 0, -0.75), "leaf_dark", seed=901, lumps=0.06, scale=(3.7, 3.7, 0.55))
+    parts = [mound, rim]
+    for i in range(22):
+        a = rnd.uniform(0, math.tau)
+        r = rnd.uniform(1.2, 3.0)
+        x, y = math.cos(a) * r, math.sin(a) * r
+        z = 0.02 - (r / 3.4) ** 2 * 0.5
+        parts.append(cyl("stem%d" % i, 0.015, 0.12, (x, y, z + 0.06), "leaf_dark", verts=6))
+        parts.append(ball("petal%d" % i, 0.06, (x, y, z + 0.14), rnd.choice(["white", "pink", "gold"]),
+                          scale=(1, 1, 0.5), subdiv=1))
+    for k in range(3):
+        x = -2.4 + k * 0.7
+        parts.append(box("fpost%d" % k, (0.08, 0.08, 0.6), (x, 2.1, -0.15), "wood", bevel=0.01))
+    parts.append(box("frail", (1.6, 0.05, 0.07), (-1.7, 2.1, 0.05), "wood", bevel=0.01))
+    join(parts, "creator_stage")
+    export("creator_stage")
+
+
 def main():
     wanted = [n for n in args.only.split(",") if n] or list(BUILDERS)
     for name in wanted:

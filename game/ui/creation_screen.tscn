@@ -23,6 +23,8 @@ sky = SubResource("DawnSky")
 ambient_light_source = 2
 ambient_light_sky_contribution = 1.0
 tonemap_mode = 2
+tonemap_white = 6.0
+tonemap_exposure = 0.85
 
 [node name="CreationScreen" type="CanvasLayer"]
 layer = 4
@@ -48,7 +50,7 @@ theme_override_constants/separation = 36
 [node name="Stage" type="PanelContainer" parent="Layout"]
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_stretch_ratio = 1.0
+size_flags_stretch_ratio = 1.15
 
 [node name="Viewport" type="SubViewportContainer" parent="Layout/Stage"]
 layout_mode = 2
@@ -58,6 +60,7 @@ mouse_filter = 2
 stretch = true
 
 [node name="SubViewport" type="SubViewport" parent="Layout/Stage/Viewport"]
+own_world_3d = true
 transparent_bg = false
 handle_input_locally = false
 size = Vector2i(480, 640)
@@ -78,9 +81,10 @@ current = true
 [node name="Turntable" type="Node3D" parent="Layout/Stage/Viewport/SubViewport"]
 
 [node name="Panel" type="PanelContainer" parent="Layout"]
+custom_minimum_size = Vector2(760, 0)
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_stretch_ratio = 1.0
+size_flags_stretch_ratio = 0.85
 
 [node name="Margin" type="MarginContainer" parent="Layout/Panel"]
 layout_mode = 2
@@ -104,6 +108,9 @@ theme_override_constants/separation = 8
 [node name="StepLook" type="Button" parent="Layout/Panel/Margin/Column/StepRow"]
 layout_mode = 2
 
+[node name="StepHair" type="Button" parent="Layout/Panel/Margin/Column/StepRow"]
+layout_mode = 2
+
 [node name="StepMark" type="Button" parent="Layout/Panel/Margin/Column/StepRow"]
 layout_mode = 2
 
@@ -113,6 +120,14 @@ layout_mode = 2
 [node name="NameBox" type="LineEdit" parent="Layout/Panel/Margin/Column"]
 layout_mode = 2
 max_length = 16
+
+[node name="RaceLabel" type="Label" parent="Layout/Panel/Margin/Column"]
+layout_mode = 2
+
+[node name="RaceGrid" type="GridContainer" parent="Layout/Panel/Margin/Column"]
+layout_mode = 2
+columns = 3
+script = ExtResource("4")
 
 [node name="CoatLabel" type="Label" parent="Layout/Panel/Margin/Column"]
 layout_mode = 2
@@ -130,6 +145,22 @@ layout_mode = 2
 columns = 8
 script = ExtResource("4")
 
+[node name="Mane2Label" type="Label" parent="Layout/Panel/Margin/Column"]
+layout_mode = 2
+
+[node name="Mane2Grid" type="GridContainer" parent="Layout/Panel/Margin/Column"]
+layout_mode = 2
+columns = 9
+script = ExtResource("4")
+
+[node name="TailLabel" type="Label" parent="Layout/Panel/Margin/Column"]
+layout_mode = 2
+
+[node name="TailGrid" type="GridContainer" parent="Layout/Panel/Margin/Column"]
+layout_mode = 2
+columns = 9
+script = ExtResource("4")
+
 [node name="EyesLabel" type="Label" parent="Layout/Panel/Margin/Column"]
 layout_mode = 2
 
@@ -142,9 +173,30 @@ script = ExtResource("4")
 layout_mode = 2
 
 [node name="ManeStyleGrid" type="GridContainer" parent="Layout/Panel/Margin/Column"]
+visible = false
 layout_mode = 2
-columns = 4
+columns = 7
 script = ExtResource("4")
+
+[node name="StyleRow" type="HBoxContainer" parent="Layout/Panel/Margin/Column"]
+layout_mode = 2
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="StylePrev" type="Button" parent="Layout/Panel/Margin/Column/StyleRow"]
+custom_minimum_size = Vector2(64, 56)
+layout_mode = 2
+text = "<"
+
+[node name="StyleName" type="Label" parent="Layout/Panel/Margin/Column/StyleRow"]
+custom_minimum_size = Vector2(260, 0)
+layout_mode = 2
+horizontal_alignment = 1
+
+[node name="StyleNext" type="Button" parent="Layout/Panel/Margin/Column/StyleRow"]
+custom_minimum_size = Vector2(64, 56)
+layout_mode = 2
+text = ">"
 
 [node name="MarkLabel" type="Label" parent="Layout/Panel/Margin/Column"]
 layout_mode = 2

@@ -116,6 +116,8 @@ func _run() -> void:
 				await _factory()
 			"talk":
 				await _talk()
+			"creator":
+				await _creator()
 
 
 func _clear() -> void:
@@ -318,3 +320,21 @@ func _talk() -> void:
 	await _shoot("talk_choice")
 	people.queue_free()
 	player.queue_free()
+
+
+## The character creator, each of its three steps, on an earth pony with a streaked mane.
+func _creator() -> void:
+	await _clear()
+	var screen: CanvasLayer = (load("res://ui/creation_screen.tscn") as PackedScene).instantiate()
+	add_child(screen)
+	var look := PlayerLook.default_look()
+	look.race = PlayerLook.RACE_EARTH
+	look.mane_style = 3
+	look.mane2 = 9
+	screen.call("open", look)
+	await get_tree().create_timer(1.0).timeout
+	for step in [0, 2, 1]:
+		screen.call("set_step", step)
+		await get_tree().create_timer(0.6).timeout
+		await _shoot("creator_step%d" % step)
+	screen.queue_free()
