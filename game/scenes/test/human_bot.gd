@@ -62,8 +62,6 @@ var _log: Array[String] = []
 var _done := false
 var _sighted_only := false
 var _build_fails: Dictionary = {}
-var _talk_fails: Dictionary = {}
-var _talk_skip: Dictionary = {}
 var _palace_visits := 0
 var _last_market := -9999.0
 var _lift: StringName = &""
@@ -456,9 +454,6 @@ func _talk_to_news() -> bool:
 	for id: StringName in p.get("npcs"):
 		if not bool(p.call("has_news", id)):
 			continue
-		# Two tries and no luck: leave her be for a few minutes, as a person would.
-		if _t() < float(_talk_skip.get(id, -1.0)):
-			continue
 		var n: Node3D = p.call("npc", id)
 		if n == null:
 			continue
@@ -488,15 +483,6 @@ func _talk_to_news() -> bool:
 		act = ranch.call("current_interaction")
 	if OS.has_environment("BOT_DEBUG"):
 		_say("talk prompt %s, %.1f m" % [act, who.global_position.distance_to(player.global_position)])
-	if int(act.get("kind", 0)) != InteractionScript.Kind.TALK or str(act.get("subject", "")) != want:
-		var fails := int(_talk_fails.get(best, 0)) + 1
-		_talk_fails[best] = fails
-		if fails >= 2:
-			_talk_skip[best] = _t() + 300.0
-			_talk_fails[best] = 0
-		_look_at = Vector3.INF
-		return true
-	_talk_fails[best] = 0
 	await _tap(&"interact")
 	await _read_conversation()
 	_look_at = Vector3.INF
