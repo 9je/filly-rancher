@@ -35,7 +35,7 @@ PALETTE = {
     "pink": (0.97, 0.62, 0.74), "teal": (0.2, 0.68, 0.66), "lilac": (0.74, 0.62, 0.94),
     "leather": (0.6, 0.38, 0.24), "black": (0.12, 0.11, 0.13), "grey": (0.56, 0.58, 0.62),
     "rose": (0.96, 0.42, 0.52), "stone": (0.74, 0.72, 0.68), "stone_dark": (0.56, 0.55, 0.52),
-    "cloud": (0.98, 0.98, 1.0), "cloud_shade": (0.86, 0.88, 0.96),
+    "cloud": (0.98, 0.98, 1.0), "cloud_shade": (0.86, 0.88, 0.96), "cream": (0.99, 0.95, 0.86),
 }
 
 BUILDERS = {}
@@ -219,19 +219,37 @@ def postbox():
     export("postbox")
 
 
-def _tree(name, seed, height, canopy, color, extra_color):
-    trunk = cyl("trunk", 0.22, height, (0, 0, height / 2), "bark", r2=0.14, verts=12)
-    puffs = [blob("c0", canopy, (0, 0, height + canopy * 0.55), color, seed=seed)]
-    puffs.append(blob("c1", canopy * 0.72, (canopy * 0.6, 0.1, height + canopy * 0.2), extra_color, seed=seed + 1))
-    puffs.append(blob("c2", canopy * 0.68, (-canopy * 0.55, -0.15, height + canopy * 0.25), color, seed=seed + 2))
-    puffs.append(blob("c3", canopy * 0.6, (0.05, canopy * 0.55, height + canopy * 0.35), extra_color, seed=seed + 3))
-    join([trunk] + puffs, name)
+def _tree(name, seed, height, canopy, color, extra_color, fruit=False):
+    """The show's soft round tree: a chunky, slightly curved trunk under a cloud of lumpy
+    leaf puffs, a darker puff tucked under for depth (the show paints its trees that way)."""
+    import random
+    rnd = random.Random(seed)
+    trunk = cyl("trunk", 0.36, height, (0, 0, height / 2), "bark", r2=0.22, verts=12)
+    for v in trunk.data.vertices:
+        v.co.x += 0.12 * math.sin(v.co.z / height * math.pi)
+    root = cyl("root", 0.55, 0.35, (0, 0, 0.17), "bark", r2=0.36, verts=12)
+    puffs = [blob("c0", canopy, (0, 0, height + canopy * 0.55), color, seed=seed, lumps=0.32)]
+    puffs.append(blob("under", canopy * 0.85, (0, 0, height + canopy * 0.15), "leaf_dark", seed=seed + 9, lumps=0.25,
+                      scale=(1.1, 1.1, 0.6)))
+    for k in range(4):
+        a = k / 4 * math.tau + rnd.uniform(-0.3, 0.3)
+        puffs.append(blob("c%d" % (k + 1), canopy * rnd.uniform(0.55, 0.72),
+                          (math.cos(a) * canopy * 0.62, math.sin(a) * canopy * 0.62, height + canopy * rnd.uniform(0.25, 0.7)),
+                          extra_color if k % 2 else color, seed=seed + k + 1, lumps=0.3))
+    extras = []
+    if fruit:
+        for i in range(16):
+            a = rnd.uniform(0, math.tau)
+            el = rnd.uniform(-0.2, 0.9)
+            r = canopy * 1.32
+            p = Vector((math.cos(a) * math.cos(el), math.sin(a) * math.cos(el), math.sin(el))) * r
+            extras.append(ball("apple%d" % i, 0.15, (p.x, p.y, height + canopy * 0.55 + p.z), "red", subdiv=1))
+    join([trunk, root] + puffs + extras, name)
     export(name)
 
 
 @prop("tree_round")
 def tree_round():
-    """The show's soft round tree: a short trunk under a cloud of leaf puffs."""
     _tree("tree_round", 11, 1.8, 1.5, "leaf", "leaf_light")
 
 
@@ -242,19 +260,7 @@ def tree_tall():
 
 @prop("tree_apple")
 def tree_apple():
-    trunk = cyl("trunk", 0.24, 1.7, (0, 0, 0.85), "bark", r2=0.15, verts=12)
-    puffs = [blob("c0", 1.45, (0, 0, 2.5), "leaf", seed=31), blob("c1", 1.0, (0.9, 0.2, 2.2), "leaf_light", seed=32),
-             blob("c2", 1.0, (-0.85, -0.2, 2.25), "leaf", seed=33)]
-    import random
-    rnd = random.Random(5)
-    apples = []
-    for i in range(14):
-        a = rnd.uniform(0, math.tau)
-        z = rnd.uniform(1.8, 3.2)
-        r = 1.35 if z < 2.8 else 1.0
-        apples.append(ball("apple%d" % i, 0.13, (math.cos(a) * r, math.sin(a) * r, z), "red", subdiv=1))
-    join([trunk] + puffs + apples, "tree_apple")
-    export("tree_apple")
+    _tree("tree_apple", 31, 1.7, 1.45, "leaf", "leaf_light", fruit=True)
 
 
 @prop("bush")
@@ -393,6 +399,299 @@ def prism_works():
     parts.append(cyl("spout", 4.5, 14, (12, -10, 30), "gold", r2=6.5, verts=24, rot=(math.radians(-55), 0, math.radians(20))))
     join(parts, "prism_works")
     export("prism_works")
+
+
+@prop("cloud_lift")
+def cloud_lift():
+    """The lift up to the Rainbow Factory: a cart of crates on a fluffy cloud platform under
+    a gold-ringed canopy. It rises from the Depot at night (clue 10)."""
+    deck = blob("deck", 2.2, (0, 0, 0), "cloud", seed=600, lumps=0.25, scale=(1.4, 1.0, 0.35))
+    rail = torus("rail", 1.9, 0.08, (0, 0, 0.75), "gold")
+    posts = [cyl("post%d" % i, 0.07, 1.6, (math.cos(a) * 1.9, math.sin(a) * 1.9, 0.6), "gold", verts=10)
+             for i, a in enumerate([k * math.tau / 6 for k in range(6)])]
+    canopy = blob("canopy", 1.6, (0, 0, 2.1), "cloud_shade", seed=601, lumps=0.2, scale=(1.4, 1.4, 0.45))
+    crates = [box("crate%d" % i, (0.7, 0.6, 0.6), (x, y, 0.55), "brightsky", bevel=0.04)
+              for i, (x, y) in enumerate([(-0.5, -0.3), (0.45, -0.2), (0.0, 0.45)])]
+    join([deck, rail, canopy] + posts + crates, "cloud_lift")
+    export("cloud_lift")
+
+
+@prop("weather_pylon")
+def weather_pylon():
+    """A weather pylon: a slim sky-blue mast with gold bands, a cloud-catcher dish and a
+    glowing core the Rescue path holds the Scoop on to cut (STORY.md section 5)."""
+    base = cyl("base", 0.9, 0.5, (0, 0, 0.25), "stone", verts=16, bevel=0.05)
+    mast = cyl("mast", 0.28, 7.5, (0, 0, 4.0), "brightsky", r2=0.18, verts=16)
+    bands = [torus("band%d" % i, 0.3 - i * 0.02, 0.06, (0, 0, 1.5 + i * 1.8), "gold") for i in range(4)]
+    dish = cyl("dish", 1.4, 0.25, (0, 0, 7.8), "white", r2=0.5, verts=24)
+    core = ball("core", 0.45, (0, 0, 8.4), "glass")
+    vanes = [box("vane%d" % i, (0.06, 1.0, 0.25), (0, 0, 6.6), "gold", bevel=0.01, rot=(0, 0, i * math.pi / 3))
+             for i in range(3)]
+    join([base, mast, dish, core] + bands + vanes, "weather_pylon")
+    export("weather_pylon")
+
+
+@prop("intake_corral")
+def intake_corral():
+    """A Company intake corral: tidy white fence panels in a ring, a gate with a
+    cloud-blue sign, and a lamp post at the gate (patrol light)."""
+    parts = []
+    n = 14
+    for i in range(n):
+        a = i / n * math.tau
+        if i == 0:
+            continue
+        x, y = math.cos(a) * 5.0, math.sin(a) * 5.0
+        parts.append(box("post%d" % i, (0.16, 0.16, 1.3), (x, y, 0.65), "white", bevel=0.03))
+        a2 = (i + 0.5) / n * math.tau
+        rx, ry = math.cos(a2) * 5.0, math.sin(a2) * 5.0
+        for z in (0.5, 1.0):
+            parts.append(box("rail%d_%.1f" % (i, z), (0.08, 2.3, 0.1), (rx, ry, z), "white", bevel=0.02,
+                             rot=(0, 0, a2)))
+    parts.append(box("sign", (1.4, 0.08, 0.6), (5.6, 0.0, 1.7), "brightsky", bevel=0.04, rot=(0, 0, math.pi / 2)))
+    parts.append(cyl("signpost", 0.07, 1.6, (5.6, 0.0, 0.8), "white", verts=8))
+    parts.append(cyl("lamppost", 0.09, 3.0, (5.8, 1.2, 1.5), "metal_dark", verts=10))
+    parts.append(ball("lamp", 0.28, (5.8, 1.2, 3.1), "gold"))
+    join(parts, "intake_corral")
+    export("intake_corral")
+
+
+@prop("lantern_gate")
+def lantern_gate():
+    """The Lantern Line's gate in the Everfree: two mossy stone pillars, a vine arch, and
+    paper lanterns strung across it."""
+    import random
+    rnd = random.Random(9)
+    parts = []
+    for x in (-1.6, 1.6):
+        parts.append(cyl("pillar", 0.45, 3.0, (x, 0, 1.5), "stone", verts=10, bevel=0.06))
+        parts.append(blob("moss", 0.5, (x, 0, 3.0), "leaf_dark", seed=int(x * 10) + 700, lumps=0.3))
+    # The vine arch: beads of leaf along a true semicircle from pillar top to pillar top.
+    for k in range(19):
+        a = math.pi * k / 18.0
+        parts.append(blob("vine%d" % k, 0.24, (-math.cos(a) * 1.6, 0, 3.0 + math.sin(a) * 1.2),
+                          "leaf" if k % 2 else "leaf_dark", seed=720 + k, lumps=0.3))
+    for i in range(5):
+        t = (i + 1) / 6.0
+        x = -1.6 + 3.2 * t
+        z = 2.9 - 0.35 * math.sin(t * math.pi)
+        parts.append(ball("lantern%d" % i, 0.18, (x, 0, z), rnd.choice(["gold", "rose", "red"]), scale=(1, 1, 1.3), subdiv=1))
+    join(parts, "lantern_gate")
+    export("lantern_gate")
+
+
+@prop("dye_vat")
+def dye_vat():
+    """Bramble's cellar dye vat: a round copper-banded wooden tub of swirling color with a
+    paddle and a rack of little bottles. The customizer, used to hide a pony."""
+    tub = cyl("tub", 0.8, 0.9, (0, 0, 0.45), "wood", verts=24, bevel=0.03)
+    bands = [torus("hoop%d" % i, 0.81, 0.04, (0, 0, z), "gold") for i, z in enumerate((0.2, 0.7))]
+    dye = cyl("dye", 0.72, 0.05, (0, 0, 0.93), "pink", verts=24)
+    paddle = box("paddle", (0.08, 0.08, 1.3), (0.3, 0.1, 1.2), "wood_dark", bevel=0.02, rot=(0, math.radians(25), 0))
+    rack = box("rack", (0.9, 0.3, 0.06), (0, 1.1, 0.9), "wood_dark", bevel=0.02)
+    bottles = [cyl("bottle%d" % i, 0.07, 0.24, (-0.32 + i * 0.16, 1.1, 1.05), c, verts=10)
+               for i, c in enumerate(["red", "gold", "leaf", "brightsky", "lilac"])]
+    legs = [box("leg%d" % i, (0.06, 0.06, 0.9), (x, 1.1, 0.45), "wood_dark", bevel=0.01) for i, x in enumerate((-0.4, 0.4))]
+    join([tub, dye, paddle, rack] + bands + bottles + legs, "dye_vat")
+    export("dye_vat")
+
+
+@prop("calm_lamp")
+def calm_lamp():
+    """The Calm Lamp, a Factory-path pen upgrade: an elegant gold post with a soft sky-blue
+    bulb. Ponies under it never flee and never Bloom."""
+    base = cyl("base", 0.3, 0.12, (0, 0, 0.06), "gold", verts=16)
+    post = cyl("post", 0.06, 2.4, (0, 0, 1.3), "gold", verts=10)
+    arm = box("arm", (0.5, 0.05, 0.05), (0.22, 0, 2.45), "gold", bevel=0.01)
+    bulb = ball("bulb", 0.2, (0.45, 0, 2.3), "glass")
+    shade = cyl("shade", 0.28, 0.16, (0.45, 0, 2.48), "brightsky", r2=0.08, verts=16)
+    join([base, post, arm, bulb, shade], "calm_lamp")
+    export("calm_lamp")
+
+
+@prop("lure_post")
+def lure_post():
+    """A Factory-path Lure Post: a candy-striped pole with a sugar-cube feeder and a little
+    music box on top. Drifters gather round it at night."""
+    pole = cyl("pole", 0.08, 1.6, (0, 0, 0.8), "white", verts=12)
+    stripes = [torus("stripe%d" % i, 0.085, 0.03, (0, 0, 0.2 + i * 0.25), "rose") for i in range(6)]
+    tray = cyl("tray", 0.35, 0.06, (0, 0, 1.62), "brightsky", verts=20)
+    cubes = [box("cube%d" % i, (0.1, 0.1, 0.1), (math.cos(i) * 0.15, math.sin(i) * 0.15, 1.7), "white", bevel=0.01)
+             for i in range(5)]
+    musicbox = box("musicbox", (0.22, 0.16, 0.14), (0, 0, 1.82), "gold", bevel=0.03)
+    join([pole, tray, musicbox] + stripes + cubes, "lure_post")
+    export("lure_post")
+
+
+# --- the Rainbow Factory interior kit (assembled in game/world/factory_interior.gd) ------
+# Every wall piece is 4 m wide, 6 m tall and 0.4 m thick, standing on the origin and facing
+# -Y; floors are 4 x 4 m tiles at z = 0. Cloud-white and gold for the public rooms, grey
+# metal for the parts nopony is shown.
+
+def _wall(name, color, trim):
+    w = box("panel", (4.0, 0.4, 6.0), (0, 0, 3.0), color, bevel=0.03)
+    base = box("base", (4.02, 0.5, 0.35), (0, -0.02, 0.18), trim, bevel=0.03)
+    crown = box("crown", (4.02, 0.5, 0.3), (0, -0.02, 5.85), trim, bevel=0.03)
+    return [w, base, crown]
+
+
+@prop("fx_wall")
+def fx_wall():
+    join(_wall("fx_wall", "white", "gold") + [box("pilaster", (0.35, 0.55, 5.4), (-1.83, -0.05, 3.0), "cloud_shade", bevel=0.05)], "fx_wall")
+    export("fx_wall")
+
+
+@prop("fx_wall_metal")
+def fx_wall_metal():
+    parts = _wall("fx_wall_metal", "metal", "metal_dark")
+    for x in (-1.5, -0.5, 0.5, 1.5):
+        for z in (0.8, 3.0, 5.2):
+            parts.append(ball("rivet", 0.06, (x, -0.21, z), "metal_dark", subdiv=1))
+    parts.append(box("seam", (4.0, 0.42, 0.05), (0, 0, 2.0), "metal_dark", bevel=0.0))
+    parts.append(box("seam2", (4.0, 0.42, 0.05), (0, 0, 4.0), "metal_dark", bevel=0.0))
+    join(parts, "fx_wall_metal")
+    export("fx_wall_metal")
+
+
+@prop("fx_arch")
+def fx_arch():
+    """A wall with a round-topped doorway 2.2 m wide, 3.6 m tall."""
+    parts = [box("left", (0.9, 0.4, 6.0), (-1.55, 0, 3.0), "white", bevel=0.03),
+             box("right", (0.9, 0.4, 6.0), (1.55, 0, 3.0), "white", bevel=0.03),
+             box("lintel", (4.0, 0.4, 1.8), (0, 0, 5.1), "white", bevel=0.03)]
+    for k in range(9):
+        a = math.pi * k / 8
+        parts.append(box("arc%d" % k, (0.42, 0.42, 0.25), (-math.cos(a) * 1.1, 0, 3.6 + math.sin(a) * 0.6 - 0.1), "gold",
+                         bevel=0.02, rot=(0, -a + math.pi / 2, 0)))
+    parts.append(box("base", (4.02, 0.5, 0.35), (0, -0.02, 0.18), "gold", bevel=0.03))
+    join(parts, "fx_arch")
+    export("fx_arch")
+
+
+@prop("fx_window_wall")
+def fx_window_wall():
+    """The long gallery window over the processing floor: a metal wall with a wide frosted
+    pane (the frosting is a material in game; this is the frame and the glass slab)."""
+    parts = [box("low", (4.0, 0.4, 1.4), (0, 0, 0.7), "metal", bevel=0.03),
+             box("high", (4.0, 0.4, 1.2), (0, 0, 5.4), "metal", bevel=0.03),
+             box("sill", (4.1, 0.7, 0.15), (0, -0.15, 1.45), "metal_dark", bevel=0.02),
+             box("mullion", (0.18, 0.45, 3.4), (-1.95, 0, 3.1), "metal_dark", bevel=0.02),
+             box("mullion2", (0.18, 0.45, 3.4), (1.95, 0, 3.1), "metal_dark", bevel=0.02)]
+    join(parts, "fx_window_wall")
+    export("fx_window_wall")
+
+
+@prop("fx_floor")
+def fx_floor():
+    t = box("tile", (4.0, 4.0, 0.2), (0, 0, -0.1), "cream", bevel=0.02)
+    inlay = box("inlay", (3.6, 3.6, 0.02), (0, 0, 0.005), "cloud_shade", bevel=0.0)
+    join([t, inlay], "fx_floor")
+    export("fx_floor")
+
+
+@prop("fx_floor_grate")
+def fx_floor_grate():
+    parts = [box("frame", (4.0, 4.0, 0.15), (0, 0, -0.08), "metal_dark", bevel=0.01)]
+    for i in range(9):
+        parts.append(box("bar%d" % i, (0.08, 3.8, 0.05), (-1.8 + i * 0.45, 0, 0.0), "metal", bevel=0.0))
+    join(parts, "fx_floor_grate")
+    export("fx_floor_grate")
+
+
+@prop("fx_column")
+def fx_column():
+    join([cyl("shaft", 0.35, 5.4, (0, 0, 3.0), "white", verts=16),
+          cyl("foot", 0.55, 0.3, (0, 0, 0.15), "gold", verts=16, bevel=0.03),
+          cyl("cap", 0.55, 0.3, (0, 0, 5.85), "gold", verts=16, bevel=0.03)], "fx_column")
+    export("fx_column")
+
+
+@prop("fx_pipe")
+def fx_pipe():
+    """A 4 m glass spectrum pipe on gold collars, lying along X at 4 m up. Its colour is a
+    spectral material in game (the only saturated thing left in the dread grade)."""
+    join([cyl("glass", 0.35, 4.0, (0, 0, 0), "glass", verts=16, rot=(0, math.radians(90), 0)),
+          cyl("collarA", 0.45, 0.25, (-1.9, 0, 0), "gold", verts=16, rot=(0, math.radians(90), 0)),
+          cyl("collarB", 0.45, 0.25, (1.9, 0, 0), "gold", verts=16, rot=(0, math.radians(90), 0))], "fx_pipe")
+    export("fx_pipe")
+
+
+@prop("fx_catwalk")
+def fx_catwalk():
+    """A 4 m walkway, 1.6 m wide, with railings both sides (the reveal's stealth route)."""
+    parts = [box("deck", (4.0, 1.6, 0.12), (0, 0, 0), "metal_dark", bevel=0.01)]
+    for y in (-0.78, 0.78):
+        parts.append(box("rail", (4.0, 0.06, 0.06), (0, y, 1.0), "metal", bevel=0.0))
+        parts.append(box("rail2", (4.0, 0.05, 0.05), (0, y, 0.5), "metal", bevel=0.0))
+        for x in (-1.9, 0.0, 1.9):
+            parts.append(box("post", (0.06, 0.06, 1.0), (x, y, 0.5), "metal", bevel=0.0))
+    join(parts, "fx_catwalk")
+    export("fx_catwalk")
+
+
+@prop("fx_ring")
+def fx_ring():
+    """The processing ring: a broad glowing hoop on a pedestal with a glass column rising
+    from it into the pipes. A pony steps into the light; nothing more is ever shown."""
+    join([cyl("plinth", 1.8, 0.4, (0, 0, 0.2), "metal_dark", verts=32, bevel=0.03),
+          torus("ring", 1.6, 0.22, (0, 0, 1.9), "gold", rot=(math.radians(90), 0, 0)),
+          torus("halo", 1.6, 0.08, (0, 0, 1.9), "glass", rot=(math.radians(90), 0, 0)),
+          cyl("column", 0.4, 6.0, (0, 0, 6.5), "glass", verts=16),
+          cyl("cap", 0.7, 0.5, (0, 0, 9.6), "gold", verts=16)], "fx_ring")
+    export("fx_ring")
+
+
+@prop("fx_stall")
+def fx_stall():
+    """A holding stall: a low pen of bars with a tag board (long-term holding)."""
+    parts = [box("floor", (2.0, 2.0, 0.1), (0, 0, 0.05), "metal_dark", bevel=0.01)]
+    for i in range(7):
+        parts.append(cyl("bar%d" % i, 0.04, 1.8, (-0.9 + i * 0.3, -1.0, 0.9), "metal", verts=8))
+    parts.append(box("top", (2.0, 0.08, 0.1), (0, -1.0, 1.8), "metal", bevel=0.0))
+    parts.append(box("tag", (0.5, 0.04, 0.3), (0.6, -1.05, 1.5), "white", bevel=0.01))
+    join(parts, "fx_stall")
+    export("fx_stall")
+
+
+@prop("fx_lever")
+def fx_lever():
+    """The control console. The lever itself is fx_lever_handle, so it can be pulled."""
+    join([box("desk", (2.4, 1.0, 1.0), (0, 0, 0.5), "metal_dark", bevel=0.05),
+          box("panel", (2.2, 0.1, 0.8), (0, -0.25, 1.3), "metal", bevel=0.03, rot=(math.radians(-25), 0, 0)),
+          ball("lampR", 0.08, (-0.7, -0.35, 1.4), "red", subdiv=1),
+          ball("lampG", 0.08, (-0.45, -0.35, 1.4), "leaf", subdiv=1),
+          ball("lampB", 0.08, (-0.2, -0.35, 1.4), "brightsky", subdiv=1),
+          cyl("socket", 0.15, 0.2, (0.6, 0, 1.05), "gold", verts=12)], "fx_lever")
+    export("fx_lever")
+
+
+@prop("fx_lever_handle")
+def fx_lever_handle():
+    join([cyl("stick", 0.05, 0.9, (0, 0, 0.45), "metal", verts=10), ball("knob", 0.13, (0, 0, 0.95), "red")], "fx_lever_handle")
+    export("fx_lever_handle")
+
+
+@prop("fx_counter")
+def fx_counter():
+    """The gift shop counter with a shelf of Rainbow Dye bottles."""
+    parts = [box("counter", (3.0, 0.8, 1.0), (0, 0, 0.5), "white", bevel=0.05),
+             box("top", (3.1, 0.9, 0.08), (0, 0, 1.02), "gold", bevel=0.02),
+             box("shelf", (3.0, 0.4, 0.06), (0, 0.9, 1.6), "wood", bevel=0.01),
+             box("shelf2", (3.0, 0.4, 0.06), (0, 0.9, 2.2), "wood", bevel=0.01)]
+    cols = ["red", "gold", "straw", "leaf", "brightsky", "lilac", "pink"]
+    for row, z in enumerate((1.75, 2.35)):
+        for i in range(9):
+            parts.append(cyl("b%d_%d" % (row, i), 0.08, 0.26, (-1.3 + i * 0.32, 0.9, z), cols[(i + row) % 7], verts=10))
+    join(parts, "fx_counter")
+    export("fx_counter")
+
+
+@prop("fx_poster")
+def fx_poster():
+    """A framed poster board (the image is a texture made in game)."""
+    join([box("frame", (1.6, 0.08, 2.2), (0, 0, 0), "gold", bevel=0.03),
+          box("board", (1.4, 0.1, 2.0), (0, -0.02, 0), "cream", bevel=0.0)], "fx_poster")
+    export("fx_poster")
 
 
 def main():

@@ -1,26 +1,43 @@
 # Progress
 
-## Done
-- Setup: branch `v1-overhaul`, MISSION.md, CLAUDE.md, DECISIONS.md.
-- Phase 1: AUDIT.md. Baseline suite on 4.5.2: 1647/1647.
-- Phase 2: RESEARCH.md.
-- Phase 3: GDD.md, STORY.md.
-- Phase 4: PLAN.md.
-- M0.1: Godot 4.7.2 (templates installed, pins updated in setup_env.sh, CI and pipeline.md). Suite 1650/1650 on 4.7.2. GUT stays 9.5.0 (see DECISIONS.md).
-- M0.2: Events autoload.
-- M0.3: toon, outline, eye, hidden and vignette shaders; ToonStyler; the `dread` shader global. WorldTone is drafted but not yet in a scene.
-- M0.4: generator v2 (PonyLook, DonorTable from tools/make_donors.py, PonyGenerator, MarkComposer, PonyPaint); the spawner, Pony and PonyInstance run on it. 14 tests.
-- M1.1 in progress: 17 new clips authored in tools/author_anims.py and verified by eye on bonbon's contact sheets (tools/anim_sheet.py + anim_sheet_tile.py, Cycles CPU, headless). PonyFace (runtime blink, ears, brows, jaw, look) is drafted.
+## Owner direction (2026-10-22)
+Canon MLP stays: real names, looks and places ("lean into mlp fully", private build). The roster de-canon was reverted; the Company is the Cloudsdale Weather Corporation, the cloud palace is the Rainbow Factory, the town is Ponyville. The OC story cast lives alongside the canon ponies.
 
-## Next
-- Re-export all 38 donors with the new clips (tools/convert_roster.sh --only <donors> --force).
-- Add the trot band to gait.gd; build an AnimationTree, or a clip router in pony.gd, for the new states.
-- M0.5 (remaining): global renames (Company, regions, player default name), drop the Twilight voice clip, stock-only spawning. Pony Book, the board and letters close the de-canon in M1.
-- M0.6: shot capture tool.
+## Done
+- Phases 1 to 4: AUDIT.md, RESEARCH.md, GDD.md, STORY.md, PLAN.md.
+- **M0 foundation:**
+  - Godot 4.7.2 (GUT 9.5.0);
+  - Events autoload;
+  - toon, outline, eye and rainbow shaders; ToonStyler;
+  - generator v2 (38 donors, show-harmony palette, two-tone manes, foals, variants, names, SDF marks for 24 talents);
+  - PonyPaint;
+  - the shot tool (`tools/capture_shots.sh`, `scenes/test/shots.gd`: lineup, face, dread, cast, factory, rigprobe).
+  - Suite at the M0 close: 1667/1667.
+- **M1 so far:**
+  - **Look pass:** every prop, building, terrain and pony is toon-shaded; Filmic tonemap at exposure 0.8; a show-tan path.
+  - **Valley frame:** the rim hills, the Rainbow Factory on its cloud, and the Rainbow arc across the northern sky.
+  - **Animations:** 17 new clips on all 38 donors (trot, jump, graze, sit, lie, sleep, startle, cower, hop, struggle, talk, nod, shake, sad, laugh, rear, look). Gait has a trot band; grazing and held ponies play their own clips.
+  - **PonyFace:** blinks drawn by the eye shader, ear moods, a talking jaw, head look.
+  - **Bloom:** in pens (meter, favorite glow, friends, Calm Lamp hook), the ceremony (rear, sparkles, fanfare, squash), and the Pony Book. The Depot refuses marked ponies.
+  - **Delivery feedback:** a coat-colored sparkle flies into the Rainbow, which brightens.
+  - **People layer:** dialogue compiler, runner, library; Act One and Act Two scripts (29 conversations); the seven-character OC cast; Npc; People; TalkBox; procedural Babble voice; Interaction.TALK.
+  - **Score:** nine Kevin MacLeod tracks via the Music autoload (dread drone, low-pass, pitch sag); Music and Voice buses; new SFX (Bloom fanfare, Scoop pop, sparkle).
+  - **Blender props (37):** depot crate, postbox, three trees, bush, straw hat, satchel, sash, goggles, patch, Scoop, valley rim, Rainbow Factory exterior, cloud lift, weather pylon, intake corral, Lantern Line gate, dye vat, Calm Lamp, lure post, and the 15-piece Factory interior kit.
+  - **FactoryInterior** level builder (eight rooms).
+  - **CREDITS.md.**
+
+## Next (M1 remainder)
+- Tumble following and pointing at Drifters; NPC spots verified in-world; a people gate (headless conversation flow).
+- Onboarding prompts on the HUD; the Arrival.
+- Customizer rebuild (race, two-tone mane, separate tail, generated or drawn mark); the player on PonyPaint.
+- The Scoop worn by the player; capture feel juice (stretch, pop, hit pause, rising pitch).
+- UI restyle (theme font, HUD rebuild, controls card).
+- Story chapters wired to Act One and Two triggers (postcards, the dye names, the invitation).
 
 ## Known issues
-- The owner declined an offscreen render during the audit; renders resume at milestone reviews.
-- Blender MCP is not connected; the headless Blender scripting pipeline is used instead.
-- The player still uses the legacy StockTint path until the customizer rebuild (M1.6).
-- Headless runs skip the toon shader swap (a dummy-renderer limitation, see DECISIONS.md).
-- The rear clip's top frame is clipped in the sheet camera; check the pose in-engine.
+- **Factory interior:** no ceiling yet; the public rooms are too bare (they need banners, colour and life); the processing floor behind the gallery window is not built.
+- **Apple trees:** the apples sit mostly inside the canopy.
+- **Distance fog:** it washes the rim hills pale.
+- **Building plinths:** still read as boxes under some houses.
+- **Headless runs:** they skip the toon shader swap (a dummy renderer limitation).
+- **The player:** still uses the legacy StockTint path until the customizer rebuild.

@@ -103,6 +103,8 @@ func _run() -> void:
 				await _rigprobe()
 			"cast":
 				await _cast()
+			"factory":
+				await _factory()
 
 
 func _clear() -> void:
@@ -259,3 +261,20 @@ func _cast() -> void:
 	_cam.position = Vector3(0, 2.6, 13.0)
 	_cam.look_at(Vector3(0, 1.0, 0))
 	await _shoot("cast")
+
+
+## Each room of the Rainbow Factory interior from its entry, at the room's own dread.
+func _factory() -> void:
+	await _clear()
+	var fi: Node3D = load("res://world/factory_interior.gd").new()
+	add_child(fi)
+	_sun.light_energy = 0.25
+	for spec: Dictionary in fi.ROOMS:
+		var origin: Vector3 = fi.room_origin(spec.name)
+		_cam.position = origin + Vector3(-1.5, 2.2, -0.8)
+		_cam.look_at(origin + Vector3(0.5, 1.6, -8.0))
+		_tone.snap(float(spec.dread))
+		await _shoot("factory_%s" % spec.name)
+	_tone.snap(0.0)
+	_sun.light_energy = 1.25
+	fi.queue_free()
