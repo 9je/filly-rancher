@@ -95,6 +95,9 @@ var chapter: int = Chapter.SUNNY
 ## String keys, bool values. Plain and untyped for GameState.unlocks' reason: these are
 ## assigned dynamically from the ranch and from tests.
 var flags: Dictionary = {}
+## v1: story state that is not a yes or no (counters, the path, heat, rank, queues). JSON
+## safe values only; saved as they are, where `flags` is coerced to bool.
+var vars: Dictionary = {}
 
 var deliveries := 0
 var named_deliveries := 0
@@ -191,6 +194,21 @@ func advance() -> bool:
 
 
 # --- flags -------------------------------------------------------------------------------
+
+## A v1 counter or value (see `vars`).
+func get_var(key: String, default: Variant = 0) -> Variant:
+	return vars.get(key, default)
+
+
+func set_var(key: String, value: Variant) -> void:
+	vars[key] = value
+
+
+func add_var(key: String, amount: int = 1) -> int:
+	var n: int = int(vars.get(key, 0)) + amount
+	vars[key] = n
+	return n
+
 
 func has_flag(key: String) -> bool:
 	return bool(flags.get(key, false))
@@ -330,6 +348,7 @@ func to_dict() -> Dictionary:
 	return {
 		"chapter": chapter,
 		"flags": saved_flags,
+		"vars": vars.duplicate(true),
 		"deliveries": deliveries,
 		"named_deliveries": named_deliveries,
 		"collection_days": collection_days,
@@ -356,6 +375,9 @@ static func from_dict(d: Dictionary) -> Story:
 	out.survey_period = maxi(-1, int(d.get("survey_period", -1)))
 	out.requisition_cycle = maxi(-1, int(d.get("requisition_cycle", -1)))
 
+	var saved_vars: Variant = d.get("vars", {})
+	if saved_vars is Dictionary:
+		out.vars = (saved_vars as Dictionary).duplicate(true)
 	var saved_flags: Variant = d.get("flags", {})
 	if typeof(saved_flags) == TYPE_DICTIONARY:
 		for key in (saved_flags as Dictionary):

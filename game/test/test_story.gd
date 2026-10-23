@@ -186,3 +186,16 @@ func test_no_line_of_this_system_carries_a_dash() -> void:
 			continue
 		assert_false(text.contains("--"), "double hyphen: %s" % text)
 		assert_false(text.contains(char(0x2014)), "em dash: %s" % text)
+
+
+## v1: story VARS survive a save as themselves (flags are coerced to bool; a counter or the
+## path stored there would come back as `true`).
+func test_story_vars_round_trip_as_numbers_strings_and_lists() -> void:
+	var story := StoryScript.new()
+	story.add_var("blooms", 3)
+	story.set_var("path", "rescue")
+	story.set_var("postcards", ["Berry Punch", "Lyra"])
+	var back := StoryScript.from_dict(JSON.parse_string(JSON.stringify(story.to_dict())))
+	assert_eq(int(back.get_var("blooms")), 3)
+	assert_eq(str(back.get_var("path", "")), "rescue")
+	assert_eq(back.get_var("postcards", []), ["Berry Punch", "Lyra"])

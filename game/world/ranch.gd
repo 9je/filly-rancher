@@ -3820,7 +3820,7 @@ func _on_pony_captured(instance: PonyInstance) -> void:
 	if instance == null or _game_state == null:
 		return
 	_game_state.onboarding.note(&"catch")
-	_game_state.story.flags["_catches"] = int(_game_state.story.flags.get("_catches", 0)) + 1
+	_game_state.story.add_var("catches")
 	# THE CROWD IS NOT COLLECTED. A stock pony has no Compendium entry and no request ever
 	# names one: she is supply, not a character. Marking her would put an id in the book
 	# that no page can ever show and no count can ever include.
@@ -7143,15 +7143,16 @@ func _talk_context() -> Dictionary:
 	var flags: Dictionary = story.flags.duplicate() if story != null else {}
 	var counts := {
 		"deliveries": story.deliveries if story != null else 0,
-		"blooms": int(flags.get("_blooms", 0)),
-		"catches": int(flags.get("_catches", 0)),
+		"blooms": int(story.get_var("blooms", 0)) if story != null else 0,
+		"catches": int(story.get_var("catches", 0)) if story != null else 0,
 		"pens": _built_pen_count(),
 		"days": story.collection_days if story != null else 0,
 	}
 	var name := "friend"
 	if _game_state != null and _game_state.player != null:
 		name = _game_state.player.player_name
-	return {"chapter": story.chapter if story != null else 0, "path": str(flags.get("path", "")),
+	return {"chapter": story.chapter if story != null else 0,
+		"path": str(story.get_var("path", "")) if story != null else "",
 		"flags": flags, "counts": counts, "name": name, "tumble": "Tumble"}
 
 
@@ -7233,7 +7234,7 @@ signal pony_bloomed(inst: PonyInstance)
 func _on_pony_bloomed(inst: PonyInstance) -> void:
 	if _game_state != null:
 		var story: Story = _game_state.story
-		story.flags["_blooms"] = int(story.flags.get("_blooms", 0)) + 1
+		story.add_var("blooms")
 		var look := PonyLookScript.from_stock(inst.stock)
 		_game_state.book.note_bloom(String(inst.uid), inst.display_name(), look,
 			story.collection_days)
@@ -7272,9 +7273,9 @@ func _after_delivery(inst: PonyInstance) -> void:
 		story.collection_days, after_reveal)
 	# THE POSTCARD COMES A DAY LATER (clue 3): queued now, posted at the next dawn, the same
 	# words in the same hoofwriting whichever pony "sent" it.
-	var pending: Array = story.flags.get("_postcards", [])
+	var pending: Array = story.get_var("postcards", [])
 	pending.append(inst.display_name())
-	story.flags["_postcards"] = pending
+	story.set_var("postcards", pending)
 	var bus := get_node_or_null("/root/Events")
 	if bus != null:
 		bus.emit_signal("delivered", String(inst.uid), inst.stock)
@@ -7306,14 +7307,13 @@ func _post_pending_postcards() -> void:
 	if _game_state == null:
 		return
 	var story: Story = _game_state.story
-	var pending: Array = story.flags.get("_postcards", [])
+	var pending: Array = story.get_var("postcards", [])
 	if pending.is_empty():
 		return
 	for pony_name in pending:
-		var n := int(story.flags.get("_postcard_count", 0)) + 1
-		story.flags["_postcard_count"] = n
+		var n := story.add_var("postcard_count")
 		story.post(StringName("postcard#%d" % n), {"name": _player_name(), "pony": str(pony_name)})
-	story.flags["_postcards"] = []
+	story.set_var("postcards", [])
 	_refresh_mailbox_flag()
 
 
