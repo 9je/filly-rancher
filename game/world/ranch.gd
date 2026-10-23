@@ -744,7 +744,7 @@ var _hosted := false
 func _ready() -> void:
 	# Asked before anything else, because the very next line depends on the answer: a
 	# hosted ranch neither arms the watchdog nor quits the process. See _hosted.
-	_hosted = get_tree().current_scene != self
+	_hosted = get_tree().current_scene != self or BootIntentScript.driven
 
 	# Armed FIRST, before anything below has a chance to raise mid-function -- see
 	# GateWatchdogScript's doc comment for the exact hang this guards against. Not armed
@@ -1141,7 +1141,7 @@ func _bind_game_state() -> void:
 	# was consumed at the top of this function (before the autoload null-check, so the latch
 	# cannot outlive a broken boot), and the creation screen opens over an empty ranch rather
 	# than over the ranch she was already playing.
-	if _hosted or _new_game:
+	if (_hosted and not BootIntentScript.driven) or _new_game:
 		_game_state.reset()
 		_save_loaded = false
 	else:
@@ -7496,8 +7496,15 @@ func _ride_lift_to_factory(mode: StringName) -> void:
 		return
 	save_game()
 	FactoryRun.mode = mode
+	lift_requested.emit(mode)
+	if BootIntentScript.driven:
+		# The playthrough driver changes the scene itself (scenes/test/playthrough.gd).
+		return
 	get_tree().paused = false
 	get_tree().change_scene_to_file.call_deferred(FACTORY_SCENE)
+
+
+signal lift_requested(mode: StringName)
 
 
 # --- Act Three (v1): the world reports, PathRules decides (game/systems/path_rules.gd) ---

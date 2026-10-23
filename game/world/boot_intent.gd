@@ -18,6 +18,9 @@ extends RefCounted
 ## Static only, no state beyond the latch, no scene. Preload by path.
 
 static var _new_game := false
+## A driver owns this process (scenes/test/playthrough.gd): the ranch reports but never
+## quits, and still loads the save like a launched game does.
+static var driven := false
 
 
 static func request_new_game() -> void:

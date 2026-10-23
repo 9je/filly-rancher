@@ -50,7 +50,7 @@ static func next_contract(done: int) -> Dictionary:
 
 
 static func post_contract(story: Story) -> void:
-	if not contract(story).is_empty():
+	if not contract(story).is_empty() or story.has_flag("jubilee_ready"):
 		return
 	if rank(story) >= DIRECTOR:
 		story.set_var("contract", {"want": JUBILEE_ORDER, "kind": "jubilee", "bonus": 5000,
