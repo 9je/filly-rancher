@@ -2,6 +2,30 @@
 
 A 75-second gameplay trailer for *Filly Rancher*. Research notes are in [docs/trailer_research.md](docs/trailer_research.md). The capture is staged in-engine by `game/scenes/test/trailer.gd` and recorded with Godot Movie Maker at 2560x1440 (the owner asked for 2K rather than 4K: it is their monitor's resolution), 60 fps. The edit is a script, `tools/trailer/edit.py`, built on an ffmpeg filtergraph. Each review pass is logged in [TRAILER_REVIEW.md](TRAILER_REVIEW.md).
 
+## Who it is for (owner, 2026-10-23)
+
+"steam trailer isnt for steam its just for my friends so try to make it interesting, maybe add some humor elements and load it with mlp references". So this is a trailer for friends who know the show:
+- **Funny:** captions written as jokes.
+- **Full of MLP references:** in the captions and staged in shot.
+- **Still well made:** the craft rules below stay (gameplay first, cuts on the beat, a readable loop, the twist teased and never spoiled).
+
+The Steam-specific rules (the microtrailer, no wishlist line) still hold, because they make a better trailer anyway. The limit of "at most 2 or 3 callouts" gives way to the owner's ask: six short caption cards, each one a joke, none longer than about six words.
+
+## The jokes and references (staged, not pasted on)
+
+| Shot | The gag |
+|---|---|
+| Catch | Caption: **"Gotta catch 'em all. Wrong franchise."** |
+| Launch | A pony sails into the pen in an arc. Caption: **"Applied pony-ballistics."** |
+| Rainbow Dash | Rainbow Dash bolts as the Gallop Shoes kick in. Caption: **"20% cooler."** |
+| Escape Artists | Apple Bloom, Sweetie Belle and Scootaloo (the game's Escape Artists) hop the Paddock fence at night. Caption: **"CUTIE MARK CRUSADERS: FENCE HOPPERS, YAY!"** |
+| Pinkie | Pinkie Pie is caught, and the toast reads her quirk: "Social Butterfly". |
+| Derpy | Derpy Hooves (a Glutton) at the pantry. No caption needed. |
+| Fluttershy | Fluttershy, Skittish, spots the player from twice as far off and flees: "...yay." |
+| The letter | Twilight's "Dear Princess Celestia" register, in the welcome letter's paper card: **"Dear Princess Celestia, today I learned... nothing suspicious."** |
+| The twist tease | Over the grey valley, a card: **"No ponies were harmed in the making of this rainbow.\*"** A beat of silence, then a small footnote card: **"\*terms and conditions apply"**. The spectrum tank cut lands on it. |
+| The title card | "Filly Rancher", the rainbow underline, and the tag **"Friendship is Magic. Ranching is Business."** |
+
 ## The hook
 
 **A wild pony lifted off the grass by the Scoop's beam, kicking in the air, and popped into the saddlebag in a burst of sparkles. Then a different pony Blooms: her cutie mark appears.** Catching and Blooming are the two verbs the whole game turns on, and both read silently in under three seconds.
@@ -14,7 +38,7 @@ The opening six seconds loop: they end on a wide shot of the valley with a pony 
 - The core loop (catch, pen, care, Bloom, sell) is readable by 0:15.
 - At least 60% real gameplay: everything except the title card and two beauty shots is played footage, HUD minimal.
 - Gameplay shots run 1 to 3 s; beauty shots run 4 to 6 s, with slow, deliberate camera moves.
-- At most three short text callouts, in Fredoka, the game's own font and pill style.
+- Six short caption cards (the owner asked for humour), in Fredoka, the game's own font and pill style.
 - Every cut lands on a beat of the track (beats detected with librosa, not assumed).
 - Energy builds to the twist, then pulls back for the title.
 - The twist is hinted, never spoiled: the colour drains, a tank of rainbow sits in a grey room, the music turns. No drained pony on screen, no machinery explained.
@@ -40,10 +64,10 @@ Game SFX under the music: the beam charge and the bag pop, the Bloom fanfare, ge
 | 1 | 0:00.0 - 0:02.0 | **Catch** | Low over the player's shoulder, a slow push in | The beam ribbon on a Drifter, who lifts and kicks, then the pop into the bag. HUD bag pips tick. |
 | 2 | 0:02.0 - 0:04.1 | **Bloom** | A close orbit, a quarter turn | A penned pony rears, sparkles, her cutie mark appears, the fanfare. |
 | 3 | 0:04.1 - 0:06.1 | **The valley** | High and wide, a slow rise | Ponyville, the pens, the rainbow arc. A pony trots into frame where shot 1 began (the loop seam). |
-| 4 | 0:06.1 - 0:08.2 | Pen launch | Third person, a whip pan to the pen | The Scoop Launcher fires a pony in an arc into a pen. **Callout 1: "Catch them."** |
+| 4 | 0:06.1 - 0:08.2 | Pen launch | Third person, a whip pan to the pen | The Scoop Launcher fires a pony in an arc into a pen. Caption: "Applied pony-ballistics." |
 | 5 | 0:08.2 - 0:10.2 | Treat toss | Third person | A treat tossed into the grass; a pony trots over, ears up. |
 | 6 | 0:10.2 - 0:12.3 | Gems | Close on a pen | Ponies grazing, gems popping out, the pouch count rising. |
-| 7 | 0:12.3 - 0:14.3 | Market | Over the counter | Selling gems to Bramble, bits ticking up. **Callout 2: "Care for them."** |
+| 7 | 0:12.3 - 0:14.3 | Market | Over the counter | Selling gems to Bramble, bits ticking up.  |
 | 8 | 0:14.3 - 0:16.3 | Herd lineup | A slow track along the line | Fourteen generated Drifters: every coat, mane, race and foal different. |
 | 9 | 0:16.3 - 0:18.4 | Creator | The UI, close | Coats and manes cycling on the player's own pony. |
 | 10 | 0:18.4 - 0:20.4 | Everfree gallop | Low tracking, at speed | The Gallop Shoes through the dark wood. |
@@ -56,7 +80,7 @@ Game SFX under the music: the beam charge and the bag pop, the Bloom fanfare, ge
 | 17 | 0:32.7 - 0:34.7 | The Palace | The slot reels, close | A three-of-a-kind win, chips cascading. |
 | 18 | 0:34.7 - 0:36.8 | Race | A trackside pan | The six lanes; a Show-off pony wins by a nose. |
 | 19 | 0:36.8 - 0:38.8 | Bloom 2 | A close shot | A second ceremony, from a different pony. |
-| 20 | 0:38.8 - 0:42.9 | **Beauty: dusk** | A slow crane across the valley at dusk | The pens full, the sky salmon, the rainbow. **Callout 3, a question: "Ever wonder where rainbows come from?"** |
+| 20 | 0:38.8 - 0:42.9 | **Beauty: dusk** | A slow crane across the valley at dusk | The pens full, the sky salmon, the rainbow.  |
 | 21 | 0:42.9 - 0:44.9 | Delivery | Behind the player at the Depot | A pony goes into the crate; a sparkle of her coat colour flies up into the rainbow, which brightens. |
 | 22 | 0:44.9 - 0:46.9 | Postcards | A slow push on Fennel's wall | The postcards, all the same. |
 | 23 | 0:46.9 - 0:49.0 | Tumble | Low, close | Tumble under the porch, facing the Works. |

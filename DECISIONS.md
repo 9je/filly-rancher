@@ -82,3 +82,5 @@ One line of reasoning per call. Newest at the bottom.
   - Runtime mesh LODs (`actors/pony/pony_lod.gd`) keep every eye surface at full detail, so the iris-cap bug of August cannot return.
   - A collision-free glide for FAR ponies was tried and dropped: it walked ponies through trunks.
 - 2026-10-23 -- The babble voice is synthesised once per syllable shape and cached, not per sample per frame in GDScript. The per-sample loop was a 10 ms hitch on every audio buffer refill whenever anypony talked.
+- 2026-10-23 -- **The trailer is for the owner's friends, not Steam** (the owner: "make it interesting, maybe add some humor elements and load it with mlp references"). It keeps the craft rules (gameplay first, beat cuts, a 6-second loop, the twist teased not spoiled) and loosens the callout limit: six joke caption cards instead of three, and staged canon gags (the Crusaders as Escape Artists, a 20%-cooler Rainbow Dash, Pinkie, Derpy, Fluttershy), all listed in TRAILER_PLAN.md.
+
