@@ -179,3 +179,40 @@ The cozy loop, fully polished, in one area.
 *Accept:* every item in the MISSION.md Definition of Done, with transcript evidence of the suite, the ending playthroughs, both exports and the Linux launch.
 
 **M5 status (done for v1):** both exports, the clean `--quit-after` launch of the Linux build, README.md, CREDITS.md, and REVIEW.md with every high and medium finding fixed. Deferred: the 60-pony perf gate, and a Proton smoke run of the Windows build.
+
+---
+
+## M6. Sharpening: fun, performance, the exit hang, the visual review (owner brief, 2026-10-23)
+
+MISSION.md's "Fun and anti-repetition rules" are part of the Definition of Done. The baseline is in docs/early_game_audit.md:
+- no verb-changing upgrade before the reveal (0 of 8);
+- generated traits are cosmetic;
+- the first real clue arrives at 20-30 min;
+- the invitation is a grind of 8 deliveries plus 3 Blooms.
+
+1. **The pacing test.**
+   - **The Novelty log:** GameState records each first-time unlock, discovery or story beat (kind, id, label) with play-clock seconds.
+   - **The human bot:** `scenes/test/human_bot.gd`, run by `tools/pacing.sh`. It plays a fresh save headless at `--fixed-fps 60`, so the play clock is simulated real time. It uses real verbs: walking with the camera, aiming and holding the Scoop, interact prompts, and menus through their own keyboard APIs. It shops from a priority list and takes natural pauses.
+   - **The report:** `tools/pacing.sh` writes PACING.md with the gaps, and fails if any gap in the first hour exceeds 8 min, any later gap exceeds 15 min, or the first clue comes after 15 min.
+2. **The redesign:**
+   - **Verb-changing upgrades:**
+     - Gallop Shoes: sprint and a dash.
+     - Treat Pouch: throw a favorite food to lure or calm a pony.
+     - Scoop Launcher: shoot bagged ponies into a pen from range.
+     - Pony Whistle: freezes nearby wild ponies.
+     - Gem Chute: pens sell their own gems.
+     - Depot Pen: a pen that sends its unmarked ponies at dawn.
+     - Lure Post and Yield Lens made real.
+   - **Traits that matter:**
+     - Race abilities: pegasi flutter away, unicorns blink, earth ponies Bloom faster.
+     - One generated quirk per Drifter, with a generated favorite food.
+   - **The first clue at about 10 min:** the first delivery adds a band of her colour to the rainbow, Tumble reacts, and the postcard arrives at once.
+   - **A shorter invitation gate.**
+   - **Timed NPC events:** rare sightings, a race night, the Strip's flyer.
+3. **60-pony performance** (`scenes/test/perf.gd`, `tools/perf.sh`): real GPU rendering, 60 ponies in view; the target is p99 at 16.6 ms or less and a worst second of 60 fps or better.
+4. **The exit hang:** the full suite in a loop under a gdb watchdog, in a detached worktree.
+5. **Rendered visual review** of every major scene, then fixes.
+6. **Videos:**
+   - FIRST_10_MINUTES.mp4 (the bot, Movie Maker, 1080p60).
+   - The trailer: TRAILER_PLAN.md, staged shots at 4K, a scripted edit, beat-cut, -14 LUFS, at least three reviewed iterations in TRAILER_REVIEW.md.
+   - Deliverables: TRAILER_4K.mp4 and TRAILER_1080p.mp4.
