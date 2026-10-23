@@ -192,10 +192,11 @@ func test_the_shipped_map_names_a_model_on_every_building_but_the_palace() -> vo
 		assert_not_null(b, "%s stands" % who)
 		assert_eq(b.model_file, String(SHIPPED[who]["file"]), "%s names its model" % who)
 		assert_eq(b.model_scale, 1.0, "%s is at the MLP family's own scale" % who)
-	# The test's own name promises the second half too: the Palace names NOTHING, because
-	# task 5's facade owns that node and a model_file landing on it would double-dress it.
+	# The Palace wears the game's own Blender model (a res:// path, at its own scale), and
+	# with it worn ranch.gd stands no kit-bashed facade, so it is never double dressed.
 	var palace := buildings.get_node(^"Palace") as Building
-	assert_eq(palace.model_file, "", "the palace wears no model; the facade task owns it")
+	assert_eq(palace.model_file, "res://assets/models/spectra_palace.glb",
+		"the palace wears its Blender model")
 	ranch.free()
 
 

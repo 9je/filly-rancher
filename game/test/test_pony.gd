@@ -809,6 +809,10 @@ func _spawn(personality: int, base_speed: float, position: Vector3) -> Character
 	pony.set_rng(rng)
 	_world.add_child(pony)
 	pony.setup(data)
+	# An earth pony, whatever the template: Pokey Pierce is a unicorn by her show race
+	# (PonyTraits.CANON_RACE), and a unicorn blinks away as she bolts, which these
+	# personality tests are not about.
+	pony.set("race", &"earth")
 	return pony
 
 

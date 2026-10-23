@@ -10,7 +10,7 @@ endings=("$@")
 fail=0
 for e in "${endings[@]}"; do
   export FILLY_TEST_SAVE_DIR="$(mktemp -d)"
-  out="$("$GODOT" --headless --audio-driver Dummy --path game -s res://scenes/test/playthrough.gd \
+  out="$("$GODOT" --headless --render-thread safe --audio-driver Dummy --path game -s res://scenes/test/playthrough.gd \
     -- --ending="$e" --factory-fast --people 2>&1)"
   rc=$?
   echo "$out" | grep -E "^PLAYTHROUGH|^ENDING_REACHED|SCRIPT ERROR" | sed "s/^/[$e] /"

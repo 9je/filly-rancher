@@ -4743,7 +4743,10 @@ func _stand_request_board() -> void:
 ## pieces would fail the export error gate on every CI run (docs/ci.md section 4).
 func _stand_palace_facade() -> void:
 	var palace := get_node_or_null(^"Buildings/Palace") as Building
-	if palace == null:
+	# THE BLENDER PALACE REPLACES THE KIT BASH (2026-10-23, DECISIONS.md): with a model worn
+	# the town-building facade only stood cottages against a casino. The facade is still the
+	# fallback for a checkout without the model.
+	if palace == null or (palace.model_file != "" and ResourceLoader.exists(palace.model_file)):
 		return
 	var out_dir: Vector3 = palace.global_transform.basis * Vector3(0.0, 0.0, 1.0)
 	out_dir.y = 0.0
