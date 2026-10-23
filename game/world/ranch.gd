@@ -2472,6 +2472,8 @@ func _apply_settings() -> void:
 		_rig.invert_look = _settings.invert_look
 	if _interactive:
 		_settings.apply_audio()
+		_settings.apply_graphics(get_viewport())
+	_settings.apply_bindings()
 
 
 ## COLLECTION DAY, ONCE PER PERIOD. Every third cycle, on the first phase change inside it,

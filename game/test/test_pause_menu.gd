@@ -159,8 +159,8 @@ func test_selection_wraps_on_both_pages() -> void:
 	assert_eq(_menu.page(), PauseMenu.Page.SETTINGS)
 	assert_eq(_menu.selected_index(), 0, "on its first row")
 	_menu.move_selection(-1)
-	assert_eq(_menu.selected_index(), PauseMenu.SettingRow.INVERT,
-		"up from the first row lands on the last of the THREE settings rows")
+	assert_eq(_menu.selected_index(), _menu.settings_row_count() - 1,
+		"up from the first row lands on the last settings row (the last key)")
 	_menu.move_selection(1)
 	assert_eq(_menu.selected_index(), PauseMenu.SettingRow.VOLUME,
 		"...and down comes back round to the first")
@@ -698,11 +698,17 @@ func test_the_requests_page_carries_the_boards_note_for_this_chapter() -> void:
 	assert_eq(_menu.board_note(), wording.board_note(story.Chapter.WEATHER))
 
 
-func test_the_settings_page_has_five_rows_now() -> void:
-	assert_eq(PauseMenu.SettingRow.size(), 5)
+## v1: one row per audio bus (Master, Music, Ambient, Effects, Menus, Voices), the look
+## controls, the picture, then one row per rebindable key.
+func test_the_settings_page_has_a_row_per_bus_the_picture_and_the_keys() -> void:
 	assert_eq(PauseMenu.SettingRow.VOLUME, 0)
-	assert_eq(PauseMenu.SettingRow.AMBIENT, 1)
-	assert_eq(PauseMenu.SettingRow.EFFECTS, 2)
+	assert_eq(PauseMenu.SettingRow.KEYS, 11)
+	_menu.open_page(PauseMenu.Page.SETTINGS)
+	assert_eq(_menu.settings_row_count(), 11 + SettingsScript.REBINDABLE.size())
+	var names: Array = _menu.settings_rows().map(func(r: Array) -> String: return str(r[0]))
+	for want in ["Master volume", "Music", "Ambience", "Effects", "Menus", "Voices",
+			"Picture quality", "Fullscreen", "Vsync", "Jump", "Interact"]:
+		assert_has(names, want)
 
 
 func test_adjusting_the_ambient_row_moves_the_ambient_volume_and_nothing_else() -> void:
@@ -713,6 +719,7 @@ func test_adjusting_the_ambient_row_moves_the_ambient_volume_and_nothing_else() 
 	assert_lt(_settings.ambient_volume, 1.0)
 	assert_almost_eq(_settings.master_volume, master_before, 0.0001)
 	assert_almost_eq(_settings.effects_volume, 1.0, 0.0001)
+	assert_almost_eq(_settings.music_volume, 0.8, 0.0001, "the music is its own slider")
 
 
 # --- the pointer, and the copy ---------------------------------------------------------
@@ -914,3 +921,36 @@ func test_the_wheel_moves_the_mail_archive_selection() -> void:
 	assert_eq(_menu.selected_index(), 0)
 	_menu._on_stage_input(_wheel(MOUSE_BUTTON_WHEEL_DOWN))
 	assert_eq(_menu.selected_index(), 1, "the stage's own wheel branch must move it too")
+
+
+
+## v1: a key row waits for a key, binds it, and shows it; Escape cancels.
+func test_a_key_row_rebinds_its_action() -> void:
+	_menu.open()
+	_menu.move_selection(PauseMenu.Row.SETTINGS)
+	_menu.confirm()
+	var jump_row: int = PauseMenu.SettingRow.KEYS + SettingsScript.REBINDABLE.find(&"jump")
+	_menu.move_selection(jump_row)
+	assert_true(_menu.confirm())
+	assert_true(_menu.is_capturing())
+	var k := InputEventKey.new()
+	k.pressed = true
+	k.physical_keycode = KEY_J
+	assert_true(_menu.capture_key(k))
+	assert_false(_menu.is_capturing())
+	assert_eq(int(_menu.settings.bindings.get(&"jump", 0)), KEY_J)
+	assert_eq(_menu.settings_rows().size(), _menu.settings_row_count())
+
+
+func test_the_picture_and_sound_rows_adjust() -> void:
+	_menu.open()
+	_menu.move_selection(PauseMenu.Row.SETTINGS)
+	_menu.confirm()
+	_menu.move_selection(PauseMenu.SettingRow.QUALITY)
+	var q: int = _menu.settings.quality
+	_menu.adjust(-1)
+	assert_eq(_menu.settings.quality, q - 1)
+	_menu.move_selection(PauseMenu.SettingRow.MUSIC - PauseMenu.SettingRow.QUALITY)
+	var m: float = _menu.settings.music_volume
+	_menu.adjust(-1)
+	assert_lt(_menu.settings.music_volume, m)

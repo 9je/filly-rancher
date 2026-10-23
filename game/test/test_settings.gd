@@ -123,11 +123,14 @@ func test_a_step_that_changes_nothing_emits_nothing() -> void:
 	assert_signal_emit_count(s, "changed", 0)
 
 
-func test_apply_audio_pushes_all_three_sliders_and_zero_mutes() -> void:
+## v1: every bus has its own slider (UI no longer rides Effects).
+func test_apply_audio_pushes_every_slider_and_zero_mutes() -> void:
 	var s = SettingsScript.new()
 	s.master_volume = 1.0
 	s.ambient_volume = 0.5
 	s.effects_volume = 0.0
+	s.ui_volume = 0.0
+	s.music_volume = 0.25
 	s.apply_audio()
 	var ambient: int = AudioServer.get_bus_index("Ambient")
 	var effects: int = AudioServer.get_bus_index("Effects")
@@ -135,11 +138,15 @@ func test_apply_audio_pushes_all_three_sliders_and_zero_mutes() -> void:
 	assert_gt(ambient, 0)
 	assert_false(AudioServer.is_bus_mute(ambient))
 	assert_almost_eq(AudioServer.get_bus_volume_db(ambient), linear_to_db(0.5), 0.01)
-	# Zero mutes rather than setting -inf dB, and the UI bus rides the effects slider.
+	# Zero mutes rather than setting -inf dB.
 	assert_true(AudioServer.is_bus_mute(effects))
 	assert_true(AudioServer.is_bus_mute(ui))
+	var music: int = AudioServer.get_bus_index("Music")
+	assert_almost_eq(AudioServer.get_bus_volume_db(music), linear_to_db(0.25), 0.01)
 	# Put the buses back so a later test in the same run is not reading this one's leavings.
 	s.effects_volume = 1.0
+	s.ui_volume = 0.8
+	s.music_volume = 0.8
 	s.apply_audio()
 
 
@@ -227,3 +234,28 @@ func test_a_saved_ambient_setting_still_wins_over_the_new_default() -> void:
 	assert_almost_eq(back.ambient_volume, 1.0, 0.0001,
 		"a player who already turned it up keeps it turned up")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+
+
+## v1: the new fields survive a save, and a key bound twice moves rather than doubles.
+func test_v1_fields_round_trip_and_a_key_does_one_thing() -> void:
+	var path := OS.get_temp_dir().path_join("filly_settings_v1_%d.cfg" % randi())
+	var a := SettingsScript.new()
+	a.music_volume = 0.3
+	a.ui_volume = 0.2
+	a.voice_volume = 0.6
+	a.quality = SettingsScript.Quality.LOW
+	a.fullscreen = true
+	a.vsync = false
+	a.bind(&"jump", KEY_J)
+	a.bind(&"interact", KEY_J)
+	assert_false(a.bindings.has(&"jump"), "J moved to interact")
+	assert_true(a.save_to(path))
+	var b := SettingsScript.new()
+	b.load_from(path)
+	assert_almost_eq(b.music_volume, 0.3, 0.001)
+	assert_almost_eq(b.ui_volume, 0.2, 0.001)
+	assert_eq(b.quality, SettingsScript.Quality.LOW)
+	assert_true(b.fullscreen)
+	assert_false(b.vsync)
+	assert_eq(int(b.bindings.get(&"interact", 0)), KEY_J)
+	DirAccess.remove_absolute(path)

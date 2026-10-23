@@ -54,7 +54,12 @@ const MouseRowsScript := preload("res://ui/mouse_rows.gd")
 
 enum Page { MAIN, SETTINGS, COMPENDIUM, REQUESTS, MAIL, LEDGER }
 enum Row { RESUME, COMPENDIUM, REQUESTS, MAIL, LEDGER, SAVE, LOAD, SETTINGS, QUIT }
-enum SettingRow { VOLUME, AMBIENT, EFFECTS, SENSITIVITY, INVERT }
+## v1: one row per bus, the picture, and the keys. KEYS is the first key row; there is one
+## per Settings.REBINDABLE action after it.
+enum SettingRow { VOLUME, MUSIC, AMBIENT, EFFECTS, MENUS, VOICE, SENSITIVITY, INVERT, QUALITY,
+	FULLSCREEN, VSYNC, KEYS }
+## How many settings rows show at once; the page scrolls under the cursor.
+const SETTINGS_WINDOW := 12
 
 ## THE ROWS, IN THE ENUM'S OWN ORDER, and the words on them.
 ##
@@ -338,7 +343,7 @@ func _process(delta: float) -> void:
 func _row_count() -> int:
 	match _page:
 		Page.SETTINGS:
-			return SettingRow.size()
+			return settings_row_count()
 		Page.COMPENDIUM:
 			# compendium_rows(), not roster(): a page that cannot draw shows one line of
 			# EMPTY_TEXT, and the cursor has to have exactly that one row to sit on. The two
@@ -380,6 +385,20 @@ func adjust(direction: int) -> void:
 			var before: float = settings.master_volume
 			settings.step_volume(direction)
 			moved = not is_equal_approx(settings.master_volume, before)
+		SettingRow.MUSIC:
+			moved = settings.step_level(&"music_volume", direction)
+		SettingRow.MENUS:
+			moved = settings.step_level(&"ui_volume", direction)
+		SettingRow.VOICE:
+			moved = settings.step_level(&"voice_volume", direction)
+		SettingRow.QUALITY:
+			moved = settings.step_quality(direction)
+		SettingRow.FULLSCREEN:
+			settings.toggle_fullscreen()
+			moved = true
+		SettingRow.VSYNC:
+			settings.toggle_vsync()
+			moved = true
 		SettingRow.AMBIENT:
 			var before: float = settings.ambient_volume
 			settings.step_ambient(direction)
@@ -432,6 +451,14 @@ func confirm() -> bool:
 		_refresh()
 		return true
 	if _page == Page.SETTINGS:
+		if _selected >= SettingRow.KEYS:
+			_capturing = SettingsScript.REBINDABLE[_selected - SettingRow.KEYS]
+			_refresh()
+			MenuStyleScript.tick_confirm()
+			return true
+		if _selected == SettingRow.FULLSCREEN or _selected == SettingRow.VSYNC:
+			adjust(1)
+			return true
 		if _selected == SettingRow.INVERT:
 			# Toggle directly rather than through adjust(): adjust() already ticks its own
 			# tick_move() on a real change, and confirm ticking too made one keypress fire
@@ -518,7 +545,36 @@ func _return_to_main(row: int) -> void:
 	_refresh()
 
 
+## The action waiting for its new key (the settings page's key rows), or &"".
+var _capturing: StringName = &""
+
+
+func settings_row_count() -> int:
+	return SettingRow.KEYS + SettingsScript.REBINDABLE.size()
+
+
+func is_capturing() -> bool:
+	return _capturing != &""
+
+
+## The key-capture step: the next key pressed becomes the action's key. Escape cancels.
+func capture_key(event: InputEventKey) -> bool:
+	if _capturing == &"" or not event.pressed or event.echo:
+		return false
+	if event.physical_keycode != KEY_ESCAPE and event.keycode != KEY_ESCAPE:
+		var code := int(event.physical_keycode) if event.physical_keycode != 0 else int(event.keycode)
+		settings.bind(_capturing, code)
+		settings_changed.emit()
+	_capturing = &""
+	_refresh()
+	return true
+
+
 func _unhandled_input(event: InputEvent) -> void:
+	if _open and _capturing != &"" and event is InputEventKey:
+		if capture_key(event as InputEventKey):
+			get_viewport().set_input_as_handled()
+		return
 	if not _open:
 		if event.is_action_pressed(&"pause"):
 			if open():
@@ -946,15 +1002,38 @@ func _draw_settings() -> void:
 	_footer.text = MenuStyleScript.footer([[&"menu_rows", "choose"],
 		[&"menu_tabs", "adjust"], [&"ui_cancel", "back"]])
 	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
-	_add_row(SettingRow.VOLUME, "Master volume",
-		"%d%%" % int(round(settings.master_volume * 100.0)))
-	_add_row(SettingRow.AMBIENT, "Ambience",
-		"%d%%" % int(round(settings.ambient_volume * 100.0)))
-	_add_row(SettingRow.EFFECTS, "Effects and menus",
-		"%d%%" % int(round(settings.effects_volume * 100.0)))
-	_add_row(SettingRow.SENSITIVITY, "Mouse sensitivity",
-		"%.1f" % (settings.mouse_sensitivity * 1000.0))
-	_add_row(SettingRow.INVERT, "Invert look", "On" if settings.invert_look else "Off")
+	var rows := settings_rows()
+	var n := rows.size()
+	var start := clampi(_selected - SETTINGS_WINDOW / 2, 0, maxi(0, n - SETTINGS_WINDOW))
+	for i in range(start, mini(n, start + SETTINGS_WINDOW)):
+		_add_row(i, str(rows[i][0]), str(rows[i][1]), MenuStyleScript.COLOR_NAME,
+			MenuStyleScript.COLOR_VALUE, true)
+
+
+static func _pct(v: float) -> String:
+	return "%d%%" % int(round(v * 100.0))
+
+
+## [name, value] per settings row, in SettingRow order then one per rebindable action.
+func settings_rows() -> Array:
+	var out: Array = [
+		["Master volume", _pct(settings.master_volume)],
+		["Music", _pct(settings.music_volume)],
+		["Ambience", _pct(settings.ambient_volume)],
+		["Effects", _pct(settings.effects_volume)],
+		["Menus", _pct(settings.ui_volume)],
+		["Voices", _pct(settings.voice_volume)],
+		["Mouse sensitivity", "%.1f" % (settings.mouse_sensitivity * 1000.0)],
+		["Invert look", "On" if settings.invert_look else "Off"],
+		["Picture quality", SettingsScript.QUALITY_NAMES[settings.quality]],
+		["Fullscreen", "On" if settings.fullscreen else "Off"],
+		["Vsync", "On" if settings.vsync else "Off"],
+	]
+	for action in SettingsScript.REBINDABLE:
+		var value := "press a key..." if _capturing == action else \
+			SettingsScript.key_label(SettingsScript.key_of(action, settings.bindings))
+		out.append([str(SettingsScript.ACTION_NAMES.get(action, String(action))), value])
+	return out
 
 
 func _draw_compendium() -> void:
