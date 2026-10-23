@@ -41,6 +41,45 @@ func _ready() -> void:
 	_rng.randomize()
 
 
+## THE EXIT HANG (DECISIONS.md, 2026-10-23). Godot's AudioStreamGeneratorPlayback holds its
+## AudioStreamGenerator by a RAW POINTER (servers/audio/effects/audio_stream_generator.h) and
+## reads the generator's rate on every mix. Stopping a player does not drop its playback at
+## once: the server marks it FADE_OUT_TO_DELETION and mixes it one more time. Freeing this node
+## freed the generator (the player's `stream` was its only reference) before that last mix, so
+## the mix read the rate out of freed memory; a garbage rate makes the resampler's catch-up
+## loop all but endless while it holds the audio lock, and then quit()'s join on the audio
+## thread (or any AudioServer call that needs the lock) waits forever. Reproduced with a live
+## generator at a 1e15 rate: the frames run, then the process never exits.
+##
+## So a leaving Babble's generator is BURIED rather than dropped: held, with an extra
+## reference, until the server is long done with it (BURY_SECONDS), and released by a later
+## burial. Whatever is still buried at shutdown stays referenced on purpose: GDScript is torn
+## down before the AudioServer (main/main.cpp, Main::cleanup), so releasing them then would
+## reopen the same race at exit, which is where the hang was first seen.
+const BURY_SECONDS := 1.0
+static var _graveyard: Array = []
+
+
+## Back in the tree after a reparent: _ready() does not run twice, so restart the stream.
+func _enter_tree() -> void:
+	if _player != null and _player.is_inside_tree() and not _player.playing:
+		_player.play()
+		_gen = _player.get_stream_playback() as AudioStreamGeneratorPlayback
+
+
+func _exit_tree() -> void:
+	if _player == null or _player.stream == null:
+		return
+	_player.stop()
+	var now := Time.get_ticks_msec() / 1000.0
+	while not _graveyard.is_empty() and now - float(_graveyard[0][1]) > BURY_SECONDS:
+		var old: RefCounted = _graveyard.pop_front()[0]
+		old.unreference()
+	var stream: RefCounted = _player.stream
+	stream.reference()
+	_graveyard.append([stream, now])
+
+
 func set_voice(p: float, t: int) -> void:
 	pitch = p
 	timbre = t

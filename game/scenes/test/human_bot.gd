@@ -64,6 +64,7 @@ var _sighted_only := false
 var _build_fails: Dictionary = {}
 var _held_since := -1.0
 var _shippable: Array[String] = []
+var _depot_rest_until := -1.0
 var _palace_visits := 0
 var _last_market := -9999.0
 var _lift: StringName = &""
@@ -736,6 +737,9 @@ func _deliver_extras() -> bool:
 			bag_stock += 1
 	if not (pens_full and (bag_stock >= 3 or extra >= 2)):
 		return false
+	# An empty trip is a definite answer: she does not walk straight back to ask again.
+	if _t() < _depot_rest_until:
+		return false
 	var depot := _node_pos(^"Buildings/Depot")
 	_say("takes ponies to the Depot")
 	if not await _approach(InteractionScript.Kind.DEPOT, depot, 3.2):
@@ -767,6 +771,12 @@ func _deliver_extras() -> bool:
 			dm.call("confirm")
 		sent += 1
 		await _wait(1.0)
+	if sent == 0:
+		_depot_rest_until = _t() + 180.0
+		var seen: Array = []
+		for r: Dictionary in dm.call("deliver_rows"):
+			seen.append("%s stock=%s marked=%s" % [r.get("uid", "?"), r.get("stock"), r.get("marked")])
+		_say("nothing to hand over; rows %s, wanted %s" % [seen, _shippable])
 	await _think()
 	dm.call("close")
 	_say("delivered %d" % sent)
