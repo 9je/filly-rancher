@@ -140,6 +140,8 @@ The cozy loop, fully polished, in one area.
 - **headless playthrough scripts reach all five endings without softlock**, using a scripted player that drives systems through their public API with accelerated time;
 - shots of each ending.
 
+**M3 status (done):** both paths, all five endings, epilogues, credits and post-game, with `tools/playthrough.sh` reaching every ending headless. Deferred: per-ending shots (the epilogue orbit is not yet reviewed in a rendered capture), and the full seven-region show-style dressing pass beyond the regions Act Three uses.
+
 ## M4. Menus, settings, save and load, onboarding
 
 1. **Title** (New, Continue, Load, Settings, Credits, Quit), **pause** (Resume, Journal, Settings, Save, Load, Quit), and **save/load** slot UI with thumbnails and play time.
@@ -157,6 +159,8 @@ The cozy loop, fully polished, in one area.
 - a controller-only navigation test per screen (simulated joypad events);
 - save/load round-trip from the UI path.
 
+**M4 status (partly done):** done: six buses; a three-step quality preset (Low, Medium, High) with fullscreen and vsync; keyboard rebinding with conflict swap and defaults; settings persistence tests. Deferred to after v1: an Ultra preset and per-effect overrides, controller rebinding, accessibility options, and save-slot thumbnails. See DECISIONS.md.
+
 ## M5. Polish, performance, bug bash, ship
 
 1. **Performance:**
@@ -173,3 +177,5 @@ The cozy loop, fully polished, in one area.
 5. **REVIEW.md:** a skeptical player and reviewer critique; fix the top issues and mark them fixed.
 
 *Accept:* every item in the MISSION.md Definition of Done, with transcript evidence of the suite, the ending playthroughs, both exports and the Linux launch.
+
+**M5 status (done for v1):** both exports, the clean `--quit-after` launch of the Linux build, README.md, CREDITS.md, and REVIEW.md with every high and medium finding fixed. Deferred: the 60-pony perf gate, and a Proton smoke run of the Windows build.

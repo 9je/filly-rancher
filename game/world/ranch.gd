@@ -7762,6 +7762,10 @@ func _setup_act3() -> void:
 	if act3 != null or _game_state == null:
 		return
 	var story: Story = _game_state.story
+	if StoryV1Script.path(story) == StoryV1Script.PATH_FACTORY:
+		# Calm Lamps work from the moment they are bought, not from the next dawn.
+		_apply_factory_gear()
+		return
 	if StoryV1Script.path(story) != StoryV1Script.PATH_RESCUE:
 		return
 	act3 = Act3WorldScript.new()

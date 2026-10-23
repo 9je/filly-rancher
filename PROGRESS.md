@@ -39,10 +39,17 @@ Canon MLP stays: real names, looks and places ("lean into mlp fully", private bu
   - Endings: a tested truth table for all five.
   - Tests: test_endings, test_story_v1, test_factory_run (both choices headless), test_factory_interior.
 
-## Next (M3)
-- Factory path: ranks, Calm Lamp, Express Chute, Yield Lens, Lure Post, the town fading, the Jubilee climax.
-- Rescue path: Heat, corral raids, pylons, Dye Vat, Lantern Line, allies, Clover, the Lights Out climax, Placement.
-- Epilogues and credits for all five endings; the headless playthrough driver for each.
+- **M3 (both paths, the endings):**
+  - PathRules: contracts, ranks, the Jubilee order, the Supply Desk (Calm Lamp, Express Chute, Yield Lens, Lure Post); Heat and what it costs, four pylons, corral raids, the Dye Vat, the Lantern Line, allies, Placement.
+  - Act3World: the Rescue path's places in the valley.
+  - The Jubilee and Lights Out climaxes in the Factory, with Clover in holding.
+  - The Epilogue: valley orbit, closing letter, credits; the post-game continues the save.
+  - `tools/playthrough.sh` plays a new save to each of the five endings headless.
+- **M4 (settings):** six buses, a picture-quality preset, fullscreen, vsync, and rebindable keys on a scrolling settings page.
+- **M5 (ship):**
+  - Linux and Windows exports (`build/`); the Linux build launches headless with a clean log (Music lets go of its tracks on exit).
+  - README.md, CREDITS.md.
+  - REVIEW.md: two reviews, 24 findings, every high and medium one fixed and tested. Placement now hands back the morning before.
 
 ## Known issues
 - **Factory interior:** still monochrome grey-white; the ring light should read stronger in colour.
@@ -50,3 +57,5 @@ Canon MLP stays: real names, looks and places ("lean into mlp fully", private bu
 - **Distance fog:** it washes the rim hills pale.
 - **Building plinths:** still read as boxes under some houses.
 - **Headless runs:** they skip the toon shader swap (a dummy renderer limitation).
+- **Epilogue orbit:** not yet reviewed in a rendered capture.
+- **Deferred past v1:** see PLAN.md's M4 and M5 status lines.
