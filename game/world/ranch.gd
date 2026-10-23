@@ -1641,6 +1641,7 @@ func _on_world_phase_changed(_phase: int) -> void:
 				and not _game_state.story.has_flag("color_day"):
 			_game_state.story.set_flag("color_day")
 			_toast("Color Day! Marigold is waiting at the Depot with the lift.")
+		_act3_dawn()
 	_on_world_changed()
 
 
@@ -2505,6 +2506,8 @@ func run_collection_day() -> Dictionary:
 		_open_permit_count())
 	if _game_state != null:
 		_game_state.story.note_collection_day()
+		if _act3_collection_day(int(summary.get("delivered", 0))):
+			return summary
 	var letter: Dictionary = LettersScript.render(LettersScript.Id.COLLECTION_NOTICE, {
 		"name": _player_name(), "balance": int(summary["balance"]),
 		"upkeep": int(summary["upkeep"])})
@@ -7281,6 +7284,7 @@ func _on_pony_bloomed(inst: PonyInstance) -> void:
 	if _game_state != null:
 		var story: Story = _game_state.story
 		story.add_var("blooms")
+		PathRulesScript.rescue_bloom(story)
 		var look := PonyLookScript.from_stock(inst.stock)
 		_game_state.book.note_bloom(String(inst.uid), inst.display_name(), look,
 			story.collection_days)
@@ -7328,6 +7332,7 @@ func _after_delivery(inst: PonyInstance) -> void:
 	if valley_frame != null:
 		valley_frame.send_up(crate_position() + Vector3(0, 1.2, 0), look.coat,
 			ValleyFrameScript.brightness_for(story.deliveries))
+	_act3_delivery(inst, look)
 
 
 # --- the score (v1) ------------------------------------------------------------------------
@@ -7396,6 +7401,7 @@ func _v1_tick(delta: float) -> void:
 	_tip_t = 0.4
 	_drive_dread()
 	_back_down()
+	_maybe_ending()
 	var hud := get_node_or_null(^"HUD")
 	if hud != null and hud.has_method("set_tip"):
 		var tip: Dictionary = _game_state.onboarding.current(_onboarding_state(),
@@ -7464,3 +7470,178 @@ func _ride_lift_to_factory(mode: StringName) -> void:
 	FactoryRun.mode = mode
 	get_tree().paused = false
 	get_tree().change_scene_to_file.call_deferred(FACTORY_SCENE)
+
+
+# --- Act Three (v1): the world reports, PathRules decides (game/systems/path_rules.gd) ---
+
+const PathRulesScript := preload("res://systems/path_rules.gd")
+const EndingsScript := preload("res://systems/endings.gd")
+const EpilogueScript := preload("res://ui/epilogue.gd")
+
+
+func _act3_delivery(inst: PonyInstance, look: PonyLook) -> void:
+	var story: Story = _game_state.story
+	if StoryV1Script.path(story) != StoryV1Script.PATH_FACTORY:
+		return
+	var data: PonyData = inst.data()
+	var rarity: int = data.rarity if data != null else PonyDataScript.Rarity.COMMON
+	var base: int = LedgerScript.delivery_credit(rarity, inst.is_stock())
+	var pay := PathRulesScript.factory_pay(story, base, look.coat, _owns(&"yield_lens"))
+	var r := PathRulesScript.factory_delivery(story, look.coat)
+	var extra: int = pay - base + int(r.bonus)
+	if extra > 0 and _economy != null:
+		_economy.grant(extra)
+	if r.rank_up:
+		_toast("Promoted: %s. The letter is very warm, and it mentions the yield." % PathRulesScript.rank_name(story))
+	elif r.jubilee_ready:
+		_toast("The Jubilee order is filled. Marigold will take you up for the Jubilee.")
+	elif int(r.bonus) > 0:
+		_toast("Contract met: +%d bits." % int(r.bonus))
+	var line := PathRulesScript.contract_line(story)
+	if line != "":
+		_toast(line)
+
+
+func _owns(gear: StringName) -> bool:
+	return _shop != null and _shop.owns_gear(gear)
+
+
+## Every dawn after the reveal: Heat cools, the Supply Desk's gear does its work.
+func _act3_dawn() -> void:
+	if _game_state == null:
+		return
+	var story: Story = _game_state.story
+	match StoryV1Script.path(story):
+		StoryV1Script.PATH_RESCUE:
+			PathRulesScript.add_heat(story, "dawn")
+		StoryV1Script.PATH_FACTORY:
+			_apply_factory_gear()
+			if _owns(&"express_chute"):
+				_express_chute()
+
+
+## Calm Lamps on every pen: nopony flees, frets, or Blooms. The pen goes quiet.
+func _apply_factory_gear() -> void:
+	var lamp := _owns(&"calm_lamp")
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen != null:
+			pen.calm_lamp = lamp
+
+
+## The Express Chute: unmarked penned ponies go to the Depot at dawn, unseen.
+func _express_chute() -> int:
+	var sent := 0
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen == null:
+			continue
+		for inst in pen.ponies():
+			if inst.is_marked():
+				continue
+			if not bool(deliver_pony(inst.uid).get("ok", false)):
+				continue
+			sent += 1
+	if sent > 0:
+		_toast("The Express Chute took %d in the night. A bonus is on your statement." % sent)
+	return sent
+
+
+## A collection day on the Rescue path. Returns true if it ended the game (Placement).
+func _act3_collection_day(delivered: int) -> bool:
+	var story: Story = _game_state.story
+	var r := PathRulesScript.rescue_collection_day(story, delivered)
+	if r.placed:
+		play_ending(EndingsScript.PLACEMENT)
+		return true
+	if int(r.fine) > 0 and _economy != null:
+		var paid := mini(int(r.fine), _economy.bits)
+		if paid > 0:
+			_economy.spend(paid)
+		_toast("Cloudsdale fined the ranch %d bits for \"irregularities\". Heat: %d." % [paid, PathRulesScript.heat(story)])
+	if r.padlock:
+		var slot_id := _fullest_pen_slot()
+		if slot_id != &"" and not _game_state.ledger.padlocked_slots.has(String(slot_id)):
+			_game_state.ledger.padlocked_slots.append(String(slot_id))
+			_apply_padlocks()
+			_toast("A Collector padlocked a pen. Everyone inside is fine. For now.")
+	if r.take:
+		_collector_takes()
+	return false
+
+
+## A Collector takes one UNMARKED pony from the ranch. Marked ponies cannot be taken, which
+## is why Blooming is the defence.
+func _collector_takes() -> String:
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen == null:
+			continue
+		for inst in pen.ponies():
+			if inst.is_marked():
+				continue
+			var body := pen.release_body(inst.uid, self)
+			if body != null:
+				body.queue_free()
+			_game_state.remove_pony(inst.uid)
+			_toast("At dawn a Collector took %s. Marked ponies cannot be taken." % inst.display_name())
+			return inst.display_name()
+	return ""
+
+
+# --- the endings (v1) ------------------------------------------------------------------
+
+## An ending was earned: say so in the save, then play its epilogue over this valley
+## (ui/epilogue.gd), then credits, then the save goes on in that world (post-game).
+func play_ending(ending: StringName) -> void:
+	if _game_state == null or ending == EndingsScript.NONE:
+		return
+	var story: Story = _game_state.story
+	story.set_var("ending", String(ending))
+	story.set_flag("ending_" + String(ending))
+	var t := EndingsScript.tone(ending)
+	if bool(t.free):
+		story.set_flag("ending_free")
+	var seen: Array = story.get_var("endings_seen", [])
+	if not (String(ending) in seen):
+		seen.append(String(ending))
+		story.set_var("endings_seen", seen)
+	print("ENDING_REACHED %s" % ending)
+	if world_tone != null and not _dread_pinned:
+		world_tone.set_target(float(t.dread))
+	save_game()
+	if not _interactive:
+		ending_played.emit(ending)
+		return
+	var music := get_node_or_null("/root/Music")
+	if music != null:
+		music.call("play_context", t.music)
+	var ep: CanvasLayer = EpilogueScript.new()
+	ep.ending = ending
+	ep.player_name = _player_name()
+	ep.lines = _epilogue_lines(ending)
+	add_child(ep)
+	ep.done.connect(func() -> void: ending_played.emit(ending))
+
+
+signal ending_played(ending: StringName)
+
+
+## The last letter, with the names this save earned.
+func _epilogue_lines(ending: StringName) -> Dictionary:
+	var story: Story = _game_state.story
+	var book: PonyBook = _game_state.book
+	var lost: Array[String] = []
+	for d: Dictionary in book.delivered:
+		if bool(d.get("after_reveal", false)) and lost.size() < 8:
+			lost.append(str(d.get("name", "")))
+	return {"rescued": int(story.get_var("rescued", 0)), "delivered": StoryV1Script.delivered_after_reveal(book),
+		"lost": lost, "rank": PathRulesScript.rank_name(story), "allies": StoryV1Script.allies(story)}
+
+
+## Back down from a climax: the ending it earned plays once.
+func _maybe_ending() -> void:
+	var story: Story = _game_state.story
+	if not story.has_flag("climax_done") or story.get_var("ending", "") != "":
+		return
+	play_ending(EndingsScript.select(StoryV1Script.ending_input(story, _game_state.book)))

@@ -4,6 +4,11 @@ Filly Rancher is a non-commercial fan game. Every original character, story, lin
 dialogue, generated cutie mark and Blender-built prop in it was made for this project. The
 third-party material it uses is listed below with its source and licence.
 
+## Source works
+
+- *My Little Pony: Friendship is Magic* (Hasbro, DHX Media; developed by Lauren Faust): the characters, places and look this fan game is built on. Not for redistribution.
+- *Rainbow Factory*, the fan story by Aurora Dawn (and WoodenToaster's song of the same name): the Factory's premise.
+
 ## Music
 
 All music is by **Kevin MacLeod** (incompetech.com) and is licensed under Creative Commons:
