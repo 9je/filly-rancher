@@ -52,6 +52,10 @@ func _ready() -> void:
 	var events := get_node_or_null("/root/Events")
 	if events != null:
 		events.connect("dread_changed", set_dread)
+	if context != &"":
+		var pending := context
+		context = &""
+		play_context(pending)
 
 
 func _player(n: String) -> AudioStreamPlayer:
@@ -69,6 +73,9 @@ func play_context(ctx: StringName) -> void:
 	if ctx == context:
 		return
 	context = ctx
+	if _a == null:
+		# Asked before _ready (a scene's own _ready can run first): _ready starts it.
+		return
 	var next := _b if _current == _a else _a
 	var path: String = TRACKS.get(ctx, "")
 	if _tween != null:

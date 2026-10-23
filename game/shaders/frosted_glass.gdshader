@@ -4,7 +4,7 @@ shader_type spatial;
 render_mode unshaded, blend_mix, cull_disabled, depth_draw_never, shadows_disabled;
 
 uniform vec3 tint : source_color = vec3(0.82, 0.88, 0.95);
-uniform float opacity : hint_range(0.0, 1.0) = 0.55;
+uniform float opacity : hint_range(0.0, 1.0) = 0.3;
 uniform float clear : hint_range(0.0, 1.0) = 0.0;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }

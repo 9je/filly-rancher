@@ -31,6 +31,8 @@ static var mode: StringName = &"reveal"
 
 ## True for the automated playthrough: walks and timed beats complete at once.
 var skip_waits := false
+## With skip_waits: false keeps the window at its real pace (the screenshot probe).
+var fast_window := true
 ## Set by the choice (or by the driver).
 var outcome: StringName = &""
 
@@ -76,22 +78,24 @@ func _build() -> void:
 	env.background_color = Color(0.82, 0.86, 0.95)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.92, 0.9, 0.96)
-	env.ambient_light_energy = 0.55
+	env.ambient_light_energy = 0.28
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.tonemap_white = 6.0
-	env.tonemap_exposure = 0.9
+	env.tonemap_exposure = 0.78
+	env.ssao_enabled = true
+	env.ssao_intensity = 1.2
 	env.glow_enabled = true
 	env.glow_intensity = 0.4
 	env.glow_hdr_threshold = 1.6
 	env.fog_enabled = true
-	env.fog_density = 0.004
+	env.fog_density = 0.006
 	env.fog_light_color = Color(0.85, 0.87, 0.95)
 	_env.environment = env
 	_env.name = "WorldEnvironment"
 	add_child(_env)
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-60, 30, 0)
-	sun.light_energy = 0.35
+	sun.light_energy = 0.15
 	add_child(sun)
 	interior = InteriorScript.new()
 	interior.name = "Interior"
@@ -251,7 +255,7 @@ func _window_scene() -> void:
 	_frost_the_glass()
 	for p in _patrols:
 		p.enabled = false
-	if skip_waits:
+	if skip_waits and fast_window:
 		window.step_seconds = 0.01
 		window.hold_seconds = 0.01
 	# The Scoop's gauge shows what it always measured (clue 9).
@@ -274,7 +278,8 @@ func _frost_the_glass() -> void:
 	m.shader = load("res://shaders/frosted_glass.gdshader")
 	pane.material_override = m
 	gallery.add_child(pane)
-	pane.position = Vector3(0, 3.1, -InteriorScript.ROOM_SIZE * 0.5 - 0.05)
+	pane.position = Vector3(InteriorScript.ROOM_SIZE * 0.5 + 0.05, 3.1, 0)
+	pane.rotation_degrees = Vector3(0, -90, 0)
 
 
 func _contract_ending() -> void:

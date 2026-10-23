@@ -135,15 +135,14 @@ func _walls(room: Node3D, spec: Dictionary, index: int) -> void:
 		var along := float(k) * TILE
 		# Side walls face inward (east wall faces -X, west wall faces +X).
 		_piece(wall, room, Vector3(-half, 0, along), 90.0)
-		_piece(wall, room, Vector3(half, 0, along), -90.0)
+		# The gallery's east wall is the window onto the processing floor beside it.
+		_piece("fx_window_wall" if spec.name == &"gallery" else wall, room, Vector3(half, 0, along), -90.0)
 	# The far wall: an arch into the next room, solid walls either side; the last room ends.
 	var last := index == ROOMS.size() - 1
 	for k in [-1, 0, 1]:
 		var file := wall
 		if k == 0 and not last:
 			file = "fx_arch"
-		if spec.name == &"gallery":
-			file = "fx_window_wall" if k != 0 else "fx_arch"
 		_piece(file, room, Vector3(float(k) * TILE, 0, -half), 0.0)
 	if index == 0:
 		for k in [-1, 1]:
@@ -262,10 +261,12 @@ func _dress(room: Node3D, spec: Dictionary, markers: Node3D) -> void:
 			_mark(markers, "patrol_b", Vector3(-4.0, 0, -3.0))
 			_mark(markers, "patrol_c", Vector3(4.0, 0, -3.0))
 		&"gallery":
-			_mark(markers, "window", Vector3(0, 0, -half + 1.6))
-			# Deep enough that the ring's 10 m glass column ends below the next room's floor.
-			_mark(markers, "floor_below", Vector3(0, -10.5, -half - 7.0))
-			_processing_floor(room, Vector3(0, -10.5, -half - 7.0))
+			_mark(markers, "window", Vector3(half - 1.6, 0, 0))
+			# Beside the gallery, not beyond it: the rooms run on down -Z, so a hall past
+			# the far wall would sit inside the holding room. 3 m down, so the ring is in
+			# the natural look down from the glass.
+			_mark(markers, "floor_below", Vector3(half + 9.0, -3.0, 0))
+			_processing_floor(room, Vector3(half + 9.0, -3.0, 0))
 		&"holding":
 			for x in [-4.0, 4.0]:
 				for z in [-3.0, 0.0, 3.0]:
@@ -279,8 +280,8 @@ func _dress(room: Node3D, spec: Dictionary, markers: Node3D) -> void:
 			_mark(markers, "lever", Vector3(0, 0, -2.2))
 
 
-## The processing floor seen through the gallery window: a sunken metal hall below and
-## beyond it, the ring at its centre, a queue lane leading in. Built here; the set piece
+## The processing floor seen through the gallery window: a sunken metal hall below it and
+## off its east side, the ring at its centre, a queue lane leading in. Built here; the set piece
 ## (game/world/factory_window.gd) stands the line of silhouettes on it and runs the light.
 func _processing_floor(room: Node3D, centre: Vector3) -> void:
 	var hall := Node3D.new()
@@ -290,13 +291,16 @@ func _processing_floor(room: Node3D, centre: Vector3) -> void:
 	for x in [-6.0, -2.0, 2.0, 6.0]:
 		for z in [-6.0, -2.0, 2.0, 6.0]:
 			_piece("fx_floor_grate", hall, Vector3(x, 0, z))
+	# Three walls: the fourth side is under the gallery's glass, and a wall there would
+	# rise past the sill and hide the floor.
 	for k in [-6.0, -2.0, 2.0, 6.0]:
-		_piece("fx_wall_metal", hall, Vector3(-8.0, 0, k), 90.0)
 		_piece("fx_wall_metal", hall, Vector3(8.0, 0, k), -90.0)
 		_piece("fx_wall_metal", hall, Vector3(k, 0, -8.0), 0.0)
+		_piece("fx_wall_metal", hall, Vector3(k, 0, 8.0), 180.0)
 	_piece("fx_ring", hall, Vector3(0, 0, 0))
-	for z in [2.0, 4.0, 6.0]:
-		_piece("fx_pipe", hall, Vector3(-3.0, 5.0, z - 4.0))
+	# Pipes along the far wall, high: never between the glass and the ring.
+	for z in [-4.0, 0.0, 4.0]:
+		_piece("fx_pipe", hall, Vector3(6.5, 6.0, z), 90.0)
 	var glow := OmniLight3D.new()
 	glow.name = "RingLight"
 	glow.light_color = Color(1.0, 0.95, 0.9)

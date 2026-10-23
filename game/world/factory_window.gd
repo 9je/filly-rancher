@@ -57,9 +57,10 @@ func _build_line() -> void:
 		_rims.append(look.coat)
 
 
-## Where place `i` in the queue stands (0 is next into the ring).
+## Where place `i` in the queue stands (0 is next into the ring): a lane down the hall's
+## side wall, away from the gallery glass, so the whole line reads from the window.
 func _slot(i: int) -> Vector3:
-	return _queue_start + Vector3(1.1, 0, 0.9) * float(i)
+	return _queue_start + Vector3(-0.12, 0, -1.3) * float(i)
 
 
 func _silhouette(body: Node3D, rim: Color) -> void:
