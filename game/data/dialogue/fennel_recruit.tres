@@ -1,0 +1,42 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"fennel_recruit"
+speaker = &"fennel"
+priority = 100
+once = true
+bark = false
+when = {
+"path": "rescue",
+"flags_all": ["intake_ledger"],
+"flags_none": ["ally_fennel"]
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "What's that paper? Give it here.",
+"who": "fennel",
+"mood": "blank",
+"next": "two"
+}, {
+"id": "two",
+"text": "Clover. That's my Clover's name. Intake, the spring before last. \"Holding, long term.\"",
+"who": "fennel",
+"mood": "sad",
+"next": "three"
+}, {
+"id": "three",
+"text": "Every postcard said she was happy. Every one. I kept them all on the wall.",
+"who": "fennel",
+"mood": "sad",
+"next": "four"
+}, {
+"id": "four",
+"text": "You go up there, you find her. And until you do, my barn's for anypony who needs it.",
+"who": "fennel",
+"mood": "blank",
+"anim": "nod",
+"flag": "ally_fennel"
+}])

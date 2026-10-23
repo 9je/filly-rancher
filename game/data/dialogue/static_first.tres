@@ -1,0 +1,42 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"static_first"
+speaker = &"static"
+priority = 110
+once = true
+bark = false
+when = {
+"path": "rescue",
+"flags_none": ["static_met"]
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "You're the steward who ran. Good. I've been waiting at this fence a long time for one of you to run.",
+"who": "static",
+"mood": "blank",
+"next": "two"
+}, {
+"id": "two",
+"text": "I can't fix the Works. But there's a path through the Everfree, past the tangle. The Lantern Line. Marked ponies can walk it and live free on the other side.",
+"who": "static",
+"mood": "blank",
+"next": "three"
+}, {
+"id": "three",
+"text": "Unmarked ones get found. So help them Bloom. A marked pony can't be drained. That's the whole trick.",
+"who": "static",
+"mood": "blank",
+"anim": "look",
+"next": "four"
+}, {
+"id": "four",
+"text": "And the pylons. Four of them, one in every region. Each one feeds the rainbow. Cut all four and I can get you back inside on Color Day.",
+"who": "static",
+"mood": "blank",
+"anim": "nod",
+"flag": "static_met"
+}])

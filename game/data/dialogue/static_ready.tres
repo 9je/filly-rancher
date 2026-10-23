@@ -1,0 +1,49 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"static_ready"
+speaker = &"static"
+priority = 115
+once = true
+bark = false
+when = {
+"path": "rescue",
+"flags_all": ["static_met"],
+"min": {
+"pylons": 4
+}
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "All four pylons. The rainbow's down to a smudge. They're scrambling up there.",
+"who": "static",
+"mood": "happy",
+"next": "two"
+}, {
+"id": "two",
+"text": "It's Color Day tomorrow. Same lift. Same walkway. Free the line, find holding, and pull the lever the other way. Ready?",
+"who": "static",
+"mood": "blank",
+"anim": "nod",
+"choices": [{
+"text": "Take us up.",
+"next": "go"
+}, {
+"text": "Not yet.",
+"next": "wait"
+}]
+}, {
+"id": "go",
+"text": "Then let's turn the lights out.",
+"who": "static",
+"mood": "happy",
+"event": "ride_lift_lights_out"
+}, {
+"id": "wait",
+"text": "Don't wait too long. Heat doesn't.",
+"who": "static",
+"mood": "blank"
+}])

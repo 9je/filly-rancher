@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"clover_found"
+speaker = &"clover"
+priority = 0
+once = false
+bark = false
+when = {
+"flags_all": ["in_factory"]
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "Is it... is Papa with you? He got my postcards?",
+"who": "clover",
+"mood": "scared",
+"next": "two"
+}, {
+"id": "two",
+"text": "He kept them? All of them? Okay. Okay. I can walk.",
+"who": "clover",
+"mood": "happy"
+}])

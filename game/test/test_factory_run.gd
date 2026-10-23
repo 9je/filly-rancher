@@ -50,3 +50,37 @@ func test_running_for_tumble_takes_the_rescue_path() -> void:
 	if _gs != null:
 		assert_eq(StoryV1Script.path(_gs.story), "rescue")
 		assert_eq(_gs.story.chapter, Story.Chapter.RESISTANCE)
+
+
+func _climax(m: StringName) -> Array:
+	FactoryRunScript.mode = m
+	var f: Node3D = FactoryScene.instantiate()
+	f.skip_waits = true
+	var steps: Array = []
+	f.step_reached.connect(func(s: StringName) -> void: steps.append(s))
+	add_child_autofree(f)
+	await wait_for_signal(f.finished, 60.0)
+	FactoryRunScript.mode = &"reveal"
+	return [f, steps]
+
+
+func test_the_jubilee_pulls_the_lever_and_marks_the_climax() -> void:
+	if _gs != null:
+		StoryV1Script.choose_path(_gs.story, "factory")
+	var r: Array = await _climax(&"jubilee")
+	assert_has(r[1], &"stage")
+	assert_has(r[1], &"lever")
+	if _gs != null:
+		assert_true(_gs.story.has_flag("climax_done"))
+
+
+func test_lights_out_frees_the_line_and_finds_clover_with_fennel() -> void:
+	if _gs != null:
+		StoryV1Script.choose_path(_gs.story, "rescue")
+		_gs.story.set_flag("ally_fennel")
+	var r: Array = await _climax(&"lights_out")
+	for s in [&"gallery", &"line_freed", &"holding", &"clover", &"control", &"lever"]:
+		assert_has(r[1], s, "Lights Out passes %s" % s)
+	if _gs != null:
+		assert_true(_gs.story.has_flag("clover_rescued"))
+		assert_gt(int(_gs.story.get_var("rescued", 0)), 0, "the freed line counts as rescued")

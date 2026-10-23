@@ -327,21 +327,8 @@ func _escape() -> void:
 
 ## Hold interact beside her: the hardest catch in the game so far (she is too wiggly).
 func _hold_to_scoop(tumble: Npc) -> void:
-	if skip_waits or tumble == null:
-		return
-	var held := 0.0
-	while held < 3.0:
-		await get_tree().process_frame
-		var near := player.global_position.distance_to(tumble.global_position) < 3.0
-		if near and Input.is_action_pressed(&"interact"):
-			held += get_process_delta_time()
-		else:
-			held = maxf(0.0, held - get_process_delta_time() * 0.5)
-		if hud != null and hud.has_method("set_prompt"):
-			hud.call("set_prompt", "%s: hold to scoop Tumble out  %d%%" % [
-				InputDeviceScript.hint(&"interact"), int(held / 3.0 * 100.0)] if near else "Get to Tumble!")
-	if hud != null and hud.has_method("set_prompt"):
-		hud.call("set_prompt", "")
+	if tumble != null:
+		await _hold_at(tumble.global_position, 3.0, "scoop Tumble out")
 
 
 func _alarm() -> void:
@@ -354,12 +341,184 @@ func _alarm() -> void:
 		music.call("play_context", &"stealth")
 
 
-# --- the climaxes (M3 fills these in) -------------------------------------------------
+# --- the climaxes ----------------------------------------------------------------------
 
 func _climax(m: StringName) -> void:
 	step_reached.emit(m)
-	await get_tree().process_frame
-	finished.emit(m)
+	if m == &"jubilee":
+		await _jubilee()
+	else:
+		await _lights_out()
+
+
+## THE JUBILEE (STORY.md section 4): a party all the way in, a stage in the control room,
+## the lever, the Grand Spectrum. The most beautiful thing in the game, and the worst.
+func _jubilee() -> void:
+	tone.snap(0.15)
+	var landing := interior.room_origin(&"landing")
+	var marigold := _cast_npc(&"marigold", landing + Vector3(1.5, 0, -3.5))
+	for i in range(8):
+		var s := CharacterDef.new()
+		s.id = StringName("guest_%d" % i)
+		s.char_seed = 6100 + i
+		var room: StringName = [&"welcome", &"classroom", &"giftshop", &"control"][i % 4]
+		var at := interior.room_origin(room) + Vector3(-3.5 + (i % 3) * 3.5, 0, -4.0 - (i % 2) * 2.0)
+		var n := _npc(s.id, s, at)
+		n.set_mode_stand(at)
+		n.act(&"happy", &"hop")
+	await _say(&"marigold", &"jubilee_welcome")
+	var control := interior.room_origin(&"control")
+	marigold.set_mode_walk_to(control + Vector3(1.5, 0, -6.0))
+	await _until_area(&"factory_control", control + Vector3(0, 0, -2))
+	step_reached.emit(&"stage")
+	tone.set_target(0.3)
+	await _say(&"marigold", &"jubilee_stage")
+	await _hold_at(_lever_point(), 2.0, "pull the lever")
+	step_reached.emit(&"lever")
+	await _grand_spectrum(true)
+	_climax_done()
+	await _fade_to(Color(1, 1, 1, 1), 2.0 if not skip_waits else 0.01)
+	_leave(&"jubilee")
+
+
+## LIGHTS OUT (STORY.md section 5): up with the town behind you, free the line, find
+## holding and Clover, and pull the same lever the other way.
+func _lights_out() -> void:
+	tone.snap(0.5)
+	var landing := interior.room_origin(&"landing")
+	var allies: Array[StringName] = [&"static"]
+	var story: Story = _game_state.story if _game_state != null else null
+	if story != null:
+		for a in [&"pip", &"bramble", &"fennel"]:
+			if story.has_flag("ally_" + String(a)):
+				allies.append(a)
+	var k := 0
+	for a in allies:
+		var n := _cast_npc(a, landing + Vector3(-2.0 + k * 1.4, 0, -1.0))
+		n.set_mode_follow(player)
+		k += 1
+	await _say(&"static", &"lights_out_landing")
+	var music := get_node_or_null("/root/Music")
+	if music != null:
+		music.call("play_context", &"stealth")
+	await _walkway()
+	await _until_area(&"factory_gallery", interior.room_origin(&"gallery") + Vector3(0, 0, -3))
+	step_reached.emit(&"gallery")
+	# Free the line: the queue on the processing floor, beamed out through the hatch.
+	var floor := interior.get_node_or_null("Rooms/gallery/ProcessingFloor") as Node3D
+	if floor != null:
+		window = WindowScript.new()
+		window.line_length = 6
+		floor.add_child(window)
+	var hatch := interior.room_origin(&"gallery") + Vector3(InteriorScript.ROOM_SIZE * 0.5 - 1.2, 0, -6.0)
+	await _hold_at(hatch, 3.0, "beam the line out through the hatch")
+	var freed := 0
+	if window != null:
+		for p in floor.get_children():
+			if p is CharacterBody3D and p.visible:
+				p.visible = false
+				freed += 1
+	if story != null:
+		story.add_var("rescued", freed)
+	step_reached.emit(&"line_freed")
+	if hud != null and hud.has_method("toast"):
+		hud.call("toast", "%d ponies out of the line." % freed)
+	# Holding, and Clover (only Fennel's page tells you where she is).
+	var holding := interior.room_origin(&"holding")
+	await _until_area(&"factory_holding", holding + Vector3(0, 0, -2))
+	step_reached.emit(&"holding")
+	if story != null and story.has_flag("ally_fennel"):
+		var mark := interior.marker(&"holding", "clover")
+		var clover := _cast_npc(&"clover", mark.global_position if mark != null else holding)
+		clover.act(&"scared", &"cower")
+		await _hold_at(clover.global_position, 2.0, "open Clover's stall")
+		clover.act(&"happy", &"hop")
+		clover.set_mode_follow(player)
+		story.set_flag("clover_rescued")
+		step_reached.emit(&"clover")
+		await _say(&"clover", &"clover_found")
+	var control := interior.room_origin(&"control")
+	await _until_area(&"factory_control", control + Vector3(0, 0, -2))
+	step_reached.emit(&"control")
+	await _hold_at(_lever_point(), 3.0, "pull the lever the other way")
+	step_reached.emit(&"lever")
+	await _grand_spectrum(false)
+	_climax_done()
+	await _fade_to(Color(0, 0, 0, 1), 2.0 if not skip_waits else 0.01)
+	_leave(&"lights_out")
+
+
+func _lever_point() -> Vector3:
+	var m := interior.marker(&"control", "lever")
+	return m.global_position if m != null else interior.room_origin(&"control") + Vector3(0, 0, -8)
+
+
+## The lever's work. Up: every light in the Works goes to rainbow, sparkles pour up.
+## Down: the lights fail room by room, from the far end back to the lift.
+func _grand_spectrum(up: bool) -> void:
+	var handle := interior.find_child("LeverHandle", true, false) as Node3D
+	if handle != null:
+		var t := create_tween()
+		t.tween_property(handle, "rotation_degrees:x", -70.0 if up else 70.0, 0.4)
+	var names: Array = interior.rooms.keys()
+	if not up:
+		names.reverse()
+	var colors: Array[Color] = [Color(1, 0.3, 0.3), Color(1, 0.6, 0.2), Color(1, 0.95, 0.3), Color(0.3, 0.9, 0.4),
+		Color(0.3, 0.6, 1), Color(0.6, 0.35, 0.95)]
+	var i := 0
+	for room_name in names:
+		var room := interior.rooms[room_name] as Node3D
+		for l in room.find_children("*", "OmniLight3D", true, false):
+			var light := l as OmniLight3D
+			var lt := create_tween()
+			if up:
+				lt.tween_property(light, "light_color", colors[i % colors.size()], 0.5)
+				lt.parallel().tween_property(light, "light_energy", light.light_energy * 2.5, 0.5)
+			else:
+				lt.tween_property(light, "light_energy", 0.0, 0.25)
+		if up:
+			var p := BloomCeremony.sparkles(colors)
+			p.amount = 120
+			room.add_child(p)
+			p.position = Vector3(0, 1.0, 0)
+			p.emitting = true
+		var sound := get_node_or_null("/root/Sound")
+		if sound != null and sound.call("has_sound", &"sparkle" if up else &"ui_denied"):
+			sound.call("play", &"sparkle" if up else &"ui_denied")
+		i += 1
+		if not skip_waits:
+			await get_tree().create_timer(0.45).timeout
+	tone.set_target(0.85 if up else 0.0)
+	if not skip_waits:
+		await get_tree().create_timer(2.5).timeout
+
+
+func _climax_done() -> void:
+	if _game_state == null:
+		return
+	var story: Story = _game_state.story
+	story.set_flag("climax_done")
+	story.set_var("ending", "")
+
+
+## Hold interact within reach of `at` for `seconds`. The scene waits on it.
+func _hold_at(at: Vector3, seconds: float, verb: String) -> void:
+	if skip_waits:
+		return
+	var held := 0.0
+	while held < seconds:
+		await get_tree().process_frame
+		var near := player.global_position.distance_to(at) < 3.2
+		var dt := get_process_delta_time()
+		if near and Input.is_action_pressed(&"interact"):
+			held += dt
+		else:
+			held = maxf(0.0, held - dt * 0.5)
+		if hud != null and hud.has_method("set_prompt"):
+			hud.call("set_prompt", "%s: hold to %s  %d%%" % [InputDeviceScript.hint(&"interact"),
+				verb, int(held / seconds * 100.0)] if near else "")
+	if hud != null and hud.has_method("set_prompt"):
+		hud.call("set_prompt", "")
 
 
 # --- helpers -----------------------------------------------------------------------

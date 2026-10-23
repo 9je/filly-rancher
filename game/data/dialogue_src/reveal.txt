@@ -62,3 +62,41 @@ sign [marigold happy] Wonderful! I knew you were one of us. She'll be waiting at
   event: path_factory
 run [marigold blank] Oh, {name}. That's a shame.
   event: path_rescue
+
+# ----- the climaxes ---------------------------------------------------------------------
+
+=== jubilee_welcome
+speaker: marigold
+once: false
+when: {"flags_all": ["in_factory"]}
+
+start [marigold happy] Regional Director! Everypony came. Listen to them!
+  -> two
+two [marigold happy nod] Come on, the stage is all the way in. Mind the confetti.
+
+=== jubilee_stage
+speaker: marigold
+once: false
+when: {"flags_all": ["in_factory"]}
+
+start [marigold happy] Equestria, the Jubilee Rainbow! And the pony who made it possible.
+  -> two
+two [marigold happy look] Go on, Director. The lever is yours.
+
+=== lights_out_landing
+speaker: static
+once: false
+when: {"flags_all": ["in_factory"]}
+
+start [static blank] Same lift, same walkway. The lanterns are still out there.
+  -> two
+two [static blank nod] Line first. Then holding. Then the lever. Stay out of the light.
+
+=== clover_found
+speaker: clover
+once: false
+when: {"flags_all": ["in_factory"]}
+
+start [clover scared] Is it... is Papa with you? He got my postcards?
+  -> two
+two [clover happy] He kept them? All of them? Okay. Okay. I can walk.

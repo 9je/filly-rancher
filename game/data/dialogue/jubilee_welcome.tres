@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"jubilee_welcome"
+speaker = &"marigold"
+priority = 0
+once = false
+bark = false
+when = {
+"flags_all": ["in_factory"]
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "Regional Director! Everypony came. Listen to them!",
+"who": "marigold",
+"mood": "happy",
+"next": "two"
+}, {
+"id": "two",
+"text": "Come on, the stage is all the way in. Mind the confetti.",
+"who": "marigold",
+"mood": "happy",
+"anim": "nod"
+}])

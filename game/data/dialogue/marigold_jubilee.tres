@@ -1,0 +1,40 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"marigold_jubilee"
+speaker = &"marigold"
+priority = 120
+once = true
+bark = false
+when = {
+"path": "factory",
+"flags_all": ["jubilee_ready"],
+"flags_none": ["climax_done"]
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "Regional Director, the Jubilee order is in! Cloudsdale wants you on the stage. You'll pull the lever yourself.",
+"who": "marigold",
+"mood": "happy",
+"choices": [{
+"text": "Take me up.",
+"next": "go"
+}, {
+"text": "Not today.",
+"next": "wait"
+}]
+}, {
+"id": "go",
+"text": "Oh, it'll be the most beautiful rainbow Equestria has ever seen.",
+"who": "marigold",
+"mood": "happy",
+"event": "ride_lift_jubilee"
+}, {
+"id": "wait",
+"text": "Whenever you're ready, Director.",
+"who": "marigold",
+"mood": "happy"
+}])

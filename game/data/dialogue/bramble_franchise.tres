@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"bramble_franchise"
+speaker = &"bramble"
+priority = 40
+once = true
+bark = false
+when = {
+"path": "factory",
+"min": {
+"rank": 3
+}
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "Welcome to Cloudsdale Provisions! Today's special: Rainbow Dye, every shade named for a pony who's helped.",
+"who": "bramble",
+"mood": "happy"
+}])

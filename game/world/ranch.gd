@@ -4350,6 +4350,15 @@ func _update_interaction() -> void:
 	var action: Dictionary = current_interaction()
 	_paint_plots(action)
 	var hud := get_node_or_null(^"HUD")
+	# Act Three's places (world/act3_world.gd) speak only when the ranch has nothing to say.
+	if action.is_empty() and act3 != null and _no_other_menu_open():
+		var offer := act3.offer(InputDeviceScript.hint(&"interact"))
+		if offer != "":
+			if hud != null and hud.has_method("set_prompt"):
+				hud.set_prompt(offer)
+			act3.work(get_process_delta_time(), Input.is_action_pressed(&"interact"),
+				Input.is_action_just_pressed(&"interact"))
+			return
 	if hud != null and hud.has_method("set_prompt"):
 		hud.set_prompt(InteractionScript.prompt_for(action,
 			InputDeviceScript.hint(&"interact")))
@@ -7158,6 +7167,12 @@ func _talk_context() -> Dictionary:
 		"catches": int(story.get_var("catches", 0)) if story != null else 0,
 		"pens": _built_pen_count(),
 		"days": story.collection_days if story != null else 0,
+		"raids": int(story.get_var("raids", 0)) if story != null else 0,
+		"dyed": int(story.get_var("dyed", 0)) if story != null else 0,
+		"rescued": int(story.get_var("rescued", 0)) if story != null else 0,
+		"heat": int(story.get_var("heat", 0)) if story != null else 0,
+		"pylons": int(story.get_var("pylons_cut", 0)) if story != null else 0,
+		"rank": int(story.get_var("rank", 0)) if story != null else 0,
 	}
 	var name := "friend"
 	if _game_state != null and _game_state.player != null:
@@ -7182,8 +7197,14 @@ func _is_present(id: StringName) -> bool:
 	match id:
 		&"tumble":
 			return bool(f.get("has_scoop", false))
-		&"static", &"clover":
-			return false
+		&"static":
+			return story != null and StoryV1Script.path(story) == StoryV1Script.PATH_RESCUE
+		&"clover":
+			return bool(f.get("clover_rescued", false))
+		&"fennel":
+			# The Factory path: Fennel stops answering his door (STORY.md section 4).
+			return not (story != null and StoryV1Script.path(story) == StoryV1Script.PATH_FACTORY
+				and StoryV1Script.delivered_after_reveal(_game_state.book) >= 3)
 	return true
 
 
@@ -7204,6 +7225,10 @@ func _on_people_effect(kind: StringName, value: String) -> void:
 					advance_story()
 				"ride_lift":
 					_ride_lift_to_factory(&"reveal")
+				"ride_lift_jubilee":
+					_ride_lift_to_factory(&"jubilee")
+				"ride_lift_lights_out":
+					_ride_lift_to_factory(&"lights_out")
 
 
 # --- tone (v1) -------------------------------------------------------------------------
@@ -7266,6 +7291,8 @@ func _back_down() -> void:
 	if not StoryV1Script.revealed(story) or story.has_flag("back_down"):
 		return
 	story.set_flag("back_down")
+	if people != null:
+		people.populate()
 	match StoryV1Script.path(story):
 		StoryV1Script.PATH_FACTORY:
 			_toast("Senior Steward. Double stipend. Tumble is home, and she will not look at you.")
@@ -7401,6 +7428,7 @@ func _v1_tick(delta: float) -> void:
 	_tip_t = 0.4
 	_drive_dread()
 	_back_down()
+	_setup_act3()
 	_maybe_ending()
 	var hud := get_node_or_null(^"HUD")
 	if hud != null and hud.has_method("set_tip"):
@@ -7645,3 +7673,95 @@ func _maybe_ending() -> void:
 	if not story.has_flag("climax_done") or story.get_var("ending", "") != "":
 		return
 	play_ending(EndingsScript.select(StoryV1Script.ending_input(story, _game_state.book)))
+
+
+# --- the Rescue path's places (v1) -----------------------------------------------------
+
+const Act3WorldScript := preload("res://world/act3_world.gd")
+const PonyGeneratorScript := preload("res://systems/pony_generator.gd")
+var act3: Act3World
+
+
+## Build the pylons, corrals, the Lantern Line gate and the Dye Vat (Rescue path only).
+func _setup_act3() -> void:
+	if act3 != null or _game_state == null:
+		return
+	var story: Story = _game_state.story
+	if StoryV1Script.path(story) != StoryV1Script.PATH_RESCUE:
+		return
+	act3 = Act3WorldScript.new()
+	act3.name = "Act3World"
+	act3.story = story
+	act3.player = player
+	act3.height_at = func(x: float, z: float) -> float:
+		return terrain.call("height_at", x, z) if terrain != null and terrain.has_method("height_at") else 0.0
+	act3.region_centre = func(id: StringName) -> Vector2:
+		var r: RegionData = _regions_registry().by_id(id)
+		return r.centre if r != null else Vector2.ZERO
+	act3.is_night = func() -> bool:
+		return _world == null or _world.phase() == WorldStateScript.Phase.NIGHT \
+			or _world.phase() == WorldStateScript.Phase.DUSK
+	act3.send_marked = _send_marked_down_line
+	act3.dye_one = _dye_one_in_bag
+	act3.bag_room = func() -> int:
+		var st := _bag()
+		return st.capacity - st.count() if st != null else 0
+	act3.bag_store = func(inst: PonyInstance) -> bool:
+		var st := _bag()
+		return st != null and st.store(inst)
+	act3.acted.connect(func(_id: String, r: Dictionary) -> void:
+		if str(r.get("text", "")) != "":
+			_toast(str(r.text))
+		if r.has("cut") and valley_frame != null:
+			valley_frame.set_bands(PathRulesScript.PYLONS.size() - int(r.cut)))
+	add_child(act3)
+	if valley_frame != null:
+		valley_frame.set_bands(PathRulesScript.PYLONS.size() - PathRulesScript.pylons_cut(story))
+
+
+func _bag() -> Storage:
+	var beam: Node3D = player.get_magic_beam() if player != null else null
+	return beam.get_storage() if beam != null and beam.has_method("get_storage") else null
+
+
+## Every marked pony in the pens walks out along the Lantern Line.
+func _send_marked_down_line() -> int:
+	var story: Story = _game_state.story
+	var sent := 0
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen == null:
+			continue
+		for inst in pen.ponies():
+			if not inst.is_marked():
+				continue
+			if not PathRulesScript.send_down_line(story, true):
+				continue
+			var body := pen.release_body(inst.uid, self)
+			if body != null:
+				body.queue_free()
+			_game_state.remove_pony(inst.uid)
+			var cards: Array = story.get_var("line_postcards", [])
+			cards.append(inst.display_name())
+			story.set_var("line_postcards", cards)
+			sent += 1
+	return sent
+
+
+## The Dye Vat: the pony at the top of the saddlebag gets a new coat and mane.
+func _dye_one_in_bag() -> String:
+	var st := _bag()
+	if st == null or st.count() == 0:
+		return ""
+	var inst: PonyInstance = st.peek()
+	if inst.stock.is_empty():
+		return ""
+	var look := PonyLookScript.from_dict(inst.stock)
+	var fresh: PonyLook = PonyGeneratorScript.generate(hash(String(inst.uid)) + int(_game_state.story.get_var("dyed", 0)) * 977)
+	look.coat = fresh.coat
+	look.mane = fresh.mane
+	look.mane2 = fresh.mane2
+	look.tail = fresh.tail
+	inst.stock = look.to_dict()
+	inst.stock["dyed"] = true
+	return inst.display_name()

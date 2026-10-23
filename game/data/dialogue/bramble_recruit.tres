@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"bramble_recruit"
+speaker = &"bramble"
+priority = 100
+once = true
+bark = false
+when = {
+"path": "rescue",
+"min": {
+"dyed": 1
+},
+"flags_none": ["ally_bramble"]
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "That was my cellar vat you used. I could smell it from the stall.",
+"who": "bramble",
+"mood": "scared",
+"next": "two"
+}, {
+"id": "two",
+"text": "Don't apologize. I've been dyeing bunting for the Factory for twenty years. About time it dyed something useful. My cellar's open, for anypony who needs hiding.",
+"who": "bramble",
+"mood": "neutral",
+"anim": "nod",
+"flag": "ally_bramble"
+}])

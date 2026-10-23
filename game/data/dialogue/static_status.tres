@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"static_status"
+speaker = &"static"
+priority = 60
+once = true
+bark = false
+when = {
+"path": "rescue",
+"flags_all": ["static_met"],
+"max": {
+"pylons": 3
+}
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "Pylons first. Then the corrals, at night, past the lanterns. Then bring your marked ones to the gate beyond the Everfree.",
+"who": "static",
+"mood": "blank"
+}])

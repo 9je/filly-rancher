@@ -1,0 +1,122 @@
+# Act Three (STORY.md sections 4 and 5). The Factory path's warm letters and quiet town;
+# the Rescue path's Static, the allies, and the way back up.
+
+# ----- the Rescue path ---------------------------------------------------------------
+
+=== static_first
+speaker: static
+priority: 110
+when: {"path": "rescue", "flags_none": ["static_met"]}
+
+start [static blank] You're the steward who ran. Good. I've been waiting at this fence a long time for one of you to run.
+  -> two
+two [static blank] I can't fix the Works. But there's a path through the Everfree, past the tangle. The Lantern Line. Marked ponies can walk it and live free on the other side.
+  -> three
+three [static blank look] Unmarked ones get found. So help them Bloom. A marked pony can't be drained. That's the whole trick.
+  -> four
+four [static blank nod] And the pylons. Four of them, one in every region. Each one feeds the rainbow. Cut all four and I can get you back inside on Color Day.
+  flag: static_met
+
+=== static_status
+speaker: static
+priority: 60
+when: {"path": "rescue", "flags_all": ["static_met"], "max": {"pylons": 3}}
+
+start [static blank] Pylons first. Then the corrals, at night, past the lanterns. Then bring your marked ones to the gate beyond the Everfree.
+
+=== static_ready
+speaker: static
+priority: 115
+when: {"path": "rescue", "flags_all": ["static_met"], "min": {"pylons": 4}}
+
+start [static happy] All four pylons. The rainbow's down to a smudge. They're scrambling up there.
+  -> two
+two [static blank nod] It's Color Day tomorrow. Same lift. Same walkway. Free the line, find holding, and pull the lever the other way. Ready?
+  * Take us up. -> go
+  * Not yet. -> wait
+go [static happy] Then let's turn the lights out.
+  event: ride_lift_lights_out
+wait [static blank] Don't wait too long. Heat doesn't.
+
+=== pip_recruit
+speaker: pip
+priority: 100
+when: {"path": "rescue", "min": {"raids": 1}, "flags_none": ["ally_pip"]}
+
+start [pip scared] I heard about the corral. Everypony on my route heard. You did that?
+  -> two
+two [pip neutral nod] I carry Cloudsdale's letters. I see the Collectors' schedule before they do. From now on, so will you.
+  flag: ally_pip
+
+=== bramble_recruit
+speaker: bramble
+priority: 100
+when: {"path": "rescue", "min": {"dyed": 1}, "flags_none": ["ally_bramble"]}
+
+start [bramble scared] That was my cellar vat you used. I could smell it from the stall.
+  -> two
+two [bramble neutral nod] Don't apologize. I've been dyeing bunting for the Factory for twenty years. About time it dyed something useful. My cellar's open, for anypony who needs hiding.
+  flag: ally_bramble
+
+=== fennel_recruit
+speaker: fennel
+priority: 100
+when: {"path": "rescue", "flags_all": ["intake_ledger"], "flags_none": ["ally_fennel"]}
+
+start [fennel blank] What's that paper? Give it here.
+  -> two
+two [fennel sad] Clover. That's my Clover's name. Intake, the spring before last. "Holding, long term."
+  -> three
+three [fennel sad] Every postcard said she was happy. Every one. I kept them all on the wall.
+  -> four
+four [fennel blank nod] You go up there, you find her. And until you do, my barn's for anypony who needs it.
+  flag: ally_fennel
+
+# ----- the Factory path --------------------------------------------------------------
+
+=== marigold_senior
+speaker: marigold
+priority: 90
+when: {"path": "factory", "flags_none": ["marigold_senior_done"]}
+
+start [marigold happy] Senior Steward! The Supply Desk at the market has your new equipment. Calm Lamps, a Yield Lens, the works. Contracts go up on the board.
+  -> two
+two [marigold happy nod] Fill them and you'll climb. Regional Director, one day! I just know it.
+  flag: marigold_senior_done
+
+=== marigold_jubilee
+speaker: marigold
+priority: 120
+when: {"path": "factory", "flags_all": ["jubilee_ready"], "flags_none": ["climax_done"]}
+
+start [marigold happy] Regional Director, the Jubilee order is in! Cloudsdale wants you on the stage. You'll pull the lever yourself.
+  * Take me up. -> go
+  * Not today. -> wait
+go [marigold happy] Oh, it'll be the most beautiful rainbow Equestria has ever seen.
+  event: ride_lift_jubilee
+wait [marigold happy] Whenever you're ready, Director.
+
+=== tumble_porch
+speaker: tumble
+priority: 40
+when: {"path": "factory"}
+
+start [tumble blank] ...
+  -> two
+two [tumble sad look] I'm watching the Works. It's quieter if I watch.
+
+=== pip_silent
+speaker: pip
+priority: 40
+when: {"path": "factory", "min": {"rank": 2}}
+
+start [pip blank] ...
+  -> two
+two [pip blank] Your mail.
+
+=== bramble_franchise
+speaker: bramble
+priority: 40
+when: {"path": "factory", "min": {"rank": 3}}
+
+start [bramble happy] Welcome to Cloudsdale Provisions! Today's special: Rainbow Dye, every shade named for a pony who's helped.

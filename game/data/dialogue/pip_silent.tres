@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"pip_silent"
+speaker = &"pip"
+priority = 40
+once = true
+bark = false
+when = {
+"path": "factory",
+"min": {
+"rank": 2
+}
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "...",
+"who": "pip",
+"mood": "blank",
+"next": "two"
+}, {
+"id": "two",
+"text": "Your mail.",
+"who": "pip",
+"mood": "blank"
+}])

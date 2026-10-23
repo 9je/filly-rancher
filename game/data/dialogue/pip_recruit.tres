@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"pip_recruit"
+speaker = &"pip"
+priority = 100
+once = true
+bark = false
+when = {
+"path": "rescue",
+"min": {
+"raids": 1
+},
+"flags_none": ["ally_pip"]
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "I heard about the corral. Everypony on my route heard. You did that?",
+"who": "pip",
+"mood": "scared",
+"next": "two"
+}, {
+"id": "two",
+"text": "I carry Cloudsdale's letters. I see the Collectors' schedule before they do. From now on, so will you.",
+"who": "pip",
+"mood": "neutral",
+"anim": "nod",
+"flag": "ally_pip"
+}])
