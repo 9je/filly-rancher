@@ -88,3 +88,16 @@ Canon MLP stays: real names, looks and places ("lean into mlp fully", private bu
 - **Headless runs:** they skip the toon shader swap (a dummy renderer limitation).
 - **Epilogue orbit:** not yet reviewed in a rendered capture.
 - **Deferred past v1:** see PLAN.md's M4 and M5 status lines.
+
+### 2026-10-23 (afternoon)
+- **Exit hang root-caused and fixed (bd6b128):** see DECISIONS.md. A use-after-free of Babble's AudioStreamGenerator during the server's fade-out mix. The 10-run loaded proof loop is running.
+- **Pacing bot fixes:**
+  - The talk guard regression, reverted.
+  - Depot trips count only the bag's Drifters, and rest after an empty trip.
+  - Ponies are shipped only when they show no Bloom progress.
+  - Stray menus are named and escaped.
+- **Game fixes:**
+  - Tumble's pointing marker is freed by id (176 errors a run).
+  - The creator no longer counts as a visit to the Strip.
+- **Visual:** the Palace and the mailbox are modelled. A real Spike model (PonySFM, BeardedDoomGuy) is downloaded; its conversion awaits the owner's approval.
+- **Trailer pipeline:** 4K (TRAILER_4K.mp4 at 3840x2160), with captions scaled.

@@ -8,7 +8,7 @@ snaps every cut to a beat of the music (librosa), renders the callouts and the t
 the game's own font and card style (PIL), assembles picture and sound with ffmpeg, normalises
 to -14 LUFS integrated (two-pass loudnorm, true peak -1 dBTP) and writes:
 
-    TRAILER_1440p.mp4  2560x1440, 60 fps, H.264 + AAC (the owner's monitor; see DECISIONS.md)
+    TRAILER_4K.mp4     3840x2160, 60 fps, H.264 + AAC (the goal; see DECISIONS.md)
     TRAILER_1080p.mp4  1920x1080, 60 fps, H.264 + AAC
     build/trailer/review/cut<N>/  a contact sheet of a frame every 0.5 s, for TRAILER_REVIEW.md
 """
@@ -28,7 +28,9 @@ MUSIC = os.path.join(ROOT, "game", "assets", "audio", "music")
 FONT = os.path.join(ROOT, "game", "assets", "fonts", "Fredoka.ttf")
 BUILD = os.path.join(ROOT, "build", "trailer")
 TAKES = os.path.join(BUILD, "takes")
-W, H, FPS = 2560, 1440, 60
+W, H, FPS = 3840, 2160, 60
+# Card and title sizes were laid out at 1440p; everything drawn scales by this.
+K = H / 1440.0
 
 # The game's HUD card (game/ui/hud.gd CARD_FILL / CARD_LINE / INK).
 CARD_FILL = (255, 247, 232, 240)
@@ -61,6 +63,8 @@ def snap(t, grid):
 
 
 def card(text, size=64, pad=(44, 20), out=None):
+    size = int(size * K)
+    pad = (int(pad[0] * K), int(pad[1] * K))
     """A callout in the game's style: the cream HUD card, purple line, Fredoka ink."""
     font = ImageFont.truetype(FONT, size)
     bbox = font.getbbox(text)
@@ -69,7 +73,7 @@ def card(text, size=64, pad=(44, 20), out=None):
     img = Image.new("RGBA", (w + 20, h + 20), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     d.rounded_rectangle((12, 14, w + 12, h + 14), radius=h // 2, fill=(40, 20, 60, 70))
-    d.rounded_rectangle((6, 6, w + 6, h + 6), radius=h // 2, fill=CARD_FILL, outline=CARD_LINE, width=10)
+    d.rounded_rectangle((6, 6, w + 6, h + 6), radius=h // 2, fill=CARD_FILL, outline=CARD_LINE, width=int(10 * K))
     d.text((6 + pad[0] - bbox[0], 6 + pad[1] - bbox[1] + size // 10), text, font=font, fill=INK)
     img.save(out)
     return out
@@ -79,23 +83,23 @@ def title_card(out):
     """The end card: the wordmark in Fredoka, a thin rainbow under it, a one-line tag."""
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    big = ImageFont.truetype(FONT, 220)
-    small = ImageFont.truetype(FONT, 62)
+    big = ImageFont.truetype(FONT, int(220 * K))
+    small = ImageFont.truetype(FONT, int(62 * K))
     t = "Filly Rancher"
     bb = big.getbbox(t)
     x = (W - (bb[2] - bb[0])) // 2 - bb[0]
     y = int(H * 0.36)
-    for dx, dy, col in [(14, 18, (60, 30, 90, 150)), (0, 0, (255, 249, 236, 255))]:
-        d.text((x + dx, y + dy), t, font=big, fill=col, stroke_width=16, stroke_fill=(120, 79, 163, 255) if dx == 0 else col)
+    for dx, dy, col in [(int(14 * K), int(18 * K), (60, 30, 90, 150)), (0, 0, (255, 249, 236, 255))]:
+        d.text((x + dx, y + dy), t, font=big, fill=col, stroke_width=int(16 * K), stroke_fill=(120, 79, 163, 255) if dx == 0 else col)
     cols = [(240, 96, 112), (250, 190, 80), (120, 200, 110), (90, 170, 240), (180, 130, 230)]
-    by = y + (bb[3] - bb[1]) + 120
-    bw = 1000
+    by = y + (bb[3] - bb[1]) + int(120 * K)
+    bw = int(1000 * K)
     for i, c in enumerate(cols):
-        d.rounded_rectangle(((W - bw) // 2, by + i * 22, (W + bw) // 2, by + i * 22 + 18), radius=9, fill=c + (255,))
+        d.rounded_rectangle(((W - bw) // 2, by + int(i * 22 * K), (W + bw) // 2, by + int((i * 22 + 18) * K)), radius=int(9 * K), fill=c + (255,))
     tag = "a pony ranching game"
     sb = small.getbbox(tag)
-    d.text(((W - (sb[2] - sb[0])) // 2 - sb[0], by + 170), tag, font=small, fill=(255, 249, 236, 255),
-           stroke_width=6, stroke_fill=(90, 60, 120, 255))
+    d.text(((W - (sb[2] - sb[0])) // 2 - sb[0], by + int(170 * K)), tag, font=small, fill=(255, 249, 236, 255),
+           stroke_width=int(6 * K), stroke_fill=(90, 60, 120, 255))
     img.save(out)
     return out
 
@@ -231,7 +235,7 @@ def main(argv):
          (stats["input_i"], stats["input_tp"], stats["input_lra"], stats["input_thresh"], stats["target_offset"]),
          "-ar", "48000", norm])
 
-    out4k = os.path.join(ROOT, "TRAILER_1440p.mp4")
+    out4k = os.path.join(ROOT, "TRAILER_4K.mp4")
     run(["ffmpeg", "-v", "error", "-y", "-i", graded, "-i", norm, "-map", "0:v", "-map", "1:a",
          "-c:v", "libx264", "-preset", "slow", "-crf", "16", "-pix_fmt", "yuv420p", "-r", str(FPS),
          "-c:a", "aac", "-b:a", "320k", "-movflags", "+faststart", "-shortest", out4k])

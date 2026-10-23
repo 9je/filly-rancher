@@ -5,7 +5,7 @@
 # TRAILER_SHOT_START, the frame the edit trims to).
 set -uo pipefail
 cd "$(dirname "$0")/../.."
-RES=2560x1440
+RES=3840x2160
 TAKE=1
 shots=()
 while [ $# -gt 0 ]; do

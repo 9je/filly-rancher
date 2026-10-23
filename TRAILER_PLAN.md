@@ -1,6 +1,6 @@
 # Trailer plan
 
-A 75-second gameplay trailer for *Filly Rancher*. Research notes are in [docs/trailer_research.md](docs/trailer_research.md). The capture is staged in-engine by `game/scenes/test/trailer.gd` and recorded with Godot Movie Maker at 2560x1440 (the owner asked for 2K rather than 4K: it is their monitor's resolution), 60 fps. The edit is a script, `tools/trailer/edit.py`, built on an ffmpeg filtergraph. Each review pass is logged in [TRAILER_REVIEW.md](TRAILER_REVIEW.md).
+A 75-second gameplay trailer for *Filly Rancher*. Research notes are in [docs/trailer_research.md](docs/trailer_research.md). The capture is staged in-engine by `game/scenes/test/trailer.gd` and recorded with Godot Movie Maker at 3840x2160, 60 fps, and delivered as TRAILER_4K.mp4 plus a 1920x1080 TRAILER_1080p.mp4. The owner had said a 2K deliverable would do (their monitor is 1440p), but their later /goal names TRAILER_4K.mp4 at 3840x2160 explicitly, and 4K downscales cleanly to their screen. The edit is a script, `tools/trailer/edit.py`, built on an ffmpeg filtergraph. Each review pass is logged in [TRAILER_REVIEW.md](TRAILER_REVIEW.md).
 
 ## Who it is for (owner, 2026-10-23)
 
@@ -106,5 +106,5 @@ Steam cuts six 1-second clips, so the trailer needs six strong 1-second moments:
 ## Capture notes
 
 - **The rig:** `scenes/test/trailer.gd` stages each shot by name. It sets the scene, pins time of day and weather, sets the dread level, and places the ponies, then runs a scripted camera path (Catmull-Rom through keyframes, eased) or a bot-driven action using the same virtual controller as `human_bot.gd`.
-- **The recording:** each shot records on its own (`tools/trailer/capture.sh`): `--write-movie build/trailer/takes/<shot>_t<take>.avi --fixed-fps 60`, with the root viewport pinned to 2560x1440 through the "viewport" stretch mode for the capture run, because the desktop clamps any window larger than its work area. There are at least two takes of every gameplay shot; the best is chosen in review.
+- **The recording:** each shot records on its own (`tools/trailer/capture.sh`): `--write-movie build/trailer/takes/<shot>_t<take>.avi --fixed-fps 60`, with the root viewport pinned to 3840x2160 through the "viewport" stretch mode for the capture run, because the desktop clamps any window larger than its work area. There are at least two takes of every gameplay shot; the best is chosen in review.
 - **Clean frames:** no cursor (it is captured or hidden), no debug text, no toasts on beauty shots, and the HUD only on gameplay shots that need it (bag pips, bits), with the tutorial card, tips and the controls chip hidden.

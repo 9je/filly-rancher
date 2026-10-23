@@ -84,3 +84,24 @@ One line of reasoning per call. Newest at the bottom.
 - 2026-10-23 -- The babble voice is synthesised once per syllable shape and cached, not per sample per frame in GDScript. The per-sample loop was a 10 ms hitch on every audio buffer refill whenever anypony talked.
 - 2026-10-23 -- **The trailer is for the owner's friends, not Steam** (the owner: "make it interesting, maybe add some humor elements and load it with mlp references"). It keeps the craft rules (gameplay first, beat cuts, a 6-second loop, the twist teased not spoiled) and loosens the callout limit: six joke caption cards instead of three, and staged canon gags (the Crusaders as Escape Artists, a 20%-cooler Rainbow Dash, Pinkie, Derpy, Fluttershy), all listed in TRAILER_PLAN.md.
 
+
+## 2026-10-23: the trailer ships at 4K after all
+
+The owner said a 2K deliverable was enough, then set a /goal that names TRAILER_4K.mp4 at 3840x2160 60 fps. The later, more specific instruction wins. The capture pins the root viewport at 3840x2160 (the window manager clamps any window that large, so the viewport is pinned, not the window), and the edit scales its caption and title cards from their 1440p layout by H/1440. 4K also downsamples cleanly to the owner's 1440p monitor.
+
+## 2026-10-23: the Palace and the mailbox are modelled, not boxes
+
+The visual review found the Spectra Palace was a purple box with a flat gold lid, and the mailbox was three grey slabs. Both are now Blender-built (tools/blender_props/build_props.py: spectra_palace, mailbox):
+- **The Palace:** gold-domed towers, a pink dome, a portico and a bulb-lit marquee, worn over its Building shell, with Building taking res:// model paths.
+- **The mailbox:** the slabs stay as the colliders and as the shape test_mailbox measures; their meshes just stop drawing. The flag stays the game's own node so it can still stand up.
+
+## 2026-10-23: the exit hang, root-caused and fixed (bd6b128)
+
+**Cause.** Godot 4.7.2's AudioStreamGeneratorPlayback holds its AudioStreamGenerator by a raw pointer and reads the generator's rate on every mix. A stopped playback is not dropped at once: the server marks it FADE_OUT_TO_DELETION and mixes it one more time. Freeing a Babble (the cartoon pony voice) freed its generator, held only by `player.stream`, before that last mix. The mix then read the rate from freed memory. A garbage rate (roughly 1e10 to 1e19, or NaN) gives the resampler (`AudioStreamPlaybackResampled::mix`) an increment so large that its catch-up loop is effectively endless, all while it holds the audio driver lock. Anything needing that lock then blocks forever. That includes quit()'s join on the audio thread, which is the "exit hang". At shutdown it is worse, because GDScript is torn down before the AudioServer (Main::cleanup).
+
+**Evidence.**
+- **The catch:** a headless debug-symbol 4.7.2 build under gdb, one hang in 10 loaded suite runs. The audio thread was in `AudioStreamGeneratorPlayback::_mix_internal` under `AudioStreamPlaybackResampled::mix`, holding the driver lock; the main thread was blocked on that lock.
+- **The mechanism:** a live generator at a 1e15 rate runs its frames, then never exits.
+- **Ruled out:** 200 sound-test runs under gdb and 36,000 Babble create/free cycles did not reproduce it, which fits a use-after-free that bites only when the freed memory gets reused.
+
+**Fix.** A leaving Babble buries its generator with an extra reference. Graves older than 1 s are released by later burials, and anything still buried at shutdown stays referenced. test_babble.gd pins this. An upstream fix (hold a Ref, or snapshot the rate) would belong in the engine. This is the game-side guard.
