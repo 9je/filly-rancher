@@ -86,6 +86,9 @@ static func factory_delivery(story: Story, coat: Color) -> Dictionary:
 		return out
 	post_contract(story)
 	var c := contract(story)
+	if c.is_empty():
+		# The Jubilee order is filled: nothing left on the board.
+		return out
 	var counts := false
 	match str(c.kind):
 		"any", "jubilee":

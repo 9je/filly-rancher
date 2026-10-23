@@ -383,19 +383,19 @@ func _rescue_path(full: bool) -> void:
 	for pid in Rules.PYLONS:
 		act3.act(pid)
 	_step("pylons cut")
+	var lift: StringName = &""
 	if full:
-		# A few more Blooms to pass twenty, then the marked ones down the Line.
+		# A few more Blooms to pass twenty, then the marked ones down the Line; everyone
+		# hears about it (the allies join, and Static, last in the round, asks for the lift).
 		_catch(4)
 		await _pen_bag()
 		_bloom(4)
 		act3.act("lantern_gate")
-		await _talk_all()
+		lift = await _talk_all()
 		_step("allies %d" % StoryV1Script.allies(_story()))
 	else:
-		picks["pip_recruit"] = 0
-	var lift: StringName = &""
-	# Half Light: say no to the allies' asks by never meeting their conditions' talk.
-	lift = await _talk_all() if full else await _talk_only(&"static")
+		# Half Light: only Static is spoken to, so nopony is recruited.
+		lift = await _talk_only(&"static")
 	if lift == &"ride_lift_lights_out":
 		await _ride(&"lights_out")
 	await _tick(30)

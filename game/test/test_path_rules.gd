@@ -143,3 +143,9 @@ func test_a_pony_bloomed_then_sent_down_the_line_counts_once() -> void:
 	Rules.send_down_line(s, true, "pony#1")
 	Rules.send_down_line(s, true, "pony#2")
 	assert_eq(int(s.get_var("rescued")), 2)
+
+
+func test_a_delivery_after_the_jubilee_order_is_filled_is_quiet() -> void:
+	var s := _story("factory")
+	s.set_flag("jubilee_ready")
+	assert_eq(Rules.factory_delivery(s, VIVID), {"bonus": 0, "rank_up": false, "jubilee_ready": false})

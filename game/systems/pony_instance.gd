@@ -247,6 +247,10 @@ func is_stock() -> bool:
 func display_name() -> String:
 	if not nickname.is_empty():
 		return nickname
+	# A Drifter has no record name of her own; her look's seed names her, the same name
+	# every time (PonyGenerator.make_name, the name the Bloom gives her too).
+	if stock.has("seed") and int(stock.get("seed", 0)) != 0:
+		return PonyGenerator.make_name(int(stock.get("seed", 0)))
 	var record := data()
 	if record != null and not record.display_name.is_empty():
 		return record.display_name
