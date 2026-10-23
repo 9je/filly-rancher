@@ -7725,7 +7725,8 @@ func _novelty_purchase(item: ShopItem) -> void:
 
 ## The first time she stands in each region.
 func _novelty_region() -> void:
-	if player == null:
+	# Not while the creator is up: she is standing on its stage, not visiting anywhere.
+	if player == null or not _creation_done:
 		return
 	var here: RegionData = _regions_registry().region_at(
 		Vector2(player.global_position.x, player.global_position.z))
