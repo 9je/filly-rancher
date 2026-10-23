@@ -97,9 +97,24 @@ func test_the_buy_tab_lists_the_catalogue_cheapest_first() -> void:
 	_menu.open()
 	_menu.set_tab(MarketMenu.Tab.BUY)
 	var rows := _menu.buy_rows()
-	assert_eq(rows.size(), reg.all().size())
+	# Off the Factory path the Supply Desk's gear is not on the shelf (ShopItem.requires_path).
+	var shelf: Array = reg.all().filter(func(it: ShopItem) -> bool: return it.requires_path.is_empty())
+	assert_eq(rows.size(), shelf.size())
 	for i in range(rows.size()):
-		assert_eq(rows[i].id, reg.all()[i].id)
+		assert_eq(rows[i].id, shelf[i].id)
+
+
+## v1: a Senior Steward sees the Cloudsdale Supply Desk's gear too.
+func test_the_factory_path_puts_the_supply_desk_on_the_shelf() -> void:
+	var reg: ShopRegistry = ShopRegistryScript.new()
+	reg.load_all(ShopRegistryScript.SHOP_DIR)
+	_menu.shop.path_provider = func() -> String: return "factory"
+	_menu.open()
+	_menu.set_tab(MarketMenu.Tab.BUY)
+	var ids: Array = _menu.buy_rows().map(func(it: ShopItem) -> StringName: return it.id)
+	assert_eq(ids.size(), reg.all().size())
+	for g in [&"calm_lamp", &"express_chute", &"yield_lens", &"lure_post"]:
+		assert_has(ids, g)
 
 
 ## A PERMIT SHE HAS ALREADY BOUGHT MUST NOT GO ON SHOWING ITS PRICE. Shop.refusal() turns

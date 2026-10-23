@@ -194,3 +194,13 @@ func test_the_build_kind_is_still_refused() -> void:
 func test_buying_null_is_refused() -> void:
 	assert_false(_shop.can_buy(null))
 	assert_false(_shop.buy(null))
+
+
+## v1: the Supply Desk's gear is refused (and unlisted) off the Factory path.
+func test_factory_gear_needs_the_factory_path() -> void:
+	var item: ShopItem = load("res://data/shop/calm_lamp.tres")
+	var shop := ShopScript.new(EconomyScript.new(), GemPouchScript.new(), InventoryScript.new(), [])
+	assert_false(shop.listed(item))
+	assert_ne(shop.refusal(item), "")
+	shop.path_provider = func() -> String: return "factory"
+	assert_true(shop.listed(item))

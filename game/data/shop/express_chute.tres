@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ShopItem" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/shop_item.gd" id="1_shop"]
+
+[resource]
+script = ExtResource("1_shop")
+id = &"express_chute"
+display_name = "Express Chute"
+description = "For a pen. Sends its ponies to the Depot at dawn, with a bonus. You never have to look at them again."
+cost = 900
+kind = 0
+gear_id = &"express_chute"
+requires_path = "factory"

@@ -24,6 +24,8 @@ var _economy: Economy
 var _pouch: GemPouch
 var _inventory: Inventory
 var _unlocks: Array
+## v1: the story path now ("", "factory", "rescue"), for items with ShopItem.requires_path.
+var path_provider: Callable = func() -> String: return ""
 
 
 func _init(economy: Economy, pouch: GemPouch, inventory: Inventory, unlocks: Array) -> void:
@@ -83,9 +85,16 @@ func owns_permit(zone: StringName) -> bool:
 
 
 ## Why `item` cannot be bought right now, as a line for the menu footer, or "" if it can.
+## Whether the item is on the shelf at all (the Supply Desk's gear only for Stewards).
+func listed(item: ShopItem) -> bool:
+	return item != null and (item.requires_path.is_empty() or item.requires_path == str(path_provider.call()))
+
+
 func refusal(item: ShopItem) -> String:
 	if item == null:
 		return "Nothing to buy."
+	if not listed(item):
+		return "Cloudsdale Supply Desk: Senior Stewards only."
 	match item.kind:
 		ShopItemScript.Kind.CARE:
 			if String(item.food_id).is_empty() or item.quantity <= 0:

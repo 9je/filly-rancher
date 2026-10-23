@@ -1473,6 +1473,9 @@ func rebind_economy() -> void:
 
 	_shop = ShopScript.new(_economy, _game_state.gems, _game_state.inventory,
 		_game_state.unlocks) if _game_state != null else null
+	if _shop != null:
+		_shop.path_provider = func() -> String:
+			return StoryV1Script.path(_game_state.story) if _game_state != null else ""
 	if market_menu != null:
 		market_menu.set("shop", _shop)
 

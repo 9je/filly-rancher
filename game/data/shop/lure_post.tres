@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ShopItem" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/shop_item.gd" id="1_shop"]
+
+[resource]
+script = ExtResource("1_shop")
+id = &"lure_post"
+display_name = "Lure Post"
+description = "Drifters gather around it at night. Catching gets easy."
+cost = 500
+kind = 0
+gear_id = &"lure_post"
+requires_path = "factory"

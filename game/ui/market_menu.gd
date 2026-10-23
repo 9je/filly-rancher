@@ -53,6 +53,8 @@ var shop: Shop = null
 var can_open := Callable()
 
 var _catalogue: Array[ShopItem] = []
+## Everything in data/shop; _catalogue is what this shop lists right now (Shop.listed).
+var _all_items: Array[ShopItem] = []
 var _tab: int = Tab.SELL
 var _selected := 0
 var _open := false
@@ -68,7 +70,8 @@ func _ready() -> void:
 	MenuStyleScript.apply_panel($Centre/Panel as PanelContainer)
 	var registry: ShopRegistry = ShopRegistryScript.new()
 	registry.load_all(ShopRegistryScript.SHOP_DIR)
-	_catalogue = registry.all()
+	_all_items = registry.all()
+	_catalogue = _all_items.duplicate()
 	MenuStyleScript.style_label(_title, MenuStyleScript.TITLE_SIZE, MenuStyleScript.COLOR_TITLE)
 	MenuStyleScript.style_label(_wallet, MenuStyleScript.ROW_SIZE, MenuStyleScript.COLOR_DIM)
 	MenuStyleScript.style_label(_gems, MenuStyleScript.ROW_SIZE, MenuStyleScript.COLOR_DIM)
@@ -103,6 +106,7 @@ func open() -> bool:
 	_selected = 0
 	_hovered = -1
 	_open = true
+	_catalogue.assign(_all_items.filter(func(it: ShopItem) -> bool: return shop.listed(it)))
 	visible = true
 	refresh()
 	opened.emit()

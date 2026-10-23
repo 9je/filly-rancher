@@ -49,6 +49,9 @@ enum Kind { GEAR, PERMIT, BUILD, CARE }
 ## BUILD: the PlotData this stands for. Unused in slice 1.
 @export var plot_id: StringName = &""
 
+## v1: only sold on this story path ("factory": the Cloudsdale Supply Desk). Empty: always.
+@export var requires_path: String = ""
+
 
 func _to_string() -> String:
 	return "ShopItem(%s, %s, cost=%d)" % [String(id), Kind.keys()[kind], cost]
