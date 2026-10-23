@@ -1440,6 +1440,7 @@ func _pull(delta: float) -> void:
 	var weight := 1.0 - exp(-PULL_RESPONSE * delta)
 	_held.global_position = _held.global_position.lerp(target, weight)
 	_held.rotation.y += HELD_SPIN_RATE * delta
+	_wobble(_held)
 
 
 ## Count the hold, and hand the body back if it outlasts its struggle time. This is the
@@ -1496,6 +1497,10 @@ func _lose(body: Node3D, reason: int) -> void:
 ## spinning by the beam would offset every facing she computes for the rest of her life.
 ## The beam borrows that yaw for the float and hands it back at zero.
 func _take_back_physics(body: Node3D) -> void:
+	if body != null and is_instance_valid(body):
+		var visuals := body.get_node_or_null("Visuals") as Node3D
+		if visuals != null and visuals.get_child_count() > 0:
+			(visuals.get_child(0) as Node3D).scale = Vector3.ONE
 	# UNCONDITIONAL, ahead of the body check below: every path a hold can end (a settle, an
 	# escape, a wrench, the tree tearing down) runs through here, and capture_charge started
 	# regardless of what _held turned out to be, so the sound stops the same way regardless.
@@ -1544,6 +1549,7 @@ func _settle_pony(pony: Node3D) -> void:
 
 	if instance != null and _storage.store(instance):
 		pony.notify_captured()
+		_capture_juice(pony, data)
 		pony.queue_free()
 		_play_first_capture_voice()
 		_sound_call(&"play_at", [&"capture_success", global_position])
@@ -1567,6 +1573,45 @@ func _settle_pony(pony: Node3D) -> void:
 ## Both nodes are `top_level`, which is load-bearing: their geometry is written in WORLD
 ## space every frame (from the horn to a point derived from the camera's aim ray), and
 ## inheriting the player's transform on top of that would apply her position twice.
+# --- feel (v1): the catch should feel like a catch (RESEARCH.md sections 1 and 3) ---------
+
+## Squash and stretch on the held body while she fights the Scoop: her body node (not
+## Visuals, which carries a foal's scale) wobbles about its rest scale.
+func _wobble(body: Node3D) -> void:
+	var visuals := body.get_node_or_null("Visuals") as Node3D
+	if visuals == null or visuals.get_child_count() == 0:
+		return
+	var model := visuals.get_child(0) as Node3D
+	var t := Time.get_ticks_msec() / 1000.0
+	var k := 0.07 * sin(t * 17.0) + 0.03 * sin(t * 31.0)
+	model.scale = Vector3(1.0 - k * 0.6, 1.0 + k, 1.0 - k * 0.6)
+
+
+## The pop: a burst of sparkles in her colours, the pop sound, and a few frames of hit
+## pause on a rare catch. Fire and forget; the pony is freed right after this.
+func _capture_juice(pony: Node3D, data: PonyData) -> void:
+	var at := pony.global_position + Vector3(0, 0.9, 0)
+	var colors: Array[Color] = [Color(1, 0.95, 0.6), Color(1, 0.75, 0.9), Color(0.75, 0.9, 1)]
+	if pony.has_method("look"):
+		var look: PonyLook = pony.call("look")
+		colors = [look.coat.lightened(0.2), look.mane.lightened(0.25), Color(1, 1, 0.85)]
+	var root := get_tree().current_scene
+	if root != null:
+		var burst := BloomCeremony.sparkles(colors)
+		burst.amount = 28
+		burst.lifetime = 0.9
+		root.add_child(burst)
+		burst.global_position = at
+		burst.emitting = true
+		get_tree().create_timer(1.6).timeout.connect(burst.queue_free)
+	_sound_call(&"play_at", [&"scoop_pop", at])
+	var rare: bool = data != null and int(data.rarity) >= PonyDataScript.Rarity.RARE
+	if rare and DisplayServer.get_name() != "headless":
+		Engine.time_scale = 0.05
+		get_tree().create_timer(0.07, true, false, true).timeout.connect(func() -> void:
+			Engine.time_scale = 1.0)
+
+
 func _build_effect() -> void:
 	var material := StandardMaterial3D.new()
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
