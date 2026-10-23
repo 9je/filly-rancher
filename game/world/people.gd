@@ -333,9 +333,12 @@ func _point_at(tumble: Npc, pony: Node3D) -> void:
 	_marker = _sparkle_marker()
 	pony.add_child(_marker)
 	_marker.position = Vector3(0, 2.4, 0)
-	var m := _marker
+	# By id, not by reference: the marker rides on the pony, and a pony caught inside the
+	# hold takes it with her, leaving a lambda holding a freed capture.
+	var mid := _marker.get_instance_id()
 	get_tree().create_timer(POINT_HOLD).timeout.connect(func() -> void:
-		if is_instance_valid(m):
+		var m := instance_from_id(mid) as Node
+		if m != null:
 			m.queue_free())
 	tumble_pointed.emit(pony)
 	var sound := get_node_or_null("/root/Sound")

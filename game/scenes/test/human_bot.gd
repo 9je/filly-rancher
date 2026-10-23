@@ -517,6 +517,7 @@ func _read_mail() -> bool:
 		return false
 	_say("checks the mailbox")
 	if not await _approach(InteractionScript.Kind.MAILBOX, box.global_position, 1.8):
+		_say("no mailbox prompt (%s at %s)" % [ranch.call("current_interaction"), player.global_position])
 		await _wait(3.0)
 		return true
 	_look_at = box.global_position + Vector3(0, 0.8, 0)
@@ -543,6 +544,9 @@ func _read_mail() -> bool:
 	if lp != null and bool(lp.call("is_open")):
 		await _wait(6.0)
 		lp.call("close")
+	elif guard == 0:
+		_say("the mailbox opened nothing (unread %d, newest unread %s)" % [
+			_story().unread_count(), ranch.call("newest_unread_row")])
 	return true
 
 
@@ -697,7 +701,13 @@ func _deliver_extras() -> bool:
 			# Drifters only: a person keeps the canon ponies she catches.
 			if inst.is_stock() and not inst.is_marked() and _not_close_to_bloom(inst):
 				extra += 1
-	if not (pens_full and (bag.count() >= 3 or extra >= 2)):
+	# The bag's Drifters only, too: the canon ponies riding in it are not for sale, and
+	# counting them sent her to the Depot every few seconds with nothing to hand over.
+	var bag_stock := 0
+	for inst: PonyInstance in bag.contents():
+		if inst.is_stock() and not inst.is_marked():
+			bag_stock += 1
+	if not (pens_full and (bag_stock >= 3 or extra >= 2)):
 		return false
 	var depot := _node_pos(^"Buildings/Depot")
 	_say("takes ponies to the Depot")
