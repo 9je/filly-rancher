@@ -7651,12 +7651,18 @@ func play_ending(ending: StringName) -> void:
 	var music := get_node_or_null("/root/Music")
 	if music != null:
 		music.call("play_context", t.music)
+	var hud := get_node_or_null(^"HUD") as CanvasLayer
+	if hud != null:
+		hud.visible = false
 	var ep: CanvasLayer = EpilogueScript.new()
 	ep.ending = ending
 	ep.player_name = _player_name()
 	ep.lines = _epilogue_lines(ending)
 	add_child(ep)
-	ep.done.connect(func() -> void: ending_played.emit(ending))
+	ep.done.connect(func() -> void:
+		if hud != null:
+			hud.visible = true
+		ending_played.emit(ending))
 
 
 signal ending_played(ending: StringName)

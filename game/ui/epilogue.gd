@@ -29,7 +29,8 @@ var _hint: Label
 
 
 func _ready() -> void:
-	layer = 70
+	# Above every other layer: the HUD, the talk box and the menus all sit under it.
+	layer = 120
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_veil = ColorRect.new()
 	_veil.set_anchors_preset(Control.PRESET_FULL_RECT)
