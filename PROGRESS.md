@@ -51,6 +51,35 @@ Canon MLP stays: real names, looks and places ("lean into mlp fully", private bu
   - README.md, CREDITS.md.
   - REVIEW.md: two reviews, 24 findings, every high and medium one fixed and tested. Placement now hands back the morning before.
 
+- **M6, the sharpening (in progress):**
+  - **The pacing test:**
+    - The novelty log lives in GameState (the play clock plus first-time beats).
+    - The human-paced bot plays a fresh save through real verbs, including the Factory reveal; `tools/pacing.sh` writes PACING.md.
+    - The baseline failed: a 15-minute gap at 35 to 50 minutes, no Bloom in an hour, and constant pointless Depot and market trips.
+  - **The fun redesign:**
+    - Pony traits: favorite foods, nine quirks, race abilities.
+    - Seven new verb-changing tools (10 of 14 upgrades are verb-changing), with Bramble's restocks announced as beats.
+    - Ten timed happenings.
+    - Faster Bloom, and a Big Pen that can Bloom.
+    - A shorter invitation gate.
+    - Talk yields to buildings, so Tumble, Bramble and Pip no longer eat the E for the mailbox, Market and Depot.
+  - **The visual review** (`scenes/test/tour.gd`, 43 views on the real GPU):
+    - The regions are dressed: a wood, a moonflower meadow, a lake shore, an orchard.
+    - Stylised water.
+    - The Factory's metal rooms are dressed (new Blender props: spectrum tanks, consoles, canister racks, crates).
+    - Fixed: Marigold talking over the creator, empty HUD pills, the outline shader smearing triangles, a talk box over the epilogue, NPCs inside plot slots and inside the Market.
+  - **Performance** (`scenes/test/perf.gd`, 60 ponies in view, real GPU):
+    - From 47 ms average (about 21 fps) to about 12 to 14 ms, about 75 fps.
+    - The changes: the render thread, pony detail tiers, pony and NPC LODs (eyes kept), instance-uniform outlines, staggered tiers, and babble synthesised once per syllable.
+    - The GPU is busy only about 3 ms a frame; the remaining cost is main-thread physics and animation.
+  - **The exit hang:**
+    - Reproduced 2 times in about 31 suite runs, both under heavy machine load.
+    - The cause is narrowed to a busy secondary thread (most likely the dummy audio driver's mix thread), joined at exit while still running.
+    - A debug-symbol headless build of 4.7.2 is in progress to name the function.
+  - **The trailer:**
+    - TRAILER_PLAN.md is written; the staging, capture and edit scripts are written.
+    - Capture is 2560x1440 GPU Movie Maker through a pinned root viewport (the owner asked for 2K).
+
 ## Known issues
 - **Factory interior:** still monochrome grey-white; the ring light should read stronger in colour.
 - **Apple trees:** the apples sit mostly inside the canopy.

@@ -374,7 +374,11 @@ func _menu_open() -> bool:
 func _brain() -> void:
 	await _creator()
 	var end := minutes * 60.0
+	var status_t := 0.0
 	while _t() < end:
+		if _t() - status_t > 120.0:
+			status_t = _t()
+			_status()
 		if _lift != &"":
 			await _play_factory(_lift)
 			continue
@@ -1016,6 +1020,27 @@ func _wander() -> void:
 	var to: Vector3 = spots[rng.randi() % spots.size()]
 	await _walk(to, 8.0, 25.0)
 	await _wait(rng.randf_range(0.5, 2.0))
+
+
+## What the pens look like (for reading a pacing run): pantry, and per pen the count and the
+## average happiness, hunger and Bloom.
+func _status() -> void:
+	var line := "pantry %d bits %d" % [_pantry(), _bits()]
+	for pen in _pens():
+		var ps: Array = pen.call("ponies")
+		if ps.is_empty():
+			line += " | pen empty"
+			continue
+		var h := 0.0
+		var hu := 0.0
+		var b := 0.0
+		for inst: PonyInstance in ps:
+			h += inst.happiness
+			hu += inst.hunger
+			b += inst.bloom
+		var n := float(ps.size())
+		line += " | pen %d: happy %.2f hungry %.2f bloom %.2f" % [ps.size(), h / n, hu / n, b / n]
+	_say("STATUS " + line)
 
 
 # --- the Rainbow Factory ------------------------------------------------------------------

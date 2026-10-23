@@ -9,7 +9,7 @@ extends Node
 ##
 ## The schedule (ALL in play minutes, each also waiting on its own condition):
 ##   9   sun_shower     three pegasus Drifters come down near you (after a couple of catches)
-##   13  sighting_1     a rare canon pony appears somewhere open; every 9 min after, another
+##   13  sighting_1     a rare canon pony appears somewhere open; every 7 min after, another
 ##   17  palace_flyer   the Palace on the Strip opens (the casino was shut till now)
 ##   26  newsletter     Pip photographs the ranch for the Corporation newsletter (a clue)
 ##   30  race_day       the track's first race day (after the Palace is open)
@@ -19,7 +19,7 @@ extends Node
 
 const GeneratorScript := preload("res://systems/pony_generator.gd")
 const SIGHTING_FIRST := 13.0 * 60.0
-const SIGHTING_EVERY := 9.0 * 60.0
+const SIGHTING_EVERY := 7.0 * 60.0
 const LOST_FOAL_REWARD := 150
 
 var ranch: Node

@@ -18,7 +18,7 @@ const RACE_WIN_BONUS := 0.25
 const FAVORITE_GLOW_SECONDS := 180.0
 const MIN_HAPPINESS := 0.45
 const MAX_HUNGER := 0.75
-const CROWDED_AT := 6
+const CROWDED_AT := 7
 ## Scales the whole curve so the best case lands exactly on BEST_CASE_SECONDS: at full
 ## happiness the rate doubles and both bonuses stack to 2.6x, so 3 / (2 * 2.6).
 const BALANCE := 3.0 / (2.0 * (1.0 + FAVORITE_BONUS + FRIEND_BONUS))
