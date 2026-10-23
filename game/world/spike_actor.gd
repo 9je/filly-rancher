@@ -7,6 +7,17 @@ extends Node3D
 ## built by tools/blender_props/build_props.py.
 
 const MODEL := "res://assets/models/spike.glb"
+## THE REAL SPIKE: BeardedDoomGuy's "Spike The Dragon" (PonySFM, 2018), converted by
+## tools/convert_mdl.py. Its VTF textures are decoded to PNG beside it (SourceIO could not
+## find this pack's material root). The Blender stand-in above is only the fallback for a
+## checkout without converted assets.
+const REAL_MODEL := "res://assets/converted/spike/spike.glb"
+const REAL_TEX := "res://assets/converted/spike/tex/"
+const REAL_SCALE := 1.1
+## Surface material (without SourceIO's ".001") to texture. The wings are the model's
+## optional bodygroup: baby Spike has none, so they are hidden.
+const REAL_SKINS := {"body": "body", "acces": "acces", "eyeball_l": "pupil_l",
+	"eyeball_r": "pupil_r", "eyebrow": "eyebrow", "tongue": "tongue", "teeth": "tongue"}
 const LOOK_RADIUS := 7.0
 
 var player: Node3D
@@ -17,12 +28,65 @@ var _yaw := 0.0
 
 
 func _ready() -> void:
-	if ResourceLoader.exists(MODEL):
+	if ResourceLoader.exists(REAL_MODEL):
+		_body = (load(REAL_MODEL) as PackedScene).instantiate()
+		add_child(_body)
+		_body.scale = Vector3.ONE * REAL_SCALE
+		_dress_real(_body)
+	elif ResourceLoader.exists(MODEL):
 		_body = (load(MODEL) as PackedScene).instantiate()
 		add_child(_body)
 		ToonStyler.style(_body, &"pony", {})
 	_base_y = position.y
 	_yaw = rotation.y
+
+
+## The model ships in its rig's reference pose, arms straight out; he stands with them down.
+func _rest_arms(root: Node) -> void:
+	for sk: Skeleton3D in root.find_children("*", "Skeleton3D", true, false):
+		for arm: String in ["LeftArm", "RightArm"]:
+			var b := sk.find_bone(arm)
+			var fore := sk.find_bone(arm.replace("Arm", "Forearm"))
+			if b < 0 or fore < 0:
+				continue
+			var g := sk.get_bone_global_pose(b)
+			var side := signf(sk.get_bone_global_pose(fore).origin.x - g.origin.x)
+			var turned := Transform3D(Basis(Vector3(0, 0, 1), -side * deg_to_rad(65.0)) * g.basis, g.origin)
+			var parent := sk.get_bone_parent(b)
+			var local := (sk.get_bone_global_pose(parent).affine_inverse() * turned) if parent >= 0 else turned
+			sk.set_bone_pose_rotation(b, local.basis.get_rotation_quaternion())
+
+
+func _dress_real(root: Node) -> void:
+	_rest_arms(root)
+	for mi: MeshInstance3D in root.find_children("*", "MeshInstance3D", true, false):
+		if "wings" in String(mi.name).to_lower():
+			mi.visible = false
+			continue
+		for i in mi.mesh.get_surface_count():
+			var src := mi.mesh.surface_get_material(i)
+			var key := (src.resource_name if src != null else "").get_slice(".", 0)
+			if key == "wings":
+				mi.set_surface_override_material(i, _clear())
+				continue
+			var tex_path: String = REAL_TEX + String(REAL_SKINS.get(key, key)) + ".png"
+			var mat := StandardMaterial3D.new()
+			mat.diffuse_mode = BaseMaterial3D.DIFFUSE_TOON
+			mat.specular_mode = BaseMaterial3D.SPECULAR_TOON
+			mat.roughness = 0.8
+			mat.rim_enabled = true
+			mat.rim = 0.25
+			if ResourceLoader.exists(tex_path):
+				mat.albedo_texture = load(tex_path)
+			mi.set_surface_override_material(i, mat)
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+
+
+func _clear() -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.albedo_color = Color(0, 0, 0, 0)
+	return m
 
 
 func _process(delta: float) -> void:

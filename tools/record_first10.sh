@@ -15,7 +15,7 @@ export FILLY_TEST_SAVE_DIR="$(mktemp -d)"
 tools/bin/godot --path game --write-movie "$(pwd)/build/first10/raw.avi" --fixed-fps 60 \
   -s res://scenes/test/human_bot.gd -- --minutes="$MIN" --seed="$SEED" --video > build/first10/record.log 2>&1
 grep -E "^BOT_OK" build/first10/record.log || { echo "RECORD_FAILED (see build/first10/record.log)"; exit 1; }
-ffmpeg -v error -y -i build/first10/raw.avi -t 600 -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p -r 60 \
+ffmpeg -v error -y -i build/first10/raw.avi -t 600 -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -r 60 \
   -c:a aac -b:a 192k -movflags +faststart FIRST_10_MINUTES.mp4
 ffprobe -v error -show_entries stream=codec_name,width,height,r_frame_rate -show_entries format=duration -of compact FIRST_10_MINUTES.mp4
 echo FIRST10_OK
