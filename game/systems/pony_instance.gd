@@ -152,6 +152,11 @@ var home_slot: StringName = &""
 ## written into a save freezes today's palette into every old file.
 var stock: Dictionary = {}
 
+## 0..1 toward her Bloom (game/systems/bloom.gd); a marked pony keeps whatever she had.
+var bloom := 0.0
+## Seconds left of the glow a favorite meal gives her Bloom.
+var favorite_glow := 0.0
+
 
 ## Mint a brand new individual of `character_id`. Every call produces a DIFFERENT pony,
 ## even for the same character -- that is the entire point of this class.
@@ -226,6 +231,11 @@ func data() -> PonyData:
 ## is what the save carries and the id is what a build's roster happens to hold: a record
 ## whose data_id this build has never heard of still resolves to null and still has to know
 ## whether to be tinted.
+## True once she has found her mark (a v2 look with a mark).
+func is_marked() -> bool:
+	return PonyLookScript.is_look_dict(stock) and stock.has("mark")
+
+
 func is_stock() -> bool:
 	return not stock.is_empty()
 
@@ -256,6 +266,8 @@ func to_dict() -> Dictionary:
 		"caught_at_ms": caught_at_ms,
 		"home_slot": String(home_slot),
 		"stock": stock.duplicate(),
+		"bloom": bloom,
+		"favorite_glow": favorite_glow,
 	}
 
 
@@ -298,6 +310,8 @@ static func from_dict(d: Dictionary) -> PonyInstance:
 	# JSON has no integer type, so every index comes back as a float and is int()ed; and a
 	# value that is not a dictionary of three numbers is DROPPED rather than kept, so a hand
 	# edited blob cannot fabricate a look this class would not have written.
+	inst.bloom = clampf(float(d.get("bloom", 0.0)), 0.0, 1.0)
+	inst.favorite_glow = maxf(0.0, float(d.get("favorite_glow", 0.0)))
 	inst.stock = {}
 	var saved_stock: Variant = d.get("stock", {})
 	if typeof(saved_stock) == TYPE_DICTIONARY and PonyLookScript.is_look_dict(saved_stock):

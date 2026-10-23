@@ -53,6 +53,8 @@ const LedgerScript := preload("res://systems/ledger.gd")
 const PlayerLookScript := preload("res://systems/player_look.gd")
 const CasinoScript := preload("res://systems/casino.gd")
 const StoryScript := preload("res://systems/story.gd")
+const PonyBookScript := preload("res://systems/pony_book.gd")
+const OnboardingScript := preload("res://systems/onboarding.gd")
 
 ## Where the authored character roster is read from. The same directory the spawner and
 ## PonyInstance use; named here because this is now the one place it is loaded.
@@ -89,6 +91,9 @@ const KEY_LEDGER := "ledger"
 const KEY_PLAYER := "player"
 const KEY_CASINO := "casino"
 const KEY_STORY := "story"
+const KEY_BOOK := "book"
+const KEY_ONBOARDING := "onboarding"
+const KEY_TALK := "talk"
 
 ## Emitted after from_dict() or load_from_slot() has replaced the world. A HUD or a pen
 ## that cached anything out of here has to rebuild on this.
@@ -172,6 +177,13 @@ var casino: Casino = CasinoScript.new()
 ## `casino` follow: a listener holding the old object is holding the story of a ranch nobody
 ## is playing any more.
 var story: Story = StoryScript.new()
+
+## v1: the Pony Book (game/systems/pony_book.gd), the onboarding tips the player has
+## retired (game/systems/onboarding.gd), and which conversations are finished
+## (game/systems/talk_library.gd's `seen`). Replaced, not mutated, like the rest.
+var book: PonyBook = PonyBookScript.new()
+var onboarding: Onboarding = OnboardingScript.new()
+var talk: Dictionary = {}
 
 ## Pending requests, as plain Dictionaries whose shape this file does not know or check;
 ## a later task defines it and reads/writes it. Untyped for the same reason `unlocks` is:
@@ -309,6 +321,9 @@ func to_dict() -> Dictionary:
 		KEY_PLAYER: player.to_dict(),
 		KEY_CASINO: casino.to_dict(),
 		KEY_STORY: story.to_dict(),
+		KEY_BOOK: book.to_dict(),
+		KEY_ONBOARDING: onboarding.to_dict(),
+		KEY_TALK: talk.duplicate(true),
 	}
 
 
@@ -380,6 +395,14 @@ func from_dict(data: Dictionary) -> void:
 	var saved_story: Variant = data.get(KEY_STORY, {})
 	story = StoryScript.from_dict(
 		saved_story if typeof(saved_story) == TYPE_DICTIONARY else {})
+	var saved_book: Variant = data.get(KEY_BOOK, {})
+	book = PonyBookScript.from_dict(saved_book if saved_book is Dictionary else {})
+	onboarding = OnboardingScript.new()
+	var saved_ob: Variant = data.get(KEY_ONBOARDING, {})
+	if saved_ob is Dictionary:
+		onboarding.from_dict(saved_ob)
+	var saved_talk: Variant = data.get(KEY_TALK, {})
+	talk = (saved_talk as Dictionary).duplicate(true) if saved_talk is Dictionary else {}
 
 	state_loaded.emit()
 
@@ -400,6 +423,9 @@ func reset() -> void:
 	player = PlayerLookScript.default_look()
 	casino = CasinoScript.new()
 	story = StoryScript.new()
+	book = PonyBookScript.new()
+	onboarding = OnboardingScript.new()
+	talk = {}
 
 
 # --- disk ---------------------------------------------------------------------------------

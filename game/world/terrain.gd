@@ -86,7 +86,7 @@ const GRASS_HIGH := Color(0.381, 0.551, 0.261)
 ## 0.309, paler and greyer than the bark the ground is meant to read next to. Hue stays under
 ## 0.14 either way, so this was never at risk of reading as another green -- it just wasn't
 ## earth-coloured enough to read as bark's own colour rather than a generic brown.
-const DIRT := Color(0.8, 0.69, 0.52)
+const DIRT := Color(0.8, 0.72, 0.6)
 
 ## THE NORTH ROAD, PAINTED INTO THE GROUND RATHER THAN LAID ON TOP OF IT.
 ##

@@ -1199,13 +1199,35 @@ func _update_facing(direction: Vector3, delta: float) -> void:
 ## Pick `idle`/`walk`/`gallop` and scale playback to her ground speed. Both decisions
 ## belong to Gait; this must not grow an if-ladder over speed constants of its own.
 func _update_animation(speed: float) -> void:
-	if _anim == null:
+	if _anim == null or _action != &"":
 		return
 	var clip := GaitScript.clip_for_speed(speed, _anim.has_animation(&"trot"))
 	if clip == &"idle":
 		clip = _standing_clip()
 	_play(clip)
 	_anim.speed_scale = GaitScript.playback_scale_for_clip(clip, speed)
+
+
+## A one-shot she is acting out (a Bloom's rear, a startle): locomotion leaves her clip
+## alone until it ends. Empty when none.
+var _action: StringName = &""
+
+
+## Play `clip` once over whatever she is doing; false if her body has no such clip.
+func play_action(clip: StringName) -> bool:
+	if _anim == null or not _anim.has_animation(clip):
+		return false
+	_action = clip
+	_anim.play(clip, 0.15)
+	_anim.speed_scale = 1.0
+	if not _anim.animation_finished.is_connected(_on_action_finished):
+		_anim.animation_finished.connect(_on_action_finished)
+	return true
+
+
+func _on_action_finished(clip: StringName) -> void:
+	if clip == _action:
+		_action = &""
 
 
 ## What she does while standing still: grazes in GRAZE, otherwise idles. A body exported

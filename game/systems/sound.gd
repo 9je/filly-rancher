@@ -366,6 +366,11 @@ func _load_streams() -> void:
 ## A 2D one shot: something the player is told about rather than something happening at a
 ## place. UI ticks and the capture stinger. Returns false when the id is unknown or its
 ## file failed to load, so a gate can assert on the refusal.
+## True when `id` is in the library (a caller can fall back to another sound).
+func has_sound(id: StringName) -> bool:
+	return LIBRARY.has(id)
+
+
 func play(id: StringName) -> bool:
 	id = _resolve_play_id(id)
 	# NOT `var entry :=`: a local of that name would shadow this class's own entry()

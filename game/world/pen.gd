@@ -112,6 +112,9 @@ extends StaticBody3D
 ## exercise through a gap in the fence. NO PONY EVER DIES; a neglected one leaves, and
 ## leaving is something the pen does TO its roster, not something she squeezes through.
 
+const BloomScript := preload("res://systems/bloom.gd")
+const PonyLookScript := preload("res://systems/pony_look.gd")
+const PonyGeneratorScript := preload("res://systems/pony_generator.gd")
 const LayersScript := preload("res://world/collision_layers.gd")
 const NeedsScript := preload("res://systems/needs.gd")
 const ProductionScript := preload("res://systems/production.gd")
@@ -467,6 +470,7 @@ func tick(delta: float) -> int:
 	for inst in _residents:
 		NeedsScript.tick(inst, delta)
 		_feed_if_hungry(inst)
+		_tick_bloom(inst, delta)
 		var made := 0 if _padlocked else ProductionScript.tick(inst, delta)
 		if made > 0:
 			var data: PonyData = inst.data()
@@ -520,7 +524,64 @@ func _feed_if_hungry(inst: PonyInstance) -> void:
 	if not NeedsScript.feed(inst, choice):
 		pantry.add(choice, 1)
 		return
+	if NeedsScript.is_favorite(inst, choice):
+		inst.favorite_glow = BloomScript.FAVORITE_GLOW_SECONDS
 	fed.emit(inst.uid, choice)
+
+
+# --- the Bloom (v1) ----------------------------------------------------------------------
+
+## A resident found her mark: her look now carries it and her nickname is her new name.
+signal bloomed(inst: PonyInstance)
+
+## Set by the Factory path's Calm Lamp upgrade: residents never Bloom (and stop emoting).
+var calm_lamp := false
+
+
+func _tick_bloom(inst: PonyInstance, delta: float) -> void:
+	inst.favorite_glow = maxf(0.0, inst.favorite_glow - delta)
+	if not inst.is_stock() or inst.is_marked():
+		return
+	var c := {"happiness": inst.happiness, "hunger": inst.hunger,
+		"favorite_glow": inst.favorite_glow, "has_friend": _has_friend(inst),
+		"pen_count": _residents.size(), "calm_lamp": calm_lamp, "marked": false}
+	inst.bloom = minf(1.0, inst.bloom + BloomScript.gain(c, delta))
+	if inst.bloom >= 1.0:
+		bloom_now(inst)
+
+
+## Give `inst` her mark and her name now (the meter filled, or a story beat says so).
+func bloom_now(inst: PonyInstance) -> void:
+	if inst.is_marked():
+		return
+	var look := PonyLookScript.from_stock(inst.stock)
+	PonyGeneratorScript.bloom(look)
+	inst.stock = look.to_dict()
+	inst.bloom = 1.0
+	if inst.nickname.is_empty():
+		inst.nickname = PonyGeneratorScript.make_name(look.rng_seed)
+	var body: Node = _bodies.get(String(inst.uid), _bodies.get(inst.uid))
+	if body != null and is_instance_valid(body) and body.has_method("set_stock"):
+		body.call("set_stock", inst.stock)
+	bloomed.emit(inst)
+
+
+## The live body standing for `uid`, or null.
+func body_of(uid: StringName) -> Node3D:
+	return body_for(uid)
+
+
+func _has_friend(inst: PonyInstance) -> bool:
+	var mine := _personality_of(inst)
+	for other in _residents:
+		if other != inst and BloomScript.are_friends(mine, _personality_of(other)):
+			return true
+	return false
+
+
+func _personality_of(inst: PonyInstance) -> int:
+	var d: PonyData = inst.data()
+	return int(d.personality) if d != null else 0
 
 
 func _physics_process(delta: float) -> void:

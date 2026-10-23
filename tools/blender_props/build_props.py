@@ -334,6 +334,67 @@ def scoop():
     export("scoop")
 
 
+@prop("valley_rim")
+def valley_rim():
+    """The soft green hills that ring Haybrook Vale, outside the playable 220 m square: big
+    rounded humps in two rows, the far row taller and bluer (aerial perspective is painted
+    in, as the show's backgrounds do), with clumps of round trees on the near slopes."""
+    import random
+    rnd = random.Random(7)
+    parts = []
+    for row, (r_min, r_max, h_min, h_max, color) in enumerate(
+            [(150, 175, 18, 34, "leaf"), (205, 240, 40, 72, "leaf_dark")]):
+        count = 20 if row == 0 else 16
+        for i in range(count):
+            a = (i + rnd.uniform(-0.3, 0.3)) / count * math.tau
+            r = rnd.uniform(r_min, r_max)
+            h = rnd.uniform(h_min, h_max)
+            w = rnd.uniform(45, 70) if row == 0 else rnd.uniform(70, 100)
+            hump = blob("hill%d_%d" % (row, i), 1.0, (math.cos(a) * r, math.sin(a) * r, 0), color,
+                        seed=100 + i + row * 50, lumps=0.12, scale=(w, w * 0.8, h))
+            parts.append(hump)
+    for i in range(26):
+        a = rnd.uniform(0, math.tau)
+        r = rnd.uniform(140, 162)
+        x, y = math.cos(a) * r, math.sin(a) * r
+        for k in range(3):
+            ox, oy = rnd.uniform(-6, 6), rnd.uniform(-6, 6)
+            s = rnd.uniform(4.5, 7.0)
+            parts.append(cyl("trunk%d_%d" % (i, k), 0.5, s * 0.9, (x + ox, y + oy, 6 + s * 0.45), "bark", verts=8))
+            parts.append(blob("crown%d_%d" % (i, k), s * 0.55, (x + ox, y + oy, 6 + s * 1.15),
+                              "leaf_light" if k % 2 else "leaf", seed=300 + i * 3 + k, lumps=0.2))
+    join(parts, "valley_rim")
+    export("valley_rim")
+
+
+@prop("prism_works")
+def prism_works():
+    """The Prism Works: Brightsky's palace on a bank of cloud above the northern ridge.
+    White towers with gold domes, a great round window, and the spout the Haybrook Rainbow
+    pours from. Seen from the valley it is lovely; nothing about it is wrong at a distance."""
+    import random
+    rnd = random.Random(3)
+    parts = []
+    for i in range(14):
+        a = i / 14 * math.tau
+        r = rnd.uniform(18, 34)
+        parts.append(blob("cloud%d" % i, rnd.uniform(9, 15), (math.cos(a) * r, math.sin(a) * r * 0.6, rnd.uniform(-3, 2)),
+                          "cloud" if i % 3 else "cloud_shade", seed=500 + i, lumps=0.25, scale=(1.3, 1.0, 0.7)))
+    parts.append(blob("cloud_core", 22, (0, 0, -2), "cloud", seed=499, lumps=0.2, scale=(1.4, 0.9, 0.6)))
+    parts.append(cyl("keep", 11, 26, (0, 0, 16), "white", verts=32))
+    parts.append(cyl("keep_dome", 11.5, 10, (0, 0, 34), "gold", r2=1.5, verts=32))
+    parts.append(torus("keep_band", 11.2, 0.8, (0, 0, 27), "brightsky"))
+    for i, (x, y, h) in enumerate([(-16, 4, 30), (16, 4, 30), (-9, -8, 22), (9, -8, 22), (0, 10, 38)]):
+        parts.append(cyl("tower%d" % i, 3.2, h, (x, y, 4 + h / 2), "white", verts=20))
+        parts.append(cyl("cap%d" % i, 3.8, 7, (x, y, 4 + h + 3.5), "gold", r2=0.2, verts=20))
+        parts.append(torus("ring%d" % i, 3.3, 0.35, (x, y, 4 + h - 2), "brightsky"))
+    parts.append(cyl("window", 6.5, 0.8, (0, -11.2, 20), "glass", verts=32, rot=(math.radians(90), 0, 0)))
+    parts.append(torus("window_rim", 6.7, 0.7, (0, -11.4, 20), "gold", rot=(math.radians(90), 0, 0)))
+    parts.append(cyl("spout", 4.5, 14, (12, -10, 30), "gold", r2=6.5, verts=24, rot=(math.radians(-55), 0, math.radians(20))))
+    join(parts, "prism_works")
+    export("prism_works")
+
+
 def main():
     wanted = [n for n in args.only.split(",") if n] or list(BUILDERS)
     for name in wanted:

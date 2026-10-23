@@ -165,6 +165,9 @@ const LobbySignScript := preload("res://world/lobby_sign.gd")
 const PalaceFacadeScript := preload("res://world/palace_facade.gd")
 const InteractionScript := preload("res://world/interaction.gd")
 const PeopleScript := preload("res://world/people.gd")
+const PonyLookScript := preload("res://systems/pony_look.gd")
+const MarkComposerScript := preload("res://systems/mark_composer.gd")
+const BloomCeremonyScript := preload("res://world/bloom_ceremony.gd")
 const BuildingScript := preload("res://world/building.gd")
 const CasinoScript := preload("res://systems/casino.gd")
 const SlotsScript := preload("res://systems/slots.gd")
@@ -1354,6 +1357,8 @@ func _on_plot_built(_plot: PlotData, node: Node) -> void:
 		# The pantry a pen feeds from is GameState's, read fresh on every call rather than
 		# captured here. See _current_inventory().
 		pen.inventory_provider = Callable(self, "_current_inventory")
+		if not pen.bloomed.is_connected(_on_pony_bloomed):
+			pen.bloomed.connect(_on_pony_bloomed)
 
 
 ## Wire the build menu to the wallet and to the thing that actually builds.
@@ -2822,6 +2827,13 @@ func deliver_pony(uid: StringName) -> Dictionary:
 	# of the two checks a refusal like this is worth.
 	if is_racing(uid):
 		_toast("She is under orders at the Palace! The counter will take her after the race.")
+		return refused
+	# PLACEMENT IS FOR PONIES STILL LOOKING (STORY.md clue 2): a pony who has found her mark
+	# cannot be sent up. Said in the Company's cheerful voice, and never explained.
+	if inst.is_marked():
+		_toast("Oh! %s has found herself already. Placement is for ponies still looking!"
+			% inst.display_name())
+		refused["reason"] = "marked"
 		return refused
 
 	# HER BODY, STILL IN THE PEN. Read rather than released, so the two refusals below cost
@@ -7163,7 +7175,17 @@ const WorldToneScript := preload("res://world/world_tone.gd")
 var world_tone: WorldTone
 
 
+const ValleyFrameScript := preload("res://world/valley_frame.gd")
+var valley_frame: ValleyFrame
+
+
 func _setup_tone() -> void:
+	if valley_frame == null:
+		valley_frame = ValleyFrameScript.new()
+		valley_frame.name = "ValleyFrame"
+		add_child(valley_frame)
+		if _game_state != null:
+			valley_frame.set_brightness(ValleyFrameScript.brightness_for(_game_state.story.deliveries))
 	if world_tone != null:
 		return
 	world_tone = WorldToneScript.new()
@@ -7174,3 +7196,39 @@ func _setup_tone() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--dread="):
 			world_tone.snap(float(arg.substr(8)))
+
+
+# --- the Bloom (v1) ----------------------------------------------------------------------
+
+signal pony_bloomed(inst: PonyInstance)
+
+
+## A penned pony found her mark: the story counts it, the Pony Book keeps her, the town
+## hears about it, and her body plays the ceremony (game/world/bloom_ceremony.gd).
+func _on_pony_bloomed(inst: PonyInstance) -> void:
+	if _game_state != null:
+		var story: Story = _game_state.story
+		story.flags["_blooms"] = int(story.flags.get("_blooms", 0)) + 1
+		var look := PonyLookScript.from_stock(inst.stock)
+		_game_state.book.note_bloom(String(inst.uid), inst.display_name(), look,
+			story.collection_days)
+		var bus := get_node_or_null("/root/Events")
+		if bus != null:
+			bus.emit_signal("bloomed", String(inst.uid), inst.stock)
+	_bloom_ceremony(inst)
+	pony_bloomed.emit(inst)
+	_toast("%s found her mark: %s!" % [inst.display_name(),
+		MarkComposerScript.talent_name(StringName(str(inst.stock.get("mark", {}).get("talent", ""))))])
+
+
+func _bloom_ceremony(inst: PonyInstance) -> void:
+	var body: Node3D = null
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen != null and pen.has_method("body_of"):
+			body = pen.call("body_of", inst.uid)
+			if body != null:
+				break
+	if body == null:
+		return
+	BloomCeremonyScript.play(body)
