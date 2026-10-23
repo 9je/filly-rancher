@@ -1,0 +1,60 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"fennel_postcards"
+speaker = &"fennel"
+priority = 70
+once = true
+bark = false
+when = {
+"chapters": [1],
+"flags_none": ["saw_fennel_wall"]
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "Come in out of the drizzle. Mind the cards.",
+"who": "fennel",
+"mood": "neutral",
+"next": "two"
+}, {
+"id": "two",
+"text": "My Clover. Six years up at the Academy now. She writes every month, regular as rain.",
+"who": "fennel",
+"mood": "happy",
+"anim": "look",
+"flag": "saw_fennel_wall",
+"next": "three"
+}, {
+"id": "three",
+"text": "\"Having a wonderful time. I found my talent.\" Every month. Never says what it is.",
+"who": "fennel",
+"mood": "neutral",
+"choices": [{
+"text": "Can I read one?",
+"next": "read"
+}, {
+"text": "You must miss her.",
+"next": "miss"
+}]
+}, {
+"id": "read",
+"text": "Help yourself. They're all the same, mind. She was never one for words.",
+"who": "fennel",
+"mood": "neutral",
+"next": "end"
+}, {
+"id": "miss",
+"text": "Every morning. But Cloudsdale says the ones who go up do better than the ones who stay. And they'd know.",
+"who": "fennel",
+"mood": "sad",
+"next": "end"
+}, {
+"id": "end",
+"text": "Six years of the same card. Funny. She used to write me whole novels.",
+"who": "fennel",
+"mood": "neutral",
+"anim": "look"
+}])

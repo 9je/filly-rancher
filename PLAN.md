@@ -36,19 +36,12 @@ Everything the slice stands on.
      - no hat, clip or clothes mesh is visible on any generated pony;
      - foals scale correctly;
      - a 40-pony batch sheet renders (shots).
-5. **De-canon the data.**
-   - Remove the canon PonyData roster from play and replace it with generated Drifters and rare-variant specs.
-   - Rename regions and the Company in data and letters.
-   - Remove the Twilight voice clip and the "Twilight" default name.
-   - Migrate saves: old `character_id` ponies become generated looks seeded from their id.
-   - *Accept:*
-     - grep finds no canon character names in `game/data`, `game/systems`, `game/world` or `game/ui` (a test enforces the list);
-     - old saves load;
-     - the suite is green with rewritten tests where the roster was asserted.
+5. **Canon stays** (owner direction): the named roster keeps its real characters and places; generated Drifters fill the world around them.
+
 6. **Shot tool** (`tools/capture_shots.sh`): key scenes, both tones (a `--dread=` arg), a generated batch, the customizer.
    - *Accept:* the script writes the listed PNGs and exits nonzero on a missing one.
 
-## M1. Vertical slice: Act One in Sunny Acres and Haybrook
+## M1. Vertical slice: Act One in Sunny Acres and Ponyville
 
 The cozy loop, fully polished, in one area.
 
@@ -87,7 +80,7 @@ The cozy loop, fully polished, in one area.
 8. **The look of the area:**
    - existing props restyled;
    - new Blender props: the Depot crate (with lid scratches), postbox, Tumble's porch, town signage, and blob trees in the show style (replacing the Kenney trees);
-   - the sky with the Haybrook Rainbow and the Works on the ridge.
+   - the sky with the Rainbow and the Works on the ridge.
    - *Accept:* shots of the ranch, town, Depot and sky are reviewed and fixed until nothing reads as primitive or off-style; zero Kenney low-poly trees left in the slice area.
 9. **Audio:**
    - music system (layered stems, crossfades, dread low-pass);

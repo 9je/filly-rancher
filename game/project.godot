@@ -37,6 +37,7 @@ GameState="*res://systems/game_state.gd"
 InputDevice="*res://systems/input_device.gd"
 Sound="*res://systems/sound.gd"
 Events="*res://systems/events.gd"
+Music="*res://systems/music.gd"
 
 [audio]
 

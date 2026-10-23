@@ -15,7 +15,7 @@ when = {
 }
 nodes = Array[Dictionary]([{
 "id": "start",
-"text": "A new face! And with gems, I bet. Bramble Butterworth, best stall in Haybrook, also the only one.",
+"text": "A new face! And with gems, I bet. Bramble Butterworth, best stall in Ponyville, also the only one.",
 "who": "bramble",
 "mood": "happy",
 "flag": "met_bramble",

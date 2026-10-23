@@ -13,7 +13,7 @@ const RaceCardScript := preload("res://systems/race_card.gd")
 func test_the_sign_names_the_palace_and_its_sponsor() -> void:
 	var text: String = "\n".join(CasinoSignScript.lines())
 	assert_true(text.contains("Spectra Palace"))
-	assert_true(text.contains("Brightsky Weather Company"))
+	assert_true(text.contains("Cloudsdale Weather Corporation"))
 
 
 func test_the_sign_publishes_every_game_at_the_number_that_game_computes() -> void:

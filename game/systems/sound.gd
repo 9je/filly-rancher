@@ -36,6 +36,10 @@ const BUS_MASTER := &"Master"
 const BUS_AMBIENT := &"Ambient"
 const BUS_EFFECTS := &"Effects"
 const BUS_UI := &"UI"
+## The score's bus (game/systems/music.gd plays it; listed here so the manifest and the
+## library stay one set). Voice is the babble's.
+const BUS_MUSIC := &"Music"
+const BUS_VOICE := &"Voice"
 
 ## Pool sizes. Twelve 2D voices is comfortably past the busiest real moment measured in
 ## this game (a slots spin ticking three reels under a casino bed); the pool steals its
@@ -86,6 +90,34 @@ const GAG_CHANCE := 0.042
 ## at runtime. Every reader still gets a PackedStringArray back, because Dictionary.get()
 ## into a statically typed PackedStringArray local converts the plain array for it.
 const LIBRARY: Dictionary = {
+	# --- the score (played by game/systems/music.gd) ---
+	&"music_day_morning": {
+		"paths": ["res://assets/audio/music/day_morning.ogg"],
+		"bus": BUS_MUSIC, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": true},
+	&"music_night_evening": {
+		"paths": ["res://assets/audio/music/night_evening.ogg"],
+		"bus": BUS_MUSIC, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": true},
+	&"music_town_carefree": {
+		"paths": ["res://assets/audio/music/town_carefree.ogg"],
+		"bus": BUS_MUSIC, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": true},
+	&"music_works_gone_beyond": {
+		"paths": ["res://assets/audio/music/works_gone_beyond.ogg"],
+		"bus": BUS_MUSIC, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": true},
+	&"music_dread_ossuary": {
+		"paths": ["res://assets/audio/music/dread_ossuary.ogg"],
+		"bus": BUS_MUSIC, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": true},
+	&"music_stealth_stay_the_course": {
+		"paths": ["res://assets/audio/music/stealth_stay_the_course.ogg"],
+		"bus": BUS_MUSIC, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": true},
+	&"music_ending_promises": {
+		"paths": ["res://assets/audio/music/ending_promises.ogg"],
+		"bus": BUS_MUSIC, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": true},
+	&"music_ending_lost_time": {
+		"paths": ["res://assets/audio/music/ending_lost_time.ogg"],
+		"bus": BUS_MUSIC, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": true},
+	&"music_casino_backbay": {
+		"paths": ["res://assets/audio/music/casino_backbay.ogg"],
+		"bus": BUS_MUSIC, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": true},
 	# --- ambient beds ---
 	&"bed_dawn_chorus": {
 		"paths": ["res://assets/audio/ambient/bed_dawn_chorus.ogg"],
@@ -136,6 +168,15 @@ const LIBRARY: Dictionary = {
 	&"capture_charge": {
 		"paths": ["res://assets/audio/world/capture_charge.ogg"],
 		"bus": BUS_EFFECTS, "volume_db": -3.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": true},
+	&"bloom_fanfare": {
+		"paths": ["res://assets/audio/world/bloom_fanfare.wav"],
+		"bus": BUS_EFFECTS, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": false},
+	&"scoop_pop": {
+		"paths": ["res://assets/audio/world/scoop_pop.wav"],
+		"bus": BUS_EFFECTS, "volume_db": 0.0, "pitch_min": 0.9, "pitch_max": 1.15, "loop": false},
+	&"sparkle": {
+		"paths": ["res://assets/audio/world/sparkle.wav"],
+		"bus": BUS_EFFECTS, "volume_db": -2.0, "pitch_min": 0.95, "pitch_max": 1.1, "loop": false},
 	&"capture_success": {
 		"paths": ["res://assets/audio/world/capture_success.wav"],
 		"bus": BUS_EFFECTS, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": false},

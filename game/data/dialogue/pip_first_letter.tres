@@ -22,14 +22,14 @@ nodes = Array[Dictionary]([{
 "next": "two"
 }, {
 "id": "two",
-"text": "This one's from Brightsky. They write ever so much. Your welcome pack is in your mailbox by the door. There's a postcard in it, too!",
+"text": "This one's from Cloudsdale. They write ever so much. Your welcome pack is in your mailbox by the door. There's a postcard in it, too!",
 "who": "pip",
 "mood": "happy",
 "event": "first_mail",
 "next": "three"
 }, {
 "id": "three",
-"text": "Can't fly up high enough to see the Prism Works myself. Brightsky says the cloud line's for staff only. Pretty, though, isn't it? The rainbow.",
+"text": "Can't fly up high enough to see the Rainbow Factory myself. Cloudsdale says the cloud line's for staff only. Pretty, though, isn't it? The rainbow.",
 "who": "pip",
 "mood": "neutral",
 "anim": "look"

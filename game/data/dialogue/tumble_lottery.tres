@@ -1,0 +1,41 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"tumble_lottery"
+speaker = &"tumble"
+priority = 96
+once = true
+bark = false
+when = {
+"flags_all": ["invited"],
+"flags_none": ["tumble_hides"]
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "I heard her. I'm not going in the crate. I'm not.",
+"who": "tumble",
+"mood": "scared",
+"anim": "cower",
+"flag": "tumble_hides",
+"next": "two"
+}, {
+"id": "two",
+"text": "I'm going to hide under the porch. You'll come with me tomorrow, won't you? You'll be right there?",
+"who": "tumble",
+"mood": "scared",
+"choices": [{
+"text": "I'll be right there.",
+"next": "promise"
+}, {
+"text": "I won't let them take you.",
+"next": "promise"
+}]
+}, {
+"id": "promise",
+"text": "Okay. Okay. Hoof-shake promise. That's the realest kind of promise there is.",
+"who": "tumble",
+"mood": "sad"
+}])

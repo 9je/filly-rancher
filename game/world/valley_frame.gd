@@ -1,7 +1,7 @@
 class_name ValleyFrame
 extends Node3D
 ## THE EDGES OF HAYBROOK VALE: the ring of green hills around the playable square, the
-## Prism Works on its cloud above the northern ridge, and the Haybrook Rainbow pouring out
+## Rainbow Factory on its cloud above the northern ridge, and the Rainbow pouring out
 ## of it across the sky (STORY.md section 1). All three are seen from everywhere and none
 ## can be reached on foot; the Works is visited only through its lift.
 ##
@@ -104,3 +104,41 @@ func set_bands(n: int) -> void:
 ## Brightness for `deliveries` ponies sent up so far.
 static func brightness_for(deliveries: int) -> float:
 	return 1.0 + 0.06 * float(deliveries)
+
+
+## A sparkle of `color` rises from `from` and flies into the rainbow's foot at the Works;
+## when it lands the rainbow takes `brightness`.
+func send_up(from: Vector3, color: Color, brightness: float) -> void:
+	var orb := MeshInstance3D.new()
+	var sphere := SphereMesh.new()
+	sphere.radius = 0.35
+	sphere.height = 0.7
+	orb.mesh = sphere
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.albedo_color = color.lightened(0.2)
+	m.emission_enabled = true
+	m.emission = color
+	m.emission_energy_multiplier = 2.5
+	orb.material_override = m
+	add_child(orb)
+	orb.global_position = from
+	var trail := BloomCeremony.sparkles([color.lightened(0.3), color, Color(1, 1, 1)])
+	trail.one_shot = false
+	trail.amount = 24
+	trail.lifetime = 0.9
+	trail.explosiveness = 0.0
+	(trail.process_material as ParticleProcessMaterial).initial_velocity_max = 0.6
+	(trail.process_material as ParticleProcessMaterial).initial_velocity_min = 0.1
+	orb.add_child(trail)
+	trail.emitting = true
+	var mid := from.lerp(RAINBOW_FROM, 0.5) + Vector3(0, 40, 0)
+	var t := create_tween()
+	t.tween_method(func(u: float) -> void:
+		var a := from.lerp(mid, u)
+		var b := mid.lerp(RAINBOW_FROM, u)
+		orb.global_position = a.lerp(b, u)
+		orb.scale = Vector3.ONE * lerpf(1.0, 3.0, u), 0.0, 1.0, 4.0).set_trans(Tween.TRANS_SINE)
+	t.tween_callback(func() -> void:
+		set_brightness(brightness)
+		orb.queue_free())

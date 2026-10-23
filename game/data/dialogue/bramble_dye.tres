@@ -1,0 +1,39 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"bramble_dye"
+speaker = &"bramble"
+priority = 60
+once = true
+bark = false
+when = {
+"chapters": [1],
+"min": {
+"deliveries": 3
+},
+"flags_none": ["bramble_dye"]
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "Ooh, look what came in! Cloudsdale Rainbow Dye. Made with one hundred percent real rainbow!",
+"who": "bramble",
+"mood": "happy",
+"flag": "bramble_dye",
+"next": "two"
+}, {
+"id": "two",
+"text": "Every shade's got a name. Peach Sunrise, Bluebell Dusk, all sorts. They bottle a new one every time the rainbow gets brighter.",
+"who": "bramble",
+"mood": "happy",
+"anim": "nod",
+"next": "three"
+}, {
+"id": "three",
+"text": "Funny, some of the names sound like ponies. Ah well. Shall I put you down for a bottle?",
+"who": "bramble",
+"mood": "neutral",
+"anim": "look"
+}])

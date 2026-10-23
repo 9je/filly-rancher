@@ -6,7 +6,7 @@ extends CanvasLayer
 ## body is where every word of the game's onboarding lives: catch, pen, collect, sell, the
 ## balance and the quota, in four numbered steps. Nothing in the game had ever drawn one.
 ## ranch.gd rendered the welcome letter, threw the body away and toasted the TITLE
-## ("Brightsky Weather Company: Welcome to the family!"), which tells a new player
+## ("Cloudsdale Weather Corporation: Welcome to the family!"), which tells a new player
 ## nothing at all. The task that letter belongs to exists to say where bits come from, and a
 ## discarded body does not say it. Whole branch review of 2026-08-31, Ruling 25.
 ##

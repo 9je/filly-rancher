@@ -7,7 +7,7 @@ speaker: marigold
 priority: 100
 when: {"chapters": [0], "flags_none": ["has_scoop"]}
 
-start [marigold happy] Welcome, welcome! You must be {name}. I'm Marigold Mayfair, Brightsky Weather Company, Regional Liaison. Isn't it a gorgeous morning?
+start [marigold happy] Welcome, welcome! You must be {name}. I'm Marigold Mayfair, Cloudsdale Weather Corporation, Regional Liaison. Isn't it a gorgeous morning?
   -> two
 two [marigold happy nod] And it's yours! Sunny Acres has been empty far too long. The roof leaks a little, but the view is complimentary.
   -> three
@@ -16,11 +16,11 @@ three [marigold happy] You're joining our Wayward Pony Program. The meadows are 
   * Lost their way how? -> lost
 lost [marigold happy] Oh, the usual! A little forgetful, a little blank around the flank. Nothing a good home won't fix.
   -> how
-how [marigold happy] With this! Your Brightsky Scoop. Point, hold, and she floats right to you. Totally safe, totally comfy.
+how [marigold happy] With this! Your CWC Scoop. Point, hold, and she floats right to you. Totally safe, totally comfy.
   flag: has_scoop
   event: give_scoop
   -> four
-four [marigold happy nod] There's a Drifter grazing just past the gate. Why not say hello? I'll leave you to settle in. Brightsky is so glad to have you!
+four [marigold happy nod] There's a Drifter grazing just past the gate. Why not say hello? I'll leave you to settle in. Cloudsdale is so glad to have you!
 
 === tumble_meets
 speaker: tumble
@@ -82,7 +82,7 @@ speaker: bramble
 priority: 70
 when: {"chapters": [0], "flags_none": ["met_bramble"]}
 
-start [bramble happy] A new face! And with gems, I bet. Bramble Butterworth, best stall in Haybrook, also the only one.
+start [bramble happy] A new face! And with gems, I bet. Bramble Butterworth, best stall in Ponyville, also the only one.
   flag: met_bramble
   -> two
 two [bramble happy nod] I buy every gem your ponies make. Shinier ponies make shinier gems, and shinier gems make me a very happy mare.
@@ -97,10 +97,10 @@ when: {"chapters": [0], "flags_none": ["met_pip"]}
 start [pip happy] Special delivery! You're {name}, right? Course you are, there's nopony else up here. I'm Pip. Mail, gossip, emergency muffins.
   flag: met_pip
   -> two
-two [pip happy] This one's from Brightsky. They write ever so much. Your welcome pack is in your mailbox by the door. There's a postcard in it, too!
+two [pip happy] This one's from Cloudsdale. They write ever so much. Your welcome pack is in your mailbox by the door. There's a postcard in it, too!
   event: first_mail
   -> three
-three [pip neutral look] Can't fly up high enough to see the Prism Works myself. Brightsky says the cloud line's for staff only. Pretty, though, isn't it? The rainbow.
+three [pip neutral look] Can't fly up high enough to see the Rainbow Factory myself. Cloudsdale says the cloud line's for staff only. Pretty, though, isn't it? The rainbow.
 
 === marigold_depot
 speaker: marigold
@@ -109,9 +109,9 @@ when: {"min": {"pens": 1, "catches": 3}, "flags_none": ["depot_explained"]}
 
 start [marigold happy] {name}! Look at you, a real rancher already. I've brought wonderful news.
   -> two
-two [marigold happy nod] The crate behind your barn is our Depot. Any Drifter you'd like to send up for Placement goes in there, and she rides the lift to the Brightsky Academy in the clouds.
+two [marigold happy nod] The crate behind your barn is our Depot. Any Drifter you'd like to send up for Placement goes in there, and she rides the lift to the Cloudsdale Academy in the clouds.
   -> three
-three [marigold happy] They find their talents up there so much faster. And Brightsky pays your ranch a stipend for each one, because helping is its own reward, but bits are nice too!
+three [marigold happy] They find their talents up there so much faster. And Cloudsdale pays your ranch a stipend for each one, because helping is its own reward, but bits are nice too!
   * What happens at the Academy? -> academy
   * Do I have to send them? -> have_to
 academy [marigold happy] Oh, all sorts! Lessons, sunshine, a lovely view. They'll write to you. Everypony always writes.
@@ -162,7 +162,7 @@ bark: true
 once: false
 when: {"chapters": [0, 1]}
 
-start [fennel neutral] Rain's coming. Brightsky rain. Smells like pennies.
+start [fennel neutral] Rain's coming. Cloudsdale rain. Smells like pennies.
 
 === fennel_bark_2
 speaker: fennel
@@ -194,4 +194,4 @@ bark: true
 once: false
 when: {"chapters": [0, 1]}
 
-start [marigold happy] Every pony has a color! Brightsky helps her find it.
+start [marigold happy] Every pony has a color! Cloudsdale helps her find it.

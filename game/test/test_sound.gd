@@ -30,10 +30,11 @@ func after_each() -> void:
 	get_tree().paused = false
 
 
-func test_the_four_buses_exist_and_route_into_master() -> void:
-	assert_eq(AudioServer.bus_count, 4)
+func test_the_six_buses_exist_and_route_into_master() -> void:
+	assert_eq(AudioServer.bus_count, 6)
 	assert_eq(AudioServer.get_bus_name(0), "Master")
-	for bus: StringName in [SoundScript.BUS_AMBIENT, SoundScript.BUS_EFFECTS, SoundScript.BUS_UI]:
+	for bus: StringName in [SoundScript.BUS_AMBIENT, SoundScript.BUS_EFFECTS, SoundScript.BUS_UI,
+			SoundScript.BUS_MUSIC, SoundScript.BUS_VOICE]:
 		var index: int = AudioServer.get_bus_index(String(bus))
 		assert_gt(index, 0, "bus %s must exist and must not be Master" % bus)
 		assert_eq(AudioServer.get_bus_send(index), &"Master")

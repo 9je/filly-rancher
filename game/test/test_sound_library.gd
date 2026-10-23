@@ -118,7 +118,8 @@ func test_every_bus_is_one_of_the_three() -> void:
 		var entry: Dictionary = SoundScript.LIBRARY[id]
 		var bus: StringName = StringName(entry.get("bus", &""))
 		assert_true(bus == SoundScript.BUS_AMBIENT or bus == SoundScript.BUS_EFFECTS
-			or bus == SoundScript.BUS_UI, "'%s' routes to '%s'" % [id, bus])
+			or bus == SoundScript.BUS_UI or bus == SoundScript.BUS_MUSIC,
+			"'%s' routes to '%s'" % [id, bus])
 
 
 func test_the_directory_a_file_sits_in_decides_its_bus() -> void:
@@ -131,6 +132,7 @@ func test_the_directory_a_file_sits_in_decides_its_bus() -> void:
 			match folder:
 				"ambient": assert_eq(bus, SoundScript.BUS_AMBIENT, "'%s' is a bed" % id)
 				"ui": assert_eq(bus, SoundScript.BUS_UI, "'%s' is a menu tick" % id)
+				"music": assert_eq(bus, SoundScript.BUS_MUSIC, "'%s' is the score" % id)
 				_: assert_eq(bus, SoundScript.BUS_EFFECTS, "'%s' is a world sound" % id)
 
 

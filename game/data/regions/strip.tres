@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_region")
 id = &"strip"
-display_name = "Glitter Row"
+display_name = "The Strip"
 centre = Vector2(0, 74)
 radius = 26.0
 permit_cost = 0

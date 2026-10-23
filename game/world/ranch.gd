@@ -2281,7 +2281,7 @@ func _on_creation_confirmed(look: PlayerLook) -> void:
 ##
 ## AND THE BODY IS SHOWN, NOT TOASTED. The whole of the game's onboarding is in the body of
 ## this letter (catch, pen, collect, sell, then the balance and the quota in a sentence
-## each); toasting the TITLE said "Brightsky Weather Company: Welcome to the family!"
+## each); toasting the TITLE said "Cloudsdale Weather Corporation: Welcome to the family!"
 ## and dropped every word of it. game/ui/letter_panel.gd is the reader, ranch.gd does the
 ## showing, and the pause comes through the same shared handlers every other panel uses.
 ## Ruling 25.
@@ -2877,6 +2877,7 @@ func deliver_pony(uid: StringName) -> Dictionary:
 	# does. A named pony's display name and her character id travel into the story here
 	# because the letter that lists her beside a colour is written long after she has gone.
 	_game_state.story.note_delivery(named, inst.display_name(), inst.data_id)
+	_after_delivery(inst)
 
 	# THE COMPENDIUM'S "EMPLOYEE'S CHOICE" STAR IS EARNED, NOT PROMISED. survey_choice
 	# carries a data_id the moment she answers the Survey, long before anyone has been
@@ -3358,7 +3359,7 @@ func _relieve_if_paid_down() -> void:
 	_apply_permits()
 	_apply_padlocks()
 	_apply_beam_recall()
-	_toast("Your account is in good standing again. Brightsky thanks you!")
+	_toast("Your account is in good standing again. Cloudsdale thanks you!")
 
 
 func is_near_market() -> bool:
@@ -3429,6 +3430,7 @@ func _update_sound_zone() -> void:
 		if region != null and region.contains(
 				Vector2(player.global_position.x, player.global_position.z)):
 			zone = SoundScript.ZONE_STRIP
+	_update_music(zone)
 	if zone == _sound_zone:
 		return
 	_sound_zone = zone
@@ -7232,3 +7234,40 @@ func _bloom_ceremony(inst: PonyInstance) -> void:
 	if body == null:
 		return
 	BloomCeremonyScript.play(body)
+
+
+# --- delivery feedback (v1): clue 1 -------------------------------------------------------
+
+## A pony went up: the Pony Book remembers her, the bus says so, and a sparkle in her own
+## coat colour rises from the crate into the rainbow, which brightens when it lands. A first
+## player reads a reward animation; a second player reads her (STORY.md clue 1).
+func _after_delivery(inst: PonyInstance) -> void:
+	var look := PonyLookScript.from_stock(inst.stock)
+	var story: Story = _game_state.story
+	var after_reveal: bool = story.chapter >= 3
+	_game_state.book.note_delivery(String(inst.uid), inst.display_name(), look,
+		story.collection_days, after_reveal)
+	var bus := get_node_or_null("/root/Events")
+	if bus != null:
+		bus.emit_signal("delivered", String(inst.uid), inst.stock)
+	if valley_frame != null:
+		valley_frame.send_up(crate_position() + Vector3(0, 1.2, 0), look.coat,
+			ValleyFrameScript.brightness_for(story.deliveries))
+
+
+# --- the score (v1) ------------------------------------------------------------------------
+
+## Day or night by the world clock, the casino track on the Strip (game/systems/music.gd).
+## Only a person playing hears it: automated runs leave the score silent.
+func _update_music(zone: StringName) -> void:
+	if not _interactive:
+		return
+	var music := get_node_or_null("/root/Music")
+	if music == null:
+		return
+	var ctx: StringName = &"day"
+	if zone == SoundScript.ZONE_CASINO or zone == SoundScript.ZONE_STRIP:
+		ctx = &"casino"
+	elif _world != null and _world.phase() == WorldStateScript.Phase.NIGHT:
+		ctx = &"night"
+	music.call("play_context", ctx)

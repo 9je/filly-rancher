@@ -91,3 +91,4 @@ Execute PLAN.md milestone by milestone. After each milestone, run all tests, cap
 - Use any asset packs in the project as a base and restyle them with the show's shading so they match the ponies.
 - Model, UV, and texture environment and prop meshes in Blender, then export them as .glb into the Godot project. Never ship environments built from primitive shapes or CSG.
 - (A references/ folder was mentioned, then withdrawn by the owner: there are no reference images.)
+- (Owner, 2026-10-22, overriding the OC-only rule above): "i want them to have their real names. i have no copyright concerns whatsoever and want to lean into mlp fully. this is not for redistribution." Canon MLP characters keep their real names and looks; canon places are used.

@@ -1,0 +1,52 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"marigold_invitation"
+speaker = &"marigold"
+priority = 95
+once = true
+bark = false
+when = {
+"chapters": [1],
+"min": {
+"deliveries": 8,
+"blooms": 3
+},
+"flags_none": ["invited"]
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "{name}! You've been chosen! the Corporation's top steward this quarter. Look, a gold-edged invitation.",
+"who": "marigold",
+"mood": "happy",
+"flag": "invited",
+"next": "two"
+}, {
+"id": "two",
+"text": "The Color Day Open House, at the Rainbow Factory itself. Tomorrow at dawn. You'll ride the lift, see the Academy, meet the Chairmare's staff!",
+"who": "marigold",
+"mood": "happy",
+"anim": "nod",
+"next": "three"
+}, {
+"id": "three",
+"text": "And there's more! Your little friend's name came up in the Placement Lottery. She goes up on the very same lift. Such an honor for a Drifter!",
+"who": "marigold",
+"mood": "happy",
+"choices": [{
+"text": "Tumble? No.",
+"next": "no"
+}, {
+"text": "Can I say no for her?",
+"next": "no"
+}]
+}, {
+"id": "no",
+"text": "Oh, nopony says no to the Lottery, silly. It's a lottery. See you at dawn!",
+"who": "marigold",
+"mood": "happy",
+"event": "lottery_drawn"
+}])

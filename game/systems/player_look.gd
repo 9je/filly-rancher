@@ -25,7 +25,7 @@ extends RefCounted
 
 const MarkPaintScript := preload("res://systems/mark_paint.gd")
 
-const DEFAULT_NAME := "Juniper"
+const DEFAULT_NAME := "Twilight"
 
 ## The longest name the box accepts. Letters.MAX_NAME_LENGTH mirrors this, and
 ## test_letters.gd renders every template at exactly this length.

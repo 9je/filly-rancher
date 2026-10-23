@@ -1,0 +1,53 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"pip_cloud_line"
+speaker = &"pip"
+priority = 65
+once = true
+bark = false
+when = {
+"chapters": [1],
+"flags_none": ["pip_cloud_line"]
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "Postcard for you! From the Academy. Somepony's settling in.",
+"who": "pip",
+"mood": "happy",
+"flag": "pip_cloud_line",
+"next": "two"
+}, {
+"id": "two",
+"text": "Weird thing, though. Academy mail is always bone dry. Even when it's been pouring all week up there.",
+"who": "pip",
+"mood": "neutral",
+"anim": "look",
+"next": "three"
+}, {
+"id": "three",
+"text": "I asked to fly a bundle up myself once. Cloudsdale said the cloud line's staff only, for my safety. Very nicely, they said it.",
+"who": "pip",
+"mood": "neutral",
+"choices": [{
+"text": "Maybe it's just well wrapped.",
+"next": "wrapped"
+}, {
+"text": "What's up there, really?",
+"next": "really"
+}]
+}, {
+"id": "wrapped",
+"text": "Ha! Maybe. Cloudsdale does love a good envelope.",
+"who": "pip",
+"mood": "happy"
+}, {
+"id": "really",
+"text": "The Academy! Obviously. Lessons and sunshine and... I mean, nopony's ever come back down to say. They're having too much fun, I suppose.",
+"who": "pip",
+"mood": "neutral",
+"anim": "look"
+}])

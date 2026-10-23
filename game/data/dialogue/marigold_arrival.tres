@@ -15,7 +15,7 @@ when = {
 }
 nodes = Array[Dictionary]([{
 "id": "start",
-"text": "Welcome, welcome! You must be {name}. I'm Marigold Mayfair, Brightsky Weather Company, Regional Liaison. Isn't it a gorgeous morning?",
+"text": "Welcome, welcome! You must be {name}. I'm Marigold Mayfair, Cloudsdale Weather Corporation, Regional Liaison. Isn't it a gorgeous morning?",
 "who": "marigold",
 "mood": "happy",
 "next": "two"
@@ -46,7 +46,7 @@ nodes = Array[Dictionary]([{
 "next": "how"
 }, {
 "id": "how",
-"text": "With this! Your Brightsky Scoop. Point, hold, and she floats right to you. Totally safe, totally comfy.",
+"text": "With this! Your CWC Scoop. Point, hold, and she floats right to you. Totally safe, totally comfy.",
 "who": "marigold",
 "mood": "happy",
 "flag": "has_scoop",
@@ -54,7 +54,7 @@ nodes = Array[Dictionary]([{
 "next": "four"
 }, {
 "id": "four",
-"text": "There's a Drifter grazing just past the gate. Why not say hello? I'll leave you to settle in. Brightsky is so glad to have you!",
+"text": "There's a Drifter grazing just past the gate. Why not say hello? I'll leave you to settle in. Cloudsdale is so glad to have you!",
 "who": "marigold",
 "mood": "happy",
 "anim": "nod"

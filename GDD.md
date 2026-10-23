@@ -48,7 +48,7 @@ Each system: what it does, the pillar it serves, how it connects. Bold names are
 ### 4.1 Player and Scoop (pillar 1)
 - Third-person movement with acceleration curves, coyote time (0.1 s), jump buffer (0.1 s) and a short hop.
 - The player picks a body in the customizer (earth, pegasus or unicorn). Wings are cosmetic. A unicorn's horn glows while she Scoops.
-- **The Scoop:** a Brightsky-issued lantern device strapped to the player's side, replacing horn magic so every body type works. Same capture logic as today's beam (hold, reel, struggle, escape timer, release to bag). Rebuilt feel: stretch toward the nozzle, a squash on the pop, rising pitch, and a short hit pause on rare catches.
+- **The Scoop:** a Cloudsdale-issued lantern device strapped to the player's side, replacing horn magic so every body type works. Same capture logic as today's beam (hold, reel, struggle, escape timer, release to bag). Rebuilt feel: stretch toward the nozzle, a squash on the pop, rising pitch, and a short hit pause on rare catches.
 - **The Sparkle gauge** (relabelled "Spectral yield" after the reveal) reads the pony's coat vividness times her happiness.
 - **Launch:** fire bagged food or ponies out of the Scoop to toss them into pens.
 - *Connects to:* bag storage, pens, corral raids, pylon cutting.
@@ -208,7 +208,7 @@ Target times for a first-time player. A scripted headless player verifies the fi
 
 **Regions** (renamed from the current map to originals):
 - Sunny Acres (the ranch, free);
-- Haybrook town (free);
+- Ponyville town (free);
 - Orchard Hollow (150);
 - Mirror Lake (300);
 - Moonpetal Meadow (700, night spawns);
@@ -240,7 +240,7 @@ Target times for a first-time player. A scripted headless player verifies the fi
   - 3 Works scripts;
   - 5 epilogues.
 - **Props (new, Blender-built and show-styled):**
-  - Brightsky gear: the Depot crate and chute, the cloud-lift and cart, a pylon, Calm Lamp, Lure Post and the Scoop;
+  - Cloudsdale gear: the Depot crate and chute, the cloud-lift and cart, a pylon, Calm Lamp, Lure Post and the Scoop;
   - Rescue gear: the Intake Corral, the Lantern Line gate and the Dye Vat;
   - mail: the postbox and postcards;
   - Works architecture: the cloud palace exterior and an interior kit.
@@ -337,8 +337,8 @@ Everything above.
 - **Seasons:** the day cycle and story acts carry the time.
 - **Multiplayer:** off-pillar.
 - **Voice acting:** babble beats bad TTS. The hook stays for real lines.
-- **Canon characters:** banned by the brief. The 43 canon `PonyData` records leave the game; the models stay as donor bodies.
-- **The current Compendium of named characters:** replaced by the **Pony Book**, which lists every Bloomed pony and the talents and rare variants discovered.
+- **Canon characters stay** (owner direction, 2026-10-22): the 43-character roster are rare named finds, as themselves.
+- **The Compendium of named characters stays**, joined by the **Pony Book** (every Bloomed pony, the talents and rare variants discovered).
 - **A second map:** the Works is an interior scene.
 
 ### Kept from the existing build

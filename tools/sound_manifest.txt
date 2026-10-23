@@ -348,3 +348,15 @@ ui/ui_denied.wav|https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4
 # stationery look the Mail page already has. Alternates: scratch_001.ogg; BBC 07045125,
 # the paper fold world/mail_open.wav comes from.
 ui/ui_page.wav|https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip#Audio/scratch_003.ogg|rate=44100,mono,fade=0.002:0.05,gain_db=-3
+world/bloom_fanfare.wav|https://opengameart.org/sites/default/files/PositiveChoice.ogg|rate=44100,mono,fade=0.01:0.4,gain=-18
+world/scoop_pop.wav|https://opengameart.org/sites/default/files/pop.ogg|rate=44100,mono,fade=0.002:0.05,gain_db=12
+world/sparkle.wav|https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip#Audio/glass_001.ogg|rate=44100,mono,fade=0.002:0.08,gain_db=0
+music/day_morning.ogg|https://incompetech.com/music/royalty-free/mp3-royaltyfree/Morning.mp3|rate=44100,gain=-20
+music/night_evening.ogg|https://incompetech.com/music/royalty-free/mp3-royaltyfree/Evening.mp3|rate=44100,gain=-21
+music/town_carefree.ogg|https://incompetech.com/music/royalty-free/mp3-royaltyfree/Carefree.mp3|rate=44100,gain=-21
+music/works_gone_beyond.ogg|https://incompetech.com/music/royalty-free/mp3-royaltyfree/Gone%20Beyond.mp3|rate=44100,gain=-21
+music/dread_ossuary.ogg|https://incompetech.com/music/royalty-free/mp3-royaltyfree/Ossuary%206%20-%20Air.mp3|rate=44100,gain=-22
+music/stealth_stay_the_course.ogg|https://incompetech.com/music/royalty-free/mp3-royaltyfree/Stay%20the%20Course.mp3|rate=44100,gain=-21
+music/ending_promises.ogg|https://incompetech.com/music/royalty-free/mp3-royaltyfree/Promises%20to%20Keep.mp3|rate=44100,gain=-23
+music/ending_lost_time.ogg|https://incompetech.com/music/royalty-free/mp3-royaltyfree/Lost%20Time.mp3|rate=44100,gain=-20
+music/casino_backbay.ogg|https://incompetech.com/music/royalty-free/mp3-royaltyfree/Backbay%20Lounge.mp3|rate=44100,gain=-22

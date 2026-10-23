@@ -36,7 +36,7 @@ const CARD_FACE := Color(0.97, 0.96, 0.93)
 const CARD_RED := Color(0.78, 0.16, 0.20)
 const CARD_INK := Color(0.11, 0.10, 0.14)
 
-## The Brightsky pocket, which no bet may name. Pale enough that it reads as absent from the
+## The Cloudsdale pocket, which no bet may name. Pale enough that it reads as absent from the
 ## rainbow rather than as a seventh colour somebody forgot to let you back.
 const HOUSE_SILVER := Color(0.80, 0.84, 0.90)
 

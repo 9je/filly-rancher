@@ -1,0 +1,48 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"tumble_depot"
+speaker = &"tumble"
+priority = 55
+once = true
+bark = false
+when = {
+"flags_all": ["depot_explained"],
+"min": {
+"deliveries": 2
+},
+"flags_none": ["tumble_depot"]
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "I don't like the crate.",
+"who": "tumble",
+"mood": "sad",
+"flag": "tumble_depot",
+"next": "two"
+}, {
+"id": "two",
+"text": "It smells like rain. Not good rain. The gray kind.",
+"who": "tumble",
+"mood": "scared",
+"choices": [{
+"text": "It's just a box, Tumble.",
+"next": "box"
+}, {
+"text": "Stay here, then. I'll be quick.",
+"next": "stay"
+}]
+}, {
+"id": "box",
+"text": "I know. I'll wait here. You go.",
+"who": "tumble",
+"mood": "sad"
+}, {
+"id": "stay",
+"text": "Okay. Don't put me in it, okay? Promise?",
+"who": "tumble",
+"mood": "sad"
+}])

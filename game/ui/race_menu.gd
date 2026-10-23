@@ -157,7 +157,7 @@ func drawn_lines() -> Array[String]:
 		Tab.CARD:
 			lines.append("Six lanes. Yours runs on the rail, lane %d, every time."
 				% (RaceCardScript.PLAYER_LANE + 1))
-			lines.append("The five others belong to Brightsky and are kept at")
+			lines.append("The five others belong to Cloudsdale and are kept at")
 			lines.append("exactly %d per cent morale. It is in the staff handbook."
 				% roundi(RaceCardScript.COMPANY_HAPPINESS * 100.0))
 			lines.append("")

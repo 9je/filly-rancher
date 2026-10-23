@@ -326,7 +326,7 @@ func statement_lines(player_name: String, built_plots: int, open_permits: int,
 		cycle: int) -> Array[String]:
 	var next_cycle: int = (period_of(cycle) + 1) * PERIOD_CYCLES
 	var lines: Array[String] = []
-	lines.append("Brightsky Weather Company, Sponsorship Services")
+	lines.append("Cloudsdale Weather Corporation, Sponsorship Services")
 	lines.append("Account: %s" % player_name)
 	lines.append("Sponsorship balance: %d bits" % balance)
 	lines.append("Upkeep next collection: %d bits" % upkeep_for(built_plots, open_permits))
@@ -337,7 +337,7 @@ func statement_lines(player_name: String, built_plots: int, open_permits: int,
 	lines.append("Quota this period: %d of %d delivered" % [delivered_this_period, quota])
 	lines.append("Collections passed: %d" % periods_run)
 	lines.append("Bits settle the service charges. The principal is settled in stock.")
-	lines.append("You may pay down to %d bits here; thank you for choosing Brightsky!"
+	lines.append("You may pay down to %d bits here; thank you for choosing Cloudsdale!"
 		% PRINCIPAL_FLOOR)
 	return lines
 

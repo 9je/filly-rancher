@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"fennel_bark_a2"
+speaker = &"fennel"
+priority = 0
+once = false
+bark = true
+when = {
+"chapters": [1]
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "Another card from Clover today. Same as the last.",
+"who": "fennel",
+"mood": "neutral",
+"anim": "look"
+}])

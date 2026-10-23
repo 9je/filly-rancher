@@ -323,7 +323,7 @@ const LAYOUT := [
 	{"file": "mlp_apple_tree.glb", "at": Vector2(48.3, 59.9), "yaw": 60.0, "s": 1.05, "family": &"mlp"},
 	{"file": "mlp_apple_tree.glb", "at": Vector2(87.5, 13.2), "yaw": 195.0, "s": 1.15, "family": &"mlp"},
 	{"file": "mlp_apple_tree_bare.glb", "at": Vector2(98.8, 24.5), "yaw": 310.0, "s": 1.20, "family": &"mlp"},
-	# Thornwood, (-74, -49) r 24: the densest planting on the map, and the
+	# The Everfree Edge, (-74, -49) r 24: the densest planting on the map, and the
 	# darkest, so the corner of the world the palette already made gloomy also LOOKS
 	# like woodland rather than like a lawn at dusk. Dead trunks now, not live pines:
 	# saa_tree_dead_narrow for six of the eight, and saa_dead_tree_large -- the Everfree's

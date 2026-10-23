@@ -58,7 +58,7 @@ const DEFAULTS := {
 @export var trigger: StringName = &"CHAPTER"
 @export var threshold: int = 0
 
-@export var sender: String = "Brightsky Weather Company"
+@export var sender: String = "Cloudsdale Weather Corporation"
 @export var title: String = ""
 @export var body: PackedStringArray = PackedStringArray()
 

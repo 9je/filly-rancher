@@ -1,0 +1,144 @@
+# Act Two: Small Wrong Details (STORY.md section 3, beats 2.1 to 2.11).
+# Chapter 1 is WEATHER (Act Two). Clue numbers are STORY.md section 7's.
+
+=== fennel_postcards
+speaker: fennel
+priority: 70
+when: {"chapters": [1], "flags_none": ["saw_fennel_wall"]}
+
+start [fennel neutral] Come in out of the drizzle. Mind the cards.
+  -> two
+two [fennel happy look] My Clover. Six years up at the Academy now. She writes every month, regular as rain.
+  flag: saw_fennel_wall
+  -> three
+three [fennel neutral] "Having a wonderful time. I found my talent." Every month. Never says what it is.
+  * Can I read one? -> read
+  * You must miss her. -> miss
+read [fennel neutral] Help yourself. They're all the same, mind. She was never one for words.
+  -> end
+miss [fennel sad] Every morning. But Cloudsdale says the ones who go up do better than the ones who stay. And they'd know.
+  -> end
+end [fennel neutral look] Six years of the same card. Funny. She used to write me whole novels.
+
+=== pip_cloud_line
+speaker: pip
+priority: 65
+when: {"chapters": [1], "flags_none": ["pip_cloud_line"]}
+
+start [pip happy] Postcard for you! From the Academy. Somepony's settling in.
+  flag: pip_cloud_line
+  -> two
+two [pip neutral look] Weird thing, though. Academy mail is always bone dry. Even when it's been pouring all week up there.
+  -> three
+three [pip neutral] I asked to fly a bundle up myself once. Cloudsdale said the cloud line's staff only, for my safety. Very nicely, they said it.
+  * Maybe it's just well wrapped. -> wrapped
+  * What's up there, really? -> really
+wrapped [pip happy] Ha! Maybe. Cloudsdale does love a good envelope.
+really [pip neutral look] The Academy! Obviously. Lessons and sunshine and... I mean, nopony's ever come back down to say. They're having too much fun, I suppose.
+
+=== bramble_dye
+speaker: bramble
+priority: 60
+when: {"chapters": [1], "min": {"deliveries": 3}, "flags_none": ["bramble_dye"]}
+
+start [bramble happy] Ooh, look what came in! Cloudsdale Rainbow Dye. Made with one hundred percent real rainbow!
+  flag: bramble_dye
+  -> two
+two [bramble happy nod] Every shade's got a name. Peach Sunrise, Bluebell Dusk, all sorts. They bottle a new one every time the rainbow gets brighter.
+  -> three
+three [bramble neutral look] Funny, some of the names sound like ponies. Ah well. Shall I put you down for a bottle?
+
+=== tumble_depot
+speaker: tumble
+priority: 55
+when: {"flags_all": ["depot_explained"], "min": {"deliveries": 2}, "flags_none": ["tumble_depot"]}
+
+start [tumble sad] I don't like the crate.
+  flag: tumble_depot
+  -> two
+two [tumble scared] It smells like rain. Not good rain. The gray kind.
+  * It's just a box, Tumble. -> box
+  * Stay here, then. I'll be quick. -> stay
+box [tumble sad] I know. I'll wait here. You go.
+stay [tumble sad] Okay. Don't put me in it, okay? Promise?
+
+=== marigold_vivid
+speaker: marigold
+priority: 50
+when: {"chapters": [1], "flags_none": ["marigold_vivid"]}
+
+start [marigold happy] {name}, a little tip from the head office. The Academy is especially keen on bright ponies this season.
+  flag: marigold_vivid
+  -> two
+two [marigold happy nod] Vivid coats, cheerful temperaments. The happier they are when they go up, the better they do! There's a bonus, of course.
+
+=== marigold_invitation
+speaker: marigold
+priority: 95
+when: {"chapters": [1], "min": {"deliveries": 8, "blooms": 3}, "flags_none": ["invited"]}
+
+start [marigold happy] {name}! You've been chosen! the Corporation's top steward this quarter. Look, a gold-edged invitation.
+  flag: invited
+  -> two
+two [marigold happy nod] The Color Day Open House, at the Rainbow Factory itself. Tomorrow at dawn. You'll ride the lift, see the Academy, meet the Chairmare's staff!
+  -> three
+three [marigold happy] And there's more! Your little friend's name came up in the Placement Lottery. She goes up on the very same lift. Such an honor for a Drifter!
+  * Tumble? No. -> no
+  * Can I say no for her? -> no
+no [marigold happy] Oh, nopony says no to the Lottery, silly. It's a lottery. See you at dawn!
+  event: lottery_drawn
+
+=== tumble_lottery
+speaker: tumble
+priority: 96
+when: {"flags_all": ["invited"], "flags_none": ["tumble_hides"]}
+
+start [tumble scared cower] I heard her. I'm not going in the crate. I'm not.
+  flag: tumble_hides
+  -> two
+two [tumble scared] I'm going to hide under the porch. You'll come with me tomorrow, won't you? You'll be right there?
+  * I'll be right there. -> promise
+  * I won't let them take you. -> promise
+promise [tumble sad] Okay. Okay. Hoof-shake promise. That's the realest kind of promise there is.
+
+# ----- Act Two barks (the wrongness in passing) ------------------------------------------
+
+=== fennel_bark_a2
+speaker: fennel
+bark: true
+once: false
+when: {"chapters": [1]}
+
+start [fennel neutral look] Another card from Clover today. Same as the last.
+
+=== pip_bark_a2
+speaker: pip
+bark: true
+once: false
+when: {"chapters": [1]}
+
+start [pip neutral] The night carts were busy again. Up and down the lift till morning. Rattle rattle.
+
+=== bramble_bark_a2
+speaker: bramble
+bark: true
+once: false
+when: {"chapters": [1]}
+
+start [bramble happy] Rainbow Dye's flying off the shelf! Everypony wants a bit of the sky.
+
+=== tumble_bark_a2
+speaker: tumble
+bark: true
+once: false
+when: {"chapters": [1]}
+
+start [tumble sad look] The rainbow's really bright today. It wasn't this bright before.
+
+=== marigold_bark_a2
+speaker: marigold
+bark: true
+once: false
+when: {"chapters": [1]}
+
+start [marigold happy] Happy ponies make the brightest colors!

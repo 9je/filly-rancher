@@ -24,14 +24,14 @@ nodes = Array[Dictionary]([{
 "next": "two"
 }, {
 "id": "two",
-"text": "The crate behind your barn is our Depot. Any Drifter you'd like to send up for Placement goes in there, and she rides the lift to the Brightsky Academy in the clouds.",
+"text": "The crate behind your barn is our Depot. Any Drifter you'd like to send up for Placement goes in there, and she rides the lift to the Cloudsdale Academy in the clouds.",
 "who": "marigold",
 "mood": "happy",
 "anim": "nod",
 "next": "three"
 }, {
 "id": "three",
-"text": "They find their talents up there so much faster. And Brightsky pays your ranch a stipend for each one, because helping is its own reward, but bits are nice too!",
+"text": "They find their talents up there so much faster. And Cloudsdale pays your ranch a stipend for each one, because helping is its own reward, but bits are nice too!",
 "who": "marigold",
 "mood": "happy",
 "choices": [{

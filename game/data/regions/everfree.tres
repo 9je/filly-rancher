@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_region")
 id = &"everfree"
-display_name = "Thornwood"
+display_name = "The Everfree Edge"
 centre = Vector2(-74, -49)
 radius = 24.0
 permit_cost = 1200

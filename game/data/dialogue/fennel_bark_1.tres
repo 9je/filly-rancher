@@ -14,7 +14,7 @@ when = {
 }
 nodes = Array[Dictionary]([{
 "id": "start",
-"text": "Rain's coming. Brightsky rain. Smells like pennies.",
+"text": "Rain's coming. Cloudsdale rain. Smells like pennies.",
 "who": "fennel",
 "mood": "neutral"
 }])

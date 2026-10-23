@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"marigold_vivid"
+speaker = &"marigold"
+priority = 50
+once = true
+bark = false
+when = {
+"chapters": [1],
+"flags_none": ["marigold_vivid"]
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "{name}, a little tip from the head office. The Academy is especially keen on bright ponies this season.",
+"who": "marigold",
+"mood": "happy",
+"flag": "marigold_vivid",
+"next": "two"
+}, {
+"id": "two",
+"text": "Vivid coats, cheerful temperaments. The happier they are when they go up, the better they do! There's a bonus, of course.",
+"who": "marigold",
+"mood": "happy",
+"anim": "nod"
+}])
