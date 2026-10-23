@@ -719,6 +719,71 @@ def creator_stage():
     export("creator_stage")
 
 
+@prop("fx_ceiling")
+def fx_ceiling():
+    """A 4 x 4 m ceiling tile, cloud-soft underneath, at z 6 (the wall height)."""
+    join([box("slab", (4.0, 4.0, 0.3), (0, 0, 6.15), "cloud_shade", bevel=0.02),
+          blob("puff", 1.0, (0, 0, 5.95), "cloud", seed=950, lumps=0.2, scale=(1.7, 1.7, 0.3))], "fx_ceiling")
+    export("fx_ceiling")
+
+
+@prop("fx_ceiling_metal")
+def fx_ceiling_metal():
+    parts = [box("slab", (4.0, 4.0, 0.3), (0, 0, 6.15), "metal_dark", bevel=0.01)]
+    for y in (-1.2, 1.2):
+        parts.append(cyl("duct%d" % int(y), 0.25, 4.0, (0, y, 5.7), "metal", verts=12, rot=(0, math.radians(90), 0)))
+    join(parts, "fx_ceiling_metal")
+    export("fx_ceiling_metal")
+
+
+@prop("fx_skylight")
+def fx_skylight():
+    join([box("frame", (4.0, 4.0, 0.3), (0, 0, 6.15), "gold", bevel=0.02),
+          box("pane", (3.2, 3.2, 0.06), (0, 0, 6.0), "glass", bevel=0.0)], "fx_skylight")
+    export("fx_skylight")
+
+
+@prop("fx_banner")
+def fx_banner():
+    """A tall hanging banner in rainbow stripes with a gold rod and a swallowtail hem."""
+    cols = ["red", "gold", "straw", "leaf", "brightsky", "lilac"]
+    parts = [cyl("rod", 0.05, 1.5, (0, 0, 0), "gold", verts=10, rot=(0, math.radians(90), 0))]
+    for i, c in enumerate(cols):
+        parts.append(box("stripe%d" % i, (1.3, 0.04, 0.42), (0, 0, -0.25 - i * 0.42), c, bevel=0.0))
+    for x in (-0.33, 0.33):
+        parts.append(box("tail", (0.64, 0.04, 0.5), (x, 0, -2.75), "lilac", bevel=0.0, rot=(0, math.radians(18 if x < 0 else -18), 0)))
+    join(parts, "fx_banner")
+    export("fx_banner")
+
+
+@prop("fx_runner")
+def fx_runner():
+    """A 4 m carpet runner in rainbow stripes down the middle of a public room."""
+    cols = ["red", "gold", "leaf", "brightsky", "lilac"]
+    parts = [box("edge", (1.8, 4.0, 0.03), (0, 0, 0.015), "gold", bevel=0.0)]
+    for i, c in enumerate(cols):
+        parts.append(box("band%d" % i, (0.3, 4.0, 0.04), (-0.6 + i * 0.3, 0, 0.02), c, bevel=0.0))
+    join(parts, "fx_runner")
+    export("fx_runner")
+
+
+@prop("fx_planter")
+def fx_planter():
+    """A gold pot with a cloud-shaped topiary: the public rooms' cheer."""
+    join([cyl("pot", 0.45, 0.6, (0, 0, 0.3), "gold", r2=0.35, verts=16, bevel=0.03),
+          blob("cloud", 0.55, (0, 0, 1.15), "cloud", seed=960, lumps=0.3, scale=(1.2, 1.2, 0.9)),
+          blob("cloud2", 0.35, (0.3, 0.1, 1.55), "cloud_shade", seed=961, lumps=0.3)], "fx_planter")
+    export("fx_planter")
+
+
+@prop("fx_lamp_hanging")
+def fx_lamp_hanging():
+    join([cyl("cord", 0.02, 1.4, (0, 0, 5.3), "metal_dark", verts=6),
+          cyl("shade", 0.5, 0.35, (0, 0, 4.5), "metal", r2=0.15, verts=16),
+          ball("bulb", 0.14, (0, 0, 4.3), "glass", subdiv=1)], "fx_lamp_hanging")
+    export("fx_lamp_hanging")
+
+
 def main():
     wanted = [n for n in args.only.split(",") if n] or list(BUILDERS)
     for name in wanted:

@@ -55,6 +55,7 @@ func build() -> void:
 		rooms[spec.name] = room
 		_floor(room, spec)
 		_walls(room, spec, i)
+		_ceiling(room, spec)
 		_light(room, spec)
 		_trigger(room, spec)
 		var markers := Node3D.new()
@@ -106,6 +107,17 @@ func _floor(room: Node3D, spec: Dictionary) -> void:
 	for x in [-half, 0.0, half]:
 		for z in [-half, 0.0, half]:
 			_piece(file, room, Vector3(x, 0, z))
+	# A base slab under the tiles, so a bevelled seam shows floor, never what is beneath.
+	var slab := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(ROOM_SIZE, 0.1, ROOM_SIZE)
+	slab.mesh = bm
+	var sm := StandardMaterial3D.new()
+	sm.albedo_color = Color(0.55, 0.58, 0.64) if spec.metal else Color(0.93, 0.88, 0.8)
+	slab.material_override = sm
+	slab.position = Vector3(0, -0.12, 0)
+	room.add_child(slab)
+	ToonStylerScript.style(slab, &"flat", {})
 	var body := StaticBody3D.new()
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
@@ -159,6 +171,28 @@ func _collide_walls(room: Node3D, index: int) -> void:
 		shape2.shape = b2
 		shape2.position = Vector3(float(seg[0]), 3.0, -half)
 		body.add_child(shape2)
+
+
+func _ceiling(room: Node3D, spec: Dictionary) -> void:
+	var half := ROOM_SIZE * 0.5 - TILE * 0.5
+	for x in [-half, 0.0, half]:
+		for z in [-half, 0.0, half]:
+			var file := "fx_ceiling_metal" if spec.metal else ("fx_skylight" if x == 0.0 and z == 0.0 else "fx_ceiling")
+			_piece(file, room, Vector3(x, 0, z))
+	if not spec.metal:
+		# THE PUBLIC ROOMS ARE CHEERFUL. A rainbow runner down the middle, banners on the
+		# walls, cloud topiaries in the corners: the tour should feel like a birthday party,
+		# so the grey metal behind the service door lands.
+		for z in [-4.0, 0.0, 4.0]:
+			_piece("fx_runner", room, Vector3(0, 0.01, z))
+		for z in [-3.5, 3.5]:
+			_piece("fx_banner", room, Vector3(-ROOM_SIZE * 0.5 + 0.5, 5.6, z), 90.0)
+			_piece("fx_banner", room, Vector3(ROOM_SIZE * 0.5 - 0.5, 5.6, z), -90.0)
+		for c in [Vector3(-4.6, 0, -4.6), Vector3(4.6, 0, -4.6), Vector3(-4.6, 0, 4.6), Vector3(4.6, 0, 4.6)]:
+			_piece("fx_planter", room, c)
+	else:
+		for z in [-3.0, 3.0]:
+			_piece("fx_lamp_hanging", room, Vector3(0, 0, z))
 
 
 func _light(room: Node3D, spec: Dictionary) -> void:
@@ -229,8 +263,9 @@ func _dress(room: Node3D, spec: Dictionary, markers: Node3D) -> void:
 			_mark(markers, "patrol_c", Vector3(4.0, 0, -3.0))
 		&"gallery":
 			_mark(markers, "window", Vector3(0, 0, -half + 1.6))
-			_mark(markers, "floor_below", Vector3(0, -6.0, -half - 6.0))
-			_piece("fx_ring", room, Vector3(0, -6.0, -half - 6.0))
+			# Deep enough that the ring's 10 m glass column ends below the next room's floor.
+			_mark(markers, "floor_below", Vector3(0, -10.5, -half - 7.0))
+			_processing_floor(room, Vector3(0, -10.5, -half - 7.0))
 		&"holding":
 			for x in [-4.0, 4.0]:
 				for z in [-3.0, 0.0, 3.0]:
@@ -242,3 +277,34 @@ func _dress(room: Node3D, spec: Dictionary, markers: Node3D) -> void:
 			if handle != null:
 				handle.name = "LeverHandle"
 			_mark(markers, "lever", Vector3(0, 0, -2.2))
+
+
+## The processing floor seen through the gallery window: a sunken metal hall below and
+## beyond it, the ring at its centre, a queue lane leading in. Built here; the set piece
+## (game/world/factory_window.gd) stands the line of silhouettes on it and runs the light.
+func _processing_floor(room: Node3D, centre: Vector3) -> void:
+	var hall := Node3D.new()
+	hall.name = "ProcessingFloor"
+	hall.position = centre
+	room.add_child(hall)
+	for x in [-6.0, -2.0, 2.0, 6.0]:
+		for z in [-6.0, -2.0, 2.0, 6.0]:
+			_piece("fx_floor_grate", hall, Vector3(x, 0, z))
+	for k in [-6.0, -2.0, 2.0, 6.0]:
+		_piece("fx_wall_metal", hall, Vector3(-8.0, 0, k), 90.0)
+		_piece("fx_wall_metal", hall, Vector3(8.0, 0, k), -90.0)
+		_piece("fx_wall_metal", hall, Vector3(k, 0, -8.0), 0.0)
+	_piece("fx_ring", hall, Vector3(0, 0, 0))
+	for z in [2.0, 4.0, 6.0]:
+		_piece("fx_pipe", hall, Vector3(-3.0, 5.0, z - 4.0))
+	var glow := OmniLight3D.new()
+	glow.name = "RingLight"
+	glow.light_color = Color(1.0, 0.95, 0.9)
+	glow.light_energy = 2.0
+	glow.omni_range = 9.0
+	glow.position = Vector3(0, 2.0, 0)
+	hall.add_child(glow)
+	var m := Marker3D.new()
+	m.name = "QueueStart"
+	m.position = Vector3(5.0, 0, 3.0)
+	hall.add_child(m)
