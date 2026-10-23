@@ -39,6 +39,7 @@ PALETTE = {
     "eye_green": (0.04, 0.45, 0.1), "eye_white": (1.0, 1.0, 1.0), "pupil": (0.01, 0.02, 0.01),
     "palace_purple": (0.24, 0.08, 0.36), "palace_pink": (0.85, 0.2, 0.55), "palace_red": (0.6, 0.06, 0.12),
     "palace_dark": (0.08, 0.03, 0.12), "bulb": (1.0, 0.92, 0.55),
+    "company": (0.62, 0.64, 0.68), "company_dark": (0.32, 0.34, 0.4),
     "cloud": (0.98, 0.98, 1.0), "cloud_shade": (0.86, 0.88, 0.96), "cream": (0.99, 0.95, 0.86),
 }
 
@@ -969,6 +970,27 @@ def spectra_palace():
                          rot=(math.radians(90), math.radians(36), 0)))
     join(parts, "spectra_palace")
     export("spectra_palace")
+
+
+@prop("mailbox")
+def mailbox():
+    """The Company's mailbox by the ranch door (game/world/mailbox.gd), without its flag: the
+    flag is the game's own node so it can stand up when post is waiting. Sized to the
+    script's numbers: a 1.05 m post, a 0.34 m by 0.52 m box with a rounded top whose lid
+    stands about 1.31 m. Faces -Y (the door), flag side +X."""
+    parts = [
+        box("post", (0.10, 0.10, 1.05), (0, 0, 0.525), "wood", bevel=0.015),
+        box("foot", (0.24, 0.24, 0.06), (0, 0, 0.03), "wood", bevel=0.01),
+        box("brace", (0.06, 0.30, 0.06), (0, 0, 1.0), "wood", bevel=0.01),
+        box("body", (0.34, 0.52, 0.14), (0, 0, 1.12), "company", bevel=0.02),
+        cyl("top", 0.17, 0.52, (0, 0, 1.19), "company", verts=24, rot=(math.radians(90), 0, 0)),
+        box("door", (0.30, 0.02, 0.26), (0, -0.265, 1.17), "company_dark", bevel=0.01),
+        cyl("handle", 0.025, 0.04, (0, -0.285, 1.22), "gold", rot=(math.radians(90), 0, 0)),
+        cyl("emblem", 0.07, 0.015, (0.172, 0.0, 1.2), "gold", rot=(0, math.radians(90), 0)),
+        cyl("pivot", 0.025, 0.03, (0.18, 0.12, 1.21), "metal", rot=(0, math.radians(90), 0)),
+    ]
+    join(parts, "mailbox")
+    export("mailbox")
 
 
 def main():

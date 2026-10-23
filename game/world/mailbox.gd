@@ -46,6 +46,8 @@ const BOX_COLOR := Color(0.62, 0.64, 0.68)
 const POST_COLOR := Color(0.36, 0.30, 0.24)
 const FLAG_COLOR := Color(0.78, 0.20, 0.22)
 
+const MODEL := "res://assets/models/mailbox.glb"
+
 var _built := false
 var _flag_up := false
 var _flag: Node3D = null
@@ -68,7 +70,24 @@ func build() -> void:
 	_flag = _slab("Flag", FLAG_SIZE,
 		Vector3(BOX_SIZE.x * 0.5 + FLAG_SIZE.x, POST_HEIGHT + BOX_SIZE.y * 0.5
 			+ FLAG_SIZE.y * 0.5, 0.0), FLAG_COLOR)
+	_wear_model()
 	_apply_flag()
+
+
+## The Blender-built box (rounded lid, door, Company emblem) worn over the slabs, which stay
+## as the colliders and as the measured shape test_mailbox.gd checks the flag against; only
+## their boxes stop drawing. The flag stays the game's own slab so it can stand up.
+func _wear_model() -> void:
+	if not ResourceLoader.exists(MODEL):
+		return
+	var model: Node3D = (load(MODEL) as PackedScene).instantiate()
+	model.name = "Model"
+	add_child(model)
+	model.rotation.y = PI
+	ToonStyler.style(model, &"prop", {})
+	for part: String in ["Post", "Box"]:
+		for mesh: MeshInstance3D in get_node(part).find_children("*", "MeshInstance3D", true, false):
+			mesh.visible = false
 
 
 ## Something is waiting, or is not. A no op when the flag is already where it should be, so

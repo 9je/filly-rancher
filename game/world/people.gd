@@ -25,13 +25,13 @@ const SPOTS := {
 	&"marigold": [Vector3(11.5, 0.0, 6.5), 210.0],
 	# Beside the plots, never on one: a spot inside a slot's footprint was fenced in by the
 	# first pen built there (and the Market's own footprint lifted Bramble onto its plinth).
-	&"fennel": [Vector3(-4.3, 0.0, 10.0), 110.0],
+	&"fennel": [Vector3(-2.2, 0.0, 12.4), 110.0],
 	&"bramble": [Vector3(-0.7, 0.0, 3.1), 45.0],
 	# Clear of the mailbox (8, -2.5) by more than TALK_RADIUS plus the mailbox's own 2.6 m: a
 	# postmare standing at the box answered every E meant for it.
 	&"pip": [Vector3(13.4, 0.0, -4.6), 240.0],
 	&"static": [Vector3(14.0, 0.0, 12.0), 230.0],
-	&"clover": [Vector3(-4.9, 0.0, 11.4), 120.0],
+	&"clover": [Vector3(-2.6, 0.0, 13.8), 120.0],
 }
 const TALK_RADIUS := 2.8
 const CAST: Array[StringName] = [&"tumble", &"marigold", &"fennel", &"pip", &"bramble", &"static", &"clover"]

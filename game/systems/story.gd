@@ -61,7 +61,11 @@ const TRIGGER_NAMES: Array[String] = ["CHAPTER", "DELIVERIES", "COLLECTION_DAYS"
 ## the spec puts the first collection day one real hour in and the fork about three
 ## sessions in, so the letters have to start going strange while the player is still
 ## pleased with herself, not five sessions later.
-const WEATHER_DELIVERIES := 3
+##
+## TWO SINCE THE v1 FUN PASS: a player who keeps her ponies to Bloom (what the game rewards)
+## delivers slowly, and the pacing test (PACING.md) found Act Two's clues waiting half an hour
+## for a third delivery.
+const WEATHER_DELIVERIES := 2
 
 ## THE LADDER, one row per chapter change this build can make. See the class comment for
 ## why it is one row long.

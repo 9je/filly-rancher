@@ -165,7 +165,7 @@ func _ranch_tour() -> void:
 		_view(Vector3(9, 4.5, 12), Vector3(-1, 1.8, -1), 60.0)
 		await _frames(30)
 		await _shot("town_market")
-		_view(Vector3(16, 3.5, 2), Vector3(9, 1.5, 3), 60.0)
+		_view(Vector3(11.5, 2.6, 5.5), Vector3(6.5, 1.0, -1.5), 55.0)
 		await _frames(20)
 		await _shot("town_depot_mailbox")
 		_view(Vector3(8.2, 1.3, 1.6), Vector3(6.9, 0.6, -1.2), 40.0)
