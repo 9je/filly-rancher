@@ -158,13 +158,15 @@ func test_the_row_box_uses_the_declared_row_colours_and_differs_when_picked() ->
 ## A WEIGHT HIERARCHY FOR ZERO ASSETS. There is no .ttf in this project and this slice does
 ## not add one; a FontVariation over the engine default is constructed in code, ships no file
 ## and needs no import.
-func test_the_title_font_is_bolder_than_the_engine_default_and_is_cached() -> void:
+func test_the_title_font_is_heavier_than_the_numeral_font_and_is_cached() -> void:
+	# v1: real weights on Fredoka's wght axis (opentype tag 2003265652), not synthetic bold.
+	const WGHT := 2003265652
 	var font: FontVariation = MenuStyleScript.title_font()
 	assert_eq(font, MenuStyleScript.title_font(), "cached")
-	assert_gt(font.variation_embolden, 0.0)
-	assert_gt(MenuStyleScript.title_font().variation_embolden,
-		MenuStyleScript.numeral_font().variation_embolden,
-		"a title is heavier than a number, and a number is heavier than prose")
+	var title_w := int(font.variation_opentype.get(WGHT, 0))
+	var num_w := int(MenuStyleScript.numeral_font().variation_opentype.get(WGHT, 0))
+	assert_gt(title_w, num_w, "a title is heavier than a number")
+	assert_gt(num_w, 500, "and a number is heavier than prose (body weight 500)")
 
 
 func test_the_subtitle_size_sits_under_the_row_size() -> void:

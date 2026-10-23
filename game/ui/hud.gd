@@ -274,9 +274,11 @@ func _ready() -> void:
 	# the one function that already knows how to compute it (_hints_wanted and not
 	# _overlay_open, and _overlay_open starts false, the state boot is actually in), so
 	# this calls that rather than hard-coding a value a second place.
-	_hints_wanted = true
+	# v1: CLOSED by default; the ControlsChip names the key instead (see _restyle()).
+	_hints_wanted = false
 	set_overlay_open(false)
 	_toast.modulate.a = 0.0
+	_restyle()
 
 	_bind()
 
@@ -325,6 +327,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_hints_wanted = not _hints_wanted
 		if not _overlay_open:
 			_hints.visible = _hints_wanted
+		_refresh_chip()
 		get_viewport().set_input_as_handled()
 
 
@@ -356,6 +359,12 @@ func _show_toast(text: String) -> void:
 	_toast.text = text
 	_toast_left = TOAST_HOLD + TOAST_FADE
 	_toast.modulate.a = 1.0
+	_fit_pill(_toast)
+	# A little pop on arrival, the way a show title card bounces in.
+	_toast.pivot_offset = _toast.size * 0.5
+	_toast.scale = Vector2(0.86, 0.86)
+	create_tween().tween_property(_toast, "scale", Vector2.ONE, 0.22).set_trans(
+		Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 ## The line that is ON SCREEN now, whether or not it has faded, which since the queue above
@@ -390,6 +399,7 @@ func set_overlay_open(open: bool) -> void:
 	_overlay_open = open
 	if _hints != null:
 		_hints.visible = _hints_wanted and not _overlay_open
+	_refresh_chip()
 
 
 func overlay_open() -> bool:
@@ -457,7 +467,16 @@ func set_tasks(rows: Array) -> void:
 			colour = COLOR_TASK_DONE if _task_lines[i].begins_with(TASK_DONE) \
 				else COLOR_TASK_OPEN
 		MenuStyleScript.style_label(label, 24 if i == 0 else 20, colour)
+		# v1: dark ink on the card, the title in the display weight.
+		label.add_theme_constant_override("outline_size", 0)
+		label.add_theme_color_override("font_color", INK if i == 0 else (
+			Color(0.3, 0.55, 0.3) if _task_lines[i].begins_with(TASK_DONE) else INK_SOFT))
+		if i == 0:
+			label.add_theme_font_override("font", MenuStyleScript.title_font())
 		_tasks.add_child(label)
+	var card := get_node_or_null("TasksCard") as Panel
+	if card != null:
+		_fit_card.call_deferred(card, _tasks, Vector2(18, 12))
 
 
 ## Every line the checklist is drawing, in order, title first. For the tests, which
@@ -674,8 +693,13 @@ func _draw_pips() -> void:
 		var fill := PIP_EMPTY
 		if i < _rarities.size():
 			fill = RARITY_COLORS.get(_rarities[i], RARITY_COLORS[PonyDataScript.Rarity.COMMON])
-		_pips.draw_rect(rect, fill, true)
-		_pips.draw_rect(rect, PIP_BORDER, false, 2.0)
+		# Rounded tiles in the card's own ink (v1): a filled slot is her rarity colour.
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = fill if i < _rarities.size() else Color(0.92, 0.88, 0.96)
+		sb.border_color = CARD_LINE
+		sb.set_border_width_all(2)
+		sb.set_corner_radius_all(5)
+		_pips.draw_style_box(sb, rect)
 
 
 ## One ring, drawn twice: an outline pass and then the colour, so the reticle stays
@@ -750,9 +774,136 @@ func get_world_line() -> String:
 ## SET UNCONDITIONALLY RATHER THAN ONLY ON CHANGE. Assigning the same string to a Label is
 ## free, and the "only on change" version of this is exactly the latch bookkeeping that
 ## went stale in ranch.gd and caused the bug this replaces.
+# --- v1 look: cards and pills in the show's UI language ---------------------------------
+
+const CARD_FILL := Color(1.0, 0.97, 0.91, 0.94)
+const CARD_LINE := Color(0.47, 0.31, 0.64)
+const INK := Color(0.24, 0.17, 0.3)
+const INK_SOFT := Color(0.42, 0.34, 0.48)
+const GOLD_INK := Color(0.72, 0.5, 0.08)
+
+var _chip: Label
+
+
+static func card_box(radius := 22, border := 4) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = CARD_FILL
+	sb.border_color = CARD_LINE
+	sb.set_border_width_all(border)
+	sb.set_corner_radius_all(radius)
+	sb.content_margin_left = 18
+	sb.content_margin_right = 18
+	sb.content_margin_top = 10
+	sb.content_margin_bottom = 10
+	sb.shadow_color = Color(0.15, 0.05, 0.2, 0.22)
+	sb.shadow_size = 6
+	sb.shadow_offset = Vector2(0, 3)
+	return sb
+
+
+## Dress the plain labels as the show's UI: cards behind the bag and the tasks, pills for
+## the toast and the prompt, dark ink instead of white text with an outline.
+func _restyle() -> void:
+	for l: Label in [_bag_title, _bag_count, _balance, _world_line]:
+		l.add_theme_color_override("font_color", INK_SOFT if l != _bag_count else INK)
+		l.add_theme_constant_override("outline_size", 0)
+	_bits.add_theme_color_override("font_color", GOLD_INK)
+	_bits.add_theme_constant_override("outline_size", 0)
+	_bits.add_theme_font_size_override("font_size", 30)
+	_bits.add_theme_font_override("font", MenuStyleScript.numeral_font())
+	_bag_title.add_theme_font_override("font", MenuStyleScript.title_font())
+	_add_card_behind($Bag as Control, Vector2(18, 14))
+	_add_card_behind(_tasks, Vector2(18, 12))
+	for pill: Label in [_toast, _prompt]:
+		pill.add_theme_stylebox_override("normal", card_box(26, 4))
+		pill.add_theme_color_override("font_color", INK)
+		pill.add_theme_constant_override("outline_size", 0)
+		pill.add_theme_font_override("font", MenuStyleScript.title_font())
+	_toast.add_theme_font_size_override("font_size", 30)
+	_prompt.add_theme_font_size_override("font_size", 24)
+	_hints.add_theme_stylebox_override("panel", card_box(22, 4))
+	for c in _hints_grid.get_children():
+		if c is Label:
+			(c as Label).add_theme_color_override("font_color", INK)
+			(c as Label).add_theme_constant_override("outline_size", 0)
+	_prompt.visible = false
+	_chip = Label.new()
+	_chip.name = "ControlsChip"
+	_chip.add_theme_stylebox_override("normal", card_box(16, 3))
+	_chip.add_theme_color_override("font_color", INK)
+	_chip.add_theme_font_size_override("font_size", 18)
+	_chip.anchor_left = 1.0
+	_chip.anchor_right = 1.0
+	_chip.anchor_top = 1.0
+	_chip.anchor_bottom = 1.0
+	_chip.offset_left = -190.0
+	_chip.offset_right = -44.0
+	_chip.offset_top = -86.0
+	_chip.offset_bottom = -44.0
+	_chip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	add_child(_chip)
+	_refresh_chip()
+
+
+func _refresh_chip() -> void:
+	if _chip != null:
+		_chip.text = "%s  controls" % InputDeviceScript.hint(&"toggle_hints")
+		_chip.visible = not _hints.visible and not _overlay_open
+
+
+## A rounded card drawn behind `node`, padded by `pad`, kept matched to its rect.
+func _add_card_behind(node: Control, pad: Vector2) -> void:
+	if node == null:
+		return
+	var card := Panel.new()
+	card.name = node.name + "Card"
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_theme_stylebox_override("panel", card_box())
+	add_child(card)
+	move_child(card, node.get_index())
+	var fit := _fit_card.bind(card, node, pad)
+	node.resized.connect(fit)
+	node.visibility_changed.connect(fit)
+	fit.call_deferred()
+
+
+func _fit_card(card: Panel, node: Control, pad: Vector2) -> void:
+	if not is_instance_valid(card) or not is_instance_valid(node) or not node.is_inside_tree():
+		return
+	var r := node.get_global_rect()
+	# The content's own height, not the box's: a three-line checklist gets a three-line card.
+	var h := minf(r.size.y, node.get_combined_minimum_size().y)
+	card.visible = node.visible and h > 2.0 and _has_content(node)
+	card.position = r.position - pad
+	card.size = Vector2(r.size.x, h) + pad * 2.0
+
+
+func _has_content(node: Control) -> bool:
+	for c in node.get_children():
+		if c is Label and (c as Label).visible and not (c as Label).text.is_empty():
+			return true
+		if c is Control and not (c is Label) and (c as Control).visible:
+			return true
+	return false
+
+
+## Shrink a pill label to its text and keep it centred where it was anchored.
+func _fit_pill(l: Label) -> void:
+	if l.text.is_empty():
+		return
+	var font := l.get_theme_font(&"font")
+	var fs := l.get_theme_font_size(&"font_size")
+	var w := font.get_string_size(l.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 56.0
+	var centre := (l.offset_left + l.offset_right) * 0.5
+	l.offset_left = centre - w * 0.5
+	l.offset_right = centre + w * 0.5
+
+
 func set_prompt(text: String) -> void:
 	if _prompt != null:
 		_prompt.text = text
+		_prompt.visible = not text.is_empty()
+		_fit_pill(_prompt)
 
 
 func clear_prompt() -> void:

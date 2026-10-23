@@ -241,9 +241,10 @@ static func title_font() -> FontVariation:
 	if _title_font != null:
 		return _title_font
 	var font := FontVariation.new()
-	font.base_font = ThemeDB.fallback_font
-	font.variation_embolden = 0.55
-	font.spacing_glyph = 2
+	font.base_font = _fredoka()
+	# Fredoka's own weight axis (wght, opentype tag 2003265652) rather than synthetic bold.
+	font.variation_opentype = {2003265652: 650}
+	font.spacing_glyph = 1
 	_title_font = font
 	return _title_font
 
@@ -254,10 +255,19 @@ static func numeral_font() -> FontVariation:
 	if _numeral_font != null:
 		return _numeral_font
 	var font := FontVariation.new()
-	font.base_font = ThemeDB.fallback_font
-	font.variation_embolden = 0.3
+	font.base_font = _fredoka()
+	font.variation_opentype = {2003265652: 600}
 	_numeral_font = font
 	return _numeral_font
+
+
+## The game's display face: Fredoka (SIL OFL 1.1, game/assets/fonts/OFL.txt), round and
+## friendly like the show's own lettering. Falls back to Godot's default if the file is gone.
+static func _fredoka() -> Font:
+	var path := "res://assets/fonts/Fredoka.ttf"
+	if ResourceLoader.exists(path):
+		return load(path)
+	return ThemeDB.fallback_font
 
 
 static func apply_title(label: Label) -> void:

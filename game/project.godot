@@ -80,6 +80,7 @@ window/stretch/aspect="expand"
 [gui]
 
 theme/custom="res://ui/theme/filly_theme.tres"
+theme/custom_font="res://assets/fonts/fredoka_body.tres"
 
 ; glTF carries no loop flag, so Godot imports every clip as LOOP_NONE and a pony
 ; plays her 0.875 s walk once and then slides around frozen. The usual per-file fix

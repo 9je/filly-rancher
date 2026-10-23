@@ -53,7 +53,7 @@ which records the exact source URL of every file.
 
 ## Fonts
 
-See `game/assets/fonts/` (added with the UI restyle; each font is listed here when it lands).
+See "Fonts (added)" below.
 
 ## Pony models (fan works, core assets)
 
@@ -89,3 +89,6 @@ credited here on the same non-commercial basis as the pony models.
 
 Godot Engine (MIT), Blender (GPL; used offline only), SourceIO (for importing SFM models), and
 GUT (MIT, tests only, not shipped).
+
+### Fonts (added)
+- **Fredoka** by The Fredoka Project Authors, SIL Open Font License 1.1 (game/assets/fonts/OFL.txt).
