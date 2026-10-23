@@ -165,18 +165,34 @@ static func add_heat(story: Story, what: String, times: int = 1) -> int:
 	return h
 
 
-## A Bloom while on the Rescue path is a rescue: a marked pony cannot be drained.
-static func rescue_bloom(story: Story) -> void:
-	if StoryV1Script.path(story) == StoryV1Script.PATH_RESCUE:
-		story.add_var("rescued")
+## A Bloom after the reveal is a rescue on either path: a marked pony cannot be drained.
+## On the Rescue path that is the defence; on the Factory path it is the "secretly Bloomed"
+## count that makes Gray Gold (STORY.md section 6).
+static func rescue_bloom(story: Story, uid: String = "") -> void:
+	if StoryV1Script.revealed(story):
+		count_rescue(story, uid)
+
+
+## One pony rescued, counted once however many ways she was saved (a Bloom, then the
+## Lantern Line). `uid` "" always counts (ponies the world never named, like the freed
+## line in Lights Out).
+static func count_rescue(story: Story, uid: String = "", n: int = 1) -> bool:
+	if uid != "":
+		var seen: Array = story.get_var("rescued_uids", [])
+		if uid in seen:
+			return false
+		seen.append(uid)
+		story.set_var("rescued_uids", seen)
+	story.add_var("rescued", n)
+	return true
 
 
 ## A marked pony sent down the Lantern Line: a permanent rescue. Unmarked ones cannot go
 ## (they would be found).
-static func send_down_line(story: Story, marked: bool) -> bool:
+static func send_down_line(story: Story, marked: bool, uid: String = "") -> bool:
 	if StoryV1Script.path(story) != StoryV1Script.PATH_RESCUE or not marked:
 		return false
-	story.add_var("rescued")
+	count_rescue(story, uid)
 	story.add_var("sent")
 	add_heat(story, "lantern")
 	return true

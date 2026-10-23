@@ -7311,7 +7311,7 @@ func _on_pony_bloomed(inst: PonyInstance) -> void:
 	if _game_state != null:
 		var story: Story = _game_state.story
 		story.add_var("blooms")
-		PathRulesScript.rescue_bloom(story)
+		PathRulesScript.rescue_bloom(story, String(inst.uid))
 		var look := PonyLookScript.from_stock(inst.stock)
 		_game_state.book.note_bloom(String(inst.uid), inst.display_name(), look,
 			story.collection_days)
@@ -7735,7 +7735,7 @@ func _send_marked_down_line() -> int:
 		for inst in pen.ponies():
 			if not inst.is_marked():
 				continue
-			if not PathRulesScript.send_down_line(story, true):
+			if not PathRulesScript.send_down_line(story, true, String(inst.uid)):
 				continue
 			var body := pen.release_body(inst.uid, self)
 			if body != null:

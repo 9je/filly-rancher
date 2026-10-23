@@ -125,3 +125,21 @@ func test_each_paths_rules_do_nothing_on_the_other() -> void:
 	var r := _story("rescue")
 	assert_eq(Rules.factory_delivery(r, VIVID).bonus, 0)
 	assert_true(Rules.contract(r).is_empty())
+
+
+func test_a_bloom_after_the_reveal_is_a_rescue_on_either_path() -> void:
+	var before := StoryScript.new()
+	Rules.rescue_bloom(before)
+	assert_eq(int(before.get_var("rescued", 0)), 0, "before the reveal a Bloom is just a Bloom")
+	for p in ["factory", "rescue"]:
+		var s := _story(p)
+		Rules.rescue_bloom(s)
+		assert_eq(int(s.get_var("rescued", 0)), 1, p)
+
+
+func test_a_pony_bloomed_then_sent_down_the_line_counts_once() -> void:
+	var s := _story("rescue")
+	Rules.rescue_bloom(s, "pony#1")
+	Rules.send_down_line(s, true, "pony#1")
+	Rules.send_down_line(s, true, "pony#2")
+	assert_eq(int(s.get_var("rescued")), 2)

@@ -23,6 +23,7 @@ const PeopleScript := preload("res://world/people.gd")
 const NpcScript := preload("res://actors/npc/npc.gd")
 const WorldToneScript := preload("res://world/world_tone.gd")
 const StoryV1Script := preload("res://systems/story_v1.gd")
+const PathRulesScript := preload("res://systems/path_rules.gd")
 const PlayerScene := preload("res://actors/player/player.tscn")
 const HudScene := preload("res://ui/hud.tscn")
 const InputDeviceScript := preload("res://systems/input_device.gd")
@@ -57,6 +58,8 @@ func _ready() -> void:
 			skip_waits = true
 		elif arg.begins_with("--factory-mode="):
 			mode = StringName(arg.substr(15))
+		elif arg.begins_with("--factory-outcome="):
+			outcome = StringName(arg.substr(18))
 	_build()
 	var bus := get_node_or_null("/root/Events")
 	if bus != null:
@@ -418,8 +421,8 @@ func _lights_out() -> void:
 			if p is CharacterBody3D and p.visible:
 				p.visible = false
 				freed += 1
-	if story != null:
-		story.add_var("rescued", freed)
+	if story != null and freed > 0:
+		PathRulesScript.count_rescue(story, "", freed)
 	step_reached.emit(&"line_freed")
 	if hud != null and hud.has_method("toast"):
 		hud.call("toast", "%d ponies out of the line." % freed)
