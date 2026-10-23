@@ -73,3 +73,12 @@ One line of reasoning per call. Newest at the bottom.
   - The Palace's grand opening (17 min). The casino was always open before, so nobody ever noticed it arrive. It now opens on a flyer; gates and tests still find it open.
   - Race day (30 min).
   - Pip's lost foal (35 min).
+- 2026-10-23 -- **The trailer is 2560x1440, not 4K** (the owner: a 2K deliverable is sufficient; their monitor is 2560x1440). Capture is GPU-rendered Movie Maker footage with the root viewport pinned to the capture size (the "viewport" stretch mode, set for the capture run only): the window manager clamps a 4K window to the work area and even exclusive fullscreen loses the panel strip, so sizing the window cannot give exact frames, while a pinned viewport does on any desktop. Xvfb was tried and is software rendering only (llvmpipe).
+- 2026-10-23 -- **Performance: the render thread is on** (`rendering/driver/threads/thread_model=2`), vendor-neutral Vulkan on both the owner's AMD/Linux machine and a friend's NVIDIA/Windows one. On the 60-pony check it took the average frame from 16.6 to 11.7 ms; a separate physics thread added nothing and is not used.
+- 2026-10-23 -- **Pony detail tiers** (FULL under 12 m, MID to 40 m, FAR past that or off screen past 12 m), with 2 m of hysteresis and a random phase within each stride:
+  - Thinking, moving and animating run every 3rd or 6th tick, carrying the skipped time.
+  - Springs are off past FULL; shadows and outlines are off past FULL; detection is off at FAR.
+  - Outlines switch through a per-instance shader parameter, not a material swap (a swap rebuilt the render instance, and that hitched).
+  - Runtime mesh LODs (`actors/pony/pony_lod.gd`) keep every eye surface at full detail, so the iris-cap bug of August cannot return.
+  - A collision-free glide for FAR ponies was tried and dropped: it walked ponies through trunks.
+- 2026-10-23 -- The babble voice is synthesised once per syllable shape and cached, not per sample per frame in GDScript. The per-sample loop was a 10 ms hitch on every audio buffer refill whenever anypony talked.
