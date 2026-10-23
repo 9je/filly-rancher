@@ -77,6 +77,12 @@ func _physics_process(delta: float) -> void:
 		_collector_visit()
 	elif not _done("starry") and t >= 45.0 * 60.0:
 		_starry()
+	elif not _done("rainboom") and t >= 52.0 * 60.0:
+		_rainboom()
+	elif not _done("derpy_mail") and t >= 57.0 * 60.0:
+		_derpy_mail()
+	elif not _done("trixie_show") and t >= 63.0 * 60.0 and story.has_flag("palace_open"):
+		_trixie_show()
 	elif t >= SIGHTING_FIRST:
 		var n := int(story.get_var("sightings", 0))
 		if t >= SIGHTING_FIRST + SIGHTING_EVERY * n and (sighting == null or not is_instance_valid(sighting)
@@ -297,3 +303,99 @@ func _newsletter() -> void:
 	var n := int(_story().deliveries)
 	ranch.call("_toast", "Pip: \"Smile! Cloudsdale wants you for the newsletter!\" Steward of the Week: %d ponies placed, \"a yield of %d%% above the valley average.\"" % [n, 40 + n * 7])
 	ranch.call("_novelty", "clue", "newsletter", "Pip photographs you for the Corporation newsletter")
+
+
+## A canon pony by id, standing at `at`, unless the player has already caught or delivered
+## her (then the moment plays without her). Returns the pony or null.
+func _canon_guest(id: StringName, at: Vector3, roam: float = 6.0) -> Node3D:
+	var reg: Object = _gs().call("get_registry")
+	var book: Object = _gs().get("compendium")
+	if reg == null or at == Vector3.INF:
+		return null
+	var data: PonyData = reg.call("by_id", id)
+	if data == null or (book != null and int(book.call("state_of", id)) >= 2):
+		return null
+	return ranch.get("spawner").call("spawn_guest", data, {}, at, roam)
+
+
+## RAINBOW DASH'S SONIC RAINBOOM (Ben's favourite): a ring of every colour bursts across
+## the sky, and the pony who made it lands somewhere near, looking pleased with herself.
+func _rainboom() -> void:
+	_mark("rainboom")
+	var p := _player().global_position
+	var dir := Vector3(randf_range(-1, 1), 0, randf_range(-1, 1)).normalized()
+	var sky := p + dir * 40.0 + Vector3(0, 28.0, 0)
+	_rainbow_ring(sky)
+	var sound := get_node_or_null("/root/Sound")
+	if sound != null:
+		sound.call("play_at", &"sparkle", p)
+	var dash := _canon_guest(&"rainbowdash", _spot(16.0, 26.0))
+	var where := " Rainbow Dash lands to the %s, hooves on hips." % _compass(dash.global_position - p) if dash != null else ""
+	ranch.call("_toast", "KA-BOOM! A Sonic Rainboom rolls across the sky!%s" % where)
+	ranch.call("_novelty", "event", "rainboom", "Rainbow Dash's Sonic Rainboom over the valley")
+
+
+func _rainbow_ring(at: Vector3) -> void:
+	var cols := [Color(0.94, 0.25, 0.3), Color(0.98, 0.6, 0.2), Color(0.98, 0.9, 0.3),
+		Color(0.4, 0.85, 0.4), Color(0.3, 0.65, 0.98), Color(0.6, 0.4, 0.9)]
+	for i in cols.size():
+		var ring := GPUParticles3D.new()
+		var pm := ParticleProcessMaterial.new()
+		pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_RING
+		pm.emission_ring_axis = Vector3(0, 0, 1)
+		pm.emission_ring_radius = 2.0 + i * 0.6
+		pm.emission_ring_inner_radius = 1.6 + i * 0.6
+		pm.emission_ring_height = 0.2
+		pm.direction = Vector3(1, 0, 0)
+		pm.spread = 180.0
+		pm.flatness = 1.0
+		pm.radial_velocity_min = 14.0
+		pm.radial_velocity_max = 16.0
+		pm.gravity = Vector3.ZERO
+		pm.color = cols[i]
+		ring.process_material = pm
+		var quad := QuadMesh.new()
+		quad.size = Vector2(1.4, 1.4)
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.vertex_color_use_as_albedo = true
+		mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+		mat.albedo_texture = BloomCeremony.star_texture()
+		quad.material = mat
+		ring.draw_pass_1 = quad
+		ring.amount = 160
+		ring.lifetime = 2.2
+		ring.one_shot = true
+		ring.explosiveness = 1.0
+		ranch.add_child(ring)
+		ring.global_position = at
+		ring.look_at(_player().global_position, Vector3.UP)
+		ring.emitting = true
+		get_tree().create_timer(3.0).timeout.connect(ring.queue_free)
+
+
+## DERPY'S MAIL MIX-UP: she drops in at the mailbox with a letter that is not yours (it is
+## for Twilight), says sorry, and leaves a muffin's worth of apples to make up for it.
+func _derpy_mail() -> void:
+	_mark("derpy_mail")
+	var box: Node3D = ranch.call("get_mailbox")
+	var at := _ground(box.global_position.x + 2.5, box.global_position.z + 2.0) if box != null else _spot(8.0, 14.0)
+	var derpy := _canon_guest(&"derpyhooves", at, 4.0)
+	var inv: Inventory = _gs().get("inventory")
+	if inv != null:
+		inv.add(&"apple", 3)
+	var who := "Derpy" if derpy != null else "A grey pegasus with a mail bag"
+	ranch.call("_toast", "%s crash-lands by your mailbox with a letter for... Twilight Sparkle? \"I just don't know what went wrong!\" She leaves you 3 apples to say sorry." % who)
+	ranch.call("_novelty", "npc", "derpy_mail", "Derpy's mail mix-up at the mailbox")
+
+
+## THE GREAT AND POWERFUL TRIXIE plays the Strip: a show outside the Palace, and Trixie
+## herself on the boardwalk for anypony brave enough to try the Scoop on her.
+func _trixie_show() -> void:
+	_mark("trixie_show")
+	var at := _ground(randf_range(-8.0, 8.0), 66.0)
+	var trixie := _canon_guest(&"trixie", at, 5.0)
+	var tail := " She's on the Strip right now." if trixie != null else ""
+	ranch.call("_toast", "A poster on the board: THE GREAT AND POWERFUL TRIXIE, LIVE outside the Palace! Tonight only!%s" % tail)
+	ranch.call("_novelty", "event", "trixie_show", "The Great and Powerful Trixie plays the Strip")
