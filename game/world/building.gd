@@ -298,7 +298,7 @@ func build() -> void:
 	# grey box on a black plinth (whole-branch review, 2026-09-05, F11; parked at Task 2's
 	# own review before that). One boolean now feeds both.
 	var wearing: bool = false
-	if model_file != "" and ResourceLoader.exists(PropsScript.PROP_DIR + model_file):
+	if model_file != "" and ResourceLoader.exists(_model_path()):
 		wearing = _stand_model()
 	_wearing = wearing
 
@@ -499,10 +499,16 @@ func wears_a_model() -> bool:
 ## bottom would drag the whole building's world AABB down, which is the number ranch.gd
 ## seats every building by and then re-checks. Standing it on the plinth's own top face
 ## leaves the plinth's underside the lowest thing under this node, exactly as before.
+## A converted PonySFM building by its file name (under Props.PROP_DIR), or one of the game's
+## own Blender-built models by its full res:// path (the Spectra Palace).
+func _model_path() -> String:
+	return model_file if model_file.begins_with("res://") else PropsScript.PROP_DIR + model_file
+
+
 func _stand_model() -> bool:
 	if model_file.is_empty():
 		return false
-	var path: String = PropsScript.PROP_DIR + model_file
+	var path: String = _model_path()
 	if not ResourceLoader.exists(path):
 		return false
 	var scene: Resource = load(path)

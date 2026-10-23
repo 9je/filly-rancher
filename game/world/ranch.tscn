@@ -212,6 +212,8 @@ wall_color = Color(0.36, 0.16, 0.42, 1)
 roof_color = Color(0.95, 0.78, 0.28, 1)
 trim_color = Color(0.98, 0.86, 0.45, 1)
 trim_metallic = 0.45
+model_file = "res://assets/models/spectra_palace.glb"
+model_scale = 1.9257
 
 [node name="Cage" type="Marker3D" parent="Buildings/Palace"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -3.4)

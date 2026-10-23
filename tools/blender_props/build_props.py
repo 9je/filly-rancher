@@ -37,6 +37,8 @@ PALETTE = {
     "rose": (0.96, 0.42, 0.52), "stone": (0.74, 0.72, 0.68), "stone_dark": (0.56, 0.55, 0.52),
     "spike_purple": (0.36, 0.13, 0.58), "spike_belly": (0.5, 0.8, 0.28), "spike_green": (0.08, 0.6, 0.12),
     "eye_green": (0.04, 0.45, 0.1), "eye_white": (1.0, 1.0, 1.0), "pupil": (0.01, 0.02, 0.01),
+    "palace_purple": (0.24, 0.08, 0.36), "palace_pink": (0.85, 0.2, 0.55), "palace_red": (0.6, 0.06, 0.12),
+    "palace_dark": (0.08, 0.03, 0.12), "bulb": (1.0, 0.92, 0.55),
     "cloud": (0.98, 0.98, 1.0), "cloud_shade": (0.86, 0.88, 0.96), "cream": (0.99, 0.95, 0.86),
 }
 
@@ -894,6 +896,79 @@ def spike():
     parts.append(cyl("spade", 0.07, 0.12, (0.29, 0.6, 0.31), G, verts=4, r2=0.0, rot=(0, 0, math.radians(45))))
     join(parts, "spike")
     export("spike")
+
+
+def text_mesh(name, body, size, loc, color, depth=0.06, rot=(math.radians(90), 0, 0)):
+    bpy.ops.object.text_add(location=loc, rotation=rot)
+    o = bpy.context.active_object
+    o.data.body = body
+    o.data.size = size
+    o.data.extrude = depth
+    o.data.align_x = "CENTER"
+    o.data.align_y = "CENTER"
+    bpy.ops.object.convert(target="MESH")
+    o = bpy.context.active_object
+    o.name = name
+    return finish(o, color, smooth=False)
+
+
+@prop("spectra_palace")
+def spectra_palace():
+    """The Spectra Palace on the Strip, Las Pegasus by way of Ponyville: a purple hall banded in
+    gold, four towers with gold onion domes, a pink dome with a star on top, a columned
+    portico, and an arched marquee lit with bulbs. 14 m by 9 m to match its Building shell;
+    the doorway (3.2 m by 3 m, front, -Y) is left open and recessed. Faces -Y."""
+    W, D = 11.6, 7.2
+    parts = [
+        box("hall", (W, D, 4.4), (0, 0, 2.2), "palace_purple", bevel=0.12),
+        box("plinthband", (W + 0.3, D + 0.3, 0.45), (0, 0, 0.22), "gold", bevel=0.05),
+        box("cornice", (W + 0.4, D + 0.4, 0.35), (0, 0, 4.55), "gold", bevel=0.05),
+        box("roof", (W - 0.6, D - 0.6, 0.5), (0, 0, 4.95), "palace_purple", bevel=0.1),
+        ball("dome", 2.4, (0, 0.4, 5.2), "palace_pink", scale=(1, 1, 0.85), subdiv=3),
+        cyl("domering", 2.45, 0.25, (0, 0.4, 5.25), "gold", verts=32),
+        cyl("spire", 0.18, 1.2, (0, 0.4, 7.6), "gold", verts=12),
+        ball("finial", 0.32, (0, 0.4, 8.3), "gold", subdiv=2),
+    ]
+    # Towers at the four corners, each with an onion dome.
+    for x in (-W / 2, W / 2):
+        for y in (-D / 2, D / 2):
+            parts += [
+                cyl("tower", 0.95, 5.6, (x, y, 2.8), "palace_purple", verts=20, bevel=0.03),
+                cyl("tband", 1.02, 0.3, (x, y, 4.6), "gold", verts=20),
+                cyl("tband2", 1.02, 0.25, (x, y, 0.4), "gold", verts=20),
+                ball("onion", 1.0, (x, y, 6.2), "gold", scale=(1, 1, 1.15), subdiv=3),
+                cyl("tip", 0.3, 0.9, (x, y, 7.4), "gold", r2=0.0, verts=10),
+            ]
+    # The doorway: a recess, gold-framed, with the red carpet running out of it.
+    front = -D / 2
+    parts += [
+        box("recess", (3.4, 0.6, 3.2), (0, front - 0.02, 1.6), "palace_dark", bevel=0.0),
+        box("doorframeL", (0.3, 0.4, 3.4), (-1.85, front - 0.15, 1.7), "gold", bevel=0.03),
+        box("doorframeR", (0.3, 0.4, 3.4), (1.85, front - 0.15, 1.7), "gold", bevel=0.03),
+        box("carpet", (2.6, 1.6, 0.05), (0, front - 0.75, 0.03), "palace_red", bevel=0.0),
+    ]
+    # The portico: four white columns, a gold pediment over them.
+    for x in (-3.4, -2.2, 2.2, 3.4):
+        parts += [cyl("column", 0.28, 3.9, (x, front - 0.75, 1.95), "white", verts=16),
+                  cyl("capital", 0.4, 0.25, (x, front - 0.75, 3.95), "gold", verts=16),
+                  cyl("base", 0.4, 0.2, (x, front - 0.75, 0.1), "gold", verts=16)]
+    parts += [box("architrave", (7.8, 1.0, 0.45), (0, front - 0.75, 4.2), "gold", bevel=0.04)]
+    # The marquee: an arched pink sign with the name in gold, ringed with bulbs.
+    parts.append(box("marquee", (6.4, 0.3, 1.5), (0, front - 1.05, 5.1), "palace_pink", bevel=0.1))
+    parts.append(cyl("arch", 3.2, 0.3, (0, front - 1.05, 5.8), "palace_pink", verts=32, rot=(math.radians(90), 0, 0)))
+    parts.append(text_mesh("name", "SPECTRA PALACE", 0.72, (0, front - 1.25, 5.25), "gold"))
+    for k in range(18):
+        a = math.pi * k / 17.0
+        parts.append(ball("bulb%d" % k, 0.09, (math.cos(a) * 3.3, front - 1.23, 5.8 + math.sin(a) * 1.2 - 0.05), "bulb", subdiv=1))
+    for k in range(9):
+        parts.append(ball("lbulb%d" % k, 0.08, (-3.1 + k * 0.775, front - 1.23, 4.42), "bulb", subdiv=1))
+    # Gold stars on the facade either side of the door.
+    for x in (-5.0, 5.0):
+        parts.append(cyl("star", 0.55, 0.12, (x, front - 0.08, 3.0), "gold", verts=5, rot=(math.radians(90), 0, 0)))
+        parts.append(cyl("star2", 0.55, 0.12, (x, front - 0.1, 3.0), "gold", verts=5,
+                         rot=(math.radians(90), math.radians(36), 0)))
+    join(parts, "spectra_palace")
+    export("spectra_palace")
 
 
 def main():

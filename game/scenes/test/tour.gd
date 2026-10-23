@@ -200,6 +200,9 @@ func _ranch_tour() -> void:
 		_view(Vector3(14, _height(14, 84) + 6, 84), Vector3(-6, 3, 64), 60.0)
 		await _frames(30)
 		await _shot("palace_strip")
+		_view(Vector3(-4, _height(-4, 44) + 3.5, 44), Vector3(-10, 3.5, 58), 55.0)
+		await _frames(30)
+		await _shot("palace_front")
 	if _want("tone"):
 		var tone: Node = ranch.get("world_tone")
 		if tone != null:
