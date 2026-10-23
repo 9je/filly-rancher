@@ -2367,6 +2367,19 @@ func _apply_player_look() -> void:
 ## pressed while the Market or the pause menu was up still ran the build path underneath
 ## them. Both prompts ask the whole question now, which is what makes the sentence above
 ## true of the code rather than only of the intention.
+## What is holding the screen, by name, or "" (the human bot and the pacing log ask).
+func blocking_menu() -> String:
+	for other in [build_menu, market_menu, pause_menu, depot_menu, creation_screen,
+			casino_menu, slots_menu, wheel_menu, blackjack_menu, race_menu, letter_panel]:
+		if other != null and other.has_method("is_open") and other.is_open():
+			return String(other.name)
+	if people != null and people.is_talking():
+		return "talk"
+	if epilogue != null and is_instance_valid(epilogue):
+		return "epilogue"
+	return ""
+
+
 func _no_other_menu_open() -> bool:
 	return _no_menu_but(null)
 

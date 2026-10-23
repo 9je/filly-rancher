@@ -62,6 +62,8 @@ var _log: Array[String] = []
 var _done := false
 var _sighted_only := false
 var _build_fails: Dictionary = {}
+var _held_since := -1.0
+var _shippable: Array[String] = []
 var _palace_visits := 0
 var _last_market := -9999.0
 var _lift: StringName = &""
@@ -443,6 +445,29 @@ func _tend_menus() -> void:
 		await _wait(6.0 + rng.randf() * 4.0)
 		lp.call("close")
 		await _think()
+	# Anything else left holding the screen (no routine of hers opened it, or one lost
+	# track of it): a person looks at it a moment, then presses Escape. Logged, because a
+	# menu that opens by itself and stays open is a game bug worth knowing about.
+	var held := str(ranch.call("blocking_menu"))
+	if held == "" or held == "talk":
+		_held_since = -1.0
+		return
+	if _held_since < 0.0:
+		_held_since = _t()
+		return
+	if _t() - _held_since < 20.0:
+		return
+	_say("a stray %s is open; presses Escape" % held)
+	await _tap(&"ui_cancel")
+	await _wait(1.0)
+	if str(ranch.call("blocking_menu")) == held:
+		for n: String in ["build_menu", "market_menu", "pause_menu", "depot_menu", "casino_menu",
+				"slots_menu", "wheel_menu", "blackjack_menu", "race_menu"]:
+			var m: Node = ranch.get(n)
+			if m != null and String(m.name) == held and m.has_method("close"):
+				m.call("close")
+				_say("closed the stray %s" % held)
+	_held_since = -1.0
 
 
 func _talk_to_news() -> bool:
@@ -696,11 +721,13 @@ func _deliver_extras() -> bool:
 	var bag := _bag()
 	var pens_full := _pen_with_room() == null
 	var extra := 0
+	_shippable.clear()
 	for pen in _pens():
 		for inst: PonyInstance in pen.call("ponies"):
 			# Drifters only: a person keeps the canon ponies she catches.
 			if inst.is_stock() and not inst.is_marked() and _not_close_to_bloom(inst):
 				extra += 1
+				_shippable.append(String(inst.uid))
 	# The bag's Drifters only, too: the canon ponies riding in it are not for sale, and
 	# counting them sent her to the Depot every few seconds with nothing to hand over.
 	var bag_stock := 0
@@ -727,7 +754,8 @@ func _deliver_extras() -> bool:
 		var pick := -1
 		for i in rows.size():
 			var r: Dictionary = rows[i]
-			if bool(r.get("stock", false)) and not bool(r.get("marked", false)):
+			if bool(r.get("stock", false)) and not bool(r.get("marked", false)) \
+					and String(r.get("uid", "")) in _shippable:
 				pick = i
 				break
 		if pick < 0 or sent >= 3:
@@ -747,8 +775,12 @@ func _deliver_extras() -> bool:
 
 ## A person keeps the ones who are coming along: anypony with some Bloom in her goes on
 ## growing, and only the newest arrivals go to the Depot.
+##
+## BY PROGRESS, NOT BY A BAR: any Bloom at all means she is coming along. The old 0.15 bar
+## shipped nearly every pony before she got there (Bloom builds over minutes), and a 70
+## minute pacing run Bloomed nopony at all.
 func _not_close_to_bloom(inst: PonyInstance) -> bool:
-	return inst.bloom < 0.15
+	return inst.bloom < 0.03
 
 
 ## The shopping list, in the order a person would want things.
@@ -1050,6 +1082,9 @@ func _status() -> void:
 			b += inst.bloom
 		var n := float(ps.size())
 		line += " | pen %d: happy %.2f hungry %.2f bloom %.2f" % [ps.size(), h / n, hu / n, b / n]
+	var held := str(ranch.call("blocking_menu"))
+	if held != "":
+		line += " | open: " + held
 	_say("STATUS " + line)
 
 
