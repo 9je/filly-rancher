@@ -26,18 +26,27 @@ Canon MLP stays: real names, looks and places ("lean into mlp fully", private bu
   - **FactoryInterior** level builder (eight rooms).
   - **CREDITS.md.**
 
-## Next (M1 remainder)
-- Tumble following and pointing at Drifters; NPC spots verified in-world; a people gate (headless conversation flow).
-- Onboarding prompts on the HUD; the Arrival.
-- Customizer rebuild (race, two-tone mane, separate tail, generated or drawn mark); the player on PonyPaint.
-- The Scoop worn by the player; capture feel juice (stretch, pop, hit pause, rising pitch).
-- UI restyle (theme font, HUD rebuild, controls card).
-- Story chapters wired to Act One and Two triggers (postcards, the dye names, the invitation).
+- **M1 close:**
+  - Customizer rebuilt (race, two-tone mane, tail, marks; three tabs); the player on PonyPaint.
+  - Onboarding tips and the Arrival; the player wears her Scoop; capture juice.
+  - HUD restyle (Fredoka, cards, controls chip).
+  - Act One and Act Two wired: postcards, dye names, the invitation, Color Day.
+  - Story.vars (counters survive a save as themselves).
+- **M2 (the reveal):**
+  - `world/factory.tscn` + FactoryRun: the tour, the walkway (CollectorPatrol lantern cones, a buzzer and reset, never a fail), the window (FactoryWindow: silhouettes, coat-coloured light, the rainbow going up), Marigold's offer, the contract or the escape.
+  - The processing hall sits beside the gallery (it used to overlap the holding room).
+  - StoryV1: path, tallies, and the dread dial as a pure function; the ranch drives the dial from it.
+  - Endings: a tested truth table for all five.
+  - Tests: test_endings, test_story_v1, test_factory_run (both choices headless), test_factory_interior.
+
+## Next (M3)
+- Factory path: ranks, Calm Lamp, Express Chute, Yield Lens, Lure Post, the town fading, the Jubilee climax.
+- Rescue path: Heat, corral raids, pylons, Dye Vat, Lantern Line, allies, Clover, the Lights Out climax, Placement.
+- Epilogues and credits for all five endings; the headless playthrough driver for each.
 
 ## Known issues
-- **Factory interior:** no ceiling yet; the public rooms are too bare (they need banners, colour and life); the processing floor behind the gallery window is not built.
+- **Factory interior:** still monochrome grey-white; the ring light should read stronger in colour.
 - **Apple trees:** the apples sit mostly inside the canopy.
 - **Distance fog:** it washes the rim hills pale.
 - **Building plinths:** still read as boxes under some houses.
 - **Headless runs:** they skip the toon shader swap (a dummy renderer limitation).
-- **The player:** still uses the legacy StockTint path until the customizer rebuild.
