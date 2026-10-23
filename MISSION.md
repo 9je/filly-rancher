@@ -92,3 +92,35 @@ Execute PLAN.md milestone by milestone. After each milestone, run all tests, cap
 - Model, UV, and texture environment and prop meshes in Blender, then export them as .glb into the Godot project. Never ship environments built from primitive shapes or CSG.
 - (A references/ folder was mentioned, then withdrawn by the owner: there are no reference images.)
 - (Owner, 2026-10-22, overriding the OC-only rule above): "i want them to have their real names. i have no copyright concerns whatsoever and want to lean into mlp fully. this is not for redistribution." Canon MLP characters keep their real names and looks; canon places are used.
+
+## Fun and anti-repetition rules
+The early game is repetitive. Fixing that is the top design priority.
+- Novelty cadence: in the first hour, the player must get something new (a pony type, area, tool, upgrade, mechanic, story clue, or NPC event) at least every 5 to 8 minutes. After that, at least every 15 minutes.
+- The first "something is wrong here" clue must appear within the first 15 minutes so the mystery pulls the player forward.
+- Upgrades must change HOW the player plays (new movement, new interactions, new options), not just bigger numbers. At least half of all upgrades must be verb-changing.
+- Use the random pony generator's variety in gameplay: pony traits must matter mechanically so different ponies create different decisions, combinations, and surprises.
+- Automate chores as they become chores: anything the player has done many times should get an upgrade or tool that removes the busywork and frees them for the next new thing.
+- No progress gates that require repeating the same action for more than a few minutes. If a playthrough shows a grind wall, redesign it.
+- Mix activity types so the player rotates between ranching, exploring, discovery, light challenge or risk, and story, never doing one for too long.
+- Pacing test: the playthrough scripts must log a timestamp for every new unlock, discovery, and story beat, and write PACING.md showing the gaps. The test fails if any gap exceeds the cadence limits above.
+
+## v1 sharpening and videos (owner, 2026-10-23)
+The owner cannot playtest yet. Keep sharpening v1 without them, then make videos they can watch at work. Stay on v1-overhaul, keep logging in DECISIONS.md and PROGRESS.md, never ask questions.
+
+Sharpening:
+1. Build the pacing test, run it, and redesign the early game until it passes. Audit every upgrade against the verb-changing rule and fix the ratio.
+2. Run the deferred 60-pony performance check with real rendering (not headless). Get it to a stable 60 FPS and fix whatever drops it.
+3. Root-cause the exit hang. Run the full suite repeatedly under the watchdog until you can reproduce or rule it out, and fix the cause.
+4. Do a rendered visual review: capture screenshots of every major scene, both tones, both paths, the customizer, a batch of random ponies, and the ending flyover. Compare against references/ (withdrawn: there are none; review against GDD.md section 8 and the show) and fix anything that looks unpolished, mismatched, empty, or off-model.
+
+Videos: record only after all sharpening is done. Godot Movie Maker (--write-movie, --fixed-fps 60), a real renderer at the highest quality settings (virtual display and software rendering only if there is no display or GPU; slow rendering is fine).
+
+FIRST_10_MINUTES.mp4: an uncut recording of a fresh save played by the playthrough bot, driven to look like a normal human player (smooth camera, natural pauses). No editing. 1080p60 H.264. For judging pacing honestly.
+
+TRAILER: a Steam-store-quality gameplay trailer, a professional deliverable, not a recording.
+- Pre-production: research current Steam trailer best practice and well-regarded cozy/indie trailers; write TRAILER_PLAN.md (the hook, a beat-by-beat shot list with timestamps, camera move per shot, the music track and where cuts land, text callouts).
+- Structure, 60 to 90 s: 0-5 s opens directly on the most striking gameplay moment (no logos, no slow fades; the first 6 s loop standalone); 5-15 s the core loop readable; 15-50 s variety (generator ponies, customizer, exploration, areas, verb-changing upgrades, satisfying feedback); 50-70 s the twist tease (palette shifting to dread, music with it; hint, never spoil); final 5 s title card in the game's style. At least 60% real gameplay; gameplay shots 1-3 s; beauty shots longer with slow deliberate camera moves.
+- Capture: every shot staged (scripted cinematic cameras for beauty shots; bot gameplay rehearsed until effortless and skilled); multiple takes, pick the best; no cursor, debug text, hitches, placeholder or off-model assets; HUD hidden on beauty shots, clean and minimal on gameplay shots; capture at 3840x2160.
+- Edit: a reproducible script (MoviePy or an ffmpeg filtergraph); the game's own music; beats detected (librosa or aubio), cuts on the beat; energy builds to the twist, pulls back for the title; game SFX under the music for punch; about -14 LUFS integrated, verified with ffmpeg ebur128; at most 2 or 3 short text callouts in the game's font and style; colour-consistent.
+- Review loop, at least 3 iterations: a contact sheet every 0.5 s after each cut, every frame reviewed (gameplay in the first 3 s, core loop readable by 15 s, cuts on beats, glitches, clipping, empty scenery, off-model ponies, dead air); findings and fixes per iteration in TRAILER_REVIEW.md; repeat until a full review finds nothing worth fixing.
+- Deliver TRAILER_4K.mp4 (3840x2160, 60 fps) and TRAILER_1080p.mp4 (1920x1080, 60 fps), H.264 with AAC.
