@@ -15,6 +15,8 @@ extends Node3D
 signal step_reached(step: StringName)
 signal finished(outcome: StringName)
 
+const PlayClockScript := preload("res://world/play_clock.gd")
+const BootIntentScript := preload("res://world/boot_intent.gd")
 const RANCH_SCENE := "res://world/ranch.tscn"
 const InteriorScript := preload("res://world/factory_interior.gd")
 const WindowScript := preload("res://world/factory_window.gd")
@@ -32,6 +34,12 @@ static var mode: StringName = &"reveal"
 
 ## True for the automated playthrough: walks and timed beats complete at once.
 var skip_waits := false
+## What the scene is waiting for the player to do right now ({kind: "area" | "hold", at}),
+## or {}. Read by the human-paced bot (scenes/test/human_bot.gd); nothing in the game needs it.
+var goal: Dictionary = {}
+## The walkway's patrols, for the same reader.
+func patrols() -> Array:
+	return _patrols
 ## With skip_waits: false keeps the window at its real pace (the screenshot probe).
 var fast_window := true
 ## Set by the choice (or by the driver).
@@ -61,6 +69,14 @@ func _ready() -> void:
 		elif arg.begins_with("--factory-outcome="):
 			outcome = StringName(arg.substr(18))
 	_build()
+	# Somebody playing (not a fast driver run): the play clock keeps running up here, and every
+	# step of the tour is a story beat in the novelty log (MISSION.md fun rules).
+	if not skip_waits and (DisplayServer.get_name() != "headless" or BootIntentScript.bot):
+		add_child(PlayClockScript.new())
+	step_reached.connect(func(step: StringName) -> void:
+		if _game_state != null and _game_state.has_method("note_novelty"):
+			_game_state.call("note_novelty", "clue" if step in [&"walkway", &"window", &"gallery"] else "story",
+				"factory_%s_%s" % [String(mode), String(step)], "The Rainbow Factory: %s" % String(step).replace("_", " ")))
 	var bus := get_node_or_null("/root/Events")
 	if bus != null:
 		bus.connect("area_entered", func(a: StringName) -> void: _last_area = a)
@@ -512,6 +528,7 @@ func _climax_done() -> void:
 func _hold_at(at: Vector3, seconds: float, verb: String) -> void:
 	if skip_waits:
 		return
+	goal = {"kind": "hold", "at": at, "verb": verb}
 	var held := 0.0
 	while held < seconds:
 		await get_tree().process_frame
@@ -526,6 +543,7 @@ func _hold_at(at: Vector3, seconds: float, verb: String) -> void:
 				verb, int(held / seconds * 100.0)] if near else "")
 	if hud != null and hud.has_method("set_prompt"):
 		hud.call("set_prompt", "")
+	goal = {}
 
 
 # --- helpers -----------------------------------------------------------------------
@@ -576,8 +594,10 @@ func _until_area(area: StringName, fallback: Vector3) -> void:
 		player.global_position = fallback + Vector3(0, 0.3, 0)
 		_last_area = area
 		return
+	goal = {"kind": "area", "at": fallback, "area": area}
 	while _last_area != area:
 		await get_tree().process_frame
+	goal = {}
 
 
 func _fade_to(c: Color, seconds: float) -> void:

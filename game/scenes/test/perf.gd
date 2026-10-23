@@ -93,12 +93,20 @@ func _run() -> void:
 		await _timing()
 	if "proc" in exp:
 		await _proc_timing()
+	if "phys" in exp:
+		await _phys_timing()
 	# Warm-up: shaders compile, the herd settles.
 	for i in 180:
 		await process_frame
 	var times: PackedFloat64Array = []
 	var t := 0.0
 	var last := Time.get_ticks_usec()
+	var vp_rid := root.get_viewport().get_viewport_rid()
+	RenderingServer.viewport_set_measure_render_time(vp_rid, true)
+	var r_cpu := 0.0
+	var r_gpu := 0.0
+	var proc := 0.0
+	var phys := 0.0
 	while t < seconds:
 		await process_frame
 		var now := Time.get_ticks_usec()
@@ -107,6 +115,21 @@ func _run() -> void:
 		times.append(ms)
 		t += ms / 1000.0
 		_place(t / seconds)
+		r_cpu += RenderingServer.viewport_get_measured_render_time_cpu(vp_rid) + RenderingServer.get_frame_setup_time_cpu()
+		r_gpu += RenderingServer.viewport_get_measured_render_time_gpu(vp_rid)
+		proc += Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
+		phys += Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
+	if "spikes" in exp:
+		var line := ""
+		var acc := 0.0
+		for i in times.size():
+			acc += times[i]
+			if times[i] > 20.0:
+				line += "%.2fs:%.0f " % [acc / 1000.0, times[i]]
+		print("PERF_SPIKES ", line)
+	var nf := float(maxi(1, times.size()))
+	print("PERF_SPLIT render_cpu_ms=%.2f render_gpu_ms=%.2f process_ms=%.2f physics_ms=%.2f" % [
+		r_cpu / nf, r_gpu / nf, proc / nf, phys / nf])
 	_report(times, added, hud != null and hud.visible)
 	quit(0)
 
@@ -201,6 +224,35 @@ func _proc_timing() -> void:
 			n.set_process(true)
 
 
+## Which scripts the physics ticks are spent in, the same way as _proc_timing().
+func _phys_timing() -> void:
+	var nodes: Array = []
+	for n in root.find_children("*", "", true, false):
+		if n.is_physics_processing() and n.get_script() != null and n.has_method("_physics_process"):
+			nodes.append(n)
+	for n in nodes:
+		n.set_physics_process(false)
+	var by: Dictionary = {}
+	var count: Dictionary = {}
+	for f in 120:
+		await physics_frame
+		for n in nodes:
+			if not is_instance_valid(n):
+				continue
+			var t0 := Time.get_ticks_usec()
+			n._physics_process(1.0 / 60.0)
+			var k := (n.get_script() as Script).resource_path.get_file()
+			by[k] = int(by.get(k, 0)) + Time.get_ticks_usec() - t0
+			count[k] = int(count.get(k, 0)) + 1
+	var keys := by.keys()
+	keys.sort_custom(func(a, b) -> bool: return by[a] > by[b])
+	for k in keys.slice(0, 14):
+		print("PERF_PHYS %-28s %7.2f ms/tick  nodes=%d" % [k, by[k] / 120000.0, count[k] / 120])
+	for n in nodes:
+		if is_instance_valid(n):
+			n.set_physics_process(true)
+
+
 func _experiments() -> void:
 	for b in ranch.find_children("*", "CharacterBody3D", true, false):
 		if not b.has_method("set_stock"):
@@ -226,6 +278,57 @@ func _experiments() -> void:
 		if "noshadow" in exp:
 			for m in b.find_children("*", "GeometryInstance3D", true, false):
 				(m as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if "nodress" in exp:
+		var d := ranch.get_node_or_null(^"Regions/Dressing") as Node3D
+		if d != null:
+			d.visible = false
+	if "nohud" in exp:
+		for c in ranch.get_children():
+			if c is CanvasLayer:
+				(c as CanvasLayer).visible = false
+				c.process_mode = Node.PROCESS_MODE_DISABLED
+	if "nonpc" in exp:
+		var people: Node = ranch.get("people")
+		if people != null:
+			people.process_mode = Node.PROCESS_MODE_DISABLED
+			for n in people.find_children("*", "Node3D", false, false):
+				(n as Node3D).visible = false
+	if "noallanim" in exp:
+		for m in root.find_children("*", "AnimationPlayer", true, false):
+			m.process_mode = Node.PROCESS_MODE_DISABLED
+		for m in root.find_children("*", "SkeletonModifier3D", true, false):
+			(m as SkeletonModifier3D).active = false
+	if "npcmods" in exp or "npchide" in exp or "npcproc" in exp:
+		var people: Node = ranch.get("people")
+		for id in people.get("npcs"):
+			var n: Node3D = people.get("npcs")[id]
+			if "npcmods" in exp:
+				for m in n.find_children("*", "SkeletonModifier3D", true, false):
+					(m as SkeletonModifier3D).active = false
+			if "npchide" in exp:
+				n.visible = false
+			if "npcproc" in exp:
+				n.process_mode = Node.PROCESS_MODE_DISABLED
+	if "npcstat" in exp:
+		var people: Node = ranch.get("people")
+		for id in people.get("npcs"):
+			var n: Node3D = people.get("npcs")[id]
+			var tris := 0
+			var meshes := 0
+			for m in n.find_children("*", "MeshInstance3D", true, false):
+				var mi := m as MeshInstance3D
+				if mi.mesh == null or not mi.is_visible_in_tree():
+					continue
+				meshes += 1
+				for k in mi.mesh.get_surface_count():
+					var arr := mi.mesh.surface_get_arrays(k)
+					var idx = arr[Mesh.ARRAY_INDEX]
+					tris += (idx.size() if idx != null else (arr[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()) / 3
+			print("PERF_NPC %s tris=%d meshes=%d skel=%d mods=%d anims=%d nodes=%d" % [id, tris, meshes,
+				n.find_children("*", "Skeleton3D", true, false).size(),
+				n.find_children("*", "SkeletonModifier3D", true, false).size(),
+				n.find_children("*", "AnimationPlayer", true, false).size(),
+				n.find_children("*", "", true, false).size()])
 	if "nosun" in exp:
 		for l in ranch.find_children("*", "DirectionalLight3D", true, false):
 			(l as DirectionalLight3D).shadow_enabled = false

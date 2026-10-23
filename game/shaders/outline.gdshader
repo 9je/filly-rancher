@@ -19,6 +19,9 @@ uniform float fade_start = 18.0;
 uniform float fade_end = 42.0;
 // An explicit color wins over the albedo-derived one when its alpha is above zero.
 uniform vec4 line_color : source_color = vec4(0.0, 0.0, 0.0, 0.0);
+// Per INSTANCE, not per material: a far pony turns her line off without her materials being
+// swapped (a swap rebuilds her render instance, which is what made tier changes hitch).
+instance uniform float outline_on = 1.0;
 
 void vertex() {
 	vec4 view_pos = MODELVIEW_MATRIX * vec4(VERTEX, 1.0);
@@ -37,7 +40,7 @@ void vertex() {
 	// point, so each triangle is degenerate and the rasterizer drops it. Only a test that is
 	// the same for the whole draw may do this; a per-vertex one (the fade) would collapse
 	// some corners of a triangle and not others and smear it across the screen.
-	if (IN_SHADOW_PASS) {
+	if (IN_SHADOW_PASS || outline_on < 0.5) {
 		POSITION = vec4(0.0, 0.0, 2.0, 1.0);
 	}
 }

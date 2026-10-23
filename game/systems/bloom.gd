@@ -9,7 +9,7 @@ extends RefCounted
 ## times as long; a hungry, lonely or Calm-Lamped one never does.
 
 ## Real seconds to Bloom with every bonus active.
-const BEST_CASE_SECONDS := 360.0
+const BEST_CASE_SECONDS := 240.0
 const BASE_RATE := 1.0 / (BEST_CASE_SECONDS * 3.0)
 const FAVORITE_BONUS := 1.0
 const FRIEND_BONUS := 0.6

@@ -64,69 +64,106 @@ func say(text: String) -> void:
 
 func stop() -> void:
 	_queue.clear()
+	_pos = _cur_len
 	envelope = 0.0
 
 
 func is_speaking() -> bool:
-	return not _queue.is_empty()
+	return not _queue.is_empty() or (_pos < _cur_len and _cur != _silence)
 
 
 func _syllable(c: String) -> Dictionary:
 	var v := VOWELS[(c.unicode_at(0) + timbre) % VOWELS.size()]
 	var question := false
-	return {"f0": 220.0 * pitch * _rng.randf_range(0.92, 1.12), "f1": v.x * lerpf(1.0, pitch, 0.35),
-		"f2": v.y * lerpf(1.0, pitch, 0.35), "dur": _rng.randf_range(0.06, 0.09), "rise": question}
+	# QUANTISED, so the syllables a voice can say are a finite set and each is rendered once
+	# (see _render): pitch to 6 Hz steps, length to 10 ms.
+	var f0 := snappedf(220.0 * pitch * _rng.randf_range(0.92, 1.12), 6.0)
+	return {"f0": f0, "f1": snappedf(v.x * lerpf(1.0, pitch, 0.35), 10.0),
+		"f2": snappedf(v.y * lerpf(1.0, pitch, 0.35), 10.0),
+		"dur": snappedf(_rng.randf_range(0.06, 0.09), 0.01), "rise": question}
 
 
 var _silence := PackedVector2Array()
+## What is being played now: a rendered syllable or a stretch of silence, and how far in.
+var _cur := PackedVector2Array()
+var _pos := 0
+var _cur_len := 0
+## Every syllable ever rendered, by its parameters: the voice is synthesised once per
+## syllable shape, not once per sample per frame. That per-sample GDScript loop (eight
+## harmonics, two formant bumps, at 22 kHz) was a 10 ms hitch on every buffer refill while
+## anypony talked, found by the 60-pony check (scenes/test/perf.gd).
+static var _rendered: Dictionary = {}
+
+
+static func _render(s: Dictionary) -> PackedVector2Array:
+	var key := "%s|%s|%s|%s" % [s.f0, s.f1, s.f2, s.dur]
+	if _rendered.has(key):
+		return _rendered[key]
+	var dur: float = s.dur
+	var n := int(dur * RATE)
+	var out := PackedVector2Array()
+	out.resize(n)
+	var f0n: float = s.f0
+	var w: PackedFloat32Array = []
+	for h in range(1, 9):
+		var fh := f0n * h
+		w.append(exp(-pow((fh - float(s.f1)) / 260.0, 2.0)) + 0.7 * exp(-pow((fh - float(s.f2)) / 380.0, 2.0)) + 0.08 / h)
+	var phase := 0.0
+	for i in n:
+		var u := float(i) / float(n)
+		var env := sin(u * PI)
+		env = env * env
+		var f0 := f0n * (1.0 + 0.06 * sin(u * PI))
+		phase = fposmod(phase + f0 / RATE, 1.0)
+		var sample := 0.0
+		for h in 8:
+			sample += sin(TAU * phase * (h + 1)) * w[h]
+		sample *= 0.16 * env
+		out[i] = Vector2(sample, sample)
+	_rendered[key] = out
+	return out
+
+
+func _next_piece() -> bool:
+	if _queue.is_empty():
+		return false
+	var s: Dictionary = _queue.pop_front()
+	if s.has("pause"):
+		var n := int(float(s.pause) * RATE)
+		if _silence.size() < n:
+			_silence.resize(n)
+			_silence.fill(Vector2.ZERO)
+		_cur = _silence
+		_cur_len = n
+	else:
+		_cur = _render(s)
+		_cur_len = _cur.size()
+	_pos = 0
+	return true
 
 
 func _process(_delta: float) -> void:
 	if _gen == null:
 		return
 	var frames := _gen.get_frames_available()
-	if _queue.is_empty() and envelope <= 0.0:
-		# Nothing to say: the silence goes in as one buffer, not hundreds of push_frame()
-		# calls a frame (that loop was 2.9 ms of every idle frame, scenes/test/perf.gd).
-		if frames > 0:
-			if _silence.size() != frames:
-				_silence.resize(frames)
-				_silence.fill(Vector2.ZERO)
-			_gen.push_buffer(_silence)
+	if frames <= 0:
 		return
 	while frames > 0:
-		if _queue.is_empty():
-			envelope = move_toward(envelope, 0.0, 0.05)
-			_gen.push_frame(Vector2.ZERO)
-			frames -= 1
-			continue
-		var s: Dictionary = _queue[0]
-		if s.has("pause"):
-			_t += 1.0 / RATE
-			_gen.push_frame(Vector2.ZERO)
-			envelope = move_toward(envelope, 0.0, 0.01)
-			if _t >= float(s["pause"]):
-				_t = 0.0
-				_queue.pop_front()
-			frames -= 1
-			continue
-		var dur: float = s["dur"]
-		var u := _t / dur
-		var env := sin(clampf(u, 0.0, 1.0) * PI)
-		env = env * env
-		var f0: float = s["f0"] * (1.0 + 0.06 * sin(u * PI))
-		_phase = fposmod(_phase + f0 / RATE, 1.0)
-		var sample := 0.0
-		# A handful of harmonics weighted by two formant bumps: a cartoon "voice".
-		for h in range(1, 9):
-			var fh := f0 * h
-			var w := exp(-pow((fh - float(s["f1"])) / 260.0, 2.0)) + 0.7 * exp(-pow((fh - float(s["f2"])) / 380.0, 2.0)) + 0.08 / h
-			sample += sin(TAU * _phase * h) * w
-		sample *= 0.16 * env
-		_gen.push_frame(Vector2(sample, sample))
-		envelope = env
-		_t += 1.0 / RATE
-		if _t >= dur:
-			_t = 0.0
-			_queue.pop_front()
-		frames -= 1
+		if _pos >= _cur_len and not _next_piece():
+			# Nothing to say: the rest of the buffer is silence, in one push.
+			if _silence.size() < frames:
+				_silence.resize(frames)
+				_silence.fill(Vector2.ZERO)
+			_gen.push_buffer(_silence.slice(0, frames))
+			envelope = move_toward(envelope, 0.0, 0.2)
+			return
+		var take := mini(frames, _cur_len - _pos)
+		_gen.push_buffer(_cur.slice(_pos, _pos + take))
+		# The mouth follows the sound: the envelope where this chunk ends.
+		if _cur != _silence and _cur_len > 0:
+			var u := float(_pos + take) / float(_cur_len)
+			envelope = pow(sin(clampf(u, 0.0, 1.0) * PI), 2.0)
+		else:
+			envelope = move_toward(envelope, 0.0, 0.2)
+		_pos += take
+		frames -= take

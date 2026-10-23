@@ -784,6 +784,74 @@ def fx_lamp_hanging():
     export("fx_lamp_hanging")
 
 
+@prop("fx_tank")
+def fx_tank():
+    """A tall glass tank of distilled spectrum: rainbow bands of colour inside, gold collars,
+    pipes off the top. The thing the Works makes, standing in rows where you can see it."""
+    cols = ["red", "gold", "leaf", "brightsky", "lilac"]
+    parts = [cyl("base", 0.95, 0.4, (0, 0, 0.2), "metal_dark", verts=24, bevel=0.04),
+             cyl("cap", 0.95, 0.35, (0, 0, 3.45), "metal_dark", verts=24, bevel=0.04),
+             cyl("collarA", 1.0, 0.12, (0, 0, 0.45), "gold", verts=24),
+             cyl("collarB", 1.0, 0.12, (0, 0, 3.22), "gold", verts=24)]
+    for i, c in enumerate(cols):
+        parts.append(cyl("band%d" % i, 0.78, 0.5, (0, 0, 0.75 + i * 0.5), c, verts=24))
+    # The glass is open struts, not a solid pane: the toon shader draws opaque, and the
+    # colour inside is the point.
+    for k in range(4):
+        a = k * math.pi / 2 + math.pi / 4
+        parts.append(cyl("strut%d" % k, 0.06, 2.8, (math.cos(a) * 0.86, math.sin(a) * 0.86, 1.85), "metal", verts=8))
+    parts.append(cyl("pipe", 0.16, 1.6, (0, 0, 4.3), "metal", verts=12))
+    parts.append(cyl("valve", 0.32, 0.14, (0, 0, 3.9), "gold", verts=16))
+    join(parts, "fx_tank")
+    export("fx_tank")
+
+
+@prop("fx_console")
+def fx_console():
+    """A control desk: a sloped panel of dials and coloured buttons, a little gauge screen."""
+    parts = [box("desk", (2.2, 0.9, 1.0), (0, 0, 0.5), "metal_dark", bevel=0.04),
+             box("panel", (2.2, 0.75, 0.12), (0, -0.1, 1.08), "metal", bevel=0.02, rot=(math.radians(-28), 0, 0)),
+             box("screen", (0.8, 0.08, 0.55), (0, 0.32, 1.45), "iron", bevel=0.02),
+             box("glow", (0.66, 0.02, 0.4), (0, 0.27, 1.45), "teal", bevel=0.0)]
+    cols = ["red", "gold", "leaf", "brightsky", "lilac", "pink"]
+    for i, c in enumerate(cols):
+        parts.append(cyl("btn%d" % i, 0.07, 0.06, (-0.75 + i * 0.3, -0.18, 1.12), c, verts=12,
+                         rot=(math.radians(-28), 0, 0)))
+    for k in range(2):
+        parts.append(cyl("dial%d" % k, 0.13, 0.05, (-0.75 + k * 1.5, 0.05, 1.22), "cream", verts=16,
+                         rot=(math.radians(-28), 0, 0)))
+    join(parts, "fx_console")
+    export("fx_console")
+
+
+@prop("fx_canisters")
+def fx_canisters():
+    """A metal rack of small spectrum canisters, one colour to a shelf: the Works' output,
+    crated for Cloudsdale."""
+    cols = ["red", "gold", "leaf", "brightsky"]
+    parts = [box("post%d" % i, (0.08, 0.08, 2.2), (x, y, 1.1), "metal_dark", bevel=0.0)
+             for i, (x, y) in enumerate([(-1.0, -0.3), (1.0, -0.3), (-1.0, 0.3), (1.0, 0.3)])]
+    for k, c in enumerate(cols):
+        z = 0.25 + k * 0.55
+        parts.append(box("shelf%d" % k, (2.1, 0.7, 0.05), (0, 0, z), "metal", bevel=0.0))
+        for j in range(5):
+            parts.append(cyl("can%d_%d" % (k, j), 0.13, 0.36, (-0.8 + j * 0.4, 0, z + 0.21), c, verts=12, bevel=0.01))
+    join(parts, "fx_canisters")
+    export("fx_canisters")
+
+
+@prop("fx_crates")
+def fx_crates():
+    """Three stacked shipping crates stencilled with the Corporation's cloud mark."""
+    parts = []
+    for i, (x, y, z, w) in enumerate([(0, 0, 0.45, 0.9), (1.0, 0.1, 0.45, 0.9), (0.5, 0.05, 1.35, 0.9)]):
+        parts.append(box("crate%d" % i, (w, w, w), (x, y, z), "metal", bevel=0.03))
+        parts.append(box("band%d" % i, (w + 0.02, w + 0.02, 0.1), (x, y, z), "metal_dark", bevel=0.0))
+        parts.append(box("mark%d" % i, (0.35, 0.02, 0.22), (x, y - w / 2 - 0.01, z + 0.2), "gold", bevel=0.0))
+    join(parts, "fx_crates")
+    export("fx_crates")
+
+
 def main():
     wanted = [n for n in args.only.split(",") if n] or list(BUILDERS)
     for name in wanted:

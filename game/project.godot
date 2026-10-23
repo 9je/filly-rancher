@@ -44,6 +44,10 @@ Music="*res://systems/music.gd"
 buses/default_bus_layout="res://default_bus_layout.tres"
 
 [rendering]
+
+; v1 sharpening: the render thread runs beside the game thread (Vulkan on AMD and NVIDIA
+; alike). Measured on the 60-pony check (scenes/test/perf.gd): 16.6 ms down to 11.7 ms average.
+driver/threads/thread_model=2
 renderer/rendering_method="forward_plus"
 
 ; The HUD (game/ui/hud.gd) is authored in 1920x1080 units -- crosshair radii, pip

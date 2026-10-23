@@ -126,8 +126,10 @@ func candidates(at: Vector3) -> Array[Dictionary]:
 		# mailbox, the Market or the Depot talked to her instead. With nothing new to say she
 		# steps aside for whatever else is in reach (ranch.gd drops a "companion" talk when a
 		# building is offered too).
-		var n: Node = npcs[best]
-		if int(n.get("mode")) == NpcScript.Mode.FOLLOW and not has_news(best):
+		# With nothing new to say she steps aside for a building in reach (ranch.gd drops a
+		# "companion" talk when a building is offered too): Tumble at your heels, Bramble at
+		# her own counter, Pip by the mailbox. Somebody with news still has the key.
+		if not has_news(best):
 			c["companion"] = true
 		out.append(c)
 	return out

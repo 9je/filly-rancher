@@ -6,7 +6,7 @@
 #   tools/pacing.sh [minutes] [seed]
 set -uo pipefail
 cd "$(dirname "$0")/.."
-MIN="${1:-75}"
+MIN="${1:-70}"
 SEED="${2:-7}"
 export FILLY_TEST_SAVE_DIR="$(mktemp -d)"
 trap 'rm -rf "$FILLY_TEST_SAVE_DIR"' EXIT

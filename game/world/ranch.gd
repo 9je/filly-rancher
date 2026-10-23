@@ -763,6 +763,7 @@ func _ready() -> void:
 	# a map that does not exist yet.
 	terrain.regions = _regions_registry()
 	terrain.build()
+	PonyScript.ground_height = Callable(terrain, "height_at")
 	var dressing := RegionDressingScript.new()
 	dressing.name = "Dressing"
 	dressing.height_at = Callable(terrain, "height_at")
@@ -7666,22 +7667,12 @@ const CLUE_LETTERS: Array[String] = ["weather_yield", "weather_colour_receipt",
 ## The play clock (GameState.play_seconds): runs through menus and talk, which is play time
 ## too, so it lives on its own always-processing node rather than in _physics_process.
 func _start_play_clock() -> void:
-	var clock := PlayClock.new()
+	var clock := PlayClockScript.new()
 	clock.name = "PlayClock"
-	clock.ranch = self
 	add_child(clock)
 
 
-class PlayClock extends Node:
-	var ranch: Node
-
-	func _ready() -> void:
-		process_mode = Node.PROCESS_MODE_ALWAYS
-
-	func _process(delta: float) -> void:
-		var gs: Node = ranch.get("_game_state")
-		if gs != null:
-			gs.set("play_seconds", float(gs.get("play_seconds")) + delta)
+const PlayClockScript := preload("res://world/play_clock.gd")
 
 
 func _novelty(kind: String, id: String, label: String) -> bool:
@@ -7913,6 +7904,11 @@ func play_ending(ending: StringName) -> void:
 	var hud := get_node_or_null(^"HUD") as CanvasLayer
 	if hud != null:
 		hud.visible = false
+	# Whoever was mid-sentence stops: the veil is see-through at first, and a talk box under
+	# it read as part of the ending.
+	var talk_box: CanvasLayer = people.get("talk_box") if people != null else null
+	if talk_box != null:
+		talk_box.visible = false
 	var ep: CanvasLayer = EpilogueScript.new()
 	ep.ending = ending
 	ep.player_name = _player_name()
@@ -7926,6 +7922,8 @@ func play_ending(ending: StringName) -> void:
 		get_tree().paused = false
 		if hud != null:
 			hud.visible = true
+		if talk_box != null and people != null and people.is_talking():
+			talk_box.visible = true
 		ending_played.emit(ending)
 		if ending == EndingsScript.PLACEMENT:
 			placement_aftermath()

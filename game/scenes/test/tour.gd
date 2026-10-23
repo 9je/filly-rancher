@@ -325,10 +325,14 @@ func _factory_tour() -> void:
 	var c := Camera3D.new()
 	c.fov = 70
 	f.add_child(c)
+	var fh := f.get_node_or_null(^"HUD") as CanvasLayer
+	if fh != null:
+		fh.visible = false
 	for room in ["landing", "welcome", "classroom", "giftshop", "walkway", "gallery", "holding", "control"]:
-		var o: Vector3 = interior.call("room_origin", StringName(room))
-		c.global_position = o + Vector3(4.5, 2.4, 5.0)
-		c.look_at(o + Vector3(-2, 1.4, -4))
+		# room_origin() is the room's entry edge; its middle is half a room further in.
+		var o: Vector3 = interior.call("room_origin", StringName(room)) - Vector3(0, 0, 6.0)
+		c.global_position = o + Vector3(4.2, 2.6, 4.6)
+		c.look_at(o + Vector3(-2.5, 1.2, -3.5))
 		c.make_current()
 		await _frames(40)
 		await _shot("factory_" + room)

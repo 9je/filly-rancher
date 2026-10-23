@@ -971,6 +971,10 @@ func _ground_point(marker: ZoneMarker, slot: int) -> Vector3:
 		var point: Vector3 = hit["position"]
 		if _too_close(point):
 			continue
+		# A trunk or a standing stone beside the spot (a ray straight down misses one that
+		# is not directly underneath): room for her whole body, or try again.
+		if _blocked_by_prop(space, point):
+			continue
 		return point
 
 	# Every attempt was rejected or missed. Fall back to the last candidate at the
@@ -978,6 +982,20 @@ func _ground_point(marker: ZoneMarker, slot: int) -> Vector3:
 	# count, so this can never quietly become the normal path.
 	_fallback_placements += 1
 	return Vector3(last.x, centre.y, last.z)
+
+
+func _blocked_by_prop(space: PhysicsDirectSpaceState3D, point: Vector3) -> bool:
+	if _clearance_shape == null:
+		_clearance_shape = SphereShape3D.new()
+		_clearance_shape.radius = 0.75
+	var params := PhysicsShapeQueryParameters3D.new()
+	params.shape = _clearance_shape
+	params.transform = Transform3D(Basis(), point + Vector3(0, 0.85, 0))
+	params.collision_mask = LayersScript.PROPS
+	return not space.intersect_shape(params, 1).is_empty()
+
+
+var _clearance_shape: SphereShape3D
 
 
 func _too_close(point: Vector3) -> bool:

@@ -257,11 +257,21 @@ func _dress(room: Node3D, spec: Dictionary, markers: Node3D) -> void:
 			for z in [-4.0, 0.0, 4.0]:
 				_piece("fx_catwalk", room, Vector3(0, 2.4, z), 90.0)
 				_piece("fx_pipe", room, Vector3(3.5, 4.2, z), 90.0)
+			# Below the walkway, the floor the Collectors patrol: tanks of what the Works
+			# makes, crates of it, racks of it.
+			for z in [-3.5, 3.5]:
+				_piece("fx_tank", room, Vector3(4.6, 0, z))
+			_piece("fx_crates", room, Vector3(-4.4, 0, 0.5), 15.0)
+			_piece("fx_canisters", room, Vector3(-5.0, 0, -4.0), 90.0)
 			_mark(markers, "patrol_a", Vector3(-4.0, 0, 3.0))
 			_mark(markers, "patrol_b", Vector3(-4.0, 0, -3.0))
 			_mark(markers, "patrol_c", Vector3(4.0, 0, -3.0))
 		&"gallery":
 			_mark(markers, "window", Vector3(half - 1.6, 0, 0))
+			_piece("fx_canisters", room, Vector3(-5.0, 0, -3.0), 90.0)
+			_piece("fx_canisters", room, Vector3(-5.0, 0, 3.0), 90.0)
+			_piece("fx_console", room, Vector3(-2.5, 0, -5.0), 0.0)
+			_piece("fx_lamp_hanging", room, Vector3(0, 0, 0))
 			# Beside the gallery, not beyond it: the rooms run on down -Z, so a hall past
 			# the far wall would sit inside the holding room. 3 m down, so the ring is in
 			# the natural look down from the glass.
@@ -272,8 +282,16 @@ func _dress(room: Node3D, spec: Dictionary, markers: Node3D) -> void:
 				for z in [-3.0, 0.0, 3.0]:
 					_piece("fx_stall", room, Vector3(x, 0, z), 90.0 if x < 0 else -90.0)
 			_mark(markers, "clover", Vector3(4.0, 0, -3.0))
+			_piece("fx_crates", room, Vector3(0, 0, -4.5), -20.0)
+			_piece("fx_lamp_hanging", room, Vector3(0, 0, 0))
 		&"control":
 			_piece("fx_lever", room, Vector3(0, 0, -3.5))
+			# The room the whole valley's sky is run from: desks of dials, tanks either side.
+			for x in [-3.6, 3.6]:
+				_piece("fx_console", room, Vector3(x, 0, -1.0), 90.0 if x < 0 else -90.0)
+				_piece("fx_tank", room, Vector3(x * 1.35, 0, -4.4))
+				_piece("fx_tank", room, Vector3(x * 1.35, 0, 3.2))
+			_piece("fx_lamp_hanging", room, Vector3(0, 0, 1.0))
 			var handle := _piece("fx_lever_handle", room, Vector3(0.6, 1.1, -3.5))
 			if handle != null:
 				handle.name = "LeverHandle"

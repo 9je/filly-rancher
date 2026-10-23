@@ -106,6 +106,7 @@ extends CharacterBody3D
 ## and a fresh clone has not built it yet.
 
 const PonyTraitsScript := preload("res://systems/pony_traits.gd")
+const PonyLodScript := preload("res://actors/pony/pony_lod.gd")
 const GaitScript := preload("res://systems/gait.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const PonyVisualsScript := preload("res://actors/pony/pony_visuals.gd")
@@ -442,8 +443,8 @@ var _noticed := false
 ## by hand on the ticks she runs. A held
 ## pony is always FULL. Headless runs never leave FULL, so no test or gate sees a tier.
 enum Detail { FULL, MID, FAR }
-const DETAIL_MID_AT := 26.0
-const DETAIL_FAR_AT := 52.0
+const DETAIL_MID_AT := 12.0
+const DETAIL_FAR_AT := 40.0
 const DETAIL_OFFSCREEN_AT := 12.0
 const DETAIL_CHECK_SECONDS := 0.3
 ## Meshes too small to see a shadow from (by name): never cast one.
@@ -454,6 +455,9 @@ var _tick_count := 0
 var _tick_accum := 0.0
 var _stood_still := false
 static var _headless := -1
+## The ground's height at (x, z), set by the ranch (Terrain.height_at): FAR ponies walk on it
+## without a collision solve.
+static var ground_height: Callable
 
 
 func _ready() -> void:
@@ -810,7 +814,7 @@ func _physics_process(delta: float) -> void:
 		_update_detail()
 	var stride := 1
 	if detail != Detail.FULL:
-		stride = 2 if detail == Detail.MID else 4
+		stride = 3 if detail == Detail.MID else 6
 		_tick_accum += delta
 		_tick_count += 1
 		if _tick_count < stride:
@@ -864,6 +868,8 @@ func _physics_process(delta: float) -> void:
 	var resting := desired == Vector3.ZERO and velocity.length_squared() < 0.0001 \
 		and is_on_floor() and _stood_still
 	if not resting:
+		# (A collision-free glide for FAR ponies was tried and dropped: it walked them through
+		# trunks and standing stones, which the ranch's own gate rightly refuses.)
 		if stride > 1:
 			# move_and_slide steps by the physics tick, not by `delta`: scale her velocity
 			# for the ticks she skipped, then hand back the velocity she would have had.
@@ -885,9 +891,13 @@ func _update_detail() -> void:
 	var cam := get_viewport().get_camera_3d() if _headless == 0 and is_inside_tree() else null
 	if cam != null:
 		var d := cam.global_position.distance_to(global_position)
-		if d > DETAIL_FAR_AT or (d > DETAIL_OFFSCREEN_AT and not cam.is_position_in_frustum(global_position)):
+		# Two metres of hysteresis either side of each line, so a pony standing on one does not
+		# flicker between tiers as the camera breathes.
+		var slack := 2.0 if detail == Detail.FULL else -2.0
+		var slack_far := 2.0 if detail != Detail.FAR else -2.0
+		if d > DETAIL_FAR_AT + slack_far or (d > DETAIL_OFFSCREEN_AT and not cam.is_position_in_frustum(global_position)):
 			want = Detail.FAR
-		elif d > DETAIL_MID_AT:
+		elif d > DETAIL_MID_AT + slack:
 			want = Detail.MID
 	if want != detail:
 		_set_detail(want)
@@ -895,22 +905,32 @@ func _update_detail() -> void:
 
 func _set_detail(want: int) -> void:
 	detail = want
-	_tick_count = 0
+	# A RANDOM PHASE IN HER STRIDE, so a crowd that changes tier together (the camera turned)
+	# does not then think, move and animate all on the same tick: the 60-pony check showed a
+	# spike every sixth tick until this was staggered.
+	_tick_count = _rng.randi() % 6
 	_tick_accum = 0.0
 	if visuals == null:
 		return
-	for m in visuals.find_children("*", "SpringBoneSimulator3D", true, false):
-		(m as SkeletonModifier3D).active = detail == Detail.FULL
-	for m in visuals.find_children("*", "MeshInstance3D", true, false):
-		var mi := m as MeshInstance3D
+	var meshes := _detail_meshes()
+	for m in _springs_cache:
+		if is_instance_valid(m):
+			m.active = detail == Detail.FULL
+	for mi: MeshInstance3D in meshes:
+		if not is_instance_valid(mi):
+			continue
 		var small := false
 		for part in NO_SHADOW_PARTS:
 			if part in String(mi.name).to_lower():
 				small = true
-		var cast := detail == Detail.FULL or (detail == Detail.MID and not small)
+		var cast := detail == Detail.FULL and not small
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if cast \
 			else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_outline(detail != Detail.FAR)
+	_outline(detail == Detail.FULL)
+	# Far off, nopony needs to notice the player: her 14 m detection sphere stops being
+	# re-queried against the broadphase every time she takes a step.
+	if detection_area != null:
+		detection_area.set_deferred("monitoring", detail != Detail.FAR)
 	if _anim != null:
 		# Past FULL her skeleton moves only on the ticks she thinks on (30 or 15 a second):
 		# every pose costs a skin update on each of her meshes.
@@ -918,33 +938,24 @@ func _set_detail(want: int) -> void:
 			if detail != Detail.FULL else AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_IDLE
 
 
-## FAR: the toon outline (a second pass per surface, invisible at that size) comes off, by
-## swapping each surface to a cached copy of its material without the pass.
-static var _no_outline: Dictionary = {}
-
-
+## Past FULL the toon outline (a second pass per surface, a thread at that size) goes off,
+## through the outline shader's per-instance `outline_on`: no material is swapped.
 func _outline(on: bool) -> void:
-	for m in visuals.find_children("*", "MeshInstance3D", true, false):
-		var mi := m as MeshInstance3D
-		if mi.mesh == null:
-			continue
-		for i in mi.mesh.get_surface_count():
-			var key := StringName("lod_mat_%d" % i)
-			if on:
-				if mi.has_meta(key):
-					mi.set_surface_override_material(i, mi.get_meta(key))
-					mi.remove_meta(key)
-				continue
-			var mat := mi.get_surface_override_material(i) as ShaderMaterial
-			if mat == null or mat.next_pass == null or mi.has_meta(key):
-				continue
-			var bare: ShaderMaterial = _no_outline.get(mat.get_instance_id())
-			if bare == null:
-				bare = mat.duplicate() as ShaderMaterial
-				bare.next_pass = null
-				_no_outline[mat.get_instance_id()] = bare
-			mi.set_meta(key, mat)
-			mi.set_surface_override_material(i, bare)
+	for mi: MeshInstance3D in _detail_meshes():
+		mi.set_instance_shader_parameter(&"outline_on", 1.0 if on else 0.0)
+
+
+var _meshes_cache: Array[MeshInstance3D] = []
+var _springs_cache: Array[SkeletonModifier3D] = []
+
+
+func _detail_meshes() -> Array[MeshInstance3D]:
+	if _meshes_cache.is_empty() and visuals != null:
+		for m in visuals.find_children("*", "MeshInstance3D", true, false):
+			_meshes_cache.append(m as MeshInstance3D)
+		for m in visuals.find_children("*", "SpringBoneSimulator3D", true, false):
+			_springs_cache.append(m as SkeletonModifier3D)
+	return _meshes_cache
 
 
 # --- states -----------------------------------------------------------------------
@@ -1423,6 +1434,9 @@ func _apply_data() -> void:
 		return
 
 	visuals.add_child(body)
+	# Mesh LODs, eyes excluded (actors/pony/pony_lod.gd): a far pony costs a fraction of a
+	# near one on the GPU.
+	PonyLodScript.apply(body)
 	_anim = body.get_node_or_null(PonyVisualsScript.ANIMATION_PLAYER_PATH)
 	if _anim == null:
 		# build() refuses to return an instance without one, so this is unreachable

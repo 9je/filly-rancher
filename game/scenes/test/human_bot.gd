@@ -16,10 +16,13 @@ extends SceneTree
 ## Prints BOT_OK (and PACING_OK / PACING_FAILED with --pacing) when the run is over.
 
 const RANCH := "res://world/ranch.tscn"
+const FACTORY := "res://world/factory.tscn"
+const FactoryRunScript := preload("res://world/factory_run.gd")
 const BootIntentScript := preload("res://world/boot_intent.gd")
 const InteractionScript := preload("res://world/interaction.gd")
 const NoveltyScript := preload("res://systems/novelty.gd")
 const ShopItemScript := preload("res://systems/shop_item.gd")
+const PonyTraitsScript := preload("res://systems/pony_traits.gd")
 
 ## Human pacing: reading speed (characters a second), a think before each menu choice, and
 ## the turn rate of the camera.
@@ -58,7 +61,10 @@ var _nav_dirty := false
 var _log: Array[String] = []
 var _done := false
 var _sighted_only := false
+var _build_fails: Dictionary = {}
 var _palace_visits := 0
+var _last_market := -9999.0
+var _lift: StringName = &""
 var _last_palace := -9999.0
 
 
@@ -91,6 +97,7 @@ func _run() -> void:
 	gs = root.get_node("GameState")
 	await _bake_nav()
 	physics_frame.connect(_control)
+	_watch_lift()
 	await _brain()
 	_finish()
 
@@ -368,6 +375,9 @@ func _brain() -> void:
 	await _creator()
 	var end := minutes * 60.0
 	while _t() < end:
+		if _lift != &"":
+			await _play_factory(_lift)
+			continue
 		await _tend_menus()
 		if await _talk_to_news():
 			continue
@@ -375,11 +385,11 @@ func _brain() -> void:
 			continue
 		if await _build_first_pen():
 			continue
-		if await _build_more_pens():
-			continue
 		if await _pen_the_bag():
 			continue
 		if await _deliver_extras():
+			continue
+		if await _build_more_pens():
 			continue
 		if await _shop():
 			continue
@@ -561,7 +571,7 @@ func _build_more_pens() -> bool:
 		return false
 	var empty: Node3D = null
 	for slot: Node3D in _slots():
-		if slot.call("get_built") == null:
+		if slot.call("get_built") == null and int(_build_fails.get(slot.name, 0)) < 2:
 			empty = slot
 			break
 	if empty == null:
@@ -569,10 +579,13 @@ func _build_more_pens() -> bool:
 	var want_big := _bits() >= 150 + 40
 	_say("builds another pen (%s)" % ("Big Pen" if want_big else "Paddock"))
 	if not await _approach(InteractionScript.Kind.PLOT_BUILD, empty.global_position + empty.global_basis.z * 4.5, 0.6):
+		_build_fails[empty.name] = int(_build_fails.get(empty.name, 0)) + 1
+		_say("no build prompt at %s (%s at %s)" % [empty.name, ranch.call("current_interaction"), player.global_position.snapped(Vector3.ONE * 0.1)])
 		await _wait(3.0)
 		return true
 	await _tap(&"interact")
 	await _wait(0.8)
+	var before := _pens().size()
 	var bm: Node = ranch.get("build_menu")
 	if bm != null and bool(bm.call("is_open")):
 		await _think()
@@ -586,6 +599,10 @@ func _build_more_pens() -> bool:
 		await _wait(1.0)
 		if bool(bm.call("is_open")):
 			bm.call("close")
+	if _pens().size() == before:
+		# The build did not happen (no bits, or she is standing on the plot): not again soon.
+		_build_fails[empty.name] = int(_build_fails.get(empty.name, 0)) + 1
+		await _wait(2.0)
 	_nav_dirty = true
 	return true
 
@@ -673,7 +690,8 @@ func _deliver_extras() -> bool:
 	var extra := 0
 	for pen in _pens():
 		for inst: PonyInstance in pen.call("ponies"):
-			if not inst.is_marked() and _not_close_to_bloom(inst):
+			# Drifters only: a person keeps the canon ponies she catches.
+			if inst.is_stock() and not inst.is_marked() and _not_close_to_bloom(inst):
 				extra += 1
 	if not (pens_full and (bag.count() >= 3 or extra >= 2)):
 		return false
@@ -713,8 +731,10 @@ func _deliver_extras() -> bool:
 	return true
 
 
+## A person keeps the ones who are coming along: anypony with some Bloom in her goes on
+## growing, and only the newest arrivals go to the Depot.
 func _not_close_to_bloom(inst: PonyInstance) -> bool:
-	return inst.bloom < 0.6
+	return inst.bloom < 0.15
 
 
 ## The shopping list, in the order a person would want things.
@@ -745,6 +765,24 @@ func _next_buy() -> ShopItem:
 	return null
 
 
+## What the penned ponies love, most-wanted first (the catch toast told her).
+func _wanted_food() -> StringName:
+	var votes := {}
+	for pen in _pens():
+		for inst: PonyInstance in pen.call("ponies"):
+			if inst.is_marked():
+				continue
+			var f := PonyTraitsScript.favorite_of(inst)
+			votes[f] = int(votes.get(f, 0)) + 1
+	var best: StringName = &"hay"
+	var best_n := 0
+	for f in votes:
+		if int(votes[f]) > best_n:
+			best_n = int(votes[f])
+			best = f
+	return best
+
+
 func _pantry() -> int:
 	var inv: Object = gs.get("inventory")
 	if inv == null:
@@ -759,8 +797,14 @@ func _shop() -> bool:
 	var item := _next_buy()
 	var gems: Object = gs.get("gems")
 	var gem_count := int(gems.call("total")) if gems != null and gems.has_method("total") else 0
-	if (item == null or _bits() + gem_count * 5 < item.cost) and gem_count < 25:
+	# A person goes to the Market when the trip buys something (or the pouch is heavy), and
+	# not twice in three minutes for the same bale of hay.
+	var worth := item != null and _bits() + gem_count * 5 >= item.cost
+	if not worth and gem_count < 40:
 		return false
+	if _t() - _last_market < 180.0:
+		return false
+	_last_market = _t()
 	_say("goes to the market")
 	if not await _approach(InteractionScript.Kind.MARKET, _node_pos(^"Buildings/Market"), 3.4):
 		return true
@@ -774,6 +818,12 @@ func _shop() -> bool:
 	mm.call("sell_everything")
 	await _wait(1.0)
 	item = _next_buy()
+	if item != null and item.kind == ShopItemScript.Kind.CARE:
+		# The food her ponies love, not whatever is top of the list.
+		var want := _wanted_food()
+		for it: ShopItem in mm.call("buy_rows"):
+			if it.kind == ShopItemScript.Kind.CARE and it.food_id == want:
+				item = it
 	if item != null and _bits() >= item.cost:
 		mm.call("set_tab", 1)
 		await _think()
@@ -820,8 +870,11 @@ func _sighted() -> Node3D:
 	var h: Node = ranch.get("happenings")
 	if h == null:
 		return null
-	var p: Node3D = h.get("sighting")
-	if p == null or not is_instance_valid(p) or int(p.get("state")) >= 5 or not _reachable(p.global_position):
+	var v: Variant = h.get("sighting")
+	if v == null or not is_instance_valid(v):
+		return null
+	var p := v as Node3D
+	if p == null or int(p.get("state")) >= 5 or not _reachable(p.global_position):
 		return null
 	return p
 
@@ -963,6 +1016,119 @@ func _wander() -> void:
 	var to: Vector3 = spots[rng.randi() % spots.size()]
 	await _walk(to, 8.0, 25.0)
 	await _wait(rng.randf_range(0.5, 2.0))
+
+
+# --- the Rainbow Factory ------------------------------------------------------------------
+
+func _watch_lift() -> void:
+	if ranch.has_signal("lift_requested") and not ranch.lift_requested.is_connected(_on_lift):
+		ranch.lift_requested.connect(_on_lift)
+
+
+func _on_lift(mode: StringName) -> void:
+	_lift = mode
+
+
+## Up the lift and through the Works the way a player goes: walk to whatever the scene is
+## waiting for, creep past the lanterns, hold E where it asks, read what is said. Back down,
+## the ranch loads the save the Factory wrote.
+func _play_factory(mode: StringName) -> void:
+	_say("rides the lift up (%s)" % mode)
+	_lift = &""
+	_stop()
+	FactoryRunScript.mode = mode
+	change_scene_to_file(FACTORY)
+	var f: Node = null
+	for i in 300:
+		await process_frame
+		f = current_scene
+		if f != null and f.get("player") != null and f.get("interior") != null and i > 10:
+			break
+	ranch = f
+	player = f.get("player")
+	rig = player.get_camera_pivot().get_node("CameraRig")
+	_nav_region = null
+	await _bake_nav()
+	var done := [false]
+	f.finished.connect(func(_o: StringName) -> void: done[0] = true)
+	var guard := 0.0
+	while not done[0] and guard < 1800.0:
+		guard += 0.25
+		var people: Node = f.get("people")
+		if people != null and bool(people.call("is_talking")):
+			await _read_conversation_in(people)
+			continue
+		var g: Dictionary = f.get("goal")
+		if g.is_empty():
+			await _wait(0.25)
+			continue
+		var at: Vector3 = g.at
+		if str(g.kind) == "area":
+			await _sneak_to(f, at)
+		elif str(g.kind) == "hold":
+			await _walk(at, 2.0, 30.0)
+			Input.action_press(&"interact")
+			var h := 0
+			while not (f.get("goal") as Dictionary).is_empty() and h < 900:
+				h += 1
+				await physics_frame
+			Input.action_release(&"interact")
+	_say("back down from the Factory")
+	# FactoryRun changes the scene back to the ranch itself.
+	for i in 900:
+		await process_frame
+		var r := current_scene
+		if r != null and r != f and r.get("people") != null and r.get("player") != null and i > 30:
+			ranch = r
+			break
+	player = ranch.get("player")
+	rig = player.get_camera_pivot().get_node("CameraRig")
+	_nav_region = null
+	await _bake_nav()
+	_watch_lift()
+
+
+## Walk toward `at`, stopping still whenever a patrol's lantern would catch the next step.
+func _sneak_to(f: Node, at: Vector3) -> void:
+	var patrols: Array = f.call("patrols") if f.has_method("patrols") else []
+	var t0 := _t()
+	while _t() - t0 < 60.0:
+		var d := Vector2(player.global_position.x - at.x, player.global_position.z - at.z).length()
+		if d < 1.2 or (f.get("goal") as Dictionary).is_empty():
+			_stop()
+			return
+		var ahead := player.global_position + (at - player.global_position).normalized() * 1.6
+		var seen := false
+		for p in patrols:
+			if is_instance_valid(p) and bool(p.get("enabled")) and (bool(p.call("sees", ahead)) or bool(p.call("sees", player.global_position))):
+				seen = true
+		if seen:
+			_stop()
+			_sneak = true
+			await _wait(0.4)
+			continue
+		_sneak = not patrols.is_empty()
+		await _walk(at, 1.0, 1.0)
+	_sneak = false
+
+
+func _read_conversation_in(people: Node) -> void:
+	var guard := 0
+	while bool(people.call("is_talking")) and guard < 60:
+		guard += 1
+		var box: Node = people.get("talk_box")
+		var runner: Object = people.get("runner")
+		var line := str((runner.call("current") as Dictionary).get("text", "")) if runner != null else ""
+		await _wait(maxf(1.4, line.length() / READ_CPS) if line != "" else 2.6)
+		if not bool(people.call("is_talking")):
+			break
+		if runner != null and bool(runner.call("has_choices")):
+			await _think()
+			box.emit_signal("chose", 0)
+		else:
+			box.call("_accept")
+			if bool(box.call("is_revealing")):
+				box.call("_accept")
 
 
 # --- the end -----------------------------------------------------------------------------

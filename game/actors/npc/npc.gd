@@ -8,6 +8,7 @@ extends CharacterBody3D
 ## She talks through game/world/people.gd, which owns the conversations; this node only
 ## acts them out: `act(mood, anim)` sets her face and plays a one-shot or loop clip.
 
+const PonyLodScript := preload("res://actors/pony/pony_lod.gd")
 const PonyRigScript := preload("res://scripts/pony_rig.gd")
 const PonyPaintScript := preload("res://systems/pony_paint.gd")
 const DonorTableScript := preload("res://systems/donor_table.gd")
@@ -80,6 +81,7 @@ func setup(d: CharacterDef) -> void:
 	var body: Node3D = (load(path) as PackedScene).instantiate()
 	PonyRigScript.attach_hair_simulation(body)
 	_visuals.add_child(body)
+	PonyLodScript.apply(body)
 	PonyPaintScript.apply(body, look)
 	_visuals.scale = Vector3.ONE * PonyPaintScript.body_scale(look)
 	_anim = body.get_node_or_null(^"AnimationPlayer") as AnimationPlayer
@@ -171,6 +173,11 @@ func set_mode_walk_to(at: Vector3) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	# Far from the camera her face and mane springs rest (see _update_far).
+	_far_t -= delta
+	if _far_t <= 0.0:
+		_far_t = 0.5
+		_update_far()
 	var desired := Vector3.ZERO
 	match mode:
 		Mode.FOLLOW:
@@ -198,9 +205,31 @@ func _physics_process(delta: float) -> void:
 	var h := Vector3(velocity.x, 0, velocity.z).move_toward(desired, 6.0 * delta)
 	velocity.x = h.x
 	velocity.z = h.z
-	move_and_slide()
+	# Standing at home on solid ground: nothing for move_and_slide to resolve.
+	if desired != Vector3.ZERO or velocity.length_squared() > 0.0001 or not is_on_floor() or not _settled:
+		move_and_slide()
+		_settled = desired == Vector3.ZERO and velocity.length_squared() < 0.0001 and is_on_floor()
 	_turn(desired, delta)
 	_animate()
+
+
+
+var _far := false
+var _settled := false
+var _far_t := 0.0
+var _far_accum := 0.0
+
+
+func _update_far() -> void:
+	if DisplayServer.get_name() == "headless" or not is_inside_tree():
+		return
+	var cam := get_viewport().get_camera_3d()
+	var far := cam != null and cam.global_position.distance_to(global_position) > 30.0
+	if far == _far:
+		return
+	_far = far
+	for m in _visuals.find_children("*", "SkeletonModifier3D", true, false):
+		(m as SkeletonModifier3D).active = not far
 
 
 func _turn(desired: Vector3, delta: float) -> void:

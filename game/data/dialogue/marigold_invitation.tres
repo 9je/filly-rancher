@@ -12,8 +12,8 @@ bark = false
 when = {
 "chapters": [1],
 "min": {
-"deliveries": 8,
-"blooms": 3
+"deliveries": 6,
+"blooms": 2
 },
 "flags_none": ["invited"]
 }

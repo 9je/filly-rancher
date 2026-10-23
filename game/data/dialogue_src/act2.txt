@@ -75,7 +75,7 @@ two [marigold happy nod] Vivid coats, cheerful temperaments. The happier they ar
 === marigold_invitation
 speaker: marigold
 priority: 95
-when: {"chapters": [1], "min": {"deliveries": 8, "blooms": 3}, "flags_none": ["invited"]}
+when: {"chapters": [1], "min": {"deliveries": 6, "blooms": 2}, "flags_none": ["invited"]}
 
 start [marigold happy] {name}! You've been chosen! the Corporation's top steward this quarter. Look, a gold-edged invitation.
   flag: invited

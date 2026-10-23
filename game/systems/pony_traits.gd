@@ -42,6 +42,9 @@ const CANON := {
 
 ## Set by the ranch at each phase change (the night-dependent quirks read it).
 static var night := false
+## Off: nopony has a quirk. For tests of the pen, production and Bloom rules on their own
+## (the traits have test_pony_traits.gd); the game never turns it off.
+static var quirks_enabled := true
 static var _cache: Dictionary = {}
 
 
@@ -74,7 +77,7 @@ static func favorite_of(inst: PonyInstance) -> StringName:
 
 ## Her quirk (a key of QUIRKS), or &"" for a pony with none (only an unseeded stock pony).
 static func quirk_of(inst: PonyInstance) -> StringName:
-	if inst == null:
+	if inst == null or not quirks_enabled:
 		return &""
 	var key := String(inst.uid)
 	if _cache.has(key):
@@ -87,6 +90,8 @@ static func quirk_of(inst: PonyInstance) -> StringName:
 
 ## The same answer from what a wild body carries (her stock look, or her record's id).
 static func quirk_for(stock: Dictionary, data_id: StringName) -> StringName:
+	if not quirks_enabled:
+		return &""
 	if not stock.is_empty():
 		var seed_value := int(stock.get("seed", 0))
 		if seed_value == 0:

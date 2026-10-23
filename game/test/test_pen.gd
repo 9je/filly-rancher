@@ -44,6 +44,15 @@ const SCRATCH_SLOT := 8
 const PONY_FULL_HEIGHT := 2.138
 
 
+
+## The pen's own rules, without the traits' (game/test/test_pony_traits.gd has those).
+func before_all() -> void:
+	PonyTraits.quirks_enabled = false
+
+
+func after_all() -> void:
+	PonyTraits.quirks_enabled = true
+
 func after_each() -> void:
 	# Production keeps a process-wide fractional-gem ledger keyed by uid. Left alone, one
 	# test's leftover progress would decide another test's first gem.

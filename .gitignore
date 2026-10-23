@@ -28,3 +28,6 @@ scratchpad/
 
 # Claude Code agent worktrees: separate git checkouts, never project content.
 .claude/worktrees/
+
+# The trailer/edit tooling venv (librosa for beat detection): tools/.venv
+tools/.venv/

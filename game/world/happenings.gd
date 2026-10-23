@@ -11,8 +11,11 @@ extends Node
 ##   9   sun_shower     three pegasus Drifters come down near you (after a couple of catches)
 ##   13  sighting_1     a rare canon pony appears somewhere open; every 9 min after, another
 ##   17  palace_flyer   the Palace on the Strip opens (the casino was shut till now)
+##   26  newsletter     Pip photographs the ranch for the Corporation newsletter (a clue)
 ##   30  race_day       the track's first race day (after the Palace is open)
 ##   35  lost_foal      Pip's lost foal: bring her back for a reward
+##   40  collector_visit  a Collector walks up to your fence, writes something down, leaves
+##   45  starry         two starry Drifters (a rare coat) wander down from the hills
 
 const GeneratorScript := preload("res://systems/pony_generator.gd")
 const SIGHTING_FIRST := 13.0 * 60.0
@@ -64,10 +67,16 @@ func _physics_process(delta: float) -> void:
 		_sun_shower()
 	elif not _done("palace_flyer") and t >= 17.0 * 60.0:
 		_palace_flyer()
+	elif not _done("newsletter") and t >= 26.0 * 60.0:
+		_newsletter()
 	elif not _done("race_day") and t >= 30.0 * 60.0 and story.has_flag("palace_open"):
 		_race_day()
 	elif not _done("lost_foal") and t >= 35.0 * 60.0:
 		_lost_foal()
+	elif not _done("collector_visit") and t >= 40.0 * 60.0:
+		_collector_visit()
+	elif not _done("starry") and t >= 45.0 * 60.0:
+		_starry()
 	elif t >= SIGHTING_FIRST:
 		var n := int(story.get_var("sightings", 0))
 		if t >= SIGHTING_FIRST + SIGHTING_EVERY * n and (sighting == null or not is_instance_valid(sighting)
@@ -103,6 +112,14 @@ func _spot(near: float, far: float) -> Vector3:
 		if not _open_at(x, z):
 			continue
 		return _ground(x, z)
+	# Nowhere open that far out (she is deep in a corner of the map): nearer, anywhere open.
+	for i in 24:
+		var a := randf() * TAU
+		var r := randf_range(10.0, near)
+		var x := clampf(p.x + cos(a) * r, -95.0, 95.0)
+		var z := clampf(p.z + sin(a) * r, -95.0, 95.0)
+		if _open_at(x, z):
+			return _ground(x, z)
 	return Vector3.INF
 
 
@@ -224,3 +241,59 @@ func _check_lost_foal() -> void:
 			ranch.call("_toast", "You found the lost foal! Pip sends %d bits, and the filly's mother sends a pie." % LOST_FOAL_REWARD)
 			ranch.call("_novelty", "story", "lost_foal_home", "Brought the lost foal home")
 			return
+
+
+## A Collector in a grey coat comes up the lane, stops at the fence, looks at your pens for a
+## while, writes something down, and goes. Nopony says anything about it. (A clue.)
+func _collector_visit() -> void:
+	_mark("collector_visit")
+	var def := CharacterDef.new()
+	def.id = &"collector_visit"
+	def.display_name = "Collector"
+	def.char_seed = 4401
+	def.look = {"coat": "8a8f99", "mane": "4d525c", "mane2": "5f6470", "tail": "4d525c"}
+	var n: Npc = (load("res://actors/npc/npc.gd") as Script).new()
+	ranch.add_child(n)
+	var start := _ground(14.0, 40.0)
+	n.global_position = start
+	n.setup(def)
+	var stop := _ground(-4.0, 16.0)
+	n.set_mode_walk_to(stop)
+	ranch.call("_toast", "A Collector in a grey coat comes up the lane and stops at your fence.")
+	ranch.call("_novelty", "clue", "collector_visit", "A Collector stops at the fence and takes notes")
+	var t := create_tween()
+	t.tween_interval(26.0)
+	t.tween_callback(func() -> void:
+		if is_instance_valid(n):
+			ranch.call("_toast", "The Collector writes something on a clipboard, and leaves.")
+			n.set_mode_walk_to(start))
+	t.tween_interval(24.0)
+	t.tween_callback(func() -> void:
+		if is_instance_valid(n):
+			n.queue_free())
+
+
+## Two Drifters with stars in their coats, the rarest look the valley has, wander in.
+func _starry() -> void:
+	_mark("starry")
+	var spawner: Node = ranch.get("spawner")
+	var data: PonyData = load("res://data/hidden/stock_shy.tres")
+	var made := 0
+	for i in 2:
+		var at := _spot(14.0, 26.0)
+		if at == Vector3.INF:
+			continue
+		var look := GeneratorScript.generate(55500 + i * 3, {"variant": &"starry"})
+		if spawner.call("spawn_guest", data, look.to_dict(), at, 6.0) != null:
+			made += 1
+	ranch.call("_toast", "Tumble: \"Look at their coats! They've got STARS in them!\" %d starry Drifters wander down from the hills." % made)
+	ranch.call("_novelty", "pony", "starry_drifters", "Starry Drifters, the rarest coat, wander in")
+
+
+## STEWARD OF THE WEEK. Pip takes a picture of you and your pens for the Corporation's
+## newsletter; the caption under it is all yield. (A clue, and a smile for the camera.)
+func _newsletter() -> void:
+	_mark("newsletter")
+	var n := int(_story().deliveries)
+	ranch.call("_toast", "Pip: \"Smile! Cloudsdale wants you for the newsletter!\" Steward of the Week: %d ponies placed, \"a yield of %d%% above the valley average.\"" % [n, 40 + n * 7])
+	ranch.call("_novelty", "clue", "newsletter", "Pip photographs you for the Corporation newsletter")
