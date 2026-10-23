@@ -41,6 +41,18 @@ var presence: Callable = func(_id: StringName) -> bool: return true
 var player: Node3D
 var camera: Camera3D
 var npcs: Dictionary = {}
+## The wild herd Tumble points at: a Callable returning the standing wild ponies (the
+## ranch hands over spawner.get_spawned()).
+var wild_provider: Callable = func() -> Array: return []
+## Emitted when Tumble points at a Drifter (for the onboarding tip and the HUD ping).
+signal tumble_pointed(pony: Node3D)
+
+const POINT_RADIUS := 25.0
+const POINT_EVERY := 2.5
+const POINT_HOLD := 4.0
+var _point_t := 0.0
+var _pointed: Dictionary = {}
+var _marker: Node3D
 
 var _speaker: StringName = &""
 var _rng := RandomNumberGenerator.new()
@@ -155,7 +167,8 @@ func _show() -> void:
 	babble.say(str(line.text))
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	_tumble_finder(delta)
 	if not is_talking():
 		return
 	var who: StringName = runner.current().get("who", _speaker)
@@ -234,3 +247,78 @@ func _color_of(id: StringName) -> Color:
 		if c.s > best.s:
 			best = c
 	return Color.from_hsv(best.h, clampf(maxf(best.s, 0.45), 0.0, 0.85), 0.62)
+
+
+# --- Tumble, the finder (STORY.md beat 1.2) -----------------------------------------------
+
+func _tumble_finder(delta: float) -> void:
+	var tumble := npc(&"tumble")
+	if tumble == null or is_talking():
+		return
+	_point_t -= delta
+	if _marker != null and is_instance_valid(_marker):
+		_marker.rotation.y += delta * 2.0
+		_marker.position.y = 2.4 + sin(Time.get_ticks_msec() / 220.0) * 0.12
+	if _point_t > 0.0:
+		return
+	_point_t = POINT_EVERY
+	var best: Node3D = null
+	var best_d := POINT_RADIUS
+	var now := Time.get_ticks_msec()
+	for p in wild_provider.call():
+		var pony := p as Node3D
+		if pony == null or not is_instance_valid(pony):
+			continue
+		if pony.has_method("is_leaving") and pony.call("is_leaving"):
+			continue
+		var key := pony.get_instance_id()
+		if now - int(_pointed.get(key, -1000000)) < 30000:
+			continue
+		var d := pony.global_position.distance_to(tumble.global_position)
+		if d < best_d:
+			best_d = d
+			best = pony
+	if best == null:
+		return
+	_pointed[best.get_instance_id()] = now
+	_point_at(tumble, best)
+
+
+func _point_at(tumble: Npc, pony: Node3D) -> void:
+	tumble.act(&"happy", &"look")
+	if tumble.face() != null:
+		tumble.face().look_target = pony.global_position + Vector3(0, 1.0, 0)
+		tumble.face().look_weight = 1.0
+	if _marker != null and is_instance_valid(_marker):
+		_marker.queue_free()
+	_marker = _sparkle_marker()
+	pony.add_child(_marker)
+	_marker.position = Vector3(0, 2.4, 0)
+	var m := _marker
+	get_tree().create_timer(POINT_HOLD).timeout.connect(func() -> void:
+		if is_instance_valid(m):
+			m.queue_free())
+	tumble_pointed.emit(pony)
+	var sound := get_node_or_null("/root/Sound")
+	if sound != null:
+		sound.call("play_at", &"sparkle", pony.global_position)
+
+
+## A floating four-point star over the pony she found, in Tumble's own mane blue.
+func _sparkle_marker() -> Node3D:
+	var root := Node3D.new()
+	var q := MeshInstance3D.new()
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.7, 0.7)
+	q.mesh = quad
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	m.albedo_texture = BloomCeremony.star_texture()
+	m.albedo_color = Color(0.55, 0.85, 1.0)
+	m.no_depth_test = true
+	m.render_priority = 10
+	q.material_override = m
+	root.add_child(q)
+	return root

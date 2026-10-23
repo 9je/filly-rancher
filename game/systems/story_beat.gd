@@ -73,6 +73,9 @@ const DEFAULTS := {
 
 ## A name from REPLY_NAMES.
 @export var reply: StringName = &"NONE"
+## A template is never posted by the ladder; it is posted by the game under ids of the form
+## "<template id>#<n>" (the postcards: one beat, many cards).
+@export var template: bool = false
 
 
 func chapter_index() -> int:

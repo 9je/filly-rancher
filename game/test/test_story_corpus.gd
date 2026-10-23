@@ -278,7 +278,7 @@ func test_the_letters_no_longer_carry_the_phrasings_the_owner_flagged() -> void:
 			assert_false(joined.contains(phrase),
 				"%s still carries '%s'" % [beat.id, phrase])
 		checked += 1
-	assert_eq(checked, 15, "all fifteen letters were actually swept")
+	assert_eq(checked, 16, "all sixteen letters were actually swept")
 
 
 ## EVERY LETTER IS SIGNED, and by a department rather than by a person. The joke only works
@@ -295,4 +295,4 @@ func test_every_letter_is_signed_off_by_a_department() -> void:
 				signed = true
 		assert_true(signed, "%s ends on '%s', which signs nothing" % [beat.id, last])
 		checked += 1
-	assert_eq(checked, 15)
+	assert_eq(checked, 16)

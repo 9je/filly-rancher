@@ -1629,6 +1629,8 @@ func _build_world_state() -> WorldState:
 ## second apply() mid ramp is continuous by construction (see SkyRig.apply), so the pair
 ## bends the light rather than fighting over it.
 func _on_world_phase_changed(_phase: int) -> void:
+	if _phase == WorldStateScript.Phase.DAWN:
+		_post_pending_postcards()
 	_on_world_changed()
 
 
@@ -7112,6 +7114,12 @@ func _setup_people() -> void:
 		people.camera = get_viewport().get_camera_3d()
 	people.context_provider = _talk_context
 	people.presence = _is_present
+	people.wild_provider = func() -> Array:
+		var out: Array = []
+		for p in spawner.get_spawned():
+			if not (p as Node).is_in_group(&"penned"):
+				out.append(p)
+		return out
 	add_child(people)
 	people.effect.connect(_on_people_effect)
 	people.populate()
@@ -7247,6 +7255,11 @@ func _after_delivery(inst: PonyInstance) -> void:
 	var after_reveal: bool = story.chapter >= 3
 	_game_state.book.note_delivery(String(inst.uid), inst.display_name(), look,
 		story.collection_days, after_reveal)
+	# THE POSTCARD COMES A DAY LATER (clue 3): queued now, posted at the next dawn, the same
+	# words in the same hoofwriting whichever pony "sent" it.
+	var pending: Array = story.flags.get("_postcards", [])
+	pending.append(inst.display_name())
+	story.flags["_postcards"] = pending
 	var bus := get_node_or_null("/root/Events")
 	if bus != null:
 		bus.emit_signal("delivered", String(inst.uid), inst.stock)
@@ -7271,3 +7284,19 @@ func _update_music(zone: StringName) -> void:
 	elif _world != null and _world.phase() == WorldStateScript.Phase.NIGHT:
 		ctx = &"night"
 	music.call("play_context", ctx)
+
+
+## Every postcard queued since the last dawn goes in the mailbox now.
+func _post_pending_postcards() -> void:
+	if _game_state == null:
+		return
+	var story: Story = _game_state.story
+	var pending: Array = story.flags.get("_postcards", [])
+	if pending.is_empty():
+		return
+	for pony_name in pending:
+		var n := int(story.flags.get("_postcard_count", 0)) + 1
+		story.flags["_postcard_count"] = n
+		story.post(StringName("postcard#%d" % n), {"name": _player_name(), "pony": str(pony_name)})
+	story.flags["_postcards"] = []
+	_refresh_mailbox_flag()

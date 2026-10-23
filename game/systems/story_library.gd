@@ -100,7 +100,10 @@ func all() -> Array[StoryBeat]:
 ## The beat under `id`, or NULL. Null is a supported answer: a save naming a letter this
 ## build no longer carries must not take the load down. See ShopRegistry.by_id().
 func by_id(id: StringName) -> StoryBeat:
-	return _by_id.get(id, null)
+	var beat: StoryBeat = _by_id.get(id, null)
+	if beat == null and String(id).contains("#"):
+		beat = _by_id.get(StringName(String(id).get_slice("#", 0)), null)
+	return beat
 
 
 ## Every letter `story` is owed right now, in ladder order. A beat whose chapter or trigger
@@ -111,6 +114,8 @@ func due(story: Story) -> Array[StoryBeat]:
 	if story == null:
 		return out
 	for beat: StoryBeat in _ordered:
+		if beat.template:
+			continue
 		var chapter: int = beat.chapter_index()
 		var kind: int = beat.trigger_index()
 		if chapter < 0 or kind < 0:
