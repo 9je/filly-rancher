@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="CharacterDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/character_def.gd" id="1_char"]
+
+[resource]
+script = ExtResource("1_char")
+id = &"bramble"
+display_name = "Bramble Butterworth"
+char_seed = 505
+gen = {"race": &"earth", "marked": true, "talent": &"baking"}
+look = {"donor": "berrypunch", "coat": "8a5d44", "mane": "f4e6c8", "mane2": "e8d2a6", "tail": "f4e6c8", "eyes": "c77a2e"}
+voice_pitch = 0.95
+voice_timbre = 5
+never_blinks = false
+blurb = "Runs the market stall. Buys gems, sells everything else."

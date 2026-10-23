@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="CharacterDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/character_def.gd" id="1_char"]
+
+[resource]
+script = ExtResource("1_char")
+id = &"pip"
+display_name = "Pip Quill"
+char_seed = 404
+gen = {"race": &"pegasus", "marked": true, "talent": &"reading"}
+look = {"donor": "flitter", "coat": "c9b2ec", "mane": "21a59c", "mane2": "5fd3c9", "tail": "21a59c", "eyes": "7a4fc4"}
+voice_pitch = 1.25
+voice_timbre = 4
+never_blinks = false
+blurb = "The valley's postmare. Knows everypony's business and says so."

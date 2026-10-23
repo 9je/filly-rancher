@@ -1,0 +1,197 @@
+# Act One: Sunny Acres (STORY.md section 3, beats 1.1 to 1.8).
+# Counters available in `when`: deliveries, blooms, catches, pens, sales, days.
+# Chapters: 0 SUNNY (Act One), 1 WEATHER (Act Two), 2 CONTACT (Color Day), 3 COMPANY, 4 RESISTANCE.
+
+=== marigold_arrival
+speaker: marigold
+priority: 100
+when: {"chapters": [0], "flags_none": ["has_scoop"]}
+
+start [marigold happy] Welcome, welcome! You must be {name}. I'm Marigold Mayfair, Brightsky Weather Company, Regional Liaison. Isn't it a gorgeous morning?
+  -> two
+two [marigold happy nod] And it's yours! Sunny Acres has been empty far too long. The roof leaks a little, but the view is complimentary.
+  -> three
+three [marigold happy] You're joining our Wayward Pony Program. The meadows are full of Drifters, sweet ponies who've lost their way. Your job is to look after them.
+  * What do I do with them? -> how
+  * Lost their way how? -> lost
+lost [marigold happy] Oh, the usual! A little forgetful, a little blank around the flank. Nothing a good home won't fix.
+  -> how
+how [marigold happy] With this! Your Brightsky Scoop. Point, hold, and she floats right to you. Totally safe, totally comfy.
+  flag: has_scoop
+  event: give_scoop
+  -> four
+four [marigold happy nod] There's a Drifter grazing just past the gate. Why not say hello? I'll leave you to settle in. Brightsky is so glad to have you!
+
+=== tumble_meets
+speaker: tumble
+priority: 90
+when: {"flags_all": ["has_scoop"], "flags_none": ["tumble_joined"]}
+
+start [tumble happy hop] Hee! You missed! Do it again!
+  -> two
+two [tumble happy] You can't scoop me, I'm way too wiggly. Everypony says so.
+  -> three
+three [tumble happy look] Are you the new pony at the big empty house? Can I come? I know where ALL the ponies hide.
+  * Of course you can. -> yes
+  * Don't you have a home? -> home
+home [tumble neutral] I live in the meadow. With the other Drifters. But they mostly just eat grass and forget my name.
+  -> yes
+yes [tumble happy hop] Yay! I'm Tumble! I'll point at ponies for you, and you scoop them, and we'll be the best team ever!
+  flag: tumble_joined
+  event: tumble_join
+
+=== fennel_first_pen
+speaker: fennel
+priority: 80
+when: {"flags_all": ["tumble_joined"], "flags_none": ["met_fennel"]}
+
+start [fennel neutral] So you're the new one. Fennel. I farm the plot over the hill, since before your roof started leaking.
+  -> two
+two [fennel neutral] You've got a Drifter in that satchel and nowhere to put her. That's a pen plot by your porch. Build on it, and let her out inside.
+  flag: met_fennel
+  event: tutor_pen
+  -> three
+three [fennel happy] Then feed her what she likes. Every pony has a favorite. Watch her ears when you toss it. Ears don't lie.
+  * How do I tell what she likes? -> likes
+  * Anything else? -> else
+likes [fennel neutral] Try things. Hay's safe. Apples if she's an orchard sort. You'll see her perk up.
+  -> else
+else [fennel happy] A pony who's fed and settled makes gems. A pony who's happy long enough... well. You'll see that too.
+
+=== fennel_bloom_hint
+speaker: fennel
+priority: 40
+when: {"flags_all": ["met_fennel"], "max": {"blooms": 0}, "min": {"pens": 1}}
+
+start [fennel neutral] Keep her fed, give her a friend in the pen, and don't rush her.
+  -> two
+two [fennel happy nod] Ponies out here come to themselves eventually. They find what they're good at. Mark comes right up on the flank, like it was always there.
+
+=== fennel_after_bloom
+speaker: fennel
+priority: 60
+when: {"min": {"blooms": 1}, "flags_none": ["fennel_saw_bloom"]}
+
+start [fennel happy] Heard the fuss from over the hill. One of yours found her mark, did she?
+  flag: fennel_saw_bloom
+  -> two
+two [fennel neutral look] That's the best thing that can happen to a pony. Don't you let anypony tell you different.
+
+=== bramble_first_sale
+speaker: bramble
+priority: 70
+when: {"chapters": [0], "flags_none": ["met_bramble"]}
+
+start [bramble happy] A new face! And with gems, I bet. Bramble Butterworth, best stall in Haybrook, also the only one.
+  flag: met_bramble
+  -> two
+two [bramble happy nod] I buy every gem your ponies make. Shinier ponies make shinier gems, and shinier gems make me a very happy mare.
+  -> three
+three [bramble happy] I sell food, seeds, bags, all the good stuff. Bring me gems, take home bits. Simple!
+
+=== pip_first_letter
+speaker: pip
+priority: 70
+when: {"chapters": [0], "flags_none": ["met_pip"]}
+
+start [pip happy] Special delivery! You're {name}, right? Course you are, there's nopony else up here. I'm Pip. Mail, gossip, emergency muffins.
+  flag: met_pip
+  -> two
+two [pip happy] This one's from Brightsky. They write ever so much. Your welcome pack is in your mailbox by the door. There's a postcard in it, too!
+  event: first_mail
+  -> three
+three [pip neutral look] Can't fly up high enough to see the Prism Works myself. Brightsky says the cloud line's for staff only. Pretty, though, isn't it? The rainbow.
+
+=== marigold_depot
+speaker: marigold
+priority: 75
+when: {"min": {"pens": 1, "catches": 3}, "flags_none": ["depot_explained"]}
+
+start [marigold happy] {name}! Look at you, a real rancher already. I've brought wonderful news.
+  -> two
+two [marigold happy nod] The crate behind your barn is our Depot. Any Drifter you'd like to send up for Placement goes in there, and she rides the lift to the Brightsky Academy in the clouds.
+  -> three
+three [marigold happy] They find their talents up there so much faster. And Brightsky pays your ranch a stipend for each one, because helping is its own reward, but bits are nice too!
+  * What happens at the Academy? -> academy
+  * Do I have to send them? -> have_to
+academy [marigold happy] Oh, all sorts! Lessons, sunshine, a lovely view. They'll write to you. Everypony always writes.
+  -> quota
+have_to [marigold happy] Have to? Goodness, no. Well. There is a small quota on collection day, just to keep the program running. Two ponies. Easy!
+  -> quota
+quota [marigold happy nod] One little thing. Ponies who've already found their mark can't go. Placement is for ponies who are still looking. Rules are rules!
+  flag: depot_explained
+  event: open_depot
+
+=== marigold_first_collection
+speaker: marigold
+priority: 50
+when: {"flags_all": ["depot_explained"], "min": {"deliveries": 1}, "flags_none": ["thanked_first"]}
+
+start [marigold happy] Your first Placement! Did you see the rainbow? It got a teeny bit brighter. That's how we know a pony's settled in.
+  flag: thanked_first
+
+# ----- barks: one-liners when nothing new is due ---------------------------------------
+
+=== tumble_bark_1
+speaker: tumble
+bark: true
+once: false
+when: {"chapters": [0, 1]}
+
+start [tumble happy hop] There's a pony over there! No, over THERE!
+
+=== tumble_bark_2
+speaker: tumble
+bark: true
+once: false
+when: {"chapters": [0, 1]}
+
+start [tumble happy] When I find my mark I hope it's a cupcake. Or a rocket. A cupcake rocket.
+
+=== tumble_bark_3
+speaker: tumble
+bark: true
+once: false
+when: {"chapters": [0, 1]}
+
+start [tumble happy look] Do you think the rainbow is warm? It looks warm.
+
+=== fennel_bark_1
+speaker: fennel
+bark: true
+once: false
+when: {"chapters": [0, 1]}
+
+start [fennel neutral] Rain's coming. Brightsky rain. Smells like pennies.
+
+=== fennel_bark_2
+speaker: fennel
+bark: true
+once: false
+when: {"chapters": [0, 1]}
+
+start [fennel happy] Feed them first. Everything else can wait.
+
+=== bramble_bark_1
+speaker: bramble
+bark: true
+once: false
+when: {"chapters": [0, 1]}
+
+start [bramble happy] Gems in, bits out! It's practically magic.
+
+=== pip_bark_1
+speaker: pip
+bark: true
+once: false
+when: {"chapters": [0, 1]}
+
+start [pip happy] Nothing for you today! Unless you count gossip. Which I do.
+
+=== marigold_bark_1
+speaker: marigold
+bark: true
+once: false
+when: {"chapters": [0, 1]}
+
+start [marigold happy] Every pony has a color! Brightsky helps her find it.

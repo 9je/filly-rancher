@@ -1,0 +1,64 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"marigold_depot"
+speaker = &"marigold"
+priority = 75
+once = true
+bark = false
+when = {
+"min": {
+"pens": 1,
+"catches": 3
+},
+"flags_none": ["depot_explained"]
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "{name}! Look at you, a real rancher already. I've brought wonderful news.",
+"who": "marigold",
+"mood": "happy",
+"next": "two"
+}, {
+"id": "two",
+"text": "The crate behind your barn is our Depot. Any Drifter you'd like to send up for Placement goes in there, and she rides the lift to the Brightsky Academy in the clouds.",
+"who": "marigold",
+"mood": "happy",
+"anim": "nod",
+"next": "three"
+}, {
+"id": "three",
+"text": "They find their talents up there so much faster. And Brightsky pays your ranch a stipend for each one, because helping is its own reward, but bits are nice too!",
+"who": "marigold",
+"mood": "happy",
+"choices": [{
+"text": "What happens at the Academy?",
+"next": "academy"
+}, {
+"text": "Do I have to send them?",
+"next": "have_to"
+}]
+}, {
+"id": "academy",
+"text": "Oh, all sorts! Lessons, sunshine, a lovely view. They'll write to you. Everypony always writes.",
+"who": "marigold",
+"mood": "happy",
+"next": "quota"
+}, {
+"id": "have_to",
+"text": "Have to? Goodness, no. Well. There is a small quota on collection day, just to keep the program running. Two ponies. Easy!",
+"who": "marigold",
+"mood": "happy",
+"next": "quota"
+}, {
+"id": "quota",
+"text": "One little thing. Ponies who've already found their mark can't go. Placement is for ponies who are still looking. Rules are rules!",
+"who": "marigold",
+"mood": "happy",
+"anim": "nod",
+"flag": "depot_explained",
+"event": "open_depot"
+}])

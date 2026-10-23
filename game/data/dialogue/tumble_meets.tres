@@ -1,0 +1,56 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"tumble_meets"
+speaker = &"tumble"
+priority = 90
+once = true
+bark = false
+when = {
+"flags_all": ["has_scoop"],
+"flags_none": ["tumble_joined"]
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "Hee! You missed! Do it again!",
+"who": "tumble",
+"mood": "happy",
+"anim": "hop",
+"next": "two"
+}, {
+"id": "two",
+"text": "You can't scoop me, I'm way too wiggly. Everypony says so.",
+"who": "tumble",
+"mood": "happy",
+"next": "three"
+}, {
+"id": "three",
+"text": "Are you the new pony at the big empty house? Can I come? I know where ALL the ponies hide.",
+"who": "tumble",
+"mood": "happy",
+"anim": "look",
+"choices": [{
+"text": "Of course you can.",
+"next": "yes"
+}, {
+"text": "Don't you have a home?",
+"next": "home"
+}]
+}, {
+"id": "home",
+"text": "I live in the meadow. With the other Drifters. But they mostly just eat grass and forget my name.",
+"who": "tumble",
+"mood": "neutral",
+"next": "yes"
+}, {
+"id": "yes",
+"text": "Yay! I'm Tumble! I'll point at ponies for you, and you scoop them, and we'll be the best team ever!",
+"who": "tumble",
+"mood": "happy",
+"anim": "hop",
+"flag": "tumble_joined",
+"event": "tumble_join"
+}])

@@ -1,0 +1,61 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"marigold_arrival"
+speaker = &"marigold"
+priority = 100
+once = true
+bark = false
+when = {
+"chapters": [0],
+"flags_none": ["has_scoop"]
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "Welcome, welcome! You must be {name}. I'm Marigold Mayfair, Brightsky Weather Company, Regional Liaison. Isn't it a gorgeous morning?",
+"who": "marigold",
+"mood": "happy",
+"next": "two"
+}, {
+"id": "two",
+"text": "And it's yours! Sunny Acres has been empty far too long. The roof leaks a little, but the view is complimentary.",
+"who": "marigold",
+"mood": "happy",
+"anim": "nod",
+"next": "three"
+}, {
+"id": "three",
+"text": "You're joining our Wayward Pony Program. The meadows are full of Drifters, sweet ponies who've lost their way. Your job is to look after them.",
+"who": "marigold",
+"mood": "happy",
+"choices": [{
+"text": "What do I do with them?",
+"next": "how"
+}, {
+"text": "Lost their way how?",
+"next": "lost"
+}]
+}, {
+"id": "lost",
+"text": "Oh, the usual! A little forgetful, a little blank around the flank. Nothing a good home won't fix.",
+"who": "marigold",
+"mood": "happy",
+"next": "how"
+}, {
+"id": "how",
+"text": "With this! Your Brightsky Scoop. Point, hold, and she floats right to you. Totally safe, totally comfy.",
+"who": "marigold",
+"mood": "happy",
+"flag": "has_scoop",
+"event": "give_scoop",
+"next": "four"
+}, {
+"id": "four",
+"text": "There's a Drifter grazing just past the gate. Why not say hello? I'll leave you to settle in. Brightsky is so glad to have you!",
+"who": "marigold",
+"mood": "happy",
+"anim": "nod"
+}])

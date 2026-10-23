@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="CharacterDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/character_def.gd" id="1_char"]
+
+[resource]
+script = ExtResource("1_char")
+id = &"tumble"
+display_name = "Tumble"
+char_seed = 101
+gen = {"race": &"earth", "foal": true}
+look = {"donor": "applebloom", "coat": "ffa055", "mane": "6ec3ff", "mane2": "a8dcff", "tail": "6ec3ff", "eyes": "3d7bd6"}
+voice_pitch = 1.5
+voice_timbre = 1
+never_blinks = false
+blurb = "A Drifter filly who decided you are hers. Too wiggly to scoop."

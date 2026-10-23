@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="CharacterDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/character_def.gd" id="1_char"]
+
+[resource]
+script = ExtResource("1_char")
+id = &"fennel"
+display_name = "Old Fennel"
+char_seed = 303
+gen = {"race": &"earth", "marked": true, "talent": &"orchards"}
+look = {"donor": "caramel", "coat": "a9c49a", "mane": "f2f2ec", "mane2": "d8d8d0", "tail": "f2f2ec", "eyes": "5d8a4a"}
+voice_pitch = 0.72
+voice_timbre = 3
+never_blinks = false
+blurb = "Your neighbor. Grumbles at the weather, feeds every pony who wanders by."

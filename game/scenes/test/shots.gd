@@ -101,6 +101,8 @@ func _run() -> void:
 				await _dread()
 			"rigprobe":
 				await _rigprobe()
+			"cast":
+				await _cast()
 
 
 func _clear() -> void:
@@ -240,3 +242,20 @@ func _rigprobe() -> void:
 				await _shoot("probe_%s_%s%s" % [pair[0], "xyz"[[Vector3.RIGHT, Vector3.UP, Vector3.BACK].find(axis)], "p" if sgn > 0 else "n"])
 				for i in rest:
 					sk.set_bone_pose_rotation(i, rest[i])
+
+
+## The story cast (game/data/characters), in a row, each with her look built exactly as the
+## game builds it.
+func _cast() -> void:
+	await _clear()
+	var ids := ["tumble", "marigold", "fennel", "pip", "bramble", "static", "clover"]
+	var x := -float(ids.size() - 1) * 1.3
+	for id in ids:
+		var def: Resource = load("res://data/characters/%s.tres" % id)
+		if def == null:
+			continue
+		_stand(def.call("build_look"), Vector3(x, 0, 0), deg_to_rad(65))
+		x += 2.6
+	_cam.position = Vector3(0, 2.6, 13.0)
+	_cam.look_at(Vector3(0, 1.0, 0))
+	await _shoot("cast")

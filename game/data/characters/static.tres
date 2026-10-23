@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="CharacterDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/character_def.gd" id="1_char"]
+
+[resource]
+script = ExtResource("1_char")
+id = &"static"
+display_name = "Static"
+char_seed = 606
+gen = {"race": &"pegasus", "marked": true, "talent": &"weather"}
+look = {"donor": "lightningdust", "coat": "6e7480", "mane": "9aa2ae", "mane2": "c0c6ce", "tail": "9aa2ae", "eyes": "e0c04a"}
+voice_pitch = 0.9
+voice_timbre = 6
+never_blinks = false
+blurb = "A Brightsky weather technician who works the night shift."

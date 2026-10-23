@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"pip_bark_1"
+speaker = &"pip"
+priority = 0
+once = false
+bark = true
+when = {
+"chapters": [0, 1]
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "Nothing for you today! Unless you count gossip. Which I do.",
+"who": "pip",
+"mood": "happy"
+}])

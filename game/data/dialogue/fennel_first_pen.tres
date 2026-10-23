@@ -1,0 +1,53 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"fennel_first_pen"
+speaker = &"fennel"
+priority = 80
+once = true
+bark = false
+when = {
+"flags_all": ["tumble_joined"],
+"flags_none": ["met_fennel"]
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "So you're the new one. Fennel. I farm the plot over the hill, since before your roof started leaking.",
+"who": "fennel",
+"mood": "neutral",
+"next": "two"
+}, {
+"id": "two",
+"text": "You've got a Drifter in that satchel and nowhere to put her. That's a pen plot by your porch. Build on it, and let her out inside.",
+"who": "fennel",
+"mood": "neutral",
+"flag": "met_fennel",
+"event": "tutor_pen",
+"next": "three"
+}, {
+"id": "three",
+"text": "Then feed her what she likes. Every pony has a favorite. Watch her ears when you toss it. Ears don't lie.",
+"who": "fennel",
+"mood": "happy",
+"choices": [{
+"text": "How do I tell what she likes?",
+"next": "likes"
+}, {
+"text": "Anything else?",
+"next": "else"
+}]
+}, {
+"id": "likes",
+"text": "Try things. Hay's safe. Apples if she's an orchard sort. You'll see her perk up.",
+"who": "fennel",
+"mood": "neutral",
+"next": "else"
+}, {
+"id": "else",
+"text": "A pony who's fed and settled makes gems. A pony who's happy long enough... well. You'll see that too.",
+"who": "fennel",
+"mood": "happy"
+}])

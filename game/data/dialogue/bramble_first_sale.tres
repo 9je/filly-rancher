@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"bramble_first_sale"
+speaker = &"bramble"
+priority = 70
+once = true
+bark = false
+when = {
+"chapters": [0],
+"flags_none": ["met_bramble"]
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "A new face! And with gems, I bet. Bramble Butterworth, best stall in Haybrook, also the only one.",
+"who": "bramble",
+"mood": "happy",
+"flag": "met_bramble",
+"next": "two"
+}, {
+"id": "two",
+"text": "I buy every gem your ponies make. Shinier ponies make shinier gems, and shinier gems make me a very happy mare.",
+"who": "bramble",
+"mood": "happy",
+"anim": "nod",
+"next": "three"
+}, {
+"id": "three",
+"text": "I sell food, seeds, bags, all the good stuff. Bring me gems, take home bits. Simple!",
+"who": "bramble",
+"mood": "happy"
+}])

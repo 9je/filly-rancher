@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"marigold_first_collection"
+speaker = &"marigold"
+priority = 50
+once = true
+bark = false
+when = {
+"flags_all": ["depot_explained"],
+"min": {
+"deliveries": 1
+},
+"flags_none": ["thanked_first"]
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "Your first Placement! Did you see the rainbow? It got a teeny bit brighter. That's how we know a pony's settled in.",
+"who": "marigold",
+"mood": "happy",
+"flag": "thanked_first"
+}])

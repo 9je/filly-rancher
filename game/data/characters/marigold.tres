@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="CharacterDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/character_def.gd" id="1_char"]
+
+[resource]
+script = ExtResource("1_char")
+id = &"marigold"
+display_name = "Marigold Mayfair"
+char_seed = 202
+gen = {"race": &"unicorn", "marked": true, "talent": &"sunshine"}
+look = {"donor": "minuette", "coat": "ffe27a", "mane": "fff8ee", "mane2": "ffe9b8", "tail": "fff8ee", "eyes": "d9932b"}
+voice_pitch = 1.1
+voice_timbre = 2
+never_blinks = true
+blurb = "Brightsky Regional Liaison. Always delighted to see you."

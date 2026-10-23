@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"fennel_after_bloom"
+speaker = &"fennel"
+priority = 60
+once = true
+bark = false
+when = {
+"min": {
+"blooms": 1
+},
+"flags_none": ["fennel_saw_bloom"]
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "Heard the fuss from over the hill. One of yours found her mark, did she?",
+"who": "fennel",
+"mood": "happy",
+"flag": "fennel_saw_bloom",
+"next": "two"
+}, {
+"id": "two",
+"text": "That's the best thing that can happen to a pony. Don't you let anypony tell you different.",
+"who": "fennel",
+"mood": "neutral",
+"anim": "look"
+}])

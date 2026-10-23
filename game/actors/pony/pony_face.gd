@@ -164,8 +164,9 @@ func _tick(delta: float) -> void:
 	if look_target != Vector3.INF and look_weight > 0.0:
 		var sk := get_skeleton()
 		var local := sk.global_transform.affine_inverse() * look_target
-		# Donor rigs face +Z in Godot after import (model forward); yaw toward the target.
-		want = clampf(atan2(local.x, local.z), -look_max, look_max) * look_weight
+		# Donor rigs face -Z (export_blend.py --rotate-z 180, the convention pony.gd and
+		# player.gd use); yaw toward the target from there.
+		want = clampf(atan2(-local.x, -local.z), -look_max, look_max) * look_weight
 	_look_yaw = lerpf(_look_yaw, want, clampf(delta * 6.0, 0.0, 1.0))
 
 

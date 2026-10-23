@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="CharacterDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/character_def.gd" id="1_char"]
+
+[resource]
+script = ExtResource("1_char")
+id = &"clover"
+display_name = "Clover"
+char_seed = 707
+gen = {"race": &"earth", "marked": true, "talent": &"luck"}
+look = {"donor": "aloeblossom", "coat": "b9d8c2", "mane": "6f9f7d", "mane2": "9cc4a6", "tail": "6f9f7d", "eyes": "5d8a4a"}
+voice_pitch = 1.05
+voice_timbre = 7
+never_blinks = false
+blurb = "Fennel's daughter. Sent up for Placement six years ago."

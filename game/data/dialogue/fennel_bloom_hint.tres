@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"fennel_bloom_hint"
+speaker = &"fennel"
+priority = 40
+once = true
+bark = false
+when = {
+"flags_all": ["met_fennel"],
+"max": {
+"blooms": 0
+},
+"min": {
+"pens": 1
+}
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "Keep her fed, give her a friend in the pen, and don't rush her.",
+"who": "fennel",
+"mood": "neutral",
+"next": "two"
+}, {
+"id": "two",
+"text": "Ponies out here come to themselves eventually. They find what they're good at. Mark comes right up on the flank, like it was always there.",
+"who": "fennel",
+"mood": "happy",
+"anim": "nod"
+}])
