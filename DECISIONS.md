@@ -105,3 +105,22 @@ The visual review found the Spectra Palace was a purple box with a flat gold lid
 - **Ruled out:** 200 sound-test runs under gdb and 36,000 Babble create/free cycles did not reproduce it, which fits a use-after-free that bites only when the freed memory gets reused.
 
 **Fix.** A leaving Babble buries its generator with an extra reference. Graves older than 1 s are released by later burials, and anything still buried at shutdown stays referenced. test_babble.gd pins this. An upstream fix (hold a Ref, or snapshot the rate) would belong in the engine. This is the game-side guard.
+
+## 2026-10-23 (evening): the owner's "eyes buggy, text random, movement weird", deep dive
+
+**Eyes, cause 1 (the big one): a stale import cache.**
+- **The symptom:** in the working copy the owner plays from, Fluttershy, Twilight and Rainbow Dash were served from Godot's cached imports of an older conversion, with their eyeballs hanging off the backs of their heads. Seen from the front they had hollow eye sockets.
+- **Why it hid:** every clean checkout imported the current models correctly, which is why no bisect commit reproduced it.
+- **The fix:** 20 stale cache entries dropped and re-imported. `tools/fix_stale_imports.py` now runs from play.sh before every launch.
+
+**Eyes, cause 2: PonySFM irises drawn too big.**
+- **The symptom:** in the 37 PonySFM-converted ponies, each eyeball's UVs span only the middle of the iris texture, because Source projected the iris small and our conversion pasted it across the whole ball. Every eye was a black pupil with a thin ring.
+- **The fix:** pony_eye.gdshader takes `iris_scale` (1.45), which shrinks the iris about its center and puts white sclera outside it. Canon ponies keep their own colors (`recolor` off), and Drifters get the same scale. `scenes/test/roster_eyes.gd` renders every canon face for checking.
+
+**Text:**
+- **The trailer:** its gameplay shots kept the HUD's bag panel and prompts, which read as stray boxes of text. Now no shot shows any HUD.
+- **The game:** the herd-churn toast ("3 ponies wandered off, 2 ponies arrived") is gone, the "CWC balance" and "Day, clear" lines are gone from the saddlebag panel, and the typed [ ] / [x] boxes are now a bullet and "Done!".
+
+**Movement:**
+- **Treats:** a tossed treat never drew a pony. Entering WANDER picked its own random target and overwrote the treat, so the Treat Pouch sent ponies strolling anywhere. Fixed.
+- **Trailer staging:** a pony's staged facing was undone by her own `_visual_yaw`, so staged ponies showed their backs. Dash was meant to bolt but stood frozen. Strangers from the spawn meadow wandered through featured shots. All three fixed: facing sticks, Dash's bolt is forced, and the stage is cleared around each featured pony.
