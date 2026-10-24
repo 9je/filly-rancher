@@ -787,7 +787,8 @@ func _ground_height(x: float, z: float) -> float:
 ## faces, nearly all canopy, and every pony sliding past one queried them all: the 60-pony
 ## check spent half its physics tick inside the orchard's leaves (scenes/test/perf.gd,
 ## exp=shapes). The trunk, the low boughs and the bush itself are kept, so nothing walks
-## through a tree; the camera simply stops bumping into a canopy overhead.
+## through a tree. The canopy above is kept too, on its own layer (CollisionLayers.CANOPY)
+## that only the camera probes, so the lens never sinks into the leaves.
 func _add_collision(inst: Node3D, ground := NAN) -> int:
 	var meshes: Array = inst.find_children("*", "MeshInstance3D", true, false)
 	if inst is MeshInstance3D:
@@ -804,15 +805,17 @@ func _add_collision(inst: Node3D, ground := NAN) -> int:
 			created += 1
 
 	for body: StaticBody3D in inst.find_children("*", "StaticBody3D", true, false):
-		body.collision_layer = LayersScript.PROPS
+		body.collision_layer = LayersScript.CANOPY if body.has_meta(&"canopy") \
+				else LayersScript.PROPS
 		body.collision_mask = 0
 
 	return created
 
 
 ## The trimesh of `m`'s faces that dip below world height `top`, as a StaticBody3D child
-## (the same shape create_trimesh_collision() builds, minus what lies wholly above).
-## False when no face reaches that low.
+## (the same shape create_trimesh_collision() builds, minus what lies wholly above). The
+## faces wholly above go to a second body marked `canopy`, which _add_collision() puts on
+## CollisionLayers.CANOPY. False when no face reaches that low.
 func _add_low_collision(m: MeshInstance3D, top: float) -> bool:
 	var faces := m.mesh.get_faces()
 	var xf := m.global_transform
@@ -820,23 +823,37 @@ func _add_low_collision(m: MeshInstance3D, top: float) -> bool:
 	var row := Vector3(xf.basis.x.y, xf.basis.y.y, xf.basis.z.y)
 	var lift := xf.origin.y - top
 	var keep := PackedVector3Array()
+	var high := PackedVector3Array()
 	for i in range(0, faces.size(), 3):
-		if row.dot(faces[i]) + lift < 0.0 or row.dot(faces[i + 1]) + lift < 0.0 \
-				or row.dot(faces[i + 2]) + lift < 0.0:
+		var low := row.dot(faces[i]) + lift < 0.0 or row.dot(faces[i + 1]) + lift < 0.0 \
+				or row.dot(faces[i + 2]) + lift < 0.0
+		# Packed arrays copy on assignment, so each one is appended to by name.
+		if low:
 			keep.append(faces[i])
 			keep.append(faces[i + 1])
 			keep.append(faces[i + 2])
+		else:
+			high.append(faces[i])
+			high.append(faces[i + 1])
+			high.append(faces[i + 2])
+	if not high.is_empty():
+		_add_face_body(m, high, "_canopy").set_meta(&"canopy", true)
 	if keep.is_empty():
 		return false
+	_add_face_body(m, keep, "_col")
+	return true
+
+
+func _add_face_body(m: MeshInstance3D, faces: PackedVector3Array, suffix: String) -> StaticBody3D:
 	var shape := ConcavePolygonShape3D.new()
-	shape.set_faces(keep)
+	shape.set_faces(faces)
 	var body := StaticBody3D.new()
-	body.name = String(m.name) + "_col"
+	body.name = String(m.name) + suffix
 	var cs := CollisionShape3D.new()
 	cs.shape = shape
 	body.add_child(cs)
 	m.add_child(body)
-	return true
+	return body
 
 
 ## A solid box under a wide prop, so the terrain always passes through the SIDE of

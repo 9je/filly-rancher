@@ -158,3 +158,24 @@ The 60-pony check (`scenes/test/perf.gd`) was failing at p99 22-27 ms. Three of 
 - **Physics on its own thread:** about 0.3 ms, but it makes ray casts from `_process` unsafe, and the game does those.
 - **Mid and far ponies stepped from `_process`:** worse. move_and_slide outside the physics step costs more under Jolt.
 - **Also no help:** a heightmap ground collider, fewer max slides, two shadow cascades, and custom AABBs.
+
+## 2026-10-24: treetops are solid to the camera again (CollisionLayers.CANOPY)
+
+**Found in the visual review on the final code.** I re-rendered all 45 tour views after 7f69812. In every homestead and tone_dread view, a tree canopy filled the right half of the frame. Yesterday's shots of the same views were clear.
+
+**Cause.** The 60-pony work kept foliage collision only below 3 m, so the herd stopped querying tens of thousands of leaf faces. That also took the canopies away from everything that looks for solid world:
+- the tour's clear-line probe, which then left the lens inside the leaves;
+- the player camera's SpringArm3D, which could now sink into a treetop in play.
+
+**Fix.** The faces above 3 m are kept as their own trimesh on a new layer, CANOPY (bit 7). No character's mask contains it, so ponies still skip the leaves. The camera rig's `probe_mask` and the tour probe are WORLD | CANOPY, and test_ranch_world pins the new mask.
+
+**Measured after the fix:**
+- The homestead and tone views match yesterday's reviewed framing.
+- The 60-pony check passed 3 runs of 3: p99 15.9, 16.2 and 16.5 ms, with the owner's browser and Steam open.
+
+**Rest of the review: nothing to fix.**
+- The two factory views that looked crowded are framed exactly as on 10-23, minus yesterday's stray talk bubble.
+- Every other view matches its reviewed version or improved on it: the endings and their flyovers, the regions, pens, herd, town, Spike, the Palace and the Strip.
+
+**Known, not visible.** The creator's restyle logs 4 "material is null" render errors. They persist with every 7f69812 rendering file reverted, so they predate it, and the creator renders correctly.
+

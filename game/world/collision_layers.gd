@@ -59,6 +59,12 @@ const INTERACTION := 1 << 4
 ## generally leaky; it makes the gate a gate.
 const PEN_GATE := 1 << 5
 
+## A tree's canopy, above where anything walks (game/world/props.gd, FOLIAGE_COLLIDE_HEIGHT).
+## Bit 7. No character collides with it: tens of thousands of leaf faces in every pony's
+## slide were half the 60-pony physics tick. Only the camera probes it, so a lens never
+## ends up inside the leaves with the whole frame gone green.
+const CANOPY := 1 << 6
+
 ## Solid, immovable world. What the camera's spring arm probes, and the floor
 ## everything walks on.
 ##

@@ -157,7 +157,7 @@ const ZOOM_STEP := 0.5
 ## than one that lets her pass through frame, and the rig already excludes the body
 ## it is mounted on by RID below. TERRAIN is still bit 1, so every scene that
 ## predates the ranch and builds its ground on the default layer still works.
-@export_flags_3d_physics var probe_mask := CollisionLayersScript.WORLD
+@export_flags_3d_physics var probe_mask := CollisionLayersScript.WORLD | CollisionLayersScript.CANOPY
 
 # SPRINGARM3D.MARGIN IS LIVE, AND IT BECAME LIVE AS A SIDE EFFECT OF THE SHOULDER
 # OFFSET. Read this before touching either.

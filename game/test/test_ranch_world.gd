@@ -71,8 +71,8 @@ func test_the_camera_rig_probes_the_world_by_default() -> void:
 	# Godot's untouched default 1, which only worked because every collision object
 	# in the project was also on the untouched default layer 1.
 	var rig = CameraRigScript.new()
-	assert_eq(rig.probe_mask, LayersScript.WORLD,
-		"CameraRig.probe_mask must default to WORLD or the camera clips through buildings")
+	assert_eq(rig.probe_mask, LayersScript.WORLD | LayersScript.CANOPY,
+		"CameraRig.probe_mask must default to WORLD | CANOPY or the camera clips through buildings and treetops")
 	rig.free()
 
 

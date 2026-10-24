@@ -141,7 +141,7 @@ func _view(from: Vector3, at: Vector3, fov: float = 55.0) -> void:
 	var p := from
 	for i in 10:
 		var q := PhysicsRayQueryParameters3D.create(p, at)
-		q.collision_mask = 0b11
+		q.collision_mask = 0b11 | (1 << 6)  # terrain, props, canopy
 		var hit: Dictionary = space.intersect_ray(q)
 		if hit.is_empty() or (hit.position as Vector3).distance_to(at) < 3.0:
 			break

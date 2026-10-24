@@ -5822,7 +5822,7 @@ func _report(pony_count: int, prop_count: int) -> void:
 
 	# --- the camera ---------------------------------------------------------------
 	_set_check(checks, "the camera probes the world, not just layer 1",
-		_spring_arm.collision_mask == LayersScript.WORLD)
+		_spring_arm.collision_mask == LayersScript.WORLD | LayersScript.CANOPY)
 	var pull_in: Dictionary = await _probe_camera_against_building()
 	if pull_in.get("ran", false):
 		# `hit` is the spring arm's own bookkeeping; `actual` is where the lens really
