@@ -1489,8 +1489,10 @@ func offer_treat(at: Vector3, food: StringName) -> bool:
 	if food != fav and _rng.randf() > 0.35:
 		return false
 	calm = 10.0 if food == fav else 6.0
-	_wander_target = at
 	_transition_to(State.WANDER)
+	# AFTER the transition: entering WANDER picks a random target of its own, which used to
+	# overwrite the treat, so a tossed treat sent her strolling anywhere but to it.
+	_wander_target = at
 	return true
 
 

@@ -215,6 +215,9 @@ func _dread(d: float) -> void:
 
 ## "off": no HUD (beauty shots). "min": the bag, the bits and the prompt; nothing else.
 func _hud(mode: String) -> void:
+	# No HUD in any shot (owner, 2026-10-23: "the text is random"): the bag pips, prompts and
+	# toasts read as stray boxes of text in a trailer. Every shot plays clean.
+	mode = "off"
 	var hud := ranch.get_node_or_null(^"HUD") as CanvasLayer
 	if hud == null:
 		return
@@ -286,6 +289,8 @@ func _pony(at: Vector3, seed_value: int, opts: Dictionary = {}, calm: float = 99
 	var p: CharacterBody3D = spawner.call("spawn_guest", data, look.to_dict(), at, 3.0)
 	p.set("calm", calm)
 	(p.get_node("Visuals") as Node3D).rotation.y = yaw
+	# Her own steering target too, or she turns straight back to where she spawned facing.
+	p.set("_visual_yaw", yaw)
 	return p
 
 
@@ -609,6 +614,7 @@ func _shot_tumble() -> void:
 	# Out on open grass: the buildings stand on stone plinths now, and her old spot by the
 	# porch put the camera inside one.
 	t.global_position = _g(8.0, 24.0, 0.0)
+	_clear_around(t.global_position, 12.0, [t])
 	t.rotation.y = 0.0
 	if t.has_method("act"):
 		t.call("act", &"sad", &"look")
@@ -646,6 +652,23 @@ func _shot_factory_tank() -> void:
 
 # --- the favourites (TRAILER_PLAN.md: the owner's and friends' ponies) --------------------
 
+## THE STAGE TO HERSELF: every other pony and townsfolk within `r` metres of `at` is hidden for
+## the shot (the spawn meadow is crowded, and strangers wandering through a featured pony's
+## moment read as weird movement).
+func _clear_around(at: Vector3, r: float, keep: Array) -> void:
+	var others: Array = ranch.get("spawner").call("get_spawned")
+	var people: Node = ranch.get("people")
+	if people != null:
+		for id: StringName in people.get("npcs"):
+			var n: Node3D = people.call("npc", id)
+			if n != null:
+				others.append(n)
+	for o in others:
+		if is_instance_valid(o) and not (o in keep) and (o as Node3D).global_position.distance_to(at) < r:
+			(o as Node3D).visible = false
+			o.set_physics_process(false)
+
+
 ## A canon pony from the roster, standing where a shot wants her.
 func _canon(id: String, at: Vector3, calm: float = 999.0, yaw: float = 0.0) -> CharacterBody3D:
 	var spawner: Node = ranch.get("spawner")
@@ -653,6 +676,8 @@ func _canon(id: String, at: Vector3, calm: float = 999.0, yaw: float = 0.0) -> C
 	var p: CharacterBody3D = spawner.call("spawn_guest", data, {}, at, 3.0)
 	p.set("calm", calm)
 	(p.get_node("Visuals") as Node3D).rotation.y = yaw
+	# Her own steering target too, or she turns straight back to where she spawned facing.
+	p.set("_visual_yaw", yaw)
 	return p
 
 
@@ -681,17 +706,19 @@ func _shot_fluttershy() -> void:
 	var f := _canon("fluttershy", _g(10.0, 25.0), 999.0, PI)
 	await _frames(30)
 	var at := f.global_position
+	_clear_around(at, 14.0, [f, pl])
+	var fav := PonyTraitsScript.favorite_for(f.call("get_stock"), f.call("get_data"))
 	# In front of her (a pony model faces -Z; yaw PI turns her to +Z), a little to the side,
 	# so the apple the player tosses lands between them and she comes for it.
 	create_timer(0.6).timeout.connect(func() -> void:
 		var tools: Node = ranch.get("tools")
-		var drop := at + Vector3(0, 0, 1.6)
+		var drop := at + Vector3(0.4, 0, 3.6)
 		if tools != null:
-			tools.call("_fly", &"apple", drop)
+			tools.call("_fly", fav, drop)
 		if is_instance_valid(f):
-			f.call("offer_treat", drop, &"apple"))
-	await _move([at + Vector3(1.6, 0.9, 3.4), at + Vector3(1.1, 0.8, 2.8)],
-		[at + Vector3(0, 0.75, 0.6), at + Vector3(0, 0.75, 1.2)], 2.6, 40.0)
+			f.call("offer_treat", drop, fav))
+	await _move([at + Vector3(1.8, 1.2, 6.4), at + Vector3(1.4, 1.1, 6.0)],
+		[at + Vector3(0, 0.9, 1.0), at + Vector3(0.2, 0.9, 2.6)], 2.6, 40.0)
 
 
 ## RAINBOW DASH (Ben's): she bolts, a pegasus faster than anypony on hoof, and the camera
@@ -701,6 +728,12 @@ func _shot_dash() -> void:
 	pl.global_position = _g(6.0, 27.0, 0.2)
 	var d := _canon("rainbowdash", _g(6.0, 21.0), 0.0, PI)
 	await _frames(20)
+	_clear_around(d.global_position, 16.0, [d, pl])
+	# She sees you and she is GONE: the bolt is forced, not left to her noticing.
+	create_timer(0.5).timeout.connect(func() -> void:
+		if is_instance_valid(d):
+			d.set("_player", pl)
+			d.call("_transition_to", Pony.State.FLEE))
 	await _follow(d, Vector3(3.2, 1.4, 2.6), 2.6, 48.0)
 
 
@@ -740,6 +773,7 @@ func _shot_trixie() -> void:
 	var t := _canon("trixie", _g(6.0, 21.0), 999.0, PI * 0.5)
 	t.set_physics_process(false)
 	await _frames(30)
+	_clear_around(t.global_position, 14.0, [t, pl])
 	var at := t.global_position
 	# Mid shot, the Scoop's beam would be on her: she blinks a few metres off, startled.
 	create_timer(1.1).timeout.connect(func() -> void:
