@@ -105,3 +105,22 @@ The owner watched cut 4 and found the eyes buggy, the text random and the moveme
 **Found, to fix:**
 1. **Slots (about 27 s):** a dim menu panel of small text, which reads as exactly the "random text" the owner objected to. Cut it.
 2. **Everfree (about 20 s):** nearly black, and it sweeps through a red trunk. Cut it.
+
+## Iteration 6 (cut 6): final
+
+**Measured:**
+- TRAILER_4K.mp4: H.264, 3840x2160, 60 fps, 64.8 s.
+- TRAILER_1080p.mp4: 1920x1080, 60 fps, 64.8 s.
+- ebur128: integrated -14.0 LUFS, LRA 5.0 LU, true peak -1.5 dBFS.
+
+**Iteration 5's fixes, checked:**
+- The slots menu and the dark Everfree shot are gone.
+- The only text on screen is now the joke captions and the title card.
+- The run flows from Spike to the lake to Trixie, Derpy, the Crusaders and Octavia.
+
+**Found, to fix: nothing.**
+- Every featured pony faces the camera with proper eyes.
+- No HUD appears anywhere.
+- The motion is clean: Dash bolts, Fluttershy trots to her treat, and Trixie blinks out.
+
+**Kept on purpose:** the character creator's swatch panel. It's the game's own menu, and it shows the creator is real.
