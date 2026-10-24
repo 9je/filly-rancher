@@ -190,3 +190,23 @@ The 60-pony check (`scenes/test/perf.gd`) was failing at p99 22-27 ms. Three of 
 - A beam press before the Scoop now toasts "No Scoop yet. Marigold has it for you: she's on her way over."
 - It also sends her back to the player.
 - She now follows a steward who walks more than 6 m away before the welcome is done; before this she stood wherever she had been left.
+
+## 2026-10-24: the owner's real-hardware playtest round (PLAYTEST_FIXES.md)
+
+The owner's rules for this round:
+- root cause and a failing test before every fix;
+- tests through real input only;
+- no trailer work, and the current trailer deleted.
+
+Decisions:
+- **Trailer deleted.** TRAILER_4K.mp4, TRAILER_1080p.mp4, build/trailer (15 GB of takes), TRAILER_PLAN.md and TRAILER_REVIEW.md are gone; git history keeps the docs. The capture pipeline (tools/trailer, scenes/test/trailer.gd) stays as code. It is not a trailer.
+- **Real-input tests are standalone SceneTree scripts** (game/test_input/), not GUT cases.
+  - They must boot the real main scene in a real window, and GUT's runner would sit in the way of a scene change.
+  - Each prints INPUT_TEST_OK or INPUT_TEST_FAILED, and tools/run_input_tests.sh runs them.
+- **Tests may look but not touch.** A test reads the game the way eyes read a screen (positions, the HUD tip, menu rows). It acts only through RealInput, which builds events from the InputMap, so a rebound key is the key pressed.
+- **Invisible display, real GPU.**
+  - The owner was using the machine and the first test windows took the mouse, so every windowed run goes into xvfb.
+  - Xvfb has no DRI3, so RADV cannot present to it. Mesa's software WSI (MESA_VK_WSI_DEBUG=sw) lets the GPU render and copies each frame in.
+  - llvmpipe was tried first and was far too slow.
+  - Runs use --fixed-fps 60, and the watchdog counts game seconds.
+- **Parallel work.** Notes 5 to 11 and the playthrough rewrite went to agents, each in its own worktree, all niced and invisible. Each writes docs/playtest_fixes/<area>.md, which is merged into PLAYTEST_FIXES.md here.
