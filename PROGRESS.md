@@ -101,3 +101,7 @@ Canon MLP stays: real names, looks and places ("lean into mlp fully", private bu
   - The creator no longer counts as a visit to the Strip.
 - **Visual:** the Palace and the mailbox are modelled. A real Spike model (PonySFM, BeardedDoomGuy) is downloaded; its conversion awaits the owner's approval.
 - **Trailer pipeline:** 4K (TRAILER_4K.mp4 at 3840x2160), with captions scaled.
+
+### 2026-10-24
+- **TRAILER_4K.mp4 and TRAILER_1080p.mp4, cut 6:** 64.8 s, 60 fps, -14.0 LUFS. Re-shot after the owner's review (eyes, text, movement); see TRAILER_REVIEW.md iterations 5 and 6 and DECISIONS.md.
+- **FIRST_10_MINUTES.mp4:** H.264 1920x1080 60 fps, 600 s, uncut. The bot plays a fresh save on the GPU under Movie Maker. Sampled every 15 s: creator, opening talks, the Scoop, pens, market, Depot, mail, with no stuck spans now that the bot has a stuck detector.
