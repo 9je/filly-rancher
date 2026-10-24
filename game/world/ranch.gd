@@ -1731,8 +1731,10 @@ func _refresh_herd() -> void:
 		clauses.append("%s wandered off" % _pony_count_phrase(left))
 	if arrived != 0:
 		clauses.append("%s arrived" % _pony_count_phrase(arrived))
+	# Not toasted any more (owner, 2026-10-23: "the text is random"): the herd turning over is
+	# something a player sees happen in the grass, not a sentence across her screen.
 	if not clauses.is_empty():
-		_toast("%s." % ", ".join(clauses))
+		print("RANCH herd %s." % ", ".join(clauses))
 
 
 ## "1 pony" or "2 ponies". The herd toast is the only line in the game that counts ponies

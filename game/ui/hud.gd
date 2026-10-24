@@ -201,8 +201,8 @@ const HINTS_ACTION := &"toggle_hints"
 ## of an experienced player's screen is clutter, and the board is where requests live after
 ## the first ten minutes.
 const TASK_TITLE := "Getting started"
-const TASK_DONE := "[x] "
-const TASK_OPEN := "[ ] "
+const TASK_DONE := "Done! "
+const TASK_OPEN := "• "
 const COLOR_TASK_DONE := Color(0.62, 0.86, 0.60, 0.92)
 const COLOR_TASK_OPEN := Color(1.0, 1.0, 1.0, 0.88)
 
@@ -261,6 +261,11 @@ func _ready() -> void:
 	MenuStyleScript.style_label(_balance, 16, COLOR_WORLD_LINE)
 	MenuStyleScript.style_label(_world_line, 22, COLOR_WORLD_LINE)
 	_world_line.text = ""
+	# Owner, 2026-10-23, "the text is random": the HUD is pictures and counts, not readouts.
+	# The sky already says the hour and the weather, and the Company balance belongs to the
+	# Depot's own page, so neither line is drawn here any more.
+	_world_line.visible = false
+	_balance.visible = false
 	MenuStyleScript.style_label(_prompt, 26, COLOR_PROMPT)
 	_prompt.text = ""
 	MenuStyleScript.style_label(_toast, 40, Color(1.0, 0.96, 0.86, 1.0))
