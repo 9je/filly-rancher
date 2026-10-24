@@ -180,6 +180,9 @@ func _control() -> void:
 	var walking := not _arrived and _path_i < _path.size()
 	if walking and not _aim:
 		look = _lookahead()
+		# A look point almost under her feet swings the camera wildly; hold the view instead.
+		if Vector2(look.x - player.global_position.x, look.z - player.global_position.z).length() < 1.2:
+			look = Vector3.INF
 	if look != Vector3.INF and cam != null:
 		var from := cam.global_position if _aim else player.global_position
 		var d := look - from
@@ -281,12 +284,42 @@ func _walk(to: Vector3, arrive: float = RUN_ARRIVE, timeout: float = 90.0) -> bo
 	_path = _path_to(to)
 	_path_i = 0
 	_arrived = false
+	# STUCK, THE WAY A PERSON NOTICES IT: two seconds of pushing and getting nowhere. She backs
+	# off and steps round; three times stuck on one walk and she gives up on it, instead of
+	# grinding against a wall with the camera swinging (the first FIRST_10_MINUTES take spent
+	# minutes doing that against the barn).
+	var check_t := _t()
+	var check_at := player.global_position
+	var stuck := 0
 	while _t() - t0 < timeout:
 		await physics_frame
 		var gap := Vector2(player.global_position.x - to.x, player.global_position.z - to.z).length()
 		if gap <= arrive:
 			_stop()
 			return true
+		if _t() - check_t > 2.0:
+			var moved := Vector2(player.global_position.x - check_at.x, player.global_position.z - check_at.z).length()
+			check_t = _t()
+			check_at = player.global_position
+			if moved < 0.4:
+				stuck += 1
+				if stuck >= 3:
+					_stop()
+					_say("gives up on a blocked walk")
+					return false
+				var away := player.global_position - to
+				away.y = 0.0
+				var side := away.normalized().cross(Vector3.UP) * (1.0 if stuck % 2 == 1 else -1.0)
+				var step := player.global_position + (away.normalized() * 1.5 + side * 2.5)
+				_path = _path_to(step)
+				_path_i = 0
+				_arrived = false
+				var s0 := _t()
+				while _t() - s0 < 1.6 and not _arrived:
+					await physics_frame
+				repath = 99.0
+				check_t = _t()
+				check_at = player.global_position
 		repath += 1.0 / 60.0
 		if _arrived or repath > 3.0:
 			repath = 0.0
