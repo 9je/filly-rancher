@@ -104,4 +104,6 @@ Canon MLP stays: real names, looks and places ("lean into mlp fully", private bu
 
 ### 2026-10-24
 - **TRAILER_4K.mp4 and TRAILER_1080p.mp4, cut 6:** 64.8 s, 60 fps, -14.0 LUFS. Re-shot after the owner's review (eyes, text, movement); see TRAILER_REVIEW.md iterations 5 and 6 and DECISIONS.md.
+- **Pacing passes:** PACING.md, 72:26 of play, longest gap 6:01 (limit 8:00), first clue 5:34. The Rainboom, Derpy and Trixie happenings closed the old 11:59 hole at 50-62 min.
+- **60 ponies at 60 FPS:** the rendered 60-pony check passes, 4 runs of 4 at p99 15.0-15.6 ms (budget 16.6), worst second 87-100 fps, average about 8.7 ms. The changes are listed in DECISIONS.md, "60 ponies at 60 FPS, measured honestly": Jolt; a herd that settles instead of running in place near the player; outline-free far ponies; one mesh per region fence; a corrected benchmark.
 - **FIRST_10_MINUTES.mp4:** H.264 1920x1080 60 fps, 600 s, uncut. The bot plays a fresh save on the GPU under Movie Maker. Sampled every 15 s: creator, opening talks, the Scoop, pens, market, Depot, mail, with no stuck spans now that the bot has a stuck detector.

@@ -124,3 +124,35 @@ The visual review found the Spectra Palace was a purple box with a flat gold lid
 **Movement:**
 - **Treats:** a tossed treat never drew a pony. Entering WANDER picked its own random target and overwrote the treat, so the Treat Pouch sent ponies strolling anywhere. Fixed.
 - **Trailer staging:** a pony's staged facing was undone by her own `_visual_yaw`, so staged ponies showed their backs. Dash was meant to bolt but stood frozen. Strangers from the spawn meadow wandered through featured shots. All three fixed: facing sticks, Dash's bolt is forced, and the stage is cleared around each featured pony.
+
+## 2026-10-24: 60 ponies at 60 FPS, measured honestly
+
+The 60-pony check (`scenes/test/perf.gd`) was failing at p99 22-27 ms. Three of its findings were the check measuring the wrong thing; the rest were real costs in the game.
+
+**The check, corrected:**
+- **Unlayered ponies.** Its own ponies came straight from pony.tscn on collision layer 1. Their 14 m detection spheres paired with the ground, the props and each other (5,019 broadphase pairs), and their bodies ignored the props. They are now layered the way spawner.gd layers a Drifter.
+- **Strays, and a growing herd.** A rejected spawn spot left its pony standing at the origin. The ranch's restock kept topping the wild up mid-run. The ring now holds exactly 60, on open ground, with restocking held (`Spawner.restock`).
+- **Synchronous render queries every frame.** These waited for the render thread and serialized it with the main thread. They are now sampled once a second.
+
+**The game, faster** (p99 about 25 to 15.3-16.5 ms; 8 of 8 runs PERF_OK across two sessions; worst second 86-104 fps; average about 8.7 ms). The full suite ran 1750 of 1752 under Jolt. Both failures were the first wary rule, which settled a bolting pony in the tick she bolted; it is fixed (she runs at least 1 s first), and test_pony_leash's cornered pony may now be settled wary, which its assertion accepts:
+- **Jolt physics** (project.godot). A tick fell from about 13 to about 7 ms with the herd layered properly. A slide against the ground fell from 141 to 38 us.
+- **The herd settles.** Two changes:
+  - A shy pony who has run at least 1 s and is past her notice radius, or pinned by her leash or a wall, now stops and watches the player for 5 s. She bolts again only if the player closes inside 5 m. Before, she fled until the player left her 14 m sphere, which her leash never allowed, so half a herd ran in place for as long as the player stood near it (27 of 59 in the check).
+  - Grazing is 4-9 s (was 1.5-3.5), idles are 1-2.5 s, and the wander chance is 0.5. The herd is on the move about a quarter of the time, not half.
+- **Far ponies draw no outline at all.** The pass was collapsed but still issued as a draw call. Each toon material is now built with an outline-free twin (`ToonStyler.BARE_META`), and the MID/FAR tiers wear the twin, so a far pony is 11-18 draws, not 22-38. Teeth and tongue are not drawn out there. NPCs get the same past 14 m, plus no shadows.
+- **Fewer shadow casters:**
+  - Each region fence's 113 post and rail meshes are one mesh. The four fences had been 452 shadow casters; their colliders are unchanged.
+  - The orchard's whole-scene props are batched into MultiMeshes like the rest of the dressing.
+  - Nothing under 30 cm casts a shadow.
+- **Resting ponies do less:**
+  - A mid-distance pony who is standing still ticks every 6th physics tick, not every 3rd.
+  - An off-screen far pony ticks every 24th.
+- **Smaller fixes:**
+  - A wanderer pressed into a wall gives up after 0.75 s. One pony grinding the coop cost as much as twenty grazing ones.
+  - Foliage collision keeps only the faces within 3 m of the ground. Tree canopies were 60-80k collision faces each. This also stopped about 30 wild ponies failing to spawn under canopies.
+
+**Kept, tried and rejected:**
+- **Depth prepass off:** frame 8.3 ms, but SSAO reads the prepass's normals. The frame went visibly darker and a pony rendered black.
+- **Physics on its own thread:** about 0.3 ms, but it makes ray casts from `_process` unsafe, and the game does those.
+- **Mid and far ponies stepped from `_process`:** worse. move_and_slide outside the physics step costs more under Jolt.
+- **Also no help:** a heightmap ground collider, fewer max slides, two shadow cascades, and custom AABBs.

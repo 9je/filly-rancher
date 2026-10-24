@@ -9,6 +9,7 @@ extends CharacterBody3D
 ## acts them out: `act(mood, anim)` sets her face and plays a one-shot or loop clip.
 
 const PonyLodScript := preload("res://actors/pony/pony_lod.gd")
+const ToonStylerScript := preload("res://systems/toon_styler.gd")
 const PonyRigScript := preload("res://scripts/pony_rig.gd")
 const PonyPaintScript := preload("res://systems/pony_paint.gd")
 const DonorTableScript := preload("res://systems/donor_table.gd")
@@ -224,12 +225,32 @@ func _update_far() -> void:
 	if DisplayServer.get_name() == "headless" or not is_inside_tree():
 		return
 	var cam := get_viewport().get_camera_3d()
-	var far := cam != null and cam.global_position.distance_to(global_position) > 30.0
+	var d := cam.global_position.distance_to(global_position) if cam != null else 0.0
+	# PAST A DOZEN METRES SHE DRAWS LIKE A PONY THERE: no outline pass, no shadow (pony.gd's MID
+	# tier). Each of the six was about fifty draws a frame wherever she stood, 360 of the
+	# 60-pony check's 2,400 (scenes/test/perf.gd exp=groups). Two metres of hysteresis.
+	var mid := d > (14.0 if not _mid else 10.0)
+	if mid != _mid:
+		_mid = mid
+		var meshes := _visuals.find_children("*", "MeshInstance3D", true, false)
+		ToonStylerScript.wear_outline(meshes, not mid, _worn_bare)
+		for m in meshes:
+			var gi := m as GeometryInstance3D
+			if mid:
+				gi.set_meta(&"near_shadow", gi.cast_shadow)
+				gi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			elif gi.has_meta(&"near_shadow"):
+				gi.cast_shadow = gi.get_meta(&"near_shadow")
+	var far := d > 30.0
 	if far == _far:
 		return
 	_far = far
 	for m in _visuals.find_children("*", "SkeletonModifier3D", true, false):
 		(m as SkeletonModifier3D).active = not far
+
+
+var _mid := false
+var _worn_bare: Dictionary = {}
 
 
 func _turn(desired: Vector3, delta: float) -> void:

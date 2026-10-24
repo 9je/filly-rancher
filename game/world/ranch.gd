@@ -1116,7 +1116,34 @@ func _ready() -> void:
 	await _report(pony_count, prop_count)
 
 	_apply_player_look()
+	_quiet_tiny_shadows(self)
 	_maybe_open_creation()
+
+
+## NOTHING SMALLER THAN A HOOF CASTS A SHADOW. Eyes, eyelashes, teeth, chips and cards were
+## each a shadow caster drawn into every cascade of the sun's map, sixty of them across the
+## people, the attendants, the player and the Strip, for shadows a few pixels across nobody
+## could find. Ponies do this per part already (pony.gd NO_SHADOW_PARTS); this is everyone else.
+## Run once the valley is built; pony bodies are skipped because their tiers own their shadows.
+const TINY_SHADOW_SIZE := 0.3
+
+
+static func _quiet_tiny_shadows(root: Node) -> int:
+	var quiet := 0
+	for g in root.find_children("*", "GeometryInstance3D", true, false):
+		var gi := g as GeometryInstance3D
+		if gi.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF or gi is MultiMeshInstance3D:
+			continue
+		var body := gi.get_parent()
+		while body != null and not (body is CharacterBody3D):
+			body = body.get_parent()
+		if body != null and body.has_method("set_stock"):
+			continue
+		var size := gi.get_aabb().size * gi.global_transform.basis.get_scale()
+		if size.length() < TINY_SHADOW_SIZE:
+			gi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			quiet += 1
+	return quiet
 
 
 # --- saving and loading ----------------------------------------------------------------

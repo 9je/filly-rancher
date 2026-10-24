@@ -87,8 +87,52 @@ static func sfm_eye(tex: Texture2D) -> ShaderMaterial:
 	return m
 
 
-## One StandardMaterial3D as a toon ShaderMaterial (plus its outline pass).
+## One StandardMaterial3D as a toon ShaderMaterial (plus its outline pass, and its twin
+## without one: see BARE_META).
 static func to_toon(src: StandardMaterial3D, preset: Dictionary) -> ShaderMaterial:
+	var m := _toon_from(src, preset)
+	var px: float = float(preset.get("outline_px", 0.0)) * outline_scale
+	if px > 0.0 and src.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED:
+		m.next_pass = make_outline(src.albedo_color, src.albedo_texture, px, float(preset.get("fade_end", 42.0)))
+		m.set_meta(BARE_META, _toon_from(src, preset))
+	return m
+
+
+## THE SAME MATERIAL WITHOUT ITS OUTLINE PASS, built beside it. A pony far off wears this
+## (pony.gd _outline) so the pass costs no draw call at all; made here, at build time, because
+## copying a material on the spot was 370 us a surface, a spike every time the camera turned.
+const BARE_META := &"bare_of_outline"
+
+
+## Wear or shed the outline pass on every surface of `meshes` (pony.gd's detail tiers, npc.gd
+## off in the distance). Shedding swaps a surface to its BARE_META twin, so the pass costs no
+## draw call; `worn` remembers each swap, so wearing it again restores exactly those, and a
+## surface somebody else changed meanwhile keeps theirs. A material with no twin is left be.
+static func wear_outline(meshes: Array, on: bool, worn: Dictionary) -> void:
+	for node in meshes:
+		var mi := node as MeshInstance3D
+		if mi == null or not is_instance_valid(mi) or mi.mesh == null:
+			continue
+		for k in mi.mesh.get_surface_count():
+			var key := mi.get_instance_id() * 64 + k
+			if on:
+				var pair: Array = worn.get(key, [])
+				if not pair.is_empty():
+					if mi.get_surface_override_material(k) == pair[1]:
+						mi.set_surface_override_material(k, pair[0])
+					worn.erase(key)
+				continue
+			var mat := mi.get_surface_override_material(k)
+			if mat == null or mat.next_pass == null:
+				continue
+			var bare: Material = mat.get_meta(BARE_META, null)
+			if bare == null:
+				continue
+			mi.set_surface_override_material(k, bare)
+			worn[key] = [mat, bare]
+
+
+static func _toon_from(src: StandardMaterial3D, preset: Dictionary) -> ShaderMaterial:
 	var m := ShaderMaterial.new()
 	m.shader = TOON
 	m.resource_name = src.resource_name
@@ -107,9 +151,6 @@ static func to_toon(src: StandardMaterial3D, preset: Dictionary) -> ShaderMateri
 	if src.emission_enabled:
 		m.set_shader_parameter(&"emission", src.emission)
 		m.set_shader_parameter(&"emission_energy", src.emission_energy_multiplier)
-	var px: float = float(preset.get("outline_px", 0.0)) * outline_scale
-	if px > 0.0 and src.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED:
-		m.next_pass = make_outline(src.albedo_color, tex, px, float(preset.get("fade_end", 42.0)))
 	return m
 
 

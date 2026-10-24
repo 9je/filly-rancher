@@ -68,6 +68,10 @@ const STOCK_RESPAWN_SECONDS := 45.0
 ## that exceeds it.
 const WORLD_PONY_BUDGET := 60
 
+## False holds the wild at the herd it has: the performance check counts the ponies it
+## measures, and a refill wandering in mid-run measured 90 where it set up 60.
+var restock := true
+
 ## How far above and below a candidate point the ground ray is cast. Generous
 ## against terrain.gd's ~+/-2.4 m of relief, and cheap.
 const RAY_UP := 40.0
@@ -711,7 +715,7 @@ func _stock_at(marker: ZoneMarker) -> int:
 ##
 ## Returns how many arrived, which is what a caller puts in a report line.
 func tick_stock(delta: float) -> int:
-	if delta <= 0.0:
+	if delta <= 0.0 or not restock:
 		return 0
 	var arrived := 0
 	var slot := _next_slot

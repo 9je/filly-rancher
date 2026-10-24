@@ -173,7 +173,10 @@ func test_a_shy_pony_cornered_against_her_leash_settles_instead_of_juddering() -
 	_add_player(Vector3.ZERO)
 	await wait_physics_frames(SETTLE_FRAMES)
 
-	assert_eq(pony.state, PonyScript.State.FLEE, "she must actually be fleeing")
+	# Pinned by her leash she may already have given up the run and settled to watch him
+	# (pony.gd _settle_wary, 2026-10-24): fleeing or wary, she must have reacted.
+	assert_true(pony.state == PonyScript.State.FLEE or float(pony.get("_wary")) > 0.0,
+		"she must actually have reacted: fleeing, or settled wary against her leash")
 	var judder := await _measure_judder(pony)
 	assert_lte(judder.reversals, MAX_REVERSALS,
 		"a cornered pony must settle, not judder: her velocity reversed %d times in %d "

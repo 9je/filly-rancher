@@ -43,6 +43,14 @@ Music="*res://systems/music.gd"
 
 buses/default_bus_layout="res://default_bus_layout.tres"
 
+[physics]
+
+; v1 sharpening: Jolt, Godot's built-in second physics engine. On the 60-pony check
+; (scenes/test/perf.gd, the herd layered as the spawner layers it) a physics tick went from
+; about 13 ms to about 7 with Godot Physics' own solver, and a slide against the ground from
+; 141 us to 38. The 99th-percentile frame is a frame with a tick in it.
+3d/physics_engine="Jolt Physics"
+
 [rendering]
 
 ; v1 sharpening: the render thread runs beside the game thread (Vulkan on AMD and NVIDIA

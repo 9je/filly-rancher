@@ -250,16 +250,44 @@ func _collider(xf: Transform3D) -> void:
 	body.global_transform = Transform3D(Basis(), xf.origin)
 
 
-## A whole converted scene (the Sweet Apple Acres props), styled the way props.gd styles them.
+## A whole converted scene (the Sweet Apple Acres props), styled the way props.gd styles them,
+## and BATCHED like the kit's pieces: an orchard of whole scenes was 500 separate shadow
+## casters, a third of every frame's draws (scenes/test/perf.gd exp=casters).
 func _scene(path: String, at: Vector3, yaw: float, s: float, solid: bool) -> void:
-	var n: Node3D = (load(path) as PackedScene).instantiate()
-	add_child(n)
-	n.global_position = at
-	n.rotation.y = yaw
-	n.scale = Vector3.ONE * s
-	ToonStylerScript.style(n, &"foliage")
+	var xf := Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3.ONE * s), at)
+	for part: Array in _scene_parts(path):
+		var key := path + "|" + str(part[2])
+		if not _batches.has(key):
+			_batches[key] = {"mesh": part[0], "xf": [], "shadow": true}
+		(_batches[key].xf as Array).append(xf * (part[1] as Transform3D))
 	if solid:
 		_collider(Transform3D(Basis().scaled(Vector3.ONE * 1.6), at))
+
+
+## A converted scene's meshes with ToonStyler's foliage look baked into them, once per path.
+func _scene_parts(path: String) -> Array:
+	if _meshes.has(path):
+		return _meshes[path]
+	var out: Array = []
+	var inst: Node3D = (load(path) as PackedScene).instantiate()
+	var i := 0
+	for m in inst.find_children("*", "MeshInstance3D", true, false):
+		var mi := m as MeshInstance3D
+		if mi.mesh == null or not mi.visible:
+			continue
+		var mesh := mi.mesh.duplicate() as Mesh
+		for sidx in mesh.get_surface_count():
+			var src := mi.get_active_material(sidx)
+			if src is StandardMaterial3D and ToonStylerScript.shading_enabled:
+				mesh.surface_set_material(sidx, ToonStylerScript.to_toon(src as StandardMaterial3D,
+					ToonStylerScript.PRESETS[&"foliage"]))
+			elif src != null:
+				mesh.surface_set_material(sidx, src)
+		out.append([mesh, _relative(inst, mi), i])
+		i += 1
+	inst.free()
+	_meshes[path] = out
+	return out
 
 
 ## One MultiMeshInstance3D per (model, mesh): a field of flowers is one draw, not a hundred.

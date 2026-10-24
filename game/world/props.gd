@@ -70,6 +70,9 @@ const BASE_SCALE := 1.5
 ## shows a hairline of daylight under its uphill edge.
 const SINK_BIAS := 0.05
 
+## How high over its ground a foliage prop keeps collision. See _add_collision().
+const FOLIAGE_COLLIDE_HEIGHT := 3.0
+
 ## A PROP WIDER THAN THIS, STANDING OFF THE FLAT APRON, GETS A PLINTH OF ITS OWN.
 ##
 ## seat() puts the bottom of a model's AABB SINK_BIAS below the ground height at ONE point.
@@ -608,7 +611,8 @@ func build() -> int:
 		if skirted:
 			_add_skirt(inst, centre, half, relief.y - relief.x, ground)
 
-		_shape_count += _add_collision(inst)
+		var foliage := ToonStylerScript.category_for(file) == &"foliage"
+		_shape_count += _add_collision(inst, ground if foliage else NAN)
 		_placed.append(inst)
 		_entries.append(entry)
 
@@ -777,7 +781,14 @@ func _ground_height(x: float, z: float) -> float:
 ## inherits the prop's scale through the transform chain -- so the collider is the
 ## shape you can see, at the size you can see it, with no second scale factor to
 ## keep in sync. Returns how many shapes were created.
-func _add_collision(inst: Node3D) -> int:
+##
+## FOLIAGE (a `ground` is passed) COLLIDES ONLY WHERE SOMETHING CAN TOUCH IT: the faces
+## reaching below FOLIAGE_COLLIDE_HEIGHT over its ground. A tree model is 60,000 to 80,000
+## faces, nearly all canopy, and every pony sliding past one queried them all: the 60-pony
+## check spent half its physics tick inside the orchard's leaves (scenes/test/perf.gd,
+## exp=shapes). The trunk, the low boughs and the bush itself are kept, so nothing walks
+## through a tree; the camera simply stops bumping into a canopy overhead.
+func _add_collision(inst: Node3D, ground := NAN) -> int:
 	var meshes: Array = inst.find_children("*", "MeshInstance3D", true, false)
 	if inst is MeshInstance3D:
 		meshes.append(inst)
@@ -786,14 +797,46 @@ func _add_collision(inst: Node3D) -> int:
 	for m: MeshInstance3D in meshes:
 		if m.mesh == null:
 			continue
-		m.create_trimesh_collision()
-		created += 1
+		if is_nan(ground):
+			m.create_trimesh_collision()
+			created += 1
+		elif _add_low_collision(m, ground + FOLIAGE_COLLIDE_HEIGHT):
+			created += 1
 
 	for body: StaticBody3D in inst.find_children("*", "StaticBody3D", true, false):
 		body.collision_layer = LayersScript.PROPS
 		body.collision_mask = 0
 
 	return created
+
+
+## The trimesh of `m`'s faces that dip below world height `top`, as a StaticBody3D child
+## (the same shape create_trimesh_collision() builds, minus what lies wholly above).
+## False when no face reaches that low.
+func _add_low_collision(m: MeshInstance3D, top: float) -> bool:
+	var faces := m.mesh.get_faces()
+	var xf := m.global_transform
+	# Only world y is needed, so one row of the basis, not a whole transform per vertex.
+	var row := Vector3(xf.basis.x.y, xf.basis.y.y, xf.basis.z.y)
+	var lift := xf.origin.y - top
+	var keep := PackedVector3Array()
+	for i in range(0, faces.size(), 3):
+		if row.dot(faces[i]) + lift < 0.0 or row.dot(faces[i + 1]) + lift < 0.0 \
+				or row.dot(faces[i + 2]) + lift < 0.0:
+			keep.append(faces[i])
+			keep.append(faces[i + 1])
+			keep.append(faces[i + 2])
+	if keep.is_empty():
+		return false
+	var shape := ConcavePolygonShape3D.new()
+	shape.set_faces(keep)
+	var body := StaticBody3D.new()
+	body.name = String(m.name) + "_col"
+	var cs := CollisionShape3D.new()
+	cs.shape = shape
+	body.add_child(cs)
+	m.add_child(body)
+	return true
 
 
 ## A solid box under a wide prop, so the terrain always passes through the SIDE of

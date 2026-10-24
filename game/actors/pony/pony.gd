@@ -275,15 +275,19 @@ const APPROACH_STOP_DISTANCE := 2.0
 const ARRIVAL_RADIUS := 0.35
 
 ## Seconds spent in each routine state. Ranges, drawn from this pony's own RNG.
-const IDLE_SECONDS := Vector2(0.5, 1.5)
-const GRAZE_SECONDS := Vector2(1.5, 3.5)
+## A HERD MOSTLY GRAZES. At 0.5-1.5 s idles, 1.5-3.5 s grazes and a 65% wander chance she was
+## on the move about half the time, a field of ponies that never settled; now it is about a
+## quarter, which reads as a herd at pasture (and halves what a crowd costs a physics tick:
+## the 60-pony check's over-budget frames were its walkers, scenes/test/perf.gd exp=freeze).
+const IDLE_SECONDS := Vector2(1.0, 2.5)
+const GRAZE_SECONDS := Vector2(4.0, 9.0)
 ## Safety valve on WANDER: if the target somehow cannot be reached (a rock in the way,
 ## a leash that keeps steering her off it) she gives up and re-picks rather than
 ## grinding into an obstacle forever.
 const WANDER_TIMEOUT_SECONDS := 6.0
 
 ## Chance the next routine state is WANDER rather than GRAZE.
-const WANDER_CHANCE := 0.65
+const WANDER_CHANCE := 0.5
 
 ## How many times _pick_wander_target() will re-roll to avoid handing back a point she
 ## is already standing on. A pony near the edge of a small roam circle draws such a
@@ -447,11 +451,21 @@ const DETAIL_MID_AT := 12.0
 const DETAIL_FAR_AT := 40.0
 const DETAIL_OFFSCREEN_AT := 12.0
 const DETAIL_CHECK_SECONDS := 0.3
+## A FAR pony nobody can see thinks and moves on every 24th tick (2.5 times a second): how
+## often an unseen pony takes her steps cannot be seen, and most of a herd is behind the
+## camera at any moment. The 60-pony check's ticks were the frames over budget, and her
+## share of them is a quarter of what it was. She is checked every DETAIL_CHECK_SECONDS
+## like anypony, so turning to look at her gives her back her steps within a third of a second.
+const OFFSCREEN_STRIDE := 24
+var _offscreen := false
 ## Meshes too small to see a shadow from (by name): never cast one.
 const NO_SHADOW_PARTS: Array[String] = ["tongue", "eyebrow", "hooves", "teeth"]
 var detail: int = Detail.FULL
 var _detail_timer := 0.0
 var _tick_count := 0
+## How long she has been wandering into a wall. See _physics_process.
+var _wall_time := 0.0
+const WALL_GIVE_UP_SECONDS := 0.75
 var _tick_accum := 0.0
 var _stood_still := false
 static var _headless := -1
@@ -807,7 +821,7 @@ func _physics_process(delta: float) -> void:
 		return
 
 	# DETAIL TIERS (see _update_detail): a pony far from the camera thinks, moves and
-	# animates on every second or fourth tick, carrying the skipped time with her.
+	# animates on every third or sixth tick, carrying the skipped time with her.
 	_detail_timer -= delta
 	if _detail_timer <= 0.0:
 		# The GLOBAL generator, never hers: her own (_rng) is seeded by the spawner and the tests
@@ -816,7 +830,11 @@ func _physics_process(delta: float) -> void:
 		_update_detail()
 	var stride := 1
 	if detail != Detail.FULL:
-		stride = 3 if detail == Detail.MID else 6
+		stride = 3 if detail == Detail.MID else (OFFSCREEN_STRIDE if _offscreen else 6)
+		# Standing grazing or idle out there, all she does is breathe and crop the grass: the
+		# slow idle reads the same at 10 steps a second, and most of a settled herd is standing.
+		if stride == 3 and _stood_still and (state == State.IDLE or state == State.GRAZE):
+			stride = 6
 		_tick_accum += delta
 		_tick_count += 1
 		if _tick_count < stride:
@@ -829,6 +847,7 @@ func _physics_process(delta: float) -> void:
 
 	_state_timer -= delta
 	calm = maxf(0.0, calm - delta)
+	_wary = maxf(0.0, _wary - delta)
 	_react_to_player()
 
 	var desired := Vector3.ZERO
@@ -881,6 +900,25 @@ func _physics_process(delta: float) -> void:
 		else:
 			move_and_slide()
 	_stood_still = desired == Vector3.ZERO and velocity.length_squared() < 0.0001 and is_on_floor()
+	# A WANDERER WHO WALKS INTO A WALL STOPS WALKING INTO IT. She has nowhere to be, and a pony
+	# pressed against a coop or a barn grinds move_and_slide through its full recovery every
+	# tick: one such pony cost the 60-pony check as much as twenty grazing ones (900 us a
+	# slide against the coop, scenes/test/perf.gd exp=timing). She stands, then picks again.
+	if state == State.WANDER and is_on_wall():
+		_wall_time += delta
+		if _wall_time > WALL_GIVE_UP_SECONDS:
+			_transition_to(State.IDLE)
+	else:
+		_wall_time = 0.0
+	# Fleeing and getting nowhere (her leash or a wall has her): see _settle_wary.
+	if state == State.FLEE:
+		_fled += delta
+	if state == State.FLEE and get_ground_speed() < _flee_speed * 0.35:
+		_pinned += delta
+		if _pinned > PINNED_SECONDS and _fled > WARY_MIN_FLEE:
+			_settle_wary()
+	else:
+		_pinned = 0.0
 
 	_update_facing(_facing_direction(desired), delta)
 	_update_animation(get_ground_speed())
@@ -897,7 +935,9 @@ func _update_detail() -> void:
 		# flicker between tiers as the camera breathes.
 		var slack := 2.0 if detail == Detail.FULL else -2.0
 		var slack_far := 2.0 if detail != Detail.FAR else -2.0
-		if d > DETAIL_FAR_AT + slack_far or (d > DETAIL_OFFSCREEN_AT and not cam.is_position_in_frustum(global_position)):
+		var seen := cam.is_position_in_frustum(global_position)
+		_offscreen = not seen and d > DETAIL_OFFSCREEN_AT
+		if d > DETAIL_FAR_AT + slack_far or _offscreen:
 			want = Detail.FAR
 		elif d > DETAIL_MID_AT + slack:
 			want = Detail.MID
@@ -910,7 +950,7 @@ func _set_detail(want: int) -> void:
 	# A RANDOM PHASE IN HER STRIDE, so a crowd that changes tier together (the camera turned)
 	# does not then think, move and animate all on the same tick: the 60-pony check showed a
 	# spike every sixth tick until this was staggered.
-	_tick_count = randi() % 6
+	_tick_count = randi() % OFFSCREEN_STRIDE
 	_tick_accum = 0.0
 	if visuals == null:
 		return
@@ -940,11 +980,26 @@ func _set_detail(want: int) -> void:
 			if detail != Detail.FULL else AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_IDLE
 
 
-## Past FULL the toon outline (a second pass per surface, a thread at that size) goes off,
-## through the outline shader's per-instance `outline_on`: no material is swapped.
+## Past FULL the toon outline (a second pass per surface, a thread at that size) goes off.
+## The pass is DROPPED, not just collapsed: each surface wears a copy of its material without
+## the next_pass, because a collapsed pass still costs its draw call, and a herd of 60 spent
+## 22 to 38 draws a pony on lines nobody could see (scenes/test/perf.gd exp=parts). Her
+## teeth and tongue, shut inside her mouth, are not drawn at all out there.
+## `outline_on` is still set, for a material somebody hands her while she is far; and a
+## surface whose material was changed by somebody else meanwhile keeps theirs on the way back.
 func _outline(on: bool) -> void:
 	for mi: MeshInstance3D in _detail_meshes():
+		if not is_instance_valid(mi):
+			continue
 		mi.set_instance_shader_parameter(&"outline_on", 1.0 if on else 0.0)
+		var lower := String(mi.name).to_lower()
+		if "tongue" in lower or "teeth" in lower:
+			mi.visible = on
+	ToonStylerScript.wear_outline(_detail_meshes(), on, _worn_bare)
+
+
+## Surfaces wearing an outline-free twin now (ToonStyler.wear_outline keeps it).
+var _worn_bare: Dictionary = {}
 
 
 var _meshes_cache: Array[MeshInstance3D] = []
@@ -999,6 +1054,9 @@ func _state_flee() -> Vector3:
 		return Vector3.ZERO
 	var away := global_position - _player.global_position
 	away.y = 0.0
+	if _fled > WARY_MIN_FLEE and away.length() > _notice_radius() + 1.0:
+		_settle_wary()
+		return Vector3.ZERO
 	if away.length_squared() < 0.0001:
 		# Standing exactly on the player: any direction is "away", so pick her facing
 		# rather than dividing by zero.
@@ -1125,12 +1183,40 @@ func _react_to_player() -> void:
 	if not _sees_player():
 		return
 	var reaction := reaction_state(_personality())
+	# Wary (see _settle_wary): she has already run, and she holds her ground watching unless
+	# the player comes on at her.
+	if reaction == State.FLEE and _wary > 0.0 \
+			and global_position.distance_to(_player.global_position) > WARY_BOLT_DISTANCE:
+		return
 	if reaction != NO_REACTION:
 		_transition_to(reaction)
 
 
+## A SHY PONY WHO HAS GOT AWAY STOPS RUNNING. Flight used to end only when the player left
+## her 14 m sphere, and her leash would not let her get that far: stand still near a shy herd
+## and half of it ran in place against its boundaries for as long as you stood there (27 of
+## 59 in the 60-pony check). Now, WARY_DISTANCE clear or pinned by her leash or a wall, she
+## stops and watches you for WARY_SECONDS, and bolts again only if you close on her.
+## "Clear" is past the distance she notices you from; and she always runs WARY_MIN_FLEE
+## first, so a bolt is a bolt and not a flinch.
+const WARY_MIN_FLEE := 1.0
+const WARY_BOLT_DISTANCE := 5.0
+const WARY_SECONDS := 5.0
+const PINNED_SECONDS := 0.6
+var _wary := 0.0
+var _pinned := 0.0
+var _fled := 0.0
+
+
+func _settle_wary() -> void:
+	_wary = WARY_SECONDS
+	_pinned = 0.0
+	_transition_to(State.IDLE)
+
+
 func _transition_to(next: int) -> void:
 	if next == State.FLEE and state != State.FLEE:
+		_fled = 0.0
 		_maybe_blink()
 	state = next
 	match state:
@@ -1310,13 +1396,18 @@ func _on_detection_body_exited(body: Node3D) -> void:
 ## him, and FLEE/APPROACH both END the moment she cannot -- so a player who drops to a
 ## sneak inside a fleeing pony's old radius watches her calm down and go back to grazing,
 ## which is exactly what the sneak is supposed to feel like.
+## How far off she notices the player as he moves now (her personality, his gait, her quirk).
+func _notice_radius() -> float:
+	return notice_radius_for(_personality(), _player_is_sneaking()) * PonyTraitsScript.notice_mult(quirk)
+
+
 func _sees_player() -> bool:
 	if _player == null or not is_instance_valid(_player):
 		_player = null
 		return false
 	if calm > 0.0:
 		return false
-	var radius := notice_radius_for(_personality(), _player_is_sneaking()) * PonyTraitsScript.notice_mult(quirk)
+	var radius := _notice_radius()
 	var seen := global_position.distance_to(_player.global_position) <= radius
 	# ANNOUNCED FROM INSIDE THE PREDICATE, not from _react_to_player(). Every route that
 	# asks whether she can see him already comes through here (the class comment on this
@@ -1348,7 +1439,8 @@ static func _is_routine_state(value: int) -> bool:
 func _facing_direction(desired: Vector3) -> Vector3:
 	if desired.length_squared() > 0.0:
 		return desired
-	if state == State.APPROACH and _sees_player():
+	if (state == State.APPROACH or (_wary > 0.0 and state == State.IDLE)) and _sees_player():
+		# Curious, or wary: either way she keeps her eyes on you.
 		var toward := _player.global_position - global_position
 		toward.y = 0.0
 		return toward

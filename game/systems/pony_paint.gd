@@ -131,14 +131,21 @@ static func _material_for(r: int, src: Material, look: PonyLook, donor: Dictiona
 
 
 static func _toon(c: Color, r: int) -> ShaderMaterial:
+	var m := _flat_toon(c, r)
+	var px: float = float(OUTLINE_PX.get(r, 0.0)) * ToonStylerScript.outline_scale
+	if px > 0.0:
+		m.next_pass = ToonStylerScript.make_outline(c, null, px, 42.0)
+		# Her far-off twin, without the pass (ToonStyler.BARE_META).
+		m.set_meta(ToonStylerScript.BARE_META, _flat_toon(c, r))
+	return m
+
+
+static func _flat_toon(c: Color, r: int) -> ShaderMaterial:
 	var m := ShaderMaterial.new()
 	m.shader = TOON
 	m.set_shader_parameter(&"albedo", c)
 	m.set_shader_parameter(&"shadow_fill", 0.38)
 	m.set_shader_parameter(&"rim_strength", 0.16 if r == Role.COAT else 0.0)
-	var px: float = float(OUTLINE_PX.get(r, 0.0)) * ToonStylerScript.outline_scale
-	if px > 0.0:
-		m.next_pass = ToonStylerScript.make_outline(c, null, px, 42.0)
 	return m
 
 

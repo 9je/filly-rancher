@@ -46,6 +46,9 @@ const GATE_SWING_DEGREES_PER_SECOND := 140.0
 var _region: RegionData
 var _ground := Callable()
 var _rails: StaticBody3D
+## Every post and rail of the ring, gathered into one mesh (see _commit_mesh).
+var _post_st: SurfaceTool
+var _rail_st: SurfaceTool
 var _gate: StaticBody3D
 var _hinge: Node3D
 var _open := false
@@ -115,6 +118,10 @@ func build() -> void:
 
 	var post_mat := PenScript._material_static(PenScript.POST_COLOR)
 	var rail_mat := PenScript._material_static(PenScript.RAIL_COLOR)
+	_post_st = SurfaceTool.new()
+	_post_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	_rail_st = SurfaceTool.new()
+	_rail_st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for i in range(SEGMENTS):
 		var a0 := float(i) * TAU / float(SEGMENTS)
 		var a1 := float(i + 1) * TAU / float(SEGMENTS)
@@ -127,7 +134,25 @@ func build() -> void:
 			_gate_segment(p0, p1, rail_mat, post_mat)
 		else:
 			_rail_segment(p0, p1, rail_mat)
+	_commit_mesh(post_mat, rail_mat)
 	set_open(was_open)
+
+
+## ONE MESH FOR THE RING, not one per post and rail: a ring was 113 meshes, and the four rings
+## were 452 shadow casters, a third of every frame's draw calls (scenes/test/perf.gd
+## exp=casters). The colliders stay one box apiece; only the drawing is merged.
+func _commit_mesh(post_mat: StandardMaterial3D, rail_mat: StandardMaterial3D) -> void:
+	var mesh := ArrayMesh.new()
+	_post_st.commit(mesh)
+	mesh.surface_set_material(mesh.get_surface_count() - 1, post_mat)
+	_rail_st.commit(mesh)
+	mesh.surface_set_material(mesh.get_surface_count() - 1, rail_mat)
+	var mi := MeshInstance3D.new()
+	mi.name = "RingMesh"
+	mi.mesh = mesh
+	_rails.add_child(mi)
+	_post_st = null
+	_rail_st = null
 
 
 ## One post, sunk POST_BURY into the ground so a slope never shows daylight under it, the
@@ -136,16 +161,13 @@ func _post(at: Vector3, mat: StandardMaterial3D) -> void:
 	var box := BoxMesh.new()
 	box.size = Vector3(PenScript.POST_SIZE, PenScript.FENCE_HEIGHT + PenScript.POST_BURY,
 		PenScript.POST_SIZE)
-	box.material = mat
-	var mesh := MeshInstance3D.new()
-	mesh.mesh = box
-	mesh.position = at + Vector3(0.0, (PenScript.FENCE_HEIGHT - PenScript.POST_BURY) * 0.5, 0.0)
-	_rails.add_child(mesh)
+	var pos := at + Vector3(0.0, (PenScript.FENCE_HEIGHT - PenScript.POST_BURY) * 0.5, 0.0)
+	_post_st.append_from(box, 0, Transform3D(Basis(), pos))
 	var shape := CollisionShape3D.new()
 	var col := BoxShape3D.new()
 	col.size = box.size
 	shape.shape = col
-	shape.position = mesh.position
+	shape.position = pos
 	_rails.add_child(shape)
 
 
@@ -161,18 +183,13 @@ func _rail_segment(p0: Vector3, p1: Vector3, mat: StandardMaterial3D) -> void:
 	for h: float in PenScript.RAIL_HEIGHTS:
 		var box := BoxMesh.new()
 		box.size = Vector3(length, PenScript.RAIL_THICKNESS, PenScript.RAIL_DEPTH)
-		box.material = mat
-		var mesh := MeshInstance3D.new()
-		mesh.mesh = box
-		mesh.position = mid + Vector3(0.0, h, 0.0)
-		mesh.rotation = Vector3(0.0, yaw, pitch)
-		_rails.add_child(mesh)
+		var xf := Transform3D(Basis.from_euler(Vector3(0.0, yaw, pitch)), mid + Vector3(0.0, h, 0.0))
+		_rail_st.append_from(box, 0, xf)
 		var shape := CollisionShape3D.new()
 		var col := BoxShape3D.new()
 		col.size = box.size
 		shape.shape = col
-		shape.position = mesh.position
-		shape.rotation = mesh.rotation
+		shape.transform = xf
 		_rails.add_child(shape)
 
 
