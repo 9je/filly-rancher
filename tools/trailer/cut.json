@@ -62,12 +62,6 @@
    "sfx": true
   },
   {
-   "shot": "everfree",
-   "take": "everfree_t1.avi",
-   "dur": 2.0,
-   "in": 0.5
-  },
-  {
    "shot": "lake",
    "take": "lake_t1.avi",
    "dur": 1.5,
@@ -87,12 +81,6 @@
    "fav": true,
    "take": "derpy_t1.avi",
    "dur": 1.0,
-   "sfx": true
-  },
-  {
-   "shot": "slots",
-   "take": "slots_t1.avi",
-   "dur": 2.0,
    "sfx": true
   },
   {

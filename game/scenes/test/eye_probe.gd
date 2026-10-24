@@ -3,6 +3,9 @@ extends "res://scenes/test/trailer.gd"
 ##   tools/bin/godot --path game -s res://scenes/test/eye_probe.gd -- --pony=fluttershy [--nolod] --out=/abs.png
 
 
+var _exposure := -1.0
+
+
 func _run() -> void:
 	var pony := "fluttershy"
 	var out := "/tmp/eye.png"
@@ -13,7 +16,12 @@ func _run() -> void:
 			out = a.substr(6)
 		elif a == "--nolod":
 			PonyLod.enabled = false
+		elif a.begins_with("--exposure="):
+			_exposure = float(a.substr(11))
 	await _boot_ranch()
+	if _exposure > 0.0:
+		for we: WorldEnvironment in ranch.find_children("*", "WorldEnvironment", true, false):
+			we.environment.tonemap_exposure = _exposure
 	var moving := "--moving" in OS.get_cmdline_user_args()
 	var p := _canon(pony, _g(30.0, 40.0), 0.0 if moving else 999.0, PI)
 	if not moving:

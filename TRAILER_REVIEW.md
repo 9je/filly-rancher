@@ -85,3 +85,23 @@ Each iteration is a full edit (`tools/trailer/edit.py --cut N`), reviewed from a
 - The Everfree shot is dark (dusk under trees) and sweeps past a trunk.
 - The slots shot is dim behind its menu.
 - A few background ponies crowd the edges of Fluttershy's and Tumble's frames.
+
+## Iteration 5 (cut 5): after the owner's review
+
+The owner watched cut 4 and found the eyes buggy, the text random and the movement weird. They were right. Root causes are in DECISIONS.md (2026-10-23, evening).
+
+**What changed before this cut:**
+- **Eyes:** the stale import cache that left Fluttershy, Twilight and Rainbow Dash with hollow eyes was cleared, and the PonySFM cast's irises are drawn at Source's size.
+- **Text:** no HUD in any shot.
+- **Movement:** each featured pony has the stage to herself. Staged facing holds (Fluttershy, Trixie and Derpy face the camera). Dash actually bolts. Fluttershy trots to her favorite food, now that the treat bug is fixed.
+- **The takes:** all 27 were re-shot.
+
+**Measured:**
+- TRAILER_4K.mp4 and TRAILER_1080p.mp4: 60 fps, 69.3 s.
+- ebur128: -14.0 LUFS, true peak -1.4 dBFS.
+
+**Checked at full resolution:** the faces of Fluttershy, Trixie, Derpy, Octavia, Tumble, Spike and the Crusaders all show proper eyes, facing the camera.
+
+**Found, to fix:**
+1. **Slots (about 27 s):** a dim menu panel of small text, which reads as exactly the "random text" the owner objected to. Cut it.
+2. **Everfree (about 20 s):** nearly black, and it sweeps through a red trunk. Cut it.
