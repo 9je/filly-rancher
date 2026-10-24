@@ -13,12 +13,13 @@ const TIPS := {
 	&"scoop": [&"catch", 100, "Hold {beam} on a pony to Scoop her up", "pony_in_view"],
 	&"pen": [&"pen", 90, "Walk onto the pen and press {interact} to let her out", "bag_has_pony_near_pen"],
 	&"build": [&"build", 85, "Press {interact} on an empty plot to build a pen", "bag_has_pony_no_pen"],
-	&"feed": [&"feed", 80, "Toss food with {launch} to feed a penned pony", "hungry_pony_near"],
+	&"feed": [&"feed", 80, "Toss a treat with {treat} to feed a penned pony", "hungry_pony_near"],
 	&"gems": [&"collect", 70, "Walk over gems to pick them up", "gems_on_ground"],
 	&"sell": [&"sell", 60, "Sell gems to Bramble at the market", "gems_in_pouch"],
 	&"talk": [&"talk", 95, "Press {interact} to talk", "npc_has_news"],
-	&"launch": [&"launch", 50, "Press {launch} to fire a pony back out of the Scoop", "bag_full"],
-	&"sprint": [&"sprint", 20, "Hold {sprint} to gallop", "far_from_home"],
+	# Owner playtest 2026-10-24: these two named keys that do not exist. A full bag empties
+	# into a pen; running is already the default gait.
+	&"launch": [&"launch", 50, "The Scoop is full: let them out in a pen with {interact}", "bag_full"],
 }
 const RETIRE_AFTER := 2
 
@@ -52,7 +53,7 @@ func current(state: Dictionary, glyph: Callable) -> Dictionary:
 	if best == &"":
 		return {}
 	var text: String = TIPS[best][2]
-	for key in ["beam", "interact", "launch", "sprint"]:
+	for key in ["beam", "interact", "treat"]:
 		text = text.replace("{%s}" % key, str(glyph.call(StringName(key))))
 	return {"id": best, "text": text}
 

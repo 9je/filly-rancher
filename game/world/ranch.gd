@@ -4447,6 +4447,7 @@ func _nearest_occupied_slot() -> PlotSlot:
 ## (_prompt_slot) doubled as the mutex the other four consulted. The prompt is a persistent
 ## label now, so there is nothing to fire once and nothing to go stale.
 func _update_interaction() -> void:
+	var fresh := _fresh_interact()
 	var action: Dictionary = current_interaction()
 	_paint_plots(action)
 	var hud := get_node_or_null(^"HUD")
@@ -4456,7 +4457,7 @@ func _update_interaction() -> void:
 		if launch != "":
 			if hud != null and hud.has_method("set_prompt"):
 				hud.set_prompt(launch)
-			tools.work(Input.is_action_just_pressed(&"interact"))
+			tools.work(fresh)
 			return
 	# Act Three's places (world/act3_world.gd) speak only when the ranch has nothing to say.
 	if action.is_empty() and act3 != null and _no_other_menu_open():
@@ -4465,14 +4466,34 @@ func _update_interaction() -> void:
 			if hud != null and hud.has_method("set_prompt"):
 				hud.set_prompt(offer)
 			act3.work(get_process_delta_time(), Input.is_action_pressed(&"interact"),
-				Input.is_action_just_pressed(&"interact"))
+				fresh)
 			return
 	if hud != null and hud.has_method("set_prompt"):
 		hud.set_prompt(InteractionScript.prompt_for(action,
 			InputDeviceScript.hint(&"interact")))
-	if action.is_empty() or not Input.is_action_just_pressed(&"interact"):
+	if action.is_empty() or not fresh:
 		return
 	perform_interaction(action)
+
+
+## Owner playtest 2026-10-24: the E that closes a conversation's last line is still
+## "just pressed" when this runs later in the same frame (the talk box marks the EVENT
+## handled; Input's polling does not care), so it opened the next conversation at once. With
+## Tumble at your heels that was an endless chatter loop. The press that ended a talk is
+## spent until the key comes back up.
+var _interact_spent := false
+
+
+func _on_talk_spent_interact(_who: StringName, _id: StringName) -> void:
+	_interact_spent = true
+
+
+func _fresh_interact() -> bool:
+	if _interact_spent:
+		if Input.is_action_pressed(&"interact"):
+			return false
+		_interact_spent = false
+	return Input.is_action_just_pressed(&"interact")
 
 
 ## THE GROUND ANSWERS BEFORE THE MENU DOES.
@@ -4924,7 +4945,9 @@ func _report(pony_count: int, prop_count: int) -> void:
 		if shapes == 0:
 			uncollided.append(prop.name)
 		for body: StaticBody3D in _bodies_of(prop):
-			if body.collision_layer != LayersScript.PROPS:
+			# A treetop above FOLIAGE_COLLIDE_HEIGHT is on CANOPY by design (props.gd).
+			var want := LayersScript.CANOPY if body.has_meta(&"canopy") else LayersScript.PROPS
+			if body.collision_layer != want:
 				prop_layers_ok = false
 		if PropsScript.is_in_pen_plots(prop.global_position.x, prop.global_position.z):
 			pen_intrusions.append(prop.name)
@@ -7266,6 +7289,7 @@ func _setup_people() -> void:
 	add_child(people)
 	people.effect.connect(_on_people_effect)
 	people.talk_finished.connect(_on_talk_finished_novelty)
+	people.talk_finished.connect(_on_talk_spent_interact)
 	people.populate()
 
 

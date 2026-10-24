@@ -101,10 +101,43 @@ static func using_gamepad() -> bool:
 ## empty string rather than erroring: a footer with a gap in it is a cosmetic fault and a
 ## crashed menu is not.
 static func hint(action: StringName) -> String:
-	if not GLYPHS.has(action):
+	if GLYPHS.has(action):
+		var pair: Array = GLYPHS[action]
+		return String(pair[1] if using_gamepad() else pair[0])
+	# Owner playtest 2026-10-24: every action missing from GLYPHS printed as nothing, so the
+	# very first tip read "Hold  on a pony to Scoop her up". Any other action is named from
+	# its live binding instead, so a rebound key is the key the tip names.
+	if not InputMap.has_action(action):
 		return ""
-	var pair: Array = GLYPHS[action]
-	return String(pair[1] if using_gamepad() else pair[0])
+	return binding_name(action, using_gamepad())
+
+
+const MOUSE_NAMES := {MOUSE_BUTTON_LEFT: "Left Click", MOUSE_BUTTON_RIGHT: "Right Mouse",
+	MOUSE_BUTTON_MIDDLE: "Middle Mouse"}
+const PAD_BUTTON_NAMES := {JOY_BUTTON_A: "A", JOY_BUTTON_B: "B", JOY_BUTTON_X: "X",
+	JOY_BUTTON_Y: "Y", JOY_BUTTON_LEFT_SHOULDER: "LB", JOY_BUTTON_RIGHT_SHOULDER: "RB",
+	JOY_BUTTON_LEFT_STICK: "L3", JOY_BUTTON_RIGHT_STICK: "R3", JOY_BUTTON_BACK: "Back",
+	JOY_BUTTON_START: "Start"}
+const PAD_AXIS_NAMES := {JOY_AXIS_TRIGGER_LEFT: "LT", JOY_AXIS_TRIGGER_RIGHT: "RT"}
+
+
+## The human name of `action`'s first keyboard/mouse binding (or gamepad one, for a pad).
+static func binding_name(action: StringName, pad: bool) -> String:
+	for e: InputEvent in InputMap.action_get_events(action):
+		if pad:
+			if e is InputEventJoypadButton:
+				return String(PAD_BUTTON_NAMES.get((e as InputEventJoypadButton).button_index, "Pad"))
+			if e is InputEventJoypadMotion:
+				return String(PAD_AXIS_NAMES.get((e as InputEventJoypadMotion).axis, "Stick"))
+		else:
+			if e is InputEventMouseButton:
+				return String(MOUSE_NAMES.get((e as InputEventMouseButton).button_index, "Mouse"))
+			if e is InputEventKey:
+				var k := e as InputEventKey
+				var code := k.keycode if k.keycode != KEY_NONE \
+					else DisplayServer.keyboard_get_keycode_from_physical(k.physical_keycode)
+				return OS.get_keycode_string(code)
+	return ""
 
 
 ## Back to the keyboard. For the tests, which share one static and would otherwise leak a
