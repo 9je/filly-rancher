@@ -158,6 +158,9 @@ static func _eye(src: Material, look: PonyLook, donor: Dictionary) -> ShaderMate
 		m.set_shader_parameter(&"eye_texture", tex)
 	m.set_shader_parameter(&"iris", look.eyes)
 	m.set_shader_parameter(&"lid_color", look.coat)
+	# The same Source iris size the canon cast gets (ToonStyler.sfm_eye), so a Drifter's eyes
+	# match the roster's instead of being all pupil.
+	m.set_shader_parameter(&"iris_scale", ToonStylerScript.SFM_IRIS_SCALE)
 	return m
 
 

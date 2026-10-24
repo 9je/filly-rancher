@@ -20,9 +20,20 @@ uniform float lid : hint_range(0.0, 1.0) = 0.0;
 uniform vec3 lid_color : source_color = vec3(0.95, 0.9, 0.85);
 uniform float lid_top = 0.08;
 uniform float lid_bottom = 0.92;
+// THE IRIS, SHRUNK THE WAY SOURCE DRAWS IT. A PonySFM eyeball's UVs cover only the middle of
+// its iris texture (Source's "eyes" shader projected the iris small onto a white eyeball; the
+// conversion pasted it across the whole ball), so the pupil filled the eye. Above 1 the iris
+// is drawn that many times smaller about iris_centre, with white sclera outside it.
+uniform float iris_scale = 1.0;
+uniform vec2 iris_centre = vec2(0.554, 0.511);
+// Off for a canon pony: her own iris colours stay, rather than the Drifters' recolour ramp.
+uniform bool recolor = true;
 
 void fragment() {
-	vec3 t = texture(eye_texture, UV).rgb;
+	vec2 iuv = iris_centre + (UV - iris_centre) * iris_scale;
+	vec4 tex = texture(eye_texture, iuv);
+	bool outside = iuv.x < 0.0 || iuv.y < 0.0 || iuv.x > 1.0 || iuv.y > 1.0 || tex.a < 0.5;
+	vec3 t = outside ? vec3(1.0) : tex.rgb;
 	float mx = max(t.r, max(t.g, t.b));
 	float mn = min(t.r, min(t.g, t.b));
 	float white = smoothstep(0.86, 0.95, mn);
@@ -30,7 +41,7 @@ void fragment() {
 	float iris_mask = clamp(1.0 - white - black, 0.0, 1.0);
 	float lum = dot(t, vec3(0.299, 0.587, 0.114));
 	vec3 ramp = mix(iris * dark_scale, mix(iris, vec3(1.0), 0.25), smoothstep(0.25, 0.85, lum));
-	vec3 c = mix(t, ramp, iris_mask);
+	vec3 c = recolor ? mix(t, ramp, iris_mask) : t;
 	float l2 = dot(c, vec3(0.299, 0.587, 0.114));
 	c = mix(c, vec3(l2), clamp(dread, 0.0, 1.0) * 0.55);
 	float edge = mix(lid_top, lid_bottom, lid);

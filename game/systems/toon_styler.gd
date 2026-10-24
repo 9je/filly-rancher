@@ -60,12 +60,31 @@ static func style(root: Node, category: StringName = &"prop", cache: Variant = n
 			if src is StandardMaterial3D:
 				var key := "%d:%s" % [src.get_instance_id(), category]
 				var out: ShaderMaterial = store.get(key)
+				if out == null and category == &"pony" and src.resource_name.begins_with("eyeball") \
+						and (src as StandardMaterial3D).albedo_texture != null:
+					out = sfm_eye((src as StandardMaterial3D).albedo_texture)
+					store[key] = out
 				if out == null:
 					out = to_toon(src as StandardMaterial3D, preset)
 					store[key] = out
 				mi.set_surface_override_material(i, out)
 				touched += 1
 	return touched
+
+
+## A canon PonySFM pony's eyeball: the eye shader with her own iris colours and the iris shrunk
+## to the size Source drew it (shaders/pony_eye.gdshader, iris_scale).
+const EYE_SHADER := preload("res://shaders/pony_eye.gdshader")
+const SFM_IRIS_SCALE := 1.45
+
+
+static func sfm_eye(tex: Texture2D) -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = EYE_SHADER
+	m.set_shader_parameter(&"eye_texture", tex)
+	m.set_shader_parameter(&"recolor", false)
+	m.set_shader_parameter(&"iris_scale", SFM_IRIS_SCALE)
+	return m
 
 
 ## One StandardMaterial3D as a toon ShaderMaterial (plus its outline pass).
