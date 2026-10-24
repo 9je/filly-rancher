@@ -770,7 +770,8 @@ func _shot_spike() -> void:
 func _shot_trixie() -> void:
 	var pl := _player()
 	pl.global_position = _g(6.0, 28.0, 0.2)
-	var t := _canon("trixie", _g(6.0, 21.0), 999.0, PI * 0.5)
+	# Facing the camera (a pony model's front is -Z: yaw atan2(-d.x, -d.z) faces direction d).
+	var t := _canon("trixie", _g(6.0, 21.0), 999.0, atan2(-4.4, -2.2))
 	t.set_physics_process(false)
 	await _frames(30)
 	_clear_around(t.global_position, 14.0, [t, pl])
@@ -799,6 +800,9 @@ func _shot_derpy() -> void:
 	await _frames(40)
 	var pen: Node = slot.call("get_built")
 	var body: Node3D = pen.call("body_of", inst.uid) if pen != null else null
+	if body != null:
+		# She stands for her close-up instead of walking into the lens.
+		body.set_physics_process(false)
 	var at := body.global_position if body != null else slot.global_position
 	# From in front of her: a pony model faces -Z in its own space.
 	var fwd := Vector3(0, 0, -1)
@@ -808,8 +812,8 @@ func _shot_derpy() -> void:
 		fwd.y = 0.0
 		fwd = fwd.normalized()
 	var side := fwd.cross(Vector3.UP)
-	await _move([at + fwd * 2.8 + side * 0.8 + Vector3(0, 1.0, 0), at + fwd * 2.3 + side * 0.4 + Vector3(0, 0.9, 0)],
-		[at + Vector3(0, 0.7, 0)], 2.2, 42.0)
+	await _move([at + fwd * 3.6 + side * 0.9 + Vector3(0, 1.5, 0), at + fwd * 3.2 + side * 0.5 + Vector3(0, 1.4, 0)],
+		[at + Vector3(0, 1.05, 0)], 2.2, 42.0)
 
 
 ## OCTAVIA: a Loner under the moonflowers, the quiet beauty shot.
