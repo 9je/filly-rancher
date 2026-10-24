@@ -42,7 +42,11 @@ const RAIL_THICKNESS := 0.12
 const RAIL_SEGMENTS := 10
 const RAIL_MARGIN := 1.2
 const RAIL_COLOR := Color(0.86, 0.84, 0.90)
-const POST_COLOR := Color(0.30, 0.27, 0.34)
+const POST_COLOR := Color(0.96, 0.95, 0.98)
+## The racing surface: groomed dirt, white lane lines, a checked finish (owner review, 2026-10-24:
+## the track was the Strip's bare grey paving with dark sticks).
+const DIRT_COLOR := Color(0.74, 0.55, 0.36)
+const LINE_COLOR := Color(0.98, 0.97, 0.94)
 const FINISH_COLOR := Color(1.00, 0.84, 0.32)
 
 signal race_finished(order: Array, winner: int)
@@ -71,6 +75,7 @@ func build() -> void:
 		add_child(runner)
 		runner.global_position = _paddock_point(lane)
 		_runners.append(runner)
+	_surface()
 	_rail(lane_z(0) - LANE_WIDTH * 0.5 - RAIL_MARGIN, "RailSouth")
 	_rail(lane_z(LANES - 1) + LANE_WIDTH * 0.5 + RAIL_MARGIN, "RailNorth")
 	_wire()
@@ -180,6 +185,61 @@ func _y(x: float, z: float) -> float:
 
 ## One rail along the whole length, in segments so it follows the ground. Solid, on the PROPS
 ## layer, so the player leans on it rather than wandering into lane three.
+## Draw-only (no colliders: the runners and the player walk the ground beneath). Every piece is
+## a sheet draped over the terrain, height-sampled each metre: the Strip rises toward the
+## Palace, and one flat slab sank under it along half the track.
+func _surface() -> void:
+	var z0 := lane_z(0) - LANE_WIDTH * 0.5 - RAIL_MARGIN
+	var z1 := lane_z(LANES - 1) + LANE_WIDTH * 0.5 + RAIL_MARGIN
+	var x0 := PADDOCK_X - 2.5
+	var x1 := FINISH_X + 4.0
+	_sheet(x0, x1, z0, z1, 0.05, DIRT_COLOR, "Dirt")
+	for lane in range(1, LANES):
+		var z := lane_z(lane) - LANE_WIDTH * 0.5
+		_sheet(START_X, FINISH_X, z - 0.05, z + 0.05, 0.07, LINE_COLOR, "Lane%d" % lane)
+	for x: float in [START_X, FINISH_X]:
+		_sheet(x - 0.14, x + 0.14, z0 + RAIL_MARGIN * 0.5, z1 - RAIL_MARGIN * 0.5, 0.07, LINE_COLOR, "Line")
+	# The finish, checked: two rows of squares across every lane.
+	var sq := 0.5
+	var n := int((z1 - z0 - RAIL_MARGIN) / sq)
+	for row in 2:
+		for k in n:
+			if (k + row) % 2 == 0:
+				var zz := z0 + RAIL_MARGIN * 0.5 + k * sq
+				var xx := FINISH_X + 0.2 + row * sq
+				_sheet(xx, xx + sq, zz, zz + sq, 0.08, Color(0.12, 0.1, 0.14), "Check")
+
+
+func _sheet(xa: float, xb: float, za: float, zb: float, lift: float, colour: Color, part: String) -> void:
+	var nx := maxi(1, int(ceil((xb - xa) / 1.0)))
+	var nz := maxi(1, int(ceil((zb - za) / 1.0)))
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.set_normal(Vector3.UP)
+	for i in nx:
+		for j in nz:
+			var xs := [lerpf(xa, xb, float(i) / nx), lerpf(xa, xb, float(i + 1) / nx)]
+			var zs := [lerpf(za, zb, float(j) / nz), lerpf(za, zb, float(j + 1) / nz)]
+			var p00 := Vector3(xs[0], _y(xs[0], zs[0]) + lift, zs[0])
+			var p10 := Vector3(xs[1], _y(xs[1], zs[0]) + lift, zs[0])
+			var p01 := Vector3(xs[0], _y(xs[0], zs[1]) + lift, zs[1])
+			var p11 := Vector3(xs[1], _y(xs[1], zs[1]) + lift, zs[1])
+			for v in [p00, p10, p11, p00, p11, p01]:
+				st.add_vertex(v)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = colour
+	mat.roughness = 0.95
+	mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	st.set_material(mat)
+	var mi := MeshInstance3D.new()
+	mi.name = part
+	mi.mesh = st.commit()
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi)
+	mi.global_transform = Transform3D.IDENTITY
+
+
 func _rail(z: float, rail_name: String) -> void:
 	var body := StaticBody3D.new()
 	body.name = rail_name

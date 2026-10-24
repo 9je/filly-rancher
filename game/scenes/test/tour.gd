@@ -53,6 +53,15 @@ func _frames(n: int) -> void:
 
 
 func _shot(name: String) -> void:
+	# No conversation left floating over a view of somewhere else (Marigold's arrival opened
+	# at boot and hung over every region shot): close whatever bubble is up, let it clear.
+	var scene := current_scene
+	var people: Node = scene.get("people") if scene != null and "people" in scene else null
+	var tb: Node = people.get("talk_box") if people != null else null
+	if tb != null and bool(tb.call("is_open")):
+		tb.call("close")
+		await process_frame
+		await process_frame
 	await RenderingServer.frame_post_draw
 	var img := root.get_viewport().get_texture().get_image()
 	var path := out.path_join(name + ".png")
