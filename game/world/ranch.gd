@@ -7568,6 +7568,16 @@ func _arrival(_delta: float) -> void:
 	var m := people.npc(&"marigold")
 	if m == null:
 		return
+	# Owner playtest 2026-10-24, "i cant get the beam to work": the horn is dead until
+	# Marigold hands the Scoop over, and a press used to do nothing and say nothing. Now it
+	# says why, and she walks back over (the player may have left her mid-welcome).
+	if _interactive and Input.is_action_just_pressed(&"beam"):
+		_toast("No Scoop yet. Marigold has it for you: she's on her way over.")
+		_arrival_started = false
+	# She follows a steward who walks off before the welcome is done.
+	if _arrival_started and not m.is_walking_to() \
+			and m.global_position.distance_to(player.global_position) > 6.0:
+		_arrival_started = false
 	if not _arrival_started:
 		_arrival_started = true
 		m.set_mode_walk_to(player.global_position + Vector3(1.6, 0, -2.2))

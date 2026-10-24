@@ -179,3 +179,14 @@ The 60-pony check (`scenes/test/perf.gd`) was failing at p99 22-27 ms. Three of 
 
 **Known, not visible.** The creator's restyle logs 4 "material is null" render errors. They persist with every 7f69812 rendering file reverted, so they predate it, and the creator renders correctly.
 
+
+## 2026-10-24: "i cant get the beam to work" (owner, playing the export)
+
+**Not broken, but silent.** A new ranch has no Scoop until Marigold's welcome hands it over (STORY.md beat 1.1), and until then the horn is recalled. A right-click before that did nothing and said nothing. A probe in the real ranch with the real input (scenes/test/beam_probe.gd) confirms:
+- with the Scoop, the beam grabs and secures a pony under Jolt;
+- with the welcome letter closed, Marigold walks up and opens the welcome by herself at about 5 s.
+
+**Fix.**
+- A beam press before the Scoop now toasts "No Scoop yet. Marigold has it for you: she's on her way over."
+- It also sends her back to the player.
+- She now follows a steward who walks more than 6 m away before the welcome is done; before this she stood wherever she had been left.

@@ -173,6 +173,10 @@ func set_mode_walk_to(at: Vector3) -> void:
 	walk_target = at
 
 
+func is_walking_to() -> bool:
+	return mode == Mode.WALK_TO
+
+
 func _physics_process(delta: float) -> void:
 	# Far from the camera her face and mane springs rest (see _update_far).
 	_far_t -= delta
