@@ -1,35 +1,182 @@
 {
-  "_note": "The trailer cut (TRAILER_PLAN.md). Each shot names its take in build/trailer/takes/ (capture.sh); boundaries snap to the beat grid in edit.py. Shots marked 'fav' still need staging in scenes/test/trailer.gd before capture: fluttershy, dash_race, spike, trixie_blink, derpy, octavia, cmc.",
-  "turn": 50.0,
-  "title_at": 68.3,
-  "shots": [
-    {"shot": "catch", "take": "catch_t1.avi", "dur": 2.0, "callout": "Gotta catch 'em all. Wrong franchise.", "sfx": true},
-    {"shot": "bloom", "take": "bloom_t1.avi", "dur": 2.0, "sfx": true},
-    {"shot": "valley", "take": "valley_t1.avi", "dur": 2.1},
-    {"shot": "launch", "take": "launch_t1.avi", "dur": 2.0, "callout": "Applied pony-ballistics.", "sfx": true},
-    {"shot": "fluttershy", "fav": true, "take": "fluttershy_t1.avi", "dur": 2.6, "callout": "Kindness. And snacks.", "sfx": true},
-    {"shot": "gems", "take": "gems_t1.avi", "dur": 2.0, "sfx": true},
-    {"shot": "herd", "take": "herd_t1.avi", "dur": 2.0},
-    {"shot": "creator", "take": "creator_t1.avi", "dur": 2.0},
-    {"shot": "dash_race", "fav": true, "take": "dash_race_t1.avi", "dur": 2.6, "callout": "20% cooler.", "sfx": true},
-    {"shot": "spike", "fav": true, "take": "spike_t1.avi", "dur": 2.6, "callout": "Spike: express mail.", "sfx": true},
-    {"shot": "everfree", "take": "everfree_t1.avi", "dur": 2.0},
-    {"shot": "lake", "take": "lake_t1.avi", "dur": 2.0},
-    {"shot": "trixie_blink", "fav": true, "take": "trixie_blink_t1.avi", "dur": 2.6, "callout": "The Great and Powerful... gone.", "sfx": true},
-    {"shot": "derpy", "fav": true, "take": "derpy_t1.avi", "dur": 2.0, "sfx": true},
-    {"shot": "slots", "take": "slots_t1.avi", "dur": 2.0, "sfx": true},
-    {"shot": "cmc", "fav": true, "take": "cmc_t1.avi", "dur": 2.6, "callout": "CUTIE MARK CRUSADERS FENCE HOPPERS, YAY!", "sfx": true},
-    {"shot": "octavia", "fav": true, "take": "octavia_t1.avi", "dur": 4.1, "fade_in": 0.3},
-    {"shot": "dusk", "take": "dusk_t1.avi", "dur": 4.1},
-    {"shot": "delivery", "take": "delivery_t1.avi", "dur": 2.0, "sfx": true},
-    {"shot": "tumble", "take": "tumble_t1.avi", "dur": 2.0},
-    {"shot": "lift", "take": "lift_t1.avi", "dur": 2.0, "sat": 0.8},
-    {"shot": "factory_hall", "take": "factory_hall_t1.avi", "dur": 2.0, "sat": 0.85},
-    {"shot": "factory_walkway", "take": "factory_walkway_t1.avi", "dur": 2.0, "sat": 0.7},
-    {"shot": "factory_tank", "take": "factory_tank_t1.avi", "dur": 1.0, "sat": 0.9},
-    {"shot": "valley_grey", "take": "valley_grey_t1.avi", "dur": 3.0, "sat": 0.45, "callout": "No ponies were harmed in the making of this rainbow.*"},
-    {"shot": "tumble", "take": "tumble_t2.avi", "dur": 3.0, "sat": 0.6, "callout": "*terms and conditions apply"},
-    {"shot": "dawn", "take": "dawn_t1.avi", "dur": 6.0, "fade_out": 0.0},
-    {"shot": "title", "take": "dawn_t2.avi", "dur": 6.7, "hold": true, "title": true, "fade_out": 1.5}
-  ]
+ "_note": "The trailer cut (TRAILER_PLAN.md). Each shot names its take in build/trailer/takes/ (capture.sh); boundaries snap to the beat grid in edit.py; 'in' skips into a take past its first camera move.",
+ "turn": 50.0,
+ "title_at": 68.3,
+ "shots": [
+  {
+   "shot": "catch",
+   "take": "catch_t1.avi",
+   "dur": 2.0,
+   "callout": "Gotta catch 'em all. Wrong franchise.",
+   "sfx": true
+  },
+  {
+   "shot": "bloom",
+   "take": "bloom_t1.avi",
+   "dur": 2.0,
+   "sfx": true
+  },
+  {
+   "shot": "valley",
+   "take": "valley_t1.avi",
+   "dur": 2.1
+  },
+  {
+   "shot": "fluttershy",
+   "fav": true,
+   "take": "fluttershy_t1.avi",
+   "dur": 2.6,
+   "callout": "Kindness. And snacks.",
+   "sfx": true
+  },
+  {
+   "shot": "gems",
+   "take": "gems_t1.avi",
+   "dur": 2.0,
+   "sfx": true
+  },
+  {
+   "shot": "herd",
+   "take": "herd_t1.avi",
+   "dur": 2.0
+  },
+  {
+   "shot": "creator",
+   "take": "creator_t1.avi",
+   "dur": 2.0
+  },
+  {
+   "shot": "dash_race",
+   "fav": true,
+   "take": "dash_race_t1.avi",
+   "dur": 2.6,
+   "callout": "20% cooler.",
+   "sfx": true
+  },
+  {
+   "shot": "spike",
+   "fav": true,
+   "take": "spike_t1.avi",
+   "dur": 2.6,
+   "callout": "Spike: express mail.",
+   "sfx": true
+  },
+  {
+   "shot": "everfree",
+   "take": "everfree_t1.avi",
+   "dur": 2.0,
+   "in": 0.5
+  },
+  {
+   "shot": "lake",
+   "take": "lake_t1.avi",
+   "dur": 1.5,
+   "in": 0.5
+  },
+  {
+   "shot": "trixie_blink",
+   "fav": true,
+   "take": "trixie_blink_t1.avi",
+   "dur": 2.6,
+   "callout": "The Great and Powerful... gone.",
+   "sfx": true,
+   "in": 0.35
+  },
+  {
+   "shot": "derpy",
+   "fav": true,
+   "take": "derpy_t1.avi",
+   "dur": 1.0,
+   "sfx": true
+  },
+  {
+   "shot": "slots",
+   "take": "slots_t1.avi",
+   "dur": 2.0,
+   "sfx": true
+  },
+  {
+   "shot": "cmc",
+   "fav": true,
+   "take": "cmc_t1.avi",
+   "dur": 2.6,
+   "callout": "CUTIE MARK CRUSADERS FENCE HOPPERS, YAY!",
+   "sfx": true
+  },
+  {
+   "shot": "octavia",
+   "fav": true,
+   "take": "octavia_t1.avi",
+   "dur": 4.1,
+   "fade_in": 0.3
+  },
+  {
+   "shot": "dusk",
+   "take": "dusk_t1.avi",
+   "dur": 4.1
+  },
+  {
+   "shot": "delivery",
+   "take": "delivery_t1.avi",
+   "dur": 2.0,
+   "sfx": true
+  },
+  {
+   "shot": "tumble",
+   "take": "tumble_t1.avi",
+   "dur": 2.0
+  },
+  {
+   "shot": "lift",
+   "take": "lift_t1.avi",
+   "dur": 2.0,
+   "sat": 0.8
+  },
+  {
+   "shot": "factory_hall",
+   "take": "factory_hall_t1.avi",
+   "dur": 2.0,
+   "sat": 0.85
+  },
+  {
+   "shot": "factory_walkway",
+   "take": "factory_walkway_t1.avi",
+   "dur": 2.0,
+   "sat": 0.7
+  },
+  {
+   "shot": "factory_tank",
+   "take": "factory_tank_t1.avi",
+   "dur": 1.0,
+   "sat": 0.9
+  },
+  {
+   "shot": "valley_grey",
+   "take": "valley_grey_t1.avi",
+   "dur": 3.0,
+   "sat": 0.45,
+   "callout": "No ponies were harmed in the making of this rainbow.*"
+  },
+  {
+   "shot": "tumble",
+   "take": "tumble_t2.avi",
+   "dur": 3.0,
+   "sat": 0.6,
+   "callout": "*terms and conditions apply"
+  },
+  {
+   "shot": "dawn",
+   "take": "dawn_t1.avi",
+   "dur": 6.0,
+   "fade_out": 0.0
+  },
+  {
+   "shot": "title",
+   "take": "dawn_t2.avi",
+   "dur": 6.7,
+   "hold": true,
+   "title": true,
+   "fade_out": 1.5
+  }
+ ]
 }

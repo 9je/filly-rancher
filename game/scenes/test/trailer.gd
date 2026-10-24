@@ -97,10 +97,36 @@ func _run() -> void:
 			await _shot_factory_room(&"walkway", 3.0)
 		"factory_tank":
 			await _shot_factory_tank()
+		"fluttershy":
+			await _shot_fluttershy()
+		"dash_race":
+			await _shot_dash()
+		"spike":
+			await _shot_spike()
+		"trixie_blink":
+			await _shot_trixie()
+		"derpy":
+			await _shot_derpy()
+		"octavia":
+			await _shot_octavia()
+		"cmc":
+			await _shot_cmc()
 		_:
 			printerr("TRAILER: no shot called %s" % shot)
 	print("TRAILER_SHOT_END %d" % Engine.get_frames_drawn())
 	quit(0)
+
+
+## THE SHOT PROPER: the first frame any camera work begins, after the shot's own set-up
+## (filling pens, spawning a pony). tools/trailer/edit.py trims to this when it is there.
+var _acted := false
+
+
+func _action() -> void:
+	if _acted:
+		return
+	_acted = true
+	print("TRAILER_ACTION %d" % Engine.get_frames_drawn())
 
 
 func _frames(n: int) -> void:
@@ -163,9 +189,9 @@ func _boot_factory() -> void:
 	change_scene_to_file(FACTORY)
 	await _frames(90)
 	ranch = current_scene
-	var hud := ranch.get_node_or_null(^"HUD") as CanvasLayer
-	if hud != null:
-		hud.visible = false
+	# No UI of any kind over the Factory: the HUD, its tips and the welcome card.
+	for layer: CanvasLayer in ranch.find_children("*", "CanvasLayer", true, false):
+		layer.visible = false
 
 
 func _pin(phase: int, weather: int) -> void:
@@ -222,6 +248,7 @@ func _free_cam() -> Camera3D:
 ## A smooth camera move through `points`, looking through `looks`, over `seconds`
 ## (Curve3D through both, eased at the ends so it starts and settles gently).
 func _move(points: Array, looks: Array, seconds: float, fov: float = 50.0) -> void:
+	_action()
 	var c := _free_cam()
 	c.fov = fov
 	var path := _curve(points)
@@ -271,6 +298,7 @@ func _rig() -> Node:
 
 
 func _player_cam() -> void:
+	_action()
 	var c: Camera3D = _rig().call("get_camera")
 	c.make_current()
 
@@ -386,14 +414,35 @@ func _shot_launch() -> void:
 		var inst := PonyInstance.create(&"stock_curious", 400 + k)
 		inst.stock = GeneratorScript.generate(4400 + k * 31).to_dict()
 		bag.store(inst)
-	_player_cam()
 	var target := _pen_slot(0).global_position
+	# Aimed through her own camera (the Launcher fires where she looks), then seen from the
+	# side, so the arc from her to the pen is the whole picture.
+	var rig_cam: Camera3D = _rig().call("get_camera")
+	rig_cam.make_current()
 	await _aim_at(target, 0.5)
+	var from := pl.global_position
+	var mid := (from + target) * 0.5
+	var across := (target - from).cross(Vector3.UP).normalized()
+	# Whichever side of the arc has a clear line to it (buildings stand close on one side).
+	var space := (ranch as Node3D).get_world_3d().direct_space_state
+	var eye := mid + across * 10.0 + Vector3(0, 3.0, 0)
+	for cand: Vector3 in [mid + across * 10.0 + Vector3(0, 3.0, 0), mid - across * 10.0 + Vector3(0, 3.0, 0),
+			mid - across * 7.0 + Vector3(0, 4.5, 0), mid + across * 7.0 + Vector3(0, 4.5, 0)]:
+		var q := PhysicsRayQueryParameters3D.create(mid + Vector3(0, 2.0, 0), cand)
+		if space.intersect_ray(q).is_empty():
+			eye = cand
+			break
+	var c := _free_cam()
+	c.fov = 55.0
+	c.global_position = eye
+	c.look_at(mid + Vector3(0, 2.0, 0))
+	_hud("off")
+	_action()
 	for k in 2:
 		Input.action_press(&"interact")
 		await process_frame
 		Input.action_release(&"interact")
-		await _seconds(0.75)
+		await _seconds(1.0)
 
 
 func _shot_treat() -> void:
@@ -557,13 +606,15 @@ func _shot_tumble() -> void:
 		await _seconds(2.0)
 		return
 	t.set_physics_process(false)
-	t.global_position = _g(1.0, -1.5, 0.0)
+	# Out on open grass: the buildings stand on stone plinths now, and her old spot by the
+	# porch put the camera inside one.
+	t.global_position = _g(8.0, 24.0, 0.0)
 	t.rotation.y = 0.0
 	if t.has_method("act"):
 		t.call("act", &"sad", &"look")
 	await _frames(20)
 	var at := t.global_position
-	await _move([at + Vector3(1.4, 0.6, 2.2), at + Vector3(0.9, 0.55, 1.9)], [at + Vector3(0, 0.6, 0)], 2.0, 34.0)
+	await _move([at + Vector3(2.4, 1.0, 3.4), at + Vector3(1.8, 0.9, 3.0)], [at + Vector3(0, 0.75, 0)], 3.0, 36.0)
 
 
 func _shot_lift() -> void:
@@ -591,3 +642,171 @@ func _shot_factory_tank() -> void:
 	var o: Vector3 = interior.call("room_origin", &"control") - Vector3(0, 0, 6.0)
 	var tank := o + Vector3(-4.86, 0, -4.4)
 	await _move([tank + Vector3(2.4, 2.4, 2.2), tank + Vector3(2.0, 1.6, 2.6)], [tank + Vector3(0, 2.0, 0), tank + Vector3(0, 1.7, 0)], 1.0, 45.0)
+
+
+# --- the favourites (TRAILER_PLAN.md: the owner's and friends' ponies) --------------------
+
+## A canon pony from the roster, standing where a shot wants her.
+func _canon(id: String, at: Vector3, calm: float = 999.0, yaw: float = 0.0) -> CharacterBody3D:
+	var spawner: Node = ranch.get("spawner")
+	var data: PonyData = load("res://data/ponies/%s.tres" % id)
+	var p: CharacterBody3D = spawner.call("spawn_guest", data, {}, at, 3.0)
+	p.set("calm", calm)
+	(p.get_node("Visuals") as Node3D).rotation.y = yaw
+	return p
+
+
+## A camera that rides beside `who` for `seconds`, `offset` from her, looking at her.
+func _follow(who: Node3D, offset: Vector3, seconds: float, fov: float = 45.0) -> void:
+	_action()
+	var c := _free_cam()
+	c.fov = fov
+	var n := int(round(seconds * 60.0))
+	var at := who.global_position
+	for i in n:
+		if is_instance_valid(who):
+			at = at.lerp(who.global_position, 0.2)
+		c.global_position = at + offset
+		c.look_at(at + Vector3(0, 0.7, 0))
+		await process_frame
+
+
+## FLUTTERSHY (the owner's): skittish, she shies off, then a tossed treat brings her trotting
+## back. "Kindness. And snacks."
+func _shot_fluttershy() -> void:
+	ranch.get("_game_state").unlocks.append("treat_pouch")
+	(ranch.get("_game_state").get("inventory") as Inventory).add(&"apple", 6)
+	var pl := _player()
+	pl.global_position = _g(10.0, 33.0, 0.2)
+	var f := _canon("fluttershy", _g(10.0, 25.0), 999.0, PI)
+	await _frames(30)
+	var at := f.global_position
+	# In front of her (a pony model faces -Z; yaw PI turns her to +Z), a little to the side,
+	# so the apple the player tosses lands between them and she comes for it.
+	create_timer(0.6).timeout.connect(func() -> void:
+		var tools: Node = ranch.get("tools")
+		var drop := at + Vector3(0, 0, 1.6)
+		if tools != null:
+			tools.call("_fly", &"apple", drop)
+		if is_instance_valid(f):
+			f.call("offer_treat", drop, &"apple"))
+	await _move([at + Vector3(1.6, 0.9, 3.4), at + Vector3(1.1, 0.8, 2.8)],
+		[at + Vector3(0, 0.75, 0.6), at + Vector3(0, 0.75, 1.2)], 2.6, 40.0)
+
+
+## RAINBOW DASH (Ben's): she bolts, a pegasus faster than anypony on hoof, and the camera
+## cannot keep up. "20% cooler."
+func _shot_dash() -> void:
+	var pl := _player()
+	pl.global_position = _g(6.0, 27.0, 0.2)
+	var d := _canon("rainbowdash", _g(6.0, 21.0), 0.0, PI)
+	await _frames(20)
+	await _follow(d, Vector3(3.2, 1.4, 2.6), 2.6, 48.0)
+
+
+## SPIKE (Damon's): the post comes in on green dragonfire. "Spike: express mail."
+func _shot_spike() -> void:
+	var sp: Node3D = ranch.get("spike")
+	if sp == null:
+		await _seconds(2.6)
+		return
+	var at := sp.global_position
+	# Framed on his mesh, not his node: the model's own origin sits off his middle.
+	var box3 := AABB()
+	var first := true
+	for mi: MeshInstance3D in sp.find_children("*", "MeshInstance3D", true, false):
+		if not mi.visible:
+			continue
+		var b := mi.global_transform * mi.get_aabb()
+		box3 = b if first else box3.merge(b)
+		first = false
+	if not first:
+		at = Vector3(box3.get_center().x, sp.global_position.y, box3.get_center().z)
+	var face := sp.global_basis.z.normalized()
+	var side := face.cross(Vector3.UP).normalized()
+	var box: Node = ranch.call("get_mailbox")
+	create_timer(0.8).timeout.connect(func() -> void:
+		sp.call("letter_arrived")
+		if box != null:
+			box.call("set_flag_up", true))
+	await _move([at + face * 1.5 + side * 0.6 + Vector3(0, 0.65, 0), at + face * 1.15 + side * 0.35 + Vector3(0, 0.6, 0)],
+		[at + Vector3(0, 0.5, 0), at + Vector3(0, 0.55, 0)], 2.6, 38.0)
+
+
+## TRIXIE: the beam closes on her and she is simply not there any more.
+func _shot_trixie() -> void:
+	var pl := _player()
+	pl.global_position = _g(6.0, 28.0, 0.2)
+	var t := _canon("trixie", _g(6.0, 21.0), 999.0, PI * 0.5)
+	t.set_physics_process(false)
+	await _frames(30)
+	var at := t.global_position
+	# Mid shot, the Scoop's beam would be on her: she blinks a few metres off, startled.
+	create_timer(1.1).timeout.connect(func() -> void:
+		if is_instance_valid(t):
+			t.set("_player", pl)
+			t.set("_blinked_at", -100.0)
+			t.call("_maybe_blink"))
+	await _move([at + Vector3(4.2, 1.3, 3.0), at + Vector3(4.6, 1.5, 1.4)],
+		[at + Vector3(0, 0.7, 0), at + Vector3(0, 0.7, -2.5)], 2.6, 48.0)
+
+
+## DERPY: a Glutton at the trough. No caption needed.
+func _shot_derpy() -> void:
+	var slot := _pen_slot(0)
+	if slot.call("get_built") == null:
+		slot.call("build", load("res://data/plots/pen_large.tres"))
+	await _frames(5)
+	var bag: Storage = _player().get_magic_beam().call("get_storage")
+	var inst := PonyInstance.create(&"derpyhooves", 4242)
+	inst.happiness = 0.9
+	if bag.store(inst):
+		ranch.call("_move_pony_into_pen", slot)
+	await _frames(40)
+	var pen: Node = slot.call("get_built")
+	var body: Node3D = pen.call("body_of", inst.uid) if pen != null else null
+	var at := body.global_position if body != null else slot.global_position
+	# From in front of her: a pony model faces -Z in its own space.
+	var fwd := Vector3(0, 0, -1)
+	var vis := body.get_node_or_null("Visuals") as Node3D if body != null else null
+	if vis != null:
+		fwd = -vis.global_basis.z
+		fwd.y = 0.0
+		fwd = fwd.normalized()
+	var side := fwd.cross(Vector3.UP)
+	await _move([at + fwd * 2.8 + side * 0.8 + Vector3(0, 1.0, 0), at + fwd * 2.3 + side * 0.4 + Vector3(0, 0.9, 0)],
+		[at + Vector3(0, 0.7, 0)], 2.2, 42.0)
+
+
+## OCTAVIA: a Loner under the moonflowers, the quiet beauty shot.
+func _shot_octavia() -> void:
+	_open_permits()
+	var c := _region_centre(&"nightmeadow")
+	_pin(WorldStateScript.Phase.NIGHT, WorldStateScript.Weather.CLEAR)
+	var o := _canon("octavia", c + Vector3(0, 0.3, 3), 999.0, PI * 0.9)
+	o.set_physics_process(false)
+	await _frames(30)
+	var at := o.global_position
+	await _move([at + Vector3(5.5, 1.6, 4.5), at + Vector3(3.2, 1.2, 4.0)], [at + Vector3(0, 0.8, 0), at + Vector3(0, 0.9, 0)], 4.2, 42.0)
+
+
+## THE CUTIE MARK CRUSADERS, FENCE HOPPERS: three Escape Artists in a Paddock at night, and
+## the Paddock does not hold them.
+func _shot_cmc() -> void:
+	var slot := _pen_slot(1)
+	if slot.call("get_built") == null:
+		slot.call("build", load("res://data/plots/pen_small.tres"))
+	await _frames(5)
+	var bag: Storage = _player().get_magic_beam().call("get_storage")
+	for id in [&"applebloom", &"sweetiebelle", &"scootaloo"]:
+		var inst := PonyInstance.create(id, hash(id))
+		inst.happiness = 0.9
+		if bag.store(inst):
+			ranch.call("_move_pony_into_pen", slot)
+	_pin(WorldStateScript.Phase.DUSK, WorldStateScript.Weather.CLEAR)
+	PonyTraitsScript.night = true
+	await _frames(40)
+	var at := slot.global_position
+	for k in 3:
+		create_timer(0.5 + k * 0.6).timeout.connect(func() -> void: ranch.call("_escape_artists"))
+	await _move([at + Vector3(9.0, 2.6, 7.0), at + Vector3(8.0, 2.2, 8.0)], [at + Vector3(3.0, 0.6, 0), at + Vector3(4.5, 0.6, 0)], 2.6, 50.0)

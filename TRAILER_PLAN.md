@@ -25,7 +25,7 @@ The owner's favorites, and their friends' (the people this is for), each get a m
 | **Derpy** | A Glutton at the pantry, hay vanishing. No caption needed. |
 | **Octavia** | A Loner under the moonflowers in the Night Meadow at night: the trailer's quiet beauty shot. |
 | Escape Artists | Apple Bloom, Sweetie Belle and Scootaloo hop the Paddock fence at night. Caption: **"CUTIE MARK CRUSADERS FENCE HOPPERS, YAY!"** |
-| Launch | A pony sails into the pen. Caption: **"Applied pony-ballistics."** |
+| Launch (cut in review) | A pony sails into the pen. Cut in iteration 3: the arc does not read at trailer scale (TRAILER_REVIEW.md). |
 | The twist tease | Over the grey valley: **"No ponies were harmed in the making of this rainbow.\*"** One beat of silence, then: **"\*terms and conditions apply"**. The spectrum tank cut lands on it. |
 | The title card | "Filly Rancher", the rainbow underline, the tag **"Friendship is Magic. Ranching is Business."** |
 

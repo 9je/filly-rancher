@@ -47,7 +47,9 @@ def shot_start(take):
     """The frame a take's shot proper begins on (trailer.gd prints it into the .log)."""
     log = os.path.join(TAKES, take.replace(".avi", ".log"))
     with open(log) as f:
-        m = re.search(r"TRAILER_SHOT_START (\d+)", f.read())
+        text = f.read()
+    # The camera's first move when the take has one (set-up is trimmed off), else the start.
+    m = re.search(r"TRAILER_ACTION (\d+)", text) or re.search(r"TRAILER_SHOT_START (\d+)", text)
     return int(m.group(1)) / FPS if m else 0.0
 
 
@@ -62,7 +64,7 @@ def snap(t, grid):
     return float(grid[i])
 
 
-def card(text, size=64, pad=(44, 20), out=None):
+def card(text, size=96, pad=(60, 28), out=None):
     size = int(size * K)
     pad = (int(pad[0] * K), int(pad[1] * K))
     """A callout in the game's style: the cream HUD card, purple line, Fredoka ink."""
@@ -84,7 +86,7 @@ def title_card(out):
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     big = ImageFont.truetype(FONT, int(220 * K))
-    small = ImageFont.truetype(FONT, int(62 * K))
+    small = ImageFont.truetype(FONT, int(80 * K))
     t = "Filly Rancher"
     bb = big.getbbox(t)
     x = (W - (bb[2] - bb[0])) // 2 - bb[0]
@@ -96,7 +98,7 @@ def title_card(out):
     bw = int(1000 * K)
     for i, c in enumerate(cols):
         d.rounded_rectangle(((W - bw) // 2, by + int(i * 22 * K), (W + bw) // 2, by + int((i * 22 + 18) * K)), radius=int(9 * K), fill=c + (255,))
-    tag = "a pony ranching game"
+    tag = "Friendship is Magic. Ranching is Business."
     sb = small.getbbox(tag)
     d.text(((W - (sb[2] - sb[0])) // 2 - sb[0], by + int(170 * K)), tag, font=small, fill=(255, 249, 236, 255),
            stroke_width=int(6 * K), stroke_fill=(90, 60, 120, 255))
@@ -161,8 +163,10 @@ def main(argv):
         src = os.path.join(TAKES, s["take"])
         start = shot_start(s["take"]) + s.get("in", 0.0)
         part = os.path.join(work, "part%02d.mp4" % i)
-        vf = ("scale=%d:%d:flags=lanczos,fps=%d,eq=saturation=%.2f:contrast=1.03,format=yuv420p" %
-              (W, H, FPS, s.get("sat", 1.06)))
+        # Held on its last frame if the take runs short of its slot, so every part is exactly
+        # its slot long and nothing after it drifts off the beat.
+        vf = ("scale=%d:%d:flags=lanczos,fps=%d,tpad=stop_mode=clone:stop_duration=%.3f,"
+              "eq=saturation=%.2f:contrast=1.03,format=yuv420p" % (W, H, FPS, s["len"], s.get("sat", 1.06)))
         if s.get("fade_in"):
             vf += ",fade=t=in:st=0:d=%.2f" % s["fade_in"]
         if s.get("fade_out"):
@@ -226,12 +230,12 @@ def main(argv):
     else:
         mix = music
     # Two-pass loudnorm to -14 LUFS integrated, -1 dBTP.
-    p1 = subprocess.run(["ffmpeg", "-hide_banner", "-i", mix, "-af", "loudnorm=I=-14:TP=-1.0:LRA=11:print_format=json",
+    p1 = subprocess.run(["ffmpeg", "-hide_banner", "-i", mix, "-af", "loudnorm=I=-14:TP=-1.5:LRA=11:print_format=json",
                          "-f", "null", "-"], capture_output=True, text=True)
     stats = json.loads(p1.stderr[p1.stderr.rindex("{"):p1.stderr.rindex("}") + 1])
     norm = os.path.join(work, "mix_norm.wav")
     run(["ffmpeg", "-v", "error", "-y", "-i", mix, "-af",
-         "loudnorm=I=-14:TP=-1.0:LRA=11:measured_I=%s:measured_TP=%s:measured_LRA=%s:measured_thresh=%s:offset=%s:linear=true" %
+         "loudnorm=I=-14:TP=-1.5:LRA=11:measured_I=%s:measured_TP=%s:measured_LRA=%s:measured_thresh=%s:offset=%s:linear=true" %
          (stats["input_i"], stats["input_tp"], stats["input_lra"], stats["input_thresh"], stats["target_offset"]),
          "-ar", "48000", norm])
 

@@ -117,11 +117,11 @@ func letter_arrived() -> void:
 	var pm := ParticleProcessMaterial.new()
 	pm.direction = Vector3(0, 0.6, -1)
 	pm.spread = 25.0
-	pm.initial_velocity_min = 1.2
-	pm.initial_velocity_max = 2.2
+	pm.initial_velocity_min = 1.6
+	pm.initial_velocity_max = 2.8
 	pm.gravity = Vector3(0, 1.5, 0)
-	pm.scale_min = 0.6
-	pm.scale_max = 1.2
+	pm.scale_min = 1.0
+	pm.scale_max = 2.0
 	var grad := Gradient.new()
 	grad.set_color(0, Color(0.6, 1.0, 0.5, 1.0))
 	grad.set_color(1, Color(0.1, 0.7, 0.3, 0.0))
@@ -130,7 +130,7 @@ func letter_arrived() -> void:
 	pm.color_ramp = gt
 	fire.process_material = pm
 	var quad := QuadMesh.new()
-	quad.size = Vector2(0.18, 0.18)
+	quad.size = Vector2(0.32, 0.32)
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -139,11 +139,15 @@ func letter_arrived() -> void:
 	mat.albedo_texture = BloomCeremony.star_texture()
 	quad.material = mat
 	fire.draw_pass_1 = quad
-	fire.amount = 40
-	fire.lifetime = 0.8
+	fire.amount = 90
+	fire.lifetime = 1.3
 	fire.one_shot = true
 	fire.explosiveness = 0.85
 	add_child(fire)
-	fire.position = Vector3(0, 0.72, -0.35)
+	# At his mouth: the real model faces +Z (the stand-in faced -Z).
+	var real := ResourceLoader.exists(REAL_MODEL)
+	fire.position = Vector3(0, 0.66, 0.28) if real else Vector3(0, 0.72, -0.35)
+	if real:
+		pm.direction = Vector3(0, 0.6, 1)
 	fire.emitting = true
-	get_tree().create_timer(1.6).timeout.connect(fire.queue_free)
+	get_tree().create_timer(2.2).timeout.connect(fire.queue_free)
