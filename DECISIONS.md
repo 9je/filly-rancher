@@ -106,6 +106,8 @@ The visual review found the Spectra Palace was a purple box with a flat gold lid
 
 **Fix.** A leaving Babble buries its generator with an extra reference. Graves older than 1 s are released by later burials, and anything still buried at shutdown stays referenced. test_babble.gd pins this. An upstream fix (hold a Ref, or snapshot the rate) would belong in the engine. This is the game-side guard.
 
+**Re-proven on the final code (2026-10-24, after 7f69812).** Ten full-suite runs in a row, each with a 2400 s hang timeout: all exited cleanly (rc 0), and every run passed 1752 of 1752 tests.
+
 ## 2026-10-23 (evening): the owner's "eyes buggy, text random, movement weird", deep dive
 
 **Eyes, cause 1 (the big one): a stale import cache.**
