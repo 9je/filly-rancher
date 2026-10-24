@@ -38,4 +38,9 @@ case "$MODE" in
 		;;
 esac
 
+# A model re-exported after its first import can leave Godot serving a stale cached copy
+# (it once put the canon ponies' eyes on the backs of their heads): drop those, re-import.
+if [ "$(python3 "$ROOT/tools/fix_stale_imports.py" | awk '{print $2}')" != "0" ]; then
+  "$ROOT/tools/bin/godot" --headless --path "$ROOT/game" --import > /dev/null 2>&1
+fi
 exec "$ROOT/tools/bin/godot" --path "$ROOT/game"
