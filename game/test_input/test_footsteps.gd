@@ -149,10 +149,8 @@ func _ground_truth() -> String:
 		return "air"
 	if hit.collider is Terrain:
 		var p := Vector2(player.global_position.x, player.global_position.z)
-		var a: Vector2 = Terrain.PATH_POINTS[0]
-		var b: Vector2 = Terrain.PATH_POINTS[Terrain.PATH_POINTS.size() - 1]
-		var d := Geometry2D.get_closest_point_to_segment(p, a, b).distance_to(p)
-		if d <= Terrain.PATH_HALF_WIDTH - 0.2 and p.y > a.y + 0.5 and p.y < b.y - 0.5:
+		var d := Terrain.path_distance(p)
+		if d <= Terrain.PATH_HALF_WIDTH - 0.2:
 			return "dirt"
 		if d >= Terrain.PATH_HALF_WIDTH + Terrain.PATH_EDGE_SOFTNESS + 0.3:
 			return "grass"

@@ -29,7 +29,7 @@ const PYLON_AT := {
 }
 const CORRAL_OFFSET := Vector2(-7, -5)
 const GATE_AT := Vector3(-92.0, 0.0, -68.0)
-const VAT_AT := Vector3(-6.0, 0.0, -1.6)
+const VAT_AT := Vector3(11.0, 0.0, 8.5)
 
 ## Set by the ranch before add_child.
 var story: Story

@@ -13,7 +13,9 @@ const MODEL := "res://assets/models/spike.glb"
 ## checkout without converted assets.
 const REAL_MODEL := "res://assets/converted/spike/spike.glb"
 const REAL_TEX := "res://assets/converted/spike/tex/"
-const REAL_SCALE := 1.1
+## 1.9: 1.31 m, 0.6 PH, up to a pony's neck as in the show (owner playtest 2026-10-25,
+## "spike also looks a little small"; at 1.1 he stood 0.76 m, a third of a pony).
+const REAL_SCALE := 1.9
 ## Surface material (without SourceIO's ".001") to texture. The wings are the model's
 ## optional bodygroup: baby Spike has none, so they are hidden.
 const REAL_SKINS := {"body": "body", "acces": "acces", "eyeball_l": "pupil_l",

@@ -151,6 +151,11 @@ func _collect() -> void:
 				_add(String(c.name).to_snake_case(), "Plots/%s/%s" % [slot.name, c.name],
 					PropsScript.world_aabb(c).size.y)
 				_cover(c)
+	# The wayfinding signs and the plaza fingerpost (2026-10-25), ranch.gd _stand_place_signs().
+	for c: Node in ranch.get_children():
+		if c is StaticBody3D and (String(c.name).begins_with("Sign") or c.name == &"Signpost"):
+			_add("place_sign", String(c.name), PropsScript.world_aabb(c).size.y)
+			_cover(c)
 	var spike := ranch.get_node_or_null(^"Spike") as Node3D
 	if spike != null:
 		_add("spike", "Spike", PropsScript.world_aabb(spike).size.y)

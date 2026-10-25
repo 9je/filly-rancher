@@ -72,7 +72,7 @@ uniform float ground_roughness = 0.95;
 // the actual polyline (see its PATH_POINTS) and pads it out to this length by repeating its
 // own last point, which is a zero-length segment here and contributes nothing extra to the
 // distance field. path_point_count is the real length; the loop below stops there.
-const int PATH_MAX_POINTS = 8;
+const int PATH_MAX_POINTS = 12;
 uniform vec2 path_points[PATH_MAX_POINTS];
 uniform int path_point_count = 0;
 // HALF THE CORE WIDTH, IN METRES, where the path is full-strength dirt regardless of edge
@@ -141,6 +141,10 @@ float path_distance(vec2 p) {
 		}
 		vec2 a = path_points[i];
 		vec2 b = path_points[i + 1];
+		// A point past 50 km is terrain.gd's PATH_BREAK: the end of one road, not a segment.
+		if (a.x > 50000.0 || b.x > 50000.0) {
+			continue;
+		}
 		vec2 ab = b - a;
 		float len2 = dot(ab, ab);
 		float t = len2 > 0.0001 ? clamp(dot(p - a, ab) / len2, 0.0, 1.0) : 0.0;

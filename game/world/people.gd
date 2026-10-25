@@ -22,16 +22,19 @@ const InteractionScript := preload("res://world/interaction.gd")
 
 ## Where each character stands by default (ranch space), and the way she faces (degrees).
 const SPOTS := {
-	&"marigold": [Vector3(11.5, 0.0, 6.5), 210.0],
+	# Re-laid round the plaza 2026-10-25 (see ranch.tscn's Buildings): each by her place.
+	# Marigold at the Depot door, Bramble at the Market door, Pip by the mailbox, the two
+	# pen hands at the yard's corner, Static on the road out.
+	&"marigold": [Vector3(-9.0, 0.0, 0.5), 250.0],
 	# Beside the plots, never on one: a spot inside a slot's footprint was fenced in by the
 	# first pen built there (and the Market's own footprint lifted Bramble onto its plinth).
-	&"fennel": [Vector3(-2.2, 0.0, 12.4), 110.0],
-	&"bramble": [Vector3(-0.7, 0.0, 3.1), 45.0],
-	# Clear of the mailbox (8, -2.5) by more than TALK_RADIUS plus the mailbox's own 2.6 m: a
+	&"fennel": [Vector3(-3.6, 0.0, 7.6), 110.0],
+	&"bramble": [Vector3(12.0, 0.0, 0.8), 270.0],
+	# Clear of the mailbox (8, 7) by more than TALK_RADIUS plus the mailbox's own 2.6 m: a
 	# postmare standing at the box answered every E meant for it.
-	&"pip": [Vector3(13.4, 0.0, -4.6), 240.0],
-	&"static": [Vector3(14.0, 0.0, 12.0), 230.0],
-	&"clover": [Vector3(-2.6, 0.0, 13.8), 120.0],
+	&"pip": [Vector3(13.0, 0.0, 10.5), 240.0],
+	&"static": [Vector3(16.0, 0.0, 14.0), 230.0],
+	&"clover": [Vector3(-6.4, 0.0, 8.2), 120.0],
 }
 const TALK_RADIUS := 2.8
 const CAST: Array[StringName] = [&"tumble", &"marigold", &"fennel", &"pip", &"bramble", &"static", &"clover"]

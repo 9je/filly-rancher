@@ -299,12 +299,16 @@ func test_the_markers_are_solid_when_she_is_standing_in_the_plot() -> void:
 	assert_almost_eq(slot.marker_alpha(), 1.0, 0.001)
 
 
-func test_the_markers_are_gone_from_across_the_clearing() -> void:
+## Owner playtest 2026-10-25, "i dont like how hard it is to find the build area": from across
+## the yard an empty plot is dimmed, never gone; past MARK_SEEN_METRES it is.
+func test_the_markers_are_dimmed_not_gone_from_across_the_clearing() -> void:
 	var slot := PlotSlotScript.new()
 	add_child_autofree(slot)
-	slot.set_marker_focus(PlotSlotScript.MARK_FAR_METRES + 1.0)
-	assert_almost_eq(slot.marker_alpha(), 0.0, 0.001,
-		"a plot nobody is near contributes no lines to the picture")
+	slot.set_marker_focus(PlotSlotScript.MARK_FAR_METRES + 20.0)
+	assert_almost_eq(slot.marker_alpha(), PlotSlotScript.MARK_FLOOR_ALPHA, 0.001,
+		"an empty plot can be seen from the plaza")
+	slot.set_marker_focus(PlotSlotScript.MARK_SEEN_METRES + 1.0)
+	assert_almost_eq(slot.marker_alpha(), 0.0, 0.001, "and is gone from across the valley")
 
 
 func test_the_markers_fade_rather_than_snap() -> void:
@@ -329,8 +333,8 @@ func test_standing_in_one_plot_does_not_light_the_next_one() -> void:
 	var slot := PlotSlotScript.new()
 	add_child_autofree(slot)
 	slot.set_marker_focus(9.0)
-	assert_almost_eq(slot.marker_alpha(), 0.0, 0.001,
-		"the slots are on a 9 m grid and only the one she is in may be lit")
+	assert_almost_eq(slot.marker_alpha(), PlotSlotScript.MARK_FLOOR_ALPHA, 0.001,
+		"the slots are on a 9 m grid and only the one she is in is lit full")
 
 
 func test_a_built_slot_carries_no_marker_geometry_at_all() -> void:

@@ -536,13 +536,7 @@ static func surface_for(collider: Object, point: Vector3, open_ground: StringNam
 
 ## Metres from `p` to the Terrain's painted path (its PATH_POINTS polyline).
 static func path_distance(p: Vector2) -> float:
-	var pts: Array[Vector2] = TerrainScript.PATH_POINTS
-	if pts.size() < 2:
-		return INF
-	var best := INF
-	for i in pts.size() - 1:
-		best = minf(best, Geometry2D.get_closest_point_to_segment(p, pts[i], pts[i + 1]).distance_to(p))
-	return best
+	return TerrainScript.path_distance(p)
 
 
 ## The surface under her right now: a short ray straight down from her hips.

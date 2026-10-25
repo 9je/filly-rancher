@@ -119,7 +119,32 @@ const DIRT := Color(0.8, 0.72, 0.6)
 ## about the mask assumes two. Padded out to the shader's fixed-size uniform array by
 ## `_path_uniform()` below, repeating this array's own last point (a zero-length segment the
 ## shader's own distance walk treats as inert, not as a divide-by-zero).
-const PATH_POINTS: Array[Vector2] = [Vector2(1.5, 10.0), Vector2(1.5, 58.0)]
+## SEVERAL ROADS, ONE LIST (owner playtest 2026-10-25: "i cant find the market ... the
+## important buildings are too close and not easy to navigate between"). PATH_BREAK between
+## two points ends one road and starts the next; the shader and path_distance() skip any
+## segment that touches it. The main street runs from the Farmhouse door down through the
+## plaza to the Strip; the cross street joins the Depot door to the Market door across the
+## plaza; the spur leaves the main street for the pen yard.
+const PATH_BREAK := Vector2(100000.0, 100000.0)
+const PATH_POINTS: Array[Vector2] = [
+	Vector2(2.0, -13.5), Vector2(2.0, 0.0), Vector2(1.5, 10.0), Vector2(1.5, 58.0),
+	PATH_BREAK,
+	Vector2(-11.8, -3.0), Vector2(14.4, -3.0),
+	PATH_BREAK,
+	Vector2(1.6, 8.0), Vector2(-4.5, 15.5),
+]
+
+
+## Metres from `p` to the nearest painted road (PATH_POINTS, its breaks skipped).
+static func path_distance(p: Vector2) -> float:
+	var best := INF
+	for i in PATH_POINTS.size() - 1:
+		var a: Vector2 = PATH_POINTS[i]
+		var b: Vector2 = PATH_POINTS[i + 1]
+		if a == PATH_BREAK or b == PATH_BREAK:
+			continue
+		best = minf(best, Geometry2D.get_closest_point_to_segment(p, a, b).distance_to(p))
+	return best
 
 ## Half the path's full-strength core width, in metres -- "a couple of metres wide" per the
 ## ruling that replaced the tiled road. `PATH_EDGE_SOFTNESS` is how far past that the dirt
@@ -142,7 +167,7 @@ const PATH_GLOW := 0.08
 ## The shader array uniform's own fixed length. Matches `PATH_MAX_POINTS` in
 ## `terrain.gdshader` -- game/test/test_terrain.gd pins both numbers so the two files cannot
 ## drift apart silently.
-const PATH_SHADER_SLOTS := 8
+const PATH_SHADER_SLOTS := 12
 
 ## When true this node builds NOTHING in _ready() beyond its collision layers, and the
 ## ground is shaped by an explicit build() instead.

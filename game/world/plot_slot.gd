@@ -101,6 +101,14 @@ const MARK_COLOR := Color(0.745, 0.694, 0.541)
 ## strength for precisely as long as the build prompt can be up.
 const MARK_NEAR_METRES := 4.8
 const MARK_FAR_METRES := 8.0
+## NEVER GONE, ONLY DIMMED, out to MARK_SEEN_METRES (owner playtest 2026-10-25: "i dont like
+## how hard it is to find the build area"). Faded to nothing past 8 m, an empty plot was bare
+## grass from the path; now it holds this much of its strength, and the plot she stands in
+## still lights up full.
+const MARK_FLOOR_ALPHA := 0.6
+const MARK_SEEN_METRES := 60.0
+## The gold pennant on an empty plot's corner stake: "build here", seen from the plaza.
+const PENNANT_COLOR := Color(1.0, 0.78, 0.25)
 
 ## THE GHOST: WHAT THE GROUND LOOKS LIKE WHILE SHE IS DECIDING.
 ##
@@ -348,6 +356,8 @@ func ghost_state() -> int:
 func set_marker_focus(distance: float) -> void:
 	var span: float = maxf(0.001, MARK_FAR_METRES - MARK_NEAR_METRES)
 	var alpha: float = clampf(1.0 - (absf(distance) - MARK_NEAR_METRES) / span, 0.0, 1.0)
+	if absf(distance) <= MARK_SEEN_METRES:
+		alpha = maxf(alpha, MARK_FLOOR_ALPHA)
 	if is_equal_approx(alpha, _mark_alpha):
 		return
 	_mark_alpha = alpha
@@ -428,6 +438,13 @@ func _refresh_stakes() -> void:
 				Vector3(STAKE_SIZE, STAKE_HEIGHT, STAKE_SIZE),
 				Vector3(sx * STAKE_INSET, STAKE_HEIGHT * 0.5 - 0.15, sz * STAKE_INSET),
 				stake_mat)
+
+	# A pennant on the near corner stake, so a free plot reads from across the yard.
+	var flag_mat := _mark_material(PENNANT_COLOR)
+	_mark("PennantPole", Vector3(0.06, 1.1, 0.06),
+		Vector3(STAKE_INSET, STAKE_HEIGHT + 0.4, STAKE_INSET), stake_mat)
+	_mark("Pennant", Vector3(0.04, 0.42, 0.7),
+		Vector3(STAKE_INSET, STAKE_HEIGHT + 0.7, STAKE_INSET - 0.36), flag_mat)
 
 	# The boundary itself: four boards laid flat on the plot's own edge, so the marked
 	# square is exactly the square the fence will stand on.

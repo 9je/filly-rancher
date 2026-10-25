@@ -214,8 +214,18 @@ func test_the_shader_array_size_matches_terrain_gd_own_constant() -> void:
 ## THE ROUTE ITSELF: along the north road's own centreline, wide enough to read as a track
 ## and narrow enough to stay clear of the town row's buildings at x = 15 and x = -12.
 func test_the_path_route_runs_the_north_roads_own_line_clear_of_the_town_row() -> void:
+	# The north road is every point from the homestead apron's edge (z = 10) on; the plaza's
+	# own roads (2026-10-25) stay on the flat apron.
+	var road := 0
 	for p: Vector2 in TerrainScript.PATH_POINTS:
-		assert_almost_eq(p.x, 1.5, 0.01, "the route stays on the road's own x")
+		if p == TerrainScript.PATH_BREAK:
+			road += 1
+			continue
+		if road == 0 and p.y >= 10.0:
+			assert_almost_eq(p.x, 1.5, 0.01, "the north road stays on its own x")
+		else:
+			assert_lte(p.distance_to(TerrainScript.HOMESTEAD_CENTRE), TerrainScript.FLAT_RADIUS,
+				"a plaza road stays on the homestead's flat apron")
 	var clearance: float = 15.0 - 1.5 - TerrainScript.PATH_HALF_WIDTH \
 		- TerrainScript.PATH_EDGE_SOFTNESS
 	assert_gt(clearance, 0.0,

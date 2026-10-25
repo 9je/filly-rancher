@@ -291,7 +291,7 @@ const LAYOUT := [
 	# (3.8, 6.5), not (2.0, 3.0): at its SCALE.md size the stall would stand on the foot of the
 	# Market's own door ramp, and the Depot's west wall, both of which grew to SCALE.md's house
 	# size (docs/playtest_fixes/scale.md).
-	{"file": "kenney_market_stall.glb", "at": Vector2(3.8, 6.5), "yaw": 200.0},
+	{"file": "kenney_market_stall.glb", "at": Vector2(10.5, -9.0), "yaw": 270.0},
 	# --- treeline, replanted MLP in slice R2 --------------------------------------
 	# SAME COORDINATES, SAME YAW, ONLY THE SPECIES AND THE FAMILY CHANGED. Every `at` below
 	# was already verified clear of every region fence ring, every ZoneMarker disc and the
@@ -299,7 +299,7 @@ const LAYOUT := [
 	# break a clearance that was already checked. Oaks and fats, the map's broad canopies,
 	# become saa_tree_wide; the homestead's own default and pine trunks become
 	# saa_tree_narrow, the same species the orchard already plants.
-	{"file": "saa_tree_wide.glb", "at": Vector2(-19.0, -19.0), "yaw": 0.0, "s": 1.15, "family": &"mlp"},
+	{"file": "saa_tree_wide.glb", "at": Vector2(-25.0, -21.0), "yaw": 0.0, "s": 1.15, "family": &"mlp"},
 	{"file": "saa_tree_narrow.glb", "at": Vector2(-26.0, -8.0), "yaw": 40.0, "s": 1.25, "family": &"mlp"},
 	{"file": "saa_tree_wide.glb", "at": Vector2(-5.0, -27.0), "yaw": 200.0, "s": 1.20, "family": &"mlp"},
 	{"file": "saa_tree_wide.glb", "at": Vector2(8.0, -28.0), "yaw": 75.0, "s": 0.95, "family": &"mlp"},
@@ -325,7 +325,7 @@ const LAYOUT := [
 	# One inside the clearing, for shade and to break up the yard. Its neighbour at
 	# (17, 7.5) came out when the yard grew crates, a basket, a well and a coop; a shade
 	# tree in the middle of that is a tree in the middle of a yard.
-	{"file": "saa_tree_wide.glb", "at": Vector2(-20.0, 1.0), "yaw": 165.0, "s": 1.10, "family": &"mlp"},
+	{"file": "saa_tree_wide.glb", "at": Vector2(-24.5, 4.5), "yaw": 165.0, "s": 1.10, "family": &"mlp"},
 	# --- the regions -------------------------------------------------------------
 	# Slice 3's four regions (game/data/regions/*.tres) are 60 m and more from the
 	# homestead, and the treeline above stops at about 45 m: without these, a region
@@ -536,6 +536,10 @@ const LAYOUT := [
 	{"file": "mlp_bush.glb", "at": Vector2(-3.0, 54.0), "yaw": 200.0, "family": &"mlp"},
 	{"file": "mlp_bush.glb", "at": Vector2(-9.0, 53.5), "yaw": 40.0, "family": &"mlp"},
 	# --- the homestead yard: a farmstead, not a field with objects dropped in it ---------
+	# RE-LAID 2026-10-25 with the buildings round the plaza (owner playtest: "all the
+	# buildings feel very randomly placed"): the barn's working corner north-west, the well
+	# and the coop either side of the Farmhouse, the stall and its crates on the Market's
+	# north end.
 	# READ AS A PICTURE. The shed stands beside the barn with the wagon between them and hay
 	# stacked against the shed's wall, which is what a working yard looks like; the well and
 	# the coop sit on the house side; the crates and the basket cluster by the market stall
@@ -543,18 +547,18 @@ const LAYOUT := [
 	# clears the Market's own new footprint (10.62 m wide at 45 degrees about (-2, -1),
 	# reaching 5.9 m on the diagonal) by at least 0.6 m, and clears every interaction radius
 	# on the map by more.
-	{"file": "saa_shed.glb", "at": Vector2(-14.5, -13.5), "yaw": 205.0, "family": &"mlp"},
-	{"file": "saa_wagon.glb", "at": Vector2(-12.0, -14.5), "yaw": 200.0, "family": &"mlp"},
-	{"file": "saa_hay_block.glb", "at": Vector2(-16.0, -11.0), "yaw": 15.0, "family": &"mlp"},
-	{"file": "saa_hay_pile.glb", "at": Vector2(-17.5, -13.0), "yaw": 40.0, "family": &"mlp"},
-	{"file": "saa_seed_bag.glb", "at": Vector2(-15.0, -10.0), "yaw": 300.0, "family": &"mlp"},
-	{"file": "mlp_farm_well.glb", "at": Vector2(5.0, -11.5), "yaw": 60.0, "family": &"mlp"},
-	{"file": "mlp_chicken_coop.glb", "at": Vector2(12.5, -11.0), "yaw": 250.0, "family": &"mlp"},
-	{"file": "mlp_crate.glb", "at": Vector2(4.5, 8.8), "yaw": 30.0, "family": &"mlp"},
-	{"file": "mlp_basket.glb", "at": Vector2(1.8, 7.2), "yaw": 0.0, "family": &"mlp"},
-	{"file": "mlp_bush.glb", "at": Vector2(-6.5, -12.0), "yaw": 120.0, "family": &"mlp"},
-	{"file": "mlp_bush.glb", "at": Vector2(15.5, -4.0), "yaw": 20.0, "family": &"mlp"},
-	{"file": "saa_small_dirt_pile.glb", "at": Vector2(-11.5, -4.5), "yaw": 0.0, "family": &"mlp"},
+	{"file": "saa_shed.glb", "at": Vector2(-22.0, -12.0), "yaw": 90.0, "family": &"mlp"},
+	{"file": "saa_wagon.glb", "at": Vector2(-20.5, -8.5), "yaw": 200.0, "family": &"mlp"},
+	{"file": "saa_hay_block.glb", "at": Vector2(-21.5, -16.0), "yaw": 15.0, "family": &"mlp"},
+	{"file": "saa_hay_pile.glb", "at": Vector2(-17.0, -20.5), "yaw": 40.0, "family": &"mlp"},
+	{"file": "saa_seed_bag.glb", "at": Vector2(-13.8, -11.0), "yaw": 300.0, "family": &"mlp"},
+	{"file": "mlp_farm_well.glb", "at": Vector2(-4.5, -16.5), "yaw": 60.0, "family": &"mlp"},
+	{"file": "mlp_chicken_coop.glb", "at": Vector2(9.5, -17.0), "yaw": 180.0, "family": &"mlp"},
+	{"file": "mlp_crate.glb", "at": Vector2(12.0, -11.2), "yaw": 30.0, "family": &"mlp"},
+	{"file": "mlp_basket.glb", "at": Vector2(9.0, -11.5), "yaw": 0.0, "family": &"mlp"},
+	{"file": "mlp_bush.glb", "at": Vector2(-3.5, -10.5), "yaw": 120.0, "family": &"mlp"},
+	{"file": "mlp_bush.glb", "at": Vector2(23.5, -12.0), "yaw": 20.0, "family": &"mlp"},
+	{"file": "saa_small_dirt_pile.glb", "at": Vector2(-18.5, 3.5), "yaw": 0.0, "family": &"mlp"},
 ]
 
 var _placed: Array[Node3D] = []

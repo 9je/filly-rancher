@@ -65,6 +65,9 @@ const PALACE_CLEARANCE := 1.5
 const MARQUEE_WIDTH_FRACTION := 0.62
 const MARQUEE_HEIGHT := 1.60
 const MARQUEE_TOP_GAP := 0.35
+## Metres from the ground at the Palace's front to the marquee's lower edge: above the third
+## person camera's head as she climbs the steps.
+const MARQUEE_CLEARANCE := 5.4
 const MARQUEE_STANDOFF := 0.55
 const MARQUEE_BOARD_COLOR := Color(0.16, 0.07, 0.20)
 const MARQUEE_TRIM_COLOR := Color(0.98, 0.86, 0.45)
@@ -259,7 +262,12 @@ func mount_marquee(front_centre: Vector3, out_dir: Vector3, half_extents: Vector
 	_marquee_facing = facing.normalized()
 	var board_width: float = half_extents.x * 2.0 * MARQUEE_WIDTH_FRACTION
 	_marquee_size = Vector2(board_width, MARQUEE_HEIGHT)
-	_marquee_ceiling = ridge_y - MARQUEE_TOP_GAP
+	# ABOVE THE DOOR, NOT ACROSS IT (owner playtest 2026-10-25: "weird sign you gotta walk
+	# through to get in"). Hung under the ridge, its lower edge sat at 3.6 m in front of the
+	# steps, and the third person camera behind a pony climbing them passed straight through
+	# it. Lifted so its lower edge clears MARQUEE_CLEARANCE over the ground the steps start on.
+	_marquee_ceiling = maxf(ridge_y - MARQUEE_TOP_GAP,
+		front_centre.y + MARQUEE_CLEARANCE + MARQUEE_HEIGHT)
 	_marquee_centre = Vector3(front_centre.x, _marquee_ceiling - MARQUEE_HEIGHT * 0.5,
 		front_centre.z) + _marquee_facing * MARQUEE_STANDOFF
 	_has_marquee = true

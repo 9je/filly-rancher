@@ -1257,6 +1257,11 @@ func _maybe_blink() -> void:
 		return
 	_blinked_at = now
 	global_position += hop + Vector3(0, 0.3, 0)
+	# Teleported, so is_on_floor() still reads the ground she left: off the resting shortcut
+	# and already falling, or she hangs 0.3 m up where she lands (set_held(false) has the
+	# same note).
+	_stood_still = false
+	velocity.y = -1.0
 	if visuals != null:
 		visuals.scale = Vector3.ONE * 0.2
 		create_tween().tween_property(visuals, "scale", Vector3.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)

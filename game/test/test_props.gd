@@ -262,7 +262,15 @@ func test_the_farmstead_has_a_shed_beside_its_barn() -> void:
 func test_the_town_row_stands_on_a_road() -> void:
 	var min_z := INF
 	var max_z := -INF
+	var road := 0
 	for p: Vector2 in TerrainScript.PATH_POINTS:
+		# The north road only (the first in the list): the plaza's roads (2026-10-25) end
+		# inside the apron.
+		if p == TerrainScript.PATH_BREAK:
+			road += 1
+			continue
+		if road > 0 or p.y < 10.0:
+			continue
 		assert_almost_eq(p.x, 1.5, 0.01, "the painted road stays on its own centreline")
 		min_z = minf(min_z, p.y)
 		max_z = maxf(max_z, p.y)

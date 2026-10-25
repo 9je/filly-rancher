@@ -112,6 +112,7 @@ without `.glb`, or the name the test gives a code-built thing.
 | lp_skeeball | prop_medium | the Strip |
 | lp_dance_game | prop_medium | the Strip |
 | mailbox | prop_medium | by the Depot |
+| place_sign | structure | the plaza fingerpost and the shop and yard signs (2026-10-25) |
 | canoe | prop_small | the Lake |
 | rock_smallFlat* | ground | the Lake shore |
 | rock_* | rock | Everfree, Lake |

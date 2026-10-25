@@ -1081,6 +1081,7 @@ func _ready() -> void:
 			LobbySignScript.HEADLINE, LobbySignScript.SUBLINE)
 
 	_stand_request_board()
+	_stand_place_signs()
 	_stand_palace_facade()
 
 	await _boot_beat(0.37, "Opening the shops")
@@ -4893,6 +4894,122 @@ func _stand_request_board() -> void:
 		REQUEST_BOARD_HEADLINE, REQUEST_BOARD_SUBLINE)
 
 
+## WAYFINDING (owner playtest 2026-10-25: "i cant find the market and the important
+## buildings at the start are too close and not easy to navigate between", "i dont like how
+## hard it is to find the build area"). A painted shop sign on a post beside each door of
+## the plaza, a fingerpost at the crossroads pointing every way, and a sign at the pen yard.
+const PLACE_SIGNS := [
+	# [building, name, icon]
+	[&"Market", "Market", PlaceSign.Icon.COIN],
+	[&"Depot", "Depot", PlaceSign.Icon.CRATE],
+	[&"Farmhouse", "Home", PlaceSign.Icon.HOUSE],
+	[&"Board", "Requests", PlaceSign.Icon.SCROLL],
+]
+## Where the fingerpost stands, on the plaza's south-east corner, off both roads.
+const SIGNPOST_AT := Vector3(4.6, 0.0, 0.9)
+## Where the yard sign stands, where the spur path reaches the pens.
+const YARD_SIGN_AT := Vector3(-3.4, 0.0, 12.6)
+
+
+func _stand_place_signs() -> void:
+	var PlaceSignScript: GDScript = load("res://world/place_sign.gd")
+	for row: Array in PLACE_SIGNS:
+		var b := get_node_or_null(NodePath("Buildings/" + String(row[0]))) as Building
+		if b == null:
+			continue
+		var out_dir: Vector3 = b.global_transform.basis * Vector3(0.0, 0.0, 1.0)
+		out_dir.y = 0.0
+		out_dir = out_dir.normalized()
+		var side: Vector3 = out_dir.cross(Vector3.UP)
+		# Beside the doorway, out in front of the wall, so it never stands in the door.
+		var at: Vector3 = b.global_position + out_dir * (b.depth * 0.5 + 1.6) \
+			+ side * (b.door_width * 0.5 + 1.4)
+		_stand_sign_post(String(row[1]), int(row[2]), at, out_dir, 2.4, 0.75, 3.3)
+	var post := _sign_post_body("Signpost", SIGNPOST_AT, 3.6)
+	var fingers := [
+		["Market", PlaceSign.Icon.COIN, get_node_or_null(^"Buildings/Market")],
+		["Depot", PlaceSign.Icon.CRATE, get_node_or_null(^"Buildings/Depot")],
+		["Home", PlaceSign.Icon.HOUSE, get_node_or_null(^"Buildings/Farmhouse")],
+		["Pens", PlaceSign.Icon.FENCE, get_node_or_null(^"Plots/Slot1")],
+		["Spectra Palace", PlaceSign.Icon.STAR, get_node_or_null(^"Buildings/Palace")],
+	]
+	var h := 3.25
+	for f: Array in fingers:
+		var target := f[2] as Node3D
+		if target == null:
+			continue
+		var to: Vector3 = target.global_position - SIGNPOST_AT
+		to.y = 0.0
+		if to.length_squared() < 0.01:
+			continue
+		var sign: Node3D = PlaceSignScript.new()
+		sign.name = "To" + String(f[0]).replace(" ", "")
+		post.add_child(sign)
+		sign.call("build", String(f[0]), int(f[1]), 1.9, 0.42, 0.32, true)
+		# The finger's +X (its point) along `to`.
+		sign.rotation.y = atan2(-to.z, to.x)
+		var dir := to.normalized()
+		sign.position = Vector3(dir.x * 1.05, h, dir.z * 1.05)
+		h -= 0.5
+	_stand_sign_post("Pens", PlaceSign.Icon.FENCE, YARD_SIGN_AT,
+		Vector3(1.0, 0.0, -0.4).normalized(), 2.0, 0.7, 2.7)
+
+
+## A post with a sign on an arm, facing `out_dir`.
+func _stand_sign_post(label: String, icon_kind: int, at: Vector3, out_dir: Vector3,
+		width: float, height: float, post_h: float) -> void:
+	var post := _sign_post_body("Sign" + label.replace(" ", ""), at, post_h)
+	var arm := MeshInstance3D.new()
+	var am := BoxMesh.new()
+	am.size = Vector3(width * 0.6, 0.1, 0.1)
+	arm.mesh = am
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = PlaceSign.WOOD_DARK
+	arm.material_override = mat
+	post.add_child(arm)
+	var sign: Node3D = (load("res://world/place_sign.gd") as GDScript).new()
+	sign.name = "Board"
+	post.add_child(sign)
+	sign.call("build", label, icon_kind, width, height, 0.0, true)
+	# Broadside to the road the player comes along, hung from the arm.
+	var yaw := atan2(out_dir.x, out_dir.z)
+	var along := Vector3(cos(yaw), 0.0, -sin(yaw))
+	sign.rotation.y = yaw
+	sign.position = along * (width * 0.5 + 0.15) + Vector3(0, post_h - 0.35 - height * 0.5, 0)
+	arm.rotation.y = yaw
+	arm.position = along * (width * 0.3 + 0.05) + Vector3(0, post_h - 0.3, 0)
+
+
+## A wooden post standing on the ground at `at`, solid to the player.
+func _sign_post_body(n: String, at: Vector3, post_h: float) -> StaticBody3D:
+	var body := StaticBody3D.new()
+	body.name = n
+	body.collision_layer = LayersScript.PROPS
+	body.collision_mask = 0
+	add_child(body)
+	var y := float(terrain.call("height_at", at.x, at.z)) if terrain != null else 0.0
+	body.global_position = Vector3(at.x, y, at.z)
+	var mi := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.09
+	cm.bottom_radius = 0.11
+	cm.height = post_h
+	mi.mesh = cm
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = PlaceSign.WOOD
+	mi.material_override = mat
+	mi.position = Vector3(0, post_h * 0.5, 0)
+	body.add_child(mi)
+	var cs := CollisionShape3D.new()
+	var shape := CylinderShape3D.new()
+	shape.radius = 0.14
+	shape.height = post_h
+	cs.shape = shape
+	cs.position = mi.position
+	body.add_child(cs)
+	return body
+
+
 ## THE PALACE'S OWN FRONT, standing inside the shell it is sized from. Mounted here rather
 ## than authored in ranch.tscn for the reason strip.gd and region_fence.gd are both built in
 ## code: game/assets/converted/ is gitignored, so a static ext_resource to one of these
@@ -5180,6 +5297,13 @@ func _report(pony_count: int, prop_count: int) -> void:
 		var pos: Vector3 = pony.global_position
 		var home: Vector3 = pony.get_home()
 		var g: float = terrain.height_at(pos.x, pos.z)
+		# The floor actually under her: a pony who wandered onto a doorstep or a plinth is
+		# standing, not floating, and the terrain alone cannot tell the two apart.
+		var floor_hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(
+			pos + Vector3.UP * 0.6, pos + Vector3.DOWN * 1.0,
+			LayersScript.TERRAIN | LayersScript.PROPS, [pony.get_rid()]))
+		if not floor_hit.is_empty():
+			g = (floor_hit["position"] as Vector3).y
 		var offset: float = absf(pos.y - g)
 		var marker := _nearest_marker(home)
 		var from_marker := INF
@@ -5190,6 +5314,7 @@ func _report(pony_count: int, prop_count: int) -> void:
 				in_zone = false
 		if offset > GROUND_TOLERANCE:
 			on_ground = false
+			print("RANCH off the ground: %s at %s" % [pony.name, pos])
 		max_relief = maxf(max_relief, absf(terrain.height_at(home.x, home.z)))
 		if PropsScript.is_in_pen_plots(home.x, home.z):
 			pen_intrusions.append(pony.name)
@@ -6740,6 +6865,11 @@ func _find_wall_stand_point() -> Dictionary:
 		if hit.is_empty():
 			continue
 		var wall: Vector3 = hit["position"]
+		# The ray went in through an east-facing doorway and stopped on a wall inside: not
+		# the outside wall this probe stands against (the Depot faces the plaza's west side
+		# since the 2026-10-25 re-layout).
+		if wall.x < box.position.x + box.size.x - 1.0:
+			continue
 		var stand := Vector3(wall.x + 0.75, 0.0, wall.z)
 		stand.y = terrain.height_at(stand.x, stand.z) + 0.15
 		return {"building": building, "stand": stand}
@@ -7762,7 +7892,7 @@ var tools: RanchTools
 
 ## SPIKE, at the mailbox (world/spike_actor.gd): he burps the post in on green dragonfire.
 const SpikeActorScript := preload("res://world/spike_actor.gd")
-const SPIKE_AT := Vector3(6.9, 0.0, -1.2)
+const SPIKE_AT := Vector3(5.5, 0.0, 3.5)
 var spike: SpikeActor
 
 
