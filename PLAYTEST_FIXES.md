@@ -87,6 +87,37 @@ The suite was green and the game was broken, for four reasons that compound.
 
 **Passing after:** `INPUT_TEST_OK test_beam_targeting highlight before the press, aim assist 0.9 m, and the press took her`. Screenshot: `beam_highlight_after.png`.
 
+## 3. "Weird shadows, especially on distant hills."
+
+Full write-up: `docs/playtest_fixes/shadows.md`. Screenshots before, after and side by side, at near, mid and three far views, are in `build/playtest_evidence/shadows/`.
+
+**Test:** `game/test_input/test_shadows.gd`. It starts a new game through the title, creator, letter and welcome, then walks by real input to five viewpoints: near, mid, and three looking out over the valley. It judges each at dawn, noon and dusk, 15 frames in all.
+
+Two steps are not player input, and the doc explains why: the test sets the hour on the world clock, and it reads a second copy of each frame with shadows off as the reference.
+
+The measure is speckle: shadowed pixels isolated from all their neighbours, counted only on surfaces that are smooth in the shadowless frame. It is summed per distance band. The ceilings are near 0.001, mid 0.0015 and far 0.0025.
+
+**Root cause** (the Sun in `world/ranch.tscn`):
+- **`light_angular_distance` 0.9** turned on PCSS soft shadows, which sample with per-pixel noise. Through the toon shading step that noise became salt-and-pepper grain on ponies at low sun, and a grainy smear on every shadow edge out on the hills.
+- **The shadow range ended at 85 m with a 7 m fade,** which the toon step turned into a hard arc that moved with the player.
+- **`shadow_blur` 1.1** widened the same noisy filter.
+- **The biases were slightly too low** for the longer far cascades.
+
+**Fix:**
+- `light_angular_distance` 0, so PCSS is off.
+- `shadow_blur` 0.6; `shadow_bias` 0.03; `shadow_normal_bias` 1.5.
+- Shadow range 160 m, with splits at 8, 24 and 64 m and a fade from 120 m to 160 m.
+- The project shadow atlas stays with the Settings quality preset. Soft-shadow filter quality stays at 2: quality 3 cut the leftover grain by about 10 % for 50 % more filter taps.
+- Perf: the 60-pony check gives the same frame times at 85 m and 160 m (p99 25.4 ms against 24.4 ms in the invisible display). The commit before this round measures 23.8 ms there, so the round added no cost.
+
+**Failing before:** `INPUT_TEST_FAILED test_shadows 2 checks failed: near speckle 0.00436 > 0.0010; mid speckle 0.00255 > 0.0015`.
+
+**Passing after:** `INPUT_TEST_OK test_shadows shadows clean at every distance and hour (speckle near 0.00018, mid 0.00055, far 0.00077)`.
+
+**Found but not fixed:**
+- The big dark faces on the rim hills at dawn and dusk are not shadows. They are the toon lighting on a large smooth mesh, and they look the same with shadows off.
+- The race track's dirt sheet depth-fights into stripes from about 40 m away.
+
 ## 4. "Some house models are the same size as ponies. Scaling is inconsistent everywhere."
 
 Full write-up: `docs/playtest_fixes/scale.md`. Reference table: `SCALE.md` (1 PH = 2.19 m, the shipped pony's ear-tip height).
