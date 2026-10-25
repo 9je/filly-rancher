@@ -283,7 +283,11 @@ const HOUSE_SAVE_REARM := 9.0
 ## How close to the Market's origin counts as "at the market", in metres. A little wider
 ## than the building's own half-diagonal (5.5 x 4.5 m, so 3.55 m corner to centre), so
 ## "go to the market" is satisfied by walking up to the door rather than into the wall.
-const MARKET_RADIUS := 4.5
+##
+## 6.0, WAS 4.5: the Market grew by 1.35 to SCALE.md's house size (docs/playtest_fixes/scale.md),
+## so its front wall and the Vendor beside its door stand 1.35 times further from this origin;
+## the radius grew with them.
+const MARKET_RADIUS := 6.0
 
 ## How close to the request board's post counts as "at the board", in metres. Narrower than
 ## MARKET_RADIUS because the board is a small thing (3.0 x 1.2 m) five metres from the

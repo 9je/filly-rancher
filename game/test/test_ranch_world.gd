@@ -228,8 +228,10 @@ func test_a_doorway_clears_the_horn_and_not_merely_the_withers() -> void:
 	var b = BuildingScript.new()
 	assert_gt(BuildingScript.MIN_DOOR_CLEARANCE, PONY_FULL_HEIGHT,
 		"the door clearance floor must be above the pony's full 2.138 m height")
-	assert_gte(b.door_height, BuildingScript.MIN_DOOR_CLEARANCE,
+	assert_gte(b.door_clearance(), BuildingScript.MIN_DOOR_CLEARANCE,
 		"the default doorway is too low for a pony to walk through")
+	# Clear of the FLOOR she walks on, not of local y = 0 (SCALE.md, door row).
+	assert_almost_eq(b.door_clearance(), b.door_height - BuildingScript.FLOOR_TOP, 0.0001)
 	# The classic way to get this wrong is to size the door off the withers figure,
 	# which would land somewhere near 1.2-1.5 m and still "look pony sized".
 	assert_gt(b.door_height, 1.163 * 1.5, "this door was sized off the withers, not the horn")

@@ -189,10 +189,10 @@ func _ranch_tour() -> void:
 		_hud(false)
 	if _want("pens"):
 		await _fill_pens()
-		_view(Vector3(-2, 7, 26), Vector3(-14, 0.5, 12), 55.0)
+		_view(Vector3(-2, 7, 28.5), Vector3(-14, 0.5, 14.5), 55.0)
 		await _frames(40)
 		await _shot("pens_full")
-		_view(Vector3(-6, 2.2, 10.5), Vector3(-9.5, 0.6, 8.5), 50.0)
+		_view(Vector3(-6, 2.2, 13), Vector3(-9.5, 0.6, 11), 50.0)
 		await _frames(30)
 		await _shot("pens_close")
 	if _want("herd"):

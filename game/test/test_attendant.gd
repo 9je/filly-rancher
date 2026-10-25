@@ -111,7 +111,7 @@ func test_a_null_record_is_refused_and_leaves_no_body() -> void:
 ## the radius that opens her building, outside the plinth, outside the apron, and short of the
 ## ramp's foot.
 const ATTENDANTS := {
-	"Vendor": {"building": ^"Buildings/Market", "radius": 4.5},
+	"Vendor": {"building": ^"Buildings/Market", "radius": 6.0},  # ranch.gd MARKET_RADIUS (SCALE.md)
 	"Teller": {"building": ^"Buildings/Palace", "radius": 6.0},
 }
 
