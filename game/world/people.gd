@@ -61,6 +61,17 @@ var _marker: Node3D
 var _speaker: StringName = &""
 var _rng := RandomNumberGenerator.new()
 
+## THE "!" OVER A TOWNSPONY WITH SOMETHING NEW TO SAY (owner playtest 2026-10-25: "i found
+## marigold but it wasnt clear if you dont know the pony"). A gold speech bubble, an icon
+## rather than floating words, bobbing over her head and seen through walls from across
+## the valley, so "Marigold is on her way over" has a face to look for. Hidden while she is
+## the one talking.
+const NEWS_EVERY := 0.25
+const NEWS_HEIGHT := 2.55
+var _news_t := 0.0
+var _news: Dictionary = {}
+static var _news_tex: ImageTexture
+
 
 func _ready() -> void:
 	library = LibraryScript.new()
@@ -221,6 +232,7 @@ func _show() -> void:
 
 func _process(delta: float) -> void:
 	_tumble_finder(delta)
+	_update_news(delta)
 	if not is_talking():
 		return
 	var who: StringName = runner.current().get("who", _speaker)
@@ -375,5 +387,80 @@ func _sparkle_marker() -> Node3D:
 	m.no_depth_test = true
 	m.render_priority = 10
 	q.material_override = m
+	root.add_child(q)
+	return root
+
+
+func _update_news(delta: float) -> void:
+	var bob := sin(Time.get_ticks_msec() / 260.0) * 0.1
+	for id: StringName in _news:
+		var m: Node3D = _news[id]
+		if is_instance_valid(m) and m.visible:
+			m.position.y = NEWS_HEIGHT + bob
+	_news_t -= delta
+	if _news_t > 0.0 or context_provider == null or not context_provider.is_valid():
+		return
+	_news_t = NEWS_EVERY
+	var ctx: Dictionary = context_provider.call()
+	for id: StringName in npcs:
+		var n: Npc = npcs[id]
+		if n == null or not is_instance_valid(n):
+			continue
+		var want := n.is_visible_in_tree() and _speaker != id and library.has_news(id, ctx)
+		var m: Node3D = _news.get(id)
+		if want and (m == null or not is_instance_valid(m)):
+			m = news_marker()
+			n.add_child(m)
+			m.position = Vector3(0, NEWS_HEIGHT, 0)
+			_news[id] = m
+		if m != null and is_instance_valid(m):
+			m.visible = want
+
+
+## Whether `id` wears the "!" right now. For the suite.
+func shows_news(id: StringName) -> bool:
+	var m: Node3D = _news.get(id)
+	return m != null and is_instance_valid(m) and m.visible
+
+
+## The gold speech bubble with a "!" in it, drawn once.
+static func news_marker() -> Node3D:
+	if _news_tex == null:
+		var n := 96
+		var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+		img.fill(Color(0, 0, 0, 0))
+		var gold := Color(1.0, 0.8, 0.25)
+		var rim := Color(0.45, 0.25, 0.55)
+		var c := Vector2(48, 42)
+		for y in n:
+			for x in n:
+				var p := Vector2(x + 0.5, y + 0.5)
+				var d := p.distance_to(c)
+				# The tail: a triangle under the bubble, pointing down at her.
+				var tail := y > 70 and y < 92 and absf(x - 48.0) < (92.0 - y) * 0.45
+				if d < 38.0 or tail:
+					img.set_pixel(x, y, gold)
+				if (d >= 38.0 and d < 42.0 and y < 74) or (tail and absf(x - 48.0) >= (92.0 - y) * 0.45 - 2.5):
+					img.set_pixel(x, y, rim)
+				# The "!": a bar and a dot.
+				if (absf(x - 48.0) < 6.0 and y > 16 and y < 52) or p.distance_to(Vector2(48, 62)) < 6.0:
+					img.set_pixel(x, y, rim)
+		_news_tex = ImageTexture.create_from_image(img)
+	var root := Node3D.new()
+	root.name = "NewsMarker"
+	var q := MeshInstance3D.new()
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.95, 0.95)
+	q.mesh = quad
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	m.albedo_texture = _news_tex
+	m.no_depth_test = true
+	m.fixed_size = false
+	m.render_priority = 10
+	q.material_override = m
+	q.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	root.add_child(q)
 	return root

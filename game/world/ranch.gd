@@ -7706,7 +7706,7 @@ func _arrival(_delta: float) -> void:
 	# Marigold hands the Scoop over, and a press used to do nothing and say nothing. Now it
 	# says why, and she walks back over (the player may have left her mid-welcome).
 	if _interactive and Input.is_action_just_pressed(&"beam"):
-		_toast("No Scoop yet. Marigold has it for you: she's on her way over.")
+		_toast("No Scoop yet. Marigold has it for you: she's on her way over. Look for the gold bubble over her head.")
 		_arrival_started = false
 	# She follows a steward who walks off before the welcome is done.
 	if _arrival_started and not m.is_walking_to() \
