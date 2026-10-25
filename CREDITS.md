@@ -28,33 +28,26 @@ licence asks:
 ## Sound effects and ambience
 
 Fetched and processed by `tools/fetch_sounds.sh` from the rows in `tools/sound_manifest.txt`,
-which records the exact source URL of every file.
+which records the exact source URL (and pack member) of every file. `AUDIO_AUDIT.md` lists
+every file in the game with its measurements and its source. (Rewritten by the audio audit
+of 2026-10-24 to match the manifest: the list it replaced named an OpenGameArt and Wikimedia
+swap that was planned and then reverted, and never named the BBC rows the game ships.)
 
-**CC0 (public domain dedication):**
-- Kenney (kenney.nl): Interface Sounds, RPG Audio, Impact Sounds, Casino Audio.
-- OpenGameArt.org:
-  - "Ambient Bird Sounds" by isaiah658;
-  - "Forest Ambience";
-  - "Crickets Ambient Noise (loopable)";
-  - "Wind" by crystalgames;
-  - "wind whoosh loop";
-  - "Horse Trotting" (the cartoon clip-clop);
-  - "bubbles 'pop'";
-  - "Short Jingle".
-- Wikimedia Commons:
-  - "large-crowd-medium-distance-stereo" by eguobyte;
-  - "Sound Effects - Applause after a concert".
+**CC0 (public domain dedication), Kenney (kenney.nl):**
+- Impact Sounds: every hoofstep (grass, dirt, wood, stone and metal sets), the delivery
+  thud, the mail stamp, the reel stop.
+- RPG Audio: the gate creak, the letterbox clack, the letter's paper and the page turn.
+- Casino Audio: the chips, the cards, the coin grant, the roulette ball settling.
+- Interface Sounds: the menu ticks, the capture chime, the slots win, the sparkle, the reel
+  tick and the wheel ratchet.
 
-**Public domain:** Wikimedia Commons, "Wiehern.ogg" (the single, rare capture gag).
+**CC0, OpenGameArt.org:** "bubbles 'pop'" (the Scoop pop) and the PositiveChoice jingle (the
+Bloom fanfare).
 
-**CC-BY 3.0** (https://creativecommons.org/licenses/by/3.0/):
-- "Birdsong background loop" by koertes (OpenGameArt.org);
-- "Sci-Fi Drone Loop" (OpenGameArt.org);
-- "Horse Gallop Loop" by alanmcki (OpenGameArt.org).
-
-**CC-BY 4.0** (https://creativecommons.org/licenses/by/4.0/):
-- "Tawny owl calling at night in Tuntorp, Brastad, Sweden" (Wikimedia Commons);
-- "WWS PokerMacine" by Work With Sounds (Wikimedia Commons).
+**BBC Sound Effects** (sound-effects.bbcrewind.co.uk, RemArc licence: personal, educational
+and research use; this build is private and not redistributed, DECISIONS.md 2026-10-22): the
+nine ambient beds, the beam's charge hum, the race crowd, gallop and cheer, and the single
+rare capture neigh. Each row's BBC catalogue number is in the manifest.
 
 ## Fonts
 

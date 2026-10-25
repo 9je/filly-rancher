@@ -21,6 +21,8 @@ const MouseRowsScript := preload("res://ui/mouse_rows.gd")
 const BootIntentScript := preload("res://world/boot_intent.gd")
 const SaveIOScript := preload("res://systems/save_io.gd")
 const SettingsScript := preload("res://systems/settings.gd")
+const LoadingScreenScript := preload("res://ui/loading_screen.gd")
+const SettingsMenuScene := preload("res://ui/settings_menu.tscn")
 
 enum Row { NEW_GAME, CONTINUE, SETTINGS, QUIT }
 
@@ -36,12 +38,10 @@ const NO_SAVE_NOTE := "No saved ranch on this machine yet."
 ## on this screen that is always on screen and always read before a key is pressed.
 const NEW_GAME_CONFIRM_TEXT := "Really start over? Enter again to confirm"
 
-## The five settings rows, in SettingRow order. Same five the pause menu edits, because there
-## is one Settings object and two doors into it.
-enum SettingRow { VOLUME, AMBIENT, EFFECTS, SENSITIVITY, INVERT }
-
-const SETTING_ROWS: Array[String] = ["Master volume", "Ambience", "Effects",
-	"Mouse sensitivity", "Invert look"]
+## SETTINGS IS ONE MENU WITH TWO DOORS: this row and the pause menu's both open
+## game/ui/settings_menu.tscn over themselves (the playtest note "Settings UI is awful and
+## hard to navigate", docs/playtest_fixes/settings.md).
+var _settings_menu: SettingsMenu = null
 
 const WORLD_SCENE := "res://world/ranch.tscn"
 
@@ -52,11 +52,10 @@ var settings: Settings = null
 
 var _selected := 0
 var _hovered := -1
-var _on_settings := false
 var _return_row := 0
 
 ## C2: whether the New game row's first confirm has been taken and is waiting on a second
-## one. Only ever true while `_selected == Row.NEW_GAME` and `not _on_settings`; every path
+## one. Only ever true while `_selected == Row.NEW_GAME` and Settings is not open; every path
 ## that leaves that state -- moving the cursor, opening Settings, Escape, a second confirm
 ## itself -- clears it.
 var _new_game_armed := false
@@ -104,7 +103,7 @@ func _ready() -> void:
 
 
 func row_count() -> int:
-	return SETTING_ROWS.size() if _on_settings else ROWS.size()
+	return ROWS.size()
 
 
 func selected_index() -> int:
@@ -112,7 +111,11 @@ func selected_index() -> int:
 
 
 func on_settings_page() -> bool:
-	return _on_settings
+	return _settings_menu != null and _settings_menu.is_open()
+
+
+func settings_menu() -> SettingsMenu:
+	return _settings_menu
 
 
 func hovered_index() -> int:
@@ -129,7 +132,6 @@ func can_continue() -> bool:
 func drawn_lines() -> Array[String]:
 	var out: Array[String] = [TITLE, SETTINGS_TITLE, NO_SAVE_NOTE, NEW_GAME_CONFIRM_TEXT]
 	out.append_array(ROWS)
-	out.append_array(SETTING_ROWS)
 	return out
 
 
@@ -157,45 +159,16 @@ func point_at_row(index: int) -> void:
 	_refresh()
 
 
-## I4, final-review.md I2: A CLICK ON A SETTINGS ROW ADJUSTS, IT DOES NOT LEAVE. Before this,
-## every click on this page ran confirm(), which is back() on _on_settings -- the only thing
-## a mouse-only player could do to a setting was leave the page she was trying to change one.
-## Left half of the row decrements, right half increments, the same split
-## game/ui/pause_menu.gd's own settings page now uses, so the two doors into one Settings
-## object agree on what a click means.
 func take_row(index: int) -> void:
 	point_at_row(index)
 	if _selected != index:
 		return
-	if _on_settings:
-		_click_adjust_row(index)
-		return
 	confirm()
 
 
-func _click_adjust_row(index: int) -> void:
-	var holder := _row_holder(index)
-	var direction := 1
-	if holder != null and holder.size.x > 0.0:
-		direction = -1 if holder.get_local_mouse_position().x < holder.size.x * 0.5 else 1
-	adjust(direction)
-
-
-func _row_holder(index: int) -> Control:
-	for child in _rows.get_children():
-		var control := child as Control
-		if control != null and MouseRowsScript.row_index(control) == index:
-			return control
-	return null
-
-
 func confirm() -> bool:
-	if _on_settings:
-		# Every settings row is adjusted with left and right, exactly as the pause menu's is;
-		# confirm on one is a page turn back, which is what a player pressing Enter on a
-		# slider means.
-		back()
-		return true
+	if on_settings_page():
+		return false
 	if _selected != Row.NEW_GAME:
 		_disarm_new_game()
 	match _selected:
@@ -221,11 +194,7 @@ func confirm() -> bool:
 			_enter_world()
 			return true
 		Row.SETTINGS:
-			MenuStyleScript.tick_page()
-			_return_row = _selected
-			_on_settings = true
-			_selected = 0
-			_refresh()
+			_open_settings()
 			return true
 		Row.QUIT:
 			MenuStyleScript.tick_back()
@@ -234,37 +203,29 @@ func confirm() -> bool:
 	return false
 
 
-func back() -> void:
-	if not _on_settings:
-		return
-	MenuStyleScript.tick_back()
-	_on_settings = false
+## The settings menu, over this screen. It edits `settings` and writes settings.cfg itself
+## on Apply; this screen only gets its cursor back when it closes.
+func _open_settings() -> void:
+	_disarm_new_game()
+	_return_row = _selected
+	if _settings_menu == null:
+		_settings_menu = SettingsMenuScene.instantiate()
+		add_child(_settings_menu)
+		_settings_menu.closed.connect(_on_settings_closed)
+	_settings_menu.open(settings)
+	_refresh()
+
+
+func _on_settings_closed() -> void:
 	_selected = _return_row
 	_hovered = -1
-	settings.save_to()
 	_refresh()
 
 
-## Left and right on a settings row, exactly as the pause menu does it, through the same
-## Settings object's own step methods so there is one place a volume step is decided.
-func adjust(direction: int) -> void:
-	_disarm_new_game()
-	if not _on_settings or settings == null:
-		return
-	match _selected:
-		SettingRow.VOLUME:
-			settings.step_volume(direction)
-		SettingRow.AMBIENT:
-			settings.step_ambient(direction)
-		SettingRow.EFFECTS:
-			settings.step_effects(direction)
-		SettingRow.SENSITIVITY:
-			settings.step_sensitivity(direction)
-		SettingRow.INVERT:
-			settings.toggle_invert()
-	settings.apply_audio()
-	MenuStyleScript.tick_move()
-	_refresh()
+## Leave Settings (Esc there asks first if anything is not applied).
+func back() -> void:
+	if on_settings_page():
+		_settings_menu.request_close()
 
 
 ## SCENE-TREE WIDE, AND GUARDED FOR EXACTLY THAT REASON. change_scene_to_file() replaces
@@ -278,24 +239,14 @@ func adjust(direction: int) -> void:
 func _enter_world() -> void:
 	if get_tree().current_scene != self:
 		return
+	# A person at the keyboard gets the loading screen (game/ui/loading_screen.gd): a threaded
+	# load and a moving bar instead of a title frozen for the whole boot. An automated boot
+	# changes scene exactly as it always has.
+	if is_interactive():
+		LoadingScreenScript.change_scene(get_tree(), WORLD_SCENE, LoadingScreenScript.Look.RANCH,
+			"A new ranch" if BootIntentScript.peek_new_game() else "Back to the ranch")
+		return
 	get_tree().change_scene_to_file(WORLD_SCENE)
-
-
-func _setting_value(index: int) -> String:
-	if settings == null:
-		return ""
-	match index:
-		SettingRow.VOLUME:
-			return "%d%%" % roundi(settings.master_volume * 100.0)
-		SettingRow.AMBIENT:
-			return "%d%%" % roundi(settings.ambient_volume * 100.0)
-		SettingRow.EFFECTS:
-			return "%d%%" % roundi(settings.effects_volume * 100.0)
-		SettingRow.SENSITIVITY:
-			return "%.4f" % settings.mouse_sensitivity
-		SettingRow.INVERT:
-			return "on" if settings.invert_look else "off"
-	return ""
 
 
 ## C2: CLEAR THE ARMED ROW. Called from every path that is "some other input" once New game
@@ -312,19 +263,18 @@ func _disarm_new_game() -> void:
 func _refresh() -> void:
 	if not is_node_ready():
 		return
-	_title.text = SETTINGS_TITLE if _on_settings else TITLE
+	_title.text = TITLE
 	MenuStyleScript.apply_title(_title)
-	if _new_game_armed and not _on_settings:
+	if _new_game_armed:
 		_footer.text = MenuStyleScript.NO_CARET + NEW_GAME_CONFIRM_TEXT
 	else:
-		_footer.text = MenuStyleScript.footer_rows("choose", "back") if _on_settings \
-			else MenuStyleScript.footer_rows("choose", "quit")
+		_footer.text = MenuStyleScript.footer_rows("choose", "quit")
 	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE,
 		MenuStyleScript.COLOR_DIM)
 	for child in _rows.get_children():
 		_rows.remove_child(child)
 		child.queue_free()
-	var names: Array[String] = SETTING_ROWS if _on_settings else ROWS
+	var names: Array[String] = ROWS
 	for i in names.size():
 		var picked: bool = i == _selected
 		var holder: PanelContainer = MouseRowsScript.row(i, picked, i == _hovered,
@@ -336,13 +286,12 @@ func _refresh() -> void:
 		label.text = MenuStyleScript.caret(picked) + names[i]
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		# A CONTINUE WITH NOTHING TO CONTINUE READS AS UNAVAILABLE rather than as broken.
-		var dimmed: bool = not _on_settings and i == Row.CONTINUE and not can_continue()
+		var dimmed: bool = i == Row.CONTINUE and not can_continue()
 		MenuStyleScript.style_label(label, MenuStyleScript.ROW_SIZE,
 			MenuStyleScript.COLOR_UNAFFORDABLE if dimmed \
 				else (MenuStyleScript.COLOR_VALUE if picked else MenuStyleScript.COLOR_NAME))
 		line.add_child(label)
-		var value: String = _setting_value(i) if _on_settings \
-			else (NO_SAVE_NOTE if dimmed else "")
+		var value: String = NO_SAVE_NOTE if dimmed else ""
 		if not value.is_empty():
 			var val := Label.new()
 			val.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -361,20 +310,16 @@ func _refresh() -> void:
 ## the OS repeat rate on a held key (M5, final-review.md) where no other menu in the project
 ## does.
 func _unhandled_input(event: InputEvent) -> void:
+	if on_settings_page():
+		return
 	if event.is_action_pressed(&"ui_up"):
 		move_selection(-1)
 	elif event.is_action_pressed(&"ui_down"):
 		move_selection(1)
-	elif event.is_action_pressed(&"ui_left"):
-		adjust(-1)
-	elif event.is_action_pressed(&"ui_right"):
-		adjust(1)
 	elif event.is_action_pressed(&"ui_accept"):
 		confirm()
 	elif event.is_action_pressed(&"ui_cancel"):
-		if _on_settings:
-			back()
-		elif _new_game_armed:
+		if _new_game_armed:
 			# C2: Escape while the row is armed cancels the confirmation rather than
 			# quitting the game out from under a player who only meant "not that".
 			_disarm_new_game()

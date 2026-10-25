@@ -30,6 +30,20 @@
 #                               hatch for a one shot too short for EBU gating to measure
 #                               honestly; a row using it is exempted from the LUFS check
 #                               but never from the true peak ceiling.
+#                 mgain=L       normalise a one shot's LOUDEST 400 ms (EBU momentary,
+#                               measured on the file padded with a second of silence) to L
+#                               LUFS; the report checks it (target=M<L>). The honest loudness
+#                               pass for short sounds, and what every row the audio audit of
+#                               2026-10-24 touched uses instead of a guessed gain_db.
+#                 highpass=F, lowpass=F   one pole filters at F Hz.
+#                 gate=T        a downward expander under T dBFS: the room between and after
+#                               a one shot's events sinks instead of riding up with its gain.
+#                 denoise=N     afftdn broadband noise reduction of N dB.
+#
+# NEVER LIFT A FIELD RECORDING TO FIND A QUIET EVENT IN IT. gain_db=+16 on a strike cut out
+# of a take lifts the take's room tone 16 dB too; that is how the old hoofsteps ended up
+# with a -31 dBFS noise floor. tools/audio_audit.py measures every file's floor and fails
+# anything over -60 dBFS for a one shot.
 #
 # LOUDNESS TARGETS: ambient beds -24 LUFS, world and casino SFX -18, UI -20. True peak
 # ceiling -1.5 dBTP everywhere, and a row over it FAILS the run.
@@ -105,7 +119,9 @@ ambient/bed_casino_room.ogg|https://sound-effects-media.bbcrewind.co.uk/wav/0704
 
 # gate_open: BBC 07037342, "Wooden Creak." 13.3s stereo 44.1k. One dry creak, no room, no
 # voices. Alternates: 07037352 "Wooden Door Creak." 8.4s; 07037341 "Wooden Creak." 6.1s.
-world/gate_open.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07037342.wav|rate=44100,mono,pick=1,fade=0.01:0.12,gain=-18
+# AUDIT 2026-10-24: broadband noise floor -32 dBFS (the creak take's room). Kenney RPG Audio creak1 (CC0).
+# was: world/gate_open.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07037342.wav|rate=44100,mono,pick=1,fade=0.01:0.12,gain=-18
+world/gate_open.wav|https://kenney.nl/media/pages/assets/rpg-audio/8e99002d76-1677590336/kenney_rpg-audio.zip#Audio/creak1.ogg|rate=44100,mono,fade=0.005:0.15,mgain=-20
 
 # mail_arrive: BBC 07011078, "Several newspapers pushed through letterbox." 17.0s; the one
 # letterbox recording in the archive. pick=2 landed on a near silent gap between strikes
@@ -116,7 +132,9 @@ world/gate_open.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07037342.wav
 #
 # R1: down 5 dB. mail_open cannot come up past the true peak ceiling, so the 15 LU gap
 # between the two is closed from this end. They are the same event a second apart.
-world/mail_arrive.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07011078.wav|rate=44100,mono,pick=9,fade=0.01:0.15,gain_db=7
+# AUDIT 2026-10-24: floor -40 dBFS: the BBC take was cut at a threshold under its own room tone and lifted 7 dB. Kenney RPG Audio metalClick (CC0), a latch clack.
+# was: world/mail_arrive.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07011078.wav|rate=44100,mono,pick=9,fade=0.01:0.15,gain_db=7
+world/mail_arrive.wav|https://kenney.nl/media/pages/assets/rpg-audio/8e99002d76-1677590336/kenney_rpg-audio.zip#Audio/metalClick.ogg|rate=44100,mono,gate=-55,fade=0.002:0.08,mgain=-24
 
 # mail_open: BBC 07045125, "Sanding, paper folded then sheet of plywood." 92.0s; the fold
 # is an isolated event inside it. The sanding pass never dips below -40dB so pick=2@-40:0.20
@@ -134,7 +152,9 @@ world/mail_arrive.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07011078.w
 # well over the -1.5 dBTP ceiling, so 4 is the last step this near 0dBFS attack has. If
 # the report FAILs on true peak at 4, put it back to 3 and take the balance out of
 # mail_arrive instead, which is 15 LU above it and is the reason this one reads as quiet.
-world/mail_open.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07045125.wav|rate=44100,mono,pick=4@-20:0.15,fade=0.01:0.18,gain_db=4
+# AUDIT 2026-10-24: floor -39 dBFS (the sanding take's own bed under the fold). Kenney RPG Audio bookFlip1 (CC0), a paper turn.
+# was: world/mail_open.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07045125.wav|rate=44100,mono,pick=4@-20:0.15,fade=0.01:0.18,gain_db=4
+world/mail_open.wav|https://kenney.nl/media/pages/assets/rpg-audio/8e99002d76-1677590336/kenney_rpg-audio.zip#Audio/bookFlip1.ogg|rate=44100,mono,fade=0.005:0.15,mgain=-24
 
 # mail_stamp: the primary (BBC 07040153, "Mail Sorting Office, letter stamping machine
 # operating." 55.7s) is one continuous run with no gap the detector can find at any noise
@@ -143,7 +163,9 @@ world/mail_open.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07045125.wav
 # short for EBU gating (gain= measured it as silence and computed a runaway gain that
 # clipped), so this row uses gain_db instead. Alternate: 07013132 "Gibson ticket machine,
 # setting machine" 16.0s.
-world/mail_stamp.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07013135.wav|rate=44100,mono,pick=11@-40:0.08,fade=0.005:0.10,gain_db=-6
+# AUDIT 2026-10-24: floor -58 dBFS (the ticket machine take lifted from a -40 dB window). Kenney Impact Sounds impactGeneric_light_000 (CC0), a dry thunk.
+# was: world/mail_stamp.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07013135.wav|rate=44100,mono,pick=11@-40:0.08,fade=0.005:0.10,gain_db=-6
+world/mail_stamp.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/impactGeneric_light_000.ogg|rate=44100,mono,fade=0.002:0.06,mgain=-26
 
 # capture_charge: BBC 07043314, "Generator hum. (Futuristic Spot Effect.)" 98.6s. speed=1.35
 # lifts it a fifth and shortens it, which is what turns an industrial hum into something
@@ -168,53 +190,73 @@ world/capture_success.wav|https://kenney.nl/media/pages/assets/interface-sounds/
 # cartoon characters and a real mare's neigh over one of them breaks the register. Hooves
 # stay, because a hoof on turf is physical sound rather than a voice.
 
-# hoofsteps_grass_1..4: BBC 07024157 "Horse On Turf: Walking, Approach and stop." 18.1s and
-# 07024158 "Horse On Turf: Walking, Depart." 12.9s. Two takes of the same horse on the same
-# turf, so four strikes taken across them sit together. -38dB never dips (the approach's own
-# room tone sits above it, so the detector reported one 16s blob); walked up to -25dB, where
-# the quieter individual footfalls separate cleanly. Every strike is under 0.4s, too short
-# for EBU gating to measure honestly, so these use gain_db rather than gain=, the same
-# escape hatch delivery_thud and neigh_real use. Alternate: 07039304 "Troop of horses
-# galloping on turf" 149.8s.
+# HOOFSTEPS, PER SURFACE (audit 2026-10-24, the owner's "the running sound is noisy and bad").
 #
-# R1, 2026-09-04, owner's ear pass: "terrible footsteps". The tail went from 0.09 to
-# 0.14 s, which is what turns a click into a hoof on turf. A brief that asked for the
-# full 14 dB cut (20/21/13/13 to 6/7/-1/-1) was tried first and reverted: at that level
-# every strike measures TP -22 to -25 dBTP, well under test_sound_library.gd's own
-# GAIN_DB_TRUE_PEAK_FLOOR (-16.0, a deliberate hard backstop against a gain_db row
-# landing far under its neighbours, not a taste knob to move for one row). The relative
-# balance between the four is kept exactly; the uniform cut that clears the floor with a
-# safety margin (measured TP -12.7 to -14.9) is 4 dB, not 14: 16/17/9/9. The sources did
-# not move: 07024157 and 07024158 are the two softest turf walks in the archive, and this
-# row's own alternate, 07039304, is a troop of horses galloping, which is not a walk and
-# is not softer.
-world/hoofsteps_grass_1.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07024157.wav|rate=44100,mono,pick=4@-25:0.08,fade=0.003:0.14,gain_db=16
-world/hoofsteps_grass_2.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07024157.wav|rate=44100,mono,pick=13@-25:0.08,fade=0.003:0.14,gain_db=17
-world/hoofsteps_grass_3.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07024158.wav|rate=44100,mono,pick=4@-25:0.08,fade=0.003:0.14,gain_db=9
-world/hoofsteps_grass_4.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07024158.wav|rate=44100,mono,pick=7@-25:0.08,fade=0.003:0.14,gain_db=9
-
-# hoofsteps_hard_1..4: BBC 07039310, "Horse walking on cobblestones." 60.7s of one horse
-# walking evenly. -38dB never dipped either (background traffic sits above it, one 60s
-# blob); walked up to -30dB, where individual cobble strikes separate. Same gain_db escape
-# hatch as the grass set, for the same reason: every strike is under 0.4s. Alternates:
-# 07024164 "Horse On Hard Road: Walking, Depart." 23.0s; 07039298 "Horse walking on road."
-# 62.5s.
-world/hoofsteps_hard_1.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07039310.wav|rate=44100,mono,pick=3@-30:0.05,fade=0.003:0.08,gain_db=-8
-world/hoofsteps_hard_2.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07039310.wav|rate=44100,mono,pick=9@-30:0.05,fade=0.003:0.08,gain_db=13
-world/hoofsteps_hard_3.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07039310.wav|rate=44100,mono,pick=15@-30:0.05,fade=0.003:0.08,gain_db=6
-world/hoofsteps_hard_4.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07039310.wav|rate=44100,mono,pick=23@-30:0.05,fade=0.003:0.08,gain_db=-3
+# THE OLD ROWS, AND WHY THEY WENT. hoofsteps_grass_1..4 (BBC 07024157/07024158, gain_db
+# +9 to +17) and hoofsteps_hard_1..4 (BBC 07039310, gain_db -8 to +13) were cut with pick=
+# at a -25/-30 dB silence threshold that sat UNDER the takes' own room tone, wind and
+# traffic, so several "strikes" were windows of background noise with no hoof in them at
+# all (hoofsteps_grass_4: 0.35 s of flat -24 dB envelope, peak only 14 dB over its own
+# median), then lifted up to 17 dB, noise and all. tools/audio_audit.py measures their
+# broadband noise floor at -35 to -39 dBFS (grass) and -31 to -49 (hard), against -60 for
+# a clean one shot. Every run cycle played one of them.
+#
+# THE NEW ROWS: Kenney Impact Sounds (CC0, kenney.nl), studio recorded and clean
+# (the concrete takes carry a little room, so they are gated). Five surfaces, four takes each, levelled on their loudest
+# 400 ms (mgain=) so a surface change is a change of character and not of level: grass and
+# dirt sit a touch under the hard surfaces, because a hoof on turf IS quieter than one on
+# boards. trim= keeps the grass, wood and metal strikes short (at the run four land every
+# 0.35 s); the dirt and stone takes are already short and keep their own natural decay,
+# which is also what lets the audit see a clean floor after them. mgain= stops at -3 dBTP
+# rather than limit, so the sharpest taps (stone) sit a few LU under their target and
+# Sound.LIBRARY lifts hoof_stone 3 dB in the mix instead.
+#   grass  footstep_grass_000..002,004   a soft thud in turf, the rustle cut short
+#   dirt   footstep_snow_000..002,004    a crunchy pack, low passed and slowed a touch so
+#                                        it reads as packed earth rather than snow
+#   wood   impactWood_light_000,002..004 a knock on boards (building floors and ramps, crates)
+#   stone  footstep_concrete_000..003    a hard clack (paving, foundations, the Strip),
+#                                        gated: the raw takes carry a little room
+#   metal  impactMetal_light_000..002,004 a ringing plate (the Factory's metal floors),
+#                                        the ring faded early
+# Alternates: footstep_carpet_000..004 (a duller dirt); impactPlank_medium_000..004
+# (heavier boards); impactGeneric_light_000..004 (stone); impactPlate_light_000..004
+# (metal, more clang).
+world/hoof_grass_1.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_grass_000.ogg|rate=44100,mono,trim=0-0.30,fade=0.002:0.14,mgain=-28
+world/hoof_grass_2.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_grass_001.ogg|rate=44100,mono,trim=0-0.30,fade=0.002:0.14,mgain=-28
+world/hoof_grass_3.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_grass_002.ogg|rate=44100,mono,trim=0-0.30,fade=0.002:0.14,mgain=-28
+world/hoof_grass_4.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_grass_004.ogg|rate=44100,mono,trim=0-0.30,fade=0.002:0.14,mgain=-28
+world/hoof_dirt_1.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_snow_000.ogg|rate=44100,mono,speed=0.92,lowpass=3200,fade=0.002:0.05,mgain=-27
+world/hoof_dirt_2.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_snow_001.ogg|rate=44100,mono,speed=0.92,lowpass=3200,fade=0.002:0.05,mgain=-27
+world/hoof_dirt_3.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_snow_002.ogg|rate=44100,mono,speed=0.92,lowpass=3200,fade=0.002:0.05,mgain=-27
+world/hoof_dirt_4.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_snow_004.ogg|rate=44100,mono,speed=0.92,lowpass=3200,fade=0.002:0.05,mgain=-27
+world/hoof_wood_1.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/impactWood_light_000.ogg|rate=44100,mono,trim=0-0.24,fade=0.002:0.10,mgain=-25
+world/hoof_wood_2.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/impactWood_light_002.ogg|rate=44100,mono,trim=0-0.24,fade=0.002:0.10,mgain=-25
+world/hoof_wood_3.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/impactWood_light_003.ogg|rate=44100,mono,trim=0-0.24,fade=0.002:0.10,mgain=-25
+world/hoof_wood_4.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/impactWood_light_004.ogg|rate=44100,mono,trim=0-0.24,fade=0.002:0.10,mgain=-25
+world/hoof_stone_1.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_concrete_000.ogg|rate=44100,mono,gate=-40,fade=0.002:0.05,mgain=-25
+world/hoof_stone_2.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_concrete_001.ogg|rate=44100,mono,gate=-40,fade=0.002:0.05,mgain=-25
+world/hoof_stone_3.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_concrete_002.ogg|rate=44100,mono,gate=-40,fade=0.002:0.05,mgain=-25
+world/hoof_stone_4.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_concrete_003.ogg|rate=44100,mono,gate=-40,fade=0.002:0.05,mgain=-25
+world/hoof_metal_1.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/impactMetal_light_000.ogg|rate=44100,mono,trim=0-0.30,fade=0.002:0.18,mgain=-26
+world/hoof_metal_2.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/impactMetal_light_001.ogg|rate=44100,mono,trim=0-0.30,fade=0.002:0.18,mgain=-26
+world/hoof_metal_3.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/impactMetal_light_002.ogg|rate=44100,mono,trim=0-0.30,fade=0.002:0.18,mgain=-26
+world/hoof_metal_4.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/impactMetal_light_004.ogg|rate=44100,mono,trim=0-0.30,fade=0.002:0.18,mgain=-26
 
 # delivery_thud: BBC 07004235, "Bucket dropped 3 times." 31.9s; take the first drop. A
 # transient impact this sharp reads as too quiet for gain= to normalise well (the LUFS
 # gain it computed left the true peak over the ceiling), so this row uses a flat gain_db
 # instead, the same escape hatch neigh_real uses. Alternates: 07002071 "Emptying hod of
 # coal into grate" 12.8s; 07045094 "Tool box closed" 9.3s.
-world/delivery_thud.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07004235.wav|rate=44100,mono,pick=1,fade=0.003:0.20,gain_db=-8
+# AUDIT 2026-10-24: floor -39 dBFS (the bucket take's room). Kenney Impact Sounds impactSoft_heavy_003 (CC0), a crate set down.
+# was: world/delivery_thud.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07004235.wav|rate=44100,mono,pick=1,fade=0.003:0.20,gain_db=-8
+world/delivery_thud.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/impactSoft_heavy_003.ogg|rate=44100,mono,fade=0.003:0.15,mgain=-22
 
 # coins_grant: BBC 07005178, "Cash register, bell, change given and coins put in drawer,
 # closed." 9.7s; the coins are the second event, after the bell. Alternates: 07074208
 # (16.3s, manual register); 07005180 (16.4s, the same setup twice through).
-world/coins_grant.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07005178.wav|rate=44100,mono,pick=2,fade=0.005:0.15,gain=-18
+# AUDIT 2026-10-24: floor -26 dBFS: the register take's shop room under the coins. Kenney Casino Audio chips-handle-1 (CC0), a handful of coin chips.
+# was: world/coins_grant.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07005178.wav|rate=44100,mono,pick=2,fade=0.005:0.15,gain=-18
+world/coins_grant.wav|https://kenney.nl/media/pages/assets/casino-audio/2472606a04-1721639069/kenney_casino-audio.zip#Audio/chips-handle-1.ogg|rate=44100,mono,fade=0.005:0.12,mgain=-18
 
 # THE ONE SANCTIONED NEIGH. A rare gag on capture: the pastel pony emits one fully
 # realistic mare neigh instead of the chime, and the game does not comment. Owner
@@ -223,7 +265,9 @@ world/coins_grant.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07005178.w
 # the alternate, NHU05078167 "Threatening neigh" 18.0s, whose one strong call plus its own
 # decaying tail trims cleanly to a 2.05s neigh. Alternate: NHU05083084 (mare answered by
 # foal).
-world/neigh_real.wav|https://sound-effects-media.bbcrewind.co.uk/wav/NHU05078167.wav|rate=44100,mono,trim=1.85-3.90,fade=0.01:0.20,gain_db=-4
+# AUDIT 2026-10-24: the one sanctioned neigh stays (owner directive), but it was the loudest one shot in the game (max momentary -11.6 LUFS) over a -55 floor: levelled to -17 and gated.
+# was: world/neigh_real.wav|https://sound-effects-media.bbcrewind.co.uk/wav/NHU05078167.wav|rate=44100,mono,trim=1.85-3.90,fade=0.01:0.20,gain_db=-4
+world/neigh_real.wav|https://sound-effects-media.bbcrewind.co.uk/wav/NHU05078167.wav|rate=44100,mono,trim=1.85-3.90,gate=-45,fade=0.01:0.20,mgain=-17
 
 # --- casino -----------------------------------------------------------------------------
 #
@@ -263,7 +307,9 @@ casino/card_flip.wav|https://kenney.nl/media/pages/assets/casino-audio/2472606a0
 # report reads TP=+0.3, over the -1.5 dBTP ceiling; stepping to 39 landed on another
 # sub-0.001s sliver. Three tries, no candidate that both lands in 0.03-0.5s and PASSes
 # the report, so this row keeps its original floor and index.
-casino/reel_tick.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07032188.wav|rate=44100,mono,pick=17@-36:0.04,fade=0.002:0.04,gain_db=24
+# AUDIT 2026-10-24: floor -35 dBFS: a 0.2 s window of the fruit machine take lifted 24 dB, its motor and room with it. Kenney Interface Sounds click_001 (CC0).
+# was: casino/reel_tick.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07032188.wav|rate=44100,mono,pick=17@-36:0.04,fade=0.002:0.04,gain_db=24
+casino/reel_tick.wav|https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip#Audio/click_001.ogg|rate=44100,mono,fade=0.001:0.03,mgain=-26
 
 # reel_stop: the same machine, a later and heavier landing, so tick and stop belong to one
 # object. Alternates: Kenney Interface drop_003.ogg; switch_003.ogg.
@@ -276,7 +322,9 @@ casino/reel_tick.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07032188.wa
 # long to be one strike; stepping to 243 landed on a sub-0.001s sliver. Three tries, no
 # candidate that both lands in 0.03-0.5s and PASSes the report, so this row keeps its
 # original floor and index.
-casino/reel_stop.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07032188.wav|rate=44100,mono,pick=112@-36:0.04,fade=0.002:0.10,gain_db=17
+# AUDIT 2026-10-24: floor -36 dBFS, the same take lifted 17 dB. Kenney Impact Sounds impactGeneric_light_002 (CC0).
+# was: casino/reel_stop.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07032188.wav|rate=44100,mono,pick=112@-36:0.04,fade=0.002:0.10,gain_db=17
+casino/reel_stop.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/impactGeneric_light_002.ogg|rate=44100,mono,fade=0.002:0.08,mgain=-21
 
 # slots_win: Kenney Interface Sounds, confirmation_002. ONE stinger; the spec is explicit
 # that this is not an escalating fanfare. Alternates: confirmation_004.ogg; bong_001.ogg.
@@ -292,7 +340,9 @@ casino/slots_win.wav|https://kenney.nl/media/pages/assets/interface-sounds/fa43c
 # R1: pick floor from -36 to -30. At -36 the detector was cutting on room tone, so the
 # indices were deep into a list of near silent fragments; at -30 it cuts on real gaps
 # between strikes. The index below was re-derived after the change, not carried over.
-casino/wheel_ratchet.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07021009.wav|rate=44100,mono,pick=123@-30:0.03,fade=0.002:0.03,gain_db=27
+# AUDIT 2026-10-24: a 30 ms window of the roulette take lifted 27 dB (too short to have a floor, but every one of its siblings is noise). Kenney Interface Sounds click_003 (CC0).
+# was: casino/wheel_ratchet.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07021009.wav|rate=44100,mono,pick=123@-30:0.03,fade=0.002:0.03,gain_db=27
+casino/wheel_ratchet.wav|https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip#Audio/click_003.ogg|rate=44100,mono,fade=0.001:0.005,mgain=-27
 
 # wheel_settle: the settle at the end of a spin on the same wheel; the last audible activity
 # in the take before it runs out into room tone. Walked pick= to trim=79.85-81.10: the pick
@@ -300,7 +350,9 @@ casino/wheel_ratchet.wav|https://sound-effects-media.bbcrewind.co.uk/wav/0702100
 # own last several bounces, so this uses the same measured window approach neigh_real does.
 # gain_db for the same true peak reason as the ticks. Alternates: Kenney Interface
 # switch_004.ogg; BBC 07051026.
-casino/wheel_settle.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07021009.wav|rate=44100,mono,trim=79.85-81.10,fade=0.01:0.15,gain_db=27
+# AUDIT 2026-10-24: floor -21 dBFS: the roulette take lifted 27 dB. Kenney Casino Audio die-throw-1 (CC0), a ball rattling to rest.
+# was: casino/wheel_settle.wav|https://sound-effects-media.bbcrewind.co.uk/wav/07021009.wav|rate=44100,mono,trim=79.85-81.10,fade=0.01:0.15,gain_db=27
+casino/wheel_settle.wav|https://kenney.nl/media/pages/assets/casino-audio/2472606a04-1721639069/kenney_casino-audio.zip#Audio/die-throw-1.ogg|rate=44100,mono,fade=0.005:0.15,mgain=-20
 
 # race_crowd_loop: BBC 07035148, "Italian crowd, exterior, murmuring crowd." 194.0s. A
 # murmur, not a roar; the roar is race_cheer's job. Alternates: 00008065 "Large restless
@@ -335,14 +387,20 @@ ui/ui_move.wav|https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-
 ui/ui_confirm.wav|https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip#Audio/select_003.ogg|rate=44100,mono,fade=0.002:0.03,gain_db=-2
 
 # ui_back: Kenney Interface Sounds, back_002. Alternates: back_001.ogg; close_001.ogg.
-ui/ui_back.wav|https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip#Audio/back_002.ogg|rate=44100,mono,fade=0.002:0.03,gain_db=-2
+# AUDIT 2026-10-24: back_002 measures a -59 dBFS floor, a buzz at the edge of the rule. minimize_007, the same pack's clean falling blip.
+# was: ui/ui_back.wav|https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip#Audio/back_002.ogg|rate=44100,mono,fade=0.002:0.03,gain_db=-2
+ui/ui_back.wav|https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip#Audio/minimize_007.ogg|rate=44100,mono,fade=0.002:0.04,mgain=-30
 
 # ui_open: Kenney Interface Sounds, open_004. Alternates: open_002.ogg; maximize_006.ogg.
-ui/ui_open.wav|https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip#Audio/open_004.ogg|rate=44100,mono,fade=0.002:0.04,gain_db=-2
+# AUDIT 2026-10-24: open_004 floor -52 dBFS. maximize_007, ui_back's rising twin.
+# was: ui/ui_open.wav|https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip#Audio/open_004.ogg|rate=44100,mono,fade=0.002:0.04,gain_db=-2
+ui/ui_open.wav|https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip#Audio/maximize_007.ogg|rate=44100,mono,fade=0.002:0.04,mgain=-25
 
 # ui_denied: Kenney Interface Sounds, error_004. The shortest and least shrill of the eight
 # errors in the pack. Alternates: error_002.ogg; glitch_002.ogg.
-ui/ui_denied.wav|https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip#Audio/error_004.ogg|rate=44100,mono,fade=0.002:0.04,gain_db=-4
+# AUDIT 2026-10-24: error_004 is a noise burst (floor -45 dBFS). error_006, a clean two note no.
+# was: ui/ui_denied.wav|https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip#Audio/error_004.ogg|rate=44100,mono,fade=0.002:0.04,gain_db=-4
+ui/ui_denied.wav|https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip#Audio/error_006.ogg|rate=44100,mono,fade=0.002:0.10,mgain=-25
 
 # ui_page: Kenney Interface Sounds, scratch_003. The paper turn that ties into the
 # stationery look the Mail page already has. Alternates: scratch_001.ogg; BBC 07045125,

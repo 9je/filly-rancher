@@ -51,15 +51,14 @@ const PaintScript := preload("res://ui/casino_paint.gd")
 const StoryBeatScript := preload("res://systems/story_beat.gd")
 const StoryWordingScript := preload("res://systems/story_wording.gd")
 const MouseRowsScript := preload("res://ui/mouse_rows.gd")
+const SettingsMenuScene := preload("res://ui/settings_menu.tscn")
 
+## Page.SETTINGS IS NOT DRAWN HERE ANY MORE. It opens game/ui/settings_menu.tscn, the one
+## tabbed Settings menu the title screen opens too, over this panel (the playtest note
+## "Settings UI is awful and hard to navigate", docs/playtest_fixes/settings.md). The value
+## stays in the enum so every other page keeps its number.
 enum Page { MAIN, SETTINGS, COMPENDIUM, REQUESTS, MAIL, LEDGER }
 enum Row { RESUME, COMPENDIUM, REQUESTS, MAIL, LEDGER, SAVE, LOAD, SETTINGS, QUIT }
-## v1: one row per bus, the picture, and the keys. KEYS is the first key row; there is one
-## per Settings.REBINDABLE action after it.
-enum SettingRow { VOLUME, MUSIC, AMBIENT, EFFECTS, MENUS, VOICE, SENSITIVITY, INVERT, QUALITY,
-	FULLSCREEN, VSYNC, KEYS }
-## How many settings rows show at once; the page scrolls under the cursor.
-const SETTINGS_WINDOW := 12
 
 ## THE ROWS, IN THE ENUM'S OWN ORDER, and the words on them.
 ##
@@ -267,9 +266,6 @@ func open() -> bool:
 	_letter_id = &""
 	_anim_t = 0.0
 	_hovered = -1
-	# A key capture never outlives the page it was asked on: a stale one would rebind
-	# whatever key the player pressed next, on any page.
-	_capturing = &""
 	set_process(true)
 	_open = true
 	visible = true
@@ -299,11 +295,13 @@ func open_page(page: int) -> bool:
 	var was_open: bool = _open
 	if not _open and not open():
 		return false
+	if page == Page.SETTINGS:
+		_open_settings()
+		return true
 	_page = page
 	_selected = 0
 	_scroll = 0
 	_letter_id = &""
-	_capturing = &""
 	# M11, final-review.md M3: open() already clears this; a page switch that skipped it left
 	# whichever roster row the pointer was resting on when Compendium was chosen drawn
 	# hovered on the page that opened, under a pointer nowhere near it.
@@ -319,7 +317,8 @@ func close() -> void:
 		return
 	_open = false
 	_hovered = -1
-	_capturing = &""
+	if settings_menu_open():
+		_settings_menu.discard_and_close()
 	visible = false
 	set_process(false)
 	closed.emit()
@@ -347,8 +346,6 @@ func _process(delta: float) -> void:
 
 func _row_count() -> int:
 	match _page:
-		Page.SETTINGS:
-			return settings_row_count()
 		Page.COMPENDIUM:
 			# compendium_rows(), not roster(): a page that cannot draw shows one line of
 			# EMPTY_TEXT, and the cursor has to have exactly that one row to sit on. The two
@@ -375,54 +372,6 @@ func move_selection(step: int) -> void:
 	_sync_scroll()
 	_refresh()
 	MenuStyleScript.tick_move()
-
-
-## Left or right on a settings row. Nothing on any other page: the compendium and the
-## request board have no adjustable anything, and this is the one place that decides so.
-## TICKS ONLY WHEN SOMETHING ACTUALLY MOVED: a slider already at its floor or ceiling is a
-## refused adjustment, not a move, so it stays silent rather than lying with tick_move().
-func adjust(direction: int) -> void:
-	if _page != Page.SETTINGS or settings == null:
-		return
-	var moved: bool = false
-	match _selected:
-		SettingRow.VOLUME:
-			var before: float = settings.master_volume
-			settings.step_volume(direction)
-			moved = not is_equal_approx(settings.master_volume, before)
-		SettingRow.MUSIC:
-			moved = settings.step_level(&"music_volume", direction)
-		SettingRow.MENUS:
-			moved = settings.step_level(&"ui_volume", direction)
-		SettingRow.VOICE:
-			moved = settings.step_level(&"voice_volume", direction)
-		SettingRow.QUALITY:
-			moved = settings.step_quality(direction)
-		SettingRow.FULLSCREEN:
-			settings.toggle_fullscreen()
-			moved = true
-		SettingRow.VSYNC:
-			settings.toggle_vsync()
-			moved = true
-		SettingRow.AMBIENT:
-			var before: float = settings.ambient_volume
-			settings.step_ambient(direction)
-			moved = not is_equal_approx(settings.ambient_volume, before)
-		SettingRow.EFFECTS:
-			var before: float = settings.effects_volume
-			settings.step_effects(direction)
-			moved = not is_equal_approx(settings.effects_volume, before)
-		SettingRow.SENSITIVITY:
-			var before: float = settings.mouse_sensitivity
-			settings.step_sensitivity(direction)
-			moved = not is_equal_approx(settings.mouse_sensitivity, before)
-		SettingRow.INVERT:
-			settings.toggle_invert()
-			moved = true
-	if moved:
-		MenuStyleScript.tick_move()
-	settings_changed.emit()
-	_refresh()
 
 
 func confirm() -> bool:
@@ -455,26 +404,6 @@ func confirm() -> bool:
 		# "ANSWERED" stamp) until some unrelated interaction happened to refresh the page.
 		_refresh()
 		return true
-	if _page == Page.SETTINGS:
-		if _selected >= SettingRow.KEYS:
-			_capturing = SettingsScript.REBINDABLE[_selected - SettingRow.KEYS]
-			_refresh()
-			MenuStyleScript.tick_confirm()
-			return true
-		if _selected == SettingRow.FULLSCREEN or _selected == SettingRow.VSYNC:
-			adjust(1)
-			return true
-		if _selected == SettingRow.INVERT:
-			# Toggle directly rather than through adjust(): adjust() already ticks its own
-			# tick_move() on a real change, and confirm ticking too made one keypress fire
-			# two sounds. A confirm on this row gets exactly the one tick_confirm() below.
-			settings.toggle_invert()
-			settings_changed.emit()
-			_refresh()
-			MenuStyleScript.tick_confirm()
-			return true
-		MenuStyleScript.tick_denied()
-		return false
 	if _page == Page.COMPENDIUM or _page == Page.REQUESTS or _page == Page.LEDGER:
 		# Read only pages; see the class comment.
 		MenuStyleScript.tick_denied()
@@ -510,10 +439,7 @@ func confirm() -> bool:
 			load_requested.emit()
 			return true
 		Row.SETTINGS:
-			_page = Page.SETTINGS
-			_selected = 0
-			_refresh()
-			MenuStyleScript.tick_page()
+			_open_settings()
 		Row.QUIT:
 			quit_requested.emit()
 			MenuStyleScript.tick_confirm()
@@ -525,8 +451,6 @@ func confirm() -> bool:
 func back() -> void:
 	MenuStyleScript.tick_back()
 	match _page:
-		Page.SETTINGS:
-			_return_to_main(Row.SETTINGS)
 		Page.COMPENDIUM:
 			_return_to_main(Row.COMPENDIUM)
 		Page.REQUESTS:
@@ -543,7 +467,6 @@ func back() -> void:
 
 
 func _return_to_main(row: int) -> void:
-	_capturing = &""
 	_page = Page.MAIN
 	_selected = row
 	_scroll = 0
@@ -551,40 +474,45 @@ func _return_to_main(row: int) -> void:
 	_refresh()
 
 
-## The action waiting for its new key (the settings page's key rows), or &"".
-var _capturing: StringName = &""
+# --- settings: the shared menu ---------------------------------------------------------------
+
+var _settings_menu: SettingsMenu = null
 
 
-func settings_row_count() -> int:
-	return SettingRow.KEYS + SettingsScript.REBINDABLE.size()
+func settings_menu_open() -> bool:
+	return _settings_menu != null and _settings_menu.is_open()
 
 
-func is_capturing() -> bool:
-	return _capturing != &""
+func settings_menu() -> SettingsMenu:
+	return _settings_menu
 
 
-## The key-capture step: the next key pressed becomes the action's key. Escape cancels;
-## Backspace puts the default back.
-func capture_key(event: InputEventKey) -> bool:
-	if _capturing == &"" or not event.pressed or event.echo:
-		return false
-	if event.physical_keycode == KEY_BACKSPACE or event.keycode == KEY_BACKSPACE:
-		# Backspace puts the action back on its own key.
-		settings.unbind(_capturing)
-		settings_changed.emit()
-	elif event.physical_keycode != KEY_ESCAPE and event.keycode != KEY_ESCAPE:
-		var code := int(event.physical_keycode) if event.physical_keycode != 0 else int(event.keycode)
-		settings.bind(_capturing, code)
-		settings_changed.emit()
-	_capturing = &""
+## The tabbed Settings menu over this panel. It edits `settings` and writes settings.cfg on
+## Apply; `settings_changed` tells ranch.gd to push them into the camera and the HUD.
+func _open_settings() -> void:
+	if settings == null:
+		settings = SettingsScript.new()
+	if _settings_menu == null:
+		_settings_menu = SettingsMenuScene.instantiate()
+		add_child(_settings_menu)
+		_settings_menu.applied.connect(func() -> void: settings_changed.emit())
+		_settings_menu.closed.connect(_settings_menu_closed)
+	_page = Page.MAIN
+	_selected = Row.SETTINGS
+	$Centre.visible = false
+	_settings_menu.open(settings)
+
+
+func _settings_menu_closed() -> void:
+	$Centre.visible = true
+	_page = Page.MAIN
+	_selected = Row.SETTINGS
+	_hovered = -1
 	_refresh()
-	return true
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _open and _capturing != &"" and event is InputEventKey:
-		if capture_key(event as InputEventKey):
-			get_viewport().set_input_as_handled()
+	if settings_menu_open():
 		return
 	if not _open:
 		if event.is_action_pressed(&"pause"):
@@ -599,12 +527,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed(&"ui_up"):
 		move_selection(-1)
-		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed(&"ui_left"):
-		adjust(-1)
-		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed(&"ui_right"):
-		adjust(1)
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed(&"ui_accept"):
 		confirm()
@@ -978,8 +900,6 @@ func _refresh() -> void:
 		if _page != Page.MAIL:
 			_stage.custom_minimum_size = Vector2.ZERO
 	match _page:
-		Page.SETTINGS:
-			_draw_settings()
 		Page.COMPENDIUM:
 			_draw_compendium()
 		Page.REQUESTS:
@@ -1006,45 +926,6 @@ func _draw_main() -> void:
 	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
 	for i in range(MAIN_ROWS.size()):
 		_add_row(i, MAIN_ROWS[i], "")
-
-
-func _draw_settings() -> void:
-	_title.text = "SETTINGS"
-	_footer.text = MenuStyleScript.footer([[&"menu_rows", "choose"],
-		[&"menu_tabs", "adjust"], [&"ui_cancel", "back"]])
-	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
-	var rows := settings_rows()
-	var n := rows.size()
-	var start := clampi(_selected - SETTINGS_WINDOW / 2, 0, maxi(0, n - SETTINGS_WINDOW))
-	for i in range(start, mini(n, start + SETTINGS_WINDOW)):
-		_add_row(i, str(rows[i][0]), str(rows[i][1]), MenuStyleScript.COLOR_NAME,
-			MenuStyleScript.COLOR_VALUE, true)
-
-
-static func _pct(v: float) -> String:
-	return "%d%%" % int(round(v * 100.0))
-
-
-## [name, value] per settings row, in SettingRow order then one per rebindable action.
-func settings_rows() -> Array:
-	var out: Array = [
-		["Master volume", _pct(settings.master_volume)],
-		["Music", _pct(settings.music_volume)],
-		["Ambience", _pct(settings.ambient_volume)],
-		["Effects", _pct(settings.effects_volume)],
-		["Menus", _pct(settings.ui_volume)],
-		["Voices", _pct(settings.voice_volume)],
-		["Mouse sensitivity", "%.1f" % (settings.mouse_sensitivity * 1000.0)],
-		["Invert look", "On" if settings.invert_look else "Off"],
-		["Picture quality", SettingsScript.QUALITY_NAMES[settings.quality]],
-		["Fullscreen", "On" if settings.fullscreen else "Off"],
-		["Vsync", "On" if settings.vsync else "Off"],
-	]
-	for action in SettingsScript.REBINDABLE:
-		var value := "press a key (Backspace: default)" if _capturing == action else \
-			SettingsScript.key_label(SettingsScript.key_of(action, settings.bindings))
-		out.append([str(SettingsScript.ACTION_NAMES.get(action, String(action))), value])
-	return out
 
 
 func _draw_compendium() -> void:
@@ -1286,36 +1167,11 @@ func point_at_row(index: int) -> void:
 	_refresh()
 
 
-## I4, final-review.md I2: A CLICK ON A SETTINGS ROW ADJUSTS IT. confirm() on Page.SETTINGS
-## refuses every row but INVERT (":428-431" in the review's own line numbers, before this
-## fix), so a mouse-only player could select "Master volume" and then do nothing to it. Left
-## half of the row decrements, right half increments -- the same split
-## game/ui/title_screen.gd's own settings page now uses, so the two doors into one Settings
-## object agree on what a click means.
 func take_row(index: int) -> void:
 	point_at_row(index)
 	if _selected != index:
 		return
-	if _page == Page.SETTINGS:
-		_click_adjust_row(index)
-		return
 	confirm()
-
-
-func _click_adjust_row(index: int) -> void:
-	var holder := _row_holder(index)
-	var direction := 1
-	if holder != null and holder.size.x > 0.0:
-		direction = -1 if holder.get_local_mouse_position().x < holder.size.x * 0.5 else 1
-	adjust(direction)
-
-
-func _row_holder(index: int) -> Control:
-	for child in _rows.get_children():
-		var control := child as Control
-		if control != null and MouseRowsScript.row_index(control) == index:
-			return control
-	return null
 
 
 ## I6, final-review.md I4: THE WHEEL MOVES THE SAME CURSOR THE ARROW KEYS DO, on any page

@@ -18,6 +18,7 @@ signal finished(outcome: StringName)
 const PlayClockScript := preload("res://world/play_clock.gd")
 const BootIntentScript := preload("res://world/boot_intent.gd")
 const RANCH_SCENE := "res://world/ranch.tscn"
+const LoadingScreenScript := preload("res://ui/loading_screen.gd")
 const InteriorScript := preload("res://world/factory_interior.gd")
 const WindowScript := preload("res://world/factory_window.gd")
 const PatrolScript := preload("res://world/collector_patrol.gd")
@@ -57,6 +58,7 @@ var _patrols: Array[CollectorPatrol] = []
 var _game_state: Node
 var _last_area: StringName = &""
 var _reset_point := Vector3.ZERO
+var _cast := 0
 
 
 func _ready() -> void:
@@ -68,7 +70,19 @@ func _ready() -> void:
 			mode = StringName(arg.substr(15))
 		elif arg.begins_with("--factory-outcome="):
 			outcome = StringName(arg.substr(18))
+	# BEHIND THE LOADING SCREEN, WHEN THERE IS ONE (game/ui/loading_screen.gd): a frame
+	# between building the rooms and casting the tour, and the screen lifts when the tour's
+	# first step is reached. No screen (the driver, a gate) and nothing here changes.
+	var paced: bool = LoadingScreenScript.claim()
+	if paced:
+		step_reached.connect(func(_s: StringName) -> void: LoadingScreenScript.release(),
+			CONNECT_ONE_SHOT)
+		LoadingScreenScript.report(0.1, "Opening the Factory doors")
+		await get_tree().process_frame
 	_build()
+	if paced:
+		LoadingScreenScript.report(0.6, "Meeting your guide")
+		await get_tree().process_frame
 	# Somebody playing (not a fast driver run): the play clock keeps running up here, and every
 	# step of the tour is a story beat in the novelty log (MISSION.md fun rules).
 	if not skip_waits and (DisplayServer.get_name() != "headless" or BootIntentScript.bot):
@@ -161,6 +175,9 @@ func _talk_context() -> Dictionary:
 
 
 func _npc(id: StringName, def: CharacterDef, at: Vector3) -> Npc:
+	# Each one cast while the loading screen is still up moves its bar a step.
+	_cast += 1
+	LoadingScreenScript.report(minf(0.95, 0.6 + 0.07 * _cast), "Meeting your guide")
 	var n: Npc = NpcScript.new()
 	n.name = "Npc_%s" % id
 	n.position = at
@@ -565,7 +582,10 @@ func _leave(o: StringName) -> void:
 	if _game_state != null and _game_state.has_method("save_to_slot") and not skip_waits:
 		_game_state.save_to_slot()
 	if not skip_waits:
-		get_tree().change_scene_to_file.call_deferred(RANCH_SCENE)
+		# Down behind the loading screen (game/ui/loading_screen.gd); the ranch reports its
+		# own boot on the bar and lifts the screen when she can play.
+		LoadingScreenScript.change_scene(get_tree(), RANCH_SCENE, LoadingScreenScript.Look.RANCH,
+			"Back down to the ranch")
 
 
 func _say(speaker: StringName, id: StringName) -> void:

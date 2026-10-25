@@ -113,59 +113,6 @@ func test_save_and_quit_emit_requests() -> void:
 	assert_signal_emitted(_menu, "quit_requested")
 
 
-func test_settings_page_adjusts_the_settings_object() -> void:
-	_menu.open()
-	_menu.move_selection(PauseMenu.Row.SETTINGS)
-	assert_true(_menu.confirm())
-	assert_eq(_menu.page(), PauseMenu.Page.SETTINGS)
-	watch_signals(_menu)
-	# row 0 volume, row 1 ambient, row 2 effects, row 3 sensitivity, row 4 invert
-	_menu.adjust(-1)
-	assert_almost_eq(_settings.master_volume, 0.9, 0.0001)
-	_menu.move_selection(PauseMenu.SettingRow.SENSITIVITY)
-	_menu.adjust(1)
-	assert_gt(_settings.mouse_sensitivity, SettingsScript.SENSITIVITY_DEFAULT)
-	_menu.move_selection(PauseMenu.SettingRow.INVERT - PauseMenu.SettingRow.SENSITIVITY)
-	_menu.adjust(1)
-	assert_true(_settings.invert_look)
-	assert_signal_emitted(_menu, "settings_changed")
-
-
-func test_cancel_on_settings_returns_to_main_and_on_main_closes() -> void:
-	_menu.open()
-	_menu.move_selection(PauseMenu.Row.SETTINGS)
-	_menu.confirm()
-	_menu.back()
-	assert_eq(_menu.page(), PauseMenu.Page.MAIN)
-	assert_true(_menu.is_open())
-	_menu.back()
-	assert_false(_menu.is_open())
-
-
-## Both pages, as the name promises. The two have DIFFERENT row counts (eight on MAIN,
-## three on SETTINGS) and _row_count() is the one thing that knows which, so a wrap that is
-## only exercised on MAIN would let the settings page wrap past its last row into a fourth
-## that is not drawn.
-func test_selection_wraps_on_both_pages() -> void:
-	_menu.open()
-	_menu.move_selection(-1)
-	assert_eq(_menu.selected_index(), PauseMenu.Row.QUIT,
-		"up from the first row lands on the last one on MAIN")
-	_menu.move_selection(1)
-	assert_eq(_menu.selected_index(), PauseMenu.Row.RESUME, "...and down comes back round")
-
-	_menu.move_selection(PauseMenu.Row.SETTINGS)
-	assert_true(_menu.confirm(), "the settings page opens")
-	assert_eq(_menu.page(), PauseMenu.Page.SETTINGS)
-	assert_eq(_menu.selected_index(), 0, "on its first row")
-	_menu.move_selection(-1)
-	assert_eq(_menu.selected_index(), _menu.settings_row_count() - 1,
-		"up from the first row lands on the last settings row (the last key)")
-	_menu.move_selection(1)
-	assert_eq(_menu.selected_index(), PauseMenu.SettingRow.VOLUME,
-		"...and down comes back round to the first")
-
-
 # --- the compendium page ---------------------------------------------------------------
 
 func test_open_page_lands_straight_on_the_compendium() -> void:
@@ -297,8 +244,11 @@ func test_left_and_right_do_nothing_on_the_compendium() -> void:
 	_wire_book()
 	_menu.open_page(PauseMenu.Page.COMPENDIUM)
 	watch_signals(_menu)
-	_menu.adjust(1)
-	_menu.adjust(-1)
+	for action: StringName in [&"ui_right", &"ui_left"]:
+		var e := InputEventAction.new()
+		e.action = action
+		e.pressed = true
+		_menu._unhandled_input(e)
 	assert_eq(_menu.selected_index(), 0)
 	assert_signal_not_emitted(_menu, "settings_changed")
 
@@ -698,30 +648,6 @@ func test_the_requests_page_carries_the_boards_note_for_this_chapter() -> void:
 	assert_eq(_menu.board_note(), wording.board_note(story.Chapter.WEATHER))
 
 
-## v1: one row per audio bus (Master, Music, Ambient, Effects, Menus, Voices), the look
-## controls, the picture, then one row per rebindable key.
-func test_the_settings_page_has_a_row_per_bus_the_picture_and_the_keys() -> void:
-	assert_eq(PauseMenu.SettingRow.VOLUME, 0)
-	assert_eq(PauseMenu.SettingRow.KEYS, 11)
-	_menu.open_page(PauseMenu.Page.SETTINGS)
-	assert_eq(_menu.settings_row_count(), 11 + SettingsScript.REBINDABLE.size())
-	var names: Array = _menu.settings_rows().map(func(r: Array) -> String: return str(r[0]))
-	for want in ["Master volume", "Music", "Ambience", "Effects", "Menus", "Voices",
-			"Picture quality", "Fullscreen", "Vsync", "Jump", "Interact"]:
-		assert_has(names, want)
-
-
-func test_adjusting_the_ambient_row_moves_the_ambient_volume_and_nothing_else() -> void:
-	_menu.open_page(PauseMenu.Page.SETTINGS)
-	_menu.move_selection(PauseMenu.SettingRow.AMBIENT)
-	var master_before: float = _settings.master_volume
-	_menu.adjust(-1)
-	assert_lt(_settings.ambient_volume, 1.0)
-	assert_almost_eq(_settings.master_volume, master_before, 0.0001)
-	assert_almost_eq(_settings.effects_volume, 1.0, 0.0001)
-	assert_almost_eq(_settings.music_volume, 0.8, 0.0001, "the music is its own slider")
-
-
 # --- the pointer, and the copy ---------------------------------------------------------
 
 ## THE OWNER MISREAD "Save the ranch" AS SOMETHING THAT HAPPENED TO THE RANCH rather than as
@@ -815,17 +741,6 @@ func _wheel(button_index: int) -> InputEventMouseButton:
 
 # --- M9: the Close button mirrors Escape -----------------------------------------------
 
-func test_the_close_button_goes_back_one_layer_on_a_sub_page() -> void:
-	_menu.open()
-	_menu.move_selection(PauseMenu.Row.SETTINGS)
-	_menu.confirm()
-	assert_eq(_menu.page(), PauseMenu.Page.SETTINGS)
-	_menu.close_button_node().pressed.emit()
-	assert_eq(_menu.page(), PauseMenu.Page.MAIN,
-		"Close on a sub-page must match Escape: one layer back, not the whole menu")
-	assert_true(_menu.is_open())
-
-
 func test_the_close_button_closes_the_whole_menu_on_the_main_page() -> void:
 	_menu.open()
 	assert_eq(_menu.page(), PauseMenu.Page.MAIN)
@@ -856,32 +771,6 @@ func test_hover_is_cleared_returning_to_main() -> void:
 
 
 # --- I4: a click on a settings row adjusts it, it does not confirm/leave ------------------
-
-func test_clicking_a_settings_row_adjusts_it_and_stays_on_the_page() -> void:
-	_menu.open()
-	_menu.move_selection(PauseMenu.Row.SETTINGS)
-	_menu.confirm()
-	assert_eq(_menu.page(), PauseMenu.Page.SETTINGS)
-	# Ambience defaults to 0.5 (Settings.AMBIENT_DEFAULT), mid range, so a click's default
-	# "increment" resolution (no laid out holder yet in this test) is never a clamped no-op --
-	# master volume, at its 1.0 ceiling by default, would be.
-	var before: float = _settings.ambient_volume
-	watch_signals(_menu)
-	_menu.take_row(PauseMenu.SettingRow.AMBIENT)
-	assert_eq(_menu.page(), PauseMenu.Page.SETTINGS,
-		"a settings row click must not leave the page (I2, final-review.md)")
-	assert_ne(_settings.ambient_volume, before, "the click must have changed the value")
-	assert_signal_emitted(_menu, "settings_changed")
-
-
-func test_clicking_the_invert_row_toggles_it() -> void:
-	_menu.open()
-	_menu.move_selection(PauseMenu.Row.SETTINGS)
-	_menu.confirm()
-	var before: bool = _settings.invert_look
-	_menu.take_row(PauseMenu.SettingRow.INVERT)
-	assert_ne(_settings.invert_look, before)
-
 
 # --- I6: the wheel scrolls the compendium and the mail archive ---------------------------
 
@@ -923,68 +812,45 @@ func test_the_wheel_moves_the_mail_archive_selection() -> void:
 	assert_eq(_menu.selected_index(), 1, "the stage's own wheel branch must move it too")
 
 
+# --- Settings is the shared tabbed menu (docs/playtest_fixes/settings.md) ----------------
 
-## v1: a key row waits for a key, binds it, and shows it; Escape cancels.
-func test_a_key_row_rebinds_its_action() -> void:
+func test_the_settings_row_opens_the_shared_settings_menu_over_the_panel() -> void:
+	_menu.open()
+	_menu.move_selection(PauseMenu.Row.SETTINGS)
+	assert_true(_menu.confirm())
+	assert_true(_menu.settings_menu_open())
+	assert_eq(_menu.settings_menu().settings, _settings, "it edits the ranch's own Settings")
+	assert_false(_menu.get_node("Centre").visible, "the pause panel steps aside")
+
+
+func test_applying_in_the_settings_menu_tells_the_ranch() -> void:
+	_menu.open()
+	_menu.open_page(PauseMenu.Page.SETTINGS)
+	var sm: SettingsMenu = _menu.settings_menu()
+	watch_signals(_menu)
+	sm.draft.master_volume = 0.4
+	sm.apply()
+	assert_almost_eq(_settings.master_volume, 0.4, 0.0001)
+	assert_signal_emitted(_menu, "settings_changed")
+
+
+func test_leaving_settings_returns_to_main_on_the_settings_row_and_then_closes() -> void:
 	_menu.open()
 	_menu.move_selection(PauseMenu.Row.SETTINGS)
 	_menu.confirm()
-	var jump_row: int = PauseMenu.SettingRow.KEYS + SettingsScript.REBINDABLE.find(&"jump")
-	_menu.move_selection(jump_row)
-	assert_true(_menu.confirm())
-	assert_true(_menu.is_capturing())
-	var k := InputEventKey.new()
-	k.pressed = true
-	k.physical_keycode = KEY_J
-	assert_true(_menu.capture_key(k))
-	assert_false(_menu.is_capturing())
-	assert_eq(int(_menu.settings.bindings.get(&"jump", 0)), KEY_J)
-	assert_eq(_menu.settings_rows().size(), _menu.settings_row_count())
-
-
-
-## A capture asked for and walked away from never rebinds the next key pressed.
-func test_a_key_capture_does_not_outlive_its_page() -> void:
-	_menu.open()
-	_menu.move_selection(PauseMenu.Row.SETTINGS)
-	_menu.confirm()
-	_menu.move_selection(PauseMenu.SettingRow.KEYS + SettingsScript.REBINDABLE.find(&"jump"))
-	assert_true(_menu.confirm())
-	assert_true(_menu.is_capturing())
+	_menu.settings_menu().request_close()
+	assert_false(_menu.settings_menu_open())
+	assert_eq(_menu.page(), PauseMenu.Page.MAIN)
+	assert_eq(_menu.selected_index(), PauseMenu.Row.SETTINGS)
+	assert_true(_menu.get_node("Centre").visible)
 	_menu.back()
-	assert_false(_menu.is_capturing(), "back to main drops the capture")
+	assert_false(_menu.is_open())
+
+
+func test_closing_the_pause_menu_drops_unapplied_settings() -> void:
+	_menu.open()
+	_menu.open_page(PauseMenu.Page.SETTINGS)
+	_menu.settings_menu().draft.master_volume = 0.2
 	_menu.close()
-	_menu.open()
-	assert_false(_menu.is_capturing(), "and a reopened menu has none")
-	var k := InputEventKey.new()
-	k.pressed = true
-	k.physical_keycode = KEY_J
-	assert_false(_menu.capture_key(k))
-	assert_false(_menu.settings.bindings.has(&"jump"))
-
-
-func test_backspace_in_a_capture_puts_the_default_back() -> void:
-	_menu.settings.bind(&"jump", KEY_J)
-	_menu.open()
-	_menu.move_selection(PauseMenu.Row.SETTINGS)
-	_menu.confirm()
-	_menu.move_selection(PauseMenu.SettingRow.KEYS + SettingsScript.REBINDABLE.find(&"jump"))
-	_menu.confirm()
-	var k := InputEventKey.new()
-	k.pressed = true
-	k.physical_keycode = KEY_BACKSPACE
-	assert_true(_menu.capture_key(k))
-	assert_false(_menu.settings.bindings.has(&"jump"))
-
-func test_the_picture_and_sound_rows_adjust() -> void:
-	_menu.open()
-	_menu.move_selection(PauseMenu.Row.SETTINGS)
-	_menu.confirm()
-	_menu.move_selection(PauseMenu.SettingRow.QUALITY)
-	var q: int = _menu.settings.quality
-	_menu.adjust(-1)
-	assert_eq(_menu.settings.quality, q - 1)
-	_menu.move_selection(PauseMenu.SettingRow.MUSIC - PauseMenu.SettingRow.QUALITY)
-	var m: float = _menu.settings.music_volume
-	_menu.adjust(-1)
-	assert_lt(_menu.settings.music_volume, m)
+	assert_false(_menu.settings_menu_open())
+	assert_almost_eq(_settings.master_volume, 1.0, 0.0001, "nothing unapplied leaks out")

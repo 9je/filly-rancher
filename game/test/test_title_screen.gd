@@ -99,16 +99,6 @@ func test_continue_is_offered_when_a_save_exists() -> void:
 	assert_true(_title.can_continue())
 
 
-func test_the_settings_page_opens_and_leaves_again() -> void:
-	_title.point_at_row(TitleScreen.Row.SETTINGS)
-	_title.confirm()
-	assert_true(_title.on_settings_page())
-	_title.back()
-	assert_false(_title.on_settings_page())
-	assert_eq(_title.selected_index(), TitleScreen.Row.SETTINGS,
-		"leaving a page puts the cursor back on the row that opened it")
-
-
 func test_every_row_is_armed_for_the_pointer() -> void:
 	var armed := 0
 	for child in _title.get_node("Centre/Panel/Margin/Column/Rows").get_children():
@@ -184,17 +174,15 @@ func test_escape_disarms_new_game_instead_of_quitting() -> void:
 	assert_false(BootIntentScript.peek_new_game())
 
 
-# --- I4: a click on a settings row adjusts it, on both doors into Settings -----------------
+# --- Settings: one shared tabbed menu (docs/playtest_fixes/settings.md) ----------------
 
-func test_clicking_a_title_settings_row_adjusts_it_and_does_not_leave_the_page() -> void:
+
+func test_the_settings_row_opens_the_shared_settings_menu_and_gives_the_cursor_back() -> void:
 	_title.point_at_row(TitleScreen.Row.SETTINGS)
 	_title.confirm()
 	assert_true(_title.on_settings_page())
-	# Ambience defaults to 0.5 (Settings.AMBIENT_DEFAULT), mid range, so either half of the
-	# row's click test moves it -- master volume defaults to 1.0 and a click that resolves to
-	# "increment" (no laid-out holder yet, this test never awaits a frame) would clamp to a
-	# no-op there.
-	var before: float = _title.settings.ambient_volume
-	_title.take_row(TitleScreen.SettingRow.AMBIENT)
-	assert_true(_title.on_settings_page(), "a settings row click must not leave the page")
-	assert_ne(_title.settings.ambient_volume, before, "the click must have changed the value")
+	assert_eq(_title.settings_menu().settings, _title.settings)
+	_title.back()
+	assert_false(_title.on_settings_page())
+	assert_eq(_title.selected_index(), TitleScreen.Row.SETTINGS,
+		"leaving Settings puts the cursor back on the row that opened it")
