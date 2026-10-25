@@ -128,3 +128,10 @@ Canon MLP stays: real names, looks and places ("lean into mlp fully", private bu
 - **Gates on the final code:** the GUT suite, and all 10 real-input tests through tools/run_input_tests.sh.
 - **Exports rebuilt** (Linux and Windows, 0 export errors). The Linux build ran on the GPU invisibly and exited cleanly, but printed engine errors that come only from the experimental render thread and were already there before this round (DECISIONS.md).
 - **Two of the owner's save slots (0 and 9) were overwritten** by an agent's probe runs, and they could not be recovered (DECISIONS.md).
+
+### 2026-10-25: playtest round 2 (PLAYTEST_FIXES.md, "Round 2")
+- **Pens upgrade in place:** Paddock to Big Pen costs 150 and Big Pen to Grand Pen costs 330, and every resident stays. A built pen offers the upgrade on its prompt when the bag is empty or the pen is full. A full pen's refusal now says what to do.
+- **Plots 3 and 4 start overgrown:** 100 and 250 bits to clear, through a painted signpost, the prompt and the card. Old saves keep the pens they already built there.
+- **Catching ramps with experience:** bold ponies take up to 1.85 s to subdue, curious ones up to 1.45 s, and shy ones stay at 1.0 s. The first catch is unchanged.
+- **Catch card:** a sliding card with her portrait, name, rarity stars and four trait icon chips replaces the "Caught ..." toast.
+- **Not yet done:** pacing (tools/pacing.sh) and the five real-input playthroughs have not been re-run with the new economy. The playthrough driver was taught to clear plots and upgrade pens, but that teaching has not been exercised end to end.
