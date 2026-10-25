@@ -715,6 +715,8 @@ func _talk_to_news() -> bool:
 	var best: StringName = &""
 	var best_d := INF
 	for id: StringName in p.get("npcs"):
+		if _t() < float(_talk_rest.get(id, -1.0)):
+			continue
 		if not _wants_to_hear(id) or not bool(p.call("has_news", id)):
 			continue
 		var n: Node3D = p.call("npc", id)
@@ -757,7 +759,13 @@ func _talk_to(id: StringName) -> bool:
 		_look_at = Vector3.INF
 		act = _interaction()
 	if int(act.get("kind", 0)) != InteractionScript.Kind.TALK or str(act.get("subject", "")) != want_name:
-		_say("could not get %s's prompt (%s)" % [id, act])
+		_say("could not get %s's prompt (%s); she stands at %s, the bot at %s" % [id, act,
+			who.global_position.snapped(Vector3.ONE * 0.1), player.global_position.snapped(Vector3.ONE * 0.1)])
+		# A person gives up on somebody she cannot get to and comes back later.
+		_talk_rest[id] = _t() + 180.0
+		if int(_talk_fails.get(id, 0)) >= 2:
+			_bug("could not reach %s to talk (she stands at %s with news to tell)" % [id, who.global_position.snapped(Vector3.ONE * 0.1)])
+		_talk_fails[id] = int(_talk_fails.get(id, 0)) + 1
 		return false
 	_stop()
 	await _press(&"interact")
@@ -1414,6 +1422,8 @@ func _brain() -> void:
 
 
 var _seen_flags := {}
+var _talk_rest := {}
+var _talk_fails := {}
 var _seen_counts := {}
 
 
