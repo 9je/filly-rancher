@@ -1,0 +1,2 @@
+[pony_materials] INPUT_TEST_OK test_pony_materials 93 ponies, cast, Spike and the player: no missing texture or eye, near and far
+INPUT_TESTS passed=1 failed=0

@@ -81,7 +81,11 @@ func _dress_real(root: Node) -> void:
 			mat.rim = 0.25
 			if ResourceLoader.exists(tex_path):
 				mat.albedo_texture = load(tex_path)
-			mi.set_surface_override_material(i, mat)
+			# The show's toon light, the one every pony wears (ToonStyler): the built-in
+			# DIFFUSE_TOON steps the soft shadow term hard and speckled him the way the old
+			# toon shader speckled the ponies (docs/playtest_fixes/ponies.md).
+			mi.set_surface_override_material(i,
+				ToonStyler.to_toon(mat, ToonStyler.PRESETS[&"pony"]) if ToonStyler.shading_enabled else mat)
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 
 
@@ -92,22 +96,17 @@ const EYE_SHADER := preload("res://shaders/pony_eye.gdshader")
 ## eyeball's UVs are a sphere unwrap; through them the iris texture (a green slit iris in the
 ## middle of a white square) came out as a green sliver at the edge of a blank white eye. The
 ## Source "eyes" shader casts $iris along the eye's axis instead, so this does too
-## (shaders/pony_eye.gdshader `planar`): centred on the front of the eyeball (the vertices
-## facing out of his face, +Z in his model), the texture spanning the eyeball's width and
-## height. Measured from the mesh, so it follows the model rather than a typed-in number.
+## (shaders/pony_eye.gdshader `planar`, along +Z, the way his face points): centred on the
+## eyeball, the texture spanning the eyeball's width and height. Measured from the mesh, so it follows the model rather than a typed-in number.
 func _eye(mesh: Mesh, surface: int, tex: Texture2D) -> ShaderMaterial:
 	var arrays := mesh.surface_get_arrays(surface)
 	var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
 	var box := AABB(verts[0], Vector3.ZERO)
-	var front := Vector3.ZERO
-	var n_front := 0
 	for k in verts.size():
 		box = box.expand(verts[k])
-		if normals[k].z > 0.9:
-			front += verts[k]
-			n_front += 1
-	var origin := front / float(n_front) if n_front > 0 else box.get_center()
+	# The middle of the eyeball as seen from in front (his eyes face +Z): the opening his lids
+	# leave is centred there, not on the forward-most vertices, which sit by his nose.
+	var origin := box.get_center()
 	var m := ShaderMaterial.new()
 	m.shader = EYE_SHADER
 	m.set_shader_parameter(&"eye_texture", tex)

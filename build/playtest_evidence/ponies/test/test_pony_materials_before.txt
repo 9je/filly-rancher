@@ -1,0 +1,82 @@
+INPUT_TEST_NOTE 208.7s 93 ponies stood at EastField, 36 m off
+INPUT_TEST_NOTE 221.0s look 1 (from the start, facing away): 0 FULL, 93 FAR, 76 problems so far
+INPUT_TEST_NOTE 420.3s look 2 (among them, turn 0): 48 FULL, 11 FAR, 224 problems so far
+INPUT_TEST_NOTE 423.7s look 3 (among them, turn 1): 55 FULL, 14 FAR, 250 problems so far
+INPUT_TEST_NOTE 427.4s look 4 (among them, turn 2): 66 FULL, 16 FAR, 283 problems so far
+INPUT_TEST_NOTE 433.2s look 5 (among them, turn 3): 73 FULL, 13 FAR, 301 problems so far
+INPUT_TEST_NOTE 439.1s look 6 (among them, turn 4): 77 FULL, 11 FAR, 319 problems so far
+INPUT_TEST_NOTE 443.1s look 7 (among them, turn 5): 74 FULL, 12 FAR, 321 problems so far
+INPUT_TEST_NOTE 446.9s look 8 (among them, turn 6): 72 FULL, 12 FAR, 323 problems so far
+INPUT_TEST_NOTE 450.7s look 9 (among them, turn 7): 70 FULL, 10 FAR, 323 problems so far
+INPUT_TEST_NOTE 528.2s look 10 (beside roster:applejack): 37 FULL, 53 FAR, 330 problems so far
+INPUT_TEST_NOTE 657.3s look 11 (beside roster:cocopommel): 32 FULL, 41 FAR, 344 problems so far
+INPUT_TEST_NOTE 690.6s look 12 (beside roster:spitfire): 38 FULL, 38 FAR, 358 problems so far
+INPUT_TEST_NOTE 719.1s look 13 (beside drifter28:flitter): 66 FULL, 17 FAR, 364 problems so far
+INPUT_TEST_NOTE 734.8s look 14 (beside drifter33:lightningdust): 59 FULL, 21 FAR, 366 problems so far
+INPUT_TEST_NOTE 793.6s look 15 (beside drifter36:milkyway): 60 FULL, 14 FAR, 368 problems so far
+INPUT_TEST_NOTE 807.2s look 16 (beside drifter44:lyra): 47 FULL, 34 FAR, 368 problems so far
+INPUT_TEST_NOTE 817.3s look 17 (beside drifter45:derpyhooves): 46 FULL, 25 FAR, 368 problems so far
+INPUT_TEST_NOTE 835.8s look 18 (beside drifter48:sweetiebelle): 41 FULL, 23 FAR, 368 problems so far
+INPUT_TEST_NOTE 881.3s look 19 (walked off, looking away): 0 FULL, 82 FAR, 368 problems so far
+INPUT_TEST_NOTE 881.5s 19 looks, 93 actors (11 left the world mid-test), 368 distinct problems
+INPUT_TEST_NOTE problem: roster:aloeblossom@FAR bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow: placeholder texture 'aloeblossom_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:aloeblossom@FAR bodyparts_feral_heads_reference_Rarity_reVAmped_head_HWM_dmx#4 eyelashes: placeholder texture 'aloeblossom_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:aloeblossom@FULL bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow (pass 1): placeholder texture 'aloeblossom_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:aloeblossom@FULL bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow [far twin] (pass 1): placeholder texture 'aloeblossom_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:aloeblossom@FULL bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow: placeholder texture 'aloeblossom_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:aloeblossom@FULL bodyparts_feral_heads_reference_Rarity_reVAmped_head_HWM_dmx#4 eyelashes (pass 1): placeholder texture 'aloeblossom_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:aloeblossom@FULL bodyparts_feral_heads_reference_Rarity_reVAmped_head_HWM_dmx#4 eyelashes [far twin] (pass 1): placeholder texture 'aloeblossom_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:aloeblossom@FULL bodyparts_feral_heads_reference_Rarity_reVAmped_head_HWM_dmx#4 eyelashes: placeholder texture 'aloeblossom_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:aloeblossom@MID bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow: placeholder texture 'aloeblossom_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:aloeblossom@MID bodyparts_feral_heads_reference_Rarity_reVAmped_head_HWM_dmx#4 eyelashes: placeholder texture 'aloeblossom_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:applebloom@FAR bodyparts_Feral_heads_reference_RD_reVAmped_head_HWM_dmx#4 eyelashes: placeholder texture 'applebloom_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:applebloom@FAR bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow: placeholder texture 'applebloom_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:applebloom@FULL bodyparts_Feral_heads_reference_RD_reVAmped_head_HWM_dmx#4 eyelashes (pass 1): placeholder texture 'applebloom_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:applebloom@FULL bodyparts_Feral_heads_reference_RD_reVAmped_head_HWM_dmx#4 eyelashes [far twin] (pass 1): placeholder texture 'applebloom_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:applebloom@FULL bodyparts_Feral_heads_reference_RD_reVAmped_head_HWM_dmx#4 eyelashes: placeholder texture 'applebloom_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:applebloom@FULL bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow (pass 1): placeholder texture 'applebloom_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:applebloom@FULL bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow [far twin] (pass 1): placeholder texture 'applebloom_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:applebloom@FULL bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow: placeholder texture 'applebloom_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:applebloom@MID bodyparts_Feral_heads_reference_RD_reVAmped_head_HWM_dmx#4 eyelashes: placeholder texture 'applebloom_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:applebloom@MID bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow: placeholder texture 'applebloom_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:applejack@FAR Base_Body: visible mesh with no surfaces (her geometry was lost)
+INPUT_TEST_NOTE problem: roster:applejack@FULL Base_Body: visible mesh with no surfaces (her geometry was lost)
+INPUT_TEST_NOTE problem: roster:applejack@MID Base_Body: visible mesh with no surfaces (her geometry was lost)
+INPUT_TEST_NOTE problem: roster:berrypunch@FAR bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow: placeholder texture 'berrypunch_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:berrypunch@FAR bodyparts_feral_heads_reference_RD_reVAmped_head_HWM_dmx#4 eyelashes: placeholder texture 'berrypunch_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:berrypunch@FULL bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow (pass 1): placeholder texture 'berrypunch_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:berrypunch@FULL bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow [far twin] (pass 1): placeholder texture 'berrypunch_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:berrypunch@FULL bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow: placeholder texture 'berrypunch_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:berrypunch@FULL bodyparts_feral_heads_reference_RD_reVAmped_head_HWM_dmx#4 eyelashes (pass 1): placeholder texture 'berrypunch_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:berrypunch@FULL bodyparts_feral_heads_reference_RD_reVAmped_head_HWM_dmx#4 eyelashes [far twin] (pass 1): placeholder texture 'berrypunch_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:berrypunch@FULL bodyparts_feral_heads_reference_RD_reVAmped_head_HWM_dmx#4 eyelashes: placeholder texture 'berrypunch_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:bonbon@FAR bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow: placeholder texture 'bonbon_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:bonbon@FAR bodyparts_feral_heads_reference_RD_reVAmped_head_HWM_dmx#4 eyelashes: placeholder texture 'bonbon_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:bonbon@FULL bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow (pass 1): placeholder texture 'bonbon_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:bonbon@FULL bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow [far twin] (pass 1): placeholder texture 'bonbon_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:bonbon@FULL bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow: placeholder texture 'bonbon_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:bonbon@FULL bodyparts_feral_heads_reference_RD_reVAmped_head_HWM_dmx#4 eyelashes (pass 1): placeholder texture 'bonbon_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:bonbon@FULL bodyparts_feral_heads_reference_RD_reVAmped_head_HWM_dmx#4 eyelashes [far twin] (pass 1): placeholder texture 'bonbon_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:bonbon@FULL bodyparts_feral_heads_reference_RD_reVAmped_head_HWM_dmx#4 eyelashes: placeholder texture 'bonbon_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:bonbon@MID bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow: placeholder texture 'bonbon_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:bonbon@MID bodyparts_feral_heads_reference_RD_reVAmped_head_HWM_dmx#4 eyelashes: placeholder texture 'bonbon_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:braeburn@FAR bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow: placeholder texture 'braeburn_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:braeburn@FAR bodyparts_feral_heads_reference_Male_reVAmped_head_HWM_dmx#4 eyelashes: placeholder texture 'braeburn_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:braeburn@FULL bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow (pass 1): placeholder texture 'braeburn_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:braeburn@FULL bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow [far twin] (pass 1): placeholder texture 'braeburn_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:braeburn@FULL bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow: placeholder texture 'braeburn_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:braeburn@FULL bodyparts_feral_heads_reference_Male_reVAmped_head_HWM_dmx#4 eyelashes (pass 1): placeholder texture 'braeburn_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:braeburn@FULL bodyparts_feral_heads_reference_Male_reVAmped_head_HWM_dmx#4 eyelashes [far twin] (pass 1): placeholder texture 'braeburn_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:braeburn@FULL bodyparts_feral_heads_reference_Male_reVAmped_head_HWM_dmx#4 eyelashes: placeholder texture 'braeburn_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:braeburn@MID bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow: placeholder texture 'braeburn_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:braeburn@MID bodyparts_feral_heads_reference_Male_reVAmped_head_HWM_dmx#4 eyelashes: placeholder texture 'braeburn_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:caramel@FAR bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow: placeholder texture 'caramel_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:caramel@FAR bodyparts_feral_heads_reference_Male_reVAmped_head_HWM_dmx#4 eyelashes: placeholder texture 'caramel_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:caramel@FULL bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow (pass 1): placeholder texture 'caramel_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:caramel@FULL bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow [far twin] (pass 1): placeholder texture 'caramel_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:caramel@FULL bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow: placeholder texture 'caramel_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:caramel@FULL bodyparts_feral_heads_reference_Male_reVAmped_head_HWM_dmx#4 eyelashes (pass 1): placeholder texture 'caramel_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:caramel@FULL bodyparts_feral_heads_reference_Male_reVAmped_head_HWM_dmx#4 eyelashes [far twin] (pass 1): placeholder texture 'caramel_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:caramel@FULL bodyparts_feral_heads_reference_Male_reVAmped_head_HWM_dmx#4 eyelashes: placeholder texture 'caramel_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_NOTE problem: roster:caramel@MID bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow: placeholder texture 'caramel_missing_white.png' (the converter could not find the real one)
+INPUT_TEST_FAILED test_pony_materials 368 broken pony materials (first: roster:aloeblossom@FAR bodyparts_feral_eyebrows_reVAmped_eyebrows_dmx#0 eyebrow: placeholder texture 'aloeblossom_missing_white.png' (the converter could not find the real one))
