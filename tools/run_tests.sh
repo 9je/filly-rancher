@@ -117,7 +117,7 @@ out="$(mktemp)"
 # thread_model=2, for the frame rate), which Godot still calls experimental; headless tests
 # build and free meshes by the thousand and gain nothing from it, and one loaded run in two
 # hit a RID allocator race under it ("Attempting to initialize the wrong RID").
-tools/bin/godot --headless --render-thread safe --audio-driver Dummy --path game \
+tools/bin/godot --headless --render-thread safe --audio-driver Dummy --log-file "$FILLY_TEST_SAVE_DIR/godot.log" --path game \
   -s addons/gut/gut_cmdln.gd \
   -gdir="$GUT_TEST_DIR" -gprefix=test_ -gsuffix=.gd \
   -gexit 2>&1 | tee "$out"
