@@ -37,8 +37,10 @@ func name() -> String:
 
 func _main() -> void:
 	await _play()
+	# Every test reaches its own verdict. A script error ends _play() early and returns
+	# here as if it had finished, so falling through is a failure, never a pass.
 	if not _done:
-		ok("finished")
+		fail("_play() ended without a verdict (a script error cut it short?)")
 
 
 ## Override.

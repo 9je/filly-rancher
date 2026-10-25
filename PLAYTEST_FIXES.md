@@ -62,7 +62,7 @@ The suite was green and the game was broken, for four reasons that compound.
 
 **Passing after:** `INPUT_TEST_OK test_first_pony caught on the first try` (on the GPU in the invisible display; 1 attempt, at 5.7 m).
 
-## 2 and 4. "Beam selection feels weird." Make targeting forgiving and readable.
+## 2. "Beam selection feels weird." (rule 4: forgiving, readable targeting)
 
 **Test:** `game/test_input/test_beam_targeting.gd`. With the Scoop in hand, through real input:
 - Aim at empty grass: nobody may be highlighted.
@@ -179,6 +179,33 @@ Plus a limiter bug: ffmpeg's default `level=true` made every processed file 1.5 
 **Failing before:** `INPUT_TEST_FAILED test_footsteps only 56% of footfalls make a sound (want 85%) | volume range -8.00..-8.00 dB is not a slight variation | 23 steps played another surface's sample set | the old noisy sample ... still plays | the samples that played fail tools/audio_audit.py (exit 1)`.
 
 **Passing after:** `INPUT_TEST_OK test_footsteps 113 hoofsteps on 169 footfalls, all aligned, varied, on the right surface and clean`. The audit went from 23 of 58 files failing to 0 of 70.
+
+## 8. "Bad textures on some pony models, and weird eyes on others."
+
+Full write-up: `docs/playtest_fixes/ponies.md`. Contact sheets for every roster model, Spike, the story cast and 50 generated ponies are in `build/playtest_evidence/ponies/before/` and `after/` (`sheet_*.jpg`, `eyes_*.jpg`). Each row shows front, side, three-quarter, an eye close-up, 16 m and far LOD.
+
+**Test:** `game/test_input/test_pony_materials.gd`, with its rules in `pony_material_audit.gd`. It stands every roster pony, the cast, Spike and the player in the real ranch, near and far, and fails on:
+- any placeholder or missing texture;
+- an eye surface without its texture;
+- a visible mesh that has lost its surfaces.
+
+**Root causes:**
+1. **Weird eyes on 37 canon ponies,** every PonySFM/ReVAmped model, including Derpy, Octavia and Trixie. Their brows and lashes are coloured from a Source engine texture (`vgui/white`) that no pack ships. The converter substituted its magenta-black "missing" checker, and that was painted onto the brows and lashes.
+2. **Marble Pie's forelock** named a texture her pack never shipped, so it also got the checker.
+3. **Applejack's body was invisible.** The runtime LOD rebuild (`pony_lod.gd`) dropped the custom-data format bits, so her body mesh came back with 0 surfaces.
+4. **Spike's eyes were blank white.** His iris was mapped through UVs never meant for it.
+5. **The grainy, speckled look on ponies** came from the shadows, not the textures. `toon.gdshader`'s hard shadow step turned soft-shadow noise into full-contrast speckle, worst at dawn, which is when a new game starts.
+
+**Fix:**
+- `toon_styler.gd` draws lashes near-black and brows a darker shade of her coat, and the converter now ships flat black.
+- Marble Pie borrows her ManeSide texture, and the converter warns on unshipped textures.
+- `pony_lod.gd` keeps the format bits and falls back to the original mesh if a surface is refused.
+- The eye shader projects the iris the way the Source shader did, and Spike's body uses the toon material.
+- The toon shadow ramp is `smoothstep(0.2, 0.8)`.
+
+**Failing before:** `INPUT_TEST_FAILED test_pony_materials 368 broken pony materials (first: roster:aloeblossom@FAR ... eyebrow: placeholder texture 'aloeblossom_missing_white.png' ...)`. The same run also reported `roster:applejack@FULL Base_Body: visible mesh with no surfaces`.
+
+**Passing after:** `INPUT_TEST_OK test_pony_materials 93 ponies, cast, Spike and the player: no missing texture or eye, near and far`.
 
 ## 9. "The camera showed under the terrain in places."
 
