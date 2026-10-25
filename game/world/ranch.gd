@@ -4953,6 +4953,23 @@ func _stand_place_signs() -> void:
 		h -= 0.5
 	_stand_sign_post("Pens", PlaceSign.Icon.FENCE, YARD_SIGN_AT,
 		Vector3(1.0, 0.0, -0.4).normalized(), 2.0, 0.7, 2.7)
+	_mount_compass(fingers)
+
+
+## The compass strip over the HUD, pointing at the same places the fingerpost does.
+func _mount_compass(fingers: Array) -> void:
+	var hud_node := get_node_or_null(^"HUD")
+	if hud_node == null or hud_node.get_node_or_null(^"Compass") != null:
+		return
+	var compass: Control = (load("res://ui/compass.gd") as GDScript).new()
+	compass.name = "Compass"
+	hud_node.add_child(compass)
+	compass.set("player", player)
+	var list: Array[Dictionary] = []
+	for f: Array in fingers:
+		if f[2] != null:
+			list.append({"name": String(f[0]), "icon": int(f[1]), "node": f[2]})
+	compass.call("set_places", list)
 
 
 ## A post with a sign on an arm, facing `out_dir`.
