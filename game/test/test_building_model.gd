@@ -184,11 +184,14 @@ const SHIPPED := {
 ## ONE EXCEPTION, THE BOARD, moved 2.2 m from (3, -1) to (5, 0) by the scale fix
 ## (docs/playtest_fixes/scale.md): at SCALE.md's house size it no longer fits the notch between
 ## the Market's ramp and the Farmhouse's, and (5, 0) is the nearest spot it does.
+##
+## RE-LAID 2026-10-25 round a plaza (owner playtest: "the important buildings at the start
+## are too close and not easy to navigate between"); DECISIONS.md has the plan.
 const ORIGINS := {
-	"Barn": Vector2(-10.0, -9.0), "Farmhouse": Vector2(9.0, -7.0),
-	"Market": Vector2(-2.0, -1.0), "Board": Vector2(5.0, 0.0),
-	"Depot": Vector2(10.0, 4.0), "Palace": Vector2(-10.0, 61.6),
-	"Mailbox": Vector2(8.0, -2.5),
+	"Barn": Vector2(-17.0, -15.0), "Farmhouse": Vector2(2.0, -16.0),
+	"Market": Vector2(18.0, -3.0), "Board": Vector2(-8.0, -13.0),
+	"Depot": Vector2(-14.0, -3.0), "Palace": Vector2(-10.0, 61.6),
+	"Mailbox": Vector2(8.0, 7.0),
 }
 
 

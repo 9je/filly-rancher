@@ -164,6 +164,15 @@ process_row() {
     esac
   done
 
+  # synth:<script> (2026-10-25): the file is made here, by tools/<script>, not downloaded
+  # and not processed; the row is only measured. tools/make_hoofsteps.py and
+  # tools/make_pen_sounds.py.
+  if [ "${url#synth:}" != "$url" ]; then
+    python3 "tools/${url#synth:}" >/dev/null || { echo "  synth failed: $url" >&2; return 1; }
+    measure_row "$dest" "$out" "none"
+    return
+  fi
+
   src="$(fetch_source "$url")" || { echo "  download failed: $url" >&2; return 1; }
   [ -n "$src" ] || { echo "  download failed: $url" >&2; return 1; }
 

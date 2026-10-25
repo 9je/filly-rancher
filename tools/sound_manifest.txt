@@ -221,26 +221,46 @@ world/capture_success.wav|https://kenney.nl/media/pages/assets/interface-sounds/
 # Alternates: footstep_carpet_000..004 (a duller dirt); impactPlank_medium_000..004
 # (heavier boards); impactGeneric_light_000..004 (stone); impactPlate_light_000..004
 # (metal, more clang).
-world/hoof_grass_1.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_grass_000.ogg|rate=44100,mono,trim=0-0.30,fade=0.002:0.14,mgain=-28
-world/hoof_grass_2.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_grass_001.ogg|rate=44100,mono,trim=0-0.30,fade=0.002:0.14,mgain=-28
-world/hoof_grass_3.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_grass_002.ogg|rate=44100,mono,trim=0-0.30,fade=0.002:0.14,mgain=-28
-world/hoof_grass_4.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_grass_004.ogg|rate=44100,mono,trim=0-0.30,fade=0.002:0.14,mgain=-28
-world/hoof_dirt_1.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_snow_000.ogg|rate=44100,mono,speed=0.92,lowpass=3200,fade=0.002:0.05,mgain=-27
-world/hoof_dirt_2.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_snow_001.ogg|rate=44100,mono,speed=0.92,lowpass=3200,fade=0.002:0.05,mgain=-27
-world/hoof_dirt_3.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_snow_002.ogg|rate=44100,mono,speed=0.92,lowpass=3200,fade=0.002:0.05,mgain=-27
-world/hoof_dirt_4.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_snow_004.ogg|rate=44100,mono,speed=0.92,lowpass=3200,fade=0.002:0.05,mgain=-27
-world/hoof_wood_1.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/impactWood_light_000.ogg|rate=44100,mono,trim=0-0.24,fade=0.002:0.10,mgain=-25
-world/hoof_wood_2.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/impactWood_light_002.ogg|rate=44100,mono,trim=0-0.24,fade=0.002:0.10,mgain=-25
-world/hoof_wood_3.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/impactWood_light_003.ogg|rate=44100,mono,trim=0-0.24,fade=0.002:0.10,mgain=-25
-world/hoof_wood_4.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/impactWood_light_004.ogg|rate=44100,mono,trim=0-0.24,fade=0.002:0.10,mgain=-25
-world/hoof_stone_1.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_concrete_000.ogg|rate=44100,mono,gate=-40,fade=0.002:0.05,mgain=-25
-world/hoof_stone_2.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_concrete_001.ogg|rate=44100,mono,gate=-40,fade=0.002:0.05,mgain=-25
-world/hoof_stone_3.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_concrete_002.ogg|rate=44100,mono,gate=-40,fade=0.002:0.05,mgain=-25
-world/hoof_stone_4.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_concrete_003.ogg|rate=44100,mono,gate=-40,fade=0.002:0.05,mgain=-25
-world/hoof_metal_1.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/impactMetal_light_000.ogg|rate=44100,mono,trim=0-0.30,fade=0.002:0.18,mgain=-26
-world/hoof_metal_2.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/impactMetal_light_001.ogg|rate=44100,mono,trim=0-0.30,fade=0.002:0.18,mgain=-26
-world/hoof_metal_3.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/impactMetal_light_002.ogg|rate=44100,mono,trim=0-0.30,fade=0.002:0.18,mgain=-26
-world/hoof_metal_4.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/impactMetal_light_004.ogg|rate=44100,mono,trim=0-0.30,fade=0.002:0.18,mgain=-26
+# was: world/hoof_grass_1.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_grass_000.ogg|rate=44100,mono,trim=0-0.30,fade=0.002:0.14,mgain=-28
+world/hoof_grass_1.wav|synth:make_hoofsteps.py|
+# was: world/hoof_grass_2.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_grass_001.ogg|rate=44100,mono,trim=0-0.30,fade=0.002:0.14,mgain=-28
+world/hoof_grass_2.wav|synth:make_hoofsteps.py|
+# was: world/hoof_grass_3.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_grass_002.ogg|rate=44100,mono,trim=0-0.30,fade=0.002:0.14,mgain=-28
+world/hoof_grass_3.wav|synth:make_hoofsteps.py|
+# was: world/hoof_grass_4.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_grass_004.ogg|rate=44100,mono,trim=0-0.30,fade=0.002:0.14,mgain=-28
+world/hoof_grass_4.wav|synth:make_hoofsteps.py|
+# was: world/hoof_dirt_1.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_snow_000.ogg|rate=44100,mono,speed=0.92,lowpass=3200,fade=0.002:0.05,mgain=-27
+world/hoof_dirt_1.wav|synth:make_hoofsteps.py|
+# was: world/hoof_dirt_2.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_snow_001.ogg|rate=44100,mono,speed=0.92,lowpass=3200,fade=0.002:0.05,mgain=-27
+world/hoof_dirt_2.wav|synth:make_hoofsteps.py|
+# was: world/hoof_dirt_3.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_snow_002.ogg|rate=44100,mono,speed=0.92,lowpass=3200,fade=0.002:0.05,mgain=-27
+world/hoof_dirt_3.wav|synth:make_hoofsteps.py|
+# was: world/hoof_dirt_4.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_snow_004.ogg|rate=44100,mono,speed=0.92,lowpass=3200,fade=0.002:0.05,mgain=-27
+world/hoof_dirt_4.wav|synth:make_hoofsteps.py|
+# was: world/hoof_wood_1.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/impactWood_light_000.ogg|rate=44100,mono,trim=0-0.24,fade=0.002:0.10,mgain=-25
+world/hoof_wood_1.wav|synth:make_hoofsteps.py|
+# was: world/hoof_wood_2.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/impactWood_light_002.ogg|rate=44100,mono,trim=0-0.24,fade=0.002:0.10,mgain=-25
+world/hoof_wood_2.wav|synth:make_hoofsteps.py|
+# was: world/hoof_wood_3.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/impactWood_light_003.ogg|rate=44100,mono,trim=0-0.24,fade=0.002:0.10,mgain=-25
+world/hoof_wood_3.wav|synth:make_hoofsteps.py|
+# was: world/hoof_wood_4.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/impactWood_light_004.ogg|rate=44100,mono,trim=0-0.24,fade=0.002:0.10,mgain=-25
+world/hoof_wood_4.wav|synth:make_hoofsteps.py|
+# was: world/hoof_stone_1.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_concrete_000.ogg|rate=44100,mono,gate=-40,fade=0.002:0.05,mgain=-25
+world/hoof_stone_1.wav|synth:make_hoofsteps.py|
+# was: world/hoof_stone_2.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_concrete_001.ogg|rate=44100,mono,gate=-40,fade=0.002:0.05,mgain=-25
+world/hoof_stone_2.wav|synth:make_hoofsteps.py|
+# was: world/hoof_stone_3.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_concrete_002.ogg|rate=44100,mono,gate=-40,fade=0.002:0.05,mgain=-25
+world/hoof_stone_3.wav|synth:make_hoofsteps.py|
+# was: world/hoof_stone_4.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/footstep_concrete_003.ogg|rate=44100,mono,gate=-40,fade=0.002:0.05,mgain=-25
+world/hoof_stone_4.wav|synth:make_hoofsteps.py|
+# was: world/hoof_metal_1.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/impactMetal_light_000.ogg|rate=44100,mono,trim=0-0.30,fade=0.002:0.18,mgain=-26
+world/hoof_metal_1.wav|synth:make_hoofsteps.py|
+# was: world/hoof_metal_2.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/impactMetal_light_001.ogg|rate=44100,mono,trim=0-0.30,fade=0.002:0.18,mgain=-26
+world/hoof_metal_2.wav|synth:make_hoofsteps.py|
+# was: world/hoof_metal_3.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/impactMetal_light_002.ogg|rate=44100,mono,trim=0-0.30,fade=0.002:0.18,mgain=-26
+world/hoof_metal_3.wav|synth:make_hoofsteps.py|
+# was: world/hoof_metal_4.wav|https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip#Audio/impactMetal_light_004.ogg|rate=44100,mono,trim=0-0.30,fade=0.002:0.18,mgain=-26
+world/hoof_metal_4.wav|synth:make_hoofsteps.py|
 
 # delivery_thud: BBC 07004235, "Bucket dropped 3 times." 31.9s; take the first drop. A
 # transient impact this sharp reads as too quiet for gain= to normalise well (the LUFS
@@ -418,3 +438,7 @@ music/stealth_stay_the_course.ogg|https://incompetech.com/music/royalty-free/mp3
 music/ending_promises.ogg|https://incompetech.com/music/royalty-free/mp3-royaltyfree/Promises%20to%20Keep.mp3|rate=44100,gain=-23
 music/ending_lost_time.ogg|https://incompetech.com/music/royalty-free/mp3-royaltyfree/Lost%20Time.mp3|rate=44100,gain=-20
 music/casino_backbay.ogg|https://incompetech.com/music/royalty-free/mp3-royaltyfree/Backbay%20Lounge.mp3|rate=44100,gain=-22
+
+# PENNING (2026-10-25, owner: "sound on paddock is pretty bad"): a latch and a two-note marimba
+# rise, made by tools/make_pen_sounds.py, in place of gate_open's door creak on every penning.
+world/pen_in.wav|synth:make_pen_sounds.py|

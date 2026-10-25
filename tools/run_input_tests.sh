@@ -36,7 +36,9 @@ for n in "${names[@]}"; do
   if [ "${FILLY_INPUT_ON_DESKTOP:-0}" != "1" ] && ! grep -q "^## INPUT_TEST_REALTIME" "game/test_input/test_$n.gd"; then
     run+=(--fixed-fps "$fps")
   fi
-  out="$(timeout 3600 "${run[@]}" --path game --audio-driver Dummy -s "res://test_input/test_$n.gd" 2>&1)"
+  # --log-file into the test's own temp dir: Godot keeps only five logs in the user dir, and a
+  # test sweep would otherwise rotate the owner's own play session out of it.
+  out="$(timeout 3600 "${run[@]}" --log-file "$FILLY_TEST_SAVE_DIR/godot.log" --path game --audio-driver Dummy -s "res://test_input/test_$n.gd" 2>&1)"
   rc=$?
   keep="^INPUT_TEST_(OK|FAILED)|SCRIPT ERROR"
   [ "${FILLY_INPUT_VERBOSE:-0}" = "1" ] && keep="^INPUT_TEST_|SCRIPT ERROR"
