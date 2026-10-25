@@ -115,4 +115,15 @@ Canon MLP stays: real names, looks and places ("lean into mlp fully", private bu
 - **Real-input harness:** game/test_input/ and tools/run_input_tests.sh, running invisibly on the GPU.
 - **First pony fixed:** the first tip named no button, and closing a conversation with E opened the next one (an endless loop with Tumble). test_first_pony catches on the first try.
 - **Beam targeting:** aim assist cone, a highlight before the press (gold outline, ring, chevron), and the press takes the lit pony. Covered by test_beam_targeting.
-- **In progress with agents:** shadows, scale (SCALE.md), loading screen, settings menu, footsteps and audio audit, pony textures and eyes, camera collision, and the real-input playthrough driver.
+- **All nine notes fixed**, each with a test that failed before its fix and passes after (PLAYTEST_FIXES.md):
+  - shadows: PCSS off, range 160 m;
+  - scale: SCALE.md, test_scale;
+  - loading screen: worst stall 0.35 s;
+  - tabbed Settings menu;
+  - hoofsteps on footfalls, per surface (AUDIO_AUDIT.md);
+  - pony textures and eyes: contact sheets, test_pony_materials;
+  - camera lens ball: never under the terrain.
+- **The first catch can no longer be wrenched away** (found after the merges: test_first_pony was failing 2 runs in 4).
+- **The real-input playthrough driver** reached all five endings from a new game, each run separately.
+- **Gates on the final code:** the GUT suite, and all 10 real-input tests through tools/run_input_tests.sh.
+- **Two of the owner's save slots (0 and 9) were overwritten** by an agent's probe runs, and they could not be recovered (DECISIONS.md).

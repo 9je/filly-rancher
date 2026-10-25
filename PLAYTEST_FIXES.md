@@ -31,6 +31,48 @@ The suite was green and the game was broken, for four reasons that compound.
    - The bug that trapped a player in Tumble's chatter (below) only exists when the same E keypress reaches both the talk box (an input event) and the ranch's interact poll (`Input` state) in one frame.
    - Calling the talk box's `_accept()` directly, as the old bot did, never sends that second half.
 
+## The playthrough driver, rewritten (rule 2)
+
+Full write-up: `docs/playtest_fixes/playthrough.md`. It lists all 17 shortcuts the old driver took, from forcing the Scoop flag to calling the collection day itself.
+
+**The new driver** is `game/test_input/playthrough_input.gd`, run by `tools/playthrough.sh`, which now calls `tools/playthrough_input.sh`. It starts a fresh game from the title screen for each ending, plays only through RealInput, and reads the game only to decide what a player would do next:
+- the keys from the InputMap to walk, sneak, gallop and jump;
+- mouse motion to look;
+- the right mouse button held for the Scoop;
+- E to interact, and number keys for talk choices;
+- arrows, Enter and Escape for the menus;
+- mouse clicks for the title screen and the creator.
+
+There is no bed, so it waits for nights and collection days by playing through them.
+
+The old function-call driver is kept as `tools/smoke_endings.sh`. It only checks the ending table quickly, and it does not count as a playthrough.
+
+**Results:** all five endings reached from a new game by real input, each with its own fresh save folder.
+
+| Ending | Game time | Wall time |
+|---|---|---|
+| brightest_rainbow | 0:56 | 32 min |
+| gray_gold | 0:41 | 24 min |
+| lights_out | 0:50 | 31 min |
+| half_light | 0:42 | 25 min |
+| placement | 1:08 | 43 min |
+
+The five ran as separate runs, not as one `PLAYTHROUGHS_OK 5` sweep.
+
+**Game bugs the real-input run found:**
+- **Fixed: no ordinary Drifter could ever count as vivid.**
+  - `PathRules.VIVID` was 0.55, but every coat swatch is at saturation 0.45 or below.
+  - So the vivid contract and the Jubilee order could only be filled by the rare starry Nightmeadow variant.
+  - The old driver hid this by forcing caught coats to saturation 0.85.
+  - The threshold is now 0.37, which the brightest five swatches meet.
+- **Fixed: a new steward's first catch could be wrenched away** (note 1, cause 4).
+- **Not fixed:**
+  - The Dye Vat sits inside the Market's 6 m E radius, so over most of its reach the prompt says "E: Market".
+  - A named pony delivered on the Factory path is judged by stock swatch 0, not her real coat.
+  - On the Factory path a Bloomed pony can never leave a pen.
+  - Placement only works if you raid on the night before a collection dawn.
+  - Once, Marigold at the Depot was out of reach for about 3 minutes; the cause is unknown.
+
 ## 1. "I could not collect the first pony."
 
 **Test:** `game/test_input/test_first_pony.gd`. A fresh save, played from the title screen with keyboard and mouse, following only the onboarding prompts:
@@ -50,17 +92,23 @@ The suite was green and the game was broken, for four reasons that compound.
 3. **Before the Scoop, the beam failed silently** (fixed earlier the same day, 877d56d).
    - The horn is locked until Marigold's welcome.
    - A right-click did nothing and said nothing, and Marigold stayed wherever the player had left her.
+4. **Her first hold could be torn away by chance** (found after the merges, when `test_first_pony` failed 2 runs in 4 with "she got out of the beam after 0.8s").
+   - A new player's nearest pony can be bold. Bold ponies are graded HARD, and a HARD hold wrenches free half the time, about 0.85 s in.
+   - So the one catch the tips teach was a coin toss, however well the player did.
 
 **Fixes:**
 - `InputDevice.hint()` names any action from its live InputMap binding ("Right Mouse", "E", "F", "Ctrl"), with gamepad names when a pad is in use. The dead `launch` and `sprint` tips are replaced or removed, and the feed tip names the treat key.
 - `ranch._fresh_interact()`: the press that ended a conversation is spent until the key comes back up.
 - A beam press before the Scoop shows a toast, and Marigold walks back over (877d56d).
+- `MagicBeam.first_catch_grace`: while the steward has never caught anyone (story var `catches` is 0), no hold wrenches. The ranch sets it, and it lifts on the first catch. This uses the same rule the wrench falloff already reaches on a pony's third grab.
 
 **Failing before** (`build/playtest_evidence/`):
 - With the GLYPHS change reverted: `INPUT_TEST_FAILED test_first_pony the Scoop prompt names no button: 'Hold  on a pony to Scoop her up'` (`fp_glyph.log`).
 - With the talk latch removed: `INPUT_TEST_FAILED test_first_pony timed out after 300s`. The bot was stuck in Tumble's chatter (`fp_loop.log`; the first run, `first_pony_before.log`, shows the same).
 
-**Passing after:** `INPUT_TEST_OK test_first_pony caught on the first try` (on the GPU in the invisible display; 1 attempt, at 5.7 m).
+- The wrench: `test_magic_beam.gd`, `test_a_new_stewards_first_catch_never_wrenches`, sweeps 64 seeds on a fresh bold pony. Without the grace: `[26] expected to equal [0]: a new steward's first catch must never be torn away (26 of 64 were)`.
+
+**Passing after:** `INPUT_TEST_OK test_first_pony caught on the first try` (on the GPU in the invisible display; 1 attempt, at 5.7 m). After the wrench fix it passed 6 runs of 6, and the sweep reads 0 of 64.
 
 ## 2. "Beam selection feels weird." (rule 4: forgiving, readable targeting)
 
