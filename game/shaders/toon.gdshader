@@ -53,8 +53,14 @@ void light() {
 	float lit = smoothstep(band_center - band_softness, band_center + band_softness, ndl);
 	float falloff = 1.0;
 	if (LIGHT_IS_DIRECTIONAL) {
-		// ATTENUATION is the shadow term for the sun; band it like N.L.
-		lit = min(lit, smoothstep(0.45, 0.55, ATTENUATION));
+		// ATTENUATION is the sun's shadow term. It is NOT banded hard like N.L: the ranch sun's
+		// soft shadows (PCSS, light_angular_distance 0.9, shadow_blur 1.1) sample the map with a
+		// per-pixel rotated pattern, so across a penumbra or a self-shadowed flank the term
+		// hovers round 0.5 with pixel noise in it. A 0.45..0.55 step turned that noise into
+		// full-contrast salt and pepper: ponies (and trees, and walls) came out grainy and
+		// dithered (playtest 2026-10-24, docs/playtest_fixes/ponies.md). A wide ramp keeps
+		// the shadow edge but passes the noise at a fifth of the contrast.
+		lit = min(lit, smoothstep(0.2, 0.8, ATTENUATION));
 	} else {
 		// Omni and spot lights keep a soft distance falloff but still band the surface.
 		falloff = ATTENUATION;

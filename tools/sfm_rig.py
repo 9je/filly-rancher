@@ -210,6 +210,26 @@ def flatten_source_materials(rebuild_fallback):
             node_tree.links.new(shader.outputs["BSDF"], out.inputs["Surface"])
             rewired.append(mat.name)
         base_color = shader.inputs["Base Color"]
+        if base_texture is not None and _is_placeholder(base_texture.image) \
+                and mat.name.split(".")[0].lower() not in ("eyebrow", "eyelashes"):
+            # A placeholder anywhere else (Marble Pie's ManeTop: her VMT names a `manetop`
+            # her pack never shipped) has no colour this script can know. Say so loudly; the
+            # game swaps in the nearest sibling texture (ToonStyler._with_sibling_texture).
+            print(f"SOURCE_PLACEHOLDER {mat.name!r}: {base_texture.image.name!r} is SourceIO's "
+                  "missing-texture checker; the VMT's texture is not in the pack")
+        elif base_texture is not None and _is_placeholder(base_texture.image):
+            # SourceIO's MISSING-TEXTURE CHECKER, not a texture. Every ReVAmped eyebrow and
+            # eyelashes VMT is `$basetexture vgui/white` times `$color2 {0 0 0}`; vgui/white
+            # ships with the engine, not the pack, so SourceIO substituted its magenta and
+            # black checker (`missing_white`) and the wiring below used to paint it on 37
+            # ponies' brows and lashes (docs/playtest_fixes/ponies.md). Ship what Source
+            # draws instead: white times $color2, a flat black.
+            for link in list(base_color.links):
+                node_tree.links.remove(link)
+            base_color.default_value = (0.0, 0.0, 0.0, 1.0)
+            base_texture = None
+            if mat.name not in rewired:
+                rewired.append(mat.name)
         if base_texture is not None and not (
                 base_color.links and base_color.links[0].from_node.type == "TEX_IMAGE"):
             # Source blends `$basetexture` with `$color2`/detail maps through a Mix, and
@@ -247,6 +267,13 @@ def flatten_source_materials(rebuild_fallback):
 ## `$basetexture` is the blank sclera -- taking the sclera there gives a pony with two
 ## plain white eyes, which is what the first render of this actually produced.
 _COLOUR_PARAMS = ("$iris", "$basetexture")
+
+
+def _is_placeholder(image):
+    """True for SourceIO's stand-in for a texture it could not find (`missing_white` and
+    friends), which is a magenta and black checker, never the colour the VMT meant."""
+    name = ((image.name or "") + " " + (image.filepath or "")).lower()
+    return "missing_" in name
 
 
 def _source_basetexture(node_tree):

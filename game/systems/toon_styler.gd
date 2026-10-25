@@ -64,12 +64,157 @@ static func style(root: Node, category: StringName = &"prop", cache: Variant = n
 						and (src as StandardMaterial3D).albedo_texture != null:
 					out = sfm_eye((src as StandardMaterial3D).albedo_texture)
 					store[key] = out
+				if out == null and category == &"pony" and is_face_line(src as StandardMaterial3D):
+					out = _face_line(src.resource_name, root)
+					store[key] = out
+				if out == null and category == &"pony" \
+						and is_placeholder((src as StandardMaterial3D).albedo_texture):
+					out = to_toon(_with_sibling_texture(src as StandardMaterial3D, root), preset)
+					store[key] = out
 				if out == null:
 					out = to_toon(src as StandardMaterial3D, preset)
 					store[key] = out
 				mi.set_surface_override_material(i, out)
 				touched += 1
 	return touched
+
+
+## THE CONVERTER'S MISSING-TEXTURE PLACEHOLDER (playtest note "weird eyes", 2026-10-24,
+## docs/playtest_fixes/ponies.md). Every ReVAmped pony's eyebrow and eyelashes VMT is
+## `$basetexture vgui/white` tinted by `$color2 {0 0 0}`; vgui/white is an engine texture no
+## pony pack ships, so SourceIO wrote its magenta-and-black "missing" checker in its place
+## (`<id>_missing_white.png`), and tools/sfm_rig.py wired that straight into the base colour.
+## Thirty-seven canon ponies wore purple checkered brows and lashes. A placeholder is never
+## drawn: the surface gets the flat colour Source meant instead (_face_line).
+static func is_placeholder(tex: Texture2D) -> bool:
+	if tex == null:
+		return false
+	var p := (tex.resource_path + " " + tex.resource_name).to_lower()
+	return p.contains("_missing_") or p.contains("missing_white") or p.contains("missing_black")
+
+
+## An SFM eyebrow or eyelashes surface that has no real colour of its own: the placeholder
+## checker (a conversion from before tools/sfm_rig.py learned to drop it), or the flat black
+## that conversion ships now. Either way the line is drawn by _face_line, so an old and a new
+## conversion of one pony look the same.
+static func is_face_line(src: StandardMaterial3D) -> bool:
+	var n := src.resource_name.get_slice(".", 0).to_lower()
+	if n != "eyebrow" and n != "eyelashes":
+		return false
+	if is_placeholder(src.albedo_texture):
+		return true
+	var c := src.albedo_color
+	return src.albedo_texture == null and maxf(c.r, maxf(c.g, c.b)) < 0.02
+
+
+## Lash and brow colours, the same ones PonyPaint gives a Drifter: lashes near black (Source's
+## own $color2 {0 0 0}), brows her coat darkened, the way the show draws a brow line.
+const LASH_COLOR := Color(0.08, 0.06, 0.1)
+const BROW_DARKEN := 0.62
+
+
+static func _face_line(name: String, root: Node) -> ShaderMaterial:
+	var c := LASH_COLOR
+	if name.to_lower().begins_with("eyebrow"):
+		var coat := coat_color(root)
+		c = Color(coat.r * BROW_DARKEN, coat.g * BROW_DARKEN, coat.b * BROW_DARKEN, 1.0)
+	var m := ShaderMaterial.new()
+	m.shader = TOON
+	m.resource_name = name
+	m.set_shader_parameter(&"albedo", c)
+	m.set_shader_parameter(&"use_texture", false)
+	m.set_shader_parameter(&"shadow_fill", 0.38)
+	m.set_meta(&"recolored", true)
+	return m
+
+
+## A copy of `src` wearing the real texture of its nearest sibling instead of the placeholder.
+## Marble Pie's VMT asks for `MarblePie/manetop`, a file her pack never shipped (it ships
+## ManeFront and ManeSide), so her forelock came out as the magenta checker; ManeSide is the
+## same grey hair painted the same way. The sibling is the material sharing the longest name
+## prefix (mane* for a mane), else any hair, mane or tail texture; with none the surface is
+## drawn flat in the colour the checker can never be.
+static func _with_sibling_texture(src: StandardMaterial3D, root: Node) -> StandardMaterial3D:
+	var want := src.resource_name.get_slice(".", 0).to_lower()
+	var best: Texture2D = null
+	var best_score := 0
+	for node: Node in root.find_children("*", "MeshInstance3D", true, false):
+		var mi: MeshInstance3D = node
+		if mi.mesh == null:
+			continue
+		for i in mi.mesh.get_surface_count():
+			var m := mi.mesh.surface_get_material(i) as StandardMaterial3D
+			if m == null or m == src or m.albedo_texture == null or is_placeholder(m.albedo_texture):
+				continue
+			var n := m.resource_name.get_slice(".", 0).to_lower()
+			var score := 0
+			while score < mini(n.length(), want.length()) and n[score] == want[score]:
+				score += 1
+			for hair in ["mane", "hair", "tail"]:
+				if n.contains(hair):
+					score += 1
+			if score > best_score:
+				best_score = score
+				best = m.albedo_texture
+	var out := src.duplicate() as StandardMaterial3D
+	out.albedo_texture = best
+	if best == null:
+		out.albedo_color = coat_color(root).darkened(0.3)
+	return out
+
+
+static var _coat_cache: Dictionary = {}
+
+
+## Her coat colour: the commonest colour of her `body` texture (the barrel covers most of it),
+## or the material's flat colour. Cached per texture.
+static func coat_color(root: Node) -> Color:
+	for node: Node in root.find_children("*", "MeshInstance3D", true, false):
+		var mi: MeshInstance3D = node
+		if mi.mesh == null:
+			continue
+		for i in mi.mesh.get_surface_count():
+			var m := mi.mesh.surface_get_material(i) as StandardMaterial3D
+			if m == null or m.resource_name.get_slice(".", 0) != "body":
+				continue
+			var tex := m.albedo_texture
+			if tex == null:
+				return m.albedo_color
+			var key := tex.get_rid().get_id()
+			if not _coat_cache.has(key):
+				_coat_cache[key] = _dominant(tex, m.albedo_color)
+			return _coat_cache[key]
+	return Color(0.5, 0.45, 0.5)
+
+
+static func _dominant(tex: Texture2D, fallback: Color) -> Color:
+	var img := tex.get_image()
+	if img == null or img.is_empty():
+		return fallback
+	if img.is_compressed():
+		img.decompress()
+	img = img.duplicate() as Image
+	img.convert(Image.FORMAT_RGBA8)
+	img.resize(32, 32, Image.INTERPOLATE_NEAREST)
+	var counts := {}
+	var sums := {}
+	for y in 32:
+		for x in 32:
+			var px := img.get_pixel(x, y)
+			if px.a < 0.5:
+				continue
+			var q := Vector3i(int(px.r * 12.0), int(px.g * 12.0), int(px.b * 12.0))
+			counts[q] = int(counts.get(q, 0)) + 1
+			sums[q] = (sums.get(q, Color(0, 0, 0, 0)) as Color) + px
+	var best: Variant = null
+	for q: Vector3i in counts:
+		if best == null or int(counts[q]) > int(counts[best]):
+			best = q
+	if best == null:
+		return fallback
+	var s: Color = sums[best]
+	var n := float(counts[best])
+	return Color(s.r / n, s.g / n, s.b / n, 1.0)
 
 
 ## A canon PonySFM pony's eyeball: the eye shader with her own iris colours and the iris shrunk

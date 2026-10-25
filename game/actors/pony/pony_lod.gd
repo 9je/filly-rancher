@@ -51,6 +51,19 @@ static func _keep_full(mesh: ArrayMesh, s: int) -> bool:
 	return false
 
 
+## The format bits a surface must be re-added with: 8 bone weights, and the CUSTOM0..3
+## channel formats. Passing only the bone-weight bit (as this file once did) told the
+## server that a surface carrying a custom channel had none, it refused the arrays
+## ("Invalid array format for surface"), and Applejack's whole body -- coat, face, mouth,
+## four surfaces -- came out as an empty mesh: an invisible pony with a hat, a mane and a
+## pair of eyes floating over the grass (docs/playtest_fixes/ponies.md).
+static func _keep_bits(format: int) -> int:
+	var bits := Mesh.ARRAY_FLAG_USE_8_BONE_WEIGHTS
+	for n in 4:
+		bits |= Mesh.ARRAY_FORMAT_CUSTOM_MASK << (Mesh.ARRAY_FORMAT_CUSTOM_BASE + n * Mesh.ARRAY_FORMAT_CUSTOM_BITS)
+	return format & bits
+
+
 static func _build(mesh: ArrayMesh) -> ArrayMesh:
 	var im := ImporterMesh.new()
 	for b in mesh.get_blend_shape_count():
@@ -59,7 +72,7 @@ static func _build(mesh: ArrayMesh) -> ArrayMesh:
 	for s in mesh.get_surface_count():
 		im.add_surface(mesh.surface_get_primitive_type(s), mesh.surface_get_arrays(s),
 			mesh.surface_get_blend_shape_arrays(s), {}, mesh.surface_get_material(s),
-			mesh.surface_get_name(s), mesh.surface_get_format(s) & Mesh.ARRAY_FLAG_USE_8_BONE_WEIGHTS)
+			mesh.surface_get_name(s), _keep_bits(mesh.surface_get_format(s)))
 	im.generate_lods(25.0, 60.0, [])
 	var out := ArrayMesh.new()
 	for b in mesh.get_blend_shape_count():
@@ -71,7 +84,12 @@ static func _build(mesh: ArrayMesh) -> ArrayMesh:
 			for l in im.get_surface_lod_count(s):
 				lods[im.get_surface_lod_size(s, l)] = im.get_surface_lod_indices(s, l)
 		out.add_surface_from_arrays(mesh.surface_get_primitive_type(s), mesh.surface_get_arrays(s),
-			mesh.surface_get_blend_shape_arrays(s), lods, mesh.surface_get_format(s) & Mesh.ARRAY_FLAG_USE_8_BONE_WEIGHTS)
+			mesh.surface_get_blend_shape_arrays(s), lods, _keep_bits(mesh.surface_get_format(s)))
+		if out.get_surface_count() != s + 1:
+			# The server refused this surface. A mesh without its LODs costs some triangles; a
+			# mesh missing a surface is a pony missing her body. Keep the original.
+			push_warning("PonyLod: surface %d of '%s' would not rebuild; keeping the mesh unLODded" % [s, mesh.resource_name])
+			return mesh
 		out.surface_set_material(s, mesh.surface_get_material(s))
 		out.surface_set_name(s, mesh.surface_get_name(s))
 	out.custom_aabb = mesh.custom_aabb
