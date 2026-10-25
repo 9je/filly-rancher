@@ -894,8 +894,12 @@ func _build_model() -> void:
 		# The assetless checkout (docs/ci.md section 4). The swatches and the canvas still
 		# work; there is simply nothing standing on the turntable to look at.
 		return
-	_model = PonyVisualsScript.build(data,
-		StockPaletteScript.mane_style_path(_look.mane_style))
+	# The body her paint expects: her race's donor list (PlayerLook.styles_for), never the
+	# old four-unicorn list, or past the fourth style the mane names miss and the mane keeps
+	# the donor's own texture (owner playtest 2026-10-25, "cant customize my ponies hair").
+	var donor: StringName = _look.to_pony_look(_palette).donor
+	_model = PonyVisualsScript.build(data, DonorTableScript.model_path(donor) if donor != &"" \
+		else StockPaletteScript.mane_style_path(_look.mane_style))
 	if _model != null:
 		_model.rotate_y(PI)
 		_turntable.add_child(_model)

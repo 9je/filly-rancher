@@ -485,3 +485,34 @@ func test_the_three_steps_fit_a_1080_screen() -> void:
 		await wait_frames(2)
 		var col := _screen.find_child("Column", true, false) as Control
 		assert_lt(col.get_combined_minimum_size().y, 1000.0, "step %d fits" % step)
+
+
+## OWNER PLAYTEST 2026-10-25: "cant customize my ponies hair". The turntable pony was built
+## from the old four-unicorn list while the paint used her race's donor list, so past the
+## fourth style (and for every earth pony and pegasus) the mane names did not match and the
+## mane kept the donor's own texture. Every style of every race must wear the picked mane.
+func test_every_style_of_every_race_wears_the_picked_mane() -> void:
+	if _screen.model() == null:
+		pending("assetless checkout")
+		return
+	# The paint finds the mane by the donor row's surface names (PonyPaint.role_of), so the
+	# body on the turntable must carry the surfaces that row names.
+	var palette := StockPalette.load_player()
+	var table := DonorTable.load_table()
+	for race in [PlayerLookScript.RACE_EARTH, PlayerLookScript.RACE_PEGASUS,
+			PlayerLookScript.RACE_UNICORN]:
+		_screen.set_race(race)
+		for style in PlayerLookScript.style_count(race):
+			_screen.set_mane_style(style)
+			var donor: StringName = _screen.look().to_pony_look(palette).donor
+			var mane_names: PackedStringArray = table.find(donor).get("mane", PackedStringArray())
+			var found := 0
+			for mi: MeshInstance3D in _screen.model().find_children("*", "MeshInstance3D", true, false):
+				if mi.mesh == null:
+					continue
+				for i in mi.mesh.get_surface_count():
+					var m := mi.mesh.surface_get_material(i)
+					if m != null and m.resource_name in mane_names:
+						found += 1
+			assert_gt(found, 0, "race %d style %d (%s): the turntable body has the mane the paint colours"
+				% [race, style, donor])
