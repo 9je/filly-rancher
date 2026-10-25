@@ -283,7 +283,11 @@ const HOUSE_SAVE_REARM := 9.0
 ## How close to the Market's origin counts as "at the market", in metres. A little wider
 ## than the building's own half-diagonal (5.5 x 4.5 m, so 3.55 m corner to centre), so
 ## "go to the market" is satisfied by walking up to the door rather than into the wall.
-const MARKET_RADIUS := 4.5
+##
+## 6.0, WAS 4.5: the Market grew by 1.35 to SCALE.md's house size (docs/playtest_fixes/scale.md),
+## so its front wall and the Vendor beside its door stand 1.35 times further from this origin;
+## the radius grew with them.
+const MARKET_RADIUS := 6.0
 
 ## How close to the request board's post counts as "at the board", in metres. Narrower than
 ## MARKET_RADIUS because the board is a small thing (3.0 x 1.2 m) five metres from the
@@ -746,6 +750,12 @@ func _ready() -> void:
 	# Asked before anything else, because the very next line depends on the answer: a
 	# hosted ranch neither arms the watchdog nor quits the process. See _hosted.
 	_hosted = get_tree().current_scene != self or BootIntentScript.driven
+	# BEHIND THE LOADING SCREEN, WHEN THERE IS ONE (game/ui/loading_screen.gd): the boot
+	# below then hands a frame back every BOOT_BEAT_MS so the bar moves. No screen (every
+	# gate, every headless run) and nothing here changes: _boot_beat() returns at once.
+	_paced = LoadingScreenScript.claim()
+	# A frame straight away: everything under the ranch has just run its own _ready().
+	await _boot_beat(0.01, "Raising the hills")
 
 	# Armed FIRST, before anything below has a chance to raise mid-function -- see
 	# GateWatchdogScript's doc comment for the exact hang this guards against. Not armed
@@ -764,6 +774,7 @@ func _ready() -> void:
 	terrain.regions = _regions_registry()
 	terrain.build()
 	PonyScript.ground_height = Callable(terrain, "height_at")
+	await _boot_beat(0.04, "Raising the hills")
 	var dressing := RegionDressingScript.new()
 	dressing.name = "Dressing"
 	dressing.height_at = Callable(terrain, "height_at")
@@ -775,7 +786,11 @@ func _ready() -> void:
 	# THE REGIONS' SCENERY (world/region_dressing.gd): a wood, a moonflower meadow, a lake
 	# shore and an orchard, where the visual review found fenced discs of tinted grass.
 	regions_root.add_child(dressing)
-	dressing.dress(_regions_registry().all())
+	if _paced:
+		await dressing.dress_paced(_regions_registry().all(), _boot_pace(0.05, 0.20,
+			"Planting the Everfree"))
+	else:
+		dressing.dress(_regions_registry().all())
 
 	# THE FENCES, HERE AND NOT IN THE SCENE FILE. A ring of rails has to be seated on the
 	# ground post by post, and the ground does not exist until the two lines above have
@@ -800,6 +815,7 @@ func _ready() -> void:
 			continue
 		fence.configure(region, Callable(terrain, "height_at"))
 		fence.build()
+		await _boot_beat(0.22, "Mending the fences")
 	_region_fence_cache = get_region_fences()
 
 	# THE STRIP, on ground that now exists. Lamp posts and a marquee, built here rather than
@@ -882,6 +898,7 @@ func _ready() -> void:
 				Vector2(palace_building.width * 0.5, palace_building.depth * 0.5),
 				palace_building.global_position.y + palace_building.ridge_height)
 		strip.build()
+	await _boot_beat(0.25, "Lighting up the Strip")
 
 	if race_track != null and race_track.has_method("configure"):
 		race_track.call("configure", Callable(terrain, "height_at"))
@@ -989,6 +1006,8 @@ func _ready() -> void:
 	# (see its own comment): a plinth deep enough to clear a dipping corner does nothing if
 	# it is still seated against the middle of the footprint instead.
 	for node: Node3D in buildings.get_children():
+		await _boot_beat(0.27 + 0.08 * float(node.get_index()) / float(buildings.get_child_count()),
+			"Raising the barn")
 		node.build()
 		var seat_height: float = terrain.height_at(node.global_position.x, node.global_position.z)
 		var seated_building: Building = node as BuildingScript
@@ -999,6 +1018,7 @@ func _ready() -> void:
 	# THE VENDOR AND THE TELLER, right after the buildings that give them their doors are
 	# seated: _stand_attendants() reads the live building nodes' global_position/depth, so
 	# it has to run after this loop, not before it.
+	await _boot_beat(0.35, "Opening the shops")
 	_stand_attendants()
 
 	# THE LOADING DOCK STAYS ON THE GROUND. Buildings/Depot/Crate is a Marker3D authored at
@@ -1063,7 +1083,12 @@ func _ready() -> void:
 	_stand_request_board()
 	_stand_palace_facade()
 
-	var prop_count: int = props.build() + buildings.get_child_count()
+	await _boot_beat(0.37, "Opening the shops")
+	var prop_count: int = buildings.get_child_count()
+	if _paced:
+		prop_count += await props.build_paced(_boot_pace(0.38, 0.52, "Dressing the valley"))
+	else:
+		prop_count += props.build()
 
 	# THE BEAM'S CATCHES, BEFORE THERE IS ANYTHING ON THE MAP TO CATCH. The beam is a child
 	# of the player scene and so has existed since the first line of this function; the
@@ -1078,9 +1103,17 @@ func _ready() -> void:
 	# for (slice 5 task 1), and _world is already built by _bind_game_state() above, so a
 	# save quit at midnight boots into the ponies who are actually out at midnight rather
 	# than into the DAWN default and then a correction on the next phase flip.
-	var pony_count: int = spawner.populate(_world.phase(), _world.weather()) if _world != null \
-		else spawner.populate()
+	var pony_count := 0
+	if _paced:
+		pony_count = await spawner.populate_paced(
+			_world.phase() if _world != null else WorldStateScript.Phase.DAWN,
+			_world.weather() if _world != null else WorldStateScript.Weather.CLEAR,
+			_boot_pace(0.54, 0.82, "Waking the herd"))
+	else:
+		pony_count = spawner.populate(_world.phase(), _world.weather()) if _world != null \
+			else spawner.populate()
 	_herd_ready = true
+	await _boot_beat(0.83, "Counting ponies (twice)")
 
 	# The plot slots are seated on the terrain before anything is built on them, so a pen
 	# inherits a slot that is already standing on the ground rather than having to find it
@@ -1094,7 +1127,9 @@ func _ready() -> void:
 	# pen up, drop ponies in it, watch whether they stay, and take it down again. See
 	# _probe_pen_containment() for why this happens at boot in every mode rather than only
 	# in a gate run.
+	await _boot_beat(0.86, "Testing the pen gates")
 	_pen_probe = await _probe_pen_containment()
+	await _boot_beat(0.89, "Unpacking your saddlebag")
 
 	# Now the player's actual ranch: what she built, then who lives in it.
 	_restored_plots = _restore_plots()
@@ -1103,9 +1138,14 @@ func _ready() -> void:
 	# she quit back where they live -- pens first, saddlebag for everyone else.
 	_restored_ponies = restore_owned_ponies()
 
+	await _boot_beat(0.91, "Unpacking your saddlebag")
 	_bind_build_menu()
+	await _boot_beat(0.94, "Calling on the neighbours")
 
 	_setup_people()
+	if _paced and people != null:
+		await people.populate_paced(_boot_pace(0.94, 0.96, "Calling on the neighbours"))
+	await _boot_beat(0.96, "Calling on the neighbours")
 	_setup_tone()
 
 	# THE FIRST POST, before the gate reports. A brand new ranch has a letter waiting in the
@@ -1113,11 +1153,56 @@ func _ready() -> void:
 	# something on the very first frame.
 	advance_story()
 
+	await _boot_beat(0.97, "Checking the mail")
 	await _report(pony_count, prop_count)
+	await _boot_beat(0.99, "Putting the kettle on")
 
 	_apply_player_look()
 	_quiet_tiny_shadows(self)
 	_maybe_open_creation()
+	boot_done = true
+	LoadingScreenScript.release()
+
+
+# --- the loading screen (game/ui/loading_screen.gd, docs/playtest_fixes/loading.md) -----
+
+const LoadingScreenScript := preload("res://ui/loading_screen.gd")
+## The longest the boot keeps the main thread before it hands a frame back to the loading
+## screen. Measured, the boot is about 25 to 35 s of work on the owner's machine; one frame
+## per tenth of a second costs it about a tenth of that and keeps the bar moving.
+const BOOT_BEAT_MS := 100
+
+## True once the ranch is up and playable: every self-check run, the creator (on a new game)
+## open. Read by game/test_input/test_loading.gd.
+var boot_done := false
+var _paced := false
+var _boot_beat_ms := 0
+
+
+## One step of the boot: the bar goes to `fraction`, and if the boot has held the main thread
+## for BOOT_BEAT_MS a frame is drawn. THE WORLD IS PAUSED FOR THAT FRAME: nothing in a half
+## built ranch gets a _process or a _physics_process from it (the player does not fall, the
+## clock does not run), and the loading screen, PROCESS_MODE_ALWAYS, is the only thing that
+## moves. The physics frames the boot already awaits below run unpaused, exactly as before.
+func _boot_beat(fraction: float, caption: String = "") -> void:
+	if not _paced:
+		return
+	LoadingScreenScript.report(fraction, caption)
+	if Time.get_ticks_msec() - _boot_beat_ms < BOOT_BEAT_MS:
+		return
+	var tree := get_tree()
+	var was := tree.paused
+	tree.paused = true
+	await tree.process_frame
+	tree.paused = was
+	_boot_beat_ms = Time.get_ticks_msec()
+
+
+## A pace for a long loop in another file (Props, RegionDressing, Spawner): called as
+## `await pace.call(done, total)`, it is a _boot_beat() between `from` and `to`.
+func _boot_pace(from: float, to: float, caption: String) -> Callable:
+	return func(done: int, total: int) -> void:
+		await _boot_beat(lerpf(from, to, float(done) / float(maxi(1, total))), caption)
 
 
 ## NOTHING SMALLER THAN A HOOF CASTS A SHADOW. Eyes, eyelashes, teeth, chips and cards were
@@ -2537,7 +2622,10 @@ func _on_load_requested() -> void:
 		pause_menu.call("close")
 	get_tree().paused = false
 	_set_cursor_captured(true)
-	get_tree().reload_current_scene()
+	# Behind the loading screen, like every other way into the ranch (docs/playtest_fixes/
+	# loading.md); reload_current_scene() rebuilt the whole valley in one frozen frame.
+	LoadingScreenScript.change_scene(get_tree(), scene_file_path, LoadingScreenScript.Look.RANCH,
+		"Back to your last save")
 
 
 func _on_settings_changed() -> void:
@@ -2554,6 +2642,14 @@ func _apply_settings() -> void:
 	if _rig != null:
 		_rig.mouse_sensitivity = _settings.mouse_sensitivity
 		_rig.invert_look = _settings.invert_look
+		_rig.stick_sensitivity = _settings.stick_sensitivity
+		var cam: Camera3D = _rig.call("get_camera") if _rig.has_method("get_camera") else null
+		if cam != null:
+			cam.fov = _settings.fov
+	var hud_node := get_node_or_null(^"HUD")
+	if hud_node != null and hud_node.has_method("set_controls_chip_enabled"):
+		hud_node.call("set_controls_chip_enabled", _settings.show_controls_chip)
+		hud_node.call("set_checklist_enabled", _settings.show_checklist)
 	if _interactive:
 		_settings.apply_audio()
 		_settings.apply_graphics(get_viewport())
@@ -3340,6 +3436,12 @@ func refund_open_race() -> int:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_EXIT_TREE:
 		refund_open_race()
+	elif what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		# THE GAMEPLAY TAB'S "Pause when the window loses focus": alt-tab away and the ranch
+		# waits under the pause menu instead of running on without her.
+		if _interactive and _settings != null and _settings.pause_on_focus_loss \
+				and pause_menu != null and not bool(pause_menu.call("is_open")):
+			pause_menu.call("open")
 
 
 func get_race_track() -> Node3D:
@@ -3544,12 +3646,13 @@ func _update_sound_zone() -> void:
 		return
 	_sound_zone = zone
 	_sound_call(&"ambient_set_zone", [zone])
-	# THE SURFACE FALLS OUT OF THE SAME ANSWER. The Strip is boards and the Palace floor is
-	# not grass; everywhere else on this map is turf. The player does not know what a
-	# region is and this is the one place that does.
+	# THE OPEN-GROUND SURFACE FALLS OUT OF THE SAME ANSWER. The Strip is paved and the
+	# Palace floor is not grass; everywhere else on this map is turf. The player does not
+	# know what a region is and this is the one place that does. (The path's dirt, a
+	# building's boards and the Factory's metal decide for themselves: Player.surface_for.)
 	if player != null and player.has_method("set_step_surface"):
 		player.call("set_step_surface", PlayerScript.SURFACE_GRASS if zone == SoundScript.ZONE_NONE
-			else PlayerScript.SURFACE_HARD)
+			else PlayerScript.SURFACE_STONE)
 
 
 ## The zone this ranch last pushed. Read by the sound gate and by the suite; nothing in the
@@ -5987,6 +6090,7 @@ func _probe_pen_containment() -> Dictionary:
 		if candidate.capacity >= PEN_PROBE_PONIES:
 			plot = candidate
 			break
+	await _boot_beat(0.865, "Testing the pen gates")
 	if plot == null or not slot.build(plot):
 		return result
 
@@ -6006,6 +6110,7 @@ func _probe_pen_containment() -> Dictionary:
 		var character: StringName = roster[i % roster.size()].id if not roster.is_empty() \
 			else &"twilight"
 		var inst: PonyInstance = PonyInstanceScript.create(character)
+		await _boot_beat(0.87 + 0.01 * float(i) / float(PEN_PROBE_PONIES), "Testing the pen gates")
 		if pen.add_pony(inst):
 			probes.append(inst)
 
@@ -7290,7 +7395,9 @@ func _setup_people() -> void:
 	people.effect.connect(_on_people_effect)
 	people.talk_finished.connect(_on_talk_finished_novelty)
 	people.talk_finished.connect(_on_talk_spent_interact)
-	people.populate()
+	# Paced, the boot stands the cast itself, a step per character (see _ready()).
+	if not _paced:
+		people.populate()
 
 
 ## The Dictionary DialogueRunner reads (game/systems/dialogue_runner.gd).
@@ -7842,7 +7949,7 @@ func _ride_lift_to_factory(mode: StringName) -> void:
 		# The playthrough driver changes the scene itself (scenes/test/playthrough.gd).
 		return
 	get_tree().paused = false
-	get_tree().change_scene_to_file.call_deferred(FACTORY_SCENE)
+	LoadingScreenScript.change_scene(get_tree(), FACTORY_SCENE, LoadingScreenScript.Look.FACTORY)
 
 
 signal lift_requested(mode: StringName)
@@ -8058,7 +8165,8 @@ func placement_aftermath() -> bool:
 			print("PLACEMENT_RESTORED")
 			if not BootIntentScript.driven and is_inside_tree():
 				get_tree().paused = false
-				get_tree().reload_current_scene.call_deferred()
+				LoadingScreenScript.change_scene(get_tree(), scene_file_path,
+					LoadingScreenScript.Look.RANCH, "Back to the morning before")
 			return true
 	var story: Story = _game_state.story
 	story.set_var("ending", "")

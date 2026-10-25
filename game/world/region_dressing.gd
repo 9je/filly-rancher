@@ -20,7 +20,24 @@ extends Node3D
 
 const ToonStylerScript := preload("res://systems/toon_styler.gd")
 const LayersScript := preload("res://world/collision_layers.gd")
+const PropsScript := preload("res://world/props.gd")
 const NATURE := "res://assets/models/nature/"
+
+## SIZES ARE IN PONY HEIGHTS NOW, NOT IN SCALE FACTORS (SCALE.md, docs/playtest_fixes/scale.md).
+## Every tree and standing stone used to be drawn at a random multiple of its OWN model's size,
+## and the Nature Kit's models are not one size: a pineTallB at 6.2x stood 5.4 pony heights and
+## a fat oak at 4.2x stood 1.9, in the same wood. A tree is now asked for by the height it
+## should stand (a random draw inside its row's range, in PH) and scaled to that off its own
+## measured height, so every tree on the map lands inside SCALE.md's tree row whatever model
+## it is. Kept as Vector2(min, max) per planting so each region still has its own character.
+const PH: float = PropsScript.PONY_HEIGHT
+const EVERFREE_RIM_PH := Vector2(2.6, 3.6)
+const EVERFREE_OUTER_PH := Vector2(2.8, 3.9)
+const EVERFREE_INNER_PH := Vector2(2.3, 3.1)
+const MEADOW_TREE_PH := Vector2(2.4, 3.3)
+const LAKE_TREE_PH := Vector2(2.3, 3.0)
+## The Night Meadow's ring: a little over a pony, every stone, whichever of the five it is.
+const STANDING_STONE_PH := Vector2(1.05, 1.35)
 
 ## Leaf and grass greens, by how dark the source material was meant to be.
 const GREEN := Color(0.42, 0.66, 0.3)
@@ -36,22 +53,71 @@ var water_y: Dictionary = {}
 var _meshes: Dictionary = {}
 var _batches: Dictionary = {}
 var _rng := RandomNumberGenerator.new()
+## dress_paced()'s dry run: true while the placements only write down what they would load.
+var _dry := false
+var _wanted: Dictionary = {}
 
 
 ## Dress every region in `regions` (RegionData).
 func dress(regions: Array) -> void:
+	# The same body as dress_paced(), with no pace: it never awaits, so it runs to the end
+	# inside this call. call() by name because the parser insists a function that CAN await
+	# is always awaited, and every existing caller of dress() is synchronous.
+	call(&"dress_paced", regions, Callable())
+
+
+## dress(), handing a frame back between the pieces of work: `await pace.call(done, total)`
+## after each region and each batch (the ranch's boot behind the loading screen,
+## docs/playtest_fixes/loading.md). An invalid pace is dress() exactly.
+func dress_paced(regions: Array, pace: Callable) -> void:
+	# PACED, THE MODELS ARE WARMED FIRST, one per step. A region's first use of a model is
+	# the expensive part (load, instance, copy and restyle its meshes; a second or more for a
+	# whole region), and it happens deep inside one placement, so a dry run of the same
+	# placements (_dry: nothing is placed, only what they would need is written down, and the
+	# seed is set again for the real run, so the valley is the one dress() builds) lists the
+	# models, and each is warmed in a step of its own.
+	var warm: Array = []
+	if pace.is_valid():
+		_dry = true
+		for r: RegionData in regions:
+			_dress_region(r)
+		_dry = false
+		warm = _wanted.values()
+		_wanted.clear()
+	var keys_hint := 24
+	var total := warm.size() + regions.size() + keys_hint
+	var done := 0
+	for w: Array in warm:
+		if String(w[0]).begins_with("res://"):
+			_scene_parts(w[0])
+		else:
+			_parts(w[0], w[1], w[2])
+		done += 1
+		await pace.call(done, total)
 	for r: RegionData in regions:
-		_rng.seed = hash(String(r.id)) * 7 + 11
-		match r.id:
-			&"everfree":
-				_everfree(r)
-			&"nightmeadow":
-				_night_meadow(r)
-			&"lake":
-				_lake(r)
-			&"orchard":
-				_orchard(r)
-	_flush()
+		_dress_region(r)
+		done += 1
+		if pace.is_valid():
+			await pace.call(done, total)
+	var keys: Array = _batches.keys()
+	for i in keys.size():
+		_flush_one(keys[i])
+		if pace.is_valid():
+			await pace.call(done + int(float(keys_hint) * float(i + 1) / float(keys.size())), total)
+	_batches.clear()
+
+
+func _dress_region(r: RegionData) -> void:
+	_rng.seed = hash(String(r.id)) * 7 + 11
+	match r.id:
+		&"everfree":
+			_everfree(r)
+		&"nightmeadow":
+			_night_meadow(r)
+		&"lake":
+			_lake(r)
+		&"orchard":
+			_orchard(r)
 
 
 # --- the regions ----------------------------------------------------------------------
@@ -63,13 +129,13 @@ func _everfree(r: RegionData) -> void:
 	for i in 54:
 		var a := TAU * float(i) / 54.0 + _rng.randf_range(-0.05, 0.05)
 		var d := r.radius * _rng.randf_range(0.78, 1.3)
-		_tree(r, trees[_rng.randi() % trees.size()], a, d, _rng.randf_range(4.2, 6.2), GREEN_EVERFREE)
+		_tree(r, trees[_rng.randi() % trees.size()], a, d, _ph(EVERFREE_RIM_PH), GREEN_EVERFREE)
 	for i in 40:
 		var a2 := TAU * float(i) / 40.0 + 0.07
-		_tree(r, trees[_rng.randi() % trees.size()], a2, r.radius * _rng.randf_range(1.3, 1.7), _rng.randf_range(4.5, 6.8), GREEN_EVERFREE)
+		_tree(r, trees[_rng.randi() % trees.size()], a2, r.radius * _rng.randf_range(1.3, 1.7), _ph(EVERFREE_OUTER_PH), GREEN_EVERFREE)
 	for i in 14:
 		_tree(r, trees[_rng.randi() % trees.size()], _rng.randf() * TAU, r.radius * _rng.randf_range(0.3, 0.72),
-			_rng.randf_range(3.6, 5.2), GREEN_EVERFREE)
+			_ph(EVERFREE_INNER_PH), GREEN_EVERFREE)
 	_scatter(r, ["mushroom_redGroup", "mushroom_tanGroup", "mushroom_red", "mushroom_redTall"], 34, 0.1, 0.95, Vector2(2.6, 4.0))
 	_scatter(r, ["log", "log_large", "stump_old", "stump_oldTall"], 12, 0.25, 0.9, Vector2(2.6, 3.6), true)
 	_scatter(r, ["rock_largeA", "rock_largeC", "rock_tallB"], 8, 0.3, 0.95, Vector2(2.2, 3.4), true)
@@ -84,9 +150,9 @@ func _night_meadow(r: RegionData) -> void:
 	var stones := ["stone_tallA", "stone_tallB", "stone_tallC", "stone_tallD", "stone_tallE"]
 	for i in 9:
 		var a := TAU * float(i) / 9.0
-		_place(r, stones[i % stones.size()], a, 5.5, Vector2(2.6, 3.4), true, Color(), false, true)
+		_place(r, stones[i % stones.size()], a, 5.5, STANDING_STONE_PH * PH, true, Color(), false, true, true)
 	for i in 22:
-		_tree(r, ["tree_pineRoundC", "tree_pineTallB_detailed"][_rng.randi() % 2], _rng.randf() * TAU, r.radius * _rng.randf_range(0.95, 1.4), _rng.randf_range(4.0, 5.6), GREEN_DARK)
+		_tree(r, ["tree_pineRoundC", "tree_pineTallB_detailed"][_rng.randi() % 2], _rng.randf() * TAU, r.radius * _rng.randf_range(0.95, 1.4), _ph(MEADOW_TREE_PH), GREEN_DARK)
 
 
 func _lake(r: RegionData) -> void:
@@ -115,7 +181,7 @@ func _lake(r: RegionData) -> void:
 		_add("path_wood", Transform3D(Basis(Vector3.UP, -jetty_a).scaled(Vector3(2.0, 1.6, 2.0)), at), true)
 	for i in 8:
 		_tree(r, ["tree_default_dark", "tree_oak_dark", "tree_fat_darkh"][_rng.randi() % 3], _rng.randf() * TAU,
-			r.radius * _rng.randf_range(1.0, 1.3), _rng.randf_range(3.8, 5.0), GREEN)
+			r.radius * _rng.randf_range(1.0, 1.3), _ph(LAKE_TREE_PH), GREEN)
 
 
 func _orchard(r: RegionData) -> void:
@@ -131,7 +197,8 @@ func _orchard(r: RegionData) -> void:
 			var z := r.centre.y + float(row) * 6.0 + _rng.randf_range(-0.4, 0.4)
 			if Vector2(x - r.centre.x, z - r.centre.y).length() > r.radius * 0.86:
 				continue
-			_scene(tree, Vector3(x, float(height_at.call(x, z)), z), _rng.randf() * TAU, 1.0, true)
+			_scene(tree, Vector3(x, float(height_at.call(x, z)), z), _rng.randf() * TAU,
+				_mlp_scale(tree), true)
 	for p in ["res://assets/converted/props/mlp_basket.glb", "res://assets/converted/props/mlp_crate.glb",
 			"res://assets/converted/props/saa_hay_pile.glb"]:
 		if not ResourceLoader.exists(p):
@@ -141,13 +208,28 @@ func _orchard(r: RegionData) -> void:
 			var d := r.radius * _rng.randf_range(0.25, 0.8)
 			var x := r.centre.x + cos(a) * d
 			var z := r.centre.y + sin(a) * d
-			_scene(p, Vector3(x, float(height_at.call(x, z)), z), _rng.randf() * TAU, 1.0, false)
+			_scene(p, Vector3(x, float(height_at.call(x, z)), z), _rng.randf() * TAU, _mlp_scale(p), false)
 
 
 # --- placing ---------------------------------------------------------------------------
 
-func _tree(r: RegionData, model: String, a: float, d: float, s: float, leaves: Color) -> void:
-	_place(r, model, a, d, Vector2(s, s), true, leaves)
+## A height in metres, drawn inside a range given in pony heights. One RNG draw, the same
+## count the old scale draw made, so every tree still stands where it always stood.
+func _ph(range_ph: Vector2) -> float:
+	return _rng.randf_range(range_ph.x, range_ph.y) * PH
+
+
+## THE ORCHARD'S CONVERTED PROPS AT THE SCALE THE REST OF THE MAP STANDS THEM AT. They were
+## placed at 1.0, the model's raw converted size, while props.gd stands the very same files at
+## MLP_SCALE times SCALE_FIX: the orchard's apple trees came out at 1.5 PH beside 2.6 PH apple
+## trees on the walk up to it, and its baskets at 7 cm.
+func _mlp_scale(path: String) -> float:
+	return PropsScript.scale_for({"file": path.get_file(), "family": PropsScript.FAMILY_MLP})
+
+
+## A tree `h` metres tall, whichever model it is.
+func _tree(r: RegionData, model: String, a: float, d: float, h: float, leaves: Color) -> void:
+	_place(r, model, a, d, Vector2(h, h), true, leaves, false, false, true)
 
 
 func _scatter(r: RegionData, models: Array, n: int, inner: float, outer: float, scale: Vector2,
@@ -158,17 +240,26 @@ func _scatter(r: RegionData, models: Array, n: int, inner: float, outer: float, 
 		_place(r, models[_rng.randi() % models.size()], a, d, scale, solid, leaves, glow)
 
 
+## `scale` is a range of scale factors, or with `by_height` a range of HEIGHTS in metres that
+## the model is scaled to off its own measured height (see the PH constants above).
 func _place(r: RegionData, model: String, a: float, d: float, scale: Vector2, solid: bool = false,
-		leaves: Color = Color(), glow: bool = false, face_centre: bool = false) -> void:
+		leaves: Color = Color(), glow: bool = false, face_centre: bool = false,
+		by_height: bool = false) -> void:
 	var x := r.centre.x + cos(a) * d
 	var z := r.centre.y + sin(a) * d
 	var y := float(height_at.call(x, z))
 	var s := _rng.randf_range(scale.x, scale.y)
+	if by_height:
+		var native := _native_height(model, leaves, glow)
+		s = s / native if native > 0.001 else 1.0
 	var yaw := -a + PI * 0.5 if face_centre else _rng.randf() * TAU
 	_add(model, Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3.ONE * s), Vector3(x, y - 0.03, z)), solid, leaves, glow)
 
 
 func _add(model: String, xf: Transform3D, solid: bool, leaves: Color = Color(), glow: bool = false) -> void:
+	if _dry:
+		_wanted["%s|%s|%s" % [model, str(leaves), str(glow)]] = [model, leaves, glow]
+		return
 	var parts: Array = _parts(model, leaves, glow)
 	for part: Array in parts:
 		var key := "%s|%s|%s" % [model, str(leaves), str(glow)] + "|" + str(part[2])
@@ -177,6 +268,20 @@ func _add(model: String, xf: Transform3D, solid: bool, leaves: Color = Color(), 
 		(_batches[key].xf as Array).append(xf * (part[1] as Transform3D))
 	if solid:
 		_collider(xf)
+
+
+## A model's own height at scale 1, off the same parts it is drawn from.
+func _native_height(model: String, leaves: Color, glow: bool) -> float:
+	# dress_paced()'s dry run loads nothing (the size is not needed to list the model).
+	if _dry:
+		return 1.0
+	var lo := INF
+	var hi := -INF
+	for part: Array in _parts(model, leaves, glow):
+		var box: AABB = (part[1] as Transform3D) * (part[0] as Mesh).get_aabb()
+		lo = minf(lo, box.position.y)
+		hi = maxf(hi, box.end.y)
+	return hi - lo if hi > lo else 0.0
 
 
 ## A model's meshes, toon-restyled once: [[mesh, local transform, index], ...].
@@ -254,6 +359,9 @@ func _collider(xf: Transform3D) -> void:
 ## and BATCHED like the kit's pieces: an orchard of whole scenes was 500 separate shadow
 ## casters, a third of every frame's draws (scenes/test/perf.gd exp=casters).
 func _scene(path: String, at: Vector3, yaw: float, s: float, solid: bool) -> void:
+	if _dry:
+		_wanted[path] = [path]
+		return
 	var xf := Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3.ONE * s), at)
 	for part: Array in _scene_parts(path):
 		var key := path + "|" + str(part[2])
@@ -261,7 +369,7 @@ func _scene(path: String, at: Vector3, yaw: float, s: float, solid: bool) -> voi
 			_batches[key] = {"mesh": part[0], "xf": [], "shadow": true}
 		(_batches[key].xf as Array).append(xf * (part[1] as Transform3D))
 	if solid:
-		_collider(Transform3D(Basis().scaled(Vector3.ONE * 1.6), at))
+		_collider(Transform3D(Basis().scaled(Vector3.ONE * 1.6 * s), at))
 
 
 ## A converted scene's meshes with ToonStyler's foliage look baked into them, once per path.
@@ -291,22 +399,25 @@ func _scene_parts(path: String) -> Array:
 
 
 ## One MultiMeshInstance3D per (model, mesh): a field of flowers is one draw, not a hundred.
-func _flush() -> void:
-	for key: String in _batches:
-		var b: Dictionary = _batches[key]
-		var xfs: Array = b.xf
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.mesh = b.mesh
-		mm.instance_count = xfs.size()
-		for i in xfs.size():
-			mm.set_instance_transform(i, xfs[i])
-		var mmi := MultiMeshInstance3D.new()
-		mmi.multimesh = mm
-		mmi.name = "Dress_" + key.get_slice("|", 0)
-		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if bool(b.shadow) \
-			else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		if not bool(b.shadow):
-			mmi.visibility_range_end = 110.0
-		add_child(mmi)
-	_batches.clear()
+func _flush_one(key: String) -> void:
+	var b: Dictionary = _batches[key]
+	var xfs: Array = b.xf
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = b.mesh
+	mm.instance_count = xfs.size()
+	for i in xfs.size():
+		mm.set_instance_transform(i, xfs[i])
+	var mmi := MultiMeshInstance3D.new()
+	mmi.multimesh = mm
+	mmi.name = "Dress_" + key.get_slice("|", 0)
+	# What this batch IS, for anyone measuring the valley (test_input/test_scale.gd): the
+	# model it draws, and the batch group its sibling parts share (every part of one model
+	# holds the same instances in the same order, so instance i of each is one placement).
+	mmi.set_meta(&"dress_model", key.get_slice("|", 0).get_file().get_basename())
+	mmi.set_meta(&"dress_group", key.substr(0, key.rfind("|")))
+	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if bool(b.shadow) \
+		else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if not bool(b.shadow):
+		mmi.visibility_range_end = 110.0
+	add_child(mmi)

@@ -11,10 +11,11 @@ extends Node3D
 ##                                 own transform ever carries.
 ##     SpringArm3D             -- owns PITCH (`rotation.x`) and DISTANCE
 ##                                 (`spring_length`, adjusted by zoom). Collision-aware:
-##                                 casts a ray each physics frame (no `shape` is
-##                                 assigned, so it probes with a ray rather than a
-##                                 volume) and pulls the camera in if something is in
-##                                 the way, so the rig never clips through a wall.
+##                                 sweeps a ball of LENS_RADIUS (its `shape`) and pulls
+##                                 the camera in if something is in the way. It only does
+##                                 that on physics ticks, so this script repeats the same
+##                                 sweep every rendered frame and that is what is drawn
+##                                 -- see LENS_RADIUS for the playtest bug that cost.
 ##       CameraMount           -- a bare Node3D that exists ONLY to be the node the
 ##                                 spring arm positions. It carries no offset of its
 ##                                 own; its position IS the arm's answer.
@@ -159,6 +160,12 @@ const ZOOM_STEP := 0.5
 ## predates the ranch and builds its ground on the default layer still works.
 @export_flags_3d_physics var probe_mask := CollisionLayersScript.WORLD | CollisionLayersScript.CANOPY
 
+# SUPERSEDED FOR PLACING THE LENS (camera playtest fix, see LENS_RADIUS): the arm now sweeps
+# a ball, and the lens is placed every frame by _resolve_arm(), which stops the ball at first
+# contact; the ball's radius IS the clearance, so this margin no longer decides where the
+# lens is drawn. It is still assigned to the arm for SpringArm3D's own per-tick sweep. The
+# history below is kept because it is what the ray version actually did.
+#
 # SPRINGARM3D.MARGIN IS LIVE, AND IT BECAME LIVE AS A SIDE EFFECT OF THE SHOULDER
 # OFFSET. Read this before touching either.
 #
@@ -225,7 +232,7 @@ const SPRING_ARM_MARGIN := 0.2
 ## 0.10 m, not 0.0 m: zero would stop the through-the-pivot flip but would still let the
 ## near plane straddle or sit behind the pivot at the clamp boundary. 0.10 m is twice the
 ## camera's default near-plane distance (0.05 m), the same "twice the near plane" reasoning
-## SHOULDER_SKIN below uses for the same reason.
+## the shoulder offset's old SHOULDER_SKIN used for the same reason.
 const MOUNT_MIN_Z := 0.10
 
 ## THE FIX FOR THE CLOSE-UP-INSIDE-THE-PONY BUG, and the reason SPRING_MIN's comment
@@ -328,52 +335,93 @@ const SHOULDER_SIDE := 0.70
 ## drops her ~37 px in frame.
 const SHOULDER_LIFT := 0.22
 
-## Metres of clearance kept between the lens and whatever the shoulder probe hits.
+# WHY THE SHOULDER OFFSET IS SWEPT (it once had a RayCast3D probe and a SHOULDER_SKIN of its own;
+# both were replaced by the lens ball, see LENS_RADIUS below).
+#
+# THE SWEEP IS NOT BELT-AND-BRACES; IT IS THE FIX FOR A BUG THE FIRST RENDER OF THIS
+# FEATURE SHOWED. The spring arm probes BACKWARDS along her centre line, so it cannot see
+# anything beside her -- and the shoulder offset moves the lens sideways off the line the
+# arm cleared. Stand her flank against a wall (her own capsule stops her 0.42 m from it,
+# and the offset wants 0.70 m) and the lens ends up INSIDE the wall: with backface culling
+# the wall then disappears from the shot entirely, leaving nothing but its shadow on the
+# grass and a clear view through solid geometry. That is exactly what
+# game/scenes/test/camera_test.tscn's `06_side_wall` render showed, with every number in
+# that gate green -- the offset was applied perfectly, to a place the camera should not be.
+#
+# So the lateral hop gets a sweep of its own: the lens ball from the mount out along the
+# offset, on the same mask as the arm, and the offset is shortened to whatever room it
+# finds (_room_for()). Note what the worst case degrades TO -- an offset of zero, i.e. the camera back
+# on her centre line, which is precisely the behaviour this rig had before this feature and
+# is already the sanctioned answer for a camera with nowhere to go (see FADE_START: she is
+# faded out by then anyway). It can never push the lens INTO anything, which is what makes
+# this clamp a different animal from the spring-length clamp SPRING_MIN's comment forbids.
+#
+# KNOWN LIMITATION, DOCUMENTED RATHER THAN FIXED: hugging a wall FLANK-ON collapses the
+# offset back to zero, and the "offset of zero" this file's design leans on so heavily
+# elsewhere (see the paragraph above, and FADE_START) is not free here the way it is at
+# a pull-in. At a pull-in the subject is fading or gone, so a centred camera has nothing
+# to aim through. Pressed flank-on against a wall, she is still fully drawn -- so a
+# collapsed offset restores exactly the bug this whole feature exists to fix: the
+# crosshair rests on her own body again, for as long as the flank-hug lasts. Measured,
+# not assumed -- the centre pixel in that pose is her body.
+#
+# The standard fix is mirroring to the free shoulder (probe the LEFT offset too when the
+# right one is blocked, and vice versa) so the camera only ever collapses when BOTH sides
+# are obstructed. It is deliberately deferred: it is a second probe and a side-selection
+# policy, not a one-line change, and "no shoulder swap" was already a considered decision
+# for the beam side (see SHOULDER_SIDE's comment) that a mirror would have to be threaded
+# through carefully rather than bolted on.
+
+## THE LENS IS A BALL, AND IT IS PLACED EVERY RENDERED FRAME, NOT EVERY PHYSICS TICK.
+## Playtest note: "The camera showed under the terrain in places." Measured by
+## game/test_input/test_camera_terrain.gd (walks the map with real keys and sweeps the mouse
+## through every yaw, pitch and zoom; docs/playtest_fixes/camera.md has the numbers), there
+## were two faults, and the first is the one the owner saw:
 ##
-## THE PROBE IS NOT BELT-AND-BRACES; IT IS THE FIX FOR A BUG THE FIRST RENDER OF THIS
-## FEATURE SHOWED. The spring arm probes BACKWARDS along her centre line, so it cannot see
-## anything beside her -- and the shoulder offset moves the lens sideways off the line the
-## arm cleared. Stand her flank against a wall (her own capsule stops her 0.42 m from it,
-## and the offset wants 0.70 m) and the lens ends up INSIDE the wall: with backface culling
-## the wall then disappears from the shot entirely, leaving nothing but its shadow on the
-## grass and a clear view through solid geometry. That is exactly what
-## game/scenes/test/camera_test.tscn's `06_side_wall` render showed, with every number in
-## that gate green -- the offset was applied perfectly, to a place the camera should not be.
+##  1. THE ARM WAS A TICK LATE. SpringArm3D works out its length in the physics step, 60 times
+##     a second. The mouse turns the arm in _unhandled_input on EVERY RENDERED FRAME. On a
+##     monitor faster than 60 Hz the frames in between are drawn with this frame's pitch and
+##     the last tick's length, so a quick look up swings the lens on its old, long arm straight
+##     through the ground (and through a wall on a quick turn) for a frame or two before the
+##     arm catches up. A 60 fps test draws exactly one frame per tick, which is why nothing
+##     before this caught it; the test runs at 144.
+##  2. A RAY HAS NO SIZE. The arm probed with a ray and backed off SPRING_ARM_MARGIN along its
+##     own line, and the shoulder probe backed off SHOULDER_SKIN along its own. At a grazing
+##     angle -- looking up, the arm meets the ground at 30 degrees -- 0.2 m back along the line
+##     is 0.1 m off the surface, and a lens beside a wall the ray ran parallel to had no
+##     clearance at all: the near plane cut into the ground and into walls.
 ##
-## So the lateral hop gets a probe of its own: a RayCast3D from the mount out along the
-## offset, on the same mask as the arm, and the offset is shortened to whatever room it
-## reports. Note what the worst case degrades TO -- an offset of zero, i.e. the camera back
-## on her centre line, which is precisely the behaviour this rig had before this feature and
-## is already the sanctioned answer for a camera with nowhere to go (see FADE_START: she is
-## faded out by then anyway). It can never push the lens INTO anything, which is what makes
-## this clamp a different animal from the spring-length clamp SPRING_MIN's comment forbids.
+## So _process() places the lens itself, after this frame's look input and before the frame
+## is drawn: a ball of LENS_RADIUS is swept from the pivot out along the arm (_resolve_arm),
+## then from the mount out along the shoulder offset (_room_for), and the lens stops where the
+## ball first touches anything (_sweep_fraction). SpringArm3D carries the same ball, so its own per-tick answer
+## (get_hit_length(), which ranch.gd's camera probe reads) agrees with what is drawn.
 ##
-## 0.10 m is twice the camera's default near-plane distance, so the near plane clears the
-## surface rather than straddling it.
-##
-## KNOWN LIMITATION, DOCUMENTED RATHER THAN FIXED: hugging a wall FLANK-ON collapses the
-## offset back to zero, and the "offset of zero" this file's design leans on so heavily
-## elsewhere (see the paragraph above, and FADE_START) is not free here the way it is at
-## a pull-in. At a pull-in the subject is fading or gone, so a centred camera has nothing
-## to aim through. Pressed flank-on against a wall, she is still fully drawn -- so a
-## collapsed offset restores exactly the bug this whole feature exists to fix: the
-## crosshair rests on her own body again, for as long as the flank-hug lasts. Measured,
-## not assumed -- the centre pixel in that pose is her body.
-##
-## The standard fix is mirroring to the free shoulder (probe the LEFT offset too when the
-## right one is blocked, and vice versa) so the camera only ever collapses when BOTH sides
-## are obstructed. It is deliberately deferred: it is a second probe and a side-selection
-## policy, not a one-line change, and "no shoulder swap" was already a considered decision
-## for the beam side (see SHOULDER_SIDE's comment) that a mirror would have to be threaded
-## through carefully rather than bolted on.
-const SHOULDER_SKIN := 0.10
+## 0.25 m: the near plane's corners reach 0.09 m from the lens (near 0.05 m, 75 degree fov,
+## 16:9), the playtest test demands 0.2 m of air under the lens, and 0.25 m clears both with
+## room for the ground's own 2 m triangles between two samples of a sweep.
+const LENS_RADIUS := 0.25
+## Smaller balls a sweep falls back to when the full one STARTS touching something. JOLT
+## IGNORES WHAT A SWEEP STARTS INSIDE: cast_motion() from a ball already touching a wall
+## reports a clear path straight through it -- measured, not assumed: test_camera_rig's wall
+## 0.05 m from the pivot left the mount at the full 3.5 m on the other side of it. So
+## _sweep_fraction() checks the start first, and with no ball free there it answers 0.
+const FALLBACK_RADII: Array[float] = [0.12, 0.05]
 
 @onready var _spring_arm: SpringArm3D = $SpringArm3D
 ## The node the spring arm actually positions. See the class comment.
 @onready var _mount: Node3D = $SpringArm3D/CameraMount
-## Casts from the mount out along the shoulder offset. See SHOULDER_SKIN.
-@onready var _shoulder_probe: RayCast3D = $SpringArm3D/CameraMount/ShoulderProbe
 @onready var _camera: Camera3D = $SpringArm3D/CameraMount/Camera3D
+
+## The sweeps of the lens ball (see LENS_RADIUS), built once: one query, and the full ball
+## followed by each FALLBACK_RADII ball.
+var _sweep_query := PhysicsShapeQueryParameters3D.new()
+var _sweep_balls: Array[SphereShape3D] = []
+## The collision shape of the body this rig is mounted on (the player's capsule), whose
+## centre is where a sweep starts when her head is inside something. See _resolve_arm().
+var _body_shape: CollisionShape3D = null
+## The ground the last-resort floor in _keep_above_ground() reads, found by group.
+var _terrain: Node = null
 
 ## Current pitch in the "intuitive" sense described above. Kept as the source of truth
 ## instead of reading it back out of `rotation.x` so the clamp is applied in exactly
@@ -397,16 +445,17 @@ func _ready() -> void:
 	_spring_arm.collision_mask = probe_mask
 	_spring_arm.margin = SPRING_ARM_MARGIN
 
-	# The shoulder probe reaches the full offset plus its clearance, and sees exactly what
-	# the arm sees: one exported mask decides what this whole rig can look through, so a
-	# future layer change cannot leave the two halves disagreeing about what a wall is.
-	# It is a CHILD OF THE MOUNT rather than of this node, which is what makes its cast
-	# start from where the arm actually left the camera this frame: the arm positions the
-	# mount during its own internal physics step, and Godot notifies a parent before its
-	# children, so the probe's cast for the frame runs after the mount has moved.
-	var reach: Vector3 = Vector3(SHOULDER_SIDE, SHOULDER_LIFT, 0.0)
-	_shoulder_probe.target_position = reach.normalized() * (reach.length() + SHOULDER_SKIN)
-	_shoulder_probe.collision_mask = probe_mask
+	# Both sweeps of the lens ball see exactly what the arm sees: one exported mask decides
+	# what this whole rig can look through, so a future layer change cannot leave the halves
+	# disagreeing about what a wall is. See LENS_RADIUS.
+	var lens_ball := SphereShape3D.new()
+	lens_ball.radius = LENS_RADIUS
+	_spring_arm.shape = lens_ball
+	for r: float in [LENS_RADIUS] + FALLBACK_RADII:
+		var ball := SphereShape3D.new()
+		ball.radius = r
+		_sweep_balls.append(ball)
+	_sweep_query.collision_mask = probe_mask
 
 	# Exclude whatever body this rig is mounted on from its own collision probe, or a
 	# spring arm whose origin ends up inside the player's capsule (it should not --
@@ -415,6 +464,11 @@ func _ready() -> void:
 	var body := _find_collision_ancestor()
 	if body != null:
 		_spring_arm.add_excluded_object(body.get_rid())
+		_sweep_query.exclude = [body.get_rid()]
+		for child in body.get_children():
+			if child is CollisionShape3D:
+				_body_shape = child
+				break
 
 	# The subject's body is built at runtime (PonyVisuals), so its meshes do not exist
 	# during anyone's _ready(). Collect them on the next frame instead of assuming a
@@ -441,13 +495,14 @@ func _process(delta: float) -> void:
 	if Input.is_action_just_pressed("zoom_out"):
 		add_zoom_delta(ZOOM_STEP)
 
-	# Corrects the arm's own placement BEFORE anything below reads it -- see MOUNT_MIN_Z.
-	_clamp_mount_margin()
+	# Places the mount for THIS frame's look, not the last physics tick's (see LENS_RADIUS),
+	# and clamps it (see MOUNT_MIN_Z), BEFORE anything below reads it.
+	_resolve_arm()
 
-	# Both of these read where the spring arm ACTUALLY put the mount, which it decides in
-	# the physics step. Godot's main loop runs its physics ticks, then _process, then
-	# renders, so reading it here is reading this frame's answer, not last frame's.
+	# Both of these read where the mount actually is now. Godot's main loop runs its physics
+	# ticks, then _process, then renders, so this is the answer the frame is drawn with.
 	_update_shoulder_offset()
+	_keep_above_ground()
 	_update_subject_fade()
 
 
@@ -609,7 +664,7 @@ func get_camera_distance() -> float:
 ## screenshot looked right -- the same reason get_subject_opacity() exists.
 ##
 ## This is what was APPLIED, which is shoulder_offset_for_distance() shortened by whatever
-## the shoulder probe found in the way (SHOULDER_SKIN). The two differ only when something
+## the lens ball's sweep found in the way (_room_for()). The two differ only when something
 ## is actually beside the camera, and a gate wanting to prove the probe fired wants both.
 func get_shoulder_offset() -> Vector3:
 	return _camera.position
@@ -628,7 +683,7 @@ func _clamp_mount_margin() -> void:
 
 ## Slide the lens off the pony's centre line by however much the current arm distance has
 ## earned, and by however much room there actually is out there. See SHOULDER_SIDE for the
-## framing reasoning and SHOULDER_SKIN for the probe.
+## framing reasoning and _room_for() for the sweep.
 ##
 ## Written every frame rather than once in _ready() because the arm distance moves (zoom,
 ## and geometry shoving the arm in), and because SpringArm3D would stomp it anyway if this
@@ -637,19 +692,77 @@ func _update_shoulder_offset() -> void:
 	_camera.position = _room_for(shoulder_offset_for_distance(get_arm_distance()))
 
 
-## `wanted` shortened to whatever the shoulder probe says fits, keeping its direction.
-## Returns `wanted` unchanged when nothing is in the way, which is the normal case.
+## `wanted` shortened to whatever fits, keeping its direction: the lens ball is swept from
+## the mount out along the offset and stops at the first contact (see LENS_RADIUS). Returns
+## `wanted` unchanged when nothing is in the way, which is the normal case.
 func _room_for(wanted: Vector3) -> Vector3:
-	if _shoulder_probe == null or not _shoulder_probe.is_colliding():
+	if wanted.length() < 0.0001 or not is_inside_tree():
 		return wanted
-	var length := wanted.length()
-	if length < 0.0001:
-		return wanted
-	var room: float = _mount.global_position.distance_to(
-		_shoulder_probe.get_collision_point()) - SHOULDER_SKIN
-	if room >= length:
-		return wanted
-	return wanted * (maxf(room, 0.0) / length)
+	return wanted * _sweep_fraction(_mount.global_position, _mount.global_basis * wanted)
+
+
+## How much of `motion` the lens ball can travel from `from` before it touches anything: 1.0
+## for a clear path, 0.0 for none. Falls back to the FALLBACK_RADII balls when the full one
+## starts out touching something (see FALLBACK_RADII for why that check cannot be skipped).
+func _sweep_fraction(from: Vector3, motion: Vector3) -> float:
+	var space := get_world_3d().direct_space_state
+	_sweep_query.transform = Transform3D(Basis(), from)
+	for ball in _sweep_balls:
+		_sweep_query.shape = ball
+		_sweep_query.motion = Vector3.ZERO
+		if not space.intersect_shape(_sweep_query, 1).is_empty():
+			continue
+		_sweep_query.motion = motion
+		var fraction := space.cast_motion(_sweep_query)
+		return fraction[0] if fraction.size() > 0 else 1.0
+	return 0.0
+
+
+## Where the arm leaves the mount for THIS frame's look: the lens ball swept from the pivot
+## out along the arm's own +Z (the way SpringArm3D casts), stopping at the first contact.
+## SpringArm3D does the same sweep, but only on physics ticks -- see LENS_RADIUS for why that
+## is not enough. Then the MOUNT_MIN_Z clamp, as before.
+##
+## WHEN HER HEAD IS INSIDE SOMETHING. The pivot is at 1.45 m and her capsule stops at 1.3 m,
+## so she can walk under an eave, a balcony or a low bough that the pivot is then INSIDE --
+## the playtest test found exactly that against the town row's OGB_1 house and under the
+## wide trees. A sweep that starts inside a collider sees nothing (see FALLBACK_RADII), so
+## the lens would sit in the eave. So the ball is first swept from the middle of her capsule
+## (which the physics keeps clear of everything) up to the pivot; if it cannot get all the
+## way, the arm is swept from where it stopped instead. The lens then always sits somewhere
+## a ball can reach from her body without passing through anything.
+func _resolve_arm() -> void:
+	if not is_inside_tree():
+		_clamp_mount_margin()
+		return
+	var length := _spring_arm.spring_length
+	var arm := _spring_arm.global_basis.z.normalized() * length
+	var pivot := _spring_arm.global_position
+	if _body_shape != null and is_instance_valid(_body_shape):
+		var centre := _body_shape.global_position
+		var reach := _sweep_fraction(centre, pivot - centre)
+		if reach < 1.0:
+			var origin := centre + (pivot - centre) * reach
+			_mount.global_position = origin + arm * _sweep_fraction(origin, arm)
+			return
+	_mount.position = Vector3(0.0, 0.0, length * _sweep_fraction(pivot, arm))
+	_clamp_mount_margin()
+
+
+## The last guard: the lens never ends up less than LENS_RADIUS above the ground the terrain
+## DRAWS under it (Terrain.surface_height_at(), the same triangles its collider is built
+## from). The sweeps above already keep it there; this holds even if a sweep ever tunnels
+## between two of the ground's triangles. A scene with no terrain (the Factory, a GUT test)
+## has nothing to hold it above, and is left alone.
+func _keep_above_ground() -> void:
+	if _terrain == null or not is_instance_valid(_terrain):
+		_terrain = get_tree().get_first_node_in_group(&"terrain") if is_inside_tree() else null
+		if _terrain == null:
+			return
+	var at := _camera.global_position
+	var floor_y: float = float(_terrain.call("surface_height_at", at.x, at.z)) + LENS_RADIUS
+	if at.y < floor_y:
+		_camera.global_position = Vector3(at.x, floor_y, at.z)
 
 
 ## How opaque the subject is being drawn right now, 1.0 (fully drawn) to 0.0 (hidden).

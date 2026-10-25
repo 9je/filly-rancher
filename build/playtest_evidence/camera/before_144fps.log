@@ -1,0 +1,809 @@
+INPUT_TEST_NOTE 13.8s mouse look check: mouse_mode=2, 200 px turned the camera 1.050 rad (fps 118, physics 60 Hz)
+INPUT_TEST_NOTE 13.8s terrain extremes: high 2.22 at (-32.0, 56.0), low -2.06 at (28.0, -72.0), steepest 14.4 deg at (32.0, 12.0)
+INPUT_TEST_NOTE 13.8s map edge: highest ground 1.68 at (109.0, -66.0)
+INPUT_TEST_NOTE 13.8s -> yard at (0.0, 7.0) ground 0.00
+INPUT_TEST_NOTE 14.6s BAD [yard] too_close_to_ground cam (1.53, 0.14, 12.23) ground 0.000 clearance 0.136 player (4.0, 0.0, 10.0) yaw -60 pitch 25.6 zoom 3.5 arm 3.50 arm_hit 3.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.36
+INPUT_TEST_NOTE 14.8s BAD [yard] under_terrain cam (1.62, -0.11, 12.17) ground 0.000 clearance -0.109 player (4.0, 0.0, 10.0) yaw -60 pitch 30.0 zoom 3.5 arm 3.50 arm_hit 3.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@2.90
+INPUT_TEST_NOTE 15.8s    picture yard_wall: near_plane_in_crate_empy_smd_col cam (4.63, 0.29, 9.33)
+INPUT_TEST_NOTE 15.8s BAD [yard] near_plane_in_crate_empy_smd_col cam (4.63, 0.29, 9.33) ground 0.000 clearance 0.291 player (2.13, 0.0, 8.86) yaw 63 pitch 30.0 zoom 3.5 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 15.9s BAD [yard] near_plane_in_crate_empy_smd_col cam (4.63, 0.29, 9.33) ground 0.000 clearance 0.291 player (2.13, 0.0, 8.86) yaw 63 pitch 30.0 zoom 3.5 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 15.9s BAD [yard] near_plane_in_crate_empy_smd_col cam (4.63, 0.29, 9.33) ground 0.000 clearance 0.291 player (2.13, 0.0, 8.86) yaw 63 pitch 30.0 zoom 3.5 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 16.4s    at yard (0.31, 0.0, 7.93)
+INPUT_TEST_NOTE 16.9s BAD [yard] under_terrain cam (2.17, -0.41, 12.22) ground 0.000 clearance -0.406 player (-0.12, 0.0, 7.72) yaw 19 pitch 22.7 zoom 6.5 arm 5.33 arm_hit 5.33 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.75
+INPUT_TEST_NOTE 17.1s BAD [yard] under_terrain cam (2.08, -1.02, 11.96) ground 0.000 clearance -1.025 player (-0.12, 0.0, 7.72) yaw 19 pitch 30.0 zoom 6.5 arm 5.33 arm_hit 5.33 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@2.90
+INPUT_TEST_NOTE 18.2s BAD [yard] near_plane_in_Market cam (-3.95, 5.7, 6.07) ground 0.000 clearance 5.696 player (-0.12, 0.0, 7.72) yaw -116 pitch -45.0 zoom 6.5 arm 5.95 arm_hit 5.95 lens_offset (0.2, 0.06, 0.0)
+INPUT_TEST_NOTE 18.2s BAD [yard] inside_Market cam (-4.55, 5.24, 6.34) ground 0.000 clearance 5.240 player (-0.12, 0.0, 7.72) yaw -116 pitch -37.4 zoom 6.5 arm 5.95 arm_hit 5.95 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@5.42 shoulder_leg_hits:Market@0.24
+INPUT_TEST_NOTE 18.3s BAD [yard] through_Market cam (-4.31, 3.47, 6.45) ground 0.000 clearance 3.469 player (-0.12, 0.0, 7.72) yaw -116 pitch -22.4 zoom 6.5 arm 4.76 arm_hit 4.76 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@4.65
+INPUT_TEST_NOTE 18.3s BAD [yard] inside_Market cam (-4.52, 2.89, 6.35) ground 0.000 clearance 2.886 player (-0.12, 0.0, 7.72) yaw -116 pitch -14.9 zoom 6.5 arm 4.76 arm_hit 4.76 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@4.45 shoulder_leg_hits:Market@0.01
+INPUT_TEST_NOTE 18.3s BAD [yard] near_plane_in_Market cam (-4.21, 0.92, 5.97) ground 0.000 clearance 0.920 player (-0.12, 0.0, 7.72) yaw -116 pitch 7.7 zoom 6.5 arm 4.47 arm_hit 4.47 lens_offset (0.22, 0.07, 0.0)
+INPUT_TEST_NOTE 18.5s BAD [yard] near_plane_in_Market cam (-1.88, 0.27, 3.35) ground 0.000 clearance 0.274 player (-0.12, 0.0, 7.72) yaw -161 pitch 15.0 zoom 6.5 arm 4.84 arm_hit 4.84 lens_offset (0.24, 0.08, 0.0)
+INPUT_TEST_NOTE 18.5s BAD [yard] inside_Market cam (-2.17, 0.98, 3.32) ground 0.000 clearance 0.980 player (-0.12, 0.0, 7.72) yaw -161 pitch 7.4 zoom 6.5 arm 4.84 arm_hit 4.84 lens_offset (0.5, 0.16, 0.0) shoulder_leg_hits:Market@0.14
+INPUT_TEST_NOTE 18.6s BAD [yard] through_Market cam (-2.3, 4.38, 3.54) ground 0.000 clearance 4.384 player (-0.12, 0.0, 7.72) yaw -161 pitch -29.9 zoom 6.5 arm 5.50 arm_hit 5.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@5.22
+INPUT_TEST_NOTE 18.7s BAD [yard] through_Market cam (-2.41, 3.75, 3.22) ground 0.000 clearance 3.749 player (-0.12, 0.0, 7.72) yaw -161 pitch -22.4 zoom 6.5 arm 5.50 arm_hit 5.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@4.90
+INPUT_TEST_NOTE 19.3s BAD [yard] through_stall-red_col cam (4.75, 0.97, 5.3) ground 0.000 clearance 0.967 player (-0.12, 0.0, 7.72) yaw 109 pitch 7.4 zoom 6.5 arm 5.42 arm_hit 5.42 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:stall-red_col@4.60
+INPUT_TEST_NOTE 19.3s BAD [yard] near_plane_in_stall-red_col cam (4.65, 2.2, 5.86) ground 0.000 clearance 2.195 player (-0.12, 0.0, 7.72) yaw 109 pitch -7.6 zoom 6.5 arm 5.17 arm_hit 5.17 lens_offset (0.2, 0.06, 0.0)
+INPUT_TEST_NOTE 19.3s BAD [yard] through_stall-red_col cam (4.38, 2.96, 5.61) ground 0.000 clearance 2.958 player (-0.12, 0.0, 7.72) yaw 109 pitch -15.1 zoom 6.5 arm 5.17 arm_hit 5.17 lens_offset (0.53, 0.17, 0.0) arm_leg_hits:stall-red_col@3.61
+INPUT_TEST_NOTE 19.4s BAD [yard] near_plane_in_Depot cam (5.79, 1.65, 4.94) ground 0.000 clearance 1.652 player (-0.12, 0.0, 7.72) yaw 109 pitch 0.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 22.4s BAD [yard] near_plane_in_stall-red_col cam (2.95, 0.7, 6.12) ground 0.000 clearance 0.702 player (-0.12, 0.0, 7.72) yaw 109 pitch 15.0 zoom 3.5 arm 3.50 arm_hit 3.50 lens_offset (0.51, 0.16, 0.0)
+INPUT_TEST_NOTE 22.7s BAD [yard] near_plane_in_stall-red_col cam (2.93, 0.7, 6.07) ground 0.000 clearance 0.702 player (-0.12, 0.0, 7.72) yaw 109 pitch 15.2 zoom 3.5 arm 3.50 arm_hit 3.50 lens_offset (0.56, 0.18, 0.0)
+INPUT_TEST_NOTE 30.4s -> Barn_ramp at (-8.7, -5.3) ground 0.00
+INPUT_TEST_NOTE 34.4s    picture Barn_ramp_wall: near_plane_in_stall-red_col cam (3.37, 2.9, 5.71)
+INPUT_TEST_NOTE 34.4s BAD [Barn_ramp] near_plane_in_stall-red_col cam (3.37, 2.9, 5.71) ground 0.000 clearance 2.904 player (0.11, 0.0, 4.49) yaw 58 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 34.5s BAD [Barn_ramp] near_plane_in_stall-red_col cam (3.4, 2.9, 5.63) ground 0.000 clearance 2.904 player (0.11, 0.0, 4.49) yaw 59 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 34.5s BAD [Barn_ramp] near_plane_in_stall-red_col cam (3.37, 2.83, 5.73) ground 0.000 clearance 2.830 player (0.16, 0.0, 4.43) yaw 60 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.45, 0.14, 0.0)
+INPUT_TEST_NOTE 41.7s    walking to (-6.509685, 0.589563): at (0.2, 0.0, 4.4), 7.7 m to go
+INPUT_TEST_NOTE 41.9s BAD [Barn_ramp] through_stall-red_col cam (3.4, 2.9, 4.99) ground 0.000 clearance 2.905 player (0.04, 0.0, 4.08) yaw 63 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:stall-red_col@0.29
+INPUT_TEST_NOTE 52.1s    walking to (-6.509685, 0.589563): at (-2.2, 0.0, 7.2), 8.0 m to go
+INPUT_TEST_NOTE 62.3s    walking to (-6.509685, 0.589563): at (0.1, 0.0, 4.0), 7.4 m to go
+INPUT_TEST_NOTE 73.4s    walking to (-6.509685, 0.589563): at (-2.6, 0.0, 6.6), 7.1 m to go
+INPUT_TEST_NOTE 83.7s    walking to (-6.509685, 0.589563): at (0.1, 0.0, 4.0), 7.4 m to go
+INPUT_TEST_NOTE 94.4s    walking to (-6.509685, 0.589563): at (-3.2, 0.0, 5.9), 6.2 m to go
+INPUT_TEST_NOTE 105.0s    walking to (-6.509685, 0.589563): at (0.1, 0.0, 4.0), 7.4 m to go
+INPUT_TEST_NOTE 113.5s BAD [Barn_ramp] inside_Depot cam (5.86, 2.9, 4.84) ground 0.000 clearance 2.905 player (2.67, 0.0, 3.46) yaw 55 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:Depot@0.63
+INPUT_TEST_NOTE 113.5s BAD [Barn_ramp] inside_Depot cam (5.89, 2.9, 4.77) ground 0.000 clearance 2.905 player (2.67, 0.0, 3.46) yaw 56 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:Depot@0.55
+INPUT_TEST_NOTE 113.5s BAD [Barn_ramp] near_plane_in_Depot cam (5.78, 2.78, 5.03) ground 0.000 clearance 2.780 player (2.72, 0.0, 3.39) yaw 57 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.28, 0.09, 0.0)
+INPUT_TEST_NOTE 113.5s BAD [Barn_ramp] near_plane_in_Depot cam (5.78, 2.77, 5.02) ground 0.000 clearance 2.766 player (2.72, 0.0, 3.39) yaw 58 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.23, 0.07, 0.0)
+INPUT_TEST_NOTE 113.5s BAD [Barn_ramp] near_plane_in_Depot cam (5.79, 2.73, 5.05) ground 0.000 clearance 2.735 player (2.77, 0.0, 3.33) yaw 58 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.13, 0.04, 0.0)
+INPUT_TEST_NOTE 113.8s BAD [Barn_ramp] near_plane_in_Board cam (4.35, 1.96, 3.13) ground 0.000 clearance 1.961 player (3.11, 0.02, 2.54) yaw 65 pitch -19.7 zoom 3.7 arm 1.46 arm_hit 1.46 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 113.8s BAD [Barn_ramp] near_plane_in_Board cam (4.35, 1.96, 3.13) ground 0.000 clearance 1.961 player (3.11, 0.02, 2.54) yaw 65 pitch -19.7 zoom 3.7 arm 1.46 arm_hit 1.46 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 113.8s BAD [Barn_ramp] near_plane_in_Board cam (4.35, 1.96, 3.14) ground 0.000 clearance 1.961 player (3.11, 0.02, 2.54) yaw 64 pitch -19.7 zoom 3.7 arm 1.46 arm_hit 1.46 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 120.1s BAD [Barn_ramp] through_Market cam (-5.16, 4.57, 4.72) ground 0.000 clearance 4.569 player (-7.12, 1.8, 2.31) yaw 26 pitch -19.7 zoom 3.7 arm 3.30 arm_hit 3.30 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@3.03
+INPUT_TEST_NOTE 120.1s BAD [Barn_ramp] through_Market cam (-5.25, 4.57, 4.79) ground 0.000 clearance 4.569 player (-7.12, 1.8, 2.31) yaw 24 pitch -19.7 zoom 3.7 arm 3.30 arm_hit 3.30 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@2.74
+INPUT_TEST_NOTE 120.2s BAD [Barn_ramp] near_plane_in_Market cam (-7.17, 3.61, 3.47) ground 0.000 clearance 3.611 player (-7.37, 1.8, 2.49) yaw 12 pitch -19.7 zoom 3.7 arm 1.07 arm_hit 1.07 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 120.2s BAD [Barn_ramp] near_plane_in_Market cam (-7.31, 3.53, 3.3) ground 0.000 clearance 3.532 player (-7.43, 1.8, 2.53) yaw 9 pitch -19.7 zoom 3.7 arm 0.83 arm_hit 0.83 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 120.2s BAD [Barn_ramp] near_plane_in_Market cam (-7.32, 3.53, 3.3) ground 0.000 clearance 3.532 player (-7.43, 1.8, 2.53) yaw 8 pitch -19.7 zoom 3.7 arm 0.83 arm_hit 0.83 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 120.7s    walking to (-7.946169, -3.357146): at (-7.8, 1.8, 1.5), 4.9 m to go
+INPUT_TEST_NOTE 130.0s BAD [Barn_ramp] through_Market cam (-5.03, 4.71, 4.97) ground 0.000 clearance 4.705 player (-7.29, 1.8, 2.33) yaw 29 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@3.05
+INPUT_TEST_NOTE 130.6s    walking to (-7.946169, -3.357146): at (-7.7, 1.8, 1.3), 4.7 m to go
+INPUT_TEST_NOTE 140.0s    walking to (-7.946169, -3.357146): at (-7.7, 1.8, 0.9), 4.2 m to go
+INPUT_TEST_NOTE 149.6s    walking to (-7.946169, -3.357146): at (-7.7, 1.8, 1.0), 4.4 m to go
+INPUT_TEST_NOTE 159.4s    walking to (-7.946169, -3.357146): at (-7.7, 1.8, 1.2), 4.7 m to go
+INPUT_TEST_NOTE 169.1s    walking to (-7.946169, -3.357146): at (-7.7, 1.8, 0.8), 4.2 m to go
+INPUT_TEST_NOTE 179.5s    walking to (-7.946169, -3.357146): at (-7.8, 1.8, 1.0), 4.3 m to go
+INPUT_TEST_NOTE 196.6s    walking to (-8.664412, -5.330501): at (-6.2, 1.8, 1.6), 7.3 m to go
+INPUT_TEST_NOTE 207.1s    walking to (-8.664412, -5.330501): at (-5.6, 1.8, -1.2), 5.1 m to go
+INPUT_TEST_NOTE 218.0s    walking to (-8.664412, -5.330501): at (-3.8, 1.8, -3.0), 5.4 m to go
+INPUT_TEST_NOTE 229.8s    walking to (-8.664412, -5.330501): at (-2.8, 1.8, -1.9), 6.8 m to go
+INPUT_TEST_NOTE 240.2s    walking to (-8.664412, -5.330501): at (-5.5, 1.8, -1.3), 5.1 m to go
+INPUT_TEST_NOTE 251.1s    walking to (-8.664412, -5.330501): at (-7.1, 1.8, 0.3), 5.8 m to go
+INPUT_TEST_NOTE 262.4s    walking to (-8.664412, -5.330501): at (-6.2, 1.8, 1.6), 7.3 m to go
+INPUT_TEST_NOTE 265.1s    at Barn_ramp (-6.08, 1.8, -0.77)
+INPUT_TEST_NOTE 265.4s BAD [Barn_ramp] inside_Market cam (-5.51, 5.65, 5.28) ground 0.000 clearance 5.649 player (-6.07, 1.8, -0.78) yaw -1 pitch -19.7 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@5.65
+INPUT_TEST_NOTE 265.4s BAD [Barn_ramp] inside_Market cam (-5.86, 6.36, 2.39) ground 0.000 clearance 6.356 player (-6.07, 1.8, -0.78) yaw -9 pitch -42.3 zoom 6.5 arm 4.37 arm_hit 4.37 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@4.17
+INPUT_TEST_NOTE 265.5s BAD [Barn_ramp] inside_Market cam (-6.05, 1.67, 3.62) ground 0.000 clearance 1.673 player (-6.07, 1.8, -0.78) yaw -9 pitch 22.7 zoom 6.5 arm 4.61 arm_hit 4.61 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@3.76
+INPUT_TEST_NOTE 278.1s -> Barn_inside at (-10.3, -9.7) ground 0.00
+INPUT_TEST_NOTE 286.7s    walking to (-10.25292, -9.694902): at (-2.6, 1.8, -4.2), 9.4 m to go
+INPUT_TEST_NOTE 295.2s    walking to (-10.25292, -9.694902): at (-5.3, 1.8, -1.6), 9.5 m to go
+INPUT_TEST_NOTE 303.7s    walking to (-10.25292, -9.694902): at (-3.6, 1.8, -3.2), 9.3 m to go
+INPUT_TEST_NOTE 312.6s    walking to (-10.25292, -9.694902): at (-4.6, 1.8, -2.3), 9.3 m to go
+INPUT_TEST_NOTE 321.0s    walking to (-10.25292, -9.694902): at (-4.0, 1.8, -2.8), 9.3 m to go
+INPUT_TEST_NOTE 330.0s    walking to (-10.25292, -9.694902): at (-4.3, 1.8, -2.5), 9.3 m to go
+INPUT_TEST_NOTE 338.7s    walking to (-10.25292, -9.694902): at (-4.1, 1.8, -2.7), 9.3 m to go
+INPUT_TEST_NOTE 344.6s    at Barn_inside (-4.36, 1.8, -2.49)
+INPUT_TEST_NOTE 344.9s    picture Barn_inside_wall: through_Market cam (-4.63, 6.71, 3.06)
+INPUT_TEST_NOTE 344.9s BAD [Barn_inside] through_Market cam (-4.63, 6.71, 3.06) ground 0.000 clearance 6.707 player (-4.36, 1.8, -2.49) yaw -10 pitch -30.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@6.04
+INPUT_TEST_NOTE 345.0s BAD [Barn_inside] inside_Market cam (-4.28, 7.1, 1.09) ground 0.000 clearance 7.105 player (-4.36, 1.8, -2.49) yaw -10 pitch -45.2 zoom 6.5 arm 5.21 arm_hit 5.21 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@4.98
+INPUT_TEST_NOTE 345.1s BAD [Barn_inside] inside_Market cam (-4.54, 1.39, 2.56) ground 0.000 clearance 1.394 player (-4.36, 1.8, -2.49) yaw -10 pitch 22.7 zoom 6.5 arm 5.33 arm_hit 5.33 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@3.76
+INPUT_TEST_NOTE 345.4s BAD [Barn_inside] near_plane_in_Market cam (-6.46, 6.65, -0.16) ground 0.000 clearance 6.646 player (-4.36, 1.8, -2.49) yaw -55 pitch -45.2 zoom 6.5 arm 4.57 arm_hit 4.57 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 345.4s BAD [Barn_inside] inside_Market cam (-6.08, 7.02, -0.43) ground 0.000 clearance 7.017 player (-4.36, 1.8, -2.49) yaw -55 pitch -52.7 zoom 6.5 arm 4.57 arm_hit 4.57 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@4.52
+INPUT_TEST_NOTE 345.4s BAD [Barn_inside] near_plane_in_Market cam (-5.67, 7.32, -0.72) ground 0.000 clearance 7.315 player (-4.36, 1.8, -2.49) yaw -55 pitch -60.0 zoom 6.5 arm 4.57 arm_hit 4.57 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@4.38
+INPUT_TEST_NOTE 345.4s BAD [Barn_inside] near_plane_in_Market cam (-5.97, 6.82, -0.51) ground 0.000 clearance 6.820 player (-4.36, 1.8, -2.49) yaw -55 pitch -52.5 zoom 6.5 arm 4.33 arm_hit 4.33 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 345.4s BAD [Barn_inside] through_Market cam (-6.66, 6.06, -0.02) ground 0.000 clearance 6.059 player (-4.36, 1.8, -2.49) yaw -55 pitch -37.4 zoom 6.5 arm 4.33 arm_hit 4.33 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@3.04
+INPUT_TEST_NOTE 345.6s BAD [Barn_inside] through_Market cam (-5.45, 2.62, -1.8) ground 0.000 clearance 2.619 player (-4.36, 1.8, -2.49) yaw -70 pitch 30.0 zoom 6.5 arm 1.41 arm_hit 1.41 lens_offset (0.27, 0.09, 0.0) arm_leg_hits:Market@1.15
+INPUT_TEST_NOTE 357.7s -> Barn_back_wall at (-11.2, -12.3) ground 0.00
+INPUT_TEST_NOTE 357.9s    picture Barn_back_wall_wall: near_plane_in_Market cam (-4.1, 3.54, -3.23)
+INPUT_TEST_NOTE 357.9s BAD [Barn_back_wall] near_plane_in_Market cam (-4.1, 3.54, -3.23) ground 0.000 clearance 3.536 player (-4.36, 1.8, -2.48) yaw 161 pitch -19.7 zoom 3.7 arm 0.84 arm_hit 0.84 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 368.5s BAD [Barn_back_wall] through_Market cam (-5.01, 4.71, 4.97) ground 0.000 clearance 4.705 player (-7.28, 1.8, 2.32) yaw 29 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@3.11
+INPUT_TEST_NOTE 368.5s BAD [Barn_back_wall] through_Market cam (-5.92, 4.19, 3.92) ground 0.000 clearance 4.193 player (-7.34, 1.8, 2.37) yaw 23 pitch -19.7 zoom 3.7 arm 2.18 arm_hit 2.18 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@2.07
+INPUT_TEST_NOTE 368.5s BAD [Barn_back_wall] through_Market cam (-5.98, 4.19, 3.97) ground 0.000 clearance 4.193 player (-7.34, 1.8, 2.37) yaw 21 pitch -19.7 zoom 3.7 arm 2.18 arm_hit 2.18 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@1.89
+INPUT_TEST_NOTE 368.6s BAD [Barn_back_wall] near_plane_in_Market cam (-7.27, 3.59, 3.38) ground 0.000 clearance 3.589 player (-7.47, 1.8, 2.46) yaw 13 pitch -19.7 zoom 3.7 arm 1.00 arm_hit 1.00 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 368.6s BAD [Barn_back_wall] near_plane_in_Market cam (-7.43, 3.5, 3.18) ground 0.000 clearance 3.496 player (-7.54, 1.8, 2.51) yaw 9 pitch -19.7 zoom 3.7 arm 0.73 arm_hit 0.73 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 369.1s    walking to (-7.946169, -3.357146): at (-7.8, 1.8, 1.5), 4.8 m to go
+INPUT_TEST_NOTE 379.4s    walking to (-7.946169, -3.357146): at (-7.7, 1.8, 1.1), 4.5 m to go
+INPUT_TEST_NOTE 390.1s    walking to (-7.946169, -3.357146): at (-7.6, 1.8, 0.8), 4.2 m to go
+INPUT_TEST_NOTE 400.8s    walking to (-7.946169, -3.357146): at (-7.4, 1.8, 0.6), 4.0 m to go
+INPUT_TEST_NOTE 411.3s    walking to (-7.946169, -3.357146): at (-7.5, 1.8, 0.7), 4.1 m to go
+INPUT_TEST_NOTE 421.9s    walking to (-7.946169, -3.357146): at (-7.6, 1.8, 0.8), 4.2 m to go
+INPUT_TEST_NOTE 432.9s    walking to (-7.946169, -3.357146): at (-7.4, 1.8, 0.6), 4.0 m to go
+INPUT_TEST_NOTE 438.3s BAD [Barn_back_wall] inside_Market cam (-2.82, 4.36, -4.64) ground 0.000 clearance 4.363 player (-4.69, 1.8, -2.16) yaw 143 pitch -19.7 zoom 3.7 arm 3.30 arm_hit 3.30 lens_offset (0.0, 0.0, 0.0) arm_leg_hits:Market@3.22
+INPUT_TEST_NOTE 438.3s BAD [Barn_back_wall] inside_Market cam (-3.17, 4.21, -4.3) ground 0.000 clearance 4.207 player (-4.72, 1.8, -2.12) yaw 144 pitch -19.7 zoom 3.7 arm 2.84 arm_hit 2.84 lens_offset (0.0, 0.0, 0.0) arm_leg_hits:Market@2.74
+INPUT_TEST_NOTE 451.6s    walking to (-7.603351, -14.19819): at (0.5, 1.8, -7.4), 10.6 m to go
+INPUT_TEST_NOTE 462.3s    walking to (-7.603351, -14.19819): at (-2.0, 1.8, -4.8), 10.9 m to go
+INPUT_TEST_NOTE 473.5s    walking to (-7.603351, -14.19819): at (0.2, 1.8, -4.5), 12.5 m to go
+INPUT_TEST_NOTE 484.6s    walking to (-7.603351, -14.19819): at (1.3, 1.8, -6.1), 12.1 m to go
+INPUT_TEST_NOTE 495.3s    walking to (-7.603351, -14.19819): at (-2.2, 1.8, -4.6), 11.0 m to go
+INPUT_TEST_NOTE 506.1s    walking to (-7.603351, -14.19819): at (0.2, 1.8, -7.0), 10.6 m to go
+INPUT_TEST_NOTE 518.2s    walking to (-7.603351, -14.19819): at (0.4, 1.8, -4.3), 12.7 m to go
+INPUT_TEST_NOTE 532.0s    walking to (-11.1851, -12.25603): at (-3.1, 1.8, -3.8), 11.7 m to go
+INPUT_TEST_NOTE 542.5s    walking to (-11.1851, -12.25603): at (-3.8, 1.8, -3.0), 11.8 m to go
+INPUT_TEST_NOTE 553.6s    walking to (-11.1851, -12.25603): at (-2.7, 1.8, -4.2), 11.7 m to go
+INPUT_TEST_NOTE 564.2s    walking to (-11.1851, -12.25603): at (-4.4, 1.8, -2.4), 11.9 m to go
+INPUT_TEST_NOTE 574.9s    walking to (-11.1851, -12.25603): at (-1.7, 1.8, -5.1), 11.9 m to go
+INPUT_TEST_NOTE 585.6s    walking to (-11.1851, -12.25603): at (-5.6, 1.8, -1.3), 12.3 m to go
+INPUT_TEST_NOTE 596.3s    walking to (-11.1851, -12.25603): at (-0.1, 1.8, -5.1), 13.2 m to go
+INPUT_TEST_NOTE 603.9s    at Barn_back_wall (-2.96, 1.8, -3.89)
+INPUT_TEST_NOTE 604.2s BAD [Barn_back_wall] inside_Market cam (-1.91, 8.0, -1.49) ground 0.000 clearance 8.001 player (-2.96, 1.8, -3.89) yaw 14 pitch -60.0 zoom 6.5 arm 5.40 arm_hit 5.40 lens_offset (0.46, 0.14, 0.0) shoulder_leg_hits:Market@0.27
+INPUT_TEST_NOTE 617.4s -> Barn_side_wall at (-6.8, -10.2) ground 0.00
+INPUT_TEST_NOTE 617.5s BAD [Barn_side_wall] near_plane_in_Market cam (-3.84, 2.7, -3.51) ground 0.000 clearance 2.698 player (-2.95, 1.8, -3.89) yaw -67 pitch 30.0 zoom 3.7 arm 1.11 arm_hit 1.11 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 625.9s BAD [Barn_side_wall] near_plane_in_Market cam (3.72, 1.96, -4.92) ground 0.000 clearance 1.958 player (1.81, 1.8, -6.34) yaw 48 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.21, 0.07, 0.0)
+INPUT_TEST_NOTE 626.6s    walking to (-7.603351, -14.19819): at (0.5, 1.8, -7.4), 10.6 m to go
+INPUT_TEST_NOTE 635.6s    walking to (-7.603351, -14.19819): at (-2.0, 1.8, -4.8), 10.9 m to go
+INPUT_TEST_NOTE 645.2s    walking to (-7.603351, -14.19819): at (0.2, 1.8, -4.5), 12.5 m to go
+INPUT_TEST_NOTE 653.9s    walking to (-7.603351, -14.19819): at (1.4, 1.8, -6.1), 12.2 m to go
+INPUT_TEST_NOTE 662.7s    walking to (-7.603351, -14.19819): at (-2.2, 1.8, -4.7), 11.0 m to go
+INPUT_TEST_NOTE 671.4s    walking to (-7.603351, -14.19819): at (0.2, 1.8, -7.1), 10.6 m to go
+INPUT_TEST_NOTE 681.1s    walking to (-7.603351, -14.19819): at (0.5, 1.8, -4.4), 12.7 m to go
+INPUT_TEST_NOTE 692.9s    walking to (-6.776855, -10.17313): at (-2.7, 1.8, -1.9), 9.3 m to go
+INPUT_TEST_NOTE 699.9s    picture Barn_side_wall_wall: near_plane_in_Market cam (3.06, 1.9, -5.55)
+INPUT_TEST_NOTE 699.9s BAD [Barn_side_wall] near_plane_in_Market cam (3.06, 1.9, -5.55) ground 0.000 clearance 1.900 player (0.95, 1.8, -6.54) yaw 65 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 701.7s    walking to (-6.776855, -10.17313): at (-1.4, 1.8, -5.4), 7.2 m to go
+INPUT_TEST_NOTE 710.2s    walking to (-6.776855, -10.17313): at (-2.3, 1.8, -4.6), 7.2 m to go
+INPUT_TEST_NOTE 719.0s    walking to (-6.776855, -10.17313): at (-2.7, 1.8, -1.9), 9.3 m to go
+INPUT_TEST_NOTE 727.6s    walking to (-6.776855, -10.17313): at (-1.4, 1.8, -5.4), 7.2 m to go
+INPUT_TEST_NOTE 736.2s    walking to (-6.776855, -10.17313): at (-2.3, 1.8, -4.6), 7.2 m to go
+INPUT_TEST_NOTE 745.1s    walking to (-6.776855, -10.17313): at (-2.7, 1.8, -1.9), 9.3 m to go
+INPUT_TEST_NOTE 750.0s    at Barn_side_wall (-3.5, 1.8, -3.35)
+INPUT_TEST_NOTE 750.3s BAD [Barn_side_wall] inside_Market cam (-2.3, 7.87, -0.26) ground 0.000 clearance 7.867 player (-3.5, 1.8, -3.35) yaw 9 pitch -52.7 zoom 6.5 arm 5.63 arm_hit 5.63 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@5.42
+INPUT_TEST_NOTE 750.4s BAD [Barn_side_wall] inside_Market cam (-2.02, 1.39, 1.48) ground 0.000 clearance 1.394 player (-3.5, 1.8, -3.35) yaw 9 pitch 22.7 zoom 6.5 arm 5.33 arm_hit 5.33 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@3.76
+INPUT_TEST_NOTE 750.5s BAD [Barn_side_wall] inside_Market cam (-2.06, 0.77, 1.21) ground 0.000 clearance 0.775 player (-3.5, 1.8, -3.35) yaw 9 pitch 30.0 zoom 6.5 arm 5.33 arm_hit 5.33 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@2.90
+INPUT_TEST_NOTE 750.8s BAD [Barn_side_wall] through_Market cam (-5.63, 7.08, 0.79) ground 0.000 clearance 7.084 player (-3.5, 1.8, -3.35) yaw -36 pitch -37.7 zoom 6.5 arm 5.99 arm_hit 5.99 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@5.61
+INPUT_TEST_NOTE 750.8s BAD [Barn_side_wall] through_Market cam (-5.32, 7.65, 0.35) ground 0.000 clearance 7.654 player (-3.5, 1.8, -3.35) yaw -36 pitch -45.2 zoom 6.5 arm 5.99 arm_hit 5.99 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@5.22
+INPUT_TEST_NOTE 751.0s BAD [Barn_side_wall] through_Market cam (-5.22, 2.09, -1.47) ground 0.000 clearance 2.091 player (-3.5, 1.8, -3.35) yaw -58 pitch 30.0 zoom 6.5 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@2.09
+INPUT_TEST_NOTE 753.1s BAD [Barn_side_wall] near_plane_in_Board cam (1.76, 3.26, 0.47) ground 0.000 clearance 3.260 player (-3.5, 1.8, -3.35) yaw 54 pitch -0.1 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 753.2s BAD [Barn_side_wall] near_plane_in_Board cam (2.18, 3.45, -0.1) ground 0.000 clearance 3.453 player (-3.5, 1.8, -3.35) yaw 54 pitch 0.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:Board@0.01
+INPUT_TEST_NOTE 763.5s -> Barn_out at (-6.5, 0.6) ground 0.00
+INPUT_TEST_NOTE 763.7s    picture Barn_out_wall: near_plane_in_Market cam (-3.14, 3.59, -4.2)
+INPUT_TEST_NOTE 763.7s BAD [Barn_out] near_plane_in_Market cam (-3.14, 3.59, -4.2) ground 0.000 clearance 3.585 player (-3.5, 1.8, -3.34) yaw 157 pitch -19.7 zoom 3.7 arm 0.99 arm_hit 0.99 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 763.8s BAD [Barn_out] near_plane_in_Market cam (-2.82, 3.75, -4.55) ground 0.000 clearance 3.750 player (-3.5, 1.8, -3.33) yaw 151 pitch -19.7 zoom 3.7 arm 1.48 arm_hit 1.48 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 763.8s BAD [Barn_out] near_plane_in_Market cam (-2.51, 3.91, -4.88) ground 0.000 clearance 3.912 player (-3.51, 1.8, -3.32) yaw 147 pitch -19.7 zoom 3.7 arm 1.96 arm_hit 1.96 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 765.0s    at Barn_out (-5.84, 1.8, -0.03)
+INPUT_TEST_NOTE 765.3s BAD [Barn_out] through_Market cam (-2.3, 8.36, -1.16) ground 0.000 clearance 8.356 player (-6.1, 1.8, 0.37) yaw 102 pitch -49.8 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@5.98
+INPUT_TEST_NOTE 765.3s BAD [Barn_out] inside_Market cam (-4.08, 7.53, -0.78) ground 0.000 clearance 7.529 player (-6.1, 1.8, 0.37) yaw 102 pitch -60.0 zoom 6.5 arm 4.81 arm_hit 4.81 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@4.75
+INPUT_TEST_NOTE 765.4s BAD [Barn_out] inside_Market cam (-0.06, 1.76, -1.64) ground 0.000 clearance 1.759 player (-6.1, 1.8, 0.37) yaw 102 pitch 15.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@5.53
+INPUT_TEST_NOTE 765.5s BAD [Barn_out] inside_Market cam (-0.3, 0.94, -1.59) ground 0.000 clearance 0.943 player (-6.1, 1.8, 0.37) yaw 102 pitch 22.7 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@3.76
+INPUT_TEST_NOTE 765.9s BAD [Barn_out] through_Market cam (-1.13, 5.74, 2.75) ground 0.000 clearance 5.742 player (-6.1, 1.8, 0.37) yaw 57 pitch -22.4 zoom 6.5 arm 6.00 arm_hit 6.00 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@5.61
+INPUT_TEST_NOTE 766.2s BAD [Barn_out] through_Market cam (-4.73, 6.86, 3.42) ground 0.000 clearance 6.858 player (-6.1, 1.8, 0.37) yaw 12 pitch -45.2 zoom 6.5 arm 4.86 arm_hit 4.86 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@4.01
+INPUT_TEST_NOTE 778.2s -> Farmhouse_ramp at (7.5, -3.7) ground 0.00
+INPUT_TEST_NOTE 778.3s    picture Farmhouse_ramp_wall: through_Market cam (-8.0, 2.45, 0.83)
+INPUT_TEST_NOTE 778.3s BAD [Farmhouse_ramp] through_Market cam (-8.0, 2.45, 0.83) ground 0.000 clearance 2.447 player (-6.09, 1.8, 0.37) yaw -97 pitch 30.0 zoom 3.7 arm 1.99 arm_hit 1.99 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@1.78
+INPUT_TEST_NOTE 778.3s BAD [Farmhouse_ramp] inside_Market cam (-8.05, 2.45, 0.52) ground 0.000 clearance 2.447 player (-6.09, 1.8, 0.37) yaw -106 pitch 30.0 zoom 3.7 arm 1.99 arm_hit 1.99 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@1.60 shoulder_leg_hits:Market@0.05
+INPUT_TEST_NOTE 778.6s BAD [Farmhouse_ramp] near_plane_in_Market cam (-7.2, 2.63, -0.13) ground 0.000 clearance 2.626 player (-5.84, 1.8, 0.52) yaw -136 pitch 30.0 zoom 3.7 arm 1.54 arm_hit 1.54 lens_offset (0.53, 0.17, 0.0)
+INPUT_TEST_NOTE 778.6s BAD [Farmhouse_ramp] near_plane_in_Market cam (-7.2, 2.63, -0.12) ground 0.000 clearance 2.626 player (-5.84, 1.8, 0.52) yaw -136 pitch 30.0 zoom 3.7 arm 1.54 arm_hit 1.54 lens_offset (0.53, 0.17, 0.0)
+INPUT_TEST_NOTE 778.6s BAD [Farmhouse_ramp] near_plane_in_Market cam (-7.27, 2.62, -0.07) ground 0.000 clearance 2.623 player (-5.8, 1.8, 0.55) yaw -135 pitch 30.0 zoom 3.7 arm 1.59 arm_hit 1.59 lens_offset (0.61, 0.19, 0.0)
+INPUT_TEST_NOTE 782.0s BAD [Farmhouse_ramp] inside_Market cam (-7.83, 2.09, 3.26) ground 0.000 clearance 2.091 player (-5.41, 1.8, 4.06) yaw -124 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:Market@0.48
+INPUT_TEST_NOTE 789.3s    walking to (0.0, 7.0): at (-0.4, 1.8, 0.4), 6.6 m to go
+INPUT_TEST_NOTE 791.0s BAD [Farmhouse_ramp] near_plane_in_Vendor cam (-0.6, 1.45, 3.06) ground 0.000 clearance 1.448 player (0.26, 0.63, 4.48) yaw -172 pitch 30.0 zoom 3.7 arm 1.63 arm_hit 1.63 lens_offset (0.67, 0.21, 0.0)
+INPUT_TEST_NOTE 791.1s BAD [Farmhouse_ramp] near_plane_in_Vendor cam (-0.61, 1.45, 3.06) ground 0.000 clearance 1.448 player (0.26, 0.63, 4.48) yaw -172 pitch 30.0 zoom 3.7 arm 1.63 arm_hit 1.63 lens_offset (0.67, 0.21, 0.0)
+INPUT_TEST_NOTE 791.1s BAD [Farmhouse_ramp] near_plane_in_Vendor cam (-0.62, 1.42, 3.14) ground 0.000 clearance 1.421 player (0.27, 0.61, 4.56) yaw -172 pitch 30.0 zoom 3.7 arm 1.65 arm_hit 1.65 lens_offset (0.68, 0.21, 0.0)
+INPUT_TEST_NOTE 791.1s BAD [Farmhouse_ramp] inside_Vendor cam (-0.63, 1.42, 3.14) ground 0.000 clearance 1.421 player (0.27, 0.61, 4.56) yaw -171 pitch 30.0 zoom 3.7 arm 1.65 arm_hit 1.65 lens_offset (0.68, 0.21, 0.0) shoulder_leg_hits:Vendor@0.67
+INPUT_TEST_NOTE 792.7s BAD [Farmhouse_ramp] too_close_to_ground cam (-0.26, 0.19, 3.2) ground 0.000 clearance 0.192 player (0.36, 0.08, 5.68) yaw -174 pitch 30.0 zoom 3.7 arm 2.86 arm_hit 2.86 lens_offset (0.34, 0.11, 0.0)
+INPUT_TEST_NOTE 792.7s BAD [Farmhouse_ramp] too_close_to_ground cam (-0.26, 0.2, 3.2) ground 0.000 clearance 0.198 player (0.36, 0.08, 5.68) yaw -174 pitch 30.0 zoom 3.7 arm 2.86 arm_hit 2.86 lens_offset (0.36, 0.11, 0.0)
+INPUT_TEST_NOTE 792.7s BAD [Farmhouse_ramp] too_close_to_ground cam (-0.17, 0.19, 3.38) ground 0.000 clearance 0.188 player (0.36, 0.02, 5.77) yaw -175 pitch 30.0 zoom 3.7 arm 2.74 arm_hit 2.74 lens_offset (0.32, 0.1, 0.0)
+INPUT_TEST_NOTE 794.0s BAD [Farmhouse_ramp] near_plane_in_basket_smd_col cam (1.67, 0.29, 7.47) ground 0.000 clearance 0.291 player (2.27, 0.0, 5.0) yaw -30 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 794.0s BAD [Farmhouse_ramp] near_plane_in_basket_smd_col cam (1.67, 0.29, 7.47) ground 0.000 clearance 0.291 player (2.27, 0.0, 5.0) yaw -30 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 794.0s BAD [Farmhouse_ramp] near_plane_in_basket_smd_col cam (1.46, 0.2, 7.2) ground 0.000 clearance 0.204 player (2.32, 0.0, 4.93) yaw -30 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.38, 0.12, 0.0)
+INPUT_TEST_NOTE 794.4s BAD [Farmhouse_ramp] near_plane_in_stall-red_col cam (2.75, 0.29, 5.69) ground 0.000 clearance 0.291 player (3.33, 0.0, 3.21) yaw -29 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 794.4s BAD [Farmhouse_ramp] near_plane_in_stall-red_col cam (2.75, 0.29, 5.69) ground 0.000 clearance 0.291 player (3.33, 0.0, 3.21) yaw -29 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 794.4s BAD [Farmhouse_ramp] near_plane_in_stall-red_col cam (2.75, 0.29, 5.69) ground 0.000 clearance 0.291 player (3.33, 0.0, 3.21) yaw -29 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 802.2s    walking to (4.820305, 1.963385): at (3.3, 0.0, 2.6), 1.6 m to go
+INPUT_TEST_NOTE 811.2s    walking to (4.820305, 1.963385): at (3.3, 0.0, 2.5), 1.7 m to go
+INPUT_TEST_NOTE 819.0s BAD [Farmhouse_ramp] through_Market cam (0.03, 1.72, 2.55) ground 0.000 clearance 1.718 player (1.8, 1.28, 1.08) yaw -68 pitch 30.0 zoom 3.7 arm 2.40 arm_hit 2.40 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@2.13 shoulder_leg_hits:Market@0.07
+INPUT_TEST_NOTE 819.0s BAD [Farmhouse_ramp] through_Market cam (-0.08, 1.72, 2.4) ground 0.000 clearance 1.718 player (1.8, 1.28, 1.08) yaw -73 pitch 30.0 zoom 3.7 arm 2.40 arm_hit 2.40 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@2.02 shoulder_leg_hits:Market@0.19
+INPUT_TEST_NOTE 820.7s    walking to (4.820305, 1.963385): at (2.6, 0.5, 1.9), 2.2 m to go
+INPUT_TEST_NOTE 829.9s    walking to (4.820305, 1.963385): at (2.7, 0.4, 2.0), 2.1 m to go
+INPUT_TEST_NOTE 839.7s    walking to (4.820305, 1.963385): at (1.2, 0.4, 3.6), 3.9 m to go
+INPUT_TEST_NOTE 849.9s    walking to (4.820305, 1.963385): at (2.6, 0.5, 1.9), 2.2 m to go
+INPUT_TEST_NOTE 859.7s    walking to (4.820305, 1.963385): at (2.5, 0.6, 1.8), 2.3 m to go
+INPUT_TEST_NOTE 874.8s    walking to (6.595302, -1.843109): at (3.1, 1.8, -2.2), 3.6 m to go
+INPUT_TEST_NOTE 884.7s    walking to (6.595302, -1.843109): at (2.8, 1.8, -5.3), 5.2 m to go
+INPUT_TEST_NOTE 895.0s    walking to (6.595302, -1.843109): at (2.0, 1.8, -2.3), 4.6 m to go
+INPUT_TEST_NOTE 904.6s    walking to (6.595302, -1.843109): at (4.5, 1.8, -3.6), 2.8 m to go
+INPUT_TEST_NOTE 914.3s    walking to (6.595302, -1.843109): at (4.0, 1.8, -4.1), 3.6 m to go
+INPUT_TEST_NOTE 924.0s    walking to (6.595302, -1.843109): at (1.8, 1.8, -1.7), 4.7 m to go
+INPUT_TEST_NOTE 933.6s    walking to (6.595302, -1.843109): at (4.5, 1.8, -3.6), 2.8 m to go
+INPUT_TEST_NOTE 947.5s    walking to (7.4828, -3.746355): at (4.5, 1.8, -3.6), 3.0 m to go
+INPUT_TEST_NOTE 956.9s    walking to (7.4828, -3.746355): at (4.5, 1.8, -3.6), 3.0 m to go
+INPUT_TEST_NOTE 966.6s    walking to (7.4828, -3.746355): at (2.3, 1.8, -5.8), 5.6 m to go
+INPUT_TEST_NOTE 976.1s    walking to (7.4828, -3.746355): at (4.5, 1.8, -3.6), 3.0 m to go
+INPUT_TEST_NOTE 987.1s    walking to (7.4828, -3.746355): at (4.0, 1.8, -3.1), 3.6 m to go
+INPUT_TEST_NOTE 998.4s    walking to (7.4828, -3.746355): at (2.7, 1.8, -5.4), 5.0 m to go
+INPUT_TEST_NOTE 1009.5s    walking to (7.4828, -3.746355): at (4.5, 1.8, -3.6), 3.0 m to go
+INPUT_TEST_NOTE 1015.2s    at Farmhouse_ramp (2.67, 1.8, -5.47)
+INPUT_TEST_NOTE 1016.0s BAD [Farmhouse_ramp] inside_Market cam (2.19, 2.7, -6.62) ground 0.000 clearance 2.704 player (2.44, 1.8, -5.71) yaw -165 pitch 30.0 zoom 6.5 arm 1.09 arm_hit 1.09 lens_offset (0.0, 0.0, 0.0) arm_leg_hits:Market@0.98
+INPUT_TEST_NOTE 1017.4s BAD [Farmhouse_ramp] inside_Board cam (4.44, 7.4, -1.07) ground 0.000 clearance 7.398 player (2.44, 1.8, -5.71) yaw 15 pitch -37.7 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@5.24 shoulder_leg_hits:Board@0.53
+INPUT_TEST_NOTE 1029.0s -> Farmhouse_inside at (9.3, -7.6) ground 0.00
+INPUT_TEST_NOTE 1034.9s    picture Farmhouse_inside_wall: near_plane_in_Market cam (1.37, 4.65, 0.09)
+INPUT_TEST_NOTE 1034.9s BAD [Farmhouse_inside] near_plane_in_Market cam (1.37, 4.65, 0.09) ground 0.000 clearance 4.653 player (3.5, 1.8, -2.65) yaw -47 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.52, 0.16, 0.0)
+INPUT_TEST_NOTE 1035.1s BAD [Farmhouse_inside] near_plane_in_Market cam (1.37, 4.65, 0.09) ground 0.000 clearance 4.653 player (3.5, 1.8, -2.65) yaw -47 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.52, 0.16, 0.0)
+INPUT_TEST_NOTE 1035.1s BAD [Farmhouse_inside] near_plane_in_Market cam (1.37, 4.65, 0.09) ground 0.000 clearance 4.653 player (3.5, 1.8, -2.65) yaw -47 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.52, 0.16, 0.0)
+INPUT_TEST_NOTE 1039.0s    walking to (9.272589, -7.584569): at (3.3, 1.8, -3.2), 7.4 m to go
+INPUT_TEST_NOTE 1048.7s    walking to (9.272589, -7.584569): at (4.5, 1.8, -3.6), 6.2 m to go
+INPUT_TEST_NOTE 1059.2s    walking to (9.272589, -7.584569): at (3.1, 1.8, -2.3), 8.1 m to go
+INPUT_TEST_NOTE 1069.0s    walking to (9.272589, -7.584569): at (4.2, 1.8, -4.0), 6.2 m to go
+INPUT_TEST_NOTE 1079.6s    walking to (9.272589, -7.584569): at (2.9, 1.8, -2.8), 8.0 m to go
+INPUT_TEST_NOTE 1089.4s    walking to (9.272589, -7.584569): at (4.5, 1.8, -3.6), 6.2 m to go
+INPUT_TEST_NOTE 1099.9s    walking to (9.272589, -7.584569): at (3.1, 1.8, -2.3), 8.1 m to go
+INPUT_TEST_NOTE 1104.9s    at Farmhouse_inside (4.09, 1.8, -4.05)
+INPUT_TEST_NOTE 1105.2s BAD [Farmhouse_inside] through_Market cam (-0.54, 7.78, -3.18) ground 0.000 clearance 7.784 player (4.09, 1.8, -4.05) yaw -88 pitch -42.3 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@5.17
+INPUT_TEST_NOTE 1105.2s BAD [Farmhouse_inside] through_Market cam (2.33, 6.79, -3.29) ground 0.000 clearance 6.786 player (4.09, 1.8, -4.05) yaw -88 pitch -60.0 zoom 6.5 arm 3.96 arm_hit 3.96 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@3.36
+INPUT_TEST_NOTE 1105.4s BAD [Farmhouse_inside] inside_Market cam (-2.21, 1.76, -3.12) ground 0.000 clearance 1.758 player (4.09, 1.8, -4.05) yaw -88 pitch 15.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@5.53
+INPUT_TEST_NOTE 1105.5s BAD [Farmhouse_inside] inside_Market cam (0.93, 1.66, -3.24) ground 0.000 clearance 1.664 player (4.09, 1.8, -4.05) yaw -88 pitch 30.0 zoom 6.5 arm 3.55 arm_hit 3.55 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@2.90
+INPUT_TEST_NOTE 1105.7s BAD [Farmhouse_inside] through_Market cam (-0.42, 6.71, -7.29) ground 0.000 clearance 6.706 player (4.09, 1.8, -4.05) yaw -133 pitch -30.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@5.02
+INPUT_TEST_NOTE 1105.7s BAD [Farmhouse_inside] inside_Market cam (1.71, 6.18, -5.31) ground 0.000 clearance 6.176 player (4.09, 1.8, -4.05) yaw -133 pitch -45.2 zoom 6.5 arm 3.91 arm_hit 3.91 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@3.52 shoulder_leg_hits:Market@0.27
+INPUT_TEST_NOTE 1107.6s BAD [Farmhouse_inside] near_plane_in_Board cam (4.64, 4.6, -2.56) ground 0.000 clearance 4.603 player (4.09, 1.8, -4.05) yaw 2 pitch -37.4 zoom 6.5 arm 2.02 arm_hit 2.02 lens_offset (0.49, 0.15, 0.0) arm_leg_hits:Market@1.71
+INPUT_TEST_NOTE 1110.5s BAD [Farmhouse_inside] near_plane_in_Board cam (4.64, 4.6, -2.56) ground 0.000 clearance 4.603 player (4.09, 1.8, -4.05) yaw 2 pitch -37.4 zoom 3.5 arm 2.03 arm_hit 2.03 lens_offset (0.49, 0.15, 0.0) arm_leg_hits:Market@1.71
+INPUT_TEST_NOTE 1113.6s BAD [Farmhouse_inside] near_plane_in_Board cam (4.64, 4.6, -2.56) ground 0.000 clearance 4.604 player (4.09, 1.8, -4.05) yaw 2 pitch -37.4 zoom 3.5 arm 2.03 arm_hit 2.03 lens_offset (0.49, 0.15, 0.0) arm_leg_hits:Market@1.71
+INPUT_TEST_NOTE 1118.9s -> Farmhouse_out at (4.8, 2.0) ground 0.00
+INPUT_TEST_NOTE 1130.9s    walking to (6.595302, -1.843109): at (3.5, 1.8, -2.7), 3.2 m to go
+INPUT_TEST_NOTE 1142.4s    walking to (6.595302, -1.843109): at (2.7, 1.8, -5.4), 5.3 m to go
+INPUT_TEST_NOTE 1154.0s    walking to (6.595302, -1.843109): at (3.2, 1.8, -3.0), 3.6 m to go
+INPUT_TEST_NOTE 1165.9s    walking to (6.595302, -1.843109): at (2.8, 1.8, -5.3), 5.2 m to go
+INPUT_TEST_NOTE 1178.0s    walking to (6.595302, -1.843109): at (3.2, 1.8, -3.3), 3.6 m to go
+INPUT_TEST_NOTE 1189.8s    walking to (6.595302, -1.843109): at (2.8, 1.8, -5.3), 5.2 m to go
+INPUT_TEST_NOTE 1202.0s    walking to (6.595302, -1.843109): at (3.2, 1.8, -3.3), 3.6 m to go
+INPUT_TEST_NOTE 1207.1s    picture Farmhouse_out_wall: through_Market cam (1.46, 2.22, -6.5)
+INPUT_TEST_NOTE 1207.1s BAD [Farmhouse_out] through_Market cam (1.46, 2.22, -6.5) ground 0.000 clearance 2.220 player (3.2, 1.8, -4.95) yaw -149 pitch 30.0 zoom 3.7 arm 2.44 arm_hit 2.44 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@1.99
+INPUT_TEST_NOTE 1207.2s BAD [Farmhouse_out] through_Market cam (1.53, 2.22, -6.58) ground 0.000 clearance 2.220 player (3.2, 1.8, -4.95) yaw -152 pitch 30.0 zoom 3.7 arm 2.44 arm_hit 2.44 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@1.67
+INPUT_TEST_NOTE 1207.2s BAD [Farmhouse_out] near_plane_in_Market cam (2.69, 2.62, -5.92) ground 0.000 clearance 2.620 player (3.23, 1.8, -4.91) yaw -156 pitch 30.0 zoom 3.7 arm 1.30 arm_hit 1.30 lens_offset (0.08, 0.02, 0.0)
+INPUT_TEST_NOTE 1207.2s BAD [Farmhouse_out] near_plane_in_Market cam (2.93, 2.73, -5.72) ground 0.000 clearance 2.731 player (3.25, 1.8, -4.88) yaw -159 pitch 30.0 zoom 3.7 arm 1.04 arm_hit 1.04 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1207.2s BAD [Farmhouse_out] near_plane_in_Market cam (2.96, 2.73, -5.73) ground 0.000 clearance 2.731 player (3.25, 1.8, -4.88) yaw -161 pitch 30.0 zoom 3.7 arm 1.04 arm_hit 1.04 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1220.6s BAD [Farmhouse_out] near_plane_in_stall-red_col cam (3.25, 0.29, 5.45) ground 0.000 clearance 0.291 player (3.66, 0.0, 2.94) yaw -25 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1220.6s BAD [Farmhouse_out] near_plane_in_stall-red_col cam (3.26, 0.29, 5.45) ground 0.000 clearance 0.291 player (3.66, 0.0, 2.94) yaw -25 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1220.6s BAD [Farmhouse_out] near_plane_in_stall-red_col cam (3.27, 0.29, 5.46) ground 0.000 clearance 0.287 player (3.67, 0.0, 2.95) yaw -25 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.69, 0.22, 0.0)
+INPUT_TEST_NOTE 1224.7s    walking to (4.820305, 1.963385): at (0.9, 1.2, 2.0), 3.9 m to go
+INPUT_TEST_NOTE 1224.7s BAD [Farmhouse_out] through_Market cam (-0.76, 1.78, 3.42) ground 0.000 clearance 1.784 player (0.89, 1.27, 2.0) yaw -68 pitch 30.0 zoom 3.7 arm 2.26 arm_hit 2.26 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@2.19
+INPUT_TEST_NOTE 1230.9s BAD [Farmhouse_out] too_close_to_ground cam (1.8, 0.14, 6.86) ground 0.000 clearance 0.144 player (3.21, 0.0, 4.95) yaw -40 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.16, 0.05, 0.0)
+INPUT_TEST_NOTE 1231.4s BAD [Farmhouse_out] through_stall-red_col cam (3.9, 0.29, 6.62) ground 0.000 clearance 0.291 player (3.85, 0.0, 4.08) yaw -15 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:stall-red_col@1.44
+INPUT_TEST_NOTE 1236.7s    walking to (4.820305, 1.963385): at (1.0, 0.9, 2.7), 3.9 m to go
+INPUT_TEST_NOTE 1248.1s    walking to (4.820305, 1.963385): at (3.6, 0.0, 2.8), 1.5 m to go
+INPUT_TEST_NOTE 1251.5s BAD [Farmhouse_out] near_plane_in_basket_smd_col cam (2.0, 0.29, 6.91) ground 0.000 clearance 0.291 player (3.44, 0.0, 4.81) yaw -51 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1251.5s BAD [Farmhouse_out] near_plane_in_basket_smd_col cam (2.0, 0.29, 6.91) ground 0.000 clearance 0.291 player (3.44, 0.0, 4.81) yaw -51 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1251.5s BAD [Farmhouse_out] near_plane_in_basket_smd_col cam (2.04, 0.29, 6.95) ground 0.000 clearance 0.291 player (3.49, 0.0, 4.85) yaw -51 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1251.7s BAD [Farmhouse_out] through_stall-red_col cam (2.8, 0.29, 7.15) ground 0.000 clearance 0.291 player (3.71, 0.0, 4.77) yaw -37 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:stall-red_col@1.19
+INPUT_TEST_NOTE 1251.7s BAD [Farmhouse_out] through_stall-red_col cam (3.0, 0.29, 7.22) ground 0.000 clearance 0.291 player (3.71, 0.0, 4.77) yaw -32 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:stall-red_col@0.79
+INPUT_TEST_NOTE 1258.8s    walking to (4.820305, 1.963385): at (5.2, 0.0, 4.6), 2.7 m to go
+INPUT_TEST_NOTE 1265.6s BAD [Farmhouse_out] too_close_to_ground cam (3.0, 0.12, 5.64) ground 0.000 clearance 0.121 player (4.32, 0.0, 3.69) yaw -36 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.08, 0.02, 0.0)
+INPUT_TEST_NOTE 1265.6s BAD [Farmhouse_out] too_close_to_ground cam (3.21, 0.14, 5.78) ground 0.000 clearance 0.145 player (4.32, 0.0, 3.69) yaw -32 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.16, 0.05, 0.0)
+INPUT_TEST_NOTE 1269.5s    walking to (4.820305, 1.963385): at (4.5, 0.0, 4.1), 2.2 m to go
+INPUT_TEST_NOTE 1274.0s BAD [Farmhouse_out] near_plane_in_Depot cam (7.08, 0.29, 4.87) ground 0.000 clearance 0.291 player (5.05, 0.0, 3.33) yaw 37 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1274.0s BAD [Farmhouse_out] near_plane_in_Depot cam (7.09, 0.29, 4.86) ground 0.000 clearance 0.291 player (5.05, 0.0, 3.33) yaw 37 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1274.7s    at Farmhouse_out (5.35, 0.0, 3.03)
+INPUT_TEST_NOTE 1275.2s BAD [Farmhouse_out] under_terrain cam (5.46, -0.4, 8.059999) ground 0.000 clearance -0.397 player (5.35, 0.0, 3.03) yaw -7 pitch 22.7 zoom 6.5 arm 5.31 arm_hit 5.31 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.76
+INPUT_TEST_NOTE 1275.3s BAD [Farmhouse_out] under_terrain cam (5.49, -1.01, 7.79) ground 0.000 clearance -1.014 player (5.35, 0.0, 3.03) yaw -7 pitch 30.0 zoom 6.5 arm 5.31 arm_hit 5.31 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@2.90
+INPUT_TEST_NOTE 1275.7s BAD [Farmhouse_out] under_terrain cam (0.81, -0.04, 7.5) ground 0.000 clearance -0.041 player (5.35, 0.0, 3.03) yaw -52 pitch 15.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@5.53
+INPUT_TEST_NOTE 1276.0s BAD [Farmhouse_out] near_plane_in_Board cam (4.93, 2.19, 2.98) ground 0.000 clearance 2.190 player (5.35, 0.0, 3.03) yaw -97 pitch -60.0 zoom 6.5 arm 0.85 arm_hit 0.85 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1276.0s BAD [Farmhouse_out] near_plane_in_Board cam (4.93, 2.19, 2.98) ground 0.000 clearance 2.190 player (5.35, 0.0, 3.03) yaw -97 pitch -60.0 zoom 6.5 arm 0.85 arm_hit 0.85 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1276.0s BAD [Farmhouse_out] near_plane_in_Board cam (4.93, 2.19, 2.98) ground 0.000 clearance 2.190 player (5.35, 0.0, 3.03) yaw -97 pitch -60.0 zoom 6.5 arm 0.85 arm_hit 0.85 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1277.3s BAD [Farmhouse_out] inside_Depot cam (8.67, 1.25, 2.72) ground 0.000 clearance 1.248 player (5.35, 0.0, 3.03) yaw 83 pitch 7.4 zoom 6.5 arm 3.25 arm_hit 3.25 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:Depot@0.64
+INPUT_TEST_NOTE 1277.3s BAD [Farmhouse_out] inside_Depot cam (8.67, 1.68, 2.72) ground 0.000 clearance 1.676 player (5.35, 0.0, 3.03) yaw 83 pitch -0.1 zoom 6.5 arm 3.25 arm_hit 3.25 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Depot@1.97 shoulder_leg_hits:Depot@0.64
+INPUT_TEST_NOTE 1277.4s BAD [Farmhouse_out] through_Depot cam (7.41, 3.75, 2.57) ground 0.000 clearance 3.750 player (5.35, 0.0, 3.03) yaw 83 pitch -45.0 zoom 6.5 arm 3.03 arm_hit 3.03 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Depot@2.78
+INPUT_TEST_NOTE 1277.4s BAD [Farmhouse_out] through_Depot cam (7.29, 2.78, 2.56) ground 0.000 clearance 2.779 player (5.35, 0.0, 3.03) yaw 83 pitch -29.9 zoom 6.5 arm 2.28 arm_hit 2.28 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Depot@2.27
+INPUT_TEST_NOTE 1277.6s BAD [Farmhouse_out] through_Depot cam (7.83, 0.29, 3.62) ground 0.000 clearance 0.291 player (5.35, 0.0, 3.03) yaw 61 pitch 30.0 zoom 6.5 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Depot@2.68
+INPUT_TEST_NOTE 1277.6s BAD [Farmhouse_out] near_plane_in_Depot cam (7.73, 0.29, 3.94) ground 0.000 clearance 0.291 player (5.35, 0.0, 3.03) yaw 53 pitch 30.0 zoom 6.5 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Depot@2.51
+INPUT_TEST_NOTE 1280.2s BAD [Farmhouse_out] inside_Board cam (6.73, 4.09, 1.05) ground 0.000 clearance 4.090 player (5.35, 0.0, 3.03) yaw 128 pitch -45.2 zoom 3.5 arm 3.50 arm_hit 3.50 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:Board@0.73
+INPUT_TEST_NOTE 1280.2s BAD [Farmhouse_out] inside_Board cam (6.46, 4.36, 1.27) ground 0.000 clearance 4.361 player (5.35, 0.0, 3.03) yaw 128 pitch -52.5 zoom 3.5 arm 3.50 arm_hit 3.50 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:Board@0.68
+INPUT_TEST_NOTE 1280.5s BAD [Farmhouse_out] inside_Depot cam (8.67, 1.25, 2.72) ground 0.000 clearance 1.248 player (5.35, 0.0, 3.03) yaw 83 pitch 7.4 zoom 3.5 arm 3.25 arm_hit 3.25 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:Depot@0.64
+INPUT_TEST_NOTE 1283.0s BAD [Farmhouse_out] inside_Board cam (6.73, 4.09, 1.05) ground 0.000 clearance 4.090 player (5.35, 0.0, 3.03) yaw 128 pitch -45.2 zoom 3.5 arm 3.50 arm_hit 3.50 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:Board@0.73
+INPUT_TEST_NOTE 1288.4s -> Market_ramp at (1.4, 2.4) ground 0.00
+INPUT_TEST_NOTE 1288.7s    picture Market_ramp_wall: near_plane_in_Board cam (5.81, 1.83, 2.08)
+INPUT_TEST_NOTE 1288.7s BAD [Market_ramp] near_plane_in_Board cam (5.81, 1.83, 2.08) ground 0.000 clearance 1.834 player (5.35, 0.0, 3.04) yaw 155 pitch -19.7 zoom 3.7 arm 1.14 arm_hit 1.14 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1288.8s BAD [Market_ramp] near_plane_in_Board cam (7.5, 2.7, 0.31) ground 0.000 clearance 2.698 player (5.35, 0.0, 3.05) yaw 142 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1290.2s BAD [Market_ramp] near_plane_in_Board cam (4.13, 2.91, 2.88) ground 0.000 clearance 2.905 player (1.91, 0.0, 5.56) yaw 129 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1298.6s BAD [Market_ramp] near_plane_in_Depot cam (8.16, 2.91, 7.41) ground 0.000 clearance 2.905 player (4.95, 0.0, 6.07) yaw 56 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1298.6s BAD [Market_ramp] near_plane_in_Depot cam (8.16, 2.91, 7.4) ground 0.000 clearance 2.905 player (4.95, 0.0, 6.07) yaw 56 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1298.6s BAD [Market_ramp] near_plane_in_Depot cam (8.17, 2.91, 7.39) ground 0.000 clearance 2.905 player (4.95, 0.0, 6.07) yaw 56 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Depot@3.20
+INPUT_TEST_NOTE 1299.8s    at Market_ramp (2.24, 0.17, 3.08)
+INPUT_TEST_NOTE 1300.0s BAD [Market_ramp] through_stall-red_col cam (5.67, 4.23, 7.73) ground 0.000 clearance 4.229 player (1.93, 0.38, 2.92) yaw 31 pitch -19.7 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:stall-red_col@2.99
+INPUT_TEST_NOTE 1300.2s BAD [Market_ramp] through_stall-red_col cam (4.39, 2.89, 8.88) ground 0.000 clearance 2.886 player (1.93, 0.38, 2.92) yaw 16 pitch -7.4 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:stall-red_col@3.72
+INPUT_TEST_NOTE 1300.3s BAD [Market_ramp] through_crate_empy_smd_col cam (4.37, 0.34, 8.8) ground 0.000 clearance 0.343 player (1.93, 0.38, 2.92) yaw 16 pitch 15.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:crate_empy_smd_col@0.38
+INPUT_TEST_NOTE 1300.4s BAD [Market_ramp] under_terrain cam (3.73, -0.25, 6.61) ground 0.000 clearance -0.250 player (1.93, 0.38, 2.92) yaw 16 pitch 30.0 zoom 6.5 arm 4.55 arm_hit 4.55 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.67
+INPUT_TEST_NOTE 1300.5s BAD [Market_ramp] near_plane_in_stall-red_col cam (3.09, 0.29, 5.89) ground 0.000 clearance 0.291 player (1.93, 0.38, 2.92) yaw 9 pitch 30.0 zoom 6.5 arm 3.47 arm_hit 3.47 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1300.8s BAD [Market_ramp] under_terrain cam (-0.38, -0.47, 8.58) ground 0.000 clearance -0.473 player (1.93, 0.38, 2.92) yaw -29 pitch 22.7 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@4.75
+INPUT_TEST_NOTE 1301.0s BAD [Market_ramp] through_Market cam (-0.87, 0.29, 4.46) ground 0.000 clearance 0.291 player (1.93, 0.38, 2.92) yaw -74 pitch 30.0 zoom 6.5 arm 3.47 arm_hit 3.47 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@1.99
+INPUT_TEST_NOTE 1301.1s BAD [Market_ramp] near_plane_in_Market cam (-2.28, 6.53, 4.54) ground 0.000 clearance 6.531 player (1.93, 0.38, 2.92) yaw -74 pitch -45.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.38, 0.12, 0.0)
+INPUT_TEST_NOTE 1301.1s BAD [Market_ramp] through_Market cam (-1.49, 7.14, 4.64) ground 0.000 clearance 7.140 player (1.93, 0.38, 2.92) yaw -74 pitch -52.7 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@6.29
+INPUT_TEST_NOTE 1301.2s BAD [Market_ramp] through_Market cam (-2.4, 5.72, 4.91) ground 0.000 clearance 5.720 player (1.93, 0.38, 2.92) yaw -74 pitch -37.4 zoom 6.5 arm 6.10 arm_hit 6.10 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@5.56
+INPUT_TEST_NOTE 1301.3s BAD [Market_ramp] through_Vendor cam (-0.13, 1.42, 4.25) ground 0.000 clearance 1.424 player (1.93, 0.38, 2.92) yaw -74 pitch 15.2 zoom 6.5 arm 2.38 arm_hit 2.38 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Vendor@2.33
+INPUT_TEST_NOTE 1301.5s BAD [Market_ramp] near_plane_in_Market cam (-1.03, 7.53, 1.8) ground 0.000 clearance 7.533 player (1.93, 0.38, 2.92) yaw -119 pitch -60.0 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.44, 0.14, 0.0)
+INPUT_TEST_NOTE 1301.6s BAD [Market_ramp] near_plane_in_Market cam (-1.03, 7.53, 1.8) ground 0.000 clearance 7.533 player (1.93, 0.38, 2.92) yaw -119 pitch -60.0 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.44, 0.14, 0.0)
+INPUT_TEST_NOTE 1301.6s BAD [Market_ramp] inside_Market cam (-4.08, 1.18, 0.42) ground 0.000 clearance 1.184 player (1.93, 0.38, 2.92) yaw -119 pitch 7.7 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@2.05
+INPUT_TEST_NOTE 1302.0s BAD [Market_ramp] inside_Market cam (0.7, 1.52, 1.19) ground 0.000 clearance 1.520 player (1.93, 0.38, 2.92) yaw -164 pitch 15.2 zoom 6.5 arm 2.01 arm_hit 2.01 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@1.90
+INPUT_TEST_NOTE 1302.2s BAD [Market_ramp] through_Board cam (2.81, 0.29, -0.15) ground 0.000 clearance 0.291 player (1.93, 0.38, 2.92) yaw 151 pitch 30.0 zoom 6.5 arm 3.47 arm_hit 3.47 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Board@2.36
+INPUT_TEST_NOTE 1302.2s BAD [Market_ramp] through_Board cam (2.9, 0.71, -0.3) ground 0.000 clearance 0.712 player (1.93, 0.38, 2.92) yaw 151 pitch 22.5 zoom 6.5 arm 3.47 arm_hit 3.47 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Board@1.83
+INPUT_TEST_NOTE 1302.3s BAD [Market_ramp] through_Board cam (2.17, 4.5, 1.03) ground 0.000 clearance 4.497 player (1.93, 0.38, 2.92) yaw 151 pitch -52.5 zoom 6.5 arm 3.19 arm_hit 3.19 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Board@2.78
+INPUT_TEST_NOTE 1302.3s BAD [Market_ramp] inside_Board cam (2.33, 4.24, 0.74) ground 0.000 clearance 4.242 player (1.93, 0.38, 2.92) yaw 151 pitch -45.0 zoom 6.5 arm 3.19 arm_hit 3.19 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Board@2.39 shoulder_leg_hits:Board@0.55
+INPUT_TEST_NOTE 1302.6s BAD [Market_ramp] inside_Board cam (3.47, 0.92, 1.63) ground 0.000 clearance 0.922 player (1.93, 0.38, 2.92) yaw 114 pitch 30.0 zoom 6.5 arm 2.13 arm_hit 2.13 lens_offset (0.56, 0.18, 0.0) shoulder_leg_hits:Board@0.50
+INPUT_TEST_NOTE 1302.6s BAD [Market_ramp] inside_Board cam (3.61, 0.96, 1.7) ground 0.000 clearance 0.960 player (1.93, 0.38, 2.92) yaw 106 pitch 30.0 zoom 6.5 arm 2.13 arm_hit 2.13 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:Board@0.58
+INPUT_TEST_NOTE 1303.0s BAD [Market_ramp] inside_Depot cam (7.93, 1.21, 5.43) ground 0.000 clearance 1.208 player (1.93, 0.38, 2.92) yaw 61 pitch 7.4 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.69, 0.22, 0.0) arm_leg_hits:Depot@4.59 shoulder_leg_hits:Depot@0.29
+INPUT_TEST_NOTE 1303.0s BAD [Market_ramp] inside_Depot cam (5.9, 2.54, 4.61) ground 0.000 clearance 2.543 player (1.93, 0.38, 2.92) yaw 61 pitch -7.6 zoom 6.5 arm 4.35 arm_hit 4.35 lens_offset (0.43, 0.13, 0.0) shoulder_leg_hits:Depot@0.16
+INPUT_TEST_NOTE 1303.0s BAD [Market_ramp] inside_Depot cam (5.9, 3.18, 4.3) ground 0.000 clearance 3.183 player (1.93, 0.38, 2.92) yaw 61 pitch -15.1 zoom 6.5 arm 4.35 arm_hit 4.35 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:Depot@0.23
+INPUT_TEST_NOTE 1303.1s BAD [Market_ramp] through_Depot cam (5.58, 7.12, 4.13) ground 0.000 clearance 7.124 player (1.93, 0.38, 2.92) yaw 61 pitch -52.5 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Depot@6.34
+INPUT_TEST_NOTE 1303.1s BAD [Market_ramp] through_Depot cam (6.16, 6.58, 4.44) ground 0.000 clearance 6.583 player (1.93, 0.38, 2.92) yaw 61 pitch -45.0 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Depot@6.44
+INPUT_TEST_NOTE 1303.1s BAD [Market_ramp] through_Depot cam (6.35, 4.77, 4.62) ground 0.000 clearance 4.770 player (1.93, 0.38, 2.92) yaw 61 pitch -29.9 zoom 6.5 arm 5.54 arm_hit 5.54 lens_offset (0.64, 0.2, 0.0) arm_leg_hits:Depot@5.25
+INPUT_TEST_NOTE 1303.1s BAD [Market_ramp] under_terrain cam (7.6, -0.47, 5.23) ground 0.000 clearance -0.473 player (1.93, 0.38, 2.92) yaw 61 pitch 22.7 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@4.75
+INPUT_TEST_NOTE 1303.3s BAD [Market_ramp] too_close_to_ground cam (3.81, 0.19, 5.36) ground 0.000 clearance 0.193 player (1.93, 0.38, 2.92) yaw 31 pitch 30.0 zoom 6.5 arm 3.47 arm_hit 3.47 lens_offset (0.34, 0.11, 0.0)
+INPUT_TEST_NOTE 1303.3s BAD [Market_ramp] near_plane_in_stall-red_col cam (3.82, 0.29, 5.49) ground 0.000 clearance 0.291 player (1.93, 0.38, 2.92) yaw 24 pitch 30.0 zoom 6.5 arm 3.47 arm_hit 3.47 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1303.3s BAD [Market_ramp] near_plane_in_stall-red_col cam (3.86, 0.86, 7.04) ground 0.000 clearance 0.860 player (1.93, 0.38, 2.92) yaw 16 pitch 15.0 zoom 6.5 arm 4.60 arm_hit 4.60 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:stall-red_col@3.80 shoulder_leg_hits:stall-red_col@0.29
+INPUT_TEST_NOTE 1303.5s BAD [Market_ramp] through_stall-red_col cam (4.39, 2.89, 8.889999) ground 0.000 clearance 2.886 player (1.93, 0.38, 2.92) yaw 16 pitch -7.4 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:stall-red_col@3.72
+INPUT_TEST_NOTE 1303.5s BAD [Market_ramp] through_crate_empy_smd_col cam (4.37, 0.34, 8.8) ground 0.000 clearance 0.343 player (1.93, 0.38, 2.92) yaw 16 pitch 15.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:crate_empy_smd_col@0.38
+INPUT_TEST_NOTE 1304.2s BAD [Market_ramp] through_Vendor cam (-0.13, 1.42, 4.25) ground 0.000 clearance 1.424 player (1.93, 0.38, 2.92) yaw -74 pitch 15.2 zoom 6.5 arm 2.38 arm_hit 2.38 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Vendor@2.33
+INPUT_TEST_NOTE 1304.6s BAD [Market_ramp] inside_Market cam (-4.08, 1.18, 0.41) ground 0.000 clearance 1.184 player (1.93, 0.38, 2.92) yaw -119 pitch 7.7 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@2.05
+INPUT_TEST_NOTE 1306.5s BAD [Market_ramp] too_close_to_ground cam (3.82, 0.18, 5.38) ground 0.000 clearance 0.177 player (1.93, 0.38, 2.92) yaw 31 pitch 30.0 zoom 3.5 arm 3.50 arm_hit 3.50 lens_offset (0.34, 0.11, 0.0)
+INPUT_TEST_NOTE 1307.4s BAD [Market_ramp] through_Vendor cam (-0.13, 1.42, 4.25) ground 0.000 clearance 1.424 player (1.93, 0.38, 2.92) yaw -74 pitch 15.2 zoom 3.5 arm 2.38 arm_hit 2.38 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Vendor@2.33
+INPUT_TEST_NOTE 1313.8s -> Market_inside at (-2.7, -1.7) ground 0.00
+INPUT_TEST_NOTE 1314.1s    picture Market_inside_wall: through_stall-red_col cam (3.63, 0.29, 5.61)
+INPUT_TEST_NOTE 1314.1s BAD [Market_inside] through_stall-red_col cam (3.63, 0.29, 5.61) ground 0.000 clearance 0.291 player (1.94, 0.38, 2.9) yaw 19 pitch 30.0 zoom 3.7 arm 3.47 arm_hit 3.47 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:stall-red_col@3.35
+INPUT_TEST_NOTE 1314.2s BAD [Market_inside] near_plane_in_stall-red_col cam (3.87, 0.27, 5.42) ground 0.000 clearance 0.273 player (1.94, 0.39, 2.9) yaw 26 pitch 30.0 zoom 3.7 arm 3.48 arm_hit 3.48 lens_offset (0.63, 0.2, 0.0)
+INPUT_TEST_NOTE 1314.2s BAD [Market_inside] near_plane_in_stall-red_col cam (3.86, 0.21, 5.33) ground 0.000 clearance 0.207 player (1.94, 0.39, 2.9) yaw 31 pitch 30.0 zoom 3.7 arm 3.48 arm_hit 3.48 lens_offset (0.39, 0.12, 0.0)
+INPUT_TEST_NOTE 1314.4s BAD [Market_inside] too_close_to_ground cam (4.81, 0.2, 4.66) ground 0.000 clearance 0.197 player (1.94, 0.41, 2.86) yaw 46 pitch 30.0 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1314.4s BAD [Market_inside] too_close_to_ground cam (4.85, 0.2, 4.6) ground 0.000 clearance 0.197 player (1.94, 0.41, 2.86) yaw 47 pitch 30.0 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1317.8s    at Market_inside (-4.27, 1.8, -2.58)
+INPUT_TEST_NOTE 1318.0s BAD [Market_inside] inside_Market cam (-3.96, 6.71, 2.97) ground 0.000 clearance 6.707 player (-4.27, 1.8, -2.58) yaw -4 pitch -30.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@6.26
+INPUT_TEST_NOTE 1318.0s BAD [Market_inside] through_Market cam (-3.92, 7.4, 2.47) ground 0.000 clearance 7.398 player (-4.27, 1.8, -2.58) yaw -4 pitch -37.7 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@5.59
+INPUT_TEST_NOTE 1318.0s BAD [Market_inside] inside_Market cam (-3.77, 7.3, 0.27) ground 0.000 clearance 7.301 player (-4.27, 1.8, -2.58) yaw -4 pitch -52.7 zoom 6.5 arm 4.92 arm_hit 4.92 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@4.81
+INPUT_TEST_NOTE 1318.1s BAD [Market_inside] inside_Market cam (-4.01, 1.76, 3.79) ground 0.000 clearance 1.759 player (-4.27, 1.8, -2.58) yaw -4 pitch 15.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@5.53
+INPUT_TEST_NOTE 1318.3s BAD [Market_inside] near_plane_in_Market cam (-7.96, 5.78, 1.56) ground 0.000 clearance 5.783 player (-4.27, 1.8, -2.58) yaw -49 pitch -22.6 zoom 6.5 arm 6.05 arm_hit 6.05 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1318.3s BAD [Market_inside] through_Market cam (-7.68, 6.48, 1.31) ground 0.000 clearance 6.481 player (-4.27, 1.8, -2.58) yaw -49 pitch -30.2 zoom 6.5 arm 6.05 arm_hit 6.05 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@5.68
+INPUT_TEST_NOTE 1318.4s BAD [Market_inside] near_plane_in_Market cam (-6.67, 6.45, 0.44) ground 0.000 clearance 6.454 player (-4.27, 1.8, -2.58) yaw -49 pitch -37.7 zoom 6.5 arm 4.95 arm_hit 4.95 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1318.4s BAD [Market_inside] near_plane_in_Market cam (-6.33, 6.92, 0.14) ground 0.000 clearance 6.922 player (-4.27, 1.8, -2.58) yaw -49 pitch -45.2 zoom 6.5 arm 4.95 arm_hit 4.95 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@4.80
+INPUT_TEST_NOTE 1318.5s BAD [Market_inside] through_Market cam (-8.349999, 5.07, 1.89) ground 0.000 clearance 5.075 player (-4.27, 1.8, -2.58) yaw -49 pitch -14.9 zoom 6.5 arm 6.27 arm_hit 6.27 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@6.24
+INPUT_TEST_NOTE 1330.8s -> Market_out at (5.9, 6.9) ground 0.00
+INPUT_TEST_NOTE 1335.5s    at Market_out (5.86, 0.0, 5.87)
+INPUT_TEST_NOTE 1335.8s    picture Market_out_wall: through_Board cam (2.43, 3.85, 1.38)
+INPUT_TEST_NOTE 1335.8s BAD [Market_out] through_Board cam (2.43, 3.85, 1.38) ground 0.000 clearance 3.849 player (6.09, 0.0, 6.24) yaw -150 pitch -19.7 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Board@4.33 shoulder_leg_hits:Board@0.25
+INPUT_TEST_NOTE 1335.9s BAD [Market_out] through_Board cam (3.1, 3.85, 0.94) ground 0.000 clearance 3.849 player (6.09, 0.0, 6.24) yaw -157 pitch -19.7 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Board@3.67
+INPUT_TEST_NOTE 1336.1s BAD [Market_out] through_Depot cam (5.38, 2.13, 4.94) ground 0.000 clearance 2.128 player (6.1, 0.0, 6.24) yaw -172 pitch -19.7 zoom 6.5 arm 1.54 arm_hit 1.54 lens_offset (0.53, 0.17, 0.0) arm_leg_hits:Depot@1.17
+INPUT_TEST_NOTE 1336.2s BAD [Market_out] near_plane_in_Depot cam (6.1, 2.08, 5.56) ground 0.000 clearance 2.076 player (6.1, 0.0, 6.25) yaw -180 pitch -42.3 zoom 6.5 arm 0.93 arm_hit 0.93 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1336.3s BAD [Market_out] through_Depot cam (5.7, 2.7, 5.45) ground 0.000 clearance 2.696 player (6.1, 0.0, 6.25) yaw -180 pitch -52.5 zoom 6.5 arm 1.47 arm_hit 1.47 lens_offset (0.4, 0.13, 0.0) arm_leg_hits:Depot@1.37
+INPUT_TEST_NOTE 1336.3s BAD [Market_out] near_plane_in_Depot cam (6.1, 2.14, 5.55) ground 0.000 clearance 2.145 player (6.1, 0.0, 6.25) yaw -180 pitch -45.0 zoom 6.5 arm 0.98 arm_hit 0.98 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1336.3s BAD [Market_out] near_plane_in_Depot cam (6.09, 2.05, 5.47) ground 0.000 clearance 2.048 player (6.1, 0.0, 6.25) yaw -180 pitch -37.4 zoom 6.5 arm 0.98 arm_hit 0.98 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1336.3s BAD [Market_out] inside_Depot cam (6.09, 1.94, 5.4) ground 0.000 clearance 1.941 player (6.1, 0.0, 6.25) yaw -180 pitch -29.9 zoom 6.5 arm 0.98 arm_hit 0.98 lens_offset (0.0, 0.0, 0.0) arm_leg_hits:Depot@0.97
+INPUT_TEST_NOTE 1338.0s BAD [Market_out] inside_Depot cam (7.12, 1.47, 7.16) ground 0.000 clearance 1.474 player (6.1, 0.0, 6.25) yaw 45 pitch -0.1 zoom 6.5 arm 1.37 arm_hit 1.37 lens_offset (0.07, 0.02, 0.0) shoulder_leg_hits:Depot@0.05
+INPUT_TEST_NOTE 1338.0s BAD [Market_out] inside_Depot cam (7.09, 1.83, 7.12) ground 0.000 clearance 1.829 player (6.1, 0.0, 6.25) yaw 45 pitch -15.1 zoom 6.5 arm 1.37 arm_hit 1.37 lens_offset (0.07, 0.02, 0.0) shoulder_leg_hits:Depot@0.07
+INPUT_TEST_NOTE 1338.2s BAD [Market_out] under_terrain cam (8.86, -0.14, 7.99) ground 0.000 clearance -0.137 player (6.1, 0.0, 6.25) yaw 45 pitch 30.0 zoom 6.5 arm 3.56 arm_hit 3.56 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@2.90
+INPUT_TEST_NOTE 1338.6s BAD [Market_out] under_terrain cam (6.85, -0.04, 12.57) ground 0.000 clearance -0.041 player (6.1, 0.0, 6.25) yaw 0 pitch 15.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@5.53
+INPUT_TEST_NOTE 1338.6s BAD [Market_out] under_terrain cam (6.84, -0.86, 12.32) ground 0.000 clearance -0.857 player (6.1, 0.0, 6.25) yaw 0 pitch 22.7 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.76
+INPUT_TEST_NOTE 1338.9s BAD [Market_out] near_plane_in_crate_empy_smd_col cam (4.88, 0.29, 8.49) ground 0.000 clearance 0.291 player (6.1, 0.0, 6.25) yaw -45 pitch 30.0 zoom 6.5 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1338.9s BAD [Market_out] near_plane_in_crate_empy_smd_col cam (4.79, 0.62, 8.58) ground 0.000 clearance 0.621 player (6.1, 0.0, 6.25) yaw -45 pitch 22.5 zoom 6.5 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:crate_empy_smd_col@0.33
+INPUT_TEST_NOTE 1339.1s BAD [Market_out] too_close_to_ground cam (4.01, 0.18, 8.849999) ground 0.000 clearance 0.175 player (6.1, 0.0, 6.25) yaw -45 pitch 22.7 zoom 6.5 arm 3.56 arm_hit 3.56 lens_offset (0.34, 0.11, 0.0)
+INPUT_TEST_NOTE 1339.1s BAD [Market_out] near_plane_in_crate_empy_smd_col cam (4.88, 0.29, 8.49) ground 0.000 clearance 0.291 player (6.1, 0.0, 6.25) yaw -45 pitch 30.0 zoom 6.5 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1339.2s BAD [Market_out] through_stall-red_col cam (3.92, 0.29, 7.58) ground 0.000 clearance 0.291 player (6.1, 0.0, 6.25) yaw -75 pitch 30.0 zoom 6.5 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:stall-red_col@0.70
+INPUT_TEST_NOTE 1339.3s BAD [Market_out] near_plane_in_stall-red_col cam (3.11, 2.34, 6.51) ground 0.000 clearance 2.336 player (6.1, 0.0, 6.25) yaw -90 pitch -15.1 zoom 6.5 arm 3.12 arm_hit 3.12 lens_offset (0.24, 0.08, 0.0)
+INPUT_TEST_NOTE 1339.3s BAD [Market_out] through_stall-red_col cam (3.27, 2.75, 6.61) ground 0.000 clearance 2.747 player (6.1, 0.0, 6.25) yaw -90 pitch -22.6 zoom 6.5 arm 3.12 arm_hit 3.12 lens_offset (0.34, 0.11, 0.0) arm_leg_hits:stall-red_col@2.96
+INPUT_TEST_NOTE 1339.3s BAD [Market_out] through_stall-red_col cam (3.51, 3.19, 6.92) ground 0.000 clearance 3.194 player (6.1, 0.0, 6.25) yaw -90 pitch -30.2 zoom 6.5 arm 3.12 arm_hit 3.12 lens_offset (0.65, 0.21, 0.0) arm_leg_hits:stall-red_col@1.24
+INPUT_TEST_NOTE 1339.4s BAD [Market_out] near_plane_in_stall-red_col cam (3.59, 2.61, 6.63) ground 0.000 clearance 2.611 player (6.1, 0.0, 6.25) yaw -90 pitch -22.4 zoom 6.5 arm 2.77 arm_hit 2.77 lens_offset (0.36, 0.11, 0.0)
+INPUT_TEST_NOTE 1339.5s BAD [Market_out] near_plane_in_stall-red_col cam (4.35, 0.69, 6.96) ground 0.000 clearance 0.693 player (6.1, 0.0, 6.25) yaw -90 pitch 30.0 zoom 6.5 arm 1.90 arm_hit 1.90 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1339.6s BAD [Market_out] too_close_to_ground cam (3.99, 0.13, 5.19) ground 0.000 clearance 0.134 player (6.1, 0.0, 6.25) yaw -120 pitch 30.0 zoom 6.5 arm 2.70 arm_hit 2.70 lens_offset (0.13, 0.04, 0.0)
+INPUT_TEST_NOTE 1339.9s BAD [Market_out] near_plane_in_Market cam (1.0, 0.8, 2.21) ground 0.000 clearance 0.800 player (6.1, 0.0, 6.25) yaw -135 pitch 7.7 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@5.91
+INPUT_TEST_NOTE 1340.1s BAD [Market_out] through_Depot cam (5.69, 2.7, 5.45) ground 0.000 clearance 2.697 player (6.1, 0.0, 6.25) yaw -180 pitch -52.5 zoom 6.5 arm 1.47 arm_hit 1.47 lens_offset (0.4, 0.13, 0.0) arm_leg_hits:Depot@1.37
+INPUT_TEST_NOTE 1342.3s BAD [Market_out] too_close_to_ground cam (3.85, 0.1, 8.559999) ground 0.000 clearance 0.104 player (6.1, 0.0, 6.25) yaw -45 pitch 22.7 zoom 3.5 arm 3.50 arm_hit 3.50 lens_offset (0.02, 0.01, 0.0)
+INPUT_TEST_NOTE 1350.6s -> Depot_ramp at (11.7, 7.0) ground 0.00
+INPUT_TEST_NOTE 1350.8s    picture Depot_ramp_wall: near_plane_in_Depot cam (6.5, 1.21, 6.3)
+INPUT_TEST_NOTE 1350.8s BAD [Depot_ramp] near_plane_in_Depot cam (6.5, 1.21, 6.3) ground 0.000 clearance 1.210 player (6.09, 0.0, 6.24) yaw 83 pitch 30.0 zoom 3.7 arm 0.48 arm_hit 0.48 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1350.9s BAD [Depot_ramp] near_plane_in_Depot cam (6.51, 1.21, 6.27) ground 0.000 clearance 1.210 player (6.09, 0.0, 6.24) yaw 87 pitch 30.0 zoom 3.7 arm 0.48 arm_hit 0.48 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1351.3s BAD [Depot_ramp] near_plane_in_Depot cam (7.66, 0.31, 5.79) ground 0.000 clearance 0.313 player (5.6, 0.0, 6.26) yaw 97 pitch 30.0 zoom 3.7 arm 2.39 arm_hit 2.39 lens_offset (0.21, 0.07, 0.0)
+INPUT_TEST_NOTE 1351.7s BAD [Depot_ramp] too_close_to_ground cam (7.61, 0.19, 5.68) ground 0.000 clearance 0.193 player (5.35, 0.0, 6.29) yaw 99 pitch 30.0 zoom 3.7 arm 2.64 arm_hit 2.64 lens_offset (0.23, 0.07, 0.0)
+INPUT_TEST_NOTE 1351.8s BAD [Depot_ramp] too_close_to_ground cam (7.6, 0.19, 5.68) ground 0.000 clearance 0.192 player (5.35, 0.0, 6.29) yaw 100 pitch 30.0 zoom 3.7 arm 2.64 arm_hit 2.64 lens_offset (0.23, 0.07, 0.0)
+INPUT_TEST_NOTE 1351.8s BAD [Depot_ramp] too_close_to_ground cam (7.58, 0.17, 5.64) ground 0.000 clearance 0.172 player (5.28, 0.0, 6.3) yaw 100 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.26, 0.08, 0.0)
+INPUT_TEST_NOTE 1354.6s BAD [Depot_ramp] near_plane_in_Board cam (5.76, 0.29, 1.58) ground 0.000 clearance 0.286 player (4.42, 0.0, 3.74) yaw 133 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.68, 0.21, 0.0)
+INPUT_TEST_NOTE 1354.6s BAD [Depot_ramp] near_plane_in_Board cam (5.76, 0.28, 1.58) ground 0.000 clearance 0.283 player (4.42, 0.0, 3.74) yaw 133 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.67, 0.21, 0.0)
+INPUT_TEST_NOTE 1355.4s BAD [Depot_ramp] near_plane_in_Board cam (4.15, 0.25, 2.39) ground 0.000 clearance 0.250 player (2.75, 0.0, 4.45) yaw 133 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.55, 0.17, 0.0)
+INPUT_TEST_NOTE 1366.3s    at Depot_ramp (11.54, 0.0, 7.95)
+INPUT_TEST_NOTE 1366.8s BAD [Depot_ramp] under_terrain cam (10.99, -0.46, 13.05) ground 0.000 clearance -0.458 player (11.31, 0.11, 7.62) yaw -11 pitch 22.7 zoom 6.5 arm 5.75 arm_hit 5.75 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@4.04
+INPUT_TEST_NOTE 1366.9s BAD [Depot_ramp] under_terrain cam (11.05, -1.13, 12.75) ground 0.000 clearance -1.125 player (11.31, 0.11, 7.62) yaw -11 pitch 30.0 zoom 6.5 arm 5.75 arm_hit 5.75 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.12
+INPUT_TEST_NOTE 1367.4s BAD [Depot_ramp] under_terrain cam (6.68, -0.75, 11.62) ground 0.000 clearance -0.746 player (11.31, 0.11, 7.62) yaw -56 pitch 22.7 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@4.04
+INPUT_TEST_NOTE 1367.6s BAD [Depot_ramp] through_Depot cam (5.43, 1.79, 7.22) ground 0.000 clearance 1.790 player (11.31, 0.11, 7.62) yaw -101 pitch -0.1 zoom 6.5 arm 5.85 arm_hit 5.85 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Depot@2.77
+INPUT_TEST_NOTE 1367.7s BAD [Depot_ramp] through_Depot cam (8.309999, 4.78, 7.76) ground 0.000 clearance 4.784 player (11.31, 0.11, 7.62) yaw -101 pitch -45.0 zoom 6.5 arm 4.34 arm_hit 4.34 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Depot@3.91
+INPUT_TEST_NOTE 1367.7s BAD [Depot_ramp] through_Depot cam (8.49, 3.39, 7.8) ground 0.000 clearance 3.389 player (11.31, 0.11, 7.62) yaw -101 pitch -29.9 zoom 6.5 arm 3.28 arm_hit 3.28 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Depot@3.19
+INPUT_TEST_NOTE 1368.1s BAD [Depot_ramp] inside_Depot cam (7.57, 4.11, 3.38) ground 0.000 clearance 4.108 player (11.31, 0.11, 7.62) yaw -146 pitch -22.4 zoom 6.5 arm 6.15 arm_hit 6.15 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Depot@5.95
+INPUT_TEST_NOTE 1368.1s BAD [Depot_ramp] inside_Depot cam (9.75, 1.07, 6.58) ground 0.000 clearance 1.073 player (11.31, 0.11, 7.62) yaw -146 pitch 22.7 zoom 6.5 arm 1.79 arm_hit 1.79 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Depot@1.57 shoulder_leg_hits:Depot@0.31
+INPUT_TEST_NOTE 1371.0s BAD [Depot_ramp] inside_Depot cam (7.57, 4.11, 3.39) ground 0.000 clearance 4.108 player (11.31, 0.11, 7.62) yaw -146 pitch -22.4 zoom 6.5 arm 6.15 arm_hit 6.15 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Depot@5.95
+INPUT_TEST_NOTE 1380.1s -> Depot_inside at (9.7, 3.5) ground 0.00
+INPUT_TEST_NOTE 1383.9s    at Depot_inside (8.86, 1.77, 3.18)
+INPUT_TEST_NOTE 1384.2s    picture Depot_inside_wall: near_plane_in_Depot cam (7.99, 4.81, 7.05)
+INPUT_TEST_NOTE 1384.2s BAD [Depot_inside] near_plane_in_Depot cam (7.99, 4.81, 7.05) ground 0.000 clearance 4.814 player (8.86, 1.77, 3.18) yaw -21 pitch -19.7 zoom 6.5 arm 4.23 arm_hit 4.23 lens_offset (0.56, 0.18, 0.0)
+INPUT_TEST_NOTE 1384.3s BAD [Depot_inside] near_plane_in_Depot cam (8.02, 6.15, 7.04) ground 0.000 clearance 6.153 player (8.86, 1.77, 3.18) yaw -21 pitch -34.7 zoom 6.5 arm 4.88 arm_hit 4.88 lens_offset (0.58, 0.18, 0.0)
+INPUT_TEST_NOTE 1384.4s BAD [Depot_inside] near_plane_in_Depot cam (7.96, 6.86, 7.53) ground 0.000 clearance 6.856 player (8.86, 1.77, 3.18) yaw -21 pitch -37.4 zoom 6.5 arm 5.69 arm_hit 5.69 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Depot@5.26 shoulder_leg_hits:Depot@0.20
+INPUT_TEST_NOTE 1384.4s BAD [Depot_inside] inside_Depot cam (8.03, 5.18, 7.34) ground 0.000 clearance 5.185 player (8.86, 1.77, 3.18) yaw -21 pitch -22.4 zoom 6.5 arm 4.62 arm_hit 4.62 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Depot@4.51 shoulder_leg_hits:Depot@0.43
+INPUT_TEST_NOTE 1384.4s BAD [Depot_inside] inside_Depot cam (8.09, 3.43, 7.18) ground 0.000 clearance 3.431 player (8.86, 1.77, 3.18) yaw -21 pitch 0.2 zoom 6.5 arm 4.01 arm_hit 4.01 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:Depot@0.61
+INPUT_TEST_NOTE 1384.4s BAD [Depot_inside] inside_Depot cam (8.12, 2.38, 7.1) ground 0.000 clearance 2.383 player (8.86, 1.77, 3.18) yaw -21 pitch 15.2 zoom 6.5 arm 4.01 arm_hit 4.01 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:Depot@0.68
+INPUT_TEST_NOTE 1386.2s BAD [Depot_inside] through_Depot cam (12.32, 1.74, 0.85) ground 0.000 clearance 1.739 player (8.86, 1.77, 3.18) yaw 114 pitch 22.7 zoom 6.5 arm 4.37 arm_hit 4.37 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Depot@3.68
+INPUT_TEST_NOTE 1386.2s BAD [Depot_inside] through_Depot cam (12.12, 1.23, 0.94) ground 0.000 clearance 1.229 player (8.86, 1.77, 3.18) yaw 114 pitch 30.0 zoom 6.5 arm 4.37 arm_hit 4.37 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Depot@2.84
+INPUT_TEST_NOTE 1386.4s BAD [Depot_inside] through_Depot cam (12.88, 2.37, 3.95) ground 0.000 clearance 2.371 player (8.86, 1.77, 3.18) yaw 69 pitch 15.0 zoom 6.5 arm 4.12 arm_hit 4.12 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:Depot@0.01
+INPUT_TEST_NOTE 1387.2s BAD [Depot_inside] too_close_to_ground cam (11.86, 0.16, 8.12) ground 0.000 clearance 0.163 player (8.86, 1.77, 3.18) yaw 24 pitch 30.0 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@6.44
+INPUT_TEST_NOTE 1398.1s -> Depot_back_wall at (8.5, 1.4) ground 0.00
+INPUT_TEST_NOTE 1414.5s    picture Depot_back_wall_wall: near_plane_in_Board cam (7.55, 0.29, -0.23)
+INPUT_TEST_NOTE 1414.5s BAD [Depot_back_wall] near_plane_in_Board cam (7.55, 0.29, -0.23) ground 0.000 clearance 0.291 player (9.27, 0.0, 1.65) yaw -154 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1414.6s BAD [Depot_back_wall] near_plane_in_Board cam (7.52, 0.29, -0.19) ground 0.000 clearance 0.291 player (9.27, 0.0, 1.65) yaw -152 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1414.6s BAD [Depot_back_wall] near_plane_in_Board cam (7.44, 0.29, -0.14) ground 0.000 clearance 0.291 player (9.23, 0.0, 1.68) yaw -152 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1416.6s    at Depot_back_wall (9.309999, 0.0, 1.63)
+INPUT_TEST_NOTE 1417.0s BAD [Depot_back_wall] near_plane_in_Farmhouse cam (9.74, 0.9, -4.28) ground 0.000 clearance 0.904 player (9.309999, 0.0, 1.63) yaw 169 pitch 7.4 zoom 6.5 arm 5.91 arm_hit 5.91 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1417.0s BAD [Depot_back_wall] inside_Farmhouse cam (9.74, 1.68, -4.3) ground 0.000 clearance 1.679 player (9.309999, 0.0, 1.63) yaw 169 pitch -0.1 zoom 6.5 arm 5.91 arm_hit 5.91 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Farmhouse@5.71
+INPUT_TEST_NOTE 1417.1s BAD [Depot_back_wall] inside_Farmhouse cam (9.74, 4.13, -4.32) ground 0.000 clearance 4.131 player (9.309999, 0.0, 1.63) yaw 169 pitch -22.4 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Farmhouse@6.18 shoulder_leg_hits:Farmhouse@0.02
+INPUT_TEST_NOTE 1417.3s BAD [Depot_back_wall] under_terrain cam (9.23, -0.14, -1.63) ground 0.000 clearance -0.137 player (9.309999, 0.0, 1.63) yaw 169 pitch 30.0 zoom 6.5 arm 3.56 arm_hit 3.56 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@2.90
+INPUT_TEST_NOTE 1417.9s BAD [Depot_back_wall] under_terrain cam (14.16, -0.04, -2.5) ground 0.000 clearance -0.041 player (9.309999, 0.0, 1.63) yaw 124 pitch 15.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@5.53
+INPUT_TEST_NOTE 1418.0s BAD [Depot_back_wall] under_terrain cam (13.95, -0.86, -2.36) ground 0.000 clearance -0.857 player (9.309999, 0.0, 1.63) yaw 124 pitch 22.7 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.76
+INPUT_TEST_NOTE 1418.3s BAD [Depot_back_wall] through_Depot cam (11.8, 0.29, 1.08) ground 0.000 clearance 0.291 player (9.309999, 0.0, 1.63) yaw 87 pitch 30.0 zoom 6.5 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Depot@0.87
+INPUT_TEST_NOTE 1418.3s BAD [Depot_back_wall] near_plane_in_Depot cam (9.809999, 1.31, 1.73) ground 0.000 clearance 1.314 player (9.309999, 0.0, 1.63) yaw 79 pitch 15.0 zoom 6.5 arm 0.53 arm_hit 0.53 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1418.4s BAD [Depot_back_wall] near_plane_in_Depot cam (9.79, 1.95, 1.72) ground 0.000 clearance 1.945 player (9.309999, 0.0, 1.63) yaw 79 pitch -45.2 zoom 6.5 arm 0.70 arm_hit 0.70 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1418.4s BAD [Depot_back_wall] near_plane_in_Depot cam (9.83, 2.37, 1.73) ground 0.000 clearance 2.372 player (9.309999, 0.0, 1.63) yaw 79 pitch -60.0 zoom 6.5 arm 1.06 arm_hit 1.06 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1419.3s BAD [Depot_back_wall] too_close_to_ground cam (8.099999, 0.13, 3.65) ground 0.000 clearance 0.126 player (9.309999, 0.0, 1.63) yaw -33 pitch 30.0 zoom 6.5 arm 2.70 arm_hit 2.70 lens_offset (0.1, 0.03, 0.0)
+INPUT_TEST_NOTE 1419.3s BAD [Depot_back_wall] through_Depot cam (6.73, 1.2, 4.23) ground 0.000 clearance 1.204 player (9.309999, 0.0, 1.63) yaw -56 pitch 7.4 zoom 6.5 arm 3.59 arm_hit 3.59 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:Depot@0.17
+INPUT_TEST_NOTE 1419.3s BAD [Depot_back_wall] through_stall-red_col cam (4.39, 2.53, 5.81) ground 0.000 clearance 2.529 player (9.309999, 0.0, 1.63) yaw -56 pitch -7.6 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:stall-red_col@0.22
+INPUT_TEST_NOTE 1419.4s BAD [Depot_back_wall] through_Depot cam (6.57, 6.74, 4.33) ground 0.000 clearance 6.740 player (9.309999, 0.0, 1.63) yaw -56 pitch -52.5 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:Depot@0.14
+INPUT_TEST_NOTE 1419.5s BAD [Depot_back_wall] near_plane_in_stall-red_col cam (3.98, 0.58, 5.24) ground 0.000 clearance 0.582 player (9.309999, 0.0, 1.63) yaw -56 pitch 7.7 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1419.8s BAD [Depot_back_wall] through_Board cam (6.41, 4.58, 1.79) ground 0.000 clearance 4.579 player (9.309999, 0.0, 1.63) yaw -101 pitch -45.0 zoom 6.5 arm 4.21 arm_hit 4.21 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Board@3.79 shoulder_leg_hits:Board@0.33
+INPUT_TEST_NOTE 1419.9s BAD [Depot_back_wall] through_Board cam (6.58, 3.23, 1.82) ground 0.000 clearance 3.228 player (9.309999, 0.0, 1.63) yaw -101 pitch -29.9 zoom 6.5 arm 3.18 arm_hit 3.18 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Board@3.10
+INPUT_TEST_NOTE 1419.9s BAD [Depot_back_wall] through_Board cam (6.37, 2.87, 1.78) ground 0.000 clearance 2.866 player (9.309999, 0.0, 1.63) yaw -101 pitch -22.4 zoom 6.5 arm 3.18 arm_hit 3.18 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Board@2.90
+INPUT_TEST_NOTE 1419.9s BAD [Depot_back_wall] too_close_to_ground cam (6.3, 0.01, 1.77) ground 0.000 clearance 0.013 player (9.309999, 0.0, 1.63) yaw -101 pitch 30.0 zoom 6.5 arm 3.26 arm_hit 3.26 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@2.90
+INPUT_TEST_NOTE 1420.1s BAD [Depot_back_wall] inside_Board cam (6.72, 1.2, -0.95) ground 0.000 clearance 1.204 player (9.309999, 0.0, 1.63) yaw -146 pitch 7.4 zoom 6.5 arm 3.59 arm_hit 3.59 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Board@2.28 shoulder_leg_hits:Board@0.63
+INPUT_TEST_NOTE 1420.2s BAD [Depot_back_wall] inside_Board cam (7.47, 3.45, 0.16) ground 0.000 clearance 3.448 player (9.309999, 0.0, 1.63) yaw -146 pitch -37.4 zoom 6.5 arm 3.00 arm_hit 3.00 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Board@2.85
+INPUT_TEST_NOTE 1420.5s BAD [Depot_back_wall] near_plane_in_Farmhouse cam (9.73, 0.9, -4.28) ground 0.000 clearance 0.904 player (9.309999, 0.0, 1.63) yaw 169 pitch 7.4 zoom 6.5 arm 5.91 arm_hit 5.91 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1420.5s BAD [Depot_back_wall] inside_Farmhouse cam (9.74, 1.68, -4.3) ground 0.000 clearance 1.679 player (9.309999, 0.0, 1.63) yaw 169 pitch -0.1 zoom 6.5 arm 5.91 arm_hit 5.91 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Farmhouse@5.71
+INPUT_TEST_NOTE 1422.3s BAD [Depot_back_wall] too_close_to_ground cam (8.099999, 0.13, 3.65) ground 0.000 clearance 0.126 player (9.309999, 0.0, 1.63) yaw -33 pitch 30.0 zoom 3.5 arm 2.70 arm_hit 2.70 lens_offset (0.1, 0.03, 0.0)
+INPUT_TEST_NOTE 1422.4s BAD [Depot_back_wall] inside_Depot cam (6.63, 2.01, 3.84) ground 0.000 clearance 2.015 player (9.309999, 0.0, 1.63) yaw -56 pitch -7.6 zoom 3.5 arm 3.50 arm_hit 3.50 lens_offset (0.32, 0.1, 0.0) shoulder_leg_hits:Depot@0.17
+INPUT_TEST_NOTE 1422.4s BAD [Depot_back_wall] inside_Depot cam (6.85, 2.89, 3.69) ground 0.000 clearance 2.892 player (9.309999, 0.0, 1.63) yaw -56 pitch -22.6 zoom 3.5 arm 3.50 arm_hit 3.50 lens_offset (0.32, 0.1, 0.0) shoulder_leg_hits:Depot@0.19
+INPUT_TEST_NOTE 1422.4s BAD [Depot_back_wall] inside_Depot cam (7.52, 4.01, 3.25) ground 0.000 clearance 4.008 player (9.309999, 0.0, 1.63) yaw -56 pitch -45.2 zoom 3.5 arm 3.50 arm_hit 3.50 lens_offset (0.33, 0.1, 0.0) shoulder_leg_hits:Depot@0.25
+INPUT_TEST_NOTE 1423.1s BAD [Depot_back_wall] inside_Board cam (6.77, 1.22, -0.87) ground 0.000 clearance 1.216 player (9.309999, 0.0, 1.63) yaw -146 pitch 7.4 zoom 3.5 arm 3.50 arm_hit 3.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Board@2.28 shoulder_leg_hits:Board@0.61
+INPUT_TEST_NOTE 1430.8s -> Depot_side_wall at (14.4, 1.5) ground 0.00
+INPUT_TEST_NOTE 1431.1s    picture Depot_side_wall_wall: near_plane_in_Depot cam (8.73, 1.79, 2.37)
+INPUT_TEST_NOTE 1431.1s BAD [Depot_side_wall] near_plane_in_Depot cam (8.73, 1.79, 2.37) ground 0.000 clearance 1.793 player (9.32, 0.0, 1.61) yaw -38 pitch -19.7 zoom 3.7 arm 1.02 arm_hit 1.02 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1431.2s BAD [Depot_side_wall] near_plane_in_Depot cam (8.51, 1.89, 2.51) ground 0.000 clearance 1.887 player (9.32, 0.0, 1.6) yaw -42 pitch -19.7 zoom 3.7 arm 1.29 arm_hit 1.29 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1431.2s BAD [Depot_side_wall] near_plane_in_Depot cam (8.49, 1.89, 2.49) ground 0.000 clearance 1.887 player (9.32, 0.0, 1.6) yaw -43 pitch -19.7 zoom 3.7 arm 1.29 arm_hit 1.29 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1432.5s BAD [Depot_side_wall] through_Farmhouse cam (9.73, 2.91, -3.53) ground 0.000 clearance 2.905 player (12.7, 0.0, -1.71) yaw -133 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Farmhouse@3.70
+INPUT_TEST_NOTE 1432.6s BAD [Depot_side_wall] through_Farmhouse cam (10.65, 2.56, -3.13) ground 0.000 clearance 2.561 player (12.8, 0.0, -1.76) yaw -138 pitch -19.7 zoom 3.7 arm 2.68 arm_hit 2.68 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Farmhouse@2.65
+INPUT_TEST_NOTE 1432.8s BAD [Depot_side_wall] near_plane_in_Farmhouse cam (12.29, 2.15, -3.22) ground 0.000 clearance 2.153 player (13.37, 0.0, -1.82) yaw -150 pitch -19.7 zoom 3.7 arm 1.89 arm_hit 1.89 lens_offset (0.23, 0.07, 0.0)
+INPUT_TEST_NOTE 1432.8s BAD [Depot_side_wall] near_plane_in_Farmhouse cam (12.29, 2.16, -3.22) ground 0.000 clearance 2.155 player (13.37, 0.0, -1.82) yaw -150 pitch -19.7 zoom 3.7 arm 1.89 arm_hit 1.89 lens_offset (0.23, 0.07, 0.0)
+INPUT_TEST_NOTE 1432.8s BAD [Depot_side_wall] near_plane_in_Farmhouse cam (12.36, 2.19, -3.36) ground 0.000 clearance 2.186 player (13.43, 0.0, -1.81) yaw -152 pitch -19.7 zoom 3.7 arm 2.01 arm_hit 2.01 lens_offset (0.2, 0.06, 0.0)
+INPUT_TEST_NOTE 1436.0s    at Depot_side_wall (14.19, 0.0, 2.26)
+INPUT_TEST_NOTE 1436.6s BAD [Depot_side_wall] under_terrain cam (20.51, -0.04, 3.06) ground 0.000 clearance -0.042 player (14.19, 0.0, 2.26) yaw 76 pitch 15.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@5.53
+INPUT_TEST_NOTE 1436.8s BAD [Depot_side_wall] under_terrain cam (20.27, -0.86, 3.01) ground 0.000 clearance -0.858 player (14.19, 0.0, 2.26) yaw 76 pitch 22.7 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.75
+INPUT_TEST_NOTE 1437.3s BAD [Depot_side_wall] under_terrain cam (17.4, -0.41, 6.16) ground 0.000 clearance -0.406 player (14.19, 0.0, 2.26) yaw 31 pitch 22.7 zoom 6.5 arm 5.33 arm_hit 5.33 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.75
+INPUT_TEST_NOTE 1437.7s BAD [Depot_side_wall] inside_Depot cam (14.05, 2.24, 2.85) ground 0.000 clearance 2.242 player (14.19, 0.0, 2.26) yaw -14 pitch -52.5 zoom 6.5 arm 1.00 arm_hit 1.00 lens_offset (0.0, 0.0, 0.0) arm_leg_hits:Depot@0.98
+INPUT_TEST_NOTE 1438.3s BAD [Depot_side_wall] inside_Depot cam (13.64, 2.2, 2.13) ground 0.000 clearance 2.196 player (14.19, 0.0, 2.26) yaw -104 pitch -52.5 zoom 6.5 arm 0.94 arm_hit 0.94 lens_offset (0.0, 0.0, 0.0) arm_leg_hits:Depot@0.94
+INPUT_TEST_NOTE 1439.1s BAD [Depot_side_wall] too_close_to_ground cam (14.84, 0.14, -3.4) ground 0.000 clearance 0.143 player (14.19, 0.0, 2.26) yaw 166 pitch 15.2 zoom 6.5 arm 5.79 arm_hit 5.79 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@5.53 shoulder_leg_hits:bush_smd_col@0.25
+INPUT_TEST_NOTE 1440.4s BAD [Depot_side_wall] inside_Depot cam (14.05, 2.24, 2.85) ground 0.000 clearance 2.243 player (14.19, 0.0, 2.26) yaw -14 pitch -52.5 zoom 6.5 arm 1.00 arm_hit 1.00 lens_offset (0.0, 0.0, 0.0) arm_leg_hits:Depot@0.98
+INPUT_TEST_NOTE 1449.5s -> Depot_out at (14.9, 12.4) ground 0.00
+INPUT_TEST_NOTE 1453.3s    at Depot_out (15.78, 0.0, 12.14)
+INPUT_TEST_NOTE 1453.8s BAD [Depot_out] under_terrain cam (20.09, -0.41, 10.33) ground 0.000 clearance -0.406 player (15.57, 0.0, 12.57) yaw 108 pitch 22.7 zoom 6.5 arm 5.33 arm_hit 5.33 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.75
+INPUT_TEST_NOTE 1454.3s BAD [Depot_out] under_terrain cam (21.54, -0.04, 14.78) ground 0.000 clearance -0.042 player (15.57, 0.0, 12.57) yaw 63 pitch 15.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@5.53
+INPUT_TEST_NOTE 1454.3s BAD [Depot_out] under_terrain cam (18.73, -0.14, 13.37) ground 0.000 clearance -0.136 player (15.57, 0.0, 12.57) yaw 63 pitch 30.0 zoom 6.5 arm 3.55 arm_hit 3.55 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@2.90
+INPUT_TEST_NOTE 1466.7s -> yard_again at (0.0, 7.0) ground 0.00
+INPUT_TEST_NOTE 1472.0s    at yard_again (0.23, 0.0, 7.94)
+INPUT_TEST_NOTE 1472.4s BAD [yard_again] under_terrain cam (2.11, -0.04, 13.64) ground 0.000 clearance -0.041 player (-0.19, 0.0, 7.7) yaw 15 pitch 15.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@5.53
+INPUT_TEST_NOTE 1472.6s BAD [yard_again] under_terrain cam (1.31, -0.14, 10.61) ground 0.000 clearance -0.137 player (-0.19, 0.0, 7.7) yaw 15 pitch 30.0 zoom 6.5 arm 3.56 arm_hit 3.56 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@2.90
+INPUT_TEST_NOTE 1473.1s BAD [yard_again] under_terrain cam (-2.09, -0.41, 12.38) ground 0.000 clearance -0.406 player (-0.19, 0.0, 7.7) yaw -30 pitch 22.7 zoom 6.5 arm 5.33 arm_hit 5.33 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.76
+INPUT_TEST_NOTE 1473.8s    picture yard_again_wall: inside_Market cam (-4.36, 1.1, 6.09)
+INPUT_TEST_NOTE 1473.8s BAD [yard_again] inside_Market cam (-4.36, 1.1, 6.09) ground 0.000 clearance 1.096 player (-0.19, 0.0, 7.7) yaw -120 pitch 7.4 zoom 6.5 arm 4.43 arm_hit 4.43 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:Market@0.24
+INPUT_TEST_NOTE 1474.1s BAD [yard_again] through_Market cam (-4.38, 6.2, 6.08) ground 0.000 clearance 6.200 player (-0.19, 0.0, 7.7) yaw -120 pitch -45.0 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@6.27
+INPUT_TEST_NOTE 1474.1s BAD [yard_again] near_plane_in_Market cam (-4.21, 4.15, 6.18) ground 0.000 clearance 4.150 player (-0.19, 0.0, 7.7) yaw -120 pitch -29.9 zoom 6.5 arm 5.03 arm_hit 5.03 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@4.79
+INPUT_TEST_NOTE 1474.3s BAD [yard_again] near_plane_in_Market cam (-1.64, 0.89, 3.11) ground 0.000 clearance 0.894 player (-0.19, 0.0, 7.7) yaw -165 pitch 7.4 zoom 6.5 arm 4.84 arm_hit 4.84 lens_offset (0.22, 0.07, 0.0)
+INPUT_TEST_NOTE 1474.4s BAD [yard_again] inside_Market cam (-1.91, 1.61, 3.15) ground 0.000 clearance 1.615 player (-0.19, 0.0, 7.7) yaw -165 pitch -0.1 zoom 6.5 arm 4.84 arm_hit 4.84 lens_offset (0.5, 0.16, 0.0) arm_leg_hits:Market@4.64 shoulder_leg_hits:Market@0.28
+INPUT_TEST_NOTE 1474.4s BAD [yard_again] near_plane_in_Market cam (-1.59, 2.13, 3.49) ground 0.000 clearance 2.128 player (-0.19, 0.0, 7.7) yaw -165 pitch -7.6 zoom 6.5 arm 4.48 arm_hit 4.48 lens_offset (0.27, 0.09, 0.0)
+INPUT_TEST_NOTE 1474.4s BAD [yard_again] inside_Market cam (-1.83, 6.76, 4.25) ground 0.000 clearance 6.756 player (-0.19, 0.0, 7.7) yaw -165 pitch -52.7 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:Market@0.72
+INPUT_TEST_NOTE 1474.5s BAD [yard_again] through_Market cam (-2.16, 5.58, 3.02) ground 0.000 clearance 5.577 player (-0.19, 0.0, 7.7) yaw -165 pitch -37.4 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@5.84
+INPUT_TEST_NOTE 1474.5s BAD [yard_again] through_Market cam (-2.07, 3.62, 3.36) ground 0.000 clearance 3.617 player (-0.19, 0.0, 7.7) yaw -165 pitch -22.4 zoom 6.5 arm 5.15 arm_hit 5.15 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@5.02
+INPUT_TEST_NOTE 1474.7s BAD [yard_again] too_close_to_ground cam (2.28, 0.11, 3.06) ground 0.000 clearance 0.109 player (-0.19, 0.0, 7.7) yaw 150 pitch 15.0 zoom 6.5 arm 5.42 arm_hit 5.42 lens_offset (0.19, 0.06, 0.0)
+INPUT_TEST_NOTE 1475.0s BAD [yard_again] too_close_to_ground cam (2.2, 0.12, 3.11) ground 0.000 clearance 0.124 player (-0.19, 0.0, 7.7) yaw 150 pitch 15.2 zoom 6.5 arm 5.33 arm_hit 5.33 lens_offset (0.24, 0.07, 0.0)
+INPUT_TEST_NOTE 1475.1s BAD [yard_again] through_basket_smd_col cam (2.0, 0.29, 6.39) ground 0.000 clearance 0.291 player (-0.19, 0.0, 7.7) yaw 105 pitch 30.0 zoom 6.5 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:basket_smd_col@2.01
+INPUT_TEST_NOTE 1475.1s BAD [yard_again] through_stall-red_col cam (3.04, 0.74, 6.12) ground 0.000 clearance 0.736 player (-0.19, 0.0, 7.7) yaw 105 pitch 15.0 zoom 6.5 arm 3.59 arm_hit 3.59 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:stall-red_col@0.72
+INPUT_TEST_NOTE 1475.1s BAD [yard_again] near_plane_in_stall-red_col cam (4.76, 2.2, 6.2) ground 0.000 clearance 2.196 player (-0.19, 0.0, 7.7) yaw 105 pitch -7.6 zoom 6.5 arm 5.22 arm_hit 5.22 lens_offset (0.18, 0.06, 0.0)
+INPUT_TEST_NOTE 1475.1s BAD [yard_again] through_stall-red_col cam (4.5, 2.97, 5.9) ground 0.000 clearance 2.974 player (-0.19, 0.0, 7.7) yaw 105 pitch -15.1 zoom 6.5 arm 5.22 arm_hit 5.22 lens_offset (0.53, 0.17, 0.0) arm_leg_hits:stall-red_col@3.76
+INPUT_TEST_NOTE 1478.2s BAD [yard_again] through_basket_smd_col cam (2.0, 0.29, 6.39) ground 0.000 clearance 0.291 player (-0.19, 0.0, 7.7) yaw 105 pitch 30.0 zoom 3.5 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:basket_smd_col@2.01
+INPUT_TEST_NOTE 1478.2s BAD [yard_again] through_stall-red_col cam (2.95, 0.76, 6.14) ground 0.000 clearance 0.760 player (-0.19, 0.0, 7.7) yaw 105 pitch 15.0 zoom 3.5 arm 3.50 arm_hit 3.50 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:stall-red_col@0.63
+INPUT_TEST_NOTE 1481.1s BAD [yard_again] through_basket_smd_col cam (2.0, 0.29, 6.39) ground 0.000 clearance 0.291 player (-0.19, 0.0, 7.7) yaw 105 pitch 30.0 zoom 3.5 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:basket_smd_col@2.01
+INPUT_TEST_NOTE 1486.1s -> under_tree at (-18.9, 1.3) ground 0.00
+INPUT_TEST_NOTE 1486.3s    picture under_tree_wall: through_basket_smd_col cam (2.01, 0.29, 6.44)
+INPUT_TEST_NOTE 1486.3s BAD [under_tree] through_basket_smd_col cam (2.01, 0.29, 6.44) ground 0.000 clearance 0.291 player (-0.19, 0.0, 7.72) yaw 104 pitch 30.0 zoom 3.7 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:basket_smd_col@2.02
+INPUT_TEST_NOTE 1492.7s    at under_tree (-20.71, 0.0, -0.2)
+INPUT_TEST_NOTE 1493.3s BAD [under_tree] under_terrain cam (-22.71, -0.43, -4.79) ground 0.000 clearance -0.434 player (-20.39, 0.06, -0.06) yaw -162 pitch 22.7 zoom 6.5 arm 5.56 arm_hit 5.56 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.91
+INPUT_TEST_NOTE 1493.7s BAD [under_tree] too_close_to_ground cam (-18.19, 0.02, -6.04) ground 0.000 clearance 0.019 player (-20.39, 0.06, -0.06) yaw 153 pitch 15.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@5.76
+INPUT_TEST_NOTE 1493.7s BAD [under_tree] under_terrain cam (-19.53, -0.15, -3.35) ground 0.000 clearance -0.154 player (-20.39, 0.06, -0.06) yaw 153 pitch 30.0 zoom 6.5 arm 3.71 arm_hit 3.71 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.02
+INPUT_TEST_NOTE 1493.7s BAD [under_tree] under_terrain cam (-19.53, -0.15, -3.35) ground 0.000 clearance -0.154 player (-20.39, 0.06, -0.06) yaw 153 pitch 30.0 zoom 6.5 arm 3.71 arm_hit 3.71 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.02
+INPUT_TEST_NOTE 1494.2s BAD [under_tree] through_Tree_Wide_smd_canopy cam (-19.22, 3.61, -0.26) ground 0.000 clearance 3.609 player (-20.39, 0.06, -0.06) yaw 63 pitch -60.0 zoom 6.5 arm 2.30 arm_hit 2.30 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Tree_Wide_smd_canopy@2.18
+INPUT_TEST_NOTE 1494.3s BAD [under_tree] too_close_to_ground cam (-14.42, 0.02, 2.14) ground 0.000 clearance 0.019 player (-20.39, 0.06, -0.06) yaw 63 pitch 15.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@5.76
+INPUT_TEST_NOTE 1494.4s BAD [under_tree] through_Tree_Wide_smd_col cam (-18.4, 0.29, 1.68) ground 0.000 clearance 0.291 player (-20.39, 0.06, -0.06) yaw 33 pitch 30.0 zoom 6.5 arm 2.82 arm_hit 2.82 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Tree_Wide_smd_col@0.96
+INPUT_TEST_NOTE 1494.4s BAD [under_tree] through_Tree_Wide_smd_col cam (-18.65, 0.29, 1.92) ground 0.000 clearance 0.291 player (-20.39, 0.06, -0.06) yaw 26 pitch 30.0 zoom 6.5 arm 2.82 arm_hit 2.82 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Tree_Wide_smd_col@0.91
+INPUT_TEST_NOTE 1494.5s BAD [under_tree] near_plane_in_Tree_Wide_smd_col cam (-20.13, 2.51, 0.65) ground 0.000 clearance 2.512 player (-20.39, 0.06, -0.06) yaw 18 pitch -52.5 zoom 6.5 arm 1.26 arm_hit 1.26 lens_offset (0.03, 0.01, 0.0)
+INPUT_TEST_NOTE 1494.5s BAD [under_tree] through_Tree_Wide_smd_col cam (-20.09, 2.4, 0.77) ground 0.000 clearance 2.404 player (-20.39, 0.06, -0.06) yaw 18 pitch -45.0 zoom 6.5 arm 1.26 arm_hit 1.26 lens_offset (0.03, 0.01, 0.0) arm_leg_hits:Tree_Wide_smd_col@1.14
+INPUT_TEST_NOTE 1494.8s BAD [under_tree] through_Tree_Wide_smd_canopy cam (-21.13, 7.25, 2.99) ground 0.000 clearance 7.250 player (-20.39, 0.06, -0.06) yaw -27 pitch -60.0 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Tree_Wide_smd_canopy@1.93
+INPUT_TEST_NOTE 1494.8s BAD [under_tree] near_plane_in_Tree_Wide_smd_col cam (-20.59, 3.04, 0.75) ground 0.000 clearance 3.041 player (-20.39, 0.06, -0.06) yaw -27 pitch -60.0 zoom 6.5 arm 1.73 arm_hit 1.73 lens_offset (0.19, 0.06, 0.0)
+INPUT_TEST_NOTE 1494.8s BAD [under_tree] near_plane_in_Tree_Wide_smd_col cam (-20.59, 3.04, 0.75) ground 0.000 clearance 3.041 player (-20.39, 0.06, -0.06) yaw -27 pitch -60.0 zoom 6.5 arm 1.73 arm_hit 1.73 lens_offset (0.19, 0.06, 0.0)
+INPUT_TEST_NOTE 1494.9s BAD [under_tree] too_close_to_ground cam (-22.59, 0.02, 5.91) ground 0.000 clearance 0.019 player (-20.39, 0.06, -0.06) yaw -27 pitch 15.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@5.76
+INPUT_TEST_NOTE 1495.2s BAD [under_tree] near_plane_in_Tree_Wide_smd_canopy cam (-21.26, 3.18, 0.3) ground 0.000 clearance 3.183 player (-20.39, 0.06, -0.06) yaw -72 pitch -60.0 zoom 6.5 arm 1.92 arm_hit 1.92 lens_offset (0.07, 0.02, 0.0)
+INPUT_TEST_NOTE 1495.2s BAD [under_tree] near_plane_in_Tree_Wide_smd_canopy cam (-21.26, 3.18, 0.3) ground 0.000 clearance 3.183 player (-20.39, 0.06, -0.06) yaw -72 pitch -60.0 zoom 6.5 arm 1.92 arm_hit 1.92 lens_offset (0.07, 0.02, 0.0)
+INPUT_TEST_NOTE 1495.2s BAD [under_tree] near_plane_in_Tree_Wide_smd_canopy cam (-21.26, 3.18, 0.3) ground 0.000 clearance 3.183 player (-20.39, 0.06, -0.06) yaw -72 pitch -60.0 zoom 6.5 arm 1.92 arm_hit 1.92 lens_offset (0.07, 0.02, 0.0)
+INPUT_TEST_NOTE 1496.9s BAD [under_tree] through_Tree_Wide_smd_canopy cam (-19.22, 3.61, -0.26) ground 0.000 clearance 3.610 player (-20.39, 0.06, -0.06) yaw 63 pitch -60.0 zoom 6.5 arm 2.30 arm_hit 2.30 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Tree_Wide_smd_canopy@2.18
+INPUT_TEST_NOTE 1505.3s -> town_road at (1.5, 43.0) ground 0.96
+INPUT_TEST_NOTE 1505.6s    picture town_road_wall: through_Tree_Wide_smd_col cam (-18.2, 2.96, 2.64)
+INPUT_TEST_NOTE 1505.6s BAD [town_road] through_Tree_Wide_smd_col cam (-18.2, 2.96, 2.64) ground 0.000 clearance 2.963 player (-20.4, 0.06, -0.07) yaw 27 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Tree_Wide_smd_col@0.89
+INPUT_TEST_NOTE 1513.1s BAD [town_road] near_plane_in_Market cam (-4.26, 2.91, 6.17) ground 0.000 clearance 2.905 player (-0.79, 0.0, 6.47) yaw -107 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Market@3.28 shoulder_leg_hits:Market@0.13
+INPUT_TEST_NOTE 1513.2s BAD [town_road] near_plane_in_Market cam (-2.48, 2.67, 4.44) ground 0.000 clearance 2.669 player (-0.47, 0.0, 6.44) yaw -149 pitch -19.7 zoom 3.7 arm 3.00 arm_hit 3.00 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1513.2s BAD [town_road] near_plane_in_Market cam (-2.45, 2.67, 4.41) ground 0.000 clearance 2.669 player (-0.47, 0.0, 6.44) yaw -150 pitch -19.7 zoom 3.7 arm 3.00 arm_hit 3.00 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1522.3s    at town_road (2.18, 0.96, 42.28)
+INPUT_TEST_NOTE 1522.7s BAD [town_road] under_terrain cam (6.05, 0.92, 37.69) ground 0.937 clearance -0.018 player (2.19, 0.96, 42.76) yaw 136 pitch 15.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@5.49
+INPUT_TEST_NOTE 1522.9s BAD [town_road] under_terrain cam (5.88, 0.1, 37.87) ground 0.947 clearance -0.843 player (2.19, 0.96, 42.76) yaw 136 pitch 22.7 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.70
+INPUT_TEST_NOTE 1523.4s BAD [town_road] under_terrain cam (8.51, 0.92, 41.9) ground 0.961 clearance -0.041 player (2.19, 0.96, 42.76) yaw 91 pitch 15.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@5.53
+INPUT_TEST_NOTE 1523.7s BAD [town_road] too_close_to_ground cam (7.26, 0.92, 46.62) ground 0.882 clearance 0.037 player (2.19, 0.96, 42.76) yaw 46 pitch 15.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@5.75
+INPUT_TEST_NOTE 1524.1s BAD [town_road] too_close_to_ground cam (3.05, 0.92, 49.07) ground 0.905 clearance 0.015 player (2.19, 0.96, 42.76) yaw 1 pitch 15.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@5.67
+INPUT_TEST_NOTE 1524.8s BAD [town_road] too_close_to_ground cam (-4.12, 0.92, 43.61) ground 0.897 clearance 0.022 player (2.19, 0.96, 42.76) yaw -89 pitch 15.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@5.77
+INPUT_TEST_NOTE 1535.5s -> town_wall at (10.5, 43.0) ground 0.90
+INPUT_TEST_NOTE 1540.0s    at town_wall (13.11, 0.88, 41.87)
+INPUT_TEST_NOTE 1540.6s BAD [town_wall] under_terrain cam (9.99, 0.61, 38.32) ground 0.978 clearance -0.371 player (13.11, 0.88, 41.87) yaw -147 pitch 22.7 zoom 6.5 arm 4.99 arm_hit 4.99 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.55
+INPUT_TEST_NOTE 1540.8s BAD [town_wall] under_terrain cam (10.13, 0.03, 38.53) ground 0.976 clearance -0.949 player (13.11, 0.88, 41.87) yaw -147 pitch 30.0 zoom 6.5 arm 4.99 arm_hit 4.99 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@2.78
+INPUT_TEST_NOTE 1541.0s    picture town_wall_wall: near_plane_in_Pink_B_smd_col cam (13.46, 1.92, 36.97)
+INPUT_TEST_NOTE 1541.0s BAD [town_wall] near_plane_in_Pink_B_smd_col cam (13.46, 1.92, 36.97) ground 0.945 clearance 0.972 player (13.11, 0.88, 41.87) yaw 168 pitch 7.4 zoom 6.5 arm 4.88 arm_hit 4.88 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1541.2s BAD [town_wall] near_plane_in_Pink_B_smd_col cam (13.46, 2.56, 36.96) ground 0.945 clearance 1.612 player (13.11, 0.88, 41.87) yaw 168 pitch -0.1 zoom 6.5 arm 4.88 arm_hit 4.88 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1541.2s BAD [town_wall] near_plane_in_Pink_B_smd_col cam (13.46, 3.87, 36.99) ground 0.945 clearance 2.923 player (13.11, 0.88, 41.87) yaw 168 pitch -15.1 zoom 6.5 arm 5.08 arm_hit 5.08 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1541.2s BAD [town_wall] through_OGB_1_smd_col cam (13.4, 4.49, 37.22) ground 0.945 clearance 3.544 player (13.11, 0.88, 41.87) yaw 168 pitch -22.6 zoom 6.5 arm 5.08 arm_hit 5.08 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:OGB_1_smd_col@0.94
+INPUT_TEST_NOTE 1541.2s BAD [town_wall] near_plane_in_OGB_1_smd_col cam (13.2, 2.66, 41.45) ground 0.863 clearance 1.800 player (13.11, 0.88, 41.87) yaw 168 pitch -37.7 zoom 6.5 arm 0.54 arm_hit 0.54 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1541.2s BAD [town_wall] through_OGB_1_smd_col cam (13.19, 2.72, 41.5) ground 0.861 clearance 1.855 player (13.11, 0.88, 41.87) yaw 168 pitch -45.2 zoom 6.5 arm 0.54 arm_hit 0.54 lens_offset (0.0, 0.0, 0.0) arm_leg_hits:OGB_1_smd_col@0.53
+INPUT_TEST_NOTE 1541.3s BAD [town_wall] through_Pink_B_smd_col cam (13.48, 2.54, 36.89) ground 0.945 clearance 1.591 player (13.11, 0.88, 41.87) yaw 168 pitch 0.2 zoom 6.5 arm 4.95 arm_hit 4.95 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:Pink_B_smd_col@0.65
+INPUT_TEST_NOTE 1541.4s BAD [town_wall] near_plane_in_OGB_1_Veg_smd_col cam (13.27, 2.13, 41.57) ground 0.857 clearance 1.277 player (13.11, 0.88, 41.87) yaw 153 pitch 30.0 zoom 6.5 arm 0.39 arm_hit 0.39 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1541.5s BAD [town_wall] near_plane_in_OGB_1_smd_col cam (13.35, 2.69, 41.72) ground 0.849 clearance 1.842 player (13.11, 0.88, 41.87) yaw 123 pitch -52.5 zoom 6.5 arm 0.46 arm_hit 0.46 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1541.6s BAD [town_wall] near_plane_in_OGB_1_smd_col cam (13.38, 2.65, 41.7) ground 0.849 clearance 1.803 player (13.11, 0.88, 41.87) yaw 123 pitch -45.0 zoom 6.5 arm 0.46 arm_hit 0.46 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1542.2s BAD [town_wall] through_OGB_1_smd_col cam (13.31, 2.81, 42.18) ground 0.836 clearance 1.976 player (13.11, 0.88, 41.87) yaw 33 pitch -52.7 zoom 6.5 arm 0.61 arm_hit 0.61 lens_offset (0.0, 0.0, 0.0) arm_leg_hits:OGB_1_smd_col@0.58
+INPUT_TEST_NOTE 1542.6s BAD [town_wall] through_Terrain cam (12.45, 0.84, 48.21) ground 0.625 clearance 0.213 player (13.11, 0.88, 41.87) yaw -12 pitch 15.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@6.31
+INPUT_TEST_NOTE 1542.7s BAD [town_wall] under_terrain cam (13.06, 0.58, 45.41) ground 0.725 clearance -0.145 player (13.11, 0.88, 41.87) yaw -12 pitch 30.0 zoom 6.5 arm 3.88 arm_hit 3.88 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.09
+INPUT_TEST_NOTE 1543.9s BAD [town_wall] through_Pink_B_smd_col cam (13.48, 2.54, 36.89) ground 0.945 clearance 1.591 player (13.11, 0.88, 41.87) yaw 168 pitch 0.2 zoom 6.5 arm 4.95 arm_hit 4.95 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:Pink_B_smd_col@0.65
+INPUT_TEST_NOTE 1544.1s BAD [town_wall] near_plane_in_OGB_1_Veg_smd_col cam (13.27, 2.13, 41.57) ground 0.857 clearance 1.277 player (13.11, 0.88, 41.87) yaw 153 pitch 30.0 zoom 6.5 arm 0.39 arm_hit 0.39 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1545.5s BAD [town_wall] too_close_to_ground cam (13.13, 0.77, 45.09) ground 0.736 clearance 0.034 player (13.11, 0.88, 41.87) yaw -12 pitch 30.0 zoom 3.5 arm 3.50 arm_hit 3.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.09
+INPUT_TEST_NOTE 1545.6s BAD [town_wall] too_close_to_ground cam (13.13, 0.77, 45.09) ground 0.736 clearance 0.034 player (13.11, 0.88, 41.87) yaw -12 pitch 30.0 zoom 3.5 arm 3.50 arm_hit 3.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.09
+INPUT_TEST_NOTE 1546.9s BAD [town_wall] near_plane_in_OGB_1_Veg_smd_col cam (13.27, 2.13, 41.57) ground 0.857 clearance 1.278 player (13.11, 0.88, 41.87) yaw 153 pitch 30.0 zoom 3.5 arm 0.39 arm_hit 0.39 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1548.3s BAD [town_wall] too_close_to_ground cam (13.12, 0.77, 45.09) ground 0.736 clearance 0.034 player (13.11, 0.88, 41.87) yaw -12 pitch 30.0 zoom 3.5 arm 3.50 arm_hit 3.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.09
+INPUT_TEST_NOTE 1553.3s -> palace_front at (-4.0, 54.0) ground 1.07
+INPUT_TEST_NOTE 1554.1s    picture palace_front_wall: near_plane_in_OGB_1_smd_col cam (13.31, 2.68, 41.69)
+INPUT_TEST_NOTE 1554.1s BAD [palace_front] near_plane_in_OGB_1_smd_col cam (13.31, 2.68, 41.69) ground 0.852 clearance 1.827 player (12.47, 0.86, 42.28) yaw 125 pitch -19.7 zoom 3.7 arm 1.09 arm_hit 1.09 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1554.2s BAD [palace_front] near_plane_in_OGB_1_smd_col cam (13.31, 2.68, 41.69) ground 0.852 clearance 1.827 player (12.47, 0.86, 42.28) yaw 125 pitch -19.7 zoom 3.7 arm 1.09 arm_hit 1.09 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1554.2s BAD [palace_front] near_plane_in_OGB_1_smd_col cam (13.31, 2.68, 41.69) ground 0.852 clearance 1.827 player (12.47, 0.86, 42.28) yaw 125 pitch -19.7 zoom 3.7 arm 1.09 arm_hit 1.09 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1564.3s    at palace_front (-7.2, 1.29, 56.35)
+INPUT_TEST_NOTE 1564.9s BAD [palace_front] through_bush_smd_col cam (-1.65, 1.25, 53.32) ground 0.982 clearance 0.270 player (-7.25, 1.29, 56.35) yaw 112 pitch 15.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:bush_smd_col@5.19
+INPUT_TEST_NOTE 1565.1s BAD [palace_front] under_terrain cam (-4.1, 0.87, 54.32) ground 1.083 clearance -0.214 player (-7.25, 1.29, 56.35) yaw 112 pitch 30.0 zoom 6.5 arm 4.13 arm_hit 4.13 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.23
+INPUT_TEST_NOTE 1565.3s BAD [palace_front] through_Palace cam (-5.59, 2.11, 56.33) ground 1.203 clearance 0.906 player (-7.25, 1.29, 56.35) yaw 67 pitch 30.0 zoom 6.5 arm 1.64 arm_hit 1.64 lens_offset (0.67, 0.21, 0.0) arm_leg_hits:Palace@1.25
+INPUT_TEST_NOTE 1565.4s BAD [palace_front] through_Palace cam (-5.53, 2.31, 56.36) ground 1.200 clearance 1.113 player (-7.25, 1.29, 56.35) yaw 67 pitch 22.5 zoom 6.5 arm 1.63 arm_hit 1.64 lens_offset (0.67, 0.21, 0.0) arm_leg_hits:Palace@1.17
+INPUT_TEST_NOTE 1565.4s BAD [palace_front] near_plane_in_Palace cam (-6.43, 2.51, 56.7) ground 1.262 clearance 1.243 player (-7.25, 1.29, 56.35) yaw 67 pitch 15.0 zoom 6.5 arm 0.92 arm_hit 0.92 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1565.4s BAD [palace_front] near_plane_in_Palace cam (-6.41, 2.62, 56.71) ground 1.261 clearance 1.363 player (-7.25, 1.29, 56.35) yaw 67 pitch 7.4 zoom 6.5 arm 0.92 arm_hit 0.92 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1565.4s BAD [palace_front] near_plane_in_Palace cam (-6.44, 2.75, 56.7) ground 1.263 clearance 1.483 player (-7.25, 1.29, 56.35) yaw 67 pitch -0.1 zoom 6.5 arm 0.89 arm_hit 0.89 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1565.5s BAD [palace_front] through_Palace cam (-5.1, 5.76, 56.5) ground 1.183 clearance 4.581 player (-7.25, 1.29, 56.35) yaw 67 pitch -52.5 zoom 6.5 arm 3.64 arm_hit 3.64 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Palace@3.15
+INPUT_TEST_NOTE 1565.7s BAD [palace_front] inside_Palace cam (-6.47, 2.22, 56.81) ground 1.268 clearance 0.949 player (-7.25, 1.29, 56.35) yaw 60 pitch 30.0 zoom 6.5 arm 1.05 arm_hit 1.05 lens_offset (0.0, 0.0, 0.0) arm_leg_hits:Palace@0.96
+INPUT_TEST_NOTE 1565.9s BAD [palace_front] inside_Palace cam (-6.92, 3.43, 57.18) ground 1.308 clearance 2.120 player (-7.25, 1.29, 56.35) yaw 22 pitch -37.4 zoom 6.5 arm 1.13 arm_hit 1.13 lens_offset (0.0, 0.0, 0.0) arm_leg_hits:Palace@1.02
+INPUT_TEST_NOTE 1566.3s BAD [palace_front] inside_Palace cam (-7.29, 3.93, 57.2) ground 1.331 clearance 2.600 player (-7.25, 1.29, 56.35) yaw -23 pitch -52.5 zoom 6.5 arm 1.42 arm_hit 1.42 lens_offset (0.3, 0.09, 0.0) arm_leg_hits:Palace@1.33
+INPUT_TEST_NOTE 1566.9s BAD [palace_front] too_close_to_ground cam (-9.44, 1.61, 56.68) ground 1.426 clearance 0.182 player (-7.25, 1.29, 56.35) yaw -90 pitch 30.0 zoom 6.5 arm 2.46 arm_hit 2.46 lens_offset (0.35, 0.11, 0.0)
+INPUT_TEST_NOTE 1567.2s BAD [palace_front] too_close_to_ground cam (-10.24, 1.55, 55.44) ground 1.402 clearance 0.151 player (-7.25, 1.29, 56.35) yaw -113 pitch 22.7 zoom 6.5 arm 3.33 arm_hit 3.33 lens_offset (0.33, 0.1, 0.0)
+INPUT_TEST_NOTE 1567.3s BAD [palace_front] near_plane_in_bush_smd_col cam (-8.38, 1.63, 53.82) ground 1.238 clearance 0.394 player (-7.25, 1.29, 56.35) yaw -158 pitch 22.5 zoom 6.5 arm 2.98 arm_hit 2.98 lens_offset (0.09, 0.03, 0.0)
+INPUT_TEST_NOTE 1567.3s BAD [palace_front] near_plane_in_Balcony_B_smd_col cam (-10.2, 2.08, 50.57) ground 1.154 clearance 0.923 player (-7.25, 1.29, 56.35) yaw -158 pitch 7.4 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.56, 0.18, 0.0)
+INPUT_TEST_NOTE 1567.3s BAD [palace_front] near_plane_in_Balcony_B_smd_col cam (-10.34, 2.97, 50.59) ground 1.160 clearance 1.813 player (-7.25, 1.29, 56.35) yaw -158 pitch -0.1 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:Balcony_B_smd_col@0.68
+INPUT_TEST_NOTE 1567.3s BAD [palace_front] near_plane_in_Balcony_B_smd_col cam (-10.11, 3.75, 50.58) ground 1.151 clearance 2.603 player (-7.25, 1.29, 56.35) yaw -158 pitch -7.6 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.48, 0.15, 0.0)
+INPUT_TEST_NOTE 1567.5s BAD [palace_front] through_Balcony_B_smd_col cam (-10.31, 3.8, 50.67) ground 1.162 clearance 2.633 player (-7.25, 1.29, 56.35) yaw -158 pitch -7.4 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:Balcony_B_smd_col@0.56
+INPUT_TEST_NOTE 1567.5s BAD [palace_front] too_close_to_ground cam (-10.28, 1.25, 50.75) ground 1.165 clearance 0.087 player (-7.25, 1.29, 56.35) yaw -158 pitch 15.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@6.09
+INPUT_TEST_NOTE 1567.5s BAD [palace_front] near_plane_in_bush_smd_col cam (-8.38, 1.62, 53.83) ground 1.238 clearance 0.384 player (-7.25, 1.29, 56.35) yaw -158 pitch 22.7 zoom 6.5 arm 2.98 arm_hit 2.98 lens_offset (0.1, 0.03, 0.0)
+INPUT_TEST_NOTE 1567.5s BAD [palace_front] near_plane_in_bush_smd_col cam (-8.71, 1.49, 54.22) ground 1.271 clearance 0.215 player (-7.25, 1.29, 56.35) yaw -158 pitch 30.0 zoom 6.5 arm 2.82 arm_hit 2.82 lens_offset (0.55, 0.17, 0.0)
+INPUT_TEST_NOTE 1567.8s BAD [palace_front] under_terrain cam (-5.53, 0.44, 50.48) ground 1.035 clearance -0.598 player (-7.25, 1.29, 56.35) yaw 157 pitch 22.7 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@4.25
+INPUT_TEST_NOTE 1568.4s BAD [palace_front] through_bush_smd_col cam (-1.65, 1.25, 53.33) ground 0.982 clearance 0.270 player (-7.25, 1.29, 56.35) yaw 112 pitch 15.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:bush_smd_col@5.20
+INPUT_TEST_NOTE 1568.4s BAD [palace_front] under_terrain cam (-4.1, 0.87, 54.32) ground 1.083 clearance -0.214 player (-7.25, 1.29, 56.35) yaw 112 pitch 30.0 zoom 6.5 arm 4.13 arm_hit 4.13 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.23
+INPUT_TEST_NOTE 1579.0s -> hill_top at (-32.0, 56.0) ground 2.22
+INPUT_TEST_NOTE 1581.5s BAD [hill_top] near_plane_in_Palace cam (-7.72, 2.09, 56.69) ground 1.331 clearance 0.761 player (-6.85, 1.26, 56.04) yaw -54 pitch 30.0 zoom 3.7 arm 1.24 arm_hit 1.24 lens_offset (0.01, 0.0, 0.0)
+INPUT_TEST_NOTE 1581.7s    picture hill_top_wall: near_plane_in_Palace cam (-7.72, 2.09, 56.69)
+INPUT_TEST_NOTE 1581.7s BAD [hill_top] near_plane_in_Palace cam (-7.72, 2.09, 56.69) ground 1.331 clearance 0.761 player (-6.85, 1.26, 56.04) yaw -54 pitch 30.0 zoom 3.7 arm 1.24 arm_hit 1.24 lens_offset (0.01, 0.0, 0.0)
+INPUT_TEST_NOTE 1581.9s BAD [hill_top] near_plane_in_Palace cam (-7.71, 2.05, 56.69) ground 1.331 clearance 0.723 player (-6.8, 1.26, 56.01) yaw -54 pitch 30.0 zoom 3.7 arm 1.31 arm_hit 1.31 lens_offset (0.02, 0.01, 0.0)
+INPUT_TEST_NOTE 1584.3s BAD [hill_top] too_close_to_ground cam (-7.71, 1.51, 56.69) ground 1.331 clearance 0.175 player (-6.11, 1.2, 55.5) yaw -54 pitch 30.0 zoom 3.7 arm 2.30 arm_hit 2.30 lens_offset (0.02, 0.01, 0.0)
+INPUT_TEST_NOTE 1584.5s BAD [hill_top] too_close_to_ground cam (-7.71, 1.51, 56.69) ground 1.331 clearance 0.175 player (-6.11, 1.2, 55.5) yaw -54 pitch 30.0 zoom 3.7 arm 2.30 arm_hit 2.30 lens_offset (0.02, 0.01, 0.0)
+INPUT_TEST_NOTE 1584.5s BAD [hill_top] too_close_to_ground cam (-7.71, 1.45, 56.69) ground 1.331 clearance 0.120 player (-6.04, 1.2, 55.45) yaw -54 pitch 30.0 zoom 3.7 arm 2.41 arm_hit 2.41 lens_offset (0.02, 0.01, 0.0)
+INPUT_TEST_NOTE 1594.9s BAD [hill_top] near_plane_in_Balcony_B_smd_col cam (-10.21, 1.48, 50.88) ground 1.168 clearance 0.314 player (-12.67, 1.33, 52.17) yaw 103 pitch 30.0 zoom 3.7 arm 2.98 arm_hit 2.98 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1594.9s BAD [hill_top] near_plane_in_Balcony_B_smd_col cam (-10.21, 1.48, 50.88) ground 1.168 clearance 0.314 player (-12.67, 1.33, 52.17) yaw 103 pitch 30.0 zoom 3.7 arm 2.98 arm_hit 2.98 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1595.0s BAD [hill_top] near_plane_in_Balcony_B_smd_col cam (-10.21, 1.48, 50.88) ground 1.168 clearance 0.314 player (-12.67, 1.33, 52.17) yaw 103 pitch 30.0 zoom 3.7 arm 2.98 arm_hit 2.98 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1598.2s BAD [hill_top] near_plane_in_School_Sign_smd_col cam (-21.17, 2.23, 54.68) ground 1.899 clearance 0.326 player (-23.75, 2.07, 55.7) yaw 97 pitch 30.0 zoom 3.7 arm 2.97 arm_hit 2.97 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1598.2s BAD [hill_top] near_plane_in_School_Sign_smd_col cam (-21.17, 2.23, 54.68) ground 1.899 clearance 0.326 player (-23.75, 2.07, 55.7) yaw 97 pitch 30.0 zoom 3.7 arm 2.97 arm_hit 2.97 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1598.2s BAD [hill_top] near_plane_in_School_Sign_smd_col cam (-21.26, 2.22, 54.73) ground 1.907 clearance 0.310 player (-23.83, 2.07, 55.71) yaw 97 pitch 30.0 zoom 3.7 arm 2.97 arm_hit 2.97 lens_offset (0.65, 0.21, 0.0)
+INPUT_TEST_NOTE 1600.1s BAD [hill_top] near_plane_in_swingswirl1_SMD_col cam (-28.07, 2.49, 55.49) ground 2.178 clearance 0.315 player (-30.45, 2.23, 56.5) yaw 97 pitch 30.0 zoom 3.7 arm 2.75 arm_hit 2.75 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1600.1s BAD [hill_top] near_plane_in_swingswirl1_SMD_col cam (-28.07, 2.49, 55.49) ground 2.178 clearance 0.315 player (-30.45, 2.23, 56.5) yaw 97 pitch 30.0 zoom 3.7 arm 2.75 arm_hit 2.75 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1600.2s BAD [hill_top] near_plane_in_swingswirl1_SMD_col cam (-28.07, 2.49, 55.49) ground 2.178 clearance 0.315 player (-30.45, 2.23, 56.5) yaw 97 pitch 30.0 zoom 3.7 arm 2.75 arm_hit 2.75 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1600.9s    at hill_top (-32.06, 2.24, 57.15)
+INPUT_TEST_NOTE 1601.4s BAD [hill_top] under_terrain cam (-31.12, 1.91, 61.81) ground 2.303 clearance -0.391 player (-32.27, 2.23, 57.1) yaw 5 pitch 22.7 zoom 6.5 arm 5.11 arm_hit 5.11 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.63
+INPUT_TEST_NOTE 1601.6s BAD [hill_top] under_terrain cam (-31.14, 1.32, 61.55) ground 2.300 clearance -0.982 player (-32.27, 2.23, 57.1) yaw 5 pitch 30.0 zoom 6.5 arm 5.11 arm_hit 5.11 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@2.82
+INPUT_TEST_NOTE 1602.2s BAD [hill_top] under_terrain cam (-35.6, 1.38, 62.23) ground 2.164 clearance -0.787 player (-32.27, 2.23, 57.1) yaw -40 pitch 22.7 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.82
+INPUT_TEST_NOTE 1603.9s BAD [hill_top] through_swingswirl1_SMD_col cam (-30.62, 2.49, 55.07) ground 2.187 clearance 0.300 player (-32.27, 2.23, 57.1) yaw 125 pitch 30.0 zoom 6.5 arm 2.77 arm_hit 2.77 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:swingswirl1_SMD_col@1.54
+INPUT_TEST_NOTE 1607.3s BAD [hill_top] through_swingswirl1_SMD_col cam (-30.62, 2.49, 55.07) ground 2.187 clearance 0.300 player (-32.27, 2.23, 57.1) yaw 125 pitch 30.0 zoom 3.5 arm 2.77 arm_hit 2.77 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:swingswirl1_SMD_col@1.54
+INPUT_TEST_NOTE 1610.5s BAD [hill_top] through_swingswirl1_SMD_col cam (-30.62, 2.49, 55.08) ground 2.187 clearance 0.300 player (-32.27, 2.23, 57.1) yaw 125 pitch 30.0 zoom 3.5 arm 2.77 arm_hit 2.77 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:swingswirl1_SMD_col@1.54
+INPUT_TEST_NOTE 1616.1s -> steepest_slope at (32.0, 12.0) ground 0.93
+INPUT_TEST_NOTE 1619.3s    picture steepest_slope_wall: near_plane_in_swingswirl1_SMD_col cam (-31.49, 5.0, 55.78)
+INPUT_TEST_NOTE 1619.3s BAD [steepest_slope] near_plane_in_swingswirl1_SMD_col cam (-31.49, 5.0, 55.78) ground 2.210 clearance 2.791 player (-29.24, 2.1, 53.13) yaw -52 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1619.5s BAD [steepest_slope] near_plane_in_swingswirl1_SMD_col cam (-31.49, 5.0, 55.78) ground 2.210 clearance 2.791 player (-29.24, 2.1, 53.13) yaw -52 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1619.5s BAD [steepest_slope] near_plane_in_swingswirl1_SMD_col cam (-31.49, 5.0, 55.78) ground 2.210 clearance 2.791 player (-29.24, 2.1, 53.13) yaw -52 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1619.6s BAD [steepest_slope] near_plane_in_Swingframe_smd_col cam (-31.34, 4.99, 55.57) ground 2.203 clearance 2.787 player (-29.08, 2.09, 52.92) yaw -52 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1619.6s BAD [steepest_slope] near_plane_in_Swingframe_smd_col cam (-31.35, 4.99, 55.56) ground 2.203 clearance 2.787 player (-29.08, 2.09, 52.92) yaw -52 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1619.6s BAD [steepest_slope] near_plane_in_Swingframe_smd_col cam (-31.3, 4.99, 55.51) ground 2.201 clearance 2.784 player (-29.03, 2.08, 52.87) yaw -52 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1629.1s BAD [steepest_slope] near_plane_in_OGB_2_smd_col cam (-13.35, 3.51, 37.31) ground 0.721 clearance 2.786 player (-10.6, 0.6, 35.17) yaw -64 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1629.1s BAD [steepest_slope] near_plane_in_OGB_2_smd_col cam (-13.35, 3.51, 37.31) ground 0.721 clearance 2.786 player (-10.6, 0.6, 35.17) yaw -64 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1629.1s BAD [steepest_slope] near_plane_in_OGB_2_smd_col cam (-13.32, 3.48, 37.19) ground 0.716 clearance 2.761 player (-10.52, 0.6, 35.13) yaw -64 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.61, 0.19, 0.0)
+INPUT_TEST_NOTE 1629.7s    walking to (1.5, 30.0): at (-8.8, 0.5, 34.3), 11.2 m to go
+INPUT_TEST_NOTE 1640.0s    at steepest_slope (31.03, 0.71, 11.82)
+INPUT_TEST_NOTE 1640.2s BAD [steepest_slope] near_plane_in_Tree_Wide_smd_canopy cam (25.31, 4.4, 12.04) ground 0.006 clearance 4.397 player (31.41, 0.76, 11.55) yaw -85 pitch -19.7 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1640.3s BAD [steepest_slope] under_terrain cam (25.31, -0.09, 11.14) ground 0.002 clearance -0.095 player (31.42, 0.76, 11.54) yaw -100 pitch 22.7 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@5.71
+INPUT_TEST_NOTE 1640.8s BAD [steepest_slope] under_terrain cam (28.09, -0.33, 7.95) ground 0.014 clearance -0.342 player (31.42, 0.76, 11.54) yaw -145 pitch 30.0 zoom 6.5 arm 5.47 arm_hit 5.47 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@4.14
+INPUT_TEST_NOTE 1641.1s BAD [steepest_slope] through_Terrain cam (29.57, 0.43, 8.46) ground 0.158 clearance 0.276 player (31.42, 0.76, 11.54) yaw -160 pitch 30.0 zoom 6.5 arm 3.94 arm_hit 3.94 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.92
+INPUT_TEST_NOTE 1641.3s BAD [steepest_slope] under_terrain cam (31.82, -0.09, 5.44) ground 0.336 clearance -0.430 player (31.42, 0.76, 11.54) yaw 170 pitch 22.7 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@4.34
+INPUT_TEST_NOTE 1641.6s BAD [steepest_slope] through_Terrain cam (32.24, 0.97, 8.99) ground 0.679 clearance 0.292 player (31.42, 0.76, 11.54) yaw 147 pitch 30.0 zoom 6.5 arm 2.87 arm_hit 2.87 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@2.75
+INPUT_TEST_NOTE 1642.0s BAD [steepest_slope] too_close_to_ground cam (36.35, 1.56, 7.29) ground 1.475 clearance 0.089 player (31.42, 0.76, 11.54) yaw 125 pitch 7.7 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@5.49
+INPUT_TEST_NOTE 1642.2s BAD [steepest_slope] too_close_to_ground cam (33.03, 1.06, 9.58) ground 0.917 clearance 0.143 player (31.42, 0.76, 11.54) yaw 125 pitch 30.0 zoom 6.5 arm 2.69 arm_hit 2.69 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@2.39
+INPUT_TEST_NOTE 1643.3s BAD [steepest_slope] too_close_to_ground cam (32.51, 1.35, 13.29) ground 1.193 clearance 0.158 player (31.42, 0.76, 11.54) yaw 12 pitch 30.0 zoom 6.5 arm 2.11 arm_hit 2.11 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1643.4s BAD [steepest_slope] through_Tree_Narrow_smd_canopy cam (31.03, 4.92, 17.49) ground 1.342 clearance 3.578 player (31.42, 0.76, 11.54) yaw -10 pitch -22.6 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Tree_Narrow_smd_canopy@6.15
+INPUT_TEST_NOTE 1643.4s BAD [steepest_slope] through_Tree_Narrow_smd_canopy cam (31.11, 5.67, 17.09) ground 1.315 clearance 4.355 player (31.42, 0.76, 11.54) yaw -10 pitch -30.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Tree_Narrow_smd_canopy@6.20
+INPUT_TEST_NOTE 1643.5s BAD [steepest_slope] through_Tree_Narrow_smd_canopy cam (31.1, 5.65, 17.1) ground 1.316 clearance 4.331 player (31.42, 0.76, 11.54) yaw -10 pitch -29.9 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Tree_Narrow_smd_canopy@6.20
+INPUT_TEST_NOTE 1643.7s BAD [steepest_slope] through_Tree_Wide_smd_canopy cam (26.92, 4.05, 15.49) ground 0.320 clearance 3.729 player (31.42, 0.76, 11.54) yaw -55 pitch -15.1 zoom 6.5 arm 6.22 arm_hit 6.22 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Tree_Wide_smd_canopy@5.89
+INPUT_TEST_NOTE 1643.8s BAD [steepest_slope] through_Tree_Wide_smd_canopy cam (27.26, 5.65, 15.25) ground 0.348 clearance 5.299 player (31.42, 0.76, 11.54) yaw -55 pitch -29.9 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Tree_Wide_smd_canopy@5.93
+INPUT_TEST_NOTE 1643.8s BAD [steepest_slope] through_Tree_Wide_smd_canopy cam (26.93, 4.89, 15.48) ground 0.321 clearance 4.574 player (31.42, 0.76, 11.54) yaw -55 pitch -22.4 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Tree_Wide_smd_canopy@5.66
+INPUT_TEST_NOTE 1644.5s BAD [steepest_slope] through_Terrain cam (29.58, 0.43, 8.46) ground 0.159 clearance 0.276 player (31.42, 0.76, 11.54) yaw -160 pitch 30.0 zoom 6.5 arm 3.94 arm_hit 3.94 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.92
+INPUT_TEST_NOTE 1653.6s -> valley at (28.0, -72.0) ground -2.06
+INPUT_TEST_NOTE 1654.2s BAD [valley] too_close_to_ground cam (32.85, 1.42, 12.83) ground 1.222 clearance 0.194 player (31.4, 0.76, 11.54) yaw 27 pitch 30.0 zoom 3.7 arm 1.97 arm_hit 1.97 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1654.4s BAD [valley] too_close_to_ground cam (32.56, 1.36, 13.2) ground 1.195 clearance 0.164 player (31.39, 0.76, 11.53) yaw 15 pitch 30.0 zoom 3.7 arm 2.08 arm_hit 2.08 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1654.6s BAD [valley] too_close_to_ground cam (32.46, 1.36, 13.27) ground 1.178 clearance 0.181 player (31.39, 0.76, 11.53) yaw 11 pitch 30.0 zoom 3.7 arm 2.08 arm_hit 2.08 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1657.9s    picture valley_wall: near_plane_in_Tree_Narrow_smd_col cam (30.82, 0.3, -1.7)
+INPUT_TEST_NOTE 1657.9s BAD [valley] near_plane_in_Tree_Narrow_smd_col cam (30.82, 0.3, -1.7) ground 0.054 clearance 0.245 player (30.03, 0.0, -4.11) yaw 2 pitch 30.0 zoom 3.7 arm 2.69 arm_hit 2.69 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1658.0s BAD [valley] near_plane_in_Tree_Narrow_smd_col cam (30.82, 0.3, -1.7) ground 0.054 clearance 0.245 player (30.03, 0.0, -4.11) yaw 2 pitch 30.0 zoom 3.7 arm 2.69 arm_hit 2.69 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1658.0s BAD [valley] near_plane_in_Tree_Narrow_smd_col cam (30.66, 0.25, -1.8) ground 0.043 clearance 0.211 player (30.02, 0.0, -4.19) yaw 2 pitch 30.0 zoom 3.7 arm 2.69 arm_hit 2.69 lens_offset (0.54, 0.17, 0.0)
+INPUT_TEST_NOTE 1662.1s    walking to (28.0, -72.0): at (29.0, 0.6, -27.9), 44.2 m to go
+INPUT_TEST_NOTE 1668.5s    walking to (28.0, -72.0): at (27.4, -2.0, -69.5), 2.6 m to go
+INPUT_TEST_NOTE 1668.8s    at valley (27.33, -2.04, -71.25)
+INPUT_TEST_NOTE 1669.1s BAD [valley] under_terrain cam (24.82, -2.21, -68.0) ground -1.904 clearance -0.302 player (27.31, -2.04, -71.73) yaw -43 pitch 22.7 zoom 6.5 arm 4.71 arm_hit 4.71 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.50
+INPUT_TEST_NOTE 1669.5s BAD [valley] under_terrain cam (21.01, -2.08, -70.78) ground -1.755 clearance -0.327 player (27.31, -2.04, -71.73) yaw -88 pitch 15.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@4.84
+INPUT_TEST_NOTE 1669.5s BAD [valley] under_terrain cam (24.39, -2.04, -70.92) ground -1.935 clearance -0.102 player (27.31, -2.04, -71.73) yaw -88 pitch 30.0 zoom 6.5 arm 3.27 arm_hit 3.27 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@2.75
+INPUT_TEST_NOTE 1670.6s BAD [valley] through_Tree_Narrow_smd_canopy cam (29.8, 4.18, -75.46) ground -2.033 clearance 6.210 player (27.31, -2.04, -71.73) yaw 137 pitch -45.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Tree_Narrow_smd_canopy@3.41
+INPUT_TEST_NOTE 1670.6s BAD [valley] through_Tree_Narrow_smd_canopy cam (29.35, 4.72, -74.97) ground -2.040 clearance 6.755 player (27.31, -2.04, -71.73) yaw 137 pitch -52.7 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Tree_Narrow_smd_canopy@3.16
+INPUT_TEST_NOTE 1670.8s BAD [valley] through_Tree_Narrow_smd_col cam (29.58, -1.74, -72.83) ground -2.069 clearance 0.331 player (27.31, -2.04, -71.73) yaw 100 pitch 30.0 zoom 6.5 arm 2.68 arm_hit 2.68 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:Tree_Narrow_smd_col@0.58
+INPUT_TEST_NOTE 1670.9s BAD [valley] near_plane_in_Tree_Narrow_smd_canopy cam (29.7, 1.82, -71.83) ground -2.076 clearance 3.896 player (27.31, -2.04, -71.73) yaw 92 pitch -45.2 zoom 6.5 arm 3.39 arm_hit 3.39 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1670.9s BAD [valley] through_Tree_Narrow_smd_canopy cam (29.27, 2.17, -72.12) ground -2.072 clearance 4.243 player (27.31, -2.04, -71.73) yaw 92 pitch -52.7 zoom 6.5 arm 3.39 arm_hit 3.39 lens_offset (0.31, 0.1, 0.0) shoulder_leg_hits:Tree_Narrow_smd_canopy@0.13
+INPUT_TEST_NOTE 1671.0s BAD [valley] near_plane_in_Tree_Narrow_smd_canopy cam (29.08, 2.5, -71.84) ground -2.071 clearance 4.575 player (27.31, -2.04, -71.73) yaw 92 pitch -60.0 zoom 6.5 arm 3.57 arm_hit 3.57 lens_offset (0.03, 0.01, 0.0)
+INPUT_TEST_NOTE 1671.0s BAD [valley] near_plane_in_Tree_Narrow_smd_canopy cam (29.08, 2.5, -71.84) ground -2.071 clearance 4.575 player (27.31, -2.04, -71.73) yaw 92 pitch -60.0 zoom 6.5 arm 3.57 arm_hit 3.57 lens_offset (0.03, 0.01, 0.0)
+INPUT_TEST_NOTE 1673.5s BAD [valley] through_Tree_Narrow_smd_col cam (29.59, -1.74, -72.83) ground -2.069 clearance 0.330 player (27.31, -2.04, -71.73) yaw 100 pitch 30.0 zoom 3.5 arm 2.68 arm_hit 2.68 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:Tree_Narrow_smd_col@0.58
+INPUT_TEST_NOTE 1675.9s BAD [valley] through_Tree_Narrow_smd_col cam (29.59, -1.74, -72.83) ground -2.069 clearance 0.330 player (27.31, -2.04, -71.73) yaw 100 pitch 30.0 zoom 3.5 arm 2.68 arm_hit 2.68 lens_offset (0.7, 0.22, 0.0) shoulder_leg_hits:Tree_Narrow_smd_col@0.58
+INPUT_TEST_NOTE 1680.4s -> map_edge at (105.7, -64.0) ground 1.90
+INPUT_TEST_NOTE 1688.2s    walking to (105.73, -64.02): at (34.0, -2.0, -70.3), 72.0 m to go
+INPUT_TEST_NOTE 1695.4s    walking to (105.73, -64.02): at (40.3, -1.4, -80.9), 67.6 m to go
+INPUT_TEST_NOTE 1702.6s    walking to (105.73, -64.02): at (50.8, -0.6, -87.7), 59.8 m to go
+INPUT_TEST_NOTE 1704.8s    picture map_edge_wall: near_plane_in_Tree_Narrow_smd_col cam (48.83, 2.22, -92.61)
+INPUT_TEST_NOTE 1704.8s BAD [map_edge] near_plane_in_Tree_Narrow_smd_col cam (48.83, 2.22, -92.61) ground -0.711 clearance 2.932 player (52.12, -0.62, -91.52) yaw -116 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.48, 0.15, 0.0)
+INPUT_TEST_NOTE 1704.9s BAD [map_edge] near_plane_in_Tree_Narrow_smd_col cam (48.83, 2.22, -92.61) ground -0.711 clearance 2.932 player (52.12, -0.62, -91.52) yaw -116 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.49, 0.15, 0.0)
+INPUT_TEST_NOTE 1704.9s BAD [map_edge] near_plane_in_Tree_Narrow_smd_col cam (48.91, 2.22, -92.62) ground -0.710 clearance 2.928 player (52.19, -0.62, -91.5) yaw -117 pitch -19.7 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.47, 0.15, 0.0)
+INPUT_TEST_NOTE 1709.8s    walking to (105.73, -64.02): at (72.1, 1.1, -86.7), 40.6 m to go
+INPUT_TEST_NOTE 1717.3s    at map_edge (109.58, 1.64, -68.32)
+INPUT_TEST_NOTE 1717.6s BAD [map_edge] under_terrain cam (103.49, 1.6, -70.26) ground 2.040 clearance -0.444 player (109.58, 1.64, -68.38) yaw -113 pitch 15.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@4.42
+INPUT_TEST_NOTE 1717.6s BAD [map_edge] under_terrain cam (106.81, 1.78, -68.82) ground 1.860 clearance -0.083 player (109.58, 1.64, -68.38) yaw -113 pitch 30.0 zoom 6.5 arm 3.00 arm_hit 3.00 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@2.57
+INPUT_TEST_NOTE 1717.8s BAD [map_edge] under_terrain cam (107.19, 1.35, -72.52) ground 1.771 clearance -0.423 player (109.58, 1.64, -68.38) yaw -158 pitch 22.7 zoom 6.5 arm 5.03 arm_hit 5.03 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.58
+INPUT_TEST_NOTE 1717.9s BAD [map_edge] through_Terrain cam (109.61, 1.86, -71.04) ground 1.605 clearance 0.260 player (109.58, 1.64, -68.38) yaw 164 pitch 30.0 zoom 6.5 arm 2.83 arm_hit 2.83 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@1.77
+INPUT_TEST_NOTE 1717.9s BAD [map_edge] through_Terrain cam (109.96, 1.86, -71.01) ground 1.574 clearance 0.290 player (109.58, 1.64, -68.38) yaw 157 pitch 30.0 zoom 6.5 arm 2.83 arm_hit 2.83 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@1.22
+INPUT_TEST_NOTE 1718.0s BAD [map_edge] outside_map cam (111.49, 4.17, -74.54) ground 1.343 clearance 2.822 player (109.58, 1.64, -68.38) yaw 157 pitch -7.6 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1718.0s BAD [map_edge] outside_map cam (111.41, 5.0, -74.36) ground 1.356 clearance 3.640 player (109.58, 1.64, -68.38) yaw 157 pitch -15.1 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1718.0s BAD [map_edge] outside_map cam (111.29, 5.79, -74.09) ground 1.376 clearance 4.417 player (109.58, 1.64, -68.38) yaw 157 pitch -22.6 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1719.4s BAD [map_edge] too_close_to_ground cam (109.9, 1.72, -65.99) ground 1.601 clearance 0.114 player (109.58, 1.64, -68.38) yaw 7 pitch 30.0 zoom 6.5 arm 2.77 arm_hit 2.77 lens_offset (0.05, 0.02, 0.0)
+INPUT_TEST_NOTE 1719.4s BAD [map_edge] too_close_to_ground cam (109.88, 1.8, -65.92) ground 1.601 clearance 0.195 player (109.58, 1.64, -68.38) yaw -1 pitch 30.0 zoom 6.5 arm 2.77 arm_hit 2.77 lens_offset (0.35, 0.11, 0.0)
+INPUT_TEST_NOTE 1720.3s BAD [map_edge] through_Terrain cam (109.61, 1.86, -71.04) ground 1.604 clearance 0.260 player (109.58, 1.64, -68.38) yaw 164 pitch 30.0 zoom 6.5 arm 2.83 arm_hit 2.83 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@1.76
+INPUT_TEST_NOTE 1721.8s BAD [map_edge] too_close_to_ground cam (109.9, 1.72, -65.99) ground 1.601 clearance 0.115 player (109.58, 1.64, -68.38) yaw 6 pitch 30.0 zoom 3.5 arm 2.77 arm_hit 2.77 lens_offset (0.05, 0.02, 0.0)
+INPUT_TEST_NOTE 1728.1s -> under_tree_far at (91.0, -51.8) ground 1.98
+INPUT_TEST_NOTE 1738.9s    at under_tree_far (89.13, 2.01, -51.48)
+INPUT_TEST_NOTE 1739.2s BAD [under_tree_far] under_terrain cam (84.63, 1.65, -52.64) ground 2.034 clearance -0.389 player (89.48, 2.01, -51.68) yaw -109 pitch 22.7 zoom 6.5 arm 5.22 arm_hit 5.22 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.66
+INPUT_TEST_NOTE 1739.3s BAD [under_tree_far] under_terrain cam (84.88, 1.04, -52.55) ground 2.035 clearance -0.995 player (89.48, 2.01, -51.68) yaw -109 pitch 30.0 zoom 6.5 arm 5.22 arm_hit 5.22 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@2.84
+INPUT_TEST_NOTE 1739.7s    picture under_tree_far_wall: near_plane_in_Rails cam (86.62, 2.61, -57.46)
+INPUT_TEST_NOTE 1739.7s BAD [under_tree_far] near_plane_in_Rails cam (86.62, 2.61, -57.46) ground 2.062 clearance 0.551 player (89.48, 2.01, -51.68) yaw -154 pitch 7.7 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.08, 0.02, 0.0)
+INPUT_TEST_NOTE 1739.8s BAD [under_tree_far] under_terrain cam (86.11, 1.97, -57.08) ground 2.058 clearance -0.092 player (89.48, 2.01, -51.68) yaw -154 pitch 15.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@5.30
+INPUT_TEST_NOTE 1740.8s BAD [under_tree_far] near_plane_in_Tree_Narrow_smd_col cam (90.0, 4.41, -51.5) ground 1.994 clearance 2.421 player (89.48, 2.01, -51.68) yaw 71 pitch -60.0 zoom 6.5 arm 1.11 arm_hit 1.11 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1740.8s BAD [under_tree_far] near_plane_in_Tree_Narrow_smd_col cam (90.0, 4.41, -51.5) ground 1.994 clearance 2.421 player (89.48, 2.01, -51.68) yaw 71 pitch -60.0 zoom 6.5 arm 1.11 arm_hit 1.11 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1740.9s BAD [under_tree_far] near_plane_in_Tree_Narrow_smd_col cam (90.0, 4.41, -51.5) ground 1.994 clearance 2.421 player (89.48, 2.01, -51.68) yaw 71 pitch -60.0 zoom 6.5 arm 1.11 arm_hit 1.11 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 1740.9s BAD [under_tree_far] too_close_to_ground cam (95.68999, 1.97, -50.24) ground 1.767 clearance 0.199 player (89.48, 2.01, -51.68) yaw 71 pitch 15.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 1741.2s BAD [under_tree_far] through_Tree_Narrow_smd_col cam (92.11, 2.22, -51.14) ground 1.934 clearance 0.284 player (89.48, 2.01, -51.68) yaw 63 pitch 30.0 zoom 6.5 arm 2.86 arm_hit 2.86 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Tree_Narrow_smd_col@0.87
+INPUT_TEST_NOTE 1741.3s BAD [under_tree_far] near_plane_in_Tree_Narrow_smd_canopy cam (90.02, 4.97, -51.06) ground 1.983 clearance 2.984 player (89.48, 2.01, -51.68) yaw 26 pitch -60.0 zoom 6.5 arm 1.70 arm_hit 1.70 lens_offset (0.22, 0.07, 0.0)
+INPUT_TEST_NOTE 1741.3s BAD [under_tree_far] near_plane_in_Tree_Narrow_smd_canopy cam (89.95, 4.97, -50.98) ground 1.982 clearance 2.984 player (89.48, 2.01, -51.68) yaw 26 pitch -60.0 zoom 6.5 arm 1.72 arm_hit 1.72 lens_offset (0.12, 0.04, 0.0)
+INPUT_TEST_NOTE 1741.3s BAD [under_tree_far] near_plane_in_Tree_Narrow_smd_canopy cam (89.95, 4.97, -50.98) ground 1.982 clearance 2.984 player (89.48, 2.01, -51.68) yaw 26 pitch -60.0 zoom 6.5 arm 1.72 arm_hit 1.72 lens_offset (0.12, 0.04, 0.0)
+INPUT_TEST_NOTE 1742.3s BAD [under_tree_far] near_plane_in_Rails cam (86.62, 2.62, -57.46) ground 2.062 clearance 0.553 player (89.48, 2.01, -51.68) yaw -154 pitch 7.7 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.09, 0.03, 0.0)
+INPUT_TEST_NOTE 1743.8s BAD [under_tree_far] through_Tree_Narrow_smd_col cam (92.11, 2.22, -51.13) ground 1.934 clearance 0.284 player (89.48, 2.01, -51.68) yaw 63 pitch 30.0 zoom 3.5 arm 2.86 arm_hit 2.86 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Tree_Narrow_smd_col@0.87
+INPUT_TEST_NOTE 1744.1s BAD [under_tree_far] too_close_to_ground cam (91.47, 1.9, -49.15) ground 1.887 clearance 0.011 player (89.48, 2.01, -51.68) yaw 26 pitch 30.0 zoom 3.5 arm 3.50 arm_hit 3.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.08
+INPUT_TEST_NOTE 1744.1s BAD [under_tree_far] too_close_to_ground cam (91.47, 1.9, -49.15) ground 1.887 clearance 0.011 player (89.48, 2.01, -51.68) yaw 26 pitch 30.0 zoom 3.5 arm 3.50 arm_hit 3.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Terrain@3.08
+INPUT_TEST_NOTE 1746.6s BAD [under_tree_far] through_Tree_Narrow_smd_col cam (92.11, 2.22, -51.13) ground 1.934 clearance 0.284 player (89.48, 2.01, -51.68) yaw 63 pitch 30.0 zoom 3.5 arm 2.86 arm_hit 2.86 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:Tree_Narrow_smd_col@0.87
+INPUT_TEST_NOTE 1751.4s checked 198395 frames, 11343 bad
+INPUT_TEST_NOTE 1751.4s   kind too_close_to_ground: 749 frames
+INPUT_TEST_NOTE 1751.4s   kind under_terrain: 371 frames
+INPUT_TEST_NOTE 1751.4s   kind near_plane_in_crate_empy_smd_col: 52 frames
+INPUT_TEST_NOTE 1751.4s   kind near_plane_in_Market: 2387 frames
+INPUT_TEST_NOTE 1751.4s   kind inside_Market: 408 frames
+INPUT_TEST_NOTE 1751.4s   kind through_Market: 257 frames
+INPUT_TEST_NOTE 1751.4s   kind through_stall-red_col: 37 frames
+INPUT_TEST_NOTE 1751.4s   kind near_plane_in_stall-red_col: 3477 frames
+INPUT_TEST_NOTE 1751.4s   kind near_plane_in_Depot: 1183 frames
+INPUT_TEST_NOTE 1751.4s   kind inside_Depot: 139 frames
+INPUT_TEST_NOTE 1751.4s   kind near_plane_in_Board: 567 frames
+INPUT_TEST_NOTE 1751.4s   kind near_plane_in_Vendor: 39 frames
+INPUT_TEST_NOTE 1751.4s   kind inside_Vendor: 1 frames
+INPUT_TEST_NOTE 1751.4s   kind near_plane_in_basket_smd_col: 37 frames
+INPUT_TEST_NOTE 1751.4s   kind inside_Board: 33 frames
+INPUT_TEST_NOTE 1751.4s   kind through_Depot: 67 frames
+INPUT_TEST_NOTE 1751.4s   kind through_crate_empy_smd_col: 2 frames
+INPUT_TEST_NOTE 1751.4s   kind through_Vendor: 3 frames
+INPUT_TEST_NOTE 1751.4s   kind through_Board: 21 frames
+INPUT_TEST_NOTE 1751.4s   kind near_plane_in_Farmhouse: 64 frames
+INPUT_TEST_NOTE 1751.4s   kind inside_Farmhouse: 4 frames
+INPUT_TEST_NOTE 1751.4s   kind through_Farmhouse: 2 frames
+INPUT_TEST_NOTE 1751.4s   kind through_basket_smd_col: 4 frames
+INPUT_TEST_NOTE 1751.4s   kind through_Tree_Wide_smd_canopy: 11 frames
+INPUT_TEST_NOTE 1751.4s   kind through_Tree_Wide_smd_col: 11 frames
+INPUT_TEST_NOTE 1751.4s   kind near_plane_in_Tree_Wide_smd_col: 19 frames
+INPUT_TEST_NOTE 1751.4s   kind near_plane_in_Tree_Wide_smd_canopy: 19 frames
+INPUT_TEST_NOTE 1751.4s   kind near_plane_in_Pink_B_smd_col: 12 frames
+INPUT_TEST_NOTE 1751.4s   kind through_OGB_1_smd_col: 11 frames
+INPUT_TEST_NOTE 1751.4s   kind near_plane_in_OGB_1_smd_col: 129 frames
+INPUT_TEST_NOTE 1751.4s   kind through_Pink_B_smd_col: 2 frames
+INPUT_TEST_NOTE 1751.4s   kind near_plane_in_OGB_1_Veg_smd_col: 9 frames
+INPUT_TEST_NOTE 1751.4s   kind through_Terrain: 12 frames
+INPUT_TEST_NOTE 1751.4s   kind through_bush_smd_col: 2 frames
+INPUT_TEST_NOTE 1751.4s   kind through_Palace: 23 frames
+INPUT_TEST_NOTE 1751.4s   kind near_plane_in_Palace: 471 frames
+INPUT_TEST_NOTE 1751.4s   kind inside_Palace: 18 frames
+INPUT_TEST_NOTE 1751.4s   kind near_plane_in_bush_smd_col: 34 frames
+INPUT_TEST_NOTE 1751.4s   kind near_plane_in_Balcony_B_smd_col: 13 frames
+INPUT_TEST_NOTE 1751.4s   kind through_Balcony_B_smd_col: 1 frames
+INPUT_TEST_NOTE 1751.4s   kind near_plane_in_School_Sign_smd_col: 45 frames
+INPUT_TEST_NOTE 1751.4s   kind near_plane_in_swingswirl1_SMD_col: 22 frames
+INPUT_TEST_NOTE 1751.4s   kind through_swingswirl1_SMD_col: 3 frames
+INPUT_TEST_NOTE 1751.4s   kind near_plane_in_Swingframe_smd_col: 17 frames
+INPUT_TEST_NOTE 1751.4s   kind near_plane_in_OGB_2_smd_col: 28 frames
+INPUT_TEST_NOTE 1751.4s   kind through_Tree_Narrow_smd_canopy: 23 frames
+INPUT_TEST_NOTE 1751.4s   kind near_plane_in_Tree_Narrow_smd_col: 108 frames
+INPUT_TEST_NOTE 1751.4s   kind through_Tree_Narrow_smd_col: 6 frames
+INPUT_TEST_NOTE 1751.4s   kind near_plane_in_Tree_Narrow_smd_canopy: 49 frames
+INPUT_TEST_NOTE 1751.4s   kind outside_map: 339 frames
+INPUT_TEST_NOTE 1751.4s   kind near_plane_in_Rails: 2 frames
+INPUT_TEST_NOTE 1751.4s   stop yard: 83 bad frames; worst under_terrain clearance -1.025 cam (2.08, -1.02, 11.96) yaw 19 pitch 30.0 zoom 6.5 arm 5.33
+INPUT_TEST_NOTE 1751.4s   stop Barn_ramp: 3214 bad frames; worst inside_Market clearance 0.775 cam (-2.67, 0.77, -4.13) yaw 126 pitch 30.0 zoom 6.5 arm 5.33
+INPUT_TEST_NOTE 1751.4s   stop Barn_inside: 141 bad frames; worst inside_Market clearance 1.394 cam (-4.54, 1.39, 2.56) yaw -10 pitch 22.7 zoom 6.5 arm 5.33
+INPUT_TEST_NOTE 1751.4s   stop Barn_back_wall: 594 bad frames; worst inside_Market clearance 0.943 cam (-0.85, 0.94, 1.86) yaw 14 pitch 22.7 zoom 6.5 arm 6.50
+INPUT_TEST_NOTE 1751.4s   stop Barn_side_wall: 370 bad frames; worst inside_Market clearance 0.775 cam (-2.06, 0.77, 1.21) yaw 9 pitch 30.0 zoom 6.5 arm 5.33
+INPUT_TEST_NOTE 1751.4s   stop Barn_out: 347 bad frames; worst through_Market clearance 0.775 cam (-4.12, 0.77, -3.98) yaw 147 pitch 30.0 zoom 6.5 arm 5.33
+INPUT_TEST_NOTE 1751.4s   stop Farmhouse_ramp: 1117 bad frames; worst too_close_to_ground clearance 0.100 cam (1.81, 0.1, 6.87) yaw -35 pitch 30.0 zoom 3.7 arm 2.70
+INPUT_TEST_NOTE 1751.4s   stop Farmhouse_inside: 380 bad frames; worst inside_Market clearance 1.394 cam (1.2, 1.39, 0.09) yaw -43 pitch 22.7 zoom 6.5 arm 5.33
+INPUT_TEST_NOTE 1751.4s   stop Farmhouse_out: 600 bad frames; worst under_terrain clearance -1.014 cam (5.49, -1.01, 7.79) yaw -7 pitch 30.0 zoom 6.5 arm 5.31
+INPUT_TEST_NOTE 1751.4s   stop Market_ramp: 411 bad frames; worst under_terrain clearance -0.473 cam (-0.38, -0.47, 8.58) yaw -29 pitch 22.7 zoom 6.5 arm 6.50
+INPUT_TEST_NOTE 1751.4s   stop Market_inside: 201 bad frames; worst too_close_to_ground clearance 0.197 cam (4.81, 0.2, 4.66) yaw 46 pitch 30.0 zoom 3.7 arm 3.70
+INPUT_TEST_NOTE 1751.4s   stop Market_out: 355 bad frames; worst under_terrain clearance -0.857 cam (6.84, -0.86, 12.32) yaw 0 pitch 22.7 zoom 6.5 arm 6.50
+INPUT_TEST_NOTE 1751.4s   stop Depot_ramp: 361 bad frames; worst under_terrain clearance -1.125 cam (6.17, -1.13, 7.36) yaw -101 pitch 30.0 zoom 6.5 arm 5.75
+INPUT_TEST_NOTE 1751.4s   stop Depot_inside: 262 bad frames; worst too_close_to_ground clearance 0.163 cam (11.86, 0.16, 8.12) yaw 24 pitch 30.0 zoom 6.5 arm 6.50
+INPUT_TEST_NOTE 1751.4s   stop Depot_back_wall: 312 bad frames; worst under_terrain clearance -0.857 cam (13.95, -0.86, -2.36) yaw 124 pitch 22.7 zoom 6.5 arm 6.50
+INPUT_TEST_NOTE 1751.4s   stop Depot_side_wall: 329 bad frames; worst under_terrain clearance -1.024 cam (11.13, -1.02, -1.41) yaw -149 pitch 30.0 zoom 6.5 arm 5.33
+INPUT_TEST_NOTE 1751.4s   stop Depot_out: 24 bad frames; worst under_terrain clearance -0.406 cam (20.09, -0.41, 10.33) yaw 108 pitch 22.7 zoom 6.5 arm 5.33
+INPUT_TEST_NOTE 1751.4s   stop yard_again: 55 bad frames; worst under_terrain clearance -0.406 cam (-2.09, -0.41, 12.38) yaw -30 pitch 22.7 zoom 6.5 arm 5.33
+INPUT_TEST_NOTE 1751.4s   stop under_tree: 91 bad frames; worst under_terrain clearance -0.434 cam (-22.71, -0.43, -4.79) yaw -162 pitch 22.7 zoom 6.5 arm 5.56
+INPUT_TEST_NOTE 1751.4s   stop town_road: 58 bad frames; worst under_terrain clearance -0.847 cam (-1.49, 0.1, 47.64) yaw -44 pitch 22.7 zoom 6.5 arm 6.50
+INPUT_TEST_NOTE 1751.4s   stop town_wall: 176 bad frames; worst under_terrain clearance -0.977 cam (9.57, -0.11, 44.98) yaw -57 pitch 30.0 zoom 6.5 arm 5.25
+INPUT_TEST_NOTE 1751.4s   stop palace_front: 323 bad frames; worst under_terrain clearance -0.598 cam (-5.53, 0.44, 50.48) yaw 157 pitch 22.7 zoom 6.5 arm 6.50
+INPUT_TEST_NOTE 1751.4s   stop hill_top: 434 bad frames; worst under_terrain clearance -1.241 cam (-33.47, 0.82, 51.79) yaw -175 pitch 30.0 zoom 6.5 arm 6.10
+INPUT_TEST_NOTE 1751.4s   stop steepest_slope: 182 bad frames; worst under_terrain clearance -1.333 cam (35.58, 0.72, 16.36) yaw 35 pitch 15.2 zoom 6.5 arm 6.50
+INPUT_TEST_NOTE 1751.4s   stop valley: 407 bad frames; worst under_terrain clearance -0.391 cam (31.43, -2.43, -68.87) yaw 47 pitch 22.7 zoom 6.5 arm 5.30
+INPUT_TEST_NOTE 1751.4s   stop map_edge: 401 bad frames; worst under_terrain clearance -0.444 cam (103.49, 1.6, -70.26) yaw -113 pitch 15.2 zoom 6.5 arm 6.50
+INPUT_TEST_NOTE 1751.4s   stop under_tree_far: 115 bad frames; worst under_terrain clearance -1.402 cam (95.13, 0.4, -50.44) yaw 71 pitch 30.0 zoom 6.5 arm 6.50
+INPUT_TEST_NOTE 1751.4s   lowest lens over the ground at boot: 2.393 m
+INPUT_TEST_NOTE 1751.4s   lowest lens over the ground at yard: -1.025 m
+INPUT_TEST_NOTE 1751.4s   lowest lens over the ground at Barn_ramp: 0.291 m
+INPUT_TEST_NOTE 1751.4s   lowest lens over the ground at Barn_inside: 1.394 m
+INPUT_TEST_NOTE 1751.4s   lowest lens over the ground at Barn_back_wall: 0.943 m
+INPUT_TEST_NOTE 1751.4s   lowest lens over the ground at Barn_side_wall: 0.775 m
+INPUT_TEST_NOTE 1751.4s   lowest lens over the ground at Barn_out: 0.775 m
+INPUT_TEST_NOTE 1751.4s   lowest lens over the ground at Farmhouse_ramp: 0.100 m
+INPUT_TEST_NOTE 1751.4s   lowest lens over the ground at Farmhouse_inside: 1.394 m
+INPUT_TEST_NOTE 1751.4s   lowest lens over the ground at Farmhouse_out: -1.014 m
+INPUT_TEST_NOTE 1751.4s   lowest lens over the ground at Market_ramp: -0.473 m
+INPUT_TEST_NOTE 1751.4s   lowest lens over the ground at Market_inside: 0.197 m
+INPUT_TEST_NOTE 1751.4s   lowest lens over the ground at Market_out: -0.857 m
+INPUT_TEST_NOTE 1751.4s   lowest lens over the ground at Depot_ramp: -1.125 m
+INPUT_TEST_NOTE 1751.4s   lowest lens over the ground at Depot_inside: 0.163 m
+INPUT_TEST_NOTE 1751.4s   lowest lens over the ground at Depot_back_wall: -0.857 m
+INPUT_TEST_NOTE 1751.4s   lowest lens over the ground at Depot_side_wall: -1.024 m
+INPUT_TEST_NOTE 1751.4s   lowest lens over the ground at Depot_out: -0.406 m
+INPUT_TEST_NOTE 1751.4s   lowest lens over the ground at yard_again: -0.406 m
+INPUT_TEST_NOTE 1751.4s   lowest lens over the ground at under_tree: -0.434 m
+INPUT_TEST_NOTE 1751.4s   lowest lens over the ground at town_road: -0.847 m
+INPUT_TEST_NOTE 1751.4s   lowest lens over the ground at town_wall: -0.977 m
+INPUT_TEST_NOTE 1751.4s   lowest lens over the ground at palace_front: -0.598 m
+INPUT_TEST_NOTE 1751.4s   lowest lens over the ground at hill_top: -1.241 m
+INPUT_TEST_NOTE 1751.4s   lowest lens over the ground at steepest_slope: -1.333 m
+INPUT_TEST_NOTE 1751.4s   lowest lens over the ground at valley: -0.391 m
+INPUT_TEST_NOTE 1751.4s   lowest lens over the ground at map_edge: -0.444 m
+INPUT_TEST_NOTE 1751.4s   lowest lens over the ground at under_tree_far: -1.402 m
+INPUT_TEST_FAILED test_camera_terrain 11343 of 198395 frames had the camera under or inside the world (at yard, Barn_ramp, Barn_inside, Barn_back_wall, Barn_side_wall, Barn_out, Farmhouse_ramp, Farmhouse_inside, Farmhouse_out, Market_ramp, Market_inside, Market_out, Depot_ramp, Depot_inside, Depot_back_wall, Depot_side_wall, Depot_out, yard_again, under_tree, town_road, town_wall, palace_front, hill_top, steepest_slope, valley, map_edge, under_tree_far)

@@ -17,10 +17,10 @@ func _bare() -> Building:
 	var b: Building = BuildingScript.new()
 	b.width = 6.0
 	b.depth = 4.0
-	b.wall_height = 3.0
-	b.ridge_height = 4.2
+	b.wall_height = 4.6
+	b.ridge_height = 5.8
 	b.door_width = 2.0
-	b.door_height = 2.6
+	b.door_height = 3.85
 	add_child_autofree(b)
 	return b
 
@@ -165,20 +165,28 @@ const RanchScene := preload("res://world/ranch.tscn")
 
 ## The five that wear a model, and the seated footprint each was sized to. The Palace is not
 ## here: it is a kit bash of several pieces (game/world/palace_facade.gd), not one model.
+##
+## SCALE.md: each shell is its model's seated footprint at MLP_SCALE TIMES its own model_scale,
+## which stands the model several pony heights tall (docs/playtest_fixes/scale.md). `k` is that
+## factor; the w / d / ridge here are the MLP_SCALE measurements times k.
 const SHIPPED := {
-	"Barn": {"file": "saa_barn.glb", "w": 4.86, "d": 4.93, "ridge": 7.00},
-	"Farmhouse": {"file": "pv_wide_b.glb", "w": 7.26, "d": 3.44, "ridge": 5.77},
-	"Market": {"file": "pv_general.glb", "w": 10.62, "d": 5.07, "ridge": 5.34},
-	"Board": {"file": "pv_bridged_b.glb", "w": 2.82, "d": 2.14, "ridge": 3.60},
-	"Depot": {"file": "pv_tower_b.glb", "w": 6.29, "d": 3.05, "ridge": 7.43},
+	"Barn": {"file": "saa_barn.glb", "k": 1.0, "w": 4.86, "d": 4.93, "ridge": 7.00},
+	"Farmhouse": {"file": "pv_wide_b.glb", "k": 1.25, "w": 7.26 * 1.25, "d": 3.44 * 1.25, "ridge": 5.77 * 1.25},
+	"Market": {"file": "pv_general.glb", "k": 1.35, "w": 10.62 * 1.35, "d": 5.07 * 1.35, "ridge": 5.34 * 1.35},
+	"Board": {"file": "pv_bridged_b.glb", "k": 1.85, "w": 2.82 * 1.85, "d": 2.14 * 1.85, "ridge": 3.60 * 1.85},
+	"Depot": {"file": "pv_tower_b.glb", "k": 1.3, "w": 6.29 * 1.3, "d": 3.05 * 1.3, "ridge": 7.43 * 1.3},
 }
 
 ## Every building origin the owner's live save was made against. THESE MAY NOT MOVE: the
 ## interact verb is a flat XZ distance from each of these points (ranch.gd's is_near_*),
 ## so a moved origin is a Market that opens somewhere else than where the player learned it.
+##
+## ONE EXCEPTION, THE BOARD, moved 2.2 m from (3, -1) to (5, 0) by the scale fix
+## (docs/playtest_fixes/scale.md): at SCALE.md's house size it no longer fits the notch between
+## the Market's ramp and the Farmhouse's, and (5, 0) is the nearest spot it does.
 const ORIGINS := {
 	"Barn": Vector2(-10.0, -9.0), "Farmhouse": Vector2(9.0, -7.0),
-	"Market": Vector2(-2.0, -1.0), "Board": Vector2(3.0, -1.0),
+	"Market": Vector2(-2.0, -1.0), "Board": Vector2(5.0, 0.0),
 	"Depot": Vector2(10.0, 4.0), "Palace": Vector2(-10.0, 61.6),
 	"Mailbox": Vector2(8.0, -2.5),
 }
@@ -191,7 +199,8 @@ func test_the_shipped_map_names_a_model_on_every_building_but_the_palace() -> vo
 		var b := buildings.get_node_or_null(NodePath(who)) as Building
 		assert_not_null(b, "%s stands" % who)
 		assert_eq(b.model_file, String(SHIPPED[who]["file"]), "%s names its model" % who)
-		assert_eq(b.model_scale, 1.0, "%s is at the MLP family's own scale" % who)
+		assert_almost_eq(b.model_scale, float(SHIPPED[who]["k"]), 0.0001,
+			"%s stands at its SCALE.md factor" % who)
 	# The Palace wears the game's own Blender model (a res:// path, at its own scale), and
 	# with it worn ranch.gd stands no kit-bashed facade, so it is never double dressed.
 	var palace := buildings.get_node(^"Palace") as Building

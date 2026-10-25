@@ -32,6 +32,9 @@ FFPROBE="${FILLY_FFPROBE:-/usr/bin/ffprobe}"
 UA="Mozilla/5.0 (X11; Linux x86_64)"
 # True peak ceiling, dBTP. A row over this clips and fails.
 PEAK_CEILING="-1.5"
+# Where an mgain= row's true peak stops, in dBTP: comfortably under the ceiling, so the
+# limiter after it never engages on a one shot.
+MGAIN_PEAK_CAP="-3.0"
 # How far an integrated loudness may sit from its target before the row fails, in LU.
 LUFS_TOLERANCE="2.0"
 
@@ -136,6 +139,7 @@ process_row() {
   local out="$OUT_ROOT/$dest"
   local src work ext filters rate="44100" chans="2"
   local trim="" pick="" speed="" loopsec="" fadein="" fadeout="" target="" gaindb=""
+  local mtarget="" hipass="" lopass="" gate="" denoise=""
 
   local verb
   IFS=',' read -ra verbs <<< "$recipe"
@@ -150,6 +154,11 @@ process_row() {
       fade=*)    fadein="${verb#fade=}"; fadeout="${fadein#*:}"; fadein="${fadein%%:*}" ;;
       gain=*)    target="${verb#gain=}" ;;
       gain_db=*) gaindb="${verb#gain_db=}" ;;
+      mgain=*)   mtarget="${verb#mgain=}" ;;
+      highpass=*) hipass="${verb#highpass=}" ;;
+      lowpass=*) lopass="${verb#lowpass=}" ;;
+      gate=*)    gate="${verb#gate=}" ;;
+      denoise=*) denoise="${verb#denoise=}" ;;
       "")        ;;
       *) echo "  unknown recipe verb '$verb' in row '$dest'" >&2; return 1 ;;
     esac
@@ -193,6 +202,15 @@ process_row() {
   if [ -n "$speed" ]; then
     filters="$filters,asetrate=$(awk -v r="$rate" -v s="$speed" 'BEGIN{printf "%d", r*s}'),aresample=$rate"
   fi
+  [ -n "$hipass" ] && filters="$filters,highpass=f=$hipass"
+  [ -n "$lopass" ] && filters="$filters,lowpass=f=$lopass"
+  # denoise=N: afftdn, N dB of broadband reduction against a floor it tracks itself.
+  [ -n "$denoise" ] && filters="$filters,afftdn=nr=$denoise:nf=-50:tn=1"
+  # gate=T: a downward expander under T dBFS (agate's threshold is linear), so the room
+  # between and after a one shot's events sinks instead of riding up with its gain.
+  if [ -n "$gate" ]; then
+    filters="$filters,agate=threshold=$(awk -v t="$gate" 'BEGIN{printf "%.6f", 10^(t/20)}'):ratio=6:range=0.001:attack=0.5:release=60:knee=2"
+  fi
 
   if [ -n "$loopsec" ]; then
     # A SEAMLESS BUTT LOOP. Take loopsec plus one second of overlap, split it, and
@@ -233,17 +251,42 @@ process_row() {
   # gain_db= skips measurement entirely and applies a flat gain, for a one shot too short
   # for EBU gating to measure honestly at all.
   local levelled="$tmp_root/level_$(basename "$dest").wav"
-  if [ -n "$target" ]; then
+  # THE LIMITER IS A SAFETY NET, NOT A LEVEL. level=false matters: alimiter's own default
+  # (level=true) rescales its output so the limit lands at full scale, which added
+  # 20*log10(1/0.84) = +1.5 dB to EVERY file after the loudness pass had placed it. That
+  # is why every bed and every music track measured 1.4 to 1.5 LU over its own target
+  # (bed_day_meadow -22.6 against -24) -- the "ambience is too loud" note, in a number.
+  local limiter="alimiter=limit=0.84:level=false"
+  if [ -n "$mtarget" ]; then
+    # mgain=L: a one shot's loudness is its loudest 400 ms (EBU momentary), measured on
+    # the file padded with a second of silence so even a 0.1 s tap fills a window. This
+    # is the honest loudness pass for the short sounds gain_db= used to guess at.
+    #
+    # NEVER INTO THE LIMITER. The gain is capped so the true peak lands at MGAIN_PEAK_CAP:
+    # a sharp tap (a hoof on stone, a reel click) whose crest factor will not reach L under
+    # that cap stops short of L instead of being squared off by alimiter to get there. The
+    # report accepts such a row (see measure_row), because a clean tap 4 dB under target
+    # is a mix decision; a crushed one is a broken file.
+    local measured needed tp_now
+    measured="$(measure_momentary "$work")"
+    tp_now="$(measure_true_peak "$work")"
+    needed="$(awk -v t="$mtarget" -v m="$measured" -v p="$tp_now" -v c="$MGAIN_PEAK_CAP" \
+      'BEGIN{g = t - m; h = c - p; printf "%.2f", (h < g ? h : g)}')"
+    "$FFMPEG" -y -nostats -hide_banner -i "$work" \
+      -af "volume=${needed}dB,$limiter" \
+      -ar "$rate" -c:a pcm_s16le "$levelled" >/dev/null 2>&1 || {
+        echo "  momentary gain failed for $dest" >&2; return 1; }
+  elif [ -n "$target" ]; then
     local measured needed
     measured="$(measure_integrated "$work")"
     needed="$(awk -v t="$target" -v m="$measured" 'BEGIN{printf "%.2f", t - m}')"
     "$FFMPEG" -y -nostats -hide_banner -i "$work" \
-      -af "volume=${needed}dB,alimiter=limit=0.84" \
+      -af "volume=${needed}dB,$limiter" \
       -ar "$rate" -c:a pcm_s16le "$levelled" >/dev/null 2>&1 || {
         echo "  loudness gain failed for $dest" >&2; return 1; }
   else
     "$FFMPEG" -y -nostats -hide_banner -i "$work" \
-      -af "volume=${gaindb:-0}dB,alimiter=limit=0.84" \
+      -af "volume=${gaindb:-0}dB,$limiter" \
       -ar "$rate" -c:a pcm_s16le "$levelled" >/dev/null 2>&1 || {
         echo "  gain stage failed for $dest" >&2; return 1; }
   fi
@@ -258,7 +301,11 @@ process_row() {
       >/dev/null 2>&1 || { echo "  wav encode failed for $dest" >&2; return 1; }
   fi
 
-  measure_row "$dest" "$out" "${target:-none}"
+  if [ -n "$mtarget" ]; then
+    measure_row "$dest" "$out" "M$mtarget"
+  else
+    measure_row "$dest" "$out" "${target:-none}"
+  fi
 }
 
 # --- measurement -------------------------------------------------------------------------
@@ -271,6 +318,19 @@ measure_integrated() {
     -f null - 2>&1 | tail -40)"
   integrated="$(printf '%s' "$summary" | grep -A1 'Integrated loudness' | grep -oE 'I: *-?[0-9.]+' | grep -oE '\-?[0-9.]+$' | tail -1)"
   printf '%s' "${integrated:-0}"
+}
+
+measure_true_peak() {
+  # $1 file. Its true peak in dBTP (ebur128 peak=true).
+  "$FFMPEG" -nostats -hide_banner -i "$1" -filter_complex ebur128=peak=true -f null - 2>&1 \
+    | tail -40 | grep -A1 'True peak' | grep -oE 'Peak: *-?[0-9.]+' | grep -oE '\-?[0-9.]+$' | tail -1
+}
+
+measure_momentary() {
+  # $1 file. Its loudest EBU momentary (400 ms) loudness in LUFS, on the file padded with a
+  # second of silence.
+  "$FFMPEG" -nostats -hide_banner -i "$1" -af "apad=pad_dur=1,ebur128" -f null - 2>&1 \
+    | grep -oE ' M: *-?[0-9.]+' | grep -oE '\-?[0-9.]+$' | sort -g | tail -1
 }
 
 measure_row() {
@@ -287,14 +347,28 @@ measure_row() {
   if awk -v p="$peak" -v c="$PEAK_CEILING" 'BEGIN{exit !(p > c)}'; then
     verdict="FAIL"
   fi
-  if [ "$target" != "none" ]; then
+  local momentary=""
+  case "$target" in
+    M*)
+      momentary="$(measure_momentary "$file")"
+      # Within tolerance of the target, or under it with the true peak at the cap: the
+      # mgain pass stopped short rather than limit (see process_row).
+      if awk -v i="${momentary:-0}" -v t="${target#M}" -v tol="$LUFS_TOLERANCE" \
+          -v p="$peak" -v c="$MGAIN_PEAK_CAP" \
+          'BEGIN{d = i - t; if (d < 0) d = -d; capped = (i < t && p >= c - 0.6); exit !(d > tol && !capped)}'; then
+        verdict="FAIL"
+      fi
+      ;;
+  esac
+  if [ "$target" != "none" ] && [ "${target#M}" = "$target" ]; then
     if awk -v i="$integrated" -v t="$target" -v tol="$LUFS_TOLERANCE" \
         'BEGIN{d = i - t; if (d < 0) d = -d; exit !(d > tol)}'; then
       verdict="FAIL"
     fi
   fi
-  printf '%-4s  %-34s  dur=%-8.2f  I=%-8s  TP=%-7s  target=%s\n' \
-    "$verdict" "$dest" "$dur" "$integrated" "$peak" "$target"
+  printf '%-4s  %-34s  dur=%-8.2f  I=%-8s  TP=%-7s  target=%s%s\n' \
+    "$verdict" "$dest" "$dur" "$integrated" "$peak" "$target" \
+    "${momentary:+  M=$momentary}"
   [ "$verdict" = "PASS" ]
 }
 
@@ -322,7 +396,9 @@ while IFS= read -r line <&3; do
   if [ -s "$OUT_ROOT/$dest" ] && [ "$FORCE" = "0" ] && [ -z "$ONLY" ]; then
     skipped=$((skipped + 1))
     skip_target="$(printf '%s' "$recipe" | grep -oE '(^|,)gain=-?[0-9.]+' | grep -oE '\-?[0-9.]+$')"
+    skip_m="$(printf '%s' "$recipe" | grep -oE '(^|,)mgain=-?[0-9.]+' | grep -oE '\-?[0-9.]+$')"
     skip_target="${skip_target:-none}"
+    [ -n "$skip_m" ] && skip_target="M$skip_m"
     line_out="$(measure_row "$dest" "$OUT_ROOT/$dest" "$skip_target")"
     measured=$?
     report_lines="$report_lines$line_out"$'\n'

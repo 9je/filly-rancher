@@ -281,6 +281,18 @@ const PULL_RESPONSE := 6.0
 ## and "I was aiming at the next pony along" does not.
 const GRAB_ASSIST_RADIUS := 0.5
 
+## AIM ASSIST (owner playtest 2026-10-24, "beam selection feels weird"). The forgiveness
+## sphere above sits where the RAY lands, and a crosshair a hair beside a pony 6 m out sends
+## the ray on to the grass 8 m out, so being half a pony off took nothing at all. Now every
+## pony in reach inside this cone round the crosshair, with a clear line to her, is a
+## candidate; the one nearest the crosshair (then the nearer one) is the target, and she is
+## lit before the press (TARGET_COLOR on her outline, a ring at her hooves).
+const ASSIST_CONE_DEG := 12.0
+## Past this many metres beside the crosshair a pony is not "the one I meant", however
+## small the angle (a pony far down the line).
+const ASSIST_LATERAL := 1.6
+const TARGET_COLOR := Color(1.0, 0.86, 0.35, 1.0)
+
 ## Height above a pony's origin that the hold point should line up with, in metres.
 ## Exactly the centre of her collision capsule (pony.tscn: height 1.30, centred at 0.65),
 ## so the crosshair ends up on her barrel rather than on her hooves. Without this she
@@ -1260,6 +1272,16 @@ func _update_aim() -> void:
 func _scan(can_grab: bool) -> void:
 	_has_target = false
 	_mark_valid = false
+	var was := _target
+	_target = null
+	_scan_inner(can_grab)
+	if _target != was:
+		_light(was, false)
+		_light(_target, true)
+	_place_target_ring()
+
+
+func _scan_inner(can_grab: bool) -> void:
 
 	var space := get_world_3d().direct_space_state
 	if space == null:
@@ -1284,9 +1306,19 @@ func _scan(can_grab: bool) -> void:
 			# stays true through the post-escape cooldown, because that is exactly when the
 			# player is re-aiming and needs to know it.
 			_has_target = true
+			_set_target(body as Node3D)
 			if can_grab:
 				_begin_hold(body)
 				return
+
+	# Aim assist: the pony nearest the crosshair inside the cone (see ASSIST_CONE_DEG).
+	var assisted := _assist_target(space)
+	if assisted != null:
+		_has_target = true
+		_set_target(assisted)
+		if can_grab:
+			_begin_hold(assisted)
+		return
 
 	# Forgiveness pass, centred on whatever the ray actually reached. Runs whether or not
 	# the beam may grab, for the same reason as above -- the reticle must answer the same
@@ -1308,6 +1340,7 @@ func _scan(can_grab: bool) -> void:
 			nearest_distance = gap
 	if nearest != null:
 		_has_target = true
+		_set_target(nearest)
 		if can_grab:
 			_begin_hold(nearest)
 			return
@@ -1336,6 +1369,130 @@ func _mark_at(point: Vector3, normal: Vector3) -> void:
 	_mark_point = point + up * MARK_LIFT
 	_mark_normal = up
 	_mark_valid = true
+
+
+## The pony the beam would take right now, or null. Read by the highlight and the tests.
+func get_target() -> Node3D:
+	return _target if _target != null and is_instance_valid(_target) else null
+
+
+var _target: Node3D = null
+var _target_ring: MeshInstance3D = null
+## A small chevron over her head, drawn over everything: the pick still reads when your own
+## pony or a fence stands between the lens and her (the first evidence shot hid the ring).
+var _target_marker: MeshInstance3D = null
+
+
+func _set_target(body: Node3D) -> void:
+	if _target == null:
+		_target = body
+
+
+## Every pony within reach, inside ASSIST_CONE_DEG of the crosshair and ASSIST_LATERAL of its
+## line, that the beam can see: the one nearest the crosshair, ties to the nearer one.
+func _assist_target(space: PhysicsDirectSpaceState3D) -> Node3D:
+	var anchor := _anchor_position()
+	var r := reach() + GRAB_ASSIST_RADIUS
+	var params := PhysicsShapeQueryParameters3D.new()
+	var sphere := SphereShape3D.new()
+	sphere.radius = r + 1.0
+	params.shape = sphere
+	params.transform = Transform3D(Basis(), anchor)
+	params.collision_mask = LayersScript.PONY
+	params.exclude = _exclusions()
+	var best: Node3D = null
+	var best_score := INF
+	var cos_cone := cos(deg_to_rad(ASSIST_CONE_DEG))
+	for result in space.intersect_shape(params, 32):
+		var body: Object = result["collider"]
+		if not _is_grabbable(body):
+			continue
+		var p := body as Node3D
+		var centre := p.global_position + Vector3(0, PONY_HOLD_LIFT, 0)
+		if centre.distance_to(anchor) > r:
+			continue
+		var to := centre - _aim_origin
+		var along := to.dot(_aim_direction)
+		if along <= 0.0:
+			continue
+		var cosang := along / to.length()
+		var lateral := (to - _aim_direction * along).length()
+		if cosang < cos_cone or lateral > ASSIST_LATERAL:
+			continue
+		# A clear line from the lens to her: no barn wall or hill in between.
+		var los := PhysicsRayQueryParameters3D.create(_aim_origin, centre)
+		los.collision_mask = LayersScript.WORLD
+		los.exclude = _exclusions()
+		if not space.intersect_ray(los).is_empty():
+			continue
+		var score := acos(clampf(cosang, -1.0, 1.0)) + to.length() * 0.004
+		if score < best_score:
+			best_score = score
+			best = p
+	return best
+
+
+## Light (or unlight) a pony as the beam's target: her outline in TARGET_COLOR, thicker.
+func _light(body: Node3D, on: bool) -> void:
+	if body == null or not is_instance_valid(body) or not (body is PonyScript):
+		return
+	for m in body.find_children("*", "GeometryInstance3D", true, false):
+		(m as GeometryInstance3D).set_instance_shader_parameter(&"highlight",
+			TARGET_COLOR if on else Color(0, 0, 0, 0))
+
+
+## A soft ring at the target's hooves, so the pick reads from any angle.
+func _place_target_ring() -> void:
+	var t := get_target()
+	if t == null or _held != null:
+		if _target_ring != null:
+			_target_ring.visible = false
+			_target_marker.visible = false
+		return
+	if _target_ring == null:
+		_target_ring = MeshInstance3D.new()
+		_target_ring.name = "BeamTargetRing"
+		var torus := TorusMesh.new()
+		torus.inner_radius = 0.55
+		torus.outer_radius = 0.68
+		torus.rings = 32
+		torus.ring_segments = 6
+		_target_ring.mesh = torus
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.albedo_color = TARGET_COLOR
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.albedo_color.a = 0.85
+		_target_ring.material_override = mat
+		_target_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_target_ring.top_level = true
+		add_child(_target_ring)
+		_target_marker = MeshInstance3D.new()
+		_target_marker.name = "BeamTargetMarker"
+		var cone := CylinderMesh.new()
+		cone.top_radius = 0.2
+		cone.bottom_radius = 0.0
+		cone.height = 0.32
+		cone.radial_segments = 3
+		cone.rings = 1
+		_target_marker.mesh = cone
+		var mm := StandardMaterial3D.new()
+		mm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mm.albedo_color = TARGET_COLOR
+		mm.no_depth_test = true
+		mm.render_priority = 10
+		_target_marker.material_override = mm
+		_target_marker.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_target_marker.top_level = true
+		add_child(_target_marker)
+	_target_ring.visible = true
+	_target_marker.visible = true
+	var bob := 0.06 * sin(_elapsed * 4.0)
+	_target_marker.global_transform = Transform3D(Basis(Vector3.UP, _elapsed * 2.0),
+		t.global_position + Vector3(0, 2.05 + bob, 0))
+	var pulse := 1.0 + 0.08 * sin(_elapsed * 6.0)
+	_target_ring.global_transform = Transform3D(Basis().scaled(Vector3(pulse, 0.25, pulse)),
+		t.global_position + Vector3(0, 0.04, 0))
 
 
 ## A wild pony, or any loose rigid body. The rigid bodies cost almost nothing to support
@@ -1389,6 +1546,11 @@ func _sound_call(method: StringName, args: Array) -> void:
 
 
 func _begin_hold(body: Node3D) -> void:
+	# Held, she is no longer a target to point out.
+	_light(_target, false)
+	_target = null
+	if _target_ring != null:
+		_target_ring.visible = false
 	_held = body
 	_hold_seconds = 0.0
 	# play_loop, not play_at: a pooled one-shot cannot be individually addressed, so a grab

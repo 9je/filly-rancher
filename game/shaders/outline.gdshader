@@ -22,6 +22,9 @@ uniform vec4 line_color : source_color = vec4(0.0, 0.0, 0.0, 0.0);
 // Per INSTANCE, not per material: a far pony turns her line off without her materials being
 // swapped (a swap rebuilds her render instance, which is what made tier changes hitch).
 instance uniform float outline_on = 1.0;
+// The beam's target (MagicBeam.TARGET_COLOR): a thick line in that colour, never faded, so
+// the pony the beam would take reads at a glance (owner playtest 2026-10-24).
+instance uniform vec4 highlight : source_color = vec4(0.0);
 
 void vertex() {
 	vec4 view_pos = MODELVIEW_MATRIX * vec4(VERTEX, 1.0);
@@ -34,13 +37,18 @@ void vertex() {
 	}
 	float dist = -view_pos.z;
 	float fade = 1.0 - smoothstep(fade_start, fade_end, dist);
-	clip.xy += dir * width_px * fade * 2.0 / VIEWPORT_SIZE * clip.w;
+	float w = width_px;
+	if (highlight.a > 0.0) {
+		fade = 1.0;
+		w = max(width_px, 1.6) * 2.4;
+	}
+	clip.xy += dir * w * fade * 2.0 / VIEWPORT_SIZE * clip.w;
 	POSITION = clip;
 	// A line casts no shadow: in a shadow pass EVERY vertex of the hull collapses to one
 	// point, so each triangle is degenerate and the rasterizer drops it. Only a test that is
 	// the same for the whole draw may do this; a per-vertex one (the fade) would collapse
 	// some corners of a triangle and not others and smear it across the screen.
-	if (IN_SHADOW_PASS || outline_on < 0.5) {
+	if (IN_SHADOW_PASS || (outline_on < 0.5 && highlight.a <= 0.0)) {
 		POSITION = vec4(0.0, 0.0, 2.0, 1.0);
 	}
 }
@@ -56,5 +64,8 @@ void fragment() {
 	}
 	float lum = dot(c, vec3(0.299, 0.587, 0.114));
 	c = mix(c, vec3(lum), clamp(dread, 0.0, 1.0) * 0.5);
+	if (highlight.a > 0.0) {
+		c = highlight.rgb;
+	}
 	ALBEDO = c;
 }
