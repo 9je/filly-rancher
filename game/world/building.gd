@@ -265,6 +265,9 @@ var _wearing := false
 func _ready() -> void:
 	collision_layer = LayersScript.PROPS
 	collision_mask = 0
+	# Hooves on a building are on its planked ramp or its boarded floor (player.gd
+	# SURFACE_META); a worn model's stone foundation is a wall, not somewhere to stand.
+	set_meta(&"step_surface", &"hoof_wood")
 
 
 ## Assemble the building. Idempotent; called by ranch.gd so that seating against the

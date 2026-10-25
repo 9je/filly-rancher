@@ -108,6 +108,8 @@ const StockTintScript := preload("res://systems/stock_tint.gd")
 const CutieMarkScript := preload("res://systems/cutie_mark.gd")
 const PonyPaintScript := preload("res://systems/pony_paint.gd")
 const DonorTableScript := preload("res://systems/donor_table.gd")
+const TerrainScript := preload("res://world/terrain.gd")
+const LayersScript := preload("res://world/collision_layers.gd")
 
 ## The input action held to WALK instead of running. Named `sneak` rather than `walk`
 ## because slowness is not what it is FOR -- see is_sneaking() and Pony.SNEAK_NOTICE_FACTOR.
@@ -146,27 +148,48 @@ const RUN_SPEED := 5.2
 ## strictly a way of not making her flee in the first place.
 const SNEAK_SPEED := 2.0 * GaitScript.WALK_CLIP_SPEED
 
-## HOOFSTEPS ARE A FUNCTION OF THE CLIP, NOT OF DISTANCE AND NOT OF A TIMER. One sound per
-## cycle of whichever locomotion clip is playing, fired at the same phase of that cycle every
-## time, read off the AnimationPlayer's own position. That is what makes the sound land on
-## the animation's footfall at every speed, including the speeds where the hooves skate.
+## HOOFSTEPS LAND ON THE ANIMATION'S OWN FOOTFALLS. Not on distance, not on a timer, and
+## (since the audit of 2026-10-24) not once per cycle either: every clip's footfalls are read
+## out of the clip itself -- the moment each of the four IK hoof targets (IK_FrontHoof.L/R,
+## IK_RearHoof.L/R, which tools/author_anims.py keys and the rig plants) comes down onto
+## its stance height -- and a hoofstep plays whenever the AnimationPlayer's position crosses
+## one. Hooves that land together (the walk's diagonal pairs) are one sound. That gives the
+## walk two beats a cycle and the gallop its four, exactly where the hooves hit, at every
+## playback rate, through every crossfade.
 ##
-## It used to be one sound every 1.1 m travelled. At the sneak that was one sound per two
-## strides; at the run it was 4.7 a second against a cycle turning over 2.6 times a second.
-## Neither lined up with anything on screen, which is the whole of the owner's "walk
-## animations seems worse than before" plus "that sound is terrible": the animation had not
-## changed, the audio landing off it had arrived.
+## HISTORY. One sound every 1.1 m travelled lined up with nothing on screen. One per cycle
+## (slice R3) landed on ONE hoof of four in the gallop and one pair of two in the walk: the
+## other footfalls were silent, so the run read as a single sample looping at the cycle rate
+## rather than as hooves -- and that sample was a field recording lifted 16 dB, room tone
+## and all (tools/sound_manifest.txt, the hoofsteps block). See
+## game/test_input/test_footsteps.gd, which watches the visible hoof bones and the Sound
+## pool together, and docs/playtest_fixes/audio.md.
 ##
-## ONE PER CYCLE AND NOT FOUR: the authored walk cycle is short (Gait's own comment -- the
-## front leg chain is 98.8% extended, so the stride cannot lengthen and the cycle carries
-## only 0.55 m), and sonifying all four beats of it gives 9.6 sounds a second at a creep.
-## One per cycle is one of her four hooves, always the same one, always at the same moment.
-## See game/test/test_player_steps.gd for the cadence this produces at both speeds.
 ## Below this she is shuffling, not walking, and a sound there is a sound with no gesture
 ## behind it.
 const STEP_MIN_SPEED := 0.4
-const SURFACE_GRASS := &"hoofsteps_grass"
-const SURFACE_HARD := &"hoofsteps_hard"
+## The five surface sets (Sound.LIBRARY ids). Which one plays is decided per footfall by
+## what is under her: see surface_for().
+const SURFACE_GRASS := &"hoof_grass"
+const SURFACE_DIRT := &"hoof_dirt"
+const SURFACE_WOOD := &"hoof_wood"
+const SURFACE_STONE := &"hoof_stone"
+const SURFACE_METAL := &"hoof_metal"
+const SURFACES: Array[StringName] = [SURFACE_GRASS, SURFACE_DIRT, SURFACE_WOOD, SURFACE_STONE,
+	SURFACE_METAL]
+## A collider (or one of its first few ancestors) carrying this meta names its own surface:
+## building.gd tags itself wood, factory_interior.gd tags its floors metal or stone.
+const SURFACE_META := &"step_surface"
+## The IK hoof targets whose position tracks say when a hoof is down, front pair first.
+const HOOF_TARGETS: Array[String] = ["IK_FrontHoof.L", "IK_FrontHoof.R", "IK_RearHoof.L",
+	"IK_RearHoof.R"]
+## A hoof is down when its target is within this of its lowest height in the clip.
+const HOOF_CONTACT_EPS := 0.002
+## Touchdowns closer than this (clip seconds) are one sound.
+const FOOTFALL_MERGE := 0.012
+## A rear hoof lands this much under a front one: the forehand carries the weight, and
+## the accent is what makes four beats read as a gait rather than a drum machine.
+const REAR_ACCENT_DB := -1.5
 
 ## Peak of a standing jump, in metres. 0.9 m is about three quarters of her withers
 ## height (1.163 m) -- a pony-sized hop rather than a platformer leap.
@@ -220,7 +243,16 @@ var _coyote_left := 0.0
 var _jump_buffered := 0.0
 var _step_clip: StringName = &""
 var _step_position := 0.0
+## The surface for open ground (the Terrain off the path): grass, or stone on the Strip.
+## Set by ranch.gd, the one thing that knows what a region is.
 var _step_surface: StringName = SURFACE_GRASS
+## Clip name to its footfalls, [{t: clip seconds, rear: bool}], read once per clip.
+var _footfall_cache: Dictionary = {}
+## Whether the footfall step_on_clip() last fired was a rear hoof alone.
+var _last_footfall_rear := false
+
+## A hoofstep was just played: which set, and whether it was a rear hoof.
+signal hoofstep(surface: StringName, rear: bool)
 
 ## The mane style the body currently standing in Visuals was built from. apply_look()
 ## compares against it: a tint can be re-applied to a body that already exists, a different
@@ -332,11 +364,12 @@ func _rebuild_visuals(mane_style: int, donor: StringName = &"") -> void:
 	_build_visuals(mane_style, donor)
 
 
-## Which surface she is walking on. Set by ranch.gd, which is the only thing that knows
-## what a region is; an unknown id is refused so a typo cannot turn every step in the rest
-## of the session into a push_error.
+## The surface for open ground. Set by ranch.gd, which is the only thing that knows what a
+## region is; an unknown id is refused so a typo cannot turn every step in the rest of the
+## session into a push_error. Anything she stands on that is not open Terrain decides for
+## itself (surface_for()).
 func set_step_surface(id: StringName) -> void:
-	if id != SURFACE_GRASS and id != SURFACE_HARD:
+	if not SURFACES.has(id):
 		push_error("Player.set_step_surface: '%s' is not a surface" % id)
 		return
 	_step_surface = id
@@ -351,24 +384,168 @@ func step_phase() -> float:
 	return _step_position
 
 
-## Roll the clip position forward and answer whether a hoof landed this frame. A cycle has
-## finished when the clip's position falls, which for a looping clip happens once per cycle
-## at exactly the same phase. Pure: it makes no sound and reads no node, which is what lets
-## the suite drive it with numbers.
+## The footfalls of `clip`: [{t, rear}] sorted by t, read from the clip's own IK hoof target
+## position tracks. A clip with no such tracks (or no AnimationPlayer at all, as in this
+## file's own unit suite) gets one footfall at t = 0, which is the old once-a-cycle rule.
+func footfalls_for(clip: StringName) -> Array:
+	if _footfall_cache.has(clip):
+		return _footfall_cache[clip]
+	var out: Array = []
+	var anim: Animation = null
+	if _anim != null and _anim.has_animation(clip):
+		anim = _anim.get_animation(clip)
+	if anim != null:
+		out = footfalls_in(anim, _hoof_parent_frames())
+	if out.is_empty():
+		out = [{"t": 0.0, "rear": false}]
+	_footfall_cache[clip] = out
+	return out
+
+
+## Each hoof target's PARENT frame in skeleton space (its parent bone's rest), by name.
+## A position track is in the parent's space, and on these rigs the parent (CON_Root) carries
+## the Blender Z-up to Godot Y-up turn, so a track's own .y is NOT height: read raw, it is
+## the hoof's fore and aft travel, whose extremes sit about a tenth of a second off the
+## touchdowns in the gallop. Through this frame it is height. CON_Root is never keyed, so
+## its rest is its pose.
+func _hoof_parent_frames() -> Dictionary:
+	var out: Dictionary = {}
+	if visuals == null:
+		return out
+	var found := visuals.find_children("*", "Skeleton3D", true, false)
+	if found.is_empty():
+		return out
+	var sk := found[0] as Skeleton3D
+	for name: String in HOOF_TARGETS:
+		var bone := sk.find_bone(name)
+		if bone < 0:
+			continue
+		var parent := sk.get_bone_parent(bone)
+		out[name] = sk.get_bone_global_rest(parent) if parent >= 0 else Transform3D.IDENTITY
+	return out
+
+
+## Touchdowns in `anim`, from its IK hoof target position tracks: the moment each target
+## comes down to its lowest HEIGHT, read through `parent_frames` (bone name to the frame its
+## track is expressed in; identity when absent). Static and pure, so the suite can feed it a
+## hand built Animation.
+static func footfalls_in(anim: Animation, parent_frames: Dictionary = {}) -> Array:
+	var raw: Array = []
+	var length := anim.length
+	if length <= 0.0:
+		return raw
+	var samples := maxi(8, int(length * 1000.0))
+	for track in anim.get_track_count():
+		if anim.track_get_type(track) != Animation.TYPE_POSITION_3D:
+			continue
+		var bone: String = String(anim.track_get_path(track).get_concatenated_subnames())
+		var index := HOOF_TARGETS.find(bone)
+		if index < 0:
+			continue
+		var ys := PackedFloat32Array()
+		ys.resize(samples)
+		var low := INF
+		for k in samples:
+			var frame: Transform3D = parent_frames.get(bone, Transform3D.IDENTITY)
+			var y: float = (frame * anim.position_track_interpolate(track, length * k / samples)).y
+			ys[k] = y
+			low = minf(low, y)
+		for k in samples:
+			var down: bool = ys[k] <= low + HOOF_CONTACT_EPS
+			var was_down: bool = ys[(k - 1 + samples) % samples] <= low + HOOF_CONTACT_EPS
+			if down and not was_down:
+				raw.append({"t": length * k / samples, "rear": index >= 2})
+	raw.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.t < b.t)
+	var merged: Array = []
+	for f: Dictionary in raw:
+		if not merged.is_empty() and float(f.t) - float(merged[-1].t) < FOOTFALL_MERGE:
+			# Together with a front hoof, the pair takes the front hoof's accent.
+			merged[-1].rear = bool(merged[-1].rear) and bool(f.rear)
+			continue
+		merged.append(f.duplicate())
+	# The same merge across the loop seam.
+	if merged.size() > 1 and float(merged[0].t) + length - float(merged[-1].t) < FOOTFALL_MERGE:
+		merged[0].rear = bool(merged[0].rear) and bool(merged[-1].rear)
+		merged.pop_back()
+	return merged
+
+
+## Roll the clip position forward and answer whether a hoof landed this frame: whether the
+## position crossed one of the clip's footfalls since the last call, wrapping at the loop.
+## Makes no sound; the suite drives it with numbers.
 ##
-## A CHANGE OF CLIP IS NOT A FINISHED CYCLE. Gait.clip_for_speed() swaps walk for gallop
-## mid stride and the position resets to near zero when it does; counting that as a wrap
-## would put a stray sound on the exact frame she breaks into a run, every time.
+## A CHANGE OF CLIP IS NOT A FOOTFALL. Gait.clip_for_speed() swaps walk for gallop mid stride
+## and the position resets to near zero when it does; counting that as a crossing would put
+## a stray sound on the exact frame she breaks into a run, every time.
 func step_on_clip(clip: StringName, position_seconds: float, speed: float,
 		on_floor: bool) -> bool:
-	if not on_floor or absf(speed) < STEP_MIN_SPEED or clip == &"idle" or clip.is_empty():
+	if not on_floor or absf(speed) < STEP_MIN_SPEED or clip == &"idle" or clip.is_empty() \
+			or clip != _step_clip:
 		_step_clip = clip
 		_step_position = position_seconds
 		return false
-	var wrapped: bool = clip == _step_clip and position_seconds < _step_position
+	var from := _step_position
 	_step_clip = clip
 	_step_position = position_seconds
-	return wrapped
+	if is_equal_approx(from, position_seconds):
+		return false
+	var wrapped := position_seconds < from
+	for f: Dictionary in footfalls_for(clip):
+		var t: float = f.t
+		var crossed := (t > from and t <= position_seconds) if not wrapped \
+			else (t > from or t <= position_seconds)
+		if crossed:
+			_last_footfall_rear = bool(f.rear)
+			return true
+	return false
+
+
+## The set to play for a hoof coming down on `collider` at world `point`. Static and pure:
+## a tagged collider (SURFACE_META on it or its first four ancestors) names itself; the
+## Terrain is dirt on the painted path and `open_ground` elsewhere; anything else she can
+## stand on (a crate, a cart, a step, a fence rail) is timber.
+static func surface_for(collider: Object, point: Vector3, open_ground: StringName) -> StringName:
+	var node := collider as Node
+	var depth := 0
+	while node != null and depth < 5:
+		if node.has_meta(SURFACE_META):
+			var tagged := StringName(node.get_meta(SURFACE_META))
+			if SURFACES.has(tagged):
+				return tagged
+		node = node.get_parent()
+		depth += 1
+	if collider is TerrainScript:
+		if path_distance(Vector2(point.x, point.z)) <= TerrainScript.PATH_HALF_WIDTH \
+				+ TerrainScript.PATH_EDGE_SOFTNESS * 0.5:
+			return SURFACE_DIRT
+		return open_ground
+	if collider == null:
+		return open_ground
+	return SURFACE_WOOD
+
+
+## Metres from `p` to the Terrain's painted path (its PATH_POINTS polyline).
+static func path_distance(p: Vector2) -> float:
+	var pts: Array[Vector2] = TerrainScript.PATH_POINTS
+	if pts.size() < 2:
+		return INF
+	var best := INF
+	for i in pts.size() - 1:
+		best = minf(best, Geometry2D.get_closest_point_to_segment(p, pts[i], pts[i + 1]).distance_to(p))
+	return best
+
+
+## The surface under her right now: a short ray straight down from her hips.
+func surface_under() -> StringName:
+	if not is_inside_tree():
+		return _step_surface
+	var from := global_position + Vector3.UP * 0.3
+	var query := PhysicsRayQueryParameters3D.create(from, from + Vector3.DOWN * 0.9,
+		LayersScript.TERRAIN | LayersScript.PROPS, [get_rid()])
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return _step_surface
+	return surface_for(hit.collider, hit.position, _step_surface)
 
 
 ## get_node(), not the bare `Sound` identifier: tools/run_tests.sh's parse sweep runs every
@@ -444,7 +621,10 @@ func _physics_process(delta: float) -> void:
 		_hair.influence = PonyRigScript.influence_for_speed(ground_speed)
 	if _anim != null and step_on_clip(_anim.current_animation,
 			_anim.current_animation_position, ground_speed, is_on_floor()):
-		_sound_call(&"play_at", [_step_surface, global_position])
+		var surface := surface_under()
+		_sound_call(&"play_at", [surface, global_position,
+			REAR_ACCENT_DB if _last_footfall_rear else 0.0])
+		hoofstep.emit(surface, _last_footfall_rear)
 
 
 ## Basis whose -Z is "forward" for input purposes: the current camera's facing,
@@ -546,6 +726,7 @@ func _build_visuals(mane_style: int = 0, donor: StringName = &"") -> void:
 	_place_beam_origin(pony)
 	_mount_scoop(pony)
 	_anim = pony.get_node_or_null(PonyVisualsScript.ANIMATION_PLAYER_PATH)
+	_footfall_cache.clear()
 	if _anim == null:
 		# PonyVisuals.build() refuses to return an instance without one, so this is
 		# unreachable unless that contract changes -- assert it rather than assume it.

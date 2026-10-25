@@ -3558,12 +3558,13 @@ func _update_sound_zone() -> void:
 		return
 	_sound_zone = zone
 	_sound_call(&"ambient_set_zone", [zone])
-	# THE SURFACE FALLS OUT OF THE SAME ANSWER. The Strip is boards and the Palace floor is
-	# not grass; everywhere else on this map is turf. The player does not know what a
-	# region is and this is the one place that does.
+	# THE OPEN-GROUND SURFACE FALLS OUT OF THE SAME ANSWER. The Strip is paved and the
+	# Palace floor is not grass; everywhere else on this map is turf. The player does not
+	# know what a region is and this is the one place that does. (The path's dirt, a
+	# building's boards and the Factory's metal decide for themselves: Player.surface_for.)
 	if player != null and player.has_method("set_step_surface"):
 		player.call("set_step_surface", PlayerScript.SURFACE_GRASS if zone == SoundScript.ZONE_NONE
-			else PlayerScript.SURFACE_HARD)
+			else PlayerScript.SURFACE_STONE)
 
 
 ## The zone this ranch last pushed. Read by the sound gate and by the suite; nothing in the
