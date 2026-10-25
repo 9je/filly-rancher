@@ -380,3 +380,25 @@ Four notes from the owner's second playtest. The save behind them: 17 ponies, 15
 **Tests:**
 - `test_pen_upgrade.gd`: `test_a_full_pen_refusal_says_what_to_do`, `test_a_full_paddock_with_a_pony_in_the_bag_offers_the_upgrade` and `test_a_full_top_size_pen_says_what_to_do`.
 - `test_ranch_penning.gd` now expects the new line.
+
+## The other thirteen notes of round 2
+
+Each note: root cause, fix, and the test that failed before the fix and passes after (or the evidence where no test could fail first). DECISIONS.md, "owner playtest round 2 (my half)", has the reasoning.
+
+| Note | Root cause | Fix | Test |
+| --- | --- | --- | --- |
+| "cant customize my ponies hair" | The creator built the turntable from the old four-unicorn list (`StockPalette.MANE_STYLES`) but painted by the race's donor list, so past style 4, and for every earth pony and pegasus, the mane's surface names missed and it kept the donor's texture | The turntable body comes from the donor the look names (`creation_screen.gd _build_model`) | `test_creation_screen.gd` `test_every_style_of_every_race_wears_the_picked_mane` (failed for 12 styles before) |
+| "game window resized when i hit new game" | Not reproduced: nothing in the game changes the window outside Settings > Display, and its X11 size hints never move. Most likely GNOME on X11 with four monitors | None to the game. The creator was checked at four window sizes and fits all of them | `test_window_size` (window size and mode watched every frame from title to ranch; creator controls inside the window) |
+| "walking sound is AWFUL" | Kenney shoe-on-gravel takes at -3 to -9 dB on nearly every footfall, about 11 a second at a run | Soft synthesised hoof taps per surface (`tools/make_hoofsteps.py`), 11 to 13 dB quieter, front hooves only at a run | `test_footsteps` (alignment, variation, surface, audit); listen: `build/playtest_evidence/round2/sound_preview.wav` |
+| "the animal crossing style talking is super annoying" | The babble played on every line | Settings > Audio > Pony chatter, off by default; mouths still move | `test_settings_menu`, `test_babble` |
+| "i found marigold but it wasnt clear" | `has_news()` promised a "!" over her head that nothing drew | A gold speech-bubble icon over every townspony with news; the Scoop toast points to it | `test_news_marker` |
+| "beamed this pony and they just flew" | The beam moves her without `move_and_slide`, so `is_on_floor()` kept the old ground and the resting shortcut held her in the air | Release clears the shortcut and starts her falling; the unicorn blink had the same bug and the same fix | `test_slip_flight` (hung 1.29 m up for 3 s before; lands in 0.43 s after); the ranch boot check for the blink |
+| "hard to find the build area" | Empty plot markers faded to nothing past 8 m | Seen at 60% to 60 m with a gold pennant; a Pens sign and a fingerpost; the compass | `test_plot_slot.gd`; `test_find_market` (a plot reached in under 4 s by following the compass) |
+| "i cant run" | Running was the default and Shift was the sneak key | Shift sprints (1.5x), C sneaks | `test_sprint` |
+| "sound on paddock is pretty bad" | A wooden door creak at +3 dB on every penning | A latch and a marimba rise at -8 dB (`tools/make_pen_sounds.py`) | `test_sound.gd`, `test_sound_library.gd` (manifest and loudness report) |
+| "the 2 talking ponies are stuck inside each other" | Townsfolk never collide with one another, by design | A soft separation push; a standing one's spot moves with it | `test_npc_separation.gd` (0.9 m apart before, over 1.3 m after) |
+| "i cant find the market ... buildings too close ... randomly placed ... starting area is terrible" | Every homestead building turned 20 to 45 degrees in a 20 m knot; the Market a plain house with no sign | Re-laid round a plaza with every door facing it, three roads, shop signs, a fingerpost and an icon compass | `test_find_market` (the Market reached in 4 s by the compass); `test_building_model`, `test_terrain`, `test_props`; maps in `build/playtest_evidence/round2/` |
+| "spike also looks a little small" | 0.76 m, a third of a pony | 1.9x, 1.31 m (0.6 PH) | `test_scale` |
+| "weird sign you gotta walk through ... random white bx on the top" | The marquee hung across the entrance steps, where the camera passed through it; the white box was the Getting started card left up empty | The marquee is a shorter board on the frieze, 4.6 m up; the card hides with its last row | `test_strip.gd`; `test_hud.gd` `test_the_task_card_goes_when_the_last_row_does` |
+
+The Palace still has no walk-in interior (E at the door opens the casino lobby). That is a larger piece of work and was not done this round.

@@ -135,3 +135,16 @@ Canon MLP stays: real names, looks and places ("lean into mlp fully", private bu
 - **Catching ramps with experience:** bold ponies take up to 1.85 s to subdue, curious ones up to 1.45 s, and shy ones stay at 1.0 s. The first catch is unchanged.
 - **Catch card:** a sliding card with her portrait, name, rarity stars and four trait icon chips replaces the "Caught ..." toast.
 - **Not yet done:** pacing (tools/pacing.sh) and the five real-input playthroughs have not been re-run with the new economy. The playthrough driver was taught to clear plots and upgrade pens, but that teaching has not been exercised end to end.
+- **My thirteen notes of round 2** (PLAYTEST_FIXES.md table):
+  - the creator's mane colour;
+  - sprint on Shift;
+  - soft hoofsteps and penning sound;
+  - chatter off by default;
+  - the "!" bubble;
+  - slipped and blinked ponies land;
+  - townsfolk keep apart;
+  - the empty white card;
+  - the homestead re-laid round a plaza with signs, roads and an icon compass;
+  - Spike 1.9x;
+  - the Palace marquee over the door.
+- **The window resize was not reproduced:** pinned by test_window_size.
