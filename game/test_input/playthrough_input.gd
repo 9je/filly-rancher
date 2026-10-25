@@ -78,6 +78,7 @@ var _nav_dirty := false
 var _nav_scene: Node = null
 var _mouse_ok := true
 var _mouse_warned := false
+var _uncaptured_frames := 0
 
 var _log: Array[String] = []
 var _bugs: Array[String] = []
@@ -264,6 +265,7 @@ func _turn(dyaw: float, dpitch: float) -> void:
 	if rig == null or not is_instance_valid(rig):
 		return
 	if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		_uncaptured_frames = 0
 		_hold(&"look_left", false)
 		_hold(&"look_right", false)
 		_hold(&"look_up", false)
@@ -272,13 +274,15 @@ func _turn(dyaw: float, dpitch: float) -> void:
 		if absf(dyaw) > 1e-5 or absf(dpitch) > 1e-5:
 			RI.look(Vector2(dyaw / sens, dpitch / sens))
 		return
-	if _menu() != "" or (factory == null and not _ranch_ok()):
+	# Nothing to turn while a menu, the boot veil or the creator holds the screen.
+	if _menu() != "" or (factory == null and not _ranch_ok()) or _milestones.is_empty():
 		for a: StringName in [&"look_left", &"look_right", &"look_up", &"look_down"]:
 			_hold(a, false)
 		return
-	if not _mouse_warned:
+	_uncaptured_frames += 1
+	if not _mouse_warned and _uncaptured_frames > 180:
 		_mouse_warned = true
-		_bug("the cursor was not captured with no menu open (mode %d); turning with the look keys" % Input.mouse_mode)
+		_bug("the cursor stayed uncaptured for 3 s with no menu open (mode %d); turning with the look keys" % Input.mouse_mode)
 	# add_look_delta(+) turns right (yaw goes down): look_right; pitch + looks down.
 	_hold(&"look_right", dyaw > 0.004)
 	_hold(&"look_left", dyaw < -0.004)
@@ -352,6 +356,11 @@ func _prompt() -> String:
 	elif _ranch_ok():
 		hud = ranch.get_node_or_null(^"HUD")
 	return str(hud.call("prompt_text")) if hud != null and hud.has_method("prompt_text") else ""
+
+
+func _toast() -> String:
+	var hud := ranch.get_node_or_null(^"HUD") if _ranch_ok() else null
+	return str(hud.call("toast_text")) if hud != null and hud.has_method("toast_text") else ""
 
 
 func _world() -> WorldState:
@@ -818,15 +827,14 @@ func _read_conversation(p: Node) -> void:
 
 ## Which choice a player going for this ending takes. Read off the words on the buttons.
 func _choose(dialogue_id: StringName, choices: Array) -> int:
-	var prefer: Array[String] = []
-	match String(dialogue_id):
-		"factory_window":
-			prefer = ["Sign the contract"] if want in ["brightest_rainbow", "gray_gold"] else ["Get Tumble out"]
-		"marigold_color_day", "marigold_jubilee", "static_ready":
-			prefer = ["Let's go", "Take me up", "Take us up"]
-	for i in choices.size():
-		for w in prefer:
+	# By the words on the buttons (the same words a person reads): the reveal's choice, and
+	# yes to the lift whenever somebody offers it.
+	var prefer: Array[String] = ["Let's go", "Take me up", "Take us up"]
+	prefer.push_front("Sign the contract" if want in ["brightest_rainbow", "gray_gold"] else "Get Tumble out")
+	for w in prefer:
+		for i in choices.size():
 			if str(choices[i]).contains(w):
+				_say("(in %s)" % dialogue_id)
 				return i
 	return 0
 
@@ -944,7 +952,9 @@ func _pen_room() -> int:
 
 
 func _pen_target(pen: Node) -> int:
-	return mini(int(pen.get("capacity")) if pen.get("capacity") != null else 6, 6)
+	var cap := int(pen.get("capacity")) if pen.get("capacity") != null else 6
+	# Placement has no Blooms to protect from a crowd: every stall is a place to hide one.
+	return cap if want == "placement" else mini(cap, 6)
 
 
 func _pen_the_bag(force := false) -> bool:
@@ -1181,13 +1191,11 @@ func _gear_wishlist() -> Array[StringName]:
 	var base: Array[StringName] = [&"bigger_saddlebag", &"gallop_shoes", &"pony_whistle", &"long_beam"]
 	match _path_name():
 		"rescue":
-			if want == "placement":
-				base.append_array([&"permit_orchard", &"permit_lake", &"permit_nightmeadow"])
-			else:
-				base.append_array([&"permit_orchard", &"permit_lake", &"permit_nightmeadow", &"permit_everfree"])
+			base.append_array([&"permit_orchard", &"permit_lake", &"permit_nightmeadow", &"permit_everfree"])
 		"factory":
 			if want == "brightest_rainbow":
 				base.append(&"calm_lamp")
+			base.append(&"permit_nightmeadow")
 	return base
 
 
@@ -1234,6 +1242,13 @@ func _deliver(pick: Callable, limit: int) -> int:
 				at = i
 				break
 		if at < 0:
+			if sent == 0:
+				var seen: Array[String] = []
+				for r: Dictionary in rows:
+					var pi := _pen_pony(StringName(str(r.get("uid", ""))))
+					seen.append("%s stock=%s marked=%s bloom=%.2f" % [r.get("name", "?"), r.get("stock"),
+						pi.is_marked() if pi != null else "?", pi.bloom if pi != null else -1.0])
+				_say("nothing to hand over; rows %s" % [seen])
 			break
 		await _think()
 		await _menu_to(dm, at)
@@ -1247,7 +1262,7 @@ func _deliver(pick: Callable, limit: int) -> int:
 			await _wait(0.3)
 		await _wait(0.6)
 		if (dm.call("deliver_rows") as Array).size() >= before:
-			_say("the Depot did not take her")
+			_say("the Depot did not take her (row %d %s; toast '%s')" % [at, rows[at], _toast()])
 			break
 		sent += 1
 	await _think()
@@ -1273,7 +1288,13 @@ func _row_is_extra(r: Dictionary) -> bool:
 ## Before the reveal the first pen built is where the Blooms happen and the others are the
 ## shipping pens: a pony in a shipping pen who is not on her way to a Bloom goes to the Depot.
 func _is_extra(inst: PonyInstance) -> bool:
-	if not inst.is_stock() or inst.is_marked() or inst.bloom >= 0.3:
+	if not inst.is_stock() or inst.is_marked():
+		return false
+	if int(_story().get_var("blooms", 0)) >= 2:
+		# The invitation has its two Blooms: a Bloom before the reveal only fills a pen
+		# with a pony the Depot will not take.
+		return true
+	if inst.bloom >= 0.3:
 		return false
 	var pens := _pens()
 	for i in pens.size():
@@ -1320,6 +1341,7 @@ func _status() -> void:
 		s.chapter, _path_name(), _bits(), s.deliveries, int(s.get_var("blooms", 0)),
 		int(s.get_var("rescued", 0)), PathRulesScript.heat(s), PathRulesScript.rank(s),
 		PathRulesScript.pylons_cut(s), StoryV1Script.allies(s), _bag().count() if _bag() != null else -1]
+	line += "/%d" % (_bag().capacity if _bag() != null else 0)
 	for pen in _pens():
 		var ps: Array = pen.call("ponies")
 		var b := 0.0
@@ -1482,7 +1504,7 @@ func _act_one_two() -> bool:
 		if await _hunt():
 			return true
 		return false
-	if await _build_pens(2 if s.deliveries < 6 else 4):
+	if await _build_pens(2):
 		return true
 	if await _pen_the_bag():
 		return true
@@ -1535,6 +1557,9 @@ func _build_pens(up_to: int) -> bool:
 			want_id = &"pen_grand"
 		elif _bits() >= 150 + 30:
 			want_id = &"pen_large"
+		elif pens.size() >= 2:
+			# Past the two free Paddocks a plot is worth a real pen: wait for the bits.
+			return false
 		await _build_pen(slot, want_id)
 		return true
 	return false
@@ -1551,55 +1576,39 @@ func _factory_work() -> bool:
 		# Marigold has the Jubilee for her: _talk_to_news() takes her there.
 		if await _talk_to_news():
 			return true
-	if await _build_pens(4 if gray else 2):
+	if await _build_pens(4):
 		return true
 	if await _pen_the_bag():
 		return true
-	# Deliver what the contract counts.
-	var counts := func(r: Dictionary) -> bool:
-		if not bool(r.get("stock", false)) or bool(r.get("marked", false)):
-			return false
-		var inst := _pen_pony(StringName(str(r.get("uid", ""))))
-		if inst == null:
-			return false
-		if gray and _keep_for_bloom(inst):
-			return false
-		return _contract_counts(PathRulesScript.contract(_story()), _coat_of_stock(inst.stock))
-	var ready := 0
-	for inst in _all_penned():
-		if inst.is_stock() and not inst.is_marked() and not (gray and _keep_for_bloom(inst)) \
-				and _contract_counts(c, _coat_of_stock(inst.stock)):
-			ready += 1
-	if ready > 0 and not c.is_empty() and _t() >= _depot_rest_until:
-		var left := int(c.get("want", 0)) - int(c.get("got", 0))
-		if ready >= mini(left, 3) or _bag().is_full() or _pen_with_room() == null:
-			var n := await _deliver(counts, ready)
-			if n == 0:
-				_depot_rest_until = _t() + 90.0
-			return true
-	# Brightest Rainbow: a pony about to Bloom goes to the Depot first (any delivery counts
-	# toward something), so nopony Blooms after the reveal.
-	if not gray and _t() >= _depot_rest_until:
-		var close := false
+	# The Depot: what the contract counts first; when the pens are full, whoever is not
+	# coming along (a pen is for working). Marked ponies are refused at the counter.
+	if _t() >= _depot_rest_until:
+		var matching := 0
+		var shippable := 0
 		for inst in _all_penned():
-			if inst.is_stock() and not inst.is_marked() and inst.bloom > 0.7:
-				close = true
-		if close:
-			var n2 := await _deliver(func(r: Dictionary) -> bool:
-				var inst2 := _pen_pony(StringName(str(r.get("uid", ""))))
-				return inst2 != null and bool(r.get("stock", false)) and not inst2.is_marked() and inst2.bloom > 0.6, 6)
-			if n2 == 0:
-				_depot_rest_until = _t() + 90.0
+			if not _shippable(inst):
+				continue
+			shippable += 1
+			if c.is_empty() or _contract_counts(c, _coat_of_stock(inst.stock)):
+				matching += 1
+		var bag := _bag()
+		var cramped := _pen_with_room() == null and bag != null and bag.count() > 0
+		var picky := not c.is_empty() and str(c.get("kind", "")) in ["pastel", "vivid", "jubilee"]
+		if matching > 0 and (matching >= 2 or cramped or not picky or _wild_near(40.0) == null):
+			var n := await _deliver(func(r: Dictionary) -> bool:
+				var inst := _pen_pony(StringName(str(r.get("uid", ""))))
+				var cc := PathRulesScript.contract(_story())
+				return inst != null and _shippable(inst) and (cc.is_empty() or _contract_counts(cc, _coat_of_stock(inst.stock))), matching)
+			if n == 0:
+				_depot_rest_until = _t() + 60.0
 			return true
-	# Full pens of ponies the contract does not want: they go too (a pen is for working).
-	if _pen_with_room() == null and _bag() != null and _bag().count() > 0 and _t() >= _depot_rest_until:
-		var n3 := await _deliver(func(r: Dictionary) -> bool:
-			var inst3 := _pen_pony(StringName(str(r.get("uid", ""))))
-			return inst3 != null and bool(r.get("stock", false)) and not inst3.is_marked() \
-				and not (gray and _keep_for_bloom(inst3)), 3)
-		if n3 == 0:
-			_depot_rest_until = _t() + 90.0
-		return true
+		if cramped and shippable > 0:
+			var n2 := await _deliver(func(r: Dictionary) -> bool:
+				var inst := _pen_pony(StringName(str(r.get("uid", ""))))
+				return inst != null and _shippable(inst), mini(shippable, 3))
+			if n2 == 0:
+				_depot_rest_until = _t() + 60.0
+			return true
 	if await _shop():
 		return true
 	var kind := str(c.get("kind", "any"))
@@ -1612,9 +1621,44 @@ func _factory_work() -> bool:
 		filter = Callable()
 	if await _hunt(null, filter):
 		return true
-	if filter.is_valid() and await _hunt(null, Callable()):
-		return true
+	if filter.is_valid() and _wild_near(80.0, filter) == null:
+		if kind == "pastel":
+			return await _hunt(null, Callable())
+		# Vivid coats: no everyday Drifter has one (every coat swatch is a pastel); the
+		# starry ones in the Nightmeadow do. She goes looking there.
+		if _region_open_for("pylon_meadow"):
+			await _roam_region(&"nightmeadow")
+			return true
 	return false
+
+
+## Walk into a region and look about, the way a person goes where the ponies she wants are.
+func _roam_region(id: StringName) -> void:
+	var reg: Object = ranch.call("_regions_registry")
+	var r: Resource = reg.call("by_id", id) if reg != null else null
+	if r == null:
+		return
+	var c: Vector2 = r.get("centre")
+	var to := Vector3(c.x + rng.randf_range(-12, 12), 0.0, c.y + rng.randf_range(-12, 12))
+	_say("roams the %s" % id)
+	_hold(&"gallop", true)
+	var from := player.global_position
+	var ok_walk := await _walk(to, 6.0, 60.0)
+	if not ok_walk:
+		_nav_dirty = true
+	_say("  from %s to %s: %s, now at %s (path %d points)" % [from.snapped(Vector3.ONE), to.snapped(Vector3.ONE),
+		ok_walk, player.global_position.snapped(Vector3.ONE), _path_to(to).size()])
+	_hold(&"gallop", false)
+	await _wait(1.0)
+
+
+## On the Factory path: an unmarked Drifter in a pen, and (Gray Gold) not one she is quietly
+## letting Bloom.
+func _shippable(inst: PonyInstance) -> bool:
+	if not inst.is_stock() or inst.is_marked():
+		return false
+	return not (want == "gray_gold" and _keep_for_bloom(inst))
+
 
 
 func _contract_counts(c: Dictionary, coat: Color) -> bool:
@@ -1768,14 +1812,32 @@ func _go_to_site(id: String) -> bool:
 	_say("heads for %s" % id)
 	var reach := 3.0 if str(site.kind) != "corral" else 4.5
 	await _walk(n.global_position, reach, 120.0)
-	for i in 6:
+	# Then round it, on ground the navmesh says she can stand on, nearest the site first.
+	var spots: Array[Vector3] = []
+	for i in 12:
+		var ang := TAU * float(i) / 12.0
+		for r in [reach * 0.5, reach * 0.8]:
+			var want_at: Vector3 = n.global_position + Vector3(cos(ang), 0, sin(ang)) * float(r)
+			var on := NavigationServer3D.map_get_closest_point(_nav_map, want_at) if _nav_map.is_valid() else want_at
+			if Vector2(on.x - n.global_position.x, on.z - n.global_position.z).length() < 3.4:
+				spots.append(on)
+	spots.sort_custom(func(a: Vector3, b: Vector3) -> bool:
+		return a.distance_to(player.global_position) < b.distance_to(player.global_position))
+	if spots.is_empty():
+		var near := NavigationServer3D.map_get_closest_point(_nav_map, n.global_position)
+		_say("no standable ground within reach of %s (nearest walkable %s, %.1f m off)" % [id,
+			near.snapped(Vector3.ONE * 0.1), Vector2(near.x - n.global_position.x, near.z - n.global_position.z).length()])
+	for i in mini(6, spots.size() + 1):
 		await _wait(0.3)
 		var pr := _prompt()
 		if _site_prompt_ok(site, pr):
 			return true
-		var ang := TAU * float(i) / 6.0
-		await _walk(n.global_position + Vector3(cos(ang), 0, sin(ang)) * (reach * 0.7), 0.5, 6.0)
-	_say("no prompt for %s (prompt '%s', interaction %s)" % [id, _prompt(), _interaction()])
+		if i < spots.size():
+			await _walk(spots[i], 0.3, 8.0)
+	_say("no prompt for %s (prompt '%s', interaction %s); she is at %s, the site at %s (%.1f m), nearest site '%s'" % [
+		id, _prompt(), _interaction(), player.global_position.snapped(Vector3.ONE * 0.1),
+		n.global_position.snapped(Vector3.ONE * 0.1), Vector2(n.global_position.x - player.global_position.x,
+		n.global_position.z - player.global_position.z).length(), str(_act3().call("nearest").get("id", ""))])
 	return false
 
 
@@ -1875,7 +1937,11 @@ func _placement_work() -> bool:
 		return true
 	if await _shop():
 		return true
-	if PathRulesScript.heat(s) < PathRulesScript.HEAT_MAX and _is_night() and _night_left() > 60.0:
+	# The raids wait for the night before a collection day: Heat cools three a dawn, and it
+	# has to be at the top when the Collector comes (the ledger shows which dawn that is).
+	var w := _world()
+	var eve := w != null and LedgerScript.is_collection_cycle(w.cycle_index() + 1)
+	if PathRulesScript.heat(s) < PathRulesScript.HEAT_MAX and eve and _is_night() and _night_left() > 60.0:
 		for region: String in ["orchard", "lake", "nightmeadow", "everfree"]:
 			var cid: String = "corral_" + region
 			if cid in (s.get_var("raided", []) as Array) or not _region_open_for(cid):

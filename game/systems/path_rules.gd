@@ -19,7 +19,12 @@ const DIRECTOR := 3
 const JUBILEE_ORDER := 6
 const JUBILEE_VIVID := 2
 ## A coat this saturated is "vivid" (Yield Lens: three times the pay); under PASTEL, pastel.
-const VIVID := 0.55
+## 0.37, NOT THE 0.55 IT WAS: the generator's coat swatches (data/pony_gen.tres) top out at
+## 0.45, so at 0.55 no everyday Drifter was ever vivid and the vivid contract and the
+## Jubilee order waited on the rare starry Nightmeadow variant alone (found by the real-input
+## playthrough, docs/playtest_fixes/playthrough.md). At 0.37 the brightest five of the 24
+## swatches count, about one Drifter in five.
+const VIVID := 0.37
 const PASTEL := 0.4
 
 ## A contract: {want, kind ("any", "pastel", "vivid"), bonus, got}.
