@@ -49,6 +49,7 @@ var _yaw := 0.0
 
 func _ready() -> void:
 	collision_layer = LayersScript.PONY
+	add_to_group(GROUP)
 	collision_mask = LayersScript.PONY_WALKABLE
 	var shape := CollisionShape3D.new()
 	var capsule := CapsuleShape3D.new()
@@ -157,6 +158,35 @@ func set_talking(on: bool, amount: float = 0.0) -> void:
 			_play(standing_clip)
 
 
+## Every townspony, for the push apart below.
+const GROUP := &"townsfolk"
+## TWO TOWNSFOLK NEVER SHARE A SPOT (owner playtest 2026-10-25: "the 2 talking ponies are
+## stuck inside each other"). They do not collide with one another (PONY_WALKABLE has no
+## PONY bit, so a crowd at the Depot cannot jam), so each steps out of any other's
+## SEPARATION m with a push that grows as they close.
+const SEPARATION := 1.7
+const SEPARATION_PUSH := 2.2
+
+
+## The push away from every other townspony inside SEPARATION, flat.
+func _separation() -> Vector3:
+	var push := Vector3.ZERO
+	for other: Node in get_tree().get_nodes_in_group(GROUP):
+		if other == self or not (other is Node3D) or not (other as Node3D).is_visible_in_tree():
+			continue
+		var away := global_position - (other as Node3D).global_position
+		away.y = 0.0
+		var d := away.length()
+		if d >= SEPARATION:
+			continue
+		if d < 0.01:
+			# Exactly on top of each other: part along a direction their names decide.
+			away = Vector3(1, 0, 0).rotated(Vector3.UP, float(hash(name) % 628) / 100.0)
+			d = 0.01
+		push += away.normalized() * (1.0 - d / SEPARATION) * SEPARATION_PUSH
+	return push
+
+
 func set_mode_stand(at: Vector3 = Vector3.INF) -> void:
 	mode = Mode.STAND
 	if at != Vector3.INF:
@@ -205,6 +235,12 @@ func _physics_process(delta: float) -> void:
 			back.y = 0.0
 			if back.length() > 0.6:
 				desired = back.normalized() * walk_speed
+	var apart := _separation()
+	if apart.length_squared() > 0.0004:
+		desired += apart
+		if mode == Mode.STAND:
+			# Her spot moves with her, so two who were sent to one place settle side by side.
+			home += apart * delta
 	if not is_on_floor():
 		velocity += get_gravity() * delta
 	var h := Vector3(velocity.x, 0, velocity.z).move_toward(desired, 6.0 * delta)
