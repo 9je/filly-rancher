@@ -86,3 +86,116 @@ The suite was green and the game was broken, for four reasons that compound.
 **Failing before:** `INPUT_TEST_FAILED test_beam_targeting aimed 0.9 m beside a pony 2.0 m away: she is not highlighted ([])` (`beam_targeting_before.log`).
 
 **Passing after:** `INPUT_TEST_OK test_beam_targeting highlight before the press, aim assist 0.9 m, and the press took her`. Screenshot: `beam_highlight_after.png`.
+
+## 4. "Some house models are the same size as ponies. Scaling is inconsistent everywhere."
+
+Full write-up: `docs/playtest_fixes/scale.md`. Reference table: `SCALE.md` (1 PH = 2.19 m, the shipped pony's ear-tip height).
+
+**Test:** `game/test_input/test_scale.gd`. It boots the real game and measures the world-space bounding box of every placed asset (867 placements of 102 assets) against SCALE.md's category table. That table is machine-read, so the numbers live in the doc, not the test.
+
+**Root cause:** nothing was ever sized against the pony. Four conventions met in one valley:
+- one family scale derived from a single barn model;
+- a Kenney scale derived from the old 4.28-unit pony;
+- region dressing at hand-typed multiples of each model's own size;
+- door clearance measured from local y = 0, which sits 0.85 m inside the plinth.
+
+So town houses stood 1.6 to 2.2 PH, and every door passed its check while being shorter than the pony walking through it.
+
+**Fix:**
+- Per-building `model_scale`: Farmhouse 1.25, Market 1.35, Board 1.85, Depot 1.3.
+- Town-row `SCALE_FIX` entries; region dressing sized in PH.
+- Doors 3.0 m clear, checked by `Building.door_clearance()`.
+- The stall and the pens moved clear of the grown footprints.
+
+**Failing before:** `INPUT_TEST_FAILED test_scale 19 of 102 assets off SCALE.md (1 PH = 2.19 m)`.
+
+**Passing after:** `INPUT_TEST_OK test_scale 867 placements of 102 assets all within SCALE.md (1 PH = 2.19 m)`. Before/after pairs are in `build/playtest_evidence/scale/pairs/`.
+
+## 5. "No loading screen after New Game. I thought it froze."
+
+Full write-up: `docs/playtest_fixes/loading.md`.
+
+**Test:** `game/test_input/test_loading.gd`. It runs in real time, not fixed-fps, and measures every frame gap through New game, Load, Continue and the lift. It fails on any gap over 0.5 s that has no moving loading screen.
+
+**Root cause:**
+- `change_scene_to_file` loaded the ranch on the main thread, and the ranch built the whole valley in `_ready()` before the first frame.
+- Most of that time was `PonyLod.apply()`, at 0.4 to 1.2 s per pony. It is skipped headless, which is why no gate saw it. Its cache was keyed by instance id and never hit.
+
+**Fix:**
+- `game/ui/loading_screen.gd` loads the next scene with `ResourceLoader.load_threaded_request`, instances it on a worker, and shows a progress bar.
+- The ranch reports its boot steps and yields between them.
+- The LOD cache is keyed by resource path, and LODs are built on a worker pool.
+
+**Failing before:** `INPUT_TEST_FAILED test_loading new game: title -> creator: 4 freeze(s) over 0.5 s with no moving loading screen (worst 11.84 s) | load game ... (worst 9.46 s) | continue ... (worst 9.28 s) | the lift ... (worst 0.68 s)`.
+
+**Passing after:** every transition has 0 stalls over 0.5 s, and the worst frame is 0.35 s. The loading screen was seen with a moving bar on every long transition.
+
+## 6. "Settings UI is awful and hard to navigate."
+
+Full write-up: `docs/playtest_fixes/settings.md`.
+
+**Test:** `game/test_input/test_settings.gd`. It drives Settings from the title screen by keyboard, from the pause menu by controller, and again by mouse. It changes one value on every tab, applies, reverts, and lets the display confirmation time out unanswered.
+
+**Root cause:** there was no settings menu, only two hand-drawn row lists that disagreed:
+- the title screen had 5 rows and the pause menu had 23 in one flat list;
+- the rows were Labels, so nothing could take keyboard or controller focus;
+- a mouse click adjusted a row by which half was clicked;
+- every nudge saved at once;
+- fullscreen applied with no safety net;
+- values were 18 px text at 58 % white.
+
+**Fix:** one `game/ui/settings_menu.tscn`, used by both the title and the pause menu:
+- Four tabs: Graphics, Audio, Controls, Gameplay.
+- Real focusable controls with a gold focus ring.
+- LB/RB and Q/E switch tabs.
+- Edits go to a draft, with Apply and Revert.
+- A display change asks for confirmation and reverts after 10 s if unanswered.
+- Rebindable keys.
+
+**Failing before:** `INPUT_TEST_FAILED test_settings the title screen's Settings opened no tabbed Settings menu (Graphics, Audio, Controls, Gameplay)`.
+
+**Passing after:** `INPUT_TEST_OK test_settings keyboard, controller and mouse all drove every tab; apply, revert and the display timeout hold`.
+
+## 7. "The running sound is noisy and bad. Other sounds were bad too."
+
+Full write-up: `docs/playtest_fixes/audio.md`. Every sound file is listed with its measurements in `AUDIO_AUDIT.md` (`tools/audio_audit.py`, ffmpeg).
+
+**Test:** `game/test_input/test_footsteps.gd`. It walks and gallops by real input over grass and the dirt path, and records every visible footfall and every hoofstep played. It also runs the audit on the samples that played.
+
+**Root cause:**
+1. **The hoofstep samples were mostly background.** They were cut from long BBC takes by a silence threshold below the takes' own room tone, then boosted, which gave noise floors of -31 to -39 dBFS.
+2. **One step per animation cycle, not per hoof.** The gallop lands four hooves a cycle and only 56 % of footfalls made a sound.
+3. **No variation, one surface.** Every step was -8.00 dB, and the dirt path played grass.
+
+Plus a limiter bug: ffmpeg's default `level=true` made every processed file 1.5 dB over its target.
+
+**Fix:**
+- Footfalls are read from each clip's IK hoof tracks.
+- The surface under each hoof is found by a raycast.
+- 20 clean CC0 Kenney samples, four per surface (grass, dirt, wood, stone, metal).
+- Pitch varies 0.94 to 1.07 and volume ±1.5 dB, never repeating the last take.
+- Nine noisy one-shots replaced, and the limiter fixed.
+
+**Failing before:** `INPUT_TEST_FAILED test_footsteps only 56% of footfalls make a sound (want 85%) | volume range -8.00..-8.00 dB is not a slight variation | 23 steps played another surface's sample set | the old noisy sample ... still plays | the samples that played fail tools/audio_audit.py (exit 1)`.
+
+**Passing after:** `INPUT_TEST_OK test_footsteps 113 hoofsteps on 169 footfalls, all aligned, varied, on the right surface and clean`. The audit went from 23 of 58 files failing to 0 of 70.
+
+## 9. "The camera showed under the terrain in places."
+
+Full write-up: `docs/playtest_fixes/camera.md`.
+
+**Test:** `game/test_input/test_camera_terrain.gd`. It runs at 144 fps, like a real fast monitor. It visits 27 stops: yard, ramp, every building inside and out, trees, town, Palace, hill top, steepest slope, valley and map edge. At each it sweeps full yaw and pitch at min, default and max zoom by mouse, checking every frame. A companion test, `test_camera_factory.gd`, does the same in the Rainbow Factory.
+
+**Root cause:**
+1. **The camera arm was a physics tick late.** SpringArm3D sizes the arm only at 60 Hz, while the mouse turns it every rendered frame. On a fast monitor, a quick look up swung the lens through the ground on the last tick's long arm, up to 1.3 m under. Every older gate drew one frame per tick, which hides this.
+2. **The probe was a ray with no size,** so at grazing angles the near plane cut into the grass and walls.
+3. **The boundary walls stopped at 3 m,** so on the high east edge the lens hung outside the map.
+
+**Fix** (`camera_rig.gd`):
+- A 0.25 m lens ball is swept along the arm on every rendered frame. It handles Jolt's start-inside quirk and starts from her body when her head is under an eave.
+- A last guard keeps the lens 0.25 m above the terrain's drawn triangle (`Terrain.surface_height_at()`).
+- The boundary walls are now 16 m tall.
+
+**Failing before:** `INPUT_TEST_FAILED 11343 of 198395 frames` bad (worst 1.33 m under the steepest slope). In the Factory, 1,801 of 6,056 frames were bad.
+
+**Passing after:** `INPUT_TEST_OK 172710 frames at 27 stops`, and the lens never got closer than 0.25 m to the ground. The Factory test passes with 5,838 frames.
