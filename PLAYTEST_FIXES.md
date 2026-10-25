@@ -305,3 +305,78 @@ Full write-up: `docs/playtest_fixes/camera.md`.
 **Failing before:** `INPUT_TEST_FAILED 11343 of 198395 frames` bad (worst 1.33 m under the steepest slope). In the Factory, 1,801 of 6,056 frames were bad.
 
 **Passing after:** `INPUT_TEST_OK 172710 frames at 27 stops`, and the lens never got closer than 0.25 m to the ground. The Factory test passes with 5,838 frames.
+
+# Round 2 (2026-10-25)
+
+Four notes from the owner's second playtest. The save behind them: 17 ponies, 157 bits and a pen on all four plots after 11.6 minutes, then "That pen is full." Numbers and reasoning are in DECISIONS.md, 2026-10-25. Screenshots are in `build/playtest_evidence/round2/`.
+
+## 1. "basically its super easy to catch ponies so you can collect all the spots before you get upgrades"
+
+**Root cause:** two separate causes.
+- All four plots were buildable from minute one, and a Paddock is free. Nothing stood between a new ranch and four pens, so the Big Pen never had a reason to exist.
+- The subdue clock was a flat 1.0 s for every pony, however practised the player became.
+
+**Fix:**
+- slot_3 and slot_4 start overgrown: brambles and a painted signpost, 100 and 250 bits to clear (`ranch.gd PLOT_CLEAR_COSTS`, `PlotSlot.set_overgrown()`).
+- Past three catches, curious and bold ponies take longer to subdue. The ramp is linear to the fifteenth catch:
+  - curious, up to 1.45 s;
+  - bold, up to 1.85 s (2.0 s at most);
+  - shy, 1.0 s always (`MagicBeam.secure_seconds_for()`).
+- The first catch is unchanged.
+
+**Tests:**
+- `game/test/test_plot_overgrowth.gd`: two open plots and two overgrown, the prices, the prompt, the clearing, the refusal, and an old save with pens on plots 3 and 4 keeping them.
+- `game/test/test_catch_ramp.gd`: the first catches are the original beam, shy never changes, bold reaches about 2 s, and the window is unchanged.
+- `game/test_input/test_pen_upgrade.gd`, step 3: plot 3 reads "E: clear this plot (100 bits), not enough bits".
+- `test_first_pony` still catches on the first try.
+
+**Failing before:** all three files fail to load against the previous code, which has no `PLOT_CLEAR`, `priced()`, `secure_seconds_for()` or `RAMP_FROM_CATCHES`.
+
+## 2. "how do i upgrade my free paddock to the 150 bits one not clear"
+
+**Root cause:** there was no upgrade. `PlotSlot` had build() and demolish() and nothing else. A built pen offered only "move her in", and the build menu refused to open on a built slot.
+
+**Fix:**
+- `PlotData.upgrades_to` sets the order: Paddock, then Big Pen, then Grand Pen. The price is the difference in list price: 150, then 330.
+- `PlotSlot.upgrade()` changes the pen's capacity in place, and every resident stays.
+- At a built pen with an empty bag, or a full one, the prompt reads "E: upgrade to Big Pen (150 bits)".
+- E opens the build menu on a single UPGRADE card. When she is short, the card says "Not enough bits: you need N more."
+
+**Tests:**
+- `game/test/test_pen_upgrade.gd`, 13 tests: the ladder and its prices, residents kept, no skipped size, the prompt text, empty bag versus a pony in the bag, a full pen, spending, the refusal, and the card.
+- `game/test_input/test_pen_upgrade.gd` plays it with keyboard and mouse:
+  1. build a Paddock on plot 1;
+  2. read "E: upgrade to Big Pen (150 bits)";
+  3. press E and click the card;
+  4. check the result: a 6-pony Big Pen and 150 bits spent.
+
+**Screenshots:** `upgrade_prompt.png`, `upgrade_card.png`.
+
+## 3. "i think the text and traits on catch can be better maybe icons and stuff instead of basic text on the top"
+
+**Root cause:** `HUD._on_captured()` raised the same toast pill as every passing remark ("Caught X! Quirk, loves food.").
+
+**Fix:** `game/ui/catch_card.gd` replaces the toast with a paper card in the HUD's own card style that slides in at the top right. It shows:
+- her portrait, rendered from a copy of her own body, in a ring of her coat colour;
+- her name;
+- one to four rarity stars and the tier word;
+- four chips, each a drawn icon and a word: race, quirk, favourite food, and hold difficulty (`game/ui/catch_icon.gd`, simple shapes only).
+
+**Tests:**
+- `game/test/test_catch_card.gd`: the name, the chips and their icons, the position clear of the crosshair and the bag, no toast, and every icon kind drawing.
+- `game/test_input/test_catch_card.gd` plays the first catch from the title screen. It then checks that the card is up with a portrait and four chips, clear of the crosshair and the saddlebag, and that no "Caught" line appears.
+
+**Screenshots:** `catch_card.png`, `catch_card_settled.png`.
+
+## 4. The save that hit "That pen is full." with all four plots taken
+
+**Root cause:** the refusal said what was wrong and not what to do about it. With all four plots built and no upgrade path, there was nothing she could do.
+
+**Fix:**
+- The refusal now reads "That pen is full. Upgrade it, or build another pen." For a Grand Pen it reads "That pen is full. Build another pen."
+- Before E is pressed, a full pen's prompt says "E: pen full, upgrade to Big Pen (150 bits)". A full Grand Pen says "E: this pen is full, build another pen".
+- Notes 1 and 2 above mean the plots no longer all fill before an upgrade exists.
+
+**Tests:**
+- `test_pen_upgrade.gd`: `test_a_full_pen_refusal_says_what_to_do`, `test_a_full_paddock_with_a_pony_in_the_bag_offers_the_upgrade` and `test_a_full_top_size_pen_says_what_to_do`.
+- `test_ranch_penning.gd` now expects the new line.
