@@ -2,11 +2,15 @@
 # Real-input tests (game/test_input/test_*.gd), driven only by Input.parse_input_event
 # (PLAYTEST_FIXES.md). They need a real window, so they get one on an INVISIBLE display
 # (xvfb-run): nothing opens on the desktop and the mouse is never taken from whoever is at
-# the machine. Software rendering there, so time runs on --fixed-fps 60 and the tests count
-# game seconds. Saves isolated per test.
+# the machine. The GPU still renders (--gpu-index 0); Mesa's software present path
+# (MESA_VK_WSI_DEBUG=sw) copies each frame into the invisible screen, since Xvfb has no DRI3.
+# Time runs on --fixed-fps 60 and the tests count game seconds. Saves isolated per test.
 #   tools/run_input_tests.sh               all
 #   tools/run_input_tests.sh first_pony    just test_first_pony.gd
 #   FILLY_INPUT_ON_DESKTOP=1 ...           in a visible window on the GPU instead
+# A test may ask for a different frame rate with a header line `## fixed-fps: N`
+# (test_camera_terrain.gd runs at 144: a real monitor draws several frames per 60 Hz physics
+# tick, and that gap is where its bug lived).
 set -uo pipefail
 cd "$(dirname "$0")/.."
 GODOT="${GODOT:-tools/bin/godot}"
@@ -17,11 +21,13 @@ fi
 pass=0; fail=0
 for n in "${names[@]}"; do
   export FILLY_TEST_SAVE_DIR="$(mktemp -d)"
+  fps="$(sed -n 's/^## fixed-fps: *\([0-9]\+\).*/\1/p' "game/test_input/test_$n.gd" | head -1)"
+  fps="${fps:-60}"
   if [ "${FILLY_INPUT_ON_DESKTOP:-0}" = "1" ]; then
     run=("$GODOT" --resolution 1280x720)
   else
-    run=(env -u WAYLAND_DISPLAY xvfb-run -a -s "-screen 0 960x540x24" "$GODOT" --display-driver x11 \
-      --resolution 960x540 --fixed-fps 60)
+    run=(env -u WAYLAND_DISPLAY MESA_VK_WSI_DEBUG=sw xvfb-run -a -s "-screen 0 1280x720x24" \
+      nice -n 19 "$GODOT" --display-driver x11 --gpu-index 0 --resolution 1280x720 --fixed-fps "$fps")
   fi
   out="$(timeout 3600 "${run[@]}" --path game --audio-driver Dummy -s "res://test_input/test_$n.gd" 2>&1)"
   rc=$?

@@ -10,7 +10,5 @@ spring_length = 3.5
 
 [node name="CameraMount" type="Node3D" parent="SpringArm3D"]
 
-[node name="ShoulderProbe" type="RayCast3D" parent="SpringArm3D/CameraMount"]
-
 [node name="Camera3D" type="Camera3D" parent="SpringArm3D/CameraMount"]
 current = true

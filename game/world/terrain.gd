@@ -59,9 +59,16 @@ const BLEND_RADIUS := 44.0
 const HOMESTEAD_CENTRE := Vector2(0.0, -4.0)
 
 ## Invisible perimeter walls, so walking to the edge of the world is a wall rather
-## than a fall. Tall enough that the player (2.14 m to the horn) cannot see over the
-## top of the collider from ground level, though nothing renders there anyway.
-const BOUNDARY_HEIGHT := 6.0
+## than a fall.
+##
+## 16 m, NOT THE 6 m THEY WERE: TALL ENOUGH FOR THE CAMERA, NOT JUST FOR HER. They reach
+## from 3 m under the map to 13 m over it. At 6 m the top stood at y = 3, and on the edge's
+## high ground (1.9 m on the east side) her head is already above that, so the camera arm
+## swung out over the top and the lens hung outside the map with no ground under it at all
+## (game/test_input/test_camera_terrain.gd's map_edge stop: 344 frames outside the map).
+## The highest the lens can get is about 9.5 m (2.4 m of relief, the 1.45 m pivot, 6.5 m of
+## arm at 60 degrees), so 13 m keeps the whole arm inside the walls with room to spare.
+const BOUNDARY_HEIGHT := 16.0
 const BOUNDARY_THICKNESS := 2.0
 
 ## Grass. Slightly desaturated and very rough -- a shiny lawn under a directional
@@ -175,6 +182,9 @@ var _lakes: Array[RegionDataScript] = []
 
 func _ready() -> void:
 	collision_layer = LayersScript.TERRAIN
+	# The camera rig finds the ground by this group, to keep its lens above it (camera_rig.gd,
+	# _keep_above_ground()).
+	add_to_group(&"terrain")
 	# A StaticBody3D never initiates a collision query of its own; leaving a mask on
 	# it costs broadphase work and buys nothing.
 	collision_mask = 0
@@ -228,6 +238,33 @@ func height_at(x: float, z: float) -> float:
 		for region in _lakes:
 			h -= region.lake_depth * region.weight_at(point, region.radius * 0.5)
 	return h
+
+
+## The height the ground is DRAWN at, world XZ: the mesh's own triangle there, which is also
+## its collider's (both are built from the same vertices by _build_mesh()). Between two grid
+## vertices this is not height_at(): the smooth function bulges above or sags below the flat
+## triangle by up to a few centimetres. The camera rig keeps its lens above THIS, because this
+## is what the eye sees. Outside the map it answers for the nearest edge.
+##
+## The grid and the diagonal split are _build_mesh()'s: vertices every CELL from -HALF, each
+## quad cut along the (x0, z1)-(x1, z0) diagonal into [i01, i00, i10] and [i11, i01, i10].
+func surface_height_at(x: float, z: float) -> float:
+	var gx := (clampf(x, -HALF, HALF) + HALF) / CELL
+	var gz := (clampf(z, -HALF, HALF) + HALF) / CELL
+	var last := int(round((HALF * 2.0) / CELL)) - 1
+	var ix := clampi(floori(gx), 0, last)
+	var iz := clampi(floori(gz), 0, last)
+	var fx := gx - ix
+	var fz := gz - iz
+	var x0 := -HALF + ix * CELL
+	var z0 := -HALF + iz * CELL
+	var h00 := height_at(x0, z0)
+	var h10 := height_at(x0 + CELL, z0)
+	var h01 := height_at(x0, z0 + CELL)
+	var h11 := height_at(x0 + CELL, z0 + CELL)
+	if fx + fz <= 1.0:
+		return h00 + fx * (h10 - h00) + fz * (h01 - h00)
+	return h11 + (1.0 - fx) * (h01 - h11) + (1.0 - fz) * (h10 - h11)
 
 
 ## The relief before the homestead apron flattens it. Used for the grass tinting, so
