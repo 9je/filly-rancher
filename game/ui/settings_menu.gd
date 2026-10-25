@@ -352,6 +352,8 @@ func _specs() -> Array:
 			[&"effects_volume", "Effects", Kind.SLIDER, "Hoofsteps, the beam, the market, the casino tables."],
 			[&"ui_volume", "Menus", Kind.SLIDER, "The ticks and chimes of every menu, this one included."],
 			[&"voice_volume", "Voices", Kind.SLIDER, "Everypony who talks to you."],
+			[&"pony_chatter", "Pony chatter", Kind.TOGGLE,
+				"A burble of cartoon syllables under every line a pony says. Off reads in quiet."],
 		],
 		[
 			[&"mouse_sensitivity", "Mouse sensitivity", Kind.SLIDER, "How far the camera turns for each move of the mouse."],
@@ -407,7 +409,8 @@ func _step(key: StringName, dir: int) -> bool:
 		&"stick_sensitivity":
 			return _set_float(&"stick_sensitivity", d.stick_sensitivity + SettingsScript.STICK_STEP * dir,
 				SettingsScript.STICK_MIN, SettingsScript.STICK_MAX)
-		&"vsync", &"invert_look", &"show_controls_chip", &"show_checklist", &"pause_on_focus_loss":
+		&"vsync", &"invert_look", &"show_controls_chip", &"show_checklist", &"pause_on_focus_loss", \
+				&"pony_chatter":
 			var want := dir > 0
 			if bool(d.get(key)) == want:
 				return false

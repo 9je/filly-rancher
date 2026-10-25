@@ -127,13 +127,18 @@ var stick_sensitivity := STICK_DEFAULT
 var show_controls_chip := true
 var show_checklist := true
 var pause_on_focus_loss := true
+## The cartoon babble under every talk line. OFF by default since the owner's 2026-10-25
+## playtest ("the animal crossing style talking is super annoying and obnoxious"); the
+## mouths still move with the words either way.
+var pony_chatter := false
 
 ## Every field the settings menu edits, in one list, so a draft can be copied and compared
 ## without each caller naming them all. `fullscreen` is not here: it is a view of window_mode.
 const FIELDS: Array[StringName] = [&"master_volume", &"music_volume", &"ambient_volume",
 	&"effects_volume", &"ui_volume", &"voice_volume", &"quality", &"vsync", &"window_mode",
 	&"resolution", &"fov", &"max_fps", &"mouse_sensitivity", &"stick_sensitivity",
-	&"invert_look", &"bindings", &"show_controls_chip", &"show_checklist", &"pause_on_focus_loss"]
+	&"invert_look", &"bindings", &"show_controls_chip", &"show_checklist", &"pause_on_focus_loss",
+	&"pony_chatter"]
 
 ## The two that change the window itself, and so get the timed confirmation.
 const DISPLAY_FIELDS: Array[StringName] = [&"window_mode", &"resolution"]
@@ -183,6 +188,7 @@ func load_from(path: String = "") -> void:
 		STICK_MIN, STICK_MAX)
 	show_controls_chip = bool(cfg.get_value(SECTION, "show_controls_chip", show_controls_chip))
 	show_checklist = bool(cfg.get_value(SECTION, "show_checklist", show_checklist))
+	pony_chatter = bool(cfg.get_value(SECTION, "pony_chatter", pony_chatter))
 	pause_on_focus_loss = bool(cfg.get_value(SECTION, "pause_on_focus_loss", pause_on_focus_loss))
 	var b: Variant = cfg.get_value(SECTION, "bindings", {})
 	bindings = {}
@@ -216,6 +222,7 @@ func save_to(path: String = "") -> bool:
 	cfg.set_value(SECTION, "stick_sensitivity", stick_sensitivity)
 	cfg.set_value(SECTION, "show_controls_chip", show_controls_chip)
 	cfg.set_value(SECTION, "show_checklist", show_checklist)
+	cfg.set_value(SECTION, "pony_chatter", pony_chatter)
 	cfg.set_value(SECTION, "pause_on_focus_loss", pause_on_focus_loss)
 	var b := {}
 	for k in bindings:
@@ -446,6 +453,7 @@ func apply_audio() -> void:
 	_apply_bus("UI", ui_volume)
 	_apply_bus("Music", music_volume)
 	_apply_bus("Voice", voice_volume)
+	Babble.audible = pony_chatter
 	var master := AudioServer.get_bus_index("Master")
 	if master < 0:
 		return

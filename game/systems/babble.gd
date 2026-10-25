@@ -14,6 +14,10 @@ const VOWELS: Array[Vector2] = [Vector2(800, 1200), Vector2(500, 1900), Vector2(
 	Vector2(500, 900), Vector2(350, 800)]
 
 @export var bus: StringName = &"Voice"
+## Heard at all (Settings.pony_chatter, off by default). Silent, she still "speaks": the queue
+## runs and `envelope` still opens the jaw with the words.
+static var audible := false
+const VOLUME_DB := -9.0
 var pitch := 1.0
 var timbre := 0
 var envelope := 0.0
@@ -34,7 +38,7 @@ func _ready() -> void:
 	_player.stream = stream
 	if AudioServer.get_bus_index(bus) >= 0:
 		_player.bus = bus
-	_player.volume_db = -9.0
+	_player.volume_db = VOLUME_DB if audible else -80.0
 	add_child(_player)
 	_player.play()
 	_gen = _player.get_stream_playback() as AudioStreamGeneratorPlayback
@@ -182,6 +186,8 @@ func _next_piece() -> bool:
 
 
 func _process(_delta: float) -> void:
+	if _player != null:
+		_player.volume_db = VOLUME_DB if audible else -80.0
 	if _gen == null:
 		return
 	var frames := _gen.get_frames_available()

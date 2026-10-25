@@ -115,6 +115,10 @@ const LayersScript := preload("res://world/collision_layers.gd")
 ## because slowness is not what it is FOR -- see is_sneaking() and Pony.SNEAK_NOTICE_FACTOR.
 ## It was called `gallop` and meant the opposite until the second playtest.
 const SNEAK_ACTION := &"sneak"
+## HOLD SHIFT TO SPRINT (owner playtest 2026-10-25, "i dont like that i cant run"): the
+## default gait is already a run, so the sprint is half again on top of it. Sneak moved to C.
+const SPRINT_ACTION := &"sprint"
+const SPRINT_MULT := 1.5
 
 ## Ground speed at full stick / any WASD key, with nothing held. THE DEFAULT. Sits 8.7%
 ## past what the `gallop` clip can honestly depict (Gait.TOP_SKATE_FREE_SPEED is 4.79 m/s,
@@ -307,11 +311,17 @@ func get_ground_speed() -> float:
 ## have to grow one), and Pony.notice_radius_for() halves her notice radius when it is
 ## true. So this is a gameplay interface, not an input detail, and it deliberately answers
 ## the question about INTENT rather than about velocity: it is true while standing still
-## with Shift held, which is what lets a player stop dead and let a spooked pony settle.
+## with sneak (C) held, which is what lets a player stop dead and let a spooked pony settle.
 ## Keying it off `get_ground_speed() < something` instead would make "am I being quiet"
 ## unanswerable at a standstill and would flicker across the threshold while accelerating.
 func is_sneaking() -> bool:
 	return Input.is_action_pressed(SNEAK_ACTION)
+
+
+## Holding `sprint` (Shift) and not sneaking.
+func is_sprinting() -> bool:
+	return InputMap.has_action(SPRINT_ACTION) and Input.is_action_pressed(SPRINT_ACTION) \
+		and not is_sneaking()
 
 
 ## The body's AnimationPlayer, or null if the visuals failed to build. Exposed so
@@ -603,6 +613,8 @@ func _physics_process(delta: float) -> void:
 	# Analog magnitude scales the target speed, so a gamepad gets the whole range
 	# between a standstill and the top speed rather than an on/off dash.
 	var top_speed := (SNEAK_SPEED if is_sneaking() else RUN_SPEED) * speed_mult
+	if is_sprinting():
+		top_speed *= SPRINT_MULT
 	var target_velocity := direction * (top_speed * wish_magnitude)
 
 	var rate := acceleration if wish_magnitude > 0.0 else deceleration
@@ -620,7 +632,10 @@ func _physics_process(delta: float) -> void:
 	if _hair != null:
 		_hair.influence = PonyRigScript.influence_for_speed(ground_speed)
 	if _anim != null and step_on_clip(_anim.current_animation,
-			_anim.current_animation_position, ground_speed, is_on_floor()):
+			_anim.current_animation_position, ground_speed, is_on_floor()) \
+			and not (_last_footfall_rear and ground_speed >= GaitScript.GALLOP_HANDOVER_SPEED):
+		# At a run only the front hooves sound: four taps a stride at five a second was a
+		# drum roll (owner playtest 2026-10-25, "walking sound is AWFUL").
 		var surface := surface_under()
 		_sound_call(&"play_at", [surface, global_position,
 			REAR_ACCENT_DB if _last_footfall_rear else 0.0])
@@ -677,6 +692,10 @@ func _update_animation(speed: float) -> void:
 	var clip := GaitScript.clip_for_speed(speed)
 	_play(clip)
 	_anim.speed_scale = GaitScript.playback_scale_for_clip(clip, speed)
+	# A sprint runs the gallop clip past its usual ceiling, so her hooves keep up with the
+	# ground rather than skating.
+	if clip == &"gallop" and is_sprinting() and speed > GaitScript.TOP_SKATE_FREE_SPEED:
+		_anim.speed_scale = speed / GaitScript.GALLOP_CLIP_SPEED
 
 
 ## play() only when the clip actually changes -- calling it every frame would restart

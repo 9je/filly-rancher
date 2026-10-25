@@ -171,6 +171,9 @@ func _footfalls() -> Array[float]:
 			var f: Dictionary = _frames[k]
 			if not bool(f.moving):
 				continue
+			# At a run only the front hooves sound (player.gd, owner playtest 2026-10-25).
+			if h >= 2 and String(f.clip) == "gallop":
+				continue
 			var y: float = f.ys[h]
 			var lo := true
 			var hi := y

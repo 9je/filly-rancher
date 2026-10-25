@@ -1037,7 +1037,8 @@ func prompt_text() -> String:
 ## own continuation line.
 const HINTS := [
 	["MOVE (run)", "W A S D", "Left stick"],
-	["WALK / SNEAK", "Shift (hold)", "LB (hold)"],
+	["SPRINT", "Shift (hold)", "Left stick click (hold)"],
+	["WALK / SNEAK", "C (hold)", "LB (hold)"],
 	["", "creep quietly, and ponies notice you from half as far", ""],
 	["JUMP", "Space", "A"],
 	["INTERACT", "E", "X"],
