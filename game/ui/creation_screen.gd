@@ -245,7 +245,8 @@ const _PAPER_LABEL_PATHS: Array[NodePath] = [^"Layout/Panel/Margin/Column/Title"
 	^"Layout/Panel/Margin/Column/NameLabel", ^"Layout/Panel/Margin/Column/CoatLabel",
 	^"Layout/Panel/Margin/Column/ManeLabel", ^"Layout/Panel/Margin/Column/ManeStyleLabel",
 	^"Layout/Panel/Margin/Column/EyesLabel", ^"Layout/Panel/Margin/Column/MarkLabel",
-	^"Layout/Panel/Margin/Column/HintLabel"]
+	^"Layout/Panel/Margin/Column/HintLabel", ^"Layout/Panel/Margin/Column/RaceLabel",
+	^"Layout/Panel/Margin/Column/Mane2Label", ^"Layout/Panel/Margin/Column/TailLabel"]
 
 const _PAPER_BUTTON_PATHS: Array[NodePath] = [
 	^"Layout/Panel/Margin/Column/StepRow/StepLook",
