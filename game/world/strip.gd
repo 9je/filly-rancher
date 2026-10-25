@@ -63,11 +63,11 @@ const PALACE_CLEARANCE := 1.5
 ## the "mounted clear of the roofline" the report asked for. STANDOFF is how far in front of
 ## the wall it hangs, far enough that the two never fight for pixels.
 const MARQUEE_WIDTH_FRACTION := 0.62
-const MARQUEE_HEIGHT := 1.60
+const MARQUEE_HEIGHT := 1.10
 const MARQUEE_TOP_GAP := 0.35
 ## Metres from the ground at the Palace's front to the marquee's lower edge: above the third
 ## person camera's head as she climbs the steps.
-const MARQUEE_CLEARANCE := 5.4
+const MARQUEE_CLEARANCE := 4.6
 const MARQUEE_STANDOFF := 0.55
 const MARQUEE_BOARD_COLOR := Color(0.16, 0.07, 0.20)
 const MARQUEE_TRIM_COLOR := Color(0.98, 0.86, 0.45)

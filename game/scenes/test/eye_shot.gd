@@ -10,6 +10,8 @@ const EYES := [
 	["yard", Vector3(4, 3.0, 8), Vector3(-14, 0.5, 15)],
 	["high", Vector3(14, 22, 30), Vector3(0, 0, -4)],
 	["palace", Vector3(1.5, 2.6, 46), Vector3(-10, 3, 61)],
+	["palace_door", Vector3(-6, 3.4, 51.5), Vector3(-10, 3.4, 58)],
+	["palace_far", Vector3(2, 3.0, 30), Vector3(-10, 5, 61)],
 ]
 var out := ""
 

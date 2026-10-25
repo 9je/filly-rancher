@@ -141,10 +141,18 @@ func test_the_marquee_board_is_narrower_than_the_building_it_advertises() -> voi
 		"a sign wider than its own building is the thing that was wrong")
 
 
-func test_the_marquee_is_mounted_clear_of_the_roofline() -> void:
+## OWNER PLAYTEST 2026-10-25, "weird sign you gotta walk through to get in": the board hangs
+## over the door, its lower edge MARQUEE_CLEARANCE up, where the camera behind a pony on the
+## steps never meets it; and no higher than that needs (the worn Palace model's frieze, under
+## its dome). The shell's own 4.6 m ridge is hidden inside that model, so it is not the
+## roofline any more.
+func test_the_marquee_hangs_over_the_door_not_across_it() -> void:
 	var strip: Strip = _built_strip()
-	assert_lt(strip.marquee_top_y(), PALACE_RIDGE_Y,
-		"the top of the board must sit below the ridge, or it crosses the roof")
+	var bottom: float = strip.marquee_top_y() - strip.marquee_board_size().y
+	assert_gte(bottom, PALACE_ORIGIN.y + StripScript.MARQUEE_CLEARANCE - 0.01,
+		"the board's lower edge clears the camera on the steps")
+	assert_lte(strip.marquee_top_y(), PALACE_ORIGIN.y + StripScript.MARQUEE_CLEARANCE
+		+ StripScript.MARQUEE_HEIGHT + 0.01, "and rises no higher than that needs")
 
 
 func test_the_marquee_hangs_in_front_of_the_wall_rather_than_inside_it() -> void:
@@ -268,11 +276,11 @@ func test_the_arch_rises_above_the_board_and_stays_under_the_roofline() -> void:
 	var strip: Strip = _built_strip()
 	var accessor_peak: float = strip.marquee_arch_peak_y()
 	var measured_peak: float = _arch_measured_peak_y(strip)
-	var ridge_y: float = PALACE_ORIGIN.y + PALACE_RIDGE_Y
 	assert_lte(measured_peak, strip.marquee_top_y() + StripScript.MARQUEE_ARCH_RISE + 0.01,
 		"the arch's own built geometry must not overshoot the rise it was budgeted")
-	assert_lt(measured_peak, ridge_y - 0.05,
-		"and clear the roof by a real margin, not merely on paper")
+	# (The shell's ridge is no longer the roofline: since 2026-10-25 the board hangs on the
+	# worn Palace model's frieze, above the shell, and the arch sits under the model's dome.)
+	assert_gt(accessor_peak, strip.marquee_top_y(), "the arch rises above the board")
 	assert_almost_eq(accessor_peak, measured_peak, 0.01,
 		"marquee_arch_peak_y() must report the built mesh's own true peak")
 
