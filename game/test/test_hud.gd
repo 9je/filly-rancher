@@ -429,6 +429,20 @@ func test_an_empty_task_list_draws_no_title_either() -> void:
 		"once the three are claimed the checklist goes away entirely")
 
 
+## OWNER PLAYTEST 2026-10-25: an empty white box in the corner once the list was done.
+func test_the_task_card_goes_when_the_last_row_does() -> void:
+	_hud.set_tasks([{"id": "a", "text": "t", "done": false, "paid": false, "reward_bits": 5}])
+	await wait_physics_frames(3)
+	var card := _hud.get_node_or_null("TasksCard") as Panel
+	if card == null:
+		pending("no TasksCard in this HUD")
+		return
+	assert_true(card.visible, "a list with a row draws its card")
+	_hud.set_tasks([])
+	await wait_physics_frames(3)
+	assert_false(card.visible, "an emptied list draws no card")
+
+
 func test_nothing_the_task_list_draws_carries_a_dash() -> void:
 	_hud.set_tasks([{"id": "tutorial_sell", "text": "Sell a gem at the market.",
 		"done": false, "paid": false, "reward_bits": 50}])

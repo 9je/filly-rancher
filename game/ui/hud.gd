@@ -450,6 +450,12 @@ func set_tasks(rows: Array) -> void:
 	for child in _tasks.get_children():
 		child.queue_free()
 	if rows.is_empty():
+		# The card goes with its lines. The labels above are only QUEUED for deletion, so a
+		# refit now would still find them; left up, the card was an empty white box in the
+		# corner for the rest of the game (owner playtest 2026-10-25).
+		var empty := get_node_or_null("TasksCard") as Panel
+		if empty != null:
+			empty.visible = false
 		return
 	_task_lines.append(TASK_TITLE)
 	for entry in rows:
