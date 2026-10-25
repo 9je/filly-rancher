@@ -1,11 +1,17 @@
 extends SceneTree
-## THE HEADLESS PLAYTHROUGH (tools/playthrough.sh): plays a new save to one ending through
+## NOT A PLAYTHROUGH: A NON-COUNTING SMOKE TEST (tools/smoke_endings.sh). It bypasses player
+## input everywhere (set_flag, conversations driven by emitting the talk box's signals, catches
+## stored straight into the bag, pens built by call, Blooms forced, --factory-fast) and so
+## proves only that the ending table and the story wiring hold together. The playthroughs that
+## count are game/test_input/playthrough_input.gd (tools/playthrough.sh).
+##
+## It plays a new save to one ending through
 ## the game's own entry points -- the conversations the player would have, catches into the
 ## Scoop's bag, pens built and filled, Blooms, deliveries at the Depot, dawns and collection
 ## days, the Rescue path's pylons, raids, Dye Vat and Lantern Line, and both trips up the
 ## lift to the Rainbow Factory -- and prints ENDING_REACHED <id> when the ending plays.
 ##
-##   godot --headless --path game -s res://scenes/test/playthrough.gd -- --ending=lights_out
+##   godot --headless --path game -s res://scenes/test/smoke_endings.gd -- --ending=lights_out
 ##
 ## The scenes are the real ones (world/ranch.tscn, world/factory.tscn); the Factory runs with
 ## --factory-fast, which completes walks and timed beats at once. Exit code 0 only when the
