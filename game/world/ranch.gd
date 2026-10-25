@@ -2864,6 +2864,8 @@ func _apply_beam_recall() -> void:
 	# v1: a brand new ranch has no Scoop until Marigold hands it over (STORY.md beat 1.1).
 	var no_scoop: bool = _interactive and not _game_state.story.has_flag("has_scoop")
 	beam.call("set_recalled", _game_state.ledger.beam_is_recalled(cycle) or no_scoop)
+	# A new steward's first catch cannot be torn away (magic_beam.gd first_catch_grace).
+	beam.set("first_catch_grace", _interactive and int(_game_state.story.get_var("catches")) == 0)
 
 
 func _push_balance() -> void:
@@ -4029,6 +4031,7 @@ func _on_pony_captured(instance: PonyInstance) -> void:
 		return
 	_game_state.onboarding.note(&"catch")
 	_game_state.story.add_var("catches")
+	_apply_beam_recall()
 	_novelty_catch(instance)
 	# THE CROWD IS NOT COLLECTED. A stock pony has no Compendium entry and no request ever
 	# names one: she is supply, not a character. Marking her would put an id in the book

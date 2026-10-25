@@ -824,6 +824,35 @@ func test_capture_charge_stops_when_the_grab_is_released_before_it_secures() -> 
 		"an aborted grab must not let the charge ring out")
 
 
+## PLAYTEST: "could not collect the first pony". A new player's nearest pony can be BOLD,
+## and a HARD hold wrenches free half the time, so the very first catch the tips teach was a
+## coin toss. While the ranch says this steward has never caught anyone, no hold wrenches;
+## without the grace the same seeds do, which is what keeps this sweep honest.
+func test_a_new_stewards_first_catch_never_wrenches() -> void:
+	var registry := PonyRegistryScript.new()
+	registry.load_all("res://data/ponies")
+	var bold: PonyData = registry.by_id(&"stock_bold")
+	var beam: MagicBeam = _beam()
+	var pony: Pony = PonyScene.instantiate()
+	add_child_autofree(pony)
+	pony.setup(bold)
+	var counts := {true: 0, false: 0}
+	for grace: bool in [false, true]:
+		beam.first_catch_grace = grace
+		for seed in 64:
+			var rng := RandomNumberGenerator.new()
+			rng.seed = seed
+			beam.set_capture_rng(rng)
+			pony.beam_holds = 0
+			beam._begin_hold(pony)
+			if beam.is_wrenching():
+				counts[grace] += 1
+			beam._held = null
+			pony.set_held(false)
+	assert_gt(counts[false], 0, "test setup: a fresh BOLD pony must be able to wrench without the grace")
+	assert_eq(counts[true], 0, "a new steward's first catch must never be torn away (%d of 64 were)" % counts[true])
+
+
 func after_each() -> void:
 	var Sound := get_node("/root/Sound")
 	Sound.stop_all()

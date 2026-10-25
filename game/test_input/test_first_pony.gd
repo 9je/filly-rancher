@@ -118,7 +118,8 @@ func _scoop_one(beam: Node) -> void:
 			await physics(6)
 			break
 		if ever_held and not bool(beam.call("is_holding")):
-			_why = "she got out of the beam after %.1fs" % hold
+			_why = "she got out of the beam after %.1fs (%s, loss %d)" % [hold, pony.name,
+				int(beam.call("get_last_loss"))]
 			break
 	RI.release(_beam_action)
 	await wait(0.5)

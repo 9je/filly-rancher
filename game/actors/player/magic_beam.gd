@@ -743,6 +743,15 @@ func _exit_tree() -> void:
 ## NOT A BYPASS. A seeded generator still rolls the real rules; a gate that wants a hold
 ## which cannot wrench says so through the published rule instead, by handing the beam a
 ## pony whose `beam_holds` is already past WRENCH_GRACE_HOLDS.
+## THE FIRST CATCH CANNOT BE WRENCHED (owner's playtest: "could not collect the first
+## pony"). The ranch sets this while its steward has never caught anyone. A new player's
+## nearest pony can be BOLD, and a HARD hold tears free WRENCH_CHANCE_HARD of the time, so
+## half of all first tries were lost through no fault of the player, on the one catch the
+## tips are teaching. Every rule still runs; she is simply treated as already past
+## WRENCH_GRACE_HOLDS, the same published rule the falloff reaches on her third grab.
+var first_catch_grace := false
+
+
 func set_capture_rng(rng: RandomNumberGenerator) -> void:
 	if rng != null:
 		_rng = rng
@@ -1578,6 +1587,8 @@ func _begin_hold(body: Node3D) -> void:
 		# wrench_chance_for(), so there is still one place that decides what a hold means.
 		var prior_holds: int = body.beam_holds
 		body.beam_holds += 1
+		if first_catch_grace:
+			prior_holds = maxi(prior_holds, WRENCH_GRACE_HOLDS)
 		var clocks := roll_clocks(personality, prior_holds,
 			_rng.randf(), _rng.randf(), _rng.randf())
 		_secure_seconds = clocks["secure"]
