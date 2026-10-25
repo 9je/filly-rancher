@@ -862,7 +862,27 @@ func _restyle() -> void:
 func _refresh_chip() -> void:
 	if _chip != null:
 		_chip.text = "%s  controls" % InputDeviceScript.hint(&"toggle_hints")
-		_chip.visible = not _hints.visible and not _overlay_open
+		_chip.visible = _chip_enabled and not _hints.visible and not _overlay_open
+
+
+## THE SETTINGS MENU'S GAMEPLAY TAB. The corner "H controls" chip and the Getting started
+## list can each be switched off by a player who knows the game (game/ui/settings_menu.gd);
+## the H key still opens the card either way.
+var _chip_enabled := true
+
+
+func set_controls_chip_enabled(on: bool) -> void:
+	_chip_enabled = on
+	_refresh_chip()
+
+
+func controls_chip_visible() -> bool:
+	return _chip != null and _chip.visible
+
+
+func set_checklist_enabled(on: bool) -> void:
+	if _tasks != null:
+		_tasks.visible = on
 
 
 ## A rounded card drawn behind `node`, padded by `pad`, kept matched to its rect.

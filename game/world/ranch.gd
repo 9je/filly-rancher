@@ -2554,6 +2554,14 @@ func _apply_settings() -> void:
 	if _rig != null:
 		_rig.mouse_sensitivity = _settings.mouse_sensitivity
 		_rig.invert_look = _settings.invert_look
+		_rig.stick_sensitivity = _settings.stick_sensitivity
+		var cam: Camera3D = _rig.call("get_camera") if _rig.has_method("get_camera") else null
+		if cam != null:
+			cam.fov = _settings.fov
+	var hud_node := get_node_or_null(^"HUD")
+	if hud_node != null and hud_node.has_method("set_controls_chip_enabled"):
+		hud_node.call("set_controls_chip_enabled", _settings.show_controls_chip)
+		hud_node.call("set_checklist_enabled", _settings.show_checklist)
 	if _interactive:
 		_settings.apply_audio()
 		_settings.apply_graphics(get_viewport())
@@ -3340,6 +3348,12 @@ func refund_open_race() -> int:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_EXIT_TREE:
 		refund_open_race()
+	elif what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		# THE GAMEPLAY TAB'S "Pause when the window loses focus": alt-tab away and the ranch
+		# waits under the pause menu instead of running on without her.
+		if _interactive and _settings != null and _settings.pause_on_focus_loss \
+				and pause_menu != null and not bool(pause_menu.call("is_open")):
+			pause_menu.call("open")
 
 
 func get_race_track() -> Node3D:
