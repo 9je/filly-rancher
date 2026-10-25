@@ -1,0 +1,12 @@
+INPUT_TEST_NOTE 4.0s -> factory_landing at (0.0, 0.0)
+INPUT_TEST_NOTE 4.9s    at factory_landing (-0.56, 0.0, 0.83)
+INPUT_TEST_NOTE 12.9s -> factory_landing_wall at (4.6, 0.0)
+INPUT_TEST_NOTE 14.8s    at factory_landing_wall (5.38, 0.0, -0.63)
+INPUT_TEST_NOTE 22.3s -> factory_landing_edge at (-2.0, 5.0)
+INPUT_TEST_NOTE 25.7s    at factory_landing_edge (-1.04, 0.0, 5.07)
+INPUT_TEST_NOTE 33.7s checked 5838 frames, 0 bad
+INPUT_TEST_NOTE 33.7s   lowest lens over the floor at boot: 32.393 m
+INPUT_TEST_NOTE 33.7s   lowest lens over the floor at factory_landing: 0.441 m
+INPUT_TEST_NOTE 33.7s   lowest lens over the floor at factory_landing_wall: 0.265 m
+INPUT_TEST_NOTE 33.7s   lowest lens over the floor at factory_landing_edge: 0.322 m
+INPUT_TEST_OK test_camera_factory 5838 frames, the camera never went through the Factory's floor or walls

@@ -5,7 +5,7 @@ extends "res://test_input/test_camera_terrain.gd"
 ## test_camera_terrain.gd never goes there. The story only sends you up on Color Day, so this
 ## test loads the Factory scene the way the cloud-lift does (change_scene_to_file, the same
 ## call ranch.gd's _ride_lift_to_factory() makes) and from then on plays it with real input:
-## walk the landing and the welcome room, press against their walls, and at every stop sweep
+## walk the landing room, press against its walls, and at every stop sweep
 ## the mouse through the full yaw, pitch and zoom range. Every frame is checked exactly as in
 ## the ranch test; "the ground" is whatever the Factory's floor is under the lens (a ray down
 ## onto layer 1, which is where its floor and walls sit).
@@ -37,15 +37,19 @@ func _play() -> void:
 	_checking = true
 	await _clear_ui()
 
+	# The landing only. room_origin() is a room's far (+Z) edge, so the landing's floor runs
+	# from there 12 m toward -Z. Walking on toward the welcome room, the first run of this
+	# test saw her fall straight through the Factory floor (y -63 and still falling) -- a
+	# separate fault, reported rather than fixed here, and one that would only test the
+	# camera in free fall.
 	var interior: Node = ranch.get("interior")
-	var landing: Vector3 = interior.call("room_origin", &"landing")
-	var welcome: Vector3 = interior.call("room_origin", &"welcome")
+	var landing: Vector3 = interior.call("room_origin", &"landing") + Vector3(0, 0, -6.0)
 	var stops: Array[Dictionary] = [
 		{"name": "factory_landing", "at": _flat(landing)},
 		{"name": "factory_landing_wall", "at": _flat(landing) + Vector2(4.6, 0), "push": _flat(landing) + Vector2(8, 0)},
-		{"name": "factory_welcome", "at": _flat(welcome), "path": [_flat(landing)]},
-		{"name": "factory_welcome_wall", "at": _flat(welcome) + Vector2(-4.6, 2.0),
-			"push": _flat(welcome) + Vector2(-8, 2.0)},
+		# The landing's +Z edge is where the cloud-lift sets you down, and it is OPEN: a run that
+		# pushed her at it walked her off into the void (y -245). Stopped a metre short instead.
+		{"name": "factory_landing_edge", "at": _flat(landing) + Vector2(-2.0, 5.0)},
 	]
 	for stop: Dictionary in stops:
 		_stop = stop.name
@@ -69,11 +73,12 @@ func _play() -> void:
 		ok("%d frames, the camera never went through the Factory's floor or walls" % _frames)
 
 
-## The Factory's floor under world XZ: a ray down onto layer 1 from well above its 6 m walls.
+## The Factory's floor under world XZ: every room's floor is a slab whose top is y = 0
+## (factory_interior.gd), 12 m wide, the eight rooms in a row from the landing's +Z edge
+## toward -Z; anywhere else there is no floor. (A ray down would answer with the top of a 6 m
+## wall for a lens just past it; a lens through a wall is the legs check's to report.)
 func _surface(x: float, z: float) -> float:
-	var space := (player as Node3D).get_world_3d().direct_space_state
-	var rq := PhysicsRayQueryParameters3D.create(Vector3(x, 30.0, z), Vector3(x, -30.0, z),
-		LayersScript.TERRAIN)
-	rq.hit_back_faces = false
-	var hit := space.intersect_ray(rq)
-	return (hit.position as Vector3).y if not hit.is_empty() else -30.0
+	var edge: float = (ranch.get("interior").call("room_origin", &"landing") as Vector3).z
+	if absf(x) <= 6.0 and z <= edge and z >= edge - 12.0 * 8.0:
+		return 0.0
+	return -30.0

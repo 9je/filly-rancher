@@ -520,6 +520,9 @@ func _check_frame() -> void:
 				(lens_hit.position as Vector3).distance_to(mount.global_position)]
 			if kind == "":
 				kind = "through_%s" % (lens_hit.collider as Node).name
+	var lowest_here := clearance < float(_lowest.get(_stop, INF))
+	if lowest_here:
+		_lowest[_stop] = clearance
 	if _shot_dir != "" and _grab == "":
 		if lowest_here and clearance < float(_grabbed_at.get(_stop, INF)) - 0.03:
 			_grabbed_at[_stop] = clearance

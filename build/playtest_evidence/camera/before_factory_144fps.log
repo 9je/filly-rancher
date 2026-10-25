@@ -1,0 +1,42 @@
+INPUT_TEST_NOTE 3.9s -> factory_landing at (0.0, 0.0)
+INPUT_TEST_NOTE 4.7s    at factory_landing (-0.56, 0.0, 0.83)
+INPUT_TEST_NOTE 5.0s BAD [factory_landing] under_terrain cam (-3.68, -0.04, 5.96) ground 0.000 clearance -0.042 player (-0.65, 0.0, 0.36) yaw -35 pitch 15.2 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:@StaticBody3D@13@5.53 shoulder_leg_hits:@StaticBody3D@13@0.19
+INPUT_TEST_NOTE 5.1s BAD [factory_landing] under_terrain cam (-1.89, -0.14, 3.38) ground 0.000 clearance -0.137 player (-0.65, 0.0, 0.36) yaw -35 pitch 30.0 zoom 6.5 arm 3.55 arm_hit 3.55 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:@StaticBody3D@13@2.90 shoulder_leg_hits:@StaticBody3D@13@0.49
+INPUT_TEST_NOTE 5.3s BAD [factory_landing] under_terrain cam (-5.96, 4.88, 2.03) ground 6.000 clearance -1.117 player (-0.65, 0.0, 0.36) yaw -80 pitch -29.9 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:@StaticBody3D@23@6.04
+INPUT_TEST_NOTE 5.3s    picture factory_landing_wall: through_@StaticBody3D@23 cam (-5.66, 3.07, 1.98)
+INPUT_TEST_NOTE 5.3s BAD [factory_landing] through_@StaticBody3D@23 cam (-5.66, 3.07, 1.98) ground 0.000 clearance 3.066 player (-0.65, 0.0, 0.36) yaw -80 pitch -14.9 zoom 6.5 arm 5.47 arm_hit 5.47 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:@StaticBody3D@23@5.42
+INPUT_TEST_NOTE 5.9s BAD [factory_landing] through_@StaticBody3D@23 cam (-2.45, 3.33, -5.64) ground 0.000 clearance 3.332 player (-0.65, 0.0, 0.36) yaw -170 pitch -14.9 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:@StaticBody3D@23@6.48
+INPUT_TEST_NOTE 7.2s BAD [factory_landing] through_@StaticBody3D@23 cam (-5.66, 3.07, 1.98) ground 0.000 clearance 3.066 player (-0.65, 0.0, 0.36) yaw -80 pitch -14.9 zoom 6.5 arm 5.47 arm_hit 5.47 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:@StaticBody3D@23@5.42
+INPUT_TEST_NOTE 13.0s -> factory_landing_wall at (4.6, 0.0)
+INPUT_TEST_NOTE 14.9s    at factory_landing_wall (5.38, 0.0, -0.63)
+INPUT_TEST_NOTE 15.2s BAD [factory_landing_wall] under_terrain cam (1.27, -0.41, -3.56) ground 0.000 clearance -0.406 player (5.38, 0.0, -0.63) yaw -133 pitch 22.7 zoom 6.5 arm 5.33 arm_hit 5.33 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:@StaticBody3D@13@3.75
+INPUT_TEST_NOTE 15.3s BAD [factory_landing_wall] under_terrain cam (1.47, -1.02, -3.37) ground 0.000 clearance -1.025 player (5.38, 0.0, -0.63) yaw -133 pitch 30.0 zoom 6.5 arm 5.33 arm_hit 5.33 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:@StaticBody3D@13@2.90
+INPUT_TEST_NOTE 15.5s BAD [factory_landing_wall] under_terrain cam (4.54, 3.85, -5.86) ground 6.000 clearance -2.149 player (5.38, 0.0, -0.63) yaw -178 pitch -22.4 zoom 6.5 arm 5.77 arm_hit 5.77 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:@StaticBody3D@23@5.59
+INPUT_TEST_NOTE 15.7s    picture factory_landing_wall_wall: through_@StaticBody3D@23 cam (5.27, 0.29, -3.17)
+INPUT_TEST_NOTE 15.7s BAD [factory_landing_wall] through_@StaticBody3D@23 cam (5.27, 0.29, -3.17) ground 0.000 clearance 0.291 player (5.38, 0.0, -0.63) yaw 167 pitch 30.0 zoom 6.5 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:@StaticBody3D@23@2.09
+INPUT_TEST_NOTE 15.9s BAD [factory_landing_wall] near_plane_under_terrain cam (5.77, 2.02, -1.04) ground 0.000 clearance 2.020 player (5.38, 0.0, -0.63) yaw 137 pitch -45.0 zoom 6.5 arm 0.81 arm_hit 0.81 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 16.0s BAD [factory_landing_wall] too_close_to_ground cam (5.64, 1.23, -0.9) ground 1.065 clearance 0.167 player (5.38, 0.0, -0.63) yaw 137 pitch 30.0 zoom 6.5 arm 0.44 arm_hit 0.44 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 16.0s BAD [factory_landing_wall] too_close_to_ground cam (5.65, 1.26, -0.8) ground 1.150 clearance 0.114 player (5.38, 0.0, -0.63) yaw 122 pitch 30.0 zoom 6.5 arm 0.37 arm_hit 0.37 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 16.0s BAD [factory_landing_wall] too_close_to_ground cam (5.67, 1.26, -0.76) ground 1.150 clearance 0.114 player (5.38, 0.0, -0.63) yaw 114 pitch 30.0 zoom 6.5 arm 0.37 arm_hit 0.37 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 16.3s BAD [factory_landing_wall] near_plane_under_terrain cam (5.77, 1.98, -0.26) ground 0.000 clearance 1.983 player (5.38, 0.0, -0.63) yaw 47 pitch -45.0 zoom 6.5 arm 0.75 arm_hit 0.75 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 16.6s BAD [factory_landing_wall] near_plane_under_terrain cam (6.23, 1.67, 5.85) ground -30.000 clearance 31.673 player (5.38, 0.0, -0.63) yaw 2 pitch -0.1 zoom 6.5 arm 6.50 arm_hit 6.50 lens_offset (0.68, 0.21, 0.0) shoulder_leg_hits:@StaticBody3D@23@0.26
+INPUT_TEST_NOTE 17.6s BAD [factory_landing_wall] through_@StaticBody3D@23 cam (5.27, 0.29, -3.17) ground 0.000 clearance 0.291 player (5.38, 0.0, -0.63) yaw 167 pitch 30.0 zoom 6.5 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:@StaticBody3D@23@2.09
+INPUT_TEST_NOTE 19.3s BAD [factory_landing_wall] through_@StaticBody3D@23 cam (5.27, 0.29, -3.17) ground 0.000 clearance 0.291 player (5.38, 0.0, -0.63) yaw 167 pitch 30.0 zoom 3.5 arm 2.70 arm_hit 2.70 lens_offset (0.7, 0.22, 0.0) arm_leg_hits:@StaticBody3D@23@2.09
+INPUT_TEST_NOTE 22.9s -> factory_landing_back at (-2.0, 4.6)
+INPUT_TEST_NOTE 22.9s BAD [factory_landing_back] too_close_to_ground cam (5.63, 1.31, -0.64) ground 1.218 clearance 0.088 player (5.38, 0.0, -0.63) yaw 92 pitch 30.0 zoom 3.7 arm 0.29 arm_hit 0.29 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 23.0s BAD [factory_landing_back] too_close_to_ground cam (5.62, 1.31, -0.68) ground 1.218 clearance 0.088 player (5.38, 0.0, -0.63) yaw 101 pitch 30.0 zoom 3.7 arm 0.29 arm_hit 0.29 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 23.0s BAD [factory_landing_back] too_close_to_ground cam (5.64, 1.29, -0.72) ground 1.198 clearance 0.094 player (5.37, 0.0, -0.63) yaw 108 pitch 30.0 zoom 3.7 arm 0.32 arm_hit 0.32 lens_offset (0.0, 0.0, 0.0)
+INPUT_TEST_NOTE 24.8s BAD [factory_landing_back] under_terrain cam (-2.52, -0.8, 4.78) ground 0.000 clearance -0.796 player (-1.3, -0.59, 7.94) yaw -171 pitch 30.0 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 24.8s BAD [factory_landing_back] under_terrain cam (-2.52, -0.8, 4.78) ground 0.000 clearance -0.796 player (-1.3, -0.59, 7.94) yaw -171 pitch 30.0 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 24.8s BAD [factory_landing_back] under_terrain cam (-2.52, -0.8, 4.78) ground 0.000 clearance -0.796 player (-1.3, -0.59, 7.94) yaw -171 pitch 30.0 zoom 3.7 arm 3.70 arm_hit 3.70 lens_offset (0.7, 0.22, 0.0)
+INPUT_TEST_NOTE 26.1s    at factory_landing_back (-0.46, -6.83, 11.79)
+INPUT_TEST_NOTE 52.1s checked 6056 frames, 1801 bad
+INPUT_TEST_NOTE 52.1s   kind under_terrain: 1544 frames
+INPUT_TEST_NOTE 52.1s   kind through_@StaticBody3D@23: 7 frames
+INPUT_TEST_NOTE 52.1s   kind near_plane_under_terrain: 28 frames
+INPUT_TEST_NOTE 52.1s   kind too_close_to_ground: 222 frames
+INPUT_TEST_NOTE 52.1s   lowest lens over the floor at boot: 32.393 m
+INPUT_TEST_NOTE 52.1s   lowest lens over the floor at factory_landing: -5.929 m
+INPUT_TEST_NOTE 52.1s   lowest lens over the floor at factory_landing_wall: -6.185 m
+INPUT_TEST_NOTE 52.1s   lowest lens over the floor at factory_landing_back: -245.683 m
+INPUT_TEST_FAILED test_camera_factory 1801 of 6056 frames had the camera under or inside the Factory
