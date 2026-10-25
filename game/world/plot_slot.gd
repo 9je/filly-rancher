@@ -125,6 +125,9 @@ const GHOST_HEIGHT := 0.05
 const GHOST_WALL_HEIGHT := 0.55
 const GHOST_WALL_WIDTH := 0.14
 
+## Emitted when the pen standing here grew to a bigger plot in place (upgrade()).
+signal upgraded(plot: PlotData, node: Node)
+
 ## Emitted when something is successfully built here. Carries both halves: the data for a
 ## HUD toast, the node for anything that wants to talk to it.
 signal built(plot: PlotData, node: Node)
@@ -139,6 +142,17 @@ signal built(plot: PlotData, node: Node)
 var contents: PlotData = null
 
 var _built_node: Node = null
+
+## OVERGROWN: a plot that has to be cleared, for bits, before anything can be built on it.
+## Owner playtest 2026-10-25: "its super easy to catch ponies so you can collect all the
+## spots before you get upgrades" -- all four plots were open from minute one, so a free
+## Paddock went on every one of them and the Big Pen never had a reason to exist. Two
+## plots start open; the other two are brambles with a price on a signpost. Set by
+## game/world/ranch.gd from its PLOT_CLEAR_COSTS and the save, never by the slot itself:
+## whether she has paid is the player's record, not a fact about the ground.
+var _overgrown := false
+var _clear_cost := 0
+var _brambles: Node3D = null
 var _stakes: Node3D = null
 var _ghost: Node3D = null
 var _ghost_state: int = Ghost.OFF
@@ -168,6 +182,31 @@ func is_empty() -> bool:
 	return contents == null
 
 
+## Brambles on the plot: nothing can be built here until it is cleared.
+func is_overgrown() -> bool:
+	return _overgrown
+
+
+## What clearing it costs, in bits. Meaningful only while is_overgrown().
+func clear_cost() -> int:
+	return _clear_cost
+
+
+## Grow brambles over an EMPTY plot (`on`, at `cost` bits to clear) or clear them away. A
+## built plot refuses to be overgrown: a pen a save already put here keeps its ground,
+## which is what keeps an old save whose third and fourth plots hold pens loading as it did.
+func set_overgrown(on: bool, cost: int = 0) -> void:
+	var wanted: bool = on and is_empty()
+	_clear_cost = maxi(0, cost) if wanted else 0
+	if wanted == _overgrown and (wanted == (_brambles != null)):
+		return
+	_overgrown = wanted
+	if _overgrown:
+		set_ghost(Ghost.OFF)
+	_refresh_stakes()
+	_refresh_brambles()
+
+
 ## The node that was built here, or null. Re-validated every call so a node freed by
 ## something else cannot be handed back as a dangling reference.
 func get_built() -> Node:
@@ -190,7 +229,7 @@ func get_built() -> Node:
 ## or a scene renamed without its data following it, must not permanently brick a square of
 ## the ranch.
 func build(plot: PlotData) -> bool:
-	if plot == null or not is_empty():
+	if plot == null or not is_empty() or _overgrown:
 		return false
 	if plot.scene_path.is_empty() or not ResourceLoader.exists(plot.scene_path):
 		push_error("PlotSlot '%s': plot '%s' points at scene '%s', which does not exist."
@@ -224,6 +263,30 @@ func build(plot: PlotData) -> bool:
 	_refresh_stakes()
 	set_ghost(Ghost.OFF)
 	built.emit(plot, node)
+	return true
+
+
+## Grow the pen standing here into `plot`, IN PLACE: same node, same fence, same residents,
+## a bigger capacity. Returns false and changes nothing on an empty slot, a null plot, or a
+## plot that is not what the current one upgrades to (PlotData.upgrades_to).
+##
+## NOT A DEMOLISH AND A REBUILD. That would have to take every resident out, free her body,
+## build a new pen and put her back, which is four chances to lose a pony (NO PONY EVER
+## DIES) for a change that is, underneath, one integer. The pen's configure() is the same
+## hook build() hands the PlotData through, so the Big Pen a Paddock grows into is the Big
+## Pen a fresh build would have made.
+##
+## COST IS NOT CHECKED HERE, for the reason build() gives.
+func upgrade(plot: PlotData) -> bool:
+	var node := get_built()
+	if plot == null or node == null or contents == null:
+		return false
+	if contents.upgrades_to != plot.id:
+		return false
+	if node.has_method("configure"):
+		node.call("configure", plot, slot_id)
+	contents = plot
+	upgraded.emit(plot, node)
 	return true
 
 
@@ -295,6 +358,8 @@ func is_on_footprint(point: Vector3, radius: float) -> bool:
 ## words behind the H card. This is the actionable half alone -- what to DO, not the reason
 ## she already has a marked square in front of her to tell her.
 func placement_check(point: Vector3, radius: float) -> Dictionary:
+	if _overgrown:
+		return {"ok": false, "reason": "clear the brambles first"}
 	if not is_empty():
 		return {"ok": false, "reason": "something already stands here"}
 	if is_on_footprint(point, radius):
@@ -306,7 +371,7 @@ func placement_check(point: Vector3, radius: float) -> Dictionary:
 ## coloured footprint inside a standing fence is the overlapping-frames picture the owner
 ## already reported once, and the way to not draw it is to not be able to.
 func set_ghost(state: int) -> void:
-	var wanted: int = Ghost.OFF if not is_empty() else state
+	var wanted: int = Ghost.OFF if not is_empty() or _overgrown else state
 	if wanted == _ghost_state:
 		return
 	_ghost_state = wanted
@@ -346,6 +411,7 @@ func ghost_state() -> int:
 ## game/world/ranch.gd; cheap because it writes an alpha on two shared materials rather than
 ## touching the twelve meshes that wear them.
 func set_marker_focus(distance: float) -> void:
+	# The brambles are a thing in the world, not a diagram on it: always drawn.
 	var span: float = maxf(0.001, MARK_FAR_METRES - MARK_NEAR_METRES)
 	var alpha: float = clampf(1.0 - (absf(distance) - MARK_NEAR_METRES) / span, 0.0, 1.0)
 	if is_equal_approx(alpha, _mark_alpha):
@@ -403,7 +469,7 @@ func _ensure_shape() -> void:
 ## Meshes only, no collision: you walk over a plot you are about to build on, and a marker
 ## you can trip on is worse than no marker.
 func _refresh_stakes() -> void:
-	var want_marks := is_empty()
+	var want_marks := is_empty() and not _overgrown
 	# ADOPT BY NAME, NOT BY THE CACHED HANDLE. queue_free() only queues: a build and a
 	# demolish inside one frame would leave the old node still parented while a new one was
 	# added beside it, and the two would z fight forever afterwards. Sweeping every child
@@ -495,3 +561,127 @@ func _ghost_box(box_name: String, size: Vector3, at: Vector3,
 	mesh_node.mesh = box
 	mesh_node.position = at
 	_ghost.add_child(mesh_node)
+
+
+# --- the brambles ------------------------------------------------------------------------
+
+## What an OVERGROWN plot looks like: a thicket of round bramble clumps across the marked
+## square and a wooden signpost at the front with the price painted on its board. Drawn
+## from simple shapes in the show's flat style (the same unshaded-free lit materials the
+## stakes use), so it reads from the yard as "a plot, but not yet" without a single
+## floating word: the only text is the painted board, which is part of the post.
+const BRAMBLE_GREENS: Array[Color] = [Color(0.45, 0.70, 0.30), Color(0.38, 0.62, 0.27),
+	Color(0.52, 0.74, 0.33)]
+const BRAMBLE_BERRY := Color(0.55, 0.18, 0.42)
+const SIGN_WOOD := Color(0.62, 0.45, 0.27)
+const SIGN_INK := Color(0.24, 0.15, 0.10)
+
+
+func _refresh_brambles() -> void:
+	for existing in find_children("Brambles", "Node3D", false, false):
+		remove_child(existing)
+		existing.queue_free()
+	_brambles = null
+	if not _overgrown:
+		return
+	_brambles = Node3D.new()
+	_brambles.name = "Brambles"
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(String(slot_id)) + 4421
+	var mats: Array[StandardMaterial3D] = []
+	for c in BRAMBLE_GREENS:
+		mats.append(_solid(c, 0.9))
+	var berry := _solid(BRAMBLE_BERRY, 0.6)
+	# A loose grid of clumps, jittered, kept inside the marked square and clear of the front
+	# edge where the sign stands so the sign is never buried.
+	# Kept a body's width inside the marked square, so a player at the trigger's edge is
+	# standing beside the thicket and not in it.
+	for gx in range(-3, 4):
+		for gz in range(-3, 4):
+			if rng.randf() < 0.22:
+				continue
+			var at := Vector3(gx * 0.95 + rng.randf_range(-0.25, 0.25), 0.0,
+				gz * 0.95 + rng.randf_range(-0.25, 0.25))
+			var r := rng.randf_range(0.32, 0.58)
+			var clump := MeshInstance3D.new()
+			clump.name = "Clump"
+			var sphere := SphereMesh.new()
+			sphere.radius = r
+			sphere.height = r * rng.randf_range(1.0, 1.35)
+			sphere.radial_segments = 12
+			sphere.rings = 6
+			sphere.material = mats[rng.randi() % mats.size()]
+			clump.mesh = sphere
+			clump.position = at + Vector3(0.0, sphere.height * 0.32, 0.0)
+			_brambles.add_child(clump)
+			if rng.randf() < 0.35:
+				var b := MeshInstance3D.new()
+				b.name = "Berry"
+				var bs := SphereMesh.new()
+				bs.radius = 0.09
+				bs.height = 0.18
+				bs.radial_segments = 8
+				bs.rings = 4
+				bs.material = berry
+				b.mesh = bs
+				b.position = clump.position + Vector3(rng.randf_range(-0.3, 0.3),
+					sphere.height * 0.3, rng.randf_range(-0.3, 0.3))
+				_brambles.add_child(b)
+	_brambles.add_child(_make_sign())
+	add_child(_brambles)
+
+
+## The signpost: a post standing up out of the middle of the thicket, a board on top, and
+## the price painted on BOTH faces of the board, so whichever side of the plot she walks up
+## from (two of ranch.tscn's slots are turned 180 degrees) she reads it the right way round.
+## Tall enough to clear the tallest clump.
+const SIGN_BOARD_Y := 2.05
+
+
+func _make_sign() -> Node3D:
+	var sign := Node3D.new()
+	sign.name = "Sign"
+	var wood := _solid(SIGN_WOOD, 0.95)
+	var post := MeshInstance3D.new()
+	var pm := BoxMesh.new()
+	pm.size = Vector3(0.16, SIGN_BOARD_Y + 0.2, 0.16)
+	pm.material = wood
+	post.mesh = pm
+	post.position = Vector3(0.0, (SIGN_BOARD_Y + 0.2) * 0.5, 0.0)
+	sign.add_child(post)
+	var board := MeshInstance3D.new()
+	board.name = "Board"
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.08, 0.66, 1.6)
+	bm.material = wood
+	board.mesh = bm
+	board.position = Vector3(0.0, SIGN_BOARD_Y, 0.0)
+	sign.add_child(board)
+	# Painted on, not floating: each face's paint turns with the board, the way paint on a
+	# sign does. Not a billboard.
+	for face in [1.0, -1.0]:
+		for line in [["CLEAR ME", 42, 0.13], ["%d bits" % _clear_cost, 64, -0.11]]:
+			var paint := Label3D.new()
+			paint.name = "Paint"
+			paint.text = String(line[0])
+			if ResourceLoader.exists("res://assets/fonts/Fredoka.ttf"):
+				paint.font = load("res://assets/fonts/Fredoka.ttf")
+			paint.font_size = int(line[1])
+			paint.pixel_size = 0.004
+			paint.modulate = SIGN_INK
+			paint.outline_size = 0
+			paint.shaded = false
+			paint.double_sided = false
+			paint.billboard = BaseMaterial3D.BILLBOARD_DISABLED
+			paint.rotation = Vector3(0.0, PI * 0.5 * face, 0.0)
+			paint.position = Vector3(0.045 * face, SIGN_BOARD_Y + float(line[2]), 0.0)
+			sign.add_child(paint)
+	return sign
+
+
+func _solid(colour: Color, roughness: float) -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = colour
+	mat.roughness = roughness
+	mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+	return mat

@@ -70,6 +70,10 @@ const MouseRowsScript := preload("res://ui/mouse_rows.gd")
 
 ## The player picked a plot she can afford. The ranch pays for it and builds it.
 signal plot_chosen(plot: PlotData, slot: PlotSlot)
+## The player took the upgrade card on a built pen. The ranch pays `price` and grows it.
+signal upgrade_chosen(plot: PlotData, slot: PlotSlot, price: int)
+## The player took the clearing card on an overgrown plot. The ranch pays and clears it.
+signal clear_chosen(slot: PlotSlot, price: int)
 ## The menu came up on `slot`. game/world/ranch.gd pauses the world on this.
 signal opened(slot: PlotSlot)
 ## The menu went away, for any reason -- chosen, cancelled, or refused.
@@ -83,6 +87,17 @@ var _row_nodes: Array[PanelContainer] = []
 var _slot: PlotSlot = null
 var _selected := 0
 var _open := false
+
+## WHAT THIS PANEL IS OFFERING. The same panel, the same rows and the same keys serve three
+## questions a plot can ask (owner playtest 2026-10-25, "how do i upgrade my free paddock to
+## the 150 bits one not clear"): what to build on an empty plot (the catalogue), what a
+## built pen can grow into (one UPGRADE card), and what clearing an overgrown plot costs (one
+## CLEAR card). One panel, so a player who has learned to build has already learned to
+## upgrade.
+enum Mode { BUILD, UPGRADE, CLEAR }
+var _mode: int = Mode.BUILD
+## The rows as drawn: {"plot": PlotData or null, "name", "holds", "price", "blurb"}.
+var _offers: Array[Dictionary] = []
 
 ## Where the pointer is resting, or -1. Not the cursor: see game/ui/table_menu.gd's own
 ## comment on the same pair of fields.
@@ -117,6 +132,7 @@ func _ready() -> void:
 	MenuStyleScript.style_label(_wallet, MenuStyleScript.ROW_SIZE, MenuStyleScript.COLOR_DIM)
 	_title.text = "BUILD"
 	_dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	_offers = _catalogue_offers()
 	_close = MouseRowsScript.close_button(MouseRowsScript.CLOSE_TEXT,
 		func(_index: int) -> void: close())
 	$Centre/Panel/Margin/Column.add_child(_close)
@@ -131,10 +147,68 @@ func _ready() -> void:
 ## are states where there is no decision to offer, and popping an empty panel would be worse
 ## than not popping one.
 func open(slot: PlotSlot) -> bool:
-	if slot == null or not slot.is_empty() or _plots.is_empty():
+	if slot == null or not slot.is_empty() or slot.is_overgrown() or _plots.is_empty():
 		return false
 	if can_open.is_valid() and not bool(can_open.call()):
 		return false
+	_set_mode(Mode.BUILD, _catalogue_offers(), "BUILD")
+	return _show(slot)
+
+
+## THE UPGRADE CARD. One row: what this pen becomes, how many it will hold against how many
+## it holds now, and the price. Refuses (and shows nothing) on a slot with nothing built, a
+## null `to`, or a `can_open` that says no.
+func open_upgrade(slot: PlotSlot, from: PlotData, to: PlotData, price: int) -> bool:
+	if slot == null or slot.is_empty() or to == null:
+		return false
+	if can_open.is_valid() and not bool(can_open.call()):
+		return false
+	var now := from.capacity if from != null else 0
+	_set_mode(Mode.UPGRADE, [{"plot": to, "name": "%s" % to.display_name,
+		"holds": "holds %d, now %d" % [to.capacity, now], "price": maxi(0, price),
+		"blurb": "Everyone living here stays put. %s" % to.description}], "UPGRADE")
+	return _show(slot)
+
+
+## THE CLEARING CARD. One row: the brambles, and what it costs to have them gone.
+func open_clear(slot: PlotSlot, price: int) -> bool:
+	if slot == null or not slot.is_overgrown():
+		return false
+	if can_open.is_valid() and not bool(can_open.call()):
+		return false
+	_set_mode(Mode.CLEAR, [{"plot": null, "name": "Clear the brambles", "holds": "",
+		"price": maxi(0, price),
+		"blurb": "Hack the thicket back to bare ground. Then it is a plot like any other, " +
+			"and a Paddock on it is free."}], "CLEAR THE PLOT")
+	return _show(slot)
+
+
+func mode() -> int:
+	return _mode
+
+
+func _set_mode(m: int, offers: Array, title: String) -> void:
+	var typed: Array[Dictionary] = []
+	for o in offers:
+		typed.append(o)
+	var same := m == _mode and m == Mode.BUILD and _row_nodes.size() == typed.size()
+	_mode = m
+	_offers = typed
+	_title.text = title
+	if not same:
+		_build_rows()
+
+
+func _catalogue_offers() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for plot in _plots:
+		out.append({"plot": plot, "name": plot.display_name,
+			"holds": ("holds %d" % plot.capacity) if plot.capacity > 0 else "",
+			"price": plot.cost, "blurb": plot.description})
+	return out
+
+
+func _show(slot: PlotSlot) -> bool:
 	_slot = slot
 	_selected = 0
 	_hovered = -1
@@ -166,9 +240,28 @@ func get_slot() -> PlotSlot:
 	return _slot
 
 
-## The catalogue as drawn, cheapest first. For gates and tests.
+## The catalogue as drawn, cheapest first. For gates and tests. In the UPGRADE mode it is
+## the one plot on offer; in CLEAR, nothing.
 func entries() -> Array[PlotData]:
-	return _plots.duplicate()
+	if _mode == Mode.BUILD:
+		return _plots.duplicate()
+	var out: Array[PlotData] = []
+	for o in _offers:
+		if o.get("plot") != null:
+			out.append(o["plot"])
+	return out
+
+
+## The price on row `index`, as drawn.
+func price_at(index: int) -> int:
+	if index < 0 or index >= _offers.size():
+		return 0
+	return int(_offers[index].get("price", 0))
+
+
+## The row nodes, for a real-input test that clicks one.
+func row_nodes() -> Array[PanelContainer]:
+	return _row_nodes.duplicate()
 
 
 func selected_index() -> int:
@@ -177,9 +270,9 @@ func selected_index() -> int:
 
 ## The plot currently under the cursor, or null if the catalogue is empty.
 func selected_plot() -> PlotData:
-	if _selected < 0 or _selected >= _plots.size():
+	if _selected < 0 or _selected >= _offers.size():
 		return null
-	return _plots[_selected]
+	return _offers[_selected].get("plot") as PlotData
 
 
 ## Bits the player has, via the injected provider. Zero if nothing was injected -- which
@@ -195,15 +288,19 @@ func can_afford(plot: PlotData) -> bool:
 	return plot != null and bits() >= plot.cost
 
 
+func _can_afford_row(index: int) -> bool:
+	return bits() >= price_at(index)
+
+
 # --- input ---------------------------------------------------------------------------------
 
 ## Move the cursor by `step`, wrapping. WRAPPING RATHER THAN CLAMPING: on a gamepad, holding
 ## down past the last row and having nothing happen reads as the menu having frozen, and
 ## with three rows the wrap is never disorienting.
 func move_selection(step: int) -> void:
-	if _plots.is_empty():
+	if _offers.is_empty():
 		return
-	_selected = posmod(_selected + step, _plots.size())
+	_selected = posmod(_selected + step, _offers.size())
 	_refresh()
 	MenuStyleScript.tick_move()
 
@@ -212,18 +309,28 @@ func move_selection(step: int) -> void:
 ## so, rather than closing, because a menu that shut itself when you pressed the button
 ## looks exactly like a menu that built something.
 func confirm() -> bool:
-	var plot := selected_plot()
-	if plot == null or _slot == null:
+	if _slot == null or _selected < 0 or _selected >= _offers.size():
 		return false
-	if not can_afford(plot):
-		_footer.text = "  %s costs %d bits. You have %d." % [plot.display_name, plot.cost,
-			bits()]
+	var plot := selected_plot()
+	if _mode != Mode.CLEAR and plot == null:
+		return false
+	var price := price_at(_selected)
+	if not _can_afford_row(_selected):
+		_footer.text = "  Not enough bits yet: %d needed, you have %d." % [price, bits()]
 		MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE,
 			MenuStyleScript.COLOR_UNAFFORDABLE)
+		MenuStyleScript.tick_back()
 		return false
 	var slot := _slot
+	var mode_was := _mode
 	close()
-	plot_chosen.emit(plot, slot)
+	match mode_was:
+		Mode.UPGRADE:
+			upgrade_chosen.emit(plot, slot, price)
+		Mode.CLEAR:
+			clear_chosen.emit(slot, price)
+		_:
+			plot_chosen.emit(plot, slot)
 	return true
 
 
@@ -251,17 +358,21 @@ func _unhandled_input(event: InputEvent) -> void:
 ## every time the player walks onto a plot.
 func _build_rows() -> void:
 	for child in _rows.get_children():
+		# Out of the column first: a mode switch rebuilds the rows while the panel is up,
+		# and a row only queued for deletion would be laid out beside its replacement.
+		_rows.remove_child(child)
 		child.queue_free()
 	_row_nodes.clear()
 
-	for i in _plots.size():
-		var plot: PlotData = _plots[i]
+	for i in _offers.size():
+		var offer: Dictionary = _offers[i]
 		# ARMED ONCE, HERE, NOT IN _refresh(). MouseRows.arm() carries no double connect
 		# guard; these nodes survive every refresh() this menu ever does (see the class
 		# comment above), so arming them again on every repaint would stack a second
 		# gui_input connection on top of the first and fire take_row() twice per click.
 		var row := PanelContainer.new()
-		row.name = "Row_%s" % String(plot.id)
+		var plot := offer.get("plot") as PlotData
+		row.name = "Row_%s" % (String(plot.id) if plot != null else "clear")
 		MouseRowsScript.arm(row, i, point_at_row, take_row)
 		row.add_theme_stylebox_override(&"panel", MenuStyleScript.row_box(false))
 
@@ -285,7 +396,7 @@ func _build_rows() -> void:
 
 		var title := Label.new()
 		title.name = "Name"
-		title.text = plot.display_name
+		title.text = String(offer.get("name", ""))
 		title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		MenuStyleScript.style_label(title, 27, MenuStyleScript.COLOR_NAME)
@@ -293,26 +404,36 @@ func _build_rows() -> void:
 
 		var holds := Label.new()
 		holds.name = "Holds"
-		holds.text = ("holds %d" % plot.capacity) if plot.capacity > 0 else ""
+		holds.text = String(offer.get("holds", ""))
 		holds.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		MenuStyleScript.style_label(holds, 21, MenuStyleScript.COLOR_DIM)
 		head.add_child(holds)
 
 		var price := Label.new()
 		price.name = "Cost"
-		price.text = "FREE" if plot.cost == 0 else "%d bits" % plot.cost
+		var cost := int(offer.get("price", 0))
+		price.text = "FREE" if cost == 0 else "%d bits" % cost
 		price.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		MenuStyleScript.style_label(price, 24, MenuStyleScript.COLOR_VALUE)
 		head.add_child(price)
 
 		var blurb := Label.new()
 		blurb.name = "Description"
-		blurb.text = plot.description
+		blurb.text = String(offer.get("blurb", ""))
 		blurb.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		blurb.custom_minimum_size = Vector2(720.0, 0.0)
 		MenuStyleScript.style_label(blurb, 19, MenuStyleScript.COLOR_DIM)
 		column.add_child(blurb)
+
+		# NOT ENOUGH BITS, SAID ON THE CARD ITSELF and not only after a refused press: a
+		# red line under the price that is shown by _refresh() while she is short.
+		var short := Label.new()
+		short.name = "Short"
+		short.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		short.visible = false
+		MenuStyleScript.style_label(short, 20, MenuStyleScript.COLOR_UNAFFORDABLE)
+		column.add_child(short)
 
 		_rows.add_child(row)
 		_row_nodes.append(row)
@@ -320,7 +441,7 @@ func _build_rows() -> void:
 
 ## Repaint the selection highlight, the wallet line and the affordability colours.
 func _refresh() -> void:
-	_footer.text = MenuStyleScript.footer_rows("build", "back")
+	_footer.text = MenuStyleScript.footer_rows(["build", "upgrade", "clear"][_mode], "back")
 	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
 	_wallet.text = "%d bits" % bits()
 	for i in range(_row_nodes.size()):
@@ -333,7 +454,11 @@ func _refresh() -> void:
 		var box: StyleBoxFlat = MenuStyleScript.row_box(true) if picked \
 			else (MenuStyleScript.row_box_hover() if i == _hovered else MenuStyleScript.row_box(false))
 		row.add_theme_stylebox_override(&"panel", box)
-		var affordable := can_afford(_plots[i])
+		var affordable := _can_afford_row(i)
+		var short := row.find_child("Short", true, false) as Label
+		if short != null:
+			short.visible = not affordable
+			short.text = "Not enough bits: you need %d more." % (price_at(i) - bits())
 		var price := row.find_child("Cost", true, false) as Label
 		if price != null:
 			MenuStyleScript.style_label(price, 24,
@@ -358,7 +483,7 @@ func close_button_node() -> Button:
 ## ONE CURSOR, TWO WAYS TO MOVE IT. Absolute where move_selection() is relative, and it makes
 ## the same sound, because both are the player choosing a row.
 func point_at_row(index: int) -> void:
-	if index < 0 or index >= _plots.size():
+	if index < 0 or index >= _offers.size():
 		return
 	if index == _selected and index == _hovered:
 		return

@@ -21,7 +21,10 @@ extends RefCounted
 ## Static only, no state. Preload by path.
 
 ## The verbs E can carry. NONE is the absence of a candidate and never appears in PRIORITY.
-enum Kind { NONE, PLOT_BUILD, PEN_MOVE_IN, MARKET, BOARD, MAILBOX, DEPOT, PALACE, TALK }
+## PEN_UPGRADE and PLOT_CLEAR are appended rather than slotted in beside the other ground
+## kinds, so every int a driver or a test log already holds keeps its meaning.
+enum Kind { NONE, PLOT_BUILD, PEN_MOVE_IN, MARKET, BOARD, MAILBOX, DEPOT, PALACE, TALK,
+	PEN_UPGRADE, PLOT_CLEAR }
 
 ## THE ORDER, HIGHEST FIRST, and every one of these positions is a decision.
 ##
@@ -49,8 +52,8 @@ enum Kind { NONE, PLOT_BUILD, PEN_MOVE_IN, MARKET, BOARD, MAILBOX, DEPOT, PALACE
 ## the smallest thing on the map.
 ## TALK ranks right under the ground tier: a person standing beside you is who the key is
 ## for, ahead of any building behind her (Bramble stands at the Market's counter).
-const PRIORITY: Array[int] = [Kind.PLOT_BUILD, Kind.PEN_MOVE_IN, Kind.TALK, Kind.MARKET,
-	Kind.BOARD, Kind.MAILBOX, Kind.DEPOT, Kind.PALACE]
+const PRIORITY: Array[int] = [Kind.PLOT_BUILD, Kind.PEN_MOVE_IN, Kind.PEN_UPGRADE,
+	Kind.PLOT_CLEAR, Kind.TALK, Kind.MARKET, Kind.BOARD, Kind.MAILBOX, Kind.DEPOT, Kind.PALACE]
 
 ## THE KINDS THAT SHARE ONE RANK, so resolve() settles them on distance instead of on the
 ## order they happen to sit in above.
@@ -69,13 +72,24 @@ const PRIORITY: Array[int] = [Kind.PLOT_BUILD, Kind.PEN_MOVE_IN, Kind.TALK, Kind
 ## she meant. A slot cannot offer both verbs at once (interaction_candidates() offers
 ## PLOT_BUILD for an empty slot and PEN_MOVE_IN for a built one), so this is only ever
 ## deciding between two DIFFERENT squares of ground.
-const GROUND_TIER: Array[int] = [Kind.PLOT_BUILD, Kind.PEN_MOVE_IN]
+##
+## THE UPGRADE AND THE CLEARING ARE GROUND TOO (owner playtest 2026-10-25). A built pen
+## offers PEN_UPGRADE instead of PEN_MOVE_IN whenever moving in is not what E can do (an
+## empty saddlebag, or a full pen), and an overgrown plot offers PLOT_CLEAR instead of
+## PLOT_BUILD. Each square still offers exactly one verb, so the tie-break stays a choice
+## between squares.
+const GROUND_TIER: Array[int] = [Kind.PLOT_BUILD, Kind.PEN_MOVE_IN, Kind.PEN_UPGRADE,
+	Kind.PLOT_CLEAR]
 
 ## What the pen prompt says when the saddlebag is empty. THE PEN STILL WINS THE GROUND in
 ## that state, deliberately: a pen that dropped out of the running with an empty bag would
 ## hand E to whatever building is next nearest, so the player standing in her own paddock
 ## would press E and open the Market. She keeps the ground and the prompt says why.
 const EMPTY_BAG := "your saddlebag is empty"
+
+## What a full pen with no bigger size left says. "That pen is full." alone was the owner's
+## dead end (2026-10-25): it said what was wrong and not what to do about it.
+const FULL_PEN := "this pen is full, build another pen"
 
 
 ## One candidate, as ranch.gd hands them over. `distance` is metres in the XZ plane and is
@@ -88,6 +102,20 @@ const EMPTY_BAG := "your saddlebag is empty"
 static func candidate(kind: int, distance: float, subject: String = "",
 		reason: String = "") -> Dictionary:
 	return {"kind": kind, "distance": distance, "subject": subject, "reason": reason}
+
+
+## A priced ground verb: PEN_UPGRADE (`what` is the plot it becomes) or PLOT_CLEAR (`what` is
+## unused). `subject` is the slot's node name, as for PLOT_BUILD. `price` and `afford` go on
+## the prompt, so "not enough bits" is said before E is pressed and not after; `full` says
+## the pen she is standing at has no room, which is why the upgrade is being offered.
+static func priced(kind: int, distance: float, subject: String, price: int, afford: bool,
+		what: String = "", full: bool = false) -> Dictionary:
+	var c := candidate(kind, distance, subject)
+	c["price"] = price
+	c["afford"] = afford
+	c["what"] = what
+	c["full"] = full
+	return c
 
 
 ## Where `kind` sits in PRIORITY, or minus one for a kind that is not in it at all. A kind
@@ -149,9 +177,19 @@ static func prompt_for(action: Dictionary, key: String) -> String:
 				return "%s: cannot build, %s" % [key, reason]
 			return "%s: build here" % key
 		Kind.PEN_MOVE_IN:
+			if bool(action.get("full", false)):
+				return "%s: %s" % [key, FULL_PEN]
 			if subject.is_empty():
 				return "%s: the pen is here, %s" % [key, EMPTY_BAG]
 			return "%s: move %s in" % [key, subject]
+		Kind.PEN_UPGRADE:
+			var line := "%s: %supgrade to %s (%s)" % [key,
+				"pen full, " if bool(action.get("full", false)) else "",
+				String(action.get("what", "")), _price(int(action.get("price", 0)))]
+			return line if bool(action.get("afford", true)) else line + ", not enough bits"
+		Kind.PLOT_CLEAR:
+			var clear := "%s: clear this plot (%s)" % [key, _price(int(action.get("price", 0)))]
+			return clear if bool(action.get("afford", true)) else clear + ", not enough bits"
 		Kind.MARKET:
 			return "%s: Market, sell gems" % key
 		Kind.BOARD:
@@ -165,3 +203,7 @@ static func prompt_for(action: Dictionary, key: String) -> String:
 		Kind.TALK:
 			return "%s: talk to %s" % [key, subject]
 	return ""
+
+
+static func _price(bits: int) -> String:
+	return "free" if bits <= 0 else "%d bits" % bits

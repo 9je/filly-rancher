@@ -324,6 +324,10 @@ func test_at_a_built_pen_s_gate_the_ranch_offers_the_pen() -> void:
 	var plot = catalogue.all()[0]
 	assert_true(built.build(plot), "the first slot has to take a pen for this test to mean anything")
 	await wait_physics_frames(2)
+	# A pony in the bag, as in the playtest ("when i place ponies in the paddock"): with an
+	# empty bag the pen's verb is the upgrade (round 2, 2026-10-25), which is still the pen.
+	ranch.player.get_magic_beam().get_storage().store(
+		load("res://systems/pony_instance.gd").create(&"twilight"))
 	# Her centre 4.40 m out from the built slot, on the axis pointing at its neighbour.
 	var toward: Vector3 = (slots[1].global_position - built.global_position).normalized()
 	ranch.player.global_position = built.global_position + toward * 4.40 + Vector3.UP * 0.3

@@ -939,6 +939,46 @@ func _build_pen(slot: Node3D, want_id: StringName) -> bool:
 	return true
 
 
+## The brambles: walk up, read "clear this plot", press E, take the card.
+func _clear_plot(slot: Node3D) -> bool:
+	_say("clears the brambles on %s" % slot.name)
+	if not await _approach(InteractionScript.Kind.PLOT_CLEAR, _slot_side(slot, 4.55), 0.6, String(slot.name)):
+		_build_fails[slot.name] = int(_build_fails.get(slot.name, 0)) + 1
+		return false
+	return await _take_card(slot, func() -> bool: return not bool(slot.call("is_overgrown")))
+
+
+## A full pen with a bigger size: stand at it, read "upgrade to", press E, take the card.
+func _upgrade_pen(slot: Node3D) -> bool:
+	var was: PlotData = slot.get("contents")
+	_say("upgrades the %s on %s" % [was.display_name, slot.name])
+	if not await _approach(InteractionScript.Kind.PEN_UPGRADE, _slot_side(slot, 4.45), 0.5, String(slot.name)):
+		_build_fails[slot.name] = int(_build_fails.get(slot.name, 0)) + 1
+		return false
+	return await _take_card(slot, func() -> bool: return slot.get("contents") != was)
+
+
+## E on the plot opens its one-card menu; accept it, and check the world changed.
+func _take_card(slot: Node3D, done: Callable) -> bool:
+	await _press(&"interact")
+	await _wait(0.6)
+	var bm: Node = ranch.get("build_menu")
+	if bm == null or not bool(bm.call("is_open")):
+		_build_fails[slot.name] = int(_build_fails.get(slot.name, 0)) + 1
+		return false
+	await _think()
+	await _press(&"ui_accept")
+	await _wait(1.0)
+	if bool(bm.call("is_open")):
+		await _press(&"ui_cancel")
+		await _wait(0.4)
+	if not bool(done.call()):
+		_build_fails[slot.name] = int(_build_fails.get(slot.name, 0)) + 1
+		return false
+	_nav_dirty = true
+	return true
+
+
 ## Where to stand beside a plot: on its open side, away from the neighbouring column of
 ## plots (the four sit 9 m apart, so the side facing a neighbour is the neighbour's ground).
 func _slot_side(slot: Node3D, out: float) -> Vector3:
@@ -1574,12 +1614,29 @@ func _bloomers() -> int:
 
 func _build_pens(up_to: int) -> bool:
 	var pens := _pens()
+	# Every pen full: a bigger pen where one stands, if the bits are there (owner playtest
+	# 2026-10-25 made the upgrade a verb at the pen itself).
+	if not pens.is_empty() and _pen_with_room() == null:
+		for slot: Node3D in _slots():
+			var here: PlotData = slot.get("contents")
+			if here == null or here.upgrades_to == &"" or int(_build_fails.get(slot.name, 0)) >= 3:
+				continue
+			var bigger: PlotData = (ranch.call("plots_catalogue") as PlotRegistry).by_id(here.upgrades_to)
+			if bigger != null and _bits() >= here.upgrade_price(bigger) + 30:
+				await _upgrade_pen(slot)
+				return true
 	if pens.size() >= up_to:
 		return false
 	if not pens.is_empty() and _pen_with_room() != null:
 		return false
 	for slot: Node3D in _slots():
 		if slot.call("get_built") != null or int(_build_fails.get(slot.name, 0)) >= 3:
+			continue
+		# Two of the four plots start under brambles: clear one when it can be afforded.
+		if bool(slot.call("is_overgrown")):
+			if _bits() >= int(slot.call("clear_cost")) + 30:
+				await _clear_plot(slot)
+				return true
 			continue
 		var want_id := &"pen_small"
 		if _bits() >= 480 + 60:
