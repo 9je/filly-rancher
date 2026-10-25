@@ -89,16 +89,15 @@ transform = Transform3D(0.7071068, -0.3535534, 0.6123724, 0, 0.8660254, 0.5, -0.
 light_color = Color(1, 0.968627, 0.905882, 1)
 light_energy = 1.15
 shadow_enabled = true
-shadow_bias = 0.02
-shadow_normal_bias = 1.2
-shadow_blur = 1.1
-light_angular_distance = 0.9
-directional_shadow_max_distance = 85.0
-directional_shadow_split_1 = 0.06
-directional_shadow_split_2 = 0.17
-directional_shadow_split_3 = 0.42
+shadow_bias = 0.03
+shadow_normal_bias = 1.5
+shadow_blur = 0.6
+directional_shadow_max_distance = 160.0
+directional_shadow_split_1 = 0.05
+directional_shadow_split_2 = 0.15
+directional_shadow_split_3 = 0.4
 directional_shadow_blend_splits = true
-directional_shadow_fade_start = 0.92
+directional_shadow_fade_start = 0.75
 
 [node name="SkyRig" type="Node3D" parent="."]
 script = ExtResource("14")
