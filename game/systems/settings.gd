@@ -78,8 +78,65 @@ var voice_volume := 1.0
 enum Quality { LOW, MEDIUM, HIGH }
 const QUALITY_NAMES: Array[String] = ["Low", "Medium", "High"]
 var quality: int = Quality.HIGH
-var fullscreen := false
 var vsync := true
+
+## THE WINDOW. Windowed at `resolution`, borderless fullscreen at the desktop's own size, or
+## exclusive fullscreen (the monitor switched to the game, lowest latency, slowest alt-tab).
+## Both of these are DISPLAY settings: the settings menu applies them on a timer and changes
+## them back if nobody says keep (game/ui/settings_menu.gd).
+enum WindowMode { WINDOWED, FULLSCREEN, EXCLUSIVE }
+const WINDOW_MODE_NAMES: Array[String] = ["Windowed", "Fullscreen", "Exclusive fullscreen"]
+var window_mode: int = WindowMode.WINDOWED
+
+## The windowed size. Ignored in either fullscreen, which is the desktop's size. ZERO, the
+## default, means "whatever size the window opened at" (project.godot's 1600x900, or a
+## --resolution on the command line): nothing is resized until somebody picks a size.
+const RESOLUTIONS: Array[Vector2i] = [Vector2i(1280, 720), Vector2i(1366, 768),
+	Vector2i(1600, 900), Vector2i(1920, 1080), Vector2i(2560, 1440), Vector2i(3840, 2160)]
+const RESOLUTION_DEFAULT := Vector2i.ZERO
+var resolution := RESOLUTION_DEFAULT
+
+## The old switch, kept as a view of window_mode so a settings.cfg written before window_mode
+## existed, and every caller that still says fullscreen, mean the same thing.
+var fullscreen: bool:
+	get:
+		return window_mode != WindowMode.WINDOWED
+	set(value):
+		window_mode = WindowMode.FULLSCREEN if value else WindowMode.WINDOWED
+
+## The camera's vertical field of view, in degrees. 75 is camera_rig.tscn's own.
+const FOV_DEFAULT := 75.0
+const FOV_MIN := 60.0
+const FOV_MAX := 100.0
+const FOV_STEP := 5.0
+var fov := FOV_DEFAULT
+
+## A frame rate cap; 0 is none. Engine.max_fps.
+const FPS_CAPS: Array[int] = [0, 30, 60, 120, 144]
+var max_fps := 0
+
+## The right stick's turn speed, radians per second at full tilt (camera_rig.gd's own 2.2).
+const STICK_DEFAULT := 2.2
+const STICK_MIN := 1.0
+const STICK_MAX := 4.0
+const STICK_STEP := 0.2
+var stick_sensitivity := STICK_DEFAULT
+
+## GAMEPLAY. Each is read by something real: the HUD's corner "H controls" chip, the HUD's
+## Getting started list, and the ranch opening the pause menu when the window loses focus.
+var show_controls_chip := true
+var show_checklist := true
+var pause_on_focus_loss := true
+
+## Every field the settings menu edits, in one list, so a draft can be copied and compared
+## without each caller naming them all. `fullscreen` is not here: it is a view of window_mode.
+const FIELDS: Array[StringName] = [&"master_volume", &"music_volume", &"ambient_volume",
+	&"effects_volume", &"ui_volume", &"voice_volume", &"quality", &"vsync", &"window_mode",
+	&"resolution", &"fov", &"max_fps", &"mouse_sensitivity", &"stick_sensitivity",
+	&"invert_look", &"bindings", &"show_controls_chip", &"show_checklist", &"pause_on_focus_loss"]
+
+## The two that change the window itself, and so get the timed confirmation.
+const DISPLAY_FIELDS: Array[StringName] = [&"window_mode", &"resolution"]
 
 ## KEY BINDINGS: action -> physical keycode, for the actions a player may rebind. An action
 ## missing here keeps project.godot's key. Gamepad buttons are never touched.
@@ -113,7 +170,20 @@ func load_from(path: String = "") -> void:
 	voice_volume = clampf(float(cfg.get_value(SECTION, "voice_volume", voice_volume)), 0.0, 1.0)
 	quality = clampi(int(cfg.get_value(SECTION, "quality", quality)), 0, Quality.HIGH)
 	fullscreen = bool(cfg.get_value(SECTION, "fullscreen", fullscreen))
+	window_mode = clampi(int(cfg.get_value(SECTION, "window_mode", window_mode)), 0, WindowMode.EXCLUSIVE)
 	vsync = bool(cfg.get_value(SECTION, "vsync", vsync))
+	var res: Variant = cfg.get_value(SECTION, "resolution", resolution)
+	if res is Vector2i and ((res as Vector2i) == Vector2i.ZERO
+			or ((res as Vector2i).x >= 640 and (res as Vector2i).y >= 360)):
+		resolution = res
+	fov = clampf(float(cfg.get_value(SECTION, "fov", fov)), FOV_MIN, FOV_MAX)
+	var cap := int(cfg.get_value(SECTION, "max_fps", max_fps))
+	max_fps = cap if cap in FPS_CAPS else 0
+	stick_sensitivity = clampf(float(cfg.get_value(SECTION, "stick_sensitivity", stick_sensitivity)),
+		STICK_MIN, STICK_MAX)
+	show_controls_chip = bool(cfg.get_value(SECTION, "show_controls_chip", show_controls_chip))
+	show_checklist = bool(cfg.get_value(SECTION, "show_checklist", show_checklist))
+	pause_on_focus_loss = bool(cfg.get_value(SECTION, "pause_on_focus_loss", pause_on_focus_loss))
 	var b: Variant = cfg.get_value(SECTION, "bindings", {})
 	bindings = {}
 	if b is Dictionary:
@@ -139,6 +209,14 @@ func save_to(path: String = "") -> bool:
 	cfg.set_value(SECTION, "quality", quality)
 	cfg.set_value(SECTION, "fullscreen", fullscreen)
 	cfg.set_value(SECTION, "vsync", vsync)
+	cfg.set_value(SECTION, "window_mode", window_mode)
+	cfg.set_value(SECTION, "resolution", resolution)
+	cfg.set_value(SECTION, "fov", fov)
+	cfg.set_value(SECTION, "max_fps", max_fps)
+	cfg.set_value(SECTION, "stick_sensitivity", stick_sensitivity)
+	cfg.set_value(SECTION, "show_controls_chip", show_controls_chip)
+	cfg.set_value(SECTION, "show_checklist", show_checklist)
+	cfg.set_value(SECTION, "pause_on_focus_loss", pause_on_focus_loss)
 	var b := {}
 	for k in bindings:
 		b[String(k)] = int(bindings[k])
@@ -197,6 +275,34 @@ func step_quality(direction: int) -> bool:
 	quality = next
 	changed.emit()
 	return true
+
+
+## Take every FIELDS value from `other` (the settings menu's draft and its snapshot).
+func copy_from(other: Settings) -> void:
+	for f in FIELDS:
+		var v: Variant = other.get(f)
+		set(f, v.duplicate() if v is Dictionary else v)
+	changed.emit()
+
+
+func duplicate_settings() -> Settings:
+	var out: Settings = (get_script() as Script).new()
+	out.copy_from(self)
+	return out
+
+
+## The FIELDS that differ from `other`, in FIELDS order.
+func differences(other: Settings) -> Array[StringName]:
+	var out: Array[StringName] = []
+	for f in FIELDS:
+		var a: Variant = get(f)
+		var b: Variant = other.get(f)
+		if a is float or b is float:
+			if not is_equal_approx(float(a), float(b)):
+				out.append(f)
+		elif a != b:
+			out.append(f)
+	return out
 
 
 func toggle_fullscreen() -> void:
@@ -282,9 +388,8 @@ func apply_graphics(viewport: Viewport) -> void:
 		return
 	DisplayServer.window_set_vsync_mode(
 		DisplayServer.VSYNC_ENABLED if vsync else DisplayServer.VSYNC_DISABLED)
-	var want := DisplayServer.WINDOW_MODE_FULLSCREEN if fullscreen else DisplayServer.WINDOW_MODE_WINDOWED
-	if DisplayServer.window_get_mode() != want:
-		DisplayServer.window_set_mode(want)
+	Engine.max_fps = max_fps
+	apply_window()
 	if viewport == null:
 		return
 	viewport.scaling_3d_scale = [0.67, 0.85, 1.0][quality]
@@ -304,6 +409,22 @@ func apply_graphics(viewport: Viewport) -> void:
 					env.set_meta(&"authored_glow", env.glow_enabled)
 				env.ssao_enabled = bool(env.get_meta(&"authored_ssao")) and quality >= Quality.MEDIUM
 				env.glow_enabled = bool(env.get_meta(&"authored_glow")) and quality >= Quality.MEDIUM
+
+
+## The window mode and, windowed, the window's size, centred on its screen.
+func apply_window() -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	var want: int = [DisplayServer.WINDOW_MODE_WINDOWED, DisplayServer.WINDOW_MODE_FULLSCREEN,
+		DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN][window_mode]
+	if DisplayServer.window_get_mode() != want:
+		DisplayServer.window_set_mode(want)
+	if window_mode == WindowMode.WINDOWED and resolution != Vector2i.ZERO \
+			and DisplayServer.window_get_size() != resolution:
+		DisplayServer.window_set_size(resolution)
+		var screen := DisplayServer.window_get_current_screen()
+		var area := DisplayServer.screen_get_usable_rect(screen)
+		DisplayServer.window_set_position(area.position + ((area.size - resolution) / 2).max(Vector2i.ZERO))
 
 
 func toggle_invert() -> void:

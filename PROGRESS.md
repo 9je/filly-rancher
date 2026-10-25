@@ -110,3 +110,9 @@ Canon MLP stays: real names, looks and places ("lean into mlp fully", private bu
 - **Final-code gates:** all 5 headless playthroughs reach their endings (PLAYTHROUGHS_OK 5). Ten consecutive full-suite runs each passed 1752 of 1752 and exited cleanly, with no hang. That closes the exit-hang proof.
 - **Treetops solid to the camera again:** the re-run visual review on the final code found canopies filling the homestead views; they now sit on their own CANOPY layer, which only the camera probes. After the fix: suite 1752 of 1752 (clean exit), PLAYTHROUGHS_OK 5, and the 60-pony check 3 of 3 OK.
 - **Beam before the Scoop explains itself:** owner report "i cant get the beam to work". The horn is locked until Marigold's welcome, and a press now says so and brings her over. The export is rebuilt.
+
+### 2026-10-24 (evening): owner's real-hardware playtest round
+- **Real-input harness:** game/test_input/ and tools/run_input_tests.sh, running invisibly on the GPU.
+- **First pony fixed:** the first tip named no button, and closing a conversation with E opened the next one (an endless loop with Tumble). test_first_pony catches on the first try.
+- **Beam targeting:** aim assist cone, a highlight before the press (gold outline, ring, chevron), and the press takes the lit pony. Covered by test_beam_targeting.
+- **In progress with agents:** shadows, scale (SCALE.md), loading screen, settings menu, footsteps and audio audit, pony textures and eyes, camera collision, and the real-input playthrough driver.

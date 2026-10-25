@@ -182,7 +182,8 @@ func test_leaving_a_zone_never_disturbs_the_phase_beds() -> void:
 func test_every_world_sound_plays_and_reports_that_it_did() -> void:
 	var Sound := _sound_autoload()
 	for id: StringName in [&"mail_arrive", &"mail_open", &"mail_stamp", &"capture_charge",
-			&"capture_success", &"hoofsteps_grass", &"hoofsteps_hard", &"gate_open",
+			&"capture_success", &"hoof_grass", &"hoof_dirt", &"hoof_wood", &"hoof_stone",
+			&"hoof_metal", &"gate_open",
 			&"delivery_thud", &"coins_grant"]:
 		assert_true(Sound.has_id(id), "'%s' is missing from LIBRARY" % id)
 		assert_true(Sound.play_at(id, Vector3(1.0, 0.0, 2.0)), "'%s' would not play" % id)
@@ -190,8 +191,31 @@ func test_every_world_sound_plays_and_reports_that_it_did() -> void:
 
 func test_the_variant_sets_are_the_sizes_the_plan_asked_for() -> void:
 	var Sound := _sound_autoload()
-	assert_eq(PackedStringArray(Sound.entry(&"hoofsteps_grass").get("paths")).size(), 4)
-	assert_eq(PackedStringArray(Sound.entry(&"hoofsteps_hard").get("paths")).size(), 4)
+	for id: StringName in [&"hoof_grass", &"hoof_dirt", &"hoof_wood", &"hoof_stone", &"hoof_metal"]:
+		assert_eq(PackedStringArray(Sound.entry(id).get("paths")).size(), 4)
+
+
+func test_hoofsteps_vary_in_volume_and_never_repeat_a_take() -> void:
+	var Sound := _sound_autoload()
+	var entry: Dictionary = Sound.entry(&"hoof_grass")
+	var levels: Array[float] = []
+	for i in 40:
+		levels.append(Sound.pick_volume(entry))
+	var lo: float = levels.min()
+	var hi: float = levels.max()
+	var base := float(entry.get("volume_db"))
+	var jitter := float(entry.get("volume_jitter_db"))
+	assert_gt(hi - lo, 0.5, "forty rolls spread over more than half a dB")
+	assert_gte(lo, base - jitter)
+	assert_lte(hi, base + jitter)
+	Sound.stop_all()
+	var last := ""
+	for i in 24:
+		assert_true(Sound.play_at(&"hoof_grass", Vector3.ZERO))
+		var pool: Array = Sound.get("_pool_3d")
+		var voice: AudioStreamPlayer3D = pool[(int(Sound.get("_next_3d")) - 1 + pool.size()) % pool.size()]
+		assert_ne(voice.stream.resource_path, last, "the same take twice running")
+		last = voice.stream.resource_path
 
 
 func test_no_pony_voice_ever_entered_the_library() -> void:
@@ -216,7 +240,7 @@ func test_hoofsteps_are_mixed_well_under_everything_else() -> void:
 	# The most heard sound in the game. If it sits at the same level as a slots stinger the game
 	# is exhausting inside a minute; the owner's knob for this is parked in the plan.
 	var Sound := _sound_autoload()
-	for id: StringName in [&"hoofsteps_grass", &"hoofsteps_hard"]:
+	for id: StringName in [&"hoof_grass", &"hoof_dirt", &"hoof_wood", &"hoof_stone", &"hoof_metal"]:
 		assert_lte(float(Sound.entry(id).get("volume_db", 0.0)), -6.0)
 
 
@@ -224,7 +248,7 @@ func test_the_3d_pool_steals_its_oldest_voice_rather_than_growing() -> void:
 	var Sound := _sound_autoload()
 	Sound.stop_all()
 	for i in range(SoundScript.POOL_3D + 5):
-		assert_true(Sound.play_at(&"hoofsteps_grass", Vector3(float(i), 0.0, 0.0)))
+		assert_true(Sound.play_at(&"hoof_grass", Vector3(float(i), 0.0, 0.0)))
 	assert_eq(Sound.pool_3d_size(), SoundScript.POOL_3D)
 
 

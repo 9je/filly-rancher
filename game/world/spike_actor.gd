@@ -70,6 +70,9 @@ func _dress_real(root: Node) -> void:
 				mi.set_surface_override_material(i, _clear())
 				continue
 			var tex_path: String = REAL_TEX + String(REAL_SKINS.get(key, key)) + ".png"
+			if key.begins_with("eyeball") and ResourceLoader.exists(tex_path):
+				mi.set_surface_override_material(i, _eye(mi.mesh, i, load(tex_path)))
+				continue
 			var mat := StandardMaterial3D.new()
 			mat.diffuse_mode = BaseMaterial3D.DIFFUSE_TOON
 			mat.specular_mode = BaseMaterial3D.SPECULAR_TOON
@@ -78,8 +81,45 @@ func _dress_real(root: Node) -> void:
 			mat.rim = 0.25
 			if ResourceLoader.exists(tex_path):
 				mat.albedo_texture = load(tex_path)
-			mi.set_surface_override_material(i, mat)
+			# The show's toon light, the one every pony wears (ToonStyler): the built-in
+			# DIFFUSE_TOON steps the soft shadow term hard and speckled him the way the old
+			# toon shader speckled the ponies (docs/playtest_fixes/ponies.md).
+			mi.set_surface_override_material(i,
+				ToonStyler.to_toon(mat, ToonStyler.PRESETS[&"pony"]) if ToonStyler.shading_enabled else mat)
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+
+
+const EYE_SHADER := preload("res://shaders/pony_eye.gdshader")
+
+
+## HIS EYE, PROJECTED THE WAY SOURCE DREW IT (playtest note "weird eyes", 2026-10-24). His
+## eyeball's UVs are a sphere unwrap; through them the iris texture (a green slit iris in the
+## middle of a white square) came out as a green sliver at the edge of a blank white eye. The
+## Source "eyes" shader casts $iris along the eye's axis instead, so this does too
+## (shaders/pony_eye.gdshader `planar`, along +Z, the way his face points): centred on the
+## eyeball, the texture spanning the eyeball's width and height. Measured from the mesh, so it follows the model rather than a typed-in number.
+func _eye(mesh: Mesh, surface: int, tex: Texture2D) -> ShaderMaterial:
+	var arrays := mesh.surface_get_arrays(surface)
+	var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var box := AABB(verts[0], Vector3.ZERO)
+	for k in verts.size():
+		box = box.expand(verts[k])
+	# The middle of the eyeball as seen from in front (his eyes face +Z): the opening his lids
+	# leave is centred there, not on the forward-most vertices, which sit by his nose.
+	var origin := box.get_center()
+	var m := ShaderMaterial.new()
+	m.shader = EYE_SHADER
+	m.set_shader_parameter(&"eye_texture", tex)
+	m.set_shader_parameter(&"recolor", false)
+	m.set_shader_parameter(&"planar", true)
+	m.set_shader_parameter(&"eye_origin", origin)
+	m.set_shader_parameter(&"eye_size", Vector2(box.size.x, box.size.y) * EYE_SPAN)
+	return m
+
+
+## How much of the eyeball the iris texture spans (1.0: edge to edge, as Source's projection
+## does it). Looked at on the turntable (game/scenes/test/pony_turntable.gd), not guessed.
+const EYE_SPAN := 1.0
 
 
 func _clear() -> StandardMaterial3D:

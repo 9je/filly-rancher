@@ -78,6 +78,16 @@ func _ready() -> void:
 
 ## Stand every present character at her spot. Safe to call again (on a load, a new act).
 func populate() -> void:
+	# The same body as populate_paced(), with no pace: it never awaits, so it runs to the end
+	# inside this call. call() by name because the parser insists a function that CAN await
+	# is always awaited, and every existing caller of populate() is synchronous.
+	call(&"populate_paced", Callable())
+
+
+## populate(), handing a frame back after each character it stands: `await pace.call(done,
+## total)` (the ranch's boot behind the loading screen, docs/playtest_fixes/loading.md).
+func populate_paced(pace: Callable) -> void:
+	var done := 0
 	for id in CAST:
 		var want: bool = presence.call(id)
 		if want and not npcs.has(id):
@@ -85,6 +95,9 @@ func populate() -> void:
 		elif not want and npcs.has(id):
 			(npcs[id] as Node).queue_free()
 			npcs.erase(id)
+		done += 1
+		if pace.is_valid():
+			await pace.call(done, CAST.size())
 
 
 func npc(id: StringName) -> Npc:

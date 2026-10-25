@@ -1,0 +1,183 @@
+INPUT_TEST_NOTE 12.8s mouse look check: mouse_mode=2, 200 px turned the camera 1.050 rad (fps 123, physics 60 Hz)
+INPUT_TEST_NOTE 12.8s terrain extremes: high 2.22 at (-32.0, 56.0), low -2.06 at (28.0, -72.0), steepest 14.4 deg at (32.0, 12.0)
+INPUT_TEST_NOTE 12.8s map edge: highest ground 1.68 at (109.0, -66.0)
+INPUT_TEST_NOTE 12.8s -> yard at (0.0, 7.0) ground 0.00
+INPUT_TEST_NOTE 15.6s    at yard (0.38, 0.0, 7.94)
+INPUT_TEST_NOTE 29.5s -> Barn_ramp at (-8.7, -5.3) ground 0.00
+INPUT_TEST_NOTE 40.1s    walking to (-6.509685, 0.589563): at (-4.1, 0.0, 8.5), 8.3 m to go
+INPUT_TEST_NOTE 50.6s    walking to (-6.509685, 0.589563): at (-12.3, 0.0, 1.4), 5.8 m to go
+INPUT_TEST_NOTE 62.2s    walking to (-6.509685, 0.589563): at (-7.1, 0.0, -1.3), 2.0 m to go
+INPUT_TEST_NOTE 73.5s    walking to (-6.509685, 0.589563): at (-9.5, 0.0, 0.3), 3.0 m to go
+INPUT_TEST_NOTE 84.9s    walking to (-6.509685, 0.589563): at (-7.1, 0.0, -1.3), 2.0 m to go
+INPUT_TEST_NOTE 96.7s    walking to (-6.509685, 0.589563): at (-7.6, 0.0, -0.9), 1.8 m to go
+INPUT_TEST_NOTE 108.2s    walking to (-6.509685, 0.589563): at (-7.2, 0.0, -3.8), 4.5 m to go
+INPUT_TEST_NOTE 114.6s    at Barn_ramp (-8.3, 0.25, -4.4)
+INPUT_TEST_NOTE 128.0s -> Barn_inside at (-10.3, -9.7) ground 0.00
+INPUT_TEST_NOTE 131.7s    at Barn_inside (-11.09, 1.8, -10.48)
+INPUT_TEST_NOTE 145.2s -> Barn_back_wall at (-11.2, -12.3) ground 0.00
+INPUT_TEST_NOTE 160.4s    walking to (-6.509685, 0.589563): at (-7.3, 0.0, -3.8), 4.5 m to go
+INPUT_TEST_NOTE 172.5s    walking to (-6.509685, 0.589563): at (-7.4, 0.0, -1.1), 1.9 m to go
+INPUT_TEST_NOTE 184.2s    walking to (-6.509685, 0.589563): at (-8.0, 0.0, -0.4), 1.8 m to go
+INPUT_TEST_NOTE 197.0s    walking to (-6.509685, 0.589563): at (-9.900001, 0.0, -1.1), 3.8 m to go
+INPUT_TEST_NOTE 208.8s    walking to (-6.509685, 0.589563): at (-7.3, 0.0, -1.2), 1.9 m to go
+INPUT_TEST_NOTE 220.5s    walking to (-6.509685, 0.589563): at (-5.8, 0.0, -3.3), 4.0 m to go
+INPUT_TEST_NOTE 231.9s    walking to (-6.509685, 0.589563): at (-7.4, 0.0, -1.0), 1.8 m to go
+INPUT_TEST_NOTE 244.4s    at Barn_back_wall (-10.78, 0.0, -11.78)
+INPUT_TEST_NOTE 258.4s -> Barn_side_wall at (-6.8, -10.2) ground 0.00
+INPUT_TEST_NOTE 269.9s    at Barn_side_wall (-7.04, 0.0, -9.17)
+INPUT_TEST_NOTE 283.1s -> Barn_out at (-6.5, 0.6) ground 0.00
+INPUT_TEST_NOTE 296.9s    walking to (-6.509685, 0.589563): at (-7.4, 0.0, -1.0), 1.9 m to go
+INPUT_TEST_NOTE 308.5s    walking to (-6.509685, 0.589563): at (-8.0, 0.0, -0.4), 1.8 m to go
+INPUT_TEST_NOTE 321.8s    walking to (-6.509685, 0.589563): at (-9.900001, 0.0, -1.1), 3.8 m to go
+INPUT_TEST_NOTE 333.5s    walking to (-6.509685, 0.589563): at (-7.3, 0.0, -1.2), 1.9 m to go
+INPUT_TEST_NOTE 344.9s    walking to (-6.509685, 0.589563): at (-5.8, 0.0, -3.3), 4.0 m to go
+INPUT_TEST_NOTE 356.6s    walking to (-6.509685, 0.589563): at (-7.4, 0.0, -1.0), 1.8 m to go
+INPUT_TEST_NOTE 368.3s    walking to (-6.509685, 0.589563): at (-6.8, 0.0, -1.6), 2.2 m to go
+INPUT_TEST_NOTE 373.2s    at Barn_out (-7.11, 0.0, -4.0)
+INPUT_TEST_NOTE 387.3s -> Farmhouse_ramp at (7.5, -3.7) ground 0.00
+INPUT_TEST_NOTE 399.1s    walking to (0.0, 7.0): at (-9.1, 0.0, -1.0), 12.2 m to go
+INPUT_TEST_NOTE 410.4s    walking to (0.0, 7.0): at (-5.8, 0.0, -2.7), 11.3 m to go
+INPUT_TEST_NOTE 422.0s    walking to (0.0, 7.0): at (-8.2, 0.0, -0.2), 10.9 m to go
+INPUT_TEST_NOTE 434.6s    walking to (0.0, 7.0): at (-8.5, 0.0, -2.8), 13.0 m to go
+INPUT_TEST_NOTE 446.3s    walking to (0.0, 7.0): at (-6.7, 0.0, -3.8), 12.7 m to go
+INPUT_TEST_NOTE 457.6s    walking to (0.0, 7.0): at (-8.1, 0.0, -0.4), 10.9 m to go
+INPUT_TEST_NOTE 469.1s    walking to (0.0, 7.0): at (-5.6, 0.0, -2.9), 11.3 m to go
+INPUT_TEST_NOTE 486.1s    walking to (4.820305, 1.963385): at (-5.1, 0.0, -5.6), 12.5 m to go
+INPUT_TEST_NOTE 497.2s    walking to (4.820305, 1.963385): at (-1.2, 0.0, -9.3), 12.8 m to go
+INPUT_TEST_NOTE 509.0s    walking to (4.820305, 1.963385): at (-5.2, 0.0, -5.5), 12.5 m to go
+INPUT_TEST_NOTE 520.4s    walking to (4.820305, 1.963385): at (-1.9, 0.0, -8.8), 12.7 m to go
+INPUT_TEST_NOTE 532.2s    walking to (4.820305, 1.963385): at (-5.0, 0.0, -5.7), 12.5 m to go
+INPUT_TEST_NOTE 543.8s    walking to (4.820305, 1.963385): at (-1.9, 0.0, -8.8), 12.7 m to go
+INPUT_TEST_NOTE 555.4s    walking to (4.820305, 1.963385): at (-5.0, 0.0, -5.7), 12.5 m to go
+INPUT_TEST_NOTE 571.6s    walking to (6.595302, -1.843109): at (4.3, 0.0, -5.4), 4.2 m to go
+INPUT_TEST_NOTE 582.1s    walking to (6.595302, -1.843109): at (5.9, 0.0, -4.1), 2.4 m to go
+INPUT_TEST_NOTE 593.1s    walking to (6.595302, -1.843109): at (5.8, 0.0, -3.9), 2.2 m to go
+INPUT_TEST_NOTE 604.7s    walking to (6.595302, -1.843109): at (4.3, 0.0, -5.4), 4.2 m to go
+INPUT_TEST_NOTE 615.5s    walking to (6.595302, -1.843109): at (5.9, 0.0, -4.1), 2.4 m to go
+INPUT_TEST_NOTE 626.6s    walking to (6.595302, -1.843109): at (5.8, 0.0, -3.9), 2.2 m to go
+INPUT_TEST_NOTE 637.9s    walking to (6.595302, -1.843109): at (4.3, 0.0, -5.4), 4.2 m to go
+INPUT_TEST_NOTE 652.6s    walking to (7.4828, -3.746355): at (5.0, 0.0, -6.0), 3.4 m to go
+INPUT_TEST_NOTE 662.5s    walking to (7.4828, -3.746355): at (6.1, 0.0, -4.4), 1.5 m to go
+INPUT_TEST_NOTE 672.4s    walking to (7.4828, -3.746355): at (4.6, 0.0, -5.1), 3.2 m to go
+INPUT_TEST_NOTE 682.0s    walking to (7.4828, -3.746355): at (6.5, 0.0, -5.1), 1.7 m to go
+INPUT_TEST_NOTE 691.7s    walking to (7.4828, -3.746355): at (5.0, 0.0, -6.0), 3.4 m to go
+INPUT_TEST_NOTE 701.5s    walking to (7.4828, -3.746355): at (6.1, 0.0, -4.4), 1.5 m to go
+INPUT_TEST_NOTE 711.2s    walking to (7.4828, -3.746355): at (4.6, 0.0, -5.1), 3.2 m to go
+INPUT_TEST_NOTE 714.9s    at Farmhouse_ramp (6.5, 0.0, -5.15)
+INPUT_TEST_NOTE 728.4s -> Farmhouse_inside at (9.3, -7.6) ground 0.00
+INPUT_TEST_NOTE 737.7s    walking to (9.272589, -7.584569): at (5.1, 0.0, -10.4), 5.0 m to go
+INPUT_TEST_NOTE 747.9s    walking to (9.272589, -7.584569): at (9.0, 0.0, -9.8), 2.3 m to go
+INPUT_TEST_NOTE 759.7s    walking to (9.272589, -7.584569): at (10.6, 0.0, -9.1), 2.0 m to go
+INPUT_TEST_NOTE 772.9s    walking to (9.272589, -7.584569): at (11.8, 0.0, -10.3), 3.7 m to go
+INPUT_TEST_NOTE 784.9s    walking to (9.272589, -7.584569): at (10.9, 0.0, -8.900001), 2.1 m to go
+INPUT_TEST_NOTE 798.0s    walking to (9.272589, -7.584569): at (9.900001, 0.0, -11.5), 4.0 m to go
+INPUT_TEST_NOTE 810.7s    walking to (9.272589, -7.584569): at (8.6, 0.0, -10.8), 3.4 m to go
+INPUT_TEST_NOTE 816.5s    at Farmhouse_inside (11.84, 0.07, -10.92)
+INPUT_TEST_NOTE 829.8s -> Farmhouse_out at (4.8, 2.0) ground 0.00
+INPUT_TEST_NOTE 845.2s    walking to (6.595302, -1.843109): at (10.7, 0.0, -9.0), 8.3 m to go
+INPUT_TEST_NOTE 857.7s    walking to (6.595302, -1.843109): at (9.6, 0.0, -11.4), 10.0 m to go
+INPUT_TEST_NOTE 869.9s    walking to (6.595302, -1.843109): at (11.8, 0.0, -8.5), 8.5 m to go
+INPUT_TEST_NOTE 881.5s    walking to (6.595302, -1.843109): at (9.5, 0.0, -9.6), 8.3 m to go
+INPUT_TEST_NOTE 893.3s    walking to (6.595302, -1.843109): at (8.900001, 0.0, -9.900001), 8.4 m to go
+INPUT_TEST_NOTE 905.4s    walking to (6.595302, -1.843109): at (10.6, 0.0, -9.1), 8.3 m to go
+INPUT_TEST_NOTE 917.1s    walking to (6.595302, -1.843109): at (11.6, 0.0, -10.2), 9.8 m to go
+INPUT_TEST_NOTE 934.6s    walking to (4.820305, 1.963385): at (7.7, 0.0, -11.3), 13.7 m to go
+INPUT_TEST_NOTE 946.7s    walking to (4.820305, 1.963385): at (10.6, 0.0, -9.1), 12.5 m to go
+INPUT_TEST_NOTE 959.7s    walking to (4.820305, 1.963385): at (9.7, 0.0, -11.4), 14.2 m to go
+INPUT_TEST_NOTE 971.4s    walking to (4.820305, 1.963385): at (9.5, 0.0, -9.6), 12.5 m to go
+INPUT_TEST_NOTE 984.5s    walking to (4.820305, 1.963385): at (10.4, 0.0, -10.8), 13.9 m to go
+INPUT_TEST_NOTE 996.5s    walking to (4.820305, 1.963385): at (11.4, 0.0, -10.0), 13.7 m to go
+INPUT_TEST_NOTE 1008.3s    walking to (4.820305, 1.963385): at (10.5, 0.0, -9.1), 12.5 m to go
+INPUT_TEST_NOTE 1013.0s    at Farmhouse_out (11.95, 0.0, -9.809999)
+INPUT_TEST_NOTE 1026.6s -> Market_ramp at (1.4, 2.4) ground 0.00
+INPUT_TEST_NOTE 1038.9s    walking to (0.0, 7.0): at (7.9, 0.0, -10.3), 19.1 m to go
+INPUT_TEST_NOTE 1051.2s    walking to (0.0, 7.0): at (11.2, 0.0, -8.8), 19.4 m to go
+INPUT_TEST_NOTE 1063.9s    walking to (0.0, 7.0): at (10.7, 0.0, -10.9), 20.9 m to go
+INPUT_TEST_NOTE 1075.9s    walking to (0.0, 7.0): at (8.1, 0.0, -10.8), 19.6 m to go
+INPUT_TEST_NOTE 1088.0s    walking to (0.0, 7.0): at (11.3, 0.0, -8.8), 19.4 m to go
+INPUT_TEST_NOTE 1101.2s    walking to (0.0, 7.0): at (10.6, 0.0, -11.0), 20.9 m to go
+INPUT_TEST_NOTE 1113.6s    walking to (0.0, 7.0): at (8.1, 0.0, -10.8), 19.7 m to go
+INPUT_TEST_NOTE 1129.5s    walking to (5.89308, 6.89308): at (12.7, 0.0, -8.1), 16.5 m to go
+INPUT_TEST_NOTE 1141.6s    walking to (5.89308, 6.89308): at (14.2, 0.0, -4.3), 14.0 m to go
+INPUT_TEST_NOTE 1163.6s    at Market_ramp (2.28, 0.18, 3.03)
+INPUT_TEST_NOTE 1177.8s -> Market_inside at (-2.7, -1.7) ground 0.00
+INPUT_TEST_NOTE 1182.1s    at Market_inside (-4.27, 1.8, -2.58)
+INPUT_TEST_NOTE 1195.3s -> Market_out at (5.9, 6.9) ground 0.00
+INPUT_TEST_NOTE 1204.5s    at Market_out (5.81, 0.0, 5.93)
+INPUT_TEST_NOTE 1219.6s -> Depot_ramp at (11.7, 7.0) ground 0.00
+INPUT_TEST_NOTE 1232.2s    at Depot_ramp (11.53, 0.0, 7.94)
+INPUT_TEST_NOTE 1245.5s -> Depot_inside at (9.7, 3.5) ground 0.00
+INPUT_TEST_NOTE 1249.2s    at Depot_inside (8.86, 1.77, 3.18)
+INPUT_TEST_NOTE 1263.0s -> Depot_back_wall at (8.5, 1.4) ground 0.00
+INPUT_TEST_NOTE 1280.5s    at Depot_back_wall (9.309999, 0.0, 1.63)
+INPUT_TEST_NOTE 1293.8s -> Depot_side_wall at (14.4, 1.5) ground 0.00
+INPUT_TEST_NOTE 1299.1s    at Depot_side_wall (14.17, 0.0, 2.22)
+INPUT_TEST_NOTE 1312.5s -> Depot_out at (14.9, 12.4) ground 0.00
+INPUT_TEST_NOTE 1318.0s    at Depot_out (15.79, 0.0, 12.13)
+INPUT_TEST_NOTE 1331.4s -> yard_again at (0.0, 7.0) ground 0.00
+INPUT_TEST_NOTE 1336.2s    at yard_again (0.27, 0.0, 7.97)
+INPUT_TEST_NOTE 1350.4s -> under_tree at (-18.9, 1.3) ground 0.00
+INPUT_TEST_NOTE 1357.0s    at under_tree (-20.5, 0.05, -0.17)
+INPUT_TEST_NOTE 1369.3s -> town_road at (1.5, 43.0) ground 0.96
+INPUT_TEST_NOTE 1385.8s    at town_road (2.2, 0.96, 42.26)
+INPUT_TEST_NOTE 1399.0s -> town_wall at (10.5, 43.0) ground 0.90
+INPUT_TEST_NOTE 1403.3s    at town_wall (13.11, 0.88, 41.88)
+INPUT_TEST_NOTE 1416.0s -> palace_front at (-4.0, 54.0) ground 1.07
+INPUT_TEST_NOTE 1425.4s    at palace_front (-7.2, 1.29, 56.35)
+INPUT_TEST_NOTE 1438.8s -> hill_top at (-32.0, 56.0) ground 2.22
+INPUT_TEST_NOTE 1455.0s    at hill_top (-31.72, 2.24, 57.1)
+INPUT_TEST_NOTE 1468.0s -> steepest_slope at (32.0, 12.0) ground 0.93
+INPUT_TEST_NOTE 1480.9s    walking to (1.5, 30.0): at (-12.0, 0.9, 42.8), 18.6 m to go
+INPUT_TEST_NOTE 1495.6s    at steepest_slope (31.04, 0.71, 11.76)
+INPUT_TEST_NOTE 1509.3s -> valley at (28.0, -72.0) ground -2.06
+INPUT_TEST_NOTE 1519.4s    walking to (28.0, -72.0): at (29.1, 0.6, -27.9), 44.2 m to go
+INPUT_TEST_NOTE 1526.3s    walking to (28.0, -72.0): at (27.4, -2.0, -69.5), 2.6 m to go
+INPUT_TEST_NOTE 1526.6s    at valley (27.33, -2.04, -71.3)
+INPUT_TEST_NOTE 1538.3s -> map_edge at (105.7, -64.0) ground 1.90
+INPUT_TEST_NOTE 1547.1s    walking to (105.73, -64.02): at (32.4, -2.0, -68.8), 73.5 m to go
+INPUT_TEST_NOTE 1555.4s    walking to (105.73, -64.02): at (33.6, -2.0, -70.9), 72.5 m to go
+INPUT_TEST_NOTE 1563.6s    walking to (105.73, -64.02): at (33.1, -2.0, -67.0), 72.7 m to go
+INPUT_TEST_NOTE 1572.3s    walking to (105.73, -64.02): at (32.3, -2.0, -68.7), 73.5 m to go
+INPUT_TEST_NOTE 1580.3s    walking to (105.73, -64.02): at (33.1, -2.0, -70.8), 72.9 m to go
+INPUT_TEST_NOTE 1589.6s    walking to (105.73, -64.02): at (31.6, -2.1, -69.5), 74.4 m to go
+INPUT_TEST_NOTE 1597.5s    walking to (105.73, -64.02): at (32.5, -2.0, -67.5), 73.3 m to go
+INPUT_TEST_NOTE 1601.1s    at map_edge (34.56, -1.98, -71.95)
+INPUT_TEST_NOTE 1612.7s -> under_tree_far at (91.0, -51.8) ground 1.98
+INPUT_TEST_NOTE 1623.0s    walking to (91.04237, -51.84293): at (33.2, -2.0, -68.2), 60.1 m to go
+INPUT_TEST_NOTE 1633.1s    walking to (91.04237, -51.84293): at (32.2, -2.1, -70.1), 61.6 m to go
+INPUT_TEST_NOTE 1641.6s    walking to (91.04237, -51.84293): at (34.5, -2.0, -71.7), 60.0 m to go
+INPUT_TEST_NOTE 1650.0s    walking to (91.04237, -51.84293): at (32.2, -2.1, -70.7), 61.8 m to go
+INPUT_TEST_NOTE 1657.3s    walking to (91.04237, -51.84293): at (33.2, -2.0, -67.9), 60.1 m to go
+INPUT_TEST_NOTE 1664.5s    walking to (91.04237, -51.84293): at (32.7, -1.8, -63.5), 59.5 m to go
+INPUT_TEST_NOTE 1672.0s    walking to (91.04237, -51.84293): at (31.0, -1.8, -63.0), 61.1 m to go
+INPUT_TEST_NOTE 1675.7s    at under_tree_far (32.98, -1.94, -66.02)
+INPUT_TEST_NOTE 1687.3s checked 180297 frames, 0 bad
+INPUT_TEST_NOTE 1687.3s   lowest lens over the ground at boot: 2.393 m
+INPUT_TEST_NOTE 1687.3s   lowest lens over the ground at yard: 0.271 m
+INPUT_TEST_NOTE 1687.3s   lowest lens over the ground at Barn_ramp: 0.286 m
+INPUT_TEST_NOTE 1687.3s   lowest lens over the ground at Barn_inside: 0.441 m
+INPUT_TEST_NOTE 1687.3s   lowest lens over the ground at Barn_back_wall: 0.255 m
+INPUT_TEST_NOTE 1687.3s   lowest lens over the ground at Barn_side_wall: 0.264 m
+INPUT_TEST_NOTE 1687.3s   lowest lens over the ground at Barn_out: 0.288 m
+INPUT_TEST_NOTE 1687.3s   lowest lens over the ground at Farmhouse_ramp: 0.252 m
+INPUT_TEST_NOTE 1687.3s   lowest lens over the ground at Farmhouse_inside: 0.256 m
+INPUT_TEST_NOTE 1687.3s   lowest lens over the ground at Farmhouse_out: 0.250 m
+INPUT_TEST_NOTE 1687.3s   lowest lens over the ground at Market_ramp: 0.255 m
+INPUT_TEST_NOTE 1687.3s   lowest lens over the ground at Market_inside: 0.263 m
+INPUT_TEST_NOTE 1687.3s   lowest lens over the ground at Market_out: 0.250 m
+INPUT_TEST_NOTE 1687.3s   lowest lens over the ground at Depot_ramp: 0.252 m
+INPUT_TEST_NOTE 1687.3s   lowest lens over the ground at Depot_inside: 0.915 m
+INPUT_TEST_NOTE 1687.3s   lowest lens over the ground at Depot_back_wall: 0.312 m
+INPUT_TEST_NOTE 1687.3s   lowest lens over the ground at Depot_side_wall: 0.441 m
+INPUT_TEST_NOTE 1687.3s   lowest lens over the ground at Depot_out: 0.441 m
+INPUT_TEST_NOTE 1687.3s   lowest lens over the ground at yard_again: 0.330 m
+INPUT_TEST_NOTE 1687.3s   lowest lens over the ground at under_tree: 0.271 m
+INPUT_TEST_NOTE 1687.3s   lowest lens over the ground at town_road: 0.436 m
+INPUT_TEST_NOTE 1687.3s   lowest lens over the ground at town_wall: 0.291 m
+INPUT_TEST_NOTE 1687.3s   lowest lens over the ground at palace_front: 0.275 m
+INPUT_TEST_NOTE 1687.3s   lowest lens over the ground at hill_top: 0.261 m
+INPUT_TEST_NOTE 1687.3s   lowest lens over the ground at steepest_slope: 0.270 m
+INPUT_TEST_NOTE 1687.3s   lowest lens over the ground at valley: 0.280 m
+INPUT_TEST_NOTE 1687.3s   lowest lens over the ground at map_edge: 0.307 m
+INPUT_TEST_NOTE 1687.3s   lowest lens over the ground at under_tree_far: 0.301 m
+INPUT_TEST_OK test_camera_terrain 180297 frames at 27 stops, the camera never went under the terrain or into a building

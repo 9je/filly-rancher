@@ -185,7 +185,7 @@ func _check_the_pools() -> void:
 	_set_check("the 2D pool steals rather than growing",
 		Sound.pool_2d_size() == SoundScript.POOL_2D)
 	for i in range(SoundScript.POOL_3D + 1):
-		Sound.play_at(&"hoofsteps_grass", Vector3(float(i), 0.0, 0.0))
+		Sound.play_at(&"hoof_grass", Vector3(float(i), 0.0, 0.0))
 	_set_check("the 3D pool steals rather than growing",
 		Sound.pool_3d_size() == SoundScript.POOL_3D)
 	Sound.stop_all()

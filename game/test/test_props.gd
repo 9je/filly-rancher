@@ -25,7 +25,9 @@ const REGION_PROP_MARGIN := 4.0
 # --- families and scales ----------------------------------------------------------------
 
 func test_an_entry_with_no_family_is_a_kenney_kit_piece() -> void:
-	var entry := {"file": "kenney_market_stall.glb", "at": Vector2.ZERO, "yaw": 0.0}
+	# kenney_windmill: a Kenney piece with no SCALE_FIX row (the market stall has one now,
+	# SCALE.md's stall row), so the family's own base is all it gets.
+	var entry := {"file": "kenney_windmill.glb", "at": Vector2.ZERO, "yaw": 0.0}
 	assert_eq(PropsScript.family_of(entry), PropsScript.FAMILY_KENNEY)
 	assert_almost_eq(PropsScript.scale_for(entry), PropsScript.BASE_SCALE, 0.0001)
 

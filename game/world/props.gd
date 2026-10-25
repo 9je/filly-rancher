@@ -64,6 +64,13 @@ const PROP_DIR := "res://assets/converted/props/"
 ## docs/pipeline.md section 4. See the class comment.
 const BASE_SCALE := 1.5
 
+## ONE PONY HEIGHT (1 PH), in metres: the player's rendered body, hoof to ear tip, as
+## game/test_input/test_scale.gd measures it in the world. SCALE.md sizes every asset on the
+## map in multiples of it; code that has to ask for a size (region_dressing.gd's trees and
+## standing stones) asks in PH through this. The test measures the pony afresh each run and
+## would catch the roster drifting away from this number.
+const PONY_HEIGHT := 2.19
+
 ## Metres a seated prop's bottom is pushed below the terrain surface. Small and
 ## deliberate: the ground is a 2 m-cell heightfield, so a prop with any footprint
 ## sits across a slightly curved surface, and a base seated at exactly y=ground
@@ -146,9 +153,11 @@ const SCALE_FIX := {
 	"saa_seed_bag.glb": 1.93,  # 0.65 m: native metres, a sack a pony could drag.
 	"saa_water_chute.glb": 1.93,  # 0.83 m: native metres.
 	"saa_wire_arch.glb": 1.93,  # 2.74 m: native metres, and a pony walks under it.
-	"saa_fence_old.glb": 1.93,  # 0.75 m rail, 4.06 m long: native metres. Skirted.
+	"saa_fence_old.glb": 2.57,  # 1.00 m rail (0.46 PH), 5.4 m long. Native 0.75 m was a knee-high rail.
 	"saa_corn_plant.glb": 3.83,  # 2.40 m: a stalk over a pony; native 1.21 m is a seedling.
-	"saa_corn_plant_dead.glb": 3.83,  # the live stalk's number, so the row matches.
+	"saa_corn_plant_dead.glb": 3.83,  # the live stalk's number: the dead model is a stalk
+	# FALLEN in its row (0.83 m high, 1.8 m across), so SCALE.md files it as a plant on the
+	# ground, not as a standing crop. Stood up to a live stalk's 2.4 m it sprawled 5 m wide.
 	"mlp_apple_tree.glb": 3.21,  # 5.60 m before jitter; the Kenney trees stood 6.2 m.
 	"mlp_apple_tree_bare.glb": 3.36,  # 5.60 m: the same target, the same species.
 	"mlp_bush.glb": 1.93,  # 0.80 m: native metres.
@@ -178,6 +187,20 @@ const SCALE_FIX := {
 	"saa_tree_dead_wide.glb": 2.77,  # 5.60 m: the same species, dead.
 	"saa_tree_dead_narrow.glb": 2.98,  # 5.20 m: a thinner trunk reads shorter.
 	"saa_dead_tree_large.glb": 4.05,  # 7.20 m: the Everfree's one landmark.
+	# --- the town row and the Market stall: SCALE.md's house and stall rows --------------
+	# ONE PONY HEIGHT (PH) IS 2.19 m, measured off the player in the world (SCALE.md). At the
+	# MLP family's own MLP_SCALE these Ponyville houses stood 3.6 to 4.9 m, 1.6 to 2.2 PH: a
+	# house barely taller than the pony at its door, which is the owner's playtest note word
+	# for word. Each now stands about 7.0 m to the ridge, 3.2 PH.
+	"pv_pink_b.glb": 1.92,  # 3.64 m -> 7.0 m.
+	"pv_ogb_1.glb": 1.43,  # 4.88 m -> 7.0 m.
+	"pv_courtyard_b.glb": 1.56,  # 4.48 m -> 7.0 m.
+	"pv_courtyard_b_balcony.glb": 1.56,  # 4.48 m -> 7.0 m.
+	"pv_ogb_2.glb": 1.68,  # 4.16 m -> 7.0 m.
+	"pv_balcony_b.glb": 1.91,  # 3.66 m -> 7.0 m.
+	# A Kenney piece, so ON TOP of BASE_SCALE: 1.86 m was an awning lower than the pony
+	# standing under it. 3.06 m is 1.4 PH.
+	"kenney_market_stall.glb": 1.65,
 }
 
 ## Category-wide multiplier ON TOP of BASE_SCALE, for a "kenney_tree_*" entry, IF one is
@@ -237,7 +260,10 @@ const FOLIAGE_PREFIXES := ["kenney_tree", "mlp_apple_tree", "saa_tree", "saa_dea
 ## metres, on XZ. Nothing is placed here, no pony spawns here, and ranch.gd asserts
 ## both -- an "open area" that quietly grew a tree in it is exactly the kind of
 ## layout regression nobody notices until the feature that needed the space lands.
-const PEN_PLOTS_CENTRE := Vector2(-14.0, 13.0)
+## (-14, 15.5), was (-14, 13): moved 2.5 m south with the four Plots slots in ranch.tscn when
+## the Market grew to SCALE.md's house size -- its south-west wall would otherwise have stood
+## over the corner of slot 1 (docs/playtest_fixes/scale.md).
+const PEN_PLOTS_CENTRE := Vector2(-14.0, 15.5)
 const PEN_PLOTS_HALF_EXTENT := 9.0
 
 ## The homestead layout, hand-composed rather than scattered randomly.
@@ -262,7 +288,10 @@ const LAYOUT := [
 	# The windmill and the watermill came off the map in slice R2: game/world/building.gd's
 	# own header calls them a bare X of sails and a bare waterwheel, and the owner's verdict
 	# on the clashing Kenney silhouette applied to these two as much as to the treeline.
-	{"file": "kenney_market_stall.glb", "at": Vector2(2.0, 3.0), "yaw": 200.0},
+	# (3.8, 6.5), not (2.0, 3.0): at its SCALE.md size the stall would stand on the foot of the
+	# Market's own door ramp, and the Depot's west wall, both of which grew to SCALE.md's house
+	# size (docs/playtest_fixes/scale.md).
+	{"file": "kenney_market_stall.glb", "at": Vector2(3.8, 6.5), "yaw": 200.0},
 	# --- treeline, replanted MLP in slice R2 --------------------------------------
 	# SAME COORDINATES, SAME YAW, ONLY THE SPECIES AND THE FAMILY CHANGED. Every `at` below
 	# was already verified clear of every region fence ring, every ZoneMarker disc and the
@@ -450,9 +479,12 @@ const LAYOUT := [
 	# (-10, 61.6), eye offset -22 puts the lens near z 39.6): at z 50 it cropped the
 	# marquee out of the one screenshot that exists to showcase it. The shorter
 	# balcony_b takes z 50; the street keeps all three buildings either way.
-	{"file": "pv_courtyard_b_balcony.glb", "at": Vector2(-12.0, 36.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
-	{"file": "pv_ogb_2.glb", "at": Vector2(-12.0, 43.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
-	{"file": "pv_balcony_b.glb", "at": Vector2(-12.0, 50.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
+	# THE WEST ROW STEPPED SOUTH WHEN IT GREW (z 31 / 39.5 / 48, was 36 / 43 / 50): at SCALE.md's
+	# house size pv_ogb_2 is 8.9 m along the street and the three no longer fit between z 33
+	# and the Palace's own front at z 53.9 (docs/playtest_fixes/scale.md).
+	{"file": "pv_courtyard_b_balcony.glb", "at": Vector2(-12.0, 31.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
+	{"file": "pv_ogb_2.glb", "at": Vector2(-12.0, 39.5), "yaw": 90.0, "family": &"mlp", "skirt": true},
+	{"file": "pv_balcony_b.glb", "at": Vector2(-12.0, 48.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
 	# --- the schoolyard, west of the road --------------------------------------------
 	# A SCHOOLYARD AND NO SCHOOL, and that is the pack rather than an omission.
 	# ponysfm-schoolhouse ships school_roof, school_door, school_window, school_sign,
@@ -518,10 +550,10 @@ const LAYOUT := [
 	{"file": "saa_seed_bag.glb", "at": Vector2(-15.0, -10.0), "yaw": 300.0, "family": &"mlp"},
 	{"file": "mlp_farm_well.glb", "at": Vector2(5.0, -11.5), "yaw": 60.0, "family": &"mlp"},
 	{"file": "mlp_chicken_coop.glb", "at": Vector2(12.5, -11.0), "yaw": 250.0, "family": &"mlp"},
-	{"file": "mlp_crate.glb", "at": Vector2(4.0, 7.0), "yaw": 30.0, "family": &"mlp"},
-	{"file": "mlp_basket.glb", "at": Vector2(2.5, 6.0), "yaw": 0.0, "family": &"mlp"},
+	{"file": "mlp_crate.glb", "at": Vector2(4.5, 8.8), "yaw": 30.0, "family": &"mlp"},
+	{"file": "mlp_basket.glb", "at": Vector2(1.8, 7.2), "yaw": 0.0, "family": &"mlp"},
 	{"file": "mlp_bush.glb", "at": Vector2(-6.5, -12.0), "yaw": 120.0, "family": &"mlp"},
-	{"file": "mlp_bush.glb", "at": Vector2(13.5, -6.0), "yaw": 20.0, "family": &"mlp"},
+	{"file": "mlp_bush.glb", "at": Vector2(15.5, -4.0), "yaw": 20.0, "family": &"mlp"},
 	{"file": "saa_small_dirt_pile.glb", "at": Vector2(-11.5, -4.5), "yaw": 0.0, "family": &"mlp"},
 ]
 
@@ -559,13 +591,27 @@ static func expected_count() -> int:
 ## Build the homestead. Returns the number of props actually placed -- 0 on an
 ## assetless checkout, which is a reported state and not an error.
 func build() -> int:
+	# The same body as build_paced(), with no pace: it never awaits, so it runs to the end
+	# inside this call. call() by name because the parser insists a function that CAN await
+	# is always awaited, and every existing caller of build() is synchronous.
+	return int(call(&"build_paced", Callable()))
+
+
+## build(), handing a frame back after each prop: `await pace.call(done, total)` (the
+## ranch's boot behind the loading screen, docs/playtest_fixes/loading.md). An invalid pace
+## is build() exactly.
+func build_paced(pace: Callable) -> int:
 	if not has_assets():
 		# No converted props on this machine at all (CI, or a clone that has not run
 		# the pipeline yet). Bare terrain, reported by ranch.gd -- and reported as a
 		# distinct `assets=absent` state rather than as a zero that looks like a pass.
 		return 0
 
+	var done := 0
 	for entry: Dictionary in LAYOUT:
+		done += 1
+		if pace.is_valid():
+			await pace.call(done, LAYOUT.size())
 		var file: String = entry["file"]
 		var path := PROP_DIR + file
 		if not ResourceLoader.exists(path):

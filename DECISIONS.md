@@ -190,3 +190,41 @@ The 60-pony check (`scenes/test/perf.gd`) was failing at p99 22-27 ms. Three of 
 - A beam press before the Scoop now toasts "No Scoop yet. Marigold has it for you: she's on her way over."
 - It also sends her back to the player.
 - She now follows a steward who walks more than 6 m away before the welcome is done; before this she stood wherever she had been left.
+
+## 2026-10-24: the owner's real-hardware playtest round (PLAYTEST_FIXES.md)
+
+The owner's rules for this round:
+- root cause and a failing test before every fix;
+- tests through real input only;
+- no trailer work, and the current trailer deleted.
+
+Decisions:
+- **Trailer deleted.** TRAILER_4K.mp4, TRAILER_1080p.mp4, build/trailer (15 GB of takes), TRAILER_PLAN.md and TRAILER_REVIEW.md are gone; git history keeps the docs. The capture pipeline (tools/trailer, scenes/test/trailer.gd) stays as code. It is not a trailer.
+- **Real-input tests are standalone SceneTree scripts** (game/test_input/), not GUT cases.
+  - They must boot the real main scene in a real window, and GUT's runner would sit in the way of a scene change.
+  - Each prints INPUT_TEST_OK or INPUT_TEST_FAILED, and tools/run_input_tests.sh runs them.
+- **Tests may look but not touch.** A test reads the game the way eyes read a screen (positions, the HUD tip, menu rows). It acts only through RealInput, which builds events from the InputMap, so a rebound key is the key pressed.
+- **Invisible display, real GPU.**
+  - The owner was using the machine and the first test windows took the mouse, so every windowed run goes into xvfb.
+  - Xvfb has no DRI3, so RADV cannot present to it. Mesa's software WSI (MESA_VK_WSI_DEBUG=sw) lets the GPU render and copies each frame in.
+  - llvmpipe was tried first and was far too slow.
+  - Runs use --fixed-fps 60, and the watchdog counts game seconds.
+- **Parallel work.** Notes 5 to 11 and the playthrough rewrite went to agents, each in its own worktree, all niced and invisible. Each writes docs/playtest_fixes/<area>.md, which is merged into PLAYTEST_FIXES.md here.
+- **Back to one agent at a time.** Eight agents in parallel used up the owner's usage limit, and five of them died mid-task. Each stopped agent was resumed alone, in order: settings, audio, scale, loading, camera, ponies, shadows, then the playthrough driver.
+- **Beam targeting test: aim on the clear side.**
+  - After the pens moved 2.5 m south (SCALE.md), the point 0.9 m beside the test's pony was nearer the crosshair to a pony behind her: 4.4 degrees against 9.4.
+  - The beam took that pony, which is the rule we want: the pony nearest the crosshair wins.
+  - The game was not changed. The test now aims on whichever side of her has no other pony, and logs every candidate's angle.
+- **A real-input test that ends with no verdict fails.**
+  - A script error ends `_play()` early and returns to `InputTest._main()` as if the test had finished, and `_main()` used to call that a pass.
+  - Every test now reaches its own `ok()` or `fail()`.
+- **Shadows: PCSS off, range out to 160 m.** The numbers and reasons are in docs/playtest_fixes/shadows.md.
+  - The perf check measures 85 m and 160 m the same in the invisible display: p99 25.4 ms against 24.4 ms.
+  - The commit before this round, 877d56d, measures 23.8 ms under the same conditions, so the round added no cost.
+  - That p99 is over the 16.6 ms budget only because of how the invisible display presents frames (its CPU-side process time is about 18 ms). The 15 ms pass recorded in PROGRESS.md was measured in a real window.
+  - It was not re-measured in a real window, because the owner asked that nothing open on their screen.
+- **Two of the owner's save slots were overwritten.**
+  - At 19:34 on 2026-10-24 the shadow agent made two probe launches without `FILLY_TEST_SAVE_DIR`. They wrote fresh-game `slot_0.json` and `slot_9.json`, with their `.bak` files, into the live saves folder. Slot 9 was rewritten again at 21:24, by another direct launch.
+  - `tools/run_input_tests.sh`, `run_tests.sh`, `playthrough.sh` and `pony_turntable.sh` all isolate saves. Only the direct one-off launches did not.
+  - The newest play.sh stash is from 2026-08-28, so whatever the slots held is gone.
+  - Every agent brief now requires `FILLY_TEST_SAVE_DIR` on every launch.

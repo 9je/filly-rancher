@@ -28,9 +28,26 @@ uniform float iris_scale = 1.0;
 uniform vec2 iris_centre = vec2(0.554, 0.511);
 // Off for a canon pony: her own iris colours stay, rather than the Drifters' recolour ramp.
 uniform bool recolor = true;
+// THE IRIS PROJECTED, NOT UV-MAPPED, the way Source's "eyes" shader draws it ($iris is cast
+// onto the eyeball along the eye's own axis; the mesh UVs are a generic sphere unwrap that was
+// never meant for it). Spike's eyeballs (world/spike_actor.gd) need this: through their UVs his
+// iris landed as a green sliver at the edge of a blank white eye. Model space: the iris centre,
+// the eye's right and up axes, and the width and height the whole texture spans.
+uniform bool planar = false;
+uniform vec3 eye_origin = vec3(0.0);
+uniform vec3 eye_right = vec3(1.0, 0.0, 0.0);
+uniform vec3 eye_up = vec3(0.0, 1.0, 0.0);
+uniform vec2 eye_size = vec2(0.1);
+varying vec2 planar_uv;
+
+void vertex() {
+	vec3 d = VERTEX - eye_origin;
+	planar_uv = vec2(dot(d, eye_right) / eye_size.x, -dot(d, eye_up) / eye_size.y) + vec2(0.5);
+}
 
 void fragment() {
-	vec2 iuv = iris_centre + (UV - iris_centre) * iris_scale;
+	vec2 base_uv = planar ? planar_uv : UV;
+	vec2 iuv = planar ? base_uv : iris_centre + (UV - iris_centre) * iris_scale;
 	vec4 tex = texture(eye_texture, iuv);
 	bool outside = iuv.x < 0.0 || iuv.y < 0.0 || iuv.x > 1.0 || iuv.y > 1.0 || tex.a < 0.5;
 	vec3 t = outside ? vec3(1.0) : tex.rgb;

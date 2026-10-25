@@ -52,10 +52,17 @@ const LayersScript := preload("res://world/collision_layers.gd")
 const PropsScript := preload("res://world/props.gd")
 const TerrainScript := preload("res://world/terrain.gd")
 
-## Metres of headroom a doorway must offer. The pony's full 2.138 m plus a hand's
-## width, so the number in this file is recognisably the horn-tip measurement and not
-## the withers one.
-const MIN_DOOR_CLEARANCE := 2.25
+## Metres of CLEAR headroom a doorway must offer, from the plinth's top board (FLOOR_TOP, the
+## floor a pony actually walks on) to the underside of the lintel: SCALE.md's door row, 1.3 PH
+## (pony heights) of a 2.19 m pony, so she walks in with room over her ears rather than
+## brushing them.
+##
+## THE BUG THIS USED TO HIDE (docs/playtest_fixes/scale.md). It was 2.25 m and it was compared
+## with `door_height`, which is measured from local y = 0 -- but local y = 0 has been nearly a
+## metre inside a solid plinth since the plinth rose to FLOOR_TOP (2026-08-31). Every door on
+## the map passed the check and stood 1.75 to 2.15 m clear: shorter than the pony walking
+## through it. The check below now subtracts FLOOR_TOP.
+const MIN_DOOR_CLEARANCE := 2.85
 
 ## HOW FAR THE FLOOR SLAB REACHES ABOVE AND BELOW THE BUILDING'S OWN ORIGIN.
 ##
@@ -179,17 +186,19 @@ const GROUND_DROP := SKIRT_DEPTH - SEAT_CLEARANCE - PropsScript.SINK_BIAS
 ## -- face +/-Z.
 @export var depth := 6.5
 ## Height of the eaves.
-@export var wall_height := 3.4
+@export var wall_height := 4.6
 ## Height of the ridge. Must exceed wall_height or the roof is inside out.
-@export var ridge_height := 4.8
+@export var ridge_height := 6.4
 @export var wall_thickness := 0.28
 ## How far the roof oversails the walls.
 @export var eave_overhang := 0.45
 
 @export_group("Doorway")
-## Clear opening in the +Z gable end. Checked against MIN_DOOR_CLEARANCE.
+## Opening in the +Z gable end. door_height is the lintel's underside from local y = 0, so
+## the CLEAR height a pony gets is door_height - FLOOR_TOP (door_clearance()), and that is
+## what MIN_DOOR_CLEARANCE checks.
 @export var door_width := 2.8
-@export var door_height := 2.8
+@export var door_height := 3.85
 
 @export_group("Colour")
 @export var wall_color := Color(0.556863, 0.231373, 0.192157)
@@ -224,11 +233,13 @@ const GROUND_DROP := SKIRT_DEPTH - SEAT_CLEARANCE - PropsScript.SINK_BIAS
 ## few centimetres of set-in ground rather than a pedestal reaching past the model on every
 ## side (see GROUND_CONTACT_SLICE and _model_ground_contact_footprint()).
 @export var model_file := ""
-## Multiplier ON TOP of Props.MLP_SCALE. One, for every building on the shipped map: the
-## whole point of MLP_SCALE is that every converted Source model on this map is at one
-## scale, and a building at a different one is the clash this slice exists to end. It is an
-## export rather than a constant so a model whose shipped size is a defect (the case
-## Props.SCALE_FIX exists for) can be corrected in the scene beside the model that needs it.
+## Multiplier ON TOP of Props.MLP_SCALE, from SCALE.md (docs/playtest_fixes/scale.md). It used
+## to be one on every building, on the argument that one family scale was consistency -- but
+## MLP_SCALE was divided out of ONE barn and never compared with the pony, and it stood the
+## Ponyville houses between 1.6 and 2.6 pony heights: houses a pony could look over. Each
+## shell in ranch.tscn now carries the factor that stands its model several ponies tall, and
+## its width, depth, walls and ridge are scaled by the same number, so the collision is still
+## the box the model fills.
 @export var model_scale := 1.0
 ## Degrees the model is turned about Y inside the shell, so its own entrance faces the
 ## shell's local plus Z -- which is where the doorway, the apron and the attendants are.
@@ -265,6 +276,9 @@ var _wearing := false
 func _ready() -> void:
 	collision_layer = LayersScript.PROPS
 	collision_mask = 0
+	# Hooves on a building are on its planked ramp or its boarded floor (player.gd
+	# SURFACE_META); a worn model's stone foundation is a wall, not somewhere to stand.
+	set_meta(&"step_surface", &"hoof_wood")
 
 
 ## Assemble the building. Idempotent; called by ranch.gd so that seating against the
@@ -275,9 +289,10 @@ func build() -> void:
 		return
 	_built = true
 
-	if door_height < MIN_DOOR_CLEARANCE:
-		push_error(("Building '%s': door_height %.2f m does not clear a pony's %.2f m " +
-			"horn tip -- see MIN_DOOR_CLEARANCE") % [name, door_height, MIN_DOOR_CLEARANCE])
+	if door_width > 0.001 and door_clearance() < MIN_DOOR_CLEARANCE:
+		push_error(("Building '%s': the doorway stands %.2f m clear of the floor, under the " +
+			"%.2f m a pony needs -- see MIN_DOOR_CLEARANCE") % [name, door_clearance(),
+			MIN_DOOR_CLEARANCE])
 	if ridge_height <= wall_height:
 		push_error("Building '%s': ridge_height must exceed wall_height" % name)
 
@@ -453,6 +468,12 @@ func build() -> void:
 		# in daylight. The spec puts interiors out of scope for this slice (section 9), so the
 		# doorway is a threshold and the room behind it is the model's own business.
 		_add_interior_light()
+
+
+## The doorway's clear height over the floor a pony walks on: the lintel's underside
+## (door_height, from local y = 0) less the plinth she stands on (FLOOR_TOP).
+func door_clearance() -> float:
+	return door_height - FLOOR_TOP
 
 
 ## The top of the plinth and the bottom of the skirt, in this building's own parent space.

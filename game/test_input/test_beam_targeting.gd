@@ -44,12 +44,24 @@ func _play() -> void:
 	if not check(is_instance_valid(pony), "she vanished"):
 		return
 	var side := (pony.global_position - player.global_position).cross(Vector3.UP).normalized()
+	# Beside her on the side with nobody else: since the pens moved (SCALE.md) the herd stands
+	# close, and a point beside one pony can be nearer the crosshair to the pony behind it,
+	# whom the beam then rightly prefers.
 	var aim := pony.global_position + Vector3(0, 0.6, 0) + side * OFFSET_M
+	var alt := pony.global_position + Vector3(0, 0.6, 0) - side * OFFSET_M
+	if _clearance(alt, pony) > _clearance(aim, pony):
+		aim = alt
 	await look_at_point(aim, true, 0.01, 90)
 	await physics(8)
 	var lit := _highlighted()
 	note("aimed %.1f m beside her at %.1f m: highlighted %s" % [OFFSET_M,
 		pony.global_position.distance_to(player.global_position), lit])
+	var cam: Camera3D = rig.call("get_camera")
+	for q: Node3D in [pony] + lit:
+		var d := q.global_position + Vector3(0, 0.6, 0) - cam.global_position
+		var fwd := -cam.global_basis.z
+		note("  %s at %s: %.1f deg off the crosshair, %.2f m off its line, %.1f m from the lens" % [q.name,
+			q.global_position, rad_to_deg(fwd.angle_to(d)), (d - fwd * d.dot(fwd)).length(), d.length()])
 	if not check(pony in lit, "aimed %.1f m beside a pony %.1f m away: she is not highlighted (%s)"
 			% [OFFSET_M, pony.global_position.distance_to(player.global_position), lit]):
 		return
@@ -71,6 +83,20 @@ func _play() -> void:
 	if not check(took == pony, "the press took %s, not the highlighted pony" % [took]):
 		return
 	ok("highlight before the press, aim assist %.1f m, and the press took her" % OFFSET_M)
+
+
+## How far the line from the lens through `point` passes from every pony but `except`.
+func _clearance(point: Vector3, except: Node3D) -> float:
+	var from: Vector3 = (rig.call("get_camera") as Camera3D).global_position
+	var dir := (point - from).normalized()
+	var best := INF
+	for p: Node3D in ranch.get("spawner").call("get_spawned"):
+		if p == except:
+			continue
+		var d := p.global_position + Vector3(0, 0.6, 0) - from
+		if d.dot(dir) > 0.0:
+			best = minf(best, (d - dir * d.dot(dir)).length())
+	return best
 
 
 func _nearest_pony() -> Node3D:

@@ -2,61 +2,73 @@
 # Loudness targets: ambient beds -24 LUFS, world and casino SFX -18, UI -20.
 # True peak ceiling -1.5 dBTP; LUFS tolerance 2.0 LU.
 # A row reading FAIL fails the run, and game/test/test_sound_library.gd fails too.
-PASS  ambient/bed_casino_room.ogg         dur=45.00     I=-22.6     TP=-9.8     target=-24
-PASS  ambient/bed_dawn_chorus.ogg         dur=45.00     I=-22.7     TP=-9.9     target=-24
-PASS  ambient/bed_day_meadow.ogg          dur=45.00     I=-22.6     TP=-10.1    target=-24
-PASS  ambient/bed_dusk_calm.ogg           dur=45.00     I=-22.6     TP=-6.2     target=-24
-PASS  ambient/bed_night_insects.ogg       dur=45.00     I=-22.8     TP=-10.2    target=-24
-PASS  ambient/bed_night_owl.ogg           dur=45.00     I=-28.9     TP=-2.3     target=-30
-PASS  ambient/bed_strip_crowd.ogg         dur=45.00     I=-22.6     TP=-7.4     target=-24
-PASS  ambient/bed_strip_hum.ogg           dur=30.00     I=-22.5     TP=-13.3    target=-24
-PASS  ambient/bed_wind_soft.ogg           dur=45.00     I=-22.6     TP=-3.7     target=-24
-PASS  casino/card_flip.wav                dur=0.69      I=-26.8     TP=-3.1     target=none
-PASS  casino/card_slide_1.wav             dur=0.60      I=-27.7     TP=-4.0     target=none
-PASS  casino/card_slide_2.wav             dur=0.58      I=-27.7     TP=-3.2     target=none
-PASS  casino/chip_clink_1.wav             dur=0.17      I=-70.0     TP=-3.3     target=none
-PASS  casino/chip_clink_2.wav             dur=0.23      I=-70.0     TP=-3.1     target=none
-PASS  casino/chip_clink_3.wav             dur=0.27      I=-70.0     TP=-4.2     target=none
-PASS  casino/race_cheer.wav               dur=5.50      I=-16.5     TP=-5.2     target=-18
-PASS  casino/race_crowd_loop.ogg          dur=30.00     I=-20.6     TP=-7.5     target=-22
-PASS  casino/race_gallop.ogg              dur=20.00     I=-20.5     TP=-9.8     target=-22
-PASS  casino/reel_stop.wav                dur=0.43      I=-19.5     TP=-5.6     target=none
-PASS  casino/reel_tick.wav                dur=0.20      I=-70.0     TP=-5.8     target=none
-PASS  casino/slots_win.wav                dur=0.54      I=-17.8     TP=-5.7     target=none
-PASS  casino/wheel_ratchet.wav            dur=0.03      I=-70.0     TP=-2.9     target=none
-PASS  casino/wheel_settle.wav             dur=1.25      I=-19.4     TP=-5.6     target=none
-PASS  music/casino_backbay.ogg            dur=266.55    I=-20.4     TP=-4.8     target=-22
-PASS  music/day_morning.ogg               dur=153.31    I=-18.5     TP=-4.8     target=-20
-PASS  music/dread_ossuary.ogg             dur=250.07    I=-20.5     TP=-4.6     target=-22
-PASS  music/ending_lost_time.ogg          dur=227.40    I=-18.5     TP=-4.8     target=-20
-PASS  music/ending_promises.ogg           dur=304.07    I=-21.5     TP=-1.8     target=-23
-PASS  music/night_evening.ogg             dur=186.25    I=-19.4     TP=-6.9     target=-21
-PASS  music/stealth_stay_the_course.ogg   dur=272.07    I=-19.5     TP=-8.0     target=-21
-PASS  music/town_carefree.ogg             dur=205.14    I=-19.5     TP=-2.5     target=-21
-PASS  music/works_gone_beyond.ogg         dur=161.07    I=-19.4     TP=-7.9     target=-21
-PASS  ui/ui_back.wav                      dur=0.09      I=-70.0     TP=-7.5     target=none
-PASS  ui/ui_confirm.wav                   dur=0.38      I=-70.0     TP=-7.3     target=none
-PASS  ui/ui_denied.wav                    dur=0.10      I=-70.0     TP=-3.7     target=none
-PASS  ui/ui_move.wav                      dur=0.01      I=-70.0     TP=-5.3     target=none
-PASS  ui/ui_open.wav                      dur=0.32      I=-70.0     TP=-13.8    target=none
-PASS  ui/ui_page.wav                      dur=0.12      I=-70.0     TP=-7.5     target=none
-PASS  world/bloom_fanfare.wav             dur=3.92      I=-16.5     TP=-5.1     target=-18
-PASS  world/capture_charge.ogg            dur=1.19      I=-19.5     TP=-8.4     target=-21
-PASS  world/capture_success.wav           dur=0.29      I=-70.0     TP=-5.6     target=none
-PASS  world/coins_grant.wav               dur=0.56      I=-16.4     TP=-2.4     target=-18
-PASS  world/delivery_thud.wav             dur=0.79      I=-26.2     TP=-9.4     target=none
-PASS  world/gate_open.wav                 dur=2.03      I=-16.5     TP=-7.2     target=-18
-PASS  world/hoofsteps_grass_1.wav         dur=0.12      I=-70.0     TP=-12.7    target=none
-PASS  world/hoofsteps_grass_2.wav         dur=0.13      I=-70.0     TP=-13.3    target=none
-PASS  world/hoofsteps_grass_3.wav         dur=0.25      I=-70.0     TP=-14.9    target=none
-PASS  world/hoofsteps_grass_4.wav         dur=0.35      I=-70.0     TP=-12.4    target=none
-PASS  world/hoofsteps_hard_1.wav          dur=0.35      I=-70.0     TP=-7.6     target=none
-PASS  world/hoofsteps_hard_2.wav          dur=0.29      I=-70.0     TP=-7.9     target=none
-PASS  world/hoofsteps_hard_3.wav          dur=0.19      I=-70.0     TP=-7.7     target=none
-PASS  world/hoofsteps_hard_4.wav          dur=0.18      I=-70.0     TP=-8.0     target=none
-PASS  world/mail_arrive.wav               dur=0.56      I=-27.8     TP=-12.6    target=none
-PASS  world/mail_open.wav                 dur=1.02      I=-25.7     TP=-1.6     target=none
-PASS  world/mail_stamp.wav                dur=0.30      I=-70.0     TP=-10.2    target=none
-PASS  world/neigh_real.wav                dur=2.05      I=-13.7     TP=-2.6     target=none
-PASS  world/scoop_pop.wav                 dur=0.28      I=-70.0     TP=-3.3     target=none
-PASS  world/sparkle.wav                   dur=0.28      I=-70.0     TP=-5.5     target=none
+PASS  ambient/bed_casino_room.ogg         dur=45.00     I=-24.1     TP=-11.2    target=-24
+PASS  ambient/bed_dawn_chorus.ogg         dur=45.00     I=-24.3     TP=-11.7    target=-24
+PASS  ambient/bed_day_meadow.ogg          dur=45.00     I=-24.1     TP=-11.3    target=-24
+PASS  ambient/bed_dusk_calm.ogg           dur=45.00     I=-24.1     TP=-7.1     target=-24
+PASS  ambient/bed_night_insects.ogg       dur=45.00     I=-24.3     TP=-11.9    target=-24
+PASS  ambient/bed_night_owl.ogg           dur=45.00     I=-30.4     TP=-3.8     target=-30
+PASS  ambient/bed_strip_crowd.ogg         dur=45.00     I=-24.1     TP=-9.1     target=-24
+PASS  ambient/bed_strip_hum.ogg           dur=30.00     I=-24.0     TP=-14.6    target=-24
+PASS  ambient/bed_wind_soft.ogg           dur=45.00     I=-24.1     TP=-5.3     target=-24
+PASS  casino/card_flip.wav                dur=0.69      I=-28.3     TP=-4.6     target=none
+PASS  casino/card_slide_1.wav             dur=0.60      I=-29.2     TP=-5.5     target=none
+PASS  casino/card_slide_2.wav             dur=0.58      I=-29.2     TP=-4.7     target=none
+PASS  casino/chip_clink_1.wav             dur=0.17      I=-70.0     TP=-4.9     target=none
+PASS  casino/chip_clink_2.wav             dur=0.23      I=-70.0     TP=-4.7     target=none
+PASS  casino/chip_clink_3.wav             dur=0.27      I=-70.0     TP=-5.7     target=none
+PASS  casino/race_cheer.wav               dur=5.50      I=-18.0     TP=-6.7     target=-18
+PASS  casino/race_crowd_loop.ogg          dur=30.00     I=-22.1     TP=-9.1     target=-22
+PASS  casino/race_gallop.ogg              dur=20.00     I=-22.0     TP=-11.5    target=-22
+PASS  casino/reel_stop.wav                dur=0.16      I=-70.0     TP=-3.0     target=M-21  M=-28.9
+PASS  casino/reel_tick.wav                dur=0.10      I=-70.0     TP=-3.0     target=M-26  M=-33.7
+PASS  casino/slots_win.wav                dur=0.54      I=-19.3     TP=-7.2     target=none
+PASS  casino/wheel_ratchet.wav            dur=0.01      I=-70.0     TP=-3.0     target=M-27  M=-31.5
+PASS  casino/wheel_settle.wav             dur=0.53      I=-32.6     TP=-3.0     target=M-20  M=-32.6
+PASS  music/casino_backbay.ogg            dur=266.55    I=-22.0     TP=-6.5     target=-22
+PASS  music/day_morning.ogg               dur=153.31    I=-20.0     TP=-6.2     target=-20
+PASS  music/dread_ossuary.ogg             dur=250.07    I=-22.0     TP=-5.9     target=-22
+PASS  music/ending_lost_time.ogg          dur=227.40    I=-20.0     TP=-6.4     target=-20
+PASS  music/ending_promises.ogg           dur=304.07    I=-23.0     TP=-3.3     target=-23
+PASS  music/night_evening.ogg             dur=186.25    I=-20.9     TP=-8.7     target=-21
+PASS  music/stealth_stay_the_course.ogg   dur=272.07    I=-21.0     TP=-9.5     target=-21
+PASS  music/town_carefree.ogg             dur=205.14    I=-21.0     TP=-3.9     target=-21
+PASS  music/works_gone_beyond.ogg         dur=161.07    I=-21.0     TP=-9.3     target=-21
+PASS  ui/ui_back.wav                      dur=0.18      I=-70.0     TP=-20.6    target=M-30  M=-30.1
+PASS  ui/ui_confirm.wav                   dur=0.38      I=-70.0     TP=-8.8     target=none
+PASS  ui/ui_denied.wav                    dur=0.50      I=-26.2     TP=-7.4     target=M-25  M=-25.0
+PASS  ui/ui_move.wav                      dur=0.01      I=-70.0     TP=-6.9     target=none
+PASS  ui/ui_open.wav                      dur=0.18      I=-70.0     TP=-11.6    target=M-25  M=-25.0
+PASS  ui/ui_page.wav                      dur=0.12      I=-70.0     TP=-9.1     target=none
+PASS  world/bloom_fanfare.wav             dur=3.92      I=-18.0     TP=-6.6     target=-18
+PASS  world/capture_charge.ogg            dur=1.19      I=-21.0     TP=-10.1    target=-21
+PASS  world/capture_success.wav           dur=0.29      I=-70.0     TP=-7.1     target=none
+PASS  world/coins_grant.wav               dur=0.62      I=-29.2     TP=-3.0     target=M-18  M=-27.6
+PASS  world/delivery_thud.wav             dur=0.54      I=-24.7     TP=-4.1     target=M-22  M=-22.0
+PASS  world/gate_open.wav                 dur=0.66      I=-21.3     TP=-6.6     target=M-20  M=-20.0
+PASS  world/hoof_dirt_1.wav               dur=0.40      I=-27.0     TP=-4.9     target=M-27  M=-27.0
+PASS  world/hoof_dirt_2.wav               dur=0.40      I=-27.0     TP=-8.0     target=M-27  M=-27.0
+PASS  world/hoof_dirt_3.wav               dur=0.40      I=-27.0     TP=-7.7     target=M-27  M=-27.0
+PASS  world/hoof_dirt_4.wav               dur=0.40      I=-27.0     TP=-4.0     target=M-27  M=-27.0
+PASS  world/hoof_grass_1.wav              dur=0.30      I=-70.0     TP=-3.0     target=M-28  M=-30.6
+PASS  world/hoof_grass_2.wav              dur=0.30      I=-70.0     TP=-3.0     target=M-28  M=-29.8
+PASS  world/hoof_grass_3.wav              dur=0.30      I=-70.0     TP=-3.0     target=M-28  M=-30.3
+PASS  world/hoof_grass_4.wav              dur=0.30      I=-70.0     TP=-3.0     target=M-28  M=-30.4
+PASS  world/hoof_metal_1.wav              dur=0.30      I=-70.0     TP=-8.1     target=M-26  M=-26.0
+PASS  world/hoof_metal_2.wav              dur=0.25      I=-70.0     TP=-7.2     target=M-26  M=-26.0
+PASS  world/hoof_metal_3.wav              dur=0.23      I=-70.0     TP=-6.9     target=M-26  M=-26.0
+PASS  world/hoof_metal_4.wav              dur=0.21      I=-70.0     TP=-6.0     target=M-26  M=-26.0
+PASS  world/hoof_stone_1.wav              dur=0.10      I=-70.0     TP=-3.0     target=M-25  M=-30.6
+PASS  world/hoof_stone_2.wav              dur=0.10      I=-70.0     TP=-3.0     target=M-25  M=-31.9
+PASS  world/hoof_stone_3.wav              dur=0.11      I=-70.0     TP=-3.0     target=M-25  M=-32.0
+PASS  world/hoof_stone_4.wav              dur=0.11      I=-70.0     TP=-3.0     target=M-25  M=-31.1
+PASS  world/hoof_wood_1.wav               dur=0.24      I=-70.0     TP=-3.0     target=M-25  M=-26.9
+PASS  world/hoof_wood_2.wav               dur=0.24      I=-70.0     TP=-3.0     target=M-25  M=-26.7
+PASS  world/hoof_wood_3.wav               dur=0.24      I=-70.0     TP=-3.0     target=M-25  M=-29.0
+PASS  world/hoof_wood_4.wav               dur=0.24      I=-70.0     TP=-3.0     target=M-25  M=-29.4
+PASS  world/mail_arrive.wav               dur=0.45      I=-26.6     TP=-3.0     target=M-24  M=-26.6
+PASS  world/mail_open.wav                 dur=0.77      I=-27.7     TP=-3.0     target=M-24  M=-27.6
+PASS  world/mail_stamp.wav                dur=0.16      I=-70.0     TP=-3.0     target=M-26  M=-27.8
+PASS  world/neigh_real.wav                dur=2.05      I=-19.2     TP=-8.0     target=M-17  M=-17.0
+PASS  world/scoop_pop.wav                 dur=0.28      I=-70.0     TP=-4.8     target=none
+PASS  world/sparkle.wav                   dur=0.28      I=-70.0     TP=-7.0     target=none

@@ -127,3 +127,32 @@ static func binding_name(action: StringName) -> String:
 				else DisplayServer.keyboard_get_keycode_from_physical(k.physical_keycode)
 			return OS.get_keycode_string(code)
 	return ""
+
+
+## A controller button, the way a pad reports it: device 0, pressed or let go.
+static func joy_button(button: JoyButton, pressed: bool) -> void:
+	var b := InputEventJoypadButton.new()
+	b.device = 0
+	b.button_index = button
+	b.pressed = pressed
+	b.pressure = 1.0 if pressed else 0.0
+	Input.parse_input_event(b)
+
+
+## A controller stick or trigger moved to `value` (-1..1); 0 is the stick back at rest.
+static func joy_axis(axis: JoyAxis, value: float) -> void:
+	var m := InputEventJoypadMotion.new()
+	m.device = 0
+	m.axis = axis
+	m.axis_value = value
+	Input.parse_input_event(m)
+
+
+## A key with modifiers (Shift+Tab), pressed and let go is the caller's business.
+static func key_mod(keycode: Key, pressed: bool, shift := false) -> void:
+	var k := InputEventKey.new()
+	k.keycode = keycode
+	k.physical_keycode = keycode
+	k.shift_pressed = shift
+	k.pressed = pressed
+	Input.parse_input_event(k)
