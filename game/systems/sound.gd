@@ -157,6 +157,12 @@ const LIBRARY: Dictionary = {
 	&"gate_open": {
 		"paths": ["res://assets/audio/world/gate_open.wav"],
 		"bus": BUS_EFFECTS, "volume_db": 3.0, "pitch_min": 0.94, "pitch_max": 1.06, "loop": false},
+	# A PONY GOES INTO A PEN: a latch and a two-note marimba rise (tools/make_pen_sounds.py),
+	# soft and short. It replaced gate_open's door creak at +3 dB on every penning (owner
+	# playtest 2026-10-25, "sound on paddock is pretty bad").
+	&"pen_in": {
+		"paths": ["res://assets/audio/world/pen_in.wav"],
+		"bus": BUS_EFFECTS, "volume_db": -8.0, "pitch_min": 0.98, "pitch_max": 1.03, "loop": false},
 	&"mail_arrive": {
 		"paths": ["res://assets/audio/world/mail_arrive.wav"],
 		"bus": BUS_EFFECTS, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": false},

@@ -4379,7 +4379,7 @@ func _move_pony_into_pen(slot: PlotSlot) -> bool:
 	# never happened.
 	if _board != null:
 		_pay_out(_board.on_penned(instance.data()))
-	_sound_call(&"play_at", [&"gate_open", pen.global_position])
+	_sound_call(&"play_at", [&"pen_in", pen.global_position])
 	if _game_state != null:
 		_game_state.onboarding.note(&"pen")
 	return true

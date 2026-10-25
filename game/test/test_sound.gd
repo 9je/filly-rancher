@@ -183,7 +183,7 @@ func test_every_world_sound_plays_and_reports_that_it_did() -> void:
 	var Sound := _sound_autoload()
 	for id: StringName in [&"mail_arrive", &"mail_open", &"mail_stamp", &"capture_charge",
 			&"capture_success", &"hoof_grass", &"hoof_dirt", &"hoof_wood", &"hoof_stone",
-			&"hoof_metal", &"gate_open",
+			&"hoof_metal", &"gate_open", &"pen_in",
 			&"delivery_thud", &"coins_grant"]:
 		assert_true(Sound.has_id(id), "'%s' is missing from LIBRARY" % id)
 		assert_true(Sound.play_at(id, Vector3(1.0, 0.0, 2.0)), "'%s' would not play" % id)

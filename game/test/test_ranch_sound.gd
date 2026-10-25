@@ -41,7 +41,7 @@ func test_ranch_declares_a_sound_zone_reader() -> void:
 func test_every_id_the_ranch_fires_is_in_the_library() -> void:
 	# The whole point of a registry is that a typo at a call site is caught here rather
 	# than by a player hearing nothing.
-	for id: StringName in [&"mail_arrive", &"delivery_thud", &"gate_open", &"coins_grant",
+	for id: StringName in [&"mail_arrive", &"delivery_thud", &"pen_in", &"coins_grant",
 			&"race_crowd_loop", &"race_gallop", &"race_cheer", &"capture_charge",
 			&"capture_success"]:
 		assert_true(SoundScript.LIBRARY.has(id), "ranch fires '%s' and it is not in LIBRARY" % id)
