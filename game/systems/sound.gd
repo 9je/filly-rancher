@@ -84,6 +84,9 @@ const GAG_CHANCE := 0.042
 ##   pitch_min  lower bound of the per play pitch roll.
 ##   pitch_max  upper bound; equal to pitch_min means "never vary".
 ##   loop       true only for the ogg beds; every wav one shot is false.
+##   volume_jitter_db  OPTIONAL. Each play lands up to this many dB either side of volume_db,
+##              rolled on _rng like the pitch. The hoofsteps carry it; nothing else needs it.
+##   no_repeat  OPTIONAL. A variant set never plays the same take twice running.
 ## "paths" is written as a plain array literal rather than a PackedStringArray(...) call:
 ## Godot 4.5.2's parser refuses to fold that constructor call as a constant expression
 ## inside a const Dictionary, so the call form fails to parse here even though it is legal
@@ -147,18 +150,22 @@ const LIBRARY: Dictionary = {
 		"paths": ["res://assets/audio/ambient/bed_casino_room.ogg"],
 		"bus": BUS_AMBIENT, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": true},
 	# --- world ---
+	# AUDIO AUDIT 2026-10-24: gate_open, mail_open, mail_stamp, coins_grant, reel_tick,
+	# reel_stop and wheel_settle are new, clean recordings (tools/sound_manifest.txt), and the
+	# volume_db each carries now puts the EVENT back about where the old one sat: the old
+	# files' measured loudness was half room tone. AUDIO_AUDIT.md has the numbers.
 	&"gate_open": {
 		"paths": ["res://assets/audio/world/gate_open.wav"],
-		"bus": BUS_EFFECTS, "volume_db": 0.0, "pitch_min": 0.94, "pitch_max": 1.06, "loop": false},
+		"bus": BUS_EFFECTS, "volume_db": 3.0, "pitch_min": 0.94, "pitch_max": 1.06, "loop": false},
 	&"mail_arrive": {
 		"paths": ["res://assets/audio/world/mail_arrive.wav"],
 		"bus": BUS_EFFECTS, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": false},
 	&"mail_open": {
 		"paths": ["res://assets/audio/world/mail_open.wav"],
-		"bus": BUS_EFFECTS, "volume_db": 0.0, "pitch_min": 0.97, "pitch_max": 1.03, "loop": false},
+		"bus": BUS_EFFECTS, "volume_db": 2.0, "pitch_min": 0.97, "pitch_max": 1.03, "loop": false},
 	&"mail_stamp": {
 		"paths": ["res://assets/audio/world/mail_stamp.wav"],
-		"bus": BUS_EFFECTS, "volume_db": 0.0, "pitch_min": 0.96, "pitch_max": 1.04, "loop": false},
+		"bus": BUS_EFFECTS, "volume_db": -3.0, "pitch_min": 0.96, "pitch_max": 1.04, "loop": false},
 	# loop: true, not because the file butt-loops (it does not; see the manifest recipe), but
 	# because a hold can end before the clip finishes and play_loop()/stop_loop() is the only
 	# verb pair that gives magic_beam.gd a voice it can address and cut short. pitch_min and
@@ -180,26 +187,58 @@ const LIBRARY: Dictionary = {
 	&"capture_success": {
 		"paths": ["res://assets/audio/world/capture_success.wav"],
 		"bus": BUS_EFFECTS, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": false},
-	&"hoofsteps_grass": {
+	# HOOFSTEPS, ONE SET PER SURFACE (the audit of 2026-10-24; tools/sound_manifest.txt has
+	# the sources). Player.gd plays one on every footfall of the clip under her and picks the
+	# set from the ground under that hoof. Each play rolls a pitch inside a small window and
+	# a volume inside volume_jitter_db either side of volume_db, and never repeats the take
+	# it played last (no_repeat), which is what keeps a run of eleven a second from reading
+	# as one sample on a loop.
+	&"hoof_grass": {
 		"paths": [
-			"res://assets/audio/world/hoofsteps_grass_1.wav",
-			"res://assets/audio/world/hoofsteps_grass_2.wav",
-			"res://assets/audio/world/hoofsteps_grass_3.wav",
-			"res://assets/audio/world/hoofsteps_grass_4.wav"],
-		"bus": BUS_EFFECTS, "volume_db": -8.0, "pitch_min": 0.90, "pitch_max": 1.12, "loop": false},
-	&"hoofsteps_hard": {
+			"res://assets/audio/world/hoof_grass_1.wav",
+			"res://assets/audio/world/hoof_grass_2.wav",
+			"res://assets/audio/world/hoof_grass_3.wav",
+			"res://assets/audio/world/hoof_grass_4.wav"],
+		"bus": BUS_EFFECTS, "volume_db": -8.0, "pitch_min": 0.94, "pitch_max": 1.07, "loop": false,
+		"volume_jitter_db": 1.5, "no_repeat": true},
+	&"hoof_dirt": {
 		"paths": [
-			"res://assets/audio/world/hoofsteps_hard_1.wav",
-			"res://assets/audio/world/hoofsteps_hard_2.wav",
-			"res://assets/audio/world/hoofsteps_hard_3.wav",
-			"res://assets/audio/world/hoofsteps_hard_4.wav"],
-		"bus": BUS_EFFECTS, "volume_db": -8.0, "pitch_min": 0.90, "pitch_max": 1.12, "loop": false},
+			"res://assets/audio/world/hoof_dirt_1.wav",
+			"res://assets/audio/world/hoof_dirt_2.wav",
+			"res://assets/audio/world/hoof_dirt_3.wav",
+			"res://assets/audio/world/hoof_dirt_4.wav"],
+		"bus": BUS_EFFECTS, "volume_db": -9.0, "pitch_min": 0.94, "pitch_max": 1.07, "loop": false,
+		"volume_jitter_db": 1.5, "no_repeat": true},
+	&"hoof_wood": {
+		"paths": [
+			"res://assets/audio/world/hoof_wood_1.wav",
+			"res://assets/audio/world/hoof_wood_2.wav",
+			"res://assets/audio/world/hoof_wood_3.wav",
+			"res://assets/audio/world/hoof_wood_4.wav"],
+		"bus": BUS_EFFECTS, "volume_db": -9.0, "pitch_min": 0.94, "pitch_max": 1.07, "loop": false,
+		"volume_jitter_db": 1.5, "no_repeat": true},
+	&"hoof_stone": {
+		"paths": [
+			"res://assets/audio/world/hoof_stone_1.wav",
+			"res://assets/audio/world/hoof_stone_2.wav",
+			"res://assets/audio/world/hoof_stone_3.wav",
+			"res://assets/audio/world/hoof_stone_4.wav"],
+		"bus": BUS_EFFECTS, "volume_db": -6.0, "pitch_min": 0.94, "pitch_max": 1.07, "loop": false,
+		"volume_jitter_db": 1.5, "no_repeat": true},
+	&"hoof_metal": {
+		"paths": [
+			"res://assets/audio/world/hoof_metal_1.wav",
+			"res://assets/audio/world/hoof_metal_2.wav",
+			"res://assets/audio/world/hoof_metal_3.wav",
+			"res://assets/audio/world/hoof_metal_4.wav"],
+		"bus": BUS_EFFECTS, "volume_db": -9.0, "pitch_min": 0.94, "pitch_max": 1.07, "loop": false,
+		"volume_jitter_db": 1.5, "no_repeat": true},
 	&"delivery_thud": {
 		"paths": ["res://assets/audio/world/delivery_thud.wav"],
 		"bus": BUS_EFFECTS, "volume_db": 0.0, "pitch_min": 0.94, "pitch_max": 1.06, "loop": false},
 	&"coins_grant": {
 		"paths": ["res://assets/audio/world/coins_grant.wav"],
-		"bus": BUS_EFFECTS, "volume_db": 0.0, "pitch_min": 0.97, "pitch_max": 1.05, "loop": false},
+		"bus": BUS_EFFECTS, "volume_db": 6.0, "pitch_min": 0.97, "pitch_max": 1.05, "loop": false},
 	&"neigh_real": {
 		"paths": ["res://assets/audio/world/neigh_real.wav"],
 		"bus": BUS_EFFECTS, "volume_db": -9.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": false},
@@ -220,10 +259,10 @@ const LIBRARY: Dictionary = {
 		"bus": BUS_EFFECTS, "volume_db": -3.0, "pitch_min": 0.96, "pitch_max": 1.05, "loop": false},
 	&"reel_tick": {
 		"paths": ["res://assets/audio/casino/reel_tick.wav"],
-		"bus": BUS_EFFECTS, "volume_db": -14.0, "pitch_min": 0.96, "pitch_max": 1.06, "loop": false},
+		"bus": BUS_EFFECTS, "volume_db": -10.0, "pitch_min": 0.96, "pitch_max": 1.06, "loop": false},
 	&"reel_stop": {
 		"paths": ["res://assets/audio/casino/reel_stop.wav"],
-		"bus": BUS_EFFECTS, "volume_db": -4.0, "pitch_min": 0.96, "pitch_max": 1.04, "loop": false},
+		"bus": BUS_EFFECTS, "volume_db": 0.0, "pitch_min": 0.96, "pitch_max": 1.04, "loop": false},
 	&"slots_win": {
 		"paths": ["res://assets/audio/casino/slots_win.wav"],
 		"bus": BUS_EFFECTS, "volume_db": -2.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": false},
@@ -232,7 +271,7 @@ const LIBRARY: Dictionary = {
 		"bus": BUS_EFFECTS, "volume_db": -12.0, "pitch_min": 0.96, "pitch_max": 1.06, "loop": false},
 	&"wheel_settle": {
 		"paths": ["res://assets/audio/casino/wheel_settle.wav"],
-		"bus": BUS_EFFECTS, "volume_db": -3.0, "pitch_min": 0.97, "pitch_max": 1.04, "loop": false},
+		"bus": BUS_EFFECTS, "volume_db": 3.0, "pitch_min": 0.97, "pitch_max": 1.04, "loop": false},
 	&"race_crowd_loop": {
 		"paths": ["res://assets/audio/casino/race_crowd_loop.ogg"],
 		"bus": BUS_EFFECTS, "volume_db": -6.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": true},
@@ -421,7 +460,7 @@ func play(id: StringName) -> bool:
 	if entry_data.is_empty():
 		push_error("Sound.play: unknown id '%s'" % id)
 		return false
-	var stream: AudioStream = _pick_stream(entry_data)
+	var stream: AudioStream = _pick_stream(entry_data, id)
 	if stream == null:
 		return false
 	var player: AudioStreamPlayer = _pool_2d[_next_2d]
@@ -429,7 +468,7 @@ func play(id: StringName) -> bool:
 	player.stop()
 	player.stream = stream
 	player.bus = String(entry_data.get("bus", BUS_EFFECTS))
-	player.volume_db = float(entry_data.get("volume_db", 0.0))
+	player.volume_db = pick_volume(entry_data)
 	player.pitch_scale = pick_pitch(
 		float(entry_data.get("pitch_min", 1.0)), float(entry_data.get("pitch_max", 1.0)))
 	# A UI tick has to be audible while the tree is paused; nothing else does.
@@ -441,13 +480,16 @@ func play(id: StringName) -> bool:
 
 
 ## A 3D one shot at a world position: hooves, a gate, a crate set down, a letterbox flap.
-func play_at(id: StringName, pos: Vector3) -> bool:
+##
+## `volume_offset_db` is the caller's own accent on top of the entry's level (player.gd
+## lands a rear hoof a touch under a front one); it is added after the entry's own jitter.
+func play_at(id: StringName, pos: Vector3, volume_offset_db: float = 0.0) -> bool:
 	id = _resolve_play_id(id)
 	var entry_data: Dictionary = entry(id)
 	if entry_data.is_empty():
 		push_error("Sound.play_at: unknown id '%s'" % id)
 		return false
-	var stream: AudioStream = _pick_stream(entry_data)
+	var stream: AudioStream = _pick_stream(entry_data, id)
 	if stream == null:
 		return false
 	var player: AudioStreamPlayer3D = _pool_3d[_next_3d]
@@ -455,7 +497,7 @@ func play_at(id: StringName, pos: Vector3) -> bool:
 	player.stop()
 	player.stream = stream
 	player.bus = String(entry_data.get("bus", BUS_EFFECTS))
-	player.volume_db = float(entry_data.get("volume_db", 0.0))
+	player.volume_db = pick_volume(entry_data) + volume_offset_db
 	player.pitch_scale = pick_pitch(
 		float(entry_data.get("pitch_min", 1.0)), float(entry_data.get("pitch_max", 1.0)))
 	player.global_position = pos
@@ -704,11 +746,31 @@ func pick_pitch(low: float, high: float) -> float:
 	return _rng.randf_range(minf(low, high), maxf(low, high))
 
 
-func _pick_stream(entry_data: Dictionary) -> AudioStream:
+## The entry's volume_db, plus its volume_jitter_db roll when it carries one.
+func pick_volume(entry_data: Dictionary) -> float:
+	var base := float(entry_data.get("volume_db", 0.0))
+	var jitter := float(entry_data.get("volume_jitter_db", 0.0))
+	if jitter <= 0.0 or _rng == null:
+		return base
+	return base + _rng.randf_range(-jitter, jitter)
+
+
+## Id to the variant index it played last, for the no_repeat entries.
+var _last_variant: Dictionary = {}
+
+
+func _pick_stream(entry_data: Dictionary, id: StringName = &"") -> AudioStream:
 	var paths: PackedStringArray = entry_data.get("paths", PackedStringArray())
 	if paths.is_empty():
 		return null
-	var path: String = paths[pick_variant(paths.size())]
+	var index := pick_variant(paths.size())
+	if bool(entry_data.get("no_repeat", false)) and paths.size() > 1 \
+			and index == int(_last_variant.get(id, -1)):
+		# One step on from a repeat, rather than a re-roll: still uniform over the
+		# others, and it costs no second draw from _rng.
+		index = (index + 1) % paths.size()
+	_last_variant[id] = index
+	var path: String = paths[index]
 	var stream: AudioStream = stream_for(path)
 	if stream == null:
 		push_error("Sound: no loaded stream for '%s'" % path)

@@ -119,6 +119,8 @@ func _floor(room: Node3D, spec: Dictionary) -> void:
 	room.add_child(slab)
 	ToonStylerScript.style(slab, &"flat", {})
 	var body := StaticBody3D.new()
+	# What her hooves sound like on it (player.gd SURFACE_META): grating rings, tile clacks.
+	body.set_meta(&"step_surface", &"hoof_metal" if spec.metal else &"hoof_stone")
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
 	box.size = Vector3(ROOM_SIZE, 0.2, ROOM_SIZE)
