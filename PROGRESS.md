@@ -126,4 +126,5 @@ Canon MLP stays: real names, looks and places ("lean into mlp fully", private bu
 - **The first catch can no longer be wrenched away** (found after the merges: test_first_pony was failing 2 runs in 4).
 - **The real-input playthrough driver** reached all five endings from a new game, each run separately.
 - **Gates on the final code:** the GUT suite, and all 10 real-input tests through tools/run_input_tests.sh.
+- **Exports rebuilt** (Linux and Windows, 0 export errors). The Linux build ran on the GPU invisibly and exited cleanly, but printed engine errors that come only from the experimental render thread and were already there before this round (DECISIONS.md).
 - **Two of the owner's save slots (0 and 9) were overwritten** by an agent's probe runs, and they could not be recovered (DECISIONS.md).

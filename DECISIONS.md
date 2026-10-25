@@ -228,3 +228,16 @@ Decisions:
   - `tools/run_input_tests.sh`, `run_tests.sh`, `playthrough.sh` and `pony_turntable.sh` all isolate saves. Only the direct one-off launches did not.
   - The newest play.sh stash is from 2026-08-28, so whatever the slots held is gone.
   - Every agent brief now requires `FILLY_TEST_SAVE_DIR` on every launch.
+- **First catch: no wrench** (`MagicBeam.first_catch_grace`). After the merges, `test_first_pony` failed 2 runs in 4.
+  - A new player's nearest pony can be bold. A HARD hold wrenches at 0.5, about 0.85 s in, so the first catch the tips teach was a coin toss.
+  - While story var `catches` is 0 on an interactive ranch, the beam applies the falloff rule it already has, as if this were her third grab.
+  - The GUT sweep reads 26 of 64 seeds wrenching without the grace, and 0 with it.
+- **The final export launch printed engine errors, and they were left in place.**
+  - The Linux export ran on the RX 9070 XT in the invisible display and exited cleanly. It printed:
+    - 1 to 3 `Condition "p_image.is_null() || p_image->is_empty()"` errors from `_texture_2d_update`;
+    - one `finalize can only be called from the render thread` error at quit.
+  - Both appear only with the experimental render thread (`thread_model=2`, on since 2026-10-23 for the 60-pony target). With `--render-thread safe` there are none.
+  - The exit error appears even with no scene loaded, so it is the engine's own shutdown.
+  - The empty-image errors appear at the title, vary from run to run, and print the same on the commit before this round (877d56d). The boot splash was ruled out.
+  - Safe mode costs about 4 ms a frame on the 60-pony check (average 21.0 ms against 17.0 ms in the invisible display), which would give up the 60 fps target. So the render thread stays, and these errors are recorded as a known issue rather than hidden.
+  - If the owner sees instability, set `rendering/driver/threads/thread_model` to 1 (Safe). One boot crash in this round, a signal 11 in the camera agent's run, probably came from the same mode.
