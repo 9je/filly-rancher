@@ -437,6 +437,19 @@ const NAMED_MANE := Color(0.36, 0.16, 0.42)
 const MIN_PLOT_SLOTS := 4
 const MAX_PLOT_SLOTS := 6
 
+## THE PLOTS THAT START OVERGROWN, and what clearing each one costs. Owner playtest
+## 2026-10-25: 17 ponies in 11.6 minutes and a free Paddock on all four plots before the Big
+## Pen ever mattered. Two plots start open (two free Paddocks, six ponies); the third costs
+## less than the first upgrade so the first real decision is "more ground or a bigger pen",
+## and the fourth costs more than either so it is the mid-game goal. Reasoning in
+## DECISIONS.md, 2026-10-25. Keyed by slot_id (ranch.tscn), so a re-laid-out map keeps the
+## rule as long as it keeps the ids.
+const PLOT_CLEAR_COSTS := {"slot_3": 100, "slot_4": 250}
+
+## The story flag that remembers a plot was cleared (saved with the story, so no save
+## format change). Also set for any overgrown-by-rule plot a save already built on.
+const PLOT_CLEARED_FLAG := "plot_cleared_"
+
 ## Metres of height variation allowed across the reserved clearing.
 ##
 ## THIS IS THE ASSUMPTION game/world/pen.gd's CARPENTRY RESTS ON. A pen's fence is built
@@ -1134,6 +1147,8 @@ func _ready() -> void:
 
 	# Now the player's actual ranch: what she built, then who lives in it.
 	_restored_plots = _restore_plots()
+	# Then the brambles, over every rule-overgrown plot she has neither cleared nor built on.
+	_apply_overgrowth()
 
 	# After the beam exists and the world has settled: put the ponies the player owned when
 	# she quit back where they live -- pens first, saddlebag for everyone else.
@@ -1458,9 +1473,71 @@ func _restore_plots() -> int:
 				"type this build carries. The slot has been left empty and buildable.")
 				% [String(slot.slot_id), plot_id])
 			continue
+		# A pen in the save wins over the brambles (an old save built here before plots
+		# could be overgrown); _apply_overgrowth() then records the plot as cleared.
+		if slot.is_overgrown():
+			slot.set_overgrown(false)
 		if slot.build(plot):
 			built += 1
 	return built
+
+
+## Grow the brambles back over every plot PLOT_CLEAR_COSTS names that the player has not
+## paid to clear, and clear them off every one she has. A plot with something built on it is
+## cleared by definition and is RECORDED as cleared here, so an old save whose third and
+## fourth plots already hold pens keeps them, and keeps the ground if she ever takes one down.
+func _apply_overgrowth() -> void:
+	for slot in _plot_slots():
+		var cost: int = int(PLOT_CLEAR_COSTS.get(String(slot.slot_id), 0))
+		if cost <= 0 or _game_state == null:
+			slot.set_overgrown(false)
+			continue
+		var flag := PLOT_CLEARED_FLAG + String(slot.slot_id)
+		if not slot.is_empty():
+			_game_state.story.set_flag(flag)
+		slot.set_overgrown(not _game_state.story.has_flag(flag), cost)
+
+
+## What the plot on `slot` can be upgraded to, or null (nothing built, or the top size).
+func _upgrade_for(slot: PlotSlot) -> PlotData:
+	if slot == null or slot.contents == null or slot.contents.upgrades_to == &"":
+		return null
+	return _plots_catalogue().by_id(slot.contents.upgrades_to)
+
+
+## THE UPGRADE CARD WAS TAKEN. Same order as _on_plot_chosen(): check the wallet, change
+## the world, and only then spend, so a refused upgrade never costs anything.
+func _on_upgrade_chosen(plot: PlotData, slot: PlotSlot, price: int) -> void:
+	if plot == null or slot == null:
+		return
+	if _economy != null and not _economy.can_afford(price):
+		_deny("Not enough bits: the %s costs %d." % [plot.display_name, price])
+		return
+	if not slot.upgrade(plot):
+		_deny("That pen cannot grow into a %s." % plot.display_name)
+		return
+	if _economy != null:
+		_economy.spend(price)
+	_toast("Upgraded to a %s. Room for %d now." % [plot.display_name, plot.capacity])
+	_sound_call(&"play_at", [&"gate_open", slot.global_position])
+	if _game_state != null and _interactive:
+		_novelty("upgrade", "plot_" + String(plot.id), "Upgraded to a %s" % plot.display_name)
+
+
+## THE CLEARING CARD WAS TAKEN. Remembered as a story flag, so it is in the save.
+func _on_clear_chosen(slot: PlotSlot, price: int) -> void:
+	if slot == null or not slot.is_overgrown():
+		return
+	if _economy != null and not _economy.can_afford(price):
+		_deny("Not enough bits: clearing this plot costs %d." % price)
+		return
+	if _economy != null:
+		_economy.spend(price)
+	if _game_state != null:
+		_game_state.story.set_flag(PLOT_CLEARED_FLAG + String(slot.slot_id))
+	slot.set_overgrown(false)
+	_toast("Plot cleared. A Paddock here is free.")
+	_sound_call(&"play_at", [&"gate_open", slot.global_position])
 
 
 ## What is standing on the slots right now, as the {slot id -> plot id} dictionary of
@@ -1524,6 +1601,12 @@ func _bind_build_menu() -> void:
 	build_menu.set("can_open", func() -> bool: return _no_menu_but(build_menu))
 	if not build_menu.is_connected("plot_chosen", _on_plot_chosen):
 		build_menu.connect("plot_chosen", _on_plot_chosen)
+	if build_menu.has_signal("upgrade_chosen") \
+			and not build_menu.is_connected("upgrade_chosen", _on_upgrade_chosen):
+		build_menu.connect("upgrade_chosen", _on_upgrade_chosen)
+	if build_menu.has_signal("clear_chosen") \
+			and not build_menu.is_connected("clear_chosen", _on_clear_chosen):
+		build_menu.connect("clear_chosen", _on_clear_chosen)
 	if not build_menu.is_connected("opened", _on_menu_opened):
 		build_menu.connect("opened", _on_menu_opened)
 	if not build_menu.is_connected("closed", _on_menu_closed):
@@ -2867,6 +2950,9 @@ func _apply_beam_recall() -> void:
 	beam.call("set_recalled", _game_state.ledger.beam_is_recalled(cycle) or no_scoop)
 	# A new steward's first catch cannot be torn away (magic_beam.gd first_catch_grace).
 	beam.set("first_catch_grace", _interactive and int(_game_state.story.get_var("catches")) == 0)
+	# The bolder ponies take longer to subdue as she gets practised (magic_beam.gd's
+	# SECURE_EXTRA_MEDIUM, owner playtest 2026-10-25).
+	beam.set("catch_count", int(_game_state.story.get_var("catches")))
 
 
 func _push_balance() -> void:
@@ -4357,7 +4443,10 @@ func _move_pony_into_pen(slot: PlotSlot) -> bool:
 		_deny("Your saddlebag is empty.")
 		return false
 	if pen.is_full():
-		_deny("That pen is full.")
+		# SAY WHAT TO DO, not only what is wrong (owner playtest 2026-10-25).
+		var bigger := _upgrade_for(slot)
+		_deny("That pen is full. Upgrade it, or build another pen." if bigger != null
+			else "That pen is full. Build another pen.")
 		return false
 
 	var instance: PonyInstance = storage.release()
@@ -4403,14 +4492,17 @@ func interaction_candidates() -> Array[Dictionary]:
 			continue
 		var gap: float = Vector2(at.x - slot.global_position.x,
 			at.z - slot.global_position.z).length()
-		if slot.is_empty():
+		if slot.is_overgrown():
+			var clear_price: int = slot.clear_cost()
+			out.append(InteractionScript.priced(InteractionScript.Kind.PLOT_CLEAR, gap,
+				String(slot.name), clear_price, _current_bits() >= clear_price))
+		elif slot.is_empty():
 			var verdict: Dictionary = slot.placement_check(at, PLAYER_BODY_RADIUS)
 			out.append(InteractionScript.candidate(
 				InteractionScript.Kind.PLOT_BUILD, gap, String(slot.name),
 				String(verdict["reason"])))
 		else:
-			out.append(InteractionScript.candidate(
-				InteractionScript.Kind.PEN_MOVE_IN, gap, _next_in_the_bag()))
+			out.append(_pen_candidate(slot, gap))
 	if is_near_market():
 		out.append(InteractionScript.candidate(
 			InteractionScript.Kind.MARKET, _flat_gap_to(^"Buildings/Market")))
@@ -4438,6 +4530,26 @@ func interaction_candidates() -> Array[Dictionary]:
 				continue
 			out.append(c)
 	return out
+
+
+## WHAT E MEANS AT A BUILT PEN. Moving the next pony in when there is one and room for her;
+## otherwise, if the pen has a bigger size, the upgrade (owner playtest 2026-10-25: "how do
+## i upgrade my free paddock to the 150 bits one not clear"). An empty bag at a pen is the
+## moment she is looking at the pen itself, and a full pen is the moment she needs a bigger
+## one, so those are the two states the upgrade takes the key in.
+func _pen_candidate(slot: PlotSlot, gap: float) -> Dictionary:
+	var next_pony := _next_in_the_bag()
+	var pen := slot.get_built() as Pen
+	var full: bool = pen != null and pen.is_full()
+	var bigger := _upgrade_for(slot)
+	if bigger != null and (next_pony.is_empty() or full):
+		var price: int = slot.contents.upgrade_price(bigger)
+		return InteractionScript.priced(InteractionScript.Kind.PEN_UPGRADE, gap,
+			String(slot.name), price, _current_bits() >= price, bigger.display_name,
+			full and not next_pony.is_empty())
+	var c := InteractionScript.candidate(InteractionScript.Kind.PEN_MOVE_IN, gap, next_pony)
+	c["full"] = full and not next_pony.is_empty()
+	return c
 
 
 ## Whoever is at the top of the saddlebag, by name, or "" for an empty bag. Only the prompt
@@ -4496,6 +4608,18 @@ func perform_interaction(action: Dictionary) -> bool:
 		InteractionScript.Kind.PEN_MOVE_IN:
 			var pen_slot: PlotSlot = _nearest_occupied_slot()
 			return _move_pony_into_pen(pen_slot) if pen_slot != null else false
+		InteractionScript.Kind.PEN_UPGRADE:
+			var up_slot: PlotSlot = _slot_named(String(action.get("subject", "")))
+			var bigger := _upgrade_for(up_slot)
+			if bigger == null or build_menu == null or not build_menu.has_method("open_upgrade"):
+				return false
+			return bool(build_menu.open_upgrade(up_slot, up_slot.contents, bigger,
+				up_slot.contents.upgrade_price(bigger)))
+		InteractionScript.Kind.PLOT_CLEAR:
+			var wild_slot: PlotSlot = _slot_named(String(action.get("subject", "")))
+			if wild_slot == null or build_menu == null or not build_menu.has_method("open_clear"):
+				return false
+			return bool(build_menu.open_clear(wild_slot, wild_slot.clear_cost()))
 		InteractionScript.Kind.MARKET:
 			if market_menu == null or not market_menu.has_method("open"):
 				return false
@@ -5481,7 +5605,11 @@ func _report(pony_count: int, prop_count: int) -> void:
 			slot_ids_unique = false
 		slot_ids[String(slot.slot_id)] = true
 		var marker_meshes: int = slot.marker_mesh_count()
-		if slot.is_empty():
+		# Overgrown (round 2): brambles instead of build markers, and never both.
+		if slot.is_overgrown():
+			if marker_meshes > 0 or slot.find_child("Brambles", false, false) == null:
+				stray += 1
+		elif slot.is_empty():
 			marked += 1
 			if marker_meshes == 0:
 				stray += 1

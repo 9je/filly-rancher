@@ -10,3 +10,4 @@ cost = 150
 scene_path = "res://world/pen.tscn"
 description = "Same square of ground, twice the ponies. Six of them, on proper sawn rails."
 capacity = 6
+upgrades_to = &"pen_grand"

@@ -48,7 +48,7 @@ func test_a_full_pen_refuses_once_however_many_times_she_presses() -> void:
 
 	assert_false(ranch.call("_move_pony_into_pen", slot), "a full pen refuses")
 	var first: Dictionary = ranch.last_denial()
-	assert_eq(String(first["text"]), "That pen is full.")
+	assert_eq(String(first["text"]), "That pen is full. Upgrade it, or build another pen.")
 	for i in range(8):
 		assert_false(ranch.call("_move_pony_into_pen", slot))
 	var after: Dictionary = ranch.last_denial()
@@ -92,7 +92,7 @@ func test_a_different_refusal_is_always_heard() -> void:
 	var storage = ranch.player.get_magic_beam().get_storage()
 	assert_true(storage.store(PonyInstanceScript.create(&"twilight")))
 	assert_false(ranch.call("_move_pony_into_pen", slot))
-	assert_eq(String(ranch.last_denial()["text"]), "That pen is full.")
+	assert_eq(String(ranch.last_denial()["text"]), "That pen is full. Upgrade it, or build another pen.")
 	# Empty the bag and ask again: a different refusal, said out loud.
 	storage.release()
 	assert_false(ranch.call("_move_pony_into_pen", slot))

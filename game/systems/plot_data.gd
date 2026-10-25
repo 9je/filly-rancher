@@ -49,6 +49,23 @@ extends Resource
 ## a code change, which is the exact thing the data-driven rule above exists to prevent.
 @export var capacity: int = 0
 
+## The plot this one can be UPGRADED to where it stands, or empty for the top of its line.
+## Owner playtest 2026-10-25: "how do i upgrade my free paddock to the 150 bits one not
+## clear". A Paddock, a Big Pen and a Grand Pen are the same scene with a bigger number
+## (see `capacity`), so an upgrade is only ever a new capacity on the pen already standing:
+## nobody moves out. The price is upgrade_price(): what the bigger one costs, less what
+## this one did, so building small first never costs more than building big at once.
+@export var upgrades_to: StringName = &""
+
+
+## What upgrading from this plot to `next` costs: the difference in their list prices,
+## never negative. Paddock (free) to Big Pen is the Big Pen's own 150 bits, the number the
+## owner expected to pay; Big Pen to Grand Pen is 330.
+func upgrade_price(next: PlotData) -> int:
+	if next == null:
+		return 0
+	return maxi(0, next.cost - cost)
+
 
 func _to_string() -> String:
 	return "PlotData(%s, cost=%d, capacity=%d)" % [String(id), cost, capacity]

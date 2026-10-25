@@ -79,6 +79,7 @@ const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const MagicBeamScript := preload("res://actors/player/magic_beam.gd")
 const InputDeviceScript := preload("res://systems/input_device.gd")
 const MenuStyleScript := preload("res://ui/menu_style.gd")
+const CatchCardScript := preload("res://ui/catch_card.gd")
 
 ## Radius of the reticle ring, in (1920x1080-base) pixels. Small: it has to mark a point
 ## precisely, and a big one would obscure the pony it is resting on.
@@ -224,6 +225,8 @@ var _beam: Node3D
 var _storage: Storage
 
 var _toast_left := 0.0
+## The card a catch slides in (game/ui/catch_card.gd). See _on_captured().
+var _catch_card: Control = null
 ## Toasts raised while another one is on screen, oldest first. See toast().
 var _toast_queue: Array[String] = []
 ## Whether a letter or a menu is on screen right now, and whether the player had asked for
@@ -285,6 +288,8 @@ func _ready() -> void:
 	set_overlay_open(false)
 	_toast.modulate.a = 0.0
 	_restyle()
+	_catch_card = CatchCardScript.new()
+	add_child(_catch_card)
 
 	_bind()
 
@@ -549,19 +554,23 @@ func _on_storage_changed() -> void:
 	_pips.queue_redraw()
 
 
+## A CATCH IS A CARD, NOT A TOAST (owner playtest 2026-10-25: "i think the text and traits
+## on catch can be better maybe icons and stuff instead of basic text on the top"). Her
+## portrait, name, rarity stars and trait icons slide in at the top right; see
+## game/ui/catch_card.gd. The body is read for her portrait inside this same frame, before
+## the beam's queue_free() lands.
 func _on_captured(instance: PonyInstance) -> void:
-	# display_name() falls back nickname -> character's name -> raw data_id, so this line
-	# always names somebody even for a pony whose record is missing on this machine.
-	var who := instance.display_name() if instance != null else "a pony"
-	# What she is like comes with her name (game/systems/pony_traits.gd): the catch is also
-	# the moment you learn which pen she wants and what to feed her.
-	if who.is_empty():
-		who = "a pony"
-	var traits := PonyTraitsScript.describe(instance) if instance != null else ""
-	if traits.is_empty():
-		toast("Caught %s!" % who)
-	else:
-		toast("Caught %s! %s." % [who, traits[0].to_upper() + traits.substr(1)])
+	if instance == null or _catch_card == null:
+		return
+	var body: Node3D = null
+	if _beam != null and _beam.has_method("last_captured_body"):
+		body = _beam.last_captured_body()
+	_catch_card.show_catch(instance, body)
+
+
+## The catch card, for the tests and gates.
+func catch_card() -> Control:
+	return _catch_card
 
 
 ## The bag was full, so she was set down instead of stored -- the one capture outcome

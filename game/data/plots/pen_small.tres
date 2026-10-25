@@ -10,3 +10,4 @@ cost = 0
 scene_path = "res://world/pen.tscn"
 description = "Timber you already had. Room for three ponies, and the only thing on this list a brand new ranch can afford."
 capacity = 3
+upgrades_to = &"pen_large"

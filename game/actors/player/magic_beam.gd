@@ -385,6 +385,27 @@ const SECURE_SECONDS := 1.0
 ## chore. Both ends are asserted in game/test/test_magic_beam.gd.
 const SECURE_JITTER := 0.15
 
+## THE SUBDUE CLOCK GROWS WITH EXPERIENCE, for the bolder grades only. Owner playtest
+## 2026-10-25: "its super easy to catch ponies so you can collect all the spots before you
+## get upgrades" -- 17 ponies in 11.6 minutes. The first few catches stay exactly as the
+## tips teach them (the first is also guaranteed, first_catch_grace); from there the beam
+## needs longer to subdue a pony with fight in her, ramping linearly from RAMP_FROM_CATCHES
+## to RAMP_FULL_CATCHES ponies caught, story var "catches".
+##
+##   EASY    1.00 s always: a frozen Fluttershy is the exhale, never the chore
+##   MEDIUM  1.00 s rising to 1.45 s
+##   HARD    1.00 s rising to 1.85 s (2.0 s at the top of the jitter)
+##
+## LONGER, NOT TIGHTER. The windows (WINDOW_*) are already the owner's own numbers and the
+## grading's ordering depends on them, so the extra time goes on the subdue clock: a bold
+## pony is a longer hold with the same release to land, which is more commitment and more
+## exposure to her wrench (WRENCH_AT_MIN/MAX are fractions of this clock), not a twitchier
+## target. A treat's calm still lowers her grade (Pony.hold_personality), so it lowers this.
+const SECURE_EXTRA_MEDIUM := 0.45
+const SECURE_EXTRA_HARD := 0.85
+const RAMP_FROM_CATCHES := 3
+const RAMP_FULL_CATCHES := 15
+
 ## THE DIFFICULTY GRADE OF A HOLD. Not a new field on anything -- it is a READING of the
 ## personality a pony already carries (PonyData.personality), which is the tier this
 ## mechanic has always been keyed on. The owner asked to "tag them with different
@@ -751,6 +772,22 @@ func _exit_tree() -> void:
 ## WRENCH_GRACE_HOLDS, the same published rule the falloff reaches on her third grab.
 var first_catch_grace := false
 
+## How many ponies the steward has caught so far (story var "catches"), pushed in by
+## game/world/ranch.gd alongside first_catch_grace. Drives the subdue ramp (see
+## SECURE_EXTRA_MEDIUM). Zero, the default, is the original one-second beam.
+var catch_count := 0
+
+
+var _last_captured_body: Node3D = null
+
+
+## The body of the pony being captured RIGHT NOW, valid only inside a `captured` handler
+## (it is freed at the end of the frame). Null at any other time.
+func last_captured_body() -> Node3D:
+	if _last_captured_body != null and not is_instance_valid(_last_captured_body):
+		return null
+	return _last_captured_body
+
 
 func set_capture_rng(rng: RandomNumberGenerator) -> void:
 	if rng != null:
@@ -1100,6 +1137,24 @@ static func secure_bounds() -> Vector2:
 	return Vector2(SECURE_SECONDS - SECURE_JITTER, SECURE_SECONDS + SECURE_JITTER)
 
 
+## How far along the experience ramp a steward with `catches` catches is, 0 to 1.
+static func catch_ramp(catches: int) -> float:
+	return clampf(float(catches - RAMP_FROM_CATCHES)
+		/ float(maxi(1, RAMP_FULL_CATCHES - RAMP_FROM_CATCHES)), 0.0, 1.0)
+
+
+## The NOMINAL subdue time for this `personality` once `catches` ponies have been caught,
+## before the per-attempt jitter. See SECURE_EXTRA_MEDIUM.
+static func secure_seconds_for(personality: int, catches: int) -> float:
+	var extra := 0.0
+	match grade_for(personality):
+		Grade.MEDIUM:
+			extra = SECURE_EXTRA_MEDIUM
+		Grade.HARD:
+			extra = SECURE_EXTRA_HARD
+	return SECURE_SECONDS + extra * catch_ramp(catches)
+
+
 ## How long a pony with this `personality` resists the beam, in seconds, on a NOMINAL
 ## attempt -- the middle of the distribution, with no jitter and no wrench. What a gate or
 ## a design note should quote when it wants to say "roughly this long"; what an actual hold
@@ -1141,8 +1196,9 @@ static func wrench_chance_for(personality: int, prior_holds: int) -> float:
 ## for WHEN a wrench lands -- on a wrenching attempt the window is not used for anything
 ## else, and on any other attempt the wrench moment is not.
 static func roll_clocks(personality: int, prior_holds: int,
-		wrench_roll: float, secure_roll: float, window_roll: float) -> Dictionary:
-	var secure: float = SECURE_SECONDS \
+		wrench_roll: float, secure_roll: float, window_roll: float,
+		catches: int = 0) -> Dictionary:
+	var secure: float = secure_seconds_for(personality, catches) \
 		+ lerpf(-SECURE_JITTER, SECURE_JITTER, clampf(secure_roll, 0.0, 1.0))
 	var wrenches: bool = wrench_roll < wrench_chance_for(personality, prior_holds)
 	var bounds: Vector2 = window_bounds_for(personality)
@@ -1590,7 +1646,7 @@ func _begin_hold(body: Node3D) -> void:
 		if first_catch_grace:
 			prior_holds = maxi(prior_holds, WRENCH_GRACE_HOLDS)
 		var clocks := roll_clocks(personality, prior_holds,
-			_rng.randf(), _rng.randf(), _rng.randf())
+			_rng.randf(), _rng.randf(), _rng.randf(), catch_count)
 		_secure_seconds = clocks["secure"]
 		_struggle_seconds = clocks["struggle"]
 		_wrenching = clocks["wrenches"]
@@ -1724,12 +1780,16 @@ func _settle_pony(pony: Node3D) -> void:
 			instance.stock = pony.get_stock()
 
 	if instance != null and _storage.store(instance):
+		# Kept for the length of this call, so the HUD's catch card can take her portrait
+		# off the body she is wearing before queue_free() below takes effect.
+		_last_captured_body = pony
 		pony.notify_captured()
 		_capture_juice(pony, data)
 		pony.queue_free()
 		_play_first_capture_voice()
 		_sound_call(&"play_at", [&"capture_success", global_position])
 		captured.emit(instance)
+		_last_captured_body = null
 		return
 
 	# Full bag (or a pony with no record behind her, which is a setup bug rather than a

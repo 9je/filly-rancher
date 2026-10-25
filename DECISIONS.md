@@ -241,3 +241,46 @@ Decisions:
   - The empty-image errors appear at the title, vary from run to run, and print the same on the commit before this round (877d56d). The boot splash was ruled out.
   - Safe mode costs about 4 ms a frame on the 60-pony check (average 21.0 ms against 17.0 ms in the invisible display), which would give up the 60 fps target. So the render thread stays, and these errors are recorded as a known issue rather than hidden.
   - If the owner sees instability, set `rendering/driver/threads/thread_model` to 1 (Safe). One boot crash in this round, a signal 11 in the camera agent's run, probably came from the same mode.
+
+## 2026-10-25: playtest round 2, plots, upgrades, catching and the catch card (PLAYTEST_FIXES.md)
+
+The owner's save after 11.6 minutes: 17 ponies, 157 bits, a pen on all four plots (three free Paddocks and one Big Pen), then "That pen is full." with nothing to do about it.
+
+- **Upgrade in place, for the price difference.**
+  - Paddock to Big Pen costs 150 bits and Big Pen to Grand Pen costs 330 (`PlotData.upgrade_price()`, the new list price less the old one).
+  - The difference was chosen over the full list price so that building small first never costs more than building big at once. Paddock to Big Pen is still the 150 the owner expected to pay.
+  - The chain is data: `PlotData.upgrades_to` in each .tres.
+  - The pen is not rebuilt. Its capacity changes through the same `configure()` hook a build uses, so no resident leaves the pen at any point.
+- **Where the upgrade lives.**
+  - At a built pen, E means "move her in" when there is a pony in the bag and room in the pen.
+  - Otherwise it means the upgrade: an empty bag (she is looking at the pen itself) or a full pen (she needs a bigger one).
+  - The prompt names the size and the price, and adds "not enough bits" before E is pressed. E opens the build menu on a single UPGRADE card, so a stray E press never spends bits. The card shows "Not enough bits: you need N more." in red.
+  - A full Grand Pen says "this pen is full, build another pen". The refusal itself now says "That pen is full. Upgrade it, or build another pen."
+- **Two plots open, two overgrown.**
+  - slot_1 and slot_2 are open, which allows two free Paddocks, six ponies.
+  - slot_3 costs 100 bits to clear and slot_4 costs 250 (`ranch.gd PLOT_CLEAR_COSTS`).
+  - The reasoning comes from the save: about 300 bits were earned in the first 11.6 minutes (157 left after a 150-bit pen), so roughly 25 bits a minute.
+    - 100 bits sits below the first upgrade (150), so the first real choice, around minutes 7 to 9, is more ground or a bigger pen.
+    - 250 sits above both, which makes the fourth plot the goal for minutes 15 to 20.
+    - With 6 penned plus a 12-pony bag, the pen limit now bites before minute 10 instead of never.
+  - Overgrown plots show brambles and a signpost painted "CLEAR ME / N bits" on both faces. The prompt is "E: clear this plot (N bits)", and E opens a CLEAR card.
+- **Old saves.** Cleared plots are story flags (`plot_cleared_slot_N`), so the save format does not change. A save that already has a pen on slot_3 or slot_4 restores the pen first. `_apply_overgrowth()` then marks that plot cleared, so the pen and its ground both stay.
+- **Overgrowth applies headless too.** The rule is a game rule, and the scoop gate taught that a rule which only runs when someone is watching is a rule no test checks. The real-input playthrough driver now clears plots and upgrades pens through the prompts. The smoke-endings shortcut clears the brambles directly, the way it already builds pens directly.
+- **Catching, longer rather than tighter.**
+  - The subdue clock grows with story var `catches`, for the bolder grades only:
+    - EASY (shy) stays at 1.0 s;
+    - MEDIUM rises to 1.45 s;
+    - HARD rises to 1.85 s, and 2.0 s at the top of the jitter.
+  - The ramp is linear from 3 catches to 15.
+  - The capture windows (the owner's own numbers from the third playtest) are untouched. A bold pony becomes a longer hold with the same release to land, which also gives her wrench more time, since the wrench fires at a fraction of the subdue clock.
+  - The first catch is unchanged (catches 0, plus `first_catch_grace`).
+  - More skittish ponies were considered and not done: SHY already flees from 14 m, and making the herd flee more would make finding a pony harder, not catching one.
+- **The catch card.**
+  - A catch slides a card into the top right corner instead of a toast:
+    - her portrait, rendered from a copy of her own body in a small SubViewport;
+    - her name;
+    - one to four rarity stars and the tier word;
+    - four trait chips, each a drawn icon and a word: race, quirk, favourite food, and hold difficulty.
+  - It holds for 4.6 s. A second catch replaces it rather than queueing behind it.
+  - The icons are drawn from simple shapes in `ui/catch_icon.gd`, with no new assets.
+  - The top right corner was chosen because nothing else on the HUD uses it. It stays clear of the crosshair and the saddlebag, and `test_catch_card` measures both.

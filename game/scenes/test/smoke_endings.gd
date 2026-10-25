@@ -221,6 +221,10 @@ func _ensure_pens() -> void:
 	var cat: PlotRegistry = ranch.call("plots_catalogue")
 	var plot: PlotData = cat.by_id(&"pen_grand")
 	for slot: PlotSlot in ranch.call("plot_slots"):
+		# A smoke shortcut: the brambles on plots 3 and 4 (owner playtest 2026-10-25) are
+		# cleared the way the ranch clears them, minus the price.
+		if slot.is_overgrown():
+			slot.set_overgrown(false)
 		if slot.is_empty():
 			slot.build(plot)
 	await process_frame
