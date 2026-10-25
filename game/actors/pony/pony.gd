@@ -697,6 +697,13 @@ func set_held(is_held: bool) -> void:
 
 	if state != State.HELD:
 		return
+	# The beam wrote her transform without move_and_slide, so is_on_floor() still reads the
+	# ground she was lifted off. Left alone, the resting shortcut in _physics_process takes
+	# that stale floor at its word and she hangs in the air where the beam let go (owner
+	# playtest 2026-10-25, "i beamed this pony and they just flew"). Not resting, and already
+	# falling, the next tick's move_and_slide finds the real floor.
+	_stood_still = false
+	velocity = Vector3(0.0, -1.0, 0.0)
 	_transition_to(State.IDLE)
 
 
