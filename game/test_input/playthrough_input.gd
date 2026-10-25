@@ -390,10 +390,9 @@ func _night_left() -> float:
 	return WorldStateScript.CYCLE_SECONDS - fposmod(w.elapsed(), WorldStateScript.CYCLE_SECONDS)
 
 
+## Her coat as the Depot judges it (ranch.gd reads PonyLook.from_stock for a delivery).
 func _coat_of_stock(stock: Dictionary) -> Color:
-	if stock.is_empty():
-		return Color.WHITE
-	return PonyLookScript.from_dict(stock).coat
+	return PonyLookScript.from_stock(stock).coat
 
 
 func _coat_of_body(p: Node) -> Color:
@@ -598,6 +597,7 @@ func _walk(to: Vector3, arrive: float = RUN_ARRIVE, timeout: float = 90.0) -> bo
 				if stuck >= 3:
 					_stop()
 					_say("gives up on a blocked walk at %s" % player.global_position.snapped(Vector3.ONE * 0.1))
+					await _wriggle_free()
 					return false
 				var away := player.global_position - to
 				away.y = 0.0
@@ -619,6 +619,24 @@ func _walk(to: Vector3, arrive: float = RUN_ARRIVE, timeout: float = 90.0) -> bo
 			_arrived = false
 	_stop()
 	return false
+
+
+## Caught on something the navmesh does not know: back off, sidestep with a hop, the way a
+## person wiggles out from a corner, and look at the ground again next walk.
+func _wriggle_free() -> void:
+	var side: StringName = &"move_left" if rng.randf() < 0.5 else &"move_right"
+	_hold(&"move_back", true)
+	await _wait(0.8)
+	_hold(&"move_back", false)
+	_hold(side, true)
+	for i in 3:
+		await _press(&"jump")
+		await _wait(0.3)
+	_hold(side, false)
+	_hold(&"move_back", true)
+	await _wait(0.6)
+	_hold(&"move_back", false)
+	_nav_dirty = true
 
 
 ## Face `at` (yaw and pitch) for a moment, standing still.
@@ -954,7 +972,7 @@ func _pen_room() -> int:
 func _pen_target(pen: Node) -> int:
 	var cap := int(pen.get("capacity")) if pen.get("capacity") != null else 6
 	# Placement has no Blooms to protect from a crowd: every stall is a place to hide one.
-	return cap if want == "placement" else mini(cap, 6)
+	return cap if want == "placement" or _path_name() == "factory" else mini(cap, 6)
 
 
 func _pen_the_bag(force := false) -> bool:
@@ -1294,13 +1312,14 @@ func _is_extra(inst: PonyInstance) -> bool:
 		# The invitation has its two Blooms: a Bloom before the reveal only fills a pen
 		# with a pony the Depot will not take.
 		return true
-	if inst.bloom >= 0.3:
+	if inst.bloom >= 0.3 and inst.happiness >= 0.45:
 		return false
 	var pens := _pens()
 	for i in pens.size():
 		for other: PonyInstance in pens[i].call("ponies"):
 			if other.uid == inst.uid:
-				return i > 0
+				# A sad one in the Bloom pen is not on her way anywhere either.
+				return i > 0 or inst.happiness < 0.4
 	return false
 
 
@@ -1655,7 +1674,9 @@ func _roam_region(id: StringName) -> void:
 ## On the Factory path: an unmarked Drifter in a pen, and (Gray Gold) not one she is quietly
 ## letting Bloom.
 func _shippable(inst: PonyInstance) -> bool:
-	if not inst.is_stock() or inst.is_marked():
+	# The Factory path ships the named ponies too (the Depot asks first, she says yes): only
+	# a marked pony is refused at the counter.
+	if inst.is_marked():
 		return false
 	return not (want == "gray_gold" and _keep_for_bloom(inst))
 
