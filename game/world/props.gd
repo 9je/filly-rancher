@@ -591,13 +591,27 @@ static func expected_count() -> int:
 ## Build the homestead. Returns the number of props actually placed -- 0 on an
 ## assetless checkout, which is a reported state and not an error.
 func build() -> int:
+	# The same body as build_paced(), with no pace: it never awaits, so it runs to the end
+	# inside this call. call() by name because the parser insists a function that CAN await
+	# is always awaited, and every existing caller of build() is synchronous.
+	return int(call(&"build_paced", Callable()))
+
+
+## build(), handing a frame back after each prop: `await pace.call(done, total)` (the
+## ranch's boot behind the loading screen, docs/playtest_fixes/loading.md). An invalid pace
+## is build() exactly.
+func build_paced(pace: Callable) -> int:
 	if not has_assets():
 		# No converted props on this machine at all (CI, or a clone that has not run
 		# the pipeline yet). Bare terrain, reported by ranch.gd -- and reported as a
 		# distinct `assets=absent` state rather than as a zero that looks like a pass.
 		return 0
 
+	var done := 0
 	for entry: Dictionary in LAYOUT:
+		done += 1
+		if pace.is_valid():
+			await pace.call(done, LAYOUT.size())
 		var file: String = entry["file"]
 		var path := PROP_DIR + file
 		if not ResourceLoader.exists(path):

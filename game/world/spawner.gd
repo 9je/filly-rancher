@@ -260,6 +260,16 @@ var _stock_registry: PonyRegistry = null
 ## every existing caller keeps exactly the draw it had.
 func populate(phase: int = WorldStateScript.Phase.DAWN,
 		weather: int = WorldStateScript.Weather.CLEAR) -> int:
+	# The same body as populate_paced(), with no pace: it never awaits, so it runs to the end
+	# inside this call. call() by name because the parser insists a function that CAN await
+	# is always awaited, and every existing caller of populate() is synchronous.
+	return int(call(&"populate_paced", phase, weather, Callable()))
+
+
+## populate(), handing a frame back after each pony: `await pace.call(done, total)` (the
+## ranch's boot behind the loading screen, docs/playtest_fixes/loading.md). The draw, the
+## seeds and the order are populate()'s exactly; an invalid pace is populate() exactly.
+func populate_paced(phase: int, weather: int, pace: Callable) -> int:
 	# Before the early return below, so a spawner with no markers still remembers the hour
 	# it was booted into rather than claiming DAWN forever.
 	_last_phase = phase
@@ -303,8 +313,10 @@ func populate(phase: int = WorldStateScript.Phase.DAWN,
 				_spawned.append(pony)
 				_marker_by_pony[pony.get_instance_id()] = marker
 			slot += 1
+			if pace.is_valid():
+				await pace.call(_spawned.size(), WORLD_PONY_BUDGET)
 
-	slot = _fill_stock(slot)
+	slot = int(await _fill_stock_paced(slot, pace)) if pace.is_valid() else _fill_stock(slot)
 	_next_slot = slot
 	return _spawned.size()
 
@@ -678,6 +690,10 @@ func _registry_for_stock() -> PonyRegistry:
 ## stock ponies of the same personality standing in one field is not a duplicate, it is a
 ## field with two ponies in it, which is the entire point of the crowd.
 func _fill_stock(from_slot: int) -> int:
+	return int(call(&"_fill_stock_paced", from_slot, Callable()))
+
+
+func _fill_stock_paced(from_slot: int, pace: Callable) -> int:
 	var slot := from_slot
 	for marker: ZoneMarker in get_markers():
 		var want: int = stock_budget(marker) - _stock_at(marker)
@@ -693,6 +709,8 @@ func _fill_stock(from_slot: int) -> int:
 				_spawned.append(pony)
 				_marker_by_pony[pony.get_instance_id()] = marker
 			slot += 1
+			if pace.is_valid():
+				await pace.call(_spawned.size(), WORLD_PONY_BUDGET)
 	return slot
 
 

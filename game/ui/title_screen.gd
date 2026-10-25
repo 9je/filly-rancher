@@ -21,6 +21,7 @@ const MouseRowsScript := preload("res://ui/mouse_rows.gd")
 const BootIntentScript := preload("res://world/boot_intent.gd")
 const SaveIOScript := preload("res://systems/save_io.gd")
 const SettingsScript := preload("res://systems/settings.gd")
+const LoadingScreenScript := preload("res://ui/loading_screen.gd")
 const SettingsMenuScene := preload("res://ui/settings_menu.tscn")
 
 enum Row { NEW_GAME, CONTINUE, SETTINGS, QUIT }
@@ -237,6 +238,13 @@ func back() -> void:
 ## calling get_tree().quit() itself, which would kill the suite mid-run rather than this screen.
 func _enter_world() -> void:
 	if get_tree().current_scene != self:
+		return
+	# A person at the keyboard gets the loading screen (game/ui/loading_screen.gd): a threaded
+	# load and a moving bar instead of a title frozen for the whole boot. An automated boot
+	# changes scene exactly as it always has.
+	if is_interactive():
+		LoadingScreenScript.change_scene(get_tree(), WORLD_SCENE, LoadingScreenScript.Look.RANCH,
+			"A new ranch" if BootIntentScript.peek_new_game() else "Back to the ranch")
 		return
 	get_tree().change_scene_to_file(WORLD_SCENE)
 

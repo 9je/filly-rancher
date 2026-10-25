@@ -7,6 +7,7 @@
 # Time runs on --fixed-fps 60 and the tests count game seconds. Saves isolated per test.
 #   tools/run_input_tests.sh               all
 #   tools/run_input_tests.sh first_pony    just test_first_pony.gd
+#   FILLY_INPUT_VERBOSE=1 ...             also print every INPUT_TEST_NOTE line and errors
 #   FILLY_INPUT_ON_DESKTOP=1 ...           in a visible window on the GPU instead
 set -uo pipefail
 cd "$(dirname "$0")/.."
@@ -22,11 +23,18 @@ for n in "${names[@]}"; do
     run=("$GODOT" --resolution 1280x720)
   else
     run=(env -u WAYLAND_DISPLAY MESA_VK_WSI_DEBUG=sw xvfb-run -a -s "-screen 0 1280x720x24" \
-      nice -n 19 "$GODOT" --display-driver x11 --gpu-index 0 --resolution 1280x720 --fixed-fps 60)
+      nice -n 19 "$GODOT" --display-driver x11 --gpu-index 0 --resolution 1280x720)
+  fi
+  # A test that measures wall-clock frame gaps (test_loading.gd) says so on a line of its own
+  # and runs in real time; every other test runs on --fixed-fps 60 game seconds.
+  if [ "${FILLY_INPUT_ON_DESKTOP:-0}" != "1" ] && ! grep -q "^## INPUT_TEST_REALTIME" "game/test_input/test_$n.gd"; then
+    run+=(--fixed-fps 60)
   fi
   out="$(timeout 3600 "${run[@]}" --path game --audio-driver Dummy -s "res://test_input/test_$n.gd" 2>&1)"
   rc=$?
-  echo "$out" | grep -E "^INPUT_TEST_(OK|FAILED)|SCRIPT ERROR" | sed "s/^/[$n] /"
+  keep="^INPUT_TEST_(OK|FAILED)|SCRIPT ERROR"
+  [ "${FILLY_INPUT_VERBOSE:-0}" = "1" ] && keep="^INPUT_TEST_|SCRIPT ERROR"
+  echo "$out" | grep -E "$keep" | sed "s/^/[$n] /"
   rm -rf "$FILLY_TEST_SAVE_DIR"
   if [ $rc -eq 0 ] && echo "$out" | grep -q "^INPUT_TEST_OK"; then pass=$((pass+1)); else fail=$((fail+1)); fi
 done

@@ -53,22 +53,71 @@ var water_y: Dictionary = {}
 var _meshes: Dictionary = {}
 var _batches: Dictionary = {}
 var _rng := RandomNumberGenerator.new()
+## dress_paced()'s dry run: true while the placements only write down what they would load.
+var _dry := false
+var _wanted: Dictionary = {}
 
 
 ## Dress every region in `regions` (RegionData).
 func dress(regions: Array) -> void:
+	# The same body as dress_paced(), with no pace: it never awaits, so it runs to the end
+	# inside this call. call() by name because the parser insists a function that CAN await
+	# is always awaited, and every existing caller of dress() is synchronous.
+	call(&"dress_paced", regions, Callable())
+
+
+## dress(), handing a frame back between the pieces of work: `await pace.call(done, total)`
+## after each region and each batch (the ranch's boot behind the loading screen,
+## docs/playtest_fixes/loading.md). An invalid pace is dress() exactly.
+func dress_paced(regions: Array, pace: Callable) -> void:
+	# PACED, THE MODELS ARE WARMED FIRST, one per step. A region's first use of a model is
+	# the expensive part (load, instance, copy and restyle its meshes; a second or more for a
+	# whole region), and it happens deep inside one placement, so a dry run of the same
+	# placements (_dry: nothing is placed, only what they would need is written down, and the
+	# seed is set again for the real run, so the valley is the one dress() builds) lists the
+	# models, and each is warmed in a step of its own.
+	var warm: Array = []
+	if pace.is_valid():
+		_dry = true
+		for r: RegionData in regions:
+			_dress_region(r)
+		_dry = false
+		warm = _wanted.values()
+		_wanted.clear()
+	var keys_hint := 24
+	var total := warm.size() + regions.size() + keys_hint
+	var done := 0
+	for w: Array in warm:
+		if String(w[0]).begins_with("res://"):
+			_scene_parts(w[0])
+		else:
+			_parts(w[0], w[1], w[2])
+		done += 1
+		await pace.call(done, total)
 	for r: RegionData in regions:
-		_rng.seed = hash(String(r.id)) * 7 + 11
-		match r.id:
-			&"everfree":
-				_everfree(r)
-			&"nightmeadow":
-				_night_meadow(r)
-			&"lake":
-				_lake(r)
-			&"orchard":
-				_orchard(r)
-	_flush()
+		_dress_region(r)
+		done += 1
+		if pace.is_valid():
+			await pace.call(done, total)
+	var keys: Array = _batches.keys()
+	for i in keys.size():
+		_flush_one(keys[i])
+		if pace.is_valid():
+			await pace.call(done + int(float(keys_hint) * float(i + 1) / float(keys.size())), total)
+	_batches.clear()
+
+
+func _dress_region(r: RegionData) -> void:
+	_rng.seed = hash(String(r.id)) * 7 + 11
+	match r.id:
+		&"everfree":
+			_everfree(r)
+		&"nightmeadow":
+			_night_meadow(r)
+		&"lake":
+			_lake(r)
+		&"orchard":
+			_orchard(r)
 
 
 # --- the regions ----------------------------------------------------------------------
@@ -208,6 +257,9 @@ func _place(r: RegionData, model: String, a: float, d: float, scale: Vector2, so
 
 
 func _add(model: String, xf: Transform3D, solid: bool, leaves: Color = Color(), glow: bool = false) -> void:
+	if _dry:
+		_wanted["%s|%s|%s" % [model, str(leaves), str(glow)]] = [model, leaves, glow]
+		return
 	var parts: Array = _parts(model, leaves, glow)
 	for part: Array in parts:
 		var key := "%s|%s|%s" % [model, str(leaves), str(glow)] + "|" + str(part[2])
@@ -220,6 +272,9 @@ func _add(model: String, xf: Transform3D, solid: bool, leaves: Color = Color(), 
 
 ## A model's own height at scale 1, off the same parts it is drawn from.
 func _native_height(model: String, leaves: Color, glow: bool) -> float:
+	# dress_paced()'s dry run loads nothing (the size is not needed to list the model).
+	if _dry:
+		return 1.0
 	var lo := INF
 	var hi := -INF
 	for part: Array in _parts(model, leaves, glow):
@@ -304,6 +359,9 @@ func _collider(xf: Transform3D) -> void:
 ## and BATCHED like the kit's pieces: an orchard of whole scenes was 500 separate shadow
 ## casters, a third of every frame's draws (scenes/test/perf.gd exp=casters).
 func _scene(path: String, at: Vector3, yaw: float, s: float, solid: bool) -> void:
+	if _dry:
+		_wanted[path] = [path]
+		return
 	var xf := Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3.ONE * s), at)
 	for part: Array in _scene_parts(path):
 		var key := path + "|" + str(part[2])
@@ -341,27 +399,25 @@ func _scene_parts(path: String) -> Array:
 
 
 ## One MultiMeshInstance3D per (model, mesh): a field of flowers is one draw, not a hundred.
-func _flush() -> void:
-	for key: String in _batches:
-		var b: Dictionary = _batches[key]
-		var xfs: Array = b.xf
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.mesh = b.mesh
-		mm.instance_count = xfs.size()
-		for i in xfs.size():
-			mm.set_instance_transform(i, xfs[i])
-		var mmi := MultiMeshInstance3D.new()
-		mmi.multimesh = mm
-		mmi.name = "Dress_" + key.get_slice("|", 0)
-		# What this batch IS, for anyone measuring the valley (test_input/test_scale.gd): the
-		# model it draws, and the batch group its sibling parts share (every part of one model
-		# holds the same instances in the same order, so instance i of each is one placement).
-		mmi.set_meta(&"dress_model", key.get_slice("|", 0).get_file().get_basename())
-		mmi.set_meta(&"dress_group", key.substr(0, key.rfind("|")))
-		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if bool(b.shadow) \
-			else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		if not bool(b.shadow):
-			mmi.visibility_range_end = 110.0
-		add_child(mmi)
-	_batches.clear()
+func _flush_one(key: String) -> void:
+	var b: Dictionary = _batches[key]
+	var xfs: Array = b.xf
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = b.mesh
+	mm.instance_count = xfs.size()
+	for i in xfs.size():
+		mm.set_instance_transform(i, xfs[i])
+	var mmi := MultiMeshInstance3D.new()
+	mmi.multimesh = mm
+	mmi.name = "Dress_" + key.get_slice("|", 0)
+	# What this batch IS, for anyone measuring the valley (test_input/test_scale.gd): the
+	# model it draws, and the batch group its sibling parts share (every part of one model
+	# holds the same instances in the same order, so instance i of each is one placement).
+	mmi.set_meta(&"dress_model", key.get_slice("|", 0).get_file().get_basename())
+	mmi.set_meta(&"dress_group", key.substr(0, key.rfind("|")))
+	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if bool(b.shadow) \
+		else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if not bool(b.shadow):
+		mmi.visibility_range_end = 110.0
+	add_child(mmi)
