@@ -4554,7 +4554,9 @@ func interaction_candidates() -> Array[Dictionary]:
 			InteractionScript.Kind.PALACE, _flat_gap_to(^"Buildings/Palace")))
 	if people != null:
 		var talk: Array[Dictionary] = people.candidates(at)
-		var other := not out.is_empty()
+		# An Act Three site in reach counts too: the sites speak only when this list is
+		# empty, so a companion kept in it would take the key at the Dye Vat for good.
+		var other := not out.is_empty() or (act3 != null and not act3.nearest().is_empty())
 		for c in talk:
 			if bool(c.get("companion", false)) and other:
 				continue

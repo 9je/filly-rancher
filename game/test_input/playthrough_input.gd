@@ -86,6 +86,9 @@ var _build_fails: Dictionary = {}
 var _held_since := -1.0
 var _held_name := ""
 var _depot_rest_until := -1.0
+## Ponies she chased for the whole budget without closing in, by instance id, and the game
+## time she will look at each again (a person stops chasing the one on the far bank).
+var _gave_up_on: Dictionary = {}
 var _last_market := -9999.0
 var _market_fails := 0
 var _ending_seen := ""
@@ -1071,6 +1074,8 @@ func _wild_near(radius: float, filter := Callable()) -> Node3D:
 			continue
 		if filter.is_valid() and not bool(filter.call(p)):
 			continue
+		if _t() < float(_gave_up_on.get(p.get_instance_id(), -1.0)):
+			continue
 		var d := p.global_position.distance_to(player.global_position)
 		if d < best_d and _reachable(p.global_position):
 			best_d = d
@@ -1116,6 +1121,11 @@ func _hunt(target: Node3D = null, filter := Callable()) -> bool:
 	_hold(&"gallop", false)
 	_sneak = false
 	if not is_instance_valid(pony) or pony.global_position.distance_to(player.global_position) > CATCH_RANGE + 1.0:
+		if is_instance_valid(pony):
+			_gave_up_on[pony.get_instance_id()] = _t() + 180.0
+			_say("  could not close on her: she is at %s (state %d), I am at %s, path %d points" % [
+				pony.global_position.snapped(Vector3.ONE * 0.1), int(pony.get("state")),
+				player.global_position.snapped(Vector3.ONE * 0.1), _path_to(pony.global_position).size()])
 		return true
 	_aim = true
 	_look_at = pony.global_position + Vector3(0, 0.6, 0)
@@ -1736,6 +1746,17 @@ func _factory_work() -> bool:
 		# Vivid coats: no everyday Drifter has one (every coat swatch is a pastel); the
 		# starry ones in the Nightmeadow do. She goes looking there.
 		if _region_open_for("pylon_meadow"):
+			var wild := 0
+			var vivid := 0
+			var nearest := INF
+			for p: Node3D in ranch.get("spawner").call("get_spawned"):
+				if not is_instance_valid(p) or int(p.get("state")) >= 5 or p.is_in_group(&"penned"):
+					continue
+				wild += 1
+				if bool(filter.call(p)):
+					vivid += 1
+					nearest = minf(nearest, p.global_position.distance_to(player.global_position))
+			_say("  no wanted pony in 80 m: %d wild, %d wanted, nearest wanted %.0f m" % [wild, vivid, nearest])
 			await _roam_region(&"nightmeadow")
 			return true
 	return false

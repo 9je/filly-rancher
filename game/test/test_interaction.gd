@@ -426,3 +426,47 @@ func test_in_the_overlap_band_exactly_one_slot_is_ghosted() -> void:
 		if slot != near_slot:
 			assert_eq(int(slot.ghost_state()), PlotSlotScript.Ghost.OFF,
 				"%s must show no ghost -- only the resolver's winner ever does" % String(slot.name))
+
+
+## Someone at your heels with nothing new to say, standing in for Tumble or Pip.
+class HeelPeople:
+	extends People
+
+	func _ready() -> void:
+		pass
+
+	func candidates(_at: Vector3) -> Array[Dictionary]:
+		var c: Dictionary = InteractionScript.candidate(
+			InteractionScript.Kind.TALK, 0.9, "Tumble")
+		c["companion"] = true
+		var out: Array[Dictionary] = [c]
+		return out
+
+
+## A COMPANION STEPS ASIDE FOR AN ACT THREE SITE TOO (playthrough lights_out, 2026-10-26: at
+## the Dye Vat the prompt was "E: talk to Tumble" three tries running, because the sites
+## speak only when the ranch has nothing to say, and a companion at her heels was something).
+func test_a_companion_steps_aside_for_the_dye_vat() -> void:
+	var ranch: Node3D = RanchScene.instantiate()
+	add_child_autofree(ranch)
+	await get_tree().process_frame
+	var player: Node3D = ranch.get_node(^"Player")
+	var heel := HeelPeople.new()
+	ranch.add_child(heel)
+	ranch.people = heel
+	var act3: Act3World = (load("res://world/act3_world.gd") as GDScript).new()
+	act3.player = player
+	act3.story = (load("res://systems/story.gd") as GDScript).new()
+	autofree(act3)  # out of the tree: its _ready would build the whole of Act Three
+	var vat := Node3D.new()
+	ranch.add_child(vat)
+	vat.global_position = Vector3(player.global_position.x + 1.5, player.global_position.y,
+		player.global_position.z)
+	act3.sites = [{"id": "dye_vat", "kind": "vat", "node": vat, "hold": 0.0}]
+	ranch.act3 = act3
+	await get_tree().physics_frame
+	assert_true(ranch.current_interaction().is_empty(),
+		"with the vat in reach, Tumble's idle talk must not take the key from it")
+	vat.global_position.x += 40.0
+	assert_eq(int(ranch.current_interaction().get("kind", InteractionScript.Kind.NONE)),
+		InteractionScript.Kind.TALK, "with no site in reach, she can still be talked to")
