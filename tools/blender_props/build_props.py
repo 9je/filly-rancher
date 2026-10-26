@@ -44,14 +44,18 @@ PALETTE = {
     # The Spectra Palace's hall (pc_*): the facade's own purple, pink and gold carried indoors,
     # deepened for a room lit by lamps rather than by the sun.
     "plum": (0.30, 0.10, 0.36), "plum_dark": (0.17, 0.05, 0.22), "wine": (0.46, 0.08, 0.26),
-    "velvet": (0.62, 0.12, 0.38), "magenta": (0.86, 0.22, 0.58), "orchid": (0.72, 0.46, 0.86),
-    "felt": (0.09, 0.40, 0.24), "felt_dark": (0.05, 0.24, 0.15), "parquet": (0.70, 0.42, 0.24),
+    "velvet": (0.34, 0.05, 0.18), "magenta": (0.62, 0.07, 0.31), "orchid": (0.30, 0.12, 0.60),
+    "felt": (0.012, 0.12, 0.045), "felt_dark": (0.006, 0.06, 0.022), "parquet": (0.70, 0.42, 0.24),
     # The wheel's pockets, in game/ui/casino_paint.gd's own colours so the wheel on the stage and
-    # the wheel on the screen are one wheel: the house pocket, then the six runs of four.
-    "w_house": (0.80, 0.84, 0.90), "w_red": (0.85, 0.24, 0.26), "w_orange": (0.93, 0.55, 0.20),
-    "w_yellow": (0.95, 0.82, 0.28), "w_green": (0.33, 0.68, 0.36), "w_blue": (0.27, 0.52, 0.86),
-    "w_violet": (0.60, 0.38, 0.82),
-    "parquet_dark": (0.50, 0.27, 0.15), "carpet": (0.36, 0.07, 0.30), "carpet_pink": (0.78, 0.22, 0.52),
+    # the wheel on the screen are one wheel: the house pocket, then the six runs of four. These
+    # are LINEAR (what a glTF base colour is); casino_paint.gd's are sRGB, converted here, and
+    # the felt likewise.
+    "w_house": (0.604, 0.674, 0.787), "w_red": (0.694, 0.047, 0.055), "w_orange": (0.846, 0.263, 0.033),
+    "w_yellow": (0.888, 0.638, 0.064), "w_green": (0.089, 0.420, 0.107), "w_blue": (0.060, 0.235, 0.708),
+    "w_violet": (0.319, 0.119, 0.638),
+    "parquet_dark": (0.50, 0.27, 0.15), "carpet": (0.06, 0.02, 0.11), "carpet_pink": (0.78, 0.22, 0.52),
+    "wall_plum": (0.09, 0.025, 0.13), "panel_ruby": (0.20, 0.02, 0.08), "runner_red": (0.62, 0.07, 0.16),
+    "wainscot": (0.36, 0.18, 0.12),
     "marble": (0.93, 0.88, 0.94), "brass": (0.86, 0.66, 0.26), "sky": (0.30, 0.74, 0.96),
     "mint": (0.42, 0.88, 0.66), "ink": (0.06, 0.03, 0.09),
     # GLOWING. mat() gives every key that starts with "glow_" an emission of its own colour,
@@ -1144,7 +1148,7 @@ def pc_hall():
                 p.append(box("pip", (0.16, 0.16, 0.012), (x + step / 2, y + step / 2, 0.046), "orchid", bevel=0.0,
                              rot=(0, 0, math.radians(45))))
     # The runner, door to wheel stage, gold edged.
-    p.append(box("runner", (3.0, hd + 8.4, 0.016), (0, (-hd + 8.4) / 2, 0.05), "wine", bevel=0.0))
+    p.append(box("runner", (3.0, hd + 8.4, 0.016), (0, (-hd + 8.4) / 2, 0.05), "runner_red", bevel=0.0))
     for x in (-1.5, 1.5):
         p.append(box("runner_edge", (0.12, hd + 8.4, 0.018), (x, (-hd + 8.4) / 2, 0.052), "gold", bevel=0.0))
     for j in range(9):
@@ -1152,10 +1156,10 @@ def pc_hall():
         p.append(box("runner_star", (0.5, 0.5, 0.018), (0, y, 0.054), "gold", bevel=0.0, rot=(0, 0, math.radians(45))))
     # Walls: the shells, then the dressing on each inside face. `faces` is (centre, inward
     # normal, length along the wall).
-    p.append(box("wall_w", (0.4, hd * 2 + 0.8, H), (-hw - 0.2, 0, H / 2), "plum", bevel=0.0))
-    p.append(box("wall_e", (0.4, hd * 2 + 0.8, H), (hw + 0.2, 0, H / 2), "plum", bevel=0.0))
-    p.append(box("wall_n", (hw * 2 + 0.8, 0.4, H), (0, hd + 0.2, H / 2), "plum", bevel=0.0))
-    p.append(box("wall_s", (hw * 2 + 0.8, 0.4, H), (0, -hd - 0.2, H / 2), "plum", bevel=0.0))
+    p.append(box("wall_w", (0.4, hd * 2 + 0.8, H), (-hw - 0.2, 0, H / 2), "wall_plum", bevel=0.0))
+    p.append(box("wall_e", (0.4, hd * 2 + 0.8, H), (hw + 0.2, 0, H / 2), "wall_plum", bevel=0.0))
+    p.append(box("wall_n", (hw * 2 + 0.8, 0.4, H), (0, hd + 0.2, H / 2), "wall_plum", bevel=0.0))
+    p.append(box("wall_s", (hw * 2 + 0.8, 0.4, H), (0, -hd - 0.2, H / 2), "wall_plum", bevel=0.0))
     faces = [((-hw, 0), (1, 0), hd * 2), ((hw, 0), (-1, 0), hd * 2), ((0, hd), (0, -1), hw * 2), ((0, -hd), (0, 1), hw * 2)]
     for (cx, cy), (nx_, ny_), length in faces:
         along_x = nx_ == 0
@@ -1166,7 +1170,7 @@ def pc_hall():
             loc = (cx + nx_ * (depth / 2 + off), cy + ny_ * (depth / 2 + off), z)
             return box(name, size, loc, col, bevel=0.0)
 
-        p.append(slab("wainscot", 0.05, 1.3, 0.65, "wine"))
+        p.append(slab("wainscot", 0.05, 1.3, 0.65, "wainscot"))
         p.append(slab("rail", 0.12, 0.1, 1.35, "gold"))
         p.append(slab("skirting", 0.09, 0.22, 0.11, "plum_dark"))
         p.append(slab("crown", 0.3, 0.36, H - 0.18, "gold"))
@@ -1202,7 +1206,7 @@ def pc_hall():
             px, py = (cx + t, cy) if along_x else (cx, cy + t)
             fw, fh, fz = 2.7, 3.1, 3.45
             panel = (fw, 0.04, fh) if along_x else (0.04, fw, fh)
-            p.append(box("panel", panel, (px + nx_ * 0.04, py + ny_ * 0.04, fz), "wine", bevel=0.0))
+            p.append(box("panel", panel, (px + nx_ * 0.04, py + ny_ * 0.04, fz), "panel_ruby", bevel=0.0))
             for dz in (-fh / 2, fh / 2):
                 sz = (fw + 0.1, 0.06, 0.07) if along_x else (0.06, fw + 0.1, 0.07)
                 p.append(box("frame", sz, (px + nx_ * 0.07, py + ny_ * 0.07, fz + dz), "gold", bevel=0.0))
@@ -1217,12 +1221,12 @@ def pc_hall():
             md2 = (0.24, 0.06, 0.24) if along_x else (0.06, 0.24, 0.24)
             p.append(box("medallion2", md2, (px + nx_ * 0.1, py + ny_ * 0.1, fz), "gold", bevel=0.0, rot=rot))
     # The ceiling: a slab, a grid of wine beams with gold soffits, a scatter of tiny lights.
-    p.append(box("ceiling", (hw * 2 + 0.8, hd * 2 + 0.8, 0.4), (0, 0, H + 0.2), "plum_dark", bevel=0.0))
+    p.append(box("ceiling", (hw * 2 + 0.8, hd * 2 + 0.8, 0.4), (0, 0, H + 0.2), "ink", bevel=0.0))
     for k in range(-2, 3):
-        p.append(box("beam_x", (hw * 2, 0.4, 0.42), (0, k * 6.4, H - 0.21), "wine", bevel=0.0))
+        p.append(box("beam_x", (hw * 2, 0.4, 0.42), (0, k * 6.4, H - 0.21), "plum", bevel=0.0))
         p.append(box("soffit_x", (hw * 2, 0.12, 0.03), (0, k * 6.4, H - 0.43), "gold", bevel=0.0))
     for k in range(-2, 3):
-        p.append(box("beam_y", (0.4, hd * 2, 0.42), (k * 6.0, 0, H - 0.21), "wine", bevel=0.0))
+        p.append(box("beam_y", (0.4, hd * 2, 0.42), (k * 6.0, 0, H - 0.21), "plum", bevel=0.0))
         p.append(box("soffit_y", (0.12, hd * 2, 0.03), (k * 6.0, 0, H - 0.43), "gold", bevel=0.0))
     import random
     rnd = random.Random(7)
@@ -1547,11 +1551,11 @@ def pc_race_booth():
                          "white" if (c + i) % 2 == 0 else "black", bevel=0.0))
             p.append(box("check", (0.1, 0.02, 0.1), (1.88 + c * 0.1, -0.19, z + (-0.05 if c else 0.05)),
                          "black" if (c + i) % 2 == 0 else "white", bevel=0.0))
-    shoe = torus("horseshoe", 0.45, 0.09, (0, -0.1, bz + bh / 2 + 0.55), "gold", rot=(math.radians(90), 0, 0))
-    p.append(cut(shoe, (0, 0, bz + bh / 2 + 0.38), (0, 0, -1)))
+    shoe = torus("horseshoe", 0.34, 0.08, (0, -0.1, bz + bh / 2 + 0.4), "gold", rot=(math.radians(90), 0, 0))
+    p.append(cut(shoe, (0, 0, bz + bh / 2 + 0.26), (0, 0, -1)))
     for k in range(5):
         a = math.radians(20 + k * 35)
-        p.append(ball("nail", 0.04, (math.cos(a) * 0.45, -0.2, bz + bh / 2 + 0.55 + math.sin(a) * 0.45), "glow_bulb", subdiv=1))
+        p.append(ball("nail", 0.04, (math.cos(a) * 0.34, -0.2, bz + bh / 2 + 0.4 + math.sin(a) * 0.34), "glow_bulb", subdiv=1))
     join(p, "pc_race_booth")
     export("pc_race_booth")
 

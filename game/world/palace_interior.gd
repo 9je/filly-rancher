@@ -61,7 +61,7 @@ const STATIONS: Array[StringName] = [&"cage", &"slots", &"wheel", &"blackjack", 
 ## How near a spot she has to be for E to mean that game. Wide enough that "in front of the
 ## machine" is enough, narrow enough that two machines 1.3 m apart are both the slots anyway.
 const STATION_RADIUS := 1.9
-const EXIT_RADIUS := 2.4
+const EXIT_RADIUS := 1.6
 
 ## THE SLOT MACHINES, wall row then island: [x, z, yaw degrees]. A machine is 0.92 m across, so
 ## a 1.3 m pitch leaves a pony's shoulder between two of them.
@@ -72,7 +72,7 @@ const SLOT_ROW: Array = [
 	[-5.95, -5.2, 90.0], [-5.95, -3.9, 90.0], [-5.95, -2.6, 90.0],
 ]
 ## The machines a regular is already playing (indices into SLOT_ROW); E is not offered at those.
-const SLOT_TAKEN: Array[int] = [1, 4, 10]
+const SLOT_TAKEN: Array[int] = [1, 4, 12]
 const TABLES: Array[Vector3] = [Vector3(5.6, 0.0, 2.6), Vector3(5.6, 0.0, -3.6)]
 const CAGE_AT := Vector3(11.7, 0.0, 9.4)
 const BOOTH_AT := Vector3(11.7, 0.0, -9.6)
@@ -119,6 +119,8 @@ func build(pony_dir: String = "res://data/ponies") -> void:
 	add_child(_pieces)
 	_shell()
 	_furniture()
+	_stand_tote()
+	_collect_pulses()
 	_lights()
 	_triggers()
 	_stand_staff(pony_dir)
@@ -132,8 +134,110 @@ func set_active(on: bool) -> void:
 
 
 func _process(delta: float) -> void:
+	_t += delta
 	if _wheel != null:
 		_wheel.rotate_object_local(Vector3.FORWARD, -WHEEL_IDLE_SPIN * delta)
+	# The bulbs breathe, each model's set a beat off the next, so a row of machines reads as
+	# lit rather than painted.
+	for k in _pulse.size():
+		var entry: Array = _pulse[k]
+		(entry[0] as ShaderMaterial).set_shader_parameter(&"emission_energy",
+			float(entry[1]) * (0.72 + 0.32 * sin(_t * BULB_PULSE + float(k) * 1.7)))
+	_run_tote(delta)
+
+
+# --- life ----------------------------------------------------------------------------------
+
+## How fast the bulbs breathe, radians a second.
+const BULB_PULSE := 4.2
+## The tote board's lane colours: game/ui/casino_paint.gd's own six, so the board over the
+## window and the race screen behind it agree.
+const LANE_COLOURS: Array[Color] = [Color(0.85, 0.24, 0.26), Color(0.93, 0.55, 0.20),
+	Color(0.95, 0.82, 0.28), Color(0.33, 0.68, 0.36), Color(0.27, 0.52, 0.86),
+	Color(0.60, 0.38, 0.82)]
+## Where the lanes are on pc_race_booth's board, in the booth's own space (build_props.py:
+## bz + bh / 2 - 0.2 - i * 0.27, from x -1.4 to the chequers at 1.72).
+const LANE_TOP := 4.3
+const LANE_PITCH := 0.27
+const LANE_FROM := -1.4
+const LANE_TO := 1.72
+
+var _t := 0.0
+var _pulse: Array = []
+var _tokens: Array[MeshInstance3D] = []
+var _token_speed: Array[float] = []
+var _token_at: Array[float] = []
+var _tote_hold := 0.0
+var _tote_rng := RandomNumberGenerator.new()
+
+
+## THE TOTE BOARD RUNS A RACE OF LIGHTS: one bead per lane creeping toward the chequers at its
+## own pace, a pause on the winner, and off again. Decoration only; the real race is the
+## race menu's.
+func _stand_tote() -> void:
+	var tote := Node3D.new()
+	tote.name = "Tote"
+	tote.position = BOOTH_AT
+	tote.rotation.y = deg_to_rad(-90.0)
+	add_child(tote)
+	_tote_rng.seed = 6
+	var sphere := SphereMesh.new()
+	sphere.radius = 0.075
+	sphere.height = 0.15
+	for i in LANE_COLOURS.size():
+		var bead := MeshInstance3D.new()
+		bead.name = "Bead%d" % i
+		bead.mesh = sphere
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.albedo_color = Color(1.0, 0.98, 0.9)
+		m.emission_enabled = true
+		m.emission = LANE_COLOURS[i].lightened(0.6)
+		m.emission_energy_multiplier = 2.6
+		bead.material_override = m
+		bead.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		tote.add_child(bead)
+		bead.position = Vector3(LANE_FROM, LANE_TOP - i * LANE_PITCH, 0.26)
+		_tokens.append(bead)
+		_token_at.append(0.0)
+		_token_speed.append(_tote_rng.randf_range(0.07, 0.13))
+
+
+func _run_tote(delta: float) -> void:
+	if _tokens.is_empty():
+		return
+	if _tote_hold > 0.0:
+		_tote_hold -= delta
+		if _tote_hold <= 0.0:
+			for i in _tokens.size():
+				_token_at[i] = 0.0
+				_token_speed[i] = _tote_rng.randf_range(0.07, 0.13)
+		return
+	for i in _tokens.size():
+		# A little surge and stumble on top of each bead's own pace, so the order changes.
+		var pace: float = _token_speed[i] * (0.7 + 0.6 * absf(sin(_t * 1.3 + float(i) * 2.1)))
+		_token_at[i] = minf(1.0, _token_at[i] + pace * delta)
+		_tokens[i].position.x = lerpf(LANE_FROM, LANE_TO, _token_at[i])
+		if _token_at[i] >= 1.0:
+			_tote_hold = 2.0
+
+
+## Every glowing bulb material on the machines, the cage and the booth, once each.
+func _collect_pulses() -> void:
+	var seen: Dictionary = {}
+	for piece: Node in _pieces.get_children():
+		var asset := String(piece.get_meta(&"asset", ""))
+		if not (asset in ["pc_slot", "pc_slot_b", "pc_cage", "pc_race_booth", "pc_wheel"]):
+			continue
+		for mi: MeshInstance3D in piece.find_children("*", "MeshInstance3D", true, false):
+			if mi.mesh == null:
+				continue
+			for s in mi.mesh.get_surface_count():
+				var mat := mi.get_surface_override_material(s) as ShaderMaterial
+				if mat == null or seen.has(mat) or not mat.resource_name.contains("glow_bulb"):
+					continue
+				seen[mat] = true
+				_pulse.append([mat, float(mat.get_shader_parameter(&"emission_energy"))])
 
 
 # --- what is offered -----------------------------------------------------------------------
@@ -190,9 +294,9 @@ func view_pose(view: StringName) -> Array:
 		&"tables":
 			return [Vector3(-1.0, 3.0, -1.0), Vector3(6.8, 0.9, 0.0)]
 		&"cage":
-			return [Vector3(2.5, 2.6, 6.0), Vector3(10.5, 2.0, 10.0)]
+			return [Vector3(6.4, 2.6, 5.2), Vector3(11.0, 2.2, 9.4)]
 		&"racing":
-			return [Vector3(3.0, 2.6, -5.0), Vector3(11.0, 2.8, -10.0)]
+			return [Vector3(6.2, 2.7, -4.4), Vector3(11.0, 3.0, -9.6)]
 		&"door":
 			return [Vector3(0.5, 2.6, 2.0), Vector3(0.0, 2.4, 16.0)]
 	return [Vector3(0, 3, 10), Vector3(0, 2, 0)]
@@ -310,7 +414,7 @@ func _furniture() -> void:
 	_spots[&"racing"] = [BOOTH_AT + Vector3(-3.6, 0, 0)] as Array[Vector3]
 	# The doors back out, and the rope lane up to them.
 	_piece("pc_exit_door", EXIT_AT, 180.0)
-	_exit_spot = EXIT_AT + Vector3(0, 0, -1.6)
+	_exit_spot = EXIT_AT + Vector3(0, 0, -1.4)
 	for x in [-2.0, 2.0]:
 		_piece("pc_rope", Vector3(x, 0, 11.6), 90.0)
 		_box_body(LayersScript.PROPS, Vector3(0.12, 1.0, 2.7), Vector3(x, 0.5, 11.6))
@@ -353,7 +457,7 @@ func _lights() -> void:
 	var spot := SpotLight3D.new()
 	spot.name = "WheelSpot"
 	spot.light_color = Color(1.0, 0.95, 0.85)
-	spot.light_energy = 4.0
+	spot.light_energy = 2.4
 	spot.spot_range = 14.0
 	spot.spot_angle = 24.0
 	spot.shadow_enabled = false

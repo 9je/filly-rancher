@@ -10,7 +10,7 @@ const BootIntentScript := preload("res://world/boot_intent.gd")
 const WorldStateScript := preload("res://systems/world_state.gd")
 
 var out := ""
-var views: PackedStringArray = ["front", "player", "hall", "slots", "wheel", "tables", "cage",
+var views: PackedStringArray = ["front", "player", "hall", "slots", "wheel", "tables", "cage", "racing",
 	"door"]
 var night := false
 
@@ -92,7 +92,7 @@ func _run() -> void:
 				cam.make_current()
 		for i in 40:
 			await process_frame
-		var file := out.path_join("palace_%s%s.png" % [v, "_night" if night else ""])
+		var file := out.path_join("palace_interior_%s%s.png" % [v, "_night" if night else ""])
 		root.get_texture().get_image().save_png(file)
 		print("SHOT ", file)
 	print("PALACE_SHOT_OK")

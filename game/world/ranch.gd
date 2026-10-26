@@ -5227,9 +5227,9 @@ const PALACE_INTERIOR_DEPTH := 60.0
 ## Where the Palace's front doors stand, as metres in from the shell's front plane (its local
 ## z = depth / 2): the face of the model's dark door recess, measured off the worn model.
 const PALACE_DOOR_INSET := 0.78
-## How far out from the shell's front plane she is stood when she comes back out: on the top
-## of the steps, clear of the doorway's own trigger.
-const PALACE_STEP_OUT := 0.95
+## How far out from the shell's front plane she is stood when she comes back out: at the foot
+## of the steps (see _palace_step_point()), clear of the doorway's own trigger.
+const PALACE_STEP_OUT := 3.0
 const PALACE_FADE_OUT := 0.22
 const PALACE_FADE_IN := 0.4
 const PALACE_CLOSED_LINE := "The Spectra Palace opens on its grand opening day. Watch the post for the flyer."
@@ -5426,13 +5426,22 @@ func _move_out_of_palace() -> void:
 		people.unpark_companions()
 
 
-## The top of the Palace steps, just clear of the doorway, in world space.
+## The foot of the Palace steps, in world space, on whatever is under it (the apron or the
+## Strip): far enough out that the camera behind her has the steps to sit over rather than
+## being pressed flat against the doors, and well clear of the doorway's own trigger.
 func _palace_step_point() -> Vector3:
 	var palace := get_node_or_null(^"Buildings/Palace") as Building
 	if palace == null:
 		return player_spawn.global_position
-	return palace.to_global(Vector3(0.0, BuildingScript.FLOOR_TOP + 0.15,
+	var at: Vector3 = palace.to_global(Vector3(0.0, BuildingScript.FLOOR_TOP,
 		palace.depth * 0.5 + PALACE_STEP_OUT))
+	if is_inside_tree():
+		var query := PhysicsRayQueryParameters3D.create(at + Vector3.UP * 2.0,
+			at + Vector3.DOWN * 6.0, LayersScript.WORLD, [player.get_rid()])
+		var hit := get_world_3d().direct_space_state.intersect_ray(query)
+		if not hit.is_empty():
+			return (hit["position"] as Vector3) + Vector3.UP * 0.05
+	return at
 
 
 func _place_player(at: Vector3, yaw: float) -> void:
@@ -5441,7 +5450,10 @@ func _place_player(at: Vector3, yaw: float) -> void:
 	if player.has_method("face"):
 		player.call("face", yaw)
 	if _rig != null:
-		_rig.global_rotation.y = yaw
+		if _rig.has_method("reset_look"):
+			_rig.call("reset_look", yaw)
+		else:
+			_rig.global_rotation.y = yaw
 	player.reset_physics_interpolation()
 
 

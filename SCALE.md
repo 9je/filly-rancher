@@ -23,7 +23,10 @@ measures every placed asset's world-space bounding-box height (and each doorway'
 opening) on the ranch, in the town, at the Palace and the Strip, in all four regions and on
 the valley rim, and fails listing every asset outside its row below. Anything visible that
 no asset row claims fails as "unmapped". The Factory interior is not reachable from a new
-game, so it is not measured by this test (see the fix doc).
+game, so it is not measured by this test (see the fix doc). The Spectra Palace's hall is
+(2026-10-26): it is built the first time she walks in, so the test asks the ranch for it
+(`ensure_palace_interior()`) and measures every piece under the name of the model it was
+built from.
 
 The two tables below are MACHINE READ by that test: keep the header rows exactly as they
 are. Heights are in PH; `-` means no bound.
@@ -52,6 +55,8 @@ are. Heights are in PH; `-` means no bound.
 | ground | 0.0 | 0.3 | - | things lying flat: lily pads, jetty planks, flat stepping stones |
 | character | 0.25 | 0.8 | - | Spike (a baby dragon, about half a pony) |
 | terrain | 15 | - | - | terrain features: the valley rim and the Prism Works on the skyline |
+| interior | 2.5 | 4.5 | - | a room you walk around inside, and its floor to ceiling columns: the Spectra Palace's hall, slab to roof. Tall enough that the camera's arm swings freely under the ceiling |
+| fixture | 0.3 | 1.5 | - | things hung from a ceiling: the hall's chandeliers, from the ceiling rose to the lowest drop |
 
 ## Which asset is which category
 
@@ -124,3 +129,18 @@ without `.glb`, or the name the test gives a code-built thing.
 | spike | character | the Depot |
 | valley_rim | terrain | the skyline |
 | prism_works | terrain | the skyline |
+| pc_hall | interior | the Spectra Palace's hall, under the Palace (2026-10-26) |
+| pc_column | interior | the hall's four columns |
+| pc_slot* | prop_medium | the hall's slot machines: a pony stands at one, its topper over her head |
+| pc_blackjack | prop_medium | the hall's blackjack tables, felt at a pony's chest |
+| pc_wheel_stand | structure | the prize wheel's frame and clapper |
+| pc_wheel | structure | the prize wheel's face |
+| pc_stage | ground | the low round stage under the wheel |
+| pc_cage | stall | the cashier's cage: counter, bars, chip board |
+| pc_race_booth | stall | the racing window and its tote board |
+| pc_exit_door | structure | the doors back out, inside the hall |
+| pc_palace_doors | structure | the Palace's own front doors, in the facade's doorway |
+| pc_chandelier | fixture | the hall's chandeliers |
+| pc_rope | prop_small | the velvet rope lane at the hall's door |
+| pc_palm | bush | potted palms in the hall's corners |
+| pc_neon_* | sign | the hall's neon stars and horseshoes |

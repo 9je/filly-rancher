@@ -532,6 +532,16 @@ func add_look_delta(delta_yaw: float, delta_pitch: float) -> void:
 	_spring_arm.rotation.x = deg_to_rad(_look_pitch)
 
 
+## Look along world heading `yaw` (radians, -Z forward) at the default pitch, at once: for
+## when the player is put somewhere rather than walked there (the Spectra Palace's doors,
+## game/world/ranch.gd), so she arrives looking where she is facing instead of wherever the
+## mouse last left the lens.
+func reset_look(yaw: float) -> void:
+	global_rotation.y = yaw
+	_look_pitch = clampf(default_pitch_deg, PITCH_MIN_DEG, PITCH_MAX_DEG)
+	_spring_arm.rotation.x = deg_to_rad(_look_pitch)
+
+
 ## Current look pitch in degrees, positive = looking up. Exposed for tests and for any
 ## HUD/debug overlay that wants to show it.
 func get_look_pitch_degrees() -> float:

@@ -580,8 +580,8 @@ func set_tone(g: Dictionary) -> void:
 ## rather than whatever hour it is outside. The hour and the weather keep ramping underneath
 ## (_current is untouched), so stepping back out finds the sky exactly where it has got to.
 ## The dread grade still applies: the Palace is in the same valley as everything else.
-const INDOOR_AMBIENT_ENERGY := 0.55
-const INDOOR_AMBIENT_COLOR := Color(1.0, 0.82, 0.9)
+const INDOOR_AMBIENT_ENERGY := 0.42
+const INDOOR_AMBIENT_COLOR := Color(1.0, 0.9, 0.86)
 var _indoors := false
 
 

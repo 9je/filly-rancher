@@ -172,6 +172,18 @@ func _collect() -> void:
 			_add(String(a.name).rstrip("0123456789_").to_snake_case(), "Act3World/%s" % a.name,
 				PropsScript.world_aabb(a).size.y)
 		_cover(a)
+	# THE SPECTRA PALACE'S HALL (2026-10-26). Built the first time she goes in, so it is asked
+	# for here; every piece is measured under the asset name it was built from, and the staff,
+	# the tote board's beads and the colliders are covered with the rest of it.
+	var hall: Node = ranch.call("ensure_palace_interior") \
+		if ranch.has_method("ensure_palace_interior") else null
+	if hall != null:
+		var pieces: Node = hall.get_node_or_null(^"Pieces")
+		for p: Node in (pieces.get_children() if pieces != null else []):
+			if p is Node3D:
+				_add(String(p.get_meta(&"asset", p.name)), "PalaceInterior/%s" % p.name,
+					PropsScript.world_aabb(p).size.y)
+		_cover(hall)
 	# Characters are the yardstick, not the thing measured; the sky, the ground and the UI are
 	# not assets standing in the world.
 	for skip in [^"Player", ^"Spawner", ^"People", ^"Attendants", ^"Terrain", ^"SkyRig",
@@ -210,6 +222,8 @@ func _building(b: Node3D) -> void:
 	for c: Node in b.get_children():
 		if c.name == &"LobbySign":
 			_add("lobby_sign", "Buildings/%s/LobbySign" % b.name, PropsScript.world_aabb(c).size.y)
+		elif c.name == &"Doors":
+			_add("pc_palace_doors", "Buildings/%s/Doors" % b.name, PropsScript.world_aabb(c).size.y)
 
 
 ## The race track: its rails and their posts (fence), the finish wire's posts and the lane
