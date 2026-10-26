@@ -1825,6 +1825,95 @@ func _wobble(body: Node3D) -> void:
 
 ## The pop: a burst of sparkles in her colours, the pop sound, and a few frames of hit
 ## pause on a rare catch. Fire and forget; the pony is freed right after this.
+## THE CATCH LANDS IN THE SCOOP (feel pass 2026-10-26: she blinked out of the bubble in a
+## single frame, and nothing said where she went). A copy of her looks, scripts stripped,
+## is pulled along an arc into the nozzle over GHOST_SECONDS, stretching toward it and
+## shrinking to nothing; the pop, the Scoop's squash and the camera's kick land as she
+## arrives, not as she leaves.
+const GHOST_SECONDS := 0.32
+## How high the arc rises over the higher of its two ends, in metres.
+const GHOST_LIFT := 0.9
+
+
+## Where the ghost is at `t` (0..1) on her way from `from` into `to`: a quadratic arc.
+static func ghost_point(from: Vector3, to: Vector3, t: float) -> Vector3:
+	var top := (from + to) * 0.5
+	top.y = maxf(from.y, to.y) + GHOST_LIFT
+	var a := from.lerp(top, t)
+	var b := top.lerp(to, t)
+	return a.lerp(b, t)
+
+
+## Her scale at `t`: a beat of anticipation (a little bigger), then long and thin toward the
+## nozzle, then gone.
+static func ghost_scale(t: float) -> Vector3:
+	if t < 0.12:
+		var u := t / 0.12
+		return Vector3.ONE * (1.0 + 0.12 * sin(u * PI))
+	var v := clampf((t - 0.12) / 0.88, 0.0, 1.0)
+	var size := pow(1.0 - v, 1.6) * 0.95 + 0.0
+	var stretch := 1.0 + 0.9 * sin(v * PI)
+	return Vector3(size / sqrt(stretch), size * stretch, size / sqrt(stretch))
+
+
+func _suck_in(pony: Node3D, colors: Array[Color], rare: bool) -> void:
+	var root := get_tree().current_scene
+	var look := pony.get_node_or_null(^"Visuals") as Node3D
+	var to_node := _anchor_node()
+	if root == null or look == null:
+		_arrive_juice(pony.global_position + Vector3(0, 0.9, 0), colors, rare)
+		return
+	# No scripts, signals or groups: a picture of her, not a second pony.
+	var ghost := look.duplicate(0) as Node3D
+	ghost.name = "CatchGhost"
+	root.add_child(ghost)
+	ghost.global_transform = look.global_transform
+	var from := ghost.global_position
+	var basis0 := ghost.global_transform.basis.orthonormalized()
+	var tw := ghost.create_tween()
+	tw.tween_method(func(t: float) -> void:
+		if not is_instance_valid(ghost):
+			return
+		var end: Vector3 = to_node.global_position if is_instance_valid(to_node) else from
+		ghost.global_position = ghost_point(from, end, t)
+		ghost.global_transform.basis = basis0.scaled(ghost_scale(t)), 0.0, 1.0, GHOST_SECONDS) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_callback(func() -> void:
+		var at: Vector3 = to_node.global_position if is_instance_valid(to_node) else from
+		if is_instance_valid(ghost):
+			ghost.queue_free()
+		_arrive_juice(at, colors, rare))
+
+
+## She is in: a pop of her colours at the nozzle, the Scoop squashes, the camera kicks.
+func _arrive_juice(at: Vector3, colors: Array[Color], rare: bool) -> void:
+	if not is_inside_tree():
+		return
+	var root := get_tree().current_scene
+	if root != null:
+		var burst := BloomCeremony.sparkles(colors)
+		burst.amount = 34 if rare else 22
+		burst.lifetime = 0.7
+		root.add_child(burst)
+		burst.global_position = at
+		burst.emitting = true
+		get_tree().create_timer(1.4).timeout.connect(burst.queue_free)
+	_sound_call(&"play_at", [&"scoop_pop", at])
+	if _aim_source != null and _aim_source.has_method("add_trauma"):
+		_aim_source.call("add_trauma", 0.55 if rare else 0.32)
+	var scoop: Node3D = _player.find_child("Scoop", true, false) as Node3D if _player != null else null
+	if scoop != null:
+		var rest := scoop.scale
+		var squash := scoop.create_tween()
+		squash.tween_property(scoop, ^"scale", Vector3(rest.x * 1.28, rest.y * 0.78, rest.z * 1.28), 0.06)
+		squash.tween_property(scoop, ^"scale", rest, 0.35).set_trans(Tween.TRANS_ELASTIC) \
+			.set_ease(Tween.EASE_OUT)
+	if rare and DisplayServer.get_name() != "headless":
+		Engine.time_scale = 0.05
+		get_tree().create_timer(0.07, true, false, true).timeout.connect(func() -> void:
+			Engine.time_scale = 1.0)
+
+
 func _capture_juice(pony: Node3D, data: PonyData) -> void:
 	var at := pony.global_position + Vector3(0, 0.9, 0)
 	var colors: Array[Color] = [Color(1, 0.95, 0.6), Color(1, 0.75, 0.9), Color(0.75, 0.9, 1)]
@@ -1834,18 +1923,14 @@ func _capture_juice(pony: Node3D, data: PonyData) -> void:
 	var root := get_tree().current_scene
 	if root != null:
 		var burst := BloomCeremony.sparkles(colors)
-		burst.amount = 28
-		burst.lifetime = 0.9
+		burst.amount = 14
+		burst.lifetime = 0.6
 		root.add_child(burst)
 		burst.global_position = at
 		burst.emitting = true
 		get_tree().create_timer(1.6).timeout.connect(burst.queue_free)
-	_sound_call(&"play_at", [&"scoop_pop", at])
 	var rare: bool = data != null and int(data.rarity) >= PonyDataScript.Rarity.RARE
-	if rare and DisplayServer.get_name() != "headless":
-		Engine.time_scale = 0.05
-		get_tree().create_timer(0.07, true, false, true).timeout.connect(func() -> void:
-			Engine.time_scale = 1.0)
+	_suck_in(pony, colors, rare)
 
 
 func _build_effect() -> void:

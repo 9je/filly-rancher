@@ -367,6 +367,8 @@ func _specs() -> Array:
 				"The first three requests, pinned on screen until they are done."],
 			[&"show_guide", "Show the way", Kind.TOGGLE,
 				"A trail of sparkles on the ground toward whatever is waiting for you next."],
+			[&"camera_shake", "Camera shake", Kind.TOGGLE,
+				"The camera's little kick when a pony lands in the Scoop."],
 			[&"pause_on_focus_loss", "Pause when you switch away", Kind.TOGGLE,
 				"Switch to another window and the ranch waits for you under the pause menu."],
 		],
@@ -412,7 +414,7 @@ func _step(key: StringName, dir: int) -> bool:
 			return _set_float(&"stick_sensitivity", d.stick_sensitivity + SettingsScript.STICK_STEP * dir,
 				SettingsScript.STICK_MIN, SettingsScript.STICK_MAX)
 		&"vsync", &"invert_look", &"show_controls_chip", &"show_checklist", &"pause_on_focus_loss", \
-				&"pony_chatter", &"show_guide":
+				&"pony_chatter", &"show_guide", &"camera_shake":
 			var want := dir > 0
 			if bool(d.get(key)) == want:
 				return false

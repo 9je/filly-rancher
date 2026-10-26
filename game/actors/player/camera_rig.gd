@@ -124,6 +124,16 @@ const SPRING_DEFAULT := 3.5
 ## gamepad d-pad press -- see `_process()`).
 const ZOOM_STEP := 0.5
 
+## SHAKE (feel pass 2026-10-26; GDD feel table: "a trauma-based shake"). A kick adds trauma,
+## trauma bleeds away at SHAKE_DECAY a second, and the lens slides by trauma squared times
+## SHAKE_METRES through the camera's own h/v offsets, so the arm, the aim ray's direction
+## and the terrain guard never see it. Settings > Gameplay > Camera shake turns it off.
+const SHAKE_METRES := 0.07
+const SHAKE_DECAY := 1.8
+var shake_enabled := true
+var _trauma := 0.0
+var _shake_clock := 0.0
+
 @export_group("Look")
 ## Radians of yaw/pitch per pixel of mouse motion. Configurable per the task brief;
 ## 0.0035 rad/px (~0.2 deg/px) is a comfortable, not-too-twitchy default.
@@ -512,6 +522,29 @@ func _process(delta: float) -> void:
 	_update_shoulder_offset()
 	_keep_above_ground()
 	_update_subject_fade()
+	_apply_shake(delta)
+
+
+## Kick the camera by `amount` (0..1; a catch is about 0.3, a rare one 0.55).
+func add_trauma(amount: float) -> void:
+	if shake_enabled:
+		_trauma = clampf(_trauma + amount, 0.0, 1.0)
+
+
+func _apply_shake(delta: float) -> void:
+	if _camera == null:
+		return
+	_trauma = maxf(0.0, _trauma - SHAKE_DECAY * delta)
+	if not shake_enabled or _trauma <= 0.0:
+		_camera.h_offset = 0.0
+		_camera.v_offset = 0.0
+		return
+	_shake_clock += delta
+	var k := _trauma * _trauma * SHAKE_METRES
+	var t := _shake_clock * 38.0
+	# Two incommensurate sines an axis: a rattle with no visible period.
+	_camera.h_offset = k * (0.6 * sin(t * 1.0) + 0.4 * sin(t * 2.31 + 1.7))
+	_camera.v_offset = k * (0.6 * sin(t * 1.37 + 0.4) + 0.4 * sin(t * 2.79 + 2.9))
 
 
 ## Applies a yaw/pitch input in radians. `delta_yaw` positive turns the view right.

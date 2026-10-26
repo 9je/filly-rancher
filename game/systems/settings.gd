@@ -128,6 +128,8 @@ var show_controls_chip := true
 var show_checklist := true
 ## The guide's trail of motes and the lit compass icon (game/systems/guide.gd).
 var show_guide := true
+## The camera's kick on a catch and other big moments (game/actors/player/camera_rig.gd).
+var camera_shake := true
 var pause_on_focus_loss := true
 ## The cartoon babble under every talk line. OFF by default since the owner's 2026-10-25
 ## playtest ("the animal crossing style talking is super annoying and obnoxious"); the
@@ -140,7 +142,7 @@ const FIELDS: Array[StringName] = [&"master_volume", &"music_volume", &"ambient_
 	&"effects_volume", &"ui_volume", &"voice_volume", &"quality", &"vsync", &"window_mode",
 	&"resolution", &"fov", &"max_fps", &"mouse_sensitivity", &"stick_sensitivity",
 	&"invert_look", &"bindings", &"show_controls_chip", &"show_checklist", &"pause_on_focus_loss",
-	&"pony_chatter", &"show_guide"]
+	&"pony_chatter", &"show_guide", &"camera_shake"]
 
 ## The two that change the window itself, and so get the timed confirmation.
 const DISPLAY_FIELDS: Array[StringName] = [&"window_mode", &"resolution"]
@@ -191,6 +193,7 @@ func load_from(path: String = "") -> void:
 	show_controls_chip = bool(cfg.get_value(SECTION, "show_controls_chip", show_controls_chip))
 	show_checklist = bool(cfg.get_value(SECTION, "show_checklist", show_checklist))
 	show_guide = bool(cfg.get_value(SECTION, "show_guide", show_guide))
+	camera_shake = bool(cfg.get_value(SECTION, "camera_shake", camera_shake))
 	pony_chatter = bool(cfg.get_value(SECTION, "pony_chatter", pony_chatter))
 	pause_on_focus_loss = bool(cfg.get_value(SECTION, "pause_on_focus_loss", pause_on_focus_loss))
 	var b: Variant = cfg.get_value(SECTION, "bindings", {})
@@ -226,6 +229,7 @@ func save_to(path: String = "") -> bool:
 	cfg.set_value(SECTION, "show_controls_chip", show_controls_chip)
 	cfg.set_value(SECTION, "show_checklist", show_checklist)
 	cfg.set_value(SECTION, "show_guide", show_guide)
+	cfg.set_value(SECTION, "camera_shake", camera_shake)
 	cfg.set_value(SECTION, "pony_chatter", pony_chatter)
 	cfg.set_value(SECTION, "pause_on_focus_loss", pause_on_focus_loss)
 	var b := {}

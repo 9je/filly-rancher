@@ -960,3 +960,19 @@ func test_the_beam_still_takes_a_pony_whose_hours_simply_ended() -> void:
 	assert_true(pony.is_leaving(), "sanity: she is walking off the map")
 	assert_false(pony.is_being_delivered(), "...but nobody sent her anywhere")
 	assert_true(beam._is_grabbable(pony), "she is catchable to the last step, as she always was")
+
+
+## THE CATCH LANDS IN THE SCOOP (feel pass 2026-10-26: she used to blink out of the bubble
+## in one frame). The ghost's path leaves from her, arcs up, and ends in the nozzle, and she
+## stretches toward it and shrinks to nothing on the way.
+func test_the_catch_ghost_flies_from_her_into_the_nozzle() -> void:
+	var Beam := load("res://actors/player/magic_beam.gd")
+	var from := Vector3(0, 1, -5)
+	var to := Vector3(0, 1.2, 0)
+	assert_almost_eq(Beam.ghost_point(from, to, 0.0), from, Vector3.ONE * 0.001)
+	assert_almost_eq(Beam.ghost_point(from, to, 1.0), to, Vector3.ONE * 0.001)
+	assert_gt(Beam.ghost_point(from, to, 0.5).y, maxf(from.y, to.y), "an arc, not a line")
+	assert_almost_eq(Beam.ghost_scale(0.0), Vector3.ONE, Vector3.ONE * 0.001)
+	var mid: Vector3 = Beam.ghost_scale(0.5)
+	assert_gt(mid.y, mid.x, "stretched along the pull")
+	assert_lt(Beam.ghost_scale(1.0).length(), 0.2, "nothing left by the nozzle")

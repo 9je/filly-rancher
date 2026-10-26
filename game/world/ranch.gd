@@ -2746,6 +2746,7 @@ func _apply_settings() -> void:
 		_rig.mouse_sensitivity = _settings.mouse_sensitivity
 		_rig.invert_look = _settings.invert_look
 		_rig.stick_sensitivity = _settings.stick_sensitivity
+		_rig.set(&"shake_enabled", _settings.camera_shake)
 		var cam: Camera3D = _rig.call("get_camera") if _rig.has_method("get_camera") else null
 		if cam != null:
 			cam.fov = _settings.fov

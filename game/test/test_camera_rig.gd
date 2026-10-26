@@ -374,3 +374,26 @@ func test_invert_look_flips_pitch_and_leaves_yaw_alone() -> void:
 	# flipped horizontal would make every one of them think the option was broken.
 	assert_almost_eq(_rig.rotation.y, yaw_before, 0.000001,
 		"neither look, inverted or not, may move the yaw the caller passed zero for")
+
+
+## A KICK, NOT A WOBBLE (feel pass 2026-10-26): trauma rattles the lens a few centimetres
+## and settles within a second, and a player who switched shake off gets none of it.
+func test_trauma_shakes_the_lens_and_settles() -> void:
+	_rig.add_trauma(0.6)
+	_rig._apply_shake(1.0 / 60.0)
+	var cam: Camera3D = _rig.get_camera()
+	var off := Vector2(cam.h_offset, cam.v_offset).length()
+	assert_gt(off, 0.0, "a fresh kick moves the lens")
+	assert_lt(off, CameraRigScript.SHAKE_METRES + 0.001, "...by centimetres, not metres")
+	for i in 90:
+		_rig._apply_shake(1.0 / 60.0)
+	assert_almost_eq(Vector2(cam.h_offset, cam.v_offset).length(), 0.0, 0.0001,
+		"a second and a half later it has settled back to the shoulder")
+
+
+func test_shake_switched_off_never_moves_the_lens() -> void:
+	_rig.shake_enabled = false
+	_rig.add_trauma(1.0)
+	_rig._apply_shake(1.0 / 60.0)
+	var cam: Camera3D = _rig.get_camera()
+	assert_eq(Vector2(cam.h_offset, cam.v_offset), Vector2.ZERO)
