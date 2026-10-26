@@ -185,9 +185,9 @@ func _collect() -> void:
 					PropsScript.world_aabb(p).size.y)
 		_cover(hall)
 	# Characters are the yardstick, not the thing measured; the sky, the ground and the UI are
-	# not assets standing in the world.
+	# not assets standing in the world. Nor is the guide's trail of motes: an effect.
 	for skip in [^"Player", ^"Spawner", ^"People", ^"Attendants", ^"Terrain", ^"SkyRig",
-			^"CaptureCamera", ^"HUD"]:
+			^"CaptureCamera", ^"HUD", ^"GuideTrail"]:
 		var n := ranch.get_node_or_null(skip)
 		if n != null:
 			_cover(n)
