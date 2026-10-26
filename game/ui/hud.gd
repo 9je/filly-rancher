@@ -453,7 +453,11 @@ func get_capacity() -> int:
 ## into a plain Array with no coercion at all, so nothing is lost on the production path.
 func set_tasks(rows: Array) -> void:
 	_task_lines = []
+	# DETACHED, THEN FREED: a queued child still counts toward the box's minimum height when
+	# the deferred refit runs, so one task left kept a three-task card (render review
+	# 2026-10-26).
 	for child in _tasks.get_children():
+		_tasks.remove_child(child)
 		child.queue_free()
 	if rows.is_empty():
 		# The card goes with its lines. The labels above are only QUEUED for deletion, so a

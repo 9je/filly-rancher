@@ -609,3 +609,24 @@ func test_the_queue_drains_and_the_last_line_still_gets_shown() -> void:
 		_hud._process(0.05)
 	assert_eq(_hud.pending_toasts(), [] as Array[String], "the queue emptied")
 	assert_eq(_hud.toast_text(), "two", "and the last line was actually shown")
+
+
+## RENDER REVIEW 2026-10-26: two lessons claimed, and the card still stood three rows tall
+## round the one that was left.
+func test_the_task_card_shrinks_with_its_list() -> void:
+	var three := []
+	for i in 3:
+		three.append({"id": "t%d" % i, "text": "Task %d" % i, "done": false, "paid": false,
+			"reward_bits": 5})
+	_hud.set_tasks(three)
+	await wait_physics_frames(3)
+	var card := _hud.get_node_or_null("TasksCard") as Panel
+	if card == null:
+		pending("no TasksCard in this HUD")
+		return
+	var tall := card.size.y
+	# The ranch hands the list over again and again, not once (ranch.gd's refresh).
+	for i in 4:
+		_hud.set_tasks([three[0]])
+		await wait_physics_frames(1)
+	assert_lt(card.size.y, tall - 20.0, "one row left, a one-row card")

@@ -36,6 +36,8 @@ const MAX_FADE := 0.92
 ## far at any distance: half faded it was a grey sheet across the screen (feel pass
 ## 2026-10-26, the Pens board at the pen's gate).
 const BLOCKING_FADE := 0.96
+## At or past this fade the board is not drawn at all.
+const HIDE_AT := 0.85
 static var subject: Node3D = null
 
 var text := ""
@@ -141,8 +143,12 @@ func update_fade(cam: Camera3D) -> void:
 	if absf(f - _fade) < 0.005:
 		return
 	_fade = f
+	# Nearly gone is gone: the toon shader's ink pass does not fade cleanly, and a board at
+	# 0.9 drew as a dark see-through sheet across the screen (render review 2026-10-26).
+	var hide := f >= HIDE_AT
 	for g: Node in find_children("*", "GeometryInstance3D", true, false):
 		(g as GeometryInstance3D).transparency = f
+		(g as GeometryInstance3D).visible = not hide
 
 
 ## Does the segment a..b pass through the box of half extents `h` at the origin? (Slabs.)

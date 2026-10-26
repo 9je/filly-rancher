@@ -205,9 +205,9 @@ const MAX_RESIDENT_SPOTS := 8
 
 # --- colour ------------------------------------------------------------------------------
 
-const POST_COLOR := Color(0.412, 0.290, 0.196)
-const RAIL_COLOR := Color(0.561, 0.427, 0.290)
-const GATE_COLOR := Color(0.478, 0.353, 0.243)
+const POST_COLOR := Color(0.55, 0.36, 0.22)
+const RAIL_COLOR := Color(0.74, 0.54, 0.33)
+const GATE_COLOR := Color(0.66, 0.46, 0.28)
 
 # --- configuration ----------------------------------------------------------------------
 
@@ -881,6 +881,8 @@ func build_shell() -> void:
 		var along := Vector3(-outward.z, 0.0, outward.x)
 		_build_side("Side%d" % side, outward, along, side == gate_side,
 			post_mat, rail_mat, gate_mat)
+	# The show's shading and ink line, like every building beside it.
+	ToonStyler.style(self, &"prop", {})
 
 
 ## One fence side: posts, rails, and a solid barrier, with the gateway left out of the rails
@@ -1079,18 +1081,71 @@ static func _material_static(colour: Color) -> StandardMaterial3D:
 ## a caller that wants both should not have to reach for a second function.
 func _slab(slab_name: String, size: Vector3, at: Vector3, mat: StandardMaterial3D,
 		with_collision := true) -> void:
-	var box := BoxMesh.new()
-	box.size = size
-	box.material = mat
-
 	var mesh_node := MeshInstance3D.new()
 	mesh_node.name = slab_name
-	mesh_node.mesh = box
+	mesh_node.mesh = _timber_mesh(slab_name, size, mat, mesh_node)
 	mesh_node.position = at
 	add_child(mesh_node)
 
 	if with_collision:
 		_collider(slab_name + "Col", size, at)
+
+
+## TIMBER, NOT BOXES (art pass 2026-10-26: the paddock was the one object on screen in every
+## minute of play and it was raw grey-brown boxes beside outlined, rounded buildings). Posts
+## are round with a domed cap, rails are rounded poles; everything else stays a box. Only the
+## look changes: every collider is still _add_barrier()'s slab.
+static func _timber_mesh(slab_name: String, size: Vector3, mat: Material, holder: Node3D) -> Mesh:
+	if slab_name.contains("Post"):
+		var r := maxf(size.x, size.z) * 0.62
+		var post := CylinderMesh.new()
+		post.top_radius = r * 0.92
+		post.bottom_radius = r
+		post.height = size.y
+		post.radial_segments = 10
+		post.rings = 1
+		var cap := SphereMesh.new()
+		cap.radius = r * 1.05
+		cap.height = r * 1.2
+		cap.radial_segments = 10
+		cap.rings = 4
+		var cap_node := MeshInstance3D.new()
+		cap_node.name = "Cap"
+		cap_node.mesh = _baked(cap, mat, "cap%.3f" % r)
+		cap_node.position = Vector3(0, size.y * 0.5, 0)
+		holder.add_child(cap_node)
+		return _baked(post, mat, "post%.3f:%.3f" % [r, size.y])
+	if slab_name.contains("Rail"):
+		var span := maxf(size.x, size.z)
+		var rail := CapsuleMesh.new()
+		rail.radius = minf(size.y, minf(size.x, size.z)) * 0.6
+		rail.height = span + rail.radius * 2.0
+		rail.radial_segments = 10
+		rail.rings = 2
+		# A capsule stands up Y; lay it along whichever of X or Z the rail runs.
+		holder.rotation = Vector3(0, 0, PI * 0.5) if size.x >= size.z else Vector3(PI * 0.5, 0, 0)
+		return _baked(rail, mat, "rail%.3f:%.3f" % [rail.radius, span])
+	var box := BoxMesh.new()
+	box.size = size
+	box.material = mat
+	return box
+
+
+## Shapes baked once into plain ArrayMeshes and shared: a pen has twenty posts of two
+## heights, and a primitive mesh regenerates itself on a deferred update that a pen freed in
+## the same frame leaves dangling.
+static var _baked_meshes: Dictionary = {}
+
+
+static func _baked(prim: PrimitiveMesh, mat: Material, key: String) -> ArrayMesh:
+	var k := "%s#%d" % [key, mat.get_instance_id()]
+	var out: ArrayMesh = _baked_meshes.get(k)
+	if out == null:
+		out = ArrayMesh.new()
+		out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, prim.get_mesh_arrays())
+		out.surface_set_material(0, mat)
+		_baked_meshes[k] = out
+	return out
 
 
 func _collider(shape_name: String, size: Vector3, at: Vector3) -> void:
