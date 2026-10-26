@@ -199,7 +199,15 @@ void fragment() {
 		float wobble = (value_noise(v_world_pos.xz / 2.5) - 0.5) * path_edge_noise;
 		float path = clamp(1.0 - smoothstep(path_half_width + wobble,
 			path_half_width + path_edge_softness + wobble, pd), 0.0, 1.0);
-		base = mix(base, dirt, path);
+		// A ROAD WITH WEAR IN IT, NOT A FLAT FILL (owner, 2026-10-25: "starting area is
+		// terrible"; the plaza read as one orange sheet). The crown is packed lighter where the
+		// hooves go, two darker ruts run a cart's width apart, and small pebbles break it up.
+		// All of it rides on the path mask, so the edge itself is unchanged.
+		float crown = 1.0 - smoothstep(0.0, path_half_width * 0.8, pd);
+		float rut = 1.0 - smoothstep(0.0, 0.16, abs(pd - path_half_width * 0.55));
+		float pebble = step(0.8, value_noise(v_world_pos.xz * 3.1)) * value_noise(v_world_pos.xz * 7.3);
+		vec3 road = dirt * (1.0 + 0.16 * crown - 0.18 * rut - 0.22 * pebble);
+		base = mix(base, road, path);
 
 		// A WORN PATH READS AS PACKED, LIGHTER EARTH EVEN IN SHADOW -- REAL ambient-only
 		// lighting DOES NOT AGREE. Measured on this map's own dawn render: the corridor this

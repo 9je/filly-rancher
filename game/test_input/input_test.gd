@@ -84,7 +84,23 @@ func _watchdog() -> void:
 		await create_timer(1.0).timeout
 		t += 1.0
 		if t > _deadline_s:
-			fail("timed out after %ds of game time" % int(_deadline_s))
+			fail("timed out after %ds of game time (%s)" % [int(_deadline_s), _where()])
+
+
+## Where a timed-out test was stuck: the scene, the loading screen and the player, so a rare
+## hang says what it was waiting on instead of only that it waited.
+func _where() -> String:
+	var parts: Array[String] = []
+	parts.append("scene %s" % (current_scene.name if current_scene != null else "none"))
+	parts.append("paused %s" % str(paused))
+	var ls = LoadingScreen._current
+	if is_instance_valid(ls):
+		var staged: String = "%.2f" % float(ls._loader.progress()) if ls._loader != null else "none"
+		parts.append("loading state %d at %.2f '%s' staged load %s claimed %s" % [ls._state,
+			ls._target, ls._caption, staged, str(ls._claimed)])
+	if is_instance_valid(player):
+		parts.append("player at %s" % str(player.global_position))
+	return ", ".join(parts)
 
 
 func _release_all() -> void:

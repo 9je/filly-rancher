@@ -313,3 +313,33 @@ The owner's save after 11.6 minutes: 17 ponies, 157 bits, a pen on all four plot
   quarter of the screen tall, in 96 px blocks. Close up she needs no marker to be found.
 - **Brambles in SCALE.md as prop_medium** (1.14 PH, a thicket about pony height); `bush` tops
   out at 1.0.
+
+## 2026-10-26 -- New game could hang for good; the loading screen loads without threads
+
+- **The hang.** About one New game in six under the input gate sat on "Saddling up... 6%"
+  forever. The watchdog's new state dump (input_test.gd `_where()`) caught it: title scene,
+  loading screen in LOADING, `load_threaded_get_status` IN_PROGRESS for 600 game seconds,
+  every Godot thread parked on a futex. ResourceLoader's worker stopped inside world/ranch.tscn
+  and never came back. I could not attach a debugger (ptrace is restricted to children here,
+  and the official binary has no symbols), so the exact engine lock is not known.
+- **Correction of my own 2026-10-25 note.** I put the earlier "New game never reached the
+  ranch" failures down to the test counting game seconds while the loading screen's frames ran
+  free. The wall-clock wait was still right, but those failures were most likely this same
+  hang: the "Could not preload" lines are what a quit mid-load prints.
+- **The fix: game/ui/staged_loader.gd.** It loads the scene on the main thread, leaves first:
+  every dependency the files name, plus every script any of them preload()s, each only after
+  what it needs is cached. The loading screen steps it 12 ms a frame, so the bar moves between
+  every load. That is 2.4 s in all (2.2 s threaded), and the worst single load is ranch.gd's
+  compile, about 0.6 s, inside test_loading's rule that a stall is allowed while the bar moves.
+  Instancing moved off WorkerThreadPool too (6 ms on the main thread). No thread is asked for
+  anything, so nothing can stop and never return. test_staged_loader (3 tests, failed before:
+  no such file); 20 New-game boots in a row (results in PROGRESS.md).
+- **Race and parts.** One catch card read "Unicorn" over what looked like a wing.
+  test_race_parts paints every donor in every race it can wear: no wing on a non-pegasus, no
+  horn on a non-unicorn, every pegasus and unicorn keeps hers. It passed at once, so the
+  painting is right. The shape in catch_card_settled.png is most likely her tail behind her.
+  The test stays as a guard.
+- **Every tool script passes --log-file now** (pacing, the playthroughs, shots, turntable,
+  sheets, the release export, the atomic-save proof, the theme build), so no tool can push the
+  owner's play log out of Godot's five-log rotation. The run_tests.sh parse sweep was the one
+  that did, on 2026-10-25 at 21:33: one launch per script, each without --log-file.

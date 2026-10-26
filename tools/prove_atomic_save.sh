@@ -39,7 +39,7 @@ trap 'rm -rf "$FILLY_TEST_SAVE_DIR" "$PROOF_APPDATA"' EXIT
 
 run_phase() {
   local phase="$1"
-  "$GODOT" --headless --audio-driver Dummy --path game -s "$SCRIPT" -- "--phase=$phase"
+  "$GODOT" --headless --audio-driver Dummy --log-file "$(mktemp -d)/godot.log" --path game -s "$SCRIPT" -- "--phase=$phase"
   return $?
 }
 

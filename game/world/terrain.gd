@@ -152,9 +152,12 @@ static func path_distance(p: Vector2) -> float:
 ## sampled through the shader's own `value_noise()`, so the border reads as worn rather than
 ## as a UI decal with a hard edge. All three are also the ShaderMaterial's own uniforms
 ## (`terrain.gdshader`) and are set from here, the one place, in `_build_mesh()`.
-const PATH_HALF_WIDTH := 1.1
-const PATH_EDGE_SOFTNESS := 1.3
-const PATH_EDGE_NOISE := 0.5
+## 2026-10-26: a wider core with a short edge (was 1.1 m, a 1.3 m fade and 0.5 m of wander).
+## The old edge was as wide as the road, so from the player's eye every road was a brown
+## smear; the show paints its paths with a clean edge. Same overall width.
+const PATH_HALF_WIDTH := 1.5
+const PATH_EDGE_SOFTNESS := 0.35
+const PATH_EDGE_NOISE := 0.3
 
 ## HOW MUCH OF DIRT COMES BACK AS AN AMBIENT-INDEPENDENT EMISSION FLOOR ON THE PATH. Measured
 ## against the shipped dawn render: this route runs through the long shadow of the trees and

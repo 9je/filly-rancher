@@ -15,7 +15,7 @@ log="build/pacing.log"
 mkdir -p build
 env -u WAYLAND_DISPLAY MESA_VK_WSI_DEBUG=sw xvfb-run -a -s "-screen 0 1280x720x24" \
   nice -n 19 tools/bin/godot --display-driver x11 --gpu-index 0 --resolution 1280x720 --fixed-fps 60 \
-  --path game --audio-driver Dummy \
+  --log-file "$(mktemp -d)/godot.log" --path game --audio-driver Dummy \
   -s res://scenes/test/human_bot.gd -- --minutes="$MIN" --seed="$SEED" --pacing="$(pwd)/PACING.md" \
   > "$log" 2>&1
 grep -E "^PACING_|^BOT_OK|^PLAYTHROUGH_BUG|SCRIPT ERROR" "$log" | head -20

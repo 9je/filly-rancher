@@ -103,11 +103,11 @@ rm -f build/filly-rancher-linux.x86_64 build/filly-rancher-linux.pck \
       build/filly-rancher-windows.exe build/filly-rancher-windows.pck
 
 echo "-- exporting Linux --"
-tools/bin/godot --headless --path game --export-release "Linux" \
+tools/bin/godot --headless --log-file "$(mktemp -d)/godot.log" --path game --export-release "Linux" \
   ../build/filly-rancher-linux.x86_64 2>&1 | tee /tmp/publish-export-linux.log
 
 echo "-- exporting Windows --"
-tools/bin/godot --headless --path game --export-release "Windows" \
+tools/bin/godot --headless --log-file "$(mktemp -d)/godot.log" --path game --export-release "Windows" \
   ../build/filly-rancher-windows.exe 2>&1 | tee /tmp/publish-export-windows.log
 
 if grep -nE 'ERROR:|Failed loading resource|Failed to load resource|Cannot open file|Resource file not found' \

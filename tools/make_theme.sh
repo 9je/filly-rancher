@@ -5,7 +5,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-tools/bin/godot --headless --audio-driver Dummy --path game -s scripts/make_theme.gd
+FILLY_TEST_SAVE_DIR="$(mktemp -d)" tools/bin/godot --headless --audio-driver Dummy --log-file "$(mktemp -d)/godot.log" --path game -s scripts/make_theme.gd
 rc=$?
 if [ "$rc" -ne 0 ]; then
   echo "FAIL: the theme generator exited $rc" >&2

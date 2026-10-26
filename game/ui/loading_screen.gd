@@ -7,8 +7,9 @@ extends CanvasLayer
 ## for half a minute.
 ##
 ## WHAT IT DOES. LoadingScreen.change_scene() puts this layer over everything, loads the
-## next scene on a worker thread (ResourceLoader.load_threaded_request, its progress on the
-## bar), changes to it, and then stays up while the arriving scene builds itself: a scene
+## next scene a dependency at a time on the main thread (game/ui/staged_loader.gd, its
+## progress on the bar; never on a worker thread, which could hang for good), changes to
+## it, and then stays up while the arriving scene builds itself: a scene
 ## that claim()s the screen reports its own boot steps with report() and calls release() when
 ## the player can play; one that does not claim it is shown as soon as it is in. The screen
 ## lives under the tree's root, not under either scene, so it survives the change.
@@ -20,7 +21,7 @@ extends CanvasLayer
 
 const GROUP := &"loading_screen"
 
-## The share of the bar that the threaded load of the scene file fills; the arriving scene's
+## The share of the bar that the staged load of the scene file fills; the arriving scene's
 ## own boot steps fill the rest.
 const LOAD_SHARE := 0.3
 const FADE_SECONDS := 0.35
@@ -58,6 +59,10 @@ const CLOUDS: Array[Vector3] = [
 ]
 
 const MenuStyleScript := preload("res://ui/menu_style.gd")
+const StagedLoaderScript := preload("res://ui/staged_loader.gd")
+## Milliseconds of each frame the staged load may spend before the screen draws again. A
+## single resource can take longer (ranch.gd compiles in about 0.6 s); the bar moves after it.
+const LOAD_BUDGET_MS := 12.0
 
 ## The screen that is up, if any. Untyped and built through load() rather than through the
 ## class name, so the screen works on a checkout whose class cache has not been rebuilt yet.
@@ -74,10 +79,8 @@ var _target := 0.0
 var _shown := 0.0
 var _caption := ""
 var _claimed := false
-var _requested := false
+var _loader = null
 var _packed: PackedScene = null
-var _instance: Node = null
-var _instance_task := -1
 var _released := false
 var _frames_in := 0
 var _alpha := 1.0
@@ -167,9 +170,9 @@ func _ready() -> void:
 	_set_world_drawn(false)
 	_caption = "Saddling up" if look == Look.RANCH else "Riding the lift up"
 	_refresh_text()
-	# Already in memory (Load game reloads the scene that is running): nothing to thread.
+	# Already in memory (Load game reloads the scene that is running): nothing to stage.
 	if not ResourceLoader.has_cached(scene_path):
-		_requested = ResourceLoader.load_threaded_request(scene_path, "", false) == OK
+		_loader = StagedLoaderScript.new(scene_path)
 
 
 func _exit_tree() -> void:
@@ -370,55 +373,44 @@ func _process(delta: float) -> void:
 
 func _poll_load() -> void:
 	var res: Resource = null
-	if not _requested:
+	if _loader == null:
 		res = load(scene_path)
 	else:
-		var p: Array = []
-		var status := ResourceLoader.load_threaded_get_status(scene_path, p)
-		match status:
-			ResourceLoader.THREAD_LOAD_IN_PROGRESS:
-				var f: float = float(p[0]) if not p.is_empty() else 0.0
-				_target = maxf(_target, LOAD_SHARE * 0.8 * f)
-				_refresh_text()
-				return
-			ResourceLoader.THREAD_LOAD_LOADED:
-				res = ResourceLoader.load_threaded_get(scene_path)
-			_:
-				push_error("LoadingScreen: loading %s failed (%d); loading it directly"
-					% [scene_path, status])
-				res = load(scene_path)
+		if not _loader.step(LOAD_BUDGET_MS):
+			_target = maxf(_target, LOAD_SHARE * 0.8 * float(_loader.progress()))
+			_refresh_text()
+			return
+		res = _loader.result()
+		_loader = null
+		if res == null:
+			push_error("LoadingScreen: the staged load of %s failed; loading it directly"
+				% scene_path)
+			res = load(scene_path)
 	_target = maxf(_target, LOAD_SHARE * 0.8)
 	_print_trace("scene file loaded")
 	_caption = "Saddling up" if look == Look.RANCH else "Riding the lift up"
 	_refresh_text()
-	# THE SCENE IS INSTANCED ON A WORKER TOO: the ranch is a few thousand nodes, and building
-	# them is most of a second the main thread would otherwise spend frozen on the switch.
-	# Nothing is in the tree until change_scene_to_node(), on the main thread, below.
+	# INSTANCED ON THE NEXT FRAME, ON THE MAIN THREAD. It used to be a WorkerThreadPool task;
+	# with everything already loaded the ranch instances in a few milliseconds, and a thread
+	# is one more thing that could stop and never come back. Nothing is in the tree until
+	# change_scene_to_node(), below.
 	_packed = res as PackedScene
 	_state = State.INSTANCING
-	_instance_task = WorkerThreadPool.add_task(_instance_scene, false, "LoadingScreen")
-
-
-func _instance_scene() -> void:
-	_instance = _packed.instantiate()
 
 
 func _poll_instance() -> void:
-	if not WorkerThreadPool.is_task_completed(_instance_task):
-		return
-	WorkerThreadPool.wait_for_task_completion(_instance_task)
+	var instance: Node = _packed.instantiate() if _packed != null else null
 	_target = maxf(_target, LOAD_SHARE)
 	_print_trace("scene instanced")
 	_refresh_text()
 	_state = State.SWITCHING
 	var tree := get_tree()
 	tree.paused = false
-	if _instance == null:
+	if instance == null:
 		push_error("LoadingScreen: %s did not instance; changing to it directly" % scene_path)
-		tree.change_scene_to_packed(_packed)
+		tree.change_scene_to_file(scene_path)
 		return
-	tree.change_scene_to_node(_instance)
-	_instance = null
+	tree.change_scene_to_node(instance)
 
 
 ## Nothing gets past the screen while it is up: no menu opens behind it, no key reaches the

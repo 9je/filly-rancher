@@ -148,3 +148,10 @@ Canon MLP stays: real names, looks and places ("lean into mlp fully", private bu
   - Spike 1.9x;
   - the Palace marquee over the door.
 - **The window resize was not reproduced:** pinned by test_window_size.
+
+### 2026-10-26 (overnight)
+- **New game could hang forever on "Saddling up... 6%".** It happened in about one boot in six under the input gate: ResourceLoader's worker thread stopped inside world/ranch.tscn. The loading screen now loads leaves first on the main thread (game/ui/staged_loader.gd), 12 ms a frame, with no thread at all. That is 2.4 s in all, against 2.2 s before, and the worst single step is 0.6 s with the bar moving. Twenty boots in a row all reached the ranch, and test_loading still passes. test_staged_loader is new. The input watchdog now prints where a timed-out test was stuck.
+- **Roads with a clean edge and some wear.** Half-width 1.5 m with a 0.35 m edge (was 1.1 m and 1.3 m), plus a lighter crown, cart ruts and pebbles in the shader. Spawn views are in build/playtest_evidence/round3/spawn_view_*.png.
+- **test_race_parts:** every donor, in every race it can wear, shows only its race's parts. It passed at once (the "Unicorn with wings" card was most likely her tail).
+- **Every tool script passes --log-file.**
+- **The Spectra Palace walk-in interior** is being built on its own branch.

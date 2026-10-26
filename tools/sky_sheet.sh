@@ -108,7 +108,7 @@ for phase in $PHASES; do
       continue
     fi
     mkdir -p "$OUT/$cell"
-    timeout 300 xvfb-run -a tools/bin/godot --path game --audio-driver Dummy \
+    timeout 300 xvfb-run -a tools/bin/godot --log-file "$(mktemp -d)/godot.log" --path game --audio-driver Dummy \
         --resolution 960x540 world/ranch.tscn -- \
         "--screenshot-dir=$OUT/$cell" "--phase=$phase" "--weather=$weather" \
         > "$OUT/$cell.log" 2>&1

@@ -16,7 +16,7 @@ export FILLY_TEST_SAVE_DIR="$(mktemp -d)"
 trap 'rm -rf "$FILLY_TEST_SAVE_DIR"' EXIT
 env -u WAYLAND_DISPLAY MESA_VK_WSI_DEBUG=sw xvfb-run -a -s "-screen 0 800x800x24" \
   nice -n 19 tools/bin/godot --display-driver x11 --gpu-index 0 --resolution 800x800 \
-  --fixed-fps 60 --path game --audio-driver Dummy -s res://scenes/test/pony_turntable.gd -- \
+  --fixed-fps 60 --log-file "$(mktemp -d)/godot.log" --path game --audio-driver Dummy -s res://scenes/test/pony_turntable.gd -- \
   out="$OUT/shots" "$@" > "$OUT/render.log" 2>&1
 grep -E "Using Device" "$OUT/render.log" | head -1
 grep -E "^TURNTABLE_(PROBLEM|DONE)|SCRIPT ERROR" "$OUT/render.log"

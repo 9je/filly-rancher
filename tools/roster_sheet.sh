@@ -37,7 +37,7 @@ for f in game/data/ponies/*.tres; do
     rendered=$((rendered + 1))
     continue
   fi
-  timeout 300 xvfb-run -a tools/bin/godot --path game --audio-driver Dummy \
+  timeout 300 xvfb-run -a tools/bin/godot --log-file "$(mktemp -d)/godot.log" --path game --audio-driver Dummy \
       --resolution 1280x720 scenes/test/visual_review.tscn -- \
       mode=face character="$id" out="$OUT" > /dev/null 2>&1
   # THE VERDICT IS THE PNG, NOT THE EXIT CODE. Godot returns 0 from plenty of runs that

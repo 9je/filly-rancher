@@ -22,7 +22,7 @@ for e in "${endings[@]}"; do
   start=$(date +%s)
   timeout 21600 env -u WAYLAND_DISPLAY MESA_VK_WSI_DEBUG=sw xvfb-run -a -s "-screen 0 1280x720x24" \
     nice -n 19 "$GODOT" --display-driver x11 --gpu-index 0 --resolution 1280x720 --fixed-fps 60 \
-    --path game --audio-driver Dummy -s res://test_input/playthrough_input.gd \
+    --log-file "$(mktemp -d)/godot.log" --path game --audio-driver Dummy -s res://test_input/playthrough_input.gd \
     -- --ending="$e" --log="$(pwd)/build/playthrough_$e.bot.log" ${PT_ARGS:-} > "$log" 2>&1
   rc=$?
   wall=$(( $(date +%s) - start ))
