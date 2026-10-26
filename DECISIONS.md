@@ -362,3 +362,13 @@ The owner's save after 11.6 minutes: 17 ponies, 157 bits, a pen on all four plot
   seconds, so a run can be reviewed as a player sees it with nothing opened on the desktop.
   The 12-minute review of 2026-10-26 found the Market, Depot and Build menus still the old
   dark text lists (next), the receipt toast, and the door signs.
+- **The Market and the Depot are tiles now, in the casino lobby's look** (the owner's one
+  kind word in September was for the casino's screens). At 1280x720 the Market's BUY list
+  ran off both ends of the screen, and its SELL/BUY tabs could not be clicked. Now every row
+  is a plum tile with a gold edge (game/ui/tile_style.gd) carrying a picture drawn in the
+  catch card's style (game/ui/shop_icon.gd: the foods, all twelve pieces of gear, the four
+  permits, the four gems, a coin pile). BUY is a grid of three, SELL a column, both in a
+  scroll area that stays on screen, and the tabs are buttons. The Depot shows each pony as
+  her race's icon on a disc of her coat, two columns, scrolled. Row order, indices, signals
+  and drawn_lines() are unchanged, so the bot and the old tests drive them as before.
+  test_market_tiles (5 tests). Renders: build/playtest_evidence/round3/menu_*.png.

@@ -2142,6 +2142,9 @@ func _penned_rows() -> Array[Dictionary]:
 				"stock": inst.is_stock(),
 				"coat": _coat_word(inst),
 				"credit": LedgerScript.delivery_credit(rarity, inst.is_stock()),
+				# For the Depot's tile: her race's icon on a disc of her coat.
+				"race": PonyTraitsScript.race_of(inst),
+				"coat_color": _coat_colour(inst),
 			})
 	return rows
 
@@ -2224,6 +2227,15 @@ func race_entrants() -> Array[Dictionary]:
 ## name: "Butter Pony", "Sky Pony".
 ##
 ## EMPTY FOR A NAMED PONY, who has a name of her own and needs no help being told apart.
+## A stock pony's coat from the crowd palette; a named pony's is not on file, so cream.
+func _coat_colour(inst: PonyInstance) -> Color:
+	if inst == null or not inst.is_stock():
+		return Color(0.97, 0.96, 0.93)
+	if _stock_palette == null:
+		_stock_palette = StockPaletteScript.load_stock()
+	return _stock_palette.coat_at(int(inst.stock.get("coat", 0)))
+
+
 func _coat_word(inst: PonyInstance) -> String:
 	if inst == null or not inst.is_stock():
 		return ""

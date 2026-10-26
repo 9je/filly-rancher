@@ -24,7 +24,7 @@ grow_vertical = 2
 mouse_filter = 2
 
 [node name="Panel" type="PanelContainer" parent="Centre"]
-custom_minimum_size = Vector2(860, 0)
+custom_minimum_size = Vector2(1180, 0)
 layout_mode = 2
 mouse_filter = 2
 
@@ -58,17 +58,16 @@ layout_mode = 2
 theme_override_constants/separation = 24
 mouse_filter = 2
 
-[node name="SellTab" type="Label" parent="Centre/Panel/Margin/Column/Tabs"]
+[node name="Scroll" type="ScrollContainer" parent="Centre/Panel/Margin/Column"]
 layout_mode = 2
-mouse_filter = 2
+horizontal_scroll_mode = 0
+mouse_filter = 1
 
-[node name="BuyTab" type="Label" parent="Centre/Panel/Margin/Column/Tabs"]
+[node name="Rows" type="GridContainer" parent="Centre/Panel/Margin/Column/Scroll"]
 layout_mode = 2
-mouse_filter = 2
-
-[node name="Rows" type="VBoxContainer" parent="Centre/Panel/Margin/Column"]
-layout_mode = 2
-theme_override_constants/separation = 8
+size_flags_horizontal = 3
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 12
 mouse_filter = 2
 
 [node name="Footer" type="Label" parent="Centre/Panel/Margin/Column"]

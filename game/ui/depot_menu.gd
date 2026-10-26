@@ -10,9 +10,24 @@ extends CanvasLayer
 ##
 ## Three tabs rather than three menus, because they are three questions about one account
 ## and the player is standing at one counter.
+##
+## TILES (overnight bot review, 2026-10-26), the casino lobby's look through
+## game/ui/tile_style.gd: each pony is her race's icon on a disc of her coat, her name and
+## what the Company pays for her; each payment is a coin. Two columns of ponies in a scroll
+## area that never grows past SCROLL_MAX (four full pens no longer run off the screen). The
+## statement stays plain lines. drawn_lines() is still the text of every row.
 
 const MenuStyleScript := preload("res://ui/menu_style.gd")
 const MouseRowsScript := preload("res://ui/mouse_rows.gd")
+const TileStyleScript := preload("res://ui/tile_style.gd")
+const ShopIconScript := preload("res://ui/shop_icon.gd")
+const CatchIconScript := preload("res://ui/catch_icon.gd")
+const PaintScript := preload("res://ui/casino_paint.gd")
+
+const SCROLL_MAX := 600.0
+const PONY_TILE := Vector2(546.0, 76.0)
+const WIDE_TILE := Vector2(1104.0, 64.0)
+const ICON_SIZE := 44.0
 
 enum Tab { DELIVER, PAY, STATEMENT }
 
@@ -74,7 +89,8 @@ var _confirming_name := ""
 
 @onready var _title: Label = $Centre/Panel/Margin/Column/Title
 @onready var _tabs: HBoxContainer = $Centre/Panel/Margin/Column/Tabs
-@onready var _rows: VBoxContainer = $Centre/Panel/Margin/Column/Rows
+@onready var _scroll: ScrollContainer = $Centre/Panel/Margin/Column/Scroll
+@onready var _rows: GridContainer = $Centre/Panel/Margin/Column/Scroll/Rows
 @onready var _footer: Label = $Centre/Panel/Margin/Column/Footer
 
 
@@ -314,24 +330,109 @@ func refresh() -> void:
 	_selected = clampi(_selected, 0, maxi(0, count - 1)) if count > 0 else 0
 	MouseRowsScript.tab_strip(_tabs, TAB_NAMES, _tab, point_at_tab, take_tab)
 	for child in _rows.get_children():
+		_rows.remove_child(child)
 		child.queue_free()
 	MenuStyleScript.apply_title(_title)
 	var lines: Array[String] = drawn_lines()
+	var ponies: Array[Dictionary] = []
+	if _tab == Tab.DELIVER and not is_confirming():
+		ponies = deliver_rows()
+	_rows.columns = 2 if not ponies.is_empty() else 1
 	for i in lines.size():
 		var picked: bool = i == _selected and _tab != Tab.STATEMENT
 		var row: int = i if i < count else -1
-		var label := Label.new()
-		label.text = MenuStyleScript.caret(picked) + lines[i]
-		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		label.add_theme_color_override("font_color",
-			MenuStyleScript.COLOR_VALUE if picked else MenuStyleScript.COLOR_NAME)
-		var holder: PanelContainer
-		if row >= 0:
-			holder = MouseRowsScript.row(row, picked, row == _hovered, point_at_row, take_row)
+		if row < 0:
+			# The statement and the empty notes: words, not choices.
+			var note := Label.new()
+			note.text = lines[i]
+			note.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			note.custom_minimum_size = Vector2(WIDE_TILE.x, 0.0)
+			MenuStyleScript.style_label(note, 21, MenuStyleScript.COLOR_NAME)
+			_rows.add_child(note)
+			continue
+		var holder := MouseRowsScript.row(row, picked, row == _hovered, point_at_row, take_row)
+		TileStyleScript.dress(holder, picked, row == _hovered)
+		if not ponies.is_empty():
+			_pony_tile(holder, ponies[row])
 		else:
-			holder = MenuStyleScript.row_panel(picked)
-		holder.add_child(label)
+			_word_tile(holder, lines[i], _tab == Tab.PAY)
 		_rows.add_child(holder)
+	_fit_scroll.call_deferred()
+
+
+func _fit_scroll() -> void:
+	if _scroll == null or not _open:
+		return
+	_scroll.custom_minimum_size.y = minf(_rows.get_combined_minimum_size().y, SCROLL_MAX)
+	if _selected >= 0 and _selected < _rows.get_child_count():
+		_scroll.ensure_control_visible(_rows.get_child(_selected) as Control)
+
+
+## A pony: her race on a disc of her coat, her name, and the Company's price for her.
+func _pony_tile(holder: PanelContainer, pony: Dictionary) -> void:
+	holder.custom_minimum_size = PONY_TILE
+	var body := GridContainer.new()
+	body.columns = 3
+	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	body.add_theme_constant_override(&"h_separation", 14)
+	holder.add_child(body)
+	var coat: Color = pony.get("coat_color", PaintScript.CARD_FACE)
+	var plate := TileStyleScript.disc(ICON_SIZE, coat)
+	body.add_child(plate)
+	var icon: Control = CatchIconScript.new()
+	icon.kind = StringName(pony.get("race", &"earth"))
+	icon.custom_minimum_size = Vector2(ICON_SIZE, ICON_SIZE)
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	plate.add_child(icon)
+	var column := VBoxContainer.new()
+	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	column.alignment = BoxContainer.ALIGNMENT_CENTER
+	body.add_child(column)
+	var who := Label.new()
+	who.text = _row_name(pony)
+	who.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	who.clip_text = true
+	who.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	MenuStyleScript.style_label(who, 22, MenuStyleScript.COLOR_TITLE)
+	who.add_theme_font_override(&"font", MenuStyleScript.title_font())
+	column.add_child(who)
+	var sub := Label.new()
+	sub.text = "from the crowd" if bool(pony.get("stock", true)) \
+		else "one of a kind: she asks before she goes"
+	sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	MenuStyleScript.style_label(sub, 16, MenuStyleScript.COLOR_DIM)
+	column.add_child(sub)
+	var price := Label.new()
+	price.text = "%d bits" % int(pony.get("credit", 0))
+	price.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	price.add_theme_font_override(&"font", MenuStyleScript.numeral_font())
+	MenuStyleScript.style_label(price, 22, MenuStyleScript.COLOR_VALUE)
+	body.add_child(price)
+
+
+## A payment (a coin and its amount) or one of the two answers to a named pony's confirm.
+func _word_tile(holder: PanelContainer, text: String, coin: bool) -> void:
+	holder.custom_minimum_size = WIDE_TILE
+	var body := HBoxContainer.new()
+	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	body.add_theme_constant_override(&"separation", 14)
+	holder.add_child(body)
+	if coin:
+		var plate := TileStyleScript.disc(ICON_SIZE * 0.8)
+		var icon: Control = ShopIconScript.new()
+		icon.kind = &"sell_all"
+		icon.custom_minimum_size = Vector2(ICON_SIZE, ICON_SIZE) * 0.8
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		plate.add_child(icon)
+		body.add_child(plate)
+	var label := Label.new()
+	label.text = text
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	MenuStyleScript.style_label(label, 22, MenuStyleScript.COLOR_TITLE)
+	body.add_child(label)
 
 
 func _row_count() -> int:

@@ -11,12 +11,32 @@ extends CanvasLayer
 ##
 ## Left and right change tab, up and down change row, accept confirms, cancel closes. The
 ## first row of SELL is "Sell everything", because that is what most visits are for.
+##
+## TILES, NOT TEXT ROWS (overnight bot review, 2026-10-26). The rows were a dark list of
+## words, and at 1280 x 720 the BUY tab ran off the top and the bottom of the screen, so the
+## first and last things for sale could not be seen. Every row is now a tile in the casino
+## lobby's look (plum, a gold edge, gold when it is the pick), with its own drawn picture
+## (game/ui/shop_icon.gd) on a cream disc: SELL is a column of wide tiles, BUY a grid of
+## three, both in a scroll area that never grows past SCROLL_MAX. The tabs are buttons. Row
+## order, indices, signals and row_price_text() are unchanged.
 
 const ShopRegistryScript := preload("res://systems/shop_registry.gd")
 const ShopItemScript := preload("res://systems/shop_item.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const MenuStyleScript := preload("res://ui/menu_style.gd")
 const MouseRowsScript := preload("res://ui/mouse_rows.gd")
+const ShopIconScript := preload("res://ui/shop_icon.gd")
+const PaintScript := preload("res://ui/casino_paint.gd")
+const TileStyleScript := preload("res://ui/tile_style.gd")
+
+## The scroll area's tallest, in 1920 x 1080 base pixels: what is left of the screen once the
+## title, the tabs, the footer and the Close button have theirs.
+const SCROLL_MAX := 640.0
+const BUY_COLUMNS := 3
+const BUY_TILE := Vector2(360.0, 128.0)
+const SELL_TILE := Vector2(1104.0, 84.0)
+const ICON_SIZE := 56.0
+const TAB_NAMES: Array[String] = ["Sell", "Buy"]
 
 enum Tab { SELL, BUY }
 
@@ -27,9 +47,9 @@ const RARITY_NAMES := ["Common", "Uncommon", "Rare", "Legendary"]
 @onready var _title: Label = $Centre/Panel/Margin/Column/Title
 @onready var _wallet: Label = $Centre/Panel/Margin/Column/Wallet
 @onready var _gems: Label = $Centre/Panel/Margin/Column/Gems
-@onready var _sell_tab: Label = $Centre/Panel/Margin/Column/Tabs/SellTab
-@onready var _buy_tab: Label = $Centre/Panel/Margin/Column/Tabs/BuyTab
-@onready var _rows: VBoxContainer = $Centre/Panel/Margin/Column/Rows
+@onready var _tabs: HBoxContainer = $Centre/Panel/Margin/Column/Tabs
+@onready var _scroll: ScrollContainer = $Centre/Panel/Margin/Column/Scroll
+@onready var _rows: GridContainer = $Centre/Panel/Margin/Column/Scroll/Rows
 @onready var _footer: Label = $Centre/Panel/Margin/Column/Footer
 
 signal opened()
@@ -75,11 +95,7 @@ func _ready() -> void:
 	MenuStyleScript.style_label(_title, MenuStyleScript.TITLE_SIZE, MenuStyleScript.COLOR_TITLE)
 	MenuStyleScript.style_label(_wallet, MenuStyleScript.ROW_SIZE, MenuStyleScript.COLOR_DIM)
 	MenuStyleScript.style_label(_gems, MenuStyleScript.ROW_SIZE, MenuStyleScript.COLOR_DIM)
-	MenuStyleScript.style_label(_sell_tab, 26, MenuStyleScript.COLOR_TAB_ON)
-	MenuStyleScript.style_label(_buy_tab, 26, MenuStyleScript.COLOR_TAB_OFF)
 	_title.text = "MARKET"
-	_sell_tab.text = "SELL"
-	_buy_tab.text = "BUY"
 	var dim := get_node_or_null(^"Dim") as Control
 	if dim != null:
 		dim.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -147,6 +163,18 @@ func selected_index() -> int:
 
 func footer_text() -> String:
 	return _footer.text
+
+
+## The tiles on screen, in row order.
+func row_nodes() -> Array[Node]:
+	return _rows.get_children()
+
+
+## The button for tab `t`, or null.
+func tab_button(t: int) -> Button:
+	if _tabs == null or t < 0 or t >= _tabs.get_child_count():
+		return null
+	return _tabs.get_child(t) as Button
 
 
 ## The Sell tab's rarity rows, in enum order. Row 0 on screen is "Sell everything" and is
@@ -304,10 +332,18 @@ func refresh() -> void:
 	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
 	_wallet.text = "%d bits" % shop.bits()
 	_gems.text = "%d gems in your pouch" % _pouch_total()
-	MenuStyleScript.style_label(_sell_tab, 26,
-		MenuStyleScript.COLOR_TAB_ON if _tab == Tab.SELL else MenuStyleScript.COLOR_TAB_OFF)
-	MenuStyleScript.style_label(_buy_tab, 26,
-		MenuStyleScript.COLOR_TAB_ON if _tab == Tab.BUY else MenuStyleScript.COLOR_TAB_OFF)
+	MouseRowsScript.tab_strip(_tabs, TAB_NAMES, _tab, Callable(),
+		func(i: int) -> void:
+			if i != _tab:
+				set_tab(i))
+	for i in _tabs.get_child_count():
+		var b := _tabs.get_child(i) as Button
+		b.add_theme_font_size_override(&"font_size", 26)
+		b.add_theme_font_override(&"font", MenuStyleScript.title_font())
+		var on := MenuStyleScript.COLOR_TAB_ON if i == _tab else MenuStyleScript.COLOR_TAB_OFF
+		for state in [&"font_color", &"font_hover_color", &"font_pressed_color"]:
+			b.add_theme_color_override(state, on)
+	_rows.columns = 1 if _tab == Tab.SELL else BUY_COLUMNS
 	# remove_child BEFORE queue_free: a queued node is still a child until the end of the
 	# frame, so freeing alone would leave the old rows laid out underneath the new ones for
 	# one frame every time the cursor moves.
@@ -315,12 +351,14 @@ func refresh() -> void:
 		_rows.remove_child(child)
 		child.queue_free()
 	if _tab == Tab.SELL:
-		_add_row(0, "Sell everything", "", "%d bits" % _sell_all_value(), _pouch_total() > 0)
+		_add_row(0, "Sell everything", "every gem in your pouch, in one go",
+			"%d bits" % _sell_all_value(), _pouch_total() > 0, &"sell_all")
 		for i in range(sell_rows().size()):
 			var rarity: int = sell_rows()[i]
 			var count := shop.gem_count(rarity)
 			_add_row(i + 1, "%s gems" % _rarity_name(rarity), "you have %d" % count,
-				"%d bits each" % shop.gem_price(rarity), count > 0)
+				"%d bits each" % shop.gem_price(rarity), count > 0,
+				StringName("gem_%d" % clampi(rarity, 0, 3)))
 	else:
 		for i in range(_catalogue.size()):
 			var item := _catalogue[i]
@@ -335,7 +373,9 @@ func refresh() -> void:
 			elif item.kind == ShopItemScript.Kind.PERMIT:
 				owned = shop.owns_permit(item.permit_zone)
 			var price := "OWNED" if owned else ("FREE" if item.cost == 0 else "%d bits" % item.cost)
-			_add_row(i, item.display_name, item.description, price, shop.can_buy(item))
+			_add_row(i, item.display_name, item.description, price, shop.can_buy(item),
+				ShopIconScript.kind_for(item))
+	_fit_scroll.call_deferred()
 
 
 func _sell_all_value() -> int:
@@ -345,19 +385,44 @@ func _sell_all_value() -> int:
 	return total
 
 
-func _add_row(index: int, row_name: String, blurb: String, price: String, enabled: bool) -> void:
+## THE SCROLL AREA IS AS TALL AS ITS TILES, UP TO SCROLL_MAX, and the pick is always in it.
+## Deferred: the grid only knows its height once the frame's layout has run.
+func _fit_scroll() -> void:
+	if _scroll == null or not _open:
+		return
+	_scroll.custom_minimum_size.y = minf(_rows.get_combined_minimum_size().y, SCROLL_MAX)
+	if _selected >= 0 and _selected < _rows.get_child_count():
+		_scroll.ensure_control_visible(_rows.get_child(_selected) as Control)
+
+
+func _add_row(index: int, row_name: String, blurb: String, price: String, enabled: bool,
+		icon_kind: StringName = &"") -> void:
 	var row := MouseRowsScript.row(index, index == _selected, index == _hovered,
 		point_at_row, take_row)
-	var margin := MarginContainer.new()
-	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	margin.add_theme_constant_override(&"margin_left", 18)
-	margin.add_theme_constant_override(&"margin_right", 18)
-	margin.add_theme_constant_override(&"margin_top", 10)
-	margin.add_theme_constant_override(&"margin_bottom", 10)
-	row.add_child(margin)
+	TileStyleScript.dress(row, index == _selected, index == _hovered)
+	row.custom_minimum_size = SELL_TILE if _tab == Tab.SELL else BUY_TILE
+	# A GRID OF TWO, NOT AN HBOX: row_price_text() reads the first HBoxContainer in a tile as
+	# its name-and-price line, so the icon and the text sit side by side in a GridContainer.
+	var body := GridContainer.new()
+	body.columns = 2
+	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	body.add_theme_constant_override(&"h_separation", 14)
+	row.add_child(body)
+	var plate := TileStyleScript.disc(ICON_SIZE,
+		PaintScript.CARD_FACE if enabled else PaintScript.CARD_FACE.darkened(0.35))
+	body.add_child(plate)
+	var icon: Control = ShopIconScript.new()
+	icon.kind = icon_kind
+	icon.custom_minimum_size = Vector2(ICON_SIZE, ICON_SIZE)
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.modulate = Color(1, 1, 1) if enabled else Color(1, 1, 1, 0.55)
+	plate.add_child(icon)
 	var column := VBoxContainer.new()
 	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	margin.add_child(column)
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	column.alignment = BoxContainer.ALIGNMENT_CENTER
+	column.add_theme_constant_override(&"separation", 2)
+	body.add_child(column)
 	var head := HBoxContainer.new()
 	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	head.add_theme_constant_override(&"separation", 24)
@@ -366,13 +431,19 @@ func _add_row(index: int, row_name: String, blurb: String, price: String, enable
 	title.text = row_name
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	MenuStyleScript.style_label(title, 26,
-		MenuStyleScript.COLOR_NAME if enabled else MenuStyleScript.COLOR_DIM)
+	# Wraps rather than clipping: "Permit: The Night Meadow" is the longest name in the shop.
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title.max_lines_visible = 2
+	title.custom_minimum_size = Vector2(140.0, 0.0)
+	MenuStyleScript.style_label(title, 22,
+		MenuStyleScript.COLOR_TITLE if enabled else MenuStyleScript.COLOR_DIM)
+	title.add_theme_font_override(&"font", MenuStyleScript.title_font())
 	head.add_child(title)
 	var cost := Label.new()
 	cost.text = price
 	cost.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	MenuStyleScript.style_label(cost, 23,
+	cost.add_theme_font_override(&"font", MenuStyleScript.numeral_font())
+	MenuStyleScript.style_label(cost, 22,
 		MenuStyleScript.COLOR_VALUE if enabled else MenuStyleScript.COLOR_UNAFFORDABLE)
 	head.add_child(cost)
 	if not blurb.is_empty():
@@ -380,8 +451,9 @@ func _add_row(index: int, row_name: String, blurb: String, price: String, enable
 		sub.text = blurb
 		sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		sub.custom_minimum_size = Vector2(720.0, 0.0)
-		MenuStyleScript.style_label(sub, 19, MenuStyleScript.COLOR_DIM)
+		sub.max_lines_visible = 2 if _tab == Tab.BUY else 1
+		sub.custom_minimum_size = Vector2(0.0, 0.0)
+		MenuStyleScript.style_label(sub, 17, MenuStyleScript.COLOR_DIM)
 		column.add_child(sub)
 	_rows.add_child(row)
 

@@ -31,7 +31,9 @@ func _shopped_market() -> MarketMenu:
 
 func _armed_rows(menu: CanvasLayer) -> Array[PanelContainer]:
 	var out: Array[PanelContainer] = []
-	var column := menu.get_node_or_null(^"Centre/Panel/Margin/Column/Rows")
+	# Found by name: the Market's rows sit in a scroll area since its tiles (2026-10-26).
+	var column := menu.get_node_or_null(^"Centre/Panel/Margin/Column").find_child("Rows", true, false) \
+		if menu.get_node_or_null(^"Centre/Panel/Margin/Column") != null else null
 	if column == null:
 		return out
 	for child in column.get_children():
