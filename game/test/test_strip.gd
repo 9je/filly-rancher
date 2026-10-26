@@ -302,3 +302,22 @@ func test_the_board_and_its_trim_are_never_within_a_hair_of_coplanar() -> void:
 		+ (trim.mesh as BoxMesh).size.z * 0.5
 	assert_gt(board_face - trim_face, StripScript.MARQUEE_STANDOFF_LAYER - 0.001,
 		"one centimetre of separation is what the flickering gold was")
+
+
+## A LAMP POST HAS A LAMP. By day the ring was ten bare dark sticks (overnight review,
+## 2026-10-26: "black poles standing alone"), because the light on top is invisible until
+## dusk. Each post now carries a globe that glows, a cap over it and a foot under it.
+func test_every_lamp_post_wears_a_lamp_you_can_see_by_day() -> void:
+	var strip := _strip()
+	strip.configure(_strip_region(), func(_x: float, _z: float) -> float: return 0.0)
+	strip.build()
+	var posts := strip.find_children("Lamp*", "StaticBody3D", false, false)
+	assert_gt(posts.size(), 0)
+	for post: Node in posts:
+		var globe := post.find_child("Globe", false, false) as MeshInstance3D
+		assert_not_null(globe, "%s has a globe" % post.name)
+		if globe != null:
+			var m := globe.mesh.surface_get_material(0) as StandardMaterial3D
+			assert_true(m != null and m.emission_enabled, "%s's globe glows" % post.name)
+		assert_not_null(post.find_child("Cap", false, false), "%s has a cap" % post.name)
+		assert_not_null(post.find_child("Foot", false, false), "%s has a foot" % post.name)

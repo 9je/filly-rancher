@@ -369,9 +369,62 @@ func _lamp(lamp_name: String, base: Vector3) -> Node3D:
 	collider.position = mesh.position
 	post.add_child(collider)
 
+	# THE LAMP YOU SEE BY DAY (overnight review, 2026-10-26: by day the ring was ten bare
+	# dark sticks, the light on top being invisible until dusk). A stepped foot, a gold
+	# collar, a warm globe that glows, and a cap over it, in the Palace's gold.
+	var gold := StandardMaterial3D.new()
+	gold.albedo_color = MARQUEE_TRIM_COLOR
+	gold.metallic = 0.5
+	gold.roughness = 0.4
+	var foot := MeshInstance3D.new()
+	foot.name = "Foot"
+	var fm := CylinderMesh.new()
+	fm.top_radius = POST_THICKNESS * 0.9
+	fm.bottom_radius = POST_THICKNESS * 1.6
+	fm.height = 0.5
+	fm.material = mat
+	foot.mesh = fm
+	foot.position = Vector3(0.0, 0.25, 0.0)
+	post.add_child(foot)
+	var collar := MeshInstance3D.new()
+	collar.name = "Collar"
+	var cm := CylinderMesh.new()
+	cm.top_radius = POST_THICKNESS * 0.9
+	cm.bottom_radius = POST_THICKNESS * 0.9
+	cm.height = 0.14
+	cm.material = gold
+	collar.mesh = cm
+	collar.position = Vector3(0.0, POST_HEIGHT - 0.05, 0.0)
+	post.add_child(collar)
+	var globe := MeshInstance3D.new()
+	globe.name = "Globe"
+	var gm := SphereMesh.new()
+	gm.radius = 0.32
+	gm.height = 0.64
+	var glow := StandardMaterial3D.new()
+	glow.albedo_color = LAMP_COLOR
+	glow.emission_enabled = true
+	glow.emission = LAMP_COLOR
+	glow.emission_energy_multiplier = 1.6
+	gm.material = glow
+	globe.mesh = gm
+	globe.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	globe.position = Vector3(0.0, POST_HEIGHT + 0.3, 0.0)
+	post.add_child(globe)
+	var cap := MeshInstance3D.new()
+	cap.name = "Cap"
+	var pm := CylinderMesh.new()
+	pm.top_radius = 0.04
+	pm.bottom_radius = 0.38
+	pm.height = 0.3
+	pm.material = gold
+	cap.mesh = pm
+	cap.position = Vector3(0.0, POST_HEIGHT + 0.72, 0.0)
+	post.add_child(cap)
+
 	var light := OmniLight3D.new()
 	light.name = "Lamp"
-	light.position = Vector3(0.0, POST_HEIGHT, 0.0)
+	light.position = Vector3(0.0, POST_HEIGHT + 0.3, 0.0)
 	light.light_color = LAMP_COLOR
 	light.light_energy = LAMP_ENERGY
 	light.omni_range = LAMP_RANGE

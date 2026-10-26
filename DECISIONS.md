@@ -377,3 +377,7 @@ The owner's save after 11.6 minutes: 17 ponies, 157 bits, a pen on all four plot
 - **The Getting started card is a checklist**: drawn tick boxes that fill green when a job is
   done, and each reward as a coin and a number, in place of a bulleted paragraph with
   "(20 bits)" after each line. task_lines() is unchanged.
+- **The Strip's lamp posts have lamps.** By day the ring read as ten bare dark sticks
+  around the Strip, the track and the north road, because the only thing on top was an
+  OmniLight3D. Now each post has a stepped foot, a gold collar, a warm glowing globe and a
+  gold cap. test_strip: every post wears a lamp you can see by day.
