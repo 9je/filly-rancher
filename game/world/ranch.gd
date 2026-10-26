@@ -4139,18 +4139,19 @@ func _on_pony_captured(instance: PonyInstance) -> void:
 	_game_state.story.add_var("catches")
 	_apply_beam_recall()
 	_novelty_catch(instance)
-	# THE CROWD IS NOT COLLECTED. A stock pony has no Compendium entry and no request ever
-	# names one: she is supply, not a character. Marking her would put an id in the book
-	# that no page can ever show and no count can ever include.
+	# THE BOARD HEARS OF EVERY CATCH, the crowd's too: "Catch a pony" is a CATCH_ANY, and in
+	# the first minutes every pony there is is a Drifter (test_tutorial_catch.gd).
+	if _board != null:
+		var here: RegionData = _regions_registry().region_at(
+			Vector2(player.global_position.x, player.global_position.z))
+		var zone: StringName = here.id if here != null else &"ranch"
+		_pay_out(_board.on_caught(instance.data(), zone))
+	# THE CROWD IS NOT COLLECTED. A stock pony has no Compendium entry: she is supply, not a
+	# character. Marking her would put an id in the book that no page can ever show and no
+	# count can ever include.
 	if instance.is_stock():
 		return
 	_game_state.compendium.mark_caught(instance.data_id)
-	if _board == null:
-		return
-	var here: RegionData = _regions_registry().region_at(
-		Vector2(player.global_position.x, player.global_position.z))
-	var zone: StringName = here.id if here != null else &"ranch"
-	_pay_out(_board.on_caught(instance.data(), zone))
 
 
 ## Mark every pony the player owns CAUGHT. The three places one can be: the save's own
@@ -4997,6 +4998,7 @@ func _physics_process(delta: float) -> void:
 	# it. The gates call spawner.tick_stock() themselves, deliberately, where they mean to.
 	spawner.tick_stock(delta)
 	_update_interaction()
+	_update_guide(delta)
 	_v1_tick(delta)
 	# AFTER the interaction pass, so a ban that landed this frame shuts a door the resolver
 	# would otherwise have just opened. See enforce_casino_ban().
@@ -8928,3 +8930,148 @@ func _dye_one_in_bag() -> String:
 	inst.stock = look.to_dict()
 	inst.stock["dyed"] = true
 	return inst.display_name()
+
+
+# --- THE GUIDE: where to go next, shown on the ground and the compass --------------------
+# (game/systems/guide.gd decides; game/world/guide_trail.gd draws.)
+
+const GuideScript := preload("res://systems/guide.gd")
+const GuideTrailScript := preload("res://world/guide_trail.gd")
+## How often the goal is re-decided; the trail itself follows every frame.
+const GUIDE_EVERY := 0.4
+
+var _guide_trail: GuideTrail
+var _guide_goal: StringName = &""
+var _guide_node: Node3D
+var _guide_t := 0.0
+
+
+## What the guide wants now (&"" for nothing), and the node it leads to. Public for the suite.
+func guide_goal() -> StringName:
+	return _guide_goal
+
+
+func guide_target() -> Node3D:
+	return _guide_node if _guide_node != null and is_instance_valid(_guide_node) else null
+
+
+func _guide_state() -> Dictionary:
+	var story: Story = get_story()
+	var s := {"has_scoop": story != null and story.has_flag("has_scoop"), "mail": false, "news": false, "bag": 0,
+		"bag_full": false, "pen_room": 0, "gems": 0, "tasks": [] as Array}
+	if _game_state != null:
+		s["mail"] = _game_state.story.unread_count() > 0
+		if _game_state.gems.has_method("total"):
+			s["gems"] = int(_game_state.gems.total())
+	s["news"] = _guide_news_npc() != null
+	var beam: Node3D = player.get_magic_beam() if player != null else null
+	var storage: Storage = beam.get_storage() if beam != null else null
+	if storage != null:
+		s["bag"] = storage.count()
+		s["bag_full"] = storage.is_full()
+	var room := 0
+	var pen_gems := 0
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen != null:
+			room += maxi(0, pen.capacity - pen.count())
+			pen_gems += pen.gems()
+	s["pen_room"] = room
+	s["gems"] = int(s["gems"]) + pen_gems
+	if _board != null:
+		s["tasks"] = _board.tutorial_rows()
+	return s
+
+
+func _guide_news_npc() -> Node3D:
+	if people == null or player == null:
+		return null
+	var best: Node3D = null
+	var best_d := INF
+	for id: StringName in people.npcs:
+		if not people.shows_news(id):
+			continue
+		var n := people.npcs[id] as Node3D
+		if n == null or not is_instance_valid(n) or not n.visible:
+			continue
+		var d := n.global_position.distance_squared_to(player.global_position)
+		if d < best_d:
+			best_d = d
+			best = n
+	return best
+
+
+## The node a goal leads to, and the compass icon for it.
+func _guide_place(goal: StringName) -> Array:
+	match goal:
+		&"mail":
+			return [get_node_or_null(^"Buildings/Mailbox"), PlaceSign.Icon.SCROLL]
+		&"market":
+			return [get_node_or_null(^"Buildings/Market"), PlaceSign.Icon.COIN]
+		&"talk":
+			return [_guide_news_npc(), PlaceSign.Icon.STAR]
+		&"pens":
+			return [_guide_pen_target(), PlaceSign.Icon.FENCE]
+		&"catch":
+			return [_guide_wild_pony(), PlaceSign.Icon.ARROW]
+	return [null, 0]
+
+
+## A built pen with room, nearest first; else the nearest plot ready to build on; else the
+## first plot (an overgrown one still shows her where the pens go).
+func _guide_pen_target() -> Node3D:
+	var with_room: Node3D = null
+	var empty_plot: Node3D = null
+	var best_room := INF
+	var best_empty := INF
+	for slot in _plot_slots():
+		var d := slot.global_position.distance_squared_to(player.global_position)
+		var pen := slot.get_built() as Pen
+		if pen != null and not pen.is_full() and d < best_room:
+			best_room = d
+			with_room = slot
+		elif slot.is_empty() and not slot.is_overgrown() and d < best_empty:
+			best_empty = d
+			empty_plot = slot
+	if with_room != null:
+		return with_room
+	if empty_plot != null:
+		return empty_plot
+	return get_node_or_null(^"Plots/Slot1") as Node3D
+
+
+func _guide_wild_pony() -> Node3D:
+	if spawner == null or player == null:
+		return null
+	var best: Node3D = null
+	var best_d := 70.0 * 70.0
+	for p: Node3D in spawner.call("get_spawned"):
+		if not is_instance_valid(p) or p.is_in_group(&"penned"):
+			continue
+		var d: float = p.global_position.distance_squared_to(player.global_position)
+		if d < best_d:
+			best_d = d
+			best = p
+	return best
+
+
+func _update_guide(delta: float) -> void:
+	var on: bool = _settings == null or _settings.show_guide
+	if _guide_trail == null:
+		_guide_trail = GuideTrailScript.new()
+		_guide_trail.name = "GuideTrail"
+		_guide_trail.height_at = func(x: float, z: float) -> float:
+			return terrain.height_at(x, z)
+		add_child(_guide_trail)
+	var compass := get_node_or_null(^"HUD/Compass")
+	_guide_t -= delta
+	if _guide_t <= 0.0:
+		_guide_t = GUIDE_EVERY
+		var goal: StringName = GuideScript.pick(_guide_state()) if on and not _in_palace else &""
+		var place := _guide_place(goal)
+		_guide_goal = goal if place[0] != null else &""
+		_guide_node = place[0] as Node3D
+		if compass != null:
+			compass.call("set_goal", _guide_node, int(place[1]))
+	var target := guide_target()
+	_guide_trail.point(player.global_position, target.global_position if target != null else Vector3.INF)

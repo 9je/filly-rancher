@@ -365,6 +365,8 @@ func _specs() -> Array:
 				"The small card in the corner that names the key for the full controls list. The key works either way."],
 			[&"show_checklist", "Getting started list", Kind.TOGGLE,
 				"The first three requests, pinned on screen until they are done."],
+			[&"show_guide", "Show the way", Kind.TOGGLE,
+				"A trail of sparkles on the ground toward whatever is waiting for you next."],
 			[&"pause_on_focus_loss", "Pause when you switch away", Kind.TOGGLE,
 				"Switch to another window and the ranch waits for you under the pause menu."],
 		],
@@ -410,7 +412,7 @@ func _step(key: StringName, dir: int) -> bool:
 			return _set_float(&"stick_sensitivity", d.stick_sensitivity + SettingsScript.STICK_STEP * dir,
 				SettingsScript.STICK_MIN, SettingsScript.STICK_MAX)
 		&"vsync", &"invert_look", &"show_controls_chip", &"show_checklist", &"pause_on_focus_loss", \
-				&"pony_chatter":
+				&"pony_chatter", &"show_guide":
 			var want := dir > 0
 			if bool(d.get(key)) == want:
 				return false

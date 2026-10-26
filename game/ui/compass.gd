@@ -25,6 +25,12 @@ var player: Node3D
 
 var _icons: Array[TextureRect] = []
 var _back: Panel
+## THE GUIDE'S GOAL (game/systems/guide.gd): its own icon in a gold ring, never faded, and
+## pinned to the strip's end when it is behind her, so the strip always says which way.
+var _goal: Node3D
+var _goal_mark: Control
+var _goal_icon: TextureRect
+var _clock := 0.0
 
 
 func _ready() -> void:
@@ -44,6 +50,44 @@ func _ready() -> void:
 	tick.color = Color(0.45, 0.3, 0.55, 0.9)
 	tick.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(tick)
+	_goal_mark = Control.new()
+	_goal_mark.name = "Goal"
+	_goal_mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_goal_mark.size = Vector2(ICON + 12.0, ICON + 12.0)
+	var ring := Panel.new()
+	ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var rb := StyleBoxFlat.new()
+	rb.bg_color = Color(1.0, 0.95, 0.75, 0.95)
+	rb.border_color = Color(0.95, 0.72, 0.2)
+	rb.set_border_width_all(3)
+	rb.set_corner_radius_all(int((ICON + 12.0) * 0.5))
+	rb.shadow_color = Color(1.0, 0.8, 0.3, 0.55)
+	rb.shadow_size = 6
+	ring.add_theme_stylebox_override("panel", rb)
+	ring.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_goal_mark.add_child(ring)
+	_goal_icon = TextureRect.new()
+	_goal_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_goal_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_goal_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_goal_icon.position = Vector2(6, 6)
+	_goal_icon.size = Vector2(ICON, ICON)
+	_goal_mark.add_child(_goal_icon)
+	_goal_mark.visible = false
+	add_child(_goal_mark)
+
+
+## Light `node` as the goal with place icon `icon` (PlaceSign.Icon), or none for null.
+func set_goal(node: Node3D, icon: int) -> void:
+	_goal = node
+	if node != null:
+		_goal_icon.texture = PlaceSignScript.icon_texture(icon)
+
+
+## The goal marker as drawn now: {visible, x}. For the suite.
+func goal_state() -> Dictionary:
+	return {"visible": _goal_mark.visible,
+		"x": _goal_mark.position.x + _goal_mark.size.x * 0.5 - _left()}
 
 
 func set_places(list: Array[Dictionary]) -> void:
@@ -90,7 +134,8 @@ func _left() -> float:
 	return (get_viewport_rect().size.x - WIDTH) * 0.5
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	_clock += delta
 	var cam: Camera3D = camera_provider.call() if camera_provider.is_valid() else get_viewport().get_camera_3d()
 	var vw := get_viewport_rect().size.x
 	var left := (vw - WIDTH) * 0.5
@@ -118,3 +163,14 @@ func _process(_delta: float) -> void:
 		var edge := clampf(minf(u - 0.03, 0.97 - u) / 0.12, 0.0, 1.0)
 		var near := clampf((dist - NEAR_METRES * 0.5) / (NEAR_METRES * 0.5), 0.0, 1.0)
 		r.modulate.a = edge * near
+		if node == _goal:
+			r.visible = false
+	_goal_mark.visible = _goal != null and is_instance_valid(_goal)
+	if _goal_mark.visible:
+		var gto := _goal.global_position - from
+		var gu := clampf(strip_position(bearing(forward, gto)), 0.05, 0.95)
+		var pulse := 1.0 + 0.08 * sin(_clock * 4.0)
+		_goal_mark.pivot_offset = _goal_mark.size * 0.5
+		_goal_mark.scale = Vector2.ONE * pulse
+		_goal_mark.position = Vector2(left + gu * WIDTH - _goal_mark.size.x * 0.5,
+			TOP + (HEIGHT - _goal_mark.size.y) * 0.5)
