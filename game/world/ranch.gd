@@ -4489,10 +4489,65 @@ func _move_pony_into_pen(slot: PlotSlot) -> bool:
 	# never happened.
 	if _board != null:
 		_pay_out(_board.on_penned(instance.data()))
-	_sound_call(&"play_at", [&"pen_in", pen.global_position])
+	_launch_into_pen(pen, instance)
 	if _game_state != null:
 		_game_state.onboarding.note(&"pen")
 	return true
+
+
+## SHE FLIES IN (feel pass 2026-10-26: a penned pony used to appear at her seat). Her body is
+## hidden for the flight; a ghost of her looks leaves the Scoop small, arcs over the rail and
+## grows to her size, and she lands with a squash, a puff of sparkles and the pen's sound.
+const PEN_FLIGHT_SECONDS := 0.45
+
+
+func _launch_into_pen(pen: Pen, instance: PonyInstance) -> void:
+	var body := pen.body_for(instance.uid)
+	var look := body.get_node_or_null(^"Visuals") as Node3D if body != null else null
+	var beam: Node3D = player.get_magic_beam() if player != null else null
+	if look == null or beam == null or not is_inside_tree():
+		_sound_call(&"play_at", [&"pen_in", pen.global_position])
+		return
+	var from: Vector3 = (beam.call("get_beam_anchor") as Node3D).global_position \
+		if beam.has_method("get_beam_anchor") else player.global_position + Vector3(0, 1.2, 0)
+	var ghost := look.duplicate(0) as Node3D
+	ghost.name = "PenGhost"
+	add_child(ghost)
+	ghost.global_transform = look.global_transform
+	var to := ghost.global_position
+	var basis0 := ghost.global_transform.basis
+	var rest := look.scale
+	look.visible = false
+	var MagicBeamScript: GDScript = load("res://actors/player/magic_beam.gd")
+	var tw := ghost.create_tween()
+	tw.tween_method(func(t: float) -> void:
+		if not is_instance_valid(ghost):
+			return
+		ghost.global_position = MagicBeamScript.ghost_point(from, to, t)
+		var g: float = lerpf(0.12, 1.0, t)
+		var stretch: float = 1.0 + 0.35 * sin(t * PI)
+		ghost.global_transform.basis = basis0.scaled(
+			Vector3(g / sqrt(stretch), g * stretch, g / sqrt(stretch))), 0.0, 1.0, PEN_FLIGHT_SECONDS) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_callback(func() -> void:
+		if is_instance_valid(ghost):
+			ghost.queue_free()
+		_sound_call(&"play_at", [&"pen_in", to])
+		if not is_instance_valid(look):
+			return
+		look.visible = true
+		var land := look.create_tween()
+		land.tween_property(look, ^"scale", Vector3(rest.x * 1.22, rest.y * 0.72, rest.z * 1.22), 0.07)
+		land.tween_property(look, ^"scale", rest, 0.42).set_trans(Tween.TRANS_ELASTIC) \
+			.set_ease(Tween.EASE_OUT)
+		var puff := BloomCeremony.sparkles([Color(1, 0.97, 0.85), Color(0.85, 0.95, 0.75),
+			Color(1, 0.85, 0.95)])
+		puff.amount = 16
+		puff.lifetime = 0.6
+		add_child(puff)
+		puff.global_position = to + Vector3(0, 0.25, 0)
+		puff.emitting = true
+		get_tree().create_timer(1.2).timeout.connect(puff.queue_free))
 
 
 ## EVERYTHING E COULD MEAN WHERE THE PLAYER IS STANDING, unranked. The world half of the
@@ -5146,6 +5201,8 @@ func _stand_place_signs() -> void:
 	_stand_sign_post("Pens", PlaceSign.Icon.FENCE, YARD_SIGN_AT,
 		Vector3(1.0, 0.0, -0.4).normalized(), 2.0, 0.7, 2.7)
 	_mount_compass(fingers)
+	# A board in the way of the lens and her gets out of the way (place_sign.gd).
+	PlaceSign.subject = player
 
 
 ## The compass strip over the HUD, pointing at the same places the fingerpost does.

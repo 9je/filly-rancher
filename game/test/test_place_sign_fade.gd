@@ -46,3 +46,21 @@ func test_the_fade_is_smooth_between() -> void:
 	var b := _fade_at(2.0)
 	var c := _fade_at(1.3)
 	assert_true(a < b and b < c, "%.2f, %.2f, %.2f should rise as the lens comes in" % [a, b, c])
+
+
+## IN THE WAY IS GONE, AT ANY DISTANCE (feel pass 2026-10-26: at the pen's gate the Pens board
+## stood between the camera and her, two metres off, half faded: a grey sheet across the
+## middle of the screen while she penned a pony). A board on the line from the lens to the
+## one she is playing goes nearly all the way, however far off the lens is.
+func test_a_board_between_the_lens_and_her_goes_nearly_all_the_way() -> void:
+	var her := Node3D.new()
+	add_child_autofree(her)
+	her.global_position = _sign.global_position + Vector3(0, -1.0, -2.0)
+	PlaceSignScript.subject = her
+	_cam.global_position = _sign.global_position + Vector3(0, 0.3, 2.5)
+	_sign.call("update_fade", _cam)
+	assert_gt(float(_sign.call("fade")), 0.9, "she is behind it: it gets out of the way")
+	her.global_position = _sign.global_position + Vector3(6.0, -1.0, -2.0)
+	_sign.call("update_fade", _cam)
+	assert_lt(float(_sign.call("fade")), 0.5, "off to one side it only fades by distance")
+	PlaceSignScript.subject = null

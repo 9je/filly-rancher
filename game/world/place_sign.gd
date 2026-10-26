@@ -32,6 +32,11 @@ static var _icon_cache: Dictionary = {}
 const NEAR_M := 1.2
 const FAR_M := 3.0
 const MAX_FADE := 0.92
+## A board on the line from the lens to `subject` (the player; ranch.gd sets it) fades this
+## far at any distance: half faded it was a grey sheet across the screen (feel pass
+## 2026-10-26, the Pens board at the pen's gate).
+const BLOCKING_FADE := 0.96
+static var subject: Node3D = null
 
 var text := ""
 var icon := Icon.COIN
@@ -129,11 +134,38 @@ func update_fade(cam: Camera3D) -> void:
 	var nearest := local.clamp(-_half, _half)
 	var d := local.distance_to(nearest)
 	var f := MAX_FADE * smoothstep(FAR_M, NEAR_M, d)
+	if subject != null and is_instance_valid(subject) and subject.is_inside_tree():
+		var aim := to_local(subject.global_position + Vector3(0, 1.0, 0))
+		if _segment_hits_box(local, aim, _half + Vector3(0.15, 0.15, 0.15)):
+			f = maxf(f, BLOCKING_FADE)
 	if absf(f - _fade) < 0.005:
 		return
 	_fade = f
 	for g: Node in find_children("*", "GeometryInstance3D", true, false):
 		(g as GeometryInstance3D).transparency = f
+
+
+## Does the segment a..b pass through the box of half extents `h` at the origin? (Slabs.)
+static func _segment_hits_box(a: Vector3, b: Vector3, h: Vector3) -> bool:
+	var t0 := 0.0
+	var t1 := 1.0
+	var d := b - a
+	for i in 3:
+		if absf(d[i]) < 0.00001:
+			if a[i] < -h[i] or a[i] > h[i]:
+				return false
+			continue
+		var u := (-h[i] - a[i]) / d[i]
+		var v := (h[i] - a[i]) / d[i]
+		if u > v:
+			var w := u
+			u = v
+			v = w
+		t0 = maxf(t0, u)
+		t1 = minf(t1, v)
+		if t0 > t1:
+			return false
+	return true
 
 
 func _mat(c: Color) -> StandardMaterial3D:
