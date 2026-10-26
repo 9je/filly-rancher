@@ -165,18 +165,22 @@ static var _numeral_font: FontVariation = null
 
 
 ## THE PANEL BEHIND EVERY MENU IN THE GAME, and until this function existed it was a
-## StyleBoxFlat copy pasted verbatim into ten .tscn files. The numbers below are those
-## copies, byte for byte, so this is a refactor and not a redesign: dark navy at 88 per cent,
-## a one pixel warm gold border at 32 per cent, twelve pixel corners, no content margin
-## (the Margin node owns that).
+## StyleBoxFlat copy pasted verbatim into ten .tscn files. No content margin: the Margin
+## node owns that.
 static func panel_style() -> StyleBoxFlat:
 	if _panel_style != null:
 		return _panel_style
 	var box := StyleBoxFlat.new()
-	box.bg_color = Color(0.0392157, 0.0470588, 0.0784314, 0.88)
-	box.set_border_width_all(1)
-	box.border_color = Color(1, 0.858824, 0.552941, 0.32)
-	box.set_corner_radius_all(12)
+	# ONE LOOK WITH THE HUD (overnight review 2026-10-26: the menus were a black slab, the HUD
+	# a rounded card with a violet line). Deep Palace plum, the HUD cards' violet outline at
+	# their weight and roundness, and their soft drop shadow; the plum tiles sit on it.
+	box.bg_color = Color(0.15, 0.06, 0.19, 0.97)
+	box.set_border_width_all(4)
+	box.border_color = Color(0.62, 0.45, 0.80)
+	box.set_corner_radius_all(22)
+	box.shadow_color = Color(0.08, 0.02, 0.12, 0.45)
+	box.shadow_size = 14
+	box.shadow_offset = Vector2(0, 6)
 	box.content_margin_left = 0.0
 	box.content_margin_top = 0.0
 	box.content_margin_right = 0.0

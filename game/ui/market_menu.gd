@@ -32,6 +32,7 @@ const TileStyleScript := preload("res://ui/tile_style.gd")
 ## The scroll area's tallest, in 1920 x 1080 base pixels: what is left of the screen once the
 ## title, the tabs, the footer and the Close button have theirs.
 const SCROLL_MAX := 640.0
+const SCROLL_MAX_BUY := 400.0
 const BUY_COLUMNS := 3
 const BUY_TILE := Vector2(360.0, 128.0)
 const SELL_TILE := Vector2(1104.0, 84.0)
@@ -83,6 +84,16 @@ var _open := false
 ## comment on the same pair of fields.
 var _hovered := -1
 var _close: Button = null
+## THE PICK, IN FULL (overnight review 2026-10-26: the owner found the upgrades unclear, and a
+## tile's two lines cut "Six more pockets. Carry eighteen ponies before you" off mid
+## sentence). Under the BUY grid: the pick's big icon, its whole description, its price and
+## a Buy button. Built once; refresh() fills it.
+var _detail: PanelContainer = null
+var _detail_icon: Control = null
+var _detail_name: Label = null
+var _detail_text: Label = null
+var _detail_kind: Label = null
+var _detail_buy: Button = null
 
 
 func _ready() -> void:
@@ -101,8 +112,120 @@ func _ready() -> void:
 		dim.mouse_filter = Control.MOUSE_FILTER_STOP
 	_close = MouseRowsScript.close_button(MouseRowsScript.CLOSE_TEXT,
 		func(_index: int) -> void: close())
+	_build_detail()
 	$Centre/Panel/Margin/Column.add_child(_close)
 	visible = false
+
+
+func _build_detail() -> void:
+	var column := $Centre/Panel/Margin/Column as VBoxContainer
+	_detail = PanelContainer.new()
+	_detail.name = "Detail"
+	_detail.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var box := TileStyleScript.box(true, false)
+	box.bg_color = PaintScript.PLUM.darkened(0.15)
+	_detail.add_theme_stylebox_override(&"panel", box)
+	column.add_child(_detail)
+	column.move_child(_detail, _scroll.get_index() + 1)
+	var line := HBoxContainer.new()
+	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	line.add_theme_constant_override(&"separation", 18)
+	_detail.add_child(line)
+	var plate := TileStyleScript.disc(84.0)
+	line.add_child(plate)
+	_detail_icon = ShopIconScript.new()
+	_detail_icon.custom_minimum_size = Vector2(84, 84)
+	_detail_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	plate.add_child(_detail_icon)
+	var words := VBoxContainer.new()
+	words.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	words.alignment = BoxContainer.ALIGNMENT_CENTER
+	line.add_child(words)
+	var head := HBoxContainer.new()
+	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	head.add_theme_constant_override(&"separation", 14)
+	words.add_child(head)
+	_detail_name = Label.new()
+	_detail_name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	MenuStyleScript.style_label(_detail_name, 28, MenuStyleScript.COLOR_TITLE)
+	_detail_name.add_theme_font_override(&"font", MenuStyleScript.title_font())
+	head.add_child(_detail_name)
+	_detail_kind = Label.new()
+	_detail_kind.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_detail_kind.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	MenuStyleScript.style_label(_detail_kind, 16, PaintScript.GOLD)
+	head.add_child(_detail_kind)
+	_detail_text = Label.new()
+	_detail_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_detail_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_detail_text.custom_minimum_size = Vector2(700, 0)
+	MenuStyleScript.style_label(_detail_text, 19, MenuStyleScript.COLOR_NAME)
+	words.add_child(_detail_text)
+	_detail_buy = Button.new()
+	_detail_buy.name = "Buy"
+	_detail_buy.custom_minimum_size = Vector2(190, 64)
+	_detail_buy.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_detail_buy.focus_mode = Control.FOCUS_NONE
+	_detail_buy.add_theme_font_override(&"font", MenuStyleScript.title_font())
+	_detail_buy.add_theme_font_size_override(&"font_size", 24)
+	for state: StringName in [&"normal", &"hover", &"pressed", &"disabled"]:
+		var b := StyleBoxFlat.new()
+		b.bg_color = PaintScript.GOLD if state != &"disabled" else PaintScript.GOLD_DIM.darkened(0.4)
+		if state == &"hover":
+			b.bg_color = PaintScript.GOLD.lightened(0.15)
+		elif state == &"pressed":
+			b.bg_color = PaintScript.GOLD.darkened(0.12)
+		b.set_corner_radius_all(18)
+		b.border_color = PaintScript.PLUM_DARK
+		b.set_border_width_all(2)
+		_detail_buy.add_theme_stylebox_override(state, b)
+	for c: StringName in [&"font_color", &"font_hover_color", &"font_pressed_color"]:
+		_detail_buy.add_theme_color_override(c, PaintScript.CARD_INK)
+	_detail_buy.add_theme_color_override(&"font_disabled_color", Color(1, 1, 1, 0.45))
+	_detail_buy.pressed.connect(func() -> void: take_row(_selected))
+	line.add_child(_detail_buy)
+
+
+## What kind of thing an item is, in a word, for its tile and the detail strip.
+static func kind_word(item: ShopItem) -> String:
+	match item.kind:
+		ShopItemScript.Kind.CARE:
+			return "FOOD"
+		ShopItemScript.Kind.PERMIT:
+			return "NEW PLACE"
+		ShopItemScript.Kind.BUILD:
+			return "BUILDING"
+	return "GEAR"
+
+
+## The detail strip's words, for the suite: {name, text, kind, buy, can}.
+func detail_state() -> Dictionary:
+	if _detail == null or not _detail.visible:
+		return {}
+	return {"name": _detail_name.text, "text": _detail_text.text, "kind": _detail_kind.text,
+		"buy": _detail_buy.text, "can": not _detail_buy.disabled}
+
+
+func _fill_detail() -> void:
+	var item := _selected_item() if _tab == Tab.BUY else null
+	_detail.visible = item != null
+	if item == null:
+		return
+	var owned := _owned(item)
+	(_detail_icon as Control).set(&"kind", ShopIconScript.kind_for(item))
+	_detail_icon.queue_redraw()
+	_detail_name.text = item.display_name
+	_detail_kind.text = kind_word(item)
+	_detail_text.text = item.description
+	var why := shop.refusal(item)
+	_detail_buy.disabled = owned or not why.is_empty()
+	if owned:
+		_detail_buy.text = "Owned"
+	elif item.cost == 0:
+		_detail_buy.text = "Take it"
+	else:
+		_detail_buy.text = "Buy  %d" % item.cost
 
 
 # --- opening and closing ------------------------------------------------------------------
@@ -330,8 +453,9 @@ func refresh() -> void:
 		return
 	_footer.text = MenuStyleScript.footer_tabs_and_rows("confirm", "back")
 	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
-	_wallet.text = "%d bits" % shop.bits()
+	_wallet.text = "%d bits      %d gems in your pouch" % [shop.bits(), _pouch_total()]
 	_gems.text = "%d gems in your pouch" % _pouch_total()
+	_gems.visible = false
 	MouseRowsScript.tab_strip(_tabs, TAB_NAMES, _tab, Callable(),
 		func(i: int) -> void:
 			if i != _tab:
@@ -367,15 +491,20 @@ func refresh() -> void:
 			# still showing its price was a row offering something that could not be
 			# bought, on the most expensive line on the screen: 1200 bits displayed next
 			# to a gate that is already standing open.
-			var owned := false
-			if item.kind == ShopItemScript.Kind.GEAR:
-				owned = shop.owns_gear(item.gear_id)
-			elif item.kind == ShopItemScript.Kind.PERMIT:
-				owned = shop.owns_permit(item.permit_zone)
+			var owned := _owned(item)
 			var price := "OWNED" if owned else ("FREE" if item.cost == 0 else "%d bits" % item.cost)
 			_add_row(i, item.display_name, item.description, price, shop.can_buy(item),
-				ShopIconScript.kind_for(item))
+				ShopIconScript.kind_for(item), kind_word(item))
+	_fill_detail()
 	_fit_scroll.call_deferred()
+
+
+func _owned(item: ShopItem) -> bool:
+	if item.kind == ShopItemScript.Kind.GEAR:
+		return shop.owns_gear(item.gear_id)
+	if item.kind == ShopItemScript.Kind.PERMIT:
+		return shop.owns_permit(item.permit_zone)
+	return false
 
 
 func _sell_all_value() -> int:
@@ -390,13 +519,15 @@ func _sell_all_value() -> int:
 func _fit_scroll() -> void:
 	if _scroll == null or not _open:
 		return
-	_scroll.custom_minimum_size.y = minf(_rows.get_combined_minimum_size().y, SCROLL_MAX)
+	# The BUY tab gives the detail strip its room, so the whole panel fits a 720 p screen.
+	var cap := SCROLL_MAX if _tab == Tab.SELL else SCROLL_MAX_BUY
+	_scroll.custom_minimum_size.y = minf(_rows.get_combined_minimum_size().y, cap)
 	if _selected >= 0 and _selected < _rows.get_child_count():
 		_scroll.ensure_control_visible(_rows.get_child(_selected) as Control)
 
 
 func _add_row(index: int, row_name: String, blurb: String, price: String, enabled: bool,
-		icon_kind: StringName = &"") -> void:
+		icon_kind: StringName = &"", tag := "") -> void:
 	var row := MouseRowsScript.row(index, index == _selected, index == _hovered,
 		point_at_row, take_row)
 	TileStyleScript.dress(row, index == _selected, index == _hovered)
@@ -446,12 +577,19 @@ func _add_row(index: int, row_name: String, blurb: String, price: String, enable
 	MenuStyleScript.style_label(cost, 22,
 		MenuStyleScript.COLOR_VALUE if enabled else MenuStyleScript.COLOR_UNAFFORDABLE)
 	head.add_child(cost)
+	if not tag.is_empty():
+		var chip := Label.new()
+		chip.text = tag
+		chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		MenuStyleScript.style_label(chip, 14, PaintScript.GOLD if enabled else PaintScript.GOLD_DIM)
+		column.add_child(chip)
 	if not blurb.is_empty():
 		var sub := Label.new()
 		sub.text = blurb
 		sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		sub.max_lines_visible = 2 if _tab == Tab.BUY else 1
+		# ONE LINE, ENDED PROPERLY: the whole of it is in the detail strip under the grid.
+		sub.text_overrun_behavior = TextServer.OVERRUN_TRIM_WORD_ELLIPSIS
+		sub.clip_text = true
 		sub.custom_minimum_size = Vector2(0.0, 0.0)
 		MenuStyleScript.style_label(sub, 17, MenuStyleScript.COLOR_DIM)
 		column.add_child(sub)

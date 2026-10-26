@@ -136,10 +136,10 @@ func test_the_panel_style_is_one_shared_instance_with_the_shipped_numbers() -> v
 	var a: StyleBoxFlat = MenuStyleScript.panel_style()
 	var b: StyleBoxFlat = MenuStyleScript.panel_style()
 	assert_eq(a, b, "cached: every panel in the game points at the same box")
-	assert_eq(a.bg_color, Color(0.0392157, 0.0470588, 0.0784314, 0.88))
-	assert_eq(a.border_color, Color(1, 0.858824, 0.552941, 0.32))
-	assert_eq(a.corner_radius_top_left, 12)
-	assert_eq(a.border_width_top, 1)
+	assert_eq(a.bg_color, Color(0.15, 0.06, 0.19, 0.97))
+	assert_eq(a.border_color, Color(0.62, 0.45, 0.80))
+	assert_eq(a.corner_radius_top_left, 22)
+	assert_eq(a.border_width_top, 4)
 
 
 ## THE ROW TREATMENT THE STYLE FILE ALREADY INTENDED. These four constants shipped declared
