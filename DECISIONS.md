@@ -300,3 +300,16 @@ The owner's save after 11.6 minutes: 17 ponies, 157 bits, a pen on all four plot
 - **Spike 1.9x** (0.76 m to 1.31 m, 0.6 PH: up to a pony's neck).
 - **The Palace marquee** hung across the top of the entrance steps, where the third-person camera passed through it. It is a shorter board on the worn model's frieze now, its lower edge 4.6 m up. The Palace still has no walk-in interior: E at the door opens the casino lobby, as before. A real interior is a larger piece of work, not done this round.
 - **My own process slip:** a handful of direct Godot test launches early in this round ran without FILLY_TEST_SAVE_DIR. No save was written (the creator tests do not save, and the slot files predate those runs), but they pushed the owner's playtest log out of Godot's five-log rotation. The owner's saves are backed up to scratchpad/save-backups/2026-10-25_playtest2/, and every launch since used isolated saves and its own --log-file.
+
+## 2026-10-25 -- round 2 gates: Barn moved north, news bubble fades up close
+
+- **Barn to (-17, 0, -19), from -15.** The camera-terrain sweep stalled for 25 minutes against
+  the Depot's north end: the Barn's door apron ended 4 m from the Depot's side, so "5 m in
+  front of the Barn" was the Depot's corner. The owner's note was that the start buildings sit
+  too close together; a test pony that cannot get round them says the same. Now about 8 m. The
+  sweep's route goes round the Depot's north end (-8, -9.5) to and from the Barn.
+- **The "!" bubble fades out between 6 m and 3 m from the lens**, and its texture has mipmaps.
+  The round 2 catch-card picture showed a townspony beside the camera wearing a bubble a
+  quarter of the screen tall, in 96 px blocks. Close up she needs no marker to be found.
+- **Brambles in SCALE.md as prop_medium** (1.14 PH, a thicket about pony height); `bush` tops
+  out at 1.0.

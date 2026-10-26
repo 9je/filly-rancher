@@ -118,7 +118,7 @@ script = ExtResource("3")
 [node name="Buildings" type="Node3D" parent="."]
 
 [node name="Barn" type="StaticBody3D" parent="Buildings"]
-transform = Transform3D(1, 0, -0, 0, 1, 0, 0, 0, 1, -17, 0, -15)
+transform = Transform3D(1, 0, -0, 0, 1, 0, 0, 0, 1, -17, 0, -19)
 script = ExtResource("7")
 width = 4.86
 depth = 4.93

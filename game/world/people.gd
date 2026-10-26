@@ -448,6 +448,7 @@ static func news_marker() -> Node3D:
 				# The "!": a bar and a dot.
 				if (absf(x - 48.0) < 6.0 and y > 16 and y < 52) or p.distance_to(Vector2(48, 62)) < 6.0:
 					img.set_pixel(x, y, rim)
+		img.generate_mipmaps()
 		_news_tex = ImageTexture.create_from_image(img)
 	var root := Node3D.new()
 	root.name = "NewsMarker"
@@ -463,6 +464,12 @@ static func news_marker() -> Node3D:
 	m.no_depth_test = true
 	m.fixed_size = false
 	m.render_priority = 10
+	# A townspony beside the lens needs no bubble to be found, and one would fill the screen:
+	# it fades out inside a few metres (round 2 evidence, catch_card_settled.png).
+	m.distance_fade_mode = BaseMaterial3D.DISTANCE_FADE_PIXEL_ALPHA
+	m.distance_fade_min_distance = 3.0
+	m.distance_fade_max_distance = 6.0
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	q.material_override = m
 	q.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	root.add_child(q)

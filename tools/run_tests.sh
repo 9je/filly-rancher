@@ -89,8 +89,10 @@ else
   while IFS= read -r gd; do
     sweep_count=$((sweep_count + 1))
     res="res://${gd#game/}"
-    if ! tools/bin/godot --headless --audio-driver Dummy --path game \
-        --check-only --script "$res" >/dev/null 2>&1; then
+    # --log-file: one Godot per script here, and each would otherwise rotate a log out of the
+    # owner's user dir (Godot keeps five).
+    if ! tools/bin/godot --headless --audio-driver Dummy --log-file "$FILLY_TEST_SAVE_DIR/check.log" \
+        --path game --check-only --script "$res" >/dev/null 2>&1; then
       sweep_failures="$sweep_failures  $res"$'\n'
     fi
   done < <(find game -name '*.gd' -not -path 'game/addons/*' | sort)

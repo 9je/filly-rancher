@@ -138,10 +138,15 @@ func _stops() -> Array[Dictionary]:
 	out.append({"name": "yard", "at": hub})
 	# Building walls, ramps and interiors. Every leg goes back out to the open yard in front of
 	# the door first, so the route never asks her to walk through a building.
+	# The Barn stands behind the Depot from the yard (the 2026-10-25 layout): her way there and
+	# back goes round the Depot's north end, never through it.
+	var round_depot := Vector2(-8.0, -9.5)
+	var leave: Array = []
 	for bname: String in ["Barn", "Farmhouse", "Market", "Depot"]:
 		var b := ranch.get_node_or_null("Buildings/" + bname) as Node3D
 		if b == null:
 			continue
+		var via: Array = [round_depot] if bname == "Barn" else []
 		var xf := b.global_transform
 		var foot: float = b.call("apron_foot_z")
 		var dz: float = float(b.get("depth")) * 0.5
@@ -149,7 +154,8 @@ func _stops() -> Array[Dictionary]:
 		var front := _flat(xf * Vector3(0, 0, foot + 5.0))
 		var door := _flat(xf * Vector3(0, 0, foot + 0.8))
 		out.append({"name": bname + "_ramp", "at": _flat(xf * Vector3(0, 0, foot - 1.3)),
-			"path": [hub, front, door]})
+			"path": leave + [hub] + via + [front, door]})
+		leave = via
 		out.append({"name": bname + "_inside", "at": _flat(xf * Vector3(0, 0, -dz * 0.3)),
 			"push": _flat(xf * Vector3(0.4, 0, -dz - 2.0))})
 		if bname == "Barn" or bname == "Depot":

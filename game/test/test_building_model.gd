@@ -188,7 +188,7 @@ const SHIPPED := {
 ## RE-LAID 2026-10-25 round a plaza (owner playtest: "the important buildings at the start
 ## are too close and not easy to navigate between"); DECISIONS.md has the plan.
 const ORIGINS := {
-	"Barn": Vector2(-17.0, -15.0), "Farmhouse": Vector2(2.0, -16.0),
+	"Barn": Vector2(-17.0, -19.0), "Farmhouse": Vector2(2.0, -16.0),
 	"Market": Vector2(18.0, -3.0), "Board": Vector2(-8.0, -13.0),
 	"Depot": Vector2(-14.0, -3.0), "Palace": Vector2(-10.0, 61.6),
 	"Mailbox": Vector2(8.0, 7.0),

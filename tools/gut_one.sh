@@ -9,6 +9,6 @@ trap 'rm -rf "$FILLY_TEST_SAVE_DIR"' EXIT
 GODOT="${GODOT:-tools/bin/godot}"
 args=()
 for t in "$@"; do args+=("-gtest=res://test/${t%.gd}.gd"); done
-"$GODOT" --headless --audio-driver Dummy --path game -s addons/gut/gut_cmdln.gd \
+"$GODOT" --headless --audio-driver Dummy --log-file "$FILLY_TEST_SAVE_DIR/godot.log" --path game -s addons/gut/gut_cmdln.gd \
   "${args[@]}" -gexit 2>&1 | grep -vE "^\s*$" | grep -E "FAILED|Failing|Passing|Tests |SCRIPT ERROR|Parse Error|ERROR|\[Failed\]|^\s+at|expected|got" | head -60
 exit "${PIPESTATUS[0]}"

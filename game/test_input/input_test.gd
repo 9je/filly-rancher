@@ -147,14 +147,17 @@ func boot_new_game() -> bool:
 		return false
 	if RI.find_text(root, "Really start over") != null:
 		await click_text("New game")
-	var t := 0.0
-	while t < 60.0:
+	# WALL-CLOCK SECONDS, NOT GAME SECONDS. The ranch loads on a worker thread in real time,
+	# while the loading screen draws no 3D and its frames are nearly free: under --fixed-fps
+	# 60 game seconds of them can pass in a few real ones, and a slow load lost that race --
+	# the test quit mid-load, and every preload the worker still had pending then failed.
+	var started := Time.get_ticks_msec()
+	while Time.get_ticks_msec() - started < 180000:
 		var s := current_scene
 		if s != null and s.get("people") != null and s.get("player") != null:
 			ranch = s
 			break
 		await wait(0.1)
-		t += 0.1
 	if not check(ranch != null, "New game never reached the ranch"):
 		return false
 	player = ranch.get("player")

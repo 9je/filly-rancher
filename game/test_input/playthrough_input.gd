@@ -153,14 +153,15 @@ func _boot_continue() -> bool:
 	await frames(10)
 	if not await click_text("Continue"):
 		return false
-	var t := 0.0
-	while t < 60.0:
+	# Wall-clock seconds: the ranch loads on a worker in real time while the loading screen's
+	# frames are nearly free (see input_test.gd boot_new_game()).
+	var started := Time.get_ticks_msec()
+	while Time.get_ticks_msec() - started < 180000:
 		var s := current_scene
 		if s != null and s.get("people") != null and s.get("player") != null:
 			ranch = s
 			break
 		await wait(0.1)
-		t += 0.1
 	if ranch == null:
 		fail("Continue never reached the ranch")
 		return false
