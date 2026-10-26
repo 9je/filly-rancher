@@ -151,6 +151,7 @@ func _commit_mesh(post_mat: StandardMaterial3D, rail_mat: StandardMaterial3D) ->
 	mi.name = "RingMesh"
 	mi.mesh = mesh
 	_rails.add_child(mi)
+	ToonStyler.style(mi, &"prop", {})
 	_post_st = null
 	_rail_st = null
 
@@ -162,7 +163,11 @@ func _post(at: Vector3, mat: StandardMaterial3D) -> void:
 	box.size = Vector3(PenScript.POST_SIZE, PenScript.FENCE_HEIGHT + PenScript.POST_BURY,
 		PenScript.POST_SIZE)
 	var pos := at + Vector3(0.0, (PenScript.FENCE_HEIGHT - PenScript.POST_BURY) * 0.5, 0.0)
-	_post_st.append_from(box, 0, Transform3D(Basis(), pos))
+	# Round timber with a domed cap, the paddock's own (pen.gd _timber_mesh()).
+	var r := PenScript.POST_SIZE * 0.62
+	_post_st.append_from(PenScript.timber_shape(&"post", r, box.size.y), 0, Transform3D(Basis(), pos))
+	_post_st.append_from(PenScript.timber_shape(&"cap", r, 0.0), 0,
+		Transform3D(Basis(), pos + Vector3(0, box.size.y * 0.5, 0)))
 	var shape := CollisionShape3D.new()
 	var col := BoxShape3D.new()
 	col.size = box.size
@@ -184,7 +189,9 @@ func _rail_segment(p0: Vector3, p1: Vector3, mat: StandardMaterial3D) -> void:
 		var box := BoxMesh.new()
 		box.size = Vector3(length, PenScript.RAIL_THICKNESS, PenScript.RAIL_DEPTH)
 		var xf := Transform3D(Basis.from_euler(Vector3(0.0, yaw, pitch)), mid + Vector3(0.0, h, 0.0))
-		_rail_st.append_from(box, 0, xf)
+		# A rounded pole laid along the segment, the paddock's own rail.
+		_rail_st.append_from(PenScript.timber_shape(&"rail", PenScript.RAIL_DEPTH * 0.6, length), 0,
+			xf * Transform3D(Basis(Vector3.BACK, PI * 0.5), Vector3.ZERO))
 		var shape := CollisionShape3D.new()
 		var col := BoxShape3D.new()
 		col.size = box.size

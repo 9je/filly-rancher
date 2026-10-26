@@ -1137,10 +1137,53 @@ static func _timber_mesh(slab_name: String, size: Vector3, mat: Material, holder
 static var _baked_meshes: Dictionary = {}
 
 
+## A bare timber shape (no material) baked once and kept, with the primitive it came from,
+## for game/world/region_fence.gd's merged ring: `kind` is &"post", &"cap" or &"rail".
+static var _shapes: Dictionary = {}
+static var _keep: Array[PrimitiveMesh] = []
+
+
+static func timber_shape(kind: StringName, r: float, length: float) -> ArrayMesh:
+	var k := "%s:%.3f:%.3f" % [kind, r, length]
+	var out: ArrayMesh = _shapes.get(k)
+	if out != null:
+		return out
+	var prim: PrimitiveMesh
+	match kind:
+		&"post":
+			var c := CylinderMesh.new()
+			c.top_radius = r * 0.92
+			c.bottom_radius = r
+			c.height = length
+			c.radial_segments = 8
+			c.rings = 1
+			prim = c
+		&"cap":
+			var sp := SphereMesh.new()
+			sp.radius = r * 1.05
+			sp.height = r * 1.2
+			sp.radial_segments = 8
+			sp.rings = 3
+			prim = sp
+		_:
+			var cap := CapsuleMesh.new()
+			cap.radius = r
+			cap.height = length + r * 2.0
+			cap.radial_segments = 8
+			cap.rings = 1
+			prim = cap
+	_keep.append(prim)
+	out = ArrayMesh.new()
+	out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, prim.get_mesh_arrays())
+	_shapes[k] = out
+	return out
+
+
 static func _baked(prim: PrimitiveMesh, mat: Material, key: String) -> ArrayMesh:
 	var k := "%s#%d" % [key, mat.get_instance_id()]
 	var out: ArrayMesh = _baked_meshes.get(k)
 	if out == null:
+		_keep.append(prim)
 		out = ArrayMesh.new()
 		out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, prim.get_mesh_arrays())
 		out.surface_set_material(0, mat)
