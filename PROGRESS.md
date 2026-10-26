@@ -169,3 +169,5 @@ Canon MLP stays: real names, looks and places ("lean into mlp fully", private bu
 - **The marquee no longer hangs across the doorway:** it was hung before the Palace was seated and sat 1.7 m over the doorway floor; it is rehung 3.3 m over it.
 - **Gates:** GUT suite 1817 of 1817; real input palace_interior, find_market, scale (921 placements, 122 assets) and camera_factory 4 of 4.
 - **Not yet done:** the owner has not walked it; no music or ambience of its own beyond the casino zone the Strip already had.
+- **Merged: the Spectra Palace walk-in hall** (f9c7f21). After the merge the gates pass: GUT 1835 of 1835, real-input 17 of 17 (palace_interior included), and the owner's logs are untouched. Renders are in build/playtest_evidence/round2/palace_interior_*.png.
+- **Exports rebuilt** at 01:48 with 0 export errors (Linux and Windows). The Linux build ran on the GPU invisibly with isolated saves and exited cleanly (rc 0); it printed only the two known engine messages (render-thread finalize, empty image).
