@@ -837,14 +837,16 @@ func _wants_to_hear(id: StringName) -> bool:
 ## way the talk box wants it), a number key for a choice.
 func _read_conversation(p: Node) -> void:
 	var guard := 0
-	while bool(p.call("is_talking")) and guard < 80:
+	# is_instance_valid() each turn: the talk that ends "Let's go." rides the lift, and the
+	# ranch (and `p` with it) is freed while this loop is still waiting out the last line.
+	while is_instance_valid(p) and bool(p.call("is_talking")) and guard < 80:
 		guard += 1
 		var runner: Object = p.get("runner")
 		var box: Node = p.get("talk_box")
 		var line: Dictionary = runner.call("current") if runner != null else {}
 		var text := str(line.get("text", ""))
 		await _wait(maxf(1.0, text.length() / read_cps) if text != "" else 1.5)
-		if not bool(p.call("is_talking")):
+		if not is_instance_valid(p) or not bool(p.call("is_talking")):
 			break
 		if box != null and bool(box.call("is_revealing")):
 			await _press(&"interact")
