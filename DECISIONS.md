@@ -464,4 +464,5 @@ Owner asked for a pass on four gaps: art that reads as one style, animation and 
 - **Feel at the two verbs you do most.** A catch: her ghost arcs into the Scoop (stretch, shrink), then pop, Scoop squash, camera kick. A pen: she flies out of the Scoop over the rail, grows, lands with a squash and a puff. The camera gained a trauma shake (centimetres, gone in a second, toggle in Settings).
 - **Paddocks and region borders are cartoon timber** (round posts with caps, rounded rails, warm wood, toon shading and ink) instead of untextured boxes: the most-seen object in the game was the least show-like.
 - **A sign in the way is gone, not half gone.** Half faded it drew as a grey or dark sheet across the screen at the pen's gate. A board between the lens and her fades at any distance, and past 0.85 it is not drawn.
-- **Not done, logged:** thin fence posts beside the lens can still fill a corner of the screen (the arm sweeps only along its own line; a near-lens fade for props is the fix); the walk sound; a bits sink after the ending.
+- **A post against the lens is not drawn** (pen timber within 0.75 m of the camera).
+- **Not done, logged:** the walk sound; a bits sink after the ending.
