@@ -61,7 +61,7 @@ const AZIMUTH_WEST := -90.0
 
 ## Indexed by WorldState.Phase.
 const PHASE_LIGHT_COLORS: Array[Color] = [
-	Color(1.0, 0.78, 0.60),
+	Color(1.0, 0.84, 0.68),
 	Color(1.0, 0.97, 0.91),
 	Color(1.0, 0.62, 0.45),
 	Color(0.55, 0.62, 0.85),
@@ -71,9 +71,14 @@ const PHASE_LIGHT_COLORS: Array[Color] = [
 ## NIGHT's 0.38 is a playability number, not an art one. At 0.25 a stormy night scaled
 ## down to 0.11 and the ranch stopped being legible: a player who cannot see a pony cannot
 ## catch one. It stays far under every lit phase, which is what the ordering tests assert.
-const PHASE_LIGHT_ENERGY: Array[float] = [0.62, 1.15, 0.58, 0.38]
+## DAWN WAS RE-LIT 2026-10-26 (0.62 energy, a lavender-grey zenith (0.62, 0.55, 0.70), an
+## orange sun (1.0, 0.78, 0.60)). Every new game opens at dawn, so it is the owner's first
+## look at the valley, and in their playtest it read as an overcast purple haze over olive
+## grass ("starting area is terrible"). Now a show sunrise: a soft periwinkle zenith over the
+## same peach horizon, a gentler sun, and enough of it that the plaza reads at once.
+const PHASE_LIGHT_ENERGY: Array[float] = [0.85, 1.15, 0.58, 0.38]
 const PHASE_SKY_TOP: Array[Color] = [
-	Color(0.62, 0.55, 0.70),
+	Color(0.50, 0.62, 0.88),
 	Color(0.31, 0.51, 0.76),
 	Color(0.58, 0.40, 0.55),
 	Color(0.06, 0.08, 0.18),
@@ -97,7 +102,7 @@ const AMBIENT_SKY_CONTRIBUTION := 0.35
 ##
 ## IT IS THE NIGHT'S BASE, NOT A FLOOR UNDER IT, and the night is the one phase whose
 ## ordering against the day is NOT defined here: see the note on NIGHT_WEATHER_FLOOR.
-const PHASE_AMBIENT_ENERGY: Array[float] = [0.24, 0.32, 0.22, 0.70]
+const PHASE_AMBIENT_ENERGY: Array[float] = [0.28, 0.32, 0.22, 0.70]
 
 ## THE COLOUR OF THE FILL LIGHT, which is a separate question from how much of it there is.
 ## ranch.tscn's Environment now takes only 35% of its ambient colour off the sky and 65% off

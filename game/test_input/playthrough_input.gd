@@ -103,6 +103,10 @@ var _stop_at := ""
 ## --log=<path>: every line the bot prints, also written (and flushed) here, so a long run can
 ## be watched while it plays (stdout to a file is only flushed at exit).
 var _log_file: FileAccess = null
+## --shots=<dir>: a screenshot every SHOT_EVERY_S game seconds, numbered by the minute, for
+## reviewing a run the way a player would see it (no video, nothing on the desktop).
+var _shots_dir := ""
+const SHOT_EVERY_S := 15.0
 
 
 func _play() -> void:
@@ -119,6 +123,8 @@ func _play() -> void:
 			_deadline_s = float(a.substr(11))
 		elif a.begins_with("--log="):
 			_log_file = FileAccess.open(a.substr(6), FileAccess.WRITE)
+		elif a.begins_with("--shots="):
+			_shots_dir = a.substr(8)
 		elif a.begins_with("--stop-at="):
 			_stop_at = a.substr(10)
 		elif a == "--continue":
@@ -135,6 +141,8 @@ func _play() -> void:
 		_deadline_s = 6.0 * 3600.0 if minutes <= 0.0 else minutes * 60.0 + 900.0
 	_t_start_ms = Time.get_ticks_msec()
 	physics_frame.connect(_control)
+	if _shots_dir != "":
+		_shoot_every()
 	if _continued:
 		if not await _boot_continue():
 			return
@@ -1516,6 +1524,18 @@ func _follow_scene() -> bool:
 		return true
 	await process_frame
 	return true
+
+
+func _shoot_every() -> void:
+	DirAccess.make_dir_recursive_absolute(_shots_dir)
+	var n := 0
+	while true:
+		await create_timer(SHOT_EVERY_S, true, true).timeout
+		n += 1
+		var secs := int(n * SHOT_EVERY_S)
+		var img := root.get_texture().get_image()
+		if img != null:
+			img.save_png("%s/t%02d_%02d.png" % [_shots_dir, secs / 60, secs % 60])
 
 
 func _check_finished() -> bool:

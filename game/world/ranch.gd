@@ -3186,8 +3186,7 @@ func deliver_pony(uid: StringName) -> Dictionary:
 		LettersScript.Id.RECEIPT_NAMED if named else LettersScript.Id.RECEIPT_STOCK,
 		{"name": _player_name(), "count": shipments, "credit": credit,
 			"pony": inst.display_name()})
-	_toast("%s: %s shipment received, %d bits credited."
-		% [letter["sender"], LettersScript.ordinal(shipments), credit])
+	_toast(delivery_toast(str(letter["sender"]), shipments, credit, _game_state.ledger.balance))
 	# The crate goes down and that is the whole of it. She says nothing, on purpose: the
 	# pony voice slots are cut by owner directive, and a real mare's neigh here would be
 	# the loudest wrong note in the game.
@@ -4784,6 +4783,27 @@ func _player_stands_on_footprint(slot: PlotSlot) -> bool:
 	if slot == null or player == null:
 		return false
 	return slot.is_on_footprint(player.global_position, PLAYER_BODY_RADIUS)
+
+
+## THE RECEIPT'S ONE LINE. It used to end "300 bits credited." while the purse on screen did
+## not move, because the credit comes off the sponsorship balance and never reaches the
+## wallet. It says so now, and how much of the balance is left (test_delivery_toast.gd).
+static func delivery_toast(sender: String, shipments: int, credit: int, balance_left: int) -> String:
+	var head := "%s: %s shipment received." % [sender, LettersScript.ordinal(shipments)]
+	if balance_left <= 0:
+		return "%s %s bits off your balance. It is paid off." % [head, group_thousands(credit)]
+	return "%s %s bits off your balance, %s to go." % [head, group_thousands(credit),
+		group_thousands(balance_left)]
+
+
+## 24100 as "24,100".
+static func group_thousands(n: int) -> String:
+	var digits := str(absi(n))
+	var out := ""
+	while digits.length() > 3:
+		out = "," + digits.substr(digits.length() - 3) + out
+		digits = digits.substr(0, digits.length() - 3)
+	return ("-" if n < 0 else "") + digits + out
 
 
 func _toast(text: String) -> void:

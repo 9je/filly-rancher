@@ -343,3 +343,22 @@ The owner's save after 11.6 minutes: 17 ponies, 157 bits, a pen on all four plot
   sheets, the release export, the atomic-save proof, the theme build), so no tool can push the
   owner's play log out of Godot's five-log rotation. The run_tests.sh parse sweep was the one
   that did, on 2026-10-25 at 21:33: one launch per script, each without --log-file.
+- **Dawn re-lit.** Every new game opens at dawn, so dawn is the owner's first look at the
+  valley, and in round 2 it read as an overcast lavender haze over olive grass. Zenith
+  (0.62, 0.55, 0.70) to (0.50, 0.62, 0.88), sun (1.0, 0.78, 0.60) to (1.0, 0.84, 0.68),
+  sun energy 0.62 to 0.85, fill 0.24 to 0.28. Dusk is unchanged and dawn stays under day. I
+  considered starting a new save in DAY instead. I chose not to: that would shorten the first
+  day and move every night-keyed beat, while a good dawn helps every dawn, not just the
+  first. The before and after spawn views are in build/playtest_evidence/round3/
+  (spawn_view_* and spawn_view_dawn_relit_*).
+- **The shipment toast says where the bits went.** "4th shipment received, 300 bits
+  credited." showed up while the purse on screen did not move, because the credit comes off
+  the sponsorship balance. Now it reads "300 bits off your balance, 24,100 to go." (or "It is
+  paid off."). Ranch.delivery_toast(), test_delivery_toast.
+- **Shop signs fade for the camera.** The bot review found the camera behind the Depot's
+  door sign at every visit. A PlaceSign is solid past 3 m from the lens and 92% see-through
+  inside 1.2 m, measured to the board's nearest point. test_place_sign_fade.
+- **Bot screenshots:** playthrough_input.gd takes `--shots=<dir>`, a frame every 15 game
+  seconds, so a run can be reviewed as a player sees it with nothing opened on the desktop.
+  The 12-minute review of 2026-10-26 found the Market, Depot and Build menus still the old
+  dark text lists (next), the receipt toast, and the door signs.

@@ -25,8 +25,18 @@ const ICON_COLOURS := {
 
 static var _icon_cache: Dictionary = {}
 
+## A SIGN STEPS ASIDE FOR THE LENS (overnight bot review, 2026-10-26: the board beside the
+## Depot's door filled the screen whenever the third-person camera came up behind it). Solid
+## past FAR_M from the camera, MAX_FADE see-through at NEAR_M and closer, measured to the
+## nearest point of the board rather than its middle, so a wide board fades at its end too.
+const NEAR_M := 1.2
+const FAR_M := 3.0
+const MAX_FADE := 0.92
+
 var text := ""
 var icon := Icon.COIN
+var _half := Vector3(0.6, 0.3, 0.1)
+var _fade := 0.0
 
 
 ## A board `width` by `height` m facing local +Z, its icon on the left and `label` beside it.
@@ -35,6 +45,7 @@ func build(label: String, icon_kind: int, width: float, height: float, point: fl
 		two_sided: bool = false) -> void:
 	text = label
 	icon = icon_kind
+	_half = Vector3((width + 0.16) * 0.5 + point, (height + 0.16) * 0.5, 0.1)
 	var frame := MeshInstance3D.new()
 	var fm := BoxMesh.new()
 	fm.size = Vector3(width + 0.16, height + 0.16, 0.08)
@@ -100,6 +111,29 @@ func _paint_face(label: String, icon_kind: int, width: float, height: float, bac
 	# Centred in the room right of the icon.
 	l.position = Vector3(height * 0.55, 0, 0.066)
 	holder.add_child(l)
+
+
+## How see-through the board is right now, 0 solid to MAX_FADE.
+func fade() -> float:
+	return _fade
+
+
+func _process(_delta: float) -> void:
+	var cam := get_viewport().get_camera_3d()
+	if cam != null:
+		update_fade(cam)
+
+
+func update_fade(cam: Camera3D) -> void:
+	var local := to_local(cam.global_position)
+	var nearest := local.clamp(-_half, _half)
+	var d := local.distance_to(nearest)
+	var f := MAX_FADE * smoothstep(FAR_M, NEAR_M, d)
+	if absf(f - _fade) < 0.005:
+		return
+	_fade = f
+	for g: Node in find_children("*", "GeometryInstance3D", true, false):
+		(g as GeometryInstance3D).transparency = f
 
 
 func _mat(c: Color) -> StandardMaterial3D:
