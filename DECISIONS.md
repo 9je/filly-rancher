@@ -381,3 +381,75 @@ The owner's save after 11.6 minutes: 17 ponies, 157 bits, a pen on all four plot
   around the Strip, the track and the north road, because the only thing on top was an
   OmniLight3D. Now each post has a stepped foot, a gold collar, a warm glowing globe and a
   gold cap. test_strip: every post wears a lamp you can see by day.
+
+## 2026-10-26 -- the Spectra Palace you walk into
+
+Owner playtest note (2026-10-25): "spectra palace not real yet? weird sign you gotta walk
+through to get in".
+
+- **A hall in the ranch scene, not a scene change.** game/world/palace_interior.gd builds a
+  sealed 24 m by 32 m hall, 7.5 m to the ceiling, sixty metres under the Palace's own
+  footprint. Going in fades to black and moves the player; nothing is unloaded, saved or
+  rebuilt, so the bag, the pens, the herd, the clock and the bits are the ones she walked in
+  with (test_palace_interior, GUT and real input, both check). A separate scene was rejected
+  for exactly that reason: the Factory's scene change needs a save and a reload around it.
+  Under the map rather than off its edge because a room off the edge can be seen from the
+  valley rim; under the ground the terrain hides the roof.
+- **What being under the map costs, and the fix for each.**
+  - The camera's terrain guard would lift the lens to the grass overhead: CameraRig gains
+    `ground_guard`, off while she is inside. The hall's floor, walls and ceiling are on the
+    TERRAIN layer the arm's sweeps probe, so the lens stays in (the real-input test swings
+    the camera a turn and a half and floor to ceiling at the slots and at the doors: 0 bad
+    frames).
+  - The sky would rain and fog indoors and the sun's toon shadow would band everything:
+    SkyRig.set_indoors() puts the sun out, stops the rain, thins the fog to nothing and gives
+    the ambient a warm fixed fill. The hour and the weather keep ramping underneath.
+  - Everything else measures the map in the XZ plane, so the Palace's own door, the
+    townsfolk and the Scoop Launcher would all be "in reach" from below: inside, the
+    interact resolver is handed the hall's candidates and nothing else.
+  - Tumble's follow is an XZ walk: she waits at the foot of the steps
+    (People.park_companions()) and follows again when the player comes out.
+- **Walking in is going in.** A trigger just inside the doorway takes her in; E on the steps
+  does the same ("E: go into the Spectra Palace"). Inside, walking into the doors or E in
+  front of them takes her out, to the foot of the steps, facing the Strip, with the camera
+  reset to its default pitch behind her.
+- **Every station opens the existing screen, straight at its game.** Slots, the wheel,
+  blackjack (two tables) and racing open their own panels exactly as the lobby rows did; the
+  cage opens the lobby panel on its Cage tab (House rules is a tab away). Two new resolver
+  verbs, appended so every old int keeps its meaning: PALACE_STATION (the station id is the
+  subject) and PALACE_EXIT. The lobby menu itself is untouched and still reachable from the
+  cage.
+- **The door's rules hold at the door.** casino_can_enter() is asked before she is let in
+  (closed before the grand opening: walking into the doors says so, once per approach), the
+  stations are not offered while it says no, and enforce_palace_ban() walks her out at once
+  if it starts saying no while she is inside. A ban does not wait for a fade.
+- **The weird sign was real, and still there.** Round 2 lifted the Strip's marquee board to
+  4.6 m over "the ground", but the Strip hangs it while the Palace is still at y = 0, and the
+  Palace is then seated 2 m up onto a plinth whose floor is 0.85 m higher again: the board's
+  lower edge stood 1.73 m over the floor of the doorway, through a pony's head. Strip now
+  rehangs it after the seating loop (rehang_marquee()), its lower edge 3.3 m over the
+  doorway floor, over the doors and the camera, under the model's own pink sign.
+- **The doorway is a door now.** pc_palace_doors (velvet leaves, gold studs, lit portholes)
+  stands in the model's dark recess, with a collision slab behind it so nobody walks into the
+  model.
+- **Built lazily, behind the black.** The hall is about seventy models and twelve dressed
+  ponies; it is built the first time she goes in, so a player who never does never pays for
+  it at boot. test_scale asks for it (ensure_palace_interior()) and measures every piece.
+- **The kit is Blender, like the Factory's.** Seventeen pc_* pieces in
+  tools/blender_props/build_props.py: the hall shell (parquet, patterned carpet, a red
+  runner, plum walls, ruby panels, velvet pilasters with lit sconces, a neon band, a starry
+  coffered ceiling), white columns, two slot cabinets, the wheel and its stand and stage,
+  the blackjack table, the cage, the racing booth, chandeliers, the doors in and out, a rope
+  lane, palms, neon stars and horseshoes. The wheel's pockets and the felt are the casino
+  screens' own colours (converted to linear for glTF), so the wheel on the stage and the
+  wheel on the screen are one wheel. Glowing materials carry glTF emission, which ToonStyler
+  passes to the toon shader.
+- **Some life.** Staff are Attendants (not Ponies, so the beam cannot take them): a cashier,
+  a race clerk, a wheel host, a dealer at each table, and regulars at three machines and the
+  tables, coloured by the random generator's own look draw, seeded. The wheel idles round,
+  the bulbs breathe, and the tote board runs a race of lights.
+- **Footsteps on timber.** The hall's floor collider is tagged hoof_wood (carpet or
+  parquet); there is no carpet set, and the soft clop reads as an indoor floor.
+- **SCALE.md** gains two categories (interior 2.5-4.5 PH: the hall and its columns;
+  fixture 0.3-1.5 PH: the chandeliers) and a row for every pc_* piece. The racing booth's
+  horseshoe was lowered to fit stall's 2.5 PH (it measured 2.55).

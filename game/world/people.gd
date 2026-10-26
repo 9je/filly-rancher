@@ -133,6 +133,32 @@ func _spawn(id: StringName) -> void:
 	npcs[id] = n
 
 
+## TUMBLE WAITS AT THE DOOR. Her follow is a walk across the XZ plane toward the player, and
+## the Palace's hall is under the map (game/world/palace_interior.gd), so following her in
+## would mean standing on the grass over the hall's roof looking at nothing. She waits by the
+## door instead and picks up following again when the player comes back out. Returns whether
+## there was a companion following to park.
+var _parked: Array[StringName] = []
+
+
+func park_companions(at: Vector3) -> bool:
+	_parked.clear()
+	for id: StringName in npcs:
+		var n: Npc = npcs[id]
+		if n.mode == NpcScript.Mode.FOLLOW:
+			n.set_mode_walk_to(at)
+			_parked.append(id)
+	return not _parked.is_empty()
+
+
+func unpark_companions() -> void:
+	for id: StringName in _parked:
+		var n: Npc = npcs.get(id) as Npc
+		if n != null and is_instance_valid(n):
+			n.set_mode_follow(player)
+	_parked.clear()
+
+
 ## Interaction candidates: the nearest character in reach, as a TALK action.
 func candidates(at: Vector3) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []

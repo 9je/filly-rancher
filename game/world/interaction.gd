@@ -24,7 +24,7 @@ extends RefCounted
 ## PEN_UPGRADE and PLOT_CLEAR are appended rather than slotted in beside the other ground
 ## kinds, so every int a driver or a test log already holds keeps its meaning.
 enum Kind { NONE, PLOT_BUILD, PEN_MOVE_IN, MARKET, BOARD, MAILBOX, DEPOT, PALACE, TALK,
-	PEN_UPGRADE, PLOT_CLEAR }
+	PEN_UPGRADE, PLOT_CLEAR, PALACE_STATION, PALACE_EXIT }
 
 ## THE ORDER, HIGHEST FIRST, and every one of these positions is a decision.
 ##
@@ -52,8 +52,24 @@ enum Kind { NONE, PLOT_BUILD, PEN_MOVE_IN, MARKET, BOARD, MAILBOX, DEPOT, PALACE
 ## the smallest thing on the map.
 ## TALK ranks right under the ground tier: a person standing beside you is who the key is
 ## for, ahead of any building behind her (Bramble stands at the Market's counter).
+##
+## THE HALL'S TWO VERBS COME LAST (2026-10-26). Inside the Spectra Palace nothing else on the
+## map is ever offered (ranch.gd's interaction_candidates() hands over the hall's candidates
+## and nothing more), so where they rank only matters against each other: a game station
+## beats the way out, because a player standing between the cage and the doors came in to
+## play.
 const PRIORITY: Array[int] = [Kind.PLOT_BUILD, Kind.PEN_MOVE_IN, Kind.PEN_UPGRADE,
-	Kind.PLOT_CLEAR, Kind.TALK, Kind.MARKET, Kind.BOARD, Kind.MAILBOX, Kind.DEPOT, Kind.PALACE]
+	Kind.PLOT_CLEAR, Kind.TALK, Kind.MARKET, Kind.BOARD, Kind.MAILBOX, Kind.DEPOT, Kind.PALACE,
+	Kind.PALACE_STATION, Kind.PALACE_EXIT]
+
+## What each station in the hall says it does (game/world/palace_interior.gd's STATIONS).
+const STATION_PROMPTS := {
+	"cage": "the cage, buy and cash chips",
+	"slots": "play the slots",
+	"wheel": "bet on the wheel",
+	"blackjack": "sit down at blackjack",
+	"racing": "bet on the races",
+}
 
 ## THE KINDS THAT SHARE ONE RANK, so resolve() settles them on distance instead of on the
 ## order they happen to sit in above.
@@ -199,7 +215,11 @@ static func prompt_for(action: Dictionary, key: String) -> String:
 		Kind.DEPOT:
 			return "%s: Depot, deliver and pay" % key
 		Kind.PALACE:
-			return "%s: Spectra Palace" % key
+			return "%s: go into the Spectra Palace" % key
+		Kind.PALACE_STATION:
+			return "%s: %s" % [key, String(STATION_PROMPTS.get(subject, "play"))]
+		Kind.PALACE_EXIT:
+			return "%s: leave the Palace" % key
 		Kind.TALK:
 			return "%s: talk to %s" % [key, subject]
 	return ""

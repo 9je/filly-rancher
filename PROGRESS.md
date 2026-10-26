@@ -163,3 +163,9 @@ Canon MLP stays: real names, looks and places ("lean into mlp fully", private bu
   - The Strip's lamp posts have lamps.
   - The bot takes --shots=<dir> for frame-by-frame review.
 - **The Spectra Palace walk-in interior** is being built on its own branch.
+
+### 2026-10-26: the Spectra Palace you walk into (DECISIONS.md)
+- **Walk-in casino floor:** walking through the Palace doors (or E on the steps) fades into a sealed hall under the Palace, built from a new Blender kit (pc_*): slot machines, the prize wheel on a lit stage, two blackjack tables, the racing window with a tote board, the cashier's cage, chandeliers, neon, staff and regulars. Every station opens the existing casino screen at its own game; the doors inside lead back out to the steps. Ranch state is untouched by a visit. Renders: build/playtest_evidence/round2/palace_interior_*.png.
+- **The marquee no longer hangs across the doorway:** it was hung before the Palace was seated and sat 1.7 m over the doorway floor; it is rehung 3.3 m over it.
+- **Gates:** GUT suite 1817 of 1817; real input palace_interior, find_market, scale (921 placements, 122 assets) and camera_factory 4 of 4.
+- **Not yet done:** the owner has not walked it; no music or ambience of its own beyond the casino zone the Strip already had.

@@ -579,6 +579,28 @@ func set_tone(g: Dictionary) -> void:
 	_write_to_scene()
 
 
+## INDOORS: THE SKY STAYS OUTSIDE. While the player is in the Spectra Palace's hall (a sealed
+## room under the map, game/world/palace_interior.gd) the sun is put out, the rain stops
+## following her, the fog thins to nothing and the ambient fill is the room's own warm rose
+## rather than whatever hour it is outside. The hour and the weather keep ramping underneath
+## (_current is untouched), so stepping back out finds the sky exactly where it has got to.
+## The dread grade still applies: the Palace is in the same valley as everything else.
+const INDOOR_AMBIENT_ENERGY := 0.42
+const INDOOR_AMBIENT_COLOR := Color(1.0, 0.9, 0.86)
+var _indoors := false
+
+
+func set_indoors(on: bool) -> void:
+	if on == _indoors:
+		return
+	_indoors = on
+	_write_to_scene()
+
+
+func is_indoors() -> bool:
+	return _indoors
+
+
 func _write_to_scene() -> void:
 	if (_sun == null or _environment == null) and not _resolve_retried:
 		# A rig can be built in code and wired to its siblings AFTER _ready() has run, so
@@ -622,6 +644,13 @@ func _write_to_scene() -> void:
 		# The fog is lit by the same air the horizon band is, so it takes that colour and
 		# a night fog goes dark instead of glowing white in the dark.
 		_environment.fog_light_color = horizon
+		if _indoors:
+			_environment.ambient_light_energy = INDOOR_AMBIENT_ENERGY \
+				* float(_tone.get("ambient_mult", 1.0))
+			_environment.ambient_light_color = INDOOR_AMBIENT_COLOR
+			_environment.fog_density = 0.0
+	if _sun != null and _indoors:
+		_sun.light_energy = 0.0
 	if _sky_material != null:
 		_sky_material.sky_top_color = _current.get(KEY_SKY_TOP, _sky_material.sky_top_color)
 		_sky_material.sky_horizon_color = horizon
@@ -648,7 +677,10 @@ func _write_rain() -> void:
 	# Guarded the same way `amount` is, and for a smaller version of the same reason:
 	# assigning `emitting` restarts the emission, so a clear sky that reassigned false every
 	# frame would be doing a pointless server call sixty times a second forever.
-	var falling := wanted > 0
+	var falling := wanted > 0 and not _indoors
+	# The drops already in the air go too: indoors is a roof, not a slow fade.
+	if _rain.visible == _indoors:
+		_rain.visible = not _indoors
 	if _rain.emitting != falling:
 		_rain.emitting = falling
 

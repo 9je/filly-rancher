@@ -155,6 +155,26 @@ func test_the_marquee_hangs_over_the_door_not_across_it() -> void:
 		+ StripScript.MARQUEE_HEIGHT + 0.01, "and rises no higher than that needs")
 
 
+## THE SAME BOARD, ONCE THE PALACE HAS BEEN SEATED ON ITS PLINTH (2026-10-26). Everything that
+## belongs to the marquee goes up together, and the lower edge ends MARQUEE_DOOR_CLEARANCE over
+## the floor of the doorway, not over the ground the Strip was built on.
+func test_rehanging_lifts_every_marquee_node_over_the_seated_door() -> void:
+	var strip: Strip = _built_strip()
+	var before: Dictionary = {}
+	for c: Node in strip.get_children():
+		if String(c.name).begins_with("Marquee"):
+			before[c.name] = (c as Node3D).global_position.y
+	var floor_y := 2.87
+	var dy: float = strip.rehang_marquee(floor_y, 2.0 + PALACE_RIDGE_Y)
+	assert_gt(dy, 0.0, "it went up")
+	var bottom: float = strip.marquee_top_y() - strip.marquee_board_size().y
+	assert_almost_eq(bottom, floor_y + StripScript.MARQUEE_DOOR_CLEARANCE, 0.01)
+	assert_gt(before.size(), 4, "the board, its trim, its two lines, its arch, bulbs and wash")
+	for n: StringName in before:
+		assert_almost_eq((strip.get_node(NodePath(String(n))) as Node3D).global_position.y,
+			float(before[n]) + dy, 0.001, "%s moved with the board" % n)
+
+
 func test_the_marquee_hangs_in_front_of_the_wall_rather_than_inside_it() -> void:
 	var strip: Strip = _built_strip()
 	var centre: Vector3 = strip.marquee_board_centre()
