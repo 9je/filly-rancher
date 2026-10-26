@@ -423,6 +423,14 @@ var _body_shape: CollisionShape3D = null
 ## The ground the last-resort floor in _keep_above_ground() reads, found by group.
 var _terrain: Node = null
 
+## WHETHER _keep_above_ground() HOLDS THE LENS OVER THE TERRAIN. True everywhere on the map.
+## False while she is inside the Spectra Palace (game/world/palace_interior.gd), a sealed hall
+## sixty metres under the grass: there the terrain "under" the lens is the ground overhead, and
+## holding the lens above it would throw the camera up through the hall's ceiling. The hall's
+## own floor, walls and ceiling are on the layers the arm's sweeps probe, so the lens is kept
+## inside by the same sweeps that keep it out of a barn wall.
+var ground_guard := true
+
 ## Current pitch in the "intuitive" sense described above. Kept as the source of truth
 ## instead of reading it back out of `rotation.x` so the clamp is applied in exactly
 ## one place.
@@ -755,6 +763,8 @@ func _resolve_arm() -> void:
 ## between two of the ground's triangles. A scene with no terrain (the Factory, a GUT test)
 ## has nothing to hold it above, and is left alone.
 func _keep_above_ground() -> void:
+	if not ground_guard:
+		return
 	if _terrain == null or not is_instance_valid(_terrain):
 		_terrain = get_tree().get_first_node_in_group(&"terrain") if is_inside_tree() else null
 		if _terrain == null:

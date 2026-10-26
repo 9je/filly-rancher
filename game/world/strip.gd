@@ -273,6 +273,37 @@ func mount_marquee(front_centre: Vector3, out_dir: Vector3, half_extents: Vector
 	_has_marquee = true
 
 
+## Metres from the FLOOR OF THE DOORWAY (the top of the Palace's plinth, where her hooves are
+## as she goes in) to the board's lower edge, once the Palace has been seated: over the 3.06 m
+## doors and over the third person camera behind a pony on the top step (about 2.4 m over that
+## floor at the default pitch), and no higher, so the board stays on the frieze under the
+## model's own pink sign.
+const MARQUEE_DOOR_CLEARANCE := 3.3
+
+
+## HANG IT AGAIN, OVER THE SEATED DOOR (2026-10-26). The Strip is built, marquee and all, while
+## the Palace still stands at y = 0; ranch.gd seats every building afterwards, and the Palace
+## rises nearly three metres onto its plinth (Building.seat_ground(), Building.FLOOR_TOP). The
+## board is the Strip's, not the Palace's, so it stayed where it was hung: its lower edge 1.7 m
+## over the floor of the doorway, which is the "weird sign you gotta walk through to get in"
+## the round 2 fix measured from the wrong ground. ranch.gd calls this after the seating loop
+## with the seated numbers, and every marquee node moves by the same amount. Returns how far.
+func rehang_marquee(door_floor_y: float, ridge_y: float) -> float:
+	if not _has_marquee:
+		return 0.0
+	var ceiling: float = maxf(ridge_y - MARQUEE_TOP_GAP,
+		door_floor_y + MARQUEE_DOOR_CLEARANCE + MARQUEE_HEIGHT)
+	var dy: float = ceiling - _marquee_ceiling
+	_marquee_ceiling = ceiling
+	_marquee_centre.y += dy
+	if absf(dy) < 0.0001:
+		return 0.0
+	for c: Node in get_children():
+		if c is Node3D and String(c.name).begins_with("Marquee"):
+			(c as Node3D).global_position.y += dy
+	return dy
+
+
 ## The direction the board's face looks in, flat and unit length. Whatever mount_marquee()
 ## was handed, or the unturned default before it is called.
 func marquee_facing() -> Vector3:

@@ -41,7 +41,30 @@ PALETTE = {
     "palace_dark": (0.08, 0.03, 0.12), "bulb": (1.0, 0.92, 0.55),
     "company": (0.62, 0.64, 0.68), "company_dark": (0.32, 0.34, 0.4),
     "cloud": (0.98, 0.98, 1.0), "cloud_shade": (0.86, 0.88, 0.96), "cream": (0.99, 0.95, 0.86),
+    # The Spectra Palace's hall (pc_*): the facade's own purple, pink and gold carried indoors,
+    # deepened for a room lit by lamps rather than by the sun.
+    "plum": (0.30, 0.10, 0.36), "plum_dark": (0.17, 0.05, 0.22), "wine": (0.46, 0.08, 0.26),
+    "velvet": (0.62, 0.12, 0.38), "magenta": (0.86, 0.22, 0.58), "orchid": (0.72, 0.46, 0.86),
+    "felt": (0.09, 0.40, 0.24), "felt_dark": (0.05, 0.24, 0.15), "parquet": (0.70, 0.42, 0.24),
+    # The wheel's pockets, in game/ui/casino_paint.gd's own colours so the wheel on the stage and
+    # the wheel on the screen are one wheel: the house pocket, then the six runs of four.
+    "w_house": (0.80, 0.84, 0.90), "w_red": (0.85, 0.24, 0.26), "w_orange": (0.93, 0.55, 0.20),
+    "w_yellow": (0.95, 0.82, 0.28), "w_green": (0.33, 0.68, 0.36), "w_blue": (0.27, 0.52, 0.86),
+    "w_violet": (0.60, 0.38, 0.82),
+    "parquet_dark": (0.50, 0.27, 0.15), "carpet": (0.36, 0.07, 0.30), "carpet_pink": (0.78, 0.22, 0.52),
+    "marble": (0.93, 0.88, 0.94), "brass": (0.86, 0.66, 0.26), "sky": (0.30, 0.74, 0.96),
+    "mint": (0.42, 0.88, 0.66), "ink": (0.06, 0.03, 0.09),
+    # GLOWING. mat() gives every key that starts with "glow_" an emission of its own colour,
+    # which ToonStyler carries into the toon shader's own emission (game/systems/toon_styler.gd).
+    "glow_bulb": (1.0, 0.86, 0.5), "glow_pink": (1.0, 0.22, 0.62), "glow_cyan": (0.2, 0.86, 1.0),
+    "glow_gold": (1.0, 0.76, 0.25), "glow_warm": (1.0, 0.80, 0.52), "glow_mint": (0.3, 1.0, 0.6),
+    "glow_red": (1.0, 0.2, 0.25), "glow_violet": (0.7, 0.4, 1.0), "glow_crystal": (0.85, 0.95, 1.0),
 }
+
+# How bright each glowing key is, as an emission strength (glTF KHR_materials_emissive_strength,
+# which Godot imports as the material's emission energy).
+GLOW = {"glow_bulb": 2.6, "glow_pink": 3.2, "glow_cyan": 3.2, "glow_gold": 2.4, "glow_warm": 1.8,
+        "glow_mint": 2.6, "glow_red": 2.6, "glow_violet": 3.0, "glow_crystal": 1.6}
 
 BUILDERS = {}
 
@@ -69,6 +92,9 @@ def mat(key):
         bsdf = m.node_tree.nodes["Principled BSDF"]
         bsdf.inputs["Base Color"].default_value = (c[0], c[1], c[2], 1.0)
         bsdf.inputs["Roughness"].default_value = 1.0
+        if key in GLOW:
+            bsdf.inputs["Emission Color"].default_value = (c[0], c[1], c[2], 1.0)
+            bsdf.inputs["Emission Strength"].default_value = GLOW[key]
         m.diffuse_color = (c[0], c[1], c[2], 1.0)
     return m
 
@@ -991,6 +1017,707 @@ def mailbox():
     ]
     join(parts, "mailbox")
     export("mailbox")
+
+
+# --- the Spectra Palace, inside (game/world/palace_interior.gd) ----------------------------
+# THE HALL YOU WALK INTO (owner playtest 2026-10-25: "spectra palace not real yet?"). Every
+# piece faces -Y like the rest of this file, so in Godot (glTF, +Y up) each one faces +Z and
+# palace_interior.gd turns it into place. The hall's own numbers are palace_interior.gd's:
+# 24 m by 32 m inside, 7.5 m to the ceiling, the door in the -Y wall.
+
+PC_HW, PC_HD, PC_H = 12.0, 16.0, 7.5
+
+
+def cut(obj, co, no):
+    """Keep the half of `obj` on the far side of the plane (point `co`, normal `no`) from the
+    normal, and cap the cut. Location is applied first so the plane is in world metres."""
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    geom = bm.verts[:] + bm.edges[:] + bm.faces[:]
+    res = bmesh.ops.bisect_plane(bm, geom=geom, plane_co=co, plane_no=no, clear_outer=True)
+    edges = [e for e in res["geom_cut"] if isinstance(e, bmesh.types.BMEdge)]
+    if edges:
+        bmesh.ops.holes_fill(bm, edges=edges, sides=0)
+    bm.to_mesh(obj.data)
+    bm.free()
+    obj.data.update()
+    return obj
+
+
+def sector(name, r0, r1, a0, a1, y0, y1, color, seg=4):
+    """An annular slice of a disc in the XZ plane (a wheel pocket), from angle a0 to a1."""
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    rings = []
+    for k in range(seg + 1):
+        a = a0 + (a1 - a0) * k / seg
+        c, s = math.cos(a), math.sin(a)
+        rings.append([bm.verts.new((r * c, y, r * s)) for (r, y) in ((r0, y0), (r1, y0), (r1, y1), (r0, y1))])
+    for k in range(seg):
+        A, B = rings[k], rings[k + 1]
+        for i in range(4):
+            j = (i + 1) % 4
+            bm.faces.new((A[i], A[j], B[j], B[i]))
+    bm.faces.new(rings[0][::-1])
+    bm.faces.new(rings[-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(me)
+    bm.free()
+    obj = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(obj)
+    return finish(obj, color, smooth=False)
+
+
+def rod(name, a, b, r, color, verts=10):
+    """A cylinder from point a to point b (neon tubes, ropes, bars)."""
+    a, b = Vector(a), Vector(b)
+    d = b - a
+    rot = Vector((0, 0, 1)).rotation_difference(d.normalized()).to_euler()
+    return cyl(name, r, d.length, tuple((a + b) * 0.5), color, verts=verts, rot=tuple(rot))
+
+
+def tube(name, pts, r, color, closed=False):
+    """A tube along a polyline, a ball at every joint so the bends read as one bent tube."""
+    parts = []
+    seq = list(pts) + ([pts[0]] if closed else [])
+    for i in range(len(seq) - 1):
+        parts.append(rod(name, seq[i], seq[i + 1], r, color))
+    for p in pts:
+        parts.append(ball(name + "_j", r, p, color, subdiv=1))
+    return parts
+
+
+def bulbs_rect(cx, y, cz, w, h, n_w, n_h, r=0.035):
+    out = []
+    for i in range(n_w):
+        x = cx - w / 2 + w * i / (n_w - 1)
+        out.append(ball("bulb", r, (x, y, cz + h / 2), "glow_bulb", subdiv=1))
+        out.append(ball("bulb", r, (x, y, cz - h / 2), "glow_bulb", subdiv=1))
+    for k in range(1, n_h - 1):
+        z = cz - h / 2 + h * k / (n_h - 1)
+        out.append(ball("bulb", r, (cx - w / 2, y, z), "glow_bulb", subdiv=1))
+        out.append(ball("bulb", r, (cx + w / 2, y, z), "glow_bulb", subdiv=1))
+    return out
+
+
+@prop("pc_hall")
+def pc_hall():
+    """The hall itself: a parquet floor under a patterned carpet, plum walls with a wine
+    wainscot, velvet pilasters with gold capitals and lit sconces, gold framed panels, a neon
+    band, and a coffered ceiling scattered with tiny lights. Inside faces at x = +-12, y = +-16."""
+    hw, hd, H = PC_HW, PC_HD, PC_H
+    p = [box("slab", (hw * 2 + 0.8, hd * 2 + 0.8, 0.3), (0, 0, -0.15), "parquet", bevel=0.0)]
+    # Parquet seams round the border band, every 0.6 m.
+    k = -hw + 0.3
+    while k < hw:
+        for y in (-hd + 1.1, hd - 1.1):
+            p.append(box("seam", (0.03, 2.1, 0.006), (k, y, 0.003), "parquet_dark", bevel=0.0))
+        k += 0.6
+    k = -hd + 0.3
+    while k < hd:
+        for x in (-hw + 1.1, hw - 1.1):
+            p.append(box("seam", (2.1, 0.03, 0.006), (x, k, 0.003), "parquet_dark", bevel=0.0))
+        k += 0.6
+    # The carpet, its two borders, and its diamonds.
+    cw, cd = hw * 2 - 4.4, hd * 2 - 4.4
+    p.append(box("carpet", (cw, cd, 0.04), (0, 0, 0.02), "carpet", bevel=0.0))
+    for inset, wdt, col in ((0.3, 0.14, "gold"), (0.65, 0.22, "carpet_pink")):
+        p.append(box("bx", (cw - inset * 2, wdt, 0.012), (0, cd / 2 - inset, 0.045), col, bevel=0.0))
+        p.append(box("bx", (cw - inset * 2, wdt, 0.012), (0, -cd / 2 + inset, 0.045), col, bevel=0.0))
+        p.append(box("by", (wdt, cd - inset * 2, 0.012), (cw / 2 - inset, 0, 0.045), col, bevel=0.0))
+        p.append(box("by", (wdt, cd - inset * 2, 0.012), (-cw / 2 + inset, 0, 0.045), col, bevel=0.0))
+    step = 2.2
+    nx, ny = int((cw - 2.4) / step), int((cd - 2.4) / step)
+    for i in range(nx + 1):
+        for j in range(ny + 1):
+            x = -(nx * step) / 2 + i * step
+            y = -(ny * step) / 2 + j * step
+            if abs(x) < 2.0:
+                continue
+            p.append(box("dia", (0.9, 0.9, 0.012), (x, y, 0.046), "carpet_pink", bevel=0.0, rot=(0, 0, math.radians(45))))
+            p.append(box("dot", (0.28, 0.28, 0.014), (x, y, 0.05), "gold", bevel=0.0, rot=(0, 0, math.radians(45))))
+            if i < nx and j < ny:
+                p.append(box("pip", (0.16, 0.16, 0.012), (x + step / 2, y + step / 2, 0.046), "orchid", bevel=0.0,
+                             rot=(0, 0, math.radians(45))))
+    # The runner, door to wheel stage, gold edged.
+    p.append(box("runner", (3.0, hd + 8.4, 0.016), (0, (-hd + 8.4) / 2, 0.05), "wine", bevel=0.0))
+    for x in (-1.5, 1.5):
+        p.append(box("runner_edge", (0.12, hd + 8.4, 0.018), (x, (-hd + 8.4) / 2, 0.052), "gold", bevel=0.0))
+    for j in range(9):
+        y = -hd + 1.6 + j * 2.6
+        p.append(box("runner_star", (0.5, 0.5, 0.018), (0, y, 0.054), "gold", bevel=0.0, rot=(0, 0, math.radians(45))))
+    # Walls: the shells, then the dressing on each inside face. `faces` is (centre, inward
+    # normal, length along the wall).
+    p.append(box("wall_w", (0.4, hd * 2 + 0.8, H), (-hw - 0.2, 0, H / 2), "plum", bevel=0.0))
+    p.append(box("wall_e", (0.4, hd * 2 + 0.8, H), (hw + 0.2, 0, H / 2), "plum", bevel=0.0))
+    p.append(box("wall_n", (hw * 2 + 0.8, 0.4, H), (0, hd + 0.2, H / 2), "plum", bevel=0.0))
+    p.append(box("wall_s", (hw * 2 + 0.8, 0.4, H), (0, -hd - 0.2, H / 2), "plum", bevel=0.0))
+    faces = [((-hw, 0), (1, 0), hd * 2), ((hw, 0), (-1, 0), hd * 2), ((0, hd), (0, -1), hw * 2), ((0, -hd), (0, 1), hw * 2)]
+    for (cx, cy), (nx_, ny_), length in faces:
+        along_x = nx_ == 0
+
+        def slab(name, depth, height, z, col, off=0.0, ln=None):
+            ln = length if ln is None else ln
+            size = (ln, depth, height) if along_x else (depth, ln, height)
+            loc = (cx + nx_ * (depth / 2 + off), cy + ny_ * (depth / 2 + off), z)
+            return box(name, size, loc, col, bevel=0.0)
+
+        p.append(slab("wainscot", 0.05, 1.3, 0.65, "wine"))
+        p.append(slab("rail", 0.12, 0.1, 1.35, "gold"))
+        p.append(slab("skirting", 0.09, 0.22, 0.11, "plum_dark"))
+        p.append(slab("crown", 0.3, 0.36, H - 0.18, "gold"))
+        p.append(slab("crown2", 0.16, 0.12, H - 0.5, "wine"))
+        for z, col in ((6.0, "glow_pink"), (5.78, "glow_cyan")):
+            a = (cx + nx_ * 0.12 - (length / 2 - 0.3) * (1 if along_x else 0), cy + ny_ * 0.12 - (length / 2 - 0.3) * (0 if along_x else 1), z)
+            b = (cx + nx_ * 0.12 + (length / 2 - 0.3) * (1 if along_x else 0), cy + ny_ * 0.12 + (length / 2 - 0.3) * (0 if along_x else 1), z)
+            p.append(rod("neon", a, b, 0.045, col, verts=8))
+        # Pilasters every 4 m, panels between them.
+        n = int(length / 4)
+        for i in range(n + 1):
+            t = -length / 2 + i * 4.0
+            # The end walls keep their middles clear: the doors in the south one, the wheel
+            # against the north one.
+            if abs(t) > length / 2 - 0.2 or (along_x and abs(t) < 0.5):
+                continue
+            px, py = (cx + t, cy) if along_x else (cx, cy + t)
+            w = (0.7, 0.22) if along_x else (0.22, 0.7)
+            p.append(box("pilaster", (w[0], w[1], H - 0.9), (px + nx_ * 0.11, py + ny_ * 0.11, (H - 0.9) / 2 + 0.2), "velvet", bevel=0.02))
+            wc = (0.86, 0.32) if along_x else (0.32, 0.86)
+            p.append(box("capital", (wc[0], wc[1], 0.34), (px + nx_ * 0.16, py + ny_ * 0.16, H - 0.8), "gold", bevel=0.03))
+            p.append(box("pbase", (wc[0], wc[1], 0.4), (px + nx_ * 0.16, py + ny_ * 0.16, 0.2), "gold", bevel=0.03))
+            # A sconce: a gold cup and a lit bulb, standing off the pilaster's face.
+            sx, sy = px + nx_ * 0.38, py + ny_ * 0.38
+            p.append(cyl("sconce_arm", 0.04, 0.3, (px + nx_ * 0.3, py + ny_ * 0.3, 3.35), "gold", verts=8,
+                         rot=(math.radians(90), 0, 0) if along_x else (0, math.radians(90), 0)))
+            p.append(cyl("sconce", 0.2, 0.22, (sx, sy, 3.45), "gold", verts=16, r2=0.12, rot=(math.radians(180), 0, 0)))
+            p.append(ball("sconce_bulb", 0.13, (sx, sy, 3.66), "glow_bulb", subdiv=2))
+        for i in range(n):
+            t = -length / 2 + i * 4.0 + 2.0
+            if abs(t) > length / 2 - 1.0 or (along_x and abs(t) < 3.0):
+                continue
+            px, py = (cx + t, cy) if along_x else (cx, cy + t)
+            fw, fh, fz = 2.7, 3.1, 3.45
+            panel = (fw, 0.04, fh) if along_x else (0.04, fw, fh)
+            p.append(box("panel", panel, (px + nx_ * 0.04, py + ny_ * 0.04, fz), "wine", bevel=0.0))
+            for dz in (-fh / 2, fh / 2):
+                sz = (fw + 0.1, 0.06, 0.07) if along_x else (0.06, fw + 0.1, 0.07)
+                p.append(box("frame", sz, (px + nx_ * 0.07, py + ny_ * 0.07, fz + dz), "gold", bevel=0.0))
+            for dt in (-fw / 2, fw / 2):
+                sz = (0.07, 0.06, fh) if along_x else (0.06, 0.07, fh)
+                qx, qy = (px + dt, py) if along_x else (px, py + dt)
+                p.append(box("frame", sz, (qx + nx_ * 0.07, qy + ny_ * 0.07, fz), "gold", bevel=0.0))
+            # A diamond medallion in every panel.
+            rot = (0, math.radians(45), 0) if along_x else (math.radians(45), 0, 0)
+            md = (0.5, 0.05, 0.5) if along_x else (0.05, 0.5, 0.5)
+            p.append(box("medallion", md, (px + nx_ * 0.08, py + ny_ * 0.08, fz), "orchid", bevel=0.0, rot=rot))
+            md2 = (0.24, 0.06, 0.24) if along_x else (0.06, 0.24, 0.24)
+            p.append(box("medallion2", md2, (px + nx_ * 0.1, py + ny_ * 0.1, fz), "gold", bevel=0.0, rot=rot))
+    # The ceiling: a slab, a grid of wine beams with gold soffits, a scatter of tiny lights.
+    p.append(box("ceiling", (hw * 2 + 0.8, hd * 2 + 0.8, 0.4), (0, 0, H + 0.2), "plum_dark", bevel=0.0))
+    for k in range(-2, 3):
+        p.append(box("beam_x", (hw * 2, 0.4, 0.42), (0, k * 6.4, H - 0.21), "wine", bevel=0.0))
+        p.append(box("soffit_x", (hw * 2, 0.12, 0.03), (0, k * 6.4, H - 0.43), "gold", bevel=0.0))
+    for k in range(-2, 3):
+        p.append(box("beam_y", (0.4, hd * 2, 0.42), (k * 6.0, 0, H - 0.21), "wine", bevel=0.0))
+        p.append(box("soffit_y", (0.12, hd * 2, 0.03), (k * 6.0, 0, H - 0.43), "gold", bevel=0.0))
+    import random
+    rnd = random.Random(7)
+    for _ in range(260):
+        x, y = rnd.uniform(-hw + 0.4, hw - 0.4), rnd.uniform(-hd + 0.4, hd - 0.4)
+        p.append(ball("star", rnd.uniform(0.025, 0.05), (x, y, H - 0.01), "glow_crystal", subdiv=1))
+    for y in (-8.0, 0.0, 7.0):
+        p.append(cyl("rosette", 0.9, 0.06, (0, y, H - 0.44), "gold", verts=24))
+        p.append(cyl("rosette2", 0.6, 0.08, (0, y, H - 0.48), "wine", verts=24))
+    join(p, "pc_hall")
+    export("pc_hall")
+
+
+@prop("pc_column")
+def pc_column():
+    """A white column banded in gold, like the portico's out front, floor to ceiling."""
+    H = PC_H
+    p = [box("plinth", (1.2, 1.2, 0.35), (0, 0, 0.175), "plum_dark", bevel=0.04),
+         cyl("base", 0.62, 0.3, (0, 0, 0.5), "gold", verts=24, bevel=0.03),
+         cyl("shaft", 0.44, H - 1.4, (0, 0, 0.65 + (H - 1.4) / 2), "white", verts=24),
+         cyl("band", 0.47, 0.12, (0, 0, 1.4), "gold", verts=24),
+         cyl("band2", 0.47, 0.12, (0, 0, H - 1.6), "gold", verts=24),
+         cyl("neck", 0.5, 0.22, (0, 0, H - 0.65), "gold", verts=24, bevel=0.02),
+         box("abacus", (1.1, 1.1, 0.3), (0, 0, H - 0.4), "gold", bevel=0.04),
+         box("abacus2", (1.2, 1.2, 0.15), (0, 0, H - 0.17), "wine", bevel=0.02)]
+    for k in range(12):
+        a = 2 * math.pi * k / 12
+        p.append(cyl("flute", 0.05, H - 3.2, (math.cos(a) * 0.43, math.sin(a) * 0.43, 0.65 + (H - 1.4) / 2), "cloud_shade", verts=6))
+    join(p, "pc_column")
+    export("pc_column")
+
+
+def _slot(name, body, glow, sign):
+    p = [box("plinth", (0.92, 0.82, 0.3), (0, 0, 0.15), "plum_dark", bevel=0.03),
+         box("body", (0.86, 0.6, 1.08), (0, 0.08, 0.84), body, bevel=0.05)]
+    for x in (-0.445, 0.445):
+        p.append(box("trim", (0.05, 0.64, 1.12), (x, 0.08, 0.84), "gold", bevel=0.015))
+    # The reel window: three reels in a gold-and-ink frame, a symbol on each.
+    for i, x in enumerate((-0.22, 0.0, 0.22)):
+        p.append(cyl("reel%d" % i, 0.15, 0.19, (x, -0.3, 1.1), "cream", verts=24, rot=(0, math.radians(90), 0)))
+    p.append(box("backing", (0.7, 0.04, 0.5), (0, -0.2, 1.1), "ink", bevel=0.0))
+    for z in (1.1 + 0.25, 1.1 - 0.25):
+        p.append(box("bezel", (0.78, 0.07, 0.08), (0, -0.46, z), "gold", bevel=0.02))
+    for x in (-0.355, 0.355):
+        p.append(box("bezel", (0.08, 0.07, 0.5), (x, -0.46, 1.1), "gold", bevel=0.02))
+    for x in (-0.11, 0.11):
+        p.append(box("divider", (0.02, 0.32, 0.42), (x, -0.32, 1.1), "ink", bevel=0.0))
+    p.append(ball("apple", 0.06, (-0.22, -0.455, 1.1), "red", subdiv=2))
+    p.append(ball("leaf", 0.025, (-0.205, -0.45, 1.17), "leaf", scale=(1.4, 0.6, 0.8), subdiv=1))
+    p.append(cyl("star", 0.08, 0.03, (0.0, -0.455, 1.1), "gold", verts=5, rot=(math.radians(90), 0, 0)))
+    p.append(cyl("star2", 0.08, 0.03, (0.0, -0.457, 1.1), "gold", verts=5, rot=(math.radians(90), math.radians(36), 0)))
+    p.append(ball("gem", 0.06, (0.22, -0.455, 1.1), "glow_cyan", scale=(0.8, 0.6, 1.2), subdiv=1))
+    p.append(box("payline", (0.68, 0.01, 0.015), (0, -0.47, 1.1), "glow_red", bevel=0.0))
+    for z in (1.39, 0.81):
+        p.append(box("strip", (0.7, 0.03, 0.03), (0, -0.47, z), glow, bevel=0.0))
+    # The deck, the buttons, the coin tray, the lower panel.
+    p.append(box("deck", (0.84, 0.32, 0.07), (0, -0.36, 0.76), "plum", bevel=0.02, rot=(math.radians(-14), 0, 0)))
+    for x, col in ((-0.24, "glow_pink"), (0.0, "glow_cyan"), (0.24, "glow_gold")):
+        p.append(cyl("button", 0.05, 0.05, (x, -0.38, 0.81), col, verts=16))
+    p.append(box("tray", (0.56, 0.18, 0.1), (0, -0.33, 0.44), "gold", bevel=0.02))
+    p.append(box("tray_well", (0.48, 0.12, 0.05), (0, -0.35, 0.475), "ink", bevel=0.0))
+    p.append(box("panel", (0.66, 0.03, 0.26), (0, -0.225, 0.58), "velvet", bevel=0.01))
+    p.append(box("panel_dia", (0.16, 0.03, 0.16), (0, -0.24, 0.58), "gold", bevel=0.0, rot=(0, math.radians(45), 0)))
+    # The topper: a lit sign with a star on it, ringed with bulbs, a half moon crown on top.
+    p.append(box("topper", (0.84, 0.5, 0.42), (0, 0.06, 1.6), "plum", bevel=0.05))
+    p.append(box("sign", (0.68, 0.04, 0.28), (0, -0.2, 1.6), sign, bevel=0.01))
+    p.append(cyl("sign_star", 0.11, 0.03, (0, -0.225, 1.6), "glow_gold", verts=5, rot=(math.radians(90), 0, 0)))
+    p.append(cyl("sign_star2", 0.11, 0.03, (0, -0.227, 1.6), "glow_gold", verts=5, rot=(math.radians(90), math.radians(36), 0)))
+    p += bulbs_rect(0, -0.23, 1.6, 0.76, 0.36, 7, 4, r=0.03)
+    crown = cyl("crown", 0.32, 0.4, (0, 0.06, 1.81), body, verts=32, rot=(math.radians(90), 0, 0))
+    p.append(cut(crown, (0, 0, 1.81), (0, 0, -1)))
+    p.append(ball("finial", 0.07, (0, 0.06, 2.15), "glow_gold", subdiv=2))
+    # The lever, on her right.
+    p.append(cyl("pivot", 0.07, 0.08, (0.47, 0.05, 1.02), "gold", verts=16, rot=(0, math.radians(90), 0)))
+    p.append(cyl("rod", 0.022, 0.48, (0.5, 0.05, 1.27), "brass", verts=10))
+    p.append(ball("knob", 0.075, (0.5, 0.05, 1.53), "red", subdiv=2))
+    join(p, name)
+    export(name)
+
+
+@prop("pc_slot")
+def pc_slot():
+    """A slot machine for a pony: a pink cabinet, three reels (an apple, a star, a gem) behind a
+    gold bezel, lit buttons, a coin tray, a lit topper with a star, and the lever."""
+    _slot("pc_slot", "magenta", "glow_pink", "glow_violet")
+
+
+@prop("pc_slot_b")
+def pc_slot_b():
+    """The slot machine's sister cabinet, in orchid and cyan, so a row reads as a row of
+    machines rather than one machine repeated."""
+    _slot("pc_slot_b", "orchid", "glow_cyan", "glow_pink")
+
+
+@prop("pc_wheel")
+def pc_wheel():
+    """The prize wheel's face, centred on its own hub so the game can turn it: the house pocket
+    and the six colour runs of four, numbered, gold pegs and a rim of bulbs."""
+    R0, R1 = 0.36, 1.8
+    cols = ["w_red", "w_orange", "w_yellow", "w_green", "w_blue", "w_violet"]
+    p = []
+    n = 25
+    for k in range(n):
+        a0 = math.pi / 2 - 2 * math.pi * (k - 0.5) / n
+        a1 = math.pi / 2 - 2 * math.pi * (k + 0.5) / n
+        col = "w_house" if k == 0 else cols[(k - 1) // 4]
+        p.append(sector("pocket%d" % k, R0, R1, a0, a1, -0.08, 0.08, col, seg=3))
+        am = (a0 + a1) / 2
+        label = "*" if k == 0 else str(k)
+        t = text_mesh("num%d" % k, label, 0.2 if k else 0.3, (math.cos(am) * 1.48, -0.1, math.sin(am) * 1.48),
+                      "white" if k else "gold", depth=0.02,
+                      rot=(math.radians(90), -(am - math.pi / 2), 0))
+        p.append(t)
+        ae = a0
+        p.append(rod("divider", (math.cos(ae) * R0, -0.09, math.sin(ae) * R0),
+                     (math.cos(ae) * R1, -0.09, math.sin(ae) * R1), 0.018, "gold", verts=6))
+        p.append(cyl("peg", 0.035, 0.16, (math.cos(ae) * 1.86, -0.08, math.sin(ae) * 1.86), "gold", verts=8,
+                     rot=(math.radians(90), 0, 0)))
+    p.append(torus("rim", 1.93, 0.09, (0, 0, 0), "gold", rot=(math.radians(90), 0, 0)))
+    for k in range(30):
+        a = 2 * math.pi * k / 30
+        p.append(ball("bulb", 0.05, (math.cos(a) * 1.93, -0.1, math.sin(a) * 1.93), "glow_bulb", subdiv=1))
+    p.append(cyl("hub", 0.36, 0.24, (0, 0, 0), "gold", verts=32, rot=(math.radians(90), 0, 0)))
+    p.append(cyl("hub_star", 0.24, 0.04, (0, -0.13, 0), "glow_pink", verts=5, rot=(math.radians(90), 0, 0)))
+    p.append(cyl("hub_star2", 0.24, 0.04, (0, -0.135, 0), "glow_pink", verts=5, rot=(math.radians(90), math.radians(36), 0)))
+    join(p, "pc_wheel")
+    export("pc_wheel")
+
+
+@prop("pc_wheel_stand")
+def pc_wheel_stand():
+    """What the wheel hangs on: two gold-trimmed plum legs, a cross brace, the axle boss, and
+    the clapper at the top that says which pocket she won. The hub sits 2.7 m up, 0.2 m in
+    front of the stand's own plane."""
+    hub = 2.7
+    p = []
+    for x in (-1.15, 1.15):
+        leg = box("leg", (0.28, 0.32, hub + 0.4), (x * 0.8, 0.3, (hub + 0.4) / 2), "plum", bevel=0.04,
+                  rot=(0, math.radians(-12 if x > 0 else 12), 0))
+        p.append(leg)
+        p.append(box("leg_trim", (0.08, 0.34, hub + 0.3), (x * 0.8, 0.3, (hub + 0.3) / 2), "gold", bevel=0.01,
+                     rot=(0, math.radians(-12 if x > 0 else 12), 0)))
+        p.append(box("foot", (0.9, 1.0, 0.2), (x * 1.15, 0.3, 0.1), "gold", bevel=0.04))
+    p.append(box("brace", (2.0, 0.24, 0.24), (0, 0.3, 1.0), "plum", bevel=0.03))
+    p.append(cyl("boss", 0.3, 0.4, (0, 0.2, hub), "gold", verts=24, rot=(math.radians(90), 0, 0)))
+    p.append(cyl("axle", 0.1, 0.5, (0, 0.0, hub), "brass", verts=12, rot=(math.radians(90), 0, 0)))
+    # The clapper: a gold arrow pointing down at the top of the rim, on a little crown.
+    top = hub + 2.08
+    p.append(box("clapper_mount", (0.5, 0.3, 0.3), (0, 0.3, top + 0.15), "plum", bevel=0.04))
+    arrow = cyl("clapper", 0.22, 0.42, (0, -0.15, top - 0.05), "gold", verts=3, r2=0.0, rot=(math.radians(180), 0, 0))
+    p.append(arrow)
+    p.append(ball("clapper_gem", 0.09, (0, -0.2, top + 0.1), "glow_pink", subdiv=2))
+    p.append(rod("arch", (-1.2, 0.3, hub + 1.6), (0, 0.3, top + 0.3), 0.07, "gold", verts=8))
+    p.append(rod("arch", (1.2, 0.3, hub + 1.6), (0, 0.3, top + 0.3), 0.07, "gold", verts=8))
+    p.append(rod("arch_post", (-1.2, 0.3, hub + 1.6), (-1.3, 0.3, hub - 0.5), 0.07, "gold", verts=8))
+    p.append(rod("arch_post", (1.2, 0.3, hub + 1.6), (1.3, 0.3, hub - 0.5), 0.07, "gold", verts=8))
+    join(p, "pc_wheel_stand")
+    export("pc_wheel_stand")
+
+
+@prop("pc_stage")
+def pc_stage():
+    """A low round stage for the wheel, plum with a gold lip and a lit edge."""
+    p = [cyl("stage", 3.2, 0.26, (0, 0, 0.13), "plum", verts=48, bevel=0.03),
+         cyl("top", 3.0, 0.03, (0, 0, 0.27), "wine", verts=48),
+         torus("lip", 3.2, 0.06, (0, 0, 0.26), "gold"),
+         torus("glow", 3.24, 0.035, (0, 0, 0.1), "glow_pink")]
+    for k in range(10):
+        a = 2 * math.pi * k / 10
+        p.append(box("ray", (2.4, 0.16, 0.01), (math.cos(a) * 1.5, math.sin(a) * 1.5, 0.29), "gold", bevel=0.0,
+                     rot=(0, 0, a)))
+    p.append(cyl("medal", 0.5, 0.02, (0, 0, 0.3), "gold", verts=24))
+    join(p, "pc_stage")
+    export("pc_stage")
+
+
+@prop("pc_blackjack")
+def pc_blackjack():
+    """A blackjack table, the house's half moon: green felt in the screen's own colour, a
+    padded rail round the curve, five card spots with a hand dealt, a chip tray and a shoe on
+    the dealer's straight edge (+Y). Top at 0.95 m."""
+    top = 0.95
+    R = 1.7
+    p = []
+    ped = cyl("pedestal", 0.45, top - 0.2, (0, -0.6, (top - 0.2) / 2 + 0.1), "plum", verts=24)
+    p.append(ped)
+    p.append(cyl("foot", 0.8, 0.12, (0, -0.6, 0.06), "gold", verts=24, bevel=0.02))
+    skirt = cyl("skirt", R - 0.05, 0.26, (0, 0, top - 0.16), "wine", verts=48)
+    p.append(cut(skirt, (0, 0.0, 0), (0, 1, 0)))
+    felt = cyl("felt", R, 0.08, (0, 0, top - 0.04), "felt", verts=48)
+    p.append(cut(felt, (0, 0.0, 0), (0, 1, 0)))
+    rail = torus("rail", R, 0.12, (0, 0, top), "leather")
+    p.append(cut(rail, (0, 0.0, 0), (0, 1, 0)))
+    trim = torus("trim", R - 0.12, 0.025, (0, 0, top - 0.05), "gold")
+    p.append(cut(trim, (0, 0.0, 0), (0, 1, 0)))
+    p.append(box("edge", (R * 2 + 0.2, 0.3, 0.16), (0, 0.12, top - 0.06), "gold", bevel=0.03))
+    arc = torus("arc", 1.0, 0.012, (0, 0, top + 0.002), "gold")
+    arc.scale = (1, 1, 0.2)
+    p.append(cut(arc, (0, -0.1, 0), (0, 1, 0)))
+    # Five spots, each with a card or two.
+    for k in range(5):
+        a = math.radians(-160 + k * 35)
+        x, y = math.cos(a) * 1.25, math.sin(a) * 1.25
+        p.append(box("spot", (0.22, 0.3, 0.004), (x, y, top + 0.002), "felt_dark", bevel=0.0, rot=(0, 0, a + math.pi / 2)))
+        if k % 2 == 0:
+            p.append(box("card", (0.15, 0.21, 0.006), (x, y, top + 0.006), "cream", bevel=0.0, rot=(0, 0, a + math.pi / 2 + 0.1)))
+            p.append(box("card", (0.15, 0.21, 0.006), (x + 0.04, y + 0.02, top + 0.012), "cream", bevel=0.0, rot=(0, 0, a + math.pi / 2 - 0.15)))
+            p.append(box("pip", (0.05, 0.05, 0.004), (x + 0.04, y + 0.02, top + 0.016), "red", bevel=0.0, rot=(0, 0, math.radians(45))))
+    # The dealer's side: the chip tray, the shoe, two dealt cards.
+    p.append(box("tray", (0.9, 0.24, 0.06), (0, -0.15, top + 0.02), "ink", bevel=0.01))
+    chip_cols = ["red", "cream", "felt", "ink", "magenta", "gold", "sky"]
+    for i in range(7):
+        p.append(cyl("chips", 0.045, 0.06, (-0.36 + i * 0.12, -0.15, top + 0.06), chip_cols[i], verts=12))
+    p.append(box("shoe", (0.22, 0.34, 0.16), (0.95, -0.18, top + 0.07), "red", bevel=0.03, rot=(0, 0, math.radians(-20))))
+    p.append(box("card", (0.15, 0.21, 0.006), (-0.25, -0.42, top + 0.004), "cream", bevel=0.0))
+    p.append(box("card_back", (0.15, 0.21, 0.006), (-0.06, -0.42, top + 0.004), "wine", bevel=0.0))
+    for i in range(3):
+        p.append(cyl("bet", 0.05, 0.03 + 0.02 * i, (math.cos(math.radians(-90 + (i - 1) * 35)) * 0.95,
+                                                    math.sin(math.radians(-90 + (i - 1) * 35)) * 0.95, top + 0.02 + 0.01 * i),
+                     chip_cols[i * 2], verts=12))
+    join(p, "pc_blackjack")
+    export("pc_blackjack")
+
+
+def _booth_counter(p, w, front, color):
+    """A counter `w` wide whose front face is at y = front, 1.05 m high, marble topped."""
+    p.append(box("counter", (w, 0.7, 1.0), (0, front + 0.35, 0.5), color, bevel=0.03))
+    p.append(box("counter_top", (w + 0.1, 0.8, 0.08), (0, front + 0.38, 1.04), "marble", bevel=0.02))
+    p.append(box("kick", (w, 0.06, 0.18), (0, front - 0.02, 0.09), "gold", bevel=0.0))
+    for k in range(int(w / 1.0)):
+        x = -w / 2 + 0.5 + k * 1.0
+        p.append(box("panel", (0.76, 0.03, 0.6), (x, front - 0.015, 0.55), "wine", bevel=0.01))
+        p.append(box("panel_dia", (0.18, 0.03, 0.18), (x, front - 0.03, 0.55), "gold", bevel=0.0, rot=(0, math.radians(45), 0)))
+
+
+def _grille(p, w, y, z0, z1, windows):
+    """Brass bars from z0 to z1 across `w`, with an arched window cut at each x in `windows`."""
+    x = -w / 2 + 0.06
+    while x < w / 2:
+        clear = any(abs(x - wx) < 0.48 for wx in windows)
+        if not clear:
+            p.append(cyl("bar", 0.022, z1 - z0, (x, y, (z0 + z1) / 2), "brass", verts=8))
+        x += 0.14
+    p.append(box("bar_top", (w, 0.08, 0.1), (0, y, z1), "gold", bevel=0.02))
+    p.append(box("bar_base", (w, 0.1, 0.08), (0, y, z0), "gold", bevel=0.02))
+    for wx in windows:
+        arch = torus("arch", 0.48, 0.05, (wx, y, z1 - 0.62), "gold", rot=(math.radians(90), 0, 0))
+        p.append(cut(arch, (wx, y, z1 - 0.62), (0, 0, -1)))
+        for sx in (-0.48, 0.48):
+            p.append(cyl("jamb", 0.05, z1 - 0.62 - z0, (wx + sx, y, (z0 + z1 - 0.62) / 2), "gold", verts=10))
+
+
+@prop("pc_cage")
+def pc_cage():
+    """The cashier's cage, where bits become chips and chips become bits again: a marble topped
+    counter, brass bars with two arched windows, shelves of chip racks behind, and a lit board
+    with a stack of chips on it. 5 m wide; the back wall's front face is at y = 0, the counter's
+    front at y = -2.6, so a pony stands between them."""
+    w = 5.0
+    p = [box("back", (w + 0.4, 0.3, 4.3), (0, 0.15, 2.15), "wine", bevel=0.03)]
+    for x in (-w / 2 - 0.1, w / 2 + 0.1):
+        p.append(box("side", (0.3, 2.9, 3.6), (x, -1.3, 1.8), "plum", bevel=0.03))
+        p.append(box("side_trim", (0.34, 0.1, 3.6), (x, -2.75, 1.8), "gold", bevel=0.02))
+    p.append(box("roof", (w + 0.6, 3.0, 0.24), (0, -1.3, 3.6), "plum", bevel=0.04))
+    p.append(box("roof_trim", (w + 0.66, 0.12, 0.3), (0, -2.8, 3.6), "gold", bevel=0.02))
+    _booth_counter(p, w, -2.6, "plum")
+    _grille(p, w, -2.3, 1.1, 3.45, [-1.25, 1.25])
+    # Behind the bars: shelves of chips in every colour.
+    chip_cols = ["red", "cream", "felt", "ink", "magenta", "gold", "sky", "orchid"]
+    for z in (1.3, 2.1):
+        p.append(box("shelf", (w - 0.4, 0.4, 0.06), (0, -0.2, z), "wood_dark", bevel=0.01))
+        for i in range(16):
+            x = -w / 2 + 0.5 + i * 0.27
+            p.append(cyl("rack", 0.08, 0.3, (x, -0.2, z + 0.18), chip_cols[(i + int(z * 3)) % len(chip_cols)], verts=12))
+    # The board above: a big gold chip and two stacks, lit round the edge.
+    p.append(box("board", (3.6, 0.12, 1.0), (0, -2.9, 4.35), "ink", bevel=0.03))
+    p += bulbs_rect(0, -2.97, 4.35, 3.7, 1.08, 13, 4, r=0.04)
+    p.append(cyl("chip", 0.38, 0.08, (0, -2.98, 4.35), "glow_gold", verts=24, rot=(math.radians(90), 0, 0)))
+    p.append(cyl("chip_in", 0.26, 0.09, (0, -2.985, 4.35), "wine", verts=24, rot=(math.radians(90), 0, 0)))
+    for k in range(8):
+        a = 2 * math.pi * k / 8
+        p.append(box("chip_notch", (0.1, 0.1, 0.06), (math.cos(a) * 0.32, -3.0, 4.35 + math.sin(a) * 0.32), "cream", bevel=0.0,
+                     rot=(0, -a, 0)))
+    for sx, col in ((-1.1, "glow_pink"), (1.1, "glow_cyan")):
+        for i in range(4):
+            p.append(cyl("stack", 0.2, 0.07, (sx, -2.98, 4.05 + i * 0.09), col if i % 2 == 0 else "cream", verts=20))
+    # A banker's lamp on the counter.
+    p.append(cyl("lamp_base", 0.1, 0.05, (1.9, -2.2, 1.1), "brass", verts=12))
+    p.append(cyl("lamp_stem", 0.02, 0.3, (1.9, -2.2, 1.25), "brass", verts=8))
+    shade = cyl("lamp_shade", 0.16, 0.3, (1.9, -2.2, 1.42), "glow_mint", verts=16, rot=(0, math.radians(90), 0))
+    p.append(cut(shade, (1.9, -2.2, 1.42), (0, 0, -1)))
+    join(p, "pc_cage")
+    export("pc_cage")
+
+
+@prop("pc_race_booth")
+def pc_race_booth():
+    """The racing window: a betting counter behind brass bars, and over it the tote board, six
+    lit lanes with their numbers, a chequered finish, and a gold horseshoe on top. Same frame
+    as the cage: back wall front at y = 0, counter front at y = -2.6."""
+    w = 4.6
+    lanes = ["w_red", "w_orange", "w_yellow", "w_green", "w_blue", "w_violet"]
+    p = [box("back", (w + 0.4, 0.3, 4.9), (0, 0.15, 2.45), "plum", bevel=0.03)]
+    for x in (-w / 2 - 0.1, w / 2 + 0.1):
+        p.append(box("side", (0.3, 2.9, 2.6), (x, -1.3, 1.3), "wine", bevel=0.03))
+        p.append(box("side_trim", (0.34, 0.1, 2.6), (x, -2.75, 1.3), "gold", bevel=0.02))
+    p.append(box("roof", (w + 0.6, 3.0, 0.2), (0, -1.3, 2.6), "wine", bevel=0.04))
+    p.append(box("roof_trim", (w + 0.66, 0.12, 0.26), (0, -2.8, 2.6), "gold", bevel=0.02))
+    _booth_counter(p, w, -2.6, "wine")
+    _grille(p, w, -2.3, 1.1, 2.45, [0.0])
+    # The tote board, on the back wall above the roof, leaning out over the counter.
+    bz, bw, bh = 3.6, 4.2, 1.8
+    p.append(box("board", (bw, 0.14, bh), (0, -0.1, bz), "ink", bevel=0.04))
+    p += bulbs_rect(0, -0.19, bz, bw + 0.1, bh + 0.1, 15, 7, r=0.04)
+    for i, col in enumerate(lanes):
+        z = bz + bh / 2 - 0.2 - i * 0.27
+        p.append(box("lane", (3.2, 0.02, 0.2), (0.15, -0.18, z), col, bevel=0.0))
+        p.append(cyl("badge", 0.12, 0.03, (-1.75, -0.19, z), "cream", verts=16, rot=(math.radians(90), 0, 0)))
+        p.append(text_mesh("lane%d" % (i + 1), str(i + 1), 0.17, (-1.75, -0.215, z), "ink", depth=0.01))
+        for c in range(2):
+            p.append(box("check", (0.1, 0.02, 0.1), (1.88 + c * 0.1, -0.19, z + (0.05 if c else -0.05)),
+                         "white" if (c + i) % 2 == 0 else "black", bevel=0.0))
+            p.append(box("check", (0.1, 0.02, 0.1), (1.88 + c * 0.1, -0.19, z + (-0.05 if c else 0.05)),
+                         "black" if (c + i) % 2 == 0 else "white", bevel=0.0))
+    shoe = torus("horseshoe", 0.45, 0.09, (0, -0.1, bz + bh / 2 + 0.55), "gold", rot=(math.radians(90), 0, 0))
+    p.append(cut(shoe, (0, 0, bz + bh / 2 + 0.38), (0, 0, -1)))
+    for k in range(5):
+        a = math.radians(20 + k * 35)
+        p.append(ball("nail", 0.04, (math.cos(a) * 0.45, -0.2, bz + bh / 2 + 0.55 + math.sin(a) * 0.45), "glow_bulb", subdiv=1))
+    join(p, "pc_race_booth")
+    export("pc_race_booth")
+
+
+@prop("pc_chandelier")
+def pc_chandelier():
+    """A gold chandelier, hung from its own origin: a chain, two rings of lit candles, crystal
+    drops, a bowl, a finial. 2.3 m from the ceiling to the lowest drop."""
+    p = [cyl("chain", 0.04, 0.9, (0, 0, -0.45), "gold", verts=8),
+         cyl("canopy", 0.3, 0.12, (0, 0, -0.06), "gold", verts=16),
+         ball("bowl", 0.36, (0, 0, -1.75), "gold", scale=(1, 1, 0.6), subdiv=3),
+         ball("finial", 0.14, (0, 0, -2.08), "glow_crystal", scale=(1, 1, 1.6), subdiv=2)]
+    for R, z, n in ((1.15, -1.55, 12), (0.72, -1.15, 8)):
+        p.append(torus("ring", R, 0.05, (0, 0, z), "gold"))
+        for k in range(n):
+            a = 2 * math.pi * k / n
+            x, y = math.cos(a) * R, math.sin(a) * R
+            p.append(cyl("cup", 0.08, 0.06, (x, y, z + 0.04), "gold", verts=10))
+            p.append(cyl("candle", 0.035, 0.16, (x, y, z + 0.15), "cream", verts=8))
+            p.append(ball("flame", 0.06, (x, y, z + 0.28), "glow_bulb", scale=(1, 1, 1.4), subdiv=1))
+            p.append(ball("drop", 0.05, (x, y, z - 0.14), "glow_crystal", scale=(1, 1, 1.8), subdiv=1))
+        for k in range(4):
+            a = 2 * math.pi * (k + 0.5) / 4
+            p.append(rod("spoke", (0, 0, -1.6), (math.cos(a) * R, math.sin(a) * R, z), 0.03, "gold", verts=6))
+    for k in range(8):
+        a = 2 * math.pi * k / 8
+        p.append(rod("swag", (math.cos(a) * 0.72, math.sin(a) * 0.72, -1.15), (math.cos(a) * 1.15, math.sin(a) * 1.15, -1.55),
+                     0.015, "glow_crystal", verts=5))
+    join(p, "pc_chandelier")
+    export("pc_chandelier")
+
+
+def _doors(p, w, h, y, glass):
+    """Two padded leaves `w` across and `h` tall, faces at y, studded in gold, round portholes
+    of `glass`, gold push plates, and a lit seam between them."""
+    leaf = w / 2 - 0.03
+    for sx in (-1, 1):
+        cx = sx * (leaf / 2 + 0.03)
+        p.append(box("leaf", (leaf, 0.14, h), (cx, y + 0.07, h / 2), "velvet", bevel=0.04))
+        for i in range(3):
+            for j in range(5):
+                zx = cx - leaf / 2 + leaf * (i + 0.5) / 3
+                zz = 0.35 + (h - 1.2) * j / 4
+                if j >= 3 and i == 1:
+                    continue
+                p.append(ball("stud", 0.03, (zx, y - 0.005, zz), "gold", subdiv=1))
+        p.append(cyl("porthole_rim", 0.24, 0.06, (cx, y - 0.01, h - 0.62), "gold", verts=24, rot=(math.radians(90), 0, 0)))
+        p.append(cyl("porthole", 0.19, 0.07, (cx, y - 0.015, h - 0.62), glass, verts=24, rot=(math.radians(90), 0, 0)))
+        p.append(box("push", (0.08, 0.05, 0.5), (sx * 0.16, y - 0.02, 1.1), "gold", bevel=0.02))
+    p.append(box("seam", (0.04, 0.1, h - 0.1), (0, y + 0.05, h / 2), glass, bevel=0.0))
+
+
+@prop("pc_exit_door")
+def pc_exit_door():
+    """The way back out, inside the hall: velvet doors in a gold arch, a sunburst fanlight over
+    them, warm daylight in the portholes, and a lit star on the keystone. The opening is 2.6 m
+    by 3.4 m; faces -Y."""
+    w, h = 2.6, 3.4
+    p = []
+    _doors(p, w, h, -0.12, "glow_warm")
+    for sx in (-1, 1):
+        p.append(box("jamb", (0.42, 0.34, h + 0.2), (sx * (w / 2 + 0.21), -0.05, (h + 0.2) / 2), "gold", bevel=0.04))
+        p.append(box("jamb_in", (0.2, 0.36, h), (sx * (w / 2 + 0.21), -0.06, h / 2), "wine", bevel=0.02))
+    fan = cyl("fan", w / 2, 0.1, (0, -0.04, h + 0.1), "glow_warm", verts=32, rot=(math.radians(90), 0, 0))
+    p.append(cut(fan, (0, 0, h + 0.1), (0, 0, -1)))
+    for k in range(7):
+        a = math.pi * (k + 0.5) / 7
+        p.append(rod("ray", (0, -0.1, h + 0.1), (math.cos(a) * (w / 2 - 0.05), -0.1, h + 0.1 + math.sin(a) * (w / 2 - 0.05)),
+                     0.025, "gold", verts=6))
+    arch = torus("arch", w / 2 + 0.2, 0.2, (0, -0.06, h + 0.1), "gold", rot=(math.radians(90), 0, 0))
+    p.append(cut(arch, (0, 0, h + 0.1), (0, 0, -1)))
+    p.append(box("lintel", (w + 0.8, 0.36, 0.22), (0, -0.05, h + 0.11), "gold", bevel=0.03))
+    p.append(cyl("key_star", 0.22, 0.06, (0, -0.28, h + w / 2 + 0.35), "glow_gold", verts=5, rot=(math.radians(90), 0, 0)))
+    p.append(cyl("key_star2", 0.22, 0.06, (0, -0.285, h + w / 2 + 0.35), "glow_gold", verts=5, rot=(math.radians(90), math.radians(36), 0)))
+    p.append(box("mat", (w + 0.4, 1.2, 0.02), (0, -0.8, 0.01), "palace_red", bevel=0.0))
+    join(p, "pc_exit_door")
+    export("pc_exit_door")
+
+
+@prop("pc_palace_doors")
+def pc_palace_doors():
+    """The Palace's own front doors, out on the Strip, for the doorway the facade always had:
+    velvet leaves, gold studs, portholes that glow when the house is open. 3.1 m by 2.9 m;
+    faces -Y."""
+    p = []
+    _doors(p, 3.1, 2.9, 0.0, "glow_warm")
+    p.append(box("header", (3.3, 0.2, 0.16), (0, 0.06, 2.98), "gold", bevel=0.03))
+    join(p, "pc_palace_doors")
+    export("pc_palace_doors")
+
+
+@prop("pc_rope")
+def pc_rope():
+    """A velvet rope between two gold posts, 2.6 m apart along X, for the queue at the door."""
+    p = []
+    for x in (-1.3, 1.3):
+        p += [cyl("foot", 0.18, 0.05, (x, 0, 0.025), "gold", verts=16, bevel=0.01),
+              cyl("post", 0.035, 0.92, (x, 0, 0.5), "gold", verts=10),
+              ball("top", 0.07, (x, 0, 0.99), "gold", subdiv=2)]
+    pts = []
+    for k in range(9):
+        t = k / 8
+        pts.append((-1.25 + 2.5 * t, 0, 0.88 - 0.28 * math.sin(math.pi * t)))
+    p += tube("rope", pts, 0.035, "palace_red")
+    join(p, "pc_rope")
+    export("pc_rope")
+
+
+@prop("pc_palm")
+def pc_palm():
+    """A potted palm, because every casino has one: a gold urn, a ringed trunk, eight fronds."""
+    p = [cyl("urn", 0.4, 0.6, (0, 0, 0.3), "gold", verts=20, r2=0.3, bevel=0.03),
+         torus("urn_lip", 0.42, 0.05, (0, 0, 0.6), "gold"),
+         cyl("soil", 0.38, 0.04, (0, 0, 0.6), "wood_dark", verts=20)]
+    for i in range(6):
+        p.append(cyl("trunk", 0.12 - i * 0.008, 0.24, (0.02 * i, 0, 0.72 + i * 0.22), "bark", verts=10, bevel=0.02))
+    top = (0.12, 0, 1.85)
+    for k in range(8):
+        a = 2 * math.pi * k / 8
+        tip = (top[0] + math.cos(a) * 1.0, math.sin(a) * 1.0, top[2] - 0.35 - 0.15 * (k % 2))
+        mid = ((top[0] + tip[0]) / 2, (top[1] + tip[1]) / 2, top[2] + 0.08)
+        f = ball("frond", 0.55, mid, "leaf" if k % 2 else "leaf_dark", scale=(1.0, 0.25, 0.08), subdiv=2)
+        f.rotation_euler = (0, math.radians(14), a)
+        p.append(f)
+    p.append(ball("crown", 0.16, top, "leaf_dark", subdiv=2))
+    join(p, "pc_palm")
+    export("pc_palm")
+
+
+def _star_points(cx, cz, ro, ri, n=5):
+    pts = []
+    for k in range(n * 2):
+        a = math.pi / 2 + math.pi * k / n
+        r = ro if k % 2 == 0 else ri
+        pts.append((cx + math.cos(a) * r, 0, cz + math.sin(a) * r))
+    return pts
+
+
+@prop("pc_neon_star")
+def pc_neon_star():
+    """A neon star for the wall: a pink outline round a cyan one, on a thin plum back plate."""
+    p = [box("plate", (2.4, 0.06, 2.3), (0, 0.05, 0), "plum_dark", bevel=0.02)]
+    p += tube("outer", _star_points(0, -0.05, 1.05, 0.45), 0.04, "glow_pink", closed=True)
+    p += tube("inner", _star_points(0, -0.05, 0.72, 0.3), 0.035, "glow_cyan", closed=True)
+    for k in range(5):
+        a = math.pi / 2 + 2 * math.pi * k / 5
+        p.append(ball("tip", 0.06, (math.cos(a) * 1.05, -0.02, -0.05 + math.sin(a) * 1.05), "glow_bulb", subdiv=1))
+    join(p, "pc_neon_star")
+    export("pc_neon_star")
+
+
+@prop("pc_neon_shoe")
+def pc_neon_shoe():
+    """A lucky horseshoe in neon for the side walls, gold tube inside pink."""
+    p = [box("plate", (2.0, 0.06, 2.0), (0, 0.05, 0), "plum_dark", bevel=0.02)]
+    for R, r, col in ((0.8, 0.045, "glow_pink"), (0.6, 0.04, "glow_gold")):
+        pts = []
+        for k in range(15):
+            a = math.radians(-50 + k * (280 / 14))
+            pts.append((math.cos(a) * R, 0, 0.05 + math.sin(a) * R))
+        p += tube("shoe", pts, r, col)
+    for k in range(6):
+        a = math.radians(-30 + k * 48)
+        p.append(ball("nail", 0.05, (math.cos(a) * 0.7, -0.03, 0.05 + math.sin(a) * 0.7), "glow_bulb", subdiv=1))
+    join(p, "pc_neon_shoe")
+    export("pc_neon_shoe")
 
 
 def main():

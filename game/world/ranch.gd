@@ -1027,6 +1027,12 @@ func _ready() -> void:
 		if seated_building != null:
 			seat_height = seated_building.seat_ground(Callable(terrain, "height_at"))
 		PropsScript.seat(node, seat_height)
+	# The marquee was hung over an unseated Palace; hang it over the seated door
+	# (Strip.rehang_marquee()).
+	var seated_palace := get_node_or_null(^"Buildings/Palace") as Building
+	if seated_palace != null and strip != null and strip.has_method("rehang_marquee"):
+		strip.call("rehang_marquee", seated_palace.floor_top_y(),
+			seated_palace.global_position.y + seated_palace.ridge_height)
 
 	# THE VENDOR AND THE TELLER, right after the buildings that give them their doors are
 	# seated: _stand_attendants() reads the live building nodes' global_position/depth, so
@@ -1096,6 +1102,7 @@ func _ready() -> void:
 	_stand_request_board()
 	_stand_place_signs()
 	_stand_palace_facade()
+	_stand_palace_doors()
 
 	await _boot_beat(0.37, "Opening the shops")
 	var prop_count: int = buildings.get_child_count()
@@ -3723,7 +3730,8 @@ func _sound_call(method: StringName, args: Array) -> void:
 
 func _update_sound_zone() -> void:
 	var zone: StringName = SoundScript.ZONE_NONE
-	if casino_menu != null and casino_menu.has_method("is_open") and bool(casino_menu.is_open()):
+	if _in_palace or (casino_menu != null and casino_menu.has_method("is_open")
+			and bool(casino_menu.is_open())):
 		zone = SoundScript.ZONE_CASINO
 	elif player != null:
 		var region: RegionData = _regions_registry().by_id(StripScript.REGION_ID)
@@ -4487,6 +4495,17 @@ func interaction_candidates() -> Array[Dictionary]:
 	if player == null:
 		return out
 	var at: Vector3 = player.global_position
+	# INSIDE THE PALACE ONLY THE HALL IS OFFERED. Everything else on the map is measured in the
+	# XZ plane, and the hall is under the Strip, so the Palace's own door, the townsfolk and
+	# Tumble waiting on the steps would all be "in reach" of a player sixty metres below them.
+	# A closed house offers only the way out.
+	if _in_palace:
+		if palace_interior == null:
+			return out
+		for c: Dictionary in palace_interior.candidates(at):
+			if casino_can_enter() or int(c["kind"]) == InteractionScript.Kind.PALACE_EXIT:
+				out.append(c)
+		return out
 	for slot in _plot_slots():
 		if not (player in slot.get_overlapping_bodies()):
 			continue
@@ -4634,9 +4653,11 @@ func perform_interaction(action: Dictionary) -> bool:
 				return false
 			return bool(depot_menu.open())
 		InteractionScript.Kind.PALACE:
-			if casino_menu == null or not casino_menu.has_method("open"):
-				return false
-			return bool(casino_menu.open())
+			return enter_palace()
+		InteractionScript.Kind.PALACE_STATION:
+			return _open_palace_station(String(action.get("subject", "")))
+		InteractionScript.Kind.PALACE_EXIT:
+			return exit_palace()
 		InteractionScript.Kind.TALK:
 			return people != null and people.talk(String(action.get("subject", "")))
 	return false
@@ -4683,6 +4704,15 @@ func _update_interaction() -> void:
 	_paint_plots(action)
 	var hud := get_node_or_null(^"HUD")
 	# The Scoop Launcher (world/ranch_tools.gd) speaks only when the ranch has nothing to say.
+	# Neither it nor Act Three's places speak in the Palace's hall, for interaction_candidates()'
+	# own reason: they measure the map, and the hall is under it.
+	if _in_palace or _palace_moving:
+		if hud != null and hud.has_method("set_prompt"):
+			hud.set_prompt("" if _palace_moving else InteractionScript.prompt_for(action,
+				InputDeviceScript.hint(&"interact")))
+		if not action.is_empty() and fresh and not _palace_moving:
+			perform_interaction(action)
+		return
 	if action.is_empty() and tools != null and _no_other_menu_open():
 		var launch := tools.offer(InputDeviceScript.hint(&"interact"))
 		if launch != "":
@@ -4937,6 +4967,7 @@ func _physics_process(delta: float) -> void:
 	# AFTER the interaction pass, so a ban that landed this frame shuts a door the resolver
 	# would otherwise have just opened. See enforce_casino_ban().
 	enforce_casino_ban()
+	enforce_palace_ban()
 	_update_gate_prompt()
 	_update_sound_zone()
 	if _game_state == null:
@@ -5170,6 +5201,284 @@ func _stand_palace_facade() -> void:
 	var stood: int = facade.build(palace.width * 0.5, palace.depth * 0.5,
 		palace.door_width * 0.5, out_dir)
 	print("RANCH palace facade pieces=%d neon=%d" % [stood, facade.neon_count()])
+
+
+# --- the Spectra Palace, inside (owner playtest 2026-10-25, DECISIONS.md 2026-10-26) --------
+#
+# "spectra palace not real yet? weird sign you gotta walk through to get in". E at the door
+# used to raise the full screen lobby; now the door is a door. Walking into it, or E in front
+# of it, fades to black and stands her inside game/world/palace_interior.gd's hall, which is
+# built into THIS scene sixty metres under the Palace and is never unloaded: the visit moves
+# the player and nothing else, so the bag, the pens, the herd, the clock and the bits are the
+# ones she walked in with. Each station in the hall opens the casino screens that already
+# exist, straight at its own game; the doors inside fade her back out onto the Palace steps.
+#
+# THE RULES casino_menu.open() kept still hold, at the door rather than behind it:
+# casino_can_enter() is asked before she is let in (the grand opening, and the ban seam), the
+# stations are not offered while it says no, and enforce_palace_ban() walks her out if it
+# starts saying no while she is inside.
+
+const PalaceInteriorScript := preload("res://world/palace_interior.gd")
+const ToonStylerScript := preload("res://systems/toon_styler.gd")
+## How far under the Palace's own origin the hall's floor is. Deep enough that the hall's roof
+## (PalaceInterior.HEIGHT) is well under the deepest the valley floor gets, and that no wild
+## pony's notice sphere above reaches down to her.
+const PALACE_INTERIOR_DEPTH := 60.0
+## Where the Palace's front doors stand, as metres in from the shell's front plane (its local
+## z = depth / 2): the face of the model's dark door recess, measured off the worn model.
+const PALACE_DOOR_INSET := 0.78
+## How far out from the shell's front plane she is stood when she comes back out: on the top
+## of the steps, clear of the doorway's own trigger.
+const PALACE_STEP_OUT := 0.95
+const PALACE_FADE_OUT := 0.22
+const PALACE_FADE_IN := 0.4
+const PALACE_CLOSED_LINE := "The Spectra Palace opens on its grand opening day. Watch the post for the flyer."
+
+var palace_interior: PalaceInterior = null
+var _in_palace := false
+var _palace_moving := false
+var _palace_fade: CanvasLayer = null
+var _palace_fade_rect: ColorRect = null
+var _palace_told_closed := false
+
+
+func is_in_palace() -> bool:
+	return _in_palace
+
+
+## The doors in the doorway, the slab behind them that stops her walking into the model, and
+## the trigger in front of them that is the way in. Children of the Palace, so they stand
+## wherever it was seated.
+func _stand_palace_doors() -> void:
+	var palace := get_node_or_null(^"Buildings/Palace") as Building
+	if palace == null or palace.door_width <= 0.001:
+		return
+	var floor_y: float = BuildingScript.FLOOR_TOP
+	var face_z: float = palace.depth * 0.5 - PALACE_DOOR_INSET
+	var doors_path := "res://assets/models/pc_palace_doors.glb"
+	if ResourceLoader.exists(doors_path):
+		var doors: Node3D = (load(doors_path) as PackedScene).instantiate()
+		doors.name = "Doors"
+		palace.add_child(doors)
+		doors.position = Vector3(0.0, floor_y, face_z)
+		ToonStylerScript.style(doors, &"building")
+	var stop := StaticBody3D.new()
+	stop.name = "DoorStop"
+	stop.collision_layer = LayersScript.PROPS
+	stop.collision_mask = 0
+	var stop_shape := CollisionShape3D.new()
+	var stop_box := BoxShape3D.new()
+	stop_box.size = Vector3(palace.door_width + 0.4, 3.2, 0.3)
+	stop_shape.shape = stop_box
+	stop.add_child(stop_shape)
+	palace.add_child(stop)
+	stop.position = Vector3(0.0, floor_y + 1.6, face_z - 0.15)
+	var area := Area3D.new()
+	area.name = "DoorThreshold"
+	area.collision_layer = 0
+	area.collision_mask = LayersScript.PLAYER
+	var area_shape := CollisionShape3D.new()
+	var area_box := BoxShape3D.new()
+	area_box.size = Vector3(palace.door_width - 0.2, 2.4, 0.9)
+	area_shape.shape = area_box
+	area.add_child(area_shape)
+	palace.add_child(area)
+	area.position = Vector3(0.0, floor_y + 1.2, face_z + 0.5)
+	area.body_entered.connect(_on_palace_threshold)
+	area.body_exited.connect(func(body: Node3D) -> void:
+		if body == player:
+			_palace_told_closed = false)
+
+
+## Where the doorway's trigger is, in world space: for a test that walks her in.
+func palace_threshold_point() -> Vector3:
+	var palace := get_node_or_null(^"Buildings/Palace") as Building
+	if palace == null:
+		return Vector3.ZERO
+	return palace.to_global(Vector3(0.0, BuildingScript.FLOOR_TOP + 0.1,
+		palace.depth * 0.5 - PALACE_DOOR_INSET + 0.45))
+
+
+func _on_palace_threshold(body: Node3D) -> void:
+	if body != player or _in_palace or _palace_moving:
+		return
+	if not casino_can_enter():
+		if not _palace_told_closed:
+			_palace_told_closed = true
+			_deny(PALACE_CLOSED_LINE)
+		return
+	if not _no_other_menu_open():
+		return
+	enter_palace()
+
+
+## BUILD THE HALL, ONCE. Lazily, on the first way in, behind the black of the fade: the hall is
+## about seventy models and a dozen dressed ponies, and a player who never goes in should not
+## pay for them at boot. Public so test_scale and the capture script can ask for it.
+func ensure_palace_interior() -> PalaceInterior:
+	if palace_interior != null:
+		return palace_interior
+	var palace := get_node_or_null(^"Buildings/Palace") as Node3D
+	var at: Vector3 = palace.global_position if palace != null else Vector3.ZERO
+	palace_interior = PalaceInteriorScript.new()
+	palace_interior.name = "PalaceInterior"
+	add_child(palace_interior)
+	palace_interior.global_position = Vector3(at.x, at.y - PALACE_INTERIOR_DEPTH, at.z)
+	palace_interior.build(spawner.pony_dir if spawner != null else "res://data/ponies")
+	palace_interior.visible = false
+	palace_interior.exit_walked_into.connect(func() -> void:
+		if _in_palace and not _palace_moving and _no_other_menu_open():
+			exit_palace())
+	return palace_interior
+
+
+## IN. `instant` skips the fade (gates, tests, the capture script); a run with nobody
+## watching is always instant. Returns whether she is on her way in.
+func enter_palace(instant: bool = false) -> bool:
+	if _in_palace or _palace_moving or player == null:
+		return false
+	if not casino_can_enter() or not _no_other_menu_open():
+		return false
+	if instant or not _interactive:
+		_move_into_palace()
+		return true
+	_palace_walk(true)
+	return true
+
+
+## OUT, back onto the Palace steps facing the Strip.
+func exit_palace(instant: bool = false) -> bool:
+	if not _in_palace or _palace_moving or player == null:
+		return false
+	if instant or not _interactive:
+		_move_out_of_palace()
+		return true
+	_palace_walk(false)
+	return true
+
+
+## THE BAN WALKS HER OUT. enforce_casino_ban() shuts any table she is sitting at; this puts
+## her back on the steps, at once rather than behind a fade, because the house is not asking.
+func enforce_palace_ban() -> bool:
+	if not _in_palace or casino_can_enter():
+		return false
+	enforce_casino_ban()
+	_move_out_of_palace()
+	_toast("The Palace has shown you the door.")
+	return true
+
+
+func _palace_walk(inside: bool) -> void:
+	_palace_moving = true
+	await _palace_fade_to(1.0, PALACE_FADE_OUT)
+	if inside:
+		_move_into_palace()
+	else:
+		_move_out_of_palace()
+	# A few frames under the black: the hall's materials compile on their first draw, and the
+	# camera's arm settles against the new walls before anybody sees it.
+	for i in 4:
+		await get_tree().process_frame
+	await _palace_fade_to(0.0, PALACE_FADE_IN)
+	_palace_moving = false
+
+
+func _palace_fade_to(alpha: float, secs: float) -> void:
+	if _palace_fade == null:
+		_palace_fade = CanvasLayer.new()
+		_palace_fade.name = "PalaceFade"
+		_palace_fade.layer = 90
+		_palace_fade_rect = ColorRect.new()
+		_palace_fade_rect.color = Color(0.05, 0.02, 0.07, 0.0)
+		_palace_fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_palace_fade_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_palace_fade.add_child(_palace_fade_rect)
+		add_child(_palace_fade)
+	var tw := create_tween()
+	tw.tween_property(_palace_fade_rect, "color:a", alpha, secs)
+	await tw.finished
+
+
+func _move_into_palace() -> void:
+	ensure_palace_interior()
+	_in_palace = true
+	palace_interior.visible = true
+	palace_interior.set_active(true)
+	_place_player(palace_interior.to_global(PalaceInteriorScript.ARRIVAL),
+		palace_interior.global_rotation.y + PalaceInteriorScript.ARRIVAL_YAW)
+	_palace_indoors(true)
+	if people != null:
+		people.park_companions(_palace_step_point())
+	_novelty("area", "palace_hall", "Inside the Spectra Palace")
+
+
+func _move_out_of_palace() -> void:
+	_in_palace = false
+	if palace_interior != null:
+		palace_interior.set_active(false)
+		palace_interior.visible = false
+	var palace := get_node_or_null(^"Buildings/Palace") as Node3D
+	var out_dir: Vector3 = palace.global_basis.z if palace != null else Vector3.BACK
+	out_dir.y = 0.0
+	_place_player(_palace_step_point(), atan2(-out_dir.x, -out_dir.z))
+	_palace_indoors(false)
+	if people != null:
+		people.unpark_companions()
+
+
+## The top of the Palace steps, just clear of the doorway, in world space.
+func _palace_step_point() -> Vector3:
+	var palace := get_node_or_null(^"Buildings/Palace") as Building
+	if palace == null:
+		return player_spawn.global_position
+	return palace.to_global(Vector3(0.0, BuildingScript.FLOOR_TOP + 0.15,
+		palace.depth * 0.5 + PALACE_STEP_OUT))
+
+
+func _place_player(at: Vector3, yaw: float) -> void:
+	player.global_position = at
+	player.velocity = Vector3.ZERO
+	if player.has_method("face"):
+		player.call("face", yaw)
+	if _rig != null:
+		_rig.global_rotation.y = yaw
+	player.reset_physics_interpolation()
+
+
+## Everything that is "outside" for as long as she is in: the sun and the rain (the sky rig),
+## the camera's terrain guard, the compass strip on the HUD (it points at places across a
+## valley she cannot see from in here).
+func _palace_indoors(on: bool) -> void:
+	if _rig != null:
+		_rig.set("ground_guard", not on)
+	if sky_rig != null and sky_rig.has_method("set_indoors"):
+		sky_rig.call("set_indoors", on)
+	var compass := get_node_or_null(^"HUD/Compass") as CanvasItem
+	if compass != null:
+		compass.visible = not on
+
+
+## E at a station: the casino screen that already exists, straight at that game. The cage is a
+## page of the lobby panel, so it opens the lobby and turns to it; the four games open their
+## own panels exactly as the lobby's rows did.
+func _open_palace_station(id: String) -> bool:
+	if not casino_can_enter():
+		return false
+	match id:
+		"cage":
+			if casino_menu == null or not bool(casino_menu.open()):
+				return false
+			casino_menu.call("set_tab", CasinoMenuScript.Tab.CAGE)
+			return true
+		"slots":
+			return slots_menu != null and bool(slots_menu.call("open"))
+		"wheel":
+			return wheel_menu != null and bool(wheel_menu.call("open"))
+		"blackjack":
+			return blackjack_menu != null and bool(blackjack_menu.call("open"))
+		"racing":
+			return race_menu != null and bool(race_menu.call("open"))
+	return false
 
 
 func _stand_one(registry: PonyRegistry, who: String, building_path: NodePath,

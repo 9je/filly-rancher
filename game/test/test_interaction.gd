@@ -115,7 +115,7 @@ func test_the_prompt_names_the_verb_for_every_kind() -> void:
 		InteractionScript.Kind.MARKET: "E: Market, sell gems",
 		InteractionScript.Kind.BOARD: "E: read the board",
 		InteractionScript.Kind.DEPOT: "E: Depot, deliver and pay",
-		InteractionScript.Kind.PALACE: "E: Spectra Palace",
+		InteractionScript.Kind.PALACE: "E: go into the Spectra Palace",
 	}
 	for kind: int in expected:
 		assert_eq(InteractionScript.prompt_for(

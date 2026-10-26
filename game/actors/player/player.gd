@@ -675,6 +675,13 @@ func _update_facing(direction: Vector3, delta: float) -> void:
 	visuals.rotation.y = lerp_angle(visuals.rotation.y, _visual_yaw, weight)
 
 
+## Turn her to face world heading `yaw` (radians, -Z forward) at once, with no smoothing: for
+## when she is put somewhere rather than walked there (the Palace's doors, ranch.gd).
+func face(yaw: float) -> void:
+	_visual_yaw = yaw
+	visuals.rotation.y = yaw
+
+
 ## Pick `idle` / `walk` / `gallop` and scale playback so the gait matches the ground.
 ## Both decisions are Gait's -- deliberately not an if-ladder over speed constants here,
 ## because this is the third scene that would have needed editing when the gallop clip
