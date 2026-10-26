@@ -621,6 +621,53 @@ func _physics_process(delta: float) -> void:
 	_swing_gate(delta)
 
 
+func _process(_delta: float) -> void:
+	var cam := get_viewport().get_camera_3d() if is_inside_tree() else null
+	if cam != null:
+		clear_lens(cam.global_position)
+
+
+## TIMBER AGAINST THE LENS IS NOT DRAWN (render review 2026-10-26: at the gate a post a hand
+## from the camera filled a third of the screen; the arm's sweep only looks along its own
+## line, so a post beside the lens is not "in the way" to it). Purely visual: every collider
+## is _add_barrier()'s and stays put.
+const LENS_CLEAR_M := 0.75
+var _lens_hidden: Array[MeshInstance3D] = []
+var _timber: Array[MeshInstance3D] = []
+
+
+func clear_lens(lens: Vector3) -> void:
+	var local := to_local(lens)
+	var reach := HALF_EXTENT + 1.5
+	if absf(local.x) > reach or absf(local.z) > reach or local.y > FENCE_HEIGHT + 2.0:
+		if not _lens_hidden.is_empty():
+			for m in _lens_hidden:
+				if is_instance_valid(m):
+					m.visible = true
+			_lens_hidden.clear()
+		return
+	if _timber.is_empty():
+		for n: Node in find_children("*", "MeshInstance3D", true, false):
+			var nm := String(n.name)
+			if nm.contains("Post") or nm.contains("Rail") or nm.contains("Header") \
+					or nm.contains("GateBar"):
+				_timber.append(n as MeshInstance3D)
+	var now: Array[MeshInstance3D] = []
+	for m in _timber:
+		if not is_instance_valid(m):
+			continue
+		var box := m.global_transform * m.get_aabb()
+		var nearest := lens.clamp(box.position, box.end)
+		var hide := nearest.distance_to(lens) < LENS_CLEAR_M
+		m.visible = not hide
+		if hide:
+			now.append(m)
+	for m in _lens_hidden:
+		if is_instance_valid(m) and not (m in now):
+			m.visible = true
+	_lens_hidden = now
+
+
 ## Ease the leaf toward open or shut, depending on whether the player is at the gateway.
 ##
 ## PURELY VISUAL. The collider this is drawn over never moves, so nothing about containment

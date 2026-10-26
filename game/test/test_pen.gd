@@ -860,3 +860,24 @@ func test_a_padlocked_pen_makes_no_gems_and_keeps_its_ponies() -> void:
 	assert_eq(pen.count(), 1, "and nobody is taken")
 	pen.set_padlocked(false)
 	assert_gt(pen.tick(120.0), 0, "paying gives the pen back")
+
+
+## A POST AGAINST THE LENS STEPS ASIDE (render review 2026-10-26: at the gate a fence post a
+## hand from the camera filled a third of the screen). Timber within LENS_CLEAR_M of the lens
+## is not drawn; the rest of the fence is, and the colliders never move.
+func test_timber_against_the_lens_is_not_drawn() -> void:
+	var pen: Pen = PenScript.new()
+	pen.slot_id = &"slot_lens"
+	add_child_autofree(pen)
+	pen.build_shell()
+	var post := pen.find_child("Side0Post*", true, false) as MeshInstance3D
+	assert_not_null(post, "sanity: a post to stand by")
+	pen.clear_lens(post.global_position + Vector3(0, 0, 0.2))
+	assert_false(post.visible, "the post at the lens goes")
+	var far := 0
+	for m: Node in pen.find_children("*Rail*", "MeshInstance3D", true, false):
+		if (m as MeshInstance3D).visible:
+			far += 1
+	assert_gt(far, 4, "the rest of the fence stays")
+	pen.clear_lens(pen.global_position + Vector3(30, 2, 30))
+	assert_true(post.visible, "and it comes back when the lens moves off")

@@ -453,3 +453,15 @@ through to get in".
 - **SCALE.md** gains two categories (interior 2.5-4.5 PH: the hall and its columns;
   fixture 0.3-1.5 PH: the chandeliers) and a row for every pc_* piece. The racing booth's
   horseshoe was lowered to fit stall's 2.5 PH (it measured 2.55).
+
+## 2026-10-26 -- the second overnight pass: endings, wayfinding, feel, one art language
+Owner asked for a pass on four gaps: art that reads as one style, animation and feel, wayfinding and onboarding, and endings that block. (Licensing is out of scope for good.)
+- **lights_out was a real bug, not the bot's.** The Act Three sites (Dye Vat, pylons, corrals) speak only when the ranch offers nothing, and a companion at your heels counted as something, so Tumble or Pip took E at the Vat for good. A companion now steps aside for a site in reach, exactly as she already did for a building.
+- **gray_gold stalled on a pony the bot could not reach** (a Drifter inside the locked Everfree), chased for six hours. The bot now gives up on a pony it cannot close on for three minutes and says where she was. The game was right: the region needs a permit.
+- **"Catch a pony" never ticked.** The board was told of a catch only for named ponies; in the first minutes every pony is a Drifter. The board now hears of every catch; only the Compendium skips the crowd.
+- **The guide, not a quest marker.** One rule-based goal at a time (systems/guide.gd): a full bag, then the mail, then news, then the three lessons. Past the lessons it speaks only for things that are waiting, so it guides rather than nags. Shown as a short drifting trail of star motes on the ground and a gold-ringed icon on the compass, pinned to the strip's end when behind her. No floating words or arrows, per the owner's bar. Settings > Gameplay > Show the way.
+- **One UI language.** Every menu frame is now the HUD card's language in Palace plum: violet outline, round corners, soft shadow. The black slab is gone. Market tiles end their one line properly and name their kind, and a detail strip shows the pick in full with a Buy button: a cut-off description was why upgrades read as unclear.
+- **Feel at the two verbs you do most.** A catch: her ghost arcs into the Scoop (stretch, shrink), then pop, Scoop squash, camera kick. A pen: she flies out of the Scoop over the rail, grows, lands with a squash and a puff. The camera gained a trauma shake (centimetres, gone in a second, toggle in Settings).
+- **Paddocks and region borders are cartoon timber** (round posts with caps, rounded rails, warm wood, toon shading and ink) instead of untextured boxes: the most-seen object in the game was the least show-like.
+- **A sign in the way is gone, not half gone.** Half faded it drew as a grey or dark sheet across the screen at the pen's gate. A board between the lens and her fades at any distance, and past 0.85 it is not drawn.
+- **Not done, logged:** thin fence posts beside the lens can still fill a corner of the screen (the arm sweeps only along its own line; a near-lens fade for props is the fix); the walk sound; a bits sink after the ending.

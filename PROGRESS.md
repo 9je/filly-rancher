@@ -171,3 +171,11 @@ Canon MLP stays: real names, looks and places ("lean into mlp fully", private bu
 - **Not yet done:** the owner has not walked it; no music or ambience of its own beyond the casino zone the Strip already had.
 - **Merged: the Spectra Palace walk-in hall** (f9c7f21). After the merge the gates pass: GUT 1835 of 1835, real-input 17 of 17 (palace_interior included), and the owner's logs are untouched. Renders are in build/playtest_evidence/round2/palace_interior_*.png.
 - **Exports rebuilt** at 01:48 with 0 export errors (Linux and Windows). The Linux build ran on the GPU invisibly with isolated saves and exited cleanly (rc 0); it printed only the two known engine messages (render-thread finalize, empty image).
+
+### 2026-10-26 (day): endings, wayfinding, feel, one look (DECISIONS.md)
+- **Endings:** lights_out fixed (a companion no longer takes E from the Dye Vat); gray_gold passes (the bot stops chasing a pony behind a locked fence). Passing runs: brightest_rainbow 0:33, half_light 0:42, placement (1d56e0d); lights_out 0:42:43, gray_gold 0:41:54 (3d32705).
+- **"Catch a pony" ticks** on a Drifter (test_tutorial_catch).
+- **The guide:** a star trail on the ground and a lit compass icon toward the next thing waiting (test_guide). Settings > Show the way.
+- **Menus:** one plum card frame for every menu; Market detail strip with the full description and a Buy button (round3/menu_market_buy_detail.png).
+- **Feel:** catch ghost into the Scoop with pop, squash and camera kick; penned ponies fly in and land; camera trauma shake with a setting.
+- **Art:** paddocks and region borders are round, toon-shaded timber; the checklist card shrinks with its list; signs in the way vanish cleanly.
