@@ -154,4 +154,12 @@ Canon MLP stays: real names, looks and places ("lean into mlp fully", private bu
 - **Roads with a clean edge and some wear.** Half-width 1.5 m with a 0.35 m edge (was 1.1 m and 1.3 m), plus a lighter crown, cart ruts and pebbles in the shader. Spawn views are in build/playtest_evidence/round3/spawn_view_*.png.
 - **test_race_parts:** every donor, in every race it can wear, shows only its race's parts. It passed at once (the "Unicorn with wings" card was most likely her tail).
 - **Every tool script passes --log-file.**
+- **Dawn re-lit:** every new game opens at dawn, which read as a lavender haze. Now it is a soft blue sky with green grass (spawn_view_dawn_relit_*.png).
+- **Menus as casino-style tiles:** the Market, the Depot and the Build menu are plum tiles with drawn icons (game/ui/shop_icon.gd, tile_style.gd), scrolled to fit. The Market's BUY list used to run off the screen at 1280x720, and its tabs could not be clicked. Renders: round3/menu_*.png.
+- **Smaller fixes:**
+  - The receipt toast names the balance ("300 bits off your balance, 24,100 to go").
+  - Shop signs fade when the camera comes close.
+  - Getting started is a ticked checklist.
+  - The Strip's lamp posts have lamps.
+  - The bot takes --shots=<dir> for frame-by-frame review.
 - **The Spectra Palace walk-in interior** is being built on its own branch.
