@@ -11,7 +11,7 @@ const KINDS: Array[StringName] = [&"hay", &"carrot", &"apple", &"daisy", &"daffo
 	&"gem_chute", &"long_beam", &"lure_post", &"pony_whistle", &"scoop_launcher",
 	&"steward_monocle", &"yield_lens", &"permit_everfree", &"permit_lake",
 	&"permit_nightmeadow", &"permit_orchard", &"gem_0", &"gem_1", &"gem_2", &"gem_3",
-	&"sell_all"]
+	&"sell_all", &"pen_small", &"pen_large", &"pen_grand", &"upgrade", &"clear"]
 const FOODS: Array[StringName] = [&"hay", &"carrot", &"apple", &"daisy", &"daffodil"]
 
 ## A gem's colour by PonyData.Rarity: common, uncommon, rare, legendary.
@@ -147,6 +147,31 @@ func _gear(k: StringName, c: Vector2) -> void:
 			draw_circle(Vector2(12, 12), 6.6, Color(0.75, 0.9, 1.0, 0.55))
 			draw_line(Vector2(18, 18), Vector2(26, 26), Color(0.45, 0.35, 0.3), 4.0, true)
 			_gem(Vector2(12, 12), 3.6, GEM_COLOURS[3])
+		&"pen_small", &"pen_large", &"pen_grand":
+			# A fence that grows with the pen: two, three or four bays, rails gold on the grand.
+			var bays: int = {&"pen_small": 2, &"pen_large": 3, &"pen_grand": 4}[k]
+			var rail := BRASS if k == &"pen_grand" else WOOD
+			var w := 24.0 / bays
+			for i in bays + 1:
+				var x := 3.0 + i * w
+				_poly(PackedVector2Array([Vector2(x - 1.3, 8), Vector2(x + 1.3, 8),
+					Vector2(x + 1.3, 26), Vector2(x - 1.3, 26)]), WOOD.darkened(0.15))
+			for y in [12.0, 19.0]:
+				draw_line(Vector2(3, y), Vector2(27, y), rail, 2.6, true)
+			CatchIcon.heart(self, Vector2(15, 5), 3.2, Color(1.0, 0.55, 0.7))
+		&"upgrade":
+			_gear(&"pen_large", c)
+			_poly(PackedVector2Array([Vector2(19, 12), Vector2(25, 4), Vector2(31, 12),
+				Vector2(27, 12), Vector2(27, 18), Vector2(23, 18), Vector2(23, 12)]),
+				Color(0.45, 0.85, 0.45))
+		&"clear":
+			for a in [-0.9, -0.3, 0.3, 0.9]:
+				var tip := Vector2(15, 26) + Vector2(sin(a), -cos(a)) * 16.0
+				draw_line(Vector2(15, 26), tip, Color(0.28, 0.45, 0.22), 3.0, true)
+				_circle(tip, 2.6, Color(0.42, 0.6, 0.3))
+			draw_line(Vector2(6, 8), Vector2(24, 22), Color(0.75, 0.78, 0.85), 2.6, true)
+			draw_line(Vector2(24, 8), Vector2(6, 22), Color(0.75, 0.78, 0.85), 2.6, true)
+			_circle(Vector2(15, 15), 2.2, Color(0.9, 0.3, 0.3))
 		&"sell_all":
 			for i in 3:
 				var y := 24.0 - i * 5.0

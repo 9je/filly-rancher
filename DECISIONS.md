@@ -371,4 +371,6 @@ The owner's save after 11.6 minutes: 17 ponies, 157 bits, a pen on all four plot
   scroll area that stays on screen, and the tabs are buttons. The Depot shows each pony as
   her race's icon on a disc of her coat, two columns, scrolled. Row order, indices, signals
   and drawn_lines() are unchanged, so the bot and the old tests drive them as before.
-  test_market_tiles (5 tests). Renders: build/playtest_evidence/round3/menu_*.png.
+  test_market_tiles (5 tests). The Build menu got the same tiles, with a fence that grows
+  with the pen (two, three, four bays), an upgrade arrow and clearing shears. Renders:
+  build/playtest_evidence/round3/menu_*.png.

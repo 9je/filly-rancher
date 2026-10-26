@@ -60,6 +60,11 @@ const PlotDataScript := preload("res://systems/plot_data.gd")
 const PlotSlotScript := preload("res://world/plot_slot.gd")
 const MenuStyleScript := preload("res://ui/menu_style.gd")
 const MouseRowsScript := preload("res://ui/mouse_rows.gd")
+const TileStyleScript := preload("res://ui/tile_style.gd")
+const ShopIconScript := preload("res://ui/shop_icon.gd")
+## The picture on a tile (overnight bot review, 2026-10-26: the build card was the old dark
+## text row). A fence the size of the pen, or the upgrade's arrow, or the clearing's shears.
+const ICON_SIZE := 64.0
 
 @onready var _dim: ColorRect = $Dim
 @onready var _panel: PanelContainer = $Centre/Panel
@@ -374,20 +379,29 @@ func _build_rows() -> void:
 		var plot := offer.get("plot") as PlotData
 		row.name = "Row_%s" % (String(plot.id) if plot != null else "clear")
 		MouseRowsScript.arm(row, i, point_at_row, take_row)
-		row.add_theme_stylebox_override(&"panel", MenuStyleScript.row_box(false))
+		row.add_theme_stylebox_override(&"panel", TileStyleScript.box(false, false))
 
-		var margin := MarginContainer.new()
-		margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		margin.add_theme_constant_override(&"margin_left", 18)
-		margin.add_theme_constant_override(&"margin_right", 18)
-		margin.add_theme_constant_override(&"margin_top", 12)
-		margin.add_theme_constant_override(&"margin_bottom", 12)
-		row.add_child(margin)
+		# The picture beside the words, in a grid of two so the name line stays the tile's
+		# first HBoxContainer.
+		var body := GridContainer.new()
+		body.columns = 2
+		body.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		body.add_theme_constant_override(&"h_separation", 16)
+		row.add_child(body)
+		var plate := TileStyleScript.disc(ICON_SIZE)
+		body.add_child(plate)
+		var icon: Control = ShopIconScript.new()
+		icon.name = "Icon"
+		icon.kind = (&"upgrade" if _mode == Mode.UPGRADE else plot.id) if plot != null else &"clear"
+		icon.custom_minimum_size = Vector2(ICON_SIZE, ICON_SIZE)
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		plate.add_child(icon)
 
 		var column := VBoxContainer.new()
 		column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		column.add_theme_constant_override(&"separation", 3)
-		margin.add_child(column)
+		body.add_child(column)
 
 		var head := HBoxContainer.new()
 		head.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -399,7 +413,8 @@ func _build_rows() -> void:
 		title.text = String(offer.get("name", ""))
 		title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		MenuStyleScript.style_label(title, 27, MenuStyleScript.COLOR_NAME)
+		MenuStyleScript.style_label(title, 27, MenuStyleScript.COLOR_TITLE)
+		title.add_theme_font_override(&"font", MenuStyleScript.title_font())
 		head.add_child(title)
 
 		var holds := Label.new()
@@ -422,7 +437,7 @@ func _build_rows() -> void:
 		blurb.text = String(offer.get("blurb", ""))
 		blurb.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		blurb.custom_minimum_size = Vector2(720.0, 0.0)
+		blurb.custom_minimum_size = Vector2(640.0, 0.0)
 		MenuStyleScript.style_label(blurb, 19, MenuStyleScript.COLOR_DIM)
 		column.add_child(blurb)
 
@@ -451,9 +466,7 @@ func _refresh() -> void:
 		# _build_rows(), and this repaints the same three states row(): picked, hovered,
 		# idle -- MouseRows.row() computes internally.
 		var picked: bool = i == _selected
-		var box: StyleBoxFlat = MenuStyleScript.row_box(true) if picked \
-			else (MenuStyleScript.row_box_hover() if i == _hovered else MenuStyleScript.row_box(false))
-		row.add_theme_stylebox_override(&"panel", box)
+		row.add_theme_stylebox_override(&"panel", TileStyleScript.box(picked, i == _hovered))
 		var affordable := _can_afford_row(i)
 		var short := row.find_child("Short", true, false) as Label
 		if short != null:
@@ -466,7 +479,7 @@ func _refresh() -> void:
 		var title := row.find_child("Name", true, false) as Label
 		if title != null:
 			MenuStyleScript.style_label(title, 27,
-				MenuStyleScript.COLOR_NAME if affordable else MenuStyleScript.COLOR_DIM)
+				MenuStyleScript.COLOR_TITLE if affordable else MenuStyleScript.COLOR_DIM)
 
 
 # --- the pointer ----------------------------------------------------------------------------
