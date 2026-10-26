@@ -148,3 +148,8 @@ Canon MLP stays: real names, looks and places ("lean into mlp fully", private bu
   - Spike 1.9x;
   - the Palace marquee over the door.
 - **The window resize was not reproduced:** pinned by test_window_size.
+
+### 2026-10-26: the Spectra Palace you walk into (DECISIONS.md)
+- **Walk-in casino floor:** walking through the Palace doors (or E on the steps) fades into a sealed hall under the Palace, built from a new Blender kit (pc_*): slot machines, the prize wheel on a lit stage, two blackjack tables, the racing window with a tote board, the cashier's cage, chandeliers, neon, staff and regulars. Every station opens the existing casino screen at its own game; the doors inside lead back out to the steps. Ranch state is untouched by a visit. Renders: build/playtest_evidence/round2/palace_interior_*.png.
+- **The marquee no longer hangs across the doorway:** it was hung before the Palace was seated and sat 1.7 m over the doorway floor; it is rehung 3.3 m over it.
+- **Not yet done:** the owner has not walked it; no music or ambience of its own beyond the casino zone the Strip already had.

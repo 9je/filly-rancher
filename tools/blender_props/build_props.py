@@ -1187,6 +1187,10 @@ def pc_hall():
             # against the north one.
             if abs(t) > length / 2 - 0.2 or (along_x and abs(t) < 0.5):
                 continue
+            # The east wall's two ends are the cage and the racing booth, which stand flush
+            # against it: no pilaster or sconce pokes through their backs.
+            if cx > 0 and not along_x and abs(t) > 6.4:
+                continue
             px, py = (cx + t, cy) if along_x else (cx, cy + t)
             w = (0.7, 0.22) if along_x else (0.22, 0.7)
             p.append(box("pilaster", (w[0], w[1], H - 0.9), (px + nx_ * 0.11, py + ny_ * 0.11, (H - 0.9) / 2 + 0.2), "velvet", bevel=0.02))

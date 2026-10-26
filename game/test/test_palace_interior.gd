@@ -56,7 +56,7 @@ func test_every_station_prompt_names_its_game_and_carries_no_dash() -> void:
 			InteractionScript.Kind.PALACE_STATION, 1.0, String(id)), "E")
 		assert_true(line.begins_with("E: "), line)
 		assert_true(line.to_lower().contains(String(words[id])), line)
-		assert_false(line.contains("--") or line.contains("—"), line)
+		assert_false(line.contains("--") or line.contains(String.chr(0x2014)), line)
 	var out: String = InteractionScript.prompt_for(
 		InteractionScript.candidate(InteractionScript.Kind.PALACE_EXIT, 1.0), "E")
 	assert_true(out.to_lower().contains("leave"), out)
@@ -133,7 +133,12 @@ func test_the_hall_floor_sounds_like_wood() -> void:
 
 func test_inside_only_the_hall_is_offered() -> void:
 	ranch.call("enter_palace", true)
-	for c: Dictionary in ranch.call("interaction_candidates"):
+	var interior: Node3D = ranch.get("palace_interior")
+	ranch.get("player").global_position = interior.call("station_point", &"cage")
+	await get_tree().physics_frame
+	var offered: Array = ranch.call("interaction_candidates")
+	assert_false(offered.is_empty(), "at the cage, the cage is offered")
+	for c: Dictionary in offered:
 		assert_true(int(c["kind"]) in [InteractionScript.Kind.PALACE_STATION,
 			InteractionScript.Kind.PALACE_EXIT], "offered %s inside the hall" % c)
 
