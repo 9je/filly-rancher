@@ -80,6 +80,7 @@ const MagicBeamScript := preload("res://actors/player/magic_beam.gd")
 const InputDeviceScript := preload("res://systems/input_device.gd")
 const MenuStyleScript := preload("res://ui/menu_style.gd")
 const CatchCardScript := preload("res://ui/catch_card.gd")
+const ShopIconScript := preload("res://ui/shop_icon.gd")
 
 ## Radius of the reticle ring, in (1920x1080-base) pixels. Small: it has to mark a point
 ## precisely, and a big one would obscure the pony it is resting on.
@@ -476,24 +477,70 @@ func set_tasks(rows: Array) -> void:
 		var done: bool = bool(row.get("done", false))
 		_task_lines.append("%s%s  (%d bits)" % [TASK_DONE if done else TASK_OPEN,
 			String(row.get("text", "")), int(row.get("reward_bits", 0))])
-	for i in _task_lines.size():
-		var label := Label.new()
-		label.text = _task_lines[i]
-		var colour: Color = COLOR_WORLD_LINE
-		if i > 0:
-			colour = COLOR_TASK_DONE if _task_lines[i].begins_with(TASK_DONE) \
-				else COLOR_TASK_OPEN
-		MenuStyleScript.style_label(label, 24 if i == 0 else 20, colour)
-		# v1: dark ink on the card, the title in the display weight.
-		label.add_theme_constant_override("outline_size", 0)
-		label.add_theme_color_override("font_color", INK if i == 0 else (
-			Color(0.3, 0.55, 0.3) if _task_lines[i].begins_with(TASK_DONE) else INK_SOFT))
-		if i == 0:
-			label.add_theme_font_override("font", MenuStyleScript.title_font())
-		_tasks.add_child(label)
+	var title := Label.new()
+	title.text = TASK_TITLE
+	MenuStyleScript.style_label(title, 24, COLOR_WORLD_LINE)
+	title.add_theme_constant_override("outline_size", 0)
+	title.add_theme_color_override("font_color", INK)
+	title.add_theme_font_override("font", MenuStyleScript.title_font())
+	_tasks.add_child(title)
+	# A CHECKLIST, NOT A BULLETED PARAGRAPH (overnight bot review, 2026-10-26): a drawn tick
+	# box that fills green when the job is done, the job, and its reward as a coin and a
+	# number. task_lines() still reads as it always has.
+	for entry in rows:
+		if typeof(entry) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = entry
+		_tasks.add_child(_task_row(String(row.get("text", "")), bool(row.get("done", false)),
+			int(row.get("reward_bits", 0))))
 	var card := get_node_or_null("TasksCard") as Panel
 	if card != null:
 		_fit_card.call_deferred(card, _tasks, Vector2(18, 12))
+
+
+const TASK_TICK := Color(0.36, 0.68, 0.36)
+
+
+func _task_row(text: String, done: bool, reward: int) -> HBoxContainer:
+	var line := HBoxContainer.new()
+	line.add_theme_constant_override(&"separation", 10)
+	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var box := Control.new()
+	box.custom_minimum_size = Vector2(22, 22)
+	box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.draw.connect(func() -> void:
+		var r := Rect2(Vector2(1, 1), box.size - Vector2(2, 2))
+		if done:
+			box.draw_rect(r, TASK_TICK, true)
+			box.draw_polyline(PackedVector2Array([Vector2(5, 11), Vector2(9.5, 16),
+				Vector2(17, 6)]), Color(1, 1, 1), 3.0, true)
+		else:
+			box.draw_rect(r, Color(1, 1, 1, 0.6), true)
+			box.draw_rect(r, INK_SOFT, false, 2.0))
+	line.add_child(box)
+	var label := Label.new()
+	label.text = text
+	MenuStyleScript.style_label(label, 20, COLOR_TASK_DONE if done else COLOR_TASK_OPEN)
+	label.add_theme_constant_override("outline_size", 0)
+	label.add_theme_color_override("font_color", TASK_TICK.darkened(0.2) if done else INK_SOFT)
+	line.add_child(label)
+	if reward > 0:
+		var coin: Control = ShopIconScript.new()
+		coin.kind = &"sell_all"
+		coin.custom_minimum_size = Vector2(20, 20)
+		coin.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		coin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		coin.modulate = Color(1, 1, 1, 0.5) if done else Color(1, 1, 1)
+		line.add_child(coin)
+		var bits := Label.new()
+		bits.text = "%d" % reward
+		MenuStyleScript.style_label(bits, 20, COLOR_TASK_OPEN)
+		bits.add_theme_constant_override("outline_size", 0)
+		bits.add_theme_color_override("font_color", Color(0.62, 0.45, 0.1, 0.5 if done else 1.0))
+		bits.add_theme_font_override("font", MenuStyleScript.numeral_font())
+		line.add_child(bits)
+	return line
 
 
 ## Every line the checklist is drawing, in order, title first. For the tests, which

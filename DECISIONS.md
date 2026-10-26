@@ -374,3 +374,6 @@ The owner's save after 11.6 minutes: 17 ponies, 157 bits, a pen on all four plot
   test_market_tiles (5 tests). The Build menu got the same tiles, with a fence that grows
   with the pen (two, three, four bays), an upgrade arrow and clearing shears. Renders:
   build/playtest_evidence/round3/menu_*.png.
+- **The Getting started card is a checklist**: drawn tick boxes that fill green when a job is
+  done, and each reward as a coin and a number, in place of a bulleted paragraph with
+  "(20 bits)" after each line. task_lines() is unchanged.
