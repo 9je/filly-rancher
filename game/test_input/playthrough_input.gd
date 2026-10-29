@@ -1475,6 +1475,9 @@ func _brain() -> void:
 			# Somebody started talking on her own (a scripted beat): read it.
 			await _read_conversation(p)
 			continue
+		# The epilogue can take the ranch away while a screen was being read.
+		if not is_instance_valid(ranch) or not is_instance_valid(player):
+			return
 		if await _talk_to_news():
 			continue
 		if await _path_work():
