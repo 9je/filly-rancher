@@ -1097,14 +1097,14 @@ func _sighted() -> Node3D:
 
 
 ## Find a pony (or go after `target`), creep up, hold the Scoop on her until she is secured.
-func _hunt(target: Node3D = null, filter := Callable()) -> bool:
+func _hunt(target: Node3D = null, filter := Callable(), radius := 80.0) -> bool:
 	var bag := _bag()
 	if bag == null or bag.is_full() or not _story().has_flag("has_scoop"):
 		return false
 	# A person carries what the pens can take, and a few over.
 	if bag.count() >= _pen_room() + 3 and not _pens().is_empty():
 		return false
-	var pony := target if target != null else _wild_near(80.0, filter)
+	var pony := target if target != null else _wild_near(radius, filter)
 	if pony == null:
 		return false
 	_say("goes after a pony %.0f m away" % pony.global_position.distance_to(player.global_position))
@@ -1749,6 +1749,7 @@ func _factory_work() -> bool:
 			var wild := 0
 			var vivid := 0
 			var nearest := INF
+			var where: Array[String] = []
 			for p: Node3D in ranch.get("spawner").call("get_spawned"):
 				if not is_instance_valid(p) or int(p.get("state")) >= 5 or p.is_in_group(&"penned"):
 					continue
@@ -1756,7 +1757,13 @@ func _factory_work() -> bool:
 				if bool(filter.call(p)):
 					vivid += 1
 					nearest = minf(nearest, p.global_position.distance_to(player.global_position))
-			_say("  no wanted pony in 80 m: %d wild, %d wanted, nearest wanted %.0f m" % [wild, vivid, nearest])
+					where.append("%s%s" % [p.global_position.snapped(Vector3.ONE),
+						"" if _reachable(p.global_position) else " (no way)"])
+			_say("  no wanted pony in 80 m: %d wild, %d wanted, nearest wanted %.0f m: %s" % [
+				wild, vivid, nearest, ", ".join(where)])
+			# A person who knows where the starry ones are goes there, however far.
+			if await _hunt(null, filter, INF):
+				return true
 			await _roam_region(&"nightmeadow")
 			return true
 	return false
