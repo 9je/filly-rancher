@@ -179,3 +179,4 @@ Canon MLP stays: real names, looks and places ("lean into mlp fully", private bu
 - **Menus:** one plum card frame for every menu; Market detail strip with the full description and a Buy button (round3/menu_market_buy_detail.png).
 - **Feel:** catch ghost into the Scoop with pop, squash and camera kick; penned ponies fly in and land; camera trauma shake with a setting.
 - **Art:** paddocks and region borders are round, toon-shaded timber; the checklist card shrinks with its list; signs in the way vanish cleanly.
+- **Gates on 31e8732:** GUT 1852 of 1852; real-input 18 of 18 in one combined run (an earlier combined run had one flaky failure that passed alone); owner logs untouched. Exports rebuilt (Linux and Windows, 0 errors); the Linux build ran on the GPU invisibly and exited cleanly with only the two known engine messages. The five endings are rerunning on 31e8732.
