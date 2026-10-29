@@ -458,6 +458,20 @@ func _path_to(to: Vector3) -> PackedVector3Array:
 	return p
 
 
+## What holds her when a walk is blocked: what she touches, what she is told to do.
+func _say_stuck() -> void:
+	var body := player as CharacterBody3D
+	var hits: Array[String] = []
+	for i in body.get_slide_collision_count():
+		var c := body.get_slide_collision(i)
+		var o := c.get_collider()
+		hits.append("%s n%s" % [(o as Node).get_path() if o is Node else str(o), c.get_normal().snapped(Vector3.ONE * 0.1)])
+	_say("  stuck: vel %s floor %s phys %s input %s menu '%s' paused %s hits [%s]" % [
+		body.velocity.snapped(Vector3.ONE * 0.1), body.is_on_floor(), body.is_physics_processing(),
+		Input.get_vector("move_left", "move_right", "move_forward", "move_back").snapped(Vector2.ONE * 0.01),
+		_menu(), paused, ", ".join(hits)])
+
+
 func _reachable(at: Vector3) -> bool:
 	if not _nav_map.is_valid():
 		return true
@@ -609,6 +623,7 @@ func _walk(to: Vector3, arrive: float = RUN_ARRIVE, timeout: float = 90.0) -> bo
 				if stuck >= 3:
 					_stop()
 					_say("gives up on a blocked walk at %s" % player.global_position.snapped(Vector3.ONE * 0.1))
+					_say_stuck()
 					await _wriggle_free()
 					return false
 				var away := player.global_position - to
@@ -1126,6 +1141,7 @@ func _hunt(target: Node3D = null, filter := Callable(), radius := 80.0) -> bool:
 			_say("  could not close on her: she is at %s (state %d), I am at %s, path %d points" % [
 				pony.global_position.snapped(Vector3.ONE * 0.1), int(pony.get("state")),
 				player.global_position.snapped(Vector3.ONE * 0.1), _path_to(pony.global_position).size()])
+			_say_stuck()
 		return true
 	_aim = true
 	_look_at = pony.global_position + Vector3(0, 0.6, 0)
