@@ -35,6 +35,11 @@ uniform float fine_metres = 0.9;
 uniform float coarse_metres = 4.5;
 uniform float fine_amount = 0.055;
 uniform float coarse_amount = 0.030;
+// THE MEADOW IS NOT ONE GREEN (FS2.2): over patches about macro_metres across the grass drifts
+// toward a warmer, sun-dried green, so the valley reads as ground and not as a painted floor.
+uniform float macro_metres = 42.0;
+uniform float macro_amount = 0.5;
+uniform vec3 macro_warm = vec3(1.12, 1.04, 0.72);
 // TUNED TO THIS HEIGHTFIELD, NOT TO A TEXTBOOK. slope here is 1.0 - normal.y, and this map is
 // gentle: sampling Terrain.height_at() at the mesh's own 2 m cell over all 220 m, the STEEPEST
 // point on the whole map measures 0.0442 (16.8 degrees), on the lake basin's own rim. The
@@ -176,6 +181,8 @@ void fragment() {
 
 	base *= 1.0 + fine * fine_amount * fine_fade;
 	base = mix(base, high, coarse * coarse_amount);
+	float macro = smoothstep(0.25, 0.75, value_noise(v_world_pos.xz / macro_metres + vec2(17.3, 4.1)));
+	base = mix(base, base * macro_warm, macro * macro_amount);
 
 	// A SLOPE YOU CAN SEE IS A SLOPE YOU CAN PLAN A WALK AROUND. Hillsides and the lake basin
 	// walls become earth, which is both more believable and free relief reading.
