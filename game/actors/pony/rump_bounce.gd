@@ -20,6 +20,7 @@ var _x := 0.0
 var _v := 0.0
 var _centre := Vector3.ZERO
 var _radius := 0.0
+var _back := Vector3.BACK
 var _meshes: Array[MeshInstance3D] = []
 var _skeleton: Skeleton3D
 var _written := false
@@ -76,8 +77,11 @@ func bind(body: Node3D) -> void:
 	# Her rump: over the top of her hind legs, behind and above the hip joint. Small enough
 	# that her back and her legs stay put (owner 2026-11-05: "it looks like her whole body
 	# compresses so its not obvious at all").
-	_centre = p + back * length * 0.3 + Vector3.UP * length * 0.2
-	_radius = length * 0.7
+	# (owner, same day: "its more of the top then the back/cheeks"): centred on the back of
+	# her rump at hip height, so the cheeks move and not only the top.
+	_centre = p + back * length * 0.45 + Vector3.UP * length * 0.02
+	_radius = length * 0.75
+	_back = back
 
 
 func _process(delta: float) -> void:
@@ -99,6 +103,11 @@ func step(delta: float) -> void:
 	if absf(_x) < 1e-4 and absf(_v) < 1e-3:
 		_x = 0.0
 		_v = 0.0
+	_push()
+
+
+## Hand the shaders where the spring is (only while it moves, and once more as it stops).
+func _push() -> void:
 	var moving := _x != 0.0
 	if not moving and not _written:
 		return
@@ -109,6 +118,10 @@ func step(delta: float) -> void:
 				var at := _centre
 				if _skeleton != null and mi.is_inside_tree() and _skeleton.is_inside_tree():
 					at = mi.global_transform.affine_inverse() * (_skeleton.global_transform * _centre)
+				var back := _back
+				if _skeleton != null and mi.is_inside_tree() and _skeleton.is_inside_tree():
+					back = (mi.global_transform.basis.inverse() * (_skeleton.global_transform.basis * _back)).normalized()
 				mi.set_instance_shader_parameter(&"bounce_at", Vector4(at.x, at.y, at.z, _radius))
+				mi.set_instance_shader_parameter(&"bounce_back", back)
 			mi.set_instance_shader_parameter(&"bounce_amount", _x)
 	_written = moving
