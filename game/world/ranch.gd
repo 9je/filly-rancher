@@ -1704,6 +1704,9 @@ func rebind_economy() -> void:
 		_shop.decor_provider = func(id: StringName) -> bool:
 			return _game_state != null and Decor.owns(_game_state.story, id)
 	_build_decor()
+	# A full collection set pays out the moment its last pony is caught (FS7.2).
+	if _game_state != null and not _game_state.compendium.changed.is_connected(_on_compendium_changed):
+		_game_state.compendium.changed.connect(_on_compendium_changed)
 	if market_menu != null:
 		market_menu.set("shop", _shop)
 
@@ -2664,6 +2667,20 @@ func _on_sell_all_requested() -> void:
 				_pay_out(_board.on_sold(rarity, sold_count))
 	if market_menu.has_method("refresh"):
 		market_menu.refresh()
+
+
+func _on_compendium_changed(_id: StringName, _state: int) -> void:
+	if _game_state == null or _economy == null:
+		return
+	for got: Dictionary in CollectionSets.claim(_game_state.compendium, _pony_roster(), _game_state.story):
+		if int(got.bits) > 0:
+			_economy.grant(int(got.bits))
+		if StringName(got.decor) != &"":
+			Decor.add(_game_state.story, got.decor)
+			_build_decor()
+			_toast("Set complete: %s! %s now stands on the plaza." % [got.name, Decor.find(got.decor).name])
+		else:
+			_toast("Set complete: %s! %d bits." % [got.name, int(got.bits)])
 
 
 ## The decorations she owns, standing in their spots (world/decor_layer.gd). Rebuilt from the
