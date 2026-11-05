@@ -801,6 +801,18 @@ func _draw_pips() -> void:
 		sb.set_border_width_all(2)
 		sb.set_corner_radius_all(5)
 		_pips.draw_style_box(sb, rect)
+		# Not colour alone (FS8.3): her rarity's shape, in white on the tint.
+		if i < _rarities.size():
+			_pips.draw_colored_polygon(RarityGlyph.outline(_rarities[i], rect.get_center(),
+				PIP_SIZE.x * 0.28), Color(1, 1, 1, 0.9))
+
+
+## The rarity shapes the filled saddlebag slots carry (FS8.3), first slot first.
+func pip_shapes() -> Array[StringName]:
+	var out: Array[StringName] = []
+	for r: int in _rarities:
+		out.append(RarityGlyph.shape_of(r))
+	return out
 
 
 ## One ring, drawn twice: an outline pass and then the colour, so the reticle stays

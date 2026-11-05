@@ -945,7 +945,7 @@ func _draw_compendium() -> void:
 	for i in compendium_window():
 		var data: PonyData = entries[i]
 		_add_row(i, _entry_name(data), _entry_value(data), _rarity_color(data.rarity),
-			MenuStyleScript.COLOR_DIM, true)
+			MenuStyleScript.COLOR_DIM, true, data.rarity)
 
 
 func _draw_requests() -> void:
@@ -984,7 +984,8 @@ func _add_note(text: String) -> void:
 
 func _add_row(index: int, row_name: String, value: String,
 		name_color: Color = MenuStyleScript.COLOR_NAME,
-		value_color: Color = MenuStyleScript.COLOR_VALUE, compact: bool = false) -> void:
+		value_color: Color = MenuStyleScript.COLOR_VALUE, compact: bool = false,
+		glyph_rarity: int = -1) -> void:
 	var row: PanelContainer = MouseRowsScript.row(index, index == _selected,
 		index == _hovered, point_at_row, take_row)
 	var margin := MarginContainer.new()
@@ -997,6 +998,12 @@ func _add_row(index: int, row_name: String, value: String,
 	var head := HBoxContainer.new()
 	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	margin.add_child(head)
+	if glyph_rarity >= 0:
+		# Not colour alone (FS8.3): the rarity's shape before the name.
+		var glyph := RarityGlyph.new()
+		glyph.rarity = glyph_rarity
+		glyph.colour = name_color
+		head.add_child(glyph)
 	var title := Label.new()
 	title.text = row_name
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
