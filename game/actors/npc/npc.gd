@@ -169,6 +169,14 @@ const GROUP := &"townsfolk"
 ## SEPARATION m with a push that grows as they close.
 const SEPARATION := 1.7
 const SEPARATION_PUSH := 2.2
+## AND OUT OF SOMEONE STANDING IN HER (FS3.3; bot frames 2026-11-05: the player stood half
+## inside Old Fennel). Every body wears a narrow upright capsule in the middle of a pony two
+## metres long, so they can rest overlapping. A townspony steps out of the player, or a wild
+## pony, that has come to rest within STANDING_SPACE, and NEVER out of the way of one that is
+## moving: pushed along a walker's heading she was herded into the Market wall and blocked
+## the road (two reverted attempts; test_find_market).
+const STANDING_SPACE := 1.3
+const STILL_SPEED := 0.4
 
 
 ## The push away from every other townspony inside SEPARATION, flat.
@@ -187,6 +195,39 @@ func _separation() -> Vector3:
 			away = Vector3(1, 0, 0).rotated(Vector3.UP, float(hash(name) % 628) / 100.0)
 			d = 0.01
 		push += away.normalized() * (1.0 - d / SEPARATION) * SEPARATION_PUSH
+	if is_inside_tree():
+		push += _space_push()
+	return push
+
+
+## The step out of a player or wild pony at rest inside STANDING_SPACE.
+func _space_push() -> Vector3:
+	var space := get_world_3d().direct_space_state
+	if space == null:
+		return Vector3.ZERO
+	var q := PhysicsShapeQueryParameters3D.new()
+	var sphere := SphereShape3D.new()
+	sphere.radius = STANDING_SPACE
+	q.shape = sphere
+	q.transform = Transform3D(Basis(), global_position + Vector3(0, 0.6, 0))
+	q.collision_mask = LayersScript.PLAYER | LayersScript.PONY
+	q.exclude = [get_rid()]
+	var push := Vector3.ZERO
+	for hit: Dictionary in space.intersect_shape(q, 8):
+		var body := hit.get("collider") as CharacterBody3D
+		if body == null or body.is_in_group(GROUP) or not body.is_visible_in_tree():
+			continue
+		if Vector2(body.velocity.x, body.velocity.z).length() > STILL_SPEED:
+			continue
+		var away := global_position - body.global_position
+		away.y = 0.0
+		var d := away.length()
+		if d >= STANDING_SPACE:
+			continue
+		if d < 0.01:
+			away = Vector3(1, 0, 0).rotated(Vector3.UP, float(hash(name) % 628) / 100.0)
+			d = 0.01
+		push += away.normalized() * (1.0 - d / STANDING_SPACE) * SEPARATION_PUSH
 	return push
 
 
