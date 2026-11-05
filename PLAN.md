@@ -315,7 +315,7 @@ MISSION.md's "Fun and anti-repetition rules" are part of the Definition of Done.
 
 **Interfaces:** `Decor.place(id: StringName, at: Vector3, yaw: float) -> bool`, `Decor.saved() -> Array[Dictionary]`, `Decor.restore(rows: Array)`.
 
-- [ ] **FS7.1 Decorate the ranch.** Twelve decorations from the existing prop kits (flower beds, lanterns, a fountain, statues of the Mane Six, bunting, a gazebo), 200 to 20,000 bits, placed with the plot ghost (green or red) anywhere on the homestead except pen gates, roads and NPC spots (the Review Focus case). Tests: a placement on a road is refused; placed decor survives save and load; a 20,000-bit item is affordable on a finished bot save. Commit.
+- [ ] **FS7.1 Decorate the ranch.** Twelve decorations from the existing prop kits (flower beds, lanterns, a fountain, bunting, a gazebo, and stone statues of the Mane Six: their own bodies in a stone material), 200 to 20,000 bits, placed with the plot ghost (green or red) anywhere on the homestead except pen gates, roads and NPC spots (the Review Focus case). Tests: a placement on a road is refused; placed decor survives save and load; a 20,000-bit item is affordable on a finished bot save. Commit.
 - [ ] **FS7.2 Collection goals.** The compendium pays a bonus and unlocks one decoration for each full set (all of a rarity, all of a region, all the Mane Six). Test: completing a set grants once, never twice. Commit.
 
 ### FS8. Accessibility (gap 10)
