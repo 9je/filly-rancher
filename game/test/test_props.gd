@@ -276,3 +276,43 @@ func test_the_town_row_stands_on_a_road() -> void:
 		max_z = maxf(max_z, p.y)
 	assert_lte(min_z, 28.0, "the painted road must reach south of the town row")
 	assert_gte(max_z, 50.0, "the painted road must reach through the town row, not stop short")
+
+
+# --- the far ones fade (after home-equestria's distance tiers; draws over the yard ran 2300 to
+# 3700) ----------------------------------------------------------------------------------------
+
+func test_a_small_prop_fades_out_nearer_than_a_big_one() -> void:
+	assert_lt(PropsScript.fade_end_for(0.6), PropsScript.fade_end_for(4.0))
+	assert_lt(PropsScript.fade_end_for(4.0), PropsScript.fade_end_for(8.0))
+
+
+func test_nothing_fades_inside_the_yard_and_a_building_never_does() -> void:
+	assert_gte(PropsScript.fade_end_for(0.1), PropsScript.FADE_NEAREST)
+	assert_eq(PropsScript.fade_end_for(30.0), 0.0, "0 is no limit: a barn stays on the skyline")
+
+
+func test_a_placed_prop_carries_its_fade() -> void:
+	var inst := Node3D.new()
+	var mi := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(0.5, 0.5, 0.5)
+	mi.mesh = box
+	inst.add_child(mi)
+	add_child_autofree(inst)
+	PropsScript.apply_fade(inst)
+	assert_eq(mi.visibility_range_end, PropsScript.fade_end_for(0.5))
+	assert_eq(mi.visibility_range_fade_mode, GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF)
+
+
+func test_a_pebble_casts_no_shadow_and_a_tree_does() -> void:
+	for size: float in [0.5, 4.0]:
+		var inst := Node3D.new()
+		var mi := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = Vector3.ONE * size
+		mi.mesh = box
+		inst.add_child(mi)
+		add_child_autofree(inst)
+		PropsScript.apply_fade(inst)
+		assert_eq(mi.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF, size < PropsScript.SHADOW_FROM,
+			"%.1f m" % size)

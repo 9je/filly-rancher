@@ -657,6 +657,7 @@ func build_paced(pace: Callable) -> int:
 
 		seat(inst, ground)
 		_seat_grounds[inst] = ground
+		apply_fade(inst)
 
 		if skirted:
 			_add_skirt(inst, centre, half, relief.y - relief.x, ground)
@@ -671,6 +672,49 @@ func build_paced(pace: Callable) -> int:
 			% [_missing.size(), ", ".join(_missing)])
 
 	return _placed.size()
+
+
+## THE FAR ONES FADE (after home-equestria's distance tiers): every prop drew at any range,
+## and the yard ran 2300 to 3700 draw calls. A prop fades out past a distance that grows with
+## its size (a pebble well before a tree), never inside the yard, and anything as big as a
+## barn stays on the skyline.
+const FADE_NEAREST := 70.0
+const FADE_FARTHEST := 220.0
+## Metres of fade distance per metre of the prop's longest side.
+const FADE_PER_METRE := 25.0
+## At or over this longest side, a prop never fades.
+const FADE_NEVER_FROM := 10.0
+const FADE_MARGIN := 8.0
+## Under this longest side a prop casts no shadow: a pebble's or a flower's shadow is a few
+## pixels, but each one is drawn again in every shadow cascade (the sun's passes were about
+## 2000 of the yard's 3500 draw calls).
+const SHADOW_FROM := 2.5
+
+
+## Where a prop whose longest side is `size` metres has faded out; 0 for never.
+static func fade_end_for(size: float) -> float:
+	if size >= FADE_NEVER_FROM:
+		return 0.0
+	return clampf(size * FADE_PER_METRE, FADE_NEAREST, FADE_FARTHEST)
+
+
+## Give every mesh of `inst` (standing in the tree) its fade, by the size it stands at.
+static func apply_fade(inst: Node3D) -> void:
+	var box := world_aabb(inst)
+	var size := maxf(box.size.x, maxf(box.size.y, box.size.z))
+	var end := fade_end_for(size)
+	var geo: Array[Node] = inst.find_children("*", "GeometryInstance3D", true, false)
+	if inst is GeometryInstance3D:
+		geo.append(inst)
+	if size < SHADOW_FROM:
+		for g: GeometryInstance3D in geo:
+			g.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if end <= 0.0:
+		return
+	for g: GeometryInstance3D in geo:
+		g.visibility_range_end = end
+		g.visibility_range_end_margin = FADE_MARGIN
+		g.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 
 
 ## Number of props standing on the ranch right now.
