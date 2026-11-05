@@ -193,9 +193,9 @@ const LIBRARY: Dictionary = {
 	&"capture_success": {
 		"paths": ["res://assets/audio/world/capture_success.wav"],
 		"bus": BUS_EFFECTS, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": false},
-	# HOOFSTEPS, ONE SET PER SURFACE, synthesised by tools/make_hoofsteps.py since the owner's
-	# 2026-10-25 playtest ("walking sound is AWFUL"): soft taps well under the beds, not the
-	# shoe-on-gravel takes of the 2026-10-24 audit. Player.gd plays one on every footfall of the clip under her and picks the
+	# HOOFSTEPS, ONE SET PER SURFACE: recorded hooves (home-equestria's takes, levelled 3 dB
+	# under the synthesised taps they replace and with the click softened, by
+	# tools/import_hoofsteps.py; owner 2026-11-05: "anything is better than we got"). Player.gd plays one on every footfall of the clip under her and picks the
 	# set from the ground under that hoof. Each play rolls a pitch inside a small window and
 	# a volume inside volume_jitter_db either side of volume_db, and never repeats the take
 	# it played last (no_repeat), which is what keeps a run of eleven a second from reading
