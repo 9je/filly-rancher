@@ -84,3 +84,13 @@ func test_her_eyes_turn_toward_someone_to_her_left_or_right() -> void:
 	var ahead := _looking_at("derpyhooves", Vector3.INF)
 	assert_ne(ahead[0], ahead[1], "Derpy keeps her crossed eyes when she looks at nobody")
 	ToonStyler.shading_enabled = was
+
+
+## FS4.3: she reacts. The first time she notices the player she startles (a one-shot over
+## whatever she is doing), and a pony landing in a pen hops.
+func test_she_startles_when_she_first_notices_the_player() -> void:
+	var pony: Node3D = PonyScene.instantiate()
+	add_child_autofree(pony)
+	pony.call("setup", load("res://data/ponies/applebloom.tres"))
+	pony.call("_on_noticed_player")
+	assert_eq(pony.get("_action"), &"startle")

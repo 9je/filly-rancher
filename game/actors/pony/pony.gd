@@ -1474,6 +1474,7 @@ func _sees_player() -> bool:
 	if seen and not _noticed:
 		_noticed = true
 		noticed_player.emit()
+		_on_noticed_player()
 	return seen
 
 
@@ -1528,6 +1529,12 @@ func _update_animation(speed: float) -> void:
 		clip = _standing_clip()
 	_play(clip)
 	_anim.speed_scale = GaitScript.playback_scale_for_clip(clip, speed)
+
+
+## She has just seen the player for the first time: a startle (FS4.3).
+func _on_noticed_player() -> void:
+	if state != State.HELD:
+		play_action(&"startle")
 
 
 ## A one-shot she is acting out (a Bloom's rear, a startle): locomotion leaves her clip
