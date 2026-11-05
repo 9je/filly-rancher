@@ -466,3 +466,9 @@ Owner asked for a pass on four gaps: art that reads as one style, animation and 
 - **A sign in the way is gone, not half gone.** Half faded it drew as a grey or dark sheet across the screen at the pen's gate. A board between the lens and her fades at any distance, and past 0.85 it is not drawn.
 - **A post against the lens is not drawn** (pen timber within 0.75 m of the camera).
 - **Not done, logged:** the walk sound; a bits sink after the ending.
+
+## 2026-11-05 -- learning from home-equestria; the slapstick bounce
+
+The owner pointed at github.com/homedevanon/home-equestria (a Godot 4.5 Ponyville life-sim) as a source of better parts. Their order: hoof sounds first ("anything is better than we got", though theirs were "a bit loud and not perfect" in play, so they go in quieter and tuned); then faces and eyes, better models where they fit, the procedural leg solver, and world techniques. Voice is not wanted.
+
+Their mares carry a "flank jiggle" shader. I first said no to porting it; the owner overruled: "its my game i want to see if it creates funny elements ... i see a bouncing butt as funny not sexual". The owner's call stands. It is built as our own secondary-motion bounce on the hindquarters, fired by slapstick moments (landing from a jump, flopping into a pen from the beam, sitting down hard) so the owner can judge in play whether it lands as comedy.
