@@ -166,6 +166,13 @@ const GROUP := &"townsfolk"
 ## SEPARATION m with a push that grows as they close.
 const SEPARATION := 1.7
 const SEPARATION_PUSH := 2.2
+## AND OUT OF ANYONE ELSE (bot frames 2026-11-05: the player stood half inside Old Fennel,
+## Tumble inside a Drifter). Every body wears a 0.42 m upright capsule in the middle of a pony
+## two metres long, so collision alone lets heads and rumps pass through each other. A
+## townspony also steps out of the player's PLAYER_SPACE (small: she does not back away from
+## someone walking up to talk) and a wild pony's PONY_SPACE.
+const PLAYER_SPACE := 1.2
+const PONY_SPACE := 1.4
 
 
 ## The push away from every other townspony inside SEPARATION, flat.
@@ -184,6 +191,37 @@ func _separation() -> Vector3:
 			away = Vector3(1, 0, 0).rotated(Vector3.UP, float(hash(name) % 628) / 100.0)
 			d = 0.01
 		push += away.normalized() * (1.0 - d / SEPARATION) * SEPARATION_PUSH
+	if is_inside_tree():
+		push += _space_from_others()
+	return push
+
+
+func _space_from_others() -> Vector3:
+	var space := get_world_3d().direct_space_state
+	if space == null:
+		return Vector3.ZERO
+	var q := PhysicsShapeQueryParameters3D.new()
+	var sphere := SphereShape3D.new()
+	sphere.radius = PONY_SPACE
+	q.shape = sphere
+	q.transform = Transform3D(Basis(), global_position + Vector3(0, 0.6, 0))
+	q.collision_mask = LayersScript.PLAYER | LayersScript.PONY
+	q.exclude = [get_rid()]
+	var push := Vector3.ZERO
+	for hit: Dictionary in space.intersect_shape(q, 12):
+		var body := hit.get("collider") as Node3D
+		if body == null or body.is_in_group(GROUP) or not body.is_visible_in_tree():
+			continue
+		var reach := PLAYER_SPACE if (body as CollisionObject3D).collision_layer & LayersScript.PLAYER else PONY_SPACE
+		var away := global_position - body.global_position
+		away.y = 0.0
+		var d := away.length()
+		if d >= reach:
+			continue
+		if d < 0.01:
+			away = Vector3(1, 0, 0).rotated(Vector3.UP, float(hash(name) % 628) / 100.0)
+			d = 0.01
+		push += away.normalized() * (1.0 - d / reach) * SEPARATION_PUSH
 	return push
 
 
