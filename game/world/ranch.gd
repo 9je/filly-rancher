@@ -4540,7 +4540,8 @@ func _launch_into_pen(pen: Pen, instance: PonyInstance) -> void:
 		# The owner's slapstick bounce: she flops in rump first.
 		RumpBounce.kick_on(look, 1.0)
 		var land := look.create_tween()
-		land.tween_property(look, ^"scale", Vector3(rest.x * 1.22, rest.y * 0.72, rest.z * 1.22), 0.07)
+		# A light squash, so the rump's bounce is the joke rather than her whole body.
+		land.tween_property(look, ^"scale", Vector3(rest.x * 1.08, rest.y * 0.9, rest.z * 1.08), 0.07)
 		land.tween_property(look, ^"scale", rest, 0.42).set_trans(Tween.TRANS_ELASTIC) \
 			.set_ease(Tween.EASE_OUT)
 		var puff := BloomCeremony.sparkles([Color(1, 0.97, 0.85), Color(0.85, 0.95, 0.75),

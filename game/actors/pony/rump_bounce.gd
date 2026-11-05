@@ -9,12 +9,12 @@ extends Node
 ## PonyVisuals.build() gives every body one, as a child named RumpBounce of the body root.
 
 ## Wobbles a second, and how quickly they die away (a damping ratio).
-const HZ := 3.4
-const DAMPING := 0.16
+const HZ := 5.0
+const DAMPING := 0.09
 ## The most the spring ever moves her, in metres.
-const MAX_AMOUNT := 0.1
+const MAX_AMOUNT := 0.15
 ## A kick of 1.0 is a velocity of this many metres a second.
-const KICK_SPEED := 1.3
+const KICK_SPEED := 5.0
 
 var _x := 0.0
 var _v := 0.0
@@ -73,9 +73,11 @@ func bind(body: Node3D) -> void:
 	if length < 1e-4:
 		return
 	back /= length
-	# Over the top of her hind legs, a little behind the hip joint.
-	_centre = p + back * length * 0.35 + Vector3.UP * length * 0.05
-	_radius = length * 1.15
+	# Her rump: over the top of her hind legs, behind and above the hip joint. Small enough
+	# that her back and her legs stay put (owner 2026-11-05: "it looks like her whole body
+	# compresses so its not obvious at all").
+	_centre = p + back * length * 0.3 + Vector3.UP * length * 0.2
+	_radius = length * 0.7
 
 
 func _process(delta: float) -> void:

@@ -12,7 +12,8 @@ vec3 bounce_offset(vec3 v) {
 	}
 	vec3 rel = v - bounce_at.xyz;
 	float w = 1.0 - smoothstep(0.0, 1.0, length(rel) / bounce_at.w);
-	w = sqrt(w);
+	// Her legs stay planted: nothing much below the rump's middle moves.
+	w *= smoothstep(-0.7, 0.0, rel.y / bounce_at.w);
 	vec3 side = vec3(rel.x, 0.0, rel.z);
 	return (vec3(0.0, bounce_amount, 0.0) - side * bounce_amount * 2.5) * w;
 }
