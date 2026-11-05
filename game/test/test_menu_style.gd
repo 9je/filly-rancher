@@ -209,3 +209,20 @@ func test_a_hovered_tile_lifts_off_the_page() -> void:
 	var hover: StyleBoxFlat = TileStyle.box(false, true)
 	assert_gt(hover.shadow_size, rest.shadow_size)
 	assert_gt(hover.shadow_offset.y, rest.shadow_offset.y)
+
+
+## FS6.2: money moving is a moment, not a number changing: a gold "+300 bits" rises off the
+## tile and fades.
+func test_a_payout_pops_up_and_fades_away() -> void:
+	var host := Control.new()
+	host.size = Vector2(400, 300)
+	add_child_autofree(host)
+	var pop: Label = MenuStyle.payout_pop(host, Vector2(200, 150), 300)
+	assert_eq(pop.text, "+300 bits")
+	var y0 := pop.position.y
+	await wait_seconds(MenuStyle.PAYOUT_SECONDS * 0.5)
+	assert_lt(pop.position.y, y0, "it rises")
+	await wait_seconds(MenuStyle.PAYOUT_SECONDS * 0.7)
+	assert_false(is_instance_valid(pop), "and is gone")
+	var spend: Label = MenuStyle.payout_pop(host, Vector2(200, 150), -120)
+	assert_eq(spend.text, "-120 bits")

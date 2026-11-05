@@ -269,3 +269,20 @@ func test_a_ledger_at_the_floor_offers_nothing_to_pay() -> void:
 	assert_eq(_menu.pay_amounts().size(), 0,
 		"bits settle the service charges; at the floor there are none to settle")
 	assert_true("\n".join(_menu.drawn_lines()).contains(DepotMenu.EMPTY_PAY_TEXT))
+
+
+
+## FS6.2: a delivery pops her credit off the tile.
+func test_a_delivery_pops_her_credit() -> void:
+	var rows: Array = _menu.deliver_rows()
+	if rows.is_empty():
+		pending("no deliverable row in this fixture")
+		return
+	_menu._selected = 0
+	_menu.confirm()
+	if _menu.is_confirming():
+		_menu._selected = 0
+		_menu.confirm()
+	var pops := _menu.find_children("Payout", "", true, false)
+	assert_eq(pops.size(), 1)
+	assert_string_contains((pops[0] as Label).text, "bits")

@@ -244,16 +244,35 @@ func pay_amounts() -> Array[int]:
 ## The button. On the Deliver tab a member of the crowd goes on one press; a NAMED pony
 ## turns this into the question CONFIRM_YES asks, and the next press answers it. Returns
 ## whether the press did anything at all.
+var _confirming_credit := 0
+var _confirming_credit_kept := 0
+
+
+## Money moving is a moment (FS6.2): her credit pops off the tile she was delivered from.
+func _pop_credit(credit: int) -> void:
+	var host := get_node_or_null(^"Centre/Panel") as Control
+	if host == null or credit <= 0:
+		return
+	var at := host.size * 0.5
+	if _selected >= 0 and _selected < _rows.get_child_count():
+		var tile := _rows.get_child(_selected) as Control
+		if tile != null:
+			at = tile.global_position - host.global_position + tile.size * 0.5
+	MenuStyleScript.payout_pop(host, at, credit)
+
+
 func confirm() -> bool:
 	match _tab:
 		Tab.DELIVER:
 			if is_confirming():
 				var uid: StringName = _confirming
 				var yes: bool = _selected == 0
+				_confirming_credit_kept = _confirming_credit
 				_cancel_confirm()
 				_selected = 0
 				refresh()
 				if yes:
+					_pop_credit(_confirming_credit_kept)
 					deliver_requested.emit(uid)
 				return true
 			var rows: Array[Dictionary] = deliver_rows()
@@ -261,12 +280,14 @@ func confirm() -> bool:
 				return false
 			var row: Dictionary = rows[_selected]
 			if not bool(row.get("stock", false)):
+				_confirming_credit = int(row.get("credit", 0))
 				_confirming = StringName(row["uid"])
 				_confirming_name = String(row.get("name", ""))
 				# On "no", for the reason CONFIRM_NO's comment gives.
 				_selected = 1
 				refresh()
 				return true
+			_pop_credit(int(row.get("credit", 0)))
 			deliver_requested.emit(StringName(row["uid"]))
 			return true
 		Tab.PAY:

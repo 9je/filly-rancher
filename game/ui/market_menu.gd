@@ -234,6 +234,10 @@ func _fill_detail() -> void:
 ## and for the same reason: an open() that "succeeded" on a menu that was already up would
 ## announce a second `opened`, and ranch.gd pauses the tree on that signal and unpauses on
 ## the single `closed` that follows.
+## Her bits at the last redraw, so a change can pop (-1: none yet this opening).
+var _last_bits := -1
+
+
 func open() -> bool:
 	if _open:
 		return false
@@ -246,6 +250,7 @@ func open() -> bool:
 	_hovered = -1
 	_open = true
 	_catalogue.assign(_all_items.filter(func(it: ShopItem) -> bool: return shop.listed(it)))
+	_last_bits = -1
 	visible = true
 	refresh()
 	opened.emit()
@@ -455,6 +460,13 @@ func refresh() -> void:
 	_footer.text = MenuStyleScript.footer_tabs_and_rows("confirm", "back")
 	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
 	_wallet.text = "%d bits      %d gems in your pouch" % [shop.bits(), _pouch_total()]
+	# Money moving is a moment (FS6.2): a sale or a purchase pops over the wallet.
+	var now := shop.bits()
+	if _last_bits >= 0 and now != _last_bits and _open:
+		var host := get_node_or_null(^"Centre/Panel") as Control
+		if host != null:
+			MenuStyleScript.payout_pop(host, _wallet.position + Vector2(_wallet.size.x * 0.25, _wallet.size.y * 0.5), now - _last_bits)
+	_last_bits = now
 	_gems.text = "%d gems in your pouch" % _pouch_total()
 	_gems.visible = false
 	MouseRowsScript.tab_strip(_tabs, TAB_NAMES, _tab, Callable(),

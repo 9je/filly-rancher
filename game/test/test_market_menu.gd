@@ -202,3 +202,14 @@ func test_selection_wraps() -> void:
 	_menu.open()
 	_menu.move_selection(-1)
 	assert_eq(_menu.selected_index(), _menu.sell_rows().size(), "wrapped to the last row")
+
+
+## FS6.2: when her bits change the wallet says so with a pop, a sale up and a purchase down.
+func test_a_change_in_her_bits_pops_over_the_wallet() -> void:
+	assert_true(_menu.open())
+	assert_true(_menu.find_children("Payout", "", true, false).is_empty(), "nothing on opening")
+	_econ.grant(120)
+	_menu.refresh()
+	var pops := _menu.find_children("Payout", "", true, false)
+	assert_eq(pops.size(), 1)
+	assert_eq((pops[0] as Label).text, "+120 bits")

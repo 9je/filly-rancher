@@ -499,6 +499,30 @@ static func pop_in(panel: Control) -> void:
 	tw.tween_property(panel, ^"modulate:a", 1.0, POP_SECONDS * 0.8)
 
 
+## MONEY MOVING IS A MOMENT (FS6.2): a gold "+N bits" (or "-N bits") rises from `at` over
+## `host` and fades, freeing itself.
+const PAYOUT_SECONDS := 0.9
+const PAYOUT_RISE := 70.0
+const PAYOUT_GAIN := Color(1.0, 0.84, 0.3)
+const PAYOUT_SPEND := Color(0.98, 0.72, 0.78)
+
+
+static func payout_pop(host: Control, at: Vector2, bits: int) -> Label:
+	var pop := Label.new()
+	pop.name = "Payout"
+	pop.text = "%s%d bits" % ["+" if bits >= 0 else "-", absi(bits)]
+	pop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	style_label(pop, 30, PAYOUT_GAIN if bits >= 0 else PAYOUT_SPEND)
+	host.add_child(pop)
+	pop.position = at - pop.get_combined_minimum_size() * 0.5
+	var tw := pop.create_tween().set_parallel(true)
+	tw.tween_property(pop, ^"position:y", pop.position.y - PAYOUT_RISE, PAYOUT_SECONDS) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(pop, ^"modulate:a", 0.0, PAYOUT_SECONDS * 0.45).set_delay(PAYOUT_SECONDS * 0.55)
+	tw.chain().tween_callback(pop.queue_free)
+	return pop
+
+
 static func tick_open() -> void:
 	_sound_call(&"play", [&"ui_open"])
 
