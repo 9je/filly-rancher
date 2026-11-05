@@ -18,12 +18,29 @@ const TRACKS := {
 	&"ending_sad": "res://assets/audio/music/ending_lost_time.ogg",
 	&"drone": "res://assets/audio/music/dread_ossuary.ogg",
 }
+## THE STINGS (FS5.2; tools/make_stings.py): a short figure over the bed on the moments that
+## matter. The bed dips DUCK_DB under it and comes back as it ends.
+const STINGS := {
+	&"first_catch": "res://assets/audio/music/sting_first_catch.wav",
+	&"rare": "res://assets/audio/music/sting_rare.wav",
+	&"delivery": "res://assets/audio/music/sting_delivery.wav",
+	&"bloom": "res://assets/audio/music/sting_bloom.wav",
+}
+const DUCK_DB := 5.0
 const BUS := &"Music"
 const FADE_SECONDS := 2.5
 const SILENT_DB := -60.0
 
 var context: StringName = &""
 var dread := 0.0
+## How far the bed is dipped for a sting, in dB (0 at rest).
+var duck_db := 0.0:
+	set(v):
+		duck_db = v
+		if _current != null and _current.playing and (_tween == null or not _tween.is_running()):
+			_current.volume_db = _track_db()
+var _sting: AudioStreamPlayer
+var _duck_tween: Tween
 
 var _a: AudioStreamPlayer
 var _b: AudioStreamPlayer
@@ -38,6 +55,8 @@ func _ready() -> void:
 	_a = _player("A")
 	_b = _player("B")
 	_drone = _player("Drone")
+	_sting = _player("Sting")
+	_sting.volume_db = 0.0
 	_current = _a
 	var bus := AudioServer.get_bus_index(BUS)
 	if bus >= 0:
@@ -52,6 +71,8 @@ func _ready() -> void:
 	var events := get_node_or_null("/root/Events")
 	if events != null:
 		events.connect("dread_changed", set_dread)
+		events.connect("delivered", func(_uid: String, _look: Dictionary) -> void: stinger(&"delivery"))
+		events.connect("bloomed", func(_uid: String, _look: Dictionary) -> void: stinger(&"bloom"))
 	set_dread(dread)
 	if context != &"":
 		var pending := context
@@ -64,7 +85,9 @@ func _ready() -> void:
 func _exit_tree() -> void:
 	if _tween != null:
 		_tween.kill()
-	for p in [_a, _b, _drone]:
+	if _duck_tween != null:
+		_duck_tween.kill()
+	for p in [_a, _b, _drone, _sting]:
 		if p != null:
 			p.stop()
 			p.stream = null
@@ -137,9 +160,39 @@ func set_dread(d: float) -> void:
 		_lowpass.cutoff_hz = lerpf(20000.0, 900.0, pow(dread, 1.4))
 
 
-## The cozy track's level: full at dread 0, sinking under the drone as it climbs.
+## The cozy track's level: full at dread 0, sinking under the drone as it climbs, and dipped
+## under a sting.
 func _track_db() -> float:
-	return linear_to_db(maxf(0.0001, 1.0 - 0.75 * dread))
+	return linear_to_db(maxf(0.0001, 1.0 - 0.75 * dread)) + duck_db
+
+
+## Play the sting `id` over the bed. False for one this build does not have.
+func stinger(id: StringName) -> bool:
+	var path: String = STINGS.get(id, "")
+	if path == "" or not ResourceLoader.exists(path) or _sting == null:
+		return false
+	# A batch of deliveries is one sting, not three on top of each other.
+	if _sting.playing and _sting.stream != null and _sting.stream.resource_path == path:
+		return true
+	_sting.stream = load(path)
+	_sting.play()
+	var seconds := sting_seconds(id)
+	if _duck_tween != null:
+		_duck_tween.kill()
+	_duck_tween = create_tween()
+	_duck_tween.tween_property(self, ^"duck_db", -DUCK_DB, 0.08)
+	_duck_tween.tween_interval(maxf(0.0, seconds - 0.7))
+	_duck_tween.tween_property(self, ^"duck_db", 0.0, 0.6)
+	return true
+
+
+## How long the sting `id` runs, in seconds (0 for none).
+func sting_seconds(id: StringName) -> float:
+	var path: String = STINGS.get(id, "")
+	if path == "" or not ResourceLoader.exists(path):
+		return 0.0
+	var st: AudioStream = load(path)
+	return st.get_length() if st != null else 0.0
 
 
 func stop_all() -> void:

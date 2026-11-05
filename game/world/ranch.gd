@@ -4139,6 +4139,7 @@ func _on_pony_captured(instance: PonyInstance) -> void:
 		return
 	_game_state.onboarding.note(&"catch")
 	_game_state.story.add_var("catches")
+	_catch_sting(instance)
 	_apply_beam_recall()
 	_novelty_catch(instance)
 	# THE BOARD HEARS OF EVERY CATCH, the crowd's too: "Catch a pony" is a CATCH_ANY, and in
@@ -8585,6 +8586,20 @@ const PlayClockScript := preload("res://world/play_clock.gd")
 
 func _novelty(kind: String, id: String, label: String) -> bool:
 	return _game_state != null and _game_state.note_novelty(kind, id, label)
+
+
+## The score answers a catch (FS5.2): a chime for her very first, a sparkling run for a rare
+## or legendary pony.
+func _catch_sting(inst: PonyInstance) -> void:
+	var music := get_node_or_null(^"/root/Music")
+	if music == null:
+		return
+	if int(_game_state.story.get_var("catches", 0)) == 1:
+		music.call("stinger", &"first_catch")
+		return
+	var data: PonyData = inst.data() if not inst.is_stock() else null
+	if data != null and int(data.rarity) >= int(PonyData.Rarity.RARE):
+		music.call("stinger", &"rare")
 
 
 func _novelty_catch(inst: PonyInstance) -> void:
