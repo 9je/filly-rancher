@@ -100,3 +100,15 @@ func test_a_hard_landing_bounces_the_player() -> void:
 			peak = maxf(peak, absf(float(bounce.call("amount"))))
 	assert_not_null(bounce, "her body has a bounce")
 	assert_gt(peak, 0.005, "she lands rump first")
+
+
+func test_both_rigs_get_a_jiggle_the_same_size() -> void:
+	# The Mane Six's rig sized off its hip bone gave them a third of everyone else's.
+	var sizes := {}
+	for id: String in ["applebloom", "fluttershy", "rainbowdash", "derpyhooves"]:
+		var body: Node3D = PonyVisuals.build(load("res://data/ponies/%s.tres" % id))
+		add_child_autofree(body)
+		sizes[id] = float(body.get_node(^"RumpBounce").call("radius"))
+	var lo: float = sizes.values().min()
+	var hi: float = sizes.values().max()
+	assert_gt(lo, hi * 0.75, "every pony's jiggle within a quarter of the others: %s" % sizes)

@@ -63,26 +63,32 @@ func bind(body: Node3D) -> void:
 		return
 	var sk: Skeleton3D = sks[0]
 	_skeleton = sk
-	# The PonySFM cast's rig, or the Mane Six's.
-	var pelvis := sk.find_bone("Pelvis") if sk.find_bone("Pelvis") >= 0 else sk.find_bone("DEF_Hip")
-	var chest := sk.find_bone("Chest2") if sk.find_bone("Chest2") >= 0 else sk.find_bone("DEF_Chest2")
-	if pelvis < 0 or chest < 0:
+	# Anchored on her thighs and sized thigh to shoulder: both rigs put those in the same places
+	# (the Mane Six's hip bone sits well forward of their rump, and sizing off it gave them a
+	# jiggle a third the size; owner: "it looks like only derpy does it").
+	var thighs := _mid(sk, ["LeftThigh", "RightThigh"], ["DEF_Thigh.L", "DEF_Thigh.R"])
+	var shoulders := _mid(sk, ["LeftShoulder", "RightShoulder"], ["DEF_Shoulder.L", "DEF_Shoulder.R"])
+	if thighs == Vector3.INF or shoulders == Vector3.INF:
 		return
-	var p := sk.get_bone_global_rest(pelvis).origin
-	var c := sk.get_bone_global_rest(chest).origin
-	var back := p - c
+	var back := thighs - shoulders
 	var length := back.length()
 	if length < 1e-4:
 		return
-	back /= length
-	# Her rump: over the top of her hind legs, behind and above the hip joint. Small enough
-	# that her back and her legs stay put (owner 2026-11-05: "it looks like her whole body
-	# compresses so its not obvious at all").
-	# (owner, same day: "its more of the top then the back/cheeks"): centred on the back of
-	# her rump at hip height, so the cheeks move and not only the top.
-	_centre = p + back * length * 0.45 + Vector3.UP * length * 0.02
-	_radius = length * 0.75
+	# Level: her shoulders sit lower than her thighs, and the rump is straight behind.
+	back = Vector3(back.x, 0.0, back.z).normalized()
+	_centre = thighs + back * length * 0.37 + Vector3.UP * length * 0.017
+	_radius = length * 0.62
 	_back = back
+
+
+## The middle of a pair of bones, by either rig's names; INF when the skeleton has neither.
+static func _mid(sk: Skeleton3D, names: Array, alt: Array) -> Vector3:
+	for pair: Array in [names, alt]:
+		var a := sk.find_bone(pair[0])
+		var b := sk.find_bone(pair[1])
+		if a >= 0 and b >= 0:
+			return (sk.get_bone_global_rest(a).origin + sk.get_bone_global_rest(b).origin) * 0.5
+	return Vector3.INF
 
 
 func _process(delta: float) -> void:
