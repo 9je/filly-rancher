@@ -126,6 +126,10 @@ static func bearing(forward: Vector3, to: Vector3) -> float:
 func icon_state(i: int) -> Dictionary:
 	if i < 0 or i >= _icons.size():
 		return {}
+	# A place the guide has lit is drawn as the gold goal ring instead of its own icon.
+	if i < places.size() and places[i].get("node") == _goal and _goal_mark.visible:
+		var g := goal_state()
+		return {"visible": true, "x": g.x, "alpha": 1.0}
 	var r := _icons[i]
 	return {"visible": r.visible, "x": r.position.x + ICON * 0.5 - _left(), "alpha": r.modulate.a}
 

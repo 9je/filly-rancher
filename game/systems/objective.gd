@@ -50,10 +50,33 @@ static func current(s: Dictionary) -> Dictionary:
 	return {}
 
 
+## What the HUD's card says when the guide's ring points at `goal` (Guide.pick): the chore
+## itself when the guide is pointing at one, the story's step `story` otherwise, so the card
+## and the ring never name two places at once.
+static func for_guide(goal: StringName, story: Dictionary) -> Dictionary:
+	if not story.is_empty() and goal == StringName(story.get("goal", &"")):
+		return story
+	match goal:
+		&"mail":
+			return _o(&"mail", &"mail", PlaceSign.Icon.SCROLL, "Read your new letter")
+		&"talk":
+			return _o(&"talk", &"talk", PlaceSign.Icon.STAR, "Somepony has news")
+		&"market":
+			return _o(&"market", &"market", PlaceSign.Icon.COIN, "Sell gems at the Market")
+		&"pens":
+			return _o(&"pen", &"pens", PlaceSign.Icon.FENCE, "Pen the ponies you carry")
+		&"catch":
+			return _o(&"catch", &"catch", PlaceSign.Icon.STAR, "Catch a Drifter")
+	return story
+
+
 static func _acts_one_two(s: Dictionary, flags: Array) -> Dictionary:
 	# The first lessons: a pen, ponies in it. After the Depot, a full bag is the guide's to
 	# point out (Guide.pick), not the story's.
 	if not flags.has("depot_explained"):
+		# Catch first: Fennel shows her the pens after her first catches (act1.txt).
+		if not flags.has("met_fennel"):
+			return _o(&"first_catch", &"catch", PlaceSign.Icon.STAR, "Catch a Drifter")
 		if int(s.get("pens", 0)) == 0:
 			return _o(&"build", &"pens", PlaceSign.Icon.FENCE, "Build your first pen")
 		if int(s.get("bag", 0)) > 0:

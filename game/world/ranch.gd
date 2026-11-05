@@ -5223,6 +5223,10 @@ func _mount_compass(fingers: Array) -> void:
 		if f[2] != null:
 			list.append({"name": String(f[0]), "icon": int(f[1]), "node": f[2]})
 	compass.call("set_places", list)
+	# The story's next step, under the strip (game/ui/objective_card.gd).
+	var card: Control = (load("res://ui/objective_card.gd") as GDScript).new()
+	card.name = "ObjectiveCard"
+	hud_node.add_child(card)
 
 
 ## A post with a sign on an arm, facing `out_dir`.
@@ -9162,5 +9166,15 @@ func _update_guide(delta: float) -> void:
 		_guide_node = place[0] as Node3D
 		if compass != null:
 			compass.call("set_goal", _guide_node, int(place[1]))
+		var card := get_node_or_null(^"HUD/ObjectiveCard")
+		if card != null:
+			var o: Dictionary = ObjectiveScript.for_guide(goal, current_objective()) \
+				if on and not _in_palace else {}
+			var where: Node3D = _guide_place(StringName(o.get("goal", &"")))[0] as Node3D if not o.is_empty() else null
+			var d := -1.0
+			if where != null and player != null:
+				d = Vector2(where.global_position.x - player.global_position.x,
+					where.global_position.z - player.global_position.z).length()
+			card.call("show_objective", o, d)
 	var target := guide_target()
 	_guide_trail.point(player.global_position, target.global_position if target != null else Vector3.INF)

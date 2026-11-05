@@ -24,9 +24,10 @@ func _words(over: Dictionary) -> String:
 
 func test_act_one_walks_her_through_the_first_steps() -> void:
 	assert_eq(_goal({}), &"marigold", "before the Scoop: Marigold")
-	assert_eq(_goal({"flags": ["has_scoop"]}), &"pens", "the Scoop and no pen: build one")
-	assert_eq(_goal({"flags": ["has_scoop"], "pens": 1}), &"catch", "a pen: catch for it")
-	assert_eq(_goal({"flags": ["has_scoop"], "pens": 1, "bag": 2}), &"pens", "ponies in the bag: pen them")
+	assert_eq(_goal({"flags": ["has_scoop"]}), &"catch", "the Scoop: catch first, as the guide's ring does")
+	assert_eq(_goal({"flags": ["has_scoop", "met_fennel"]}), &"pens", "Fennel showed her the pens: build one")
+	assert_eq(_goal({"flags": ["has_scoop", "met_fennel"], "pens": 1}), &"catch", "a pen: catch for it")
+	assert_eq(_goal({"flags": ["has_scoop", "met_fennel"], "pens": 1, "bag": 2}), &"pens", "ponies in the bag: pen them")
 
 
 func test_after_the_depot_the_way_is_deliveries_then_blooms() -> void:
@@ -74,3 +75,18 @@ func test_every_objective_is_a_few_words_with_an_icon() -> void:
 		var n := String(o.words).split(" ", false).size()
 		assert_between(n, 2, 6, "'%s'" % o.words)
 		assert_true(o.has("icon"))
+
+
+func test_the_card_names_what_the_ring_points_at() -> void:
+	# One goal on screen at a time: a chore the guide points at (a letter, news, a full bag,
+	# gems to sell) is named on the card too, and with no chore the card is the story's step.
+	var story := ObjectiveScript.current(_s({"flags": ["has_scoop", "depot_explained"], "pens": 1}))
+	assert_eq(ObjectiveScript.for_guide(&"mail", story).goal, &"mail")
+	assert_eq(ObjectiveScript.for_guide(&"talk", story).goal, &"talk")
+	assert_eq(ObjectiveScript.for_guide(&"market", story).goal, &"market")
+	assert_eq(ObjectiveScript.for_guide(&"pens", story).goal, &"pens")
+	assert_eq(ObjectiveScript.for_guide(&"depot", story), story, "the ring on the story's place: the story's words")
+	assert_eq(ObjectiveScript.for_guide(&"", story), story)
+	for g: StringName in [&"mail", &"talk", &"market", &"pens", &"catch"]:
+		var o := ObjectiveScript.for_guide(g, story)
+		assert_between(String(o.words).split(" ", false).size(), 2, 6, String(o.words))
