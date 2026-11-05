@@ -216,3 +216,116 @@ MISSION.md's "Fun and anti-repetition rules" are part of the Definition of Done.
    - FIRST_10_MINUTES.mp4 (the bot, Movie Maker, 1080p60).
    - The trailer: TRAILER_PLAN.md, staged shots at 4K, a scripted edit, beat-cut, -14 LUFS, at least three reviewed iterations in TRAILER_REVIEW.md.
    - Deliverables: TRAILER_4K.mp4 and TRAILER_1080p.mp4.
+
+---
+
+## FS. The fix sweep (2026-11-05): gap items 1 to 7 and 10
+
+> **For agentic workers:** REQUIRED SUB-SKILL: superpowers:executing-plans (the owner's standing rule is at most one subagent at a time, sonnet or opus). Steps use checkbox (`- [ ]`) syntax.
+
+**Goal:** close the eight gaps the owner picked from the AAA list: mid-game guidance, art unity, faces and life, animation feel, sound, loop polish, late-game depth, accessibility.
+
+**Architecture:** each milestone is a self-contained slice with its own tests and renders, in the order below (the owner's playtest exits first). Pure rule functions (like `Guide.pick`) carry the decisions so they test headless; world and UI nodes only measure and draw. Every visual change is checked in a rendered frame before it is called done (memory: look at renders, not tests).
+
+**Tech stack:** Godot 4.7.2, GDScript, GUT 9.5, the real-input harness (`tools/run_input_tests.sh`), the bot (`tools/playthrough.sh`), Python 3 asset tools.
+
+**Spec:** the owner's request ("plan a fix sweep containing items 1-7 and 10") of the gap list given 2026-11-05: 1 guidance goes quiet mid-game; 2 art reads as a kit-bash, pale coats blow out, flat ground; 3 ponies' faces are frozen and bodies pass through each other; 4 animation is clips sped up, no transitions or reactions; 5 sound unverified in play, no music that follows the moment; 6 menus are lists, not delightful; 7 nothing to spend bits on late; 10 no rebinding, no colourblind-safe marks, no text size.
+
+### Global constraints
+- No em dashes anywhere; the house dash is " -- ".
+- Canon MLP names, looks and places stay.
+- No realistic pony vocals; AI voices are on hold (owner, 2026-11-05).
+- Visual-first UI: icons over sentences, no floating text in the world.
+- Every Godot launch sets FILLY_TEST_SAVE_DIR and passes --log-file; windows only on an invisible xvfb display.
+- Root cause first; a failing test before each fix; real-input tests act only through Input.parse_input_event.
+- No game-file edits while a test run is in progress.
+- At most one subagent at a time (sonnet or opus); prefer doing the work inline.
+- The gates at the end of each milestone: the touched GUT files, the touched real-input tests, and a rendered frame reviewed; at the end of the sweep: full GUT, all real-input tests, the five endings, both exports.
+
+### Review focus
+1. An old save or the epilogue has a story state the objective rules never named: the tracker shows nothing rather than a wrong goal or an error (test in FS1.1).
+2. A rebound key collides with another action or an old settings file has no binds section: the conflict is refused with the clash named, and the old file loads with defaults (test in FS8.1).
+3. The largest text size at 1280x720: no panel runs off screen or clips its last line (test in FS8.2).
+4. A decoration placed over a pen gate, a road or an NPC's spot: refused by the ghost, and placed decor survives save and load (test in FS7.1).
+5. Faces on every wild pony at once: far ponies skip the face (the existing LOD tiers), and 60 ponies stay inside the perf budget (test in FS3.1).
+
+---
+
+### FS1. Guidance that never goes quiet (gap 1)
+
+**Files:** create `game/systems/objective.gd` (class_name Objective), `game/ui/objective_card.gd`, `game/test/test_objective.gd`, `game/test_input/test_objective_card.gd`; modify `game/systems/guide.gd`, `game/world/ranch.gd` (guide section), `game/ui/hud.gd`.
+
+**Interfaces:**
+- Produces `static func Objective.current(s: Dictionary) -> Dictionary` returning `{id: StringName, icon: int (PlaceSign.Icon), words: String (3 to 6 words), goal: StringName}` or `{}`. State keys: everything `Guide.pick` takes, plus `chapter: int`, `path: String`, `contract: Dictionary`, `flags: Array[String]`, `ending: String`.
+- `Guide.pick` gains goals `&"depot"`, `&"marigold"`, `&"palace"`, `&"lift"`; `ranch._guide_place` maps each to its node.
+- `ObjectiveCard.show_objective(o: Dictionary, distance_m: float)`.
+
+- [ ] **FS1.1 Objective rules.** Test first, one assertion per chapter of STORY.md: chapter 0 before the Scoop "talk to Marigold"; SUNNY after the lessons "deliver ponies to the Depot (n/3)"; WEATHER with the invitation "meet Marigold at the Depot"; COMPANY "fill the contract (got/want)"; RESISTANCE per path; every unnamed state (the Review Focus case, including `ending != ""`) returns `{}`. Implement as a table, not branches scattered through ranch.gd. Commit.
+- [ ] **FS1.2 The main path on the trail.** `Guide.pick` falls through to `Objective.current(s).goal` when nothing is waiting on her, so the trail and the compass ring point at the story's next place mid-game. Test: a SUNNY state with no mail and no news picks `&"depot"`. Commit.
+- [ ] **FS1.3 The objective card.** A small casino-tile card under the compass: the goal's PlaceSign icon, the words, the metres to it, sliding in on change with the existing `MenuStyle` panel style; hidden when `{}`. Real-input test `test_objective_card`: after the first catch the card names the pens; after penning, the Depot; its distance falls as the bot walks toward it. Commit.
+- [ ] **FS1.4 The checklist as chips.** `hud.set_tasks` draws each tutorial row as an icon chip (the action's icon, lit when done, its bit reward on the chip), no sentences; the sentence moves to a hover tooltip. Test in `test_hud.gd`: three rows give three chips, a done row is lit. Commit.
+- [ ] **FS1.5 Trail at play distance.** Render the bot's first five minutes (`--shots`) and inspect the frames with a goal set; if the motes do not read at 8 to 15 m, raise `GuideTrail` quad size and core brightness until they do. Record the frames in `build/playtest_evidence/fs1/`. Commit.
+
+### FS2. One look across the world (gap 2)
+
+**Files:** modify `game/shaders/toon.gdshader`, `game/systems/toon_styler.gd`, `game/world/terrain.gd` and its shader, `game/world/ranch.tscn` (environment), `game/world/props.gd`; test `game/test/test_toon_styler.gd`, render script `game/scenes/test/look_sheet.gd` (new).
+
+- [ ] **FS2.1 Pale coats keep their shape.** Root cause first: measure which term pushes a white coat to pure white (ambient plus sun plus rim, or the tonemap). Fix with a highlight shoulder in the toon light (lit colour capped below 0.96 of white, shadow band kept visible on luminance above 0.85). Test: for an albedo of 0.97 the lit side stays under 0.96 and the shadow side differs from it by at least 0.12. Render the roster faces (`scenes/test/roster_eyes.gd`) before and after. Commit.
+- [ ] **FS2.2 Ground with life.** The terrain shader gets a large-scale hue drift (two greens), a fine painted noise and darker grass at prop and fence bases (a contact term from the prop footprint mask). Test: two samples 40 m apart differ in hue; a sample under a fence base is darker than open grass. Render spawn views. Commit.
+- [ ] **FS2.3 One palette for the kit.** `look_sheet.gd` renders one tile per prop family and building beside a pony under the game's light; any family whose albedo falls outside the show palette's saturation and value bands gets a per-family tint in `ToonStyler.PRESETS`. Test: every family's mean albedo is inside the bands. Commit with the sheet.
+
+### FS3. Faces and bodies (gap 3)
+
+**Files:** modify `game/actors/pony/pony_face.gd`, `game/actors/pony/pony_visuals.gd`, `game/actors/pony/pony.gd`, `game/actors/player/player.gd`, `game/world/spawner.gd`; create `game/actors/pony/body_space.gd`; tests `game/test/test_pony_face.gd`, `game/test/test_body_space.gd`.
+
+**Interfaces:**
+- `PonyFace` gains `const RIG_NAMES := {&"lid_l": ["LeftEyeLidUpper", "CON_UpperEyelid.L"], ...}` so both rigs resolve; `PonyVisuals.build` attaches one to every body.
+- `Pony.set_mood(m: PonyFace.Mood)`; moods driven by state: fleeing SCARED, held SCARED, penned and fed HAPPY, hungry SAD.
+- `BodySpace.push(self_pos: Vector3, others: Array, reach: float) -> Vector3` (the townsfolk separation, made shared).
+
+- [ ] **FS3.1 Every pony blinks and emotes.** Tests: a built Fluttershy and a built Apple Bloom both resolve lid, ear and jaw bones; a pony set to SCARED drops her ears; a FAR-tier pony's face does not process (the Review Focus perf case). Run `tools/perf.sh` and keep p99 at or under 16.6 ms. Commit.
+- [ ] **FS3.2 Eyes that look.** The eye shader's `gaze` (added for Derpy) follows the player when she is within 6 m and the pony is idle or penned, clamped to 0.08 UV; Derpy keeps her offset on top. Test: gaze points toward a target on the left for both eyes. Commit.
+- [ ] **FS3.3 Bodies do not pass through bodies.** `BodySpace` replaces the NPC-only push and is applied to wild ponies (against each other and the player) and to the player (a soft slide out of any pony body she is inside, never a hard stop). Test: two wild ponies spawned 0.3 m apart are over 1.2 m apart after 4 s; the player walked into a standing pony ends clear of her capsule plus body length. Commit.
+
+### FS4. Animation feel (gap 4)
+
+**Files:** create `tools/retarget_clips.py`, `game/actors/pony/gait_blend.gd`; modify `tools/convert_roster.sh`, `game/actors/pony/pony.gd`, `game/actors/player/player.gd`, `game/actors/player/magic_beam.gd`; tests `game/test/test_retarget.gd`, `game/test/test_gait_blend.gd`.
+
+- [ ] **FS4.1 The Mane Six get the full clip set.** They ship idle, walk and gallop only; the PonySFM cast has 20 (cower, graze, hop, jump, laugh, lie, look, nod, rear, sad, shake, sit, sleep, startle, struggle, talk, trot). `retarget_clips.py` maps SFM bone names to the DEF_ rig (a name table, rest-pose corrected) and writes the clips into each Mane Six glb, run by `convert_roster.sh` after export. Test: every Mane Six glb carries all 20 clip names; a retargeted `sit` puts the hips lower than `idle` does. Commit.
+- [ ] **FS4.2 Starts, stops and turns.** `GaitBlend` blends idle, walk, trot and gallop by speed (AnimationTree blend space), plays a short lean into a turn above 90 deg/s, and a settle step on stopping. Test: speed 0.5 m/s gives walk weight over 0.5; a stop from gallop passes through trot. Commit.
+- [ ] **FS4.3 Reactions.** `startle` when a pony first notices the player, `struggle` while held in the beam, `hop` on landing in a pen (with the bounce), a stumble when the player lands hard. Test per trigger in `test_pony.gd` / `test_magic_beam.gd`. Commit.
+
+### FS5. Sound in play (gap 5)
+
+**Files:** modify `game/systems/music.gd`, `game/systems/sound.gd`; create `game/scenes/test/sound_capture.gd`; tests `game/test/test_music.gd`.
+
+- [ ] **FS5.1 Hear the hoofs.** `sound_capture.gd` records the bot's first two minutes with audio (Movie Maker, a real audio driver into a file); measure hoofstep loudness against the beds (hoofs 10 to 16 dB under the music at the listener) and fix the levels if not. Commit the measurement in PROGRESS.md.
+- [ ] **FS5.2 Music that follows the moment.** `Music.stinger(id)` plays a short sting on a first catch, a rare catch, a delivery and a Bloom (the existing bus, ducking the bed 4 dB for the sting); contexts for the Market and the Depot. Test: a stinger ducks the bed and restores it within 2.5 s. Commit.
+
+### FS6. The loop's menus (gap 6)
+
+**Files:** modify `game/ui/market_menu.gd`, `game/ui/depot_menu.gd`, `game/ui/build_menu.gd`, `game/ui/menu_style.gd`; tests in their existing test files.
+
+- [ ] **FS6.1 Motion.** Every tile menu opens with a 0.18 s scale-and-fade, tiles stagger in 30 ms apart, the hovered tile lifts 4 px, and a purchase flies a coin from the tile to the wallet. Test: a menu's panel reaches full scale within 0.25 s; a buy emits `purchased` and spawns the coin. Commit.
+- [ ] **FS6.2 The Depot as a payout.** Delivering rolls each pony's pay up on her tile one by one with a counter sound, and the total lands on the balance with the receipt toast. Test: three deliveries give three roll-ups and one balance change of their sum. Commit.
+
+### FS7. Something to spend on later (gap 7)
+
+**Files:** create `game/data/decor/*.tres` (DecorItem), `game/systems/decor.gd`, `game/world/decor_layer.gd`; modify `game/systems/shop_item.gd` (Kind.DECOR), `game/ui/market_menu.gd` (a DECOR tab), `game/systems/save_io.gd`; tests `game/test/test_decor.gd`.
+
+**Interfaces:** `Decor.place(id: StringName, at: Vector3, yaw: float) -> bool`, `Decor.saved() -> Array[Dictionary]`, `Decor.restore(rows: Array)`.
+
+- [ ] **FS7.1 Decorate the ranch.** Twelve decorations from the existing prop kits (flower beds, lanterns, a fountain, statues of the Mane Six, bunting, a gazebo), 200 to 20,000 bits, placed with the plot ghost (green or red) anywhere on the homestead except pen gates, roads and NPC spots (the Review Focus case). Tests: a placement on a road is refused; placed decor survives save and load; a 20,000-bit item is affordable on a finished bot save. Commit.
+- [ ] **FS7.2 Collection goals.** The compendium pays a bonus and unlocks one decoration for each full set (all of a rarity, all of a region, all the Mane Six). Test: completing a set grants once, never twice. Commit.
+
+### FS8. Accessibility (gap 10)
+
+**Files:** modify `game/systems/settings.gd`, `game/ui/settings_menu.gd`, `game/ui/catch_card.gd`, `game/ui/catch_icon.gd`, `game/ui/menu_style.gd`; tests `game/test/test_settings.gd`, `game/test/test_settings_menu.gd`, `game/test/test_catch_card.gd`.
+
+- [ ] **FS8.1 Rebinding.** A Controls tab lists every action in `project.godot [input]` with its key and pad button; click and press to rebind; a key already bound elsewhere is refused with the other action named; binds save under `[binds]` in the settings file and an old file without it loads defaults (the Review Focus case). Tests for each. Commit.
+- [ ] **FS8.2 Text size.** A Text size setting (100, 125, 150 percent) scales the theme's font sizes; at 150 percent at 1280x720 every menu fits on screen (the Review Focus case: each panel's rect inside the viewport, its last label unclipped). Commit.
+- [ ] **FS8.3 Not colour alone.** Rarity on the catch card, the compendium and the Depot tiles carries a shape as well as a colour (common circle, uncommon diamond, rare star, legendary crown); trait chips keep their icons. Test: every rarity has a distinct shape glyph. Commit.
+
+### FS9. Gates
+
+- [ ] Full GUT; all real-input tests; the five endings (`tools/playthrough.sh`) in the frozen checkout; both exports; owner logs untouched; PROGRESS.md and DECISIONS.md updated.
