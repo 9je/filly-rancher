@@ -80,6 +80,11 @@ while IFS='|' read -r id kind source rig; do
   if ! $VALIDATOR "$out" --require-anims >> "$log" 2>&1 < /dev/null; then
     echo "FAILED $id: validation failed, see $log"; failed=$((failed + 1)); rm -f "$out"; continue
   fi
+  # The show's pupil (tools/show_pupils.py): a fresh export ships Source's all-pupil eyes.
+  if [ -z "${FILLY_EXPORTER:-}" ]; then
+    eyes=$(ls "$OUT_DIR/${id}"_pupil_[lr].png "$OUT_DIR/${id}"_Eye.png "$OUT_DIR/${id}"_Eye_R.png 2>/dev/null)
+    [ -n "$eyes" ] && python3 tools/show_pupils.py $eyes >> "$log" 2>&1 < /dev/null
+  fi
   echo "CONVERTED $id"; ok=$((ok + 1))
 done < "$MANIFEST"
 
