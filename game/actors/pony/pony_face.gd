@@ -79,13 +79,29 @@ func _ready() -> void:
 	_ear_next = _rng.randf_range(3.0, 9.0)
 
 
+## The Mane Six's rig names the same bones its own way (DEF_ and CON_, FS3.1).
+const ALIASES := {
+	"LeftEyeLidUpper": "CON_UpperEyelid.L", "RightEyeLidUpper": "CON_UpperEyelid.R",
+	"LeftEar": "DEF_Ear1.L", "RightEar": "DEF_Ear1.R", "Javv": "CON_Jaw",
+	"Neck1": "DEF_Neck1", "Head": "DEF_Head",
+}
+
+
 func _find(name: String) -> int:
 	if _bones.has(name):
 		return _bones[name]
 	var sk := get_skeleton()
 	var i := sk.find_bone(name) if sk != null else -1
+	if i < 0 and sk != null and ALIASES.has(name):
+		i = sk.find_bone(ALIASES[name])
 	_bones[name] = i
 	return i
+
+
+## Which face channels this skeleton has bones for, by either rig's names.
+func channels_found() -> Dictionary:
+	return {"lid_l": _find("LeftEyeLidUpper") >= 0, "lid_r": _find("RightEyeLidUpper") >= 0,
+		"ear_l": _find("LeftEar") >= 0, "ear_r": _find("RightEar") >= 0, "jaw": _find("Javv") >= 0}
 
 
 func _process_modification() -> void:

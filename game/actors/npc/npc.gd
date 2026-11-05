@@ -91,9 +91,12 @@ func setup(d: CharacterDef) -> void:
 		_anim.animation_finished.connect(_on_clip_finished)
 	var sks := body.find_children("*", "Skeleton3D", true, false)
 	if not sks.is_empty():
-		_face = PonyFaceScript.new()
-		_face.name = "Face"
-		(sks[0] as Skeleton3D).add_child(_face)
+		# The body may already wear one (PonyVisuals.build gives every pony a face).
+		_face = (sks[0] as Skeleton3D).get_node_or_null(^"Face") as PonyFace
+		if _face == null:
+			_face = PonyFaceScript.new()
+			_face.name = "Face"
+			(sks[0] as Skeleton3D).add_child(_face)
 		if def.never_blinks:
 			_face.blink_interval = Vector2(9999.0, 9999.0)
 	_play(&"idle")

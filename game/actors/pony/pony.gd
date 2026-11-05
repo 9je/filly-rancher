@@ -1018,9 +1018,30 @@ func _detail_meshes() -> Array[MeshInstance3D]:
 	if _meshes_cache.is_empty() and visuals != null:
 		for m in visuals.find_children("*", "MeshInstance3D", true, false):
 			_meshes_cache.append(m as MeshInstance3D)
-		for m in visuals.find_children("*", "SpringBoneSimulator3D", true, false):
+		# Hair springs, her face and her hoof planter all rest when she is far (FS3.1).
+		for m in visuals.find_children("*", "SkeletonModifier3D", true, false):
 			_springs_cache.append(m as SkeletonModifier3D)
 	return _meshes_cache
+
+
+## HER FACE FOLLOWS HER STATE (FS3.1): scared when she runs or is held in the beam, content
+## otherwise. The face is PonyVisuals' "Face" modifier on her skeleton.
+func _update_mood() -> void:
+	if visuals == null:
+		return
+	var found := visuals.find_children("Face", "", true, false)
+	if found.is_empty():
+		return
+	var face := found[0] as PonyFace
+	if face == null:
+		return
+	match state:
+		State.FLEE, State.HELD:
+			face.mood = PonyFace.Mood.SCARED
+		State.GRAZE, State.IDLE:
+			face.mood = PonyFace.Mood.HAPPY if is_in_group(&"penned") else PonyFace.Mood.NEUTRAL
+		_:
+			face.mood = PonyFace.Mood.NEUTRAL
 
 
 # --- states -----------------------------------------------------------------------
@@ -1227,6 +1248,7 @@ func _transition_to(next: int) -> void:
 		_fled = 0.0
 		_maybe_blink()
 	state = next
+	_update_mood()
 	match state:
 		State.IDLE:
 			_state_timer = _rng.randf_range(IDLE_SECONDS.x, IDLE_SECONDS.y)

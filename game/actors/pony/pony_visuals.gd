@@ -46,6 +46,7 @@ extends RefCounted
 ## one that has one; there is nothing here that could block on it.
 
 const HoofPlanterScript := preload("res://actors/pony/hoof_planter.gd")
+const PonyFaceScript := preload("res://actors/pony/pony_face.gd")
 const RumpBounceScript := preload("res://actors/pony/rump_bounce.gd")
 const PonyRigScript := preload("res://scripts/pony_rig.gd")
 
@@ -114,6 +115,10 @@ static func build(data: PonyData, model_path_override: String = "") -> Node3D:
 		var planter := HoofPlanterScript.new()
 		planter.name = "HoofPlanter"
 		sk.add_child(planter)
+		# Every pony blinks, flicks an ear and shows her mood (FS3.1; only townsfolk did).
+		var face := PonyFaceScript.new()
+		face.name = "Face"
+		sk.add_child(face)
 		break
 	_fold_wings(pony)
 	# The owner's slapstick bounce (actors/pony/rump_bounce.gd).
