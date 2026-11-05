@@ -488,67 +488,88 @@ func set_tasks(rows: Array) -> void:
 	title.add_theme_color_override("font_color", INK)
 	title.add_theme_font_override("font", MenuStyleScript.title_font())
 	_tasks.add_child(title)
-	# A CHECKLIST, NOT A BULLETED PARAGRAPH (overnight bot review, 2026-10-26): a drawn tick
-	# box that fills green when the job is done, the job, and its reward as a coin and a
-	# number. task_lines() still reads as it always has.
+	# CHIPS, NOT SENTENCES (FS1.4; owner, visual-first UIs): each lesson is its action's icon
+	# on a tile that turns green with a tick when done, one word, and its reward. The
+	# sentence is the objective card's job now (game/ui/objective_card.gd). task_lines()
+	# still reads as it always has.
+	_chips = []
+	var strip := HBoxContainer.new()
+	strip.add_theme_constant_override(&"separation", 12)
+	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tasks.add_child(strip)
 	for entry in rows:
 		if typeof(entry) != TYPE_DICTIONARY:
 			continue
 		var row: Dictionary = entry
-		_tasks.add_child(_task_row(String(row.get("text", "")), bool(row.get("done", false)),
-			int(row.get("reward_bits", 0))))
+		var kind: Array = TASK_CHIPS.get(String(row.get("id", "")),
+			[String(row.get("text", "")).get_slice(" ", 0), PlaceSign.Icon.STAR])
+		var chip := {"word": String(kind[0]), "done": bool(row.get("done", false)),
+			"icon": PlaceSign.icon_texture(int(kind[1])), "reward": int(row.get("reward_bits", 0))}
+		_chips.append(chip)
+		strip.add_child(_task_chip(chip))
 	var card := get_node_or_null("TasksCard") as Panel
 	if card != null:
 		_fit_card.call_deferred(card, _tasks, Vector2(18, 12))
 
 
 const TASK_TICK := Color(0.36, 0.68, 0.36)
+## Each lesson's chip: one word and its action's place icon.
+const TASK_CHIPS := {
+	"tutorial_catch": ["Catch", PlaceSign.Icon.STAR],
+	"tutorial_pen": ["Pen", PlaceSign.Icon.FENCE],
+	"tutorial_sell": ["Sell", PlaceSign.Icon.COIN],
+}
+var _chips: Array[Dictionary] = []
 
 
-func _task_row(text: String, done: bool, reward: int) -> HBoxContainer:
-	var line := HBoxContainer.new()
-	line.add_theme_constant_override(&"separation", 10)
-	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var box := Control.new()
-	box.custom_minimum_size = Vector2(22, 22)
-	box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.draw.connect(func() -> void:
-		var r := Rect2(Vector2(1, 1), box.size - Vector2(2, 2))
+## The checklist's chips as drawn: [{word, done, icon, reward}].
+func task_chips() -> Array[Dictionary]:
+	return _chips.duplicate()
+
+
+func _task_chip(chip: Dictionary) -> VBoxContainer:
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override(&"separation", 2)
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var done: bool = chip.done
+	var tile := Control.new()
+	tile.custom_minimum_size = Vector2(52, 52)
+	tile.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var icon: Texture2D = chip.icon
+	tile.draw.connect(func() -> void:
+		var r := Rect2(Vector2.ZERO, tile.size)
+		var sb := StyleBoxFlat.new()
+		sb.set_corner_radius_all(14)
+		sb.bg_color = TASK_TICK if done else Color(1, 1, 1, 0.75)
+		sb.border_color = TASK_TICK.darkened(0.25) if done else INK_SOFT
+		sb.set_border_width_all(2)
+		tile.draw_style_box(sb, r)
+		if icon != null:
+			tile.draw_texture_rect(icon, Rect2(Vector2(9, 9), tile.size - Vector2(18, 18)), false,
+				Color(1, 1, 1, 0.55) if done else Color.WHITE)
 		if done:
-			box.draw_rect(r, TASK_TICK, true)
-			box.draw_polyline(PackedVector2Array([Vector2(5, 11), Vector2(9.5, 16),
-				Vector2(17, 6)]), Color(1, 1, 1), 3.0, true)
-		else:
-			box.draw_rect(r, Color(1, 1, 1, 0.6), true)
-			box.draw_rect(r, INK_SOFT, false, 2.0))
-	line.add_child(box)
-	var label := Label.new()
-	label.text = text
-	MenuStyleScript.style_label(label, 20, COLOR_TASK_DONE if done else COLOR_TASK_OPEN)
-	label.add_theme_constant_override("outline_size", 0)
-	label.add_theme_color_override("font_color", TASK_TICK.darkened(0.2) if done else INK_SOFT)
-	line.add_child(label)
-	if reward > 0:
-		var coin: Control = ShopIconScript.new()
-		coin.kind = &"sell_all"
-		coin.custom_minimum_size = Vector2(20, 20)
-		coin.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		coin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		coin.modulate = Color(1, 1, 1, 0.5) if done else Color(1, 1, 1)
-		line.add_child(coin)
-		var bits := Label.new()
-		bits.text = "%d" % reward
-		MenuStyleScript.style_label(bits, 20, COLOR_TASK_OPEN)
-		bits.add_theme_constant_override("outline_size", 0)
-		bits.add_theme_color_override("font_color", Color(0.62, 0.45, 0.1, 0.5 if done else 1.0))
-		bits.add_theme_font_override("font", MenuStyleScript.numeral_font())
-		line.add_child(bits)
-	return line
+			# The tick, on a white badge at the corner.
+			var c := Vector2(tile.size.x - 9, 9)
+			tile.draw_circle(c, 9, Color.WHITE)
+			tile.draw_polyline(PackedVector2Array([c + Vector2(-4.5, 0), c + Vector2(-1, 3.5),
+				c + Vector2(5, -3.5)]), TASK_TICK, 2.5, true))
+	col.add_child(tile)
+	var word := Label.new()
+	word.text = String(chip.word)
+	word.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	MenuStyleScript.style_label(word, 17, INK)
+	word.add_theme_constant_override("outline_size", 0)
+	col.add_child(word)
+	var reward := Label.new()
+	reward.text = "+%d" % int(chip.reward)
+	reward.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	MenuStyleScript.style_label(reward, 15, Color(0.6, 0.45, 0.12))
+	reward.add_theme_constant_override("outline_size", 0)
+	col.add_child(reward)
+	return col
 
 
-## Every line the checklist is drawing, in order, title first. For the tests, which
-## otherwise have no way to read it without walking Label nodes.
 func task_lines() -> Array[String]:
 	return _task_lines.duplicate()
 
@@ -973,9 +994,11 @@ func _fit_card(card: Panel, node: Control, pad: Vector2) -> void:
 	var r := node.get_global_rect()
 	# The content's own height, not the box's: a three-line checklist gets a three-line card.
 	var h := minf(r.size.y, node.get_combined_minimum_size().y)
+	# And its own width: one chip left, a one-chip card (FS1.4).
+	var w := minf(r.size.x, node.get_combined_minimum_size().x)
 	card.visible = node.visible and h > 2.0 and _has_content(node)
 	card.position = r.position - pad
-	card.size = Vector2(r.size.x, h) + pad * 2.0
+	card.size = Vector2(w, h) + pad * 2.0
 
 
 func _has_content(node: Control) -> bool:

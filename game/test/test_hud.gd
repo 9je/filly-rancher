@@ -612,7 +612,8 @@ func test_the_queue_drains_and_the_last_line_still_gets_shown() -> void:
 
 
 ## RENDER REVIEW 2026-10-26: two lessons claimed, and the card still stood three rows tall
-## round the one that was left.
+## round the one that was left. The lessons are a row of chips now (FS1.4), so the card
+## narrows rather than shortens.
 func test_the_task_card_shrinks_with_its_list() -> void:
 	var three := []
 	for i in 3:
@@ -624,9 +625,27 @@ func test_the_task_card_shrinks_with_its_list() -> void:
 	if card == null:
 		pending("no TasksCard in this HUD")
 		return
-	var tall := card.size.y
+	var wide := card.size.x
 	# The ranch hands the list over again and again, not once (ranch.gd's refresh).
 	for i in 4:
 		_hud.set_tasks([three[0]])
 		await wait_physics_frames(1)
-	assert_lt(card.size.y, tall - 20.0, "one row left, a one-row card")
+	assert_eq(_hud.task_chips().size(), 1, "one lesson left, one chip")
+	assert_lte(card.size.x, wide, "and the card no wider than it was")
+	assert_lt(card.size.x, 300.0, "a card the width of its title and chips, not the old sentence card")
+
+
+## THE CHECKLIST AS CHIPS (FS1.4; owner, visual-first UIs): each lesson is an icon chip with
+## one word and its reward, lit when done; the sentence lives on the objective card.
+func test_the_lessons_are_icon_chips_one_word_each_lit_when_done() -> void:
+	_hud.set_tasks([
+		{"id": "tutorial_catch", "text": "Catch a pony with your magic beam.", "done": true, "paid": false, "reward_bits": 20},
+		{"id": "tutorial_pen", "text": "Move a pony into a pen.", "done": false, "paid": false, "reward_bits": 30},
+		{"id": "tutorial_sell", "text": "Sell a gem at the market.", "done": false, "paid": false, "reward_bits": 50},
+	])
+	var chips: Array = _hud.task_chips()
+	assert_eq(chips.size(), 3)
+	assert_eq(chips.map(func(c: Dictionary) -> String: return c.word), ["Catch", "Pen", "Sell"])
+	assert_eq(chips.map(func(c: Dictionary) -> bool: return c.done), [true, false, false])
+	for c: Dictionary in chips:
+		assert_not_null(c.icon, "%s has an icon" % c.word)
