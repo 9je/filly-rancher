@@ -299,7 +299,7 @@ MISSION.md's "Fun and anti-repetition rules" are part of the Definition of Done.
 
 **Files:** modify `game/systems/music.gd`, `game/systems/sound.gd`; create `game/scenes/test/sound_capture.gd`; tests `game/test/test_music.gd`.
 
-- [ ] **FS5.1 Hear the hoofs.** `sound_capture.gd` records the bot's first two minutes with audio (Movie Maker, a real audio driver into a file); measure hoofstep loudness against the beds (hoofs 10 to 16 dB under the music at the listener) and fix the levels if not. Commit the measurement in PROGRESS.md.
+- [ ] **FS5.1 Hear the hoofs.** Tried 2026-11-05, INCONCLUSIVE: a Movie Maker capture of the bot's first two minutes shows no hoof onsets while walking, and raising every hoof set 6 dB changed the walking stretch's level by nothing, so the capture is not hearing them at all (test_footsteps confirms 80 steps play on 143 footfalls in the real game). Levels left as they were; needs a capture that records the 3D mix, or the owner's ear. Original task: `sound_capture.gd` records the bot's first two minutes with audio (Movie Maker, a real audio driver into a file); measure hoofstep loudness against the beds (hoofs 10 to 16 dB under the music at the listener) and fix the levels if not. Commit the measurement in PROGRESS.md.
 - [ ] **FS5.2 Music that follows the moment.** `Music.stinger(id)` plays a short sting on a first catch, a rare catch, a delivery and a Bloom (the existing bus, ducking the bed 4 dB for the sting); contexts for the Market and the Depot. Test: a stinger ducks the bed and restores it within 2.5 s. Commit.
 
 ### FS6. The loop's menus (gap 6)
