@@ -39,6 +39,9 @@ uniform vec3 eye_right = vec3(1.0, 0.0, 0.0);
 uniform vec3 eye_up = vec3(0.0, 1.0, 0.0);
 uniform vec2 eye_size = vec2(0.1);
 varying vec2 planar_uv;
+// Where this eye looks, as a shift of the iris across the eyeball (texture UV). Zero for
+// everyone but Derpy, whose eyes each go their own way (ToonStyler.CROSS_EYED).
+uniform vec2 gaze = vec2(0.0);
 
 void vertex() {
 	vec3 d = VERTEX - eye_origin;
@@ -47,7 +50,7 @@ void vertex() {
 
 void fragment() {
 	vec2 base_uv = planar ? planar_uv : UV;
-	vec2 iuv = planar ? base_uv : iris_centre + (UV - iris_centre) * iris_scale;
+	vec2 iuv = (planar ? base_uv : iris_centre + (UV - iris_centre) * iris_scale) - gaze;
 	vec4 tex = texture(eye_texture, iuv);
 	bool outside = iuv.x < 0.0 || iuv.y < 0.0 || iuv.x > 1.0 || iuv.y > 1.0 || tex.a < 0.5;
 	vec3 t = outside ? vec3(1.0) : tex.rgb;

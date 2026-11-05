@@ -220,7 +220,33 @@ static func _dominant(tex: Texture2D, fallback: Color) -> Color:
 ## A canon PonySFM pony's eyeball: the eye shader with her own iris colours and the iris shrunk
 ## to the size Source drew it (shaders/pony_eye.gdshader, iris_scale).
 const EYE_SHADER := preload("res://shaders/pony_eye.gdshader")
-const SFM_IRIS_SCALE := 1.45
+const SFM_IRIS_SCALE := 1.2
+
+
+## DERPY'S EYES, each its own way (owner 2026-11-05: "make sure derpy has her silly crossed
+## eyes"): the gaze of her eyeball_l and eyeball_r, in iris texture UV (shaders/pony_eye.gdshader).
+const CROSS_EYED := {
+	&"derpyhooves": {&"eyeball_l": Vector2(-0.02, 0.13), &"eyeball_r": Vector2(0.02, -0.13)},
+}
+
+
+## Roll a named pony's eyes the way CROSS_EYED has them; a no op for everyone else.
+static func cross_eyes(body: Node, id: StringName) -> void:
+	var sides: Dictionary = CROSS_EYED.get(id, {})
+	if sides.is_empty() or body == null:
+		return
+	for node: Node in body.find_children("*", "MeshInstance3D", true, false):
+		var mi: MeshInstance3D = node
+		if mi.mesh == null:
+			continue
+		for i in mi.mesh.get_surface_count():
+			var src := mi.mesh.surface_get_material(i)
+			var m := mi.get_active_material(i) as ShaderMaterial
+			if src == null or m == null or m.shader != EYE_SHADER:
+				continue
+			var side := StringName(src.resource_name.get_slice(".", 0))
+			if sides.has(side):
+				m.set_shader_parameter(&"gaze", sides[side])
 
 
 static func sfm_eye(tex: Texture2D) -> ShaderMaterial:

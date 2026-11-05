@@ -535,6 +535,7 @@ func _apply_stock_tint() -> void:
 		# A named record (the legacy roster, the hidden records with no look): still the
 		# show's shading, just her own colors.
 		ToonStylerScript.style(body, &"pony", {})
+		ToonStylerScript.cross_eyes(body, _data.id if _data != null else &"")
 		return
 	var look := look()
 	PonyPaintScript.apply(body, look)
