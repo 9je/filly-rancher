@@ -39,18 +39,26 @@ func test_a_kick_wobbles_back_and_forth_and_settles() -> void:
 
 
 func test_a_built_pony_carries_one_with_its_centre_behind_her_hips() -> void:
-	var body: Node3D = PonyVisuals.build(load("res://data/ponies/applebloom.tres"))
+	for id: String in ["applebloom", "fluttershy"]:
+		await _centre_behind_hips(id)
+
+
+## Both rigs: the PonySFM cast (Pelvis, Chest2) and the Mane Six's (DEF_Hip, DEF_Chest2).
+func _centre_behind_hips(id: String) -> void:
+	var body: Node3D = PonyVisuals.build(load("res://data/ponies/%s.tres" % id))
 	add_child_autofree(body)
 	var b := body.get_node_or_null(^"RumpBounce")
 	assert_not_null(b)
 	if b == null:
 		return
 	var sk: Skeleton3D = body.find_children("*", "Skeleton3D", true, false)[0]
-	var pelvis := sk.get_bone_global_rest(sk.find_bone("Pelvis")).origin
-	var chest := sk.get_bone_global_rest(sk.find_bone("Chest2")).origin
+	var hip_bone := sk.find_bone("Pelvis") if sk.find_bone("Pelvis") >= 0 else sk.find_bone("DEF_Hip")
+	var chest_bone := sk.find_bone("Chest2") if sk.find_bone("Chest2") >= 0 else sk.find_bone("DEF_Chest2")
+	var pelvis := sk.get_bone_global_rest(hip_bone).origin
+	var chest := sk.get_bone_global_rest(chest_bone).origin
 	var centre: Vector3 = b.call("centre")
 	assert_gt((centre - pelvis).dot(pelvis - chest), 0.0, "behind the hips, away from her chest")
-	assert_gt(float(b.call("radius")), 0.05)
+	assert_gt(float(b.call("radius")), 0.05, "%s has a rump to bounce" % id)
 
 
 func test_the_bounce_reaches_her_body_s_meshes() -> void:

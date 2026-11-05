@@ -63,8 +63,9 @@ func bind(body: Node3D) -> void:
 		return
 	var sk: Skeleton3D = sks[0]
 	_skeleton = sk
-	var pelvis := sk.find_bone("Pelvis")
-	var chest := sk.find_bone("Chest2")
+	# The PonySFM cast's rig, or the Mane Six's.
+	var pelvis := sk.find_bone("Pelvis") if sk.find_bone("Pelvis") >= 0 else sk.find_bone("DEF_Hip")
+	var chest := sk.find_bone("Chest2") if sk.find_bone("Chest2") >= 0 else sk.find_bone("DEF_Chest2")
 	if pelvis < 0 or chest < 0:
 		return
 	var p := sk.get_bone_global_rest(pelvis).origin

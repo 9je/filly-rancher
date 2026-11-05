@@ -50,16 +50,26 @@ func test_a_cliff_under_a_hoof_is_not_reached_for() -> void:
 
 func _hooves(sk: Skeleton3D) -> Dictionary:
 	var out := {}
-	for leaf: String in ["LeftHand", "RightHand", "LeftFoot", "RightFoot"]:
-		out[leaf] = sk.global_transform * sk.get_bone_global_pose(sk.find_bone(leaf)).origin
+	for leaf: String in ["LeftHand", "RightHand", "LeftFoot", "RightFoot", "DEF_FrontHoof.L",
+			"DEF_FrontHoof.R", "DEF_RearHoof.L", "DEF_RearHoof.R"]:
+		if sk.find_bone(leaf) >= 0:
+			out[leaf] = sk.global_transform * sk.get_bone_global_pose(sk.find_bone(leaf)).origin
 	return out
 
 
 func test_on_a_slope_every_hoof_of_a_real_pony_stands_on_the_ground() -> void:
+	await _on_slope("applebloom")
+
+
+func test_the_mane_six_rig_plants_its_hooves_too() -> void:
+	await _on_slope("fluttershy")
+
+
+func _on_slope(id: String) -> void:
 	# A hill rising across her and along her length through her feet; she stands on it at
 	# the origin.
 	var hill := func(x: float, z: float) -> float: return x * 0.2 + z * 0.2
-	var data: PonyData = load("res://data/ponies/applebloom.tres")
+	var data: PonyData = load("res://data/ponies/%s.tres" % id)
 	var body: Node3D = PonyVisuals.build(data)
 	add_child_autofree(body)
 	var sk: Skeleton3D = body.find_children("*", "Skeleton3D", true, false)[0]
@@ -70,6 +80,7 @@ func test_on_a_slope_every_hoof_of_a_real_pony_stands_on_the_ground() -> void:
 	anim.seek(0.0, true)
 	# Her hooves on the flat, the way the clip stands her.
 	var flat := _hooves(sk)
+	assert_eq(flat.size(), 4, "four hooves found on %s" % id)
 	var planter: Node = Planter.new()
 	planter.set("ground", hill)
 	sk.add_child(planter)

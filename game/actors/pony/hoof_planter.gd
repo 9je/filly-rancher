@@ -21,14 +21,19 @@ const BODY_FOLLOW := 0.7
 ## How fast each hoof's offset follows the ground, per second (no pop on a step).
 const FOLLOW_RATE := 14.0
 
-## [upper, middle, hoof] bone names, front legs then hind (the SFM ReVAmped rig).
+## [upper, middle, hoof] bone names, front legs then hind, per rig: the PonySFM cast's
+## (SFM ReVAmped) and the Mane Six's (DEF_ names). A skeleton uses whichever it has.
 const LEGS := [
 	["LeftShoulder", "LeftForearm", "LeftHand"],
 	["RightShoulder", "RightForearm", "RightHand"],
 	["LeftLeg1", "LeftLeg2", "LeftFoot"],
 	["RightLeg1", "RightLeg2", "RightFoot"],
+	["DEF_FrontUpperLeg.L", "DEF_LowerFrontLeg.L", "DEF_FrontHoof.L"],
+	["DEF_FrontUpperLeg.R", "DEF_LowerFrontLeg.R", "DEF_FrontHoof.R"],
+	["DEF_RearUpperLeg.L", "DEF_RearLowerLeg.L", "DEF_RearHoof.L"],
+	["DEF_RearUpperLeg.R", "DEF_RearLowerLeg.R", "DEF_RearHoof.R"],
 ]
-const PELVIS := "Pelvis"
+const PELVIS := ["Pelvis", "DEF_Hip"]
 
 var _legs: Array = []
 var _pelvis := -1
@@ -73,9 +78,26 @@ func _bind(sk: Skeleton3D) -> void:
 		var ids := [sk.find_bone(names[0]), sk.find_bone(names[1]), sk.find_bone(names[2])]
 		if ids.min() >= 0:
 			_legs.append(ids)
-	_pelvis = sk.find_bone(PELVIS)
+	_pelvis = -1
+	for n: String in PELVIS:
+		if _pelvis < 0:
+			_pelvis = sk.find_bone(n)
+	# The body settles from the bone both pairs of legs hang from: the Mane Six's rig hangs its
+	# chest beside the hip, not under it, so moving the hip alone left her front standing.
+	if _pelvis >= 0 and _legs.size() == 4:
+		while _pelvis >= 0 and not _is_ancestor(sk, _pelvis, int(_legs[0][0])):
+			_pelvis = sk.get_bone_parent(_pelvis)
 	_offsets.resize(_legs.size())
 	_offsets.fill(0.0)
+
+
+static func _is_ancestor(sk: Skeleton3D, ancestor: int, bone: int) -> bool:
+	var b := bone
+	while b >= 0:
+		if b == ancestor:
+			return true
+		b = sk.get_bone_parent(b)
+	return false
 
 
 func _process_modification_with_delta(delta: float) -> void:
