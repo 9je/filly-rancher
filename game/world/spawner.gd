@@ -59,8 +59,10 @@ const RegionRegistryScript := preload("res://systems/region_registry.gd")
 ## caught, delivered or otherwise left. Long enough that emptying a field feels like an
 ## achievement for the length of a walk back to the pens, short enough that the field is
 ## full again by the next visit. THE WILD MUST NEVER RUN DRY: this timer is the whole of
-## the spec's repeatability promise.
-const STOCK_RESPAWN_SECONDS := 45.0
+## the spec's repeatability promise. 90 s, not 45 (owner playtest 2026-10-25, "you can
+## collect all the spots before you get upgrades"): at 45 the pasture by the yard refilled
+## faster than she could carry ponies away (game/test/test_pacing_tuning.gd).
+const STOCK_RESPAWN_SECONDS := 90.0
 
 ## The most pony bodies this spawner will ever have standing at once, named and stock
 ## together. A ceiling rather than a target: it is what stops a future retune of

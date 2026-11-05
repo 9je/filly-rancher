@@ -280,7 +280,7 @@ zone_id = &"ranch"
 spawn_radius = 6.5
 spawn_count = 1
 roam_radius = 4.5
-stock_count = 4
+stock_count = 2
 
 [node name="WestHollow" type="Area3D" parent="Zones"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -42, 0, -20)
