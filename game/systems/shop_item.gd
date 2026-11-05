@@ -20,7 +20,7 @@ extends Resource
 ## Thin on purpose. How a purchase is paid for is Shop's business (game/systems/shop.gd),
 ## and what a gear id does is the business of whatever reads it.
 
-enum Kind { GEAR, PERMIT, BUILD, CARE }
+enum Kind { GEAR, PERMIT, BUILD, CARE, DECOR }
 
 ## Unique lookup key, e.g. &"hay" or &"bigger_saddlebag". The ShopRegistry dictionary key.
 @export var id: StringName = &""
@@ -48,6 +48,8 @@ enum Kind { GEAR, PERMIT, BUILD, CARE }
 
 ## BUILD: the PlotData this stands for. Unused in slice 1.
 @export var plot_id: StringName = &""
+## Kind.DECOR: the decoration it buys (systems/decor.gd CATALOGUE).
+@export var decor_id: StringName = &""
 
 ## v1: only sold on this story path ("factory": the Cloudsdale Supply Desk). Empty: always.
 @export var requires_path: String = ""

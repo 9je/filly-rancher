@@ -88,12 +88,16 @@ func owns_permit(zone: StringName) -> bool:
 ## Whether the item is on the shelf at all (the Supply Desk's gear only for Stewards).
 ## Whether a story flag is up (the ranch answers; nothing is ever listed early).
 var flag_provider: Callable = func(_flag: String) -> bool: return true
+## Whether she already owns decoration `id` (one of each; the ranch answers from the story).
+var decor_provider: Callable = func(_id: StringName) -> bool: return false
 
 
 func listed(item: ShopItem) -> bool:
 	if item == null:
 		return false
 	if not item.requires_path.is_empty() and item.requires_path != str(path_provider.call()):
+		return false
+	if item.kind == ShopItemScript.Kind.DECOR and bool(decor_provider.call(item.decor_id)):
 		return false
 	return item.requires_flag.is_empty() or bool(flag_provider.call(item.requires_flag))
 
@@ -142,5 +146,8 @@ func buy(item: ShopItem) -> bool:
 			_unlocks.append(String(item.gear_id))
 		ShopItemScript.Kind.PERMIT:
 			_unlocks.append(String(permit_id_for(item.permit_zone)))
+		ShopItemScript.Kind.DECOR:
+			# Recorded by the ranch (Decor.add on the story), which stands it.
+			pass
 	bought.emit(item)
 	return true

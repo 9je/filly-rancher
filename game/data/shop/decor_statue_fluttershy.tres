@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="ShopItem" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/shop_item.gd" id="1_shop"]
+
+[resource]
+script = ExtResource("1_shop")
+id = &"decor_statue_fluttershy"
+display_name = "Fluttershy Statue"
+description = "Fluttershy in stone, on the plaza."
+cost = 6000
+kind = 4
+decor_id = &"statue_fluttershy"

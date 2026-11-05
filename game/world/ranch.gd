@@ -1701,6 +1701,9 @@ func rebind_economy() -> void:
 			return StoryV1Script.path(_game_state.story) if _game_state != null else ""
 		_shop.flag_provider = func(flag: String) -> bool:
 			return _game_state != null and _game_state.story.has_flag(flag)
+		_shop.decor_provider = func(id: StringName) -> bool:
+			return _game_state != null and Decor.owns(_game_state.story, id)
+	_build_decor()
 	if market_menu != null:
 		market_menu.set("shop", _shop)
 
@@ -2663,11 +2666,33 @@ func _on_sell_all_requested() -> void:
 		market_menu.refresh()
 
 
+## The decorations she owns, standing in their spots (world/decor_layer.gd). Rebuilt from the
+## story whenever it is replaced (a load) or a decoration is bought.
+var _decor: DecorLayer
+
+
+func _build_decor() -> void:
+	if _game_state == null or not is_inside_tree():
+		return
+	if _decor != null and is_instance_valid(_decor):
+		_decor.queue_free()
+	_decor = DecorLayer.new()
+	_decor.name = "Decor"
+	if terrain != null:
+		_decor.height_at = func(x: float, z: float) -> float: return terrain.height_at(x, z)
+	add_child(_decor)
+	_decor.build(_game_state.story)
+
+
 func _on_buy_requested(item: ShopItem) -> void:
 	if _shop == null or item == null:
 		return
 	if _shop.buy(item):
 		_novelty_purchase(item)
+		# A decoration stands in its spot at once (systems/decor.gd).
+		if item.kind == ShopItemScript.Kind.DECOR and _game_state != null:
+			Decor.add(_game_state.story, item.decor_id)
+			_build_decor()
 		# Gear takes effect the moment it is bought, not on the next load. So does a
 		# permit: the gate she is standing at swings open while she is still standing at
 		# it, which is the only moment the purchase can be SEEN to have done anything.

@@ -196,6 +196,8 @@ static func kind_word(item: ShopItem) -> String:
 			return "NEW PLACE"
 		ShopItemScript.Kind.BUILD:
 			return "BUILDING"
+		ShopItemScript.Kind.DECOR:
+			return "DECOR"
 	return "GEAR"
 
 
