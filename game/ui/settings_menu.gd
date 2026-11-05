@@ -92,6 +92,12 @@ var _confirm_left := 0.0
 var _display_before := {}
 
 var _capturing: StringName = &""
+var _swap_note := ""
+
+
+## What the last rebind did to another action ("Jump moved to E."), or "".
+func swap_note() -> String:
+	return _swap_note
 var _font: FontVariation
 
 
@@ -626,7 +632,14 @@ func _capture_input(event: InputEvent) -> void:
 		else:
 			draft.bind(_capturing, code)
 			MenuStyleScript.tick_confirm()
+			_swap_note = ""
+			if draft.last_swapped != &"":
+				# Not in silence (FS8.1): name the action that moved onto the old key.
+				_swap_note = "%s moved to %s." % [SettingsScript.ACTION_NAMES.get(draft.last_swapped,
+					String(draft.last_swapped)), OS.get_keycode_string(SettingsScript.key_of(draft.last_swapped, draft.bindings))]
 		_end_capture()
+		if _swap_note != "" and _info_body != null:
+			_info_body.text = _swap_note
 		return
 	if event.is_action_pressed(&"ui_cancel"):
 		MenuStyleScript.tick_back()

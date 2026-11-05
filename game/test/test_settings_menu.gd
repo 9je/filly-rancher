@@ -144,3 +144,17 @@ func test_settings_round_trip_the_new_fields() -> void:
 	b.load_from(_path)
 	assert_true(b.differences(a).is_empty(), "differs in %s" % [b.differences(a)])
 	assert_true(b.fullscreen, "the old switch still reads the mode")
+
+
+## FS8.1: a key that another action held moves that action onto the old key, and the menu
+## says so rather than swapping in silence.
+func test_taking_another_actions_key_says_which_action_moved() -> void:
+	var jump_key := SettingsScript.key_of(&"jump", _menu.draft.bindings)
+	var interact_key := SettingsScript.key_of(&"interact", _menu.draft.bindings)
+	_menu._activate(&"key_interact")
+	var k := InputEventKey.new()
+	k.pressed = true
+	k.physical_keycode = jump_key as Key
+	_menu._capture_input(k)
+	assert_eq(SettingsScript.key_of(&"jump", _menu.draft.bindings), interact_key, "Jump took Interact's old key")
+	assert_string_contains(_menu.swap_note(), "Jump")

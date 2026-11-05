@@ -339,7 +339,12 @@ func toggle_vsync() -> void:
 
 ## Bind `action` to `keycode` (physical). A key already bound to another rebindable action
 ## is taken from it (that action falls back to its project default), so no key does two.
+## The action that last gave its key up to a bind() (it took the old key), or &"".
+var last_swapped: StringName = &""
+
+
 func bind(action: StringName, keycode: int) -> void:
+	last_swapped = &""
 	if not (action in REBINDABLE) or keycode <= 0:
 		return
 	# A key does one thing: whichever action answered to it (bound, or by the project's
@@ -348,6 +353,7 @@ func bind(action: StringName, keycode: int) -> void:
 	for other in REBINDABLE:
 		if other != action and key_of(other, bindings) == keycode:
 			bindings[other] = old
+			last_swapped = other
 	bindings[action] = keycode
 	changed.emit()
 
