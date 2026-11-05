@@ -836,6 +836,8 @@ func _physics_process(delta: float) -> void:
 		# for a reproducible wander, and a draw here would shift every target after it.
 		_detail_timer = DETAIL_CHECK_SECONDS + randf() * 0.1
 		_update_detail()
+		if detail == Detail.FULL:
+			_update_gaze_target()
 	var stride := 1
 	if detail != Detail.FULL:
 		stride = 3 if detail == Detail.MID else (OFFSCREEN_STRIDE if _offscreen else 6)
@@ -1026,13 +1028,34 @@ func _detail_meshes() -> Array[MeshInstance3D]:
 
 ## HER FACE FOLLOWS HER STATE (FS3.1): scared when she runs or is held in the beam, content
 ## otherwise. The face is PonyVisuals' "Face" modifier on her skeleton.
+var _face_node: PonyFace
+
+
+func _face_ref() -> PonyFace:
+	if (_face_node == null or not is_instance_valid(_face_node)) and visuals != null:
+		var found := visuals.find_children("Face", "", true, false)
+		_face_node = found[0] as PonyFace if not found.is_empty() else null
+	return _face_node
+
+
+## Her eyes on the player when he is close and she is calm (FS3.2); on nobody otherwise.
+const GAZE_RADIUS := 6.0
+
+
+func _update_gaze_target() -> void:
+	var face := _face_ref()
+	if face == null:
+		return
+	var calm := state == State.IDLE or state == State.GRAZE or state == State.WANDER or state == State.APPROACH
+	if calm and _player != null and is_instance_valid(_player) \
+			and _player.global_position.distance_to(global_position) < GAZE_RADIUS:
+		face.gaze_at = _player.global_position + Vector3(0, 1.2, 0)
+	else:
+		face.gaze_at = Vector3.INF
+
+
 func _update_mood() -> void:
-	if visuals == null:
-		return
-	var found := visuals.find_children("Face", "", true, false)
-	if found.is_empty():
-		return
-	var face := found[0] as PonyFace
+	var face := _face_ref()
 	if face == null:
 		return
 	match state:

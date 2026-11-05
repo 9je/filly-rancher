@@ -79,6 +79,15 @@ func _ready() -> void:
 	_ear_next = _rng.randf_range(3.0, 9.0)
 
 
+## HER EYES FOLLOW SOMEONE CLOSE (FS3.2). A world point to look at, or Vector3.INF; the
+## pony sets it to the player when she is near and calm. The iris slides at most GAZE_MAX
+## (iris texture UV) on top of any gaze the eye already has (Derpy's, ToonStyler.CROSS_EYED).
+var gaze_at: Vector3 = Vector3.INF
+const GAZE_MAX := 0.08
+const GAZE_PER_RAD := 0.09
+var _eye_base: Dictionary = {}
+
+
 ## The Mane Six's rig names the same bones its own way (DEF_ and CON_, FS3.1).
 const ALIASES := {
 	"LeftEyeLidUpper": "CON_UpperEyelid.L", "RightEyeLidUpper": "CON_UpperEyelid.R",
@@ -119,6 +128,7 @@ func _process_modification() -> void:
 	_rotate(sk, "LeftEyeLidUpper", LID_AXIS, minf(lid, 0.5) * LID_CLOSED)
 	_rotate(sk, "RightEyeLidUpper", LID_AXIS, minf(lid, 0.5) * LID_CLOSED)
 	_set_eye_lid(sk, lid)
+	_update_gaze()
 	var flick := _ear_flick_amount()
 	_rotate(sk, "LeftEar", EAR_AXIS, _mood_ears + (flick if _ear_side == 0 else 0.0))
 	_rotate(sk, "RightEar", EAR_AXIS, -(_mood_ears + (flick if _ear_side == 1 else 0.0)))
@@ -138,18 +148,46 @@ func _set_eye_lid(sk: Skeleton3D, lid: float) -> void:
 	if absf(lid - _lid_written) < 0.002:
 		return
 	_lid_written = lid
-	if _eyes.is_empty():
-		var root: Node = sk.get_parent() if sk.get_parent() != null else sk
-		for node: Node in root.find_children("*", "MeshInstance3D", true, false):
-			var mi: MeshInstance3D = node
-			if mi.mesh == null:
-				continue
-			for i in range(mi.mesh.get_surface_count()):
-				var m := mi.get_active_material(i)
-				if m is ShaderMaterial and (m as ShaderMaterial).shader == EYE_SHADER:
-					_eyes.append(m)
+	_collect_eyes(sk)
 	for m: ShaderMaterial in _eyes:
 		m.set_shader_parameter(&"lid", lid)
+
+
+## Every eye material on this pony (cached on first use), and the gaze each started with.
+func _collect_eyes(sk: Skeleton3D) -> void:
+	if not _eyes.is_empty() or sk == null:
+		return
+	var root: Node = sk.get_parent() if sk.get_parent() != null else sk
+	for node: Node in root.find_children("*", "MeshInstance3D", true, false):
+		var mi: MeshInstance3D = node
+		if mi.mesh == null:
+			continue
+		for i in range(mi.mesh.get_surface_count()):
+			var m := mi.get_active_material(i)
+			if m is ShaderMaterial and (m as ShaderMaterial).shader == EYE_SHADER:
+				_eyes.append(m)
+				var g: Variant = (m as ShaderMaterial).get_shader_parameter(&"gaze")
+				_eye_base[m.get_instance_id()] = g if g is Vector2 else Vector2.ZERO
+
+
+func _update_gaze() -> void:
+	var sk := get_skeleton()
+	if sk == null:
+		return
+	_collect_eyes(sk)
+	if _eyes.is_empty():
+		return
+	var look := Vector2.ZERO
+	var head := _find("Head")
+	if gaze_at != Vector3.INF and head >= 0:
+		# Her own frame: the rigs face +Z.
+		var d := sk.global_transform.affine_inverse() * gaze_at - sk.get_bone_global_pose(head).origin
+		var yaw := atan2(d.x, d.z)
+		var pitch := atan2(d.y, Vector2(d.x, d.z).length())
+		look = Vector2(clampf(yaw * GAZE_PER_RAD, -GAZE_MAX, GAZE_MAX),
+			clampf(-pitch * GAZE_PER_RAD, -GAZE_MAX, GAZE_MAX))
+	for m: ShaderMaterial in _eyes:
+		m.set_shader_parameter(&"gaze", (_eye_base.get(m.get_instance_id(), Vector2.ZERO) as Vector2) + look)
 
 
 func _tick(delta: float) -> void:
