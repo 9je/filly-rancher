@@ -13,6 +13,12 @@ const HZ := 5.0
 const DAMPING := 0.09
 ## The most the spring ever moves her, in metres.
 const MAX_AMOUNT := 0.15
+## Her mane and tail are thrown with the spring: an external force on her hair springs of this
+## much per metre a second of the spring's speed (owner: "make tail and hair bounce a little
+## more obvious"). Gravity on the hair is 0.22 to 0.28, so a good flop throws it several times
+## that, down, then up, then down, dying away with the rump.
+const HAIR_THROW := 0.25
+
 ## A kick of 1.0 is a velocity of this many metres a second.
 const KICK_SPEED := 5.0
 
@@ -23,6 +29,7 @@ var _radius := 0.0
 var _back := Vector3.BACK
 var _meshes: Array[MeshInstance3D] = []
 var _skeleton: Skeleton3D
+var _hair: Array[SpringBoneSimulator3D] = []
 var _written := false
 
 
@@ -58,6 +65,9 @@ func bind(body: Node3D) -> void:
 	_meshes.clear()
 	for mi: MeshInstance3D in body.find_children("*", "MeshInstance3D", true, false):
 		_meshes.append(mi)
+	_hair.clear()
+	for sim: SpringBoneSimulator3D in body.find_children("*", "SpringBoneSimulator3D", true, false):
+		_hair.append(sim)
 	var sks := body.find_children("*", "Skeleton3D", true, false)
 	if sks.is_empty():
 		return
@@ -116,6 +126,11 @@ func step(delta: float) -> void:
 ## Hand the shaders where the spring is (only while it moves, and once more as it stops).
 func _push() -> void:
 	var moving := _x != 0.0
+	if moving or _written:
+		var force := Vector3(0.0, _v * HAIR_THROW, 0.0) if moving else Vector3.ZERO
+		for sim in _hair:
+			if is_instance_valid(sim):
+				sim.set_external_force(force)
 	if not moving and not _written:
 		return
 	for mi: MeshInstance3D in _meshes:

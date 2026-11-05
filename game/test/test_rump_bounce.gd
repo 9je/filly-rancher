@@ -112,3 +112,21 @@ func test_both_rigs_get_a_jiggle_the_same_size() -> void:
 	var lo: float = sizes.values().min()
 	var hi: float = sizes.values().max()
 	assert_gt(lo, hi * 0.75, "every pony's jiggle within a quarter of the others: %s" % sizes)
+
+
+func test_her_mane_and_tail_are_thrown_with_the_bounce_and_let_go_after() -> void:
+	# Owner: "maybe make tail and hair bounce a little more obvious".
+	var body: Node3D = PonyVisuals.build(load("res://data/ponies/applebloom.tres"))
+	add_child_autofree(body)
+	var sims := body.find_children("*", "SpringBoneSimulator3D", true, false)
+	assert_false(sims.is_empty(), "she has hair springs")
+	if sims.is_empty():
+		return
+	var sim: SpringBoneSimulator3D = sims[0]
+	var b := body.get_node(^"RumpBounce")
+	b.call("kick", 1.0)
+	b.call("step", 1.0 / 60.0)
+	assert_lt(sim.get_external_force().y, -0.1, "flung down as she lands")
+	for i in 240:
+		b.call("step", 1.0 / 60.0)
+	assert_eq(sim.get_external_force(), Vector3.ZERO, "let go once she has settled")
