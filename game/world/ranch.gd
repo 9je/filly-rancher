@@ -787,6 +787,7 @@ func _ready() -> void:
 	terrain.regions = _regions_registry()
 	terrain.build()
 	PonyScript.ground_height = Callable(terrain, "height_at")
+	HoofPlanter.default_ground = PonyScript.ground_height
 	await _boot_beat(0.04, "Raising the hills")
 	var dressing := RegionDressingScript.new()
 	dressing.name = "Dressing"

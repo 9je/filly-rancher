@@ -45,6 +45,7 @@ extends RefCounted
 ## no voice bank (every current pony but Twilight) spawns exactly the same way as
 ## one that has one; there is nothing here that could block on it.
 
+const HoofPlanterScript := preload("res://actors/pony/hoof_planter.gd")
 const PonyRigScript := preload("res://scripts/pony_rig.gd")
 
 ## Documented, stable path to the AnimationPlayer on any instance build() returns.
@@ -107,6 +108,12 @@ static func build(data: PonyData, model_path_override: String = "") -> Node3D:
 	# contract; see attach_hair_simulation()'s doc comment), which build() already
 	# satisfies since it never adds the instance anywhere itself.
 	PonyRigScript.attach_hair_simulation(pony)
+	# Hooves on the ground under them, not on the flat floor the clips were authored on.
+	for sk: Skeleton3D in pony.find_children("*", "Skeleton3D", true, false):
+		var planter := HoofPlanterScript.new()
+		planter.name = "HoofPlanter"
+		sk.add_child(planter)
+		break
 
 	var anim := pony.get_node_or_null(ANIMATION_PLAYER_PATH)
 	if anim == null or not (anim is AnimationPlayer):
