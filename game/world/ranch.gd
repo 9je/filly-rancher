@@ -8618,6 +8618,8 @@ func _novelty(kind: String, id: String, label: String) -> bool:
 ## The score answers a catch (FS5.2): a chime for her very first, a sparkling run for a rare
 ## or legendary pony.
 func _catch_sting(inst: PonyInstance) -> void:
+	if not is_inside_tree():
+		return
 	var music := get_node_or_null(^"/root/Music")
 	if music == null:
 		return

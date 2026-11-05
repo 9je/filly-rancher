@@ -194,3 +194,14 @@ Canon MLP stays: real names, looks and places ("lean into mlp fully", private bu
 - **Pacing** (2fb956b, DECISIONS.md): the pasture by the yard holds two wild ponies and the wild refills after 90 s.
 - **First ten minutes, read from bot frames:** townsfolk now step out of the player and of wild ponies (0b88aa4); a speech bubble fits a short line (95e25f2).
 - **Gates:** GUT 1887 of 1887 before the pacing and NPC changes; the touched suites and the first-pony, catch-card, beam, market and news-marker real-input tests pass after them. The five endings are rerunning on 2fb956b.
+
+### 2026-11-05: the fix sweep (PLAN.md section FS)
+- **FS1 guidance:** Objective names the story's next step at every stage (test_objective); with nothing waiting the trail and compass follow it; an objective card under the compass names what the ring points at, with its distance (unit and real-input tests); the lessons are icon chips. The trail at play distance is still to be checked by eye.
+- **FS2 art:** pale coats dropped on evidence (they read fine in the game's light); the meadow drifts between two greens over 40 m patches (not yet seen in a render).
+- **FS3 faces:** every pony blinks, flicks an ear and shows her mood on both rigs; a calm pony's eyes follow the player within 6 m. Bodies passing through bodies: two attempts reverted (both broke test_find_market), redesign logged in PLAN.md.
+- **FS4 animation:** startle on first noticing the player, hop on landing in a pen; the Mane Six get the PonySFM clips (sit, graze, hop, startle, struggle, sleep and the rest) by world-space retargeting from each rig's own stand (systems/retarget.gd; renders in build/playtest_evidence/round4/mane_six_retarget.png). Gait blending (FS4.2) is not done.
+- **FS5 sound:** four music stings (tools/make_stings.py) over the bed on a first catch, a rare catch, a delivery and a Bloom, the bed dipping 5 dB for them. The hoof-level capture (FS5.1) is not done.
+- **FS6 menus:** tile menus pop open, a hovered tile lifts, and money moving pops (a delivery's credit off its tile, a sale or a purchase over the wallet).
+- **FS7 late game:** twelve decorations at the Market in hand-placed spots (DECISIONS.md). Collection sets (FS7.2) are not done.
+- **FS8 accessibility:** rarity is a shape as well as a colour; a Text size setting (100, 125, 150 percent); rebinding was already in, and a swap now says which action moved. Gamepad rebinding is not done.
+- **Process:** one subagent (FS8) stopped before starting because its worktree came from master; FS8 was done inline instead.
