@@ -189,3 +189,23 @@ func test_a_table_draws_its_rows_with_the_outline_and_in_a_row_box() -> void:
 	var label := holder.get_child(0) as Label
 	assert_not_null(label)
 	assert_eq(label.get_theme_constant("outline_size"), MenuStyleScript.OUTLINE_SIZE)
+
+
+## FS6.1: a tile menu opens with a little pop instead of appearing, and a hovered tile lifts.
+func test_a_menu_pops_in_and_settles_at_full_size() -> void:
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(200, 100)
+	add_child_autofree(panel)
+	MenuStyle.pop_in(panel)
+	assert_lt(panel.scale.x, 1.0, "starts small")
+	assert_lt(panel.modulate.a, 1.0, "and faint")
+	await wait_seconds(MenuStyle.POP_SECONDS + 0.1)
+	assert_almost_eq(panel.scale.x, 1.0, 0.001)
+	assert_almost_eq(panel.modulate.a, 1.0, 0.001)
+
+
+func test_a_hovered_tile_lifts_off_the_page() -> void:
+	var rest: StyleBoxFlat = TileStyle.box(false, false)
+	var hover: StyleBoxFlat = TileStyle.box(false, true)
+	assert_gt(hover.shadow_size, rest.shadow_size)
+	assert_gt(hover.shadow_offset.y, rest.shadow_offset.y)

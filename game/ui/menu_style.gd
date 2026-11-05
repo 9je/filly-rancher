@@ -472,6 +472,24 @@ static func tick_back() -> void:
 
 
 ## A panel was opened.
+## A TILE MENU POPS OPEN (FS6.1): from a little smaller and faint to full size, overshooting
+## a touch, instead of appearing between one frame and the next.
+const POP_SECONDS := 0.18
+const POP_FROM := 0.92
+
+
+static func pop_in(panel: Control) -> void:
+	if panel == null or not panel.is_inside_tree():
+		return
+	panel.pivot_offset = panel.size * 0.5
+	panel.scale = Vector2.ONE * POP_FROM
+	panel.modulate.a = 0.0
+	var tw := panel.create_tween().set_parallel(true)
+	tw.tween_property(panel, ^"scale", Vector2.ONE, POP_SECONDS) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(panel, ^"modulate:a", 1.0, POP_SECONDS * 0.8)
+
+
 static func tick_open() -> void:
 	_sound_call(&"play", [&"ui_open"])
 

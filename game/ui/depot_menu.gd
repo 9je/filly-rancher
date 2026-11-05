@@ -120,6 +120,7 @@ func open() -> bool:
 	refresh()
 	opened.emit()
 	MenuStyleScript.tick_open()
+	MenuStyleScript.pop_in(get_node_or_null(^"Centre/Panel") as Control)
 	return true
 
 

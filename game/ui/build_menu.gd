@@ -222,6 +222,7 @@ func _show(slot: PlotSlot) -> bool:
 	_refresh()
 	opened.emit(slot)
 	MenuStyleScript.tick_open()
+	MenuStyleScript.pop_in(get_node_or_null(^"Centre/Panel") as Control)
 	return true
 
 

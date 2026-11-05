@@ -20,6 +20,10 @@ static func box(picked: bool, hovered: bool) -> StyleBoxFlat:
 	b.content_margin_right = 14.0
 	b.content_margin_top = 10.0
 	b.content_margin_bottom = 10.0
+	# Hovered, the tile lifts off the page (FS6.1).
+	b.shadow_color = Color(0, 0, 0, 0.35 if hovered else 0.18)
+	b.shadow_size = 10 if hovered else 3
+	b.shadow_offset = Vector2(0, 6 if hovered else 2)
 	return b
 
 
