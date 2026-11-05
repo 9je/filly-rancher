@@ -225,6 +225,8 @@ const ANIM_BLEND := 0.2
 ## Seconds a `jump` press is remembered for, so a press made just before landing
 ## fires on touchdown instead of being swallowed.
 @export var jump_buffer := 0.12
+## Landing faster than this (m/s, a jump comes down at about 4) bounces her hindquarters.
+const LAND_BOUNCE_FROM := 3.0
 
 @export_group("Character")
 ## The base record the player's body is built from. A HIDDEN record
@@ -618,7 +620,11 @@ func _physics_process(delta: float) -> void:
 	velocity.x = horizontal.x
 	velocity.z = horizontal.z
 
+	var fall_speed := -velocity.y
 	move_and_slide()
+	# A hard landing is slapstick: her hindquarters bounce (actors/pony/rump_bounce.gd).
+	if not on_floor and is_on_floor() and fall_speed > LAND_BOUNCE_FROM:
+		RumpBounce.kick_on(visuals, clampf(fall_speed / 7.0, 0.3, 1.2))
 
 	var ground_speed := get_ground_speed()
 	_update_facing(direction, delta)

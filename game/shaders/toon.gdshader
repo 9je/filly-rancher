@@ -9,6 +9,7 @@
 // Works' output.
 shader_type spatial;
 render_mode cull_back, depth_draw_opaque, specular_disabled;
+#include "res://shaders/bounce.gdshaderinc"
 
 global uniform float dread;
 
@@ -27,6 +28,10 @@ uniform bool spectral = false;
 uniform float alpha_scissor : hint_range(0.0, 1.0) = 0.0;
 uniform vec3 emission : source_color = vec3(0.0);
 uniform float emission_energy = 0.0;
+
+void vertex() {
+	VERTEX += bounce_offset(VERTEX);
+}
 
 void fragment() {
 	vec4 c = albedo;

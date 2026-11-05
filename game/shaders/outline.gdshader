@@ -7,6 +7,7 @@
 // a 30-pixel pony is a smudge.
 shader_type spatial;
 render_mode unshaded, cull_front, depth_draw_opaque, shadows_disabled, fog_disabled;
+#include "res://shaders/bounce.gdshaderinc"
 
 global uniform float dread;
 
@@ -27,6 +28,7 @@ instance uniform float outline_on = 1.0;
 instance uniform vec4 highlight : source_color = vec4(0.0);
 
 void vertex() {
+	VERTEX += bounce_offset(VERTEX);
 	vec4 view_pos = MODELVIEW_MATRIX * vec4(VERTEX, 1.0);
 	vec3 view_n = normalize((MODELVIEW_MATRIX * vec4(NORMAL, 0.0)).xyz);
 	vec4 clip = PROJECTION_MATRIX * view_pos;

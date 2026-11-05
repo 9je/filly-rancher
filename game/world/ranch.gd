@@ -4537,6 +4537,8 @@ func _launch_into_pen(pen: Pen, instance: PonyInstance) -> void:
 		if not is_instance_valid(look):
 			return
 		look.visible = true
+		# The owner's slapstick bounce: she flops in rump first.
+		RumpBounce.kick_on(look, 1.0)
 		var land := look.create_tween()
 		land.tween_property(look, ^"scale", Vector3(rest.x * 1.22, rest.y * 0.72, rest.z * 1.22), 0.07)
 		land.tween_property(look, ^"scale", rest, 0.42).set_trans(Tween.TRANS_ELASTIC) \
