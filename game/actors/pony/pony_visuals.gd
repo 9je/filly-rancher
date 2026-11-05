@@ -121,6 +121,8 @@ static func build(data: PonyData, model_path_override: String = "") -> Node3D:
 		sk.add_child(face)
 		break
 	_fold_wings(pony)
+	# The Mane Six's rig ships three clips; carry the PonySFM cast's across (FS4.1).
+	Retarget.dress(pony, model_path)
 	# The owner's slapstick bounce (actors/pony/rump_bounce.gd).
 	var bounce := RumpBounceScript.new()
 	bounce.name = "RumpBounce"
