@@ -80,6 +80,7 @@ func _ready() -> void:
 	settings = SettingsScript.new()
 	settings.load_from()
 	settings.apply_audio()
+	settings.apply_text()
 	# C2: THE CURSOR STARTS ON CONTINUE WHENEVER THERE IS SOMETHING TO CONTINUE. Before this
 	# the cursor defaulted to row 0, New game, one Enter away from `_game_state.reset()` with
 	# no confirmation -- the exact keypress a returning player makes out of habit on every

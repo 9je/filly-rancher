@@ -191,7 +191,7 @@ func _build_letter() -> void:
 	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text.custom_minimum_size = Vector2(664, 0)
 	text.add_theme_color_override(&"font_color", MenuStyleScript.COLOR_INK)
-	text.add_theme_font_size_override(&"font_size", 24)
+	text.add_theme_font_size_override(&"font_size", MenuStyle.font_px(24))
 	text.text = letter_text(ending, player_name, lines)
 	_letter.add_child(text)
 	_letter.visible = false

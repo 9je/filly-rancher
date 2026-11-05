@@ -256,7 +256,7 @@ func _build() -> void:
 	rb.content_margin_bottom = 2
 	_ribbon.add_theme_stylebox_override(&"normal", rb)
 	_ribbon.add_theme_font_override(&"font", MenuStyleScript.title_font())
-	_ribbon.add_theme_font_size_override(&"font_size", 18)
+	_ribbon.add_theme_font_size_override(&"font_size", MenuStyle.font_px(18))
 	_ribbon.add_theme_color_override(&"font_color", Color(1, 1, 1))
 	_ribbon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	top.add_child(_ribbon)
@@ -269,14 +269,14 @@ func _build() -> void:
 	top.add_child(_stars)
 	_rarity_word = Label.new()
 	_rarity_word.add_theme_font_override(&"font", MenuStyleScript.title_font())
-	_rarity_word.add_theme_font_size_override(&"font_size", 19)
+	_rarity_word.add_theme_font_size_override(&"font_size", MenuStyle.font_px(19))
 	_rarity_word.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	top.add_child(_rarity_word)
 
 	_name = Label.new()
 	_name.name = "Name"
 	_name.add_theme_font_override(&"font", MenuStyleScript.title_font())
-	_name.add_theme_font_size_override(&"font_size", 40)
+	_name.add_theme_font_size_override(&"font_size", MenuStyle.font_px(40))
 	_name.add_theme_color_override(&"font_color", INK)
 	_name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_name.clip_text = true
@@ -333,7 +333,7 @@ func _chip(family: StringName, icon: StringName, words: String) -> void:
 	var l := Label.new()
 	l.text = words
 	l.add_theme_font_override(&"font", MenuStyleScript.title_font())
-	l.add_theme_font_size_override(&"font_size", 19)
+	l.add_theme_font_size_override(&"font_size", MenuStyle.font_px(19))
 	l.add_theme_color_override(&"font_color", INK)
 	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	h.add_child(l)

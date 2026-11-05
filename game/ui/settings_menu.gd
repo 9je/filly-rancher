@@ -180,6 +180,7 @@ func apply() -> void:
 		&"size": _effective_resolution(settings)}
 	settings.copy_from(draft)
 	settings.apply_audio()
+	settings.apply_text()
 	settings.apply_graphics(get_viewport())
 	settings.apply_bindings()
 	MenuStyleScript.tick_confirm()
@@ -207,6 +208,7 @@ func revert() -> void:
 		return
 	draft.copy_from(settings)
 	settings.apply_audio()
+	settings.apply_text()
 	_capturing = &""
 	MenuStyleScript.tick_back()
 	_refresh_all()
@@ -365,6 +367,8 @@ func _specs() -> Array:
 				"The small card in the corner that names the key for the full controls list. The key works either way."],
 			[&"show_checklist", "Getting started list", Kind.TOGGLE,
 				"The first three requests, pinned on screen until they are done."],
+			[&"text_size", "Text size", Kind.CHOICE,
+				"Bigger words in the menus and on the HUD. Menus change at once; the HUD on the next load."],
 			[&"show_guide", "Show the way", Kind.TOGGLE,
 				"A trail of sparkles on the ground toward whatever is waiting for you next."],
 			[&"camera_shake", "Camera shake", Kind.TOGGLE,
@@ -400,6 +404,9 @@ func _step(key: StringName, dir: int) -> bool:
 			return true
 		&"quality":
 			return _set_int(&"quality", clampi(d.quality + dir, 0, SettingsScript.Quality.HIGH))
+		&"text_size":
+			var at := maxi(SettingsScript.TEXT_SIZES.find(d.text_size), 0)
+			return _set_int(&"text_size", SettingsScript.TEXT_SIZES[clampi(at + dir, 0, SettingsScript.TEXT_SIZES.size() - 1)])
 		&"max_fps":
 			var caps := SettingsScript.FPS_CAPS
 			var i := maxi(caps.find(d.max_fps), 0)
@@ -509,6 +516,8 @@ func _value_text(s: Settings, key: StringName) -> String:
 			return _resolution_text(s)
 		&"quality":
 			return SettingsScript.QUALITY_NAMES[s.quality]
+		&"text_size":
+			return "%d%%" % s.text_size
 		&"max_fps":
 			return "Off" if s.max_fps == 0 else "%d fps" % s.max_fps
 		&"fov":
@@ -568,6 +577,8 @@ func _choice_pips(key: StringName) -> Vector2i:
 			return Vector2i(_resolution_index(draft), SettingsScript.RESOLUTIONS.size())
 		&"quality":
 			return Vector2i(draft.quality, 3)
+		&"text_size":
+			return Vector2i(maxi(SettingsScript.TEXT_SIZES.find(draft.text_size), 0), SettingsScript.TEXT_SIZES.size())
 		&"max_fps":
 			return Vector2i(maxi(SettingsScript.FPS_CAPS.find(draft.max_fps), 0), SettingsScript.FPS_CAPS.size())
 	return Vector2i(0, 1)
@@ -742,6 +753,7 @@ func discard_and_close() -> void:
 func _modal_discard_and_close() -> void:
 	draft.copy_from(settings)
 	settings.apply_audio()
+	settings.apply_text()
 	_close_modal()
 	_finish_close()
 
@@ -893,7 +905,7 @@ func _build() -> void:
 		b.custom_minimum_size = Vector2(0, 68)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.focus_mode = Control.FOCUS_ALL
-		b.add_theme_font_size_override("font_size", TAB_PX)
+		b.add_theme_font_size_override("font_size", MenuStyle.font_px(TAB_PX))
 		b.add_theme_constant_override("h_separation", 12)
 		b.add_theme_constant_override("outline_size", 0)
 		var icon := TabIcon.new()
@@ -1117,7 +1129,7 @@ func _label(text: String, px: int, colour: Color) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	l.add_theme_font_size_override("font_size", px)
+	l.add_theme_font_size_override("font_size", MenuStyle.font_px(px))
 	l.add_theme_color_override("font_color", colour)
 	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.45))
 	l.add_theme_constant_override("outline_size", 4 if px >= 30 else 0)
@@ -1186,7 +1198,7 @@ func _make_button(text: String, primary: bool) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.focus_mode = Control.FOCUS_ALL
-	b.add_theme_font_size_override("font_size", ROW_PX)
+	b.add_theme_font_size_override("font_size", MenuStyle.font_px(ROW_PX))
 	b.add_theme_constant_override("outline_size", 0)
 	_style_bar_button(b, primary, true)
 	b.mouse_entered.connect(func() -> void:
@@ -1395,7 +1407,7 @@ class Row extends Button:
 						continue
 					var cap := menu._keycap(caps[i], i == 0 and kind == Kind.KEY)
 					cap.custom_minimum_size = Vector2(64, 40)
-					cap.add_theme_font_size_override("font_size", SMALL_PX if i > 0 else VALUE_PX)
+					cap.add_theme_font_size_override("font_size", MenuStyle.font_px(SMALL_PX if i > 0 else VALUE_PX))
 					_caps.add_child(cap)
 				if kind == Kind.INFO:
 					_name_label.add_theme_color_override("font_color", CREAM_DIM)

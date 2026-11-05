@@ -62,10 +62,19 @@ const OUTLINE_COLOR := Color(0.0, 0.0, 0.0, 0.75)
 const OUTLINE_SIZE := 5
 
 
+## TEXT SIZE (FS8.2; Settings.text_size): every size the menus style is scaled by this.
+static var text_scale := 1.0
+
+
+## `size` px at the player's text size.
+static func font_px(size: int) -> int:
+	return int(round(size * text_scale))
+
+
 static func style_label(label: Label, size: int, colour: Color) -> void:
 	if label == null:
 		return
-	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_font_size_override("font_size", font_px(size))
 	label.add_theme_color_override("font_color", colour)
 	label.add_theme_color_override("font_outline_color", OUTLINE_COLOR)
 	label.add_theme_constant_override("outline_size", OUTLINE_SIZE)
@@ -416,7 +425,7 @@ static func theme_resource() -> Theme:
 static func style_label_button(button: Button) -> void:
 	if button == null:
 		return
-	button.add_theme_font_size_override("font_size", ROW_SIZE)
+	button.add_theme_font_size_override("font_size", font_px(ROW_SIZE))
 	button.add_theme_color_override("font_color", COLOR_NAME)
 	button.add_theme_color_override("font_outline_color", OUTLINE_COLOR)
 	button.add_theme_constant_override("outline_size", OUTLINE_SIZE)

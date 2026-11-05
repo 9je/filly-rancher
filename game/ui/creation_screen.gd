@@ -278,7 +278,7 @@ func _style_paper() -> void:
 			continue
 		MenuStyleScript.style_label(label, MenuStyleScript.ROW_SIZE, MenuStyleScript.COLOR_INK)
 		label.add_theme_constant_override(&"outline_size", 0)
-	_title_label.add_theme_font_size_override("font_size", MenuStyleScript.TITLE_SIZE)
+	_title_label.add_theme_font_size_override("font_size", MenuStyle.font_px(MenuStyleScript.TITLE_SIZE))
 	for path: NodePath in _PAPER_BUTTON_PATHS:
 		var button := get_node_or_null(path) as Button
 		if button == null:

@@ -128,6 +128,8 @@ var show_controls_chip := true
 var show_checklist := true
 ## The guide's trail of motes and the lit compass icon (game/systems/guide.gd).
 var show_guide := true
+## TEXT SIZE (FS8.2): percent, one of TEXT_SIZES.
+var text_size := 100
 ## The camera's kick on a catch and other big moments (game/actors/player/camera_rig.gd).
 var camera_shake := true
 var pause_on_focus_loss := true
@@ -142,7 +144,8 @@ const FIELDS: Array[StringName] = [&"master_volume", &"music_volume", &"ambient_
 	&"effects_volume", &"ui_volume", &"voice_volume", &"quality", &"vsync", &"window_mode",
 	&"resolution", &"fov", &"max_fps", &"mouse_sensitivity", &"stick_sensitivity",
 	&"invert_look", &"bindings", &"show_controls_chip", &"show_checklist", &"pause_on_focus_loss",
-	&"pony_chatter", &"show_guide", &"camera_shake"]
+	&"pony_chatter", &"show_guide", &"camera_shake", &"text_size"]
+const TEXT_SIZES: Array[int] = [100, 125, 150]
 
 ## The two that change the window itself, and so get the timed confirmation.
 const DISPLAY_FIELDS: Array[StringName] = [&"window_mode", &"resolution"]
@@ -193,6 +196,9 @@ func load_from(path: String = "") -> void:
 	show_controls_chip = bool(cfg.get_value(SECTION, "show_controls_chip", show_controls_chip))
 	show_checklist = bool(cfg.get_value(SECTION, "show_checklist", show_checklist))
 	show_guide = bool(cfg.get_value(SECTION, "show_guide", show_guide))
+	text_size = int(cfg.get_value(SECTION, "text_size", text_size))
+	if not text_size in TEXT_SIZES:
+		text_size = 100
 	camera_shake = bool(cfg.get_value(SECTION, "camera_shake", camera_shake))
 	pony_chatter = bool(cfg.get_value(SECTION, "pony_chatter", pony_chatter))
 	pause_on_focus_loss = bool(cfg.get_value(SECTION, "pause_on_focus_loss", pause_on_focus_loss))
@@ -229,6 +235,7 @@ func save_to(path: String = "") -> bool:
 	cfg.set_value(SECTION, "show_controls_chip", show_controls_chip)
 	cfg.set_value(SECTION, "show_checklist", show_checklist)
 	cfg.set_value(SECTION, "show_guide", show_guide)
+	cfg.set_value(SECTION, "text_size", text_size)
 	cfg.set_value(SECTION, "camera_shake", camera_shake)
 	cfg.set_value(SECTION, "pony_chatter", pony_chatter)
 	cfg.set_value(SECTION, "pause_on_focus_loss", pause_on_focus_loss)
@@ -455,6 +462,11 @@ func toggle_invert() -> void:
 ## begins with "--screenshot" (an offscreen/windowed capture run). This method mirrors
 ## both of those same conditions before unmuting, so a gate that opens the pause menu
 ## during one of those runs cannot undo AudioSafety's mute.
+## Every label the menus style from now on, at the player's text size (MenuStyle.text_scale).
+func apply_text() -> void:
+	MenuStyle.text_scale = float(text_size) / 100.0
+
+
 func apply_audio() -> void:
 	_apply_bus("Ambient", ambient_volume)
 	_apply_bus("Effects", effects_volume)

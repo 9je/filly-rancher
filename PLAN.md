@@ -245,7 +245,7 @@ MISSION.md's "Fun and anti-repetition rules" are part of the Definition of Done.
 ### Review focus
 1. An old save or the epilogue has a story state the objective rules never named: the tracker shows nothing rather than a wrong goal or an error (test in FS1.1).
 2. A rebound key collides with another action or an old settings file has no binds section: the conflict is refused with the clash named, and the old file loads with defaults (test in FS8.1).
-3. The largest text size at 1280x720: no panel runs off screen or clips its last line (test in FS8.2).
+3. The largest text size: no panel runs off the UI canvas (1920x1080 at every window size, project.godot stretch canvas_items) (test in FS8.2).
 4. A decoration placed over a pen gate, a road or an NPC's spot: refused by the ghost, and placed decor survives save and load (test in FS7.1).
 5. Faces on every wild pony at once: far ponies skip the face (the existing LOD tiers), and 60 ponies stay inside the perf budget (test in FS3.1).
 

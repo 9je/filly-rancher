@@ -922,7 +922,7 @@ func _restyle() -> void:
 		l.add_theme_constant_override("outline_size", 0)
 	_bits.add_theme_color_override("font_color", GOLD_INK)
 	_bits.add_theme_constant_override("outline_size", 0)
-	_bits.add_theme_font_size_override("font_size", 30)
+	_bits.add_theme_font_size_override("font_size", MenuStyle.font_px(30))
 	_bits.add_theme_font_override("font", MenuStyleScript.numeral_font())
 	_bag_title.add_theme_font_override("font", MenuStyleScript.title_font())
 	_add_card_behind($Bag as Control, Vector2(18, 14))
@@ -932,8 +932,8 @@ func _restyle() -> void:
 		pill.add_theme_color_override("font_color", INK)
 		pill.add_theme_constant_override("outline_size", 0)
 		pill.add_theme_font_override("font", MenuStyleScript.title_font())
-	_toast.add_theme_font_size_override("font_size", 30)
-	_prompt.add_theme_font_size_override("font_size", 24)
+	_toast.add_theme_font_size_override("font_size", MenuStyle.font_px(30))
+	_prompt.add_theme_font_size_override("font_size", MenuStyle.font_px(24))
 	_hints.add_theme_stylebox_override("panel", card_box(22, 4))
 	for c in _hints_grid.get_children():
 		if c is Label:
@@ -944,7 +944,7 @@ func _restyle() -> void:
 	_chip.name = "ControlsChip"
 	_chip.add_theme_stylebox_override("normal", card_box(16, 3))
 	_chip.add_theme_color_override("font_color", INK)
-	_chip.add_theme_font_size_override("font_size", 18)
+	_chip.add_theme_font_size_override("font_size", MenuStyle.font_px(18))
 	_chip.anchor_left = 1.0
 	_chip.anchor_right = 1.0
 	_chip.anchor_top = 1.0
@@ -1045,7 +1045,7 @@ func set_tip(text: String) -> void:
 		_tip.name = "Tip"
 		_tip.add_theme_stylebox_override("normal", card_box(24, 4))
 		_tip.add_theme_color_override("font_color", INK)
-		_tip.add_theme_font_size_override("font_size", 24)
+		_tip.add_theme_font_size_override("font_size", MenuStyle.font_px(24))
 		_tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		_tip.anchor_left = 0.5
 		_tip.anchor_right = 0.5
@@ -1081,7 +1081,7 @@ func set_target_info(text: String) -> void:
 		_target.name = "TargetInfo"
 		_target.add_theme_stylebox_override("normal", card_box(18, 3))
 		_target.add_theme_color_override("font_color", INK)
-		_target.add_theme_font_size_override("font_size", 20)
+		_target.add_theme_font_size_override("font_size", MenuStyle.font_px(20))
 		_target.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		_target.anchor_left = 0.5
 		_target.anchor_right = 0.5

@@ -53,7 +53,7 @@ func _ready() -> void:
 	_text.fit_content = true
 	_text.scroll_active = false
 	_text.custom_minimum_size = Vector2(MIN_WIDTH - 52.0, 0)
-	_text.add_theme_font_size_override("normal_font_size", 26)
+	_text.add_theme_font_size_override("normal_font_size", MenuStyle.font_px(26))
 	_text.add_theme_color_override("default_color", Color(0.22, 0.17, 0.25))
 	_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(_text)
@@ -62,13 +62,13 @@ func _ready() -> void:
 	v.add_child(_choices)
 	_hint = Label.new()
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_hint.add_theme_font_size_override("font_size", 18)
+	_hint.add_theme_font_size_override("font_size", MenuStyle.font_px(18))
 	_hint.add_theme_color_override("font_color", Color(0.45, 0.38, 0.5))
 	v.add_child(_hint)
 	_name_tab = PanelContainer.new()
 	root.add_child(_name_tab)
 	_name_label = Label.new()
-	_name_label.add_theme_font_size_override("font_size", 22)
+	_name_label.add_theme_font_size_override("font_size", MenuStyle.font_px(22))
 	_name_label.add_theme_color_override("font_color", Color.WHITE)
 	_name_tab.add_child(_name_label)
 	_panel.gui_input.connect(_on_panel_input)
@@ -109,7 +109,7 @@ func show_line(line: Dictionary, speaker: Node3D, color: Color) -> void:
 		var b := Button.new()
 		b.text = "%d.  %s" % [i + 1, choices[i]]
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		b.add_theme_font_size_override("font_size", 23)
+		b.add_theme_font_size_override("font_size", MenuStyle.font_px(23))
 		b.focus_mode = Control.FOCUS_ALL
 		b.mouse_entered.connect(func() -> void: _select(i))
 		b.pressed.connect(func() -> void: _pick(i))

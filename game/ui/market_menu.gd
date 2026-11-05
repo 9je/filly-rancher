@@ -168,7 +168,7 @@ func _build_detail() -> void:
 	_detail_buy.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_detail_buy.focus_mode = Control.FOCUS_NONE
 	_detail_buy.add_theme_font_override(&"font", MenuStyleScript.title_font())
-	_detail_buy.add_theme_font_size_override(&"font_size", 24)
+	_detail_buy.add_theme_font_size_override(&"font_size", MenuStyle.font_px(24))
 	for state: StringName in [&"normal", &"hover", &"pressed", &"disabled"]:
 		var b := StyleBoxFlat.new()
 		b.bg_color = PaintScript.GOLD if state != &"disabled" else PaintScript.GOLD_DIM.darkened(0.4)
@@ -463,7 +463,7 @@ func refresh() -> void:
 				set_tab(i))
 	for i in _tabs.get_child_count():
 		var b := _tabs.get_child(i) as Button
-		b.add_theme_font_size_override(&"font_size", 26)
+		b.add_theme_font_size_override(&"font_size", MenuStyle.font_px(26))
 		b.add_theme_font_override(&"font", MenuStyleScript.title_font())
 		var on := MenuStyleScript.COLOR_TAB_ON if i == _tab else MenuStyleScript.COLOR_TAB_OFF
 		for state in [&"font_color", &"font_hover_color", &"font_pressed_color"]:
