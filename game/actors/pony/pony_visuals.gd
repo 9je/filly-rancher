@@ -115,6 +115,7 @@ static func build(data: PonyData, model_path_override: String = "") -> Node3D:
 		planter.name = "HoofPlanter"
 		sk.add_child(planter)
 		break
+	_fold_wings(pony)
 	# The owner's slapstick bounce (actors/pony/rump_bounce.gd).
 	var bounce := RumpBounceScript.new()
 	bounce.name = "RumpBounce"
@@ -130,3 +131,21 @@ static func build(data: PonyData, model_path_override: String = "") -> Node3D:
 		return null
 
 	return pony
+
+
+## THE MANE SIX'S FOLDED WINGS, AS THE SHOW FOLDS THEM. As exported they reached back over the
+## whole flank, so Rainbow Dash, Fluttershy and Twilight wore their marks hidden but for
+## slivers around the wing (owner 2026-11-05: "Make sure this cutie mark bug doesn't happen
+## anywhere"). Each is drawn smaller about its root, the front top edge where it meets her
+## shoulder, so it rests on her barrel and the mark shows whole behind it.
+const FOLDED_WING_SCALE := 0.75
+
+
+static func _fold_wings(pony: Node3D) -> void:
+	for mi: MeshInstance3D in pony.find_children("Base_Wings_Folded*", "MeshInstance3D", true, false):
+		if mi.mesh == null:
+			continue
+		var box := mi.mesh.get_aabb()
+		var root := Vector3(0.0, box.end.y, box.end.z)
+		var k := FOLDED_WING_SCALE
+		mi.transform = Transform3D(Basis().scaled(Vector3.ONE * k), root - root * k)

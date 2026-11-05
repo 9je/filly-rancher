@@ -9,18 +9,18 @@ extends Node
 ## PonyVisuals.build() gives every body one, as a child named RumpBounce of the body root.
 
 ## Wobbles a second, and how quickly they die away (a damping ratio).
-const HZ := 5.0
-const DAMPING := 0.09
+const HZ := 2.6
+const DAMPING := 0.08
 ## The most the spring ever moves her, in metres.
 const MAX_AMOUNT := 0.15
 ## Her mane and tail are thrown with the spring: an external force on her hair springs of this
 ## much per metre a second of the spring's speed (owner: "make tail and hair bounce a little
 ## more obvious"). Gravity on the hair is 0.22 to 0.28, so a good flop throws it several times
 ## that, down, then up, then down, dying away with the rump.
-const HAIR_THROW := 0.25
+const HAIR_THROW := 0.4
 
 ## A kick of 1.0 is a velocity of this many metres a second.
-const KICK_SPEED := 5.0
+const KICK_SPEED := 2.8
 
 var _x := 0.0
 var _v := 0.0

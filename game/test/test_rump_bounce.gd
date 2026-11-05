@@ -33,9 +33,11 @@ func test_a_kick_wobbles_back_and_forth_and_settles() -> void:
 	assert_gt(peak, 0.01, "a visible wobble")
 	assert_lte(peak, BounceScript.MAX_AMOUNT + 0.0001, "never more than the cap")
 	assert_gte(signs, 3, "it wobbles, not just sags")
-	for i in 120:
+	# Long enough to read at full speed (owner: "at full speed it's too short and fast"), and
+	# still gone in a few seconds.
+	for i in 180:
 		b.call("step", 1.0 / 60.0)
-	assert_almost_eq(float(b.call("amount")), 0.0, 0.002, "settled within three seconds")
+	assert_almost_eq(float(b.call("amount")), 0.0, 0.002, "settled within four seconds")
 
 
 func test_a_built_pony_carries_one_with_its_centre_behind_her_hips() -> void:
@@ -127,6 +129,6 @@ func test_her_mane_and_tail_are_thrown_with_the_bounce_and_let_go_after() -> voi
 	b.call("kick", 1.0)
 	b.call("step", 1.0 / 60.0)
 	assert_lt(sim.get_external_force().y, -0.1, "flung down as she lands")
-	for i in 240:
+	for i in 420:
 		b.call("step", 1.0 / 60.0)
 	assert_eq(sim.get_external_force(), Vector3.ZERO, "let go once she has settled")

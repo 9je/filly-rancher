@@ -51,6 +51,7 @@ static func style(root: Node, category: StringName = &"prop", cache: Variant = n
 	var meshes: Array[Node] = root.find_children("*", "MeshInstance3D", true, false)
 	if root is MeshInstance3D:
 		meshes.append(root)
+	var mark_body := _mark_body(meshes) if category == &"pony" else null
 	for node: Node in meshes:
 		var mi: MeshInstance3D = node
 		if mi.mesh == null:
@@ -59,6 +60,21 @@ static func style(root: Node, category: StringName = &"prop", cache: Variant = n
 			var src: Material = mi.get_active_material(i)
 			if src is StandardMaterial3D:
 				var key := "%d:%s" % [src.get_instance_id(), category]
+				# The mark is her body's; a wing or a "Circle" handed the body's material gets
+				# its plain coat (see is_mark_texture).
+				if mark_body != null and mi != mark_body \
+						and is_mark_texture((src as StandardMaterial3D).albedo_texture):
+					key += ":plain"
+					if not store.has(key):
+						store[key] = to_toon(_plain_coat(src as StandardMaterial3D), preset)
+				elif mark_body != null and mi == mark_body \
+						and is_mark_texture((src as StandardMaterial3D).albedo_texture):
+					key += ":mark"
+					if not store.has(key):
+						var body_mat := to_toon(src as StandardMaterial3D, preset)
+						body_mat.set_shader_parameter(&"mark_sides_only", true)
+						body_mat.set_shader_parameter(&"mark_coat", _plain_coat(src as StandardMaterial3D).albedo_color)
+						store[key] = body_mat
 				var out: ShaderMaterial = store.get(key)
 				if out == null and category == &"pony" and src.resource_name.begins_with("eyeball") \
 						and (src as StandardMaterial3D).albedo_texture != null:
@@ -77,6 +93,47 @@ static func style(root: Node, category: StringName = &"prop", cache: Variant = n
 				mi.set_surface_override_material(i, out)
 				touched += 1
 	return touched
+
+
+## A TEXTURE WITH HER CUTIE MARK BAKED IN (the Mane Six's exports: CutieMark_baked). Those
+## exports hand the body's material to other meshes too (the folded wings, a "Circle"), which
+## read the texture at their own UVs and wore slivers of the mark (owner 2026-11-05, Rainbow
+## Dash's wing: "Make sure this cutie mark bug doesn't happen anywhere").
+static func is_mark_texture(tex: Texture2D) -> bool:
+	if tex == null:
+		return false
+	var p := (tex.resource_path + " " + tex.resource_name).to_lower().replace("_", "")
+	return p.contains("cutiemark")
+
+
+## Of `meshes`, the one that wears a mark texture over the most vertices: her body.
+static func _mark_body(meshes: Array[Node]) -> MeshInstance3D:
+	var best: MeshInstance3D = null
+	var most := 0
+	for node: Node in meshes:
+		var mi := node as MeshInstance3D
+		if mi == null or mi.mesh == null:
+			continue
+		for i in mi.mesh.get_surface_count():
+			var m := mi.get_active_material(i) as StandardMaterial3D
+			if m != null and is_mark_texture(m.albedo_texture):
+				var n: int = mi.mesh.surface_get_array_len(i)
+				if n > most:
+					most = n
+					best = mi
+	return best
+
+
+## `src` without its texture, in the coat colour that texture is mostly painted.
+static func _plain_coat(src: StandardMaterial3D) -> StandardMaterial3D:
+	var out := src.duplicate() as StandardMaterial3D
+	var tex := src.albedo_texture
+	var key := tex.get_rid().get_id()
+	if not _coat_cache.has(key):
+		_coat_cache[key] = _dominant(tex, src.albedo_color)
+	out.albedo_texture = null
+	out.albedo_color = _coat_cache[key]
+	return out
 
 
 ## THE CONVERTER'S MISSING-TEXTURE PLACEHOLDER (playtest note "weird eyes", 2026-10-24,

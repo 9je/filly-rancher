@@ -29,14 +29,27 @@ uniform float alpha_scissor : hint_range(0.0, 1.0) = 0.0;
 uniform vec3 emission : source_color = vec3(0.0);
 uniform float emission_energy = 0.0;
 
+// A Mane Six body whose cutie mark the export stretched over its whole texture: the texture is
+// drawn only where she faces sideways (her flanks), and her plain coat everywhere else, so the
+// back of her rump does not wear a sliver of the mark (ToonStyler.is_mark_texture).
+uniform bool mark_sides_only = false;
+uniform vec4 mark_coat : source_color = vec4(1.0);
+varying vec3 model_normal;
+
 void vertex() {
+	model_normal = NORMAL;
 	VERTEX += bounce_offset(VERTEX);
 }
 
 void fragment() {
 	vec4 c = albedo;
 	if (use_texture) {
-		c *= texture(albedo_texture, UV);
+		vec4 tc = texture(albedo_texture, UV);
+		if (mark_sides_only) {
+			float side = smoothstep(0.35, 0.6, abs(normalize(model_normal).x));
+			tc = mix(mark_coat, tc, side);
+		}
+		c *= tc;
 	}
 	if (alpha_scissor > 0.0 && c.a < alpha_scissor) {
 		discard;
