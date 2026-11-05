@@ -14,6 +14,11 @@ signal chose(index: int)
 const REVEAL_CPS := 46.0
 const MAX_WIDTH := 640.0
 const MIN_WIDTH := 540.0
+## A short line's bubble fits it, down to this (Tumble's "Yay!" sat in a bubble built for a
+## paragraph); the name tab and the "click or E" hint still need the room.
+const SHORT_MIN_WIDTH := 300.0
+## The bubble's padding round its text, each side together.
+const TEXT_PAD := 52.0
 
 var anchor: Node3D
 var camera: Camera3D
@@ -86,6 +91,14 @@ func show_line(line: Dictionary, speaker: Node3D, color: Color) -> void:
 	_name_label.text = str(line.get("who_name", ""))
 	_text.text = str(line.get("text", ""))
 	_total = _text.get_total_character_count()
+	var choices_in: Array = line.get("choices", [])
+	var width := MIN_WIDTH
+	if choices_in.is_empty():
+		var font := _text.get_theme_font(&"normal_font")
+		var line_w := font.get_string_size(_text.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 26).x if font != null else MIN_WIDTH
+		width = clampf(line_w + TEXT_PAD + 12.0, SHORT_MIN_WIDTH, MIN_WIDTH)
+	_panel.custom_minimum_size.x = width
+	_text.custom_minimum_size.x = width - TEXT_PAD
 	_shown = 0.0
 	_text.visible_characters = 0
 	for b in _buttons:
@@ -182,7 +195,7 @@ func _on_revealed() -> void:
 func _place() -> void:
 	var vp := get_viewport().get_visible_rect().size
 	var size := _panel.get_combined_minimum_size()
-	size.x = clampf(size.x, MIN_WIDTH, MAX_WIDTH)
+	size.x = clampf(size.x, _panel.custom_minimum_size.x, MAX_WIDTH)
 	_panel.size = size
 	var at := Vector2(vp.x * 0.5, vp.y * 0.2)
 	if anchor != null and is_instance_valid(anchor) and camera != null:
