@@ -20,17 +20,35 @@ const REAL_SCALE := 1.9
 ## optional bodygroup: baby Spike has none, so they are hidden.
 const REAL_SKINS := {"body": "body", "acces": "acces", "eyeball_l": "pupil_l",
 	"eyeball_r": "pupil_r", "eyebrow": "eyebrow", "tongue": "tongue", "teeth": "tongue"}
+## SPIKE, ANIMATED: home-equestria's Spike (assets/models/spike_he/SOURCE.md), the same PonySFM
+## family as REAL_MODEL but with 24 keyed clips, so he idles, waves and breathes his fire
+## instead of standing frozen in his rig's pose (owner 2026-11-05: "maybe some better models
+## if we could use them"). Preferred over both models above when it is there.
+const ANIM_MODEL := "res://assets/models/spike_he/spike.glb"
+## 1.53: the model stands 0.86 m; this brings him to REAL_SCALE's 1.31 m.
+const ANIM_SCALE := 1.53
+const SPIKE_EYE := preload("res://shaders/spike_eye.gdshader")
+const IRIS_L := preload("res://assets/models/spike_he/spike_iris_l.png")
+const IRIS_R := preload("res://assets/models/spike_he/spike_iris_r.png")
 const LOOK_RADIUS := 7.0
 
 var player: Node3D
 var _body: Node3D
+var _anim: AnimationPlayer
+## She is within LOOK_RADIUS (he waves once each time she comes up).
+var _near := false
 var _t := 0.0
 var _base_y := 0.0
 var _yaw := 0.0
 
 
 func _ready() -> void:
-	if ResourceLoader.exists(REAL_MODEL):
+	if ResourceLoader.exists(ANIM_MODEL):
+		_body = (load(ANIM_MODEL) as PackedScene).instantiate()
+		add_child(_body)
+		_body.scale = Vector3.ONE * ANIM_SCALE
+		_dress_animated(_body)
+	elif ResourceLoader.exists(REAL_MODEL):
 		_body = (load(REAL_MODEL) as PackedScene).instantiate()
 		add_child(_body)
 		_body.scale = Vector3.ONE * REAL_SCALE
@@ -41,6 +59,39 @@ func _ready() -> void:
 		ToonStyler.style(_body, &"pony", {})
 	_base_y = position.y
 	_yaw = rotation.y
+
+
+## The animated Spike: the game's toon light, his own iris on his eyes, idling.
+func _dress_animated(root: Node) -> void:
+	ToonStyler.style(root, &"pony", {})
+	for mi: MeshInstance3D in root.find_children("*", "MeshInstance3D", true, false):
+		for i in mi.mesh.get_surface_count():
+			var src := mi.mesh.surface_get_material(i)
+			var key := (src.resource_name if src != null else "").get_slice(".", 0)
+			if key == "eyeball_l" or key == "eyeball_r":
+				var eye := ShaderMaterial.new()
+				eye.shader = SPIKE_EYE
+				eye.set_shader_parameter(&"iris_texture", IRIS_L if key == "eyeball_l" else IRIS_R)
+				mi.set_surface_override_material(i, eye)
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	var players := root.find_children("*", "AnimationPlayer", true, false)
+	if players.is_empty():
+		return
+	_anim = players[0]
+	if _anim.has_animation(&"idle"):
+		_anim.get_animation(&"idle").loop_mode = Animation.LOOP_LINEAR
+	_anim.animation_finished.connect(func(_n: StringName) -> void: _play(&"idle"))
+	_play(&"idle")
+
+
+## His AnimationPlayer (null on the clip-less models).
+func animation_player() -> AnimationPlayer:
+	return _anim
+
+
+func _play(clip: StringName) -> void:
+	if _anim != null and _anim.has_animation(clip):
+		_anim.play(clip, 0.2)
 
 
 ## The model ships in its rig's reference pose, arms straight out; he stands with them down.
@@ -135,16 +186,22 @@ func _process(delta: float) -> void:
 	_t += delta
 	if _body == null:
 		return
-	# Breathing, and a little sway, so he reads as alive from across the yard.
-	_body.position.y = sin(_t * 2.1) * 0.02
-	_body.rotation.z = sin(_t * 1.3) * 0.04
+	if _anim == null:
+		# Breathing, and a little sway, so he reads as alive from across the yard.
+		_body.position.y = sin(_t * 2.1) * 0.02
+		_body.rotation.z = sin(_t * 1.3) * 0.04
 	# He turns to watch the player when she is close; otherwise back to the lane.
 	var want := _yaw
+	var near := false
 	if player != null and is_instance_valid(player):
 		var to := player.global_position - global_position
 		to.y = 0.0
 		if to.length() < LOOK_RADIUS and to.length() > 0.3:
 			want = atan2(to.x, to.z)
+			near = true
+	if near and not _near and _anim != null and _anim.current_animation == "idle":
+		_play(&"wave")
+	_near = near
 	rotation.y = lerp_angle(rotation.y, want, 1.0 - exp(-3.0 * delta))
 
 
@@ -152,6 +209,7 @@ func _process(delta: float) -> void:
 func letter_arrived() -> void:
 	if _body == null:
 		return
+	_play(&"fire")
 	var t := create_tween()
 	t.tween_property(_body, "position:y", 0.12, 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	t.tween_property(_body, "position:y", 0.0, 0.18).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
@@ -187,7 +245,7 @@ func letter_arrived() -> void:
 	fire.explosiveness = 0.85
 	add_child(fire)
 	# At his mouth: the real model faces +Z (the stand-in faced -Z).
-	var real := ResourceLoader.exists(REAL_MODEL)
+	var real := ResourceLoader.exists(REAL_MODEL) or _anim != null
 	fire.position = Vector3(0, 0.66, 0.28) if real else Vector3(0, 0.72, -0.35)
 	if real:
 		pm.direction = Vector3(0, 0.6, 1)
