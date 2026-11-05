@@ -40,6 +40,11 @@ const FLANK := Vector3(0.26, 0.86, 0.22)
 
 ## Decal box: across the flank, INTO the pony (the projection depth), and along her.
 const DECAL_SIZE := Vector3(0.30, 0.26, 0.30)
+## THE MARK PAINTS HER BODY AND NOTHING ELSE. A Decal paints whatever is in its box: a tail
+## swinging through, a wing, a mane thrown by the bounce (owner 2026-11-05: "Make sure this
+## cutie mark bug doesn't happen anywhere"). Her body mesh carries this render layer, and the
+## decals paint only it.
+const MARK_LAYER := 1 << 19
 
 const MarkPaintScript := preload("res://systems/mark_paint.gd")
 
@@ -53,6 +58,7 @@ static func apply(model: Node3D, mark: Image) -> int:
 	clear(model)
 	if mark == null or MarkPaintScript.is_blank(mark):
 		return 0
+	_mark_body(model)
 	var texture: ImageTexture = ImageTexture.create_from_image(mark)
 	var anchor: Node3D = _anchor(model)
 	if anchor == null:
@@ -66,6 +72,7 @@ static func apply(model: Node3D, mark: Image) -> int:
 		decal.albedo_mix = 1.0
 		# Softened at the rim so the square canvas does not read as a sticker with a hard
 		# edge on a curved barrel.
+		decal.cull_mask = MARK_LAYER
 		decal.upper_fade = 0.4
 		decal.lower_fade = 0.4
 		anchor.add_child(decal)
@@ -174,6 +181,25 @@ static func clear(model: Node3D) -> void:
 ## Where the decals hang. A BoneAttachment3D on the haunch when the model has a skeleton
 ## with one of BONE_NAMES; the model itself otherwise. Reused across calls so applying a new
 ## mark does not leave a trail of empty attachments behind it.
+## Put her body (the biggest mesh that is not hair, tail, wing or eye) on MARK_LAYER.
+static func _mark_body(model: Node3D) -> void:
+	var best: MeshInstance3D = null
+	var most := 0
+	for mi: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+		var n := String(mi.name).to_lower()
+		if mi.mesh == null or n.contains("tail") or n.contains("hair") or n.contains("mane") \
+				or n.contains("wing") or n.contains("eye"):
+			continue
+		var verts := 0
+		for i in mi.mesh.get_surface_count():
+			verts += mi.mesh.surface_get_array_len(i)
+		if verts > most:
+			most = verts
+			best = mi
+	if best != null:
+		best.layers |= MARK_LAYER
+
+
 static func _anchor(model: Node3D) -> Node3D:
 	var skeleton := model.find_child("Skeleton3D", true, false) as Skeleton3D
 	if skeleton == null:

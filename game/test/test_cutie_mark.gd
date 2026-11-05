@@ -155,3 +155,29 @@ func test_the_top_of_the_canvas_sits_higher_on_the_barrel_than_the_bottom() -> v
 		assert_gt(top.y, bottom.y, "%s has the canvas upside down" % decal.name)
 		assert_almost_eq(top.y - bottom.y, decal.size.z, 0.001,
 			"the canvas spans the decal's own depth along the barrel")
+
+
+func test_the_mark_paints_her_body_and_nothing_else() -> void:
+	# A Decal paints whatever is in its box: a tail swinging through, a wing, a mane thrown by
+	# the bounce (owner 2026-11-05: "Make sure this cutie mark bug doesn't happen anywhere").
+	_model = _base_model()
+	if _model == null:
+		pending("no converted model")
+		return
+	add_child(_model)
+	var img := Image.create(16, 16, false, Image.FORMAT_RGBA8)
+	img.fill(Color(1, 0, 0, 1))
+	CutieMarkScript.apply(_model, img)
+	var decals := _model.find_children("*", "Decal", true, false)
+	assert_eq(decals.size(), 2)
+	var bodies := 0
+	for mi: MeshInstance3D in _model.find_children("*", "MeshInstance3D", true, false):
+		var on: bool = (mi.layers & CutieMarkScript.MARK_LAYER) != 0
+		var name := String(mi.name).to_lower()
+		if on:
+			bodies += 1
+		if name.contains("tail") or name.contains("hair") or name.contains("mane") or name.contains("wing"):
+			assert_false(on, "%s takes no mark" % mi.name)
+	assert_eq(bodies, 1, "her body, once")
+	for d: Decal in decals:
+		assert_eq(d.cull_mask, CutieMarkScript.MARK_LAYER)
