@@ -90,3 +90,12 @@ func test_the_trail_follows_the_ground() -> void:
 	trail.point(Vector3.ZERO, Vector3(20, 0, 0))
 	for m: Vector3 in trail.mote_positions():
 		assert_almost_eq(m.y - m.x * 0.1, TrailScript.HOVER, 0.35)
+
+
+func test_with_nothing_waiting_it_points_where_the_story_goes_next() -> void:
+	# Mid-game the guide went silent (owner: "idk what to do anymore"): with no chore waiting
+	# it now follows the main path (game/systems/objective.gd).
+	assert_eq(GuideScript.pick(_state({"objective_goal": &"depot"})), &"depot")
+	assert_eq(GuideScript.pick(_state({"mail": true, "objective_goal": &"depot"})), &"mail",
+		"a waiting chore still comes first")
+	assert_eq(GuideScript.pick(_state({"has_scoop": false, "objective_goal": &"marigold"})), &"marigold")

@@ -13,14 +13,17 @@ extends RefCounted
 ## (free places across the built pens), gems (in the pouch and the pens), tasks (the board's
 ## tutorial_rows()).
 ##
-## Goals: &"pens", &"mail", &"talk", &"market", &"catch", or &"" for nowhere.
+## Goals: &"pens", &"mail", &"talk", &"market", &"catch", or the story's own (objective_goal:
+## &"depot", &"marigold", &"static"), or &"" for nowhere.
 
 
 static func pick(s: Dictionary) -> StringName:
 	var news := bool(s.get("news", false))
+	# Where the story goes next (Objective.current), when nothing is waiting on her.
+	var story := StringName(s.get("objective_goal", &""))
 	if not bool(s.get("has_scoop", false)):
 		# The first minutes are people: whoever hands her the Scoop has the "!".
-		return &"talk" if news else &""
+		return &"talk" if news else story
 	var bag := int(s.get("bag", 0))
 	if bool(s.get("bag_full", false)):
 		return &"pens"
@@ -41,4 +44,4 @@ static func pick(s: Dictionary) -> StringName:
 		return &"pens" if bag > 0 else &"catch"
 	if open.has("tutorial_sell"):
 		return &"market" if int(s.get("gems", 0)) > 0 else &"catch"
-	return &""
+	return story

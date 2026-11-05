@@ -8655,6 +8655,7 @@ signal lift_requested(mode: StringName)
 # --- Act Three (v1): the world reports, PathRules decides (game/systems/path_rules.gd) ---
 
 const PathRulesScript := preload("res://systems/path_rules.gd")
+const ObjectiveScript := preload("res://systems/objective.gd")
 const EndingsScript := preload("res://systems/endings.gd")
 const EpilogueScript := preload("res://ui/epilogue.gd")
 
@@ -9042,7 +9043,28 @@ func _guide_state() -> Dictionary:
 	s["gems"] = int(s["gems"]) + pen_gems
 	if _board != null:
 		s["tasks"] = _board.tutorial_rows()
+	s["objective_goal"] = StringName(current_objective().get("goal", &""))
 	return s
+
+
+## The story's next step (game/systems/objective.gd), for the guide and the HUD's card.
+func current_objective() -> Dictionary:
+	var story: Story = get_story()
+	if story == null:
+		return {}
+	var built := 0
+	for slot in _plot_slots():
+		if slot.get_built() is Pen:
+			built += 1
+	var beam: Node3D = player.get_magic_beam() if player != null else null
+	var storage: Storage = beam.get_storage() if beam != null else null
+	return ObjectiveScript.current({
+		"chapter": story.chapter, "path": StoryV1Script.path(story),
+		"ending": String(story.get_var("ending", "")), "flags": story.flags.keys(),
+		"deliveries": story.deliveries, "blooms": int(story.get_var("blooms", 0)),
+		"pens": built, "bag": storage.count() if storage != null else 0,
+		"pylons": PathRulesScript.pylons_cut(story), "contract": PathRulesScript.contract(story),
+	})
 
 
 func _guide_news_npc() -> Node3D:
@@ -9076,6 +9098,11 @@ func _guide_place(goal: StringName) -> Array:
 			return [_guide_pen_target(), PlaceSign.Icon.FENCE]
 		&"catch":
 			return [_guide_wild_pony(), PlaceSign.Icon.ARROW]
+		&"depot":
+			return [get_node_or_null(^"Buildings/Depot"), PlaceSign.Icon.CRATE]
+		&"marigold", &"static":
+			var who: Node3D = people.npcs.get(goal) as Node3D if people != null else null
+			return [who if who != null and is_instance_valid(who) and who.visible else null, PlaceSign.Icon.STAR]
 	return [null, 0]
 
 
