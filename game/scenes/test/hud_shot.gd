@@ -45,6 +45,14 @@ func _run() -> void:
 	for i in 30:
 		await process_frame
 	root.get_texture().get_image().save_png(out.path_join("hud_plain.png"))
+	ranch.set("_person_aim_t", 9999.0)
+	hud.call("set_aiming_person", true)
+	for i in 3:
+		await process_frame
+	root.get_texture().get_image().save_png(out.path_join("hud_person.png"))
+	var b: Node = hud.call("get_beam")
+	print("PERSON aiming=", hud.call("aiming_person"), " target=", b.call("has_target") if b != null else "nobeam", " holding=", b.call("is_holding") if b != null else "")
+	hud.call("set_aiming_person", false)
 	hud.call("toast", "Pip: \"Smile! Cloudsdale wants you for the newsletter!\" Steward of the Week: 12 ponies placed, \"a yield of 124% above the valley average.\"")
 	hud.call("_on_captured", PonyInstanceScript.create(&"twilight"))
 	for i in 20:

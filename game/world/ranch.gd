@@ -5133,6 +5133,7 @@ func _physics_process(delta: float) -> void:
 	spawner.tick_stock(delta)
 	_update_interaction()
 	_update_guide(delta)
+	_update_person_aim()
 	_v1_tick(delta)
 	# AFTER the interaction pass, so a ban that landed this frame shuts a door the resolver
 	# would otherwise have just opened. See enforce_casino_ban().
@@ -9282,6 +9283,33 @@ func _guide_place(goal: StringName) -> Array:
 		&"sighting":
 			return [_guide_sighting(), PlaceSign.Icon.STAR]
 	return [null, 0]
+
+
+## A TOWNSPONY IS NOT A CATCH, AND THE CROSSHAIR SAYS SO (PT8; playtest 2026-11-05: "its hard
+## to tell when you cant collect a pony like whihc ones are the npc"). The ray from the lens's
+## centre, out to PERSON_AIM_M: on a townspony the HUD shows a speech bubble beside the
+## reticle. Ten times a second is plenty for a glance.
+const PERSON_AIM_M := 25.0
+var _person_aim_t := 0.0
+
+
+func _update_person_aim() -> void:
+	_person_aim_t -= get_physics_process_delta_time()
+	if _person_aim_t > 0.0:
+		return
+	_person_aim_t = 0.1
+	var cam := get_viewport().get_camera_3d()
+	var hud := get_node_or_null(^"HUD")
+	if cam == null or hud == null or not hud.has_method("set_aiming_person"):
+		return
+	var from := cam.global_position
+	var to := from - cam.global_transform.basis.z * PERSON_AIM_M
+	var q := PhysicsRayQueryParameters3D.create(from, to,
+		LayersScript.PONY | LayersScript.PROPS | LayersScript.TERRAIN)
+	if player != null:
+		q.exclude = [player.get_rid()]
+	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	hud.call("set_aiming_person", not hit.is_empty() and hit.collider is Npc)
 
 
 ## The pony Tumble last pointed out, while she is still out there to be found (Happenings).

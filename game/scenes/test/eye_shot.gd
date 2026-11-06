@@ -16,6 +16,10 @@ const EYES := [
 	["palace_far", Vector3(2, 3.0, 30), Vector3(-10, 5, 61)],
 	["barn_yard", Vector3(-2, 3.4, -6), Vector3(-17, 1.5, -19)],
 	["plots", Vector3(-2, 3.6, 4), Vector3(-15, 0.5, 17)],
+	["strip_walkup", Vector3(4, 3.2, 52), Vector3(0, 1.0, 78)],
+	["strip_track", Vector3(14, 3.6, 66), Vector3(-6, 0.5, 82)],
+	["strip_west", Vector3(-18, 3.2, 62), Vector3(6, 1.0, 82)],
+	["town_row", Vector3(6, 3.2, 26), Vector3(-14, 2.0, 38)],
 	["market_front", Vector3(17, 3.0, 12), Vector3(18, 2.5, -3)],
 	["depot_front", Vector3(-12, 3.0, 9), Vector3(-14, 2.5, -3)],
 ]

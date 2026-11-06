@@ -695,8 +695,35 @@ func _on_escaped(_body: Node3D) -> void:
 
 # --- drawing ---------------------------------------------------------------------
 
+## Whether the crosshair is resting on a townspony (Ranch._update_person_aim, PT8).
+var _aiming_person := false
+
+
+func set_aiming_person(on: bool) -> void:
+	if on != _aiming_person:
+		_aiming_person = on
+		_crosshair.queue_redraw()
+
+
+func aiming_person() -> bool:
+	return _aiming_person
+
+
+## A little speech bubble beside the reticle: a person to talk to, not a pony to catch.
+func _draw_person_badge(centre: Vector2) -> void:
+	var at := centre + Vector2(38.0, -38.0)
+	_crosshair.draw_circle(at, 23.0, Color(0.25, 0.18, 0.32, 0.55))
+	_crosshair.draw_circle(at, 20.0, Color(1.0, 0.98, 0.93))
+	_crosshair.draw_colored_polygon(PackedVector2Array([at + Vector2(-14, 11), at + Vector2(-4, 14),
+		at + Vector2(-19, 25)]), Color(1.0, 0.98, 0.93))
+	for k in 3:
+		_crosshair.draw_circle(at + Vector2(-8.0 + 8.0 * k, 0.0), 3.0, Color(0.45, 0.3, 0.55))
+
+
 func _draw_crosshair() -> void:
 	var centre: Vector2 = _crosshair.size * 0.5
+	if _aiming_person and not (_beam != null and (_beam.is_holding() or _beam.has_target())):
+		_draw_person_badge(centre)
 	var holding: bool = _beam != null and _beam.is_holding()
 	var beaming: bool = _beam != null and _beam.is_active()
 	var secured: bool = holding and _beam.is_secured()
