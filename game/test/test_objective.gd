@@ -38,6 +38,19 @@ func test_after_the_depot_the_way_is_deliveries_then_blooms() -> void:
 	assert_string_contains(_words({"chapter": 1, "flags": f, "pens": 2, "deliveries": 6, "blooms": 1}), "1/2")
 
 
+func test_a_bloom_needs_a_penned_drifter_and_the_card_says_so() -> void:
+	# PT3 (playtest 2026-11-05 item 53): every Drifter delivered, only named ponies kept, and
+	# the card sent her to the pens for a Bloom that could never come. Only a Drifter Blooms.
+	var f := ["has_scoop", "depot_explained"]
+	var st := {"chapter": 1, "flags": f, "pens": 2, "deliveries": 6, "blooms": 0}
+	st["drifters"] = 0
+	assert_eq(_goal(st), &"catch", "no Drifter penned: go and catch one")
+	assert_string_contains(_words(st), "Drifter")
+	st["drifters"] = 1
+	assert_eq(_goal(st), &"pens", "a Drifter penned: her pen")
+	assert_string_contains(_words(st), "Drifter")
+
+
 func test_the_invitation_then_color_day_then_the_lift() -> void:
 	var f := ["has_scoop", "depot_explained", "invited"]
 	assert_eq(_goal({"chapter": 1, "flags": f}), &"", "Color Day comes at dawn: no place to go")

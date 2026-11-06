@@ -278,7 +278,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, 19)
 script = ExtResource("4")
 zone_id = &"ranch"
 spawn_radius = 6.5
-spawn_count = 1
+spawn_count = 0
 roam_radius = 4.5
 stock_count = 2
 

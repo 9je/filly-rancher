@@ -21,7 +21,7 @@ nodes = Array[Dictionary]([{
 "next": "two"
 }, {
 "id": "two",
-"text": "You've got a Drifter in that satchel and nowhere to put her. That's a pen plot by your porch. Build on it, and let her out inside.",
+"text": "Catch yourself a Drifter and she'll need somewhere to go. That's a pen plot by your porch. Build on it, and let her out inside.",
 "who": "fennel",
 "mood": "neutral",
 "flag": "met_fennel",

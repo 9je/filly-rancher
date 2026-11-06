@@ -47,7 +47,7 @@ when: {"flags_all": ["tumble_joined"], "flags_none": ["met_fennel"]}
 
 start [fennel neutral] So you're the new one. Fennel. I farm the plot over the hill, since before your roof started leaking.
   -> two
-two [fennel neutral] You've got a Drifter in that satchel and nowhere to put her. That's a pen plot by your porch. Build on it, and let her out inside.
+two [fennel neutral] Catch yourself a Drifter and she'll need somewhere to go. That's a pen plot by your porch. Build on it, and let her out inside.
   flag: met_fennel
   event: tutor_pen
   -> three

@@ -436,6 +436,25 @@ func test_stock_ponies_may_stand_twice_but_named_ponies_may_not() -> void:
 	assert_gt(world.spawner.stock_standing(), 3, "the crowd is allowed to repeat itself")
 
 
+func test_a_named_pony_the_player_has_is_never_drawn_into_the_wild() -> void:
+	# PT3: an escaped Sweetie Belle stood unknown to the spawner, which spawned a second one.
+	var first := _build_world(2, 1)
+	first.spawner.populate(WorldStateScript.Phase.DAY, WorldStateScript.Weather.CLEAR)
+	var named: Array = []
+	for pony in first.spawner.get_spawned():
+		var id: StringName = pony.get_data().id
+		if not StockPaletteScript.is_stock_id(id):
+			named.append(id)
+	assert_gt(named.size(), 0, "the fixture world draws named ponies at all")
+	var world := _build_world(2, 2)  # a fresh world: _build_world caches by its arguments
+	world.spawner.owned_ids = func() -> Array: return named
+	world.spawner.populate(WorldStateScript.Phase.DAY, WorldStateScript.Weather.CLEAR)
+	world.spawner.refresh(WorldStateScript.Phase.NIGHT, WorldStateScript.Weather.CLEAR, 2, Vector3.ZERO)
+	world.spawner.refresh(WorldStateScript.Phase.DAY, WorldStateScript.Weather.CLEAR, 3, Vector3.ZERO)
+	for pony in world.spawner.get_spawned():
+		assert_does_not_have(named, pony.get_data().id, "%s is the player's already" % pony.get_data().id)
+
+
 func test_every_stock_pony_carries_a_palette_triple() -> void:
 	var world := _build_world(1, 1)
 	world.spawner.get_markers()[0].stock_count = 5

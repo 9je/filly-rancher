@@ -8,7 +8,8 @@ extends RefCounted
 ##
 ## State keys: chapter (Story.Chapter), path ("", "factory", "rescue"), ending (non-empty
 ## once one has played), flags (the story flags set), deliveries, blooms, pens (built), bag
-## (ponies carried), pylons (cut), contract (PathRules.contract: want, kind, got).
+## (ponies carried), drifters (unmarked Drifters penned), pylons (cut), contract
+## (PathRules.contract: want, kind, got).
 ##
 ## Returns {id, goal, icon (PlaceSign.Icon), words} or {} for no objective. goal is a Guide
 ## goal (&"marigold", &"static", &"catch", &"pens", &"depot") or &"" when the objective is a
@@ -89,8 +90,14 @@ static func _acts_one_two(s: Dictionary, flags: Array) -> Dictionary:
 				"Deliver ponies %d/%d" % [d, INVITE_DELIVERIES])
 		var b := int(s.get("blooms", 0))
 		if b < INVITE_BLOOMS:
+			# ONLY A DRIFTER BLOOMS (PT3; playtest 2026-11-05 item 53): with every Drifter
+			# delivered and the named ponies kept, "Help ponies Bloom" pointed at pens where
+			# nobody could. Say who, and send her for one when none is penned.
+			if int(s.get("drifters", 1)) <= 0:
+				return _o(&"bloom", &"catch", PlaceSign.Icon.STAR,
+					"Pen a Drifter to Bloom %d/%d" % [b, INVITE_BLOOMS])
 			return _o(&"bloom", &"pens", PlaceSign.Icon.FENCE,
-				"Help ponies Bloom %d/%d" % [b, INVITE_BLOOMS])
+				"Feed Drifters to Bloom %d/%d" % [b, INVITE_BLOOMS])
 		return _o(&"invite", &"marigold", PlaceSign.Icon.STAR, "Marigold wants a word")
 	if not flags.has("color_day"):
 		return _o(&"wait", &"", PlaceSign.Icon.HOUSE, "Color Day comes at dawn")

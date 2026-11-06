@@ -1161,6 +1161,9 @@ func _ready() -> void:
 	# After the beam exists and the world has settled: put the ponies the player owned when
 	# she quit back where they live -- pens first, saddlebag for everyone else.
 	_restored_ponies = restore_owned_ponies()
+	# A save quit at night with an Escape Artist out: her body did not survive the quit, so
+	# she is home already (PT3).
+	_escapees_come_home()
 
 	await _boot_beat(0.91, "Unpacking your saddlebag")
 	_bind_build_menu()
@@ -1301,6 +1304,8 @@ func _bind_game_state() -> void:
 		spawner.spawn_seed = _game_state.world_seed
 	else:
 		_game_state.world_seed = spawner.spawn_seed
+	# Never a second of a named pony she already has (PT3): see Spawner.owned_ids.
+	spawner.owned_ids = _owned_named_ids
 
 	# Every write -- the one at the house AND the one on quit -- pulls the live world in
 	# through this first. Without it, quitting would save whatever the state last happened
@@ -1877,6 +1882,7 @@ func _on_world_phase_changed(_phase: int) -> void:
 		_escape_artists()
 	_on_world_changed()
 	if _phase == WorldStateScript.Phase.DAWN and _game_state != null:
+		_escapees_come_home()
 		_depot_cart()
 	# After _on_world_changed(), so a collection day that falls on this dawn reads the Heat
 	# the night left, before the dawn cools it (STORY.md: "stays there through a collection day").
@@ -8162,6 +8168,9 @@ func _talk_context() -> Dictionary:
 		"heat": int(story.get_var("heat", 0)) if story != null else 0,
 		"pylons": int(story.get_var("pylons_cut", 0)) if story != null else 0,
 		"rank": int(story.get_var("rank", 0)) if story != null else 0,
+		# What is in the saddlebag right now, so a line that says so can require it (PT3).
+		"bag": player.get_magic_beam().get_storage().count() if player != null \
+			and player.get_magic_beam() != null else 0,
 	}
 	var name := "friend"
 	if _game_state != null and _game_state.player != null:
@@ -8563,6 +8572,73 @@ func _announce_stock() -> void:
 		_novelty("npc", "stock_" + String(it.id), "Bramble's new stock: %s" % it.display_name)
 
 
+## Every named pony the player has: penned, in the saddlebag, or out of a Paddock tonight.
+func _owned_named_ids() -> Array:
+	var ids: Array = []
+	if _game_state != null:
+		for inst: PonyInstance in _game_state.get_ponies():
+			if not inst.is_stock():
+				ids.append(inst.data_id)
+		for d: Dictionary in _game_state.story.get_var(ESCAPED_VAR, []):
+			ids.append(StringName(str(d.get("data_id", ""))))
+	if player != null and player.get_magic_beam() != null:
+		for inst: PonyInstance in player.get_magic_beam().get_storage().contents():
+			if not inst.is_stock():
+				ids.append(inst.data_id)
+	return ids
+
+
+## AN ESCAPE ARTIST COMES HOME AT DAWN (PT3; playtest 2026-11-05: "were my ponies escaping the
+## paddock? cuz i feel like i was catching repeats"). She still hops a Paddock fence at night
+## -- that is her trait -- but she is not lost: she grazes by the fence, and at dawn walks back
+## into a pen with room. Her record is kept in the save, so quitting at night loses nobody.
+const ESCAPED_VAR := "escaped_tonight"
+
+
+func _escapees_come_home() -> void:
+	if _game_state == null:
+		return
+	var waiting: Array = []
+	for d: Dictionary in _game_state.story.get_var(ESCAPED_VAR, []):
+		var uid := StringName(str(d.get("uid", "")))
+		var body := _escaped_body(uid)
+		if body == null and _game_state.find_pony(uid) != null:
+			continue  # caught again: she is in the saddlebag
+		var pen := _pen_with_room(StringName(str(d.get("slot", ""))))
+		if pen == null:
+			waiting.append(d)
+			continue
+		var inst := PonyInstanceScript.from_dict(d.get("instance", {}))
+		if inst == null or not pen.add_pony(inst):
+			waiting.append(d)
+			continue
+		if body != null:
+			body.queue_free()
+		_toast("%s came home at dawn." % inst.display_name())
+	_game_state.story.set_var(ESCAPED_VAR, waiting)
+
+
+func _escaped_body(uid: StringName) -> Node3D:
+	for n: Node in get_children():
+		if n is Node3D and n.has_meta(&"escaped") and StringName(str(n.get_meta(&"escaped_uid", ""))) == uid:
+			return n
+	return null
+
+
+## Her own pen if it has room, else any pen with room, else null.
+func _pen_with_room(slot_id: StringName) -> Pen:
+	var any: Pen = null
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen == null or pen.is_full():
+			continue
+		if slot.slot_id == slot_id:
+			return pen
+		if any == null:
+			any = pen
+	return any
+
+
 ## At nightfall an Escape Artist in a Paddock hops the fence (a Big or Grand Pen holds her).
 func _escape_artists() -> void:
 	for slot in _plot_slots():
@@ -8578,11 +8654,16 @@ func _escape_artists() -> void:
 				continue
 			_game_state.remove_pony(inst.uid)
 			body.set_meta(&"escaped", true)
+			body.set_meta(&"escaped_uid", String(inst.uid))
+			var gone: Array = _game_state.story.get_var(ESCAPED_VAR, [])
+			gone.append({"uid": String(inst.uid), "data_id": String(inst.data_id),
+				"slot": String(slot.slot_id), "instance": inst.to_dict()})
+			_game_state.story.set_var(ESCAPED_VAR, gone)
 			var out := Vector3(slot.global_position.x + 6.5, 0.0, slot.global_position.z)
 			out.y = float(terrain.call("height_at", out.x, out.z)) + 0.2 if terrain != null else 0.2
 			body.global_position = out
 			body.set("_home", out)
-			_toast("%s hopped the Paddock fence! An Escape Artist needs a Big Pen." % inst.display_name())
+			_toast("%s hopped the Paddock fence for the night! She'll be back at dawn; a Big Pen holds her." % inst.display_name())
 			_novelty("event", "first_escape", "An Escape Artist hopped the Paddock fence")
 			return
 
@@ -9118,12 +9199,18 @@ func current_objective() -> Dictionary:
 	if story == null:
 		return {}
 	var built := 0
+	var drifters := 0
 	for slot in _plot_slots():
-		if slot.get_built() is Pen:
+		var pen := slot.get_built() as Pen
+		if pen != null:
 			built += 1
+			for inst: PonyInstance in pen.ponies():
+				if inst.is_stock() and not inst.is_marked():
+					drifters += 1
 	var beam: Node3D = player.get_magic_beam() if player != null else null
 	var storage: Storage = beam.get_storage() if beam != null else null
 	return ObjectiveScript.current({
+		"drifters": drifters,
 		"chapter": story.chapter, "path": StoryV1Script.path(story),
 		"ending": String(story.get_var("ending", "")), "flags": story.flags.keys(),
 		"deliveries": story.deliveries, "blooms": int(story.get_var("blooms", 0)),

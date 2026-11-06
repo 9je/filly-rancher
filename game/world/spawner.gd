@@ -300,6 +300,7 @@ func populate_paced(phase: int, weather: int, pace: Callable) -> int:
 		if _zoned_in_roster(marker.zone_id) == 0 and not marker.zone_id in _empty_zones:
 			_empty_zones.append(marker.zone_id)
 
+		pool = _without(pool, _owned())
 		if pool.is_empty():
 			continue
 
@@ -486,8 +487,25 @@ func refresh(phase: int, weather: int, cycle: int, player_position: Vector3) -> 
 
 ## {id: true} for every pony standing on the map who is STAYING there. The set refresh()
 ## refuses to draw a second copy of.
+## Named ponies the player already has -- in a pen, in the saddlebag, or out of a Paddock for
+## the night -- as an Array of ids (the ranch sets it). None of them is ever drawn into the
+## wild as well (PT3; playtest 2026-11-05: "2 sweetie belles sitting next to each other", and
+## a Deliver list of one-of-a-kinds with two Scootaloos: an escaped pony stood unknown to this
+## spawner, so it spawned her again).
+var owned_ids: Callable
+
+
+func _owned() -> Dictionary:
+	var out := {}
+	if owned_ids.is_valid():
+		for id in owned_ids.call():
+			if not StockPaletteScript.is_stock_id(StringName(id)):
+				out[StringName(id)] = true
+	return out
+
+
 func _standing_ids() -> Dictionary:
-	var ids := {}
+	var ids := _owned()
 	for pony in get_spawned():
 		if pony.is_leaving():
 			continue
