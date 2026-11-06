@@ -334,6 +334,8 @@ MISSION.md's "Fun and anti-repetition rules" are part of the Definition of Done.
 
 ## PT. The playtest sweep (2026-11-05): 70 items, fixed at the root
 
+> **2026-11-06: these ticks were wrong.** They were set because a commit cited the item, not because the item was checked. An audit found items 3, 6, 29, 32, 36, 44, 55, 64 and 69 not met and 17, 37, 40, 56 unverified. Superseded by section PS below, which re-opens all 70.
+
 > Source: docs/playtest-2026-11-05.md (item numbers below are that list's). Owner: "tackle a lot of these from the root and make sure its not reoccuring similar elsewhere". Every group starts with the cause, gets a failing test that sweeps EVERY instance of that kind (all buildings, all menus, all ponies), then the fix. One subagent at most; no review videos; renders checked by me before a group is called done.
 
 Order (highest pain first):
@@ -351,3 +353,187 @@ Order (highest pain first):
 - [x] **PT11. Odds and ends** (1 fullscreen, 12 pause in talk, 21/23 bounce from the beam and side-on landing, 2 to 6 creator).
 
 Gates per group: the new sweep test, the touched GUT files and real-input tests. At the end: full GUT, all real-input tests, the five endings, both exports.
+
+## PS. The playtest sweep, no exceptions (planned 2026-11-06)
+
+> **For agentic workers:** REQUIRED SUB-SKILL: superpowers:executing-plans (owner rule: at most one subagent at a time, sonnet or opus; Fable only for the acceptance review). Steps use checkbox (`- [ ]`) syntax.
+
+**Goal:** every one of the 70 items in docs/playtest-2026-11-05.md is met as the owner worded it, plus every known open gap, and each one is proven by evidence somebody other than the implementer has judged.
+
+**Architecture:** a ledger (`docs/playtest-2026-11-05-ledger.md`) holds one row per item: the owner's words, its state, the evidence and who judged it. A render harness (`scenes/test/playtest_shots.gd`) frames the owner's screenshot spots. Each item follows the same loop: render or test the item as it is now, fix the cause, then render or test it again. An acceptance reviewer then reads only the owner's text and the evidence. The previous sweep's ticks (section PT) count for nothing; all 70 start open.
+
+**Tech stack:** Godot 4.7.2, typed GDScript, GUT (`tools/gut_one.sh`, `tools/run_tests.sh`), real-input tests (`tools/run_input_tests.sh`), invisible xvfb renders.
+
+**Spec:** docs/playtest-2026-11-05.md (the owner's 70 items and screenshots in the session images folder it names), plus the gaps listed in task PS12.
+
+### Global constraints (every task; breaking one fails the task)
+
+- Never push. Stay on v1-overhaul. Stage only my own files.
+- No em dashes; the house dash is " -- ". Canon MLP names stay. No realistic pony vocals (the rare capture neigh is the one exception). AI voices are on hold.
+- Never open a visible window or take the mouse or the screen. Every Godot launch is an invisible xvfb launch with FILLY_TEST_SAVE_DIR and --log-file set. Run `git checkout -q build/playtest_evidence` after input tests.
+- **No bot playthroughs** (`tools/playthrough*.sh`), not as a gate and not as a check.
+- At most one subagent at a time, sonnet or opus. Fable only for PS13's acceptance review.
+- Root cause and a failing test first. No game-file edits while a test run is going.
+- Never raise IP, Hasbro or a store release.
+- **An item is ticked in the ledger only when its evidence exists and has been looked at**, never because a commit names it. A render is opened and looked at before it counts. Report test results exactly, flakes included. No "all done" report: the report is the ledger.
+
+### The item loop (every item row below runs this)
+
+1. **Before:** render the item's spot (`playtest_shots.gd --item=N`) or run its test, and confirm the problem shows. If it doesn't show, write down why and keep the render as evidence; the item is not skipped.
+2. **Test:** write a test that asserts the owner's words as directly as code can. It must fail.
+3. **Fix:** fix the cause, then search for the same cause elsewhere (the owner's standing ask) and fix that too.
+4. **After:** the test passes; render the same frame again and look at it.
+5. **Ledger:** the row gets the commit, the test name, the before and after render paths, and state `FIXED-UNREVIEWED`. Only PS13 sets `MET`.
+
+### Review focus (cases the items imply but no single row tests)
+
+1. A save made before this sweep loads cleanly after it: no placed prop, pen or pony lost, and nobody duplicated.
+2. Every fix also holds at 1280x720 and at 150% text size.
+3. Every fix also holds at night and in rain (the owner played through both).
+4. Every fix also holds on the Mane Six rig as well as the PonySFM rig.
+5. A gamepad-only player can reach every new control (creator tools, area preview, pantry).
+
+Each of these is covered by a test in the task that owns the code: PS0 (1), PS6 (2), PS4 (3), PS1 (4), PS6 and PS10 (5).
+
+---
+
+### Task PS0: The ledger and the shot harness
+
+**Files:** create `docs/playtest-2026-11-05-ledger.md`, `game/scenes/test/playtest_shots.gd`. Test `game/test/test_ledger_complete.gd`.
+
+- [ ] Ledger: 71 rows (56 is two items: the coat line and the walk-by). Columns: item, the owner's words verbatim, screenshot, state (`OPEN`, `FIXED-UNREVIEWED`, `MET`, `NOT-MET`), evidence (test name, render paths), commit, judged by.
+- [ ] `test_ledger_complete.gd` parses the ledger and fails unless every number from 1 to 70 has a row and every row has a state. It also fails when a row says `MET` but its evidence column is empty.
+- [ ] `playtest_shots.gd --item=N --out=DIR` loads a seeded save and puts the camera and the player at the pose that matches screenshot N. The pose table lives in the script, one pose per screenshot the doc references, estimated by eye from the owner's image. It writes `itemN_<label>.png` with a day and a night/rain variant where the item is about the world. For each pose, a render is taken and compared by eye with the owner's screenshot until they show the same place.
+- [ ] Old-save check (review focus 1): `test_old_save_loads.gd` loads a save from 13d0c11 with placed decor, penned ponies, an escapee and a full bag, and asserts the counts survive.
+- [ ] Commit: "PS0: ledger and shot harness".
+
+### Task PS1: Pony bodies (items 7, 9, 10, 13, 17, 19/23, 21, 54, 65, 67)
+
+**Files:** likely `actors/pony/pony.gd`, `pony_visuals.gd`, `pony_face.gd`, `world/pen.gd`, `systems/body_space.gd`, `actors/player/player.gd`, `ui/creation_screen.gd`.
+
+| Item | What it needs (owner's words, short) | Known state | Evidence that closes it |
+|---|---|---|---|
+| 17 | Twilight twisted at a broken angle (top priority) [21][52] | UNVERIFIED. The fix assumed overlap, but [52] shows her rolled on her side | First, a render reproduces it (Twilight in a full Paddock, dropped from the beam, landing, bounced). Then a test asserts her root and hip roll stay under 25° through the pen landing turn, the bounce, HoofPlanter and the lean. Rendered for every Mane Six pony |
+| 17b | Ponies merge (wild vs wild) [19][54] | claimed, unverified | Render of 8 wild ponies in one clearing after 60 s: no visible overlap. test_body_space covers wild vs wild |
+| 65 | Full pen piles in a corner, overlaps, pushes through the fence; "moved into the pen" while the prompt says full [52] | partly | Render of a full Grand Pen after 120 s: spread out, nobody outside the fence. The toast for the pony that fills the pen says she moved in *and* the pen is now full |
+| 10, 13 | A pony walks through a conversation; Tumble spawns inside the player mid-talk | claimed | Tests: a conversation ring clears; Tumble's spawn point is at least 1.5 m from the player |
+| 19/23, 21 | The bounce is barely seen; a drop from the beam at height bounces | claimed | A gait_shot frame strip of a drop from 3 m and a pen landing, with the bounce visible from the default camera |
+| 54, 67 | Far ponies have no eyes; the half-lidded look switches off up close | claimed | An eye_shot strip at 4, 12, 30 and 60 m: eyes present and the same shape; the half-lidded look is held at 2 m |
+| 9 | The player's tail stutters | claimed | A 60-frame strip at 144 Hz physics/render mismatch: tail positions change smoothly from frame to frame (test on the delta) |
+| 7 | Creator spin flings the mane; the tail clips the body | claimed | A turntable render at full spin speed: no spikes, no tail inside the body |
+
+- [ ] Run the item loop for each row. Commit per row: "PS1 item N: ...".
+
+### Task PS2: A solid world (items 31, 41, 43, 57, 58, 61, 68)
+
+| Item | Needs | Known state | Evidence |
+|---|---|---|---|
+| 41, 68 | Can't walk into the Depot; no rain inside; never soft-locked | claimed | Real-input test walking into every building door; render at the Depot [35][55] |
+| 31 | The camera never enters the Market | claimed | Camera-terrain input test orbiting every building; render [29] |
+| 43 | Nobody stuck in the Palace plinth | claimed | Test: every townspony's spot is outside every collider; render [37] |
+| 61 | Lake: no walking under the water, no half-sunk ponies, no grass through the water, real banks | claimed for floor and walls; banks unverified | Render at [48][49], day and night: banks visible, water opaque. Existing lake tests |
+| 57 | No pony spawns inside a haystack | claimed | Spawner test across 500 seeds |
+| 58 | Tumble never stuck on the Orchard fence | claimed | Companion catch-up test at the Orchard fence |
+
+### Task PS3: Pens, ownership, the Depot (items 15, 39, 53, 62, 63, 70)
+
+| Item | Needs | Known state | Evidence |
+|---|---|---|---|
+| 39, 63, 70 | No duplicates of a named pony anywhere; no escapes from upgraded pens; the "one of a kind" tag is right | escapee recatch fixed 72e9736 | One test runs 10 in-game nights with upgraded pens, a recatch, save and load, and asserts no duplicate data_id. The Deliver list tags only unique ponies |
+| 53 | The trail stops pointing at an upgraded paddock ("0/2") [45] | claimed | Guide test after an upgrade, and a render of the trail |
+| 62 | The Depot statement is right: quota, cycle, collections [50] | claimed | Test after 3 cycles; render of the statement |
+| 15 | Old Fennel's bag line matches the bag | claimed | Test with an empty bag and with a full bag |
+
+### Task PS4: The world looks right (items 14, 25, 26, 27, 29, 32, 36, 37, 40)
+
+**Files:** `world/building.gd`, `world/props.gd`, `world/region_dressing.gd`, `world/strip.gd`, `world/terrain.gd`, `world/sky_rig.gd`, SCALE.md; a new `world/street.gd` for the Ponyville row.
+
+| Item | Needs | Known state | Fix decided | Evidence |
+|---|---|---|---|---|
+| 29 | Doors to pony scale; no oversized porches and ramps [27][31] | **NOT DONE** | Each building model gets a measured door height in a table in building.gd. Its scale is set so the door is at least 1.25 times the player's standing height. A ramp is never longer than 1.5 m | `test_doors_fit` sweeps every building; renders [27][31] beside the player |
+| 32 | Barn yard: barn not on a plinth, ramp size, mismatched shed, wagon, hay and seed bags, scattered [30] | **plinth only** | The yard props are laid out on a grid by the barn door, scaled by SCALE.md's one rule; the shed is swapped for a kit match | Render [30] |
+| 36 | Ponyville row: houses lean and sink, lamps lean, no streets or yards, the road junction [33] | **sinking only** | Buildings and lamps stay upright (no tilt to the ground normal). A paved street runs along the row's frontage (`street.gd`, the Strip's paving reused), with a fenced yard per house and a blended join where the grey road meets the dirt road | `test_upright` (every building and lamp has up within 2° of world up); render [33] |
+| 37 | The Strip: tilted cabinets, floating track, leaning lamps, dirt across the paving [34] | **paving and slabs only** | The track is seated on the terrain; cabinets and lamps are upright | `test_upright` covers them; render [34] |
+| 40 | Rain too heavy and cheap; night plus rain too dark [45] | rain softened; darkness unverified | Night and rain together keep the scene's mean luminance at or above a floor measured from a lit night | Luminance test on a night-plus-rain render; render [45] |
+| 25, 26, 27 | Brambles, the CLEAR ME board, the yellow blob [24][25] | claimed | -- | Renders [24][25] |
+| 14 | Signs flicker [32] | claimed | -- | A 120-frame render walking past the fingerpost: every board is lit in every frame |
+
+### Task PS5: The casino (items 44 to 49)
+
+| Item | Needs | Known state | Fix decided | Evidence |
+|---|---|---|---|---|
+| 44 | Patrons not frozen [38] | **NOT DONE** | Attendants get a PonyFace (blinks, moods) and a cycle of clips: a slot pull, cheer, sit and look around, with their timing staggered. Regulars move between free machines every 30 to 90 s | Test: each regular plays at least 3 clips in 120 s, and one changes machine; a palace_shot strip |
+| 45, 46, 47, 48, 49 | Wheel, slots, blackjack rebuilt as specified [39][40][41][42] | claimed | -- | A casino_shot render of each table checked against each item's words (tiers, no tabs, no log, three different symbols, working chips, a lever, Hit/Stand/Double, a banner that fits) |
+
+### Task PS6: Menus and HUD (items 8, 20, 22, 24, 30, 42, 51, 59, 60, 66)
+
+All claimed in 5a57c38 and e560489; all unverified as renders. For each item: a hud_shot render at 1280x720 and at 1920x1080, at 100% and 150% text (review focus 2), plus pad-only navigation of every menu (review focus 5, a real-input test). Items: the welcome letter (8), thick text (20), the catch card over the strip (22), the objective card over the chips (24), every menu's key hints, Back and scroll bar, and the Compendium's "0 of 0" and "???" rows (30), the giant toast (42), the mailbox and the survey (51), toasts too fast and cleared by pausing (59), pips at 18 slots (60), the compass (66).
+
+Also in PS6: fullscreen chosen during loading stays fullscreen (1; `test_fullscreen_kept` plus a window-size check after load), and pausing works mid conversation and returns to the same line (12; `test_pause_in_talk`). And what the owner liked must survive the sweep: the rare capture neigh still plays (a sound test), and the half-lidded look is unchanged (PS1's item 67 render).
+
+### Task PS7: The creator (items 2 to 6)
+
+| Item | Needs | Known state | Fix decided | Evidence |
+|---|---|---|---|---|
+| 2 | A Random button | done (Surprise me) | -- | creation render |
+| 3 | Better cutie mark creation | **gallery only** | The mark canvas gets stamps: up to three symbols from the 24 talents plus 12 shapes, each moved, scaled, rotated and recoloured by drag, with undo | Test of the stamp operations; a render of a composed mark on the flank |
+| 4, 5 | Mane style under Mane and tail; the streak row only when used | claimed | -- | creation render |
+| 6 | More customisation | **NOT DONE** | Coat markings (socks, blaze, dapples, a star) as masks in the coat shader with their own colour; six new accessories from the kit; eye shape (round, almond, sleepy) | Test: each option survives save and load; a turntable render of each |
+
+### Task PS8: Knowing where to go, and the people (items 11, 16, 18, 28, 34, 35, 38, 50, 56a, 56b, Marigold)
+
+| Item | Needs | Known state | Fix decided | Evidence |
+|---|---|---|---|---|
+| 56a | The coat stallion: the dialogue says coat but there's no coat | **reworded, and the new toast names a clipboard he doesn't hold** | The Collector wears a grey coat (a coat mesh on the pony rig, from the accessory kit) and carries a clipboard prop. Every narrating toast is removed; the walk-by is shown | Render of him at the fence; test: no toast fires during the walk-by |
+| 56b | A mysterious walk-by, not a slow shuffle | claimed | -- | A frame strip of the walk-by |
+| Marigold | She walks in front of the camera when she greets you | **NOT DONE** | Greeting townsfolk stop on the side of the player away from the camera | Test: during a greeting, no NPC stands within 1 m of the camera-to-player segment |
+| 16 | The first catch's place is shown | claimed | -- | Render at the start: the trail points at a Drifter |
+| 18 | Tumble is not in front of the camera, and her prompt doesn't steal E at catch time | claimed | -- | heel_shot strip; input test |
+| 34, 35, 38 | Townsfolk read as not catchable; Spike has a purpose; sightings light the compass | claimed | -- | Renders and the existing tests named in the ledger |
+| 11, 28, 50 | Pip's line, Fennel's lines, the Rainbow Factory hints | claimed | -- | The ledger quotes the new text beside the owner's complaint |
+
+### Task PS9: Economy and difficulty (items 33, 52, 55, 64, 69)
+
+**Files:** `actors/player/magic_beam.gd`, `actors/pony/pony.gd`, `world/spawner.gd`, `systems/ledger.gd`, `data/shop/*.tres`, `ui/market_menu.gd`, a HUD pantry chip, `tools/pacing.sh`.
+
+| Item | Needs | Known state | Fix decided | Evidence |
+|---|---|---|---|---|
+| 69 | Catching too easy apart from the toughest, and repetitive; 49 deliveries came fast; ~800 gems per Market trip | **only uncommon and rarer ponies weave** | (a) Every rarity weaves, scaled: Drifter 0.35, common 0.55, uncommon 0.8, rare 1.0, legendary 1.2. (b) Ponies notice the player sooner and flee in a curve, not a line; the shy ones hide. (c) Three catch behaviours spread across the regions: runners, hiders in tall grass that need a sneak, and flyers that must be caught on the ground. (d) Delivery credit and gem drops tuned until the pacing sim gives: under 20 deliveries in the first hour, 250 to 400 gems per Market trip at mid-game, and the debt paid off within the story's 3 cycles | `test_beam_weave` per rarity. `tools/pacing.sh` writes the numbers to PACING.md and fails outside the bands. A common catch takes at least 2 s of tracking in the beam probe |
+| 55 | An area shows its ponies and their times before you buy; it opens with a guaranteed rare | **rare done; preview NOT DONE** | The permit tile in the Market lists the region's ponies (portrait, rarity shape, the time of day they come out) | Test on the tile's rows; render of the tile |
+| 64 | Feeding is automatic and nothing says so: show the pantry stock and the hungry state | **NOT DONE (Spike only)** | A pantry chip by each pen's sign shows the food count and how many residents are hungry. A hungry pony wears a small food bubble and the SAD mood (FS3.1's missing part) | Test: an empty pantry lights the chip; a hungry pony is SAD; render |
+| 33 | The debt is explained; a delivery shows pay | claimed | -- | Render of the Depot tile and the toast |
+| 52 | The Market buy screen is easy to find; food is easy to buy | claimed | -- | Render of the Market opening on Buy |
+
+### Task PS10: The FS parts built short (from the review on 2026-11-06)
+
+- [ ] FS1.4: hovering a lesson chip shows its sentence as a tooltip (the chips take the mouse).
+- [ ] FS2.2: the ground's fine painted grain, and darker grass at prop and fence bases.
+- [ ] FS3.1: a hungry pony is SAD (shared with PS9's item 64).
+- [ ] FS4.3: a stumble when the player lands hard.
+- [ ] FS5.2: Market and Depot music contexts; the duck set to 4 dB.
+- [ ] FS6.1: tiles stagger in 30 ms apart, and a purchase flies a coin to the wallet.
+- [ ] FS6.2: the Depot pays out per tile, one by one, with a counter sound, and the total lands on the balance.
+- [ ] FS8.3: rarity shapes on the Depot tiles.
+- [ ] FS5.1: hoof loudness. A capture that records the 3D mix (a Movie Maker run at the listener), measured against the beds. If it still can't be measured, the ledger says so and the owner's ear decides it.
+
+Each part gets a test and a render under the item loop.
+
+### Task PS11: The test bench itself
+
+- [ ] Find out why loading, pen_upgrade and sprint fail in a full `run_input_tests.sh` batch but pass alone. Fix the cause (shared save directory, leftover state, or timing), then run the whole batch twice with every test passing.
+- [ ] The 60-pony performance check (`tools/perf.sh`, p99 at or under 16.6 ms) and a Proton smoke run of the Windows build.
+
+### Task PS12: Gaps outside the owner's list (known on 2026-11-06)
+
+Marigold (in PS8), the FS parts (PS10), the batch flake and perf/Proton (PS11). Anything new found while working is added to the ledger as a row; nothing is fixed off the books.
+
+### Task PS13: Acceptance (the gate)
+
+- [ ] A Fable reviewer gets **only** docs/playtest-2026-11-05.md, the owner's screenshots, the ledger's evidence column (renders and test names) and read access to the code. It does **not** get commit messages or my notes. For each of the 71 rows it answers MET or NOT-MET, with a sentence citing the evidence. It is told to treat a missing render or a test that doesn't assert the owner's words as NOT-MET.
+- [ ] Every NOT-MET goes back through the item loop, then to a fresh acceptance pass on those rows only.
+- [ ] Gates: full GUT; the full real-input batch twice (PS11); both exports built and the Linux build booted; owner logs untouched; PROGRESS.md and DECISIONS.md updated.
+- [ ] The report to the owner is the ledger itself: per item, MET with its evidence or NOT-MET with the reason. No summary claims beyond it.
+
+### Order
+
+PS0 first: no fix starts before the ledger and the harness exist. Then PS1 (item 17 is the top priority), PS9 (69 is the biggest complaint), PS4, PS5, PS7, PS8, PS3, PS2, PS6, PS10 and PS11. PS13 last.
