@@ -48,6 +48,13 @@ static func edge_line(game_name: String, edge: float) -> String:
 	return "%s: the house keeps %.1f bits of every 100 wagered." % [game_name, edge * 100.0]
 
 
+## The Wheel's bets keep different amounts (systems/wheel.gd), so it publishes the range,
+## not only its worst bet.
+static func wheel_line() -> String:
+	return "The Wheel: the house keeps %.1f to %.1f bits of every 100." % [
+		WheelScript.best_edge() * 100.0, WheelScript.house_edge() * 100.0]
+
+
 ## Everything the lobby sign says, top to bottom. No blank spacer lines: every entry is a
 ## sentence a player can read, because the sign panel has no room to waste on a gap and the
 ## sign gate checks that every line on it says something.
@@ -58,7 +65,7 @@ static func lines() -> Array[String]:
 		"The odds on this sign are the real ones.",
 		"We print them because we do not need to hide them.",
 		edge_line("Slots", SlotsScript.house_edge()),
-		edge_line("The Wheel", WheelScript.house_edge()),
+		wheel_line(),
 		edge_line("Blackjack", BlackjackScript.house_edge()),
 		edge_line("Racing", RaceCardScript.TAKEOUT),
 		"Blackjack is measured against the card on the placard.",

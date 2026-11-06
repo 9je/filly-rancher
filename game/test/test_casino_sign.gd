@@ -18,11 +18,15 @@ func test_the_sign_names_the_palace_and_its_sponsor() -> void:
 
 func test_the_sign_publishes_every_game_at_the_number_that_game_computes() -> void:
 	var text: String = "\n".join(CasinoSignScript.lines())
-	for pair in [["Slots", SlotsScript.house_edge()], ["The Wheel", WheelScript.house_edge()],
+	for pair in [["Slots", SlotsScript.house_edge()],
 			["Blackjack", BlackjackScript.house_edge()], ["Racing", RaceCardScript.TAKEOUT]]:
 		var expected: String = CasinoSignScript.edge_line(String(pair[0]), float(pair[1]))
 		assert_true(text.contains(expected),
 			"the sign must carry '%s' exactly as the game computes it" % expected)
+	# The Wheel's bets differ: its range, from the best bet to the worst.
+	assert_true(text.contains(CasinoSignScript.wheel_line()))
+	assert_true(CasinoSignScript.wheel_line().contains("%.1f to %.1f" % [
+		WheelScript.best_edge() * 100.0, WheelScript.house_edge() * 100.0]))
 
 
 func test_an_edge_line_reads_as_bits_in_a_hundred() -> void:
