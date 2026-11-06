@@ -9243,7 +9243,7 @@ func _setup_act3() -> void:
 	act3.story = story
 	act3.player = player
 	act3.height_at = func(x: float, z: float) -> float:
-		return terrain.call("height_at", x, z) if terrain != null and terrain.has_method("height_at") else 0.0
+		return terrain.call("walk_height_at", x, z) if terrain != null and terrain.has_method("walk_height_at") else 0.0
 	act3.region_centre = func(id: StringName) -> Vector2:
 		var r: RegionData = _regions_registry().by_id(id)
 		return r.centre if r != null else Vector2.ZERO

@@ -363,7 +363,13 @@ func grass_at(x: float, z: float) -> Color:
 ## under the lake", ponies sunk to the ears and grass showing through). The basin is deeper
 ## than a pony is tall, so a walker now stands on a shelf the water covers to her knees:
 ## wading, never under. It is TERRAIN, so the camera and the hooves treat it as ground.
+## Not a flat disc: the basin is already deeper than the shelf where the water meets it, so a
+## disc's rim stood 0.55 m over the ground, a wall round the whole lake (the endings bot could
+## not reach the Lake pylon, 2026-11-06). The floor is the higher of the basin and the shelf,
+## and the shelf slopes down at WADE_RAMP for its outer WADE_RAMP_IN metres, so she walks in.
 const WADE_DEPTH := 0.35
+const WADE_RAMP := 0.5
+const WADE_RAMP_IN := 2.0
 
 
 func build_water(region: RegionDataScript) -> MeshInstance3D:
@@ -384,13 +390,7 @@ func build_water(region: RegionDataScript) -> MeshInstance3D:
 	var node := MeshInstance3D.new()
 	node.name = "Water_" + String(region.id)
 	node.mesh = mesh
-	# height_at() in the middle is the BOTTOM of the basin, so the surface is put back most
-	# of the way up toward the rim: deep enough to read as water, shallow enough that the
-	# basin's own shore is still visible around it.
-	node.position = Vector3(
-		region.centre.x,
-		height_at(region.centre.x, region.centre.y) + region.lake_depth * 0.55 - 0.4,
-		region.centre.y)
+	node.position = Vector3(region.centre.x, _surface_y(region), region.centre.y)
 	mat.set_shader_parameter(&"centre", node.position)
 	mat.set_shader_parameter(&"opacity", 1.0)
 	var shelf := StaticBody3D.new()
@@ -399,15 +399,55 @@ func build_water(region: RegionDataScript) -> MeshInstance3D:
 	shelf.collision_mask = 0
 	# No splash set exists yet; a lake bed sounds like the mud it is.
 	shelf.set_meta(&"step_surface", &"hoof_dirt")
-	var disc := CylinderShape3D.new()
-	disc.radius = region.radius * 0.7
-	disc.height = 0.2
 	var col := CollisionShape3D.new()
-	col.shape = disc
-	col.position = Vector3(0.0, -WADE_DEPTH - 0.1, 0.0)
+	col.shape = _wading_floor(node.position, region.radius * 0.7)
 	shelf.add_child(col)
 	node.add_child(shelf)
 	return node
+
+
+## The wading floor round `surface` (the water's centre) as a heightfield on a 1 m grid, in
+## metres from the surface: max(basin, shelf), the shelf ramping down near its rim.
+func _wading_floor(surface: Vector3, radius: float) -> HeightMapShape3D:
+	var half := ceili(radius + WADE_RAMP_IN)
+	var n := half * 2 + 1
+	var data := PackedFloat32Array()
+	data.resize(n * n)
+	for iz in n:
+		for ix in n:
+			var lx := float(ix - half)
+			var lz := float(iz - half)
+			var shelf := _shelf_drop(Vector2(lx, lz).length(), radius)
+			var basin := height_at(surface.x + lx, surface.z + lz) - surface.y
+			data[iz * n + ix] = maxf(basin, shelf)
+	var hm := HeightMapShape3D.new()
+	hm.map_width = n
+	hm.map_depth = n
+	hm.map_data = data
+	return hm
+
+
+## The wading floor's height under the surface `r` metres from a lake's middle.
+static func _shelf_drop(r: float, radius: float) -> float:
+	return -WADE_DEPTH - WADE_RAMP * maxf(0.0, r - (radius - WADE_RAMP_IN))
+
+
+## height_at() in a lake's middle is the BOTTOM of the basin, so the surface is put back most
+## of the way up toward the rim: deep enough to read as water, shallow enough that the basin's
+## own shore is still visible around it.
+func _surface_y(region: RegionDataScript) -> float:
+	return height_at(region.centre.x, region.centre.y) + region.lake_depth * 0.55 - 0.4
+
+
+## Where a hoof lands, world XZ: the ground, or the wading floor over a lake's basin. Anything
+## standing in the water (Act Three's Lake pylon) stands on this, not on the lake bed.
+func walk_height_at(x: float, z: float) -> float:
+	var h := height_at(x, z)
+	for region in _lakes:
+		var r := Vector2(x, z).distance_to(region.centre)
+		if r < region.radius * 0.7 + WADE_RAMP_IN:
+			h = maxf(h, _surface_y(region) + _shelf_drop(r, region.radius * 0.7))
+	return h
 
 
 ## The heightfield as an ArrayMesh.

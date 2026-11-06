@@ -94,6 +94,48 @@ func test_every_lake_holds_a_walker_at_wading_depth() -> void:
 	assert_gt(lakes, 0, "the map has a lake to test")
 
 
+## AND SHE CAN WALK INTO IT (the endings bot, 2026-11-06: the wading floor's flat rim stood
+## 0.55 m over the basin at the water's edge, a wall round the whole lake, so the Lake pylon in
+## the water could not be reached). From the dry shore to the middle, along every heading, the
+## ground under her never rises faster than a slope she climbs.
+func test_every_lake_is_walked_into_from_its_shore() -> void:
+	var ranch = RanchScene.instantiate()
+	add_child_autofree(ranch)
+	await wait_physics_frames(4)
+	var space: PhysicsDirectSpaceState3D = ranch.get_world_3d().direct_space_state
+	var climb: float = tan(deg_to_rad(40.0))
+	var lakes := 0
+	for w: Node in ranch.find_children("Water_*", "MeshInstance3D", true, false):
+		if not ((w as MeshInstance3D).mesh is CylinderMesh):
+			continue
+		lakes += 1
+		var c: Vector3 = (w as Node3D).global_position
+		var rad: float = ((w as MeshInstance3D).mesh as CylinderMesh).top_radius
+		var walls := 0
+		for k in 16:
+			var dir := Vector3(cos(TAU * k / 16.0), 0, sin(TAU * k / 16.0))
+			var last := NAN
+			var step := 0.2
+			var r := rad + 4.0
+			while r > rad - 4.0:
+				var at := c + dir * r
+				var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(
+					at + Vector3(0, 10, 0), at + Vector3(0, -20, 0), LayersScript.TERRAIN))
+				if not hit.is_empty():
+					var y := float((hit.position as Vector3).y)
+					if not is_nan(last) and y - last > step * climb + 0.02:
+						walls += 1
+						if walls == 1:
+							gut.p("%s: %.2f m rise over %.1f m at r %.1f" % [w.name, y - last, step, r])
+					last = y
+					if k % 4 == 0 and absf(r - roundf(r)) < 0.01:
+						assert_almost_eq(ranch.terrain.walk_height_at(at.x, at.z), y, 0.08,
+							"walk_height_at is the floor she stands on (%s r %.0f)" % [w.name, r])
+				r -= step
+		assert_eq(walls, 0, "%s is walked into from every side, no ledge at its rim" % w.name)
+	assert_gt(lakes, 0, "the map has a lake to test")
+
+
 ## THE ORCHARD'S HAY, CRATES AND BASKETS ARE THINGS, NOT PICTURES (item 57: a pony spawned
 ## inside a haystack). Every whole prop scene in the regions taller than a pony's knee is solid
 ## where it stands, so nothing walks or spawns inside one.
