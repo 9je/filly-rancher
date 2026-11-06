@@ -507,6 +507,13 @@ Also in PS6: fullscreen chosen during loading stays fullscreen (1; `test_fullscr
 | 33 | The debt is explained; a delivery shows pay | claimed | -- | Render of the Depot tile and the toast |
 | 52 | The Market buy screen is easy to find; food is easy to buy | claimed | -- | Render of the Market opening on Buy |
 
+**PS9 implementation notes (2026-11-06, before coding):**
+- Weave: `MagicBeam.WEAVE_BY_RARITY` becomes [0.55, 0.8, 1.0, 1.2] by rarity and a Drifter (stock) weaves at 0.35; a common needs at least 2 s on the crosshair (beam probe).
+- Fleeing: the notice radius grows by a quarter; a fleeing pony probes ahead and bends toward the open side of a tree or prop rather than running straight into it.
+- Repeat deliveries: `Ledger` counts deliveries per kind per cycle (every Drifter is one kind) and scales the credit and the handler share by 1.0, 0.7, 0.5, then 0.35; the count resets at a new cycle.
+- Halfway: gem sales pay 0.85 of today; pens, permits, gear and decor cost 1.15 of today, rounded to 5.
+- The pacing check is a model, not the bot: `tools/pacing.sh` is a bot playthrough (banned by the owner), so `test_pacing_model.gd` replays the sell-the-repeats strategy from the game's own constants and asserts the three bands.
+
 ### Task PS10: The FS parts built short (from the review on 2026-11-06)
 
 - [ ] FS1.4: hovering a lesson chip shows its sentence as a tooltip (the chips take the mouse).
