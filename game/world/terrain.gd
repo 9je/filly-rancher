@@ -110,9 +110,8 @@ const DIRT := Color(0.8, 0.72, 0.6)
 ## THE ROUTE. Straight along x = 1.5, the same centreline the tiles stood on, from inside
 ## the homestead's own flat apron (z = 10, comfortably short of `FLAT_RADIUS` from
 ## `HOMESTEAD_CENTRE`) up through the town row's own corridor (the buildings flank it at
-## x = 15 and x = -12, more than 10 m clear on either side) to z = 58, where the boardwalk's
-## own first plate stands at (2.5, 58.0) -- so a kept boardwalk tile sits on painted ground
-## too, rather than the seam trading one visible edge for another.
+## x = 15 and x = -12, more than 10 m clear on either side) to the Strip's paving
+## (STRIP_EDGE_Z), where the grey of the paved region takes over from the dirt.
 ##
 ## A STRAIGHT TWO-POINT POLYLINE IS STILL A POLYLINE. The shader (`terrain.gdshader`) walks
 ## an arbitrary vertex list, so a future road that bends only has to add points here; nothing
@@ -126,8 +125,13 @@ const DIRT := Color(0.8, 0.72, 0.6)
 ## plaza to the Strip; the cross street joins the Depot door to the Market door across the
 ## plaza; the spur leaves the main street for the pen yard.
 const PATH_BREAK := Vector2(100000.0, 100000.0)
+## THE DIRT ROAD STOPS WHERE THE PAVING STARTS (PT7; playtest 2026-11-05: on the Strip "the
+## dirt road is painted straight across the grey pavement"). The Strip is the region at
+## (0, 74) with a 26 m radius, so its paving begins near z = 48 and is solid by 51; the
+## road ran on to 58. It stops at 50.5, past the town row, where the blend still hides the end.
+const STRIP_EDGE_Z := 50.5
 const PATH_POINTS: Array[Vector2] = [
-	Vector2(2.0, -13.5), Vector2(2.0, 0.0), Vector2(1.5, 10.0), Vector2(1.5, 58.0),
+	Vector2(2.0, -13.5), Vector2(2.0, 0.0), Vector2(1.5, 10.0), Vector2(1.5, STRIP_EDGE_Z),
 	PATH_BREAK,
 	Vector2(-11.8, -3.0), Vector2(14.4, -3.0),
 	PATH_BREAK,

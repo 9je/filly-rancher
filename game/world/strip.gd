@@ -350,6 +350,62 @@ func build() -> void:
 			continue
 		_lights.append(_lamp("Lamp%d" % i, Vector3(x, _y(x, z), z)))
 	_marquee()
+	_paving()
+
+
+## THE STRIP IS PAVED, NOT GREY GRASS (PT7; playtest 2026-11-05: the Strip "looks like shit",
+## a flat grey field with a few machines on it). Flagstones in the foundations' own stonework
+## shader, laid over the region's ground a few centimetres up and following it, the track's
+## oval and the Palace's own footprint left open. Drawing only: the ground under it is still
+## what everything walks on.
+const PAVING_LIFT := 0.035
+const PAVING_STEP := 1.5
+const PAVING_TRACK := Rect2(-25.0, 72.0, 50.0, 16.0)
+
+
+func _paving() -> void:
+	var r: float = _region.radius * 0.97
+	var c := Vector2(_region.centre.x, _region.centre.y)
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var n := int(ceil(r * 2.0 / PAVING_STEP))
+	for ix in n:
+		for iz in n:
+			var x0 := c.x - r + float(ix) * PAVING_STEP
+			var z0 := c.y - r + float(iz) * PAVING_STEP
+			var mid := Vector2(x0 + PAVING_STEP * 0.5, z0 + PAVING_STEP * 0.5)
+			if mid.distance_to(c) > r or PAVING_TRACK.has_point(mid) or _avoided(mid):
+				continue
+			var q: Array[Vector3] = []
+			for corner: Vector2 in [Vector2(x0, z0), Vector2(x0 + PAVING_STEP, z0),
+					Vector2(x0 + PAVING_STEP, z0 + PAVING_STEP), Vector2(x0, z0 + PAVING_STEP)]:
+				q.append(Vector3(corner.x, _y(corner.x, corner.y) + PAVING_LIFT, corner.y))
+			for i: int in [0, 1, 2, 0, 2, 3]:
+				st.set_normal(Vector3.UP)
+				st.add_vertex(q[i])
+	st.generate_normals()
+	var mesh := st.commit()
+	var mi := MeshInstance3D.new()
+	mi.name = "Paving"
+	mi.mesh = mesh
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://shaders/stonework.gdshader")
+	mat.set_shader_parameter(&"pattern", 0)
+	mat.set_shader_parameter(&"base", Color(0.76, 0.69, 0.62))
+	mat.set_shader_parameter(&"joint", Color(0.55, 0.48, 0.44))
+	mat.set_shader_parameter(&"block_w", 1.1)
+	mat.set_shader_parameter(&"block_h", 0.55)
+	mi.material_override = mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi)
+	mi.global_transform = Transform3D.IDENTITY
+
+
+func _avoided(p: Vector2) -> bool:
+	for rect: Rect2 in _avoid_rects:
+		if rect.has_point(p):
+			return true
+	return false
 
 
 func light_count() -> int:
