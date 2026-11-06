@@ -155,6 +155,7 @@ const COLOR_PROMPT := Color(1.00, 0.86, 0.42, 1.0)
 ## Saddlebag pip geometry.
 const PIP_SIZE := Vector2(26.0, 26.0)
 const PIP_GAP := 8.0
+const PIPS_PER_ROW := 12
 const PIP_EMPTY := Color(1.0, 1.0, 1.0, 0.14)
 const PIP_BORDER := Color(0.0, 0.0, 0.0, 0.5)
 
@@ -183,7 +184,7 @@ const TOAST_FADE := 0.7
 ## line about the third one arrived nine seconds after the thing it described and read as a
 ## bug in the game rather than in the overlay. A queue with anything in it now runs the
 ## current line short instead, so the text keeps pace with the play.
-const TOAST_HOLD_BUSY := 0.6
+const TOAST_HOLD_BUSY := 1.5
 
 ## And a ceiling on the backlog itself. Past this the OLDEST waiting line is dropped, not the
 ## newest: nine seconds of stale news is worse than a line nobody read.
@@ -311,7 +312,10 @@ func _process(delta: float) -> void:
 		# player who just did three things quickly is the player this is for.
 		if not _toast_queue.is_empty():
 			_toast_left = minf(_toast_left, TOAST_HOLD_BUSY + TOAST_FADE)
-		_toast_left -= delta
+		# HELD WHILE THE WORLD IS PAUSED OR A MENU IS UP (PT5; playtest 2026-11-05: "some
+		# dialogue ... dissapears when paused"): the line waits for her to come back to it.
+		if not (get_tree().paused or _overlay_open):
+			_toast_left -= delta
 		_toast.modulate.a = clampf(_toast_left / TOAST_FADE, 0.0, 1.0)
 		# The queue is drained here rather than on a timer, so a toast raised while the
 		# world is paused still waits its turn rather than being written over.
@@ -369,7 +373,7 @@ func toast(text: String) -> void:
 
 func _show_toast(text: String) -> void:
 	_toast.text = text
-	_toast_left = TOAST_HOLD + TOAST_FADE
+	_toast_left = toast_hold_for(text) + TOAST_FADE
 	_toast.modulate.a = 1.0
 	_fit_pill(_toast)
 	# A little pop on arrival, the way a show title card bounces in.
@@ -377,6 +381,16 @@ func _show_toast(text: String) -> void:
 	_toast.scale = Vector2(0.86, 0.86)
 	create_tween().tween_property(_toast, "scale", Vector2.ONE, 0.22).set_trans(
 		Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## LONG ENOUGH TO READ (PT5; owner: "some dialogue i dont read it goes too fast"): a short
+## line holds TOAST_HOLD, a long one about a third of a second a word, up to TOAST_HOLD_MAX.
+const TOAST_HOLD_MAX := 7.0
+
+
+static func toast_hold_for(text: String) -> float:
+	var words := text.split(" ", false).size()
+	return clampf(1.2 + float(words) * 0.32, TOAST_HOLD, TOAST_HOLD_MAX)
 
 
 ## The line that is ON SCREEN now, whether or not it has faded, which since the queue above
@@ -623,6 +637,10 @@ func _on_storage_changed() -> void:
 		var data: PonyData = instance.data() if instance != null else null
 		_rarities.append(data.rarity if data != null else PonyDataScript.Rarity.COMMON)
 	_bag_count.text = "%d / %d" % [_storage.count(), _capacity]
+	var rows := maxi(1, ceili(float(_capacity) / float(PIPS_PER_ROW)))
+	_pips.custom_minimum_size = Vector2(
+		float(mini(_capacity, PIPS_PER_ROW)) * (PIP_SIZE.x + PIP_GAP) - PIP_GAP,
+		float(rows) * (PIP_SIZE.y + PIP_GAP) - PIP_GAP)
 	_pips.queue_redraw()
 
 
@@ -789,7 +807,9 @@ func _draw_wriggle_ring(centre: Vector2) -> void:
 
 func _draw_pips() -> void:
 	for i in range(_capacity):
-		var at := Vector2(float(i) * (PIP_SIZE.x + PIP_GAP), 0.0)
+		# PIPS_PER_ROW to a row (PT5; playtest 2026-11-05: eighteen slots ran off the card).
+		var at := Vector2(float(i % PIPS_PER_ROW) * (PIP_SIZE.x + PIP_GAP),
+			float(i / PIPS_PER_ROW) * (PIP_SIZE.y + PIP_GAP))
 		var rect := Rect2(at, PIP_SIZE)
 		var fill := PIP_EMPTY
 		if i < _rarities.size():
@@ -1028,10 +1048,22 @@ func _fit_pill(l: Label) -> void:
 		return
 	var font := l.get_theme_font(&"font")
 	var fs := l.get_theme_font_size(&"font_size")
-	var w := font.get_string_size(l.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 56.0
+	# NEVER WIDER THAN PILL_MAX_WIDTH (PT5; playtest 2026-11-05: "holy line of text", a toast
+	# across the whole screen): a long line wraps onto a second and the pill grows down.
+	var one_line := font.get_string_size(l.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 56.0
+	var w := minf(one_line, PILL_MAX_WIDTH)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if one_line > PILL_MAX_WIDTH \
+		else TextServer.AUTOWRAP_OFF
+	var h := font.get_multiline_string_size(l.text, HORIZONTAL_ALIGNMENT_CENTER, w - 56.0, fs).y \
+		+ 22.0 if one_line > PILL_MAX_WIDTH else l.offset_bottom - l.offset_top
 	var centre := (l.offset_left + l.offset_right) * 0.5
 	l.offset_left = centre - w * 0.5
 	l.offset_right = centre + w * 0.5
+	if one_line > PILL_MAX_WIDTH:
+		l.offset_bottom = l.offset_top + maxf(h, 60.0)
+
+
+const PILL_MAX_WIDTH := 900.0
 
 
 ## The onboarding tip (game/systems/onboarding.gd): one friendly line in a pill above the

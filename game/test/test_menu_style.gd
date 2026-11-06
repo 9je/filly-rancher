@@ -103,7 +103,7 @@ func test_every_styled_label_gets_the_outline_that_makes_it_readable() -> void:
 	assert_eq(label.get_theme_color("font_outline_color"), MenuStyleScript.OUTLINE_COLOR,
 		"unoutlined text over a bright green field is what this exists to stop")
 	assert_eq(label.get_theme_constant("outline_size"), MenuStyleScript.OUTLINE_SIZE)
-	assert_gt(MenuStyleScript.OUTLINE_SIZE, 0, "a zero width outline is no outline")
+	assert_eq(MenuStyleScript.OUTLINE_SIZE, 0, "PT5: no outline; it made every word heavy")
 
 
 ## THE PANELS THEMSELVES, not just the helper: every menu that draws a row draws it through

@@ -160,7 +160,8 @@ func test_the_stage_answers_the_pointer_and_the_base_offers_no_hits() -> void:
 		assert_gt(rect.size.x * rect.size.y, 0.0, "an empty hit rect can never be hit")
 
 
-func test_the_footer_still_prints_the_keys() -> void:
+func test_no_key_hints_are_shown() -> void:
+	# PT5 (owner, 2026-11-05: "why esc back and close annoying"): the Back button is the way
+	# out; the keys still work, they are just not printed under every panel.
 	var footer := _menu.get_node("Centre/Panel/Margin/Column/Footer") as Label
-	assert_false(footer.text.strip_edges().is_empty(),
-		"the key hints stay; the mouse was added, not traded")
+	assert_false(footer.is_visible_in_tree(), "no row of key hints under the table")

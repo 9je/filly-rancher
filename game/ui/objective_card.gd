@@ -21,7 +21,7 @@ var _tween: Tween
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	set_anchors_preset(Control.PRESET_CENTER_TOP)
+	set_anchors_preset(Control.PRESET_TOP_LEFT)
 	_panel = PanelContainer.new()
 	_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var sb := StyleBoxFlat.new()
@@ -102,7 +102,11 @@ func distance_text() -> String:
 func _layout() -> void:
 	var s := _panel.get_combined_minimum_size()
 	_panel.size = s
-	_panel.position = Vector2(-s.x * 0.5, TOP)
+	# CENTRED ON THE SCREEN BY HAND (PT5; playtest 2026-11-05: the card sat half off the left
+	# edge, on the checklist). Under a CanvasLayer this Control's anchors had nothing to
+	# resolve against, so it stood at x 0 and drew its panel half a width left of that.
+	var width := get_viewport().get_visible_rect().size.x if is_inside_tree() else 1920.0
+	_panel.position = Vector2(width * 0.5 - s.x * 0.5, TOP)
 
 
 func _slide_in() -> void:

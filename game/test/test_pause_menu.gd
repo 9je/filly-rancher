@@ -125,6 +125,21 @@ func test_open_page_lands_straight_on_the_compendium() -> void:
 	assert_signal_emitted(_menu, "opened")
 
 
+func test_a_long_compendium_has_a_scroll_bar_the_pointer_can_drag() -> void:
+	# PT5 (owner, 2026-11-05: "just put a scroll bar").
+	_wire_book()
+	_menu.open_page(PauseMenu.Page.COMPENDIUM)
+	var n: int = _menu.roster().size()
+	if n <= PauseMenu.PAGE_ROWS:
+		pass_test("the fixture roster fits on one page")
+		return
+	var bar: VScrollBar = _menu.scroll_bar()
+	assert_not_null(bar)
+	assert_true(bar.visible, "a roster longer than the page shows a bar")
+	bar.value = n - PauseMenu.PAGE_ROWS
+	assert_eq(_menu.compendium_window()[-1], n - 1, "dragged to the bottom, the last entry shows")
+
+
 func test_open_page_refuses_a_page_number_this_menu_does_not_have() -> void:
 	_wire_book()
 	assert_false(_menu.open_page(99), "an unknown page must not leave the menu on a blank")
@@ -186,21 +201,20 @@ func test_the_zone_tallies_put_the_ranch_before_the_regions() -> void:
 	_compendium.mark_caught(&"twilight")
 	_menu.open_page(PauseMenu.Page.COMPENDIUM)
 	var rows: Array[String] = _menu.compendium_region_rows()
-	assert_eq(rows.size(), 1 + _regions.all().size(), "the ranch plus every region")
+	var lived := _regions.all().filter(func(r: RegionData) -> bool: return not _registry.by_zone(r.id).is_empty())
+	assert_eq(rows.size(), 1 + lived.size(), "the ranch plus every region anyone lives in")
 	assert_eq(rows[0], "Ranch: 1 of %d" % _registry.by_zone(&"ranch").size())
-	assert_eq(rows[1], "%s: 0 of %d" % [
-		_regions.all()[0].display_name, _registry.by_zone(_regions.all()[0].id).size(),
-	])
+	assert_eq(rows[1], "%s: 0 of %d" % [lived[0].display_name, _registry.by_zone(lived[0].id).size()])
 
 
-## The Strip is a region with nobody living on it, so its tally reads as a real zero rather
-## than being hidden. Pinned rather than left to chance: a paved strip with no wild ponies on
-## it is a true thing for the Compendium to say.
-func test_the_free_region_tallies_as_a_zone_with_nobody_in_it() -> void:
+## The Strip is a region with nobody living on it: the owner read "The Strip: 0 of 0" as a
+## bug (playtest 2026-11-05), so a region nobody lives in has no line in the book (PT5).
+func test_a_region_nobody_lives_in_is_not_listed() -> void:
 	_wire_book()
 	_menu.open_page(PauseMenu.Page.COMPENDIUM)
 	var rows: Array[String] = _menu.compendium_region_rows()
-	assert_true(rows.has("The Strip: 0 of 0"), "rows were: %s" % ", ".join(rows))
+	for row in rows:
+		assert_false(row.ends_with("0 of 0"), "rows were: %s" % ", ".join(rows))
 
 
 func test_the_character_list_scrolls_a_window_and_wraps_round_the_whole_roster() -> void:
@@ -232,7 +246,8 @@ func test_an_unseen_row_is_hidden_a_seen_row_is_a_name_and_a_caught_row_carries_
 	_compendium.mark_caught(&"cloudchaser")
 	_menu.open_page(PauseMenu.Page.COMPENDIUM)
 
-	assert_eq(_row_for(&"applejack"), "???", "nobody has ever laid eyes on her")
+	assert_string_starts_with(_row_for(&"applejack"), "???", "nobody has ever laid eyes on her")
+	assert_string_contains(_row_for(&"applejack"), "lives in", "but the book says where to look (PT5)")
 	assert_eq(_row_for(&"twilight"), "Twilight Sparkle", "seen buys the name and nothing else")
 	assert_eq(_row_for(&"carrottop"), "Carrot Top  when: dawn/day, any",
 		"listed phases joined by a slash; an empty weather list is any")

@@ -2389,23 +2389,28 @@ func open_mailbox_letter() -> bool:
 	if row.is_empty():
 		row = rows[rows.size() - 1]
 	var id := StringName(String(row.get("id", "")))
-	if int(row.get("reply", 0)) != StoryBeatScript.Reply.NONE:
-		# The bool travels the whole branch: open_mail_page() can refuse (another menu holds
-		# the tree), and a refusal that reported true would eat the player's press silently.
-		open_mail_page()
-		if pause_menu == null or not pause_menu.has_method("open_letter"):
-			return false
-		if not bool(pause_menu.call("is_open")):
-			return false
-		return bool(pause_menu.call("open_letter", id))
 	if letter_panel == null or not letter_panel.has_method("open"):
 		return false
+	# A LETTER WITH A QUESTION CARRIES ITS ANSWERS (PT5; playtest 2026-11-05 item 51: the
+	# mailbox opened "Saddlebag Copies", and the answers were below the bottom of it).
 	var letter := {"sender": String(row.get("sender", "")),
-		"title": String(row.get("title", "")), "body": row.get("body", [])}
+		"title": String(row.get("title", "")), "body": row.get("body", []),
+		"replies": PauseMenu.replies_for(row, owned_rows())}
 	if not bool(letter_panel.call("open", letter)):
 		return false
+	_letter_reply_id = id
+	if letter_panel.has_signal("replied") and not letter_panel.is_connected("replied", _on_letter_replied):
+		letter_panel.connect("replied", _on_letter_replied)
 	_on_mail_opened(id)
 	return true
+
+
+var _letter_reply_id: StringName = &""
+
+
+func _on_letter_replied(choice: String) -> void:
+	if _letter_reply_id != &"":
+		_on_mail_reply(_letter_reply_id, choice)
 
 
 ## The Spectra Palace's own origin in world space, or the Strip's centre if the building is

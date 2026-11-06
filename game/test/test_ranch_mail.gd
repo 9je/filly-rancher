@@ -270,15 +270,24 @@ func test_an_empty_mailbox_says_so_rather_than_doing_nothing() -> void:
 	assert_false(_ranch.letter_panel.is_open())
 
 
-func test_a_letter_that_asks_a_question_goes_to_the_page_that_can_answer_it() -> void:
-	# The Survey carries a PICK_PONY reply control, and the reader is read only by design
-	# (letter_panel.gd's class comment). So the one letter with a question in it opens where
-	# the picker lives, and the fiction holds because that page is still her own mailbox.
+func test_a_letter_that_asks_a_question_is_answered_in_the_letter_itself() -> void:
+	# PT5 (playtest 2026-11-05 item 51): "idk how i even got into saddlebag menu i clicked
+	# mailbox", "also not clear how to respond". The mailbox opens the letter, every time, and
+	# a letter with a question carries its answers on the sheet as buttons.
+	var instance = PonyInstanceScript.create(&"trixie")
+	_state.add_pony(instance)
 	_state.story.post(&"weather_survey")
 	_ranch.open_mailbox_letter()
-	assert_true(_ranch.get_pause_menu().is_open(),
-		"a letter with a reply opens the page that can take one")
-	assert_eq(_ranch.get_pause_menu().open_letter_id(), &"weather_survey")
+	assert_true(_ranch.letter_panel.is_open(), "the letter, not the archive page")
+	assert_false(_ranch.get_pause_menu().is_open())
+	var buttons: Array = _ranch.letter_panel.reply_buttons()
+	assert_eq(buttons.size(), 1, "one button per pony she could name")
+	var bits_before: int = _ranch.get_economy().bits
+	(buttons[0] as Button).pressed.emit()
+	await wait_frames(2)
+	assert_true(_state.story.survey_answered(), "pressing a pony answers the survey")
+	assert_eq(_ranch.get_economy().bits, bits_before + StoryScript.SURVEY_BONUS_BITS)
+	assert_false(_ranch.letter_panel.is_open(), "and the letter is put away")
 
 
 func test_the_archive_page_says_what_it_is() -> void:

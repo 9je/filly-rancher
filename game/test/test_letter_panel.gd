@@ -164,7 +164,8 @@ func test_the_footer_wears_the_one_menu_style_like_every_other_panel() -> void:
 	assert_eq(footer.get_theme_font_size("font_size"), MenuStyleScript.FOOTER_SIZE)
 	assert_eq(footer.get_theme_constant("outline_size"), 0,
 		"paper is read against itself, not against the world; no outline needed")
-	assert_ne(footer.text.strip_edges(), "", "the page says how to leave it")
+	assert_false(footer.visible, "PT5: no key hints; the Back button is the way out")
+	assert_eq(panel.close_button_node().text, "Back")
 
 
 # --- the crafted sheet ------------------------------------------------------------------

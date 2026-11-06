@@ -166,7 +166,7 @@ func test_arm_with_no_on_exit_leaves_mouse_exited_unconnected() -> void:
 
 ## I5, final-review.md I3: MouseRows.tab_strip() is the shared helper casino_menu.gd,
 ## depot_menu.gd and table_menu.gd all swapped their `_tabs.text = tab_strip(...)` for.
-func test_tab_strip_builds_one_focus_none_button_per_name_bracketing_the_active_one() -> void:
+func test_tab_strip_builds_one_focus_none_button_per_name_lighting_the_active_one() -> void:
 	var container := HBoxContainer.new()
 	add_child_autofree(container)
 	var pointed: Array[int] = []
@@ -177,9 +177,10 @@ func test_tab_strip_builds_one_focus_none_button_per_name_bracketing_the_active_
 	var buttons: Array[Button] = []
 	for child in container.get_children():
 		buttons.append(child as Button)
-	assert_eq(buttons[0].text, " Lobby ")
-	assert_eq(buttons[1].text, "[Cage]", "index 1 is the active tab")
-	assert_eq(buttons[2].text, " House rules ")
+	assert_eq(buttons[0].text, "Lobby", "PT5: real tabs, no brackets")
+	assert_eq(buttons[1].text, "Cage")
+	assert_eq(buttons[2].text, "House rules")
+	assert_eq(MouseRowsScript.active_tab(container), 1, "index 1 is the lit tab")
 	for button: Button in buttons:
 		assert_eq(button.focus_mode, Control.FOCUS_NONE)
 	var event := InputEventMouseButton.new()

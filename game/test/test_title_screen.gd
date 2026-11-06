@@ -108,9 +108,9 @@ func test_every_row_is_armed_for_the_pointer() -> void:
 		"every row the keyboard reaches, the mouse reaches")
 
 
-func test_the_footer_still_prints_the_keys() -> void:
+func test_no_key_hints_are_shown() -> void:
 	var footer := _title.get_node("Centre/Panel/Margin/Column/Footer") as Label
-	assert_false(footer.text.strip_edges().is_empty())
+	assert_false(footer.visible, "PT5: no row of key hints")
 
 
 # --- C2: the default row, and the second confirm on New game ------------------------------

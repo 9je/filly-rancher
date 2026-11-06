@@ -234,7 +234,75 @@ func _ready() -> void:
 		# transparent while the holder finally hears the wheel.
 		_rows.mouse_filter = Control.MOUSE_FILTER_PASS
 		_rows.gui_input.connect(_on_rows_input)
+		_add_scroll_bar()
 	set_process(false)
+
+
+## A REAL SCROLL BAR (PT5; owner, 2026-11-05: "up down scroll kinda obvious just put a scroll
+## bar"). The Compendium shows PAGE_ROWS of its roster at a time; the rows now sit beside a
+## bar the pointer can drag, which moves the same window the wheel and the arrows move.
+var _bar: VScrollBar = null
+var _bar_sync := false
+
+
+func _add_scroll_bar() -> void:
+	var column := _rows.get_parent()
+	var at := _rows.get_index()
+	var box := HBoxContainer.new()
+	box.name = "RowsBox"
+	box.add_theme_constant_override(&"separation", 12)
+	column.add_child(box)
+	column.move_child(box, at)
+	_rows.reparent(box)
+	_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_bar = VScrollBar.new()
+	_bar.name = "Bar"
+	_bar.custom_minimum_size = Vector2(16, 0)
+	_bar.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_bar.focus_mode = Control.FOCUS_NONE
+	var track := StyleBoxFlat.new()
+	track.bg_color = Color(1, 1, 1, 0.06)
+	track.set_corner_radius_all(8)
+	var grab := StyleBoxFlat.new()
+	grab.bg_color = Color(0.70, 0.55, 0.88)
+	grab.set_corner_radius_all(8)
+	var grab_hi := grab.duplicate() as StyleBoxFlat
+	grab_hi.bg_color = Color(0.85, 0.72, 1.0)
+	_bar.add_theme_stylebox_override(&"scroll", track)
+	_bar.add_theme_stylebox_override(&"grabber", grab)
+	_bar.add_theme_stylebox_override(&"grabber_highlight", grab_hi)
+	_bar.add_theme_stylebox_override(&"grabber_pressed", grab_hi)
+	_bar.visible = false
+	_bar.value_changed.connect(_on_bar_moved)
+	box.add_child(_bar)
+
+
+func _sync_bar() -> void:
+	if _bar == null:
+		return
+	var n := roster().size() if _page == Page.COMPENDIUM else 0
+	_bar.visible = n > PAGE_ROWS
+	if not _bar.visible:
+		return
+	_bar_sync = true
+	_bar.max_value = n
+	_bar.page = PAGE_ROWS
+	_bar.value = clampi(_scroll, 0, n - PAGE_ROWS)
+	_bar_sync = false
+
+
+func _on_bar_moved(v: float) -> void:
+	if _bar_sync or _page != Page.COMPENDIUM:
+		return
+	var n := roster().size()
+	_scroll = clampi(int(round(v)), 0, maxi(0, n - PAGE_ROWS))
+	_selected = clampi(_selected, _scroll, _scroll + PAGE_ROWS - 1)
+	_refresh()
+
+
+## The bar, for the tests.
+func scroll_bar() -> VScrollBar:
+	return _bar
 
 
 ## get_node_or_null(), not the bare `Sound` identifier: see game/ui/menu_style.gd's own
@@ -594,6 +662,10 @@ func compendium_region_rows() -> Array[String]:
 	out.append(_zone_row(RANCH_NAME, RANCH_ZONE))
 	if regions != null:
 		for region: RegionData in regions.all():
+			# A region nobody lives in is not a line in a book of ponies (playtest 2026-11-05:
+			# "The Strip: 0 of 0").
+			if registry != null and registry.by_zone(region.id).is_empty():
+				continue
 			out.append(_zone_row(region.display_name, region.id))
 	return out
 
@@ -673,9 +745,22 @@ func _entry_value(data: PonyData) -> String:
 		# comment has said this is how it would read since the state was added.
 		return StoryWordingScript.processed_value(story_chapter,
 			data.id == employees_choice)
+	if compendium.state_of(data.id) == CompendiumScript.State.UNSEEN:
+		# A HINT, NOT A BLANK (playtest 2026-11-05: a page of bare "???"): where to look.
+		return "lives in %s" % _zone_name(data.spawn_zones[0] if not data.spawn_zones.is_empty() else &"")
 	if compendium.state_of(data.id) != CompendiumScript.State.CAUGHT:
 		return ""
 	return "when: %s, %s" % [_phases_text(data), _weathers_text(data)]
+
+
+func _zone_name(zone: StringName) -> String:
+	if zone == RANCH_ZONE:
+		return RANCH_NAME
+	if regions != null:
+		for region: RegionData in regions.all():
+			if region.id == zone:
+				return region.display_name
+	return "the valley"
 
 
 func _phases_text(data: PonyData) -> String:
@@ -837,14 +922,20 @@ func reply_rows() -> Array[Dictionary]:
 	var row: Dictionary = _open_row()
 	if row.is_empty():
 		return []
-	if not String(row.get("replied", "")).is_empty():
+	var ponies: Array = mail_ponies_provider.call() if mail_ponies_provider.is_valid() else []
+	return replies_for(row, ponies)
+
+
+## A letter's answers, the same on this page and on the sheet the mailbox opens
+## (letter_panel.gd, PT5): {"label", "choice"} rows, empty for a letter with no question or
+## one already answered. `ponies` is owned_rows()'s shape: {uid, name, coat}.
+static func replies_for(row: Dictionary, ponies: Array) -> Array[Dictionary]:
+	if row.is_empty() or not String(row.get("replied", "")).is_empty():
 		return []
 	var out: Array[Dictionary] = []
 	match int(row.get("reply", 0)):
 		StoryBeatScript.Reply.PICK_PONY:
-			if not mail_ponies_provider.is_valid():
-				return out
-			for entry in mail_ponies_provider.call():
+			for entry in ponies:
 				var pony: Dictionary = entry
 				var coat: String = String(pony.get("coat", ""))
 				var who: String = String(pony.get("name", ""))
@@ -910,6 +1001,7 @@ func _refresh() -> void:
 			_draw_ledger()
 		_:
 			_draw_main()
+	_sync_bar()
 
 
 ## Redraw whatever page is up. ranch.gd calls this when something the open page is drawing

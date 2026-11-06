@@ -59,7 +59,11 @@ const NO_CARET := "  "
 ##
 ## THE NUMBERS ARE build_menu.gd's, verbatim: 75% black at 5 px.
 const OUTLINE_COLOR := Color(0.0, 0.0, 0.0, 0.75)
-const OUTLINE_SIZE := 5
+## ZERO SINCE PT5 (playtest 2026-11-05: "text is a bit thick", the letters "hard to read"):
+## white on plum and ink on cream both read cleanly, and a dark ring round every glyph made
+## them smear into one heavy weight. Kept as a constant so the theme and the drawn screens
+## still agree on one number.
+const OUTLINE_SIZE := 0
 
 
 ## TEXT SIZE (FS8.2; Settings.text_size): every size the menus style is scaled by this.

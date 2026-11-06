@@ -21,7 +21,8 @@ const MenuStyleScript := preload("res://ui/menu_style.gd")
 ## Control which row it is without keeping a parallel array beside the VBox.
 const ROW_INDEX_META := &"filly_row_index"
 
-const CLOSE_TEXT := "Close"
+## "Back", not "Close" (PT5; owner: "back button please"), on every panel.
+const CLOSE_TEXT := "Back"
 
 
 ## Whether `event` is the one gesture this kit acts on: a LEFT button going DOWN. A release
@@ -126,12 +127,54 @@ static func tab_strip(container: Control, names: Array[String], active: int,
 	for child in container.get_children():
 		container.remove_child(child)
 		child.queue_free()
+	# REAL TABS, NOT BRACKETS (PT5; playtest 2026-11-05: "[Colour]  Number", "[Deliver]  Pay"
+	# read as debug text). The active tab is a lit pill in the HUD's violet; the others are
+	# quiet labels that brighten under the pointer.
+	container.add_theme_constant_override(&"separation", 8)
 	for i in names.size():
 		var button := Button.new()
-		button.text = "[%s]" % names[i] if i == active else " %s " % names[i]
-		button.flat = true
+		button.text = names[i]
+		button.flat = false
+		button.add_theme_font_size_override(&"font_size", MenuStyleScript.font_px(MenuStyleScript.ROW_SIZE))
+		var on := i == active
+		for state: StringName in [&"normal", &"hover", &"pressed", &"focus"]:
+			button.add_theme_stylebox_override(state, _tab_box(on, state == &"hover"))
+		button.add_theme_color_override(&"font_color",
+			Color(1, 1, 1) if on else Color(0.82, 0.76, 0.90))
+		button.add_theme_color_override(&"font_hover_color", Color(1, 1, 1))
+		button.add_theme_constant_override(&"outline_size", 0)
+		button.set_meta(&"active_tab", on)
 		arm(button, i, on_point, on_take)
 		container.add_child(button)
+
+
+static func _tab_box(on: bool, hover: bool) -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.set_corner_radius_all(14)
+	box.content_margin_left = 18.0
+	box.content_margin_right = 18.0
+	box.content_margin_top = 6.0
+	box.content_margin_bottom = 6.0
+	if on:
+		box.bg_color = Color(0.48, 0.30, 0.66)
+		box.set_border_width_all(2)
+		box.border_color = Color(0.80, 0.66, 0.95)
+	else:
+		box.bg_color = Color(1, 1, 1, 0.10 if hover else 0.04)
+	return box
+
+
+## Which tab button is lit, or -1.
+static func active_tab(container: Control) -> int:
+	if container == null:
+		return -1
+	var i := 0
+	for c in container.get_children():
+		if c is Button and not c.is_queued_for_deletion():
+			if bool(c.get_meta(&"active_tab", false)):
+				return i
+			i += 1
+	return -1
 
 
 ## WHICH RECT THE POINTER IS IN, for the screens that paint their rows instead of stacking

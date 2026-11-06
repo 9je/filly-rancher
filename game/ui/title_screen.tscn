@@ -49,4 +49,5 @@ layout_mode = 2
 theme_override_constants/separation = 6
 
 [node name="Footer" type="Label" parent="Centre/Panel/Margin/Column"]
+visible = false
 layout_mode = 2

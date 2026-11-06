@@ -127,12 +127,15 @@ func test_a_left_click_on_a_row_holder_reaches_take_row() -> void:
 	assert_eq(menu.selected_index(), MouseRowsScript.row_index(armed[1]))
 
 
-func test_every_list_menu_still_prints_its_footer_keys() -> void:
+func test_no_list_menu_prints_key_hints() -> void:
+	# PT5 (owner, 2026-11-05): one Back button, no "Up Down scroll   Esc back" rows.
 	var checked := 0
 	for path: String in SCENES:
 		var menu: CanvasLayer = load(path).instantiate()
 		add_child_autofree(menu)
 		var footer := menu.get_node_or_null(^"Centre/Panel/Margin/Column/Footer") as Label
 		assert_not_null(footer, "%s has no footer" % path)
+		if footer != null:
+			assert_false(footer.visible, "%s shows no key hints" % path)
 		checked += 1
 	assert_eq(checked, SCENES.size())

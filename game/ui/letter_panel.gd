@@ -61,10 +61,13 @@ const TITLE_HEIGHT := LINE_HEIGHT * 1.5
 
 signal opened()
 signal closed()
+## A letter with a question was answered from the sheet (PT5): `choice` is the reply row's.
+signal replied(choice: String)
 
 var _open := false
 var _letter: Dictionary = {}
 var _close: Button = null
+var _replies: HFlowContainer = null
 
 @onready var _footer: Label = $Centre/Panel/Margin/Column/Footer
 @onready var _stage: Control = get_node_or_null(^"Centre/Panel/Margin/Column/Stage")
@@ -91,6 +94,14 @@ func _ready() -> void:
 		_stage.mouse_filter = Control.MOUSE_FILTER_STOP
 		_stage.focus_mode = Control.FOCUS_NONE
 		_stage.draw.connect(func() -> void: paint(_stage))
+	# THE ANSWERS, ON THE SHEET (PT5; playtest 2026-11-05: the survey said "answer below" and
+	# below was another page). One chip per answer, under the letter, above the way out.
+	_replies = HFlowContainer.new()
+	_replies.name = "Replies"
+	_replies.add_theme_constant_override(&"h_separation", 10)
+	_replies.add_theme_constant_override(&"v_separation", 10)
+	_replies.custom_minimum_size = Vector2(SHEET_WIDTH, 0.0)
+	$Centre/Panel/Margin/Column.add_child(_replies)
 	_close = MouseRowsScript.close_button(MouseRowsScript.CLOSE_TEXT,
 		func(_index: int) -> void: close())
 	$Centre/Panel/Margin/Column.add_child(_close)
@@ -152,16 +163,85 @@ func drawn_lines() -> Array[String]:
 func refresh() -> void:
 	if not is_node_ready():
 		return
-	# THE FOOTER STILL PRINTS THE KEY. The mouse was added; the key hint stays, and it now
-	# names the pointer's way out beside it. THE FOOTER IS NOT THE LETTER: the sender, the
-	# title and the body are drawn once, on the Stage, by paint() below.
+	# NO KEY HINTS (PT5; owner: "why esc back and close annoying"): the Back button is the way
+	# out, and Enter and Esc still close it for a player who reaches for them.
 	_footer.text = MenuStyleScript.footer([[&"ui_accept", "close"]])
+	_footer.visible = false
 	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE,
 		MenuStyleScript.COLOR_INK)
 	_footer.add_theme_constant_override(&"outline_size", 0)
+	_build_replies()
 	if _stage != null:
 		_stage.custom_minimum_size = stage_size()
 		_stage.queue_redraw()
+
+
+## The letter's answers as buttons, rebuilt from _letter["replies"] ({label, choice} rows).
+func _build_replies() -> void:
+	if _replies == null:
+		return
+	for child in _replies.get_children():
+		_replies.remove_child(child)
+		child.queue_free()
+	var rows: Array = _letter.get("replies", [])
+	_replies.visible = not rows.is_empty()
+	for row: Dictionary in rows:
+		var b := Button.new()
+		b.text = String(row.get("label", ""))
+		b.focus_mode = Control.FOCUS_NONE
+		b.add_theme_font_size_override(&"font_size", MenuStyleScript.font_px(MenuStyleScript.ROW_SIZE))
+		var choice := String(row.get("choice", ""))
+		b.pressed.connect(func() -> void: _answer(choice))
+		_replies.add_child(b)
+
+
+func _answer(choice: String) -> void:
+	if not _open:
+		return
+	replied.emit(choice)
+	close()
+
+
+## The answer buttons on the sheet, in order. For the tests.
+func reply_buttons() -> Array[Button]:
+	var out: Array[Button] = []
+	if _replies != null:
+		for c in _replies.get_children():
+			if c is Button and not c.is_queued_for_deletion():
+				out.append(c)
+	return out
+
+
+## THE BODY AS PARAGRAPHS (PT5; playtest 2026-11-05 item 8: the welcome letter was a narrow
+## column with the right half of the sheet empty). The authored lines are hard wrapped short;
+## consecutive lines join into one paragraph and wrap to the sheet's own width, and a blank
+## line is still a paragraph break.
+func paragraphs() -> Array[String]:
+	var out: Array[String] = []
+	var cur: Array[String] = []
+	for line in drawn_lines():
+		if line.strip_edges().is_empty():
+			if not cur.is_empty():
+				out.append(" ".join(cur))
+				cur.clear()
+			out.append("")
+			continue
+		cur.append(line.strip_edges())
+	if not cur.is_empty():
+		out.append(" ".join(cur))
+	return out
+
+
+func _body_height(width: float) -> float:
+	var font: Font = ThemeDB.fallback_font
+	var h := 0.0
+	for p in paragraphs():
+		if p.is_empty():
+			h += LINE_HEIGHT * 0.6
+			continue
+		h += font.get_multiline_string_size(p, HORIZONTAL_ALIGNMENT_LEFT, width,
+			MenuStyleScript.ROW_SIZE).y + LINE_HEIGHT * 0.25
+	return h
 
 
 # --- the sheet ------------------------------------------------------------------------------
@@ -178,10 +258,9 @@ func refresh() -> void:
 ## paint() draws below: the letterhead, one row for the title, one row per body line, and
 ## the seal -- nothing here is reserved twice.
 func stage_size() -> Vector2:
-	var lines: int = maxi(drawn_lines().size(), 1)
+	var body := maxf(_body_height(SHEET_WIDTH - SHEET_MARGIN * 2.0), LINE_HEIGHT)
 	return Vector2(SHEET_WIDTH,
-		HEAD_HEIGHT + SHEET_MARGIN + TITLE_HEIGHT + float(lines) * LINE_HEIGHT
-			+ SEAL_SIZE + SHEET_MARGIN)
+		HEAD_HEIGHT + SHEET_MARGIN + TITLE_HEIGHT + body + SEAL_SIZE + SHEET_MARGIN)
 
 
 ## THE WHOLE LETTER, DRAWN ONCE. Sheet, letterhead (which prints the sender itself), the
@@ -208,14 +287,15 @@ func paint(ci: Control) -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, text_width, MenuStyleScript.TITLE_SIZE,
 		MenuStyleScript.COLOR_INK)
 	row_top += TITLE_HEIGHT
-	for line in drawn_lines():
-		# A BLANK LINE IS A PARAGRAPH BREAK: it still advances row_top, it just has
-		# nothing to draw, which is the drawn equivalent of the old space-holding Label.
-		if not line.is_empty():
-			ci.draw_string(font, Vector2(text_left, row_top + LINE_HEIGHT * 0.75), line,
-				HORIZONTAL_ALIGNMENT_LEFT, text_width, MenuStyleScript.ROW_SIZE,
-				MenuStyleScript.COLOR_INK)
-		row_top += LINE_HEIGHT
+	for p in paragraphs():
+		if p.is_empty():
+			row_top += LINE_HEIGHT * 0.6
+			continue
+		ci.draw_multiline_string(font, Vector2(text_left, row_top + LINE_HEIGHT * 0.75), p,
+			HORIZONTAL_ALIGNMENT_LEFT, text_width, MenuStyleScript.ROW_SIZE, -1,
+			MenuStyleScript.COLOR_INK)
+		row_top += font.get_multiline_string_size(p, HORIZONTAL_ALIGNMENT_LEFT, text_width,
+			MenuStyleScript.ROW_SIZE).y + LINE_HEIGHT * 0.25
 
 	# THE SEAL SITS UNDER THE SIGN OFF, bottom right, where a seal goes.
 	var seal := Rect2(box.size.x - SHEET_MARGIN - SEAL_SIZE,
