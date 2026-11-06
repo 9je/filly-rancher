@@ -785,6 +785,14 @@ func _build_visuals(mane_style: int = 0, donor: StringName = &"") -> void:
 	# Re-found on every rebuild rather than kept: apply_look() frees the whole body when the
 	# mane style changes, and a stale simulator reference would be a freed node.
 	_hair = PonyRigScript.hair_simulator(pony)
+	# HER POSE AND HER HAIR STEP WITH HER BODY (PT11; playtest 2026-11-05: "your tail bugs out
+	# as you walk ... it like stutters between frames"). She moves on the physics tick; her clip
+	# and her tail's springs ran on every drawn frame, so on a fast display the springs saw her
+	# stand still for a frame or two and then jump, and threw the tail each time. Both now run
+	# on the physics tick, in step with the body that carries them.
+	_anim.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_PHYSICS
+	for sk: Skeleton3D in pony.find_children("*", "Skeleton3D", true, false):
+		sk.modifier_callback_mode_process = Skeleton3D.MODIFIER_CALLBACK_MODE_PROCESS_PHYSICS
 
 
 ## Move `BeamOrigin` onto the actual tip of the actual horn of the actual model.
