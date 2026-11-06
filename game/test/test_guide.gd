@@ -71,6 +71,24 @@ func test_the_trail_lies_between_her_and_the_goal() -> void:
 		assert_almost_eq(m.z, 0.0, 0.6)
 
 
+## FS1.5 (rendered 2026-11-06): the far motes shrank to specks on the grass at play distance.
+## Along the run they grow, so the far end reads as well as the near.
+func test_the_far_motes_are_drawn_bigger_than_the_near() -> void:
+	var trail: GuideTrail = TrailScript.new()
+	add_child_autofree(trail)
+	trail.point(Vector3.ZERO, Vector3(30, 0, 0))
+	var sizes := trail.mote_sizes()
+	assert_gt(sizes.size(), 6)
+	# Halves, not ends: each mote also pulses (0.5x to 1x), which averages out over a half.
+	var half := sizes.size() / 2
+	var near := 0.0
+	var far := 0.0
+	for i in half:
+		near += sizes[i] / half
+		far += sizes[sizes.size() - 1 - i] / half
+	assert_gt(far, near * 1.25, "the far half (%.2f) well over the near (%.2f)" % [far, near])
+
+
 func test_the_trail_ends_short_of_a_goal_close_by_and_goes_when_she_arrives() -> void:
 	var trail: GuideTrail = TrailScript.new()
 	add_child_autofree(trail)

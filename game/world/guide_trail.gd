@@ -24,6 +24,14 @@ const STOP := 1.2
 const BEACON_FROM := 14.0
 ## How fast the motes drift along the way, metres a second.
 const DRIFT := 1.1
+## A mote this much bigger per metre along the run, so the far ones still read at play
+## distance instead of shrinking to specks (FS1.5, rendered 2026-11-06: past 8 m they were
+## lost on the grass). Their colour, richer than the pastel they were.
+const GROW := 0.07
+const SATURATION := 0.72
+## The column of light shows at least this strong once it is on (it used to start at
+## nothing at BEACON_FROM and was invisible at 18 m).
+const BEACON_MIN := 0.45
 
 ## (x, z) -> ground height; unset, the line between the two ends is used.
 var height_at: Callable
@@ -37,6 +45,7 @@ var _beacon: MeshInstance3D
 var _strength := 0.0
 ## What _layout() last placed (the headless renderer keeps no MultiMesh transforms to read).
 var _placed: Array[Vector3] = []
+var _sizes: Array[float] = []
 
 
 func _ready() -> void:
@@ -84,6 +93,12 @@ func mote_positions() -> Array[Vector3]:
 	return _placed.duplicate()
 
 
+## Each drawn mote's size, nearest first, for the suite (the headless renderer keeps no
+## MultiMesh transforms to read back).
+func mote_sizes() -> Array[float]:
+	return _sizes.duplicate()
+
+
 func beacon_shown() -> bool:
 	return _beacon != null and _beacon.visible
 
@@ -106,6 +121,7 @@ func _layout() -> void:
 		return
 	var mm := _motes.multimesh
 	_placed.clear()
+	_sizes.clear()
 	if _to == Vector3.INF:
 		mm.visible_instance_count = 0
 		_beacon.visible = false
@@ -131,11 +147,12 @@ func _layout() -> void:
 		# Thin at both ends: fade in just ahead of her, out toward the run's end.
 		var a := clampf((d - START) / 1.5, 0.0, 1.0) * clampf((end - d) / 2.5, 0.0, 1.0)
 		var hue := fmod(d * 0.06 + _clock * 0.05, 1.0)
-		var c := Color.from_hsv(hue, 0.55, 1.0, a * _strength * 0.95)
-		var s := 0.75 + 0.25 * sin(_clock * 4.0 + d)
+		var c := Color.from_hsv(hue, SATURATION, 1.0, a * _strength * 0.95)
+		var s := (0.75 + 0.25 * sin(_clock * 4.0 + d)) * (1.0 + GROW * (d - START))
 		mm.set_instance_transform(n, Transform3D(Basis().scaled(Vector3.ONE * s), Vector3(x, y, z)))
 		mm.set_instance_color(n, c)
 		_placed.append(Vector3(x, y, z))
+		_sizes.append(s)
 		n += 1
 		d += SPACING
 	mm.visible_instance_count = n
@@ -143,7 +160,7 @@ func _layout() -> void:
 	if _beacon.visible:
 		var gy := _ground(_to.x, _to.z, _to.y)
 		_beacon.global_position = Vector3(_to.x, gy + 8.0, _to.z)
-		var far := clampf((dist - BEACON_FROM) / 20.0, 0.0, 1.0)
+		var far := clampf(BEACON_MIN + (dist - BEACON_FROM) / 20.0, 0.0, 1.0)
 		(_beacon.material_override as ShaderMaterial).set_shader_parameter(&"strength",
 			far * _strength)
 
