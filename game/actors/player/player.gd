@@ -651,12 +651,12 @@ func _physics_process(delta: float) -> void:
 
 	var ground_speed := get_ground_speed()
 	_update_facing(direction, delta)
-	_update_animation(ground_speed)
+	_update_animation(ground_speed, delta)
 	if _hair != null:
 		_hair.influence = PonyRigScript.influence_for_speed(ground_speed)
 	if _anim != null and step_on_clip(_anim.current_animation,
 			_anim.current_animation_position, ground_speed, is_on_floor()) \
-			and not (_last_footfall_rear and ground_speed >= GaitScript.GALLOP_HANDOVER_SPEED):
+			and not (_last_footfall_rear and _anim.current_animation == &"gallop"):
 		# At a run only the front hooves sound: four taps a stride at five a second was a
 		# drum roll (owner playtest 2026-10-25, "walking sound is AWFUL").
 		var surface := surface_under()
@@ -701,7 +701,12 @@ func _update_facing(direction: Vector3, delta: float) -> void:
 		_visual_yaw = atan2(-direction.x, -direction.z)
 	# Framerate-independent exponential smoothing toward the target yaw.
 	var weight := 1.0 - exp(-turn_response * delta)
+	var before := visuals.rotation.y
 	visuals.rotation.y = lerp_angle(visuals.rotation.y, _visual_yaw, weight)
+	# Into a sharp turn she banks (FS4.2, systems/gait_blend.gd).
+	if delta > 0.0:
+		visuals.rotation.z = _gait_blend.lean(angle_difference(before, visuals.rotation.y) / delta,
+			get_ground_speed(), delta)
 
 
 ## Turn her to face world heading `yaw` (radians, -Z forward) at once, with no smoothing: for
@@ -716,16 +721,23 @@ func face(yaw: float) -> void:
 ## because this is the third scene that would have needed editing when the gallop clip
 ## was added. All the reasoning about the bands and the resulting skate lives in
 ## game/systems/gait.gd; this function must not grow its own speed constants.
-func _update_animation(speed: float) -> void:
+func _update_animation(speed: float, delta := 1.0 / 60.0) -> void:
 	if _anim == null:
 		return
-	var clip := GaitScript.clip_for_speed(speed)
+	# Her legs show a speed that settles down through the trot and the walk when she stops
+	# (FS4.2, systems/gait_blend.gd); Gait still names the clip for it.
+	speed = _gait_blend.shown_speed(speed, delta)
+	var clip := _gait_blend.clip(speed, _anim.has_animation(&"trot"))
 	_play(clip)
 	_anim.speed_scale = GaitScript.playback_scale_for_clip(clip, speed)
 	# A sprint runs the gallop clip past its usual ceiling, so her hooves keep up with the
 	# ground rather than skating.
 	if clip == &"gallop" and is_sprinting() and speed > GaitScript.TOP_SKATE_FREE_SPEED:
 		_anim.speed_scale = speed / GaitScript.GALLOP_CLIP_SPEED
+
+
+const GaitBlendScript := preload("res://systems/gait_blend.gd")
+var _gait_blend: GaitBlend = GaitBlendScript.new()
 
 
 ## play() only when the clip actually changes -- calling it every frame would restart

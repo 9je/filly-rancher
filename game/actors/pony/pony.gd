@@ -979,7 +979,7 @@ func _physics_process(delta: float) -> void:
 		_pinned = 0.0
 
 	_update_facing(_facing_direction(desired), delta)
-	_update_animation(get_ground_speed())
+	_update_animation(get_ground_speed(), delta)
 
 
 func _update_detail() -> void:
@@ -1600,19 +1600,31 @@ func _update_facing(direction: Vector3, delta: float) -> void:
 		# convention player.gd relies on.
 		_visual_yaw = atan2(-direction.x, -direction.z)
 	var weight := 1.0 - exp(-TURN_RESPONSE * delta)
+	var before := visuals.rotation.y
 	visuals.rotation.y = lerp_angle(visuals.rotation.y, _visual_yaw, weight)
+	# Into a sharp turn she banks (FS4.2, systems/gait_blend.gd).
+	if delta > 0.0:
+		visuals.rotation.z = _gait_blend.lean(angle_difference(before, visuals.rotation.y) / delta,
+			get_ground_speed(), delta)
 
 
 ## Pick `idle`/`walk`/`gallop` and scale playback to her ground speed. Both decisions
 ## belong to Gait; this must not grow an if-ladder over speed constants of its own.
-func _update_animation(speed: float) -> void:
+func _update_animation(speed: float, delta := 1.0 / 60.0) -> void:
 	if _anim == null or _action != &"":
 		return
-	var clip := GaitScript.clip_for_speed(speed, _anim.has_animation(&"trot"))
+	# Her legs show a speed that settles down through the trot and the walk when she stops
+	# (FS4.2, systems/gait_blend.gd); Gait still names the clip for it.
+	speed = _gait_blend.shown_speed(speed, delta)
+	var clip := _gait_blend.clip(speed, _anim.has_animation(&"trot"))
 	if clip == &"idle":
 		clip = _standing_clip()
 	_play(clip)
 	_anim.speed_scale = GaitScript.playback_scale_for_clip(clip, speed)
+
+
+const GaitBlendScript := preload("res://systems/gait_blend.gd")
+var _gait_blend: GaitBlend = GaitBlendScript.new()
 
 
 ## She has just seen the player for the first time: a startle (FS4.3).

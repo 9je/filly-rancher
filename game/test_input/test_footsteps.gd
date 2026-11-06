@@ -21,6 +21,7 @@ extends "res://test_input/input_test.gd"
 ## RealInput.
 
 const ALIGN_S := 0.040
+var _was_on_floor := true
 const COVERAGE_MIN := 0.85
 const OLD_FILES := [
 	"res://assets/audio/world/hoofsteps_grass_1.wav", "res://assets/audio/world/hoofsteps_grass_2.wav",
@@ -122,7 +123,12 @@ func _sample() -> void:
 	var ys: Array[float] = []
 	for b in _bones:
 		ys.append(_skeleton.get_bone_global_pose(b).origin.y)
-	_frames.append({"t": t, "moving": moving, "clip": clip, "ys": ys})
+	# In a gait clip at all, slow or not, recorded or not: her settle steps as she stops
+	# (FS4.2) are footfalls on screen too, played on after her body has slowed under the
+	# "moving" line, and a judged step may sit at either edge of a recorded leg.
+	var gait: bool = player.is_on_floor() and MOVING_CLIPS.has(clip)
+	_frames.append({"t": t, "moving": moving, "gait": gait, "clip": clip, "ys": ys, "speed": speed,
+		"floor": player.is_on_floor()})
 	# Every 3D one shot the Sound autoload started since last frame: its pool cursor moved.
 	var next: int = int(_sound.get("_next_3d"))
 	var pool: Array = _sound.get("_pool_3d")
@@ -132,12 +138,15 @@ func _sample() -> void:
 		var voice: AudioStreamPlayer3D = pool[i]
 		var path: String = voice.stream.resource_path if voice.stream != null else ""
 		if path.contains("hoof") and _recording:
+			# A step on the frame she comes down from the air is her landing, not a stride's
+			# footfall: not judged against the stride (it is what she sounds like landing).
 			_steps.append({"t": t, "path": path, "pitch": voice.pitch_scale,
 				"volume_db": voice.volume_db, "truth": _ground_truth(), "clip": clip,
-				"moving": moving})
+				"moving": moving and _was_on_floor})
 		i = (i + 1) % pool.size()
 		guard += 1
 	_last_next_3d = next
+	_was_on_floor = player.is_on_floor()
 
 
 ## What is under her, by this test's own reading of the world.
@@ -160,14 +169,15 @@ func _ground_truth() -> String:
 	return "other"
 
 
-## Footfalls: per hoof, a local minimum of its height with a real swing around it.
-func _footfalls() -> Array[float]:
+## Footfalls: per hoof, a local minimum of its height with a real swing around it, in frames
+## where she is moving, or with `any_gait` wherever a gait clip plays.
+func _footfalls(any_gait := false) -> Array[float]:
 	var out: Array[float] = []
 	var n := _frames.size()
 	for h in HOOVES.size():
 		for k in range(4, n - 4):
 			var f: Dictionary = _frames[k]
-			if not bool(f.moving):
+			if not bool(f.get("gait" if any_gait else "moving", false)):
 				continue
 			# At a run only the front hooves sound (player.gd, owner playtest 2026-10-25).
 			if h >= 2 and String(f.clip) == "gallop":
@@ -192,16 +202,21 @@ func _footfalls() -> Array[float]:
 
 func _judge() -> void:
 	var falls := _footfalls()
+	# A step is judged against every footfall on screen, the settle steps included.
+	var all_falls := _footfalls(true)
+
 	# FOOTSTEP_DUMP=<file> writes every frame and step for offline reading.
 	var dump := OS.get_environment("FOOTSTEP_DUMP")
 	if dump != "":
 		var f := FileAccess.open(dump, FileAccess.WRITE)
 		for row in _frames:
-			f.store_line("F %.4f %s %s %s" % [row.t, row.clip, row.moving, row.ys])
+			f.store_line("F %.4f %s %s %.2f %s %s" % [row.t, row.clip, row.moving, row.speed, row.floor, row.ys])
 		for s in _steps:
 			f.store_line("S %.4f %s %s %s" % [s.t, s.clip, s.moving, String(s.path).get_file()])
 		for t in falls:
 			f.store_line("L %.4f" % t)
+		for t in all_falls:
+			f.store_line("G %.4f" % t)
 		f.close()
 	var judged: Array[Dictionary] = []
 	for s in _steps:
@@ -218,7 +233,7 @@ func _judge() -> void:
 	var worst := 0.0
 	var sum := 0.0
 	for s in judged:
-		var d := _nearest(falls, float(s.t))
+		var d := _nearest(all_falls, float(s.t))
 		sum += d
 		worst = maxf(worst, d)
 		if d > ALIGN_S:

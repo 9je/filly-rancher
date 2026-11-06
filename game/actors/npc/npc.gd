@@ -467,12 +467,18 @@ func _turn(desired: Vector3, delta: float) -> void:
 			_face.look_weight = 0.0
 
 
+const GaitBlendScript := preload("res://systems/gait_blend.gd")
+var _gait_blend: GaitBlend = GaitBlendScript.new()
+
+
 func _animate() -> void:
 	if _anim == null or _one_shot:
 		return
-	var speed := Vector3(velocity.x, 0, velocity.z).length()
-	if speed > GaitScript.IDLE_SPEED:
-		var clip := GaitScript.clip_for_speed(speed, _anim.has_animation(&"trot"))
+	# Her legs settle down through the gaits when she stops (FS4.2, systems/gait_blend.gd).
+	var speed := _gait_blend.shown_speed(Vector3(velocity.x, 0, velocity.z).length(),
+		get_physics_process_delta_time())
+	var clip := _gait_blend.clip(speed, _anim.has_animation(&"trot"))
+	if clip != &"idle":
 		_play(clip)
 		_anim.speed_scale = GaitScript.playback_scale_for_clip(clip, speed)
 	elif _anim.current_animation != &"talk":
