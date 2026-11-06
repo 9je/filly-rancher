@@ -1687,7 +1687,9 @@ func _begin_hold(body: Node3D) -> void:
 		_wrenching = clocks["wrenches"]
 		if data != null and not body.is_stock():
 			_weave = weave_for(data.rarity)
-			if _weave > 0.0:
+			# Not on a wrench: a wrench is a struggle shorter than the subdue (roll_clocks), and
+			# the grace would turn it into a catch (checkpoint review).
+			if _weave > 0.0 and not _wrenching:
 				_struggle_seconds += WEAVE_GRACE
 		return
 

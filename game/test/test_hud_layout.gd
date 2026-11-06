@@ -81,3 +81,15 @@ func test_a_long_toast_stays_long_enough_to_read_and_waits_out_a_pause() -> void
 	await wait_process_frames(30)
 	assert_almost_eq(float(hud.call("toast_seconds_left")), left, 0.05, "a menu up holds the line")
 	hud.call("set_overlay_open", false)
+
+
+func test_a_short_toast_after_a_long_one_is_one_line_again() -> void:
+	var hud: CanvasLayer = HudScene.instantiate()
+	add_child_autofree(hud)
+	await wait_process_frames(2)
+	var t := hud.get_node("Toast") as Control
+	var one: float = t.offset_bottom - t.offset_top
+	hud.call("_show_toast", LONG)
+	assert_gt(t.offset_bottom - t.offset_top, one, "the long one grew")
+	hud.call("_show_toast", "Short.")
+	assert_almost_eq(t.offset_bottom - t.offset_top, one, 0.5, "the short one is one line again")

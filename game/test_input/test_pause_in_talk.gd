@@ -32,4 +32,6 @@ func _play() -> void:
 		return
 	if not check(bool(people.call("is_talking")) and talk.visible, "the conversation did not come back"):
 		return
-	ok("paused mid conversation and came back to the same line")
+	if not check(not ranch.get_tree().paused, "the world stayed paused after the pause menu closed (checkpoint review soft-lock)"):
+		return
+	ok("paused mid conversation and came back to the same line, the world running")

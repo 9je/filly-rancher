@@ -1077,6 +1077,10 @@ func _fit_pill(l: Label) -> void:
 	var fs := l.get_theme_font_size(&"font_size")
 	# NEVER WIDER THAN PILL_MAX_WIDTH (PT5; playtest 2026-11-05: "holy line of text", a toast
 	# across the whole screen): a long line wraps onto a second and the pill grows down.
+	if not l.has_meta(&"pill_height"):
+		l.set_meta(&"pill_height", l.offset_bottom - l.offset_top)
+	# Back to one line before measuring, so a short toast after a long one is short again.
+	l.offset_bottom = l.offset_top + float(l.get_meta(&"pill_height"))
 	var one_line := font.get_string_size(l.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 56.0
 	var w := minf(one_line, PILL_MAX_WIDTH)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if one_line > PILL_MAX_WIDTH \

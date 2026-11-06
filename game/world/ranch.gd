@@ -1649,9 +1649,9 @@ func _on_menu_closed() -> void:
 		_talk_hidden_for_pause = false
 		var talk: CanvasLayer = people.get("talk_box") if people != null else null
 		if talk != null and people.is_talking():
+			# Back on screen; a conversation does not pause the world, so neither does this
+			# (checkpoint review: returning here left the ranch frozen after the talk ended).
 			talk.visible = true
-			# The conversation keeps the world paused and the cursor free, as it was.
-			return
 	get_tree().paused = false
 	_set_cursor_captured(true)
 	_set_hud_overlay(false)
@@ -8905,12 +8905,18 @@ func _welcome_rare(region: RegionData) -> Node3D:
 		return null
 	pool.sort_custom(func(a: PonyData, b: PonyData) -> bool: return a.rarity > b.rarity)
 	var pick: PonyData = pool[0]
-	var at2 := region.centre.lerp(Vector2(player.global_position.x, player.global_position.z), 0.35) \
-		if player != null else region.centre
+	# Inside the gate: a third of the way from the middle toward her, never past half the radius.
+	var at2 := region.centre
+	if player != null:
+		var toward := Vector2(player.global_position.x, player.global_position.z) - region.centre
+		at2 = region.centre + toward.limit_length(region.radius * 0.5)
 	var at := Vector3(at2.x, float(terrain.height_at(at2.x, at2.y)) + 0.1, at2.y)
 	var guest: Node3D = spawner.spawn_guest(pick, {}, at, 6.0)
 	if guest != null and happenings != null:
-		happenings.set("sighting", guest)
+		# Never over a sighting that is still live (the lost foal, a pony Tumble pointed out).
+		var live: Node3D = happenings.get("sighting") as Node3D
+		if live == null or not is_instance_valid(live) or not live.is_inside_tree():
+			happenings.set("sighting", guest)
 		_toast("Tumble: \"Look, look! %s lives in there! Follow the sparkles!\"" % pick.display_name)
 	return guest
 
