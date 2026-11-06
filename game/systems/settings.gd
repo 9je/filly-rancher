@@ -148,7 +148,7 @@ var pony_chatter := false
 const FIELDS: Array[StringName] = [&"master_volume", &"music_volume", &"ambient_volume",
 	&"effects_volume", &"ui_volume", &"voice_volume", &"quality", &"vsync", &"window_mode",
 	&"resolution", &"fov", &"max_fps", &"mouse_sensitivity", &"stick_sensitivity",
-	&"invert_look", &"bindings", &"show_controls_chip", &"show_checklist", &"pause_on_focus_loss",
+	&"invert_look", &"bindings", &"pad_bindings", &"show_controls_chip", &"show_checklist", &"pause_on_focus_loss",
 	&"pony_chatter", &"show_guide", &"camera_shake", &"text_size"]
 const TEXT_SIZES: Array[int] = [100, 125, 150]
 
@@ -156,7 +156,9 @@ const TEXT_SIZES: Array[int] = [100, 125, 150]
 const DISPLAY_FIELDS: Array[StringName] = [&"window_mode", &"resolution"]
 
 ## KEY BINDINGS: action -> physical keycode, for the actions a player may rebind. An action
-## missing here keeps project.godot's key. Gamepad buttons are never touched.
+## missing here keeps project.godot's key. PAD BINDINGS (FS8.1): action -> joypad button, by
+## the same rules, for the actions the project gives a button (pad_rebindable); the sticks and
+## triggers stay as authored.
 const REBINDABLE: Array[StringName] = [&"move_forward", &"move_back", &"move_left",
 	&"move_right", &"jump", &"sneak", &"gallop", &"interact", &"treat", &"whistle", &"pause",
 	&"toggle_hints"]
@@ -165,6 +167,11 @@ const ACTION_NAMES := {&"move_forward": "Walk forward", &"move_back": "Walk back
 	&"sneak": "Sneak", &"gallop": "Gallop", &"interact": "Interact", &"treat": "Toss a treat",
 	&"whistle": "Whistle", &"pause": "Pause", &"toggle_hints": "Controls card"}
 var bindings: Dictionary = {}
+var pad_bindings: Dictionary = {}
+## Buttons never bound: B backs out of every menu, Guide belongs to the system, and the
+## D-pad's up and down are the camera's zoom.
+const PAD_RESERVED: Array[int] = [JOY_BUTTON_B, JOY_BUTTON_GUIDE, JOY_BUTTON_DPAD_UP,
+	JOY_BUTTON_DPAD_DOWN]
 var mouse_sensitivity := SENSITIVITY_DEFAULT
 var invert_look := false
 
@@ -216,6 +223,14 @@ func load_from(path: String = "") -> void:
 			var code := int((b as Dictionary)[k]) if (b as Dictionary)[k] is int or (b as Dictionary)[k] is float else 0
 			if StringName(k) in REBINDABLE and code > 0 and code != KEY_ESCAPE:
 				bindings[StringName(k)] = code
+	var pb: Variant = cfg.get_value(SECTION, "pad_bindings", {})
+	pad_bindings = {}
+	if pb is Dictionary:
+		for k in (pb as Dictionary):
+			var v: Variant = (pb as Dictionary)[k]
+			var button := int(v) if v is int or v is float else -1
+			if pad_rebindable(StringName(k)) and _pad_bindable(button):
+				pad_bindings[StringName(k)] = button
 	changed.emit()
 
 
@@ -251,6 +266,10 @@ func save_to(path: String = "") -> bool:
 	for k in bindings:
 		b[String(k)] = int(bindings[k])
 	cfg.set_value(SECTION, "bindings", b)
+	var pb := {}
+	for k in pad_bindings:
+		pb[String(k)] = int(pad_bindings[k])
+	cfg.set_value(SECTION, "pad_bindings", pb)
 	return cfg.save(target) == OK
 
 
@@ -366,10 +385,45 @@ func bind(action: StringName, keycode: int) -> void:
 	changed.emit()
 
 
-## Back to the project's own key for `action`.
+## The same for a pad button: whichever action answered to `button` takes this one's old one.
+func pad_bind(action: StringName, button: int) -> void:
+	last_swapped = &""
+	if not pad_rebindable(action) or not _pad_bindable(button):
+		return
+	var old := pad_button_of(action, pad_bindings)
+	for other in REBINDABLE:
+		if other != action and pad_rebindable(other) and pad_button_of(other, pad_bindings) == button:
+			pad_bindings[other] = old
+			last_swapped = other
+	pad_bindings[action] = button
+	changed.emit()
+
+
+## Back to the project's own key and button for `action`.
 func unbind(action: StringName) -> void:
-	if bindings.erase(action):
+	var a := bindings.erase(action)
+	var b := pad_bindings.erase(action)
+	if a or b:
 		changed.emit()
+
+
+## True when the project gives `action` a pad button (the sticks are not rebound).
+static func pad_rebindable(action: StringName) -> bool:
+	return action in REBINDABLE and pad_button_of(action, {}) >= 0
+
+
+static func _pad_bindable(button: int) -> bool:
+	return button >= 0 and button < JOY_BUTTON_SDL_MAX and not button in PAD_RESERVED
+
+
+## The button `action` answers to now (its binding, else the project's first), or -1.
+static func pad_button_of(action: StringName, binds: Dictionary) -> int:
+	if binds.has(action):
+		return int(binds[action])
+	for e in default_events(action):
+		if e is InputEventJoypadButton:
+			return int((e as InputEventJoypadButton).button_index)
+	return -1
 
 
 ## The key `action` answers to now (its binding, else the project's first key), or 0.
@@ -399,15 +453,24 @@ static func key_label(keycode: int) -> String:
 
 
 ## Put the bindings into the InputMap. Every rebindable action is rebuilt from the
-## project's own events first, so an action whose key was taken, or that went back to its
-## default, never keeps a key it no longer has; mouse and gamepad events stay as authored.
+## project's own events first, so an action whose key or button was taken, or that went back
+## to its default, never keeps one it no longer has; mouse and stick events stay as authored.
 func apply_bindings() -> void:
 	for action in REBINDABLE:
 		if not InputMap.has_action(action):
 			continue
 		for e in InputMap.action_get_events(action):
-			if e is InputEventKey:
+			if e is InputEventKey or e is InputEventJoypadButton:
 				InputMap.action_erase_event(action, e)
+		if pad_bindings.has(action):
+			var pe := InputEventJoypadButton.new()
+			pe.button_index = int(pad_bindings[action]) as JoyButton
+			pe.device = -1
+			InputMap.action_add_event(action, pe)
+		else:
+			for e in default_events(action):
+				if e is InputEventJoypadButton:
+					InputMap.action_add_event(action, e)
 		if bindings.has(action):
 			var ev := InputEventKey.new()
 			ev.physical_keycode = int(bindings[action]) as Key

@@ -386,7 +386,7 @@ func _specs() -> Array:
 	for action in SettingsScript.REBINDABLE:
 		(out[2] as Array).append([StringName("key_" + String(action)),
 			String(SettingsScript.ACTION_NAMES.get(action, String(action))), Kind.KEY,
-			"Select it, then press the new key. Backspace puts the original key back; Esc leaves it as it is. Controller buttons are fixed."])
+			"Select it, then press the new key or controller button. Backspace puts the originals back; Esc or B leaves it as it is."])
 	for pair in [[&"beam", "Magic beam"], [&"look", "Look around"], [&"zoom", "Camera distance"]]:
 		(out[2] as Array).append([StringName("info_" + String(pair[0])), String(pair[1]), Kind.INFO,
 			"Fixed: the mouse and the sticks are not rebound."])
@@ -605,7 +605,11 @@ func _key_caps(key: StringName) -> Array[String]:
 		var action := StringName(k.trim_prefix("key_"))
 		var keyname := "Press a key" if _capturing == action else \
 			SettingsScript.key_label(SettingsScript.key_of(action, draft.bindings))
-		return [keyname, InputDeviceScript.binding_name(action, true)]
+		var padname := InputDeviceScript.binding_name(action, true)
+		if SettingsScript.pad_rebindable(action):
+			padname = "Press a button" if _capturing == action else InputDeviceScript.pad_button_name(
+				SettingsScript.pad_button_of(action, draft.pad_bindings))
+		return [keyname, padname]
 	match key:
 		&"info_beam":
 			return [InputDeviceScript.binding_name(&"beam", false), InputDeviceScript.binding_name(&"beam", true)]
@@ -637,6 +641,24 @@ func _capture_input(event: InputEvent) -> void:
 				# Not in silence (FS8.1): name the action that moved onto the old key.
 				_swap_note = "%s moved to %s." % [SettingsScript.ACTION_NAMES.get(draft.last_swapped,
 					String(draft.last_swapped)), OS.get_keycode_string(SettingsScript.key_of(draft.last_swapped, draft.bindings))]
+		_end_capture()
+		if _swap_note != "" and _info_body != null:
+			_info_body.text = _swap_note
+		return
+	var j := event as InputEventJoypadButton
+	if j != null and j.pressed and j.button_index != JOY_BUTTON_B \
+			and SettingsScript.pad_rebindable(_capturing):
+		draft.pad_bind(_capturing, int(j.button_index))
+		if draft.pad_bindings.get(_capturing, -1) != int(j.button_index):
+			# A reserved button (Guide, the zoom's D-pad): refused, still listening.
+			MenuStyleScript.tick_denied()
+			return
+		MenuStyleScript.tick_confirm()
+		_swap_note = ""
+		if draft.last_swapped != &"":
+			_swap_note = "%s moved to %s." % [SettingsScript.ACTION_NAMES.get(draft.last_swapped,
+				String(draft.last_swapped)), InputDeviceScript.pad_button_name(
+				SettingsScript.pad_button_of(draft.last_swapped, draft.pad_bindings))]
 		_end_capture()
 		if _swap_note != "" and _info_body != null:
 			_info_body.text = _swap_note

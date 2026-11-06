@@ -332,3 +332,51 @@ func test_a_chosen_fov_is_kept() -> void:
 	var s = SettingsScript.new()
 	s.load_from(SCRATCH)
 	assert_almost_eq(s.fov, 90.0, 0.001)
+
+
+## FS8.1 GAMEPAD REBINDING: the buttons move too, by the keyboard's rules. Only an action the
+## project gives a pad button is rebound (the sticks stay as authored); a button another action
+## held moves that action onto the old one; the binds save, and nonsense in the file is dropped.
+func test_a_pad_button_rebinds_and_swaps() -> void:
+	var a := SettingsScript.new()
+	assert_true(SettingsScript.pad_rebindable(&"jump"))
+	assert_false(SettingsScript.pad_rebindable(&"move_forward"), "a stick is not a button")
+	var jump := SettingsScript.pad_button_of(&"jump", {})
+	var talk := SettingsScript.pad_button_of(&"interact", {})
+	a.pad_bind(&"jump", talk)
+	assert_eq(SettingsScript.pad_button_of(&"jump", a.pad_bindings), talk)
+	assert_eq(SettingsScript.pad_button_of(&"interact", a.pad_bindings), jump, "interact took jump's old button")
+	assert_eq(a.last_swapped, &"interact")
+	a.pad_bind(&"move_forward", JOY_BUTTON_A)
+	assert_false(a.pad_bindings.has(&"move_forward"))
+	a.pad_bind(&"jump", JOY_BUTTON_B)
+	assert_eq(SettingsScript.pad_button_of(&"jump", a.pad_bindings), talk, "B backs out of menus, never bound")
+	a.unbind(&"jump")
+	assert_eq(SettingsScript.pad_button_of(&"jump", a.pad_bindings), jump, "the default is back")
+
+
+func test_pad_binds_apply_save_and_load() -> void:
+	var a := SettingsScript.new()
+	a.pad_bind(&"treat", JOY_BUTTON_RIGHT_SHOULDER)
+	a.apply_bindings()
+	var buttons: Array[int] = []
+	for e in InputMap.action_get_events(&"treat"):
+		if e is InputEventJoypadButton:
+			buttons.append(int((e as InputEventJoypadButton).button_index))
+	assert_eq(buttons, [JOY_BUTTON_RIGHT_SHOULDER] as Array[int], "only the new button")
+	a.save_to(SCRATCH)
+	var b := SettingsScript.new()
+	b.load_from(SCRATCH)
+	assert_true(b.differences(a).is_empty(), "differs in %s" % [b.differences(a)])
+	a.unbind(&"treat")
+	a.apply_bindings()
+
+
+func test_a_saved_pad_bind_that_is_nonsense_is_dropped() -> void:
+	var cfg := ConfigFile.new()
+	cfg.set_value(SettingsScript.SECTION, "pad_bindings", {"jump": "banana", "treat": JOY_BUTTON_B,
+		"move_back": JOY_BUTTON_X, "sneak": JOY_BUTTON_Y, "nope": JOY_BUTTON_A})
+	cfg.save(SCRATCH)
+	var b := SettingsScript.new()
+	b.load_from(SCRATCH)
+	assert_eq(b.pad_bindings, {&"sneak": JOY_BUTTON_Y})

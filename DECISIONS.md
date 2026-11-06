@@ -515,3 +515,5 @@ Made without asking, per CLAUDE.md; each is the smallest change that fixes the o
 - **The pause menu opens mid conversation**; the talk box steps aside and comes back.
 - **Toasts live at the bottom centre**, wrap at 900 px, and hold while paused.
 - **The Wheel is a Rust-style tiered wheel** (1x to 20x on 45 segments); Blackjack has real decisions. (The casino agent's own calls are logged above under 2026-11-05.)
+- **Controller rebinding (FS8.1) shares the key row.** Pressing a pad button while a row listens rebinds the button; B always cancels and is never bound, Guide and D-pad up/down (zoom) are reserved, and the sticks stay fixed. Backspace resets both key and button.
+- **The lake's wading floor ramps down at its rim** (2026-11-06): it had made a 0.55 m wall round the lake, found by the endings bot at the Lake pylon.

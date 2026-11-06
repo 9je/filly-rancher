@@ -117,11 +117,17 @@ const MOUSE_NAMES := {MOUSE_BUTTON_LEFT: "Left Click", MOUSE_BUTTON_RIGHT: "Righ
 const PAD_BUTTON_NAMES := {JOY_BUTTON_A: "A", JOY_BUTTON_B: "B", JOY_BUTTON_X: "X",
 	JOY_BUTTON_Y: "Y", JOY_BUTTON_LEFT_SHOULDER: "LB", JOY_BUTTON_RIGHT_SHOULDER: "RB",
 	JOY_BUTTON_LEFT_STICK: "L3", JOY_BUTTON_RIGHT_STICK: "R3", JOY_BUTTON_BACK: "Back",
-	JOY_BUTTON_START: "Start"}
+	JOY_BUTTON_START: "Start", JOY_BUTTON_DPAD_LEFT: "D-pad left",
+	JOY_BUTTON_DPAD_RIGHT: "D-pad right", JOY_BUTTON_DPAD_UP: "D-pad up",
+	JOY_BUTTON_DPAD_DOWN: "D-pad down"}
 const PAD_AXIS_NAMES := {JOY_AXIS_TRIGGER_LEFT: "LT", JOY_AXIS_TRIGGER_RIGHT: "RT"}
 
 
 ## The human name of `action`'s first keyboard/mouse binding (or gamepad one, for a pad).
+static func pad_button_name(button: int) -> String:
+	return String(PAD_BUTTON_NAMES.get(button, "Pad")) if button >= 0 else "-"
+
+
 static func binding_name(action: StringName, pad: bool) -> String:
 	for e: InputEvent in InputMap.action_get_events(action):
 		if pad:

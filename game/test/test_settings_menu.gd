@@ -124,6 +124,16 @@ func test_a_key_row_rebinds_into_the_draft() -> void:
 	assert_eq(int(_settings.bindings.get(&"jump", 0)), KEY_J)
 
 
+func test_a_key_row_takes_a_pad_button_too() -> void:
+	_menu._activate(&"key_jump")
+	var b := InputEventJoypadButton.new()
+	b.pressed = true
+	b.button_index = JOY_BUTTON_Y
+	_menu._capture_input(b)
+	assert_eq(int(_menu.draft.pad_bindings.get(&"jump", -1)), JOY_BUTTON_Y)
+	assert_true(_menu._key_caps(&"key_jump")[1] == "Y", "the row shows the draft's button")
+
+
 func test_resolution_only_moves_when_windowed() -> void:
 	_menu.draft.window_mode = SettingsScript.WindowMode.FULLSCREEN
 	assert_false(_menu._step(&"resolution", 1))
