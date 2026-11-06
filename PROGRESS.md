@@ -13,7 +13,11 @@ Fixed by cause, each with a test that sweeps every instance of its kind. Done so
 - **Knowing where to go** (34, 35, 38, 66): sightings, the lost foal and Rainbow Dash are on the trail and the card; the compass has badges, N E S W, the goal's distance and a behind chevron; townsfolk wear a speech bubble under the crosshair; Spike gives tips.
 - **Economy** (33, 52, 55, 69): a delivery pays a handler's share; food in sacks; a new area opens with a rare; rarer ponies weave in the beam.
 - **Words** (11, 28, 50, 56): Fennel, Pip, the yield letter, the newsletter and the Collector's walk-by.
-- **The casino** (45 to 49): rebuilt by a subagent (in progress at the time of writing).
+- **The casino** (45 to 49): a Rust-style tiered Wheel, slots, Blackjack with Hit/Stand/Double; the sign prints each game's real edge (the Wheel as its range).
+- **The creator** (2 to 7): Surprise me, a gallery of the talents' marks, mane style first, no hair flung on the turntable.
+- **Feel** (9, 12, 16, 21, 44): pause opens mid conversation; fullscreen survives the load; a hard landing bounces; distant ponies keep their eyes and the coy look; the tail no longer stutters.
+- **FS leftovers, 2026-11-06:** controller rebinding (FS8.1); starts, stops and turns (FS4.2, systems/gait_blend.gd); the guide trail reads at play distance (FS1.5); one palette for the kit (FS2.3, seven near-black families lifted). Found on the way: a 0.55 m ledge round the lake (the wading floor), a rear-hoof tap in the settle step, the material audit not knowing a plain coat.
+- **Gates, 2026-11-06:** unit suite 2016/2016; every real-input test passes; both exports build and the Linux build boots. The five-ending bot is retired as a gate (owner: hours for little signal); before retiring, two endings passed on this branch.
 - Two pre-existing headless flakes fixed (the safe render thread in gut_one.sh) and one pre-existing ranch self-check (the crowd ratio).
 
 ## Done
