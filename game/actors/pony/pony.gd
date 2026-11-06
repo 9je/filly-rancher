@@ -920,7 +920,9 @@ func _physics_process(delta: float) -> void:
 	# NOT INTO ANOTHER BODY (PT4): the part of where she wants to go that points into a pony
 	# she already touches is dropped, so she slides along her or stops rather than walking
 	# through her faster than the two can ease apart.
-	var touching := BodySpaceScript.push_on(self)
+	# And not up to one she is about to touch (PS1 item 17b): the step toward a body within
+	# BodySpace.CLEARANCE is dropped too, so a walker turns aside rather than nosing in.
+	var touching := BodySpaceScript.push_on(self) + BodySpaceScript.aside_on(self)
 	if touching != Vector3.ZERO and desired != Vector3.ZERO:
 		var out_of := touching.normalized()
 		var into := desired.dot(-out_of)
@@ -928,6 +930,13 @@ func _physics_process(delta: float) -> void:
 			desired += out_of * into
 	var rate := ACCELERATION if desired.length_squared() > 0.0 else DECELERATION
 	var horizontal := Vector3(velocity.x, 0.0, velocity.z).move_toward(desired, rate * delta)
+	# The speed she already carries is trimmed the same way: easing toward a trimmed wish
+	# still walked her in at her old speed for half a second.
+	if touching != Vector3.ZERO:
+		var out_of := touching.normalized()
+		var carried := horizontal.dot(-out_of)
+		if carried > 0.0:
+			horizontal += out_of * carried
 	velocity.x = horizontal.x
 	velocity.z = horizontal.z
 

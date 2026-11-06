@@ -13,12 +13,18 @@ extends RefCounted
 ## in DECISIONS.md 2026-11-05).
 
 ## How fast an overlap is undone, per second, and the fastest a body is ever slid.
-const STIFFNESS := 5.0
+const STIFFNESS := 10.0
 const MAX_PUSH := 2.0
 ## An adult pony's segment half-length and radius at body scale 1 (from the roster's bodies:
-## about 1.55 m nose to tail root, 0.6 m across the barrel).
+## about 1.55 m nose to tail root, 0.6 m across the barrel). The radius is wider than the
+## barrel because the head is (PS1 item 17b: the Mane Six reach 0.41 to 0.44 m out at the
+## eyes and ears, 0.88 m to the nose; at 0.3 two heads met before their footprints did).
 const HALF := 0.5
-const RADIUS := 0.3
+const RADIUS := 0.36
+## Closer than this (a gap between footprints, metres), a body walking toward another turns
+## aside instead of walking in and being pushed out after (PS1 item 17b: a head went 0.48 m
+## into another pony before the push undid it).
+const CLEARANCE := 0.15
 ## Within this much of a weightless body (the player, a townspony at her spot), nothing is slid
 ## toward it.
 const NEAR_FIXED := 0.6
@@ -28,6 +34,7 @@ const SAME_FLOOR := 3.0
 static var _members: Array[Node3D] = []
 static var _frame := -1
 static var _pushes := {}
+static var _aside := {}
 
 
 static func join(n: Node3D) -> void:
@@ -167,8 +174,16 @@ static func push_on(n: Node3D) -> Vector3:
 	return _pushes.get(n.get_instance_id(), Vector3.ZERO)
 
 
+## The way out from every body within CLEARANCE of `n` (unit length, or zero): a walker drops
+## the part of her step that points the other way, so she slides past rather than in.
+static func aside_on(n: Node3D) -> Vector3:
+	push_on(n)
+	return _aside.get(n.get_instance_id(), Vector3.ZERO)
+
+
 static func _solve() -> void:
 	_pushes.clear()
+	_aside.clear()
 	var fps: Array[Dictionary] = []
 	var owners: Array[int] = []
 	for i in range(_members.size() - 1, -1, -1):
@@ -182,6 +197,7 @@ static func _solve() -> void:
 	var reach := (HALF + RADIUS) * 2.0 * 1.3 + NEAR_FIXED
 	for i in fps.size():
 		var push := Vector3.ZERO
+		var aside := Vector3.ZERO
 		var ai: Vector3 = fps[i].at
 		var fixed: Array[Dictionary] = []
 		for j in fps.size():
@@ -195,7 +211,15 @@ static func _solve() -> void:
 			push += push_between(fps[i], fps[j])
 			if float(fps[j].get("weight", 1.0)) <= 0.0:
 				fixed.append(fps[j])
+			if gap(fps[i], fps[j]) < CLEARANCE:
+				var c := _closest(_ends(fps[i])[0], _ends(fps[i])[1], _ends(fps[j])[0], _ends(fps[j])[1])
+				var away := Vector3(c[0] - c[1])
+				away.y = 0.0
+				if away.length_squared() > 1e-8:
+					aside += away.normalized()
 		if push != Vector3.ZERO and not fixed.is_empty():
 			push = _spare_the_fixed(fps[i], push, fixed)
 		if push != Vector3.ZERO:
 			_pushes[owners[i]] = push.limit_length(MAX_PUSH)
+		if aside != Vector3.ZERO:
+			_aside[owners[i]] = aside.normalized()
