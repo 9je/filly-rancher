@@ -1,0 +1,373 @@
+{
+  "bits": 1234,
+  "book": {
+    "bloomed": [],
+    "delivered": [],
+    "talents": {},
+    "variants": {}
+  },
+  "casino": {
+    "chips": 0
+  },
+  "compendium": {
+    "stock_bold": 1,
+    "stock_shy": 1
+  },
+  "gems": {},
+  "inventory": {},
+  "ledger": {
+    "balance": 25000,
+    "beam_recalled_until": -1,
+    "delivered_this_period": 0,
+    "padlocked_slots": [],
+    "pending_punishment": 0,
+    "pending_punishment_cycle": -1,
+    "periods_run": 0,
+    "quota": 2,
+    "revoked_permits": [],
+    "shipments": 0,
+    "tier": 0
+  },
+  "novelty": [
+    {
+      "id": "letter_sunny_mailbox",
+      "kind": "story",
+      "label": "Letter: Your mailbox is installed",
+      "t": 0.0
+    },
+    {
+      "id": "first_escape",
+      "kind": "event",
+      "label": "An Escape Artist hopped the Paddock fence",
+      "t": 0.0
+    }
+  ],
+  "onboarding": {
+    "done": {
+      "build": 3
+    }
+  },
+  "play_seconds": 0.0,
+  "player": {
+    "coat": 3,
+    "eyes": 4,
+    "mane": 1,
+    "mane2": -1,
+    "mane_style": 0,
+    "mark_png": "",
+    "name": "Twilight",
+    "race": 2,
+    "tail": -1
+  },
+  "plots": {
+    "slot_1": "pen_small",
+    "slot_2": "pen_grand"
+  },
+  "ponies": [
+    {
+      "bloom": 0.0,
+      "caught_at_ms": 0,
+      "data_id": "applejack",
+      "favorite_glow": 0.0,
+      "happiness": 0.5,
+      "home_slot": "",
+      "hunger": 0.0,
+      "nickname": "",
+      "stock": {},
+      "uid": "applejack#000009"
+    },
+    {
+      "bloom": 0.0,
+      "caught_at_ms": 0,
+      "data_id": "rarity",
+      "favorite_glow": 0.0,
+      "happiness": 0.5,
+      "home_slot": "",
+      "hunger": 0.0,
+      "nickname": "",
+      "stock": {},
+      "uid": "rarity#000010"
+    },
+    {
+      "bloom": 0.0,
+      "caught_at_ms": 0,
+      "data_id": "pinkiepie",
+      "favorite_glow": 0.0,
+      "happiness": 0.5,
+      "home_slot": "",
+      "hunger": 0.0,
+      "nickname": "",
+      "stock": {},
+      "uid": "pinkiepie#000011"
+    },
+    {
+      "bloom": 0.0,
+      "caught_at_ms": 0,
+      "data_id": "rainbowdash",
+      "favorite_glow": 0.0,
+      "happiness": 0.5,
+      "home_slot": "",
+      "hunger": 0.0,
+      "nickname": "",
+      "stock": {},
+      "uid": "rainbowdash#000012"
+    },
+    {
+      "bloom": 0.0,
+      "caught_at_ms": 0,
+      "data_id": "trixie",
+      "favorite_glow": 0.0,
+      "happiness": 0.5,
+      "home_slot": "",
+      "hunger": 0.0,
+      "nickname": "",
+      "stock": {},
+      "uid": "trixie#000013"
+    },
+    {
+      "bloom": 0.0,
+      "caught_at_ms": 0,
+      "data_id": "lyra",
+      "favorite_glow": 0.0,
+      "happiness": 0.5,
+      "home_slot": "",
+      "hunger": 0.0,
+      "nickname": "",
+      "stock": {},
+      "uid": "lyra#000014"
+    },
+    {
+      "bloom": 0.0,
+      "caught_at_ms": 0,
+      "data_id": "bonbon",
+      "favorite_glow": 0.0,
+      "happiness": 0.5,
+      "home_slot": "",
+      "hunger": 0.0,
+      "nickname": "",
+      "stock": {},
+      "uid": "bonbon#000015"
+    },
+    {
+      "bloom": 0.0,
+      "caught_at_ms": 0,
+      "data_id": "vinylscratch",
+      "favorite_glow": 0.0,
+      "happiness": 0.5,
+      "home_slot": "",
+      "hunger": 0.0,
+      "nickname": "",
+      "stock": {},
+      "uid": "vinylscratch#000016"
+    },
+    {
+      "bloom": 0.0,
+      "caught_at_ms": 0,
+      "data_id": "carrottop",
+      "favorite_glow": 0.0,
+      "happiness": 0.5,
+      "home_slot": "",
+      "hunger": 0.0,
+      "nickname": "",
+      "stock": {},
+      "uid": "carrottop#000017"
+    },
+    {
+      "bloom": 0.0,
+      "caught_at_ms": 0,
+      "data_id": "berrypunch",
+      "favorite_glow": 0.0,
+      "happiness": 0.5,
+      "home_slot": "",
+      "hunger": 0.0,
+      "nickname": "",
+      "stock": {},
+      "uid": "berrypunch#000018"
+    },
+    {
+      "bloom": 0.0,
+      "caught_at_ms": 0,
+      "data_id": "minuette",
+      "favorite_glow": 0.0,
+      "happiness": 0.5,
+      "home_slot": "",
+      "hunger": 0.0,
+      "nickname": "",
+      "stock": {},
+      "uid": "minuette#000019"
+    },
+    {
+      "bloom": 0.0,
+      "caught_at_ms": 0,
+      "data_id": "sweetiebelle",
+      "favorite_glow": 0.0,
+      "happiness": 0.5,
+      "home_slot": "",
+      "hunger": 0.0,
+      "nickname": "",
+      "stock": {},
+      "uid": "sweetiebelle#000020"
+    },
+    {
+      "bloom": 0.0,
+      "caught_at_ms": 0,
+      "data_id": "twilight",
+      "favorite_glow": 0.0,
+      "happiness": 0.5,
+      "home_slot": "slot_1",
+      "hunger": 0.0,
+      "nickname": "",
+      "stock": {},
+      "uid": "twilight#000005"
+    },
+    {
+      "bloom": 0.0,
+      "caught_at_ms": 0,
+      "data_id": "derpyhooves",
+      "favorite_glow": 0.0,
+      "happiness": 0.5,
+      "home_slot": "slot_1",
+      "hunger": 0.0,
+      "nickname": "",
+      "stock": {},
+      "uid": "derpyhooves#000006"
+    },
+    {
+      "bloom": 0.0,
+      "caught_at_ms": 0,
+      "data_id": "fluttershy",
+      "favorite_glow": 0.0,
+      "happiness": 0.5,
+      "home_slot": "slot_2",
+      "hunger": 0.0,
+      "nickname": "",
+      "stock": {},
+      "uid": "fluttershy#000007"
+    },
+    {
+      "bloom": 0.0,
+      "caught_at_ms": 0,
+      "data_id": "octavia",
+      "favorite_glow": 0.0,
+      "happiness": 0.5,
+      "home_slot": "slot_2",
+      "hunger": 0.0,
+      "nickname": "",
+      "stock": {},
+      "uid": "octavia#000008"
+    }
+  ],
+  "requests": [
+    {
+      "draw_counter": 0,
+      "seed": 20721716
+    },
+    {
+      "character": "",
+      "count": 1,
+      "done": false,
+      "id": "tutorial_catch",
+      "kind": 0,
+      "paid": false,
+      "personality": -1,
+      "progress": 0,
+      "rarity": -1,
+      "reward_bits": 20,
+      "reward_food": "",
+      "reward_food_count": 0,
+      "subject": "",
+      "text": "Catch a pony with your magic beam.",
+      "zone": ""
+    },
+    {
+      "character": "",
+      "count": 1,
+      "done": false,
+      "id": "tutorial_pen",
+      "kind": 1,
+      "paid": false,
+      "personality": -1,
+      "progress": 0,
+      "rarity": -1,
+      "reward_bits": 30,
+      "reward_food": "",
+      "reward_food_count": 0,
+      "subject": "",
+      "text": "Move a pony into a pen.",
+      "zone": ""
+    },
+    {
+      "character": "",
+      "count": 1,
+      "done": false,
+      "id": "tutorial_sell",
+      "kind": 2,
+      "paid": false,
+      "personality": -1,
+      "progress": 0,
+      "rarity": -1,
+      "reward_bits": 50,
+      "reward_food": "",
+      "reward_food_count": 0,
+      "subject": "",
+      "text": "Sell a gem at the market.",
+      "zone": ""
+    }
+  ],
+  "story": {
+    "chapter": 0,
+    "collection_days": 0,
+    "deliveries": 0,
+    "flags": {},
+    "last_named": {},
+    "mail": [
+      {
+        "id": "sunny_mailbox",
+        "params": {
+          "balance": 25000,
+          "chosen": "your pony",
+          "colour": "a colour",
+          "count": 0,
+          "name": "Twilight",
+          "pony": "your pony",
+          "quota": 2
+        },
+        "read": false,
+        "reply": ""
+      }
+    ],
+    "named_deliveries": 0,
+    "requisition_cycle": -1,
+    "survey_choice": {},
+    "survey_period": -1,
+    "vars": {
+      "decor": [
+        "hay_bales"
+      ],
+      "escaped_tonight": [
+        {
+          "data_id": "scootaloo",
+          "instance": {
+            "bloom": 0.0,
+            "caught_at_ms": 0,
+            "data_id": "scootaloo",
+            "favorite_glow": 0.0,
+            "happiness": 0.5,
+            "home_slot": "",
+            "hunger": 0.0,
+            "nickname": "",
+            "stock": {},
+            "uid": "scootaloo#000004"
+          },
+          "slot": "slot_1",
+          "uid": "scootaloo#000004"
+        }
+      ]
+    }
+  },
+  "talk": {},
+  "unlocks": [],
+  "version": 5,
+  "world_seed": 20721716,
+  "world_time": 0.0
+}

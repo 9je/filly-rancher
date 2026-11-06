@@ -3,7 +3,13 @@
 ## Owner direction (2026-10-22)
 Canon MLP stays: real names, looks and places ("lean into mlp fully", private build). The roster de-canon was reverted; the Company is the Cloudsdale Weather Corporation, the cloud palace is the Rainbow Factory, the town is Ponyville. The OC story cast lives alongside the canon ponies.
 
-## Overnight sweep, 2026-11-05 (the owner's 70-item playtest, docs/playtest-2026-11-05.md; PLAN.md section PT)
+## Playtest sweep PS, 2026-11-06 (PLAN.md section PS; the ledger is docs/playtest-2026-11-05-ledger.md)
+The PT section below claimed items that were not met; the owner's audit found nine not done and four unverified. Every item re-opened under a ledger; a row moves only with evidence (a test of the owner's words or a render at the owner's screenshot spot), and only the PS13 acceptance reviewer marks MET.
+- **PS0 (ledger and harness):** ledger of 84 rows (70 items, Marigold, 12 known gaps), `test_ledger_complete`; `scenes/test/playtest_shots.gd --item=N` renders 16 poses matched by eye to the owner's world screenshots, day and night-in-rain (before renders in build/ps_evidence/before/); the old-save fixture and `test_old_save_loads`. That test found an Escape Artist home on a load not counted as owned (a second of her could spawn), and the same cause in the Survey's picker; both fixed.
+- **PS1 item 17 (in progress):** the body never rolls (probe: torso at most 18 degrees from rest, lean at most 3.1, on slopes, in the beam, dropped, in full pens). Two causes found: the Mane Six's borrowed graze and sleep folded the head joint 66 degrees (fixed: the turn is shared down the two neck bones, 50% and 90%, looked at against the donor), and a full pen piles everyone into one overlapping heap at night (open; items 65 and 17b, PT had claimed them).
+- **Found on the way:** `test_casino_rounds` (wheel) flakes in a full run: an unseeded wheel can bust the 500-chip purse in 30 spins. Pre-existing (06b3d47).
+
+## Overnight sweep, 2026-11-05 (the owner's 70-item playtest; PLAN.md section PT) -- SUPERSEDED: these claims were not all true; see PS above
 Fixed by cause, each with a test that sweeps every instance of its kind. Done so far:
 - **Bodies keep their space** (17, 19, 65, 10, 13, 18): ponies are a footprint along their length (systems/body_space.gd) and ease apart; residents never bolt in their pen, whose leash now reaches the whole paddock; Tumble heels behind and beside you. The "twisted Twilight" was another pony inside her.
 - **A solid world** (31, 41, 43, 57, 58, 61, 68): every doorway sealed; anyone inside a building is set down outside it; lakes are waded under opaque water; the regions' hay, crates and baskets are solid; Tumble catches up past a fence.

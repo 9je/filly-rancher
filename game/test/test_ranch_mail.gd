@@ -295,3 +295,17 @@ func test_the_archive_page_says_what_it_is() -> void:
 	assert_false(PauseMenu.MAIL_ARCHIVE_NOTE.is_empty())
 	assert_false(PauseMenu.MAIL_ARCHIVE_NOTE.contains("--"))
 	assert_false(PauseMenu.MAIL_ARCHIVE_NOTE.contains(char(0x2014)))
+
+
+## PS0 (same cause as _owned_named_ids): the roster in GameState is written at a save, so a
+## pony caught since the last save was missing from the Survey's "which of your ponies"
+## picker, and naming her was refused.
+func test_the_survey_can_name_a_pony_caught_since_the_last_save() -> void:
+	for i in range(StoryScript.WEATHER_DELIVERIES):
+		_state.story.note_delivery(false, "Pony", &"")
+	_ranch.advance_story()
+	var caught = PonyInstanceScript.create(&"octavia")
+	assert_true(_ranch.player.get_magic_beam().get_storage().store(caught))
+	var uids: Array = _ranch.owned_rows().map(func(r: Dictionary) -> String: return String(r["uid"]))
+	assert_has(uids, String(caught.uid), "the pony in the saddlebag is offered")
+	assert_true(_ranch.answer_mail(&"weather_survey", String(caught.uid)), "and can be named")

@@ -42,6 +42,9 @@ func _live_deal() -> Dictionary:
 func test_a_wheel_spin_takes_every_stake_and_pays_only_the_tier_it_lands_on() -> void:
 	var bets: Array[int] = [20, 10, 0, 0, 10]
 	for i in 30:
+		# Topped up each spin: the wheel is unseeded, and twelve losses in a row emptied the
+		# 500-chip purse, so the thirtieth spin was refused in about one full run in three.
+		_ranch._game_state.casino.add_chips(40)
 		var before: int = _chips()
 		var spun: Dictionary = _ranch.play_wheel(bets)
 		assert_true(bool(spun["ok"]))

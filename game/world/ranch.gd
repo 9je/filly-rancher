@@ -4092,6 +4092,28 @@ func mail_rows() -> Array[Dictionary]:
 	return out
 
 
+## Every pony she owns right now, once each: the pens and the saddlebag as they stand, and
+## the saved roster for anyone in neither (an Escape Artist out for the night). The roster
+## alone is only as fresh as the last save (PS0: a pony caught since was nobody's).
+func _owned_instances() -> Array[PonyInstance]:
+	var out: Array[PonyInstance] = []
+	var seen := {}
+	var live: Array[PonyInstance] = []
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen != null:
+			live.append_array(pen.ponies())
+	if player != null and player.get_magic_beam() != null:
+		live.append_array(player.get_magic_beam().get_storage().contents())
+	if _game_state != null:
+		live.append_array(_game_state.get_ponies())
+	for inst: PonyInstance in live:
+		if not seen.has(inst.uid):
+			seen[inst.uid] = true
+			out.append(inst)
+	return out
+
+
 ## EVERY PONY SHE OWNS, for the Survey's picker: the ones in pens, the ones in the
 ## saddlebag, all of them, because the question is "which of your ponies", not "which of the
 ## ponies you happen to have penned".
@@ -4099,7 +4121,7 @@ func owned_rows() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	if _game_state == null:
 		return out
-	for inst: PonyInstance in _game_state.get_ponies():
+	for inst: PonyInstance in _owned_instances():
 		out.append({
 			"uid": String(inst.uid),
 			"name": inst.display_name(),
@@ -4135,8 +4157,10 @@ func answer_mail(id: StringName, choice: String) -> bool:
 	if beat == null or beat.reply_index() == StoryBeatScript.Reply.NONE:
 		return false
 	if beat.reply_index() == StoryBeatScript.Reply.PICK_PONY:
-		var picked: PonyInstance = _game_state.find_pony(StringName(choice)) \
-			if _game_state != null else null
+		var picked: PonyInstance = null
+		for inst: PonyInstance in _owned_instances():
+			if String(inst.uid) == choice:
+				picked = inst
 		if picked == null:
 			return false
 		if not story.record_reply(id, choice):
@@ -8729,6 +8753,17 @@ func _owned_named_ids() -> Array:
 				ids.append(inst.data_id)
 		for d: Dictionary in _game_state.story.get_var(ESCAPED_VAR, []):
 			ids.append(StringName(str(d.get("data_id", ""))))
+	# The pens themselves, not only the roster: GameState's list is written at a save, so a
+	# pony penned since (an Escape Artist home at dawn, or home on a load after a night quit,
+	# whose record was only ever the escaped list) was nobody's, and the wild got a second of
+	# her (PS0's old-save test; items 39, 63, 70).
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen == null:
+			continue
+		for inst: PonyInstance in pen.ponies():
+			if not inst.is_stock():
+				ids.append(inst.data_id)
 	if player != null and player.get_magic_beam() != null:
 		for inst: PonyInstance in player.get_magic_beam().get_storage().contents():
 			if not inst.is_stock():

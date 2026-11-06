@@ -23,6 +23,14 @@ const MANE_SIX_MAP := {
 	"DEF_Thigh.R": "RightThigh", "DEF_RearUpperLeg.R": "RightLeg1", "DEF_RearLowerLeg.R": "RightLeg2", "DEF_RearHoof.R": "RightFoot",
 	"DEF_Tail1-1": "TailBase", "DEF_Tail1-2": "Tail1", "DEF_Tail1-3": "Tail2", "DEF_Tail1-4": "Tail3",
 }
+## HER NECK CARRIES HER HEAD DOWN (PS1 item 17, "Twilight twisted at a broken angle"). The
+## donor's clips lower the head at the skull joint alone (Lyra's graze keys Head, never Neck),
+## and carried bone for bone that whole bend landed on one joint of a rig whose head pivot sits
+## elsewhere in the skull: 68 degrees there folded her muzzle into her chest. Each neck bone
+## here takes this share of the head's turn beyond the neck's own, measured from the chest end,
+## so the head ends where the clip puts it and the bend is spread over three joints.
+const NECK_SHARE := {"DEF_Neck1": 0.5, "DEF_Neck2": 0.9}
+
 ## The pony whose clips are carried across: an adult mare, so the proportions are a mare's.
 const DONOR := "res://data/ponies/lyra.tres"
 const FPS := 30.0
@@ -83,6 +91,19 @@ static func _locals_for(src: Skeleton3D, src_now: Array[Transform3D], src_ref: A
 	# Each skeleton sits in its own turned space inside its model (the two rigs were exported
 	# with different rotations): a source turn is carried through model space.
 	var to_tgt := tgt_space.inverse() * src_space
+	# Every mapped bone's world turn away from its reference pose, in the target's space.
+	var deltas := {}
+	for name: String in map:
+		var s := src.find_bone(String(map[name]))
+		if s >= 0 and tgt.find_bone(name) >= 0:
+			var delta := _q(src_now[s].basis) * _q(src_ref[s].basis).inverse()
+			deltas[name] = to_tgt * delta * to_tgt.inverse()
+	if deltas.has("DEF_Neck1") and deltas.has("DEF_Head"):
+		var neck: Quaternion = deltas["DEF_Neck1"]
+		var beyond: Quaternion = (neck.inverse() * (deltas["DEF_Head"] as Quaternion)).normalized()
+		for name: String in NECK_SHARE:
+			if tgt.find_bone(name) >= 0:
+				deltas[name] = (neck * Quaternion.IDENTITY.slerp(beyond, float(NECK_SHARE[name]))).normalized()
 	var g := {}
 	for i in tgt.get_bone_count():
 		var parent := tgt.get_bone_parent(i)
@@ -90,13 +111,9 @@ static func _locals_for(src: Skeleton3D, src_now: Array[Transform3D], src_ref: A
 		var ref_parent := _q(tgt_ref[parent].basis) if parent >= 0 else Quaternion.IDENTITY
 		var local := (ref_parent.inverse() * _q(tgt_ref[i].basis)).normalized()
 		var name := tgt.get_bone_name(i)
-		if map.has(name):
-			var s := src.find_bone(String(map[name]))
-			if s >= 0:
-				var delta := _q(src_now[s].basis) * _q(src_ref[s].basis).inverse()
-				delta = to_tgt * delta * to_tgt.inverse()
-				local = (pg.inverse() * (delta * _q(tgt_ref[i].basis))).normalized()
-				out[name] = local
+		if deltas.has(name):
+			local = (pg.inverse() * ((deltas[name] as Quaternion) * _q(tgt_ref[i].basis))).normalized()
+			out[name] = local
 		g[i] = pg * local
 	return out
 
@@ -146,8 +163,8 @@ static func bake(donor: Node3D, target: Node3D, map: Dictionary = MANE_SIX_MAP) 
 		a.length = src_clip.length
 		a.loop_mode = src_clip.loop_mode
 		var tracks := {}
-		for t: String in map:
-			if tgt_sk.find_bone(t) < 0:
+		for t: String in map.keys() + NECK_SHARE.keys():
+			if tgt_sk.find_bone(t) < 0 or tracks.has(t):
 				continue
 			var ti := a.add_track(Animation.TYPE_ROTATION_3D)
 			a.track_set_path(ti, NodePath("%s:%s" % [sk_path, t]))
@@ -166,7 +183,7 @@ static func bake(donor: Node3D, target: Node3D, map: Dictionary = MANE_SIX_MAP) 
 			for tr in tgt_idle.get_track_count():
 				var bone_name := String(tgt_idle.track_get_path(tr)).get_slice(":", 1)
 				var kind := tgt_idle.track_get_type(tr)
-				if tgt_idle.track_get_key_count(tr) == 0 or (map.has(bone_name) and kind == Animation.TYPE_ROTATION_3D) \
+				if tgt_idle.track_get_key_count(tr) == 0 or (tracks.has(bone_name) and kind == Animation.TYPE_ROTATION_3D) \
 						or (body_bone >= 0 and bone_name == tgt_sk.get_bone_name(body_bone) and kind == Animation.TYPE_POSITION_3D):
 					continue
 				if kind != Animation.TYPE_ROTATION_3D and kind != Animation.TYPE_POSITION_3D:
