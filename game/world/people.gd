@@ -169,6 +169,11 @@ func candidates(at: Vector3) -> Array[Dictionary]:
 	for id: StringName in npcs:
 		var n: Node3D = npcs[id]
 		var d := Vector2(at.x - n.global_position.x, at.z - n.global_position.z).length()
+		# A COMPANION WITH NOTHING NEW IS TALKED TO ONLY WHEN LOOKED AT (PT4; playtest
+		# 2026-11-05 item 18: aiming at Twilight, the prompt read "E: talk to Tumble").
+		if d < best_d and (n as Npc).mode == NpcScript.Mode.FOLLOW and not has_news(id) \
+				and not _looked_at(n):
+			continue
 		if d < best_d:
 			best_d = d
 			best = id
@@ -186,6 +191,24 @@ func candidates(at: Vector3) -> Array[Dictionary]:
 			c["companion"] = true
 		out.append(c)
 	return out
+
+
+## Whether the camera is turned toward `n` (within LOOK_CONE of straight ahead, flat).
+## True with no camera (headless), so the rule above never hides anybody from a test.
+const LOOK_CONE := 0.9
+
+
+func _looked_at(n: Node3D) -> bool:
+	var cam := get_viewport().get_camera_3d() if is_inside_tree() else null
+	if cam == null:
+		return true
+	var to := n.global_position - cam.global_position
+	var fwd := -cam.global_transform.basis.z
+	to.y = 0.0
+	fwd.y = 0.0
+	if to.length_squared() < 1e-6 or fwd.length_squared() < 1e-6:
+		return true
+	return to.normalized().dot(fwd.normalized()) > LOOK_CONE
 
 
 ## Start talking to `id` (or the character called `display`). Returns false if she has

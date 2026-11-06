@@ -289,12 +289,15 @@ func _physics_process(delta: float) -> void:
 	match mode:
 		Mode.FOLLOW:
 			if follow_target != null and is_instance_valid(follow_target):
-				var to := follow_target.global_position - global_position
+				var heel := _heel_point()
+				var to := heel - global_position
 				to.y = 0.0
 				var d := to.length()
-				if d > follow_distance:
+				# At a heel spot she settles on it; following the player herself she keeps off.
+				var stop := HEEL_STOP if heel != follow_target.global_position else follow_distance
+				if d > stop:
 					var speed := run_speed if d > follow_distance * 3.0 else walk_speed * 1.4
-					desired = to.normalized() * minf(speed, (d - follow_distance) * 2.0 + 0.4)
+					desired = to.normalized() * minf(speed, (d - stop) * 2.0 + 0.4)
 				_catch_up(d, delta)
 		Mode.WALK_TO:
 			var to2 := walk_target - global_position
@@ -366,6 +369,31 @@ func _catch_up(gap: float, delta: float) -> void:
 			break
 	_best_gap = INF
 	_stalled = 0.0
+
+
+## AT HER HEEL, NOT IN THE SHOT (PT4; playtest 2026-11-05 item 18: "tumble gets in the way
+## when i catch ponies"). Following, she makes for a spot behind the player and to one side,
+## as the camera sees it, so she is never between the lens and what the player aims at. The
+## side is whichever she is already on. With no camera (a test) it is the player herself.
+const HEEL_BACK := 1.1
+const HEEL_SIDE := 1.5
+const HEEL_STOP := 0.6
+
+
+func _heel_point() -> Vector3:
+	var at := follow_target.global_position
+	var cam := get_viewport().get_camera_3d() if is_inside_tree() else null
+	if cam == null or DisplayServer.get_name() == "headless":
+		return at
+	var back := cam.global_transform.basis.z
+	back.y = 0.0
+	if back.length_squared() < 1e-6:
+		return at
+	back = back.normalized()
+	var side := back.cross(Vector3.UP)
+	if (global_position - at).dot(side) < 0.0:
+		side = -side
+	return at + back * HEEL_BACK + side * HEEL_SIDE
 
 
 func _clear_at(at: Vector3) -> bool:
