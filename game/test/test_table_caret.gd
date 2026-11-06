@@ -97,32 +97,14 @@ func test_the_blackjack_table_marks_the_stake_it_is_backing_before_and_after_a_h
 		"after a hand the focus must still be on the same stake, not up in the result")
 
 
-func test_the_wheel_marks_the_guess_it_is_backing_before_and_after_a_spin() -> void:
+func test_the_wheel_keeps_its_focus_on_the_same_tier_across_a_spin() -> void:
 	var menu: CanvasLayer = await _open(WheelMenuScene)
-	var before_id: String = String(menu.call("focused_id"))
-	assert_ne(before_id, "", "before any spin the wheel is already focused on something real")
-	if CasinoStagesTestScript.STAGED.has("res://ui/wheel_menu.tscn"):
-		assert_eq(before_id, "guess:0", "before any spin the focus is on the first bet")
-	var spun: Array[String] = [WheelScript.pocket_text(7), "The house takes that one."]
-	menu.call("show_result", spun)
-	var after_id: String = String(menu.call("focused_id"))
-	assert_eq(after_id, before_id,
-		"after a spin the focus must still be on the same bet, not up in the result")
-
-
-## And it follows the cursor all the way onto the stake row, which is the row that only
-## exists because of the other half of this fix. See test_wheel_menu.gd.
-func test_the_wheel_s_caret_follows_the_cursor_onto_the_stake_row() -> void:
-	var menu: CanvasLayer = await _open(WheelMenuScene)
-	var spun: Array[String] = [WheelScript.pocket_text(7), "The house takes that one."]
-	menu.call("show_result", spun)
-	var before_move: String = String(menu.call("focused_id"))
-	menu.call("move_selection", int(menu.call("guess_count")))
-	var after_move: String = String(menu.call("focused_id"))
-	assert_ne(after_move, before_move,
-		"one press past the last colour must move the focus off the bet it was on")
-	if CasinoStagesTestScript.STAGED.has("res://ui/wheel_menu.tscn"):
-		assert_eq(after_move, "stake:0", "one press past the last colour is the stake row")
+	assert_eq(String(menu.call("focused_id")), "tier:0", "the felt opens on the first tier")
+	menu.call("add_bet", 0)
+	menu.call("show_spin", 7, 0, 10)
+	menu.call("finish_animation")
+	assert_eq(String(menu.call("focused_id")), "tier:0",
+		"a spin does not move the cursor off what she was pointing at")
 
 
 ## THE RING IS SOMEWHERE, and it is somewhere on the panel. A focus_rect() of zero size is a

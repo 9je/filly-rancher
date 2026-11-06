@@ -32,7 +32,6 @@ const RaceCardScript := preload("res://systems/race_card.gd")
 const CasinoSignScript := preload("res://systems/casino_sign.gd")
 const CompanyRunnersScript := preload("res://systems/company_runners.gd")
 const CasinoMenuScript := preload("res://ui/casino_menu.gd")
-const WheelMenuScript := preload("res://ui/wheel_menu.gd")
 
 ## THE ONE SOURCE OF TRUTH FOR WHICH SCREENS ARE STAGED. Read directly off
 ## game/test/test_casino_stages.gd's own STAGED constant rather than kept as a second copy
@@ -136,22 +135,23 @@ func _measure_the_games() -> void:
 	_set_check("the slots converge on their published edge",
 		absf(slots_edge - SlotsScript.house_edge()) <= EDGE_TOLERANCE)
 
+	# THE BIG WHEEL (2026-11-05): every tier, backed at once, against its own counted edge.
+	# The sign prints the worst tier, so each tier is checked against its own number.
 	rng.seed = WHEEL_SEED
-	returned = 0
-	var number_returned := 0
+	var tier_returned: Array[int] = [0, 0, 0, 0, 0]
 	for i in PLAYS:
-		var pocket: int = WheelScript.spin(rng)
-		returned += WheelScript.payout(WheelScript.Bet.COLOUR, WheelScript.Colour.BLUE,
-			pocket, STAKE)
-		number_returned += WheelScript.payout(WheelScript.Bet.NUMBER, 17, pocket, STAKE)
-	var colour_edge: float = 1.0 - float(returned) / float(PLAYS * STAKE)
-	var number_edge: float = 1.0 - float(number_returned) / float(PLAYS * STAKE)
-	print("CASINO wheel plays=%d colour=%.4f number=%.4f published=%.4f"
-		% [PLAYS, colour_edge, number_edge, WheelScript.house_edge()])
-	_set_check("a colour bet converges on the published edge",
-		absf(colour_edge - WheelScript.house_edge()) <= EDGE_TOLERANCE)
-	_set_check("a number bet converges on the same published edge",
-		absf(number_edge - WheelScript.house_edge()) <= EDGE_TOLERANCE)
+		var segment: int = WheelScript.spin(rng)
+		for tier: int in WheelScript.TIERS:
+			var bets: Array[int] = WheelScript.empty_bets()
+			bets[tier] = STAKE
+			tier_returned[tier] += WheelScript.payout(bets, segment)
+	for tier: int in WheelScript.TIERS:
+		var tier_edge: float = 1.0 - float(tier_returned[tier]) / float(PLAYS * STAKE)
+		print("CASINO wheel %s plays=%d measured=%.4f counted=%.4f"
+			% [WheelScript.TIER_LABELS[tier], PLAYS, tier_edge, WheelScript.tier_edge(tier)])
+		_set_check("a %s bet converges on its counted edge" % WheelScript.TIER_LABELS[tier],
+			absf(tier_edge - WheelScript.tier_edge(tier))
+				<= EDGE_TOLERANCE * (1.0 if tier < WheelScript.Tier.TEN else 3.0))
 
 	var blackjack_edge: float = BlackjackScript.measure_edge(BLACKJACK_SEED, PLAYS)
 	print("CASINO blackjack hands=%d measured=%.4f placard=%.4f"
@@ -384,42 +384,43 @@ func _drive_the_palace() -> void:
 	settled = true
 	for i in 40:
 		var before: int = state.casino.chips
-		var bet: Dictionary = ranch.play_wheel(WheelScript.Bet.COLOUR, WheelScript.Colour.RED,
-			50)
+		var wheel_bets: Array[int] = WheelScript.empty_bets()
+		wheel_bets[WheelScript.Tier.ONE] = 30
+		wheel_bets[WheelScript.Tier.TEN] = 20
+		var bet: Dictionary = ranch.play_wheel(wheel_bets)
 		if not bool(bet["ok"]) or state.casino.chips != before - 50 + int(bet["won"]):
 			settled = false
 	_set_check("every wheel bet settles at exactly the stake out and the win in", settled)
 
-	# --- one wheel bet, driven through the menu seam end to end (Task 6 review addition) ---
-	# WheelMenu.Tab is COLOUR first and Wheel.Bet is NUMBER first (see wheel_menu.gd's own
-	# class comment); ranch._on_wheel_bet_requested() is the one place that translates
-	# between them. Nothing above exercises that translation from the menu's own side, so a
-	# future re-ordering of either enum would still pass every check above it while quietly
-	# paying a colour bet at 24x instead of 6x. This drives the felt itself: open the table,
-	# pick the COLOUR tab, confirm, repeat until a win is seen, and check what it paid.
+	# --- one wheel bet, driven through the menu seam end to end ---------------------------
+	# The felt stacks chips on a tier and Spin sends the whole set; this drives that from the
+	# menu's own side, so a felt whose tier order drifted from Wheel.Tier would pay a 3x bet
+	# at some other tier's price and fail here.
 	var wheel_table: CanvasLayer = ranch.get_table_menu(CasinoMenuScript.Row.WHEEL)
 	_set_check("the wheel opens as a table", wheel_table != null and bool(wheel_table.call("open")))
 	var menu_win_seen := false
 	var menu_win_correct := true
 	if wheel_table != null:
-		wheel_table.call("set_tab", WheelMenuScript.Tab.COLOUR)
-		wheel_table.call("set_stake_index", 0)
+		wheel_table.call("clear_bets")
+		wheel_table.call("set_chip", 0)
+		wheel_table.call("add_bet", WheelScript.Tier.THREE)
 		for i in MENU_WHEEL_ATTEMPTS:
-			var stake_played: int = int(wheel_table.call("selected_stake"))
+			var stake_played: int = int(wheel_table.call("total_bet"))
 			if stake_played <= 0:
 				break
 			var before: int = state.casino.chips
-			if not bool(wheel_table.call("confirm")):
+			if not bool(wheel_table.call("spin")):
 				break
+			wheel_table.call("finish_animation")
 			var won: int = state.casino.chips - before + stake_played
 			if won > 0:
 				menu_win_seen = true
-				if won != (WheelScript.COLOUR_PAYS_TO_ONE + 1) * stake_played:
+				if won != (WheelScript.MULTIPLIERS[WheelScript.Tier.THREE] + 1) * stake_played:
 					menu_win_correct = false
 		wheel_table.call("close")
-	_set_check("a colour bet driven through the menu seam wins at least once in this run",
+	_set_check("a 3x bet driven through the menu seam wins at least once in this run",
 		menu_win_seen)
-	_set_check("a colour bet driven through the menu seam pays colour odds, not number odds",
+	_set_check("a 3x bet driven through the menu seam pays 3 to 1, not another tier's price",
 		menu_win_correct)
 
 	settled = true

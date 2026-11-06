@@ -23,10 +23,10 @@ extends RefCounted
 ## to the front of the undealt tail and take it. One swap per card rather than fifty two per
 ## hand, which is what lets the gate deal a hundred thousand hands in seconds.
 ##
-## NO DOUBLING, NO SPLITTING, NO INSURANCE, ON PURPOSE. Every one of them is a second
-## decision the player has to be taught, a second row on the placard, and a second thing the
-## published number would have to be conditioned on. The Palace keeps it simple and says so
-## on the placard.
+## DOUBLING YES, SPLITTING AND INSURANCE NO (2026-11-05). The table gained real decisions
+## (game/systems/blackjack_round.gd): Hit, Stand, and Double on the first two cards. A split is
+## a second hand the felt would have to lay out and insurance is a side bet on the dealer's
+## hole card; neither was asked for, and both stay off the placard.
 ##
 ## Static only; play_hand() takes the caller's RandomNumberGenerator. Preload by path.
 
@@ -100,72 +100,23 @@ static func is_blackjack(cards: Array[int]) -> bool:
 	return cards.size() == 2 and hand_total(cards) == 21
 
 
-## Deal and play one hand by the placard's rules. Returns
+## Deal and play one hand BY THE HOUSE STRATEGY CARD. Returns
 ## {"player": Array[int], "dealer": Array[int], "outcome": int}.
 ##
-## THE ORDER OF THE CHECKS IS THE RULES. A blackjack on either side settles before anybody
-## draws; a player who busts loses whatever the dealer then does, which is where the house's
-## advantage actually comes from at this table.
+## THE TABLE NO LONGER PLAYS THIS FOR HER. Since the 2026-11-05 playtest she makes her own
+## decisions through game/systems/blackjack_round.gd; this is the reference player the
+## published edge is measured against, and it plays through that same class so the measured
+## dealer and the dealer she sits down with are one piece of code. The card never doubles.
 static func play_hand(rng: RandomNumberGenerator) -> Dictionary:
-	var deck: Array[int] = []
-	for card in DECK_SIZE:
-		deck.append(card)
-	var dealt := 0
-
-	var player: Array[int] = []
-	var dealer: Array[int] = []
-	for i in 2:
-		var picked := rng.randi_range(dealt, DECK_SIZE - 1)
-		var swap: int = deck[dealt]
-		deck[dealt] = deck[picked]
-		deck[picked] = swap
-		player.append(deck[dealt])
-		dealt += 1
-		picked = rng.randi_range(dealt, DECK_SIZE - 1)
-		swap = deck[dealt]
-		deck[dealt] = deck[picked]
-		deck[picked] = swap
-		dealer.append(deck[dealt])
-		dealt += 1
-
-	var player_natural := is_blackjack(player)
-	var dealer_natural := is_blackjack(dealer)
-	if player_natural or dealer_natural:
-		var settled: int = Outcome.PUSH
-		if player_natural and not dealer_natural:
-			settled = Outcome.PLAYER_BLACKJACK
-		elif dealer_natural and not player_natural:
-			settled = Outcome.DEALER_WIN
-		return {"player": player, "dealer": dealer, "outcome": settled}
-
-	while hand_total(player) < STRATEGY_DRAWS_BELOW and dealt < DECK_SIZE:
-		var picked := rng.randi_range(dealt, DECK_SIZE - 1)
-		var swap: int = deck[dealt]
-		deck[dealt] = deck[picked]
-		deck[picked] = swap
-		player.append(deck[dealt])
-		dealt += 1
-	if hand_total(player) > 21:
-		return {"player": player, "dealer": dealer, "outcome": Outcome.DEALER_WIN}
-
-	while hand_total(dealer) < DEALER_STANDS_ON and dealt < DECK_SIZE:
-		var picked := rng.randi_range(dealt, DECK_SIZE - 1)
-		var swap: int = deck[dealt]
-		deck[dealt] = deck[picked]
-		deck[picked] = swap
-		dealer.append(deck[dealt])
-		dealt += 1
-	if hand_total(dealer) > 21:
-		return {"player": player, "dealer": dealer, "outcome": Outcome.PLAYER_WIN}
-
-	var mine: int = hand_total(player)
-	var theirs: int = hand_total(dealer)
-	var result: int = Outcome.PUSH
-	if mine > theirs:
-		result = Outcome.PLAYER_WIN
-	elif mine < theirs:
-		result = Outcome.DEALER_WIN
-	return {"player": player, "dealer": dealer, "outcome": result}
+	var hand: RefCounted = (load("res://systems/blackjack_round.gd") as GDScript) \
+		.call("deal", rng, REFERENCE_STAKE)
+	while not bool(hand.call("is_settled")) \
+			and int(hand.call("player_total")) < STRATEGY_DRAWS_BELOW:
+		hand.call("hit")
+	if not bool(hand.call("is_settled")):
+		hand.call("stand")
+	return {"player": hand.get("player"), "dealer": hand.get("dealer"),
+		"outcome": int(hand.get("outcome"))}
 
 
 ## Chips handed back, THE STAKE INCLUDED; 0 for a loss. See Slots.payout() for the contract
@@ -228,13 +179,13 @@ static func outcome_text(hand: Dictionary) -> String:
 ## The placard on the table. Player facing, so no dashes.
 static func placard_lines() -> Array[String]:
 	return [
-		"Blackjack, Spectra Palace house rules",
 		"One deck, shuffled before every hand.",
+		"The dealer's second card stays face down until you stand.",
 		"Dealer draws to 16 and stands on %d, hard or soft." % DEALER_STANDS_ON,
 		"Blackjack pays %d to %d. A tie is a push."
 			% [BLACKJACK_PAYS_NUMERATOR, BLACKJACK_PAYS_DENOMINATOR],
-		"No doubling, no splitting, no insurance. We keep it simple.",
-		"House strategy card: draw below %d, stand on %d or more."
-			% [STRATEGY_DRAWS_BELOW, STRATEGY_DRAWS_BELOW],
-		"The edge on the lobby sign is measured against that card.",
+		"Double on your first two cards: twice the stake, one more card.",
+		"No splitting, no insurance.",
+		"The lobby sign's edge is for the house card: draw below %d, never double."
+			% STRATEGY_DRAWS_BELOW,
 	]

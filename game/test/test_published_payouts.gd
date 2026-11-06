@@ -42,10 +42,6 @@ const STAKE := 100
 ## What _quoted_return() answers for a line that names no price at all.
 const NO_PRICE := -1.0
 
-## The pocket the wheel's checks settle on. Any pocket from 1 up does; 7 is in the second
-## colour band, so the colour bet and the number bet are genuinely different guesses.
-const WHEEL_POCKET := 7
-
 var _to_one: RegEx = null
 var _for_one: RegEx = null
 
@@ -129,29 +125,29 @@ func test_every_price_on_the_slot_machine_s_paytable_is_what_the_reels_actually_
 		"one priced line per triple, plus the two rainbow lines")
 
 
-func test_every_price_on_the_wheel_s_rules_is_what_the_pocket_actually_pays() -> void:
+func test_every_price_on_the_wheel_s_rules_is_what_the_segment_actually_pays() -> void:
 	var checked := 0
 	for line in WheelScript.rules_lines():
 		for clause in _clauses(line):
 			var quoted: float = _quoted_return(clause)
 			if quoted < 0.0:
 				continue
-			var lower: String = clause.to_lower()
-			var names_number: bool = lower.contains("number")
-			var names_colour: bool = lower.contains("colour")
-			assert_true(names_number != names_colour,
-				"a priced rule must name exactly one of the wheel's two bets: '%s'" % clause)
-			if names_number == names_colour:
+			var tier: int = -1
+			for t: int in WheelScript.TIERS:
+				if clause.begins_with(WheelScript.TIER_LABELS[t] + " "):
+					tier = t
+			assert_true(tier >= 0,
+				"a priced rule must name exactly one of the wheel's tiers: '%s'" % clause)
+			if tier < 0:
 				continue
-			var kind: int = WheelScript.Bet.NUMBER if names_number else WheelScript.Bet.COLOUR
-			var guess: int = WHEEL_POCKET if names_number \
-				else WheelScript.colour_of(WHEEL_POCKET)
-			var paid: int = WheelScript.payout(kind, guess, WHEEL_POCKET, STAKE)
+			var bets: Array[int] = WheelScript.empty_bets()
+			bets[tier] = STAKE
+			var paid: int = WheelScript.payout(bets, WheelScript.LAYOUT.find(tier))
 			assert_eq(paid, roundi(quoted * float(STAKE)),
 				"'%s' promises %.2f x %d chips back; the winning bet pays %d"
 					% [clause, quoted, STAKE, paid])
 			checked += 1
-	assert_gte(checked, 2, "the felt prices a number bet and a colour bet, at the least")
+	assert_eq(checked, WheelScript.TIERS, "the rules price every tier on the wheel")
 
 
 func test_every_price_on_the_blackjack_placard_is_what_the_table_actually_pays() -> void:

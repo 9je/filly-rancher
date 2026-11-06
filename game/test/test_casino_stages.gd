@@ -130,6 +130,13 @@ func test_the_focus_follows_the_cursor_across_every_row_of_every_tab() -> void:
 			var seen: Dictionary = {}
 			var rows: int = int(menu.call("row_count")) if menu.has_method("row_count") \
 				else int(menu.call("_row_count"))
+			# A FELT BUTTON THAT IS GREYED OUT IS SKIPPED BY THE CURSOR (game/ui/casino_table.gd):
+			# an empty Spin or Clear is not a place the keyboard can stand.
+			if menu.has_method("stage_buttons"):
+				rows = 0
+				for button: Dictionary in menu.call("stage_buttons"):
+					if bool(button.get("enabled", true)):
+						rows += 1
 			for row: int in rows:
 				menu.call("move_selection", 1 if row > 0 else 0)
 				await get_tree().process_frame

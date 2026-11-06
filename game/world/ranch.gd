@@ -175,7 +175,6 @@ const SlotsScript := preload("res://systems/slots.gd")
 const WheelScript := preload("res://systems/wheel.gd")
 const BlackjackScript := preload("res://systems/blackjack.gd")
 const CasinoMenuScript := preload("res://ui/casino_menu.gd")
-const WheelMenuScript := preload("res://ui/wheel_menu.gd")
 const RaceCardScript := preload("res://systems/race_card.gd")
 const RaceTrackScript := preload("res://world/race_track.gd")
 const CompanyRunnersScript := preload("res://systems/company_runners.gd")
@@ -3374,26 +3373,24 @@ func play_slots(stake: int) -> Dictionary:
 	return {"ok": true, "reels": reels, "won": won, "stake": stake}
 
 
-## ONE SPIN OF THE WHEEL. `kind` is a Wheel.Bet value and `guess` is a colour or a pocket
-## number; see Wheel.payout(), which is the only thing that interprets either.
-func play_wheel(kind: int, guess: int, stake: int) -> Dictionary:
-	var refused := {"ok": false, "pocket": -1, "won": 0, "stake": 0}
-	if _game_state == null or not _game_state.casino.can_stake(stake):
+## ONE SPIN OF THE WHEEL. `bets[t]` is the stake on Wheel tier t (1x, 3x, 5x, 10x, 20x);
+## Wheel.payout() is the only thing that interprets it. Every stake comes out together,
+## before the spin, the same take-then-roll order every table here keeps.
+func play_wheel(bets: Array) -> Dictionary:
+	var refused := {"ok": false, "segment": -1, "won": 0, "stake": 0}
+	var staked: int = WheelScript.total_staked(bets)
+	if _game_state == null or not _game_state.casino.can_stake(staked):
 		return refused
-	if not _game_state.casino.remove_chips(stake):
+	if not _game_state.casino.remove_chips(staked):
 		return refused
-	var pocket: int = WheelScript.spin(_casino_rng)
-	var won: int = WheelScript.payout(kind, guess, pocket, stake)
+	var segment: int = WheelScript.spin(_casino_rng)
+	var won: int = WheelScript.payout(bets, segment)
 	if won > 0:
 		_game_state.casino.add_chips(won)
-	if wheel_menu != null and wheel_menu.has_method("show_result"):
-		var lines: Array[String] = [WheelScript.pocket_text(pocket),
-			"You win %d chips." % won if won > 0 else "The house takes that one."]
-		wheel_menu.call("show_result", lines)
 	if wheel_menu != null and wheel_menu.has_method("show_spin"):
-		wheel_menu.call("show_spin", pocket, won, stake)
+		wheel_menu.call("show_spin", segment, won, staked)
 	_refresh_casino_menus()
-	return {"ok": true, "pocket": pocket, "won": won, "stake": stake}
+	return {"ok": true, "segment": segment, "won": won, "stake": staked}
 
 
 ## ONE HAND. The player plays the strategy card on the placard, so the whole hand settles in
@@ -3644,18 +3641,9 @@ func _on_spin_requested(stake: int) -> void:
 	play_slots(stake)
 
 
-## TRANSLATES A FELT TAB INTO A Wheel.Bet VALUE before the bet ever reaches play_wheel().
-## WheelMenu.Tab is COLOUR-first because that is the felt's own reading order
-## (game/ui/wheel_menu.gd); Wheel.Bet is NUMBER-first because that is the order
-## game/systems/wheel.gd's own comment writes it out in. The menu never touches Wheel, so
-## this is the one seam where the two numberings meet, and it is here rather than folded
-## into play_wheel() so a gate calling play_wheel() directly (as test-8's does) can pass a
-## genuine Wheel.Bet value and mean it.
-func _on_wheel_bet_requested(kind: int, guess: int, stake: int) -> void:
-	var bet_kind: int = WheelScript.Bet.COLOUR if kind == WheelMenuScript.Tab.COLOUR \
-		else WheelScript.Bet.NUMBER
+func _on_wheel_bet_requested(bets: Array) -> void:
 	_novelty("mechanic", "first_casino", "First game at the casino")
-	play_wheel(bet_kind, guess, stake)
+	play_wheel(bets)
 
 
 func _on_deal_requested(stake: int) -> void:

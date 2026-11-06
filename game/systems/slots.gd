@@ -1,6 +1,6 @@
 class_name Slots
 extends RefCounted
-## THE FAST ONE. Three reels, one strip of sixteen symbols, and a paytable, with the whole
+## THE FAST ONE. Three reels, a strip of sixteen symbols on each, and a paytable, with the whole
 ## of it enumerable: sixteen cubed is 4096 equally likely position triples, so the return to
 ## player is a fraction this file can WORK OUT rather than a number somebody measured once
 ## and typed onto a sign.
@@ -33,13 +33,26 @@ enum Symbol { APPLE, HORSESHOE, BELL, GEM, STAR, RAINBOW }
 ## How many reels spin. Three, and named, because payout() indexes the array it is handed.
 const REELS := 3
 
-## Positions on one reel. All three reels share the same strip; a different strip per reel
-## would buy nothing except an enumeration nobody could check by hand.
+## Positions on one reel.
 const REEL_SIZE := 16
 
-## Positions given to each symbol, indexed by Symbol. Sums to REEL_SIZE, which
+## Positions given to each symbol ON EVERY REEL, indexed by Symbol. Sums to REEL_SIZE, which
 ## test_slots.gd asserts rather than trusts.
 const STRIP_COUNTS: Array[int] = [5, 4, 3, 2, 1, 1]
+
+## THE REAL STRIPS, one per reel, top to bottom, as Symbol values. The owner's playtest
+## (2026-11-05: "the first 2 reels had all 3 the same if its one line why") saw three apples
+## stacked in one window: the old single strip was sorted, five apples in a row, so a window
+## showing three adjacent positions showed one symbol three times and read as rigged. These
+## strips hold the same counts (so the enumeration below, and the edge on the sign, are
+## unchanged to the last chip) in an order where ANY THREE ADJACENT POSITIONS, wrapping round,
+## are three different symbols; test_slots.gd checks every window of every reel. Three
+## different orders, so the reels do not move in lockstep.
+const REEL_STRIPS: Array = [
+	[1, 0, 2, 1, 0, 4, 1, 0, 3, 2, 5, 0, 1, 2, 0, 3],
+	[1, 0, 3, 2, 0, 1, 2, 0, 1, 2, 4, 0, 1, 5, 0, 3],
+	[1, 0, 5, 4, 0, 2, 1, 0, 3, 1, 0, 3, 2, 1, 0, 2],
+]
 
 ## What three of a kind pays, as a multiple of the stake, indexed by Symbol.
 const TRIPLE_PAYS: Array[int] = [4, 10, 27, 55, 150, 450]
@@ -55,8 +68,17 @@ const ONE_RAINBOW_PAY := 1
 const SYMBOL_NAMES: Array[String] = ["Apple", "Horseshoe", "Bell", "Gem", "Star", "Rainbow"]
 
 
-## One reel's symbols, in strip order. Built rather than authored so it cannot drift from
-## STRIP_COUNTS.
+## Reel `reel`'s symbols, in strip order, top to bottom. An index off the machine answers the
+## first reel rather than erroring.
+static func reel_strip(reel: int) -> Array[int]:
+	var out: Array[int] = []
+	for symbol in REEL_STRIPS[clampi(reel, 0, REELS - 1)]:
+		out.append(int(symbol))
+	return out
+
+
+## Every symbol one reel holds, counted rather than ordered: the multiset every reel shares.
+## What the enumeration walks, since the order on a strip changes nothing about the odds.
 static func strip() -> Array[int]:
 	var out: Array[int] = []
 	for symbol in STRIP_COUNTS.size():
@@ -65,14 +87,13 @@ static func strip() -> Array[int]:
 	return out
 
 
-## Three symbols, one per reel, drawn uniformly over the strip's positions. Uniform over
-## POSITIONS and not over symbols, which is what makes the enumeration in return_to_player()
-## correct.
+## Three symbols, one per reel, each drawn uniformly over ITS OWN strip's positions. Uniform
+## over POSITIONS and not over symbols, and every strip holds STRIP_COUNTS, which is what makes
+## the enumeration in return_to_player() correct.
 static func spin(rng: RandomNumberGenerator) -> Array[int]:
-	var reel: Array[int] = strip()
 	var out: Array[int] = []
 	for i in REELS:
-		out.append(reel[rng.randi_range(0, REEL_SIZE - 1)])
+		out.append(int(REEL_STRIPS[i][rng.randi_range(0, REEL_SIZE - 1)]))
 	return out
 
 
@@ -96,14 +117,13 @@ static func payout(reels: Array[int], stake: int) -> int:
 
 
 ## The exact long run return per unit staked, by walking every one of the REEL_SIZE cubed
-## equally likely position triples. 4096 iterations, so this is cheap enough to call from a
+## equally likely position triples of the three real strips. 4096 iterations, so this is cheap enough to call from a
 ## sign that is being drawn.
 static func return_to_player() -> float:
-	var reel: Array[int] = strip()
 	var total := 0
-	for a in reel:
-		for b in reel:
-			for c in reel:
+	for a in reel_strip(0):
+		for b in reel_strip(1):
+			for c in reel_strip(2):
 				total += payout([a, b, c], 1)
 	return float(total) / float(REEL_SIZE * REEL_SIZE * REEL_SIZE)
 

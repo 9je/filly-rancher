@@ -21,6 +21,39 @@ func test_the_strip_is_sixteen_positions_and_holds_every_symbol() -> void:
 	assert_eq(counts, SlotsScript.STRIP_COUNTS, "the strip is exactly what STRIP_COUNTS says")
 
 
+## EVERY REEL HOLDS THE SAME SIXTEEN SYMBOLS, so the odds are the old odds; only the order
+## changed, and the order is what the window shows.
+func test_every_real_reel_strip_holds_exactly_the_published_counts() -> void:
+	assert_eq(SlotsScript.REEL_STRIPS.size(), SlotsScript.REELS)
+	for reel: int in SlotsScript.REELS:
+		var strip: Array[int] = SlotsScript.reel_strip(reel)
+		assert_eq(strip.size(), SlotsScript.REEL_SIZE, "reel %d" % reel)
+		var counts: Array[int] = [0, 0, 0, 0, 0, 0]
+		for symbol in strip:
+			counts[symbol] += 1
+		assert_eq(counts, SlotsScript.STRIP_COUNTS, "reel %d holds the published counts" % reel)
+
+
+## THE PLAYTEST BUG ("2 spins in a row where the first 2 reels had all 3 the same"): a window
+## shows three adjacent positions, and on every reel every three adjacent positions, wrapping
+## round, must be three different symbols.
+func test_every_window_on_every_reel_shows_three_different_symbols() -> void:
+	for reel: int in SlotsScript.REELS:
+		var strip: Array[int] = SlotsScript.reel_strip(reel)
+		for top: int in strip.size():
+			var a: int = strip[top]
+			var b: int = strip[(top + 1) % strip.size()]
+			var c: int = strip[(top + 2) % strip.size()]
+			assert_true(a != b and b != c and a != c,
+				"reel %d positions %d to %d show %d %d %d" % [reel, top, top + 2, a, b, c])
+
+
+func test_the_three_reels_do_not_share_one_order() -> void:
+	assert_ne(SlotsScript.reel_strip(0), SlotsScript.reel_strip(1))
+	assert_ne(SlotsScript.reel_strip(1), SlotsScript.reel_strip(2))
+	assert_ne(SlotsScript.reel_strip(0), SlotsScript.reel_strip(2))
+
+
 func test_three_of_a_kind_pays_the_paytable_and_a_losing_line_pays_nothing() -> void:
 	assert_eq(SlotsScript.payout([SlotsScript.Symbol.APPLE, SlotsScript.Symbol.APPLE,
 		SlotsScript.Symbol.APPLE], 10), 40)
@@ -73,24 +106,27 @@ func test_the_same_seed_spins_the_same_reels() -> void:
 		assert_eq(SlotsScript.spin(a), SlotsScript.spin(b))
 
 
-func test_a_long_seeded_run_converges_on_the_published_edge() -> void:
-	## Seed picked by search rather than by date: three payouts sit at 55, 150 and 450
-	## times the stake, so the payout distribution is fat tailed and the measured edge
-	## over twenty thousand spins swings several points either way depending on how many
-	## of those rare lines land. This seed was checked to land 0.0008 from the published
-	## edge, comfortably inside the assertion's tolerance; most seeds at this sample size
-	## do not.
+## THE SPIN IS UNIFORM OVER EACH REEL'S POSITIONS, which together with the exact enumeration
+## above is the whole proof that the sign is honest. This used to measure the edge itself over
+## twenty thousand spins from a seed picked by search, and that is not a test: three lines pay
+## 55, 150 and 450 times the stake, so one standard error at that sample is five points, and
+## the per reel strips (2026-11-05) moved the seed's luck. Symbol frequencies have no fat tail,
+## so they are checked instead, per reel, against STRIP_COUNTS / 16.
+func test_each_reel_lands_on_its_symbols_in_the_published_proportions() -> void:
 	var rng := RandomNumberGenerator.new()
-	rng.seed = 183
-	var staked := 0
-	var returned := 0
+	rng.seed = 20261105
+	var seen: Array = [[0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]]
 	for i in SAMPLE_SPINS:
-		staked += 100
-		returned += SlotsScript.payout(SlotsScript.spin(rng), 100)
-	var measured: float = 1.0 - (float(returned) / float(staked))
-	assert_almost_eq(measured, SlotsScript.house_edge(), 0.02,
-		"the sign is honest: measured %.4f against a published %.4f"
-			% [measured, SlotsScript.house_edge()])
+		var line: Array[int] = SlotsScript.spin(rng)
+		for reel: int in SlotsScript.REELS:
+			seen[reel][line[reel]] += 1
+	for reel: int in SlotsScript.REELS:
+		for symbol: int in SlotsScript.STRIP_COUNTS.size():
+			var measured: float = float(seen[reel][symbol]) / float(SAMPLE_SPINS)
+			var expected: float = float(SlotsScript.STRIP_COUNTS[symbol]) \
+				/ float(SlotsScript.REEL_SIZE)
+			assert_almost_eq(measured, expected, 0.012,
+				"reel %d symbol %d" % [reel, symbol])
 
 
 func test_every_paytable_line_is_printable_and_carries_no_dashes() -> void:

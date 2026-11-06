@@ -15,6 +15,7 @@ extends GutTest
 const PaintScript := preload("res://ui/casino_paint.gd")
 const SlotsScript := preload("res://systems/slots.gd")
 const WheelScript := preload("res://systems/wheel.gd")
+const MenuStyleScript := preload("res://ui/menu_style.gd")
 
 ## An off origin, non square box, deliberately. A glyph authored against a unit square at the
 ## origin passes a containment test at (0, 0, 1, 1) by accident.
@@ -98,11 +99,41 @@ func test_every_slot_symbol_and_every_lobby_room_has_a_glyph() -> void:
 	pass_test("every glyph the enums name drew without erroring")
 
 
-## ONE RAINBOW, THREE PLACES. The wheel's bands, the six race lanes and the slots RAINBOW
-## symbol are the same six colours in the same order, so the building reads as one building.
-func test_the_band_colours_are_one_per_wheel_colour_in_rainbow_order() -> void:
-	assert_eq(PaintScript.BAND_COLORS.size(), int(WheelScript.Colour.HOUSE),
-		"one band per colour a bet may name, and none for the house pocket")
+## ONE RAINBOW, TWO PLACES. The six race lanes and the slots RAINBOW symbol are the same six
+## colours in the same order, so the building reads as one building; the wheel has its own
+## five tier colours, one per tier.
+func test_the_band_colours_are_a_rainbow_and_the_tiers_have_one_colour_each() -> void:
+	assert_eq(PaintScript.BAND_COLORS.size(), 6)
+	assert_eq(PaintScript.TIER_COLOURS.size(), WheelScript.TIERS)
+
+
+## NOTHING DRAWN SPILLS, AT ANY TEXT SIZE (playtest 2026-11-05: a rules box cut off on the
+## right, a banner's words out of their plate). fit_size() and paragraph_size() are what every
+## casino stage sizes its words with; both must land inside the box at 100, 125 and 150.
+func test_fitted_text_and_wrapped_paragraphs_stay_in_their_boxes_at_every_text_size() -> void:
+	var font: Font = MenuStyleScript.title_font()
+	var lines: Array[String] = WheelScript.rules_lines()
+	for scale: float in [1.0, 1.25, 1.5]:
+		MenuStyleScript.text_scale = scale
+		var px: int = PaintScript.fit_size(font, "Dealer busts", 44, 300.0)
+		assert_lte(font.get_string_size("Dealer busts", HORIZONTAL_ALIGNMENT_LEFT, -1, px).x,
+			300.0, "scale %.2f" % scale)
+		var box := Vector2(420.0, 300.0)
+		var para: int = PaintScript.paragraph_size(font, lines, 22, box)
+		assert_lte(PaintScript.paragraph_height(font, lines, para, box.x), box.y,
+			"scale %.2f: the rules fit their card" % scale)
+		assert_gte(para, PaintScript.MIN_FIT_PX)
+	MenuStyleScript.text_scale = 1.0
+
+
+func test_a_bigger_text_size_draws_bigger_where_there_is_room() -> void:
+	var font: Font = MenuStyleScript.title_font()
+	MenuStyleScript.text_scale = 1.0
+	var small: int = PaintScript.fit_size(font, "Hit", 28, 400.0)
+	MenuStyleScript.text_scale = 1.5
+	var big: int = PaintScript.fit_size(font, "Hit", 28, 400.0)
+	MenuStyleScript.text_scale = 1.0
+	assert_gt(big, small, "the setting reaches the felt")
 
 
 ## THE CHIP COLOURS AND THE STAKES ARE THE SAME LIST. A fourth stake with no chip colour

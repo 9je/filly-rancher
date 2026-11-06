@@ -60,6 +60,18 @@ const BAND_COLORS: Array[Color] = [
 	Color(0.60, 0.38, 0.82),
 ]
 
+## THE BIG WHEEL'S FIVE TIER COLOURS, indexed by Wheel.Tier (1x, 3x, 5x, 10x, 20x), the way
+## the Rust wheel colours its own: the common tier a warm gold, the jackpot a red you can see
+## across the room. Here rather than on the wheel's felt so the lobby tile paints the same
+## wheel the table does.
+const TIER_COLOURS: Array[Color] = [
+	Color(0.96, 0.78, 0.26),
+	Color(0.30, 0.72, 0.42),
+	Color(0.27, 0.55, 0.92),
+	Color(0.63, 0.38, 0.88),
+	Color(0.92, 0.24, 0.30),
+]
+
 ## Hearts, diamonds, spades, clubs, in the order Blackjack's own card index implies:
 ## card / Blackjack.RANKS. See game/ui/blackjack_menu.gd on why that is presentation only.
 const SUIT_COLORS: Array[Color] = [CARD_RED, CARD_RED, CARD_INK, CARD_INK]
@@ -192,6 +204,114 @@ static func text(ci: CanvasItem, font: Font, at: Vector2, string: String, size: 
 	ci.draw_string_outline(font, at, string, align, max_width, size,
 		MenuStyleScript.OUTLINE_SIZE, MenuStyleScript.OUTLINE_COLOR)
 	ci.draw_string(font, at, string, align, max_width, size, colour)
+
+
+## THE TEXT SIZE SETTING REACHES THE FELT, AND NOTHING SPILLS (2026-11-05). The owner's
+## playtest saw a rules box cut off on the right and a banner whose words ran out of their
+## plate: draw_string() with a max width CLIPS, silently. So every drawn label on a casino
+## stage now goes through fit_size(): the size the player asked for (Settings.text_size, via
+## MenuStyle.font_px()), shrunk a pixel at a time until the string fits the width it was given.
+## A label can get smaller to fit its box; it can never get out of it.
+const MIN_FIT_PX := 9
+
+
+static func fit_size(font: Font, string: String, size: int, max_width: float) -> int:
+	var px: int = MenuStyleScript.font_px(size)
+	if font == null or max_width <= 0.0:
+		return px
+	while px > MIN_FIT_PX and font.get_string_size(string, HORIZONTAL_ALIGNMENT_LEFT, -1,
+			px).x > max_width:
+		px -= 1
+	return px
+
+
+## The same, bounded in height too, for a label that has a box rather than a line.
+static func fit_box_size(font: Font, string: String, size: int, box: Vector2) -> int:
+	var px: int = fit_size(font, string, size, box.x)
+	while px > MIN_FIT_PX and font.get_height(px) > box.y:
+		px -= 1
+	return px
+
+
+## ONE LABEL, CENTRED IN ITS BOX VERTICALLY, aligned in it horizontally, fitted to it in both
+## directions. The workhorse of every drawn screen in the Palace since the rebuild.
+static func label(ci: CanvasItem, font: Font, box: Rect2, string: String, size: int,
+		colour: Color, align: int = HORIZONTAL_ALIGNMENT_CENTER) -> void:
+	if font == null or string.is_empty():
+		return
+	var px: int = fit_box_size(font, string, size, box.size)
+	var ascent: float = font.get_ascent(px)
+	var height: float = ascent + font.get_descent(px)
+	var baseline: float = box.position.y + (box.size.y - height) * 0.5 + ascent
+	ci.draw_string(font, Vector2(box.position.x, baseline), string, align, box.size.x, px,
+		colour)
+
+
+## THE SIZE A WRAPPED BLOCK OF LINES IS DRAWN AT so that all of it fits `box`: each line
+## wraps at the box's width, and the whole block shrinks until its height fits too. Pure, so
+## test_casino_paint.gd can ask it at every text size the settings offer.
+const PARAGRAPH_GAP := 0.45
+
+
+static func paragraph_size(font: Font, lines: Array[String], size: int, box: Vector2) -> int:
+	var px: int = MenuStyleScript.font_px(size)
+	while px > MIN_FIT_PX and paragraph_height(font, lines, px, box.x) > box.y:
+		px -= 1
+	return px
+
+
+static func paragraph_height(font: Font, lines: Array[String], px: int, width: float) -> float:
+	var total := 0.0
+	for i: int in lines.size():
+		total += font.get_multiline_string_size(lines[i], HORIZONTAL_ALIGNMENT_LEFT, width,
+			px).y
+		if i < lines.size() - 1:
+			total += float(px) * PARAGRAPH_GAP
+	return total
+
+
+## A wrapped block of lines, top left at `box.position`, never wider or taller than `box`.
+## Returns the pixel size it settled on.
+static func paragraph(ci: CanvasItem, font: Font, box: Rect2, lines: Array[String],
+		size: int, colour: Color) -> int:
+	if font == null or lines.is_empty():
+		return 0
+	var px: int = paragraph_size(font, lines, size, box.size)
+	var y: float = box.position.y + font.get_ascent(px)
+	for line: String in lines:
+		ci.draw_multiline_string(font, Vector2(box.position.x, y), line,
+			HORIZONTAL_ALIGNMENT_LEFT, box.size.x, px, -1, colour)
+		y += font.get_multiline_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, box.size.x,
+			px).y + float(px) * PARAGRAPH_GAP
+	return px
+
+
+## A PRESSABLE BUTTON ON THE FELT: a glossy pill with its caption fitted inside. `lit` is the
+## hover or focus state, `enabled` false greys it out. The focus ring is drawn by the caller
+## with focus_ring(), the one focus treatment, so this never draws a second one.
+static func button(ci: CanvasItem, rect: Rect2, caption: String, fill: Color, enabled: bool,
+		lit: bool, press: float = 0.0) -> void:
+	var body: Rect2 = rect
+	if press > 0.0:
+		body = Rect2(rect.position + Vector2(0.0, 3.0 * press), rect.size)
+	var colour: Color = fill if enabled else Color(0.32, 0.30, 0.34)
+	if lit and enabled:
+		colour = colour.lightened(0.12)
+	var radius: float = minf(body.size.y * 0.5, 22.0)
+	# A drop under the pill, then the pill, then a gloss band on its top half: three rects,
+	# and it reads as a thing that goes down when pressed.
+	rounded(ci, Rect2(body.position + Vector2(0.0, 5.0), body.size), radius,
+		Color(0.0, 0.0, 0.0, 0.35), Color(0, 0, 0, 0), 0.0)
+	rounded(ci, body, radius, colour, colour.darkened(0.35) if enabled else GOLD_DIM.darkened(0.4),
+		2.0)
+	rounded(ci, Rect2(body.position + Vector2(6.0, 4.0),
+		Vector2(body.size.x - 12.0, body.size.y * 0.42)), radius * 0.8,
+		Color(1.0, 1.0, 1.0, 0.16 if enabled else 0.05), Color(0, 0, 0, 0), 0.0)
+	var ink: Color = CARD_INK if colour.get_luminance() > 0.55 else Color(1.0, 0.98, 0.92)
+	if not enabled:
+		ink = Color(1.0, 1.0, 1.0, 0.40)
+	label(ci, MenuStyleScript.title_font(), body.grow_individual(-14.0, -6.0, -14.0, -6.0),
+		caption, 28, ink)
 
 
 ## THE ONE FOCUS TREATMENT IN THE WHOLE CASINO. Every focusable thing on every screen gets
@@ -448,13 +568,19 @@ static func draw_room(ci: CanvasItem, box: Rect2, row: int) -> void:
 				rounded(ci, window, 4.0, Color(0.06, 0.05, 0.09), GOLD_DIM, 1.0)
 				draw_symbol(ci, window.grow(-2.0), i + 1)
 		2:
-			for band: int in BAND_COLORS.size():
-				var from_angle: float = TAU * float(band) / float(BAND_COLORS.size())
-				var to_angle: float = TAU * float(band + 1) / float(BAND_COLORS.size())
+			# The big wheel in miniature: fifteen slices in the tier colours, a third of the
+			# real wheel's forty five, in the same proportions near enough.
+			var slices: Array[int] = [4, 0, 1, 0, 2, 0, 3, 0, 1, 0, 2, 0, 1, 0, 3]
+			ci.draw_circle(_at(box, 0.5, 0.5), box.size.y * 0.47, GOLD_DIM)
+			for i: int in slices.size():
+				var from_angle: float = TAU * float(i) / float(slices.size()) - PI * 0.5
+				var to_angle: float = TAU * float(i + 1) / float(slices.size()) - PI * 0.5
 				ci.draw_colored_polygon(sector_points(_at(box, 0.5, 0.5),
-					box.size.y * 0.16, box.size.y * 0.44, from_angle, to_angle),
-					BAND_COLORS[band])
+					box.size.y * 0.14, box.size.y * 0.44, from_angle, to_angle),
+					TIER_COLOURS[slices[i]])
 			ci.draw_circle(_at(box, 0.5, 0.5), box.size.y * 0.14, GOLD)
+			ci.draw_colored_polygon(PackedVector2Array([_at(box, 0.44, 0.0),
+				_at(box, 0.56, 0.0), _at(box, 0.5, 0.14)]), GOLD)
 		3:
 			for i: int in 3:
 				var card := Rect2(_at(box, 0.22 + 0.16 * float(i), 0.22),

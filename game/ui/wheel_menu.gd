@@ -1,210 +1,266 @@
 class_name WheelMenu
-extends "res://ui/table_menu.gd"
-## THE WHEEL'S FELT. Two tabs because there are two bets: back a colour or back a number.
-## The guess is the highlighted row and the stake is one row past the last guess, so a whole
-## bet is a few key presses and never a typed number.
+extends "res://ui/casino_table.gd"
+## THE BIG WHEEL'S FELT. One wheel of forty five segments on the left, painted in five tier
+## colours with the tier on every segment; on the right, a pad per tier to stack chips on, the
+## chip she is stacking with, Clear and a big Spin. The owner asked for "the rust wheel with
+## different payout levels" and for it to look "so much prettier" (playtest 2026-11-05); the
+## colour and number roulette with its bracket tabs is gone entirely.
 ##
-## WHERE THE STAKE ACTUALLY LIVES, and why it is not simply "left and right". Left and right
-## already switch the felt's two tabs, and up and down already pick the guess, so on four
-## directional buttons there is no fifth direction left for a third independent control. The
-## fix is RaceMenu's, and it is deliberately the same one so the two tables read alike: the
-## cursor gets ONE position past the last guess (row_count() is guess_count() + 1), and on
-## that row left and right move the stake instead of the tab. The hint beside the stake chips
-## says so now, drawn on the stage itself rather than buried in a footer nobody ever saw (see
-## paint()'s own comment on the stake row).
+## A BET IS A SET OF STACKS. Clicking a tier pad puts one chip of the chosen size on it
+## (a right click takes one back), as many tiers as she likes, never more in total than she
+## holds. Spin sends the whole set; ranch.gd takes it, spins Wheel.spin() and settles, then
+## pushes the segment back through show_spin(). The stacks stay on the felt after a spin, so
+## "again" is one press, and are cleared if the purse can no longer cover them.
 ##
-## This file used to override neither move_selection() nor the stake half of switch_tab(),
-## so `_stake_index` sat at zero for the whole life of the panel and the class comment's own
-## promise was unreachable by any key on the keyboard.
+## THE RESULT IS TOLD BY THE WHEEL. Nothing is printed under it: the pointer ticks over the
+## segments as the wheel slows (an ease out over a constant SPIN_SECONDS), the landed segment
+## and its tier pad flash, the hub shows the win, and a strip of coloured dots remembers the
+## last few spins. The chip counter holds what she had until the wheel stops, so the number
+## does not give the result away while it is still turning.
 ##
-## THE HOUSE POCKET IS NOT ON THE FELT. It is on the wheel, and the rules say so, but there
-## is no row to back it with, which is what makes it the house's.
-##
-## THE TAB VALUE IS NOT A Wheel.Bet VALUE. This tab is COLOUR-first because that is the felt's
-## own reading order; Wheel.Bet is NUMBER-first (game/systems/wheel.gd). bet_requested carries
-## whichever tab is highlighted, so this file never has to know about Wheel.Bet at all, which
-## is the class comment's own reason nothing under game/ui/ touches a systems class. ranch.gd's
-## _on_wheel_bet_requested() is the one place that translates a Tab into a Bet before it ever
-## reaches Wheel.payout().
+## NOTHING HERE ROLLS. The jitter that stops the pointer somewhere inside its segment rather
+## than dead centre is a function of the spin count, not a generator (test_casino_paint.gd's
+## last test forbids one anywhere under game/ui/).
 
 const WheelScript := preload("res://systems/wheel.gd")
 
 const TITLE := "The Wheel"
 
-## PaintScript is NOT re-declared here: table_menu.gd already carries it and GDScript
-## refuses a const that shadows one declared on the parent class. Same reason
-## WHEEL_FOOTER had to have a distinct name from TableMenu's own FOOTER.
-
 # --- the felt, in stage local pixels ---------------------------------------------------------
-const STAGE_HEIGHT := 580.0
-const WHEEL_CENTRE := Vector2(240.0, 230.0)
-const WHEEL_OUTER := 200.0
-const WHEEL_INNER := 66.0
-const HUB_RADIUS := 58.0
-const NUMBER_RADIUS := 140.0
-const RULES := Rect2(20.0, 440.0, 440.0, 130.0)
-const FELT := Rect2(500.0, 0.0, 620.0, 470.0)
+const STAGE_HEIGHT := 640.0
+const WHEEL_CENTRE := Vector2(318.0, 324.0)
+const WHEEL_OUTER := 292.0
+const WHEEL_INNER := 104.0
+const RIM_WIDTH := 16.0
+const HUB_RADIUS := 92.0
+const LABEL_RADIUS := 206.0
+const BULBS := 30
 
-## The colour felt: six pads in a 3 by 2 grid. The number felt: twenty four in a 6 by 4.
-const COLOUR_PAD := Vector2(180.0, 120.0)
-const COLOUR_ORIGIN := Vector2(520.0, 60.0)
-const COLOUR_PITCH := Vector2(196.0, 136.0)
-const NUMBER_PAD := Vector2(88.0, 74.0)
-const NUMBER_ORIGIN := Vector2(516.0, 60.0)
-const NUMBER_PITCH := Vector2(100.0, 86.0)
-const NUMBER_COLUMNS := 6
-
-const STAKE_ROW := Vector2(560.0, 440.0)
-const STAKE_PITCH := 96.0
-const CHIP_RADIUS := 30.0
+const COLUMN_X := 660.0
+const COLUMN_W := 460.0
+const COUNTER := Rect2(660.0, 0.0, 190.0, 46.0)
+const HISTORY := Rect2(866.0, 0.0, 254.0, 46.0)
+const PAD_TOP := 62.0
+const PAD_HEIGHT := 68.0
+const PAD_GAP := 9.0
+const CHIP_ROW_Y := 506.0
+const CHIP_RADIUS := 34.0
+const CHIP_PITCH := 96.0
+const CLEAR := Rect2(970.0, 476.0, 150.0, 60.0)
+const SPIN := Rect2(660.0, 556.0, 460.0, 80.0)
+const HISTORY_MAX := 7
 
 # --- the spin, and every one of these is a CONSTANT ------------------------------------------
-## FIVE FULL TURNS, ALWAYS. A spin whose length varied would be a generator living under
-## game/ui/, which is the one thing this file may not have. TRANS_CUBIC with EASE_OUT is a
-## friction curve, which is what a wheel slowing down actually is.
-const SPIN_TURNS := 5
-const SPIN_SECONDS := 3.2
-const LANDED_GLOW_SECONDS := 0.8
-const SETTLE_SECONDS := 0.4
+## A spin whose length varied would be a generator living under game/ui/. TRANS_QUART with
+## EASE_OUT is friction: fast off the hand, then individual clicks as it dies.
+const SPIN_TURNS := 4
+const SPIN_SECONDS := 4.6
+const WIN_FLASH_SECONDS := 1.8
+const COUNT_UP_SECONDS := 0.8
 
-## The pointer's ratchet: it kicks back this far each time a new pocket passes under it and
-## springs home over RATCHET_SECONDS. On a fast spin that is a flutter; as the wheel slows it
-## becomes individual clicks, which is the entire reason a real wheel feels like it is
-## slowing down rather than simply moving less.
-const RATCHET_DEGREES := 8.0
-const RATCHET_SECONDS := 0.09
+## The pointer's flap kicks back this far each time a segment boundary passes under it and
+## springs home over RATCHET_SECONDS.
+const RATCHET_DEGREES := 14.0
+const RATCHET_SECONDS := 0.10
 
-var _angle := 0.0
+## How far from a segment's centre the pointer may stop, as a fraction of a segment, so a
+## landing reads as a wheel that stopped rather than a list that was indexed.
+const LAND_SPREAD := 0.62
+
+signal bet_requested(bets: Array[int])
+
+var _bets: Array[int] = WheelScript.empty_bets()
+var _chip := 0
+## Starts with segment 0, a 20x, under the pointer: the first thing she sees is the jackpot.
+var _angle := -PI * 0.5
 var _spinning := false
 var _landed := -1
-var _glow := 0.0
+var _won := 0
+var _flash := 0.0
 var _ratchet := 0.0
-var _last_pocket := -1
+var _last_segment := -1
+var _spins := 0
+var _history: Array[int] = []
+var _shown_chips := 0.0
+var _held_chips := -1
 var _tween: Tween = null
-
-enum Tab { COLOUR, NUMBER }
-
-signal bet_requested(kind: int, guess: int, stake: int)
-
-var _tab: int = Tab.COLOUR
-
-## The row the bet is actually backing. Tracked separately from `_selected` for RaceMenu's
-## reason: `_selected` also has to reach the stake row past the last guess, and a bet must
-## keep pointing at whichever guess was last actually highlighted rather than at wherever
-## the cursor happens to be sitting once it has moved on to adjust the stake.
-var _guess_row := 0
 
 
 func title_text() -> String:
 	return TITLE
 
 
-func tab() -> int:
-	return _tab
-
-
-func set_tab(value: int) -> void:
-	_tab = clampi(value, Tab.COLOUR, Tab.NUMBER)
-	_selected = 0
-	_guess_row = 0
-	refresh()
-
-
-## Left and right switch the felt's two tabs everywhere except one place: sitting on the
-## stake row, one past the last guess, where they move the stake instead. See the class
-## comment for why that row exists at all.
-func switch_tab(step: int) -> void:
-	if _selected == guess_count():
-		var available: Array[int] = stakes()
-		if not available.is_empty():
-			set_stake_index(posmod(stake_index() + step, available.size()))
-		MenuStyleScript.tick_page()
-		return
-	set_tab(posmod(_tab + step, Tab.NUMBER + 1))
-	MenuStyleScript.tick_page()
-
-
-## Cycles the guesses and, right after the last one, one more position: the stake. Only
-## `_guess_row` is updated while the cursor is actually over a guess, so wrapping straight
-## past every guess onto the stake row can never silently change what a bet lands on.
-func move_selection(step: int) -> void:
-	var n: int = row_count()
-	if n <= 0:
-		_selected = 0
-		return
-	_selected = posmod(_selected + step, n)
-	if _selected < guess_count():
-		_guess_row = _selected
-	refresh()
-	MenuStyleScript.tick_move()
-
-
-## I5, final-review.md I3: the bracket text itself is now MouseRows.tab_strip()'s job (see
-## table_menu.gd's refresh()); this is only the note beside it.
-func tab_names() -> Array[String]:
-	return ["Colour", "Number"]
-
-
-func tabs_text() -> String:
-	return "the house keeps %.1f bits of every 100 on either" % (WheelScript.house_edge() * 100.0)
-
-
-## How many things she may back on this tab.
-func guess_count() -> int:
-	return WheelScript.NUMBERS if _tab == Tab.NUMBER else int(WheelScript.Colour.HOUSE)
-
-
-## What the backed row means to Wheel.payout(): a Colour value on the colour tab, a pocket
-## number from 1 up on the number tab. Reads `_guess_row` rather than the raw cursor, so a
-## bet placed while the cursor sits on the stake row still lands on the guess that was
-## actually highlighted.
-func selected_guess() -> int:
-	if _tab == Tab.NUMBER:
-		return clampi(_guess_row, 0, guess_count() - 1) + 1
-	return clampi(_guess_row, 0, guess_count() - 1)
-
-
-func drawn_lines() -> Array[String]:
-	var lines: Array[String] = [chips_line(), keys_line()]
-	lines.append_array(result_block())
-	if _tab == Tab.NUMBER:
-		for pocket in range(1, WheelScript.NUMBERS + 1):
-			lines.append("Back %d, %s at %d to 1"
-				% [pocket, WheelScript.COLOUR_NAMES[WheelScript.colour_of(pocket)],
-					WheelScript.NUMBER_PAYS_TO_ONE])
-	else:
-		for colour in guess_count():
-			lines.append("Back %s at %d to 1"
-				% [WheelScript.COLOUR_NAMES[colour], WheelScript.COLOUR_PAYS_TO_ONE])
-	# NO BLANK BETWEEN THE LAST GUESS AND THE STAKE, deliberately: the stake is a ROW the
-	# cursor sits on (row index guess_count()), so the line it is drawn on has to be the one
-	# right after the last guess or the caret would point at the gap instead.
-	for line in stake_lines():
-		lines.append(line)
-	lines.append("")
-	for line in WheelScript.rules_lines():
-		lines.append(line)
-	return lines
-
-
-## The guesses, plus one more position past the last of them: the stake. See the class
-## comment.
-func row_count() -> int:
-	return guess_count() + 1
-
-
-func confirm() -> bool:
-	if selected_stake() <= 0:
-		return false
-	MenuStyleScript.tick_confirm()
-	_sound_call(&"play", [&"chip_clink"])
-	bet_requested.emit(_tab, selected_guess(), selected_stake())
-	return true
-
-
 func stage_size() -> Vector2:
 	return Vector2(STAGE_WIDTH, STAGE_HEIGHT)
 
+
+func initial_focus() -> StringName:
+	return &"tier:0"
+
+
+func animating() -> bool:
+	return _spinning
+
+
+func open() -> bool:
+	if not super.open():
+		return false
+	_shown_chips = float(_purse())
+	_held_chips = -1
+	_trim_bets()
+	return true
+
+
+func _purse() -> int:
+	return int(chips_provider.call()) if chips_provider.is_valid() else 0
+
+
+# --- the bet ----------------------------------------------------------------------------------
+
+func bets() -> Array[int]:
+	return _bets.duplicate()
+
+
+func total_bet() -> int:
+	return WheelScript.total_staked(_bets)
+
+
+func chip_value() -> int:
+	return STAKES[clampi(_chip, 0, STAKES.size() - 1)]
+
+
+func chip_index() -> int:
+	return _chip
+
+
+## THE CHIP SHE IS STACKING WITH. Any size she could put down at all; a size bigger than her
+## purse is drawn greyed and cannot be picked.
+func set_chip(index: int) -> bool:
+	if index < 0 or index >= STAKES.size() or STAKES[index] > _purse():
+		return false
+	_chip = index
+	if _stage != null:
+		_stage.queue_redraw()
+	return true
+
+
+## One chip of the chosen size onto `tier`. Refused mid spin, and refused (with the denied
+## tick) when the purse cannot cover the stacks plus this one.
+func add_bet(tier: int) -> bool:
+	if _spinning or tier < 0 or tier >= WheelScript.TIERS:
+		return false
+	if total_bet() + chip_value() > _purse():
+		MenuStyleScript.tick_denied()
+		return false
+	_bets[tier] += chip_value()
+	_sound_call(&"play", [&"chip_clink"])
+	if _stage != null:
+		_stage.queue_redraw()
+	return true
+
+
+## One chip of the chosen size back off `tier`, or whatever is left on it if less.
+func remove_bet(tier: int) -> bool:
+	if _spinning or tier < 0 or tier >= WheelScript.TIERS or _bets[tier] <= 0:
+		return false
+	_bets[tier] = maxi(0, _bets[tier] - chip_value())
+	MenuStyleScript.tick_back()
+	if _stage != null:
+		_stage.queue_redraw()
+	return true
+
+
+func clear_bets() -> bool:
+	if _spinning or total_bet() <= 0:
+		return false
+	_bets = WheelScript.empty_bets()
+	MenuStyleScript.tick_back()
+	if _stage != null:
+		_stage.queue_redraw()
+	return true
+
+
+func can_spin() -> bool:
+	return not _spinning and total_bet() > 0 and total_bet() <= _purse()
+
+
+## SPIN: the whole set of stacks goes to ranch.gd in one signal.
+func spin() -> bool:
+	if not can_spin():
+		return false
+	MenuStyleScript.tick_confirm()
+	_sound_call(&"play", [&"chip_clink"])
+	bet_requested.emit(bets())
+	return true
+
+
+## A set of stacks the purse can no longer cover is cleared rather than left to refuse.
+func _trim_bets() -> void:
+	if total_bet() > _purse():
+		_bets = WheelScript.empty_bets()
+	if chip_value() > _purse():
+		_chip = 0
+
+
+# --- the controls -----------------------------------------------------------------------------
+
+func pad_rect(tier: int) -> Rect2:
+	return Rect2(COLUMN_X, PAD_TOP + (PAD_HEIGHT + PAD_GAP) * float(tier), COLUMN_W, PAD_HEIGHT)
+
+
+func chip_rect(index: int) -> Rect2:
+	var centre := Vector2(COLUMN_X + CHIP_RADIUS + 8.0 + CHIP_PITCH * float(index), CHIP_ROW_Y)
+	return Rect2(centre - Vector2(CHIP_RADIUS, CHIP_RADIUS) * 1.15,
+		Vector2(CHIP_RADIUS, CHIP_RADIUS) * 2.3)
+
+
+func clear_rect() -> Rect2:
+	return CLEAR
+
+
+func spin_rect() -> Rect2:
+	return SPIN
+
+
+func stage_buttons() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for tier: int in WheelScript.TIERS:
+		out.append({"id": StringName("tier:%d" % tier), "rect": pad_rect(tier),
+			"enabled": not _spinning})
+	for i: int in STAKES.size():
+		out.append({"id": StringName("chip:%d" % i), "rect": chip_rect(i),
+			"enabled": not _spinning and STAKES[i] <= _purse()})
+	out.append({"id": &"clear", "rect": CLEAR, "enabled": not _spinning and total_bet() > 0})
+	out.append({"id": &"spin", "rect": SPIN, "enabled": can_spin()})
+	return out
+
+
+func activate(id: StringName) -> bool:
+	var name: String = String(id)
+	if name.begins_with("tier:"):
+		return add_bet(int(name.substr(5)))
+	if name.begins_with("chip:"):
+		var ok: bool = set_chip(int(name.substr(5)))
+		if ok:
+			MenuStyleScript.tick_confirm()
+		return ok
+	if id == &"clear":
+		return clear_bets()
+	if id == &"spin":
+		return spin()
+	return false
+
+
+func on_stage_alt(index: int) -> void:
+	var buttons: Array[Dictionary] = stage_buttons()
+	if index < 0 or index >= buttons.size():
+		return
+	var name: String = String(buttons[index]["id"])
+	if name.begins_with("tier:"):
+		remove_bet(int(name.substr(5)))
+
+
+# --- the wheel, as geometry ---------------------------------------------------------------------
 
 func wheel_centre() -> Vector2:
 	return WHEEL_CENTRE
@@ -214,265 +270,333 @@ func wheel_outer() -> float:
 	return WHEEL_OUTER
 
 
-func wheel_inner() -> float:
-	return WHEEL_INNER
-
-
 func wheel_angle() -> float:
 	return _angle
 
 
-func rules_rect() -> Rect2:
-	return RULES
+func _per() -> float:
+	return TAU / float(WheelScript.SEGMENTS)
 
 
-## The pad for guess row `index` on whichever tab is up. One function and not two, because
-## `_selected` and `_guess_row` index the same list on both tabs and a caller that had to
-## know which tab it was on is a caller that can be wrong.
-func pad_rect(index: int) -> Rect2:
-	if _tab == Tab.NUMBER:
-		return Rect2(NUMBER_ORIGIN + Vector2(
-			NUMBER_PITCH.x * float(index % NUMBER_COLUMNS),
-			NUMBER_PITCH.y * float(index / NUMBER_COLUMNS)), NUMBER_PAD)
-	return Rect2(COLOUR_ORIGIN + Vector2(
-		COLOUR_PITCH.x * float(index % 3), COLOUR_PITCH.y * float(index / 3)), COLOUR_PAD)
-
-
-func stake_chip_rect(index: int) -> Rect2:
-	var centre := Vector2(STAKE_ROW.x + STAKE_PITCH * float(index),
-		STAKE_ROW.y - (8.0 if index == stake_index() else 0.0))
-	return Rect2(centre - Vector2(CHIP_RADIUS, CHIP_RADIUS) * 1.1,
-		Vector2(CHIP_RADIUS, CHIP_RADIUS) * 2.2)
-
-
-## THE FELT'S BETTING BOX FOR ROW `index`: a guess pad for every guess, and the whole stake
-## row for the one position past the last guess (row_count() is guess_count() + 1; see the
-## class comment on where the stake actually lives). Same list stage_hit_rects() walks, in
-## the same order, so a click on the felt and a keyboard confirm at that row are the same act.
-func bet_rect(index: int) -> Rect2:
-	if index < guess_count():
-		return pad_rect(index)
-	var available: Array[int] = stakes()
-	if available.is_empty():
-		return Rect2()
-	return stake_chip_rect(0).merge(stake_chip_rect(available.size() - 1))
-
-
-## WHICH POCKET IS UNDER THE POINTER RIGHT NOW, derived from the live angle rather than
-## remembered from the push, so the test that asks it is asking the drawing.
-func pocket_under_pointer() -> int:
-	var per: float = TAU / float(WheelScript.POCKETS)
-	# The pointer is at twelve o'clock, which is minus a quarter turn in screen radians.
+## THE SEGMENT UNDER THE POINTER RIGHT NOW, derived from the live angle rather than
+## remembered from the push, so the test that asks it is asking the drawing. Segment i is
+## centred at _angle + i * per; the pointer is at twelve o'clock.
+func segment_under_pointer() -> int:
 	var at: float = fposmod(-PI * 0.5 - _angle, TAU)
-	return posmod(roundi(at / per), WheelScript.POCKETS)
+	return posmod(roundi(at / _per()), WheelScript.SEGMENTS)
 
 
-func focus_rect() -> Rect2:
-	if _selected == guess_count():
-		if stakes().is_empty():
-			return Rect2()
-		return to_viewport(stake_chip_rect(clampi(stake_index(), 0, stakes().size() - 1)))
-	return to_viewport(pad_rect(clampi(_selected, 0, guess_count() - 1)))
+func landed_segment() -> int:
+	return _landed
 
 
-func focused_id() -> StringName:
-	if _selected == guess_count():
-		return StringName("stake:%d" % stake_index())
-	return StringName("guess:%d" % clampi(_selected, 0, guess_count() - 1))
+func history() -> Array[int]:
+	return _history.duplicate()
 
 
-func animating() -> bool:
-	return _spinning
+## The chip count the counter is showing: held at the pre win figure while the wheel turns.
+func shown_chips() -> int:
+	return _held_chips if _held_chips >= 0 else _purse()
 
 
-## The whole text model stays; the felt already shows every guess, so the column keeps only
-## the two lines that are not pictures plus the last spin.
-func printed_lines() -> Array[String]:
-	var lines: Array[String] = [chips_line(), keys_line()]
-	lines.append_array(result_block())
-	return lines
-
-
-func first_row_line_index() -> int:
-	return printed_lines().size()
-
-
-## TOLD, NEVER ASKED. ranch.gd's play_wheel() has taken the stake, spun Wheel.spin() and
-## settled by the time this is called. A pocket that is not on the wheel is a still frame:
+## TOLD, NEVER ASKED. ranch.gd's play_wheel() has taken the stakes, spun Wheel.spin() and
+## settled by the time this is called. A segment that is not on the wheel is a still frame:
 ## this arrives over a dynamic call() and nothing type checks it at the call site.
-func show_spin(pocket: int, won: int, stake: int) -> void:
-	if pocket < 0 or pocket >= WheelScript.POCKETS:
+func show_spin(segment: int, won: int, _staked: int) -> void:
+	if segment < 0 or segment >= WheelScript.SEGMENTS:
 		return
 	if _tween != null and _tween.is_valid():
 		_tween.kill()
 	_spinning = true
-	_landed = pocket
-	_glow = 0.0
-	var per: float = TAU / float(WheelScript.POCKETS)
-	# Where the wheel must end up for `pocket` to sit under the twelve o'clock pointer, plus
-	# five whole turns past wherever it is now. Whole turns, so the arithmetic is exact and
-	# the landing is a function of the value and nothing else.
-	var target: float = -PI * 0.5 - per * float(pocket)
+	_landed = -1
+	_flash = 0.0
+	_won = maxi(0, won)
+	_spins += 1
+	_held_chips = maxi(0, _purse() - _won)
+	_shown_chips = float(_held_chips)
+	var per: float = _per()
+	# A deterministic spread inside the segment: the golden ratio walks the spin count round
+	# the unit interval without repeating, so no two landings sit at the same spot.
+	var spread: float = (fposmod(float(_spins) * 0.618034, 1.0) - 0.5) * LAND_SPREAD * per
+	var target: float = -PI * 0.5 - per * float(segment) + spread
 	while target < _angle + TAU * float(SPIN_TURNS):
 		target += TAU
+	var land_at := segment
 	_tween = create_tween()
 	_tween.tween_property(self, "_angle", target, SPIN_SECONDS) \
-		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	_tween.tween_property(self, "_glow", 1.0, 0.12)
-	_tween.tween_property(self, "_glow", 0.0, LANDED_GLOW_SECONDS)
+		.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
+	_tween.tween_callback(func() -> void: _on_landed(land_at))
+	if _won > 0:
+		_tween.tween_property(self, "_flash", 1.0, 0.15)
+		_tween.parallel().tween_property(self, "_shown_chips", float(_purse()),
+			COUNT_UP_SECONDS)
+		_tween.tween_property(self, "_flash", 0.0, WIN_FLASH_SECONDS)
+	else:
+		_tween.tween_property(self, "_flash", 0.4, 0.12)
+		_tween.tween_property(self, "_flash", 0.0, 0.5)
 	_tween.tween_callback(func() -> void:
 		_spinning = false
-		_sound_call(&"play", [&"wheel_settle"]))
-	# `won` and `stake` are not used to decide anything; they are here so a later slice can
-	# slide the winning chips to the player without changing this call's shape, and so the
-	# signature matches SlotsMenu.show_spin()'s.
-	if won < 0 or stake < 0:
-		return
+		_held_chips = -1
+		_trim_bets()
+		refresh())
 
 
-## super(delta) FIRST, ALWAYS: see slots_menu.gd's own comment on the same line, which this
-## mirrors. TableMenu's _process is what advances anim_time() and queues the stage redraw.
-##
-## THE RATCHET STATE LIVES HERE, NOT IN paint(). A _draw pass is not a frame tick: it runs
-## only when something queues a redraw, and paint() used to detect the pocket crossing and
-## fire wheel_ratchet itself, which meant the ratchet stopped ticking whenever the stage
-## was not being redrawn. Detection and the sound trigger move here, driven once per
-## physics-independent process frame exactly like _sound_reels() on the slots cabinet;
-## paint() below only reads _last_pocket and _ratchet to draw the kick.
+func _on_landed(segment: int) -> void:
+	_landed = segment
+	_history.push_front(WheelScript.tier_of(segment))
+	while _history.size() > HISTORY_MAX:
+		_history.pop_back()
+	_sound_call(&"play", [&"wheel_settle"])
+	if _won > 0:
+		_sound_call(&"play", [&"slots_win"])
+	if _won <= 0:
+		_held_chips = -1
+
+
+## A ranch push of the old result lines lands here and is not printed: the wheel tells it.
+func show_result(lines: Array[String]) -> void:
+	_result = lines.duplicate()
+
+
+## super(delta) FIRST: TableMenu's _process advances anim_time() and queues the redraw. The
+## ratchet's crossing detection lives here and not in paint(), for the reason the old wheel
+## recorded: a draw pass is not a frame tick.
 func _process(delta: float) -> void:
 	super(delta)
-	var now: int = pocket_under_pointer()
-	if now != _last_pocket:
-		_last_pocket = now
-		_ratchet = 1.0
+	var now: int = segment_under_pointer()
+	if now != _last_segment:
+		_last_segment = now
 		if _spinning:
+			_ratchet = 1.0
 			_sound_call(&"play", [&"wheel_ratchet"])
 	_ratchet = maxf(0.0, _ratchet - delta / RATCHET_SECONDS)
 
 
+## The text model: every word this felt draws, for the dash test.
+func drawn_lines() -> Array[String]:
+	var lines: Array[String] = []
+	for tier: int in WheelScript.TIERS:
+		lines.append(WheelScript.TIER_LABELS[tier])
+		lines.append(_pays_text(tier))
+	lines.append("Spin")
+	lines.append("Clear")
+	lines.append(_edge_text())
+	return lines
+
+
+func _pays_text(tier: int) -> String:
+	return "pays %d to 1" % WheelScript.MULTIPLIERS[tier]
+
+
+func _edge_text() -> String:
+	return "house keeps %.1f to %.1f%%" % [WheelScript.best_edge() * 100.0,
+		WheelScript.house_edge() * 100.0]
+
+
+# --- the paint ----------------------------------------------------------------------------------
+
 func paint(ci: Control) -> void:
-	var font: Font = ThemeDB.fallback_font
 	var t: float = anim_time()
-	var per: float = TAU / float(WheelScript.POCKETS)
+	var title_font: Font = MenuStyleScript.title_font()
+	var numeral_font: Font = MenuStyleScript.numeral_font()
+	_paint_wheel(ci, t, title_font)
+	_paint_column(ci, t, title_font, numeral_font)
+	paint_focus(ci)
 
-	# --- the wheel ---------------------------------------------------------------------------
-	for pocket: int in WheelScript.POCKETS:
-		var from_angle: float = _angle + per * float(pocket) - per * 0.5
-		var to_angle: float = from_angle + per
-		var colour: Color = PaintScript.HOUSE_SILVER
-		if pocket != WheelScript.HOUSE_POCKET:
-			colour = PaintScript.BAND_COLORS[WheelScript.colour_of(pocket)]
-		if pocket == _landed and _glow > 0.0:
-			colour = colour.lightened(0.35 * _glow)
-		ci.draw_colored_polygon(PaintScript.sector_points(WHEEL_CENTRE,
-			WHEEL_INNER, WHEEL_OUTER, from_angle, to_angle), colour)
-		if pocket == WheelScript.HOUSE_POCKET:
-			# No number on the house pocket, because no bet may name it. A small cloud
-			# instead, which is whose pocket it is.
-			var mid: float = from_angle + per * 0.5
-			var at: Vector2 = WHEEL_CENTRE + Vector2(cos(mid), sin(mid)) * NUMBER_RADIUS
-			for lobe: Vector2 in [Vector2(-8.0, 2.0), Vector2(0.0, -4.0), Vector2(8.0, 2.0)]:
-				ci.draw_circle(at + lobe, 7.0, Color(1.0, 1.0, 1.0, 0.9))
-			continue
-		var mid_angle: float = from_angle + per * 0.5
-		var label_at: Vector2 = WHEEL_CENTRE \
-			+ Vector2(cos(mid_angle), sin(mid_angle)) * NUMBER_RADIUS
-		PaintScript.text(ci, MenuStyleScript.numeral_font(), label_at + Vector2(-9.0, 7.0),
-			str(pocket), 20, PaintScript.CARD_INK, HORIZONTAL_ALIGNMENT_LEFT, -1.0)
-	ci.draw_circle(WHEEL_CENTRE, HUB_RADIUS, PaintScript.GOLD)
-	for spoke: int in 6:
-		var a: float = _angle + TAU * float(spoke) / 6.0
-		ci.draw_line(WHEEL_CENTRE, WHEEL_CENTRE + Vector2(cos(a), sin(a)) * HUB_RADIUS,
-			PaintScript.GOLD_DIM, 3.0, true)
-	ci.draw_arc(WHEEL_CENTRE, WHEEL_OUTER, 0.0, TAU, 96, PaintScript.GOLD_DIM, 5.0, true)
 
-	# --- the pointer, ratcheting -------------------------------------------------------------
-	# _last_pocket and _ratchet are read only here; _process() above owns writing both, so
-	# a redraw draws whatever the last process frame decided rather than deciding it itself.
-	var kick: float = deg_to_rad(RATCHET_DEGREES) * _ratchet
-	var tip: Vector2 = WHEEL_CENTRE + Vector2(sin(kick), -cos(kick)) * (WHEEL_OUTER - 6.0)
-	var base: Vector2 = WHEEL_CENTRE + Vector2(sin(kick), -cos(kick)) * (WHEEL_OUTER + 26.0)
-	var side := Vector2(-(base - tip).y, (base - tip).x).normalized() * 12.0
-	ci.draw_colored_polygon(PackedVector2Array([tip, base + side, base - side]),
-		PaintScript.GOLD)
-
-	# --- the rules plate under the wheel -----------------------------------------------------
-	var rules: Array[String] = []
-	for line in WheelScript.rules_lines():
-		rules.append(line)
-	PaintScript.plate(ci, RULES, font, "", rules)
-
-	# --- the felt ----------------------------------------------------------------------------
-	PaintScript.rounded(ci, FELT, 14.0, PaintScript.FELT, PaintScript.GOLD_DIM, 2.0)
-	for i: int in 4:
-		var y: float = FELT.position.y + 24.0 + 108.0 * float(i)
-		ci.draw_line(Vector2(FELT.position.x + 12.0, y),
-			Vector2(FELT.position.x + FELT.size.x - 12.0, y), PaintScript.FELT_LINE, 1.0, true)
-	if _tab == Tab.NUMBER:
-		PaintScript.text(ci, font, Vector2(FELT.position.x + 16.0, 38.0),
-			"A number pays %d to 1" % WheelScript.NUMBER_PAYS_TO_ONE,
-			MenuStyleScript.ROW_SIZE, PaintScript.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1.0)
-	for guess: int in guess_count():
-		var pad: Rect2 = pad_rect(guess)
-		var colour: Color = PaintScript.BAND_COLORS[guess] if _tab == Tab.COLOUR \
-			else PaintScript.BAND_COLORS[WheelScript.colour_of(guess + 1)]
-		PaintScript.rounded(ci, pad, 8.0, Color(colour, 0.85), colour.darkened(0.3), 2.0)
-		if _tab == Tab.COLOUR:
-			PaintScript.text(ci, font, pad.position + Vector2(14.0, 44.0),
-				WheelScript.COLOUR_NAMES[guess], MenuStyleScript.ROW_SIZE,
-				PaintScript.CARD_INK, HORIZONTAL_ALIGNMENT_LEFT, pad.size.x - 28.0)
-			PaintScript.text(ci, font, pad.position + Vector2(14.0, 82.0),
-				"pays %d to 1" % WheelScript.COLOUR_PAYS_TO_ONE,
-				MenuStyleScript.SUBTITLE_SIZE, PaintScript.CARD_INK,
-				HORIZONTAL_ALIGNMENT_LEFT, pad.size.x - 28.0)
-		else:
-			PaintScript.text(ci, MenuStyleScript.numeral_font(),
-				pad.position + Vector2(pad.size.x * 0.5, 48.0), str(guess + 1),
-				MenuStyleScript.ROW_SIZE, PaintScript.CARD_INK,
-				HORIZONTAL_ALIGNMENT_CENTER, -1.0)
-		# HER BET IS A THING ON THE TABLE, not a caret next to a sentence. The pad _guess_row
-		# names carries a stack of the current stake, so "my bet is on green" is visible.
-		if guess == _guess_row and selected_stake() > 0:
-			PaintScript.chip_stack(ci, pad.position + Vector2(pad.size.x - 26.0,
-				pad.size.y - 12.0), 4,
-				PaintScript.CHIP_COLORS[stake_index() % PaintScript.CHIP_COLORS.size()], 7.0)
-
-	# --- the stake row, one press past the last guess -----------------------------------------
-	var available: Array[int] = stakes()
-	for i: int in available.size():
-		var box: Rect2 = stake_chip_rect(i)
-		PaintScript.chip(ci, box.position + box.size * 0.5, CHIP_RADIUS,
-			PaintScript.CHIP_COLORS[i % PaintScript.CHIP_COLORS.size()], true)
-		PaintScript.text(ci, MenuStyleScript.numeral_font(),
-			box.position + Vector2(box.size.x * 0.5, box.size.y * 0.62), str(available[i]),
-			20, PaintScript.CARD_INK, HORIZONTAL_ALIGNMENT_CENTER, -1.0)
-	# THE HINT THE DEAD FOOTER WAS TRYING TO GIVE, put where the player is actually looking.
-	# InputDevice.hint() answers in the glyphs of the device in her hands, so this is one
-	# scheme and never both, which is the whole reason WHEEL_FOOTER had to go.
-	PaintScript.text(ci, font, Vector2(STAKE_ROW.x - 40.0, STAKE_ROW.y + 58.0),
-		"%s moves the stake" % InputDeviceScript.hint(&"menu_tabs"),
-		MenuStyleScript.SUBTITLE_SIZE, PaintScript.GOLD_DIM, HORIZONTAL_ALIGNMENT_LEFT, -1.0)
-
-	# --- the focus ring, the one focus treatment in the building -------------------------------
-	if _selected == guess_count():
-		if not available.is_empty():
-			PaintScript.focus_ring(ci, stake_chip_rect(
-				clampi(stake_index(), 0, available.size() - 1)).grow(6.0), 40.0, t)
+func _paint_wheel(ci: Control, t: float, title_font: Font) -> void:
+	var per: float = _per()
+	var landed_tier: int = WheelScript.tier_of(_landed)
+	# The drop shadow and the rim: a dark disc a little low, then the gold rim ring.
+	ci.draw_circle(WHEEL_CENTRE + Vector2(0.0, 10.0), WHEEL_OUTER + RIM_WIDTH + 4.0,
+		Color(0.0, 0.0, 0.0, 0.35))
+	ci.draw_circle(WHEEL_CENTRE, WHEEL_OUTER + RIM_WIDTH, PaintScript.GOLD_DIM.darkened(0.25))
+	ci.draw_circle(WHEEL_CENTRE, WHEEL_OUTER + RIM_WIDTH - 3.0, PaintScript.PLUM_DARK)
+	for segment: int in WheelScript.SEGMENTS:
+		var tier: int = WheelScript.tier_of(segment)
+		var mid: float = _angle + per * float(segment)
+		var colour: Color = PaintScript.TIER_COLOURS[tier]
+		# Every other segment a shade darker, so a run of different tiers still reads as
+		# separate slices from across the room.
+		if segment % 2 == 1:
+			colour = colour.darkened(0.10)
+		if segment == _landed and _flash > 0.0:
+			colour = colour.lerp(Color.WHITE, 0.55 * _flash * (0.6 + 0.4 * sin(t * 18.0)))
+		ci.draw_colored_polygon(PaintScript.sector_points(WHEEL_CENTRE, WHEEL_INNER,
+			WHEEL_OUTER, mid - per * 0.5, mid + per * 0.5), colour)
+		# An inner band in the tier's deep shade gives each slice a lip.
+		ci.draw_colored_polygon(PaintScript.sector_points(WHEEL_CENTRE, WHEEL_INNER,
+			WHEEL_INNER + 22.0, mid - per * 0.5, mid + per * 0.5), colour.darkened(0.30))
+		var edge: float = mid - per * 0.5
+		ci.draw_line(WHEEL_CENTRE + Vector2(cos(edge), sin(edge)) * WHEEL_INNER,
+			WHEEL_CENTRE + Vector2(cos(edge), sin(edge)) * WHEEL_OUTER,
+			Color(PaintScript.GOLD, 0.85), 2.0, true)
+		_paint_segment_label(ci, title_font, mid, tier)
+	# The rim's bulbs: a chase while idle, a fast chase while spinning, all lit on a win.
+	for bulb: int in BULBS:
+		var a: float = TAU * float(bulb) / float(BULBS)
+		var at: Vector2 = WHEEL_CENTRE + Vector2(cos(a), sin(a)) * (WHEEL_OUTER + RIM_WIDTH * 0.5)
+		var speed: float = 3.0 if _spinning else 1.0
+		var phase: float = fposmod(t * speed - float(bulb) / 6.0, 1.0)
+		var lit: float = 0.30 + 0.70 * (1.0 if phase < 0.5 else 0.0)
+		if _flash > 0.0 and _won > 0:
+			lit = 0.5 + 0.5 * sin(t * 14.0 + float(bulb))
+		ci.draw_circle(at, 5.0, Color(1.0, 0.95, 0.70, lit))
+	# The hub, with a burst of light behind it on a win.
+	if _won > 0 and _flash > 0.0:
+		for ray: int in 16:
+			var a: float = TAU * float(ray) / 16.0 + t * 0.8
+			ci.draw_colored_polygon(PaintScript.sector_points(WHEEL_CENTRE, HUB_RADIUS,
+				HUB_RADIUS + 40.0 * _flash, a - 0.07, a + 0.07),
+				Color(1.0, 0.92, 0.55, 0.75 * _flash))
+	ci.draw_circle(WHEEL_CENTRE, HUB_RADIUS + 6.0, PaintScript.GOLD_DIM)
+	ci.draw_circle(WHEEL_CENTRE, HUB_RADIUS, PaintScript.PLUM)
+	ci.draw_arc(WHEEL_CENTRE, HUB_RADIUS - 8.0, 0.0, TAU, 64, Color(PaintScript.GOLD, 0.6),
+		2.0, true)
+	var hub_box := Rect2(WHEEL_CENTRE - Vector2(HUB_RADIUS * 0.78, HUB_RADIUS * 0.42),
+		Vector2(HUB_RADIUS * 1.56, HUB_RADIUS * 0.84))
+	if _landed >= 0 and _won > 0:
+		var pulse: float = 1.0 + 0.08 * _flash * sin(t * 12.0)
+		PaintScript.label(ci, title_font, Rect2(hub_box.get_center() - hub_box.size * pulse
+			* 0.5, hub_box.size * pulse), "+%d" % _won, 44, PaintScript.GOLD)
+	elif _landed >= 0 and landed_tier >= 0:
+		PaintScript.label(ci, title_font, hub_box, WheelScript.TIER_LABELS[landed_tier], 44,
+			PaintScript.TIER_COLOURS[landed_tier].lightened(0.25))
 	else:
-		PaintScript.focus_ring(ci, pad_rect(clampi(_selected, 0, guess_count() - 1)), 8.0, t)
+		var star := Rect2(WHEEL_CENTRE - Vector2(44.0, 44.0), Vector2(88.0, 88.0))
+		ci.draw_colored_polygon(PaintScript.star_points(star), PaintScript.GOLD)
+	_paint_pointer(ci)
 
 
-## THE FELT'S BETTING BOXES, one per row of the panel and in the panel's own row order, so
-## clicking red on the felt and pressing confirm on the red row are the same act. The order
-## mattering is the point: game/scenes/test/casino_test.gd already drives one wheel bet end
-## to end through the felt precisely because a swap between the felt's order and Wheel.Bet's
-## would silently mispay a colour bet at number odds.
-func stage_hit_rects() -> Array[Rect2]:
-	var out: Array[Rect2] = []
-	for i in row_count():
-		out.append(bet_rect(i))
-	return out
+## The tier on its slice, reading along the radius, turned on the left half of the wheel so
+## no label is ever upside down.
+func _paint_segment_label(ci: Control, font: Font, mid: float, tier: int) -> void:
+	var at: Vector2 = WHEEL_CENTRE + Vector2(cos(mid), sin(mid)) * LABEL_RADIUS
+	var rotation: float = mid
+	var facing_left: bool = cos(mid) < 0.0
+	if facing_left:
+		rotation += PI
+	ci.draw_set_transform(at, rotation, Vector2.ONE)
+	var size: int = 30 if tier >= WheelScript.Tier.TEN else 26
+	var box := Rect2(Vector2(-70.0, -18.0), Vector2(140.0, 36.0))
+	var ink: Color = PaintScript.CARD_INK if tier == WheelScript.Tier.ONE \
+		else Color(1.0, 1.0, 1.0)
+	# A soft dark copy one pixel down, so white on gold and white on red both read.
+	PaintScript.label(ci, font, Rect2(box.position + Vector2(0.0, 2.0), box.size),
+		WheelScript.TIER_LABELS[tier], size, Color(0.0, 0.0, 0.0, 0.30))
+	PaintScript.label(ci, font, box, WheelScript.TIER_LABELS[tier], size, ink)
+	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
-func on_stage_hit(index: int) -> void:
-	take_row(index)
+func _paint_pointer(ci: Control) -> void:
+	var pivot: Vector2 = WHEEL_CENTRE + Vector2(0.0, -(WHEEL_OUTER + RIM_WIDTH + 2.0))
+	var kick: float = deg_to_rad(RATCHET_DEGREES) * _ratchet
+	var down := Vector2(sin(-kick), cos(-kick))
+	var side := Vector2(down.y, -down.x)
+	var tip: Vector2 = pivot + down * 58.0
+	ci.draw_colored_polygon(PackedVector2Array([pivot - side * 20.0 + down * 2.0,
+		pivot + side * 20.0 + down * 2.0, tip + Vector2(0.0, 4.0)]), Color(0.0, 0.0, 0.0, 0.35))
+	ci.draw_colored_polygon(PackedVector2Array([pivot - side * 20.0, pivot + side * 20.0, tip]),
+		PaintScript.GOLD)
+	ci.draw_polyline(PackedVector2Array([pivot - side * 20.0, tip, pivot + side * 20.0]),
+		PaintScript.GOLD_DIM.darkened(0.3), 2.0, true)
+	ci.draw_circle(pivot, 12.0, PaintScript.GOLD_DIM)
+	ci.draw_circle(pivot, 6.0, PaintScript.GOLD)
+
+
+func _paint_column(ci: Control, t: float, title_font: Font, numeral_font: Font) -> void:
+	# --- the chip counter and the last spins -----------------------------------------------
+	PaintScript.rounded(ci, COUNTER, 23.0, Color(0.0, 0.0, 0.0, 0.35),
+		Color(PaintScript.GOLD, 0.5), 2.0)
+	PaintScript.draw_chip_icon(ci, Rect2(COUNTER.position + Vector2(10.0, 9.0),
+		Vector2(28.0, 28.0)))
+	var counting: int = roundi(_shown_chips) if _spinning else shown_chips()
+	PaintScript.label(ci, numeral_font, Rect2(COUNTER.position + Vector2(46.0, 2.0),
+		COUNTER.size - Vector2(56.0, 4.0)), "%d" % counting, 28, PaintScript.GOLD,
+		HORIZONTAL_ALIGNMENT_LEFT)
+	for i: int in _history.size():
+		var dot := Rect2(Vector2(HISTORY.end.x - 34.0 - 36.0 * float(i), 6.0),
+			Vector2(34.0, 34.0))
+		var tier: int = _history[i]
+		ci.draw_circle(dot.get_center(), 16.0, PaintScript.TIER_COLOURS[tier].darkened(0.1 if i > 0 else 0.0))
+		if i == 0:
+			ci.draw_arc(dot.get_center(), 18.0, 0.0, TAU, 32, PaintScript.GOLD, 2.0, true)
+		PaintScript.label(ci, title_font, dot.grow(-5.0), WheelScript.TIER_LABELS[tier], 14,
+			PaintScript.CARD_INK if tier == 0 else Color.WHITE)
+
+	# --- the tier pads -------------------------------------------------------------------------
+	var winning_tier: int = WheelScript.tier_of(_landed) if _landed >= 0 else -1
+	for tier: int in WheelScript.TIERS:
+		var pad: Rect2 = pad_rect(tier)
+		var colour: Color = PaintScript.TIER_COLOURS[tier]
+		var lit: bool = is_lit(StringName("tier:%d" % tier))
+		var won_here: bool = tier == winning_tier and _won > 0 and _flash > 0.0
+		var fill := Color(0.08, 0.05, 0.12, 0.82)
+		if lit and not _spinning:
+			fill = Color(0.16, 0.10, 0.22, 0.92)
+		if won_here:
+			fill = fill.lerp(colour, 0.6 * _flash * (0.6 + 0.4 * sin(t * 14.0)))
+		PaintScript.rounded(ci, pad, 14.0, fill, colour if lit or won_here else
+			Color(colour, 0.55), 3.0 if lit or won_here else 2.0)
+		# The swatch: the tier as a big badge in its own colour.
+		var badge := Rect2(pad.position + Vector2(8.0, 8.0), Vector2(112.0, pad.size.y - 16.0))
+		PaintScript.rounded(ci, badge, 12.0, colour, colour.darkened(0.35), 2.0)
+		PaintScript.label(ci, title_font, badge.grow(-6.0), WheelScript.TIER_LABELS[tier], 34,
+			PaintScript.CARD_INK if tier == WheelScript.Tier.ONE else Color.WHITE)
+		# Pays line and the odds as pips: one dot per segment the tier owns.
+		PaintScript.label(ci, numeral_font, Rect2(pad.position + Vector2(132.0, 6.0),
+			Vector2(170.0, 30.0)), _pays_text(tier), 20, MenuStyleScript.COLOR_NAME,
+			HORIZONTAL_ALIGNMENT_LEFT)
+		var count: int = WheelScript.segment_count(tier)
+		for pip: int in count:
+			var col: int = pip % 11
+			var row: int = pip / 11
+			ci.draw_circle(pad.position + Vector2(138.0 + 13.0 * float(col),
+				44.0 + 11.0 * float(row)), 4.0, Color(colour, 0.9))
+		# Her stack on this tier.
+		var stake: int = _bets[tier]
+		if stake > 0:
+			var stack_at: Vector2 = pad.position + Vector2(pad.size.x - 132.0,
+				pad.size.y - 18.0)
+			PaintScript.chip_stack(ci, stack_at, clampi(stake / 10, 1, 6),
+				_stack_colour(stake), 4.0)
+			PaintScript.label(ci, numeral_font, Rect2(pad.position + Vector2(pad.size.x - 104.0,
+				8.0), Vector2(96.0, pad.size.y - 16.0)), "%d" % stake, 30,
+				PaintScript.GOLD, HORIZONTAL_ALIGNMENT_RIGHT)
+		elif lit and not _spinning:
+			PaintScript.label(ci, numeral_font, Rect2(pad.position + Vector2(pad.size.x - 140.0,
+				8.0), Vector2(132.0, pad.size.y - 16.0)), "+%d" % chip_value(), 24,
+				Color(PaintScript.GOLD, 0.55), HORIZONTAL_ALIGNMENT_RIGHT)
+
+	# --- the chip she stacks with ------------------------------------------------------------
+	for i: int in STAKES.size():
+		var box: Rect2 = chip_rect(i)
+		var usable: bool = STAKES[i] <= _purse()
+		var chosen: bool = i == _chip
+		var centre: Vector2 = box.get_center() - Vector2(0.0, 8.0 if chosen else 0.0)
+		var colour: Color = PaintScript.CHIP_COLORS[i] if usable else Color(0.30, 0.28, 0.32)
+		if chosen:
+			ci.draw_arc(centre, CHIP_RADIUS + 7.0, 0.0, TAU, 48,
+				Color(PaintScript.GOLD, 0.75 + 0.25 * sin(t * 4.0)), 4.0, true)
+		PaintScript.chip(ci, centre, CHIP_RADIUS, colour, true)
+		PaintScript.label(ci, numeral_font, Rect2(centre - Vector2(CHIP_RADIUS * 0.66, 14.0),
+			Vector2(CHIP_RADIUS * 1.32, 28.0)), str(STAKES[i]), 22,
+			Color.WHITE if i == 2 or not usable else PaintScript.CARD_INK)
+	PaintScript.button(ci, CLEAR, "Clear", Color(0.42, 0.30, 0.52),
+		button_enabled(&"clear"), is_lit(&"clear"))
+
+	# --- spin ----------------------------------------------------------------------------------
+	var spin_text: String = "Spin" if total_bet() <= 0 else "Spin  %d" % total_bet()
+	if _spinning:
+		spin_text = "Spinning"
+	PaintScript.button(ci, SPIN, spin_text, Color(0.95, 0.62, 0.18), can_spin(),
+		is_lit(&"spin"))
+
+
+## A stack's colour is the biggest chip it could be built from.
+func _stack_colour(stake: int) -> Color:
+	if stake >= STAKES[2]:
+		return PaintScript.CHIP_COLORS[2]
+	if stake >= STAKES[1]:
+		return PaintScript.CHIP_COLORS[1]
+	return PaintScript.CHIP_COLORS[0]
