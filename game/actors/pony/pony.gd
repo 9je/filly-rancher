@@ -835,6 +835,9 @@ func is_being_delivered() -> bool:
 	return state == State.LEAVING and _has_leave_target
 
 
+var _rescue_check := 0.5
+
+
 func _physics_process(delta: float) -> void:
 	if state == State.HELD:
 		# Everything below -- gravity, steering, move_and_slide -- is exactly what the
@@ -843,6 +846,11 @@ func _physics_process(delta: float) -> void:
 			_set_detail(Detail.FULL)
 		_state_held(delta)
 		return
+	# Never trapped in a building (PT2): checked twice a second, see Building.rescue_body.
+	_rescue_check -= delta
+	if _rescue_check <= 0.0:
+		_rescue_check = 0.5
+		Building.rescue_body(self)
 
 	# DETAIL TIERS (see _update_detail): a pony far from the camera thinks, moves and
 	# animates on every third or sixth tick, carrying the skipped time with her.

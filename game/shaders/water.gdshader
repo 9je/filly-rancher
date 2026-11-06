@@ -12,6 +12,8 @@ uniform float radius = 16.0;
 uniform vec4 deep : source_color = vec4(0.16, 0.42, 0.72, 1.0);
 uniform vec4 shallow : source_color = vec4(0.42, 0.74, 0.88, 1.0);
 uniform vec4 foam : source_color = vec4(0.94, 0.98, 1.0, 1.0);
+// 1.0 for a lake: nothing under it shows through (playtest 2026-11-05: grass under the water).
+uniform float opacity = 0.92;
 
 varying vec3 world_pos;
 
@@ -34,5 +36,5 @@ void fragment() {
 	c = mix(c, vec3(lum) * vec3(0.92, 0.95, 1.0), clamp(dread, 0.0, 1.0) * 0.6);
 	ALBEDO = c;
 	ROUGHNESS = 0.9;
-	ALPHA = 0.92;
+	ALPHA = opacity;
 }

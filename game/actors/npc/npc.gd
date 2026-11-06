@@ -271,7 +271,15 @@ func is_walking_to() -> bool:
 	return mode == Mode.WALK_TO
 
 
+var _rescue_check := 0.5
+
+
 func _physics_process(delta: float) -> void:
+	# Never trapped in a building (PT2): checked twice a second, see Building.rescue_body.
+	_rescue_check -= delta
+	if _rescue_check <= 0.0:
+		_rescue_check = 0.5
+		Building.rescue_body(self)
 	# Far from the camera her face and mane springs rest (see _update_far).
 	_far_t -= delta
 	if _far_t <= 0.0:
@@ -287,6 +295,7 @@ func _physics_process(delta: float) -> void:
 				if d > follow_distance:
 					var speed := run_speed if d > follow_distance * 3.0 else walk_speed * 1.4
 					desired = to.normalized() * minf(speed, (d - follow_distance) * 2.0 + 0.4)
+				_catch_up(d, delta)
 		Mode.WALK_TO:
 			var to2 := walk_target - global_position
 			to2.y = 0.0
@@ -317,6 +326,58 @@ func _physics_process(delta: float) -> void:
 	_turn(desired, delta)
 	_animate()
 
+
+
+## FALLEN BEHIND AND GAINING NOTHING, SHE CATCHES UP (PT2; playtest 2026-11-05 item 58: Tumble
+## "stuck outside of apple area running into fence"). Her follow is a straight line, and a
+## fence across it held her for good. Past CATCH_UP_FAR and not CATCH_UP_GAIN closer in
+## CATCH_UP_SECONDS, she is set down CATCH_UP_BEHIND behind the player.
+const CATCH_UP_FAR := 6.0
+const CATCH_UP_GAIN := 0.6
+const CATCH_UP_SECONDS := 2.5
+const CATCH_UP_BEHIND := 2.2
+var _best_gap := INF
+var _stalled := 0.0
+
+
+func _catch_up(gap: float, delta: float) -> void:
+	if gap < CATCH_UP_FAR:
+		_best_gap = INF
+		_stalled = 0.0
+		return
+	if gap < _best_gap - CATCH_UP_GAIN:
+		_best_gap = gap
+		_stalled = 0.0
+		return
+	_stalled += delta
+	if _stalled < CATCH_UP_SECONDS:
+		return
+	var t := follow_target.global_transform
+	var face := follow_target.get_node_or_null(^"Visuals") as Node3D
+	var back := (face.global_transform.basis.z if face != null else t.basis.z)
+	back.y = 0.0
+	back = back.normalized() if back.length_squared() > 1e-6 else Vector3.BACK
+	# Behind her if that spot is clear, else beside her, else in front: never inside a prop.
+	for turn: float in [0.0, PI * 0.5, -PI * 0.5, PI]:
+		var at := t.origin + back.rotated(Vector3.UP, turn) * CATCH_UP_BEHIND + Vector3(0, 0.2, 0)
+		if _clear_at(at):
+			global_position = at
+			velocity = Vector3.ZERO
+			break
+	_best_gap = INF
+	_stalled = 0.0
+
+
+func _clear_at(at: Vector3) -> bool:
+	if Building.rescue_point(at) != Vector3.INF or not is_inside_tree():
+		return false
+	var q := PhysicsShapeQueryParameters3D.new()
+	var ball := SphereShape3D.new()
+	ball.radius = 0.5
+	q.shape = ball
+	q.transform = Transform3D(Basis(), at + Vector3(0, 0.7, 0))
+	q.collision_mask = LayersScript.PROPS
+	return get_world_3d().direct_space_state.intersect_shape(q, 1).is_empty()
 
 
 var _far := false

@@ -363,6 +363,7 @@ func _scene(path: String, at: Vector3, yaw: float, s: float, solid: bool) -> voi
 		_wanted[path] = [path]
 		return
 	var xf := Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3.ONE * s), at)
+	placements.append({"model": path.get_file().get_basename(), "at": at})
 	for part: Array in _scene_parts(path):
 		var key := path + "|" + str(part[2])
 		if not _batches.has(key):
@@ -370,6 +371,48 @@ func _scene(path: String, at: Vector3, yaw: float, s: float, solid: bool) -> voi
 		(_batches[key].xf as Array).append(xf * (part[1] as Transform3D))
 	if solid:
 		_collider(Transform3D(Basis().scaled(Vector3.ONE * 1.6 * s), at))
+	else:
+		# ANYTHING TALLER THAN A KNEE IS A THING (PT2; playtest 2026-11-05: a pony spawned inside
+		# a haystack). A non-tree scene stands a collider the size of its own footprint, so the
+		# spawner's prop check, the hooves and the player all meet it.
+		var box := _scene_box(path)
+		if box.size.y * s > KNEE_HEIGHT:
+			_bulk_collider(at, Vector2(box.size.x, box.size.z) * s, box.size.y * s)
+
+
+## Every whole scene this dressing stood: {model, at}. For the tests that walk the valley.
+var placements: Array = []
+
+## Taller than this (metres) and a region's prop scene is solid.
+const KNEE_HEIGHT := 0.45
+
+
+## A converted scene's bounds at scale 1, off the parts it is drawn from.
+func _scene_box(path: String) -> AABB:
+	var box := AABB()
+	var first := true
+	for part: Array in _scene_parts(path):
+		var b: AABB = (part[1] as Transform3D) * (part[0] as Mesh).get_aabb()
+		box = b if first else box.merge(b)
+		first = false
+	return box
+
+
+## An upright cylinder over a prop's footprint: radius from its narrower side (a round hay
+## pile, a square crate), so a pony can stand close beside one without hitting air.
+func _bulk_collider(at: Vector3, size: Vector2, height: float) -> void:
+	var body := StaticBody3D.new()
+	body.collision_layer = LayersScript.PROPS
+	body.collision_mask = 0
+	var shape := CollisionShape3D.new()
+	var cyl := CylinderShape3D.new()
+	cyl.radius = maxf(0.2, minf(size.x, size.y) * 0.45)
+	cyl.height = maxf(0.5, height)
+	shape.shape = cyl
+	shape.position = Vector3(0, cyl.height * 0.5, 0)
+	body.add_child(shape)
+	add_child(body)
+	body.global_transform = Transform3D(Basis(), at)
 
 
 ## A converted scene's meshes with ToonStyler's foliage look baked into them, once per path.

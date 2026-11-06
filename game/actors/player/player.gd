@@ -590,7 +590,15 @@ func _sound_call(method: StringName, args: Array) -> void:
 var speed_mult := 1.0
 
 
+var _rescue_check := 0.5
+
+
 func _physics_process(delta: float) -> void:
+	# Never trapped in a building (PT2): checked twice a second, see Building.rescue_body.
+	_rescue_check -= delta
+	if _rescue_check <= 0.0:
+		_rescue_check = 0.5
+		Building.rescue_body(self)
 	var on_floor := is_on_floor()
 
 	# --- timers -----------------------------------------------------------------

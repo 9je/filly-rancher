@@ -355,9 +355,13 @@ func grass_at(x: float, z: float) -> Color:
 ## A flat, translucent disc of water for a region that has a lake, ready for the caller to
 ## parent wherever it keeps its regional scenery (ranch.gd puts it under $Regions).
 ##
-## NO COLLISION, deliberately: the ground under it is the terrain's own basin, which is
-## walkable, so a pony or a player wading in is standing on real ground the whole way.
-## Water that pushed bodies around would be a swimming mechanic, and there is not one.
+## A WADING FLOOR WADE_DEPTH under the surface (PT2; playtest 2026-11-05 item 61: "i can walk
+## under the lake", ponies sunk to the ears and grass showing through). The basin is deeper
+## than a pony is tall, so a walker now stands on a shelf the water covers to her knees:
+## wading, never under. It is TERRAIN, so the camera and the hooves treat it as ground.
+const WADE_DEPTH := 0.35
+
+
 func build_water(region: RegionDataScript) -> MeshInstance3D:
 	var mesh := CylinderMesh.new()
 	# The inner 70 percent of the region, so the shore is bare basin rather than the water
@@ -384,6 +388,21 @@ func build_water(region: RegionDataScript) -> MeshInstance3D:
 		height_at(region.centre.x, region.centre.y) + region.lake_depth * 0.55 - 0.4,
 		region.centre.y)
 	mat.set_shader_parameter(&"centre", node.position)
+	mat.set_shader_parameter(&"opacity", 1.0)
+	var shelf := StaticBody3D.new()
+	shelf.name = "WadingFloor"
+	shelf.collision_layer = LayersScript.TERRAIN
+	shelf.collision_mask = 0
+	# No splash set exists yet; a lake bed sounds like the mud it is.
+	shelf.set_meta(&"step_surface", &"hoof_dirt")
+	var disc := CylinderShape3D.new()
+	disc.radius = region.radius * 0.7
+	disc.height = 0.2
+	var col := CollisionShape3D.new()
+	col.shape = disc
+	col.position = Vector3(0.0, -WADE_DEPTH - 0.1, 0.0)
+	shelf.add_child(col)
+	node.add_child(shelf)
 	return node
 
 

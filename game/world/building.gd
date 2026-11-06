@@ -1,6 +1,6 @@
 class_name Building
 extends StaticBody3D
-## A gabled farm building -- walls, a doorway you can actually walk through, a
+## A gabled farm building -- walls, a doorway sealed to walkers (PT2: nobody enters on foot), a
 ## pitched roof -- assembled from primitives at load time.
 ##
 ## WHY THIS EXISTS: THE PROP KIT HAS NO BUILDINGS IN IT. That was not obvious from
@@ -273,6 +273,51 @@ var _built := false
 var _wearing := false
 
 
+## Every building standing on the map, for rescue_point().
+static var _all: Array[Building] = []
+
+
+func _enter_tree() -> void:
+	if not _all.has(self):
+		_all.append(self)
+
+
+func _exit_tree() -> void:
+	_all.erase(self)
+
+
+## True if `p` (world) is inside this building's shell: its walls' rectangle, from below its
+## plinth to its ridge. A margin shrinks the rectangle (positive) or grows it (negative).
+func contains_point(p: Vector3, margin := 0.0) -> bool:
+	var l := to_local(p)
+	return absf(l.x) < width * 0.5 - margin and absf(l.z) < depth * 0.5 - margin \
+		and l.y > -SKIRT_DEPTH - 0.5 and l.y < ridge_height
+
+
+## Where somebody found inside a building is set down: on the ground outside its door, at the
+## foot of its ramp (beside a doorless one's front wall). INF when `p` is inside none.
+static func rescue_point(p: Vector3) -> Vector3:
+	for b in _all:
+		if is_instance_valid(b) and b.is_inside_tree() and b.contains_point(p):
+			return b.to_global(Vector3(0.0, 0.0, b.apron_foot_z() + 0.9))
+	return Vector3.INF
+
+
+## Lift `body` out of any building it is inside and stand it outside the door, at rest.
+## True if it was moved. The player, every pony and every townspony call this twice a second:
+## a soft-lock nobody can walk out of is never the answer (playtest 2026-11-05 item 68).
+static func rescue_body(body: Node3D) -> bool:
+	if body == null or not body.is_inside_tree():
+		return false
+	var out := rescue_point(body.global_position)
+	if out == Vector3.INF:
+		return false
+	body.global_position = out + Vector3(0.0, 0.3, 0.0)
+	if body is CharacterBody3D:
+		(body as CharacterBody3D).velocity = Vector3.ZERO
+	return true
+
+
 func _ready() -> void:
 	collision_layer = LayersScript.PROPS
 	collision_mask = 0
@@ -369,6 +414,18 @@ func build() -> void:
 			Vector3(-(width - panel) * 0.5, wall_height * 0.5, front_z), wall_mat, 0.0, 0.0, true)
 		_slab("WallFrontR", Vector3(panel, wall_height, t),
 			Vector3((width - panel) * 0.5, wall_height * 0.5, front_z), wall_mat, 0.0, 0.0, true)
+	# THE DOORWAY IS SHUT (PT2; playtest 2026-11-05: "i can walk in the depot", then stuck
+	# inside it). Nobody enters a building on foot -- the Palace's hall is its own room -- so
+	# the gap the model's door is drawn over is a collider with nothing drawn: she walks up the
+	# ramp to the door, and no further.
+	if door_width > 0.001:
+		var seal := BoxShape3D.new()
+		seal.size = Vector3(door_width, door_height, t)
+		var seal_col := CollisionShape3D.new()
+		seal_col.name = "DoorSeal"
+		seal_col.shape = seal
+		seal_col.position = Vector3(0.0, door_height * 0.5, front_z)
+		add_child(seal_col)
 	var lintel := wall_height - door_height
 	if lintel > 0.001:
 		_slab("Lintel", Vector3(door_width, lintel, t),
