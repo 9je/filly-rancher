@@ -32,6 +32,7 @@ const StockTintScript := preload("res://systems/stock_tint.gd")
 const CutieMarkScript := preload("res://systems/cutie_mark.gd")
 const MarkStampsScript := preload("res://systems/mark_stamps.gd")
 const MarkPaintScript := preload("res://systems/mark_paint.gd")
+const MarkComposerScript := preload("res://systems/mark_composer.gd")
 const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 const PonyVisualsScript := preload("res://actors/pony/pony_visuals.gd")
 const MenuStyleScript := preload("res://ui/menu_style.gd")
@@ -111,8 +112,11 @@ const TURN_DEGREES_PER_SECOND := 24.0
 ## ui_down a no-op there: posmod(index + count, count) is index again), so one pair of
 ## helpers below drives a two column stepper and a six column swatch grid the same way.
 const LOOK_REGIONS: Array[StringName] = [&"name", &"step", &"race", &"coat", &"eyes",
-	&"mane_style", &"confirm"]
-const HAIR_REGIONS: Array[StringName] = [&"step", &"mane", &"mane2", &"tail", &"confirm"]
+	&"confirm"]
+## MANE STYLE LIVES WITH THE MANE (PT11; playtest 2026-11-05: "mane style isnt under mane and
+## tail").
+const HAIR_REGIONS: Array[StringName] = [&"step", &"mane_style", &"mane", &"mane2", &"tail",
+	&"confirm"]
 const MARK_REGIONS: Array[StringName] = [&"step", &"ink", &"stamp", &"tool", &"action",
 	&"confirm"]
 
@@ -212,6 +216,16 @@ func _ready() -> void:
 		MenuStyleScript.frame_box())
 	_style_paper()
 	_build_grids()
+	_build_talent_gallery()
+	_build_surprise_button()
+	# Mane style first on the hair step, the first thing you pick about a mane.
+	var col := get_node_or_null(^"Layout/Panel/Margin/Column") as VBoxContainer
+	var mane_label := get_node_or_null(^"Layout/Panel/Margin/Column/ManeLabel") as Control
+	if col != null and mane_label != null:
+		for n: String in ["ManeStyleLabel", "StyleRow"]:
+			var node := col.get_node_or_null(n) as Control
+			if node != null:
+				col.move_child(node, mane_label.get_index())
 	_wire_steps()
 	var prev := get_node_or_null(^"Layout/Panel/Margin/Column/StyleRow/StylePrev") as Button
 	var nxt := get_node_or_null(^"Layout/Panel/Margin/Column/StyleRow/StyleNext") as Button
@@ -269,6 +283,17 @@ const _PAPER_BUTTON_PATHS: Array[NodePath] = [
 	^"Layout/Panel/Margin/Column/ActionRow/Undo",
 	^"Layout/Panel/Margin/Column/ActionRow/Clear",
 	^"Layout/Panel/Margin/Column/Confirm"]
+
+
+## Paper chrome on a button built in code (the gallery's, Surprise me).
+static func _paper_button(button: Button) -> void:
+	for state: StringName in [&"normal", &"hover", &"pressed", &"focus", &"disabled"]:
+		button.add_theme_stylebox_override(state, MenuStyleScript.field_box(
+			state == &"hover" or state == &"pressed" or state == &"focus"))
+	button.add_theme_color_override("font_color", MenuStyleScript.COLOR_INK)
+	button.add_theme_color_override("font_hover_color", MenuStyleScript.COLOR_INK)
+	button.add_theme_color_override("font_pressed_color", MenuStyleScript.COLOR_INK)
+	button.add_theme_constant_override("outline_size", 0)
 
 
 func _style_paper() -> void:
@@ -455,6 +480,7 @@ func set_eyes(index: int) -> void:
 func set_mane_style(index: int) -> void:
 	_look.mane_style = posmod(index, PlayerLookScript.style_count(_look.race))
 	_build_model()
+	_show_streak()
 	_restyle()
 	_refresh_swatches()
 
@@ -530,6 +556,8 @@ func set_ink(index: int) -> void:
 	_canvas.set_colour(ink_at(index))
 	if _ink_swatch != null:
 		_ink_swatch.color = ink_at(index)
+	if not _talent_buttons.is_empty():
+		_refresh_talent_thumbs()
 
 
 ## Take the look as it stands and hand it over. Returns whether anything happened; a second
@@ -573,16 +601,18 @@ func set_step(value: int) -> void:
 	_step = clampi(value, Step.LOOK, Step.HAIR)
 	var shown: Dictionary = {
 		Step.LOOK: ["NameLabel", "NameBox", "RaceLabel", "RaceGrid", "CoatLabel", "CoatGrid",
-			"EyesLabel", "EyesGrid", "ManeStyleLabel", "StyleRow"],
-		Step.HAIR: ["ManeLabel", "ManeGrid", "Mane2Label", "Mane2Grid", "TailLabel", "TailGrid"],
-		Step.MARK: ["MarkLabel", "MarkCanvas", "HintLabel", "InkRow", "StampRow", "ToolRow",
-			"ActionRow"],
+			"EyesLabel", "EyesGrid"],
+		Step.HAIR: ["ManeStyleLabel", "StyleRow", "ManeLabel", "ManeGrid", "Mane2Label",
+			"Mane2Grid", "TailLabel", "TailGrid"],
+		Step.MARK: ["MarkLabel", "MarkCanvas", "HintLabel", "InkRow", "TalentLabel", "TalentGrid",
+			"MotifRow", "StampRow", "ToolRow", "ActionRow"],
 	}
 	for step: int in shown:
 		for n: String in shown[step]:
 			var node := get_node_or_null(NodePath("Layout/Panel/Margin/Column/" + n)) as Control
 			if node != null:
 				node.visible = step == _step
+	_show_streak()
 	MenuStyleScript.tick_page()
 	# THE CURSOR MOVES WITH THE STEP. The two steps do not share a region list (MARK has no
 	# name field or colour grids; LOOK has no ink/stamp/tool/action rows), so a cursor left
@@ -884,6 +914,144 @@ func _stand_stage() -> void:
 	ToonStyler.style(stage, &"prop", {})
 
 
+## THE STREAK ROW ONLY WHERE THERE IS A STREAK (PT11; playtest 2026-11-05: "mane streak is
+## visible always when its like never used"): shown on the hair step for a mane style whose
+## donor carries second-colour locks, hidden otherwise.
+func _show_streak() -> void:
+	var on := _step == Step.HAIR and style_has_streak()
+	for n: String in ["Mane2Label", "Mane2Grid"]:
+		var node := get_node_or_null(NodePath("Layout/Panel/Margin/Column/" + n)) as Control
+		if node != null:
+			node.visible = on
+
+
+func style_has_streak() -> bool:
+	var donor: StringName = _look.to_pony_look(_palette).donor
+	if donor == &"":
+		return false
+	var entry: Dictionary = DonorTableScript.load_table().find(donor)
+	return not (entry.get("mane2", PackedStringArray()) as PackedStringArray).is_empty()
+
+
+## SURPRISE ME (PT11; playtest 2026-11-05: "maybe random on pony creation?"): a whole new pony,
+## kind, coat, eyes, mane style and colours, and a generated cutie mark; her name is kept.
+func surprise(seed_value: int = -1) -> void:
+	var rng := RandomNumberGenerator.new()
+	if seed_value >= 0:
+		rng.seed = seed_value
+	else:
+		rng.randomize()
+	_look.race = rng.randi_range(0, PlayerLookScript.RACE_NAMES.size() - 1)
+	_look.mane_style = rng.randi_range(0, maxi(1, PlayerLookScript.style_count(_look.race)) - 1)
+	_look.coat = rng.randi_range(0, maxi(1, _palette.coats.size()) - 1)
+	_look.mane = rng.randi_range(0, maxi(1, _palette.manes.size()) - 1)
+	_look.eyes = rng.randi_range(0, maxi(1, _palette.eyes.size()) - 1)
+	_look.mane2 = rng.randi_range(-1, _palette.manes.size() - 1) if rng.randf() < 0.5 else -1
+	_look.tail = rng.randi_range(-1, _palette.manes.size() - 1) if rng.randf() < 0.4 else -1
+	var talents := MarkComposerScript.talent_ids()
+	_motif = rng.randi_range(0, 2)
+	set_ink(rng.randi_range(0, ink_count() - 1))
+	use_talent(talents[rng.randi() % talents.size()])
+	_build_model()
+	_retint_mane_style_grid()
+	_restyle()
+	_show_streak()
+
+
+## A GALLERY OF REAL MARKS TO START FROM (PT11; playtest 2026-11-05: "cutie mark creation has to
+## be better"). The 24 talents the valley's own ponies Bloom into (MarkComposer), drawn in her
+## chosen ink with a gold accent, alone, in a pair or in three: click one and it lands on the
+## canvas, ready to draw over.
+var _motif := 0
+var _talent_buttons: Array[TextureButton] = []
+const ACCENT := Color(1.0, 0.86, 0.42)
+const TALENT_THUMB := 44
+
+
+func _build_talent_gallery() -> void:
+	var column := get_node_or_null(^"Layout/Panel/Margin/Column") as VBoxContainer
+	var stamps := get_node_or_null(^"Layout/Panel/Margin/Column/StampRow") as Control
+	if column == null or stamps == null:
+		return
+	var label := Label.new()
+	label.name = "TalentLabel"
+	label.text = "Or start from a talent"
+	MenuStyleScript.style_label(label, 20, MenuStyleScript.COLOR_INK)
+	column.add_child(label)
+	column.move_child(label, stamps.get_index())
+	var grid := GridContainer.new()
+	grid.name = "TalentGrid"
+	grid.columns = 12
+	grid.add_theme_constant_override(&"h_separation", 6)
+	grid.add_theme_constant_override(&"v_separation", 6)
+	column.add_child(grid)
+	column.move_child(grid, stamps.get_index())
+	for t: StringName in MarkComposerScript.talent_ids():
+		var b := TextureButton.new()
+		b.name = "Talent_" + String(t)
+		b.custom_minimum_size = Vector2(TALENT_THUMB, TALENT_THUMB)
+		b.ignore_texture_size = true
+		b.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+		b.tooltip_text = MarkComposerScript.talent_name(t)
+		b.focus_mode = Control.FOCUS_NONE
+		var talent := t
+		b.pressed.connect(func() -> void: use_talent(talent))
+		grid.add_child(b)
+		_talent_buttons.append(b)
+	var motifs := HBoxContainer.new()
+	motifs.name = "MotifRow"
+	motifs.add_theme_constant_override(&"separation", 8)
+	column.add_child(motifs)
+	column.move_child(motifs, stamps.get_index())
+	for i in 3:
+		var m := Button.new()
+		m.text = ["One", "A pair", "Three"][i]
+		m.focus_mode = Control.FOCUS_NONE
+		var which := i
+		m.pressed.connect(func() -> void:
+			_motif = which
+			_refresh_talent_thumbs())
+		_paper_button(m)
+		motifs.add_child(m)
+	_refresh_talent_thumbs()
+
+
+func _refresh_talent_thumbs() -> void:
+	var ink: Color = _canvas.get("_colour") if _canvas != null and _canvas.get("_colour") is Color else ink_at(0)
+	var talents := MarkComposerScript.talent_ids()
+	for i in mini(_talent_buttons.size(), talents.size()):
+		var img: Image = MarkComposerScript.compose({"talent": talents[i], "motif": _motif, "a": ink, "b": ACCENT})
+		if img != null:
+			_talent_buttons[i].texture_normal = ImageTexture.create_from_image(img)
+
+
+func use_talent(talent: StringName) -> void:
+	var ink: Color = _canvas.get("_colour") if _canvas != null and _canvas.get("_colour") is Color else ink_at(0)
+	var img: Image = MarkComposerScript.compose({"talent": talent, "motif": _motif, "a": ink, "b": ACCENT})
+	if img == null or _canvas == null:
+		return
+	var sized := img.duplicate() as Image
+	var current: Image = _canvas.image()
+	if current != null and sized.get_size() != current.get_size():
+		sized.resize(current.get_width(), current.get_height(), Image.INTERPOLATE_BILINEAR)
+	_canvas.set_image(sized)
+	_sync_mark()
+
+
+func _build_surprise_button() -> void:
+	var row := get_node_or_null(^"Layout/Panel/Margin/Column/StepRow") as HBoxContainer
+	if row == null:
+		return
+	var b := Button.new()
+	b.name = "Surprise"
+	b.text = "Surprise me"
+	b.focus_mode = Control.FOCUS_NONE
+	b.pressed.connect(func() -> void: surprise())
+	_paper_button(b)
+	b.add_theme_color_override("font_color", Color(0.55, 0.25, 0.62))
+	row.add_child(b)
+
+
 func _build_model() -> void:
 	if _model != null and is_instance_valid(_model):
 		_model.queue_free()
@@ -904,6 +1072,11 @@ func _build_model() -> void:
 	if _model != null:
 		_model.rotate_y(PI)
 		_turntable.add_child(_model)
+		# NO HAIR SPRINGS ON THE TURNTABLE (PT11; playtest 2026-11-05: "spinning the pony makes
+		# it bug out", the mane flung spiky and the tail through her): a spin is the stand
+		# turning, not her running, and the preview shows her hair as styled.
+		for sim: SkeletonModifier3D in _model.find_children("*", "SpringBoneSimulator3D", true, false):
+			sim.active = false
 
 
 func _restyle() -> void:

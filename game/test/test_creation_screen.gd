@@ -516,3 +516,37 @@ func test_every_style_of_every_race_wears_the_picked_mane() -> void:
 						found += 1
 			assert_gt(found, 0, "race %d style %d (%s): the turntable body has the mane the paint colours"
 				% [race, style, donor])
+
+
+## PT11 (playtest 2026-11-05: "maybe random on pony creation?", "cutie mark creation has to be
+## better", "mane style isnt under mane and tail", "mane streak is visible always").
+func test_surprise_me_makes_a_new_pony_and_a_mark() -> void:
+	var before: Dictionary = _screen.look().to_dict()
+	_screen.surprise(4242)
+	var after: Dictionary = _screen.look().to_dict()
+	assert_ne(JSON.stringify(after), JSON.stringify(before), "something about her changed")
+	assert_eq(after.get("player_name", ""), before.get("player_name", ""), "her name is kept")
+
+
+func test_a_talent_lands_on_the_canvas() -> void:
+	_screen.set_step(CreationScreen.Step.MARK)
+	_screen.canvas().clear_all()
+	_screen.use_talent(&"music")
+	var img: Image = _screen.canvas().image()
+	var inked := 0
+	for y in range(0, img.get_height(), 4):
+		for x in range(0, img.get_width(), 4):
+			if img.get_pixel(x, y).a > 0.5:
+				inked += 1
+	assert_gt(inked, 10, "the music note is on the canvas")
+
+
+func test_mane_style_is_on_the_hair_step() -> void:
+	assert_has(CreationScreen.HAIR_REGIONS, &"mane_style")
+	assert_does_not_have(CreationScreen.LOOK_REGIONS, &"mane_style")
+
+
+func test_the_streak_row_shows_only_for_a_style_with_a_streak() -> void:
+	_screen.set_step(CreationScreen.Step.HAIR)
+	var row := _screen.find_child("Mane2Grid", true, false) as Control
+	assert_eq(row.visible, _screen.style_has_streak())
