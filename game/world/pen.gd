@@ -155,6 +155,14 @@ const PONY_BODY_RADIUS := 0.42
 ## that catches her, and every centimetre of it is a centimetre of paddock she cannot use.
 const LEASH_MARGIN := 0.35
 
+## Half her length, nose to rump (systems/body_space.gd's footprint, rounded up for the
+## biggest adult): the leash is measured from her middle, and her nose must stay off the rails.
+const PONY_BODY_HALF_LENGTH := 0.8
+## How far a WALKING pony carries past where her leash turns her (a wander is under 1 m/s and
+## the leash is a ramp). A resident never flees inside her own pen (PT4: Pony._react_to_player),
+## so the flee overshoot the wild budgets for (ZoneMarker.ROAM_OVERSHOOT) is not hers.
+const WALK_OVERSHOOT := 0.15
+
 ## Fence carpentry, all in metres.
 const POST_SIZE := 0.16
 const RAIL_THICKNESS := 0.12
@@ -194,7 +202,7 @@ const GATE_SENSOR_RADIUS := 3.0
 ## game/world/props.gd's LAYOUT makes about scattering trees. Bounded, hence
 ## MAX_RESIDENT_SPOTS.
 const SPOT_INNER := 0.55
-const SPOT_STEP := 0.50
+const SPOT_STEP := 0.75
 const GOLDEN_ANGLE := 2.39996322972865332
 
 ## How many residents the spot spiral can seat before its radius runs past the leash.
@@ -721,12 +729,11 @@ func take_gems() -> int:
 ## Where a pony's leash is set for a pen of this half-extent.
 ##
 ## SHE TURNS AROUND HERE, she does not stop here -- see the class comment's measurement 2.
-## The setback is the flee overshoot plus her own body radius plus a little slack, so that
-## even the worst case (straight at the fence, at a gallop) leaves her inside it. Static so
-## tests can pin the arithmetic without building a pen.
+## The setback is a walk's overshoot plus half her length plus a little slack, so her nose
+## turns before the rails. No flee overshoot: a resident never runs from the player in her own
+## pen (Pony._react_to_player). Static so tests can pin the arithmetic without building a pen.
 static func roam_radius_for(half_extent: float) -> float:
-	return maxf(0.0, half_extent - ZoneMarkerScript.ROAM_OVERSHOOT - PONY_BODY_RADIUS
-		- LEASH_MARGIN)
+	return maxf(0.0, half_extent - WALK_OVERSHOOT - PONY_BODY_HALF_LENGTH - LEASH_MARGIN)
 
 
 ## Where resident number `index` is set down, in pen-local space (y = 0). A golden-angle
@@ -806,8 +813,10 @@ func _spawn_body(inst: PonyInstance) -> void:
 	# through the rails, and the only reason nothing had walked out yet was that the fence
 	# was catching them -- which is exactly the "never has to" promise this file makes,
 	# being quietly cashed in every time a pony wandered. Anchored to the centre, the
-	# arithmetic is the one roam_radius_for() actually documents: 1.98 + 1.15 + 0.42 = 3.55,
+	# arithmetic is the one roam_radius_for() actually documents: 2.60 + 0.15 + 0.80 = 3.55,
 	# inside 3.90 with 0.35 m to spare, for every resident regardless of where she stands.
+	# (It was 1.98 m while a resident could still flee in her own pen: eight ponies in a
+	# circle that size fused into one blob, playtest 2026-11-05 item 65.)
 	#
 	# Written as LOCAL positions because a node that is not in the tree yet has no global
 	# transform to assign to -- spawner.gd and magic_beam.gd make the same conversion.

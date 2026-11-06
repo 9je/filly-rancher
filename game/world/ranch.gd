@@ -6131,11 +6131,11 @@ func _report(pony_count: int, prop_count: int) -> void:
 	# doorway.
 	_set_check(checks, "a pen's fence clears a pony's horn tip",
 		PenScript.FENCE_HEIGHT >= 2.138 and PenScript.GATE_CLEARANCE >= 2.138)
-	# roam_radius IS SOFT: fleeing momentum overshoots it by ~1.15 m, so a leash set at the
-	# fence line is a pony clipped through her own paddock.
-	_set_check(checks, "a penned pony's leash stops short of the fence by more than her flee overshoot",
-		PenScript.roam_radius_for(PenScript.HALF_EXTENT) + ZoneMarkerScript.ROAM_OVERSHOOT
-			+ PenScript.PONY_BODY_RADIUS <= PenScript.HALF_EXTENT)
+	# roam_radius IS SOFT: a walk carries her a little past it, and her nose is half her length
+	# ahead of her middle. (A resident never flees in her own pen, so no gallop overshoot.)
+	_set_check(checks, "a penned pony's leash stops her nose short of the fence",
+		PenScript.roam_radius_for(PenScript.HALF_EXTENT) + PenScript.WALK_OVERSHOOT
+			+ PenScript.PONY_BODY_HALF_LENGTH <= PenScript.HALF_EXTENT)
 
 	var catalogue: Array[PlotData] = _plots_catalogue().all()
 	_set_check(checks, "the plot catalogue loaded at all", catalogue.size() > 0)

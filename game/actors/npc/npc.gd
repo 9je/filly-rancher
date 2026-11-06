@@ -8,6 +8,7 @@ extends CharacterBody3D
 ## She talks through game/world/people.gd, which owns the conversations; this node only
 ## acts them out: `act(mood, anim)` sets her face and plays a one-shot or loop clip.
 
+const BodySpaceScript := preload("res://systems/body_space.gd")
 const PonyLodScript := preload("res://actors/pony/pony_lod.gd")
 const ToonStylerScript := preload("res://systems/toon_styler.gd")
 const PonyRigScript := preload("res://scripts/pony_rig.gd")
@@ -197,7 +198,26 @@ func _separation() -> Vector3:
 		push += away.normalized() * (1.0 - d / SEPARATION) * SEPARATION_PUSH
 	if is_inside_tree():
 		push += _space_push()
+		# Following (Tumble at her heels): she makes room like a pony does (systems/body_space.gd).
+		if mode == Mode.FOLLOW:
+			push += BodySpaceScript.push_on(self)
 	return push
+
+
+func _enter_tree() -> void:
+	BodySpaceScript.join(self)
+
+
+func _exit_tree() -> void:
+	BodySpaceScript.leave(self)
+
+
+## Her footprint for BodySpace: a townspony standing at her spot is a fixed thing ponies walk
+## round (weight 0); a companion on the move gives way like anyone (weight 1).
+func body_footprint() -> Dictionary:
+	if not is_visible_in_tree():
+		return {}
+	return BodySpaceScript.default_footprint(self, 1.0 if mode == Mode.FOLLOW else 0.0)
 
 
 ## The step out of a player or wild pony at rest inside STANDING_SPACE.

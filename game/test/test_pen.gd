@@ -289,21 +289,19 @@ func test_the_fence_clears_a_ponys_horn_tip_not_her_withers() -> void:
 		"the gateway must let a 2.138 m pony walk through it")
 
 
-func test_the_leash_stops_short_of_the_fence_by_more_than_the_flee_overshoot() -> void:
-	# roam_radius IS SOFT. A fleeing pony's momentum carries her ~1.15 m past it
-	# (ZoneMarker.ROAM_OVERSHOOT, measured in Phase 1A), so a leash set exactly at the
-	# fence line means a spooked pony clips straight through her own paddock. The leash
-	# has to stop short by the overshoot PLUS her own body radius, or the fence is
-	# decorative.
+func test_the_leash_stops_her_nose_short_of_the_fence() -> void:
+	# roam_radius IS SOFT: a walking pony carries a little past it (Pen.WALK_OVERSHOOT), and
+	# her nose is half her length ahead of her middle. A resident never flees in her own pen
+	# (test_a_resident_does_not_bolt_from_her_farmer), so the wild's 1.15 m gallop overshoot
+	# is not in this sum; it was, and it left eight ponies a 2 m circle to share (PT4).
 	#
 	# MEASURED FROM THE PEN'S CENTRE, which is where every resident's leash is anchored --
-	# see _spawn_body(). If it were anchored to her standing spot instead, her spot's own
-	# offset would have to be in this sum too, and it does not fit.
+	# see _spawn_body().
 	var half: float = PenScript.HALF_EXTENT
 	var roam: float = PenScript.roam_radius_for(half)
-	assert_gt(roam, 0.5, "the leash must leave a pony somewhere to actually walk")
-	assert_lte(roam + ZoneMarkerScript.ROAM_OVERSHOOT + PenScript.PONY_BODY_RADIUS, half,
-		"leash + flee overshoot + body radius must still land inside the fence line")
+	assert_gt(roam, 2.4, "a Grand Pen's eight need most of the paddock")
+	assert_lte(roam + PenScript.WALK_OVERSHOOT + PenScript.PONY_BODY_HALF_LENGTH, half,
+		"leash + walk overshoot + half her length must still land inside the fence line")
 
 
 func test_every_resident_stands_inside_her_own_leash_and_clear_of_her_neighbours() -> void:

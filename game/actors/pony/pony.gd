@@ -105,6 +105,7 @@ extends CharacterBody3D
 ## game/scripts/pony_rig.gd: the global class cache lives in the gitignored game/.godot/
 ## and a fresh clone has not built it yet.
 
+const BodySpaceScript := preload("res://systems/body_space.gd")
 const PonyTraitsScript := preload("res://systems/pony_traits.gd")
 const PonyLodScript := preload("res://actors/pony/pony_lod.gd")
 const GaitScript := preload("res://systems/gait.gd")
@@ -472,6 +473,21 @@ static var _headless := -1
 ## The ground's height at (x, z), set by the ranch (Terrain.height_at): FAR ponies walk on it
 ## without a collision solve.
 static var ground_height: Callable
+
+
+func _enter_tree() -> void:
+	BodySpaceScript.join(self)
+
+
+func _exit_tree() -> void:
+	BodySpaceScript.leave(self)
+
+
+## Her footprint for BodySpace: none while the beam holds her or she is out of sight.
+func body_footprint() -> Dictionary:
+	if state == State.HELD or collision_layer == 0:
+		return {}
+	return BodySpaceScript.default_footprint(self, 1.0)
 
 
 func _ready() -> void:
@@ -887,6 +903,15 @@ func _physics_process(delta: float) -> void:
 		velocity += get_gravity() * delta
 		velocity.y = maxf(velocity.y, -TERMINAL_VELOCITY)
 
+	# NOT INTO ANOTHER BODY (PT4): the part of where she wants to go that points into a pony
+	# she already touches is dropped, so she slides along her or stops rather than walking
+	# through her faster than the two can ease apart.
+	var touching := BodySpaceScript.push_on(self)
+	if touching != Vector3.ZERO and desired != Vector3.ZERO:
+		var out_of := touching.normalized()
+		var into := desired.dot(-out_of)
+		if into > 0.0:
+			desired += out_of * into
 	var rate := ACCELERATION if desired.length_squared() > 0.0 else DECELERATION
 	var horizontal := Vector3(velocity.x, 0.0, velocity.z).move_toward(desired, rate * delta)
 	velocity.x = horizontal.x
@@ -896,8 +921,12 @@ func _physics_process(delta: float) -> void:
 	# (about 47 of 67 us measured, game/scenes/test/perf.gd), and a grazing herd is mostly
 	# standing: with no wish to move, no speed and a floor already under her, there is
 	# nothing for it to resolve.
+	# ROOM FOR HER BODY (PT4): her collider is a post under a long body, so her nose and rump
+	# would pass through other ponies; overlapping footprints slide apart (systems/body_space.gd).
+	var room := BodySpaceScript.push_on(self)
 	var resting := desired == Vector3.ZERO and velocity.length_squared() < 0.0001 \
-		and is_on_floor() and _stood_still
+		and is_on_floor() and _stood_still and room == Vector3.ZERO
+	velocity += room
 	if not resting:
 		# (A collision-free glide for FAR ponies was tried and dropped: it walked them through
 		# trunks and standing stones, which the ranch's own gate rightly refuses.)
@@ -909,6 +938,7 @@ func _physics_process(delta: float) -> void:
 			velocity /= float(stride)
 		else:
 			move_and_slide()
+	velocity -= room
 	_stood_still = desired == Vector3.ZERO and velocity.length_squared() < 0.0001 and is_on_floor()
 	# A WANDERER WHO WALKS INTO A WALL STOPS WALKING INTO IT. She has nowhere to be, and a pony
 	# pressed against a coop or a barn grinds move_and_slide through its full recovery every
@@ -1235,6 +1265,11 @@ func _react_to_player() -> void:
 	if not _sees_player():
 		return
 	var reaction := reaction_state(_personality())
+	# SHE IS HOME. A resident does not bolt from her own farmer: her pen's leash is set for a
+	# walk, not a gallop (Pen.roam_radius_for), and a shy pony running laps of a full paddock
+	# was half of how eight of them ended up in one heap (playtest 2026-11-05 item 65).
+	if reaction == State.FLEE and is_in_group(&"penned"):
+		return
 	# Wary (see _settle_wary): she has already run, and she holds her ground watching unless
 	# the player comes on at her.
 	if reaction == State.FLEE and _wary > 0.0 \

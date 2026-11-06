@@ -480,3 +480,7 @@ The owner's note "its super easy to catch ponies so you can collect all the spot
 ## 2026-11-05 -- decorations stand in hand-placed spots, not anywhere
 
 FS7.1 planned free placement with a ghost. Built instead: twelve decorations (200 to 20,000 bits) sold at the Market, each with its own spot round the homestead, standing the moment it is bought. A spot can never block a road, a pen gate, a building or a townspony (game/test/test_decor.gd holds all twelve clear of each), there is no new placement interface to learn or to break, and the plaza always looks arranged. Two of the twelve are stone statues of Fluttershy and Rainbow Dash (their own bodies, frozen and greyed, on a plinth). Free placement can come later on top of the same catalogue. The collection sets that unlock decorations (FS7.2) are not built yet.
+
+## 2026-11-05 -- the playtest sweep is fixed by cause, not by item
+
+The owner's 70-item playtest (docs/playtest-2026-11-05.md) is planned as eleven groups by shared cause (PLAN.md section PT), each with a test that sweeps every instance of its kind, so a fix to one building, menu or pony cannot leave its siblings broken. The owner asked for exactly this ("tackle ... from the root and make sure its not reoccuring similar elsewhere"). The Wheel becomes a tiered wheel in the style the owner named (Rust's), replacing the colour and number bets.

@@ -102,6 +102,7 @@ extends CharacterBody3D
 const GaitScript := preload("res://systems/gait.gd")
 const PonyRigScript := preload("res://scripts/pony_rig.gd")
 const PonyRegistryScript := preload("res://systems/pony_registry.gd")
+const BodySpaceScript := preload("res://systems/body_space.gd")
 const PonyVisualsScript := preload("res://actors/pony/pony_visuals.gd")
 const StockPaletteScript := preload("res://systems/stock_palette.gd")
 const StockTintScript := preload("res://systems/stock_tint.gd")
@@ -272,6 +273,20 @@ var _worn: PonyLook
 ## The look she is wearing now (what PonyPaint was last handed), or null before any.
 func current_look() -> PonyLook:
 	return _worn
+
+
+func _enter_tree() -> void:
+	BodySpaceScript.join(self)
+
+
+func _exit_tree() -> void:
+	BodySpaceScript.leave(self)
+
+
+## Her footprint for BodySpace (PT4): ponies, townsfolk and Tumble make room for her; she is
+## never shoved herself (weight 0), so a road or a doorway always stays hers to walk.
+func body_footprint() -> Dictionary:
+	return BodySpaceScript.default_footprint(self, 0.0)
 
 
 func _ready() -> void:

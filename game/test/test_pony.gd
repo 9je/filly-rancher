@@ -328,6 +328,16 @@ func test_a_shy_pony_flees_and_gallops_away_from_the_player() -> void:
 		"she flees at the speed her base_speed prescribes")
 
 
+func test_a_resident_does_not_bolt_from_her_farmer() -> void:
+	# PT4: a pen's leash is sized for a walk (Pen.roam_radius_for), so a resident must never
+	# gallop: a shy one running laps of a full paddock was half of the eight-pony heap.
+	var pony := _spawn(PonyDataScript.Personality.SHY, 3.0, Vector3.ZERO)
+	pony.add_to_group(&"penned")
+	_add_player(Vector3(2.0, 0.0, 0.0))
+	await wait_physics_frames(RUN_FRAMES)
+	assert_ne(pony.state, PonyScript.State.FLEE, "a penned pony stays put when her farmer comes close")
+
+
 func test_a_curious_pony_approaches_and_stops_short() -> void:
 	var pony := _spawn(PonyDataScript.Personality.CURIOUS, 3.4, Vector3.ZERO)
 	var player := _add_player(Vector3(4.0, 0.0, 0.0))

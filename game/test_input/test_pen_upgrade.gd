@@ -46,7 +46,8 @@ func _play() -> void:
 	await tap(&"interact")
 	await wait(0.5)
 	var bm: Node = ranch.get("build_menu")
-	if not check(bool(bm.call("is_open")), "E on plot 1 did not open the build menu"):
+	if not check(bool(bm.call("is_open")), "E on plot 1 did not open the build menu (refusal: %s, prompt now '%s')"
+			% [ranch.call("last_denial"), _prompt()]):
 		return
 	var rows: Array = bm.call("row_nodes")
 	await click(rows[0])
@@ -160,6 +161,12 @@ func _stand_at(slot: Node3D, kind: int, out: float, need_clean: bool) -> bool:
 		var at: Vector3 = slot.global_position + side * out
 		await walk_to(at, 0.3, 15.0)
 		await physics(6)
+		# STANDING, not still gliding off the walk: a press while she drifts 6 cm over the
+		# marker line is refused, and the prompt read a frame earlier was right (PT4 run).
+		for settle in 60:
+			if Vector2(player.velocity.x, player.velocity.z).length() < 0.01:
+				break
+			await physics(1)
 		if bool(ranch.get("people").call("is_talking")):
 			await talk_through()
 		var act: Dictionary = ranch.call("current_interaction")
