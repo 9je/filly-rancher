@@ -356,7 +356,7 @@ Gates per group: the new sweep test, the touched GUT files and real-input tests.
 
 ## PS. The playtest sweep, no exceptions (planned 2026-11-06)
 
-> **For agentic workers:** REQUIRED SUB-SKILL: superpowers:executing-plans (owner rule: at most one subagent at a time, sonnet or opus; Fable only for the acceptance review). Steps use checkbox (`- [ ]`) syntax.
+> **For agentic workers:** REQUIRED SUB-SKILL: superpowers:executing-plans (owner rule: at most one subagent at a time, Opus 5.5 only; Fable only for the acceptance review; never Sonnet, Haiku or an older Opus (owner 2026-11-06)). Steps use checkbox (`- [ ]`) syntax.
 
 **Goal:** every one of the 70 items in docs/playtest-2026-11-05.md is met as the owner worded it, plus every known open gap, and each one is proven by evidence somebody other than the implementer has judged.
 
@@ -372,7 +372,7 @@ Gates per group: the new sweep test, the touched GUT files and real-input tests.
 - No em dashes; the house dash is " -- ". Canon MLP names stay. No realistic pony vocals (the rare capture neigh is the one exception). AI voices are on hold.
 - Never open a visible window or take the mouse or the screen. Every Godot launch is an invisible xvfb launch with FILLY_TEST_SAVE_DIR and --log-file set. Run `git checkout -q build/playtest_evidence` after input tests.
 - **No bot playthroughs** (`tools/playthrough*.sh`), not as a gate and not as a check.
-- At most one subagent at a time, sonnet or opus. Fable only for PS13's acceptance review.
+- At most one subagent at a time, on Opus 5.5 (never Sonnet, Haiku or an older Opus; owner 2026-11-06). Fable only for PS13's acceptance review.
 - Root cause and a failing test first. No game-file edits while a test run is going.
 - Never raise IP, Hasbro or a store release.
 - **An item is ticked in the ledger only when its evidence exists and has been looked at**, never because a commit names it. A render is opened and looked at before it counts. Report test results exactly, flakes included. No "all done" report: the report is the ledger.

@@ -18,7 +18,7 @@ const DRAWN_RADIUS := 0.36
 ## or two). No overlap at all, however brief, may reach DEEP.
 const MERGED := 0.15
 const LASTING := 3
-const DEEP := 0.35
+const DEEP := 0.2
 const TEN := [&"twilight", &"rarity", &"applejack", &"fluttershy", &"lyra", &"bonbon",
 	&"derpyhooves", &"octavia", &"minuette", &"carrottop"]
 
