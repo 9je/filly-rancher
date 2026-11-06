@@ -501,3 +501,17 @@ The owner: "were my ponies escaping the paddock? cuz i feel like i was catching 
 - **The casino gate checks slots and the wheel by roll frequency, not by a measured edge.** Their edges are exact by enumeration (unit tested); a 100k-spin measured slots edge has a standard error near two points (a 450x line), and the old 0.6 point check passed only on its seed's luck. Symbol and tier frequencies have no fat tail, so the same tolerance is several standard errors wide.
 - **A result pushed into a closed table lands at once** (a gate, or blackjack's walk-away Stand, settling while nobody watches), so the felt is never still "spinning" when she next walks up to it.
 - The ranch.gd blackjack wiring (play_blackjack deals, blackjack_action, the action_requested connect) went in with the orchestrator's commit e560489 rather than the casino's own.
+
+## 2026-11-05/06 -- the overnight sweep's design calls
+
+Made without asking, per CLAUDE.md; each is the smallest change that fixes the owner's note at its cause.
+- **Buildings are not entered on foot.** Every doorway is sealed; the Palace hall is still reached through its doors by Ranch.enter_palace. A worn model now stands 0.2 m over the highest ground under it instead of on a 1.8 m pedestal (the plinth only shows where the ground falls away).
+- **The camera's field of view defaults to 60, not 75.** A save holding the old default is moved once; a chosen value is kept.
+- **A delivery pays a handler's share** (a quarter of its credit, into the purse) ON TOP of the full credit coming off the balance, so the story's pace of paying the debt is unchanged. Food sells in sacks (hay 20 for 20 bits).
+- **Rarer ponies weave in the beam.** Uncommon, rare and legendary ponies drift off the crosshair while held; only time on the crosshair secures them. Commons and Drifters are caught exactly as before. Tuned so the endings bot still catches them (its servos outrun the weave).
+- **A new area opens with one of its rares** standing inside the gate, pointed out like a sighting.
+- **An Escape Artist comes home at dawn**; nobody the player owns is ever spawned in the wild as well.
+- **Spike gives tips** (E at Spike): the most useful thing to know right now.
+- **The pause menu opens mid conversation**; the talk box steps aside and comes back.
+- **Toasts live at the bottom centre**, wrap at 900 px, and hold while paused.
+- **The Wheel is a Rust-style tiered wheel** (1x to 20x on 45 segments); Blackjack has real decisions. (The casino agent's own calls are logged above under 2026-11-05.)
