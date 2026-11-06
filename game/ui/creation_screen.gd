@@ -33,6 +33,7 @@ const CutieMarkScript := preload("res://systems/cutie_mark.gd")
 const MarkStampsScript := preload("res://systems/mark_stamps.gd")
 const MarkPaintScript := preload("res://systems/mark_paint.gd")
 const MarkComposerScript := preload("res://systems/mark_composer.gd")
+const PonySurpriseScript := preload("res://systems/pony_surprise.gd")
 const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 const PonyVisualsScript := preload("res://actors/pony/pony_visuals.gd")
 const MenuStyleScript := preload("res://ui/menu_style.gd")
@@ -936,22 +937,18 @@ func style_has_streak() -> bool:
 ## SURPRISE ME (PT11; playtest 2026-11-05: "maybe random on pony creation?"): a whole new pony,
 ## kind, coat, eyes, mane style and colours, and a generated cutie mark; her name is kept.
 func surprise(seed_value: int = -1) -> void:
-	var rng := RandomNumberGenerator.new()
-	if seed_value >= 0:
-		rng.seed = seed_value
-	else:
-		rng.randomize()
-	_look.race = rng.randi_range(0, PlayerLookScript.RACE_NAMES.size() - 1)
-	_look.mane_style = rng.randi_range(0, maxi(1, PlayerLookScript.style_count(_look.race)) - 1)
-	_look.coat = rng.randi_range(0, maxi(1, _palette.coats.size()) - 1)
-	_look.mane = rng.randi_range(0, maxi(1, _palette.manes.size()) - 1)
-	_look.eyes = rng.randi_range(0, maxi(1, _palette.eyes.size()) - 1)
-	_look.mane2 = rng.randi_range(-1, _palette.manes.size() - 1) if rng.randf() < 0.5 else -1
-	_look.tail = rng.randi_range(-1, _palette.manes.size() - 1) if rng.randf() < 0.4 else -1
-	var talents := MarkComposerScript.talent_ids()
-	_motif = rng.randi_range(0, 2)
-	set_ink(rng.randi_range(0, ink_count() - 1))
-	use_talent(talents[rng.randi() % talents.size()])
+	var r: Dictionary = PonySurpriseScript.roll(seed_value, _palette.coats.size(),
+		_palette.manes.size(), _palette.eyes.size(), ink_count())
+	_look.race = int(r.race)
+	_look.mane_style = int(r.mane_style)
+	_look.coat = int(r.coat)
+	_look.mane = int(r.mane)
+	_look.eyes = int(r.eyes)
+	_look.mane2 = int(r.mane2)
+	_look.tail = int(r.tail)
+	_motif = int(r.motif)
+	set_ink(int(r.ink))
+	use_talent(StringName(r.talent))
 	_build_model()
 	_retint_mane_style_grid()
 	_restyle()
