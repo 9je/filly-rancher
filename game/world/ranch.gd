@@ -1645,6 +1645,13 @@ func _on_menu_opened(_slot: PlotSlot) -> void:
 
 
 func _on_menu_closed() -> void:
+	if _talk_hidden_for_pause:
+		_talk_hidden_for_pause = false
+		var talk: CanvasLayer = people.get("talk_box") if people != null else null
+		if talk != null and people.is_talking():
+			talk.visible = true
+			# The conversation keeps the world paused and the cursor free, as it was.
+			return
 	get_tree().paused = false
 	_set_cursor_captured(true)
 	_set_hud_overlay(false)
@@ -2446,7 +2453,9 @@ func _bind_pause_menu() -> void:
 	_settings.load_from()
 	_apply_settings()
 	pause_menu.set("settings", _settings)
-	pause_menu.set("can_open", func() -> bool: return _no_menu_but(pause_menu))
+	# PAUSE WORKS MID CONVERSATION (PT11; playtest 2026-11-05: "i cant pause in convo"). The
+	# talk box steps aside while the pause menu is up and the line waits where it was.
+	pause_menu.set("can_open", func() -> bool: return _no_menu_but(pause_menu, true))
 	# WHAT THE COMPENDIUM AND REQUESTS PAGES DRAW (game/ui/pause_menu.gd). Pushed in rather
 	# than pulled by the menu, exactly like `settings` above: the menu is instantiated bare
 	# by its own tests and by the boot shutter, and a page that loaded the roster off disk
@@ -2494,14 +2503,14 @@ func _bind_pause_menu() -> void:
 ## call site that happened to remember it, so MarketMenu.open() would cheerfully open over
 ## an open pause menu. Asking one question, excluding only the menu doing the asking, is
 ## what keeps the two directions from drifting apart again.
-func _no_menu_but(menu: CanvasLayer) -> bool:
+func _no_menu_but(menu: CanvasLayer, over_talk := false) -> bool:
 	for other in [build_menu, market_menu, pause_menu, depot_menu, creation_screen,
 			casino_menu, slots_menu, wheel_menu, blackjack_menu, race_menu, letter_panel]:
 		if other == menu or other == null:
 			continue
 		if other.has_method("is_open") and other.is_open():
 			return false
-	if people != null and people.is_talking():
+	if not over_talk and people != null and people.is_talking():
 		return false
 	if epilogue != null and is_instance_valid(epilogue):
 		return false
@@ -2638,6 +2647,13 @@ func _on_market_opened() -> void:
 
 func _on_pause_opened() -> void:
 	_on_menu_opened(null)
+	var talk: CanvasLayer = people.get("talk_box") if people != null else null
+	if talk != null and people.is_talking():
+		talk.visible = false
+		_talk_hidden_for_pause = true
+
+
+var _talk_hidden_for_pause := false
 
 
 func _on_sell_requested(rarity: int, count: int) -> void:
