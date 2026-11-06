@@ -25,6 +25,31 @@ const PRESETS := {
 	&"flat": {"outline_px": 0.0, "rim": 0.0, "shadow_fill": 0.38, "fade_end": 0.0},
 }
 
+## ONE PALETTE FOR THE KIT (FS2.3; gap list item 2, "the art reads as a kit-bash"). Measured
+## 2026-11-06 (test/test_kit_palette.gd): a few families are painted far darker than the rest
+## of the valley, mean brightness 0.15 to 0.33 against 0.4 to 0.9 for the rest, and read as
+## black blobs under the toon shadow. Each is lifted (albedo times this) into the band, by
+## file name prefix, longest first.
+const FAMILY_LIFT := {
+	"saa_corn_plant": 2.6, "saa_dead_tree_large": 2.2, "saa_tree_dead": 1.6,
+	"school_swingframe": 2.3, "school_picnic_table": 1.4, "mlp_apple_tree_bare": 1.35,
+	"mlp_bush": 1.25,
+}
+## The band every family's lifted mean albedo brightness must sit in.
+const KIT_VALUE_MIN := 0.36
+const KIT_VALUE_MAX := 0.95
+
+
+## The lift for a model file (or its basename), 1.0 for most.
+static func lift_for(file: String) -> float:
+	var f := file.get_file().to_lower()
+	var best := ""
+	for k: String in FAMILY_LIFT:
+		if f.begins_with(k) and k.length() > best.length():
+			best = k
+	return float(FAMILY_LIFT[best]) if best != "" else 1.0
+
+
 ## Outline width is multiplied by this; the graphics settings set it (0 disables lines).
 static var outline_scale: float = 1.0
 
@@ -42,7 +67,8 @@ static var _shared: Dictionary = {}
 ## Style every surface under `root`. Returns the number of surfaces converted.
 ## `category` picks a preset; `cache` is the material cache to use (pass {} for a private
 ## one, or omit for the process-wide shared cache).
-static func style(root: Node, category: StringName = &"prop", cache: Variant = null) -> int:
+static func style(root: Node, category: StringName = &"prop", cache: Variant = null,
+		lift: float = 1.0) -> int:
 	if root == null or not shading_enabled:
 		return 0
 	var store: Dictionary = _shared if cache == null else cache
@@ -60,6 +86,8 @@ static func style(root: Node, category: StringName = &"prop", cache: Variant = n
 			var src: Material = mi.get_active_material(i)
 			if src is StandardMaterial3D:
 				var key := "%d:%s" % [src.get_instance_id(), category]
+				if lift != 1.0:
+					key += ":lift%.2f" % lift
 				# The mark is her body's; a wing or a "Circle" handed the body's material gets
 				# its plain coat (see is_mark_texture).
 				if mark_body != null and mi != mark_body \
@@ -95,6 +123,8 @@ static func style(root: Node, category: StringName = &"prop", cache: Variant = n
 					store[key] = out
 				if out == null:
 					out = to_toon(src as StandardMaterial3D, preset)
+					if lift != 1.0:
+						_lift(out, lift)
 					store[key] = out
 				mi.set_surface_override_material(i, out)
 				touched += 1
@@ -403,6 +433,15 @@ static func make_outline(color: Color, tex: Texture2D, px: float, fade_end: floa
 
 ## The preset a prop file reads best with: soft thin lines for plants, the prop line for
 ## everything else.
+## Brighten a toon material and its outline-free twin by `lift` (FAMILY_LIFT).
+static func _lift(m: ShaderMaterial, lift: float) -> void:
+	for mat: Variant in [m, m.get_meta(BARE_META, null)]:
+		if mat is ShaderMaterial:
+			var c: Color = (mat as ShaderMaterial).get_shader_parameter(&"albedo")
+			(mat as ShaderMaterial).set_shader_parameter(&"albedo",
+				Color(c.r * lift, c.g * lift, c.b * lift, c.a))
+
+
 static func category_for(file: String) -> StringName:
 	var f := file.to_lower()
 	for k in ["tree", "bush", "grass", "flower", "leaf", "hedge", "plant"]:

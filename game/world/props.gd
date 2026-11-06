@@ -635,7 +635,8 @@ func build_paced(pace: Callable) -> int:
 			push_error("Props: '%s' failed to instantiate" % path)
 			continue
 		# One light model for the whole valley (game/systems/toon_styler.gd).
-		ToonStylerScript.style(inst, ToonStylerScript.category_for(file))
+		ToonStylerScript.style(inst, ToonStylerScript.category_for(file), null,
+			ToonStylerScript.lift_for(file))
 
 		var at: Vector2 = entry["at"]
 		inst.name = "%s_%d" % [file.get_basename(), _placed.size()]
