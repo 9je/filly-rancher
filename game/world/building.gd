@@ -312,6 +312,13 @@ static func rescue_body(body: Node3D) -> bool:
 	var out := rescue_point(body.global_position)
 	if out == Vector3.INF:
 		return false
+	# On the ground actually there, not at the building's own origin height (checkpoint
+	# review: on a rising slope that was under the terrain).
+	var space := body.get_world_3d().direct_space_state
+	var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(out + Vector3(0, 4, 0),
+		out + Vector3(0, -6, 0), LayersScript.WORLD))
+	if not hit.is_empty():
+		out = hit.position
 	body.global_position = out + Vector3(0.0, 0.3, 0.0)
 	if body is CharacterBody3D:
 		(body as CharacterBody3D).velocity = Vector3.ZERO

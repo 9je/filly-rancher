@@ -22,6 +22,8 @@ const RADIUS := 0.3
 ## Within this much of a weightless body (the player, a townspony at her spot), nothing is slid
 ## toward it.
 const NEAR_FIXED := 0.6
+## Bodies further apart than this in height are on different floors.
+const SAME_FLOOR := 3.0
 
 static var _members: Array[Node3D] = []
 static var _frame := -1
@@ -60,7 +62,7 @@ static func default_footprint(n: Node3D, weight: float) -> Dictionary:
 	heading.y = 0.0
 	heading = heading.normalized() if heading.length_squared() > 1e-6 else Vector3.FORWARD
 	var at := n.global_position
-	return {"at": Vector3(at.x, 0.0, at.z), "heading": heading, "half": HALF * s,
+	return {"at": Vector3(at.x, 0.0, at.z), "y": at.y, "heading": heading, "half": HALF * s,
 		"radius": RADIUS * s, "weight": weight, "id": n.get_instance_id()}
 
 
@@ -186,6 +188,9 @@ static func _solve() -> void:
 			if i == j:
 				continue
 			if ai.distance_squared_to(fps[j].at) > reach * reach:
+				continue
+			# A floor apart (the Palace hall is under the map): not the same crowd.
+			if absf(float(fps[i].get("y", 0.0)) - float(fps[j].get("y", 0.0))) > SAME_FLOOR:
 				continue
 			push += push_between(fps[i], fps[j])
 			if float(fps[j].get("weight", 1.0)) <= 0.0:

@@ -404,7 +404,8 @@ func _clear_at(at: Vector3) -> bool:
 	ball.radius = 0.5
 	q.shape = ball
 	q.transform = Transform3D(Basis(), at + Vector3(0, 0.7, 0))
-	q.collision_mask = LayersScript.PROPS
+	# TERRAIN too: the factory's rooms are plain bodies on the default layer (checkpoint review).
+	q.collision_mask = LayersScript.PROPS | LayersScript.TERRAIN
 	return get_world_3d().direct_space_state.intersect_shape(q, 1).is_empty()
 
 

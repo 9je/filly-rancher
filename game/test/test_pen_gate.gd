@@ -160,6 +160,12 @@ func test_a_resident_is_spawned_with_the_mask_that_keeps_her_in() -> void:
 	assert_eq(body.collision_layer, LayersScript.PONY, "she is on the PONY layer")
 	assert_ne(body.collision_mask & LayersScript.PEN_GATE, 0,
 		"...and her mask includes the gate leaf, or the paddock is open on the gate side")
+	# PT checkpoint review: nothing put a resident in this group, so Pony._react_to_player's
+	# "a resident never bolts" (which the walk-only leash depends on) never held in play.
+	assert_true(body.is_in_group(&"penned"), "she is known to be a resident")
+	var out: Node3D = pen.release_body(inst.uid, self)
+	assert_false(out.is_in_group(&"penned"), "and is not one once she is let out")
+	out.queue_free()
 
 
 # --- the gateway, measured -------------------------------------------------------------------

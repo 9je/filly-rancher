@@ -403,6 +403,7 @@ func release_body(uid: StringName, new_parent: Node3D) -> Node3D:
 	_bodies.erase(uid)
 	if body is CollisionObject3D:
 		(body as CollisionObject3D).collision_mask = LayersScript.WALKABLE
+	body.remove_from_group(&"penned")
 	_held_bodies.erase(uid)
 	inst.home_slot = &""
 	ProductionScript.forget(uid)
@@ -796,6 +797,11 @@ func _spawn_body(inst: PonyInstance) -> void:
 		detection.collision_mask = LayersScript.PLAYER
 
 	pony.roam_radius = roam_radius_for(HALF_EXTENT)
+	# SHE IS A RESIDENT, and the pony says so to everything that asks (her face, the guide,
+	# the people's list of wild ponies, and above all Pony._react_to_player: a resident never
+	# bolts, which is what roam_radius_for's walk-only setback assumes). Nothing set this
+	# before the PT checkpoint review, so every reader of the group read "not penned".
+	pony.add_to_group(&"penned")
 
 	# --- HER LEASH IS ANCHORED TO THE MIDDLE OF THE PEN, AND THAT IS THE WHOLE TRICK -------
 	#
