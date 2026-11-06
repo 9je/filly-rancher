@@ -132,3 +132,28 @@ func test_her_mane_and_tail_are_thrown_with_the_bounce_and_let_go_after() -> voi
 	for i in 420:
 		b.call("step", 1.0 / 60.0)
 	assert_eq(sim.get_external_force(), Vector3.ZERO, "let go once she has settled")
+
+
+## PT11 (playtest 2026-11-05: "i was dropping twilight from the beam i thought it would do it
+## from that height"): a pony who lands hard bounces, as the player does.
+func test_a_pony_dropped_from_a_height_bounces_on_landing() -> void:
+	var floor_body := StaticBody3D.new()
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(20, 1, 20)
+	shape.shape = box
+	shape.position.y = -0.5
+	floor_body.add_child(shape)
+	add_child_autofree(floor_body)
+	var pony: CharacterBody3D = preload("res://actors/pony/pony.tscn").instantiate()
+	pony.position = Vector3(0, 4.0, 0)
+	pony.call("setup", load("res://data/ponies/applebloom.tres"))
+	add_child_autofree(pony)
+	var bounce: Node = pony.find_children("RumpBounce", "", true, false)[0]
+	var moved := false
+	for f in 120:
+		await wait_physics_frames(1)
+		if absf(float(bounce.call("amount"))) > 0.005:
+			moved = true
+			break
+	assert_true(moved, "she bounced when she hit the ground")

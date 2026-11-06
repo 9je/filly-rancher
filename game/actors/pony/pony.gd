@@ -106,6 +106,8 @@ extends CharacterBody3D
 ## and a fresh clone has not built it yet.
 
 const BodySpaceScript := preload("res://systems/body_space.gd")
+## Landing faster than this (m/s) bounces her hindquarters, as it does the player's.
+const LAND_BOUNCE_FROM := 3.0
 const PonyTraitsScript := preload("res://systems/pony_traits.gd")
 const PonyLodScript := preload("res://actors/pony/pony_lod.gd")
 const GaitScript := preload("res://systems/gait.gd")
@@ -935,6 +937,11 @@ func _physics_process(delta: float) -> void:
 	var resting := desired == Vector3.ZERO and velocity.length_squared() < 0.0001 \
 		and is_on_floor() and _stood_still and room == Vector3.ZERO
 	velocity += room
+	# DROPPED FROM A HEIGHT, SHE BOUNCES (PT11; playtest 2026-11-05: "i was dropping twilight from
+	# the beam i thought it would do it from that height"): the player's own landing rule
+	# (Player.LAND_BOUNCE_FROM), on her.
+	var was_airborne := not is_on_floor()
+	var fall_speed := -velocity.y
 	if not resting:
 		# (A collision-free glide for FAR ponies was tried and dropped: it walked them through
 		# trunks and standing stones, which the ranch's own gate rightly refuses.)
@@ -947,6 +954,8 @@ func _physics_process(delta: float) -> void:
 		else:
 			move_and_slide()
 	velocity -= room
+	if was_airborne and is_on_floor() and fall_speed > LAND_BOUNCE_FROM:
+		RumpBounce.kick_on(visuals, clampf(fall_speed / 7.0, 0.3, 1.2))
 	_stood_still = desired == Vector3.ZERO and velocity.length_squared() < 0.0001 and is_on_floor()
 	# A WANDERER WHO WALKS INTO A WALL STOPS WALKING INTO IT. She has nowhere to be, and a pony
 	# pressed against a coop or a barn grinds move_and_slide through its full recovery every
@@ -1553,6 +1562,15 @@ func _facing_direction(desired: Vector3) -> Vector3:
 ## the `Visuals` child turns, never the body: the capsule is rotationally symmetric
 ## about Y so rotating the body would change nothing about collision, and DetectionArea
 ## is a sphere for the same reason -- exactly the split player.gd documents.
+## Turn her to face `direction` (flat) at once, and keep facing it until she next moves.
+func face(direction: Vector3) -> void:
+	direction.y = 0.0
+	if direction.length_squared() < 1e-6:
+		return
+	_visual_yaw = atan2(-direction.x, -direction.z)
+	visuals.rotation.y = _visual_yaw
+
+
 func _update_facing(direction: Vector3, delta: float) -> void:
 	if direction.length_squared() > 0.0:
 		# The asset's forward is -Z (baked in by export_blend.py --rotate-z 180), same

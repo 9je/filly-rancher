@@ -4631,6 +4631,12 @@ func _launch_into_pen(pen: Pen, instance: PonyInstance) -> void:
 		if not is_instance_valid(look):
 			return
 		look.visible = true
+		# SIDE ON TO THE LENS (PT11; playtest 2026-11-05: "they always face you when you place
+		# it", so the bounce happened behind her). She lands across the camera's view.
+		var cam := get_viewport().get_camera_3d()
+		if cam != null and body != null and body.has_method("face"):
+			var across := cam.global_transform.basis.x
+			body.call("face", across if randf() < 0.5 else -across)
 		# The owner's slapstick bounce: she flops in rump first, and hops for joy (FS4.3).
 		RumpBounce.kick_on(look, 1.0)
 		if body != null and body.has_method("play_action"):
