@@ -711,6 +711,9 @@ func set_held(is_held: bool) -> void:
 			return
 		velocity = Vector3.ZERO
 		_held_seconds = 0.0
+		# Lifted, she neither leans nor carries her last stride into the drop (FS4.2 review).
+		_gait_blend.reset()
+		visuals.rotation.z = 0.0
 		_transition_to(State.HELD)
 		return
 

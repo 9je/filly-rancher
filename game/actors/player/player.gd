@@ -714,6 +714,8 @@ func _update_facing(direction: Vector3, delta: float) -> void:
 func face(yaw: float) -> void:
 	_visual_yaw = yaw
 	visuals.rotation.y = yaw
+	visuals.rotation.z = 0.0
+	_gait_blend.reset()
 
 
 ## Pick `idle` / `walk` / `gallop` and scale playback so the gait matches the ground.

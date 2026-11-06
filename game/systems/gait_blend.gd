@@ -34,6 +34,15 @@ var _below := 0.0
 var _roll := 0.0
 
 
+## Standing, upright, no memory of the last stride: for a body lifted, dropped or put
+## somewhere rather than walked there.
+func reset() -> void:
+	_shown = 0.0
+	_clip = &"idle"
+	_below = 0.0
+	_roll = 0.0
+
+
 ## The speed her legs show for a true ground speed of `speed`, advanced by `delta`.
 func shown_speed(speed: float, delta: float) -> float:
 	var s := absf(speed)

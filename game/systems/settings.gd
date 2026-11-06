@@ -170,6 +170,10 @@ var bindings: Dictionary = {}
 var pad_bindings: Dictionary = {}
 ## Buttons never bound: B backs out of every menu, Guide belongs to the system, and the
 ## D-pad's up and down are the camera's zoom.
+## Actions that share another's pad button and follow it when it is rebound: on a pad, L3 is
+## both the run (sprint) and the Gallop Shoes' burst (gallop), and the Controls menu shows the
+## one row (review 2026-11-06: rebinding Gallop left L3 still sprinting).
+const PAD_SHADOWS := {&"sprint": &"gallop"}
 const PAD_RESERVED: Array[int] = [JOY_BUTTON_B, JOY_BUTTON_GUIDE, JOY_BUTTON_DPAD_UP,
 	JOY_BUTTON_DPAD_DOWN]
 var mouse_sensitivity := SENSITIVITY_DEFAULT
@@ -456,6 +460,16 @@ static func key_label(keycode: int) -> String:
 ## project's own events first, so an action whose key or button was taken, or that went back
 ## to its default, never keeps one it no longer has; mouse and stick events stay as authored.
 func apply_bindings() -> void:
+	for shadow: StringName in PAD_SHADOWS:
+		if not InputMap.has_action(shadow):
+			continue
+		for e in InputMap.action_get_events(shadow):
+			if e is InputEventJoypadButton:
+				InputMap.action_erase_event(shadow, e)
+		var pe := InputEventJoypadButton.new()
+		pe.button_index = pad_button_of(PAD_SHADOWS[shadow], pad_bindings) as JoyButton
+		pe.device = -1
+		InputMap.action_add_event(shadow, pe)
 	for action in REBINDABLE:
 		if not InputMap.has_action(action):
 			continue

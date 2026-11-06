@@ -380,3 +380,22 @@ func test_a_saved_pad_bind_that_is_nonsense_is_dropped() -> void:
 	var b := SettingsScript.new()
 	b.load_from(SCRATCH)
 	assert_eq(b.pad_bindings, {&"sneak": JOY_BUTTON_Y})
+
+
+## Review 2026-11-06: on a pad the run and the Gallop row share L3; moving Gallop moves the run.
+func test_the_run_follows_the_gallop_button() -> void:
+	var a := SettingsScript.new()
+	a.pad_bind(&"gallop", JOY_BUTTON_RIGHT_STICK)
+	a.apply_bindings()
+	var buttons: Array[int] = []
+	for e in InputMap.action_get_events(&"sprint"):
+		if e is InputEventJoypadButton:
+			buttons.append(int((e as InputEventJoypadButton).button_index))
+	assert_eq(buttons, [JOY_BUTTON_RIGHT_STICK] as Array[int], "the run is on the new button only")
+	a.unbind(&"gallop")
+	a.apply_bindings()
+	buttons.clear()
+	for e in InputMap.action_get_events(&"sprint"):
+		if e is InputEventJoypadButton:
+			buttons.append(int((e as InputEventJoypadButton).button_index))
+	assert_eq(buttons, [JOY_BUTTON_LEFT_STICK] as Array[int], "and back on L3 with the default")

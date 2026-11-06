@@ -78,3 +78,26 @@ func test_a_lift_reaches_the_material_it_makes() -> void:
 	ToonStylerScript.shading_enabled = DisplayServer.get_name() != "headless"
 	assert_almost_eq(ToonStylerScript.lift_for("saa_tree_dead_wide.glb"), 1.6, 0.001)
 	assert_almost_eq(ToonStylerScript.lift_for("saa_tree_wide.glb"), 1.0, 0.001)
+
+
+## Review 2026-11-06: the bought decorations (world/decor_layer.gd) styled the same models
+## without the lift; style() now finds the lift from the model's own scene file.
+func test_a_model_styled_anywhere_gets_its_family_lift() -> void:
+	ToonStylerScript.shading_enabled = true
+	var inst: Node3D = (load("res://assets/converted/props/mlp_bush.glb") as PackedScene).instantiate()
+	add_child_autofree(inst)
+	ToonStylerScript.style(inst, &"prop", {})
+	var lifted := false
+	for n in inst.find_children("*", "MeshInstance3D", true, false):
+		var mi := n as MeshInstance3D
+		var src := mi.mesh.surface_get_material(0) as StandardMaterial3D
+		var out := mi.get_surface_override_material(0) as ShaderMaterial
+		if src != null and out != null:
+			var c: Color = out.get_shader_parameter(&"albedo")
+			lifted = is_equal_approx(c.g, src.albedo_color.g * ToonStylerScript.lift_for("mlp_bush.glb"))
+			if out.next_pass is ShaderMaterial:
+				assert_almost_eq((out.next_pass.get_shader_parameter(&"albedo") as Color).g,
+					c.g, 0.001, "the outline is lifted with it")
+			break
+	ToonStylerScript.shading_enabled = DisplayServer.get_name() != "headless"
+	assert_true(lifted, "a bush styled with no lift named gets the bush's lift")

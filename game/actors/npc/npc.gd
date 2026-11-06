@@ -157,6 +157,8 @@ func set_talking(on: bool, amount: float = 0.0) -> void:
 		_face.talk_amount = amount if on else 0.0
 	if _anim != null and not _one_shot and velocity.length() < 0.2:
 		if on and _anim.has_animation(&"talk"):
+			# Stopped to talk: the settle ladder (systems/gait_blend.gd) does not walk over it.
+			_gait_blend.reset()
 			_play(&"talk")
 		elif not on and _anim.current_animation == &"talk":
 			_play(standing_clip)

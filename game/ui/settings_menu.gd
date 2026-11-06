@@ -386,7 +386,9 @@ func _specs() -> Array:
 	for action in SettingsScript.REBINDABLE:
 		(out[2] as Array).append([StringName("key_" + String(action)),
 			String(SettingsScript.ACTION_NAMES.get(action, String(action))), Kind.KEY,
-			"Select it, then press the new key or controller button. Backspace puts the originals back; Esc or B leaves it as it is."])
+			"Select it, then press the new key or controller button. Backspace puts the originals back; Esc or B leaves it as it is."
+			if SettingsScript.pad_rebindable(action) else
+			"Select it, then press the new key. Backspace puts the original back; Esc leaves it as it is. The stick moves her either way."])
 	for pair in [[&"beam", "Magic beam"], [&"look", "Look around"], [&"zoom", "Camera distance"]]:
 		(out[2] as Array).append([StringName("info_" + String(pair[0])), String(pair[1]), Kind.INFO,
 			"Fixed: the mouse and the sticks are not rebound."])

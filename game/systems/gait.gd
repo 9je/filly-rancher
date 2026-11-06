@@ -225,7 +225,9 @@ static func playback_scale_for_clip(clip: StringName, speed: float) -> float:
 		&"gallop":
 			return gallop_playback_scale_for_speed(speed)
 		&"trot":
-			return absf(speed) / TROT_CLIP_SPEED
+			# Floored like the walk: a settle step down through the trot (systems/gait_blend.gd)
+			# shows it under its band, where speed alone would freeze it (review 2026-11-06).
+			return maxf(MIN_PLAYBACK, absf(speed) / TROT_CLIP_SPEED)
 		_:
 			return 1.0
 

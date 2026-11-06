@@ -67,10 +67,14 @@ static var _shared: Dictionary = {}
 ## Style every surface under `root`. Returns the number of surfaces converted.
 ## `category` picks a preset; `cache` is the material cache to use (pass {} for a private
 ## one, or omit for the process-wide shared cache).
+## `lift` brightens the albedo (FAMILY_LIFT); left below zero it is the model's own, from the
+## scene file `root` was instanced from, so no caller can miss it (the bought decorations did).
 static func style(root: Node, category: StringName = &"prop", cache: Variant = null,
-		lift: float = 1.0) -> int:
+		lift: float = -1.0) -> int:
 	if root == null or not shading_enabled:
 		return 0
+	if lift < 0.0:
+		lift = lift_for(root.scene_file_path) if root.scene_file_path != "" else 1.0
 	var store: Dictionary = _shared if cache == null else cache
 	var preset: Dictionary = PRESETS.get(category, PRESETS[&"prop"])
 	var touched := 0
@@ -433,9 +437,9 @@ static func make_outline(color: Color, tex: Texture2D, px: float, fade_end: floa
 
 ## The preset a prop file reads best with: soft thin lines for plants, the prop line for
 ## everything else.
-## Brighten a toon material and its outline-free twin by `lift` (FAMILY_LIFT).
+## Brighten a toon material, its outline pass and its outline-free twin by `lift`.
 static func _lift(m: ShaderMaterial, lift: float) -> void:
-	for mat: Variant in [m, m.get_meta(BARE_META, null)]:
+	for mat: Variant in [m, m.next_pass, m.get_meta(BARE_META, null)]:
 		if mat is ShaderMaterial:
 			var c: Color = (mat as ShaderMaterial).get_shader_parameter(&"albedo")
 			(mat as ShaderMaterial).set_shader_parameter(&"albedo",

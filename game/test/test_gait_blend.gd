@@ -107,3 +107,19 @@ func test_standing_she_does_not_lean() -> void:
 	for i in 30:
 		roll = g.lean(deg_to_rad(400.0), 0.0, DT)
 	assert_almost_eq(roll, 0.0, 0.001, "turning on the spot is no bank")
+
+
+## Review 2026-11-06: lifted mid gallop and mid turn, she carried both into the drop.
+func test_reset_forgets_the_stride_and_the_lean() -> void:
+	var g := GaitBlendScript.new()
+	for i in 30:
+		g.clip(g.shown_speed(7.8, DT), true)
+		g.lean(deg_to_rad(400.0), 7.8, DT)
+	g.reset()
+	assert_eq(g.clip(g.shown_speed(0.0, DT), true), &"idle", "standing at once")
+	assert_almost_eq(g.lean(0.0, 0.0, DT), 0.0, 0.001, "and upright")
+
+
+func test_the_settle_trot_moves_its_legs() -> void:
+	assert_gte(GaitScript.playback_scale_for_clip(&"trot", 0.3), GaitScript.MIN_PLAYBACK,
+		"a trot shown under its band still plays (it froze at zero)")
