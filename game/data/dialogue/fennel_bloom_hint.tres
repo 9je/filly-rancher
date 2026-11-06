@@ -26,7 +26,7 @@ nodes = Array[Dictionary]([{
 "next": "two"
 }, {
 "id": "two",
-"text": "Ponies out here come to themselves eventually. They find what they're good at. Mark comes right up on the flank, like it was always there.",
+"text": "A Drifter who's settled finds what she's good at, all on her own. One morning her cutie mark's just there, like it always was. That's a Bloom.",
 "who": "fennel",
 "mood": "happy",
 "anim": "nod"

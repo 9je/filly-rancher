@@ -306,3 +306,29 @@ func test_a_saved_binding_that_is_nonsense_is_dropped() -> void:
 	b.load_from(path)
 	assert_eq(b.bindings, {&"sneak": KEY_K})
 	DirAccess.remove_absolute(path)
+
+
+## PT7 (playtest 2026-11-05: the town leaning out at the screen's edges): the old 75 degree
+## default moves to 60 once; a field of view she picked herself is never touched.
+func test_the_old_default_fov_moves_to_the_new_one_once() -> void:
+	var cfg := ConfigFile.new()
+	cfg.set_value("settings", "fov", SettingsScript.FOV_OLD_DEFAULT)
+	cfg.save(SCRATCH)
+	var s = SettingsScript.new()
+	s.load_from(SCRATCH)
+	assert_almost_eq(s.fov, SettingsScript.FOV_DEFAULT, 0.001)
+	s.fov = SettingsScript.FOV_OLD_DEFAULT
+	assert_true(s.save_to(SCRATCH))
+	var back = SettingsScript.new()
+	back.load_from(SCRATCH)
+	assert_almost_eq(back.fov, SettingsScript.FOV_OLD_DEFAULT, 0.001,
+		"chosen again after the move, it is hers")
+
+
+func test_a_chosen_fov_is_kept() -> void:
+	var cfg := ConfigFile.new()
+	cfg.set_value("settings", "fov", 90.0)
+	cfg.save(SCRATCH)
+	var s = SettingsScript.new()
+	s.load_from(SCRATCH)
+	assert_almost_eq(s.fov, 90.0, 0.001)

@@ -605,47 +605,65 @@ func _refresh_brambles() -> void:
 	_brambles.name = "Brambles"
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(String(slot_id)) + 4421
-	var mats: Array[StandardMaterial3D] = []
-	for c in BRAMBLE_GREENS:
-		mats.append(_solid(c, 0.9))
-	var berry := _solid(BRAMBLE_BERRY, 0.6)
-	# A loose grid of clumps, jittered, kept inside the marked square and clear of the front
-	# edge where the sign stands so the sign is never buried.
-	# Kept a body's width inside the marked square, so a player at the trigger's edge is
-	# standing beside the thicket and not in it.
+	# A REAL TANGLE, NOT A FIELD OF BALLS (PT7; playtest 2026-11-05: "these look bad", big
+	# green spheres in rows). The valley's own undergrowth -- bushes, tall grass, weeds in
+	# flower, a fallen log -- jittered over the marked square, low enough to read as a plot
+	# gone wild rather than a hedge, and toon styled like the regions' plants.
 	for gx in range(-3, 4):
 		for gz in range(-3, 4):
-			if rng.randf() < 0.22:
+			if rng.randf() < 0.18:
 				continue
-			var at := Vector3(gx * 0.95 + rng.randf_range(-0.25, 0.25), 0.0,
-				gz * 0.95 + rng.randf_range(-0.25, 0.25))
-			var r := rng.randf_range(0.32, 0.58)
-			var clump := MeshInstance3D.new()
-			clump.name = "Clump"
-			var sphere := SphereMesh.new()
-			sphere.radius = r
-			sphere.height = r * rng.randf_range(1.0, 1.35)
-			sphere.radial_segments = 12
-			sphere.rings = 6
-			sphere.material = mats[rng.randi() % mats.size()]
-			clump.mesh = sphere
-			clump.position = at + Vector3(0.0, sphere.height * 0.32, 0.0)
-			_brambles.add_child(clump)
-			if rng.randf() < 0.35:
-				var b := MeshInstance3D.new()
-				b.name = "Berry"
-				var bs := SphereMesh.new()
-				bs.radius = 0.09
-				bs.height = 0.18
-				bs.radial_segments = 8
-				bs.rings = 4
-				bs.material = berry
-				b.mesh = bs
-				b.position = clump.position + Vector3(rng.randf_range(-0.3, 0.3),
-					sphere.height * 0.3, rng.randf_range(-0.3, 0.3))
-				_brambles.add_child(b)
+			var at := Vector3(gx * 0.95 + rng.randf_range(-0.3, 0.3), 0.0,
+				gz * 0.95 + rng.randf_range(-0.3, 0.3))
+			var pick: Array = UNDERGROWTH[rng.randi() % UNDERGROWTH.size()]
+			_brambles.add_child(_wild(String(pick[0]), at, rng.randf_range(pick[1], pick[2]),
+				rng.randf() * TAU))
+	var log_at := Vector3(rng.randf_range(-1.6, 1.6), 0.0, rng.randf_range(-1.8, 0.4))
+	_brambles.add_child(_wild("log_large", log_at, 2.4, rng.randf() * TAU))
 	_brambles.add_child(_make_sign())
 	add_child(_brambles)
+
+
+## The overgrown plot's plants: [model, scale min, scale max], from the nature kit.
+const UNDERGROWTH := [
+	["plant_bushDetailed", 2.0, 2.8], ["plant_bushLarge", 1.6, 2.2], ["grass_leafsLarge", 2.4, 3.4],
+	["grass_large", 2.0, 3.0], ["flower_purpleA", 2.0, 2.8], ["flower_yellowA", 2.0, 2.8],
+	["plant_flatShort", 2.0, 2.8], ["plant_bushDetailed", 2.0, 2.8], ["plant_bushLarge", 1.6, 2.2],
+]
+
+
+func _wild(model: String, at: Vector3, scale: float, yaw: float) -> Node3D:
+	var path := "res://assets/models/nature/%s.glb" % model
+	var holder := Node3D.new()
+	holder.name = "Wild"
+	holder.position = at
+	holder.rotation.y = yaw
+	holder.scale = Vector3.ONE * scale
+	if ResourceLoader.exists(path):
+		var inst := (load(path) as PackedScene).instantiate() as Node3D
+		holder.add_child(inst)
+		# The nature kit ships Kenney's teal; the valley's greens are the regions' own
+		# (region_dressing.gd's GREEN, by the same material-name rule it uses).
+		for mi: MeshInstance3D in inst.find_children("*", "MeshInstance3D", true, false):
+			for i in range(mi.mesh.get_surface_count() if mi.mesh != null else 0):
+				var src := mi.get_active_material(i) as StandardMaterial3D
+				if src == null:
+					continue
+				var lname := src.resource_name.to_lower()
+				if "leaf" in lname or "grass" in lname or "green" in lname or "plant" in lname:
+					var m := src.duplicate() as StandardMaterial3D
+					m.albedo_color = WILD_GREEN.lerp(WILD_GREEN * src.albedo_color.v * 1.4, 0.25)
+					mi.set_surface_override_material(i, m)
+				elif "wood" in lname or "bark" in lname or "trunk" in lname or model.begins_with("log"):
+					var w := src.duplicate() as StandardMaterial3D
+					w.albedo_color = WILD_WOOD
+					mi.set_surface_override_material(i, w)
+		ToonStyler.style(inst, &"foliage")
+	return holder
+
+
+const WILD_GREEN := Color(0.40, 0.62, 0.28)
+const WILD_WOOD := Color(0.45, 0.31, 0.19)
 
 
 ## The signpost: a post standing up out of the middle of the thicket, a board on top, and
@@ -666,33 +684,15 @@ func _make_sign() -> Node3D:
 	post.mesh = pm
 	post.position = Vector3(0.0, (SIGN_BOARD_Y + 0.2) * 0.5, 0.0)
 	sign.add_child(post)
-	var board := MeshInstance3D.new()
+	# A PAPER FACED BOARD LIKE EVERY OTHER SIGN (PT7; playtest 2026-11-05: "signs dont have
+	# white bg", dark paint on dark wood, and paint 5 mm off the board that flickered): the
+	# coin and the price, both faces, on the same PlaceSign the fingerposts use.
+	var board: Node3D = (load("res://world/place_sign.gd") as GDScript).new()
 	board.name = "Board"
-	var bm := BoxMesh.new()
-	bm.size = Vector3(0.08, 0.66, 1.6)
-	bm.material = wood
-	board.mesh = bm
-	board.position = Vector3(0.0, SIGN_BOARD_Y, 0.0)
 	sign.add_child(board)
-	# Painted on, not floating: each face's paint turns with the board, the way paint on a
-	# sign does. Not a billboard.
-	for face in [1.0, -1.0]:
-		for line in [["CLEAR ME", 42, 0.13], ["%d bits" % _clear_cost, 64, -0.11]]:
-			var paint := Label3D.new()
-			paint.name = "Paint"
-			paint.text = String(line[0])
-			if ResourceLoader.exists("res://assets/fonts/Fredoka.ttf"):
-				paint.font = load("res://assets/fonts/Fredoka.ttf")
-			paint.font_size = int(line[1])
-			paint.pixel_size = 0.004
-			paint.modulate = SIGN_INK
-			paint.outline_size = 0
-			paint.shaded = false
-			paint.double_sided = false
-			paint.billboard = BaseMaterial3D.BILLBOARD_DISABLED
-			paint.rotation = Vector3(0.0, PI * 0.5 * face, 0.0)
-			paint.position = Vector3(0.045 * face, SIGN_BOARD_Y + float(line[2]), 0.0)
-			sign.add_child(paint)
+	board.call("build", "%d bits" % _clear_cost, PlaceSign.Icon.COIN, 1.5, 0.55, 0.0, true)
+	board.position = Vector3(0.0, SIGN_BOARD_Y, 0.0)
+	board.rotation = Vector3(0.0, PI * 0.5, 0.0)
 	return sign
 
 

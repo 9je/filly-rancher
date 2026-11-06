@@ -716,7 +716,24 @@ func footprint_relief(ground_sampler: Callable) -> Vector2:
 ## under its own origin: SEAT_CLEARANCE below the LOWEST point footprint_relief() finds.
 ## See SEAT_CLEARANCE for why a single centre sample cannot do this job.
 func seat_ground(ground_sampler: Callable) -> float:
-	return footprint_relief(ground_sampler).x - SEAT_CLEARANCE
+	var relief := footprint_relief(ground_sampler)
+	if _wearing:
+		# A MODEL STANDS ON THE GROUND, NOT ON A PEDESTAL (PT7; playtest 2026-11-05: "weird
+		# assets and scaling", the barn up on a stone plinth with an oversized ramp, every
+		# door shorter than the pony). Seated against the lowest corner, a worn model's
+		# floor stood FLOOR_TOP + GROUND_DROP (1.8 m) over flat grass. Nobody walks in any
+		# more (the doorway is sealed), so the floor sits WORN_RISE over the HIGHEST corner:
+		# the plinth shows only where the ground falls away, and the ramp sinks into it.
+		# Props.seat() puts the plinth's underside (SKIRT_DEPTH under local y = 0) SINK_BIAS
+		# under the height handed it, so this is the height that lands the floor there.
+		var lowest_reachable := relief.y + WORN_RISE - FLOOR_TOP - SKIRT_DEPTH
+		if lowest_reachable <= relief.x - SEAT_CLEARANCE:
+			return relief.y + WORN_RISE - FLOOR_TOP - SKIRT_DEPTH + PropsScript.SINK_BIAS
+	return relief.x - SEAT_CLEARANCE
+
+
+## How far a worn model's floor stands over the highest ground under it.
+const WORN_RISE := 0.2
 
 
 ## A warm fill light inside the shell.

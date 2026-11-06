@@ -105,8 +105,13 @@ var fullscreen: bool:
 		window_mode = WindowMode.FULLSCREEN if value else WindowMode.WINDOWED
 
 ## The camera's vertical field of view, in degrees. 75 is camera_rig.tscn's own.
-const FOV_DEFAULT := 75.0
-const FOV_MIN := 60.0
+## 60, NOT 75 (PT7; playtest 2026-11-05: "this looks like shit", houses and lamp posts leaning
+## out at the edges). 75 degrees tall is about 106 across at 16:9, and a third person camera
+## looking down at that width splays every upright in the town. A save holding the old
+## default is moved to the new one once (FOV_MIGRATED); a value she chose herself is kept.
+const FOV_DEFAULT := 60.0
+const FOV_OLD_DEFAULT := 75.0
+const FOV_MIN := 50.0
 const FOV_MAX := 100.0
 const FOV_STEP := 5.0
 var fov := FOV_DEFAULT
@@ -189,6 +194,8 @@ func load_from(path: String = "") -> void:
 			or ((res as Vector2i).x >= 640 and (res as Vector2i).y >= 360)):
 		resolution = res
 	fov = clampf(float(cfg.get_value(SECTION, "fov", fov)), FOV_MIN, FOV_MAX)
+	if not bool(cfg.get_value(SECTION, "fov_migrated", false)) and is_equal_approx(fov, FOV_OLD_DEFAULT):
+		fov = FOV_DEFAULT
 	var cap := int(cfg.get_value(SECTION, "max_fps", max_fps))
 	max_fps = cap if cap in FPS_CAPS else 0
 	stick_sensitivity = clampf(float(cfg.get_value(SECTION, "stick_sensitivity", stick_sensitivity)),
@@ -230,6 +237,7 @@ func save_to(path: String = "") -> bool:
 	cfg.set_value(SECTION, "window_mode", window_mode)
 	cfg.set_value(SECTION, "resolution", resolution)
 	cfg.set_value(SECTION, "fov", fov)
+	cfg.set_value(SECTION, "fov_migrated", true)
 	cfg.set_value(SECTION, "max_fps", max_fps)
 	cfg.set_value(SECTION, "stick_sensitivity", stick_sensitivity)
 	cfg.set_value(SECTION, "show_controls_chip", show_controls_chip)

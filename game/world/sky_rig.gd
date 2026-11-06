@@ -192,10 +192,12 @@ const WEATHER_SKY_DARKEN: Array[float] = [1.0, 0.75, 0.85, 0.55]
 ## FOG's 0.010 is what a fog is FOR: the ranch reduced to a silhouette, not deleted. At
 ## 0.018 the barn, the fences and every tree past the yard were gone from a shot taken 45 m
 ## out, which is not weather, it is a wall.
-const WEATHER_FOG_DENSITY: Array[float] = [0.0011, 0.004, 0.010, 0.008]
+const WEATHER_FOG_DENSITY: Array[float] = [0.0011, 0.004, 0.010, 0.0065]
 ## Drops alive at once. Rain is a wash of streaks around the player, not a simulation of a
 ## storm front, so these are tuned to read from the camera's usual distance and no further.
-const WEATHER_RAIN_AMOUNT: Array[int] = [0, 600, 0, 1400]
+## PT7 (playtest 2026-11-05: "the rain makes it a little too hard to see ... its just falling
+## rectangles"): fewer, softer streaks, and none at all within RAIN_NEAR_FADE of the lens.
+const WEATHER_RAIN_AMOUNT: Array[int] = [0, 420, 0, 900]
 
 ## Never let the world go absolutely black; a stormy night still has to be playable.
 const MIN_LIGHT_ENERGY := 0.06
@@ -228,7 +230,11 @@ const RAIN_BOX_EXTENTS := Vector3(7.0, 0.5, 7.0)
 const RAIN_GRAVITY := Vector3(0.0, -18.0, 0.0)
 const RAIN_LIFETIME := 1.2
 const RAIN_DROP_SIZE := Vector3(0.02, 0.5, 0.02)
-const RAIN_COLOR := Color(0.72, 0.80, 0.92, 0.55)
+const RAIN_COLOR := Color(0.78, 0.85, 0.95, 0.38)
+## A streak, not a box: this wide, this long, fading out at both ends.
+const RAIN_STREAK := Vector2(0.018, 0.55)
+## Drops closer than the first number to the lens are not drawn; by the second they are whole.
+const RAIN_NEAR_FADE := Vector2(1.5, 4.0)
 
 const KEY_SUN_ELEVATION := "sun_elevation"
 const KEY_SUN_AZIMUTH := "sun_azimuth"
@@ -777,6 +783,21 @@ func _find_sibling(type_name: String) -> Node:
 ## The emitter is authored here rather than in the scene file so a rig built in code gets
 ## exactly the same rain as ranch.tscn's, and so the one set of numbers is the one that
 ## ships. ranch.tscn carries only a bare, silent GPUParticles3D named Rain for this to find.
+## A vertical gradient: clear at the top, brightest two thirds down, clear at the tip.
+static func _streak_texture() -> GradientTexture2D:
+	var g := Gradient.new()
+	g.set_color(0, Color(1, 1, 1, 0))
+	g.set_color(1, Color(1, 1, 1, 0))
+	g.add_point(0.65, Color(1, 1, 1, 1))
+	var t := GradientTexture2D.new()
+	t.gradient = g
+	t.fill_from = Vector2(0.5, 0.0)
+	t.fill_to = Vector2(0.5, 1.0)
+	t.width = 4
+	t.height = 64
+	return t
+
+
 func _ensure_rain() -> void:
 	if _rain != null and is_instance_valid(_rain):
 		return
@@ -787,12 +808,21 @@ func _ensure_rain() -> void:
 		add_child(found)
 	_rain = found
 
-	var drop := BoxMesh.new()
-	drop.size = RAIN_DROP_SIZE
+	# A THIN STREAK THAT FACES THE LENS, SOFT AT BOTH ENDS (PT7): a box read as a falling
+	# rectangle, and a drop a metre from the camera filled the frame.
+	var drop := QuadMesh.new()
+	drop.size = RAIN_STREAK
 	var drop_material := StandardMaterial3D.new()
 	drop_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	drop_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	drop_material.albedo_color = RAIN_COLOR
+	drop_material.albedo_texture = _streak_texture()
+	drop_material.billboard_mode = BaseMaterial3D.BILLBOARD_FIXED_Y
+	drop_material.billboard_keep_scale = true
+	drop_material.distance_fade_mode = BaseMaterial3D.DISTANCE_FADE_PIXEL_ALPHA
+	drop_material.distance_fade_min_distance = RAIN_NEAR_FADE.x
+	drop_material.distance_fade_max_distance = RAIN_NEAR_FADE.y
+	drop_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	drop.material = drop_material
 
 	var process_material := ParticleProcessMaterial.new()

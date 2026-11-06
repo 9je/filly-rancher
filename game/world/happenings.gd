@@ -260,23 +260,37 @@ func _collector_visit() -> void:
 	def.look = {"coat": "8a8f99", "mane": "4d525c", "mane2": "5f6470", "tail": "4d525c"}
 	var n: Npc = (load("res://actors/npc/npc.gd") as Script).new()
 	ranch.add_child(n)
-	var start := _ground(14.0, 40.0)
+	# A WALK BY, NOT A VISIT (PT10; owner, 2026-11-05: "it should have been just more of a
+	# mysterious walk by than a slow shuffle to me then walk away", and the line named a coat
+	# he was not wearing). He comes along the lane at a walk, stops by the fence for a few
+	# seconds with his clipboard, and walks on out of sight the other way.
+	var start := _ground(34.0, 30.0)
+	var by_fence := _ground(-2.0, 18.0)
+	var gone := _ground(-38.0, 26.0)
 	n.global_position = start
 	n.setup(def)
-	var stop := _ground(-4.0, 16.0)
-	n.set_mode_walk_to(stop)
-	ranch.call("_toast", "A Collector in a grey coat comes up the lane and stops at your fence.")
-	ranch.call("_novelty", "clue", "collector_visit", "A Collector stops at the fence and takes notes")
+	n.walk_speed = COLLECTOR_SPEED
+	n.set_mode_walk_to(by_fence)
+	ranch.call("_toast", "A grey stranger with a clipboard is coming along the lane.")
+	ranch.call("_novelty", "clue", "collector_visit", "A Collector walks past and takes notes")
 	var t := create_tween()
-	t.tween_interval(26.0)
+	t.tween_interval(start.distance_to(by_fence) / COLLECTOR_SPEED + 0.5)
 	t.tween_callback(func() -> void:
 		if is_instance_valid(n):
-			ranch.call("_toast", "The Collector writes something on a clipboard, and leaves.")
-			n.set_mode_walk_to(start))
-	t.tween_interval(24.0)
+			n.act(&"neutral", &"nod")
+			ranch.call("_toast", "He looks over your pens, writes something down, and walks on."))
+	t.tween_interval(3.5)
+	t.tween_callback(func() -> void:
+		if is_instance_valid(n):
+			n.set_mode_walk_to(gone))
+	t.tween_interval(by_fence.distance_to(gone) / COLLECTOR_SPEED + 1.0)
 	t.tween_callback(func() -> void:
 		if is_instance_valid(n):
 			n.queue_free())
+
+
+## A brisk walk, not a shuffle.
+const COLLECTOR_SPEED := 1.7
 
 
 ## Two Drifters with stars in their coats, the rarest look the valley has, wander in.
@@ -301,7 +315,9 @@ func _starry() -> void:
 func _newsletter() -> void:
 	_mark("newsletter")
 	var n := int(_story().deliveries)
-	ranch.call("_toast", "Pip: \"Smile! Cloudsdale wants you for the newsletter!\" Steward of the Week: %d ponies placed, \"a yield of %d%% above the valley average.\"" % [n, 40 + n * 7])
+	# THE CAPTION IS JUST A CAPTION NOW (PT10; owner: the clues were "a little too on the
+	# nose a little too early"): the yield figure waits for later in the story.
+	ranch.call("_toast", "Pip: \"Smile! You're in the Cloudsdale newsletter!\" Steward of the Week: %d ponies placed." % n)
 	ranch.call("_novelty", "clue", "newsletter", "Pip photographs you for the Corporation newsletter")
 
 

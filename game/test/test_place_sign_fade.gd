@@ -29,23 +29,40 @@ func test_solid_from_across_the_plaza() -> void:
 	assert_eq(_fade_at(8.0), 0.0)
 
 
-func test_almost_gone_with_the_lens_against_it() -> void:
-	assert_gt(_fade_at(0.6), 0.8)
+func test_gone_with_the_lens_against_it() -> void:
+	assert_eq(_fade_at(0.6), 1.0)
 
 
-func test_every_part_of_the_board_fades_together() -> void:
+func test_every_part_of_the_board_goes_together() -> void:
 	_fade_at(0.6)
 	var parts := _sign.find_children("*", "GeometryInstance3D", true, false)
 	assert_gt(parts.size(), 2)
 	for g: GeometryInstance3D in parts:
-		assert_gt(g.transparency, 0.8, "%s still solid in front of the lens" % g.name)
+		assert_false(g.visible, "%s still drawn in front of the lens" % g.name)
 
 
-func test_the_fade_is_smooth_between() -> void:
-	var a := _fade_at(2.8)
-	var b := _fade_at(2.0)
-	var c := _fade_at(1.3)
-	assert_true(a < b and b < c, "%.2f, %.2f, %.2f should rise as the lens comes in" % [a, b, c])
+## NEVER HALF THERE, AND NO FLICKER (PT7; playtest 2026-11-05: "basically all signs flicker",
+## the fingerpost's boards dark). A half faded board showed its dark frame through its paper,
+## and a board on the edge of the fade flipped as the camera breathed. A board is solid or it
+## is gone, and once gone it comes back only well clear: SHOW_M, not HIDE_M.
+func test_a_board_is_solid_or_gone_never_between() -> void:
+	for d: float in [0.3, 0.8, 1.2, 1.6, 2.0, 2.6, 3.4, 6.0]:
+		var f := _fade_at(d)
+		assert_true(f == 0.0 or f == 1.0, "at %.1f m the board is %.2f faded" % [d, f])
+
+
+func test_the_way_back_is_further_out_than_the_way_in() -> void:
+	assert_eq(_fade_at(0.8), 1.0, "close: gone")
+	assert_eq(_fade_at(PlaceSign.HIDE_M + 0.1), 1.0, "just past where it went: still gone")
+	assert_eq(_fade_at(PlaceSign.SHOW_M + 0.1), 0.0, "well clear: back")
+	for g: GeometryInstance3D in _sign.find_children("*", "GeometryInstance3D", true, false):
+		assert_eq(g.transparency, 0.0, "%s is drawn solid, never see-through" % g.name)
+
+
+func test_the_lettering_stands_clear_of_the_paper() -> void:
+	# The z-fight that flickered the white face through the letters at a distance.
+	for l: Label3D in _sign.find_children("*", "Label3D", true, false):
+		assert_gte(absf(l.position.z), 0.075, "the lettering is at least 15 mm off the 60 mm face")
 
 
 ## IN THE WAY IS GONE, AT ANY DISTANCE (feel pass 2026-10-26: at the pen's gate the Pens board
@@ -59,8 +76,9 @@ func test_a_board_between_the_lens_and_her_goes_nearly_all_the_way() -> void:
 	PlaceSignScript.subject = her
 	_cam.global_position = _sign.global_position + Vector3(0, 0.3, 2.5)
 	_sign.call("update_fade", _cam)
-	assert_gt(float(_sign.call("fade")), 0.9, "she is behind it: it gets out of the way")
+	assert_eq(float(_sign.call("fade")), 1.0, "she is behind it: it gets out of the way")
 	her.global_position = _sign.global_position + Vector3(6.0, -1.0, -2.0)
 	_sign.call("update_fade", _cam)
-	assert_lt(float(_sign.call("fade")), 0.5, "off to one side it only fades by distance")
+	_sign.call("update_fade", _cam)
+	assert_eq(float(_sign.call("fade")), 0.0, "off to one side and 2.5 m off, it is back")
 	PlaceSignScript.subject = null

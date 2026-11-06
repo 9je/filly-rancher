@@ -38,6 +38,13 @@ const MAX_FADE := 0.92
 const BLOCKING_FADE := 0.96
 ## At or past this fade the board is not drawn at all.
 const HIDE_AT := 0.85
+## SOLID OR GONE, WITH ROOM BETWEEN (PT7; playtest 2026-11-05: "basically all signs flicker").
+## A half faded board showed its dark frame through its paper (the fingerpost's dark Home and
+## Pens), and one on the edge of the fade flipped as the camera breathed. Now a board goes
+## when the lens is within HIDE_M of it or it stands between the lens and her, and comes back
+## only once the lens is past SHOW_M and it is out of the way.
+const HIDE_M := 1.4
+const SHOW_M := 2.2
 static var subject: Node3D = null
 
 var text := ""
@@ -63,7 +70,12 @@ func build(label: String, icon_kind: int, width: float, height: float, point: fl
 	var bm := BoxMesh.new()
 	bm.size = Vector3(width, height, 0.12)
 	face.mesh = bm
-	face.material_override = _mat(PAPER)
+	# THE PAPER IS ALWAYS READABLE (PT7): lit like the wood, a board turned from the sun or
+	# out in a storm went grey brown and its lettering went with it ("signs dont have white
+	# bg"). Painted, unlit, a little under white so it does not glow at night.
+	var paper := _mat(PAPER.darkened(0.06))
+	paper.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	face.material_override = paper
 	add_child(face)
 	if point > 0.0:
 		var tip := MeshInstance3D.new()
@@ -96,7 +108,9 @@ func _paint_face(label: String, icon_kind: int, width: float, height: float, bac
 	im.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	ic.material_override = im
 	ic.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	ic.position = Vector3(-width * 0.5 + height * 0.55, 0, 0.065)
+	# CLEAR OF THE PAPER (PT7): 6 mm off a 60 mm face z-fought at a distance, the white
+	# flickering through the letters; the icon and the letters now stand 18 and 20 mm off it.
+	ic.position = Vector3(-width * 0.5 + height * 0.55, 0, 0.078)
 	holder.add_child(ic)
 	var l := Label3D.new()
 	l.text = label
@@ -116,11 +130,11 @@ func _paint_face(label: String, icon_kind: int, width: float, height: float, bac
 		px *= room / est
 	l.pixel_size = px
 	# Centred in the room right of the icon.
-	l.position = Vector3(height * 0.55, 0, 0.066)
+	l.position = Vector3(height * 0.55, 0, 0.08)
 	holder.add_child(l)
 
 
-## How see-through the board is right now, 0 solid to MAX_FADE.
+## 0.0 while the board is drawn, 1.0 while it is stood aside for the lens.
 func fade() -> float:
 	return _fade
 
@@ -135,20 +149,22 @@ func update_fade(cam: Camera3D) -> void:
 	var local := to_local(cam.global_position)
 	var nearest := local.clamp(-_half, _half)
 	var d := local.distance_to(nearest)
-	var f := MAX_FADE * smoothstep(FAR_M, NEAR_M, d)
+	var blocking := false
 	if subject != null and is_instance_valid(subject) and subject.is_inside_tree():
 		var aim := to_local(subject.global_position + Vector3(0, 1.0, 0))
-		if _segment_hits_box(local, aim, _half + Vector3(0.15, 0.15, 0.15)):
-			f = maxf(f, BLOCKING_FADE)
-	if absf(f - _fade) < 0.005:
+		blocking = _segment_hits_box(local, aim, _half + Vector3(0.15, 0.15, 0.15))
+	var gone := _fade >= 1.0
+	if blocking or d < HIDE_M:
+		gone = true
+	elif d > SHOW_M:
+		gone = false
+	var f := 1.0 if gone else 0.0
+	if f == _fade:
 		return
 	_fade = f
-	# Nearly gone is gone: the toon shader's ink pass does not fade cleanly, and a board at
-	# 0.9 drew as a dark see-through sheet across the screen (render review 2026-10-26).
-	var hide := f >= HIDE_AT
 	for g: Node in find_children("*", "GeometryInstance3D", true, false):
-		(g as GeometryInstance3D).transparency = f
-		(g as GeometryInstance3D).visible = not hide
+		(g as GeometryInstance3D).transparency = 0.0
+		(g as GeometryInstance3D).visible = not gone
 
 
 ## Does the segment a..b pass through the box of half extents `h` at the origin? (Slabs.)

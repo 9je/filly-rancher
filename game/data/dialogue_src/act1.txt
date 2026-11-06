@@ -66,7 +66,7 @@ when: {"flags_all": ["met_fennel"], "max": {"blooms": 0}, "min": {"pens": 1}}
 
 start [fennel neutral] Keep her fed, give her a friend in the pen, and don't rush her.
   -> two
-two [fennel happy nod] Ponies out here come to themselves eventually. They find what they're good at. Mark comes right up on the flank, like it was always there.
+two [fennel happy nod] A Drifter who's settled finds what she's good at, all on her own. One morning her cutie mark's just there, like it always was. That's a Bloom.
 
 === fennel_after_bloom
 speaker: fennel
@@ -101,7 +101,7 @@ start [pip happy] Special delivery! You're {name}, right? Course you are, there'
 two [pip happy] This one's from Cloudsdale. They write ever so much. Your welcome pack is in your mailbox by the door. There's a postcard in it, too!
   event: first_mail
   -> three
-three [pip neutral look] Can't fly up high enough to see the Rainbow Factory myself. Cloudsdale says the cloud line's for staff only. Pretty, though, isn't it? The rainbow.
+three [pip happy look] See the rainbow over the hills? Cloudsdale makes those. Prettiest thing in the valley, if you ask me.
 
 === marigold_depot
 speaker: marigold

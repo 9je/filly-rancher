@@ -283,7 +283,7 @@ func test_fog_is_the_thickest_weather_there_is() -> void:
 	assert_almost_eq(SkyRigScript.fog_density(CLEAR), 0.0011, 0.000001)
 	assert_almost_eq(SkyRigScript.fog_density(RAIN), 0.004, 0.000001)
 	assert_almost_eq(SkyRigScript.fog_density(FOG), 0.010, 0.000001)
-	assert_almost_eq(SkyRigScript.fog_density(STORM), 0.008, 0.000001)
+	assert_almost_eq(SkyRigScript.fog_density(STORM), 0.0065, 0.000001)
 
 
 func test_it_only_rains_when_it_is_raining() -> void:

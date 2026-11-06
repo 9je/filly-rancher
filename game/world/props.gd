@@ -558,7 +558,9 @@ const LAYOUT := [
 	{"file": "mlp_basket.glb", "at": Vector2(9.0, -11.5), "yaw": 0.0, "family": &"mlp"},
 	{"file": "mlp_bush.glb", "at": Vector2(-3.5, -10.5), "yaw": 120.0, "family": &"mlp"},
 	{"file": "mlp_bush.glb", "at": Vector2(23.5, -12.0), "yaw": 20.0, "family": &"mlp"},
-	{"file": "saa_small_dirt_pile.glb", "at": Vector2(-18.5, 3.5), "yaw": 0.0, "family": &"mlp"},
+	# (The small dirt pile that stood at (-18.5, 3.5) is gone: in the toon light it read as a
+	# flat yellow blob with marks on it, and nobody could tell what it was. PT7, playtest
+	# 2026-11-05 item 27.)
 ]
 
 var _placed: Array[Node3D] = []

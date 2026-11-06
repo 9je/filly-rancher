@@ -52,9 +52,10 @@ func test_apply_commits_and_writes_the_file() -> void:
 	_menu._step(&"fov", 1)
 	_menu._step(&"show_checklist", -1)
 	_menu.apply()
-	assert_almost_eq(_settings.fov, 80.0, 0.001)
+	var want := Settings.FOV_DEFAULT + Settings.FOV_STEP
+	assert_almost_eq(_settings.fov, want, 0.001)
 	assert_false(_settings.show_checklist)
-	assert_almost_eq(float(_file().get_value("settings", "fov", 0.0)), 80.0, 0.001)
+	assert_almost_eq(float(_file().get_value("settings", "fov", 0.0)), want, 0.001)
 	assert_false(_menu.is_dirty())
 	assert_signal_emitted(_menu, "applied")
 

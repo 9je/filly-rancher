@@ -101,7 +101,6 @@ without `.glb`, or the name the test gives a code-built thing.
 | mlp_basket | prop_small | yard, orchard |
 | saa_hay_block | prop_small | yard |
 | saa_seed_bag | prop_small | yard, Sweet Apple Acres |
-| saa_small_dirt_pile | prop_small | yard |
 | school_cone | prop_small | schoolyard |
 | log_large | prop_medium | Everfree |
 | stump_oldTall | prop_medium | Everfree |
