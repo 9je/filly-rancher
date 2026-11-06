@@ -456,14 +456,21 @@ static func draw_symbol(ci: CanvasItem, box: Rect2, symbol: int) -> void:
 			ci.draw_line(_at(box, 0.50, 0.30), _at(box, 0.50, 0.12),
 				Color(0.38, 0.26, 0.16), 3.0, true)
 		SlotsScript.Symbol.HORSESHOE:
-			var centre: Vector2 = _at(box, 0.5, 0.46)
-			ci.draw_arc(centre, box.size.y * 0.34, PI * 0.10, PI * 0.90,
-				24, GOLD, box.size.y * 0.18, true)
-			for f: float in [0.20, 0.80]:
-				ci.draw_rect(Rect2(_at(box, f - 0.07, 0.62),
-					Vector2(box.size.x * 0.14, box.size.y * 0.14)), GOLD_DIM)
-			for f: float in [0.28, 0.42, 0.58, 0.72]:
-				ci.draw_circle(_at(box, f, 0.30), box.size.y * 0.035, PLUM_DARK)
+			# A lucky horseshoe, open side down: a thick arc over the top, the two heels as
+			# blocks, and the nail holes along the arc so it cannot read as a smile.
+			var centre: Vector2 = _at(box, 0.5, 0.56)
+			var r: float = box.size.y * 0.30
+			var w: float = box.size.y * 0.15
+			ci.draw_arc(centre, r, PI * 0.82, PI * 2.18, 28, GOLD_DIM.darkened(0.2), w + 4.0, true)
+			ci.draw_arc(centre, r, PI * 0.82, PI * 2.18, 28, GOLD, w, true)
+			for end: float in [PI * 0.82, PI * 2.18]:
+				var heel: Vector2 = centre + Vector2(cos(end), sin(end)) * r
+				ci.draw_rect(Rect2(heel - Vector2(w * 0.6, 0.0), Vector2(w * 1.2, w * 0.8)),
+					GOLD_DIM)
+			for k: int in 6:
+				var a: float = lerpf(PI * 0.98, PI * 2.02, float(k) / 5.0)
+				ci.draw_circle(centre + Vector2(cos(a), sin(a)) * r, box.size.y * 0.025,
+					PLUM_DARK)
 		SlotsScript.Symbol.BELL:
 			ci.draw_colored_polygon(PackedVector2Array([_at(box, 0.30, 0.70),
 				_at(box, 0.38, 0.24), _at(box, 0.62, 0.24), _at(box, 0.70, 0.70)]),
@@ -480,11 +487,14 @@ static func draw_symbol(ci: CanvasItem, box: Rect2, symbol: int) -> void:
 		SlotsScript.Symbol.STAR:
 			ci.draw_colored_polygon(star_points(box), GOLD)
 		SlotsScript.Symbol.RAINBOW:
-			var arc_centre: Vector2 = _at(box, 0.5, 0.86)
+			# Six bands inside the box: the outer radius is half the box's narrower side, so a
+			# rainbow never spills into the next tile on a paytable row.
+			var arc_centre: Vector2 = _at(box, 0.5, 0.80)
+			var outer: float = minf(box.size.x * 0.48, box.size.y * 0.66)
+			var band_w: float = outer * 0.11
 			for band: int in BAND_COLORS.size():
-				var r: float = box.size.y * (0.72 - 0.10 * float(band))
-				ci.draw_arc(arc_centre, r, PI, TAU, 20, BAND_COLORS[band],
-					box.size.y * 0.09, true)
+				var r: float = outer - band_w * 0.5 - band_w * float(band)
+				ci.draw_arc(arc_centre, r, PI, TAU, 24, BAND_COLORS[band], band_w + 0.5, true)
 
 
 ## THE CLUB IS FOUR POLYGONS, NOT ONE. club_points() is three disjoint circular lobes plus a

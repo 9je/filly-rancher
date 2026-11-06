@@ -1,10 +1,11 @@
 extends GutTest
-## THE SLOT MACHINE'S PANEL. It shows the paytable, offers a stake it knows she can cover,
-## emits, and shows what came back. It never spins anything itself.
+## THE SLOT MACHINE. Real strips in clipped windows, chips that are buttons, a lever and a
+## Spin that ask for one spin, and a result told by the reels. Every test here is a line of
+## the owner's playtest (2026-11-05) that must not come back.
 
 const SlotsMenuScene := preload("res://ui/slots_menu.tscn")
 const SlotsScript := preload("res://systems/slots.gd")
-const PaintScript := preload("res://ui/casino_paint.gd")
+const MenuStyleScript := preload("res://ui/menu_style.gd")
 
 var _menu: SlotsMenu = null
 var _chips := 500
@@ -20,158 +21,162 @@ func before_each() -> void:
 	await get_tree().process_frame
 
 
-func test_it_offers_only_stakes_she_can_cover() -> void:
-	_chips = 60
-	_menu.refresh()
-	assert_eq(_menu.stakes(), [10, 50])
+func _press(at: Vector2, down: bool) -> InputEventMouseButton:
+	var event := InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.pressed = down
+	event.position = at
+	return event
 
 
-func test_an_empty_purse_offers_no_stake_and_confirming_does_nothing() -> void:
+func _drag(at: Vector2) -> InputEventMouseMotion:
+	var event := InputEventMouseMotion.new()
+	event.position = at
+	return event
+
+
+## "it wont let me change bet size in slots now": the drawn chip is the button.
+func test_clicking_the_drawn_50_and_200_chips_changes_the_stake() -> void:
+	_chips = 205
+	_menu.on_stage_hit(_menu.button_index(&"stake:1"))
+	assert_eq(_menu.selected_stake(), 50)
+	_menu.on_stage_hit(_menu.button_index(&"stake:2"))
+	assert_eq(_menu.selected_stake(), 200, "205 chips cover a 200 stake")
+	_menu.on_stage_hit(_menu.button_index(&"stake:0"))
+	assert_eq(_menu.selected_stake(), 10)
+
+
+func test_a_chip_she_cannot_cover_is_greyed_and_refused() -> void:
+	_chips = 120
+	assert_false(_menu.button_enabled(&"stake:2"))
+	_menu.on_stage_hit(_menu.button_index(&"stake:2"))
+	assert_ne(_menu.selected_stake(), 200)
+
+
+func test_an_empty_purse_cannot_spin() -> void:
 	_chips = 0
-	_menu.refresh()
 	watch_signals(_menu)
-	assert_true(_menu.stakes().is_empty())
-	assert_false(_menu.confirm())
-	assert_signal_not_emitted(_menu, "spin_requested")
+	assert_false(_menu.pull())
+	assert_false(_menu.button_enabled(&"spin"))
+	assert_signal_emit_count(_menu, "spin_requested", 0)
 
 
-func test_confirming_emits_the_highlighted_stake_and_spins_nothing_itself() -> void:
+func test_spin_emits_the_stake_that_is_showing_and_spins_nothing_itself() -> void:
+	_menu.on_stage_hit(_menu.button_index(&"stake:1"))
 	watch_signals(_menu)
-	_menu.move_selection(1)
+	_menu.on_stage_hit(_menu.button_index(&"spin"))
+	assert_signal_emit_count(_menu, "spin_requested", 1)
+	assert_eq(get_signal_parameters(_menu, "spin_requested", 0)[0], 50)
+	assert_false(_menu.animating(), "the reels wait for ranch.gd's roll")
+
+
+func test_the_keyboard_opens_on_spin_and_confirm_spins() -> void:
+	assert_eq(String(_menu.focused_id()), "spin")
+	watch_signals(_menu)
 	assert_true(_menu.confirm())
-	assert_signal_emitted_with_parameters(_menu, "spin_requested", [_menu.stakes()[1]])
-	assert_eq(_chips, 500, "the menu draws and emits")
+	assert_signal_emit_count(_menu, "spin_requested", 1)
 
 
-func test_it_draws_the_whole_paytable() -> void:
-	var drawn: String = "\n".join(_menu.drawn_lines())
-	for line in SlotsScript.paytable_lines():
-		assert_true(drawn.contains(line), "the paytable line '%s' is not on the panel" % line)
+## THE LEVER: press, drag down past half way, let go, and it spins; let go early and it
+## springs back without spinning.
+func test_dragging_the_lever_down_pulls_it_and_a_short_drag_does_not() -> void:
+	watch_signals(_menu)
+	var knob: Vector2 = _menu.lever_rect().get_center()
+	_menu._on_stage_input(_press(knob, true))
+	_menu._on_stage_input(_drag(knob + Vector2(0.0, 30.0)))
+	_menu._on_stage_input(_press(knob + Vector2(0.0, 30.0), false))
+	assert_signal_emit_count(_menu, "spin_requested", 0, "a short tug is not a pull")
+	_menu._on_stage_input(_press(knob, true))
+	_menu._on_stage_input(_drag(knob + Vector2(0.0, 140.0)))
+	_menu._on_stage_input(_press(knob + Vector2(0.0, 140.0), false))
+	assert_signal_emit_count(_menu, "spin_requested", 1, "a full pull spins")
 
 
-func test_a_result_is_shown_until_the_next_one() -> void:
-	_menu.show_result(["Apple Apple Apple", "You win 40 chips."])
-	assert_true("\n".join(_menu.drawn_lines()).contains("You win 40 chips."))
-	_menu.show_result(["Bell Gem Star", "Nothing this time."])
-	assert_false("\n".join(_menu.drawn_lines()).contains("You win 40 chips."))
+func test_a_click_on_the_lever_spins_at_the_stake_that_is_showing() -> void:
+	_menu.on_stage_hit(_menu.button_index(&"stake:0"))
+	watch_signals(_menu)
+	var knob: Vector2 = _menu.lever_rect().get_center()
+	_menu._on_stage_input(_press(knob, true))
+	_menu._on_stage_input(_press(knob, false))
+	assert_eq(get_signal_parameters(_menu, "spin_requested", 0)[0], 10)
+
+
+## A SPIN LANDS ON THE VALUE ranch.gd ALREADY ROLLED, read off the drawing's own positions.
+func test_a_pushed_spin_lands_every_payline_on_the_symbol_it_was_handed() -> void:
+	for line: Array in [[2, 5, 0], [0, 0, 0], [5, 5, 1]]:
+		var reels: Array[int] = []
+		reels.assign(line)
+		_menu.show_spin(reels, 0, 10)
+		assert_true(_menu.animating())
+		_menu.finish_animation()
+		assert_false(_menu.animating())
+		assert_eq(_menu.payline_symbols(), reels)
+
+
+## "the first 2 reels had all 3 the same": after any landing, every window shows three
+## different symbols.
+func test_every_window_shows_three_different_symbols_after_every_landing() -> void:
+	for spin: int in 40:
+		var reels: Array[int] = [spin % 6, (spin * 5) % 6, (spin * 7 + 1) % 6]
+		_menu.show_spin(reels, 0, 10)
+		_menu.finish_animation()
+		for reel: int in SlotsScript.REELS:
+			var shown: Array[int] = _menu.window_symbols(reel)
+			assert_true(shown[0] != shown[1] and shown[1] != shown[2] and shown[0] != shown[2],
+				"spin %d reel %d shows %s" % [spin, reel, shown])
+
+
+func test_a_bad_push_is_a_still_frame() -> void:
+	var before: float = _menu.reel_position(0)
+	_menu.show_spin([] as Array[int], 0, 10)
+	_menu.show_spin([99, -3, 7] as Array[int], 0, 10)
+	assert_false(_menu.animating())
+	assert_eq(_menu.reel_position(0), before)
+
+
+## "text spoils the roll": no log, and the counter holds until the reels stop.
+func test_nothing_is_printed_and_the_counter_holds_until_the_reels_stop() -> void:
+	assert_false((_menu.get_node("Centre/Panel/Margin/Column/Rows") as Control).visible)
+	_menu.show_result(["Gem Apple Bell", "Nothing this time."] as Array[String])
+	assert_eq(_menu.printed_lines().size(), 0, "a pushed result line is not printed")
+	_chips = 640
+	_menu.show_spin([1, 1, 1] as Array[int], 100, 10)
+	assert_eq(_menu.shown_chips(), 540)
+	_menu.finish_animation()
+	assert_eq(_menu.shown_chips(), 640)
+
+
+## "symbols poked out of the reel windows": each window is a clipping Control exactly the
+## size of the window.
+func test_every_reel_window_clips_its_symbols() -> void:
+	for reel: int in SlotsScript.REELS:
+		var window := _menu.get_node("Centre/Panel/Margin/Column/Stage/Reel%d" % reel) as Control
+		assert_not_null(window)
+		assert_true(window.clip_contents, "reel %d clips" % reel)
+		assert_eq(Rect2(window.position, window.size), _menu.reel_rect(reel))
+
+
+## "the rainbow overlapped the SPECTRA SLOTS sign", "a paytable line was cut off".
+func test_the_sign_the_windows_the_controls_and_the_paytable_never_overlap() -> void:
+	var stage := Rect2(Vector2.ZERO, _menu.stage_size())
+	var parts: Array[Rect2] = [_menu.marquee_rect(), _menu.paytable_rect()]
+	for reel: int in SlotsScript.REELS:
+		parts.append(_menu.reel_rect(reel))
+	for b: Dictionary in _menu.stage_buttons():
+		parts.append(b["rect"])
+	for i: int in parts.size():
+		assert_true(stage.encloses(parts[i]), "part %d is on the stage" % i)
+		for j: int in range(i + 1, parts.size()):
+			assert_false(parts[i].intersects(parts[j]), "parts %d and %d overlap" % [i, j])
+
+
+func test_the_windows_sit_left_to_right_and_the_payline_crosses_their_middles() -> void:
+	for reel: int in range(1, SlotsScript.REELS):
+		assert_gt(_menu.reel_rect(reel).position.x, _menu.reel_rect(reel - 1).end.x)
+	for reel: int in SlotsScript.REELS:
+		assert_almost_eq(_menu.payline_y(), _menu.reel_rect(reel).get_center().y, 0.5)
 
 
 func test_nothing_it_draws_carries_a_dash() -> void:
-	_menu.show_result(["Apple Apple Apple", "You win 40 chips."])
-	for line in _menu.drawn_lines():
+	for line: String in _menu.drawn_lines():
 		assert_false(line.contains("--") or line.contains("—"), line)
-
-
-## THE REPORT: "each table screen shows your chips, the stake picker, and what keys do
-## what". A table that only says "Stake: [10 chips]" leaves a player who has not read a
-## document with no way to find out what Enter does here.
-func test_the_table_says_what_she_is_holding() -> void:
-	assert_true(_menu.chips_line().contains(str(_chips)),
-		"her chips must be on the screen she is betting them on: %s" % _menu.chips_line())
-
-
-func test_the_table_says_what_the_keys_do_on_this_table() -> void:
-	var keys: String = _menu.keys_line()
-	assert_false(keys.is_empty())
-	assert_true(keys.to_lower().contains("stake"),
-		"the stake picker is the control a new player cannot guess: %s" % keys)
-
-
-## THE REPORT: "results render prominently (win/lose line with numbers)".
-func test_a_settled_result_renders_as_its_own_block_with_the_numbers_in_it() -> void:
-	_menu.show_result(["You win 40 chips!", "Two cherries and a bell."])
-	var block: Array[String] = _menu.result_block()
-	assert_gt(block.size(), 0, "a settled bet must leave something on the screen")
-	assert_true("\n".join(block).contains("40"),
-		"the number is the whole point of the line")
-	assert_true("\n".join(_menu.drawn_lines()).contains("40"),
-		"and it is drawn, not merely stored")
-
-
-## THE CABINET AND THE PAYTABLE DIVIDE THE STAGE AND NEITHER LEAVES IT. Laid out by eye, a
-## panel that is 20 px too wide looks fine on the machine it was authored on and clips on the
-## next one, because every 2D size in this project is in 1920x1080 base pixels and the window
-## is 1600x900.
-func test_every_drawn_region_sits_inside_the_stage() -> void:
-	var stage := Rect2(Vector2.ZERO, _menu.stage_size())
-	for pair: Array in [[_menu.cabinet_rect(), "cabinet"],
-			[_menu.paytable_rect(), "paytable"]]:
-		assert_true(stage.encloses(pair[0] as Rect2),
-			"the %s leaves the stage: %s" % [pair[1], pair[0]])
-	for i: int in 3:
-		assert_true(_menu.cabinet_rect().encloses(_menu.reel_rect(i)),
-			"reel window %d leaves the cabinet" % i)
-
-
-## THREE WINDOWS, NO OVERLAP, IN ORDER. Reels drawn on top of each other are the failure a
-## rect test catches and a screenshot does not, because two reels landing on the same symbol
-## look correct.
-func test_the_three_reel_windows_are_separate_and_left_to_right() -> void:
-	for i: int in 2:
-		var here: Rect2 = _menu.reel_rect(i)
-		var next: Rect2 = _menu.reel_rect(i + 1)
-		assert_lt(here.position.x + here.size.x, next.position.x,
-			"reel %d overlaps reel %d" % [i, i + 1])
-
-
-## THE PAYLINE IS THE MIDDLE ROW OF EVERY WINDOW, and the player has to be able to see which
-## row counts BEFORE she spins.
-func test_the_payline_crosses_the_middle_of_every_reel_window() -> void:
-	for i: int in 3:
-		var window: Rect2 = _menu.reel_rect(i)
-		assert_almost_eq(_menu.payline_y(), window.position.y + window.size.y * 0.5, 1.0)
-
-
-## THE PAYTABLE MOVED TO THE STAGE AND THE MODEL STILL CARRIES IT. This is the whole reason
-## printed_lines() exists beside drawn_lines(): test_published_payouts.gd parses the price out
-## of these eight strings and a menu that stopped returning them would take that guard with
-## it silently.
-func test_the_paytable_leaves_the_column_and_stays_in_the_model() -> void:
-	var model: Array[String] = _menu.drawn_lines()
-	var printed: Array[String] = _menu.printed_lines()
-	for line: String in SlotsScript.paytable_lines():
-		assert_true(model.has(line), "the model still carries '%s'" % line)
-		assert_false(printed.has(line), "the column stopped printing '%s'" % line)
-
-
-## A SPIN LANDS ON THE VALUE ranch.gd ALREADY ROLLED, and nothing here rolls anything. The
-## stage is TOLD the reels; the tween's target is that value and no other.
-func test_a_pushed_spin_lands_every_reel_on_the_symbol_it_was_handed() -> void:
-	var reels: Array[int] = [2, 5, 0]
-	_menu.show_spin(reels, 0, 10)
-	assert_true(_menu.animating(), "the reels are running")
-	# Run the tween out rather than waiting on wall clock. A fixed frame count tied to an
-	# assumed frame rate is exactly the flake this avoids: headless CI has been observed
-	# well north of 100 fps here, so a bound on FRAMES rather than on seconds still settles
-	# the spin quickly and a genuinely stuck tween still trips the 2000 frame cap instead
-	# of hanging the suite.
-	var frames := 0
-	while _menu.animating() and frames < 2000:
-		await get_tree().process_frame
-		frames += 1
-	assert_false(_menu.animating(), "the reels have settled")
-	var strip: Array[int] = SlotsScript.strip()
-	for reel: int in 3:
-		var landed: int = strip[posmod(roundi(_menu.reel_offset(reel)),
-			SlotsScript.REEL_SIZE)]
-		assert_eq(landed, reels[reel],
-			"reel %d settled on %s and was handed %s" % [reel,
-				SlotsScript.SYMBOL_NAMES[landed], SlotsScript.SYMBOL_NAMES[reels[reel]]])
-
-
-## AN EMPTY OR OUT OF RANGE PUSH IS A STILL FRAME, not an error. These arrive over a dynamic
-## call() and a gate calling ranch.play_slots() directly can produce one.
-func test_a_bad_push_leaves_the_reels_where_they_were() -> void:
-	var before: float = _menu.reel_offset(0)
-	_menu.show_spin([] as Array[int], 0, 10)
-	assert_false(_menu.animating(), "an empty reel array starts no spin")
-	assert_eq(_menu.reel_offset(0), before)
-	_menu.show_spin([99, -3, 7] as Array[int], 0, 10)
-	assert_false(_menu.animating(), "a symbol that is not on the strip starts no spin")
-
-
-## THE STAKE IS STILL THE ONLY THING THE CURSOR MOVES.
-func test_the_focus_id_names_the_stake_the_cursor_is_on() -> void:
-	assert_eq(String(_menu.focused_id()), "stake:0")
-	_menu.move_selection(1)
-	assert_eq(String(_menu.focused_id()), "stake:1")

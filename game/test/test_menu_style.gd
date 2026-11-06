@@ -177,10 +177,15 @@ func test_the_subtitle_size_sits_under_the_row_size() -> void:
 ## its rows, which is why every table in the Palace shipped with unoutlined rows over a
 ## translucent panel for a whole phase. It now asks a table as well.
 func test_a_table_draws_its_rows_with_the_outline_and_in_a_row_box() -> void:
-	var menu: CanvasLayer = load("res://ui/slots_menu.tscn").instantiate()
+	# THE RACE CARD, since the three casino games stopped having a row column at all
+	# (game/ui/casino_table.gd, 2026-11-05); it is the table that still prints rows.
+	var menu: CanvasLayer = load("res://ui/race_menu.tscn").instantiate()
 	add_child_autofree(menu)
 	menu.set("can_open", func() -> bool: return true)
 	menu.set("chips_provider", func() -> int: return 500)
+	menu.set("entrants_provider", func() -> Array[Dictionary]: return [
+		{"uid": &"a", "name": "Mote", "happiness": 0.8, "odds": 3.5, "chance": 0.28},
+	] as Array[Dictionary])
 	assert_true(bool(menu.call("open")))
 	var rows := menu.get_node(^"Centre/Panel/Margin/Column/Rows") as VBoxContainer
 	assert_gt(rows.get_child_count(), 0, "the table drew rows to check")

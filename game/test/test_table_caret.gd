@@ -70,7 +70,7 @@ func test_the_slot_machine_marks_the_stake_it_is_backing_before_and_after_a_spin
 	assert_ne(before_id, "",
 		"before any spin the slot machine is already focused on something real")
 	if CasinoStagesTestScript.STAGED.has("res://ui/slots_menu.tscn"):
-		assert_eq(before_id, "stake:0", "before any spin the focus is on the first stake")
+		assert_eq(before_id, "spin", "the slot machine opens with the cursor on Spin")
 	var spun: Array[String] = ["Apple Apple Apple", "You win 40 chips."]
 	menu.call("show_result", spun)
 	var after_id: String = String(menu.call("focused_id"))

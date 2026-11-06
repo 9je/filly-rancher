@@ -1,168 +1,191 @@
 class_name SlotsMenu
-extends "res://ui/table_menu.gd"
-## THE SLOT MACHINE. A cabinet with three reel windows, a payline, a lever and a paytable,
-## and it spins nothing: ranch.gd rolls the seeded generator, settles the chips and pushes
-## the outcome back through show_spin(). The tween's target is the value Slots.spin() already
-## produced; there is no path by which anything on this screen can influence it, because the
-## outcome arrives AFTER the chips have already moved.
+extends "res://ui/casino_table.gd"
+## THE SLOT MACHINE. A cabinet with a lit marquee, three reel windows, a lever, a Spin button,
+## the three stake chips and a paytable that fits, and it spins nothing: ranch.gd rolls the
+## seeded generator, settles the chips and pushes the three symbols back through show_spin().
 ##
-## THE INPUT MODEL IS UNCHANGED IN EVERY PARTICULAR. row_count() is still stakes().size(),
-## move_selection() still moves the stake index, confirm() still emits spin_requested().
+## WHAT THE OWNER'S PLAYTEST (2026-11-05) SAW, AND WHERE EACH WENT:
+##   - "text spoils the roll": a log under the reels ("Gem Apple Bell", "Nothing this time.",
+##     rows of "= = ="). Gone: the reels tell the result, a win flashes the payline and pops a
+##     banner, and the chip counter holds its old figure until the last reel stops.
+##   - "its clipping": symbols poked out of the reel windows and the rainbow crossed the
+##     SPECTRA SLOTS sign. Each window is now its own Control with clip_contents on, so a
+##     symbol physically cannot be drawn outside it.
+##   - "all 3 the same": one sorted strip showed three apples in a window. Each reel has its
+##     own real strip now (Slots.REEL_STRIPS), and the window shows the true neighbours of the
+##     landed position, three different symbols every time.
+##   - "it wont let me change bet size": the drawn 50 and 200 chips were never click targets;
+##     an invisible row column under the stage was. The chips are the buttons now.
+##   - a paytable line cut off: the table is icons and a number per row, fitted to its column.
 ##
-## WHAT MOVED IS WHERE THE WORDS ARE. drawn_lines() still returns all fifteen lines, because
-## it is the semantic model of the screen and game/test/test_published_payouts.gd parses the
-## price back out of the eight paytable strings. printed_lines() drops eleven of them onto
-## the stage, so the column under the cabinet is two lines instead of fifteen.
+## THE LEVER IS REAL. Press it and drag it down past half way (or just click it) and the
+## machine spins; let go early and it springs back. Spin, Enter and a click do the same thing.
 ##
-## Extended by path rather than by the global class_name, for the reason every preload in
-## this project is by path: the class cache lives in the gitignored game/.godot/.
+## NOTHING HERE ROLLS. Which of a symbol's places on a strip a reel stops at walks with the
+## spin count; the symbol itself is ranch.gd's roll.
 
 const SlotsScript := preload("res://systems/slots.gd")
 
 const TITLE := "Slots"
 
 # --- the cabinet, in stage local pixels ------------------------------------------------------
-const STAGE_HEIGHT := 480.0
-const CABINET := Rect2(0.0, 0.0, 700.0, 420.0)
-const PAYTABLE := Rect2(720.0, 0.0, 400.0, 420.0)
-const HEADBOARD := Rect2(24.0, 14.0, 652.0, 52.0)
-const REEL_SIZE_PX := Vector2(180.0, 300.0)
-const REEL_TOP := 86.0
-const REEL_LEFT := 40.0
-const REEL_PITCH := 216.0
-const CELL_HEIGHT := 96.0
-const LEVER_X := 676.0
-const STAKE_ROW_Y := 452.0
-const STAKE_PITCH := 96.0
-const CHIP_RADIUS := 30.0
-
-## THE LEVER'S HIT BOX AND THE THREE REEL WINDOWS' BOUNDING BAND, in the same stage local
-## pixels paint() draws into. The lever swings from LEVER_X, 120.0 out to a 35 degree ball at
-## radius 90 (see paint()'s own pivot and ball), so this box is generous enough to cover the
-## knob at rest and at full swing without reaching into the paytable beside it. The band is
-## reel_rect(0) through reel_rect(2), unioned by hand rather than at runtime because a const
-## cannot call a function.
-const LEVER_RECT := Rect2(655.0, 100.0, 100.0, 140.0)
-const REEL_BAND := Rect2(40.0, 86.0, 612.0, 300.0)
-
-## Nine bulbs whose alpha chases left to right on this loop. The ONLY thing that moves while
-## nothing is happening, which is what makes the cabinet read as a machine that is switched on
-## rather than as a picture of one.
-const BULBS := 9
+const STAGE_HEIGHT := 580.0
+const MARQUEE := Rect2(20.0, 0.0, 700.0, 86.0)
+const HOUSING := Rect2(20.0, 100.0, 700.0, 340.0)
+const REEL_TOP := 120.0
+const REEL_LEFT := 50.0
+const REEL_PITCH := 220.0
+const REEL_SIZE_PX := Vector2(200.0, 300.0)
+const CELL_HEIGHT := 100.0
+const LEVER_PIVOT := Vector2(758.0, 300.0)
+const LEVER_LENGTH := 210.0
+const LEVER_HIT := Rect2(728.0, 60.0, 60.0, 270.0)
+const CHIP_ROW_Y := 512.0
+const CHIP_RADIUS := 36.0
+const CHIP_PITCH := 98.0
+const COUNTER := Rect2(330.0, 484.0, 180.0, 56.0)
+const SPIN := Rect2(530.0, 466.0, 250.0, 92.0)
+const PAYTABLE := Rect2(808.0, 0.0, 312.0, 580.0)
+const BANNER := Rect2(170.0, 360.0, 400.0, 70.0)
+const BULBS := 14
 const BULB_CHASE_SECONDS := 1.2
 
+## How far down the pointer must drag the knob, in stage pixels, for a full pull.
+const LEVER_DRAG_PX := 150.0
+
 # --- the spin, and every one of these is a CONSTANT ------------------------------------------
-# A spin whose length varied would be a generator living under game/ui/, which is the one
-# thing this file may not have. See game/test/test_casino_paint.gd's last test.
 const LEVER_DROP_SECONDS := 0.12
 const LEVER_RISE_SECONDS := 0.35
-const SPIN_UP_SECONDS := 0.15
-const REEL_SPEED := 22.0
-const LAND_FIRST := 0.60
-const LAND_STAGGER := 0.35
+const LAND_FIRST := 0.75
+const LAND_STAGGER := 0.40
 const LAND_SECONDS := 0.45
-const WIN_FLASH_SECONDS := 0.6
-const COUNTER_SECONDS := 0.5
-
-## Whole strip turns a reel makes before it lands, so the ribbon has visibly run rather than
-## jumped. Landing i begins at LAND_FIRST + i * LAND_STAGGER, so the three settle left to
-## right at 0.60, 0.95 and 1.30 seconds and the whole spin is 1.75.
+const WIN_FLASH_SECONDS := 1.6
 const SPIN_TURNS := 3
+const REEL_LANDED_SPEED := 1.2
 
 signal spin_requested(stake: int)
 
-## Below this many symbols per second a reel counts as landed. The spin runs at REEL_SPEED
-## and the landing tween eases to a stop, so anything this slow is the settle and not the
-## run.
-const REEL_LANDED_SPEED := 1.2
-
-var _reel_offset: Array[float] = [0.0, 0.0, 0.0]
+## Each reel's position: the strip index sitting on the payline, as a float while it rolls.
+var _reel_pos: Array[float] = [0.0, 0.0, 0.0]
 var _lever := 0.0
 var _flash := 0.0
-var _shown_chips := 0.0
 var _spinning := false
+var _won := 0
+var _held_chips := -1
+var _spins := 0
+var _stake := 0
+var _dragging := false
+var _drag_from := 0.0
+var _drag_moved := 0.0
 var _tween: Tween = null
+var _reels: Array[Control] = []
+var _overlay: Control = null
 
 var _reel_step: Array[int] = [-1, -1, -1]
 var _reel_prev: Array[float] = [0.0, 0.0, 0.0]
 var _reel_landed: Array[bool] = [true, true, true]
 
 
+func _ready() -> void:
+	super._ready()
+	if _stage == null:
+		return
+	# THE WINDOWS CLIP. One Control per reel with clip_contents on, drawn after the stage, so a
+	# symbol rolling past the top or bottom edge is cut off by the engine, not by arithmetic.
+	for reel: int in SlotsScript.REELS:
+		var window := Control.new()
+		window.name = "Reel%d" % reel
+		window.clip_contents = true
+		window.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		window.position = reel_rect(reel).position
+		window.size = reel_rect(reel).size
+		window.draw.connect(_paint_reel.bind(reel, window))
+		_stage.add_child(window)
+		_reels.append(window)
+	_overlay = Control.new()
+	_overlay.name = "Overlay"
+	_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_overlay.size = stage_size()
+	_overlay.draw.connect(_paint_overlay)
+	_stage.add_child(_overlay)
+	# Every reel opens on a different place on its strip, so the first look is three columns
+	# of different symbols rather than three copies of one.
+	_reel_pos = [3.0, 7.0, 11.0]
+
+
 func title_text() -> String:
 	return TITLE
-
-
-func tabs_text() -> String:
-	return "Pull the lever. The house keeps %.1f bits of every 100." \
-		% (SlotsScript.house_edge() * 100.0)
 
 
 func stage_size() -> Vector2:
 	return Vector2(STAGE_WIDTH, STAGE_HEIGHT)
 
 
-func drawn_lines() -> Array[String]:
-	var lines: Array[String] = [chips_line(), keys_line()]
-	lines.append_array(result_block())
-	lines.append_array(stake_lines())
-	if not stakes().is_empty():
-		lines.append("Spin for %d chips" % selected_stake())
-	lines.append("")
-	for line in SlotsScript.paytable_lines():
-		lines.append(line)
-	return lines
+func initial_focus() -> StringName:
+	return &"spin"
 
 
-## THE STAKE ROW, THE SPIN LINE AND THE WHOLE PAYTABLE ARE ON THE CABINET NOW. What is left in
-## the column is the two lines that are not pictures: what she is holding, and what the keys
-## do. The last result stays too, because a player who looked away wants the sentence.
-func printed_lines() -> Array[String]:
-	var lines: Array[String] = [chips_line(), keys_line()]
-	lines.append_array(result_block())
-	return lines
+func animating() -> bool:
+	return _spinning
 
 
-## Every printed line is above the cursor, and the cursor is not in the column at all any
-## more: it is on a drawn chip. Zero, so refresh() marks nothing.
-func first_row_line_index() -> int:
-	return printed_lines().size()
+func open() -> bool:
+	if not super.open():
+		return false
+	_held_chips = -1
+	_fit_stake()
+	return true
 
 
-func row_count() -> int:
-	return stakes().size()
+func _purse() -> int:
+	return int(chips_provider.call()) if chips_provider.is_valid() else 0
 
 
-## ROW AND STAKE ARE THE SAME NUMBER ON THIS CABINET: every selectable row IS a stake amount,
-## so _selected (the pointer's cursor) and _stake_index (what selected_stake() actually pays
-## out) are kept equal in both directions. See point_at_row()'s own override below for the
-## other direction.
-##
-## SYNCED BEFORE THE REFRESH, NOT AFTER. set_stake_index() below calls refresh() itself; _selected
-## has to already hold the new value when that happens or the padded row's hover/picked state
-## (and anything else that reads _selected while painting) draws one keypress behind, self
-## perpetuating on every further step since nothing repaints a second time to catch up.
-func move_selection(step: int) -> void:
-	if _spinning:
+# --- the stake ---------------------------------------------------------------------------------
+
+## The stakes she can cover, in order. Kept for the callers that ask (the trailer, the gate).
+func stakes() -> Array[int]:
+	var out: Array[int] = []
+	for stake: int in STAKES:
+		if stake <= _purse():
+			out.append(stake)
+	return out
+
+
+func stake_index() -> int:
+	return _stake
+
+
+## The chip that is up, or 0 when she cannot cover even the smallest.
+func selected_stake() -> int:
+	if STAKES[_stake] <= _purse():
+		return STAKES[_stake]
+	return 0
+
+
+func set_stake_index(index: int) -> void:
+	if index < 0 or index >= STAKES.size() or STAKES[index] > _purse():
+		MenuStyleScript.tick_denied()
 		return
-	var n: int = row_count()
-	if n <= 0:
-		return
-	_selected = posmod(stake_index() + step, n)
-	set_stake_index(_selected)
-	MenuStyleScript.tick_move()
+	_stake = index
+	if _stage != null:
+		_stage.queue_redraw()
 
 
-## super() FIRST: table_menu.gd's own point_at_row() is what actually moves _selected and
-## _hovered and ticks the sound. _stake_index has to follow it here or a chip clicked with the
-## mouse would highlight while confirm() still paid out whatever the keyboard last left in
-## _stake_index.
-func point_at_row(index: int) -> void:
-	super.point_at_row(index)
-	_stake_index = _selected
+## A chip she can no longer cover drops to the biggest one she can.
+func _fit_stake() -> void:
+	while _stake > 0 and STAKES[_stake] > _purse():
+		_stake -= 1
 
 
-func confirm() -> bool:
-	if _spinning or selected_stake() <= 0:
+func can_spin() -> bool:
+	return not _spinning and selected_stake() > 0
+
+
+## PULL. The one place a spin is asked for, whether by the lever, the button or a key.
+func pull() -> bool:
+	if not can_spin():
+		MenuStyleScript.tick_denied()
 		return false
 	MenuStyleScript.tick_confirm()
 	_sound_call(&"play", [&"chip_clink"])
@@ -170,53 +193,7 @@ func confirm() -> bool:
 	return true
 
 
-func animating() -> bool:
-	return _spinning
-
-
-func reel_offset(index: int) -> float:
-	return _reel_offset[clampi(index, 0, SlotsScript.REELS - 1)]
-
-
-## super(delta) FIRST, ALWAYS. TableMenu's own _process is what advances _anim_t and queues
-## the stage redraw; an override that forgot it would leave the whole cabinet's paint frozen
-## the moment this file added one, with no error anywhere to say why.
-func _process(delta: float) -> void:
-	super(delta)
-	_sound_reels(delta)
-
-
-## ONE TICK PER SYMBOL WHILE A REEL RUNS, ONE CLUNK WHEN IT STOPS. Derived from the ribbon
-## position the paint pass already reads, so no timing, no state and no tween changes shape
-## because the machine now makes a noise. THE MATH DOES NOT CHANGE: nothing here touches
-## Slots, the stake, or any generator.
-func _sound_reels(delta: float) -> void:
-	if not is_open() or delta <= 0.0:
-		return
-	for reel: int in SlotsScript.REELS:
-		var offset: float = _reel_offset[reel]
-		var speed: float = absf(offset - _reel_prev[reel]) / delta
-		_reel_prev[reel] = offset
-		if speed > REEL_LANDED_SPEED:
-			_reel_landed[reel] = false
-			var step: int = int(floor(offset))
-			if step != _reel_step[reel]:
-				_reel_step[reel] = step
-				_sound_call(&"play", [&"reel_tick"])
-		elif not _reel_landed[reel]:
-			_reel_landed[reel] = true
-			_sound_call(&"play", [&"reel_stop"])
-
-
-# --- the layout, pure, and the same numbers paint() draws with -------------------------------
-
-func cabinet_rect() -> Rect2:
-	return CABINET
-
-
-func paytable_rect() -> Rect2:
-	return PAYTABLE
-
+# --- the controls -------------------------------------------------------------------------------
 
 func reel_rect(index: int) -> Rect2:
 	return Rect2(Vector2(REEL_LEFT + REEL_PITCH * float(index), REEL_TOP), REEL_SIZE_PX)
@@ -227,33 +204,118 @@ func payline_y() -> float:
 
 
 func stake_chip_rect(index: int) -> Rect2:
-	var centre := Vector2(REEL_LEFT + CHIP_RADIUS + STAKE_PITCH * float(index),
-		STAKE_ROW_Y - (8.0 if index == stake_index() else 0.0))
-	return Rect2(centre - Vector2(CHIP_RADIUS, CHIP_RADIUS) * 1.1,
-		Vector2(CHIP_RADIUS, CHIP_RADIUS) * 2.2)
+	var centre := Vector2(REEL_LEFT + CHIP_RADIUS + CHIP_PITCH * float(index), CHIP_ROW_Y)
+	return Rect2(centre - Vector2(CHIP_RADIUS, CHIP_RADIUS) * 1.15,
+		Vector2(CHIP_RADIUS, CHIP_RADIUS) * 2.3)
 
 
-func focus_rect() -> Rect2:
-	if stakes().is_empty():
-		return Rect2()
-	return to_viewport(stake_chip_rect(clampi(stake_index(), 0, stakes().size() - 1)))
+func lever_rect() -> Rect2:
+	return LEVER_HIT
 
 
-func focused_id() -> StringName:
-	if stakes().is_empty():
-		return &""
-	return StringName("stake:%d" % clampi(stake_index(), 0, stakes().size() - 1))
+func spin_rect() -> Rect2:
+	return SPIN
+
+
+func paytable_rect() -> Rect2:
+	return PAYTABLE
+
+
+func marquee_rect() -> Rect2:
+	return MARQUEE
+
+
+func stage_buttons() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for i: int in STAKES.size():
+		out.append({"id": StringName("stake:%d" % i), "rect": stake_chip_rect(i),
+			"enabled": not _spinning and STAKES[i] <= _purse()})
+	out.append({"id": &"spin", "rect": SPIN, "enabled": can_spin()})
+	out.append({"id": &"lever", "rect": LEVER_HIT, "enabled": can_spin()})
+	return out
+
+
+func activate(id: StringName) -> bool:
+	var name: String = String(id)
+	if name.begins_with("stake:"):
+		var index: int = int(name.substr(6))
+		if STAKES[index] > _purse() or _spinning:
+			return false
+		_stake = index
+		MenuStyleScript.tick_confirm()
+		if _stage != null:
+			_stage.queue_redraw()
+		return true
+	if id == &"spin" or id == &"lever":
+		return pull()
+	return false
+
+
+## THE LEVER'S DRAG. A press on the knob's column takes the pointer; dragging pulls the arm;
+## letting go past half way (or after barely moving, which is a click) spins, and anything
+## else springs it back.
+func stage_pointer(event: InputEvent) -> bool:
+	var button := event as InputEventMouseButton
+	if button != null and button.button_index == MOUSE_BUTTON_LEFT:
+		if button.pressed and LEVER_HIT.has_point(button.position) and can_spin():
+			_dragging = true
+			_drag_from = button.position.y
+			_drag_moved = 0.0
+			focus_on(&"lever")
+			return true
+		if not button.pressed and _dragging:
+			_dragging = false
+			if _lever >= 0.5 or _drag_moved < 6.0:
+				if not pull():
+					_spring_lever()
+			else:
+				_spring_lever()
+			return true
+	var motion := event as InputEventMouseMotion
+	if motion != null and _dragging:
+		_drag_moved = maxf(_drag_moved, absf(motion.position.y - _drag_from))
+		_lever = clampf((motion.position.y - _drag_from) / LEVER_DRAG_PX, 0.0, 1.0)
+		return true
+	return false
+
+
+func _spring_lever() -> void:
+	var spring: Tween = create_tween()
+	spring.tween_property(self, "_lever", 0.0, LEVER_RISE_SECONDS) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 # --- the spin ---------------------------------------------------------------------------------
 
+func reel_position(index: int) -> float:
+	return _reel_pos[clampi(index, 0, SlotsScript.REELS - 1)]
+
+
+## The three symbols a window shows, top to bottom, read off the live reel position: what the
+## drawing draws, for the tests to ask.
+func window_symbols(reel: int) -> Array[int]:
+	var strip: Array[int] = SlotsScript.reel_strip(reel)
+	var at: int = roundi(_reel_pos[reel])
+	return [strip[posmod(at + 1, strip.size())], strip[posmod(at, strip.size())],
+		strip[posmod(at - 1, strip.size())]]
+
+
+## The symbol on the payline of every reel, left to right.
+func payline_symbols() -> Array[int]:
+	var out: Array[int] = []
+	for reel: int in SlotsScript.REELS:
+		out.append(window_symbols(reel)[1])
+	return out
+
+
+func shown_chips() -> int:
+	return _held_chips if _held_chips >= 0 else _purse()
+
+
 ## TOLD, NEVER ASKED. ranch.gd's play_slots() has already taken the stake, rolled
-## Slots.spin() and settled the win by the time this is called; `reels` is that roll. See
-## ranch.gd's own comment on the order, which is the safety property this whole casino shares.
-##
-## A REEL VALUE THAT IS NOT ON THE STRIP IS A STILL FRAME. This arrives over a dynamic call()
-## from ranch.gd, so nothing type checks it at the call site.
-func show_spin(reels: Array[int], won: int, stake: int) -> void:
+## Slots.spin() and settled the win by the time this is called; `reels` is that roll. A symbol
+## that is not on the machine is a still frame: this arrives over a dynamic call().
+func show_spin(reels: Array[int], won: int, _stake_played: int) -> void:
 	if reels.size() != SlotsScript.REELS:
 		return
 	for symbol: int in reels:
@@ -262,180 +324,308 @@ func show_spin(reels: Array[int], won: int, stake: int) -> void:
 	if _tween != null and _tween.is_valid():
 		_tween.kill()
 	_spinning = true
-	for reel: int in SlotsScript.REELS:
-		_reel_prev[reel] = _reel_offset[reel]
-		_reel_landed[reel] = true
+	_spins += 1
+	_won = maxi(0, won)
+	_held_chips = maxi(0, _purse() - _won)
 	_flash = 0.0
-	var strip: Array[int] = SlotsScript.strip()
-	# The tween runs on the menu node, which is process_mode 3 (PROCESS_MODE_ALWAYS) in every
-	# menu .tscn, so it keeps running while get_tree().paused is true.
+	for reel: int in SlotsScript.REELS:
+		_reel_prev[reel] = _reel_pos[reel]
+		_reel_landed[reel] = true
 	_tween = create_tween()
 	_tween.set_parallel(true)
 	_tween.tween_property(self, "_lever", 1.0, LEVER_DROP_SECONDS)
 	_tween.tween_property(self, "_lever", 0.0, LEVER_RISE_SECONDS) \
 		.set_delay(LEVER_DROP_SECONDS)
+	var size: float = float(SlotsScript.REEL_SIZE)
 	for reel: int in SlotsScript.REELS:
-		var target: float = float(_first_position(strip, reels[reel]))
+		var target: float = float(_stop_for(reel, reels[reel]))
 		var landing: float = LAND_FIRST + LAND_STAGGER * float(reel)
-		# Where the ribbon has to be when the landing tween takes over, so the reel appears to
-		# have been running at REEL_SPEED the whole time rather than teleporting into its
-		# landing. Whole turns plus the target, so the arithmetic is exact.
-		var run_to: float = _reel_offset[reel] + float(SPIN_TURNS * SlotsScript.REEL_SIZE)
-		# tween_method(), NOT tween_property() ON "_reel_offset:%d". A NodePath subname
-		# only resolves into a Vector's or a Resource's own NAMED sub properties (".x",
-		# an exported field); an Array element has no such name, so a property tweener
-		# built on one silently fails to bind and every reel stays at 0. A per reel
-		# setter closure is the same animation with a target Array.set() can actually
-		# reach.
-		var set_offset: Callable = (func(v: float) -> void: _reel_offset[reel] = v)
-		_tween.tween_method(set_offset, _reel_offset[reel], run_to, landing) \
+		var run_to: float = _reel_pos[reel] + float(SPIN_TURNS) * size
+		var settle: float = run_to + size - fposmod(run_to - target, size)
+		var set_pos: Callable = (func(v: float) -> void: _reel_pos[reel] = v)
+		# tween_method and not a property path: an Array element has no property name a
+		# tweener can bind to (the old cabinet's own finding).
+		_tween.tween_method(set_pos, _reel_pos[reel], run_to, landing) \
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-		# TRANS_BACK overshoots by about a third of a symbol and settles back, which is what
-		# makes a reel feel like a physical object rather than a list that stopped.
-		var settle: float = run_to + float(SlotsScript.REEL_SIZE) \
-			- posmod(run_to - target, float(SlotsScript.REEL_SIZE))
-		_tween.tween_method(set_offset, run_to, settle, LAND_SECONDS) \
+		_tween.tween_method(set_pos, run_to, settle, LAND_SECONDS) \
 			.set_delay(landing).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	var total: float = LAND_FIRST + LAND_STAGGER * float(SlotsScript.REELS - 1) + LAND_SECONDS
-	if won > 0:
-		# A WIN FLASHES AND A LOSS IS QUIET. A machine that celebrates a loss is a machine
-		# that is lying, and this one publishes its own house edge on the wall outside.
-		_tween.tween_property(self, "_flash", 1.0, WIN_FLASH_SECONDS).set_delay(total)
-		_tween.tween_property(self, "_flash", 0.0, 0.01) \
-			.set_delay(total + WIN_FLASH_SECONDS)
-	# NO .set_delay() HERE. set_parallel(false) already makes this callback its own
-	# sequential step, which starts the moment every Tweener in the parallel group above
-	# it has finished -- that IS total (plus the flash, when there is one). A set_delay()
-	# on top of that waits the same span again on top of the wait sequencing already gives
-	# it for free, which is the bug that used to leave a losing spin animating() for 3.5
-	# real seconds when the constants above only promise 1.75.
 	_tween.set_parallel(false)
-	_tween.tween_callback(func() -> void: _spinning = false)
-	if won > 0:
-		_tween.tween_callback(func() -> void: _sound_call(&"play", [&"slots_win"]))
+	_tween.tween_callback(func() -> void:
+		_held_chips = -1
+		if _won > 0:
+			_sound_call(&"play", [&"slots_win"]))
+	if _won > 0:
+		_tween.tween_property(self, "_flash", 1.0, 0.12)
+		_tween.tween_property(self, "_flash", 0.0, WIN_FLASH_SECONDS)
+	_tween.tween_callback(func() -> void:
+		for reel: int in SlotsScript.REELS:
+			_reel_pos[reel] = fposmod(_reel_pos[reel], size)
+		_spinning = false
+		_fit_stake()
+		refresh())
 
 
-## The first strip position carrying `symbol`. Any position carrying it would do; the first is
-## chosen so the landing is a function of the value and nothing else.
-func _first_position(strip: Array[int], symbol: int) -> int:
+## WHICH OF THE SYMBOL'S PLACES ON THIS REEL'S STRIP the reel stops at. Every place carrying the
+## symbol shows the same payline; which one walks with the spin count and the reel, so the
+## neighbours above and below vary the way a real machine's do.
+func _stop_for(reel: int, symbol: int) -> int:
+	var strip: Array[int] = SlotsScript.reel_strip(reel)
+	var places: Array[int] = []
 	for i: int in strip.size():
 		if strip[i] == symbol:
-			return i
-	return 0
+			places.append(i)
+	if places.is_empty():
+		return 0
+	return places[(_spins + reel * 2) % places.size()]
 
+
+## A ranch push of the old result lines lands here and is not printed: the reels tell it.
+func show_result(lines: Array[String]) -> void:
+	_result = lines.duplicate()
+
+
+func _process(delta: float) -> void:
+	super(delta)
+	for window: Control in _reels:
+		window.queue_redraw()
+	if _overlay != null:
+		_overlay.queue_redraw()
+	_sound_reels(delta)
+
+
+## ONE TICK PER SYMBOL WHILE A REEL RUNS, ONE CLUNK WHEN IT STOPS, read off the positions the
+## paint already reads.
+func _sound_reels(delta: float) -> void:
+	if not is_open() or delta <= 0.0:
+		return
+	for reel: int in SlotsScript.REELS:
+		var pos: float = _reel_pos[reel]
+		var speed: float = absf(pos - _reel_prev[reel]) / delta
+		_reel_prev[reel] = pos
+		if speed > REEL_LANDED_SPEED:
+			_reel_landed[reel] = false
+			var step: int = int(floor(pos))
+			if step != _reel_step[reel]:
+				_reel_step[reel] = step
+				_sound_call(&"play", [&"reel_tick"])
+		elif not _reel_landed[reel]:
+			_reel_landed[reel] = true
+			_sound_call(&"play", [&"reel_stop"])
+
+
+## The text model, for the dash test and test_published_payouts' neighbours.
+func drawn_lines() -> Array[String]:
+	var lines: Array[String] = ["SPECTRA SLOTS", "Spin"]
+	for line in SlotsScript.paytable_lines():
+		lines.append(line)
+	return lines
+
+
+# --- the paint ----------------------------------------------------------------------------------
 
 func paint(ci: Control) -> void:
-	var font: Font = ThemeDB.fallback_font
 	var t: float = anim_time()
+	var title_font: Font = MenuStyleScript.title_font()
+	var numeral_font: Font = MenuStyleScript.numeral_font()
 
-	# --- the cabinet -------------------------------------------------------------------------
-	PaintScript.rounded(ci, CABINET.grow(-2.0), 16.0, PaintScript.PLUM,
-		PaintScript.GOLD, 4.0)
-	PaintScript.rounded(ci, HEADBOARD, 10.0, PaintScript.GOLD_DIM, PaintScript.GOLD, 2.0)
-	PaintScript.text(ci, MenuStyleScript.title_font(),
-		HEADBOARD.position + Vector2(HEADBOARD.size.x * 0.5, 38.0), "SPECTRA SLOTS",
-		MenuStyleScript.TITLE_SIZE, PaintScript.PLUM_DARK, HORIZONTAL_ALIGNMENT_CENTER, -1.0)
+	# --- the cabinet body ----------------------------------------------------------------------
+	PaintScript.rounded(ci, Rect2(0.0, 0.0, 790.0, STAGE_HEIGHT), 20.0,
+		Color(PaintScript.PLUM_DARK, 0.85), Color(PaintScript.GOLD_DIM, 0.6), 2.0)
+
+	# --- the marquee ---------------------------------------------------------------------------
+	PaintScript.rounded(ci, MARQUEE, 18.0, PaintScript.PLUM, PaintScript.GOLD, 4.0)
+	var sign := MARQUEE.grow_individual(-40.0, -14.0, -40.0, -14.0)
+	var glow: float = 0.5 + 0.5 * sin(t * 2.0)
+	if _flash > 0.0:
+		glow = 0.5 + 0.5 * sin(t * 16.0)
+	PaintScript.label(ci, title_font, Rect2(sign.position + Vector2(0.0, 3.0), sign.size),
+		"SPECTRA SLOTS", 46, Color(0.0, 0.0, 0.0, 0.35))
+	PaintScript.label(ci, title_font, sign, "SPECTRA SLOTS", 46,
+		PaintScript.GOLD.lerp(Color(1.0, 0.98, 0.85), 0.35 * glow))
 	for bulb: int in BULBS:
 		var phase: float = fposmod(t / BULB_CHASE_SECONDS - float(bulb) / float(BULBS), 1.0)
 		var lit: float = 0.35 + 0.65 * maxf(0.0, 1.0 - phase * 4.0)
-		ci.draw_circle(Vector2(HEADBOARD.position.x + 30.0
-			+ (HEADBOARD.size.x - 60.0) * float(bulb) / float(BULBS - 1), 8.0),
-			5.0, Color(PaintScript.GOLD, lit))
+		if _flash > 0.0:
+			lit = 0.5 + 0.5 * sin(t * 18.0 + float(bulb))
+		var x: float = MARQUEE.position.x + 22.0 + (MARQUEE.size.x - 44.0) * float(bulb) \
+			/ float(BULBS - 1)
+		ci.draw_circle(Vector2(x, MARQUEE.position.y + 10.0), 4.5, Color(1.0, 0.95, 0.7, lit))
+		ci.draw_circle(Vector2(x, MARQUEE.end.y - 10.0), 4.5, Color(1.0, 0.95, 0.7, lit))
 
-	# --- the three windows -------------------------------------------------------------------
-	var strip: Array[int] = SlotsScript.strip()
+	# --- the reel housing (the windows draw themselves, clipped, on top of this) --------------
+	PaintScript.rounded(ci, HOUSING, 18.0, Color(0.10, 0.06, 0.13), PaintScript.GOLD, 3.0)
 	for reel: int in SlotsScript.REELS:
-		var window: Rect2 = reel_rect(reel)
-		PaintScript.rounded(ci, window, 10.0, Color(0.06, 0.05, 0.09),
-			PaintScript.GOLD_DIM, 3.0)
-		# The ribbon: the REAL strip, at this reel's scroll offset, wrapped. Three cells are
-		# visible and the middle one is the payline.
-		var offset: float = _reel_offset[reel]
-		var top_index: int = floori(offset) - 1
-		var slide: float = (offset - floor(offset)) * CELL_HEIGHT
-		for cell: int in 4:
-			var symbol: int = strip[posmod(top_index + cell, SlotsScript.REEL_SIZE)]
-			var y: float = window.position.y + CELL_HEIGHT * float(cell) - slide \
-				- (CELL_HEIGHT - window.size.y * 0.5) * 0.0
-			var box := Rect2(Vector2(window.position.x + 26.0, y - CELL_HEIGHT * 0.5),
-				Vector2(window.size.x - 52.0, CELL_HEIGHT - 12.0))
-			if box.position.y + box.size.y < window.position.y:
-				continue
-			if box.position.y > window.position.y + window.size.y:
-				continue
-			PaintScript.draw_symbol(ci, box, symbol)
-		# The cylinder shading: two flat bands top and bottom, so the ribbon reads as a drum
-		# rather than as a list somebody is scrolling.
-		ci.draw_rect(Rect2(window.position, Vector2(window.size.x, 48.0)),
-			Color(0.02, 0.02, 0.04, 0.55))
-		ci.draw_rect(Rect2(window.position + Vector2(0.0, window.size.y - 48.0),
-			Vector2(window.size.x, 48.0)), Color(0.02, 0.02, 0.04, 0.55))
+		PaintScript.rounded(ci, reel_rect(reel).grow(6.0), 12.0, PaintScript.GOLD_DIM,
+			PaintScript.GOLD, 2.0)
 
-	# --- the payline, always on, so she knows which row counts before she spins ---------------
-	var flash_colour: Color = PaintScript.GOLD if _flash <= 0.0 \
-		else PaintScript.BAND_COLORS[int(t * 8.0) % PaintScript.BAND_COLORS.size()]
-	ci.draw_line(Vector2(reel_rect(0).position.x - 8.0, payline_y()),
-		Vector2(reel_rect(2).position.x + REEL_SIZE_PX.x + 8.0, payline_y()),
-		Color(flash_colour, 0.5 + 0.5 * _flash), 2.0 + 2.0 * _flash, true)
+	# --- the lever -----------------------------------------------------------------------------
+	PaintScript.rounded(ci, Rect2(LEVER_PIVOT - Vector2(22.0, 34.0), Vector2(44.0, 68.0)), 10.0,
+		PaintScript.GOLD_DIM, PaintScript.GOLD, 2.0)
+	# At rest the arm stands up and leans out; pulled, it swings down past the pivot.
+	var swing: float = lerpf(-PI * 0.5 - 0.10, PI * 0.5 - 0.35, _lever)
+	# The arm swings toward the player, so it is seen foreshortened: mostly up and down, with
+	# only a small lean outward, which keeps the knob off the paytable at every point of a pull.
+	var knob: Vector2 = LEVER_PIVOT + Vector2(cos(swing) * 0.12, sin(swing)) * LEVER_LENGTH
+	ci.draw_line(LEVER_PIVOT, knob, PaintScript.GOLD_DIM.darkened(0.2), 12.0, true)
+	ci.draw_line(LEVER_PIVOT, knob, PaintScript.GOLD, 6.0, true)
+	ci.draw_circle(LEVER_PIVOT, 12.0, PaintScript.GOLD)
+	var lever_lit: bool = is_lit(&"lever") and can_spin()
+	ci.draw_circle(knob + Vector2(0.0, 3.0), 23.0, Color(0.0, 0.0, 0.0, 0.3))
+	ci.draw_circle(knob, 22.0, Color(0.88, 0.20, 0.24).lightened(0.15 if lever_lit else 0.0))
+	ci.draw_circle(knob + Vector2(-7.0, -7.0), 7.0, Color(1.0, 1.0, 1.0, 0.45))
 
-	# --- the lever, purely cosmetic; the spin is on ui_accept ---------------------------------
-	var pivot := Vector2(LEVER_X, 120.0)
-	var swing: float = deg_to_rad(35.0) * _lever
-	var ball: Vector2 = pivot + Vector2(sin(swing), cos(swing)) * 90.0
-	ci.draw_line(pivot, ball, PaintScript.GOLD_DIM, 8.0, true)
-	ci.draw_circle(ball, 16.0, Color(0.82, 0.18, 0.20))
-
-	# --- the stake, as drawn chips -----------------------------------------------------------
-	var available: Array[int] = stakes()
-	for i: int in available.size():
+	# --- the stake chips ------------------------------------------------------------------------
+	for i: int in STAKES.size():
 		var box: Rect2 = stake_chip_rect(i)
-		PaintScript.chip(ci, box.position + box.size * 0.5, CHIP_RADIUS,
-			PaintScript.CHIP_COLORS[i % PaintScript.CHIP_COLORS.size()], true)
-		PaintScript.text(ci, MenuStyleScript.numeral_font(),
-			box.position + Vector2(box.size.x * 0.5, box.size.y * 0.62),
-			str(available[i]), 20, PaintScript.CARD_INK, HORIZONTAL_ALIGNMENT_CENTER, -1.0)
-		if i == stake_index():
-			PaintScript.focus_ring(ci, box.grow(6.0), 40.0, t)
+		var usable: bool = STAKES[i] <= _purse()
+		var chosen: bool = i == _stake and usable
+		var centre: Vector2 = box.get_center() - Vector2(0.0, 8.0 if chosen else 0.0)
+		var colour: Color = PaintScript.CHIP_COLORS[i] if usable else Color(0.30, 0.28, 0.32)
+		if chosen:
+			ci.draw_arc(centre, CHIP_RADIUS + 7.0, 0.0, TAU, 48,
+				Color(PaintScript.GOLD, 0.75 + 0.25 * sin(t * 4.0)), 4.0, true)
+		PaintScript.chip(ci, centre, CHIP_RADIUS, colour, true)
+		PaintScript.label(ci, numeral_font, Rect2(centre - Vector2(CHIP_RADIUS * 0.66, 14.0),
+			Vector2(CHIP_RADIUS * 1.32, 28.0)), str(STAKES[i]), 22,
+			Color.WHITE if i == 2 or not usable else PaintScript.CARD_INK)
 
-	# --- the chip counter, tweening toward what she is actually holding -----------------------
-	var chips: float = float(chips_provider.call()) if chips_provider.is_valid() else 0.0
-	_shown_chips = lerpf(_shown_chips, chips, 1.0 - pow(0.001, get_process_delta_time()))
-	PaintScript.draw_chip_icon(ci, Rect2(CABINET.size.x - 150.0, 386.0, 24.0, 24.0))
-	PaintScript.text(ci, MenuStyleScript.numeral_font(), Vector2(CABINET.size.x - 118.0, 406.0),
-		"%d" % roundi(_shown_chips), 24, PaintScript.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1.0)
+	# --- the chip counter, holding until the last reel stops -------------------------------------
+	PaintScript.rounded(ci, COUNTER, 28.0, Color(0.0, 0.0, 0.0, 0.40),
+		Color(PaintScript.GOLD, 0.5), 2.0)
+	PaintScript.draw_chip_icon(ci, Rect2(COUNTER.position + Vector2(12.0, 13.0),
+		Vector2(30.0, 30.0)))
+	PaintScript.label(ci, numeral_font, Rect2(COUNTER.position + Vector2(50.0, 4.0),
+		COUNTER.size - Vector2(60.0, 8.0)), "%d" % shown_chips(), 30, PaintScript.GOLD,
+		HORIZONTAL_ALIGNMENT_LEFT)
 
-	# --- the paytable ------------------------------------------------------------------------
-	PaintScript.rounded(ci, PAYTABLE, 12.0, Color(PaintScript.FELT_DARK, 0.9),
+	# --- spin ------------------------------------------------------------------------------------
+	PaintScript.button(ci, SPIN, "Spin %d" % selected_stake() if selected_stake() > 0
+		else "No chips", Color(0.95, 0.62, 0.18), can_spin(), is_lit(&"spin"))
+
+	_paint_paytable(ci, title_font, numeral_font)
+	paint_focus(ci)
+
+
+func _paint_paytable(ci: Control, title_font: Font, numeral_font: Font) -> void:
+	PaintScript.rounded(ci, PAYTABLE, 16.0, Color(PaintScript.FELT_DARK, 0.92),
 		PaintScript.GOLD_DIM, 2.0)
-	var lines: Array[String] = SlotsScript.paytable_lines()
-	for i: int in lines.size():
-		var y: float = PAYTABLE.position.y + 46.0 + 46.0 * float(i)
-		if i < SlotsScript.SYMBOL_NAMES.size():
-			for pip: int in 3:
-				PaintScript.draw_symbol(ci, Rect2(PAYTABLE.position.x + 16.0 + 36.0 * float(pip),
-					y - 26.0, 32.0, 32.0), i)
-			PaintScript.text(ci, MenuStyleScript.numeral_font(),
-				Vector2(PAYTABLE.position.x + 140.0, y), "%d for 1" % SlotsScript.TRIPLE_PAYS[i],
-				MenuStyleScript.ROW_SIZE, PaintScript.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1.0)
+	PaintScript.label(ci, title_font, Rect2(PAYTABLE.position + Vector2(16.0, 10.0),
+		Vector2(PAYTABLE.size.x - 32.0, 40.0)), "Chips back per chip", 22, PaintScript.GOLD)
+	var row_h := 62.0
+	var top: float = PAYTABLE.position.y + 60.0
+	var rows: int = SlotsScript.SYMBOL_NAMES.size() + 2
+	var winning_row: int = _winning_row()
+	for row: int in rows:
+		var y: float = top + row_h * float(row)
+		var band := Rect2(PAYTABLE.position.x + 10.0, y, PAYTABLE.size.x - 20.0, row_h - 8.0)
+		if row == winning_row and _flash > 0.0:
+			PaintScript.rounded(ci, band, 10.0, Color(PaintScript.GOLD, 0.35 * _flash + 0.1),
+				PaintScript.GOLD, 2.0)
+		elif row % 2 == 0:
+			PaintScript.rounded(ci, band, 10.0, Color(1.0, 1.0, 1.0, 0.04),
+				Color(0, 0, 0, 0), 0.0)
+		var icons: Array[int] = []
+		var pay: int = 0
+		if row < SlotsScript.SYMBOL_NAMES.size():
+			icons = [row, row, row]
+			pay = SlotsScript.TRIPLE_PAYS[row]
+		elif row == SlotsScript.SYMBOL_NAMES.size():
+			icons = [SlotsScript.Symbol.RAINBOW, SlotsScript.Symbol.RAINBOW, -1]
+			pay = SlotsScript.TWO_RAINBOW_PAY
 		else:
-			PaintScript.text(ci, font, Vector2(PAYTABLE.position.x + 16.0, y), lines[i],
-				MenuStyleScript.SUBTITLE_SIZE, MenuStyleScript.COLOR_DIM,
-				HORIZONTAL_ALIGNMENT_LEFT, PAYTABLE.size.x - 32.0)
+			icons = [SlotsScript.Symbol.RAINBOW, -1, -1]
+			pay = SlotsScript.ONE_RAINBOW_PAY
+		for i: int in 3:
+			var box := Rect2(band.position + Vector2(8.0 + 50.0 * float(i), 4.0),
+				Vector2(46.0, 46.0))
+			if icons[i] >= 0:
+				PaintScript.draw_symbol(ci, box, icons[i])
+			else:
+				# "ANY": a dim empty tile, so two rainbows and one rainbow read as pictures too.
+				PaintScript.rounded(ci, box.grow(-6.0), 8.0, Color(1.0, 1.0, 1.0, 0.06),
+					Color(1.0, 1.0, 1.0, 0.25), 1.5)
+				PaintScript.label(ci, title_font, box.grow(-8.0), "any", 14,
+					Color(1.0, 1.0, 1.0, 0.5))
+		PaintScript.label(ci, numeral_font, Rect2(band.position + Vector2(162.0, 0.0),
+			Vector2(band.size.x - 172.0, band.size.y)), "x%d" % pay, 32,
+			PaintScript.GOLD, HORIZONTAL_ALIGNMENT_RIGHT)
 
 
-## THE LEVER AND THE THREE REELS. Clicking the lever is spinning; clicking a reel is the
-## same, because a player who clicks the machine means play. The rects are the ones paint()
-## already draws into, taken from the same constants, so the drawing and the hit test cannot
-## disagree.
-func stage_hit_rects() -> Array[Rect2]:
-	return [LEVER_RECT, REEL_BAND]
+## Which paytable row the last spin hit, or -1.
+func _winning_row() -> int:
+	if _won <= 0 or _spinning and _flash <= 0.0:
+		return -1
+	var line: Array[int] = payline_symbols()
+	if line[0] == line[1] and line[1] == line[2]:
+		return line[0]
+	var rainbows: int = line.count(SlotsScript.Symbol.RAINBOW)
+	if rainbows == 2:
+		return SlotsScript.SYMBOL_NAMES.size()
+	if rainbows == 1:
+		return SlotsScript.SYMBOL_NAMES.size() + 1
+	return -1
 
 
-## I8, final-review.md I6 (controller ruling overrides the plan text): THE LEVER PLAYS THE
-## STAKE THAT IS SHOWING. take_row(row_count() - 1) mirrored the click into the LAST stake
-## row before spinning, so a player who picked the smallest chip with the arrow keys and then
-## reached for the lever with the mouse bet her whole affordable maximum instead -- the worst
-## possible mouse gesture to ship in the one part of the game whose math is published and
-## tested. _selected is exactly what the keyboard's own confirm() on the stake row plays.
-func on_stage_hit(_index: int) -> void:
-	take_row(_selected)
+## ONE REEL, drawn into its own clipped window. Symbols on a cream drum, the payline cell
+## lit, shaded top and bottom so it reads as a cylinder.
+func _paint_reel(reel: int, window: Control) -> void:
+	var size: Vector2 = window.size
+	window.draw_rect(Rect2(Vector2.ZERO, size), Color(0.97, 0.94, 0.86))
+	var strip: Array[int] = SlotsScript.reel_strip(reel)
+	var pos: float = _reel_pos[reel]
+	var mid: float = size.y * 0.5
+	var base: int = floori(pos)
+	var speed: float = absf(pos - _reel_prev[reel])
+	for i: int in range(base - 2, base + 4):
+		# Rolling down: a higher strip index sits higher in the window.
+		var y: float = mid + (pos - float(i)) * CELL_HEIGHT
+		var cell := Rect2(Vector2(0.0, y - CELL_HEIGHT * 0.5), Vector2(size.x, CELL_HEIGHT))
+		window.draw_line(Vector2(12.0, cell.position.y), Vector2(size.x - 12.0, cell.position.y),
+			Color(0.0, 0.0, 0.0, 0.08), 2.0)
+		var box := Rect2(cell.position + Vector2(size.x * 0.5 - 40.0, 10.0), Vector2(80.0, 80.0))
+		var symbol: int = strip[posmod(i, strip.size())]
+		if speed > 0.25:
+			# A fast reel smears: the symbol drawn twice more, fainter, along its path.
+			for ghost: int in 2:
+				var off := Vector2(0.0, -CELL_HEIGHT * 0.18 * float(ghost + 1))
+				var ghost_box := Rect2(box.position + off, box.size)
+				PaintScript.draw_symbol(window, ghost_box, symbol)
+				window.draw_rect(ghost_box, Color(0.97, 0.94, 0.86, 0.55))
+		PaintScript.draw_symbol(window, box, symbol)
+	# The cylinder: darker bands at the top and bottom.
+	for band: int in 6:
+		var a: float = 0.30 * (1.0 - float(band) / 6.0)
+		window.draw_rect(Rect2(0.0, 8.0 * float(band), size.x, 8.0), Color(0.1, 0.05, 0.12, a))
+		window.draw_rect(Rect2(0.0, size.y - 8.0 * float(band + 1), size.x, 8.0),
+			Color(0.1, 0.05, 0.12, a))
+
+
+## Over the windows: the payline and, on a win, the banner. Its own Control so it draws above
+## the clipped reels.
+func _paint_overlay() -> void:
+	if _overlay == null:
+		return
+	var t: float = anim_time()
+	var lit: bool = _flash > 0.0
+	var colour: Color = PaintScript.GOLD if not lit \
+		else PaintScript.BAND_COLORS[int(t * 10.0) % PaintScript.BAND_COLORS.size()]
+	var left: float = reel_rect(0).position.x - 22.0
+	var right: float = reel_rect(SlotsScript.REELS - 1).end.x + 22.0
+	_overlay.draw_line(Vector2(left + 14.0, payline_y()), Vector2(right - 14.0, payline_y()),
+		Color(colour, 0.35 + 0.55 * _flash), 2.0 + 3.0 * _flash, true)
+	for side: float in [left, right]:
+		var dir: float = 1.0 if side == left else -1.0
+		_overlay.draw_colored_polygon(PackedVector2Array([Vector2(side, payline_y() - 14.0),
+			Vector2(side, payline_y() + 14.0), Vector2(side + 18.0 * dir, payline_y())]), colour)
+	if lit:
+		for reel: int in SlotsScript.REELS:
+			var cell := Rect2(reel_rect(reel).position + Vector2(4.0, REEL_SIZE_PX.y * 0.5
+				- CELL_HEIGHT * 0.5 + 4.0), Vector2(REEL_SIZE_PX.x - 8.0, CELL_HEIGHT - 8.0))
+			PaintScript.rounded(_overlay, cell, 12.0, Color(1.0, 0.9, 0.4, 0.0),
+				Color(colour, _flash), 4.0)
+		var pop: float = 1.0 + 0.06 * sin(t * 14.0)
+		var banner := Rect2(BANNER.get_center() - BANNER.size * pop * 0.5, BANNER.size * pop)
+		PaintScript.rounded(_overlay, banner, 35.0, Color(PaintScript.PLUM_DARK, 0.92),
+			PaintScript.GOLD, 4.0)
+		PaintScript.label(_overlay, MenuStyleScript.title_font(), banner.grow(-12.0),
+			"WIN  +%d" % _won, 44, PaintScript.GOLD)
