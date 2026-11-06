@@ -75,7 +75,8 @@ static func _check(m: Material, where: String, src_real: bool, out: PackedString
 				out.append(tag + ": use_texture on but no albedo_texture")
 			elif tex != null and _texture_problem(tex) != "":
 				out.append(tag + ": " + _texture_problem(tex))
-			elif src_real and not use and sm.shader == TOON and not bool(sm.get_meta(&"recolored", false)):
+			elif src_real and not use and sm.shader == TOON and not bool(sm.get_meta(&"recolored", false)) \
+					and not bool(sm.get_meta(&"plain_coat", false)):
 				out.append(tag + ": the imported material had a texture this one dropped")
 		elif sm.shader == EYE:
 			var et := sm.get_shader_parameter(&"eye_texture") as Texture2D

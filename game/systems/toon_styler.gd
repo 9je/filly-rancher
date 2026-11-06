@@ -67,6 +67,12 @@ static func style(root: Node, category: StringName = &"prop", cache: Variant = n
 					key += ":plain"
 					if not store.has(key):
 						store[key] = to_toon(_plain_coat(src as StandardMaterial3D), preset)
+						# Its texture dropped ON PURPOSE (the mark is the body's alone), which
+						# the material audit (test_input/pony_material_audit.gd) is told.
+						(store[key] as Material).set_meta(&"plain_coat", true)
+						var twin: Variant = (store[key] as Material).get_meta(BARE_META, null)
+						if twin is Material:
+							(twin as Material).set_meta(&"plain_coat", true)
 				elif mark_body != null and mi == mark_body \
 						and is_mark_texture((src as StandardMaterial3D).albedo_texture):
 					key += ":mark"

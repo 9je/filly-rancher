@@ -139,6 +139,9 @@ func _collect() -> void:
 			_cover(s)
 		elif String(s.name).begins_with("Marquee"):
 			_cover(s)
+		elif s.name == &"Paving":
+			# The flagstones laid over the Strip's ground (PT7): paint on the ground, like a lake.
+			_cover(s)
 	if strip != null and strip.get_node_or_null(^"MarqueeBoard") != null:
 		_add("strip_marquee", "Strip/MarqueeBoard",
 			PropsScript.world_aabb(strip.get_node(^"MarqueeBoard")).size.y)
