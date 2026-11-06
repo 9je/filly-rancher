@@ -24,7 +24,7 @@ extends RefCounted
 ## PEN_UPGRADE and PLOT_CLEAR are appended rather than slotted in beside the other ground
 ## kinds, so every int a driver or a test log already holds keeps its meaning.
 enum Kind { NONE, PLOT_BUILD, PEN_MOVE_IN, MARKET, BOARD, MAILBOX, DEPOT, PALACE, TALK,
-	PEN_UPGRADE, PLOT_CLEAR, PALACE_STATION, PALACE_EXIT }
+	PEN_UPGRADE, PLOT_CLEAR, PALACE_STATION, PALACE_EXIT, SPIKE }
 
 ## THE ORDER, HIGHEST FIRST, and every one of these positions is a decision.
 ##
@@ -59,8 +59,8 @@ enum Kind { NONE, PLOT_BUILD, PEN_MOVE_IN, MARKET, BOARD, MAILBOX, DEPOT, PALACE
 ## beats the way out, because a player standing between the cage and the doors came in to
 ## play.
 const PRIORITY: Array[int] = [Kind.PLOT_BUILD, Kind.PEN_MOVE_IN, Kind.PEN_UPGRADE,
-	Kind.PLOT_CLEAR, Kind.TALK, Kind.MARKET, Kind.BOARD, Kind.MAILBOX, Kind.DEPOT, Kind.PALACE,
-	Kind.PALACE_STATION, Kind.PALACE_EXIT]
+	Kind.PLOT_CLEAR, Kind.TALK, Kind.MARKET, Kind.BOARD, Kind.MAILBOX, Kind.SPIKE, Kind.DEPOT,
+	Kind.PALACE, Kind.PALACE_STATION, Kind.PALACE_EXIT]
 
 ## What each station in the hall says it does (game/world/palace_interior.gd's STATIONS).
 const STATION_PROMPTS := {
@@ -212,6 +212,8 @@ static func prompt_for(action: Dictionary, key: String) -> String:
 			return "%s: read the board" % key
 		Kind.MAILBOX:
 			return "%s: read your mail" % key
+		Kind.SPIKE:
+			return "%s: ask Spike for a tip" % key
 		Kind.DEPOT:
 			return "%s: Depot, deliver and pay" % key
 		Kind.PALACE:

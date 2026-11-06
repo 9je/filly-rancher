@@ -47,3 +47,17 @@ func test_she_waits_outside_when_every_pen_is_full() -> void:
 	assert_eq((ranch.get("_game_state").story.get_var("escaped_tonight", []) as Array).size(), 1,
 		"she is still remembered, to come home when there is room")
 	assert_has(ranch.call("_owned_named_ids"), &"scootaloo")
+
+
+func test_spike_names_the_escape_artist_when_asked() -> void:
+	# PT8: E at Spike reads the ranch (Ranch.spike_state) and says the most useful thing.
+	var got := await _ranch_with_paddock()
+	var ranch = got[0]
+	var pen: Pen = got[1]
+	assert_true(pen.add_pony(PonyInstanceScript.create(&"scootaloo")))
+	var st: Dictionary = ranch.call("spike_state")
+	assert_eq(String(st.get("escapee", "")), "Scootaloo")
+	assert_true(ranch.call("ask_spike"))
+	var hud: Node = ranch.get_node("HUD")
+	var said: String = hud.call("toast_text") + " ".join(hud.call("pending_toasts"))
+	assert_string_contains(said, "Escape Artist")

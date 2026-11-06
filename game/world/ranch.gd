@@ -4677,6 +4677,11 @@ func interaction_candidates() -> Array[Dictionary]:
 	if is_near_mailbox():
 		out.append(InteractionScript.candidate(
 			InteractionScript.Kind.MAILBOX, _flat_gap_to(^"Buildings/Mailbox")))
+	if spike != null and player != null:
+		var sg := Vector2(player.global_position.x - spike.global_position.x,
+			player.global_position.z - spike.global_position.z).length()
+		if sg <= SPIKE_RADIUS:
+			out.append(InteractionScript.candidate(InteractionScript.Kind.SPIKE, sg))
 	if is_near_depot():
 		out.append(InteractionScript.candidate(
 			InteractionScript.Kind.DEPOT, _flat_gap_to(^"Buildings/Depot")))
@@ -4796,6 +4801,8 @@ func perform_interaction(action: Dictionary) -> bool:
 			return true
 		InteractionScript.Kind.MAILBOX:
 			return open_mailbox_letter()
+		InteractionScript.Kind.SPIKE:
+			return ask_spike()
 		InteractionScript.Kind.DEPOT:
 			if depot_menu == null or not depot_menu.has_method("open"):
 				return false
@@ -8533,7 +8540,85 @@ const RanchToolsScript := preload("res://world/ranch_tools.gd")
 const HappeningsScript := preload("res://world/happenings.gd")
 var happenings: Happenings
 const PonyTraitsScript := preload("res://systems/pony_traits.gd")
+const NeedsScript := preload("res://systems/needs.gd")
 var tools: RanchTools
+
+
+## ASK SPIKE (PT8; playtest 2026-11-05: "why does spike just sit there"): the most useful thing
+## to know right now (systems/spike_tips.gd), with a wave. Each ask moves the general tips on.
+const SPIKE_RADIUS := 2.4
+const SpikeTipsScript := preload("res://systems/spike_tips.gd")
+var _spike_asks := 0
+
+
+func ask_spike() -> bool:
+	if spike == null:
+		return false
+	spike.asked()
+	_toast("Spike: \"%s\"" % SpikeTipsScript.pick(spike_state(), _spike_asks))
+	_spike_asks += 1
+	return true
+
+
+## What Spike's tips read (SpikeTips' keys).
+func spike_state() -> Dictionary:
+	var s := {}
+	var hungry := 0
+	var escapee := ""
+	var drifters := 0
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen == null:
+			continue
+		for inst: PonyInstance in pen.ponies():
+			if inst.hunger >= NeedsScript.HUNGRY_THRESHOLD:
+				hungry += 1
+			if inst.is_stock() and not inst.is_marked():
+				drifters += 1
+			if escapee.is_empty() and String(slot.saved_plot_id()) == "pen_small" \
+					and PonyTraitsScript.quirk_of(inst) == &"escapee":
+				escapee = inst.display_name()
+	s["hungry"] = hungry
+	s["escapee"] = escapee
+	s["drifters"] = drifters
+	var inv: Inventory = _current_inventory()
+	var food := 0
+	if inv != null:
+		for id: StringName in inv.ids():
+			if NeedsScript.resolve_food(id) != null:
+				food += inv.count(id)
+	s["pantry"] = food
+	s["bloom_goal"] = StringName(current_objective().get("id", &"")) == &"bloom"
+	var beam: Node3D = player.get_magic_beam() if player != null else null
+	s["bag_full"] = beam != null and beam.get_storage().is_full()
+	s["rare_hint"] = _spike_rare_hint()
+	return s
+
+
+## A rare she has not seen, in a region she can reach, that keeps hours: where and when.
+func _spike_rare_hint() -> Dictionary:
+	if _game_state == null:
+		return {}
+	var book: Compendium = _game_state.compendium
+	for data: PonyData in _game_state.get_registry().all():
+		if data.rarity < 1 or data.spawn_zones.is_empty() or StockPaletteScript.is_stock_id(data.id):
+			continue
+		if book.state_of(data.id) != CompendiumScript.State.UNSEEN:
+			continue
+		if data.phases.is_empty() and data.weathers.is_empty():
+			continue
+		var zone: StringName = data.spawn_zones[0]
+		if zone != &"ranch" and not is_region_open(zone):
+			continue
+		var region: RegionData = _regions_registry().by_id(zone)
+		var where := region.display_name if region != null else "the homestead"
+		var when: Array[String] = []
+		for p: int in data.phases:
+			when.append("at " + WorldStateScript.phase_name(p).to_lower())
+		for w: int in data.weathers:
+			when.append("in the " + WorldStateScript.weather_name(w).to_lower())
+		return {"region": where, "when": " or ".join(when)}
+	return {}
 
 
 ## SPIKE, at the mailbox (world/spike_actor.gd): he burps the post in on green dragonfire.

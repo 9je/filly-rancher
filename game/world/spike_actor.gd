@@ -206,6 +206,11 @@ func _process(delta: float) -> void:
 
 
 ## A letter: a burp of green dragonfire and a little hop, the way he sends Twilight's mail.
+## Asked for a tip (PT8): a wave, the same one he gives her on arrival.
+func asked() -> void:
+	_play(&"wave")
+
+
 func letter_arrived() -> void:
 	if _body == null:
 		return
