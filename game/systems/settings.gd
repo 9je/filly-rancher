@@ -419,13 +419,18 @@ func apply_bindings() -> void:
 
 
 ## The graphics preset, the window and vsync, on `viewport` and the scene's environment.
-func apply_graphics(viewport: Viewport) -> void:
+## `with_window` false leaves the OS window alone (PT11; playtest 2026-11-05: fullscreen chosen
+## during the load "went small when it loaded in"). The ranch applies the rest of the
+## graphics on load, but the window is set at boot and by the Settings menu, never by a scene
+## arriving.
+func apply_graphics(viewport: Viewport, with_window := true) -> void:
 	if DisplayServer.get_name() == "headless":
 		return
 	DisplayServer.window_set_vsync_mode(
 		DisplayServer.VSYNC_ENABLED if vsync else DisplayServer.VSYNC_DISABLED)
 	Engine.max_fps = max_fps
-	apply_window()
+	if with_window:
+		apply_window()
 	if viewport == null:
 		return
 	viewport.scaling_3d_scale = [0.67, 0.85, 1.0][quality]

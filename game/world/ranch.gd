@@ -2818,7 +2818,9 @@ func _apply_settings() -> void:
 		hud_node.call("set_checklist_enabled", _settings.show_checklist)
 	if _interactive:
 		_settings.apply_audio()
-		_settings.apply_graphics(get_viewport())
+		# The window is not the ranch's to set (Settings.apply_graphics): fullscreen chosen
+		# while it loaded stays fullscreen.
+		_settings.apply_graphics(get_viewport(), false)
 	_settings.apply_bindings()
 
 
