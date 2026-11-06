@@ -174,6 +174,7 @@ const CasinoScript := preload("res://systems/casino.gd")
 const SlotsScript := preload("res://systems/slots.gd")
 const WheelScript := preload("res://systems/wheel.gd")
 const BlackjackScript := preload("res://systems/blackjack.gd")
+const BlackjackRoundScript := preload("res://systems/blackjack_round.gd")
 const CasinoMenuScript := preload("res://ui/casino_menu.gd")
 const RaceCardScript := preload("res://systems/race_card.gd")
 const RaceTrackScript := preload("res://world/race_track.gd")
@@ -691,6 +692,10 @@ var _settings: Settings = null
 ## same night's play back. Seeded from the clock for a person actually playing; see
 ## set_casino_seed().
 var _casino_rng := RandomNumberGenerator.new()
+
+## The blackjack hand on the felt, waiting for her next decision, or null. A
+## game/systems/blackjack_round.gd; see play_blackjack().
+var _blackjack_round: RefCounted = null
 
 ## The bet currently on the track: whose race it is, which lane is backed, for how much, and
 ## the exact field the odds were quoted from. Kept here rather than on the track, because the
@@ -2079,6 +2084,9 @@ func _bind_casino_menus() -> void:
 	if blackjack_menu != null and not blackjack_menu.is_connected("deal_requested",
 			_on_deal_requested):
 		blackjack_menu.connect("deal_requested", _on_deal_requested)
+	if blackjack_menu != null and blackjack_menu.has_signal("action_requested") \
+			and not blackjack_menu.is_connected("action_requested", _on_blackjack_action):
+		blackjack_menu.connect("action_requested", _on_blackjack_action)
 
 	if race_menu != null and race_menu.has_method("open"):
 		race_menu.set("can_open",
@@ -3393,29 +3401,54 @@ func play_wheel(bets: Array) -> Dictionary:
 	return {"ok": true, "segment": segment, "won": won, "stake": staked}
 
 
-## ONE HAND. The player plays the strategy card on the placard, so the whole hand settles in
-## one call; see BlackjackMenu's class comment.
+## DEAL A HAND SHE PLAYS HERSELF (2026-11-05; the table used to play the strategy card for
+## her in one press). The stake comes out first, then the round deals; a natural on either
+## side settles at once, otherwise the hand waits in _blackjack_round for blackjack_action().
+## Returns {"ok", "hand": the table's view, "won", "stake", "settled"}.
 func play_blackjack(stake: int) -> Dictionary:
-	var refused := {"ok": false, "hand": {}, "won": 0, "stake": 0}
-	if _game_state == null or not _game_state.casino.can_stake(stake):
+	var refused := {"ok": false, "hand": {}, "won": 0, "stake": 0, "settled": false}
+	if _game_state == null or _blackjack_round != null \
+			or not _game_state.casino.can_stake(stake):
 		return refused
 	if not _game_state.casino.remove_chips(stake):
 		return refused
-	var hand: Dictionary = BlackjackScript.play_hand(_casino_rng)
-	var won: int = BlackjackScript.payout(int(hand["outcome"]), stake)
-	if won > 0:
-		_game_state.casino.add_chips(won)
-	if blackjack_menu != null and blackjack_menu.has_method("show_result"):
-		var lines: Array[String] = [
-			"You: " + _cards_text(hand["player"]),
-			"Dealer: " + _cards_text(hand["dealer"]),
-			BlackjackScript.outcome_text(hand),
-		]
-		blackjack_menu.call("show_result", lines)
+	_blackjack_round = BlackjackRoundScript.deal(_casino_rng, stake)
+	return _blackjack_step()
+
+
+## HIT, STAND OR DOUBLE on the live hand (a BlackjackRound.Action). A Double's second stake
+## comes out of the purse BEFORE the card, and a purse that cannot cover it refuses the
+## Double having changed nothing.
+func blackjack_action(action: int) -> Dictionary:
+	var refused := {"ok": false, "hand": {}, "won": 0, "stake": 0, "settled": false}
+	if _game_state == null or _blackjack_round == null:
+		return refused
+	if action == BlackjackRoundScript.Action.DOUBLE:
+		if not _blackjack_round.can_double():
+			return refused
+		if not _game_state.casino.remove_chips(int(_blackjack_round.stake)):
+			return refused
+	if not _blackjack_round.act(action):
+		return refused
+	return _blackjack_step()
+
+
+## Settle the hand if it is over, push it to the table either way.
+func _blackjack_step() -> Dictionary:
+	var hand: RefCounted = _blackjack_round
+	var settled: bool = hand.is_settled()
+	var won := 0
+	if settled:
+		won = hand.payout()
+		if won > 0:
+			_game_state.casino.add_chips(won)
+		_blackjack_round = null
+	var view: Dictionary = hand.view()
 	if blackjack_menu != null and blackjack_menu.has_method("show_hand"):
-		blackjack_menu.call("show_hand", hand, won, stake)
+		blackjack_menu.call("show_hand", view, won, hand.total_staked())
 	_refresh_casino_menus()
-	return {"ok": true, "hand": hand, "won": won, "stake": stake}
+	return {"ok": true, "hand": view, "won": won, "stake": hand.total_staked(),
+		"settled": settled}
 
 
 ## RUN A RACE. Returns {"ok": bool, "field": Array, "result": Dictionary, "odds": float}.
@@ -3615,13 +3648,6 @@ func _on_race_requested(uid: StringName, stake: int) -> void:
 	start_race(uid, stake)
 
 
-func _cards_text(cards: Array) -> String:
-	var names: Array[String] = []
-	for card in cards:
-		names.append(BlackjackScript.card_text(int(card)))
-	return ", ".join(names)
-
-
 func _refresh_casino_menus() -> void:
 	for menu: CanvasLayer in [casino_menu, slots_menu, wheel_menu, blackjack_menu, race_menu]:
 		if menu != null and menu.has_method("refresh"):
@@ -3649,6 +3675,10 @@ func _on_wheel_bet_requested(bets: Array) -> void:
 func _on_deal_requested(stake: int) -> void:
 	_novelty("mechanic", "first_casino", "First game at the casino")
 	play_blackjack(stake)
+
+
+func _on_blackjack_action(action: int) -> void:
+	blackjack_action(action)
 
 
 ## SHE PICKED A ROW IN THE LOBBY. The cage and the house rules are pages of the lobby menu
@@ -9183,6 +9213,7 @@ func _guide_state() -> Dictionary:
 	if _board != null:
 		s["tasks"] = _board.tutorial_rows()
 	s["objective_goal"] = StringName(current_objective().get("goal", &""))
+	s["sighting"] = _guide_sighting() != null
 	return s
 
 
@@ -9248,7 +9279,20 @@ func _guide_place(goal: StringName) -> Array:
 		&"marigold", &"static":
 			var who: Node3D = people.npcs.get(goal) as Node3D if people != null else null
 			return [who if who != null and is_instance_valid(who) and who.visible else null, PlaceSign.Icon.STAR]
+		&"sighting":
+			return [_guide_sighting(), PlaceSign.Icon.STAR]
 	return [null, 0]
+
+
+## The pony Tumble last pointed out, while she is still out there to be found (Happenings).
+func _guide_sighting() -> Node3D:
+	if happenings == null:
+		return null
+	var who: Node3D = happenings.get("sighting") as Node3D
+	if who == null or not is_instance_valid(who) or not who.is_inside_tree() \
+			or who.is_queued_for_deletion() or (who.has_method("is_leaving") and who.call("is_leaving")):
+		return null
+	return who
 
 
 ## A built pen with room, nearest first; else the nearest plot ready to build on; else the
@@ -9311,6 +9355,11 @@ func _update_guide(delta: float) -> void:
 		if card != null:
 			var o: Dictionary = ObjectiveScript.for_guide(goal, current_objective()) \
 				if on and not _in_palace else {}
+			var seen := _guide_sighting()
+			if StringName(o.get("id", &"")) == &"sighting" and seen != null and seen.has_method("get_data") \
+					and seen.call("get_data") != null:
+				o = o.duplicate()
+				o["words"] = "Find %s" % (seen.call("get_data") as PonyData).display_name
 			var where: Node3D = _guide_place(StringName(o.get("goal", &"")))[0] as Node3D if not o.is_empty() else null
 			var d := -1.0
 			if where != null and player != null:

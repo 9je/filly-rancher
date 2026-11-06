@@ -34,6 +34,11 @@ static func pick(s: Dictionary) -> StringName:
 	var learning := not open.is_empty()
 	if learning and bag > 0 and int(s.get("pen_room", 0)) > 0 and open.has("tutorial_pen"):
 		return &"pens"
+	# A PONY TUMBLE HAS JUST POINTED OUT (PT8; playtest 2026-11-05: "it said octavia to north
+	# east and i couldnt find her"). She will not wait, so past the lessons she comes before
+	# the mail and the news.
+	if not learning and bool(s.get("sighting", false)):
+		return &"sighting"
 	if bool(s.get("mail", false)):
 		return &"mail"
 	if news:

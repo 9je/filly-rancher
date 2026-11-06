@@ -187,16 +187,11 @@ func _sighting() -> bool:
 	sighting = spawner.call("spawn_guest", pick, {}, at, 6.0)
 	if sighting == null:
 		return false
-	var dir := _compass(at - _player().global_position)
-	ranch.call("_toast", "Tumble: \"Look, look! %s, over to the %s!\"" % [pick.display_name, dir])
+	# THE TRAIL TAKES YOU TO HER, not a compass word (PT8; the owner could not tell which way
+	# was north-east and never found Octavia). Ranch.guide picks her up as &"sighting".
+	ranch.call("_toast", "Tumble: \"Look, look! It's %s! Follow the sparkles, quick!\"" % pick.display_name)
 	ranch.call("_novelty", "event", "sighting_" + String(pick.id), "Tumble spots %s out in the grass" % pick.display_name)
 	return true
-
-
-func _compass(v: Vector3) -> String:
-	var a := fposmod(rad_to_deg(atan2(v.x, -v.z)), 360.0)
-	var names := ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"]
-	return names[int(round(a / 45.0)) % 8]
 
 
 func _palace_flyer() -> void:
@@ -225,8 +220,10 @@ func _lost_foal() -> void:
 	if lost_foal != null:
 		lost_foal.set_meta(&"lost_foal", true)
 		_story().set_var("lost_foal_seed", int(look.rng_seed))
-	ranch.call("_toast", "Pip: \"A little filly's wandered off from town, out to the %s. Bring her home safe and there's %d bits in it.\"" % [
-		_compass(at - _player().global_position), LOST_FOAL_REWARD])
+	# The trail leads to her (PT8: a compass word told the owner nothing).
+	if lost_foal != null:
+		sighting = lost_foal
+	ranch.call("_toast", "Pip: \"A little filly's wandered off from town! Follow the sparkles and bring her home safe: there's %d bits in it.\"" % LOST_FOAL_REWARD)
 	ranch.call("_novelty", "npc", "lost_foal", "Pip asks you to find a lost foal")
 
 
@@ -346,7 +343,9 @@ func _rainboom() -> void:
 	if sound != null:
 		sound.call("play_at", &"sparkle", p)
 	var dash := _canon_guest(&"rainbowdash", _spot(16.0, 26.0))
-	var where := " Rainbow Dash lands to the %s, hooves on hips." % _compass(dash.global_position - p) if dash != null else ""
+	if dash != null:
+		sighting = dash
+	var where := " Rainbow Dash lands nearby, hooves on hips. Follow the sparkles!" if dash != null else ""
 	ranch.call("_toast", "KA-BOOM! A Sonic Rainboom rolls across the sky!%s" % where)
 	ranch.call("_novelty", "event", "rainboom", "Rainbow Dash's Sonic Rainboom over the valley")
 

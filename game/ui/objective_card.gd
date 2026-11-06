@@ -7,7 +7,9 @@ extends Control
 ## one piece of HUD.
 
 const ICON := 30.0
-const TOP := 68.0
+## Clear of the compass strip AND what hangs under it (its N E S W letters, the goal's
+## distance pill): 92, not 68 (PT8).
+const TOP := 92.0
 const HERE_METRES := 4.0
 const SLIDE_SECONDS := 0.35
 

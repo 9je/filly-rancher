@@ -99,3 +99,16 @@ func test_with_nothing_waiting_it_points_where_the_story_goes_next() -> void:
 	assert_eq(GuideScript.pick(_state({"mail": true, "objective_goal": &"depot"})), &"mail",
 		"a waiting chore still comes first")
 	assert_eq(GuideScript.pick(_state({"has_scoop": false, "objective_goal": &"marigold"})), &"marigold")
+
+
+## PT8 (playtest 2026-11-05: "it said octavia to north east and i couldnt find her after
+## looking almost everywhere"): a pony Tumble has just pointed out is where the trail goes,
+## once the lessons are done and while the bag has room.
+func test_a_sighting_is_where_the_trail_goes() -> void:
+	var s := {"has_scoop": true, "sighting": true, "objective_goal": &"depot"}
+	assert_eq(GuideScript.pick(s), &"sighting")
+	s["bag_full"] = true
+	assert_eq(GuideScript.pick(s), &"pens", "a full bag still comes first")
+	s["bag_full"] = false
+	s["tasks"] = [{"id": "tutorial_catch", "done": false}]
+	assert_eq(GuideScript.pick(s), &"catch", "and the first lessons")
