@@ -1,0 +1,5 @@
+[fullscreen_kept] INPUT_TEST_OK test_fullscreen_kept fullscreen chosen during the load is still fullscreen in the ranch
+[pause_in_talk] INPUT_TEST_OK test_pause_in_talk paused mid conversation and came back to the same line, the world running
+[camera_terrain] INPUT_TEST_OK test_camera_terrain 107579 frames at 27 stops, the camera never went under the terrain or into a building
+INPUT_TESTS passed=3 failed=0
+exit 0

@@ -9,75 +9,75 @@ Liked and kept (checked in PS6): the rare capture neigh; the half-lidded look (6
 
 | Item | Owner's words | Shots | Task | State | Evidence | Commit | Judged by |
 |---|---|---|---|---|---|---|---|
-| 1 | Fullscreen set during loading snaps back small on ranch load (ranch.gd apply_graphics -> apply_window forces the saved mode). | -- | PS6 | OPEN |  |  |  |
-| 2 | A Random button in the pony creator. | -- | PS7 | OPEN |  |  |  |
+| 1 | Fullscreen set during loading snaps back small on ranch load (ranch.gd apply_graphics -> apply_window forces the saved mode). | -- | PS6 | FIXED-UNREVIEWED | input test_fullscreen_kept (3/3 in batch) |  |  |
+| 2 | A Random button in the pony creator. | -- | PS7 | FIXED-UNREVIEWED | build/ps_evidence/batch/ui/creator_look.png (Surprise me in the step row) |  |  |
 | 3 | Better cutie mark creation. | -- | PS7 | OPEN |  |  |  |
-| 4 | Mane style isn't under the "Mane and tail" tab. | -- | PS7 | OPEN |  |  |  |
-| 5 | The mane streak option is always shown though it's rarely used. | -- | PS7 | OPEN |  |  |  |
+| 4 | Mane style isn't under the "Mane and tail" tab. | -- | PS7 | FIXED-UNREVIEWED | build/ps_evidence/batch/ui/creator_hair.png (Mane style first under Mane and tail) |  |  |
+| 5 | The mane streak option is always shown though it's rarely used. | -- | PS7 | FIXED-UNREVIEWED | build/ps_evidence/batch/ui/creator_hair.png vs ui/creator_hair_streak_style.png (streak row only for a streaked style) |  |  |
 | 6 | More customisation. | -- | PS7 | OPEN |  |  |  |
-| 7 | Creator: spinning the pony makes the mane fly spiky and the tail clip the body (hair springs react to the spin). | -- | PS1 | OPEN |  |  |  |
-| 8 | The welcome letter: a text wall, empty right side, "Enter close" plus Close. | -- | PS6 | OPEN |  |  |  |
-| 9 | Player tail stutters between frames while walking. | -- | PS1 | OPEN |  |  |  |
-| 10 | A pony walked through the conversation. | -- | PS1 | OPEN |  |  |  |
-| 11 | Pip's "Rainbow Factory / cloud line's for staff only" line is confusing. | -- | PS8 | OPEN |  |  |  |
-| 12 | Can't pause during a conversation. | -- | PS6 | OPEN |  |  |  |
-| 13 | Tumble spawned mid-conversation, inside the player. | -- | PS1 | OPEN |  |  |  |
-| 14 | Signs flicker on and off almost everywhere (the fingerpost's Home and Pens boards go dark; PlaceSign blocking-fade toggling) [32]. | [32] | PS4 | OPEN |  |  |  |
-| 15 | Old Fennel says there's a pony in the bag when there isn't. | -- | PS3 | OPEN |  |  |  |
-| 16 | The start doesn't show where to go for a first catch; after that, catchable ponies are clear. | -- | PS8 | OPEN |  |  |  |
+| 7 | Creator: spinning the pony makes the mane fly spiky and the tail clip the body (hair springs react to the spin). | -- | PS1 | FIXED-UNREVIEWED | build/ps_evidence/batch/ui/creator_spin_a/b/c.png (fast spin: no spikes, no tail through the body) |  |  |
+| 8 | The welcome letter: a text wall, empty right side, "Enter close" plus Close. | -- | PS6 | OPEN | batch check FAIL: the four steps are still one run-on paragraph and the only Back button is white on cream, nearly invisible (build/ps_evidence/batch/ui2/welcome_letter.png) |  |  |
+| 9 | Player tail stutters between frames while walking. | -- | PS1 | OPEN | batch check NO-EVIDENCE: no tail frame test |  |  |
+| 10 | A pony walked through the conversation. | -- | PS1 | OPEN | batch check FAIL: townsfolk are not in BodySpace and nothing clears a conversation (npc.gd:175-180); no test |  |  |
+| 11 | Pip's "Rainbow Factory / cloud line's for staff only" line is confusing. | -- | PS8 | FIXED-UNREVIEWED | text only: Pip's act1 line now about the rainbow (game/data/dialogue_src/act1.txt); act2 pip_cloud_line still says staff only, in context |  |  |
+| 12 | Can't pause during a conversation. | -- | PS6 | FIXED-UNREVIEWED | input test_pause_in_talk (3/3 in batch) |  |  |
+| 13 | Tumble spawned mid-conversation, inside the player. | -- | PS1 | OPEN | batch check FAIL: Tumble still spawns at player + (2, 0, 1.5) with no check (people.gd:130-132); no test |  |  |
+| 14 | Signs flicker on and off almost everywhere (the fingerpost's Home and Pens boards go dark; PlaceSign blocking-fade toggling) [32]. | [32] | PS4 | FIXED-UNREVIEWED | build/ps_evidence/batch/shots/item14_shot32_fingerpost_day.png + test_place_sign_fade 7/7 (single frame, not the planned 120-frame strip) |  |  |
+| 15 | Old Fennel says there's a pony in the bag when there isn't. | -- | PS3 | FIXED-UNREVIEWED | text only: Fennel's bag line now 'Catch yourself a Drifter and she'll need somewhere to go.' |  |  |
+| 16 | The start doesn't show where to go for a first catch; after that, catchable ponies are clear. | -- | PS8 | FIXED-UNREVIEWED | test only: test_guide.test_the_first_task_points_at_a_wild_pony |  |  |
 | 17 | Twilight twisted at a broken angle, twice [21][52]. Likely retarget/HoofPlanter on the Mane Six rig. TOP PRIORITY. | [21] [52] | PS1 | FIXED-UNREVIEWED | Two causes, both fixed. (1) The borrowed graze/sleep folded the Mane Six head joint 66 deg: test_mane_six_neck; before/after build/ps_evidence/item17/neck_tries.png. (2) [52] is the corner heap of item 65 (Twilight is curious): test_pen_spread, test_pony.test_a_curious_resident_turns_to_watch_her_farmer_and_stays_put; build/ps_evidence/item65/corner_compare.png. Body roll measured never above 3.1 deg (scenes/test/twist_probe.gd) |  |  |
 | 17b | Ponies merge into each other (wild vs wild, a brown pony inside a purple one) [19][54]. | [19] [54] | PS1 | FIXED-UNREVIEWED | Lasting merges reproduced and fixed: test_wild_no_merge (ten wild ponies, the player strolling through, judged by bodies as drawn): before, Twilight/Rarity and three more pairs inside each other 0.75 s or more, 0.44 m deep; after, none, and no momentary overlap past 0.2 m in the clearing (two runs, and two more with a stricter limit). Photos before/after: build/ps_evidence/item17b/merge_compare.png. Known and not fixed: in the world probe a shy pony galloping off and a curious one walking in can meet for a frame or two at the player's feet (0.32 m once in 240 checks); a turn-hold rule was tried, did not change it, and was taken out |  |  |
-| 18 | Tumble gets in the way at catch time: in front of the camera, and her talk prompt steals E. | -- | PS8 | OPEN |  |  |  |
-| 19/23 | The rump bounce is barely seen: it only fires on a pen flop or a hard landing, and ponies land facing you in the paddock. | -- | PS1 | OPEN |  |  |  |
-| 20 | Text is too thick: heavy outlined lettering on cards and the HUD [22]. | [22] | PS6 | OPEN |  |  |  |
-| 21 | Dropping a pony from the beam at height should trigger the rump bounce; it doesn't. | -- | PS1 | OPEN |  |  |  |
-| 22 | Catch card covers the checklist strip; the strip still shows a sentence, not chips [22]. | [22] | PS6 | OPEN |  |  |  |
-| 24 | Objective card lands on top of the "Getting started" chips [23]. | [23] | PS6 | OPEN |  |  |  |
-| 25 | The overgrown-plot brambles are a field of big green blobs [24]. | [24] | PS4 | OPEN |  |  |  |
-| 26 | "CLEAR ME / 250 bits" signs: dark on brown, no light backing, unreadable [24]. | [24] | PS4 | OPEN |  |  |  |
-| 27 | A flat yellow blob prop on the grass, unidentified [25]. | [25] | PS4 | OPEN |  |  |  |
-| 28 | Old Fennel's lines read weird ("come to themselves", "Mark comes right up on the flank"). | -- | PS8 | OPEN |  |  |  |
+| 18 | Tumble gets in the way at catch time: in front of the camera, and her talk prompt steals E. | -- | PS8 | OPEN | batch check FAIL: Tumble stands at the crosshair ahead of the player (build/ps_evidence/batch/heel_sheet.png); E-prompt not tested |  |  |
+| 19/23 | The rump bounce is barely seen: it only fires on a pen flop or a hard landing, and ponies land facing you in the paddock. | -- | PS1 | OPEN | batch check NO-EVIDENCE: no render of a pen landing from the default camera |  |  |
+| 20 | Text is too thick: heavy outlined lettering on cards and the HUD [22]. | [22] | PS6 | FIXED-UNREVIEWED | build/ps_evidence/batch/hud/hud_busy.png (no heavy outline) |  |  |
+| 21 | Dropping a pony from the beam at height should trigger the rump bounce; it doesn't. | -- | PS1 | FIXED-UNREVIEWED | test only: test_rump_bounce 8/8, test_a_pony_dropped_from_a_height_bounces_on_landing |  |  |
+| 22 | Catch card covers the checklist strip; the strip still shows a sentence, not chips [22]. | [22] | PS6 | FIXED-UNREVIEWED | build/ps_evidence/batch/hud/hud_busy.png (catch card top right, strip is three chips) |  |  |
+| 24 | Objective card lands on top of the "Getting started" chips [23]. | [23] | PS6 | FIXED-UNREVIEWED | build/ps_evidence/batch/hud/hud_busy.png (objective pill under the compass, clear of the chips) |  |  |
+| 25 | The overgrown-plot brambles are a field of big green blobs [24]. | [24] | PS4 | FIXED-UNREVIEWED | build/ps_evidence/batch/shots/item24-26_shot24_plot_brambles_day.png (a leafy tangle) |  |  |
+| 26 | "CLEAR ME / 250 bits" signs: dark on brown, no light backing, unreadable [24]. | [24] | PS4 | OPEN | batch check NO-EVIDENCE: the price board is cut off in the render |  |  |
+| 27 | A flat yellow blob prop on the grass, unidentified [25]. | [25] | PS4 | FIXED-UNREVIEWED | build/ps_evidence/batch/shots/item25_shot25_yellow_blob_day.png + props.gd (dirt pile removed) |  |  |
+| 28 | Old Fennel's lines read weird ("come to themselves", "Mark comes right up on the flank"). | -- | PS8 | FIXED-UNREVIEWED | text only: Fennel's Bloom line rewritten (act1.txt) |  |  |
 | 29 | Doors far too small next to buildings everywhere (Market, Depot); oversized porches and ramps [27][31]. | [27] [31] | PS4 | OPEN |  |  |  |
-| 30 | EVERY menu: drop the key hints, one Back button (not Close plus Esc), a real scroll bar. Compendium: "The Strip 0 of 0", bare "???" rows [28]. | [28] | PS6 | OPEN |  |  |  |
-| 31 | The camera passes into the Market; you see the hollow shell from inside [29]. | [29] | PS2 | OPEN |  |  |  |
+| 30 | EVERY menu: drop the key hints, one Back button (not Close plus Esc), a real scroll bar. Compendium: "The Strip 0 of 0", bare "???" rows [28]. | [28] | PS6 | FIXED-UNREVIEWED | build/ps_evidence/batch/ui/pause_main.png, ui/pause_compendium.png (no key hints, one Back, scroll bar, no 0 of 0, ??? rows say where) |  |  |
+| 31 | The camera passes into the Market; you see the hollow shell from inside [29]. | [29] | PS2 | FIXED-UNREVIEWED | input test_camera_terrain (3/3; 107,579 frames at 27 stops, never under terrain or in a building) |  |  |
 | 32 | Barn yard: barn on a tall plinth, oversized ramp, mismatched shed, wagon, hay and seed bag scale, scattered [30]. | [30] | PS4 | OPEN |  |  |  |
-| 33 | Delivering ponies went against the debt when the owner expected pay; the debt isn't explained. | -- | PS9 | OPEN |  |  |  |
-| 34 | You can't tell which ponies aren't catchable (townsfolk). | -- | PS8 | OPEN |  |  |  |
-| 35 | Spike just sits there with no clear purpose. | -- | PS8 | OPEN |  |  |  |
+| 33 | Delivering ponies went against the debt when the owner expected pay; the debt isn't explained. | -- | PS9 | FIXED-UNREVIEWED | test only: test_delivery_toast + build/ps_evidence/batch/ui/depot_tab_2.png (statement explains the debt) |  |  |
+| 34 | You can't tell which ponies aren't catchable (townsfolk). | -- | PS8 | OPEN | batch check NO-EVIDENCE: no render of a townspony under the crosshair |  |  |
+| 35 | Spike just sits there with no clear purpose. | -- | PS8 | FIXED-UNREVIEWED | test only: test_spike_tips 6/6 |  |  |
 | 36 | Ponyville row: houses lean and sink into the slope, lamp posts lean, no streets or yards, grey road meets dirt road badly [33]. | [33] | PS4 | OPEN |  |  |  |
 | 37 | The Strip: tilted arcade machines on a grey slab, a floating track, leaning lamps, dirt road painted across the pavement [34]. | [34] | PS4 | OPEN |  |  |  |
-| 38 | Tumble's "over to the south-east" means nothing; sightings should light the compass or trail (couldn't find Octavia). | -- | PS8 | OPEN |  |  |  |
+| 38 | Tumble's "over to the south-east" means nothing; sightings should light the compass or trail (couldn't find Octavia). | -- | PS8 | FIXED-UNREVIEWED | test only: test_guide.test_a_sighting_is_where_the_trail_goes |  |  |
 | 39 | Two of the same named pony at once (two Sweetie Belles, two Scootaloos). | -- | PS3 | OPEN | partial, not closing: test_old_save_loads (an escapee home on a load counts as owned) |  |  |
 | 40 | Rain too heavy to see through; it looks cheap (falling rectangles); night plus rain is very dark [45]. | [45] | PS4 | OPEN |  |  |  |
-| 41 | You can walk into the Depot; walls have no collision, and it rains inside [35]. | [35] | PS2 | OPEN |  |  |  |
-| 42 | A toast as one giant full-width line, overlapping the objective card [36]. | [36] | PS6 | OPEN |  |  |  |
-| 43 | A townspony stuck half inside the Palace plinth wall [37]. | [37] | PS2 | OPEN |  |  |  |
+| 41 | You can walk into the Depot; walls have no collision, and it rains inside [35]. | [35] | PS2 | FIXED-UNREVIEWED | test only: test_buildings_solid 6/6 |  |  |
+| 42 | A toast as one giant full-width line, overlapping the objective card [36]. | [36] | PS6 | FIXED-UNREVIEWED | build/ps_evidence/batch/hud/hud_toast.png (wraps to three lines at bottom centre) |  |  |
+| 43 | A townspony stuck half inside the Palace plinth wall [37]. | [37] | PS2 | FIXED-UNREVIEWED | build/ps_evidence/batch/shots/item43_shot37_palace_plinth_day.png (stallion on the grass by the ramp) |  |  |
 | 44 | Casino patrons frozen in place [38]. | [38] | PS5 | OPEN |  |  |  |
-| 45 | The Wheel rebuilt like Rust's Bandit Camp wheel: one wheel, payout tiers 1x/3x/5x/10x/20x, high tiers rarer, bet on a tier. Drop the Colour and Number tabs. Fix the clipped rules box and the empty lower half [39]. | [39] | PS5 | OPEN |  |  |  |
-| 46 | All casino games: no text log under the game (no "=====" rows); the reels and a win flash tell it. Symbols clip their windows; the paytable line is cut off; a real lever; bigger chips; a spin button [40]. | [40] | PS5 | OPEN |  |  |  |
-| 47 | Slots: every reel window shows the result symbol three times stacked [40][42]. | [40] [42] | PS5 | OPEN |  |  |  |
-| 48 | Blackjack plays itself: no Hit/Stand/Double/Split. Dealer labelled "stand" after busting. Banner text overflows its box [41]. | [41] | PS5 | OPEN |  |  |  |
-| 49 | Slots: can't change the bet off 10 (the 50 and 200 chips do nothing) [42]. | [42] | PS5 | OPEN |  |  |  |
-| 50 | The Rainbow Factory hints (the yield letter, the Mayor) are too on the nose, too early. | -- | PS8 | OPEN |  |  |  |
-| 51 | Clicking the mailbox opens "Saddlebag Copies"; the survey says "answer below" with no way to answer; the letter text has a heavy outline and is hard to read [44]. | [44] | PS6 | OPEN |  |  |  |
-| 52 | The Market buy screen is easy to miss; buying food is fiddly, so feeding feels not worth it. | -- | PS9 | OPEN |  |  |  |
-| 53 | The trail keeps pointing to the paddock after you've upgraded it ("0/2") [45]. | [45] | PS3 | OPEN |  |  |  |
-| 54 | Far ponies have no eyes until close; eyes change shape between far and near [53][54]. | [53] [54] | PS1 | OPEN |  |  |  |
+| 45 | The Wheel rebuilt like Rust's Bandit Camp wheel: one wheel, payout tiers 1x/3x/5x/10x/20x, high tiers rarer, bet on a tier. Drop the Colour and Number tabs. Fix the clipped rules box and the empty lower half [39]. | [39] | PS5 | FIXED-UNREVIEWED | build/ps_evidence/batch/casino/wheel_100_bets.png, wheel_100_win.png (one tiered wheel, no tabs) |  |  |
+| 46 | All casino games: no text log under the game (no "=====" rows); the reels and a win flash tell it. Symbols clip their windows; the paytable line is cut off; a real lever; bigger chips; a spin button [40]. | [40] | PS5 | OPEN | batch check FAIL: chips about 50 px beside 140 px reels, not bigger (build/ps_evidence/batch/casino/slots_100_idle.png) |  |  |
+| 47 | Slots: every reel window shows the result symbol three times stacked [40][42]. | [40] [42] | PS5 | FIXED-UNREVIEWED | build/ps_evidence/batch/casino/slots_100_idle.png (three different symbols per window) |  |  |
+| 48 | Blackjack plays itself: no Hit/Stand/Double/Split. Dealer labelled "stand" after busting. Banner text overflows its box [41]. | [41] | PS5 | OPEN | batch check FAIL: no Split (systems/blackjack_round.gd:26 'No splitting') |  |  |
+| 49 | Slots: can't change the bet off 10 (the 50 and 200 chips do nothing) [42]. | [42] | PS5 | FIXED-UNREVIEWED | build/ps_evidence/batch/casino/slots_100_win.png + test_slots_menu 15/15 (50 chip selects, 'Spin 50') |  |  |
+| 50 | The Rainbow Factory hints (the yield letter, the Mayor) are too on the nose, too early. | -- | PS8 | OPEN | my check FAIL: Pip's newsletter toast still says 'a yield of 124% above the valley average' (build/ps_evidence/batch/hud/hud_toast.png); the batch agent had passed it |  |  |
+| 51 | Clicking the mailbox opens "Saddlebag Copies"; the survey says "answer below" with no way to answer; the letter text has a heavy outline and is hard to read [44]. | [44] | PS6 | OPEN | batch check FAIL: the answer button is white on cream, nearly invisible (build/ps_evidence/batch/ui2/mailbox_survey.png) |  |  |
+| 52 | The Market buy screen is easy to miss; buying food is fiddly, so feeding feels not worth it. | -- | PS9 | FIXED-UNREVIEWED | build/ps_evidence/batch/ui/market_open.png (opens on Buy, hay a sack of 20) |  |  |
+| 53 | The trail keeps pointing to the paddock after you've upgraded it ("0/2") [45]. | [45] | PS3 | OPEN | batch check NO-EVIDENCE: no test or render of the trail after an upgrade |  |  |
+| 54 | Far ponies have no eyes until close; eyes change shape between far and near [53][54]. | [53] [54] | PS1 | FIXED-UNREVIEWED | build/ps_evidence/batch/lod_sheet.png (eyes present, same shape at 6 to 30 m) |  |  |
 | 55 | Buying the Orchard felt pointless (no rares seen). Each area should show its ponies and their times before you buy, and give a guaranteed rare when it opens. | -- | PS9 | OPEN |  |  |  |
 | 56a | The coat stallion: the dialogue says coat but there's no coat on the model. | -- | PS8 | OPEN |  |  |  |
-| 56b | The coat stallion should be a mysterious walk-by, not a slow shuffle up to you. | -- | PS8 | OPEN |  |  |  |
-| 57 | A pony hidden inside a haystack: give hiding a tell, or don't spawn inside props. | -- | PS2 | OPEN |  |  |  |
-| 58 | Tumble gets stuck on the Orchard fence. | -- | PS2 | OPEN |  |  |  |
-| 59 | Toasts and companion lines vanish too fast, and pausing clears them. | -- | PS6 | OPEN |  |  |  |
-| 60 | The saddlebag pips run off the card at 18 slots [47]. | [47] | PS6 | OPEN |  |  |  |
-| 61 | Lake: ponies and the player walk under the water; ponies half sunk; grass shows through; no banks [48][49]. | [48] [49] | PS2 | OPEN |  |  |  |
-| 62 | Depot statement: "Quota 31 of 2", still "cycle 1" and "collections passed 0" after a long session [50]. | [50] | PS3 | OPEN |  |  |  |
+| 56b | The coat stallion should be a mysterious walk-by, not a slow shuffle up to you. | -- | PS8 | OPEN | batch check NO-EVIDENCE: no frame strip of the walk-by |  |  |
+| 57 | A pony hidden inside a haystack: give hiding a tell, or don't spawn inside props. | -- | PS2 | FIXED-UNREVIEWED | test only: test_buildings_solid, test_every_standing_region_prop_is_solid, spawner prop re-roll |  |  |
+| 58 | Tumble gets stuck on the Orchard fence. | -- | PS2 | FIXED-UNREVIEWED | test only: test_companion_catch_up 2/2 |  |  |
+| 59 | Toasts and companion lines vanish too fast, and pausing clears them. | -- | PS6 | FIXED-UNREVIEWED | test only: test_hud_layout, test_a_long_toast_stays_long_enough_to_read_and_waits_out_a_pause |  |  |
+| 60 | The saddlebag pips run off the card at 18 slots [47]. | [47] | PS6 | FIXED-UNREVIEWED | build/ps_evidence/batch/hud/hud_busy.png (18 pips in two rows) |  |  |
+| 61 | Lake: ponies and the player walk under the water; ponies half sunk; grass shows through; no banks [48][49]. | [48] [49] | PS2 | OPEN | batch check FAIL: water opaque, but a flat disc with a lip, no bank, and black wedges by the shore (build/ps_evidence/batch/lake_wedge_crop.png) |  |  |
+| 62 | Depot statement: "Quota 31 of 2", still "cycle 1" and "collections passed 0" after a long session [50]. | [50] | PS3 | OPEN | batch check FAIL: 'Collections passed: 0' still printed; no test after 3 cycles (build/ps_evidence/batch/ui/depot_tab_2.png) |  |  |
 | 63 | Duplicates and everyone tagged "one of a kind" in the Deliver list [51]. | [51] | PS3 | OPEN | partial, not closing: test_old_save_loads (an escapee home on a load counts as owned) |  |  |
 | 64 | Feeding is automatic from the pantry, and nothing says so; show the pantry stock and the hungry state. | -- | PS9 | OPEN |  |  |  |
 | 65 | Full pen: ponies pile in one corner, overlap, push through the fence; "moved into the pen" while the prompt says the pen is full [52]. | [52] | PS1 | FIXED-UNREVIEWED | Corner heap reproduced (player at a corner; curious residents walked to the rails and heaped) and fixed: residents turn to watch instead. test_pen_spread (no one past the rails, no persistent overlap, herd not in a corner, nobody walking to the farmer), test_pony.test_a_curious_resident_turns_to_watch_her_farmer_and_stays_put, test_ranch_penning.test_the_pony_that_fills_the_pen_is_told_it_is_now_full; before/after build/ps_evidence/item65/corner_compare.png. Not changed: eight ponies in a 7.8 m Grand Pen still read as crowded (every tier is the same size); a bigger pen per tier would be a layout change |  |  |
-| 66 | The compass strip: better icons, distances, N/E/S/W, a clear goal marker. | -- | PS6 | OPEN |  |  |  |
-| 67 | The half-lidded "looking at you" eyes switch off as you get close (backwards). The owner LIKED them: keep them, make them deliberate and shared by more ponies. | -- | PS1 | OPEN |  |  |  |
-| 68 | SOFT-LOCK: walked into the Depot, fell out, stuck, couldn't move or get up [55]. Needs an unstuck (and the collision fix in 41). | [55] | PS2 | OPEN |  |  |  |
+| 66 | The compass strip: better icons, distances, N/E/S/W, a clear goal marker. | -- | PS6 | FIXED-UNREVIEWED | build/ps_evidence/batch/hud/hud_busy.png, hud/hud_toast.png (badges, N, goal with distance) |  |  |
+| 67 | The half-lidded "looking at you" eyes switch off as you get close (backwards). The owner LIKED them: keep them, make them deliberate and shared by more ponies. | -- | PS1 | OPEN | batch check FAIL: the look shows only past 2 m (pony.gd:1143-1149 d > 2.0), still off up close |  |  |
+| 68 | SOFT-LOCK: walked into the Depot, fell out, stuck, couldn't move or get up [55]. Needs an unstuck (and the collision fix in 41). | [55] | PS2 | FIXED-UNREVIEWED | test only: test_buildings_solid, test_the_player_put_inside_the_depot_is_out_within_a_second |  |  |
 | 69 | Catching is too easy (all but the toughest) and repetitive; 49 deliveries came fast; ~800 gems per Market trip mid-game. Pacing and difficulty need a pass. | -- | PS9 | OPEN |  |  |  |
 | 70 | Ponies escaping fully upgraded pens. The owner had every pen at its highest tier and still saw escapes, with repeats in the wild. In code, only the Paddock (pen_small) lets an Escape Artist out at night (ranch._escape_artists, PonyTraits.escapes_from). Check: (a) does the upgraded tier survive save and load, or does contents revert to pen_small; (b) does anything else free penned ponies (the night pen, the Depot cart, the full-pen "moved into the pen" path in 65); (c) the upgrade flow itself (53, stuck "0/2"). The spawner also lets an owned pony spawn again (only on-map dupes are blocked), so decide whether to block owned repeats. Failing test first. | -- | PS3 | OPEN | partial, not closing: test_old_save_loads (an escapee home on a load counts as owned) |  |  |
 | M | Marigold walks in front of the camera when she greets you (known gap, 2026-11-06). | -- | PS8 | OPEN |  |  |  |
@@ -93,3 +93,5 @@ Liked and kept (checked in PS6): the rare capture neigh; the half-lidded look (6
 | G10 | The real-input batch: loading, pen_upgrade and sprint fail in a full batch but pass alone. | -- | PS11 | OPEN |  |  |  |
 | G11 | 60-pony performance: p99 frame time at or under 16.6 ms. | -- | PS11 | OPEN |  |  |  |
 | G12 | Proton smoke run of the Windows build. | -- | PS11 | OPEN |  |  |  |
+| G13 | Found in the batch check: the paper letters' buttons (the welcome letter's Back, the survey's answer) are white on cream and nearly invisible; behind items 8 and 51. | -- | PS6 | OPEN |  |  |  |
+| G14 | Found in the batch check: several Market decor tiles show blank grey icons (build/ps_evidence/batch/ui/market_open.png). | -- | PS6 | OPEN |  |  |  |

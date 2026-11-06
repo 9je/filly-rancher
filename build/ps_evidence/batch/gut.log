@@ -1,0 +1,262 @@
+=== test_place_sign_fade
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+Tests                 7
+Passing Tests         7
+exit 0
+=== test_rump_bounce
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+Tests                 8
+Passing Tests         8
+exit 0
+=== test_pony_face
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+ERROR: Parameter "material" is null.
+   at: material_get_instance_shader_parameters (servers/rendering/dummy/storage/material_storage.cpp:264)
+Tests                 7
+Passing Tests         7
+exit 0
+=== test_hud_layout
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+Tests                 4
+Passing Tests         4
+exit 0
+=== test_creation_screen
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+Tests                44
+Passing Tests        44
+exit 0
+=== test_buildings_solid
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+ERROR: Resumed function '_ready()' after await, but class instance is gone. At script: res://world/ranch.gd:1150
+   at: resume (modules/gdscript/gdscript_function.cpp:323)
+ERROR: Resumed function '_ready()' after await, but class instance is gone. At script: res://world/ranch.gd:1150
+   at: resume (modules/gdscript/gdscript_function.cpp:323)
+[0mERROR: Resumed function '_probe_pen_containment()' after await, but class instance is gone. At script: res://world/ranch.gd:6964
+   at: resume (modules/gdscript/gdscript_function.cpp:323)
+ERROR: Resumed function '_ready()' after await, but class instance is gone. At script: res://world/ranch.gd:1150
+   at: resume (modules/gdscript/gdscript_function.cpp:323)
+ERROR: Resumed function '_ready()' after await, but class instance is gone. At script: res://world/ranch.gd:1150
+   at: resume (modules/gdscript/gdscript_function.cpp:323)
+ERROR: Resumed function '_ready()' after await, but class instance is gone. At script: res://world/ranch.gd:1150
+   at: resume (modules/gdscript/gdscript_function.cpp:323)
+Tests                 6
+Passing Tests         6
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 4 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)
+exit 0
+=== test_companion_catch_up
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+Tests                 2
+Passing Tests         2
+exit 0
+=== test_spawner
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+ERROR: Spawner: pony_dir cannot be changed to 'res://test/fixtures/ponies_malformed' after the roster has been read (it is cached at the first populate()); the spawner is still drawing from 'res://test/fixtures/ponies_conditional'.
+   at: push_error (core/variant/variant_utility.cpp:1023)
+Tests                28
+Passing Tests        28
+exit 0
+=== test_delivery_toast
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+Tests                 4
+Passing Tests         4
+exit 0
+=== test_market_menu
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+Tests                18
+Passing Tests        18
+exit 0
+=== test_spike_tips
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+Tests                 6
+Passing Tests         6
+exit 0
+=== test_guide
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+Tests                13
+Passing Tests        13
+exit 0
+=== test_slots_menu
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+Tests                15
+Passing Tests        15
+exit 0
+=== test_blackjack_menu
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+Tests                14
+Passing Tests        14
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 2 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)
+exit 0
+=== test_wheel_menu
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+Tests                17
+Passing Tests        17
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 1 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)
+exit 0
+=== test_pause_menu
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+Tests                60
+Passing Tests        60
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 1 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)
+exit 0
+=== test_ranch_mail
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+RANCH props placed=114 expected=114 shapes=232 missing=-
+RANCH props placed=114 expected=114 shapes=232 missing=-
+RANCH props placed=114 expected=114 shapes=232 missing=-
+RANCH props placed=114 expected=114 shapes=232 missing=-
+RANCH props placed=114 expected=114 shapes=232 missing=-
+RANCH props placed=114 expected=114 shapes=232 missing=-
+RANCH props placed=114 expected=114 shapes=232 missing=-
+RANCH props placed=114 expected=114 shapes=232 missing=-
+RANCH props placed=114 expected=114 shapes=232 missing=-
+RANCH props placed=114 expected=114 shapes=232 missing=-
+RANCH props placed=114 expected=114 shapes=232 missing=-
+RANCH props placed=114 expected=114 shapes=232 missing=-
+RANCH props placed=114 expected=114 shapes=232 missing=-
+RANCH props placed=114 expected=114 shapes=232 missing=-
+RANCH props placed=114 expected=114 shapes=232 missing=-
+RANCH props placed=114 expected=114 shapes=232 missing=-
+RANCH props placed=114 expected=114 shapes=232 missing=-
+ERROR: ranch: FAILED check -- the player is standing on the ground
+   at: push_error (core/variant/variant_utility.cpp:1023)
+ERROR: ranch: FAILED check -- the player reports a floor under her
+   at: push_error (core/variant/variant_utility.cpp:1023)
+ERROR: ranch: FAILED check -- the pen probe actually moved its ponies
+   at: push_error (core/variant/variant_utility.cpp:1023)
+RANCH_FAILED ponies=46 props=114 assets=present
+RANCH props placed=114 expected=114 shapes=232 missing=-
+ERROR: ranch: FAILED check -- the player is standing on the ground
+   at: push_error (core/variant/variant_utility.cpp:1023)
+ERROR: ranch: FAILED check -- the player reports a floor under her
+   at: push_error (core/variant/variant_utility.cpp:1023)
+ERROR: ranch: FAILED check -- the pen probe actually moved its ponies
+   at: push_error (core/variant/variant_utility.cpp:1023)
+RANCH_FAILED ponies=46 props=114 assets=present
+RANCH props placed=114 expected=114 shapes=232 missing=-
+ERROR: ranch: FAILED check -- the player is standing on the ground
+   at: push_error (core/variant/variant_utility.cpp:1023)
+ERROR: ranch: FAILED check -- the player reports a floor under her
+   at: push_error (core/variant/variant_utility.cpp:1023)
+ERROR: ranch: FAILED check -- the pen probe actually moved its ponies
+   at: push_error (core/variant/variant_utility.cpp:1023)
+RANCH_FAILED ponies=46 props=114 assets=present
+RANCH props placed=114 expected=114 shapes=232 missing=-
+RANCH props placed=114 expected=114 shapes=232 missing=-
+RANCH props placed=114 expected=114 shapes=232 missing=-
+Tests                22
+Passing Tests        22
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 5 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)
+exit 0
+=== test_letter_panel
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+Tests                20
+Passing Tests        20
+exit 0
+=== test_letters
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+Tests                 8
+Passing Tests         8
+exit 0
+=== test_npc_separation
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+Tests                 5
+Passing Tests         5
+exit 0
+=== test_attendant
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+Tests                13
+Passing Tests        13
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 4 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)
+exit 0
+=== test_hud
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+Tests                41
+Passing Tests        41
+exit 0
+=== test_list_menu_mouse
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+Tests                 8
+Passing Tests         8
+exit 0
+=== test_table_mouse
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+Tests                 7
+Passing Tests         7
+exit 0
+=== test_objective
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+Tests                 9
+Passing Tests         9
+exit 0
+=== test_body_space
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+Tests                 8
+Passing Tests         8
+exit 0
+=== test_people
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+Tests                 4
+Passing Tests         4
+   at: cleanup (core/object/object.cpp:2536)
+exit 0
+=== test_plot_overgrowth
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+RANCH props placed=114 expected=114 shapes=232 missing=-
+Tests                 9
+Passing Tests         9
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 5 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)
+exit 0
+=== test_gait_blend
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+Tests                10
+Passing Tests        10
+exit 0
+=== test_strip
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+Tests                17
+Passing Tests        17
+exit 0
