@@ -1,9 +1,15 @@
 extends GutTest
-## THE BLACKJACK TABLE'S PANEL, and the placard beside it.
+## THE BLACKJACK TABLE, where she makes the decisions. Every test is a line of the owner's
+## playtest (2026-11-05): "why blackjack i cant make decisions?", the banner whose text left
+## its box, the "=====" log under the felt, and "dealer 'stand' after he bust". Hands pushed
+## here are real ones from game/systems/blackjack_round.gd, pushed the way ranch.gd pushes.
 
 const BlackjackMenuScene := preload("res://ui/blackjack_menu.tscn")
 const BlackjackScript := preload("res://systems/blackjack.gd")
-const TableMenuScript := preload("res://ui/table_menu.gd")
+const RoundScript := preload("res://systems/blackjack_round.gd")
+const MenuStyleScript := preload("res://ui/menu_style.gd")
+const PaintScript := preload("res://ui/casino_paint.gd")
+const MouseRowsScript := preload("res://ui/mouse_rows.gd")
 
 var _menu: BlackjackMenu = null
 var _chips := 500
@@ -18,163 +24,175 @@ func before_each() -> void:
 	_menu.open()
 
 
-func test_every_stake_at_every_table_is_an_even_number_of_chips() -> void:
-	for stake in TableMenuScript.STAKES:
-		assert_eq(stake % 2, 0,
-			"blackjack pays three to two with integer division; an odd stake would round "
-				+ "the bonus down by half a chip")
+func after_each() -> void:
+	MenuStyleScript.text_scale = 1.0
 
 
-func test_the_placard_tab_prints_the_house_rules() -> void:
-	_menu.set_tab(BlackjackMenu.Tab.PLACARD)
-	var drawn: Array[String] = _menu.drawn_lines()
-	for line in BlackjackScript.placard_lines():
-		assert_true(drawn.has(line), "missing placard line: %s" % line)
+func _find(want: Callable) -> RoundScript:
+	for seed_value in range(1, 20000):
+		var rng := RandomNumberGenerator.new()
+		rng.seed = seed_value
+		if want.call(RoundScript.deal(rng, 50)):
+			rng.seed = seed_value
+			return RoundScript.deal(rng, 50) as RoundScript
+	return null
 
 
-func test_confirming_at_the_placard_deals_nothing() -> void:
+func _live() -> RoundScript:
+	return _find(func(h) -> bool: return not h.is_settled())
+
+
+func _push(hand: RoundScript) -> void:
+	_menu.show_hand(hand.view(), hand.payout(), hand.total_staked())
+	_menu.finish_animation()
+
+
+func test_before_a_hand_there_are_stakes_and_deal_and_deal_emits_the_stake() -> void:
+	assert_eq(String(_menu.focused_id()), "deal")
+	_menu.on_stage_hit(_menu.button_index(&"stake:2"))
 	watch_signals(_menu)
-	_menu.set_tab(BlackjackMenu.Tab.PLACARD)
-	assert_false(_menu.confirm())
-	assert_signal_not_emitted(_menu, "deal_requested")
+	_menu.on_stage_hit(_menu.button_index(&"deal"))
+	assert_signal_emitted(_menu, "deal_requested")
+	assert_eq(get_signal_parameters(_menu, "deal_requested")[0], 200)
 
 
-func test_confirming_at_the_table_emits_the_stake() -> void:
-	watch_signals(_menu)
-	_menu.set_tab(BlackjackMenu.Tab.TABLE)
-	assert_true(_menu.confirm())
-	assert_signal_emitted_with_parameters(_menu, "deal_requested", [_menu.stakes()[0]])
-
-
-func test_an_empty_purse_refuses_to_deal() -> void:
+func test_an_empty_purse_cannot_deal() -> void:
 	_chips = 0
-	_menu.refresh()
 	watch_signals(_menu)
-	assert_false(_menu.confirm())
+	assert_false(_menu.button_enabled(&"deal"))
+	assert_false(_menu.activate(&"deal"))
 	assert_signal_not_emitted(_menu, "deal_requested")
 
 
-func test_a_dealt_hand_is_shown_as_cards_and_a_verdict() -> void:
-	_menu.show_result(["You: Ace, King", "Dealer: Nine, Seven", "Blackjack. Pays three to two."])
-	var drawn: String = "\n".join(_menu.drawn_lines())
-	assert_true(drawn.contains("You: Ace, King"))
-	assert_true(drawn.contains("Blackjack. Pays three to two."))
+## "why blackjack i cant make decisions?"
+func test_a_live_hand_offers_hit_stand_and_double_and_each_emits_its_action() -> void:
+	_push(_live())
+	assert_true(_menu.hand_live())
+	var ids: Array[String] = []
+	for b: Dictionary in _menu.stage_buttons():
+		ids.append(String(b["id"]))
+	assert_eq(ids, ["hit", "stand", "double"] as Array[String])
+	assert_eq(String(_menu.focused_id()), "hit", "the cursor waits on Hit")
+	watch_signals(_menu)
+	for pair: Array in [[&"hit", RoundScript.Action.HIT], [&"stand", RoundScript.Action.STAND],
+			[&"double", RoundScript.Action.DOUBLE]]:
+		_menu.on_stage_hit(_menu.button_index(pair[0]))
+	assert_signal_emit_count(_menu, "action_requested", 3)
+	assert_eq(get_signal_parameters(_menu, "action_requested", 0)[0], RoundScript.Action.HIT)
+	assert_eq(get_signal_parameters(_menu, "action_requested", 2)[0],
+		RoundScript.Action.DOUBLE)
+
+
+func test_double_is_greyed_when_the_purse_cannot_cover_a_second_stake() -> void:
+	_chips = 20
+	_push(_live())
+	assert_false(_menu.button_enabled(&"double"))
+	assert_true(_menu.button_enabled(&"hit"))
+
+
+func test_double_is_greyed_after_a_hit() -> void:
+	var hand: RoundScript = _find(func(h) -> bool:
+		if h.is_settled():
+			return false
+		h.hit()
+		return not h.is_settled())
+	hand.hit()
+	_push(hand)
+	assert_false(_menu.button_enabled(&"double"))
+
+
+func test_the_hole_card_is_face_down_and_the_dealer_total_hidden_until_she_stands() -> void:
+	var hand: RoundScript = _live()
+	_push(hand)
+	assert_eq(_menu.shown_dealer_cards().size(), 2)
+	assert_eq(_menu.shown_dealer_cards()[1], -1, "the hole card is drawn as a back")
+	assert_eq(_menu.dealer_total_text(), "?")
+	assert_ne(_menu.player_total_text(), "?")
+	hand.stand()
+	_push(hand)
+	assert_eq(_menu.shown_dealer_cards(), hand.dealer)
+	assert_ne(_menu.dealer_total_text(), "?")
+
+
+func test_a_hit_slides_one_card_to_her_and_nothing_to_the_dealer() -> void:
+	var hand: RoundScript = _find(func(h) -> bool:
+		if h.is_settled():
+			return false
+		h.hit()
+		return not h.is_settled())
+	_push(hand)
+	hand.hit()
+	_push(hand)
+	assert_eq(_menu.shown_player_cards().size(), 3)
+	assert_eq(_menu.shown_dealer_cards().size(), 2)
+	assert_eq(_menu.shown_dealer_cards()[1], -1)
+
+
+## "dealer 'stand' after he bust"
+func test_a_dealer_who_busts_is_said_to_bust() -> void:
+	var hand: RoundScript = _find(func(h) -> bool:
+		if h.is_settled():
+			return false
+		h.stand()
+		return h.dealer_total() > 21)
+	_push(hand)
+	hand.stand()
+	_push(hand)
+	assert_true(_menu.banner_up())
+	assert_eq(_menu.headline(), "Dealer busts")
+	assert_eq(_menu.dealer_total_text(), "Bust")
+	for line: String in [_menu.headline(), _menu.detail()]:
+		assert_false(line.to_lower().contains("stand"), line)
+
+
+func test_the_deal_animates_card_by_card_and_refuses_actions_meanwhile() -> void:
+	_menu.show_hand(_live().view(), 0, 50)
+	assert_true(_menu.animating())
+	assert_lt(_menu.shown_player_cards().size(), 2, "the cards arrive one at a time")
+	for b: Dictionary in _menu.stage_buttons():
+		assert_false(bool(b["enabled"]), "%s waits for the deal" % b["id"])
+	_menu.finish_animation()
+	assert_false(_menu.animating())
+	assert_eq(_menu.shown_player_cards().size(), 2)
+
+
+## The banner's words stay inside its plate at every text size.
+func test_the_banner_text_fits_its_box_at_every_text_size() -> void:
+	var font: Font = MenuStyleScript.title_font()
+	var box: Rect2 = _menu.banner_rect()
+	for scale: float in [1.0, 1.25, 1.5]:
+		MenuStyleScript.text_scale = scale
+		for ending: int in range(1, RoundScript.Ending.TIE + 1):
+			var words: String = RoundScript.headline(ending)
+			var px: int = PaintScript.fit_size(font, words, 50, box.size.x - 48.0 - 150.0)
+			assert_lte(font.get_string_size(words, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x,
+				box.size.x - 48.0 - 150.0, "%s at %.2f" % [words, scale])
+	MenuStyleScript.text_scale = 1.0
+
+
+## WALKING AWAY MID HAND STANDS FOR HER rather than leaving her stake in limbo.
+func test_closing_mid_hand_asks_ranch_to_stand() -> void:
+	_push(_live())
+	watch_signals(_menu)
+	_menu.close()
+	assert_signal_emit_count(_menu, "action_requested", 1)
+	assert_eq(get_signal_parameters(_menu, "action_requested", 0)[0], RoundScript.Action.STAND)
+
+
+func test_the_rules_tab_is_a_real_tab_with_nothing_to_press() -> void:
+	_menu.take_tab(BlackjackMenu.Tab.RULES)
+	assert_eq(_menu.tab(), BlackjackMenu.Tab.RULES)
+	assert_eq(_menu.stage_buttons().size(), 0)
+	assert_eq(MouseRowsScript.active_tab(_menu.get_node("Centre/Panel/Margin/Column/Tabs")), 1)
+
+
+func test_a_broken_push_is_a_still_frame() -> void:
+	_menu.show_hand({}, 0, 10)
+	_menu.show_hand({"player": [300, -4], "dealer": []}, 0, 10)
+	assert_false(_menu.animating())
+	assert_false(_menu.hand_live())
 
 
 func test_nothing_it_draws_carries_a_dash() -> void:
-	for tab in [BlackjackMenu.Tab.TABLE, BlackjackMenu.Tab.PLACARD]:
-		_menu.set_tab(tab)
-		for line in _menu.drawn_lines():
-			assert_false(line.contains("--") or line.contains("—"), line)
-
-
-## THE REPORT: "each table screen shows your chips, the stake picker, and what keys do
-## what". A table that only says "Stake: [10 chips]" leaves a player who has not read a
-## document with no way to find out what Enter does here.
-func test_the_table_says_what_she_is_holding() -> void:
-	assert_true(_menu.chips_line().contains(str(_chips)),
-		"her chips must be on the screen she is betting them on: %s" % _menu.chips_line())
-
-
-func test_the_table_says_what_the_keys_do_on_this_table() -> void:
-	var keys: String = _menu.keys_line()
-	assert_false(keys.is_empty())
-	assert_true(keys.to_lower().contains("stake"),
-		"the stake picker is the control a new player cannot guess: %s" % keys)
-
-
-## THE REPORT: "results render prominently (win/lose line with numbers)".
-func test_a_settled_result_renders_as_its_own_block_with_the_numbers_in_it() -> void:
-	_menu.show_result(["You win 40 chips!", "Two cherries and a bell."])
-	var block: Array[String] = _menu.result_block()
-	assert_gt(block.size(), 0, "a settled bet must leave something on the screen")
-	assert_true("\n".join(block).contains("40"),
-		"the number is the whole point of the line")
-	assert_true("\n".join(_menu.drawn_lines()).contains("40"),
-		"and it is drawn, not merely stored")
-
-
-const PaintScript := preload("res://ui/casino_paint.gd")
-## The file already preloads the SCENE as BlackjackMenuScene; the SCRIPT is what carries the
-## Tab enum this file now reads.
-const BlackjackMenuScript := preload("res://ui/blackjack_menu.gd")
-
-
-## THE FELT, THE SHOE, THE STAKE AND BOTH HANDS ALL STAY ON THE STAGE, and neither hand is
-## drawn on top of the other. Two hands sharing a row is the failure that looks correct in a
-## screenshot of a two card push and wrong the first time somebody draws three.
-func test_both_hands_stay_on_the_stage_and_never_overlap_each_other() -> void:
-	var stage := Rect2(Vector2.ZERO, _menu.stage_size())
-	assert_true(stage.encloses(_menu.shoe_rect()), "the shoe leaves the stage")
-	assert_true(stage.encloses(_menu.stake_rect()), "the stake leaves the stage")
-	for index: int in 8:
-		var player: Rect2 = _menu.card_rect(0, index)
-		var dealer: Rect2 = _menu.card_rect(1, index)
-		assert_true(stage.encloses(player), "player card %d leaves the stage" % index)
-		assert_true(stage.encloses(dealer), "dealer card %d leaves the stage" % index)
-		assert_false(player.intersects(dealer),
-			"the player's card %d is drawn over the dealer's" % index)
-
-
-## A SUIT IS PRESENTATION AND CANNOT REACH A NUMBER. Blackjack numbers cards 0 to 51 and never
-## names a suit at all; the stage derives one from card / RANKS. This test is the written
-## proof that the derivation is one way: two cards of the same rank in different suits are
-## worth the same, so a suit cannot move a total, a payout or the published edge.
-func test_the_suit_the_stage_derives_cannot_change_a_hand_total() -> void:
-	for rank: int in BlackjackScript.RANKS:
-		var totals: Array[int] = []
-		for suit: int in 4:
-			totals.append(BlackjackScript.hand_total([rank + suit * BlackjackScript.RANKS]))
-		for total: int in totals:
-			assert_eq(total, totals[0],
-				"rank %d is worth the same in every suit" % rank)
-
-
-## THE PLACARD IS READING MATTER AND IS DRAWN AS A PLATE. Its seven lines are unchanged and
-## are still what drawn_lines() returns on that tab, because test_published_payouts.gd parses
-## the three to two out of them.
-func test_the_placard_tab_still_returns_every_placard_line() -> void:
-	_menu.set_tab(BlackjackMenuScript.Tab.PLACARD)
-	var model: Array[String] = _menu.drawn_lines()
-	for line: String in BlackjackScript.placard_lines():
-		assert_true(model.has(line), "the model still carries '%s'" % line)
-	assert_eq(_menu.row_count(), 0, "the placard is unselectable, as it always was")
-
-
-## THE PUSHED HAND IS THE HAND THAT LANDS, in the order the strategy card played it.
-func test_a_pushed_hand_deals_every_card_it_was_handed() -> void:
-	var hand: Dictionary = {
-		"player": [0, 12, 25] as Array[int],
-		"dealer": [7, 20] as Array[int],
-		"outcome": BlackjackScript.Outcome.PLAYER_WIN,
-	}
-	_menu.show_hand(hand, 20, 10)
-	assert_true(_menu.animating(), "the deal is running")
-	# Run the tween out rather than waiting on wall clock. A fixed frame count tied to an
-	# assumed frame rate is exactly the flake this avoids: headless CI has been observed well
-	# north of 100 fps here, so a bound on FRAMES rather than on seconds still settles the deal
-	# quickly and a genuinely stuck tween still trips the 2000 frame cap instead of hanging
-	# the suite.
-	var frames := 0
-	while _menu.animating() and frames < 2000:
-		await get_tree().process_frame
-		frames += 1
-	assert_false(_menu.animating(), "the deal has finished")
-	assert_eq(_menu.cards_dealt(), 5, "three to the player and two to the dealer")
-
-
-## A HAND WITH NO CARDS IN IT IS A STILL FRAME. This arrives over a dynamic call() from
-## ranch.gd and a gate calling play_blackjack() directly can produce one.
-func test_an_empty_or_broken_hand_starts_no_deal() -> void:
-	_menu.show_hand({} as Dictionary, 0, 10)
-	assert_false(_menu.animating())
-	_menu.show_hand({"player": [] as Array[int], "dealer": [] as Array[int], "outcome": 0},
-		0, 10)
-	assert_false(_menu.animating())
-
-
-func test_the_focus_id_names_the_stake_on_the_table_tab_and_nothing_on_the_placard() -> void:
-	_menu.set_tab(BlackjackMenuScript.Tab.TABLE)
-	assert_eq(String(_menu.focused_id()), "stake:0")
-	_menu.set_tab(BlackjackMenuScript.Tab.PLACARD)
-	assert_eq(String(_menu.focused_id()), "", "reading matter has no cursor")
+	for line: String in _menu.drawn_lines():
+		assert_false(line.contains("--") or line.contains("—"), line)

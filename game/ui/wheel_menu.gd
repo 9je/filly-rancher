@@ -339,6 +339,10 @@ func show_spin(segment: int, won: int, _staked: int) -> void:
 		_held_chips = -1
 		_trim_bets()
 		refresh())
+	# A PUSH INTO A CLOSED TABLE LANDS AT ONCE: nobody is watching, and a felt left mid
+	# animation would refuse the next bet when it is opened.
+	if not is_open():
+		finish_animation()
 
 
 func _on_landed(segment: int) -> void:

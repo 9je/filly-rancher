@@ -363,6 +363,10 @@ func show_spin(reels: Array[int], won: int, _stake_played: int) -> void:
 		_spinning = false
 		_fit_stake()
 		refresh())
+	# A PUSH INTO A CLOSED TABLE LANDS AT ONCE: nobody is watching, and a felt left mid
+	# animation would refuse the next bet when it is opened.
+	if not is_open():
+		finish_animation()
 
 
 ## WHICH OF THE SYMBOL'S PLACES ON THIS REEL'S STRIP the reel stops at. Every place carrying the
@@ -471,7 +475,9 @@ func paint(ci: Control) -> void:
 	ci.draw_circle(LEVER_PIVOT, 12.0, PaintScript.GOLD)
 	var lever_lit: bool = is_lit(&"lever") and can_spin()
 	ci.draw_circle(knob + Vector2(0.0, 3.0), 23.0, Color(0.0, 0.0, 0.0, 0.3))
-	ci.draw_circle(knob, 22.0, Color(0.88, 0.20, 0.24).lightened(0.15 if lever_lit else 0.0))
+	var knob_colour: Color = Color(0.88, 0.20, 0.24) if can_spin() or _spinning \
+		else Color(0.45, 0.40, 0.46)
+	ci.draw_circle(knob, 22.0, knob_colour.lightened(0.15 if lever_lit else 0.0))
 	ci.draw_circle(knob + Vector2(-7.0, -7.0), 7.0, Color(1.0, 1.0, 1.0, 0.45))
 
 	# --- the stake chips ------------------------------------------------------------------------

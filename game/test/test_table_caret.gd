@@ -88,7 +88,7 @@ func test_the_blackjack_table_marks_the_stake_it_is_backing_before_and_after_a_h
 	assert_ne(before_id, "",
 		"before any hand the blackjack table is already focused on something real")
 	if CasinoStagesTestScript.STAGED.has("res://ui/blackjack_menu.tscn"):
-		assert_eq(before_id, "stake:0", "before any hand the focus is on the first stake")
+		assert_eq(before_id, "deal", "before any hand the cursor waits on Deal")
 	var hand: Dictionary = {"player": [0, 12] as Array[int], "dealer": [7, 20] as Array[int],
 		"outcome": BlackjackScript.Outcome.PLAYER_WIN}
 	menu.call("show_hand", hand, 20, 10)

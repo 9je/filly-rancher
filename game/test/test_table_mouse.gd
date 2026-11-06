@@ -1,167 +1,105 @@
 extends GutTest
-## THE FOUR TABLES, AND THE POINTER. The owner's playtest called the casino the one bright
-## spot and also said every menu was keyboard only; this file is the claim that both are now
-## true of it. Acceptance item 13: "Casino UI keeps its crown and gains mouse play."
-##
-## IT DRIVES THE HOLDERS THE MENU ACTUALLY BUILT, not a rect computed here. A test that
-## measured its own idea of where row 2 is would go green on a menu that drew row 2 somewhere
-## else, which is the defect game/test/test_table_caret.gd already exists for.
+## THE THREE TABLES, AND THE POINTER. Since the rebuild of 2026-11-05 every control on the
+## slot machine, the wheel and the blackjack table is a drawn thing on the felt, listed once in
+## stage_buttons(); this file is the claim that the pointer reaches exactly those, that hover
+## and the arrow keys move one cursor, and that nothing is left of the old row column, its
+## invisible hit targets or its key hints.
 
 const MouseRowsScript := preload("res://ui/mouse_rows.gd")
-const SlotsScript := preload("res://ui/slots_menu.gd")
 
-var _menu: SlotsMenu
-
-
-func before_each() -> void:
-	_menu = preload("res://ui/slots_menu.tscn").instantiate()
-	add_child_autofree(_menu)
-	_menu.chips_provider = func() -> int: return 5000
-	_menu.can_open = func() -> bool: return true
-	_menu.open()
+const SCENES: Array[String] = ["res://ui/slots_menu.tscn", "res://ui/wheel_menu.tscn",
+	"res://ui/blackjack_menu.tscn"]
 
 
-func _row_holders() -> Array[PanelContainer]:
-	var out: Array[PanelContainer] = []
-	for child in _menu.get_node("Centre/Panel/Margin/Column/Rows").get_children():
-		var panel := child as PanelContainer
-		if panel != null and MouseRowsScript.row_index(panel) >= 0:
-			out.append(panel)
-	return out
+func _open(path: String) -> CanvasLayer:
+	var menu: CanvasLayer = (load(path) as PackedScene).instantiate()
+	add_child_autofree(menu)
+	menu.set("chips_provider", func() -> int: return 5000)
+	menu.set("can_open", func() -> bool: return true)
+	menu.call("open")
+	return menu
 
 
-func test_every_selectable_row_is_armed_and_no_unselectable_line_is() -> void:
-	var armed: Array[PanelContainer] = _row_holders()
-	assert_eq(armed.size(), _menu.row_count(),
-		"exactly the rows the keyboard can reach are the rows the mouse can reach")
-	var seen: Array[int] = []
-	for holder: PanelContainer in armed:
-		seen.append(MouseRowsScript.row_index(holder))
-	seen.sort()
-	assert_eq(seen, range(_menu.row_count()) as Array[int])
+func _motion(at: Vector2) -> InputEventMouseMotion:
+	var event := InputEventMouseMotion.new()
+	event.position = at
+	return event
 
 
-func test_pointing_at_a_row_moves_the_keyboard_cursor_to_it() -> void:
-	_menu.point_at_row(1)
-	assert_eq(_menu.selected_index(), 1, "one cursor, two ways to move it")
-	assert_eq(_menu.hovered_index(), 1)
+func test_the_pointer_hits_exactly_the_drawn_controls() -> void:
+	for path: String in SCENES:
+		var menu: CanvasLayer = _open(path)
+		var buttons: Array = menu.call("stage_buttons")
+		var rects: Array[Rect2] = menu.call("stage_hit_rects")
+		assert_gt(buttons.size(), 0, path)
+		assert_eq(rects.size(), buttons.size(), path)
+		for i: int in buttons.size():
+			assert_eq(rects[i], buttons[i]["rect"], "%s control %d" % [path, i])
+			assert_gt(rects[i].size.x * rects[i].size.y, 0.0, "%s control %d" % [path, i])
 
 
-func test_the_arrow_keys_still_move_the_cursor_after_the_mouse_has_touched_it() -> void:
-	_menu.point_at_row(1)
-	_menu.move_selection(1)
-	assert_eq(_menu.selected_index(), 2 % _menu.row_count(),
-		"the mouse must never take the keyboard away")
+func test_hovering_a_control_moves_the_one_cursor_to_it() -> void:
+	for path: String in SCENES:
+		var menu: CanvasLayer = _open(path)
+		var buttons: Array = menu.call("stage_buttons")
+		var last: int = buttons.size() - 1
+		menu.call("_on_stage_input", _motion((buttons[last]["rect"] as Rect2).get_center()))
+		assert_eq(int(menu.call("selected_index")), last, path)
+		assert_eq(int(menu.call("hovered_index")), last, path)
+		menu.call("_on_stage_input", _motion(Vector2(-50.0, -50.0)))
+		assert_eq(int(menu.call("hovered_index")), -1, "%s: off the controls is off" % path)
 
 
-## THE STAGE ALREADY SHOWS THE SELECTION. These holders exist to be clicked, not to be
-## looked at: slots_menu.gd prints nothing for its stake rows (the stage draws the chips), so
-## the column's copy of them must stay visually silent -- no caret text, no box at rest, none
-## even while picked, and at most the plain hover box while the pointer is actually on one.
-##
-## await A FRAME BEFORE THE SECOND LOOK. refresh() frees the old holders with queue_free(),
-## which does not actually remove them until the frame ends, so a second refresh() run
-## synchronously right after the first (exactly what point_at_row() does here) leaves both
-## generations of PanelContainer sitting under Rows at once; asking the pending-deletion set
-## about its stylebox is asking last frame's answer, not this one's.
-func test_padded_rows_paint_nothing_until_hovered() -> void:
-	var holders: Array[PanelContainer] = _row_holders()
-	assert_gt(holders.size(), 0)
-	for holder: PanelContainer in holders:
-		var label := holder.get_child(0) as Label
-		assert_not_null(label)
-		assert_eq(label.text, "", "the row already has words on the stage")
-		assert_true(holder.get_theme_stylebox(&"panel") is StyleBoxEmpty,
-			"nothing paints here until the pointer actually rests on the row")
-	_menu.point_at_row(1)
-	await get_tree().process_frame
-	var seen := 0
-	for holder: PanelContainer in _row_holders():
-		var box: StyleBox = holder.get_theme_stylebox(&"panel")
-		if MouseRowsScript.row_index(holder) == _menu.hovered_index():
-			assert_false(box is StyleBoxEmpty, "the hovered row gets the plain hover box")
-		else:
-			assert_true(box is StyleBoxEmpty, "a row nothing is over stays blank")
-		seen += 1
-	assert_eq(seen, _menu.row_count(), "the freed generation is gone, not just outnumbered")
+func test_the_arrow_keys_still_move_the_cursor_after_the_mouse_has() -> void:
+	for path: String in SCENES:
+		var menu: CanvasLayer = _open(path)
+		menu.call("point_at_row", 0)
+		var before: StringName = menu.call("focused_id")
+		menu.call("move_selection", 1)
+		assert_ne(menu.call("focused_id"), before, "%s: the mouse never takes the keys" % path)
 
 
-func test_clicking_a_row_takes_it() -> void:
-	watch_signals(_menu)
-	_menu.take_row(_menu.row_count() - 1)
-	assert_eq(_menu.selected_index(), _menu.row_count() - 1)
-	assert_gt(_menu.result_lines().size() + get_signal_emit_count(_menu, "spin_requested"),
-		0, "a click on a row has to actually do the thing the row says")
+func test_there_is_no_row_column_and_no_key_hint_row() -> void:
+	for path: String in SCENES:
+		var menu: CanvasLayer = _open(path)
+		var rows := menu.get_node("Centre/Panel/Margin/Column/Rows") as Control
+		assert_false(rows.visible, "%s: no text column under the felt" % path)
+		assert_eq(rows.get_child_count(), 0, "%s: no invisible hit rows either" % path)
+		var footer := menu.get_node("Centre/Panel/Margin/Column/Footer") as Label
+		assert_false(footer.is_visible_in_tree(), "%s: no key hints" % path)
 
 
-func test_a_left_click_on_a_row_holder_reaches_take_row() -> void:
-	var holders: Array[PanelContainer] = _row_holders()
-	assert_gt(holders.size(), 1, "the slot machine has rows")
-	var event := InputEventMouseButton.new()
-	event.button_index = MOUSE_BUTTON_LEFT
-	event.pressed = true
-	holders[1].gui_input.emit(event)
-	assert_eq(_menu.selected_index(), MouseRowsScript.row_index(holders[1]))
+func test_the_close_button_says_back_and_closes() -> void:
+	for path: String in SCENES:
+		var menu: CanvasLayer = _open(path)
+		var button: Button = menu.call("close_button_node")
+		assert_eq(button.text, MouseRowsScript.CLOSE_TEXT)
+		assert_eq(button.focus_mode, Control.FOCUS_NONE)
+		button.pressed.emit()
+		assert_false(bool(menu.call("is_open")), path)
 
 
-## I8, final-review.md I6 (controller ruling): CLICKING THE LEVER PLAYS THE STAKE THAT IS
-## SHOWING, NOT THE MAXIMUM AFFORDABLE. Before this fix on_stage_hit() re-staked to
-## row_count() - 1 (the biggest chip she could cover) and only THEN spun, so a player who set
-## the smallest stake with the arrow keys and reached for the lever with the mouse bet her
-## whole affordable maximum instead. stage_hit_rects() returns [LEVER_RECT, REEL_BAND] in that
-## order, so index 0 is the lever.
-func test_clicking_the_lever_spins_at_the_current_stake_not_the_maximum() -> void:
-	assert_gt(_menu.row_count(), 1, "the fixture needs more than one affordable stake")
-	_menu.set_stake_index(_menu.row_count() - 1)
-	var max_stake: int = _menu.selected_stake()
-	_menu.set_stake_index(0)
-	var current_stake: int = _menu.selected_stake()
-	assert_ne(current_stake, max_stake, "the fixture needs a real gap between the two")
-	watch_signals(_menu)
-	_menu.on_stage_hit(0)
-	assert_eq(_menu.stake_index(), 0,
-		"the lever must not silently re-stake to the maximum before it spins")
-	assert_true(get_signal_parameters(_menu, "spin_requested", 0)[0] == current_stake,
-		"the spin must be played at the stake that was actually showing")
+func test_the_dim_swallows_clicks_and_the_felt_answers_the_pointer() -> void:
+	for path: String in SCENES:
+		var menu: CanvasLayer = _open(path)
+		assert_eq((menu.get_node("Dim") as Control).mouse_filter, Control.MOUSE_FILTER_STOP)
+		assert_eq((menu.get_node("Centre/Panel/Margin/Column/Stage") as Control).mouse_filter,
+			Control.MOUSE_FILTER_STOP, path)
 
 
-func test_the_reel_band_also_spins_at_the_current_stake() -> void:
-	assert_gt(_menu.row_count(), 1, "the fixture needs more than one affordable stake")
-	_menu.set_stake_index(0)
-	var current_stake: int = _menu.selected_stake()
-	watch_signals(_menu)
-	_menu.on_stage_hit(1)
-	assert_true(get_signal_parameters(_menu, "spin_requested", 0)[0] == current_stake,
-		"the reel band is the same lever, played the same way")
-
-
-func test_the_close_button_exists_says_close_and_closes() -> void:
-	var button: Button = _menu.close_button_node()
-	assert_not_null(button, "every screen gets a pointer usable way out")
-	assert_eq(button.text, MouseRowsScript.CLOSE_TEXT)
-	assert_eq(button.focus_mode, Control.FOCUS_NONE)
-	button.pressed.emit()
-	assert_false(_menu.is_open())
-
-
-func test_the_dim_behind_the_panel_swallows_clicks_meant_for_nothing() -> void:
-	var dim := _menu.get_node("Dim") as Control
-	assert_eq(dim.mouse_filter, Control.MOUSE_FILTER_STOP,
-		"a click beside the panel must not reach the world behind it")
-
-
-func test_the_stage_answers_the_pointer_and_the_base_offers_no_hits() -> void:
-	var stage := _menu.get_node("Centre/Panel/Margin/Column/Stage") as Control
-	assert_eq(stage.mouse_filter, Control.MOUSE_FILTER_STOP,
-		"a felt nothing can click is a felt with no mouse play on it")
-	assert_gt(_menu.stage_hit_rects().size(), 0,
-		"the slot machine paints something worth clicking")
-	for rect: Rect2 in _menu.stage_hit_rects():
-		assert_gt(rect.size.x * rect.size.y, 0.0, "an empty hit rect can never be hit")
-
-
-func test_no_key_hints_are_shown() -> void:
-	# PT5 (owner, 2026-11-05: "why esc back and close annoying"): the Back button is the way
-	# out; the keys still work, they are just not printed under every panel.
-	var footer := _menu.get_node("Centre/Panel/Margin/Column/Footer") as Label
-	assert_false(footer.is_visible_in_tree(), "no row of key hints under the table")
+## THE WHOLE PANEL FITS THE 1920 x 1080 CANVAS AT EVERY TEXT SIZE: the title, the tabs, the
+## felt and the Back button, with nothing pushed off the bottom at 150.
+func test_every_table_fits_the_canvas_at_every_text_size() -> void:
+	const MenuStyleScript := preload("res://ui/menu_style.gd")
+	for scale: float in [1.0, 1.25, 1.5]:
+		MenuStyleScript.text_scale = scale
+		for path: String in SCENES:
+			var menu: CanvasLayer = _open(path)
+			menu.call("refresh")
+			await get_tree().process_frame
+			await get_tree().process_frame
+			var panel := menu.get_node("Centre/Panel") as Control
+			assert_lte(panel.get_combined_minimum_size().y, 1080.0,
+				"%s at %.2f is %.0f tall" % [path, scale, panel.get_combined_minimum_size().y])
+			assert_lte(panel.get_combined_minimum_size().x, 1920.0, path)
+	MenuStyleScript.text_scale = 1.0

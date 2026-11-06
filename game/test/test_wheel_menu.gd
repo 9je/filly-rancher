@@ -184,3 +184,14 @@ func test_the_close_button_says_back_and_closes() -> void:
 	assert_eq(button.text, MouseRowsScript.CLOSE_TEXT)
 	button.pressed.emit()
 	assert_false(_menu.is_open())
+
+
+## A SPIN PUSHED INTO A CLOSED FELT (a gate or a save hook calling ranch.play_wheel() directly)
+## lands at once, so the felt is not still "spinning" when she next walks up to it.
+func test_a_spin_pushed_into_a_closed_felt_lands_at_once() -> void:
+	_menu.close()
+	_menu.show_spin(9, 0, 10)
+	assert_false(_menu.animating())
+	assert_eq(_menu.segment_under_pointer(), 9)
+	assert_true(_menu.open())
+	assert_true(_menu.add_bet(0), "and the next bet is taken")

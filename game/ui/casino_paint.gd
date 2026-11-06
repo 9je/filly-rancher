@@ -529,11 +529,18 @@ static func draw_card(ci: CanvasItem, rect: Rect2, font: Font, card: int,
 		face_up: bool) -> void:
 	if not face_up or card < 0 or card >= 52:
 		rounded(ci, rect, 8.0, PLUM, GOLD, 2.0)
+		# THE HATCH STAYS ON THE CARD (2026-11-05 render: it ran off both sides onto the felt).
+		# Each 45 degree line is cut to the inset back's own left and right edges.
+		var back: Rect2 = rect.grow(-5.0)
+		var h: float = back.size.y
 		var step: float = rect.size.x * 0.22
-		var x: float = rect.position.x - rect.size.y
-		while x < rect.position.x + rect.size.x + rect.size.y:
-			ci.draw_line(Vector2(x, rect.position.y + rect.size.y),
-				Vector2(x + rect.size.y, rect.position.y), Color(GOLD_DIM, 0.55), 1.5, true)
+		var x: float = back.position.x - h
+		while x < back.end.x:
+			var t0: float = clampf((back.position.x - x) / h, 0.0, 1.0)
+			var t1: float = clampf((back.end.x - x) / h, 0.0, 1.0)
+			if t1 > t0:
+				ci.draw_line(Vector2(x + h * t0, back.end.y - h * t0),
+					Vector2(x + h * t1, back.end.y - h * t1), Color(GOLD_DIM, 0.55), 1.5, true)
 			x += step
 		return
 	var rank: int = card % 13

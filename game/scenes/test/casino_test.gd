@@ -28,6 +28,7 @@ const CasinoScript := preload("res://systems/casino.gd")
 const SlotsScript := preload("res://systems/slots.gd")
 const WheelScript := preload("res://systems/wheel.gd")
 const BlackjackScript := preload("res://systems/blackjack.gd")
+const BlackjackRoundScript := preload("res://systems/blackjack_round.gd")
 const RaceCardScript := preload("res://systems/race_card.gd")
 const CasinoSignScript := preload("res://systems/casino_sign.gd")
 const CompanyRunnersScript := preload("res://systems/company_runners.gd")
@@ -125,33 +126,44 @@ func _ready() -> void:
 func _measure_the_games() -> void:
 	var rng := RandomNumberGenerator.new()
 
+	# SLOTS AND THE WHEEL ARE CHECKED BY FREQUENCY, NOT BY A MEASURED EDGE (2026-11-05).
+	# Their edges are enumerated exactly in game/systems/ and pinned by unit tests; what a
+	# seeded run can honestly check is that the roll is uniform. A measured edge cannot be:
+	# the slots pay up to 450 times the stake, so one standard error over a hundred thousand
+	# spins is two points, and the old check passed at a 0.6 point tolerance only because its
+	# seed happened to. A symbol's or a tier's frequency has no fat tail, so the tolerance
+	# below is several standard errors wide and still tight.
 	rng.seed = SLOTS_SEED
-	var returned := 0
+	var seen: Array = [[0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]]
 	for i in PLAYS:
-		returned += SlotsScript.payout(SlotsScript.spin(rng), STAKE)
-	var slots_edge: float = 1.0 - float(returned) / float(PLAYS * STAKE)
-	print("CASINO slots plays=%d measured=%.4f published=%.4f"
-		% [PLAYS, slots_edge, SlotsScript.house_edge()])
-	_set_check("the slots converge on their published edge",
-		absf(slots_edge - SlotsScript.house_edge()) <= EDGE_TOLERANCE)
+		var line: Array[int] = SlotsScript.spin(rng)
+		for reel: int in SlotsScript.REELS:
+			seen[reel][line[reel]] += 1
+	var slots_uniform := true
+	for reel: int in SlotsScript.REELS:
+		for symbol: int in SlotsScript.STRIP_COUNTS.size():
+			var measured: float = float(seen[reel][symbol]) / float(PLAYS)
+			var expected: float = float(SlotsScript.STRIP_COUNTS[symbol]) \
+				/ float(SlotsScript.REEL_SIZE)
+			if absf(measured - expected) > EDGE_TOLERANCE:
+				slots_uniform = false
+	print("CASINO slots plays=%d exact edge=%.4f" % [PLAYS, SlotsScript.house_edge()])
+	_set_check("every slot reel lands on its symbols in the strip's proportions",
+		slots_uniform)
 
-	# THE BIG WHEEL (2026-11-05): every tier, backed at once, against its own counted edge.
-	# The sign prints the worst tier, so each tier is checked against its own number.
 	rng.seed = WHEEL_SEED
-	var tier_returned: Array[int] = [0, 0, 0, 0, 0]
+	var tier_seen: Array[int] = [0, 0, 0, 0, 0]
 	for i in PLAYS:
-		var segment: int = WheelScript.spin(rng)
-		for tier: int in WheelScript.TIERS:
-			var bets: Array[int] = WheelScript.empty_bets()
-			bets[tier] = STAKE
-			tier_returned[tier] += WheelScript.payout(bets, segment)
+		tier_seen[WheelScript.tier_of(WheelScript.spin(rng))] += 1
 	for tier: int in WheelScript.TIERS:
-		var tier_edge: float = 1.0 - float(tier_returned[tier]) / float(PLAYS * STAKE)
-		print("CASINO wheel %s plays=%d measured=%.4f counted=%.4f"
-			% [WheelScript.TIER_LABELS[tier], PLAYS, tier_edge, WheelScript.tier_edge(tier)])
-		_set_check("a %s bet converges on its counted edge" % WheelScript.TIER_LABELS[tier],
-			absf(tier_edge - WheelScript.tier_edge(tier))
-				<= EDGE_TOLERANCE * (1.0 if tier < WheelScript.Tier.TEN else 3.0))
+		var measured: float = float(tier_seen[tier]) / float(PLAYS)
+		var expected: float = float(WheelScript.segment_count(tier)) \
+			/ float(WheelScript.SEGMENTS)
+		print("CASINO wheel %s plays=%d landed=%.4f counted=%.4f edge=%.4f"
+			% [WheelScript.TIER_LABELS[tier], PLAYS, measured, expected,
+				WheelScript.tier_edge(tier)])
+		_set_check("the wheel lands on %s as often as its segments say"
+			% WheelScript.TIER_LABELS[tier], absf(measured - expected) <= EDGE_TOLERANCE)
 
 	var blackjack_edge: float = BlackjackScript.measure_edge(BLACKJACK_SEED, PLAYS)
 	print("CASINO blackjack hands=%d measured=%.4f placard=%.4f"
@@ -163,7 +175,7 @@ func _measure_the_games() -> void:
 		"name": "Bramble", "uid": &"gate#000001", "data_id": &"stock_bold",
 		"speed": 5.0, "stamina": 5.0, "spirit": 5.0, "happiness": 0.6, "stock": {},
 	}, CompanyRunnersScript.load_shipped())
-	returned = 0
+	var returned := 0
 	for i in PLAYS:
 		var winner: int = int(RaceCardScript.run(field, RACE_SEED + i)["winner"])
 		returned += RaceCardScript.payout(field, RaceCardScript.PLAYER_LANE, STAKE, winner)
@@ -410,6 +422,8 @@ func _drive_the_palace() -> void:
 				break
 			var before: int = state.casino.chips
 			if not bool(wheel_table.call("spin")):
+				print("CASINO note: the felt refused spin %d (purse %d, bet %d, spinning %s)"
+					% [i, state.casino.chips, stake_played, wheel_table.call("animating")])
 				break
 			wheel_table.call("finish_animation")
 			var won: int = state.casino.chips - before + stake_played
@@ -426,8 +440,15 @@ func _drive_the_palace() -> void:
 	settled = true
 	for i in 40:
 		var before: int = state.casino.chips
+		# SHE PLAYS THE HAND NOW (2026-11-05): deal, then stand until it settles. Every
+		# chip out (the stake, and a double's second stake) and the win in must add up.
 		var hand: Dictionary = ranch.play_blackjack(50)
-		if not bool(hand["ok"]) or state.casino.chips != before - 50 + int(hand["won"]):
+		var guard := 0
+		while bool(hand["ok"]) and not bool(hand["settled"]) and guard < 4:
+			hand = ranch.blackjack_action(BlackjackRoundScript.Action.STAND)
+			guard += 1
+		if not bool(hand["ok"]) or not bool(hand["settled"]) \
+				or state.casino.chips != before - int(hand["stake"]) + int(hand["won"]):
 			settled = false
 	_set_check("every hand settles at exactly the stake out and the win in", settled)
 
