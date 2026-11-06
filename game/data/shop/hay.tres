@@ -6,8 +6,8 @@
 script = ExtResource("1_shop")
 id = &"hay"
 display_name = "Hay"
-description = "A bale of it. Every pony will eat hay, and none of them will thank you for it."
-cost = 5
+description = "A sack of twenty bales. Every pony will eat hay, and none of them will thank you for it."
+cost = 20
 kind = 3
 food_id = &"hay"
-quantity = 2
+quantity = 20

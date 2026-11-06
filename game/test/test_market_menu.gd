@@ -43,7 +43,8 @@ func test_open_and_close_signal_and_start_on_the_sell_tab() -> void:
 	watch_signals(_menu)
 	assert_true(_menu.open())
 	assert_true(_menu.is_open())
-	assert_eq(_menu.tab(), MarketMenu.Tab.SELL)
+	# PT9: with gems to sell it opens on Sell; with an empty pouch, on Buy.
+	assert_eq(_menu.tab(), MarketMenu.Tab.SELL if _menu.call("_pouch_total") > 0 else MarketMenu.Tab.BUY)
 	assert_signal_emitted(_menu, "opened")
 	_menu.close()
 	assert_false(_menu.is_open())
@@ -200,6 +201,7 @@ func test_every_rarity_the_enum_carries_has_a_name_and_an_unknown_one_still_has_
 
 func test_selection_wraps() -> void:
 	_menu.open()
+	_menu.set_tab(MarketMenu.Tab.SELL)
 	_menu.move_selection(-1)
 	assert_eq(_menu.selected_index(), _menu.sell_rows().size(), "wrapped to the last row")
 

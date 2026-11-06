@@ -247,7 +247,9 @@ func open() -> bool:
 		return false
 	if can_open.is_valid() and not bool(can_open.call()):
 		return false
-	_tab = Tab.SELL
+	# NOTHING TO SELL, STRAIGHT TO THE SHELVES (PT9; playtest 2026-11-05: the buy screen was
+	# easy to miss). With gems in the pouch it opens on Sell, as it always has.
+	_tab = Tab.SELL if _pouch_total() > 0 else Tab.BUY
 	_selected = 0
 	_hovered = -1
 	_open = true

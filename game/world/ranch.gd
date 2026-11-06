@@ -2741,6 +2741,7 @@ func _on_buy_requested(item: ShopItem) -> void:
 			region = _regions_registry().by_id(item.permit_zone)
 		if region != null:
 			_toast("%s is open." % region.display_name)
+			_welcome_rare(region)
 		else:
 			_toast("Bought %s." % item.display_name)
 	if market_menu.has_method("refresh"):
@@ -3267,7 +3268,10 @@ func deliver_pony(uid: StringName) -> Dictionary:
 		LettersScript.Id.RECEIPT_NAMED if named else LettersScript.Id.RECEIPT_STOCK,
 		{"name": _player_name(), "count": shipments, "credit": credit,
 			"pony": inst.display_name()})
-	_toast(delivery_toast(str(letter["sender"]), shipments, credit, _game_state.ledger.balance))
+	var paid := handler_share(credit)
+	if paid > 0 and _economy != null:
+		_economy.grant(paid)
+	_toast(delivery_toast(str(letter["sender"]), shipments, credit, _game_state.ledger.balance, paid))
 	# The crate goes down and that is the whole of it. She says nothing, on purpose: the
 	# pony voice slots are cut by owner directive, and a real mare's neigh here would be
 	# the loudest wrong note in the game.
@@ -4974,12 +4978,19 @@ func _player_stands_on_footprint(slot: PlotSlot) -> bool:
 ## THE RECEIPT'S ONE LINE. It used to end "300 bits credited." while the purse on screen did
 ## not move, because the credit comes off the sponsorship balance and never reaches the
 ## wallet. It says so now, and how much of the balance is left (test_delivery_toast.gd).
-static func delivery_toast(sender: String, shipments: int, credit: int, balance_left: int) -> String:
+static func delivery_toast(sender: String, shipments: int, credit: int, balance_left: int,
+		paid: int = 0) -> String:
 	var head := "%s: %s shipment received." % [sender, LettersScript.ordinal(shipments)]
+	var you := " +%s bits for you." % group_thousands(paid) if paid > 0 else ""
 	if balance_left <= 0:
-		return "%s %s bits off your balance. It is paid off." % [head, group_thousands(credit)]
-	return "%s %s bits off your balance, %s to go." % [head, group_thousands(credit),
-		group_thousands(balance_left)]
+		return "%s %s bits off your balance. It is paid off.%s" % [head, group_thousands(credit), you]
+	return "%s %s bits off your balance, %s to go.%s" % [head, group_thousands(credit),
+		group_thousands(balance_left), you]
+
+
+## The handler's share of a delivery (Ledger.handler_share, PT9).
+static func handler_share(credit: int) -> int:
+	return LedgerScript.handler_share(credit)
 
 
 ## 24100 as "24,100".
@@ -8848,6 +8859,36 @@ func _novelty_catch(inst: PonyInstance) -> void:
 	var data: PonyData = inst.data()
 	if data != null:
 		_novelty("pony", "named_" + String(data.id), "Caught %s" % data.display_name)
+
+
+## A NEW AREA OPENS WITH SOMEPONY WORTH OPENING IT FOR (PT9; playtest 2026-11-05: "why did i
+## even pay for apple area if there were no rare ponies in there?", "there should be a rare
+## pony reward tho to actually motivate you"). One of its rares she has not caught steps out
+## inside the gate the moment it opens, whatever the hour, and Tumble points her out: the
+## trail leads there (Happenings.sighting).
+func _welcome_rare(region: RegionData) -> Node3D:
+	if _game_state == null or spawner == null:
+		return null
+	var book: Compendium = _game_state.compendium
+	var pool: Array[PonyData] = []
+	for data: PonyData in _game_state.get_registry().all():
+		if data.rarity < 1 or StockPaletteScript.is_stock_id(data.id) or not data.spawn_zones.has(region.id):
+			continue
+		if book.state_of(data.id) >= CompendiumScript.State.CAUGHT or _owned_named_ids().has(data.id):
+			continue
+		pool.append(data)
+	if pool.is_empty():
+		return null
+	pool.sort_custom(func(a: PonyData, b: PonyData) -> bool: return a.rarity > b.rarity)
+	var pick: PonyData = pool[0]
+	var at2 := region.centre.lerp(Vector2(player.global_position.x, player.global_position.z), 0.35) \
+		if player != null else region.centre
+	var at := Vector3(at2.x, float(terrain.height_at(at2.x, at2.y)) + 0.1, at2.y)
+	var guest: Node3D = spawner.spawn_guest(pick, {}, at, 6.0)
+	if guest != null and happenings != null:
+		happenings.set("sighting", guest)
+		_toast("Tumble: \"Look, look! %s lives in there! Follow the sparkles!\"" % pick.display_name)
+	return guest
 
 
 func _novelty_purchase(item: ShopItem) -> void:

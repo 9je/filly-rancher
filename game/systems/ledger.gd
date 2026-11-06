@@ -160,6 +160,16 @@ static func is_collection_cycle(cycle: int) -> bool:
 
 ## Bits credited for delivering one pony. Stock is a flat rate; a named pony is her gem
 ## value times the multiplier.
+## A DELIVERY PAYS HER TOO (PT9; playtest 2026-11-05: "i thought i was gonna get paid but it
+## went to debt"). The full credit comes off the balance, as it always has (the story's pace of
+## paying the debt is unchanged), and HANDLER_SHARE of it goes into her purse on top.
+const HANDLER_SHARE := 0.25
+
+
+static func handler_share(credit: int) -> int:
+	return int(round(float(maxi(0, credit)) * HANDLER_SHARE))
+
+
 static func delivery_credit(rarity: int, is_stock: bool) -> int:
 	if is_stock:
 		return DELIVERY_CREDIT_STOCK

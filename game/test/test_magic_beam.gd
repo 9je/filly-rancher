@@ -904,6 +904,7 @@ func test_recalling_a_beam_holding_a_secured_pony_stores_her_as_the_ordinary_cat
 	pony.setup(data)
 	beam._begin_hold(pony)
 	beam._hold_seconds = 999.0  # force is_secured() true regardless of this attempt's roll
+	beam._steady_seconds = 999.0
 	assert_true(beam.is_secured(), "test setup: this hold must already read as secured")
 
 	beam.set_recalled(true)

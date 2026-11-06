@@ -427,7 +427,9 @@ func _pony_tile(holder: PanelContainer, pony: Dictionary) -> void:
 	MenuStyleScript.style_label(sub, 16, MenuStyleScript.COLOR_DIM)
 	column.add_child(sub)
 	var price := Label.new()
-	price.text = "%d bits" % int(pony.get("credit", 0))
+	# What she is worth, both ways (PT9): off the balance, and the handler's share to her.
+	var credit := int(pony.get("credit", 0))
+	price.text = "-%d debt\n+%d bits" % [credit, preload("res://systems/ledger.gd").handler_share(credit)]
 	price.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	price.add_theme_font_override(&"font", MenuStyleScript.numeral_font())
 	MenuStyleScript.style_label(price, 22, MenuStyleScript.COLOR_VALUE)

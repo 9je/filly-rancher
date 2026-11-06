@@ -660,6 +660,12 @@ var _recalled := false
 
 var _held: Node3D
 var _hold_seconds := 0.0
+## Seconds the held pony has spent ON the crosshair (see WEAVE_BY_RARITY); what secures her.
+var _steady_seconds := 0.0
+## Her own direction from the aim's origin while she weaves, and how hard she weaves.
+var _held_dir := Vector3.ZERO
+var _weave := 0.0
+var _weave_phase := 0.0
 ## The two clocks THIS hold is running on, rolled once at _begin_hold() -- not the nominal
 ## constants. Read back through get_struggle_seconds() / get_secure_seconds(), which is
 ## what the HUD draws its two rings from, so what is on screen is always the truth about
@@ -1035,13 +1041,13 @@ func get_secure_seconds() -> float:
 func get_secure_progress() -> float:
 	if not is_holding() or _secure_seconds <= 0.0:
 		return 1.0
-	return clampf(_hold_seconds / _secure_seconds, 0.0, 1.0)
+	return clampf(_steady_seconds / _secure_seconds, 0.0, 1.0)
 
 
 ## Whether the current hold has lasted long enough that letting go would STOW her rather
 ## than lose her. False when nothing is held.
 func is_secured() -> bool:
-	return is_holding() and _hold_seconds >= _secure_seconds
+	return is_holding() and _steady_seconds >= _secure_seconds
 
 
 ## Whether the hold in progress is one she will tear out of before it can secure her (see
@@ -1135,6 +1141,30 @@ static func window_bounds_for(personality: int) -> Vector2:
 ## The narrowest and widest the subdue clock can be rolled at, as (min, max).
 static func secure_bounds() -> Vector2:
 	return Vector2(SECURE_SECONDS - SECURE_JITTER, SECURE_SECONDS + SECURE_JITTER)
+
+
+## A RARER PONY MUST BE KEPT IN THE CROSSHAIR (PT9; playtest 2026-11-05: "all catches but the
+## toughests being ez af and kinda repetitive"). Held, she weaves off the aim at
+## weave_for(rarity) radians a second and the aim reels her back at WEAVE_REEL a second, so
+## left untracked she settles weave / reel off it, past ON_TARGET_RAD; only time with her on
+## the crosshair counts toward securing her (_steady_seconds), while her struggle clock runs
+## regardless. A common or a Drifter does not weave at all: caught exactly as before.
+const WEAVE_BY_RARITY := [0.0, 0.42, 0.66, 0.9]
+const WEAVE_REEL := 2.6
+const ON_TARGET_RAD := 0.12
+## Extra seconds of struggle a weaving hold is given, so tracking her is a test and not a coin
+## flip: a whole window's worth on top of the time spent chasing her back on.
+const WEAVE_GRACE := 1.6
+
+
+static func weave_for(rarity: int) -> float:
+	return float(WEAVE_BY_RARITY[clampi(rarity, 0, WEAVE_BY_RARITY.size() - 1)])
+
+
+static func on_target(aim_direction: Vector3, to_her: Vector3) -> bool:
+	if to_her.length_squared() < 1e-6:
+		return true
+	return aim_direction.normalized().angle_to(to_her.normalized()) < ON_TARGET_RAD
 
 
 ## How far along the experience ramp a steward with `catches` catches is, 0 to 1.
@@ -1618,6 +1648,11 @@ func _begin_hold(body: Node3D) -> void:
 		_target_ring.visible = false
 	_held = body
 	_hold_seconds = 0.0
+	_steady_seconds = 0.0
+	_weave = 0.0
+	_weave_phase = _rng.randf() * TAU
+	_held_dir = (body.global_position - _aim_origin).normalized() \
+		if body.global_position.distance_squared_to(_aim_origin) > 1e-6 else _aim_direction
 	# play_loop, not play_at: a pooled one-shot cannot be individually addressed, so a grab
 	# released before the clip's 1.19s ran out used to ring on regardless. A dedicated,
 	# stoppable voice fixes that; see _take_back_physics(), which stops it on every path a
@@ -1650,6 +1685,10 @@ func _begin_hold(body: Node3D) -> void:
 		_secure_seconds = clocks["secure"]
 		_struggle_seconds = clocks["struggle"]
 		_wrenching = clocks["wrenches"]
+		if data != null and not body.is_stock():
+			_weave = weave_for(data.rarity)
+			if _weave > 0.0:
+				_struggle_seconds += WEAVE_GRACE
 		return
 
 	if body is RigidBody3D:
@@ -1669,6 +1708,16 @@ func _begin_hold(body: Node3D) -> void:
 ## Reel the held body toward the hold point and turn it slowly while it floats.
 func _pull(delta: float) -> void:
 	var target := get_hold_point() + _hold_offset
+	if _weave > 0.0:
+		# She pulls off the aim along a slowly turning heading; the aim reels her back.
+		var right := _aim_direction.cross(Vector3.UP).normalized()
+		var up := right.cross(_aim_direction).normalized()
+		_weave_phase += delta * 1.3
+		var push := (right * cos(_weave_phase) + up * 0.45 * sin(_weave_phase * 1.7)) * _weave * delta
+		_held_dir = (_held_dir + push).normalized()
+		_held_dir = _held_dir.slerp(_aim_direction, 1.0 - exp(-WEAVE_REEL * delta)).normalized()
+		var reach_m := (get_hold_point() - _aim_origin).length()
+		target = _aim_origin + _held_dir * reach_m + _hold_offset
 	var weight := 1.0 - exp(-PULL_RESPONSE * delta)
 	_held.global_position = _held.global_position.lerp(target, weight)
 	_held.rotation.y += HELD_SPIN_RATE * delta
@@ -1680,6 +1729,8 @@ func _pull(delta: float) -> void:
 ## that says what a hold means.
 func _run_struggle(delta: float) -> void:
 	_hold_seconds += delta
+	if _weave <= 0.0 or on_target(_aim_direction, _held.global_position - _hold_offset - _aim_origin):
+		_steady_seconds += delta
 	if _hold_seconds < _struggle_seconds:
 		return
 
@@ -1688,7 +1739,7 @@ func _run_struggle(delta: float) -> void:
 	# before the subdue clock has finished can only be a wrench -- every non-wrenching
 	# attempt rolls its struggle as (subdue + a positive window), so the comparison is
 	# exact rather than approximate, and there is no second flag to fall out of step.
-	var reason: int = Loss.WRENCHED if _hold_seconds < _secure_seconds else Loss.STRUGGLED
+	var reason: int = Loss.WRENCHED if _steady_seconds < _secure_seconds else Loss.STRUGGLED
 	_take_back_physics(body)
 	_held = null
 	_lose(body, reason)
