@@ -3,6 +3,19 @@
 ## Owner direction (2026-10-22)
 Canon MLP stays: real names, looks and places ("lean into mlp fully", private build). The roster de-canon was reverted; the Company is the Cloudsdale Weather Corporation, the cloud palace is the Rainbow Factory, the town is Ponyville. The OC story cast lives alongside the canon ponies.
 
+## Overnight sweep, 2026-11-05 (the owner's 70-item playtest, docs/playtest-2026-11-05.md; PLAN.md section PT)
+Fixed by cause, each with a test that sweeps every instance of its kind. Done so far:
+- **Bodies keep their space** (17, 19, 65, 10, 13, 18): ponies are a footprint along their length (systems/body_space.gd) and ease apart; residents never bolt in their pen, whose leash now reaches the whole paddock; Tumble heels behind and beside you. The "twisted Twilight" was another pony inside her.
+- **A solid world** (31, 41, 43, 57, 58, 61, 68): every doorway sealed; anyone inside a building is set down outside it; lakes are waded under opaque water; the regions' hay, crates and baskets are solid; Tumble catches up past a fence.
+- **Pens, ownership, spawns** (15, 39, 53, 62, 63, 70): nobody you own spawns twice; an Escape Artist comes home at dawn; the Bloom card says only Drifters Bloom; the quota reads met or short.
+- **One menu frame, a HUD that never overlaps** (8, 20, 22, 24, 30, 42, 51, 59, 60): no key hints, one Back button, real tabs, a Compendium scroll bar, no heavy text outline, letters answered on the sheet, toasts at the bottom centre that hold while paused, eighteen pips in two rows.
+- **The world sits right** (14, 25, 26, 27, 29, 32, 36, 37, 40): signs solid or gone, no flicker; buildings on the ground, not a 1.8 m pedestal; 60 degree field of view; softer rain; the Strip paved; the bramble plots a real tangle.
+- **Knowing where to go** (34, 35, 38, 66): sightings, the lost foal and Rainbow Dash are on the trail and the card; the compass has badges, N E S W, the goal's distance and a behind chevron; townsfolk wear a speech bubble under the crosshair; Spike gives tips.
+- **Economy** (33, 52, 55, 69): a delivery pays a handler's share; food in sacks; a new area opens with a rare; rarer ponies weave in the beam.
+- **Words** (11, 28, 50, 56): Fennel, Pip, the yield letter, the newsletter and the Collector's walk-by.
+- **The casino** (45 to 49): rebuilt by a subagent (in progress at the time of writing).
+- Two pre-existing headless flakes fixed (the safe render thread in gut_one.sh) and one pre-existing ranch self-check (the crowd ratio).
+
 ## Done
 - Phases 1 to 4: AUDIT.md, RESEARCH.md, GDD.md, STORY.md, PLAN.md.
 - **M0 foundation:**
