@@ -4606,7 +4606,10 @@ func _move_pony_into_pen(slot: PlotSlot) -> bool:
 		storage.store(instance)
 		_deny("She would not go in.")
 		return false
-	_toast("%s moved into the pen." % instance.display_name())
+	# The pony that fills it says so (PS1 item 65: the toast said she moved in while the
+	# prompt beside it already read "this pen is full").
+	_toast("%s moved into the pen. It is now full." % instance.display_name() if pen.is_full()
+		else "%s moved into the pen." % instance.display_name())
 	# AFTER the add succeeded and not before: the two branches above both end with her back
 	# in the saddlebag, and a board credited on the attempt would pay for a penning that
 	# never happened.

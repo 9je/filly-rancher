@@ -212,7 +212,8 @@ func _h(x: float, z: float) -> float:
 
 func _pen_only(player: Node3D) -> void:
 	var w: Object = ranch.get("_world")
-	w.call("pin", 3, 1)
+	var day := OS.get_cmdline_user_args().has("--day")
+	w.call("pin", 1 if day else 3, 0 if day else 1)
 	var sky: Node = ranch.get("sky_rig")
 	sky.call("apply_immediately", w)
 	var slot: PlotSlot = null
@@ -225,14 +226,22 @@ func _pen_only(player: Node3D) -> void:
 		await physics_frame
 	var pen := slot.get_built() as Pen
 	var k := 0
+	var eight := MANE6 + [&"lyra", &"bonbon"]
 	while not pen.is_full():
-		pen.add_pony(PonyInstanceScript.create(MANE6[k % MANE6.size()]))
+		pen.add_pony(PonyInstanceScript.create(eight[k % eight.size()]))
 		k += 1
-	player.process_mode = Node.PROCESS_MODE_DISABLED
+	if OS.get_cmdline_user_args().has("--player-at-corner"):
+		# Where the owner stood in [52]: outside the fence, at a corner.
+		var corner := pen.global_position + Vector3(Pen.HALF_EXTENT + 0.9, 0.0, Pen.HALF_EXTENT + 0.9)
+		corner.y = _h(corner.x, corner.z) + 0.1
+		player.global_position = corner
+		player.velocity = Vector3.ZERO
+	else:
+		player.process_mode = Node.PROCESS_MODE_DISABLED
 	var cam := Camera3D.new()
 	ranch.add_child(cam)
-	cam.global_position = pen.global_position + Vector3(0, 7, 6)
-	cam.look_at(pen.global_position)
+	cam.global_position = pen.global_position + (Vector3(0, 2.6, 7.5) if day else Vector3(0, 7, 6))
+	cam.look_at(pen.global_position + Vector3(0, 0.6, 0))
 	cam.make_current()
 	for f in 5400:
 		await physics_frame
@@ -243,7 +252,18 @@ func _pen_only(player: Node3D) -> void:
 				bodies.append(b)
 		_measure_quiet("pen_night", bodies)
 		if f % 900 == 0:
+			cam.make_current()
 			await _save("grand_night_t%d" % (f / 60))
+			var rows: Array[String] = []
+			for b: Node3D in bodies:
+				var near := 99.0
+				for o: Node3D in bodies:
+					if o != b:
+						near = minf(near, Vector2(b.global_position.x - o.global_position.x, b.global_position.z - o.global_position.z).length())
+				var off := b.global_position - pen.global_position
+				rows.append("%s st=%d r=%.2f near=%.2f v=%.2f" % [String(b.call("get_data").id), int(b.get("state")),
+					Vector2(off.x, off.z).length(), near, (b as CharacterBody3D).velocity.length()])
+			print("PEN t=%ds roam=%.2f | %s" % [f / 60, float(bodies[0].get("roam_radius")), " | ".join(rows)])
 	for key: String in worst:
 		print("TWIST %s %s" % [key, worst[key]])
 	print("TWIST_PROBE_DONE shots=%d" % shots)

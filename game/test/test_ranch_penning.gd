@@ -127,3 +127,22 @@ func test_a_legal_penning_still_pens_her_on_the_first_press() -> void:
 	assert_true(ranch.call("_move_pony_into_pen", slot), "one press, and she is in")
 	assert_true(pen.has_pony(mine.uid))
 	assert_eq(storage.contents().size(), 0, "and out of the bag")
+
+
+## PS1 item 65 ([52]): the last pony in read "Saffron Daydream moved into the pen." while the
+## prompt already said the pen was full. The toast for the pony that fills it says both.
+func test_the_pony_that_fills_the_pen_is_told_it_is_now_full() -> void:
+	var ranch = await _ranch()
+	var slot = ranch.plot_slots()[0]
+	assert_true(slot.build(ranch.call("_plots_catalogue").by_id(&"pen_small")))
+	await wait_physics_frames(2)
+	var pen = slot.get_built()
+	while pen.count() < pen.capacity - 1:
+		assert_true(pen.add_pony(PonyInstanceScript.create(&"lyra")))
+	var storage = ranch.player.get_magic_beam().get_storage()
+	assert_true(storage.store(PonyInstanceScript.create(&"octavia")))
+	assert_true(ranch.call("_move_pony_into_pen", slot))
+	var hud: Node = ranch.get_node("HUD")
+	var said: String = hud.call("toast_text") + " ".join(hud.call("pending_toasts"))
+	assert_string_contains(said, "moved into the pen")
+	assert_string_contains(said, "now full")

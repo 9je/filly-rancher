@@ -338,6 +338,22 @@ func test_a_resident_does_not_bolt_from_her_farmer() -> void:
 	assert_ne(pony.state, PonyScript.State.FLEE, "a penned pony stays put when her farmer comes close")
 
 
+## PS1 item 65 ([52]: the owner at a pen's corner, the full pen heaped against that corner's
+## rails): every curious resident walked to the edge nearest the farmer and stood in one pile
+## there, pressed past her leash into the fence. At home she greets by turning to watch.
+func test_a_curious_resident_turns_to_watch_her_farmer_and_stays_put() -> void:
+	var pony := _spawn(PonyDataScript.Personality.CURIOUS, 3.4, Vector3.ZERO)
+	pony.add_to_group(&"penned")
+	var player := _add_player(Vector3(4.0, 0.0, 0.0))
+	var start: Vector3 = pony.global_position
+	await wait_physics_frames(RUN_FRAMES * 4)
+	assert_ne(pony.state, PonyScript.State.APPROACH, "a resident does not walk up to the rails")
+	var to_player := player.global_position - pony.global_position
+	var facing: Vector3 = -pony.visuals.global_basis.z
+	assert_lt(rad_to_deg(Vector2(facing.x, facing.z).angle_to(Vector2(to_player.x, to_player.z))), 30.0,
+		"she has turned to watch him")
+
+
 func test_a_curious_pony_approaches_and_stops_short() -> void:
 	var pony := _spawn(PonyDataScript.Personality.CURIOUS, 3.4, Vector3.ZERO)
 	var player := _add_player(Vector3(4.0, 0.0, 0.0))

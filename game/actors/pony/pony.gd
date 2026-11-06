@@ -1313,6 +1313,14 @@ func _react_to_player() -> void:
 	# was half of how eight of them ended up in one heap (playtest 2026-11-05 item 65).
 	if reaction == State.FLEE and is_in_group(&"penned"):
 		return
+	# NOR DOES SHE WALK UP TO THE RAILS (PS1 item 65, [52]): every curious resident of a full
+	# pen headed for the edge nearest the farmer and they stood in one heap there, pressed
+	# past the leash into the fence. At home she turns where she stands to watch him.
+	if reaction == State.APPROACH and is_in_group(&"penned"):
+		if state != State.WANDER:
+			var toward := _player.global_position - global_position
+			_visual_yaw = atan2(-toward.x, -toward.z)
+		return
 	# Wary (see _settle_wary): she has already run, and she holds her ground watching unless
 	# the player comes on at her.
 	if reaction == State.FLEE and _wary > 0.0 \
