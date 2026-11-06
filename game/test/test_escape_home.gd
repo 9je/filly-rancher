@@ -61,3 +61,26 @@ func test_spike_names_the_escape_artist_when_asked() -> void:
 	var hud: Node = ranch.get_node("HUD")
 	var said: String = hud.call("toast_text") + " ".join(hud.call("pending_toasts"))
 	assert_string_contains(said, "Escape Artist")
+
+
+## Review 2026-11-06: caught again the same night, she is in the saddlebag, which is not in
+## GameState.ponies until a save syncs it, so dawn re-penned her saved copy too and there
+## were two Scootaloos (item 63 again). A catch ends her night out.
+func test_caught_again_the_same_night_she_is_not_doubled_at_dawn() -> void:
+	var got := await _ranch_with_paddock()
+	var ranch = got[0]
+	var pen: Pen = got[1]
+	var scoot := PonyInstanceScript.create(&"scootaloo")
+	assert_true(pen.add_pony(scoot))
+	ranch.call("_escape_artists")
+	var body: Node3D = ranch.call("_escaped_body", scoot.uid)
+	assert_not_null(body)
+	var beam = ranch.get("player").get_magic_beam()
+	assert_true(beam.get_storage().store(scoot))
+	body.queue_free()
+	beam.emit_signal("captured", scoot)
+	await wait_physics_frames(2)
+	ranch.call("_escapees_come_home")
+	assert_eq(pen.ponies().size(), 0, "she is in the bag, not also back in the pen")
+	assert_eq((ranch.get("_game_state").story.get_var("escaped_tonight", []) as Array).size(), 0,
+		"her night out ended when she was caught")

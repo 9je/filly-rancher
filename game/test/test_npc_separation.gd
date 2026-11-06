@@ -87,3 +87,20 @@ func test_a_walking_player_does_not_push_her() -> void:
 	player.velocity = Vector3(0, 0, -3.0)
 	await wait_physics_frames(5)
 	assert_eq(npc.call("_space_push"), Vector3.ZERO, "no push from someone on the move")
+
+
+## Review 2026-11-06: the step out of the player moved her spot for good, so standing in Old
+## Fennel a few times walked her metres off her talk spot, onto the road. She makes room, and
+## once nobody is standing in her she goes back.
+func test_she_goes_back_to_her_spot_when_the_player_steps_away() -> void:
+	add_child_autofree(_floor())
+	var npc := _npc(Vector3(0, 0.05, 0), "Old Fennel")
+	npc.call("set_mode_stand", Vector3.ZERO)
+	var player := _body(Vector3(0.5, 0.05, 0), preload("res://world/collision_layers.gd").PLAYER)
+	await wait_physics_frames(240)
+	var d := Vector2(npc.global_position.x - player.global_position.x, npc.global_position.z - player.global_position.z).length()
+	assert_gt(d, NpcScript.STANDING_SPACE - 0.2, "she made room (%.2f m)" % d)
+	player.global_position = Vector3(20, 0.05, 20)
+	await wait_physics_frames(600)
+	var off := Vector2(npc.global_position.x, npc.global_position.z).length()
+	assert_lt(off, 0.7, "back on her spot (%.2f m off)" % off)

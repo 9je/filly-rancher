@@ -519,3 +519,12 @@ Made without asking, per CLAUDE.md; each is the smallest change that fixes the o
 - **The lake's wading floor ramps down at its rim** (2026-11-06): it had made a 0.55 m wall round the lake, found by the endings bot at the Lake pylon.
 - **FS4.2 is a GaitBlend over the AnimationPlayer, not an AnimationTree blend space.** Two rigs (PonySFM and the Mane Six) and four actor scripts already drive one AnimationPlayer each; a shown speed that settles and a debounced rung-down gives the stop through trot and walk, and a roll gives the turn lean, with no new rig wiring. At a run only the front hooves sound, now judged by the clip she shows rather than her true speed (a settle step was a rear-hoof tap).
 - **The five-ending bot playthrough is no longer a gate** (owner, 2026-11-06): hours of wall time for little signal. Changes are verified by focused GUT tests on the system touched, short real-input tests where input matters, and renders that are looked at.
+
+## 2026-11-06 -- the review of the unreviewed commits
+
+A Fable review of the FS sweep, de3f961, a543262 and 13d0c11 (never reviewed before) found five bugs, all fixed with a test each:
+- **A clip played over a one-shot ends it** (Pony._play clears `_action`). A startle cut off by the beam's struggle never sent animation_finished, so the pony never animated again.
+- **A catch ends an Escape Artist's night out** (Ranch._end_night_out on every capture). The saddlebag is not in GameState.ponies until a save syncs it, so dawn penned a second copy of a pony caught again that night.
+- **A townspony makes room without losing her spot.** The push out of the player or a wild pony now goes into `_yield`, which runs back at 0.5 m/s once nobody stands in her; only the townsfolk-on-townsfolk push moves `home` (so two sent to one spot still settle side by side). Her shape query is skipped past 30 m from the camera.
+- **The ranch applies the saved text size** too, not only the title screen.
+- The FS items the review found built short of their spec are marked PARTLY DONE in PLAN.md with what is missing, rather than ticked.

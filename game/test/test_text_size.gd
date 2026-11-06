@@ -77,3 +77,18 @@ func test_at_150_percent_the_menus_fit_the_ui_canvas() -> void:
 	var mp := market.get_node_or_null(^"Centre/Panel") as Control
 	if mp != null:
 		assert_true(_inside(mp, vp), "the market at 150%%: %s" % mp.get_global_rect())
+
+
+## Review 2026-11-06: only the title screen applied the saved size, so a ranch launched as the
+## first scene drew every menu at 100 percent whatever the setting said.
+func test_the_ranch_applies_the_saved_text_size() -> void:
+	var was := MenuStyle.text_scale
+	var ranch: Node = load("res://world/ranch.gd").new()
+	var s := Settings.new()
+	s.text_size = 150
+	ranch.set("_settings", s)
+	MenuStyle.text_scale = 1.0
+	ranch.call("_apply_settings")
+	assert_almost_eq(MenuStyle.text_scale, 1.5, 0.001)
+	MenuStyle.text_scale = was
+	ranch.free()

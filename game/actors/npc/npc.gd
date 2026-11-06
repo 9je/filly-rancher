@@ -198,12 +198,29 @@ func _separation() -> Vector3:
 			away = Vector3(1, 0, 0).rotated(Vector3.UP, float(hash(name) % 628) / 100.0)
 			d = 0.01
 		push += away.normalized() * (1.0 - d / SEPARATION) * SEPARATION_PUSH
-	if is_inside_tree():
-		push += _space_push()
-		# Following (Tumble at her heels): she makes room like a pony does (systems/body_space.gd).
-		if mode == Mode.FOLLOW:
-			push += BodySpaceScript.push_on(self)
 	return push
+
+
+## The room she makes for everyone who is not a townspony: the player or a wild pony at rest
+## in her, and (following) BodySpace. Unlike _separation() this never moves her spot for good;
+## see _yield. Far from the camera nobody is standing in her, so no shape query is spent.
+func _room_push() -> Vector3:
+	if not is_inside_tree():
+		return Vector3.ZERO
+	var push := Vector3.ZERO
+	if not _far:
+		push += _space_push()
+	# Following (Tumble at her heels): she makes room like a pony does (systems/body_space.gd).
+	if mode == Mode.FOLLOW:
+		push += BodySpaceScript.push_on(self)
+	return push
+
+
+## How far the player or a wild pony has moved her off her spot. It grows while someone stands
+## in her and runs back out at YIELD_RETURN m/s once nobody does, so she makes room and then goes
+## back (review 2026-11-06: moving `home` itself walked Old Fennel off her talk spot for good).
+var _yield := Vector3.ZERO
+const YIELD_RETURN := 0.5
 
 
 func _enter_tree() -> void:
@@ -257,6 +274,7 @@ func set_mode_stand(at: Vector3 = Vector3.INF) -> void:
 	mode = Mode.STAND
 	if at != Vector3.INF:
 		home = at
+		_yield = Vector3.ZERO
 
 
 func set_mode_follow(target: Node3D) -> void:
@@ -309,7 +327,7 @@ func _physics_process(delta: float) -> void:
 			else:
 				set_mode_stand(walk_target)
 		Mode.STAND:
-			var back := home - global_position
+			var back := home + _yield - global_position
 			back.y = 0.0
 			if back.length() > 0.6:
 				desired = back.normalized() * walk_speed
@@ -319,6 +337,13 @@ func _physics_process(delta: float) -> void:
 		if mode == Mode.STAND:
 			# Her spot moves with her, so two who were sent to one place settle side by side.
 			home += apart * delta
+	var room := _room_push()
+	if room.length_squared() > 0.0004:
+		desired += room
+		if mode == Mode.STAND:
+			_yield += room * delta
+	else:
+		_yield = _yield.move_toward(Vector3.ZERO, YIELD_RETURN * delta)
 	if not is_on_floor():
 		velocity += get_gravity() * delta
 	var h := Vector3(velocity.x, 0, velocity.z).move_toward(desired, 6.0 * delta)

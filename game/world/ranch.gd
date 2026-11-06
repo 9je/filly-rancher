@@ -2838,6 +2838,9 @@ func _apply_settings() -> void:
 		# while it loaded stays fullscreen.
 		_settings.apply_graphics(get_viewport(), false)
 	_settings.apply_bindings()
+	# The saved text size, here too: a ranch launched as the first scene never passed the
+	# title screen that applied it (review 2026-11-06).
+	_settings.apply_text()
 
 
 ## COLLECTION DAY, ONCE PER PERIOD. Every third cycle, on the first phase change inside it,
@@ -4232,6 +4235,7 @@ func _on_pony_captured(instance: PonyInstance) -> void:
 		return
 	_game_state.onboarding.note(&"catch")
 	_game_state.story.add_var("catches")
+	_end_night_out(instance.uid)
 	_catch_sting(instance)
 	_apply_beam_recall()
 	_novelty_catch(instance)
@@ -8760,6 +8764,16 @@ func _escapees_come_home() -> void:
 			body.queue_free()
 		_toast("%s came home at dawn." % inst.display_name())
 	_game_state.story.set_var(ESCAPED_VAR, waiting)
+
+
+## Caught again while she was out, she is in the saddlebag, which GameState.ponies does not
+## list until a save syncs it: her record has to go now or dawn pens a second copy of her
+## (review 2026-11-06, playtest item 63).
+func _end_night_out(uid: StringName) -> void:
+	var out: Array = _game_state.story.get_var(ESCAPED_VAR, [])
+	var kept: Array = out.filter(func(d: Dictionary) -> bool: return StringName(str(d.get("uid", ""))) != uid)
+	if kept.size() != out.size():
+		_game_state.story.set_var(ESCAPED_VAR, kept)
 
 
 func _escaped_body(uid: StringName) -> Node3D:

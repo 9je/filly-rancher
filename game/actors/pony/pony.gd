@@ -1674,6 +1674,10 @@ func _play(clip: StringName) -> void:
 	if not _anim.has_animation(clip):
 		push_error("Pony '%s' has no '%s' animation" % [_id(), clip])
 		return
+	# A clip played over a one-shot cuts it off, and Godot sends no animation_finished
+	# for a cut clip: without this `_action` stays set and locomotion never runs again
+	# (a startle cut off by the beam's struggle, review 2026-11-06).
+	_action = &""
 	_anim.play(clip, ANIM_BLEND)
 
 

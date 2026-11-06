@@ -125,3 +125,22 @@ func test_a_resting_face_settles_to_its_moods_lids() -> void:
 	face.settle()
 	for m: ShaderMaterial in eyes:
 		assert_almost_eq(float(m.get_shader_parameter(&"lid")), 0.42, 0.001, "the coy half-lid")
+
+
+## Review 2026-11-06: a pony startled and Scooped inside the second the startle lasts had
+## her one-shot cut off by the beam's struggle clip, which never reports finishing, so
+## `_action` stayed "startle" and she never animated again. Any clip played over a
+## one-shot ends it.
+func test_a_startle_cut_off_by_the_beam_does_not_freeze_her() -> void:
+	var pony: Node3D = PonyScene.instantiate()
+	add_child_autofree(pony)
+	pony.call("setup", load("res://data/ponies/applebloom.tres"))
+	pony.call("_on_noticed_player")
+	assert_eq(pony.get("_action"), &"startle")
+	pony.call("set_held", true)
+	pony.call("_state_held", 0.1)
+	pony.call("set_held", false)
+	assert_eq(pony.get("_action"), &"", "the startle the beam cut off no longer holds her clip")
+	pony.call("_update_animation", 3.0, 0.5)
+	var anim: AnimationPlayer = pony.get("_anim")
+	assert_ne(anim.current_animation, &"struggle", "dropped, she walks again")
