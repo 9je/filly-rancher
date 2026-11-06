@@ -862,6 +862,7 @@ func _physics_process(delta: float) -> void:
 		# for a reproducible wander, and a draw here would shift every target after it.
 		_detail_timer = DETAIL_CHECK_SECONDS + randf() * 0.1
 		_update_detail()
+		_update_mood()
 		if detail == Detail.FULL:
 			_update_gaze_target()
 	var stride := 1
@@ -1015,6 +1016,8 @@ func _set_detail(want: int) -> void:
 	for m in _springs_cache:
 		if is_instance_valid(m):
 			m.active = detail == Detail.FULL
+			if m is PonyFace and detail != Detail.FULL:
+				(m as PonyFace).settle()
 	for mi: MeshInstance3D in meshes:
 		if not is_instance_valid(mi):
 			continue
@@ -1101,17 +1104,37 @@ func _update_gaze_target() -> void:
 		face.gaze_at = Vector3.INF
 
 
+## Within this many metres a calm pony who has noticed the player gives her the coy look.
+const COY_RADIUS := 16.0
+
+
 func _update_mood() -> void:
 	var face := _face_ref()
 	if face == null:
 		return
+	var was := face.mood
 	match state:
 		State.FLEE, State.HELD:
 			face.mood = PonyFace.Mood.SCARED
-		State.GRAZE, State.IDLE:
+		State.GRAZE, State.IDLE, State.APPROACH:
 			face.mood = PonyFace.Mood.HAPPY if is_in_group(&"penned") else PonyFace.Mood.NEUTRAL
+			if _coy_at_player():
+				face.mood = PonyFace.Mood.COY
 		_:
 			face.mood = PonyFace.Mood.NEUTRAL
+	# A resting face (Detail past FULL) is told once, rather than left where it stopped.
+	if face.mood != was and not face.active:
+		face.settle()
+
+
+## A calm pony, not a shy one, who has the player in sight and not too close.
+func _coy_at_player() -> bool:
+	if _player == null or not is_instance_valid(_player) or _data == null:
+		return false
+	if _personality() == PonyDataScript.Personality.SHY:
+		return false
+	var d := _player.global_position.distance_to(global_position)
+	return d > 2.0 and d < COY_RADIUS
 
 
 # --- states -----------------------------------------------------------------------

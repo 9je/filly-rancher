@@ -14,7 +14,7 @@ extends SkeletonModifier3D
 ## bone's local space; the axes below were measured on the donor rig (see the face sheet in
 ## tools/capture_shots.sh).
 
-enum Mood { NEUTRAL, HAPPY, SAD, SCARED, ANGRY, BLANK }
+enum Mood { NEUTRAL, HAPPY, SAD, SCARED, ANGRY, BLANK, COY }
 
 ## Measured with the rigprobe set in game/scenes/test/shots.gd: +X brings the upper lid down
 ## over the eye; +Y swings the left ear out and down (the right ear mirrors it).
@@ -36,6 +36,10 @@ const MOODS := {
 	Mood.SCARED: [0.75, 0.24, 0.0],
 	Mood.ANGRY: [0.35, -0.3, 0.25],
 	Mood.BLANK: [0.0, 0.0, 0.0],
+	## THE LOOK THE OWNER LIKED (playtest 2026-11-05: "she was also looking at me with lidded
+	## eyes at first it was funny and i liked it"): half lidded, a little sly. A calm pony who
+	## has noticed the player gives her this (Pony._update_mood).
+	Mood.COY: [-0.05, 0.08, 0.42],
 }
 
 ## Seconds between blinks, min and max. A BLANK face never blinks (Marigold's tell).
@@ -141,6 +145,21 @@ func _process_modification() -> void:
 	if absf(_look_yaw) > 0.001:
 		_rotate_world_up(sk, "Neck1", _look_yaw * 0.4)
 		_rotate_world_up(sk, "Head", _look_yaw * 0.6)
+
+
+## AT REST, THE EYES ARE HER MOOD'S, NEVER A FROZEN BLINK (PT11; playtest 2026-11-05: a far
+## pony "didnt have eyes" until the player came close). A far pony's face does not process
+## (Pony._set_detail), and it used to stop wherever it was: mid blink, the lids stayed shut.
+## This writes the lids and the gaze for `mood` at rest, once, for a face that is resting.
+func settle() -> void:
+	var sk := get_skeleton()
+	if sk == null:
+		return
+	_blink_phase = -1.0
+	var m: Array = MOODS.get(mood, MOODS[Mood.NEUTRAL])
+	_mood_lid = float(m[2])
+	_lid_written = -1.0
+	_set_eye_lid(sk, maxf(_mood_lid, 1.0 if eyes_closed else 0.0))
 
 
 ## Push the lid amount into every eye material on this pony (cached on first use).

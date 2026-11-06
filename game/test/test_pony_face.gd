@@ -94,3 +94,34 @@ func test_she_startles_when_she_first_notices_the_player() -> void:
 	pony.call("setup", load("res://data/ponies/applebloom.tres"))
 	pony.call("_on_noticed_player")
 	assert_eq(pony.get("_action"), &"startle")
+
+
+## PT11 (playtest 2026-11-05: a far pony "didnt have eyes" until the player came close): a face
+## that stops processing settles to its mood's lids, never a frozen blink; and the coy look the
+## owner liked is a real mood with half-lidded eyes.
+func test_a_resting_face_settles_to_its_moods_lids() -> void:
+	var was: bool = ToonStyler.shading_enabled
+	ToonStyler.shading_enabled = true
+	var body: Node3D = PonyVisuals.build(load("res://data/ponies/applebloom.tres"))
+	add_child_autofree(body)
+	var face: PonyFace = body.find_children("Face", "", true, false)[0]
+	var eyes: Array = []
+	for mi: MeshInstance3D in body.find_children("*", "MeshInstance3D", true, false):
+		for i in range(mi.mesh.get_surface_count() if mi.mesh != null else 0):
+			var m := mi.get_active_material(i)
+			if m is ShaderMaterial and (m as ShaderMaterial).shader == PonyFace.EYE_SHADER:
+				eyes.append(m)
+	ToonStyler.shading_enabled = was
+	if eyes.is_empty():
+		pass_test("no eye shader on this machine's build")
+		return
+	for m: ShaderMaterial in eyes:
+		m.set_shader_parameter(&"lid", 1.0)  # caught mid blink
+	face.mood = PonyFace.Mood.NEUTRAL
+	face.settle()
+	for m: ShaderMaterial in eyes:
+		assert_almost_eq(float(m.get_shader_parameter(&"lid")), 0.0, 0.001, "open, not a frozen blink")
+	face.mood = PonyFace.Mood.COY
+	face.settle()
+	for m: ShaderMaterial in eyes:
+		assert_almost_eq(float(m.get_shader_parameter(&"lid")), 0.42, 0.001, "the coy half-lid")
