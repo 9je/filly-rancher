@@ -89,7 +89,7 @@ Liked and kept (checked in PS6): the rare capture neigh; the half-lidded look (6
 | G6 | FS6.1: tiles stagger in 30 ms apart; a purchase flies a coin to the wallet. | -- | PS10 | OPEN |  |  |  |
 | G7 | FS6.2: the Depot pays out per tile with a counter sound; the total lands on the balance. | -- | PS10 | OPEN |  |  |  |
 | G8 | FS8.3: rarity shapes on the Depot tiles. | -- | PS10 | OPEN |  |  |  |
-| G9 | FS5.1: hoof loudness measured in the 3D mix against the beds. | -- | PS10 | OPEN |  |  |  |
+| G9 | FS5.1: hoof loudness measured in the 3D mix against the beds. | -- | PS10 | FIXED-UNREVIEWED | The old capture heard no hooves because the score only plays for a person playing and the bot run had none to compare with. Measured now in the real 3D mix: Godot's movie writer mixes audio on the Dummy driver, so two takes at the player's camera (scenes/test/hoof_capture.gd: the day score alone; her hoofsteps alone, walking on grass) are compared by tools/measure_hooves.py. Before: hooves 16.4 dB under the score (just past the -16 to -10 target); every hoof set raised 2 dB (sound.gd); after: 14.8 dB under. +3 dB measured 11.3 under, so the spread run to run is about 2 dB on 13 steps a take. Evidence: build/ps_evidence/itemG9/hoof_measure.txt. Not heard through speakers; the owner's ear is still the final word |  |  |
 | G10 | The real-input batch: loading, pen_upgrade and sprint fail in a full batch but pass alone. | -- | PS11 | OPEN |  |  |  |
 | G11 | 60-pony performance: p99 frame time at or under 16.6 ms. | -- | PS11 | OPEN |  |  |  |
 | G12 | Proton smoke run of the Windows build. | -- | PS11 | OPEN |  |  |  |

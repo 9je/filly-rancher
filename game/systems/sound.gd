@@ -195,7 +195,11 @@ const LIBRARY: Dictionary = {
 		"bus": BUS_EFFECTS, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": false},
 	# HOOFSTEPS, ONE SET PER SURFACE: recorded hooves (home-equestria's takes, levelled 3 dB
 	# under the synthesised taps they replace and with the click softened, by
-	# tools/import_hoofsteps.py; owner 2026-11-05: "anything is better than we got"). Player.gd plays one on every footfall of the clip under her and picks the
+	# tools/import_hoofsteps.py; owner 2026-11-05: "anything is better than we got").
+	# LEVELS MEASURED IN THE MIX (PS10 gap G9; FS5.1): a movie-writer capture at the player's
+	# camera (scenes/test/hoof_capture.gd, tools/measure_hooves.py) put her hooves on grass
+	# 16.4 dB under the day score, past the 10 to 16 target; every hoof set is 2 dB up (3 put
+	# them 11.3 under, the loud end). Player.gd plays one on every footfall of the clip under her and picks the
 	# set from the ground under that hoof. Each play rolls a pitch inside a small window and
 	# a volume inside volume_jitter_db either side of volume_db, and never repeats the take
 	# it played last (no_repeat), which is what keeps a run of eleven a second from reading
@@ -206,7 +210,7 @@ const LIBRARY: Dictionary = {
 			"res://assets/audio/world/hoof_grass_2.wav",
 			"res://assets/audio/world/hoof_grass_3.wav",
 			"res://assets/audio/world/hoof_grass_4.wav"],
-		"bus": BUS_EFFECTS, "volume_db": -17.0, "pitch_min": 0.94, "pitch_max": 1.07, "loop": false,
+		"bus": BUS_EFFECTS, "volume_db": -15.0, "pitch_min": 0.94, "pitch_max": 1.07, "loop": false,
 		"volume_jitter_db": 1.5, "no_repeat": true},
 	&"hoof_dirt": {
 		"paths": [
@@ -214,7 +218,7 @@ const LIBRARY: Dictionary = {
 			"res://assets/audio/world/hoof_dirt_2.wav",
 			"res://assets/audio/world/hoof_dirt_3.wav",
 			"res://assets/audio/world/hoof_dirt_4.wav"],
-		"bus": BUS_EFFECTS, "volume_db": -16.0, "pitch_min": 0.94, "pitch_max": 1.07, "loop": false,
+		"bus": BUS_EFFECTS, "volume_db": -14.0, "pitch_min": 0.94, "pitch_max": 1.07, "loop": false,
 		"volume_jitter_db": 1.5, "no_repeat": true},
 	&"hoof_wood": {
 		"paths": [
@@ -222,7 +226,7 @@ const LIBRARY: Dictionary = {
 			"res://assets/audio/world/hoof_wood_2.wav",
 			"res://assets/audio/world/hoof_wood_3.wav",
 			"res://assets/audio/world/hoof_wood_4.wav"],
-		"bus": BUS_EFFECTS, "volume_db": -13.0, "pitch_min": 0.94, "pitch_max": 1.07, "loop": false,
+		"bus": BUS_EFFECTS, "volume_db": -11.0, "pitch_min": 0.94, "pitch_max": 1.07, "loop": false,
 		"volume_jitter_db": 1.5, "no_repeat": true},
 	&"hoof_stone": {
 		"paths": [
@@ -230,7 +234,7 @@ const LIBRARY: Dictionary = {
 			"res://assets/audio/world/hoof_stone_2.wav",
 			"res://assets/audio/world/hoof_stone_3.wav",
 			"res://assets/audio/world/hoof_stone_4.wav"],
-		"bus": BUS_EFFECTS, "volume_db": -14.0, "pitch_min": 0.94, "pitch_max": 1.07, "loop": false,
+		"bus": BUS_EFFECTS, "volume_db": -12.0, "pitch_min": 0.94, "pitch_max": 1.07, "loop": false,
 		"volume_jitter_db": 1.5, "no_repeat": true},
 	&"hoof_metal": {
 		"paths": [
@@ -238,7 +242,7 @@ const LIBRARY: Dictionary = {
 			"res://assets/audio/world/hoof_metal_2.wav",
 			"res://assets/audio/world/hoof_metal_3.wav",
 			"res://assets/audio/world/hoof_metal_4.wav"],
-		"bus": BUS_EFFECTS, "volume_db": -17.0, "pitch_min": 0.94, "pitch_max": 1.07, "loop": false,
+		"bus": BUS_EFFECTS, "volume_db": -15.0, "pitch_min": 0.94, "pitch_max": 1.07, "loop": false,
 		"volume_jitter_db": 1.5, "no_repeat": true},
 	&"delivery_thud": {
 		"paths": ["res://assets/audio/world/delivery_thud.wav"],

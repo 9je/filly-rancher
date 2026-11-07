@@ -1,0 +1,12 @@
+== before (hoof sets as shipped)
+score RMS -24.8 dBFS over 11.9 s
+hoofsteps: 13, median -41.2 dBFS (range -48.9 to -36.4)
+hoofs against the score: -16.4 dB (target -16 to -10)
+== +3 dB
+score RMS -24.8 dBFS over 11.9 s
+hoofsteps: 13, median -36.1 dBFS (range -40.5 to -33.5)
+hoofs against the score: -11.3 dB (target -16 to -10)
+== +2 dB (shipped)
+score RMS -24.8 dBFS over 11.9 s
+hoofsteps: 13, median -39.6 dBFS (range -42.1 to -35.6)
+hoofs against the score: -14.8 dB (target -16 to -10)
