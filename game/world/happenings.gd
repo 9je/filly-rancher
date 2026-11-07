@@ -14,10 +14,12 @@ extends Node
 ##   26  newsletter     Pip photographs the ranch for the Corporation newsletter (a clue)
 ##   30  race_day       the track's first race day (after the Palace is open)
 ##   35  lost_foal      Pip's lost foal: bring her back for a reward
-##   40  collector_visit  a Collector walks up to your fence, writes something down, leaves
+##   40  collector_visit  a Collector in a grey coat walks past your fence, pauses, walks on
 ##   45  starry         two starry Drifters (a rare coat) wander down from the hills
 
 const GeneratorScript := preload("res://systems/pony_generator.gd")
+const AccessoriesScript := preload("res://systems/accessories.gd")
+const PonyPaintScript := preload("res://systems/pony_paint.gd")
 const SIGHTING_FIRST := 13.0 * 60.0
 const SIGHTING_EVERY := 7.0 * 60.0
 const LOST_FOAL_REWARD := 150
@@ -266,16 +268,17 @@ func _collector_visit() -> void:
 	var gone := _ground(-38.0, 26.0)
 	n.global_position = start
 	n.setup(def)
+	_dress_collector(n)
 	n.walk_speed = COLLECTOR_SPEED
 	n.set_mode_walk_to(by_fence)
-	ranch.call("_toast", "A grey stranger with a clipboard is coming along the lane.")
+	# NO NARRATION (PS8 item 56a): the walk-by is shown, never told. The toasts named a coat
+	# and a clipboard he did not have; now he has both and nothing says so.
 	ranch.call("_novelty", "clue", "collector_visit", "A Collector walks past and takes notes")
 	var t := create_tween()
 	t.tween_interval(start.distance_to(by_fence) / COLLECTOR_SPEED + 0.5)
 	t.tween_callback(func() -> void:
 		if is_instance_valid(n):
-			n.act(&"neutral", &"nod")
-			ranch.call("_toast", "He looks over your pens, writes something down, and walks on."))
+			n.act(&"neutral", &"nod"))
 	t.tween_interval(3.5)
 	t.tween_callback(func() -> void:
 		if is_instance_valid(n):
@@ -284,6 +287,18 @@ func _collector_visit() -> void:
 	t.tween_callback(func() -> void:
 		if is_instance_valid(n):
 			n.queue_free())
+
+
+## His grey coat and his clipboard, on his rig, in his own toon.
+static func _dress_collector(n: Node) -> void:
+	var visuals := n.get_node_or_null(^"Visuals")
+	if visuals == null or visuals.get_child_count() == 0:
+		return
+	var body: Node3D = visuals.get_child(0)
+	for id: StringName in [&"collector_coat", &"clipboard"]:
+		var piece: Node3D = AccessoriesScript.wear_kit(body, id)
+		if piece != null and ToonStyler.shading_enabled:
+			PonyPaintScript.paint_piece(piece)
 
 
 ## A brisk walk, not a shuffle.

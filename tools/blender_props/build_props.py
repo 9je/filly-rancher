@@ -429,6 +429,49 @@ def pony_goggles():
     export("pony_goggles")
 
 
+@prop("collector_coat")
+def collector_coat():
+    """The Collector's grey coat (PS8 item 56a), in a pony's own units round her barrel (the model's
+    origin is the barrel's middle): a shell over her back and flanks, open underneath, from the
+    withers to the rump, with a turned-up collar at the neck."""
+    import bmesh
+    bpy.ops.mesh.primitive_cylinder_add(vertices=40, radius=1.0, depth=1.0, location=(0, 0, 0),
+                                        rotation=(math.radians(90), 0, 0))
+    shell = bpy.context.active_object
+    shell.name = "shell"
+    bpy.ops.object.transform_apply(rotation=True)
+    shell.scale = (0.285, 0.98, 0.385)
+    bpy.ops.object.transform_apply(scale=True)
+    bm = bmesh.new()
+    bm.from_mesh(shell.data)
+    caps = [f for f in bm.faces if abs(f.normal.y) > 0.9]
+    bmesh.ops.delete(bm, geom=caps, context="FACES_ONLY")
+    low = [v for v in bm.verts if v.co.z < -0.3]
+    bmesh.ops.delete(bm, geom=low, context="VERTS")
+    bm.to_mesh(shell.data)
+    bm.free()
+    mod = shell.modifiers.new("thick", "SOLIDIFY")
+    mod.thickness = 0.025
+    bpy.ops.object.modifier_apply(modifier="thick")
+    shell = finish(shell, "company_dark")
+    collar = torus("collar", 0.21, 0.06, (0, 0.42, 0.3), "iron", rot=(math.radians(-55), 0, 0))
+    belt = box("belt", (0.6, 0.06, 0.05), (0, 0.05, -0.27), "black", bevel=0.01)
+    buttons = [ball("button%d" % i, 0.02, (0.29, 0.25 - i * 0.16, 0.0), "metal") for i in range(3)]
+    join([shell, collar, belt] + buttons, "collector_coat")
+    export("collector_coat")
+
+
+@prop("clipboard")
+def clipboard():
+    """The Collector's clipboard (PS8 item 56a): a board, a sheet and a steel clip, held flat
+    against the shoulder."""
+    board = box("board", (0.22, 0.02, 0.3), (0, 0, 0), "wood_dark", bevel=0.008)
+    sheet = box("sheet", (0.18, 0.01, 0.24), (0, -0.012, -0.02), "white", bevel=0.002)
+    clip = box("clip", (0.09, 0.03, 0.04), (0, -0.01, 0.14), "metal", bevel=0.008)
+    join([board, sheet, clip], "clipboard")
+    export("clipboard")
+
+
 @prop("patch")
 def patch():
     """Static's Brightsky flank patch: a rounded badge that hides her mark."""

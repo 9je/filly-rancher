@@ -97,13 +97,13 @@ static func apply(body: Node3D, look: PonyLook) -> int:
 	_apply_mark(body, look)
 	var piece: Node3D = AccessoriesScript.wear(body, look.accessory)
 	if piece != null and ToonStylerScript.shading_enabled:
-		_paint_piece(piece)
+		paint_piece(piece)
 	return painted
 
 
 ## A worn piece in her own toon, each surface its model colour with her coat's outline: the
 ## props' style bleached a leather bag to cream beside her coat (render, 2026-11-07).
-static func _paint_piece(piece: Node3D) -> void:
+static func paint_piece(piece: Node3D) -> void:
 	for node: Node in piece.find_children("*", "MeshInstance3D", true, false):
 		var mi: MeshInstance3D = node
 		for i in mi.mesh.get_surface_count():

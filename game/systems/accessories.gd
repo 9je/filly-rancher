@@ -29,6 +29,15 @@ const LIST: Array[Dictionary] = [
 		"bone": "Chest1", "at": Vector3(0.0, 0.84, 0.02), "rot": Vector3(0, 0, 0), "scale": 1.0},
 ]
 
+## STORY KIT, never offered in the creator (PS8 item 56a): the Collector's grey coat, round
+## her barrel, and the clipboard he carries at the shoulder.
+const KIT: Dictionary = {
+	&"collector_coat": {"id": &"collector_coat", "model": "res://assets/models/collector_coat.glb",
+		"bone": "Chest1", "at": Vector3(0.0, 0.83, -0.06), "rot": Vector3.ZERO, "scale": 1.0},
+	&"clipboard": {"id": &"clipboard", "model": "res://assets/models/clipboard.glb",
+		"bone": "Chest2", "at": Vector3(0.33, 0.9, -0.36), "rot": Vector3(0, -80, -10), "scale": 1.0},
+}
+
 
 static func count() -> int:
 	return LIST.size()
@@ -41,24 +50,47 @@ static func label(index: int) -> String:
 ## Put piece `index` on `body` (a donor instance), taking off whatever she wore before; -1
 ## takes it off. Returns the piece, or null when none is worn.
 static func wear(body: Node3D, index: int) -> Node3D:
-	if body == null:
+	take_off(body, NODE_NAME)
+	if index < 0 or index >= LIST.size():
 		return null
-	var sks := body.find_children("*", "Skeleton3D", true, false)
-	if sks.is_empty():
-		return null
-	var sk: Skeleton3D = sks[0]
-	var old := sk.get_node_or_null(NodePath(NODE_NAME))
+	return put_on(body, LIST[index], NODE_NAME)
+
+
+## A story character's own kit (KIT), each piece under its own node so several are worn at
+## once beside the player's one LIST piece. Returns the piece.
+static func wear_kit(body: Node3D, id: StringName) -> Node3D:
+	var node_name := StringName("Kit_" + String(id))
+	take_off(body, node_name)
+	return put_on(body, KIT[id], node_name) if KIT.has(id) else null
+
+
+static func take_off(body: Node3D, node_name: StringName) -> void:
+	var sk := _skeleton(body)
+	if sk == null:
+		return
+	var old := sk.get_node_or_null(NodePath(node_name))
 	if old != null:
 		sk.remove_child(old)
 		old.free()
-	if index < 0 or index >= LIST.size():
+
+
+static func _skeleton(body: Node3D) -> Skeleton3D:
+	if body == null:
 		return null
-	var e: Dictionary = LIST[index]
+	var sks := body.find_children("*", "Skeleton3D", true, false)
+	return null if sks.is_empty() else sks[0]
+
+
+## Entry `e` on `body`'s rig under a BoneAttachment3D named `node_name`.
+static func put_on(body: Node3D, e: Dictionary, node_name: StringName) -> Node3D:
+	var sk := _skeleton(body)
+	if sk == null:
+		return null
 	var bone := sk.find_bone(String(e.bone))
 	if bone < 0 or not ResourceLoader.exists(String(e.model)):
 		return null
 	var attach := BoneAttachment3D.new()
-	attach.name = NODE_NAME
+	attach.name = node_name
 	attach.bone_idx = bone
 	sk.add_child(attach)
 	# A holder between the bone and the model: the model's own root may carry a turn from its
