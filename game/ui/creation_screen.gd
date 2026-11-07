@@ -33,6 +33,7 @@ const CutieMarkScript := preload("res://systems/cutie_mark.gd")
 const MarkStampsScript := preload("res://systems/mark_stamps.gd")
 const MarkPaintScript := preload("res://systems/mark_paint.gd")
 const MarkComposerScript := preload("res://systems/mark_composer.gd")
+const MarkLayoutScript := preload("res://systems/mark_layout.gd")
 const PonySurpriseScript := preload("res://systems/pony_surprise.gd")
 const PonyRegistryScript := preload("res://systems/pony_registry.gd")
 const PonyVisualsScript := preload("res://actors/pony/pony_visuals.gd")
@@ -54,7 +55,7 @@ const MANE_STYLE_LABEL := "Mane style"
 const EYES_LABEL := "Eyes"
 const MARK_LABEL := "Your cutie mark; draw it yourself"
 const CONFIRM_LABEL := "This is me"
-const HINT := "Left click to draw. Pick an ink and a shape to start from, or start with nothing."
+const HINT := "Left click to draw. Click a symbol to stamp it, up to three: drag it to move it, its corner to size it, its top knob to turn it; an ink recolours it."
 
 ## HAIR is appended (not inserted) so LOOK and MARK keep their values; the tabs show it
 ## between them: Your pony, Mane and tail, Your cutie mark.
@@ -606,7 +607,7 @@ func set_step(value: int) -> void:
 		Step.HAIR: ["ManeStyleLabel", "StyleRow", "ManeLabel", "ManeGrid", "Mane2Label",
 			"Mane2Grid", "TailLabel", "TailGrid"],
 		Step.MARK: ["MarkLabel", "MarkCanvas", "HintLabel", "InkRow", "TalentLabel", "TalentGrid",
-			"MotifRow", "StampRow", "ToolRow", "ActionRow"],
+			"ShapeGrid", "ToolRow", "ActionRow"],
 	}
 	for step: int in shown:
 		for n: String in shown[step]:
@@ -961,6 +962,7 @@ func surprise(seed_value: int = -1) -> void:
 ## canvas, ready to draw over.
 var _motif := 0
 var _talent_buttons: Array[TextureButton] = []
+var _shape_buttons: Array[TextureButton] = []
 const ACCENT := Color(1.0, 0.86, 0.42)
 const TALENT_THUMB := 44
 
@@ -972,7 +974,7 @@ func _build_talent_gallery() -> void:
 		return
 	var label := Label.new()
 	label.name = "TalentLabel"
-	label.text = "Or start from a talent"
+	label.text = "Stamp a symbol, up to three"
 	MenuStyleScript.style_label(label, 20, MenuStyleScript.COLOR_INK)
 	column.add_child(label)
 	column.move_child(label, stamps.get_index())
@@ -992,24 +994,43 @@ func _build_talent_gallery() -> void:
 		b.tooltip_text = MarkComposerScript.talent_name(t)
 		b.focus_mode = Control.FOCUS_NONE
 		var talent := t
-		b.pressed.connect(func() -> void: use_talent(talent))
+		# STAMPED, NOT PASTED (PS7 item 3): the talent lands as a stamp she can move, size, turn
+		# and recolour, over whatever she has drawn.
+		b.pressed.connect(func() -> void: stamp_symbol(StringName("talent:" + String(talent))))
 		grid.add_child(b)
 		_talent_buttons.append(b)
-	var motifs := HBoxContainer.new()
-	motifs.name = "MotifRow"
-	motifs.add_theme_constant_override(&"separation", 8)
-	column.add_child(motifs)
-	column.move_child(motifs, stamps.get_index())
-	for i in 3:
-		var m := Button.new()
-		m.text = ["One", "A pair", "Three"][i]
-		m.focus_mode = Control.FOCUS_NONE
-		var which := i
-		m.pressed.connect(func() -> void:
-			_motif = which
-			_refresh_talent_thumbs())
-		_paper_button(m)
-		motifs.add_child(m)
+	# THE TWELVE PLAIN SHAPES beside the talents (MarkLayout.SHAPES). The old one, pair and three
+	# arrangements and the six whole-canvas stamps are gone: a stamp is placed by hand now.
+	var shapes := GridContainer.new()
+	shapes.name = "ShapeGrid"
+	shapes.columns = 12
+	shapes.add_theme_constant_override(&"h_separation", 6)
+	column.add_child(shapes)
+	column.move_child(shapes, stamps.get_index())
+	for sh: StringName in MarkLayoutScript.SHAPES:
+		var b := TextureButton.new()
+		b.name = "Shape_" + String(sh)
+		b.custom_minimum_size = Vector2(TALENT_THUMB, TALENT_THUMB)
+		b.ignore_texture_size = true
+		b.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+		b.tooltip_text = String(sh).capitalize()
+		b.focus_mode = Control.FOCUS_NONE
+		var kind := StringName("shape:" + String(sh))
+		b.pressed.connect(func() -> void: stamp_symbol(kind))
+		shapes.add_child(b)
+		_shape_buttons.append(b)
+	stamps.visible = false
+	var actions := get_node_or_null(^"Layout/Panel/Margin/Column/ActionRow") as HBoxContainer
+	if actions != null and actions.get_node_or_null(^"Remove") == null:
+		var rm := Button.new()
+		rm.name = "Remove"
+		rm.text = "Remove stamp"
+		rm.focus_mode = Control.FOCUS_NONE
+		rm.pressed.connect(func() -> void:
+			if _canvas != null:
+				_canvas.remove_selected())
+		_paper_button(rm)
+		actions.add_child(rm)
 	_refresh_talent_thumbs()
 
 
@@ -1017,9 +1038,21 @@ func _refresh_talent_thumbs() -> void:
 	var ink: Color = _canvas.get("_colour") if _canvas != null and _canvas.get("_colour") is Color else ink_at(0)
 	var talents := MarkComposerScript.talent_ids()
 	for i in mini(_talent_buttons.size(), talents.size()):
-		var img: Image = MarkComposerScript.compose({"talent": talents[i], "motif": _motif, "a": ink, "b": ACCENT})
+		var img: Image = MarkComposerScript.compose({"talent": talents[i], "motif": 0, "a": ink, "b": ACCENT})
 		if img != null:
 			_talent_buttons[i].texture_normal = ImageTexture.create_from_image(img)
+	for i in mini(_shape_buttons.size(), MarkLayoutScript.SHAPES.size()):
+		var st: Dictionary = MarkLayoutScript.new_stamp(StringName("shape:" + String(MarkLayoutScript.SHAPES[i])), ink, ACCENT)
+		st.scale = 0.9
+		_shape_buttons[i].texture_normal = ImageTexture.create_from_image(MarkLayoutScript.compose([st], 64))
+
+
+## Stamp a symbol (a MarkLayout kind) on her mark, selected and ready to move.
+func stamp_symbol(kind: StringName) -> bool:
+	if _canvas == null or not _canvas.add_stamp(kind):
+		return false
+	_sync_mark()
+	return true
 
 
 func use_talent(talent: StringName) -> void:

@@ -182,13 +182,23 @@ static func clear(model: Node3D) -> void:
 ## with one of BONE_NAMES; the model itself otherwise. Reused across calls so applying a new
 ## mark does not leave a trail of empty attachments behind it.
 ## Put her body (the biggest mesh that is not hair, tail, wing or eye) on MARK_LAYER.
+## THE BODY, BY NAME FIRST (PS7, 2026-11-07): the mesh named as the body ("bodies" or "_body"),
+## and only failing that the most vertices among what is left. By vertices alone the PonySFM
+## rig's head won (13,207 against the body's 4,078), so every drawn mark was laid on a head the
+## flank decals never reach, and no player's mark ever showed.
 static func _mark_body(model: Node3D) -> void:
+	for mi: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+		var named := String(mi.name).to_lower()
+		if mi.mesh != null and not named.contains("head") \
+				and (named.contains("bodies") or named.contains("_body")):
+			mi.layers |= MARK_LAYER
+			return
 	var best: MeshInstance3D = null
 	var most := 0
 	for mi: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
 		var n := String(mi.name).to_lower()
 		if mi.mesh == null or n.contains("tail") or n.contains("hair") or n.contains("mane") \
-				or n.contains("wing") or n.contains("eye"):
+				or n.contains("wing") or n.contains("eye") or n.contains("head") or n.contains("horn"):
 			continue
 		var verts := 0
 		for i in mi.mesh.get_surface_count():

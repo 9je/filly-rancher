@@ -181,3 +181,31 @@ func test_the_mark_paints_her_body_and_nothing_else() -> void:
 	assert_eq(bodies, 1, "her body, once")
 	for d: Decal in decals:
 		assert_eq(d.cull_mask, CutieMarkScript.MARK_LAYER)
+
+
+## A DRAWN MARK LANDS ON HER BODY, NOT HER HEAD (PS7, found rendering item 3, 2026-11-07). The
+## decals project only onto the mesh carrying MARK_LAYER, and the mesh picked for it was the
+## one with the most vertices: on the PonySFM rig that is the head (13,207 against the body's
+## 4,078), which never reaches the flanks, so no drawn or stamped mark ever showed on a pony.
+func test_the_mark_layer_goes_on_the_body_mesh() -> void:
+	var reg := preload("res://systems/pony_registry.gd").new()
+	reg.load_all("res://data/ponies")
+	var data: PonyData = reg.by_id(preload("res://systems/stock_palette.gd").IDS[0])
+	var model: Node3D = PonyVisuals.build(data)
+	add_child_autofree(model)
+	var mark := preload("res://systems/mark_paint.gd").orientation_probe()
+	assert_eq(CutieMarkScript.apply(model, mark), 2)
+	var wearers: Array[String] = []
+	for mi: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+		if mi.layers & CutieMarkScript.MARK_LAYER:
+			wearers.append(String(mi.name))
+	assert_eq(wearers.size(), 1, "one mesh takes the mark: %s" % str(wearers))
+	assert_true(wearers.size() == 1 and (wearers[0].to_lower().contains("bodies") or wearers[0].to_lower().contains("_body")) \
+		and not wearers[0].to_lower().contains("head"), "and it is her body, not her head: %s" % str(wearers))
+	# And the decals reach it: each decal's box overlaps the body's box.
+	for mi: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+		if mi.layers & CutieMarkScript.MARK_LAYER:
+			var body_box: AABB = mi.global_transform * mi.get_aabb()
+			for d: Decal in CutieMarkScript.decals_of(model):
+				assert_true(body_box.intersects(AABB(d.global_position - d.size * 0.5, d.size)),
+					"%s reaches her body" % d.name)

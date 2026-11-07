@@ -120,6 +120,15 @@ static func _over(top: Color, under: Color) -> Color:
 static func shape(name: String, p: Vector2) -> float:
 	var q := p - Vector2(0.5, 0.5)
 	match name:
+		# The plain shapes the stamp editor offers beside the talents (systems/mark_layout.gd).
+		"circle":
+			return _circle(q, 0.4)
+		"square":
+			return _box(q, Vector2(0.36, 0.36))
+		"diamond":
+			return (absf(q.x) + absf(q.y) - 0.44) * 0.7071
+		"triangle":
+			return _poly(q, [Vector2(0.0, -0.42), Vector2(0.42, 0.34), Vector2(-0.42, 0.34)])
 		"dot":
 			return _circle(q - Vector2(0.0, 0.0), 0.08)
 		"heart":
