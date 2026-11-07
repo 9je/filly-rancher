@@ -105,6 +105,8 @@ func listed(item: ShopItem) -> bool:
 func refusal(item: ShopItem) -> String:
 	if item == null:
 		return "Nothing to buy."
+	if item.kind == ShopItemScript.Kind.DECOR and bool(decor_provider.call(item.decor_id)):
+		return "You already have that."
 	if not listed(item):
 		if not item.requires_flag.is_empty():
 			return "Not in stock yet."
@@ -123,6 +125,11 @@ func refusal(item: ShopItem) -> String:
 				return "That is not for sale."
 			if owns_permit(item.permit_zone):
 				return "You already hold that permit."
+		ShopItemScript.Kind.DECOR:
+			# Bought at the Market since FS7.1, but refused here until 2026-11-07: there was
+			# no case for it, so every decoration fell through to "Not for sale yet."
+			if String(item.decor_id).is_empty():
+				return "That is not for sale."
 		_:
 			return "Not for sale yet."
 	if not _economy.can_afford(item.cost):

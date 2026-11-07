@@ -28,6 +28,9 @@ const MouseRowsScript := preload("res://ui/mouse_rows.gd")
 const ShopIconScript := preload("res://ui/shop_icon.gd")
 const PaintScript := preload("res://ui/casino_paint.gd")
 const TileStyleScript := preload("res://ui/tile_style.gd")
+const RarityGlyphScript := preload("res://ui/rarity_glyph.gd")
+const HoursIconScript := preload("res://ui/hours_icon.gd")
+const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 
 ## The scroll area's tallest, in 1920 x 1080 base pixels: what is left of the screen once the
 ## title, the tabs, the footer and the Close button have theirs.
@@ -94,6 +97,8 @@ var _detail_name: Label = null
 var _detail_text: Label = null
 var _detail_kind: Label = null
 var _detail_buy: Button = null
+## The permit's ponies (PS9 item 55); hidden for anything that is not a permit.
+var _detail_ponies: HFlowContainer = null
 
 
 func _ready() -> void:
@@ -162,6 +167,12 @@ func _build_detail() -> void:
 	_detail_text.custom_minimum_size = Vector2(700, 0)
 	MenuStyleScript.style_label(_detail_text, 19, MenuStyleScript.COLOR_NAME)
 	words.add_child(_detail_text)
+	_detail_ponies = HFlowContainer.new()
+	_detail_ponies.name = "Ponies"
+	_detail_ponies.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_detail_ponies.add_theme_constant_override(&"h_separation", 8)
+	_detail_ponies.add_theme_constant_override(&"v_separation", 6)
+	words.add_child(_detail_ponies)
 	_detail_buy = Button.new()
 	_detail_buy.name = "Buy"
 	_detail_buy.custom_minimum_size = Vector2(190, 64)
@@ -205,8 +216,90 @@ static func kind_word(item: ShopItem) -> String:
 func detail_state() -> Dictionary:
 	if _detail == null or not _detail.visible:
 		return {}
+	var ponies: Array = []
+	for chip: Control in preview_chips():
+		ponies.append(str(chip.get_meta(&"pony")))
 	return {"name": _detail_name.text, "text": _detail_text.text, "kind": _detail_kind.text,
-		"buy": _detail_buy.text, "can": not _detail_buy.disabled}
+		"buy": _detail_buy.text, "can": not _detail_buy.disabled, "ponies": ponies}
+
+
+## A PERMIT SHOWS ITS PONIES BEFORE YOU BUY IT (PS9, playtest 2026-11-05 item 55: "Each area
+## should show its ponies and their times before you buy"). The chips on the detail strip,
+## rarest first; each carries metas `pony`, `rarity` and `hours`.
+func preview_chips() -> Array[Control]:
+	var out: Array[Control] = []
+	if _detail_ponies != null and _detail_ponies.visible:
+		for c in _detail_ponies.get_children():
+			if not c.is_queued_for_deletion():
+				out.append(c as Control)
+	return out
+
+
+## The hours a pony keeps, in words, from her PonyData.phases (WorldState.Phase values).
+static func hours_word(phases: Array) -> String:
+	if phases.is_empty():
+		return "any time"
+	var names := ["dawn", "day", "dusk", "night"]
+	var words: Array[String] = []
+	for p in phases:
+		if int(p) >= 0 and int(p) < names.size():
+			words.append(names[int(p)])
+	if words.size() <= 1:
+		return "".join(words)
+	return ", ".join(words.slice(0, words.size() - 1)) + " and " + words[-1]
+
+
+func _fill_ponies(item: ShopItem) -> void:
+	for c in _detail_ponies.get_children():
+		c.queue_free()
+	var zone: StringName = item.permit_zone if item.kind == ShopItemScript.Kind.PERMIT else &""
+	_detail_ponies.visible = zone != &""
+	if zone == &"":
+		return
+	var ponies := PonyInstanceScript.get_registry().by_zone(zone)
+	ponies.sort_custom(func(a: PonyData, b: PonyData) -> bool:
+		return a.rarity > b.rarity if a.rarity != b.rarity else a.display_name < b.display_name)
+	for data: PonyData in ponies:
+		_detail_ponies.add_child(_pony_chip(data))
+
+
+func _pony_chip(data: PonyData) -> Control:
+	var chip := PanelContainer.new()
+	chip.name = String(data.id)
+	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var hours := hours_word(data.phases)
+	chip.set_meta(&"pony", data.display_name)
+	chip.set_meta(&"rarity", data.rarity)
+	chip.set_meta(&"hours", hours)
+	var box := StyleBoxFlat.new()
+	box.bg_color = PaintScript.PLUM_DARK
+	box.set_corner_radius_all(14)
+	box.content_margin_left = 8
+	box.content_margin_right = 12
+	box.content_margin_top = 3
+	box.content_margin_bottom = 3
+	if data.rarity >= PonyDataScript.Rarity.RARE:
+		box.border_color = PaintScript.GOLD
+		box.set_border_width_all(2)
+	chip.add_theme_stylebox_override(&"panel", box)
+	var line := HBoxContainer.new()
+	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	line.add_theme_constant_override(&"separation", 6)
+	chip.add_child(line)
+	var glyph := RarityGlyphScript.new()
+	glyph.rarity = data.rarity
+	glyph.colour = PaintScript.GOLD if data.rarity >= PonyDataScript.Rarity.RARE \
+		else MenuStyleScript.COLOR_NAME
+	line.add_child(glyph)
+	var name_label := Label.new()
+	name_label.text = data.display_name
+	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	MenuStyleScript.style_label(name_label, 18, MenuStyleScript.COLOR_NAME)
+	line.add_child(name_label)
+	var when := HoursIconScript.new()
+	when.phases = data.phases
+	line.add_child(when)
+	return chip
 
 
 func _fill_detail() -> void:
@@ -220,6 +313,7 @@ func _fill_detail() -> void:
 	_detail_name.text = item.display_name
 	_detail_kind.text = kind_word(item)
 	_detail_text.text = item.description
+	_fill_ponies(item)
 	var why := shop.refusal(item)
 	_detail_buy.disabled = owned or not why.is_empty()
 	if owned:
