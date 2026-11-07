@@ -379,6 +379,44 @@ static func paper_box() -> StyleBoxFlat:
 	return box
 
 
+## A BUTTON THAT SITS ON PAPER (PS6, G13; batch check of the 2026-11-05 playtest: the welcome
+## letter's Back and the survey's answers were "white on cream, nearly invisible"). The theme's
+## Button is made for the dark menu panels: a 4% white face and white words, which on a sheet
+## of cream is nothing at all. Anything put on a paper panel takes this instead: a face a shade
+## darker than the sheet, an ink edge, ink words, and a gold face under the pointer.
+const PAPER_BUTTON_FACE := Color(0.88, 0.84, 0.74, 1.0)
+const PAPER_BUTTON_EDGE := Color(0.42, 0.36, 0.30, 1.0)
+const PAPER_BUTTON_LIT := Color(1.0, 0.84, 0.48, 1.0)
+
+
+static func paper_button_box(state: StringName) -> StyleBoxFlat:
+	var box: StyleBoxFlat
+	match state:
+		&"hover", &"focus":
+			box = _box(PAPER_BUTTON_LIT, COLOR_INK, 2, BUTTON_RADIUS)
+		&"pressed":
+			box = _box(PAPER_BUTTON_LIT.darkened(0.12), COLOR_INK, 2, BUTTON_RADIUS)
+		&"disabled":
+			box = _box(Color(COLOR_PAPER, 1.0), COLOR_PAPER_EDGE, 2, BUTTON_RADIUS)
+		_:
+			box = _box(PAPER_BUTTON_FACE, PAPER_BUTTON_EDGE, 2, BUTTON_RADIUS)
+	box.content_margin_left = 18.0
+	box.content_margin_right = 18.0
+	box.content_margin_top = 8.0
+	box.content_margin_bottom = 8.0
+	return box
+
+
+static func paper_button(button: Button) -> void:
+	for state: StringName in [&"normal", &"hover", &"pressed", &"focus", &"disabled"]:
+		button.add_theme_stylebox_override(state, paper_button_box(state))
+	for slot: StringName in [&"font_color", &"font_hover_color", &"font_pressed_color",
+			&"font_focus_color", &"font_hover_pressed_color"]:
+		button.add_theme_color_override(slot, COLOR_INK)
+	button.add_theme_color_override(&"font_disabled_color", Color(COLOR_INK, 0.45))
+	button.add_theme_constant_override(&"outline_size", 0)
+
+
 ## THE WOODEN FRAME. Used around the turntable and the cutie mark canvas, which are the two
 ## things on screen that are pictures rather than text.
 static func frame_box() -> StyleBoxFlat:

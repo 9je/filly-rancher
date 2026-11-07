@@ -224,8 +224,9 @@ func test_a_longer_letter_reserves_a_taller_sheet() -> void:
 func test_the_panel_wears_the_paper_box_rather_than_the_navy_one() -> void:
 	var panel := _panel.get_node("Centre/Panel") as PanelContainer
 	var box: StyleBoxFlat = panel.get_theme_stylebox(&"panel") as StyleBoxFlat
-	assert_eq(box.bg_color, MenuStyleScript.COLOR_PAPER,
+	assert_eq(Color(box.bg_color, 1.0), Color(MenuStyleScript.COLOR_PAPER, 1.0),
 		"a letter is paper, not a menu panel")
+	assert_eq(box.bg_color.a, 1.0, "PS6 item 51: nothing behind the sheet shows through it")
 
 
 ## paint() DRAWS THROUGH CanvasItem.draw_*, which Godot only allows inside that item's own
@@ -329,3 +330,76 @@ func test_the_key_that_closed_it_still_closes_it() -> void:
 	event.pressed = true
 	_panel._unhandled_input(event)
 	assert_false(_panel.is_open(), "the mouse was added, the key was not taken")
+
+
+# --- PS6: the owner's playtest of 2026-11-05 ------------------------------------------------
+
+## WCAG relative luminance of an sRGB colour, and the contrast ratio of two.
+func _lum(c: Color) -> float:
+	var ch := func(v: float) -> float:
+		return v / 12.92 if v <= 0.03928 else pow((v + 0.055) / 1.055, 2.4)
+	return 0.2126 * ch.call(c.r) + 0.7152 * ch.call(c.g) + 0.0722 * ch.call(c.b)
+
+
+func _contrast(a: Color, b: Color) -> float:
+	var la := _lum(a)
+	var lb := _lum(b)
+	return (maxf(la, lb) + 0.05) / (minf(la, lb) + 0.05)
+
+
+## The colour a button's face actually shows: its normal box laid over the sheet behind it.
+func _face(button: Button) -> Color:
+	var sheet := Color(MenuStyleScript.COLOR_PAPER, 1.0)
+	var box := button.get_theme_stylebox(&"normal") as StyleBoxFlat
+	if box == null:
+		return sheet
+	return sheet.lerp(Color(box.bg_color, 1.0), box.bg_color.a)
+
+
+## G13 (batch check of PS6): "the paper letters' buttons (the welcome letter's Back, the
+## survey's answer) are white on cream and nearly invisible". Every button on the sheet reads
+## at the WCAG body text ratio, 4.5 to 1, from the colours the theme actually applies, and has
+## a face and an edge that stand off the paper.
+func test_every_button_on_the_sheet_is_ink_on_paper_not_white_on_cream() -> void:
+	var survey := {"sender": "Cloudsdale Weather Corporation",
+		"title": "Employee Appreciation Survey", "body": ["Dear Twilight,", "", "Answer below."],
+		"replies": [{"label": "Trixie", "choice": "a"}, {"label": "Fluttershy", "choice": "b"}]}
+	_panel.open(survey)
+	await get_tree().process_frame
+	var buttons: Array[Button] = [_panel.close_button_node()]
+	buttons.append_array(_panel.reply_buttons())
+	assert_eq(buttons.size(), 3, "Back and one answer per pony")
+	for b: Button in buttons:
+		var ink: Color = b.get_theme_color(&"font_color")
+		var ratio := _contrast(ink, _face(b))
+		assert_gte(ratio, 4.5, "'%s' reads %.2f:1 on its face %s (ink %s)" % [b.text, ratio,
+			_face(b), ink])
+		var hover_ink: Color = b.get_theme_color(&"font_hover_color")
+		var hover := b.get_theme_stylebox(&"hover") as StyleBoxFlat
+		if hover != null:
+			var hover_face := Color(MenuStyleScript.COLOR_PAPER, 1.0).lerp(
+				Color(hover.bg_color, 1.0), hover.bg_color.a)
+			assert_gte(_contrast(hover_ink, hover_face), 4.5, "'%s' under the pointer" % b.text)
+		var box := b.get_theme_stylebox(&"normal") as StyleBoxFlat
+		assert_not_null(box, "'%s' has a drawn face" % b.text)
+		if box != null:
+			assert_gte(box.border_width_bottom, 2, "'%s' has an edge you can see" % b.text)
+			assert_gte(_contrast(box.border_color, MenuStyleScript.COLOR_PAPER), 3.0,
+				"'%s' edge stands off the paper" % b.text)
+
+
+## ITEM 8 (owner, playtest 2026-11-05): "The welcome letter: a text wall". Batch check: "the
+## four steps are still one run-on paragraph". Each numbered step is its own row on the sheet,
+## with its own picture, never run on into the next.
+func test_the_welcome_letters_four_steps_are_four_rows_not_one_paragraph() -> void:
+	_panel.open(_welcome())
+	var steps: Array[Dictionary] = _panel.steps()
+	assert_eq(steps.size(), 4, "catch, pen, collect, sell")
+	var verbs: Array[String] = []
+	for s: Dictionary in steps:
+		verbs.append(String(s.verb))
+		assert_ne(StringName(s.icon), &"", "%s has a picture" % s.verb)
+	assert_eq(verbs, ["CATCH", "PEN", "COLLECT", "SELL"] as Array[String])
+	var marker := RegEx.create_from_string("(^|\\s)\\d\\.\\s")
+	for p: String in _panel.paragraphs():
+		assert_lte(marker.search_all(p).size(), 1, "one step to a paragraph: '%s'" % p)

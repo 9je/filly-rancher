@@ -43,6 +43,7 @@ extends CanvasLayer
 const MenuStyleScript := preload("res://ui/menu_style.gd")
 const MouseRowsScript := preload("res://ui/mouse_rows.gd")
 const PaperPaintScript := preload("res://ui/paper_paint.gd")
+const PlaceSignScript := preload("res://world/place_sign.gd")
 
 ## THE SHEET, IN 1920x1080 BASE PIXELS. The width is the Panel's existing 860 so nothing
 ## about where the letter sits on screen moves; the rest is what turns a column of Labels
@@ -79,7 +80,11 @@ func _ready() -> void:
 	# result was "week". paper_box() is the same warm sheet game/ui/paper_paint.gd draws the
 	# Mail page's stationery on, so the reader and the archive are made of one material.
 	var panel := $Centre/Panel as PanelContainer
-	panel.add_theme_stylebox_override(&"panel", MenuStyleScript.paper_box())
+	# OPAQUE (PS6 item 51): at the box's own 0.97 the HUD's "Post! The flag is up on your
+	# mailbox." toast showed through the sheet as a ghost line beside the survey's answers.
+	var paper := MenuStyleScript.paper_box()
+	paper.bg_color.a = 1.0
+	panel.add_theme_stylebox_override(&"panel", paper)
 	var dim := get_node_or_null(^"Dim") as Control
 	if dim != null:
 		dim.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -104,6 +109,10 @@ func _ready() -> void:
 	$Centre/Panel/Margin/Column.add_child(_replies)
 	_close = MouseRowsScript.close_button(MouseRowsScript.CLOSE_TEXT,
 		func(_index: int) -> void: close())
+	# EVERY BUTTON ON THE SHEET IS INK ON PAPER (PS6, G13): the theme's Button is white words
+	# on a 4% white face, made for the dark menus, and on cream it all but vanished.
+	MenuStyleScript.paper_button(_close)
+	_close.add_theme_font_size_override(&"font_size", MenuStyleScript.font_px(MenuStyleScript.ROW_SIZE))
 	$Centre/Panel/Margin/Column.add_child(_close)
 	visible = false
 
@@ -190,6 +199,7 @@ func _build_replies() -> void:
 		b.text = String(row.get("label", ""))
 		b.focus_mode = Control.FOCUS_NONE
 		b.add_theme_font_size_override(&"font_size", MenuStyleScript.font_px(MenuStyleScript.ROW_SIZE))
+		MenuStyleScript.paper_button(b)
 		var choice := String(row.get("choice", ""))
 		b.pressed.connect(func() -> void: _answer(choice))
 		_replies.add_child(b)
@@ -226,22 +236,146 @@ func paragraphs() -> Array[String]:
 				cur.clear()
 			out.append("")
 			continue
+		# A NUMBERED STEP STARTS ITS OWN PARAGRAPH (PS6 item 8: the welcome letter's four
+		# steps joined into one run on block, "1. CATCH ... 2. PEN ... 3. COLLECT ...").
+		if _step_marker().search(line.strip_edges()) != null and not cur.is_empty():
+			out.append(" ".join(cur))
+			cur.clear()
 		cur.append(line.strip_edges())
 	if not cur.is_empty():
 		out.append(" ".join(cur))
 	return out
 
 
-func _body_height(width: float) -> float:
+## THE LETTER'S HOW-TO, AS STEPS (PS6 item 8; owner: "a text wall"). A paragraph that opens
+## "N. VERB" is a step: {n, verb, head, rest, icon}. `head` is its first sentence with the verb
+## in sentence case ("Catch a pony."), `rest` the remainder, and `icon` the picture its tile
+## wears (the HUD checklist's own Catch, Pen and Sell icons, and a gem for Collect).
+func steps() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for p in paragraphs():
+		var step := _step(p)
+		if not step.is_empty():
+			out.append(step)
+	return out
+
+
+const STEP_ICONS := {"CATCH": &"star", "PEN": &"fence", "COLLECT": &"gem", "SELL": &"coin"}
+const _STEP_PLACE_ICONS := {&"star": PlaceSignScript.Icon.STAR,
+	&"fence": PlaceSignScript.Icon.FENCE, &"coin": PlaceSignScript.Icon.COIN}
+
+static var _marker: RegEx = null
+
+
+static func _step_marker() -> RegEx:
+	if _marker == null:
+		_marker = RegEx.create_from_string("^(\\d+)\\.\\s+([A-Z]{2,})\\b\\s*(.*)$")
+	return _marker
+
+
+func _step(p: String) -> Dictionary:
+	var m := _step_marker().search(p)
+	if m == null:
+		return {}
+	var verb := m.get_string(2)
+	var after := m.get_string(3)
+	var stop := after.find(". ")
+	var head := after if stop < 0 else after.substr(0, stop + 1)
+	var rest := "" if stop < 0 else after.substr(stop + 2).strip_edges()
+	return {"n": int(m.get_string(1)), "verb": verb,
+		"head": (verb.capitalize() + " " + head).strip_edges(), "rest": rest,
+		"icon": STEP_ICONS.get(verb, &"star")}
+
+
+## The step rows' measurements, in base pixels: the picture tile and the gap after a row.
+const STEP_TILE := 56.0
+const STEP_GAP := 12.0
+
+
+## THE BODY, LAID OUT ONCE. Measures when `ci` is null and draws when it is not, so the sheet
+## stage_size() reserves and the sheet paint() fills cannot disagree. Answers the height used.
+func _lay_body(ci: Control, left: float, top: float, width: float) -> float:
 	var font: Font = ThemeDB.fallback_font
-	var h := 0.0
+	var bold: Font = MenuStyleScript.title_font()
+	var y := top
 	for p in paragraphs():
 		if p.is_empty():
-			h += LINE_HEIGHT * 0.6
+			y += LINE_HEIGHT * 0.6
 			continue
-		h += font.get_multiline_string_size(p, HORIZONTAL_ALIGNMENT_LEFT, width,
-			MenuStyleScript.ROW_SIZE).y + LINE_HEIGHT * 0.25
-	return h
+		var step := _step(p)
+		if step.is_empty():
+			if ci != null:
+				ci.draw_multiline_string(font, Vector2(left, y + LINE_HEIGHT * 0.75), p,
+					HORIZONTAL_ALIGNMENT_LEFT, width, MenuStyleScript.ROW_SIZE, -1,
+					MenuStyleScript.COLOR_INK)
+			y += font.get_multiline_string_size(p, HORIZONTAL_ALIGNMENT_LEFT, width,
+				MenuStyleScript.ROW_SIZE).y + LINE_HEIGHT * 0.25
+			continue
+		# A STEP ROW: its picture on a tile, the step in bold beside it, the how-to under that.
+		var text_left := left + STEP_TILE + 18.0
+		var text_width := width - STEP_TILE - 18.0
+		var head := String(step.head)
+		var rest := String(step.rest)
+		var head_h := bold.get_multiline_string_size(head, HORIZONTAL_ALIGNMENT_LEFT,
+			text_width, MenuStyleScript.ROW_SIZE).y
+		var rest_h := 0.0 if rest.is_empty() else font.get_multiline_string_size(rest,
+			HORIZONTAL_ALIGNMENT_LEFT, text_width, MenuStyleScript.FOOTER_SIZE).y + 4.0
+		var row_h := maxf(STEP_TILE, head_h + rest_h)
+		if ci != null:
+			_paint_step_tile(ci, Rect2(left, y + (row_h - STEP_TILE) * 0.5, STEP_TILE,
+				STEP_TILE), StringName(step.icon), int(step.n))
+			var text_top := y + (row_h - head_h - rest_h) * 0.5
+			ci.draw_multiline_string(bold, Vector2(text_left, text_top + LINE_HEIGHT * 0.75),
+				head, HORIZONTAL_ALIGNMENT_LEFT, text_width, MenuStyleScript.ROW_SIZE, -1,
+				MenuStyleScript.COLOR_INK)
+			if not rest.is_empty():
+				ci.draw_multiline_string(font,
+					Vector2(text_left, text_top + head_h + 4.0 + LINE_HEIGHT * 0.65), rest,
+					HORIZONTAL_ALIGNMENT_LEFT, text_width, MenuStyleScript.FOOTER_SIZE, -1,
+					MenuStyleScript.COLOR_INK)
+		y += row_h + STEP_GAP
+	return y - top
+
+
+## One step's tile: the HUD checklist's own white rounded tile and icon, with the step's
+## number on a violet badge at its corner.
+func _paint_step_tile(ci: Control, r: Rect2, icon: StringName, n: int) -> void:
+	var sb := StyleBoxFlat.new()
+	sb.set_corner_radius_all(14)
+	sb.bg_color = Color(1, 1, 1, 0.9)
+	sb.border_color = MenuStyleScript.PAPER_BUTTON_EDGE
+	sb.set_border_width_all(2)
+	ci.draw_style_box(sb, r)
+	var inner := r.grow(-9.0)
+	if _STEP_PLACE_ICONS.has(icon):
+		ci.draw_texture_rect(PlaceSignScript.icon_texture(int(_STEP_PLACE_ICONS[icon])), inner,
+			false)
+	else:
+		_paint_gem(ci, inner)
+	var badge := r.position + Vector2(3.0, 3.0)
+	ci.draw_circle(badge, 11.0, PaperPaintScript.STAMP_INK)
+	ci.draw_string(MenuStyleScript.title_font(), badge + Vector2(-5.0, 6.0), str(n),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color.WHITE)
+
+
+## A gem, the thing a happy pony leaves in her pen: the Market's own cut, in its rare blue.
+static func _paint_gem(ci: Control, box: Rect2) -> void:
+	var c := box.get_center() + Vector2(0.0, box.size.y * 0.04)
+	var r := box.size.x * 0.44
+	var pts := PackedVector2Array([c + Vector2(-r, -r * 0.35), c + Vector2(-r * 0.5, -r * 0.85),
+		c + Vector2(r * 0.5, -r * 0.85), c + Vector2(r, -r * 0.35), c + Vector2(0, r)])
+	var fill := Color(0.45, 0.55, 1.0)
+	ci.draw_colored_polygon(pts, fill)
+	var edge := pts.duplicate()
+	edge.append(pts[0])
+	ci.draw_polyline(edge, fill.darkened(0.45), 2.5, true)
+	ci.draw_line(pts[0], pts[3], fill.darkened(0.45), 2.0, true)
+	ci.draw_line(c + Vector2(-r * 0.35, -r * 0.35), c + Vector2(0, r), Color(1, 1, 1, 0.6),
+		2.0, true)
+
+
+func _body_height(width: float) -> float:
+	return _lay_body(null, 0.0, 0.0, width)
 
 
 # --- the sheet ------------------------------------------------------------------------------
@@ -287,15 +421,7 @@ func paint(ci: Control) -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, text_width, MenuStyleScript.TITLE_SIZE,
 		MenuStyleScript.COLOR_INK)
 	row_top += TITLE_HEIGHT
-	for p in paragraphs():
-		if p.is_empty():
-			row_top += LINE_HEIGHT * 0.6
-			continue
-		ci.draw_multiline_string(font, Vector2(text_left, row_top + LINE_HEIGHT * 0.75), p,
-			HORIZONTAL_ALIGNMENT_LEFT, text_width, MenuStyleScript.ROW_SIZE, -1,
-			MenuStyleScript.COLOR_INK)
-		row_top += font.get_multiline_string_size(p, HORIZONTAL_ALIGNMENT_LEFT, text_width,
-			MenuStyleScript.ROW_SIZE).y + LINE_HEIGHT * 0.25
+	_lay_body(ci, text_left, row_top, text_width)
 
 	# THE SEAL SITS UNDER THE SIGN OFF, bottom right, where a seal goes.
 	var seal := Rect2(box.size.x - SHEET_MARGIN - SEAL_SIZE,
