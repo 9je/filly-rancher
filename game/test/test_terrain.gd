@@ -56,8 +56,12 @@ func test_the_lake_region_is_a_basin_and_the_others_are_not() -> void:
 	var regions: RegionRegistry = terrain.regions
 	var lake: RegionData = regions.by_id(&"lake")
 	var centre_h: float = terrain.height_at(lake.centre.x, lake.centre.y)
-	var rim_h: float = terrain.height_at(lake.centre.x + lake.radius + 5.0, lake.centre.y)
-	assert_lt(centre_h, rim_h - lake.lake_depth * 0.8, "the lake centre sits well below its rim")
+	# A wading pond (item 61; game/test/test_lake_shore.gd has its shore and bank).
+	assert_almost_eq(centre_h, terrain.water_level(lake) - lake.lake_depth, 0.01,
+		"the lake's middle is its bed, a wading depth under the water")
+	var shore: float = TerrainScript.shore_radius(lake) + TerrainScript.LAKE_BANK_OUT
+	assert_lt(centre_h, terrain.height_at(lake.centre.x + shore, lake.centre.y) - 1.0,
+		"and sits well below the top of its bank")
 	var orchard: RegionData = regions.by_id(&"orchard")
 	var raw: float = terrain._raw_height(orchard.centre.x, orchard.centre.y) * terrain._relief_weight(orchard.centre.x, orchard.centre.y)
 	assert_almost_eq(terrain.height_at(orchard.centre.x, orchard.centre.y), raw, 0.001, "a dry region is untouched")

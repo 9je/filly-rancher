@@ -27,7 +27,8 @@ void fragment() {
 	vec3 c = mix(deep.rgb, shallow.rgb, smoothstep(0.35, 0.95, r));
 	// Foam: a ragged band at the rim.
 	float wob = sin(atan(d.y, d.x) * 9.0 + TIME * 0.6) * 0.015;
-	float edge = smoothstep(0.9 + wob, 0.985 + wob, r);
+	// Narrow, so the shore reads as a waterline against the bank rather than a pale ring.
+	float edge = smoothstep(0.95 + wob, 0.995 + wob, r);
 	c = mix(c, foam.rgb, edge * 0.85);
 	// Sparkle bands, drifting.
 	float band = sin(world_pos.x * 0.9 + world_pos.z * 0.35 + TIME * 0.8) * sin(world_pos.z * 1.3 - TIME * 0.5);

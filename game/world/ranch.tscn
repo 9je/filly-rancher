@@ -317,9 +317,9 @@ stock_count = 5
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 60, 0, -62)
 script = ExtResource("4")
 zone_id = &"lake"
-spawn_radius = 18.0
+spawn_radius = 20.5
 spawn_count = 1
-roam_radius = 6.0
+roam_radius = 4.0
 stock_count = 5
 
 [node name="NightMeadow" type="Area3D" parent="Zones"]

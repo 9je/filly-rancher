@@ -43,6 +43,12 @@ const STANDING_STONE_PH := Vector2(1.05, 1.35)
 const GREEN := Color(0.42, 0.66, 0.3)
 const GREEN_DARK := Color(0.2, 0.36, 0.2)
 const GREEN_EVERFREE := Color(0.16, 0.3, 0.2)
+## NO LEAF TINT AT ALL. The parameters' own default, Color(), is opaque BLACK, and _parts()
+## tints a part whenever the colour's alpha is above zero, so a prop placed without a green had
+## every "leaf" or "grass" material painted black: the lake's canoe (its hull is Kenney's
+## leafsFall) and the mossy tops of its shore stones were the black wedges by the water
+## (playtest 2026-11-05 item 61, the PS batch check).
+const NO_TINT := Color(0, 0, 0, 0)
 const WOOD := Color(0.4, 0.27, 0.18)
 const STONE := Color(0.55, 0.57, 0.62)
 
@@ -171,10 +177,10 @@ func _lake(r: RegionData) -> void:
 		_place(r, ["plant_flatTall", "plant_flatShort", "grass_leafsLarge"][_rng.randi() % 3], a, d, Vector2(3.0, 4.6), false, GREEN)
 	for i in 18:
 		_place(r, ["rock_smallFlatA", "rock_smallFlatB", "rock_smallA"][_rng.randi() % 3], _rng.randf() * TAU,
-			water_r * _rng.randf_range(0.95, 1.25), Vector2(1.4, 2.2))
+			water_r * _rng.randf_range(0.95, 1.25), Vector2(1.4, 2.2), false, GREEN)
 	# A canoe on the bank, and a short jetty of planks out over the water.
 	var jetty_a := 0.6
-	_place(r, "canoe", jetty_a + 0.35, water_r * 1.08, Vector2(3.2, 3.2), true)
+	_place(r, "canoe", jetty_a + 0.35, water_r * 1.08, Vector2(3.2, 3.2), true, NO_TINT)
 	for k in 5:
 		var d := water_r * 1.04 - float(k) * 1.1
 		var at := Vector3(r.centre.x + cos(jetty_a) * d, maxf(wy + 0.12, float(height_at.call(r.centre.x + cos(jetty_a) * d, r.centre.y + sin(jetty_a) * d)) + 0.05), r.centre.y + sin(jetty_a) * d)

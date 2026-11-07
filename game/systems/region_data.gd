@@ -19,6 +19,7 @@ extends Resource
 @export var grass_low := Color(0.239, 0.408, 0.196)
 @export var grass_high := Color(0.443, 0.541, 0.271)
 @export var has_lake := false
+## Metres of water over the pond's bed (Terrain: the ground is shaped round it, a wading pond).
 @export var lake_depth := 0.0
 
 ## How crowded this region may be with STOCK ponies: the band a ZoneMarker's own

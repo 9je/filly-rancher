@@ -997,12 +997,16 @@ func _ground_point(marker: ZoneMarker, slot: int) -> Vector3:
 	var space := get_world_3d().direct_space_state
 	var centre := marker.global_position
 	var last := centre
+	# A marker in a lake's middle draws over the dry ring round the water, not the water.
+	var inner := minf(_dry_from(centre), marker.spawn_radius)
 
 	for attempt in range(PLACEMENT_ATTEMPTS):
 		var angle := rng.randf() * TAU
-		var radius := sqrt(rng.randf()) * marker.spawn_radius
+		var radius := sqrt(lerpf(inner * inner, marker.spawn_radius * marker.spawn_radius, rng.randf()))
 		var candidate := centre + Vector3(cos(angle), 0.0, sin(angle)) * radius
 		last = candidate
+		if _dry_from(candidate) > 0.0:
+			continue
 
 		var query := PhysicsRayQueryParameters3D.create(
 			candidate + Vector3.UP * RAY_UP,
@@ -1032,6 +1036,22 @@ func _ground_point(marker: ZoneMarker, slot: int) -> Vector3:
 	# count, so this can never quietly become the normal path.
 	_fallback_placements += 1
 	return Vector3(last.x, centre.y, last.z)
+
+
+## NO PONY IS SET DOWN IN A LAKE (playtest 2026-11-05 item 61). 0 if `point` is out of every
+## lake's water (Terrain.build_water: the "lake_water" group, its "pony_keep_out" radius),
+## else how far from that lake's middle the dry ground starts, which is also how far out a
+## marker standing in the water draws from.
+func _dry_from(point: Vector3) -> float:
+	if not is_inside_tree():
+		return 0.0
+	for water: Node in get_tree().get_nodes_in_group(&"lake_water"):
+		var at := (water as Node3D).global_position
+		var keep_out := float(water.get_meta(&"pony_keep_out", 0.0))
+		var d := Vector2(point.x - at.x, point.z - at.z).length()
+		if d < keep_out:
+			return keep_out - d + 0.75
+	return 0.0
 
 
 func _blocked_by_prop(space: PhysicsDirectSpaceState3D, point: Vector3) -> bool:

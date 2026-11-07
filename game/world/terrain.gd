@@ -200,16 +200,22 @@ var regions: RegionRegistryScript = null:
 	set(value):
 		regions = value
 		_lakes.clear()
+		_bank_tops.clear()
 		if value != null:
 			for region in value.all():
 				if region.has_lake:
 					_lakes.append(region)
+					_bank_tops.append(_mean_relief_round(region.centre, shore_radius(region) + LAKE_BANK_OUT))
 
 var _mesh_instance: MeshInstance3D
 var _collision: CollisionShape3D
 
 ## The subset of `regions` that carries a lake, in registry order. See the setter above.
 var _lakes: Array[RegionDataScript] = []
+## The height of each lake's level ring of grass, the top of its bank, in _lakes' order: the
+## mean of the relief round the bank's top edge, so the levelling moves the ground as little as
+## it can. Worked out once in the setter, read 62,000 times by height_at().
+var _bank_tops: Array[float] = []
 
 
 func _ready() -> void:
@@ -257,18 +263,16 @@ func build() -> void:
 ## Deterministic: no RNG, no noise texture, no per-machine anything. The only input beyond
 ## XZ is `regions`, which is assigned once, before the ground is built, and never again.
 ##
-## A region with a lake in it is a BASIN sunk into the relief: a smooth bowl reaching full
-## depth in the middle and nothing at all by the rim, feathered over the OUTER half of the
-## radius (from half radius out to the rim) so the ground walks down into the water instead
-## of stepping off a shelf. It is
-## subtracted here, in the one function everything else reads, so the mesh, the collider,
-## the props and the water disc all agree about where the bottom is.
+## A region with a lake in it is a POND: the rolling relief is levelled round it to one
+## height (the top of its bank), so its water, which is flat, meets the ground at the same
+## radius on every heading; then a bank falls from that level ring down through the waterline
+## to a bed a wading depth under the water. See _lake_ground(). It is done here, in the one
+## function everything else reads, so the mesh, the collider, the props, the ponies' feet and
+## the water all agree about where the ground is.
 func height_at(x: float, z: float) -> float:
 	var h := _raw_height(x, z) * _relief_weight(x, z)
-	if not _lakes.is_empty():
-		var point := Vector2(x, z)
-		for region in _lakes:
-			h -= region.lake_depth * region.weight_at(point, region.radius * 0.5)
+	for i in _lakes.size():
+		h = _lake_ground(_lakes[i], _bank_tops[i], Vector2(x, z), h)
 	return h
 
 
@@ -356,98 +360,173 @@ func grass_at(x: float, z: float) -> Color:
 	return color.lerp(region.grass_low.lerp(region.grass_high, tone), region.weight_at(point))
 
 
-## A flat, translucent disc of water for a region that has a lake, ready for the caller to
-## parent wherever it keeps its regional scenery (ranch.gd puts it under $Regions).
+## A POND, NOT A DISC LAID ON THE HILLS (playtest 2026-11-05 item 61: "ponies and the player
+## walk under the water; ponies half sunk; grass shows through; no banks"; the PS batch check
+## after the first try: "a flat disc with a lip, no bank, and black wedges by the shore").
 ##
-## A WADING FLOOR WADE_DEPTH under the surface (PT2; playtest 2026-11-05 item 61: "i can walk
-## under the lake", ponies sunk to the ears and grass showing through). The basin is deeper
-## than a pony is tall, so a walker now stands on a shelf the water covers to her knees:
-## wading, never under. It is TERRAIN, so the camera and the hooves treat it as ground.
-## Not a flat disc: the basin is already deeper than the shelf where the water meets it, so a
-## disc's rim stood 0.55 m over the ground, a wall round the whole lake (the endings bot could
-## not reach the Lake pylon, 2026-11-06). The floor is the higher of the basin and the shelf,
-## and the shelf slopes down at WADE_RAMP for its outer WADE_RAMP_IN metres, so she walks in.
-const WADE_DEPTH := 0.35
-const WADE_RAMP := 0.5
-const WADE_RAMP_IN := 2.0
+## The lake used to be a 2.2 m bowl SUBTRACTED from the rolling relief, with a flat disc laid
+## over it at one height. The relief runs 3 m from one side of the lake to the other, so where
+## it ran high the bank stood over the water and cut wedges out of it, where it ran low the
+## disc's rim stood in the air over dry ground, and nowhere did the two meet at a shore. And the
+## ponies stand on height_at(), the bowl, under a wading shelf only the player's collider knew
+## about: sunk to the withers.
+##
+## So the ground is shaped round the water instead. Inside LAKE_BANK_OUT of the shore the
+## relief is levelled to one height (the bank's top), easing back to the hills by
+## LAKE_LEVEL_OUT past the fence. Across the bank the ground falls on one smooth curve from that
+## level, through the waterline at the shore radius, to a flat bed `lake_depth` under the water
+## LAKE_BED_IN inside it. The pond is a wading pond (DECISIONS.md, item 61): knee deep all the
+## way across, so the player walks in to the Lake pylon and nobody is ever under it.
+##
+## The shoreline: SHORE_FRACTION of the region's radius, where the dressing's lily pads, reeds
+## and jetty already stand.
+const SHORE_FRACTION := 0.7
+## Metres inside the shore where the bed levels out.
+const LAKE_BED_IN := 3.0
+## Metres outside the shore where the bank reaches its top.
+const LAKE_BANK_OUT := 4.0
+## Metres past the region's own radius by which the levelled ground is back to the hills.
+const LAKE_LEVEL_OUT := 6.0
+## How far the water sheet runs on under the bank past the shore, so its edge is buried in the
+## ground everywhere rather than ending exactly where the ground meets it.
+const WATER_TUCK := 1.0
+## Metres outside the shore at which a pony is turned back: a one-way fence she cannot see.
+const PONY_SHORE_OUT := 0.5
 
 
+## The shoreline's radius, from the lake's middle.
+static func shore_radius(region: RegionDataScript) -> float:
+	return region.radius * SHORE_FRACTION
+
+
+## The height of the lake's water: on the bank's curve at the shore radius.
+func water_level(region: RegionDataScript) -> float:
+	var i := _lakes.find(region)
+	var top: float = _bank_tops[i] if i >= 0 else height_at(region.centre.x, region.centre.y)
+	return top - _lake_drop(region) * (1.0 - _bank_curve(shore_radius(region), region))
+
+
+## Bed to bank top, metres: the drop that puts the water `lake_depth` over the bed at the shore.
+static func _lake_drop(region: RegionDataScript) -> float:
+	var at_shore := smoothstep(0.0, 1.0, LAKE_BED_IN / (LAKE_BED_IN + LAKE_BANK_OUT))
+	return region.lake_depth / maxf(at_shore, 0.01)
+
+
+## 0 on the bed, 1 at the bank's top, smooth between: one curve through the waterline, so the
+## ground crosses the water at a slope (a crisp shore) rather than running along under it.
+static func _bank_curve(d: float, region: RegionDataScript) -> float:
+	var s := shore_radius(region)
+	return smoothstep(s - LAKE_BED_IN, s + LAKE_BANK_OUT, d)
+
+
+## The ground at `point` given the relief `h` there, shaped round one lake.
+func _lake_ground(region: RegionDataScript, top: float, point: Vector2, h: float) -> float:
+	var d := point.distance_to(region.centre)
+	if d >= region.radius + LAKE_LEVEL_OUT:
+		return h
+	var s := shore_radius(region)
+	var level := 1.0 - smoothstep(s + LAKE_BANK_OUT, region.radius + LAKE_LEVEL_OUT, d)
+	return lerpf(h, top, level) - _lake_drop(region) * (1.0 - _bank_curve(d, region))
+
+
+## The mean of the relief on a circle: the height a lake's bank top is levelled to.
+func _mean_relief_round(centre: Vector2, radius: float) -> float:
+	const N := 48
+	var sum := 0.0
+	for k in N:
+		var a := TAU * float(k) / float(N)
+		var x := centre.x + cos(a) * radius
+		var z := centre.y + sin(a) * radius
+		sum += _raw_height(x, z) * _relief_weight(x, z)
+	return sum / float(N)
+
+
+## The water for a region that has a lake, ready for the caller to parent wherever it keeps
+## its regional scenery (ranch.gd puts it under $Regions): a flat sheet at water_level(), no
+## thicker than paint, running WATER_TUCK on under the bank so its rim is in the ground, and a
+## one-way fence at the shore that turns ponies back (see _pony_shore()). Opaque: nothing on
+## the bed shows through. In the "lake_water" group with its keep-out radius as the meta
+## "pony_keep_out", which the spawner reads so no pony is set down in it.
 func build_water(region: RegionDataScript) -> MeshInstance3D:
-	var mesh := CylinderMesh.new()
-	# The inner 70 percent of the region, so the shore is bare basin rather than the water
-	# running straight up to the fence.
-	mesh.top_radius = region.radius * 0.7
-	mesh.bottom_radius = region.radius * 0.7
-	mesh.height = 0.05
-
-	# The show's water (shaders/water.gdshader): shallows, a foam line, drifting sparkle.
+	var shore := shore_radius(region)
+	# The show's water (shaders/water.gdshader): shallows, a foam line at the shore, sparkle.
 	var mat := ShaderMaterial.new()
 	mat.shader = WaterShader
-	mat.set_shader_parameter(&"radius", region.radius * 0.7)
-	mesh.material = mat
-	mesh.radial_segments = 96
-
+	mat.set_shader_parameter(&"radius", shore)
 	var node := MeshInstance3D.new()
 	node.name = "Water_" + String(region.id)
-	node.mesh = mesh
-	node.position = Vector3(region.centre.x, _surface_y(region), region.centre.y)
+	node.mesh = _water_sheet(shore + WATER_TUCK, 96)
+	node.mesh.surface_set_material(0, mat)
+	node.position = Vector3(region.centre.x, water_level(region), region.centre.y)
 	mat.set_shader_parameter(&"centre", node.position)
 	mat.set_shader_parameter(&"opacity", 1.0)
-	var shelf := StaticBody3D.new()
-	shelf.name = "WadingFloor"
-	shelf.collision_layer = LayersScript.TERRAIN
-	shelf.collision_mask = 0
-	# No splash set exists yet; a lake bed sounds like the mud it is.
-	shelf.set_meta(&"step_surface", &"hoof_dirt")
-	var col := CollisionShape3D.new()
-	col.shape = _wading_floor(node.position, region.radius * 0.7)
-	shelf.add_child(col)
-	node.add_child(shelf)
+	node.add_to_group(&"lake_water")
+	node.set_meta(&"pony_keep_out", shore + PONY_SHORE_OUT)
+	node.add_child(_pony_shore(shore + PONY_SHORE_OUT))
 	return node
 
 
-## The wading floor round `surface` (the water's centre) as a heightfield on a 1 m grid, in
-## metres from the surface: max(basin, shelf), the shelf ramping down near its rim.
-func _wading_floor(surface: Vector3, radius: float) -> HeightMapShape3D:
-	var half := ceili(radius + WADE_RAMP_IN)
-	var n := half * 2 + 1
-	var data := PackedFloat32Array()
-	data.resize(n * n)
-	for iz in n:
-		for ix in n:
-			var lx := float(ix - half)
-			var lz := float(iz - half)
-			var shelf := _shelf_drop(Vector2(lx, lz).length(), radius)
-			var basin := height_at(surface.x + lx, surface.z + lz) - surface.y
-			data[iz * n + ix] = maxf(basin, shelf)
-	var hm := HeightMapShape3D.new()
-	hm.map_width = n
-	hm.map_depth = n
-	hm.map_data = data
-	return hm
+## A flat disc of `radius` in the node's own XZ plane, facing up: a fan of `segments`.
+static func _water_sheet(radius: float, segments: int) -> ArrayMesh:
+	var verts := PackedVector3Array([Vector3.ZERO])
+	var normals := PackedVector3Array([Vector3.UP])
+	for k in segments:
+		var a := TAU * float(k) / float(segments)
+		verts.append(Vector3(cos(a), 0.0, sin(a)) * radius)
+		normals.append(Vector3.UP)
+	var indices := PackedInt32Array()
+	# Centre, then the rim in increasing angle: a right-hand normal pointing DOWN, which is a
+	# Godot front face pointing up (see _build_mesh()'s winding note).
+	for k in segments:
+		indices.append_array([0, 1 + k, 1 + (k + 1) % segments])
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh
 
 
-## The wading floor's height under the surface `r` metres from a lake's middle.
-static func _shelf_drop(r: float, radius: float) -> float:
-	return -WADE_DEPTH - WADE_RAMP * maxf(0.0, r - (radius - WADE_RAMP_IN))
+## A ring of wall at `radius` round the water, on PEN_GATE (in a pony's mask, not the
+## player's: CollisionLayers), FACING OUT. A one-sided concave shape only stops what meets its
+## front, so a pony walking down to the water is stopped on the bank, and a pony that is in the
+## water anyway (dropped there from the beam) walks out through its back. The player and the
+## camera never meet it.
+static func _pony_shore(radius: float) -> StaticBody3D:
+	const SEGMENTS := 72
+	const BELOW := 1.5
+	const ABOVE := 3.0
+	var faces := PackedVector3Array()
+	for k in SEGMENTS:
+		var a0 := TAU * float(k) / float(SEGMENTS)
+		var a1 := TAU * float(k + 1) / float(SEGMENTS)
+		var p0 := Vector3(cos(a0), 0.0, sin(a0)) * radius
+		var p1 := Vector3(cos(a1), 0.0, sin(a1)) * radius
+		var lo0 := p0 + Vector3.DOWN * BELOW
+		var lo1 := p1 + Vector3.DOWN * BELOW
+		var hi0 := p0 + Vector3.UP * ABOVE
+		var hi1 := p1 + Vector3.UP * ABOVE
+		# Right-hand normal inward, so the Godot front face looks out at the bank.
+		faces.append_array([lo0, lo1, hi0, lo1, hi1, hi0])
+	var shape := ConcavePolygonShape3D.new()
+	shape.set_faces(faces)
+	shape.backface_collision = false
+	var body := StaticBody3D.new()
+	body.name = "PonyShore"
+	body.collision_layer = LayersScript.PEN_GATE
+	body.collision_mask = 0
+	var col := CollisionShape3D.new()
+	col.shape = shape
+	body.add_child(col)
+	return body
 
 
-## height_at() in a lake's middle is the BOTTOM of the basin, so the surface is put back most
-## of the way up toward the rim: deep enough to read as water, shallow enough that the basin's
-## own shore is still visible around it.
-func _surface_y(region: RegionDataScript) -> float:
-	return height_at(region.centre.x, region.centre.y) + region.lake_depth * 0.55 - 0.4
-
-
-## Where a hoof lands, world XZ: the ground, or the wading floor over a lake's basin. Anything
-## standing in the water (Act Three's Lake pylon) stands on this, not on the lake bed.
+## Where a hoof lands, world XZ. In the water that is the pond's bed, the same ground everybody
+## stands on: kept as its own name for Act Three's Lake pylon, which stands in the water.
 func walk_height_at(x: float, z: float) -> float:
-	var h := height_at(x, z)
-	for region in _lakes:
-		var r := Vector2(x, z).distance_to(region.centre)
-		if r < region.radius * 0.7 + WADE_RAMP_IN:
-			h = maxf(h, _surface_y(region) + _shelf_drop(r, region.radius * 0.7))
-	return h
+	return height_at(x, z)
 
 
 ## The heightfield as an ArrayMesh.

@@ -1,0 +1,43 @@
+shore radius 16.80 m, water level -0.25, bank top 0.45
+pony Pony06_soarin from 21.8 m
+t 0.5 s pony 21.70 m out (shore 16.80), feet at 0.51, water -0.25
+t 1.0 s pony 21.47 m out (shore 16.80), feet at 0.44, water -0.25
+t 1.5 s pony 21.26 m out (shore 16.80), feet at 0.44, water -0.25
+t 2.0 s pony 21.04 m out (shore 16.80), feet at 0.44, water -0.25
+t 2.5 s pony 20.83 m out (shore 16.80), feet at 0.41, water -0.25
+t 3.0 s pony 20.62 m out (shore 16.80), feet at 0.38, water -0.25
+t 3.5 s pony 20.41 m out (shore 16.80), feet at 0.36, water -0.25
+t 4.0 s pony 20.20 m out (shore 16.80), feet at 0.35, water -0.25
+t 4.5 s pony 19.99 m out (shore 16.80), feet at 0.33, water -0.25
+t 5.0 s pony 19.76 m out (shore 16.80), feet at 0.31, water -0.25
+t 5.5 s pony 19.54 m out (shore 16.80), feet at 0.29, water -0.25
+t 6.0 s pony 19.33 m out (shore 16.80), feet at 0.28, water -0.25
+t 6.5 s pony 19.13 m out (shore 16.80), feet at 0.26, water -0.25
+t 7.0 s pony 18.89 m out (shore 16.80), feet at 0.23, water -0.25
+t 7.5 s pony 18.67 m out (shore 16.80), feet at 0.18, water -0.25
+t 8.0 s pony 18.46 m out (shore 16.80), feet at 0.14, water -0.25
+t 8.5 s pony 18.24 m out (shore 16.80), feet at 0.09, water -0.25
+t 9.0 s pony 17.98 m out (shore 16.80), feet at 0.03, water -0.25
+t 9.5 s pony 17.76 m out (shore 16.80), feet at -0.01, water -0.25
+t 10.0 s pony 17.71 m out (shore 16.80), feet at -0.03, water -0.25
+t 10.5 s pony 17.71 m out (shore 16.80), feet at -0.03, water -0.25
+t 11.0 s pony 17.71 m out (shore 16.80), feet at -0.04, water -0.25
+t 11.5 s pony 17.71 m out (shore 16.80), feet at -0.03, water -0.25
+t 12.0 s pony 17.72 m out (shore 16.80), feet at -0.03, water -0.25
+t 12.5 s pony 17.72 m out (shore 16.80), feet at -0.02, water -0.25
+t 13.0 s pony 17.72 m out (shore 16.80), feet at -0.02, water -0.25
+t 13.5 s pony 17.71 m out (shore 16.80), feet at -0.02, water -0.25
+t 14.0 s pony 17.71 m out (shore 16.80), feet at -0.02, water -0.25
+t 14.5 s pony 17.71 m out (shore 16.80), feet at -0.02, water -0.25
+t 15.0 s pony 17.71 m out (shore 16.80), feet at -0.02, water -0.25
+t 15.5 s pony 17.71 m out (shore 16.80), feet at -0.02, water -0.25
+t 16.0 s pony 17.70 m out (shore 16.80), feet at -0.02, water -0.25
+t 16.5 s pony 17.70 m out (shore 16.80), feet at -0.02, water -0.25
+t 17.0 s pony 17.70 m out (shore 16.80), feet at -0.02, water -0.25
+t 17.5 s pony 17.71 m out (shore 16.80), feet at -0.02, water -0.25
+t 18.0 s pony 17.71 m out (shore 16.80), feet at -0.02, water -0.25
+t 18.5 s pony 17.71 m out (shore 16.80), feet at -0.02, water -0.25
+t 19.0 s pony 17.71 m out (shore 16.80), feet at -0.02, water -0.25
+t 19.5 s pony 17.71 m out (shore 16.80), feet at -0.02, water -0.25
+t 20.0 s pony 17.71 m out (shore 16.80), feet at -0.02, water -0.25
+player 12.30 m out, feet at -0.70, water -0.25 (0.45 deep)

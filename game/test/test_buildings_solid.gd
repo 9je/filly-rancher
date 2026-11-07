@@ -77,7 +77,7 @@ func test_every_lake_holds_a_walker_at_wading_depth() -> void:
 	var space: PhysicsDirectSpaceState3D = ranch.get_world_3d().direct_space_state
 	var lakes := 0
 	for w: Node in ranch.find_children("Water_*", "MeshInstance3D", true, false):
-		if not ((w as MeshInstance3D).mesh is CylinderMesh):
+		if not w.is_in_group(&"lake_water"):
 			continue
 		lakes += 1
 		var top: float = (w as Node3D).global_position.y
@@ -89,7 +89,7 @@ func test_every_lake_holds_a_walker_at_wading_depth() -> void:
 		if not hit.is_empty():
 			var depth := top - float((hit.position as Vector3).y)
 			assert_between(depth, 0.2, 0.5, "%s is waded knee deep (%.2f m), not over her head" % [w.name, depth])
-		var mat := ((w as MeshInstance3D).mesh as CylinderMesh).material as ShaderMaterial
+		var mat := (w as MeshInstance3D).mesh.surface_get_material(0) as ShaderMaterial
 		assert_eq(float(mat.get_shader_parameter(&"opacity")), 1.0, "%s's water is not see-through" % w.name)
 	assert_gt(lakes, 0, "the map has a lake to test")
 
@@ -106,11 +106,11 @@ func test_every_lake_is_walked_into_from_its_shore() -> void:
 	var climb: float = tan(deg_to_rad(40.0))
 	var lakes := 0
 	for w: Node in ranch.find_children("Water_*", "MeshInstance3D", true, false):
-		if not ((w as MeshInstance3D).mesh is CylinderMesh):
+		if not w.is_in_group(&"lake_water"):
 			continue
 		lakes += 1
 		var c: Vector3 = (w as Node3D).global_position
-		var rad: float = ((w as MeshInstance3D).mesh as CylinderMesh).top_radius
+		var rad: float = float(((w as MeshInstance3D).mesh.surface_get_material(0) as ShaderMaterial).get_shader_parameter(&"radius"))
 		var walls := 0
 		for k in 16:
 			var dir := Vector3(cos(TAU * k / 16.0), 0, sin(TAU * k / 16.0))
