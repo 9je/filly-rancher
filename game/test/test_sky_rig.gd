@@ -629,3 +629,18 @@ func test_the_rain_follows_whoever_it_was_told_to() -> void:
 	_rig.step(0.016)
 	assert_almost_eq(rain.global_position.x, -8.0, 0.001, "it goes where she goes")
 	assert_almost_eq(rain.global_position.z, 44.0, 0.001)
+
+
+## A RAINY NIGHT IS NOT MUCH DARKER THAN A CLEAR ONE (PS4 item 40; playtest 2026-11-05: "night
+## plus rain is very dark" [45]). Measured at the owner's spot, rain took a quarter of a clear
+## night's light (mean luminance 0.198 against 0.259). The moon, the fill and the sky each
+## keep at least 90% of the clear night's in rain; a storm is still allowed to be darker.
+func test_rain_at_night_keeps_nine_tenths_of_the_light() -> void:
+	assert_gte(SkyRigScript.light_energy(NIGHT, RAIN), 0.9 * SkyRigScript.light_energy(NIGHT, CLEAR), "moonlight")
+	assert_gte(SkyRigScript.ambient_energy(NIGHT, RAIN), 0.9 * SkyRigScript.ambient_energy(NIGHT, CLEAR), "fill")
+	assert_gte(SkyRigScript.sky_top(NIGHT, RAIN).get_luminance(),
+		0.9 * SkyRigScript.sky_top(NIGHT, CLEAR).get_luminance(), "zenith")
+	assert_lt(SkyRigScript.light_energy(NIGHT, RAIN), SkyRigScript.light_energy(NIGHT, CLEAR),
+		"but rain still dims the night a little")
+	assert_lt(SkyRigScript.light_energy(NIGHT, STORM), SkyRigScript.light_energy(NIGHT, RAIN),
+		"and a storm more")

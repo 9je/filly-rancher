@@ -91,6 +91,9 @@ func _run() -> void:
 		var variants := [["day", WorldStateScript.Phase.DAY, WorldStateScript.Weather.CLEAR]]
 		if bool(pose.get("world", false)):
 			variants.append(["night_rain", WorldStateScript.Phase.NIGHT, WorldStateScript.Weather.RAIN])
+			# The same hour without the rain, the yardstick item 40's luminance check reads
+			# night-in-rain against (playtest 2026-11-05: "night plus rain is very dark").
+			variants.append(["night_clear", WorldStateScript.Phase.NIGHT, WorldStateScript.Weather.CLEAR])
 		for v: Array in variants:
 			await _take(pose, String(v[0]), int(v[1]), int(v[2]))
 	if wanted == 0:

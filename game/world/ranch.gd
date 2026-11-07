@@ -7334,7 +7334,7 @@ func _sky_rig_matches_state(state: WorldState) -> bool:
 	var light: Color = targets.get(SkyRigScript.KEY_LIGHT_COLOR, Color.BLACK)
 	var top: Color = targets.get(SkyRigScript.KEY_SKY_TOP, Color.BLACK)
 	return absf(energy - SkyRigScript.light_energy(phase, weather)) < 0.0001 \
-		and absf(fog - SkyRigScript.fog_density(weather)) < 0.000001 \
+		and absf(fog - SkyRigScript.fog_density(weather, phase)) < 0.000001 \
 		and light.is_equal_approx(SkyRigScript.light_color(phase, weather)) \
 		and top.is_equal_approx(SkyRigScript.sky_top(phase, weather))
 

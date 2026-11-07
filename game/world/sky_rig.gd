@@ -216,6 +216,19 @@ const MIN_AMBIENT_ENERGY := 0.05
 ## screen is asserted on light_energy and on sky_top luminance, which hold in every weather.
 const NIGHT_WEATHER_FLOOR := 0.7
 
+## RAIN AT NIGHT TAKES LITTLE (PS4 item 40; playtest 2026-11-05: "night plus rain is very
+## dark" [45]). Measured at the owner's spot, a rainy night stood at 0.198 mean luminance
+## against a clear night's 0.259: the moon, the fill and the sky each cut by rain on top of
+## the darkest hour. At night, rain keeps this much of each; the cloud's grey is mixed in at
+## NIGHT_RAIN_MIX of its day weight. A storm keeps NIGHT_WEATHER_FLOOR and is darker.
+const NIGHT_RAIN_FLOOR := 0.92
+const NIGHT_RAIN_MIX := 0.25
+
+
+static func _night_rain(phase: int, weather: int) -> bool:
+	return _phase_index(phase) == WorldStateScript.Phase.NIGHT \
+		and _weather_index(weather) == WorldStateScript.Weather.RAIN
+
 ## The rain column: a 14 by 14 metre box of emitters one metre thick, RAIN_HEIGHT above
 ## whoever follow() was given, falling at RAIN_GRAVITY for RAIN_LIFETIME seconds.
 ##
@@ -330,7 +343,10 @@ static func sun_azimuth_degrees(phase: int, progress: float) -> float:
 
 static func light_energy(phase: int, weather: int) -> float:
 	var base: float = PHASE_LIGHT_ENERGY[_phase_index(phase)]
-	return maxf(MIN_LIGHT_ENERGY, base * WEATHER_ENERGY_SCALE[_weather_index(weather)])
+	var scale: float = WEATHER_ENERGY_SCALE[_weather_index(weather)]
+	if _night_rain(phase, weather):
+		scale = maxf(scale, NIGHT_RAIN_FLOOR)
+	return maxf(MIN_LIGHT_ENERGY, base * scale)
 
 
 static func light_color(phase: int, weather: int) -> Color:
@@ -363,8 +379,12 @@ static func ground_bottom(phase: int, weather: int) -> Color:
 ## One base colour put through one weather: mixed toward that weather's cloud, then dimmed.
 static func _weathered(base: Color, phase: int, weather: int) -> Color:
 	var w := _weather_index(weather)
-	return _scaled(base.lerp(cloud_colour(phase, weather), WEATHER_SKY_MIX[w]),
-		WEATHER_SKY_DARKEN[w])
+	var mix: float = WEATHER_SKY_MIX[w]
+	var darken: float = WEATHER_SKY_DARKEN[w]
+	if _night_rain(phase, weather):
+		mix *= NIGHT_RAIN_MIX
+		darken = maxf(darken, NIGHT_RAIN_FLOOR)
+	return _scaled(base.lerp(cloud_colour(phase, weather), mix), darken)
 
 
 ## THE CLOUD THIS WEATHER HANGS IN THIS HOUR. WEATHER_SKY_GREY is a daylight cloud, and a
@@ -401,6 +421,8 @@ static func ambient_energy(phase: int, weather: int) -> float:
 	var scale: float = WEATHER_ENERGY_SCALE[_weather_index(weather)]
 	if p == WorldStateScript.Phase.NIGHT:
 		scale = maxf(scale, NIGHT_WEATHER_FLOOR)
+	if _night_rain(phase, weather):
+		scale = maxf(scale, NIGHT_RAIN_FLOOR)
 	return maxf(MIN_AMBIENT_ENERGY, base * scale)
 
 
@@ -411,11 +433,18 @@ static func ambient_energy(phase: int, weather: int) -> float:
 static func ambient_light_color(phase: int, weather: int) -> Color:
 	var p := _phase_index(phase)
 	var w := _weather_index(weather)
-	return PHASE_AMBIENT_COLORS[p].lerp(cloud_colour(phase, weather), WEATHER_AMBIENT_MIX[w])
+	var mix: float = WEATHER_AMBIENT_MIX[w]
+	if _night_rain(phase, weather):
+		mix *= NIGHT_RAIN_MIX
+	return PHASE_AMBIENT_COLORS[p].lerp(cloud_colour(phase, weather), mix)
 
 
-static func fog_density(weather: int) -> float:
-	return WEATHER_FOG_DENSITY[_weather_index(weather)]
+static func fog_density(weather: int, phase: int = -1) -> float:
+	var d: float = WEATHER_FOG_DENSITY[_weather_index(weather)]
+	# Rain's haze at night is half its day's: at night it only greys the dark (PS4 item 40).
+	if phase >= 0 and _night_rain(phase, weather):
+		d *= 0.5
+	return d
 
 
 ## Drops alive at once. FOG is deliberately dry: it is a thickness, not a downpour.
@@ -568,7 +597,7 @@ func _set_targets_from(state: WorldState) -> void:
 		KEY_GROUND_BOTTOM: ground_bottom(phase, weather),
 		KEY_AMBIENT_ENERGY: ambient_energy(phase, weather),
 		KEY_AMBIENT_COLOR: ambient_light_color(phase, weather),
-		KEY_FOG_DENSITY: fog_density(weather),
+		KEY_FOG_DENSITY: fog_density(weather, phase),
 		KEY_RAIN_AMOUNT: rain_amount(weather),
 	}
 	_has_targets = true

@@ -292,7 +292,7 @@ func _targets_match(phase: int, weather: int) -> bool:
 	var top: Color = targets.get(SkyRigScript.KEY_SKY_TOP, Color.BLACK)
 	var drops := int(targets.get(SkyRigScript.KEY_RAIN_AMOUNT, -1))
 	return absf(energy - SkyRigScript.light_energy(phase, weather)) < ENERGY_EPSILON \
-		and absf(fog - SkyRigScript.fog_density(weather)) < DENSITY_EPSILON \
+		and absf(fog - SkyRigScript.fog_density(weather, phase)) < DENSITY_EPSILON \
 		and light.is_equal_approx(SkyRigScript.light_color(phase, weather)) \
 		and top.is_equal_approx(SkyRigScript.sky_top(phase, weather)) \
 		and drops == SkyRigScript.rain_amount(weather)
