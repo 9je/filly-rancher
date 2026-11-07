@@ -732,7 +732,11 @@ func _fit_scroll() -> void:
 	# The BUY tab gives the detail strip its room, so the whole panel fits a 720 p screen.
 	var cap := SCROLL_MAX if _tab == Tab.SELL else SCROLL_MAX_BUY
 	_scroll.custom_minimum_size.y = minf(_rows.get_combined_minimum_size().y, cap)
-	if _selected >= 0 and _selected < _rows.get_child_count():
+	# The first row is the top (PS10 gap G17): ensure_control_visible on a grid whose layout
+	# had not settled scrolled the Buy tab 256 px past its pick, Hay out of view.
+	if _selected == 0:
+		_scroll.scroll_vertical = 0
+	elif _selected > 0 and _selected < _rows.get_child_count():
 		_scroll.ensure_control_visible(_rows.get_child(_selected) as Control)
 
 

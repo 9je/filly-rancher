@@ -189,3 +189,20 @@ func test_a_refused_purchase_flies_nothing() -> void:
 			_menu.take_row(i)
 			break
 	assert_eq(_menu.find_children("Coin", "", true, false).size(), 0)
+
+
+## THE BUY TAB OPENS AT ITS TOP (PS10 gap G17, found rendering G6): the pick was Hay, row 0,
+## but the grid opened scrolled to Gallop Shoes' row, Hay out of view.
+func test_the_buy_tab_opens_with_its_first_row_in_view() -> void:
+	_menu.open()
+	_menu.set_tab(MarketMenu.Tab.BUY)
+	for i in 30:
+		await wait_frames(1)
+	var scroll := _menu.get_node(^"Centre/Panel/Margin/Column/Scroll") as ScrollContainer
+	assert_eq(_menu.selected_index(), 0)
+	var rows := scroll.get_child(0) as Control
+	var first := rows.get_child(0) as Control
+	var view := scroll.get_global_rect()
+	var r := first.get_global_rect()
+	assert_true(r.position.y >= view.position.y - 1.0 and r.end.y <= view.end.y + 1.0,
+		"row 0 (the pick) is in view: tile %s, view %s, scrolled %d" % [r, view, scroll.scroll_vertical])
