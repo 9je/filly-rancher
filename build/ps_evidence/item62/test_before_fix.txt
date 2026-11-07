@@ -1,0 +1,28 @@
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+RANCH props placed=112 expected=112 shapes=229 missing=-
+[31m    [Failed]:  [0m[0.00000000000000000000] expected to equal [1740.0] +/- [2.0]:  29 minutes at the Depot are 29 minutes of the day, not none
+      at line 52
+RANCH props placed=112 expected=112 shapes=229 missing=-
+RANCH props placed=112 expected=112 shapes=229 missing=-
+[31m    [Failed]:  [0m[1] expected to be >= than [3]:  an hour of play is three cycles, wherever she spent it
+      at line 82
+[31m    [Failed]:  [0mthe first collection has come and gone:
+      at line 84
+[31m    [Failed]:  [0mbefore the first collection the statement says when it comes, not 'passed: 0':
+      at line 93
+[31m    [Failed]:  [0mit names the first one:
+      at line 95
+[31m    [Failed]:  [0m[0.00000000000000000000] expected to equal [1740.0] +/- [2.0]:  29 minutes at the Depot are 29 minutes of the day, not none
+          at line 52
+[31m    [Failed]:  [0m[1] expected to be >= than [3]:  an hour of play is three cycles, wherever she spent it
+          at line 82
+[31m    [Failed]:  [0mthe first collection has come and gone:
+          at line 84
+[31m    [Failed]:  [0mbefore the first collection the statement says when it comes, not 'passed: 0':
+          at line 93
+[31m    [Failed]:  [0mit names the first one:
+          at line 95
+Tests                 4
+Passing Tests         1
+Failing Tests         3

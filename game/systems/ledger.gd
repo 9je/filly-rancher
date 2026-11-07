@@ -375,14 +375,18 @@ func statement_lines(player_name: String, built_plots: int, open_permits: int,
 		UPKEEP_BASE, built_plots, UPKEEP_PER_PLOT, open_permits, UPKEEP_PER_PERMIT])
 	lines.append("Service charge next collection: %d bits" % service_charge())
 	var days := next_cycle - cycle
-	lines.append("Next collection: %s" % ("tomorrow" if days <= 1 else "in %d days" % days))
+	# "Collections passed: 0" read as a counter that never moved (item 62): before the
+	# first one, the statement says when it comes instead.
+	lines.append("%s collection: %s" % ["First" if periods_run == 0 else "Next",
+		"tomorrow" if days <= 1 else "in %d days" % days])
 	# "31 of 2" read as a broken counter (playtest 2026-11-05 item 62): say met or short.
 	if delivered_this_period >= quota:
 		lines.append("Quota met: %d delivered, %d needed" % [delivered_this_period, quota])
 	else:
 		lines.append("Quota: %d more to deliver (%d of %d)" % [quota - delivered_this_period,
 			delivered_this_period, quota])
-	lines.append("Collections passed: %d" % periods_run)
+	if periods_run > 0:
+		lines.append("Collections passed: %d" % periods_run)
 	lines.append("Bits settle the service charges. The principal is settled in stock.")
 	lines.append("You may pay down to %d bits here; thank you for choosing Cloudsdale!"
 		% PRINCIPAL_FLOOR)

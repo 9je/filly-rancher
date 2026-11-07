@@ -1648,6 +1648,8 @@ func _bind_build_menu() -> void:
 ## you cannot get the pointer back from is a menu players close with Alt-F4.
 func _on_menu_opened(_slot: PlotSlot) -> void:
 	get_tree().paused = true
+	_menu_opened_msec = Time.get_ticks_msec()
+	_menu_clock_owed = true
 	_set_cursor_captured(false)
 	_set_hud_overlay(true)
 
@@ -1663,6 +1665,33 @@ func _on_menu_closed() -> void:
 	get_tree().paused = false
 	_set_cursor_captured(true)
 	_set_hud_overlay(false)
+	_catch_up_menu_time()
+
+
+## MENU TIME IS DAY TIME (playtest 2026-11-05 item 62: "still cycle 1 and collections passed
+## 0 after a long session"). A menu pauses the tree, and the world clock ticks in
+## _physics_process, so an evening at the Palace's tables or the Depot's counter used to
+## leave the day where it was: the owner's save had 3392 s of play and 1647 s on the clock,
+## so the first collection never came. The time a menu was up goes back on the clock when it
+## closes, in steps short enough that every phase it crosses still turns over (escapes at
+## night, the cart at dawn, a collection day). Not the pause menu: a pause is a pause. Only
+## for somebody playing, like the clock itself, so a gate's menus never move the world.
+const MENU_CATCH_UP_STEP := 60.0
+var _menu_opened_msec := 0
+var _menu_clock_owed := false
+
+
+func _catch_up_menu_time() -> void:
+	if not _menu_clock_owed:
+		return
+	_menu_clock_owed = false
+	var seconds := float(Time.get_ticks_msec() - _menu_opened_msec) / 1000.0
+	if not _interactive or _world == null:
+		return
+	while seconds > 0.0:
+		var step := minf(seconds, MENU_CATCH_UP_STEP)
+		_world.advance(step)
+		seconds -= step
 
 
 ## THE CONTROL CARD IS NOT ON SCREEN WHILE ANYTHING IS OVER THE WORLD. See game/ui/hud.gd's
@@ -2655,6 +2684,7 @@ func _on_market_opened() -> void:
 
 func _on_pause_opened() -> void:
 	_on_menu_opened(null)
+	_menu_clock_owed = false  # a pause is not day time (item 62)
 	var talk: CanvasLayer = people.get("talk_box") if people != null else null
 	if talk != null and people.is_talking():
 		talk.visible = false
