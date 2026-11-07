@@ -1,0 +1,15 @@
+== tail_frames.gd --ticks (windowed, 144 fps drawn, 60 Hz physics)
+TAIL_SPIKE 0.80
+TAIL_FRAMES jerk/motion 0.312  (motion 1.8790 m over 180 frames)
+SCREEN tail on screen jerk 0.5862 m, motion 1.8790 m
+SCREEN body on screen jerk 0.0001 m, motion 0.0000 m
+== tail_frames.gd --ticks --old (windowed, 144 fps drawn, 60 Hz physics)
+TAIL_SPIKE 1.07
+TAIL_FRAMES jerk/motion 0.451  (motion 1.8983 m over 180 frames)
+SCREEN tail on screen jerk 0.8570 m, motion 1.8983 m
+SCREEN body on screen jerk 0.0001 m, motion 0.0000 m
+== tail_frames.gd  (windowed, 144 fps drawn, 60 Hz physics)
+TAIL_SPIKE 3.94
+TAIL_FRAMES jerk/motion 1.864  (motion 1.9934 m over 432 frames)
+SCREEN tail on screen jerk 3.7167 m, motion 1.9935 m
+SCREEN body on screen jerk 0.0002 m, motion 0.0001 m
