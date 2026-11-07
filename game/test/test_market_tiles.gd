@@ -58,6 +58,33 @@ func test_every_icon_kind_draws_something() -> void:
 		assert_true(ShopIconScript.draws(k), "%s has a drawing" % k)
 
 
+## G14 (batch check of PS6, build/ps_evidence/batch/ui/market_open.png): "several Market decor
+## tiles show blank grey icons". Every tile the Buy tab shows has a picture to draw, and a
+## decoration's is a real picture of the thing: a baked image with something on it.
+func test_every_thing_for_sale_has_a_picture_not_a_blank_disc() -> void:
+	_menu.open()
+	_menu.set_tab(MarketMenu.Tab.BUY)
+	var decor := 0
+	for item: ShopItem in _menu.buy_rows():
+		var k: StringName = ShopIconScript.kind_for(item)
+		assert_true(ShopIconScript.draws(k), "%s (%s) has a picture" % [item.display_name, k])
+		if item.decor_id != &"":
+			decor += 1
+			var tex: Texture2D = ShopIconScript.picture(k)
+			assert_not_null(tex, "%s has a baked picture" % item.display_name)
+			if tex != null:
+				var img := tex.get_image()
+				var solid := 0
+				for y in range(0, img.get_height(), 4):
+					for x in range(0, img.get_width(), 4):
+						if img.get_pixel(x, y).a > 0.5:
+							solid += 1
+				var cells := (img.get_height() / 4) * (img.get_width() / 4)
+				assert_gt(solid, cells / 10, "%s's picture shows something" % item.display_name)
+				assert_lt(solid, cells * 9 / 10, "%s's picture is cut out, not a box" % item.display_name)
+	assert_eq(decor, 12, "all twelve decorations are on sale in this catalogue")
+
+
 func _click(c: Control) -> void:
 	var e := InputEventMouseButton.new()
 	e.button_index = MOUSE_BUTTON_LEFT
