@@ -1,0 +1,43 @@
+LETTER closed by its button
+TALK opened after 13.1 s
+TALK marigold: Welcome, welcome! You must be Twilight. I'm Marigold Mayfair, Cloudsdale Weather Corporation, Regional Liaison. Isn't it
+TALK marigold: And it's yours! Sunny Acres has been empty far too long. The roof leaks a little, but the view is complimentary.
+TALK marigold: You're joining our Wayward Pony Program. The meadows are full of Drifters, sweet ponies who've lost their way. Your job 
+TALK marigold: With this! Your CWC Scoop. Point, hold, and she floats right to you. Totally safe, totally comfy.
+TALK marigold: There's a Drifter grazing just past the gate. Why not say hello? I'll leave you to settle in. Cloudsdale is so glad to h
+TALKS 1 has_scoop true
+ITEM16 step 0 GUIDE goal=mail target=Mailbox dist=6.3 m motes=2
+ITEM16 step 0: reading the mail: true
+LETTER closed by its button
+ITEM16 step 1 GUIDE goal=talk target=Npc_tumble dist=1.7 m motes=0
+ITEM16 step 1: talking to tumble: true
+TALK opened after 0.0 s
+TALK tumble: Hee! You missed! Do it again!
+TALK tumble: You can't scoop me, I'm way too wiggly. Everypony says so.
+TALK tumble: Are you the new pony at the big empty house? Can I come? I know where ALL the ponies hide.
+TALK tumble: Yay! I'm Tumble! I'll point at ponies for you, and you scoop them, and we'll be the best team ever!
+TALKS 1 has_scoop true
+ITEM16 step 2 GUIDE goal=talk target=Npc_fennel dist=5.8 m motes=2
+ITEM16 step 2: talking to fennel: true
+TALK opened after 0.0 s
+TALK fennel: So you're the new one. Fennel. I farm the plot over the hill, since before your roof started leaking.
+TALK fennel: Catch yourself a Drifter and she'll need somewhere to go. That's a pen plot by your porch. Build on it, and let her out 
+TALK fennel: Then feed her what she likes. Every pony has her own favorite, no two alike. Here. My old treat pouch. Toss one where sh
+TALK fennel: Try things. One who loves what you tossed comes trotting, and she'll sit quiet as a lamb in that Scoop of yours. Hay's s
+TALK fennel: A pony who's fed and settled makes gems. A pony who's happy long enough... well. You'll see that too.
+TALKS 1 has_scoop true
+ITEM16 step 3 GUIDE goal=talk target=Npc_pip dist=11.1 m motes=5
+ITEM16 step 3: talking to pip: true
+TALK opened after 0.0 s
+TALK pip: Special delivery! You're Twilight, right? Course you are, there's nopony else up here. I'm Pip. Mail, gossip, emergency 
+TALK pip: This one's from Cloudsdale. They write ever so much. Your welcome pack is in your mailbox by the door. There's a postcar
+TALK pip: See the rainbow over the hills? Cloudsdale makes those. Prettiest thing in the valley, if you ask me.
+TALKS 1 has_scoop true
+ITEM16 step 4 GUIDE goal=talk target=Npc_bramble dist=12.9 m motes=7
+ITEM16 step 4: talking to bramble: true
+TALK opened after 0.0 s
+TALK bramble: A new face! And with gems, I bet. Bramble Butterworth, best stall in Ponyville, also the only one.
+TALK bramble: I buy every gem your ponies make. Shinier ponies make shinier gems, and shinier gems make me a very happy mare.
+TALK bramble: I sell food, seeds, bags, all the good stuff. Bring me gems, take home bits. Simple!
+TALKS 1 has_scoop true
+ITEM16 step 5 GUIDE goal=catch target=Pony21_stock_curious (Pony) dist=7.3 m motes=3

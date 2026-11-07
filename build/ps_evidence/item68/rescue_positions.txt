@@ -1,0 +1,8 @@
+ITEM68 t 0.04 s: inside the Depot true at (-15.784, 0.323778, -3.0)
+ITEM68 out of the Depot at 0.36 s, at (-8.377001, 0.272778, -3.0)
+ITEM68 t 0.36 s: inside the Depot false at (-8.377001, 0.272778, -3.0)
+ITEM68 t 0.70 s: inside the Depot false at (-8.377001, 0.087667, -3.0)
+ITEM68 t 1.03 s: inside the Depot false at (-8.377001, 0.00013, -3.0)
+ITEM68 t 1.36 s: inside the Depot false at (-8.377001, 0.00013, -3.0)
+ITEM68 t 1.68 s: inside the Depot false at (-8.377001, 0.00013, -3.0)
+ITEM68 walked 4.02 m after the rescue

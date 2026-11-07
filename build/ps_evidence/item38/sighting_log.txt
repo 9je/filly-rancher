@@ -1,0 +1,6 @@
+ITEM38 _sighting try 1: false
+ITEM38 _sighting try 2: true
+ITEM38 sighting pony=Vinyl Scratch at (6.287865, 1.26349, 43.38184)
+ITEM38 TOAST Tumble: "Look, look! It's Vinyl Scratch! Follow the sparkles, quick!"
+ITEM38 GUIDE goal=sighting target=Guest01_vinylscratch (Vinyl Scratch) dist=34.8 m motes=12
+ITEM38 trail goes to the sighting: true

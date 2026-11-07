@@ -1,0 +1,22 @@
+ITEM21 pony Pony let go 4.0 m over the grass at (7.0, 4.0, 9.0)
+ITEM21 tick   1: height 4.00 m, vy +0.00 m/s, RumpBounce +0.000
+ITEM21 tick   9: height 3.90 m, vy -1.31 m/s, RumpBounce +0.000
+ITEM21 tick  17: height 3.63 m, vy -2.61 m/s, RumpBounce +0.000
+ITEM21 tick  25: height 3.18 m, vy -3.92 m/s, RumpBounce +0.000
+ITEM21 tick  33: height 2.56 m, vy -5.23 m/s, RumpBounce +0.000
+ITEM21 tick  42: height 1.66 m, vy -6.70 m/s, RumpBounce +0.000
+ITEM21 tick  49: height 0.80 m, vy -7.84 m/s, on floor false, RumpBounce +0.000
+ITEM21 LANDED at physics tick 57
+ITEM21 tick  57: height 0.00 m, vy +0.00 m/s, on floor true, RumpBounce +0.000
+ITEM21 tick  60: height 0.00 m, vy +0.00 m/s, on floor true, RumpBounce -0.127
+ITEM21 tick  68: height 0.00 m, vy +0.00 m/s, on floor true, RumpBounce -0.048
+ITEM21 tick  76: height 0.00 m, vy +0.00 m/s, on floor true, RumpBounce +0.103
+ITEM21 tick  84: height 0.00 m, vy +0.00 m/s, on floor true, RumpBounce -0.077
+ITEM21 tick  92: height 0.00 m, vy +0.00 m/s, on floor true, RumpBounce -0.016
+ITEM21 tick 100: height 0.00 m, vy +0.00 m/s, on floor true, RumpBounce +0.062
+ITEM21 tick 108: height 0.00 m, vy +0.00 m/s, on floor true, RumpBounce -0.050
+ITEM21 tick 116: height 0.00 m, vy +0.00 m/s, on floor true, RumpBounce +0.008
+ITEM21 tick 124: height 0.00 m, vy +0.00 m/s, on floor true, RumpBounce +0.029
+ITEM21 tick 132: height 0.00 m, vy +0.00 m/s, on floor true, RumpBounce -0.033
+ITEM21 tick 140: height 0.00 m, vy +0.00 m/s, on floor true, RumpBounce +0.012
+ITEM21 peak |RumpBounce| 0.127, frames 13

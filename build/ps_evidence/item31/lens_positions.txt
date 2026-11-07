@@ -1,0 +1,9 @@
+ITEM31 step 0 yaw +0 deg: lens (14.32556, 1.609473, -3.0), 0.96 m from the player, 0.25 m off the front wall, inside the Market: false
+ITEM31 step 1 yaw +45 deg: lens (14.32691, 1.67574, -3.749405), 1.26 m from the player, 0.25 m off the front wall, inside the Market: false
+ITEM31 step 2 yaw +90 deg: lens (13.09488, 2.326525, -6.391981), 3.67 m from the player, 1.48 m off the front wall, inside the Market: false
+ITEM31 step 3 yaw +135 deg: lens (10.69408, 2.393353, -4.893475), 3.72 m from the player, 3.88 m off the front wall, inside the Market: false
+ITEM31 step 4 yaw +180 deg: lens (10.19972, 2.393353, -2.3), 3.72 m from the player, 4.38 m off the front wall, inside the Market: false
+ITEM31 step 5 yaw +225 deg: lens (11.68403, 2.393353, -0.116578), 3.72 m from the player, 2.89 m off the front wall, inside the Market: false
+ITEM31 step 6 yaw +270 deg: lens (14.2775, 2.393353, 0.377775), 3.72 m from the player, 0.30 m off the front wall, inside the Market: false
+ITEM31 step 7 yaw +315 deg: lens (14.3269, 1.67574, -2.250595), 1.26 m from the player, 0.25 m off the front wall, inside the Market: false
+ITEM31 lens inside the Market in 0 of 8

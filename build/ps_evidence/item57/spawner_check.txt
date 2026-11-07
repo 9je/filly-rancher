@@ -1,0 +1,14 @@
+ITEM57 mlp_basket at (81.87847, -0.092692, 29.74856): solid true, the spawner refuses a pony here true
+ITEM57 mlp_basket at (81.20327, 0.001907, 35.33913): solid true, the spawner refuses a pony here true
+ITEM57 mlp_basket at (74.2916, 0.758358, 53.91015): solid true, the spawner refuses a pony here true
+ITEM57 mlp_crate at (79.26215, 0.334498, 45.77633): solid true, the spawner refuses a pony here true
+ITEM57 mlp_crate at (64.01741, 0.731798, 52.6542): solid true, the spawner refuses a pony here true
+ITEM57 mlp_crate at (68.81336, 0.771457, 55.32906): solid true, the spawner refuses a pony here true
+ITEM57 saa_hay_pile at (67.94533, 0.154309, 29.20213): solid true, the spawner refuses a pony here true
+ITEM57 saa_hay_pile at (73.43074, 0.803773, 55.49766): solid true, the spawner refuses a pony here true
+ITEM57 saa_hay_pile at (77.18968, 0.105319, 35.2269): solid true, the spawner refuses a pony here true
+ITEM57 props 9 (hay piles 3): solid 9, refused by the spawner 9
+ITEM57 wild ponies 46; nearest any stands to a hay pile's middle: 2.77 m
+ITEM57 marker Orchard (orchard, r 14 m) holds hay: 200 draws
+ITEM57 spawner draws 200 on hay markers: 0 within 1 m of a pile's middle, nearest 1.92 m
+ITEM57 photographing hay (67.94533, 0.154309, 29.20213) with 2 wild ponies within 15 m

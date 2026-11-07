@@ -1,0 +1,11 @@
+ITEM41 t 0.0 s: 4.00 m out from the Depot's front wall, inside: false
+ITEM41 t 0.5 s: 3.08 m out from the Depot's front wall, inside: false
+ITEM41 t 1.0 s: 1.36 m out from the Depot's front wall, inside: false
+ITEM41 t 1.5 s: 0.42 m out from the Depot's front wall, inside: false
+ITEM41 t 2.0 s: 0.42 m out from the Depot's front wall, inside: false
+ITEM41 t 2.5 s: 0.42 m out from the Depot's front wall, inside: false
+ITEM41 t 3.0 s: 0.42 m out from the Depot's front wall, inside: false
+ITEM41 t 3.5 s: 0.42 m out from the Depot's front wall, inside: false
+ITEM41 t 4.0 s: 0.42 m out from the Depot's front wall, inside: false
+ITEM41 t 4.5 s: 0.42 m out from the Depot's front wall, inside: false
+ITEM41 nearest to the front wall 0.42 m

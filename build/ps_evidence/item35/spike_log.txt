@@ -1,0 +1,13 @@
+TALKS 1 has_scoop true
+ITEM35 offered: ["13"]
+ITEM35 before ask 1 offered: ["13"], prompt 'E: ask Spike for a tip'
+ITEM35 ask 1 TOAST: Spike: "Hold right mouse on a pony to scoop her up. The tricky ones wriggle, so keep your aim on her!"
+ITEM35 ask 1 queued: [], Spike asked 1 times, talking false
+ITEM35 before ask 2 offered: ["13", "8"], prompt 'E: talk to Tumble'
+ITEM35 ask 2 TOAST: Spike: "Hold right mouse on a pony to scoop her up. The tricky ones wriggle, so keep your aim on her!"
+ITEM35 ask 2 queued: [], Spike asked 1 times, talking true
+ITEM35 a talk opened before ask 3; talked through
+TALKS 1 has_scoop true
+ITEM35 before ask 3 offered: ["13"], prompt 'E: ask Spike for a tip'
+ITEM35 ask 3 TOAST: Spike: "Every pony has a favorite food. Toss her a treat she loves and watch her glow!"
+ITEM35 ask 3 queued: [], Spike asked 2 times, talking false
