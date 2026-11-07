@@ -1,0 +1,8 @@
+FRAME 0 pitch -0.074 slow 0.45
+FRAME 1 pitch -0.242 slow 0.45
+FRAME 2 pitch 0.056 slow 0.45
+FRAME 3 pitch 0.009 slow 0.45
+FRAME 4 pitch -0.007 slow 0.45
+FRAME 5 pitch 0.000 slow 1.00
+FRAME 6 pitch 0.000 slow 1.00
+FRAME 7 pitch 0.000 slow 1.00

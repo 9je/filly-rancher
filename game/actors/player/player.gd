@@ -228,6 +228,49 @@ const ANIM_BLEND := 0.2
 @export var jump_buffer := 0.12
 ## Landing faster than this (m/s, a jump comes down at about 4) bounces her hindquarters.
 const LAND_BOUNCE_FROM := 3.0
+## A STUMBLE ON A HARD LANDING (PS10 gap G4; FS4.3). A normal jump lands at about 4.2 m/s with
+## the bounce alone; from this fall speed (about a 1.8 m drop) she also pitches forward and
+## back and is slowed for STUMBLE_SECONDS.
+const STUMBLE_FROM := 6.0
+const STUMBLE_SECONDS := 0.55
+const STUMBLE_PITCH := 0.55
+const STUMBLE_SLOW := 0.45
+var _stumble_left := 0.0
+
+
+## How hard a landing at `fall_speed` stumbles her, 0 (not at all) to 1.
+static func stumble_for(fall_speed: float) -> float:
+	if fall_speed < STUMBLE_FROM:
+		return 0.0
+	return clampf(0.5 + (fall_speed - STUMBLE_FROM) / 8.0, 0.0, 1.0)
+
+
+## Pitch her forward and back, and slow her for a moment. The pitch is drawn by
+## _update_facing() from the stumble's own clock (stumble_pitch()), beside the yaw and lean
+## it already sets, so nothing else writing her rotation can flatten it.
+var _stumble_strength := 0.0
+
+
+func stumble(strength: float) -> void:
+	if strength <= 0.0 or visuals == null:
+		return
+	_stumble_left = STUMBLE_SECONDS
+	_stumble_strength = strength
+
+
+## Her forward pitch (radians, negative is nose down) `left` seconds before a stumble of
+## `strength` ends: a quick dip, then a wobble back to straight.
+static func stumble_pitch(left: float, strength: float) -> float:
+	if left <= 0.0 or strength <= 0.0:
+		return 0.0
+	var u := 1.0 - left / STUMBLE_SECONDS
+	var f := sin(u / 0.22 * PI * 0.5) if u < 0.22 else exp(-5.0 * (u - 0.22)) * cos(8.0 * (u - 0.22))
+	return -STUMBLE_PITCH * strength * f
+
+
+## The share of her speed a stumble leaves her (1.0 when she is not stumbling).
+func stumble_slow() -> float:
+	return STUMBLE_SLOW if _stumble_left > 0.0 else 1.0
 
 @export_group("Character")
 ## The base record the player's body is built from. A HIDDEN record
@@ -634,6 +677,8 @@ func _physics_process(delta: float) -> void:
 	var top_speed := (SNEAK_SPEED if is_sneaking() else RUN_SPEED) * speed_mult
 	if is_sprinting():
 		top_speed *= SPRINT_MULT
+	top_speed *= stumble_slow()
+	_stumble_left = maxf(0.0, _stumble_left - delta)
 	var target_velocity := direction * (top_speed * wish_magnitude)
 
 	var rate := acceleration if wish_magnitude > 0.0 else deceleration
@@ -648,6 +693,7 @@ func _physics_process(delta: float) -> void:
 	# A hard landing is slapstick: her hindquarters bounce (actors/pony/rump_bounce.gd).
 	if not on_floor and is_on_floor() and fall_speed > LAND_BOUNCE_FROM:
 		RumpBounce.kick_on(visuals, clampf(fall_speed / 7.0, 0.3, 1.2))
+		stumble(stumble_for(fall_speed))
 
 	var ground_speed := get_ground_speed()
 	_update_facing(direction, delta)
@@ -707,6 +753,8 @@ func _update_facing(direction: Vector3, delta: float) -> void:
 	if delta > 0.0:
 		visuals.rotation.z = _gait_blend.lean(angle_difference(before, visuals.rotation.y) / delta,
 			get_ground_speed(), delta)
+	# A hard landing's stumble (G4).
+	visuals.rotation.x = stumble_pitch(_stumble_left, _stumble_strength)
 
 
 ## Turn her to face world heading `yaw` (radians, -Z forward) at once, with no smoothing: for

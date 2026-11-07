@@ -84,7 +84,7 @@ Liked and kept (checked in PS6): the rare capture neigh; the half-lidded look (6
 | G1 | FS1.4: hovering a lesson chip shows its sentence as a tooltip. | -- | PS10 | OPEN |  |  |  |
 | G2 | FS2.2: the ground's fine painted grain, darker grass at prop and fence bases. | -- | PS10 | OPEN |  |  |  |
 | G3 | FS3.1: a hungry pony is SAD (with item 64). | -- | PS10 | FIXED-UNREVIEWED | Done with item 64 (a10c495): pony.gd _update_mood gives a penned pony who looks_hungry() the SAD face (not over a fright), and the hay bubble over her. Test: test_pantry_shown (asserts SAD when hungry, and not SAD once fed). Renders: build/ps_evidence/item64/ |  |  |
-| G4 | FS4.3: a stumble when the player lands hard. | -- | PS10 | OPEN |  |  |  |
+| G4 | FS4.3: a stumble when the player lands hard. | -- | PS10 | FIXED-UNREVIEWED | Missing entirely: a hard landing only bounced. Now a landing at 6 m/s or more (about a 1.8 m drop; a normal jump lands at 4.2 and only bounces) also pitches her nose down up to 0.55 rad and back in a wobble, drawn by _update_facing from the stumble clock (a tween on rotation.x was flattened to 0.11 rad), and slows her to 45% for 0.55 s (player.gd stumble_for, stumble, stumble_pitch, stumble_slow). Test: test_player_stumble. Render, a 2.5 m drop from the side: build/ps_evidence/itemG4/stumble_strip.png (frame 3: nose down) and stumble_frames.txt |  |  |
 | G5 | FS5.2: Market and Depot music contexts; the duck at 4 dB. | -- | PS10 | OPEN |  |  |  |
 | G6 | FS6.1: tiles stagger in 30 ms apart; a purchase flies a coin to the wallet. | -- | PS10 | OPEN |  |  |  |
 | G7 | FS6.2: the Depot pays out per tile with a counter sound; the total lands on the balance. | -- | PS10 | OPEN |  |  |  |
