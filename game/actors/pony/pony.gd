@@ -112,6 +112,7 @@ const PonyTraitsScript := preload("res://systems/pony_traits.gd")
 const PonyLodScript := preload("res://actors/pony/pony_lod.gd")
 const GaitScript := preload("res://systems/gait.gd")
 const LayersScript := preload("res://world/collision_layers.gd")
+const NeedsScript := preload("res://systems/needs.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const PonyVisualsScript := preload("res://actors/pony/pony_visuals.gd")
 const PlayerScript := preload("res://actors/player/player.gd")
@@ -1134,6 +1135,7 @@ const COY_RADIUS := 16.0
 
 
 func _update_mood() -> void:
+	_show_hunger(looks_hungry())
 	var face := _face_ref()
 	if face == null:
 		return
@@ -1147,9 +1149,84 @@ func _update_mood() -> void:
 				face.mood = PonyFace.Mood.COY
 		_:
 			face.mood = PonyFace.Mood.NEUTRAL
+	# Hungry in her pen, she looks it (PS9 item 64; FS3.1's missing part). Not over a fright.
+	if state != State.FLEE and state != State.HELD and looks_hungry():
+		face.mood = PonyFace.Mood.SAD
 	# A resting face (Detail past FULL) is told once, rather than left where it stopped.
 	if face.mood != was and not face.active:
 		face.settle()
+
+
+## THE HUNGER BUBBLE (PS9 item 64): her face alone said too little from across a pen (renders,
+## 2026-11-07), so a hungry resident wears a cream bubble with a hay bale in it, the same
+## shape as a townspony's news bubble, gone the moment she is fed.
+static var _hunger_tex: ImageTexture
+var _hunger_bubble: Node3D
+
+
+func _show_hunger(on: bool) -> void:
+	if not on:
+		if _hunger_bubble != null:
+			_hunger_bubble.visible = false
+		return
+	if _hunger_bubble == null:
+		_hunger_bubble = _make_hunger_bubble()
+		add_child(_hunger_bubble)
+	_hunger_bubble.position = Vector3(0.0, 2.45 * absf(visuals.scale.y), 0.0)
+	_hunger_bubble.visible = true
+
+
+func hunger_bubble_shown() -> bool:
+	return _hunger_bubble != null and _hunger_bubble.visible
+
+
+static func _make_hunger_bubble() -> Node3D:
+	if _hunger_tex == null:
+		var n := 96
+		var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+		img.fill(Color(0, 0, 0, 0))
+		var cream := Color(1.0, 0.96, 0.86)
+		var rim := Color(0.45, 0.25, 0.55)
+		var straw := Color(0.96, 0.78, 0.32)
+		var band := Color(0.7, 0.5, 0.18)
+		var c := Vector2(48, 42)
+		for y in n:
+			for x in n:
+				var p := Vector2(x + 0.5, y + 0.5)
+				var d := p.distance_to(c)
+				var tail := y > 70 and y < 92 and absf(x - 48.0) < (92.0 - y) * 0.45
+				if d < 38.0 or tail:
+					img.set_pixel(x, y, cream)
+				if (d >= 38.0 and d < 42.0 and y < 74) or (tail and absf(x - 48.0) >= (92.0 - y) * 0.45 - 2.5):
+					img.set_pixel(x, y, rim)
+				# A hay bale: a straw block with two bands.
+				if x >= 26 and x < 70 and y >= 28 and y < 58:
+					var edge := x < 28 or x >= 68 or y < 30 or y >= 56
+					img.set_pixel(x, y, band if edge or absf(x - 40.0) < 1.5 or absf(x - 56.0) < 1.5 else straw)
+		img.generate_mipmaps()
+		_hunger_tex = ImageTexture.create_from_image(img)
+	var q := MeshInstance3D.new()
+	q.name = "HungerBubble"
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.6, 0.6)
+	q.mesh = quad
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	m.albedo_texture = _hunger_tex
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	q.material_override = m
+	q.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return q
+
+
+## A resident past Needs.HUNGRY_THRESHOLD: the pantry has nothing for her, or she is about to eat.
+func looks_hungry() -> bool:
+	if not is_in_group(&"penned"):
+		return false
+	var inst = get_instance() if has_method("get_instance") else null
+	return inst != null and inst.hunger >= NeedsScript.HUNGRY_THRESHOLD
 
 
 ## A calm pony, not a shy one, who has the player in sight and not too close.

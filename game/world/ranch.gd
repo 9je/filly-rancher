@@ -5226,6 +5226,7 @@ func _physics_process(delta: float) -> void:
 	enforce_palace_ban()
 	_update_gate_prompt()
 	_update_sound_zone()
+	_update_pantry_chip(delta)
 	if _game_state == null:
 		return
 	var house := get_node_or_null(^"Buildings/Farmhouse") as Node3D
@@ -8636,6 +8637,44 @@ func ask_spike() -> bool:
 	_toast("Spike: \"%s\"" % SpikeTipsScript.pick(spike_state(), _spike_asks))
 	_spike_asks += 1
 	return true
+
+
+## THE HUD'S PANTRY ROW (PS9 item 64), twice a second: the feed in stock and the hungry
+## residents, or hidden (-1) before there is a pen to feed.
+var _pantry_clock := 0.0
+
+
+func _update_pantry_chip(delta: float) -> void:
+	_pantry_clock -= delta
+	var hud := get_node_or_null(^"HUD")
+	if _pantry_clock > 0.0 or hud == null or not hud.has_method("set_pantry"):
+		return
+	_pantry_clock = 0.5
+	var counts := pantry_counts()
+	hud.set_pantry(counts.x, counts.y)
+
+
+## (food items in the pantry, hungry residents); x is -1 while no pen is built.
+func pantry_counts() -> Vector2i:
+	var pens := 0
+	var hungry := 0
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen == null:
+			continue
+		pens += 1
+		for inst: PonyInstance in pen.ponies():
+			if inst.hunger >= NeedsScript.HUNGRY_THRESHOLD:
+				hungry += 1
+	if pens == 0:
+		return Vector2i(-1, 0)
+	var inv: Inventory = _current_inventory()
+	var food := 0
+	if inv != null:
+		for id: StringName in inv.ids():
+			if NeedsScript.resolve_food(id) != null:
+				food += inv.count(id)
+	return Vector2i(food, hungry)
 
 
 ## What Spike's tips read (SpikeTips' keys).

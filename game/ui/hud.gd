@@ -80,6 +80,7 @@ const MagicBeamScript := preload("res://actors/player/magic_beam.gd")
 const InputDeviceScript := preload("res://systems/input_device.gd")
 const MenuStyleScript := preload("res://ui/menu_style.gd")
 const CatchCardScript := preload("res://ui/catch_card.gd")
+const PantryIconScript := preload("res://ui/pantry_icon.gd")
 const ShopIconScript := preload("res://ui/shop_icon.gd")
 
 ## Radius of the reticle ring, in (1920x1080-base) pixels. Small: it has to mark a point
@@ -276,6 +277,7 @@ func _ready() -> void:
 	MenuStyleScript.style_label(_toast, 40, Color(1.0, 0.96, 0.86, 1.0))
 
 	_bag_title.text = "SADDLEBAG"
+	_build_pantry()
 	_build_hints()
 	# I7, final-review.md I5: THE CARD IS THE PRE-BRANCH DEFAULT -- visible on a fresh
 	# interactive game until dismissed with H. `_hints_wanted` starting true is not enough
@@ -873,6 +875,75 @@ func _ring(centre: Vector2, radius: float, color: Color, width: float) -> void:
 
 ## The wallet line under the saddlebag. Driven by ranch.gd off Economy.bits_changed, so
 ## it repaints on a change and never per frame.
+## THE PANTRY, SHOWN (PS9, playtest 2026-11-05 item 64: "Feeding is automatic from the
+## pantry, and nothing says so; show the pantry stock and the hungry state"). A row under the
+## bits: a bale, the word, the food in stock, and when anypony penned is hungry a sad face and
+## how many. Warm red when hungry ponies meet an empty pantry: they cannot eat.
+## On the cream bag card, so the card's own inks (_restyle), not the white of the old HUD.
+const PANTRY_WARN := Color(0.76, 0.2, 0.14)
+var _pantry: HBoxContainer
+var _pantry_food: Label
+var _pantry_hungry: Label
+var _pantry_face: Control
+var _pantry_warn := false
+
+
+func _build_pantry() -> void:
+	_pantry = HBoxContainer.new()
+	_pantry.name = "Pantry"
+	_pantry.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_pantry.add_theme_constant_override(&"separation", 8)
+	_pantry.visible = false
+	$Bag.add_child(_pantry)
+	$Bag.move_child(_pantry, _bits.get_index() + 1)
+	var bale := PantryIconScript.new()
+	bale.kind = &"bale"
+	_pantry.add_child(bale)
+	var word := Label.new()
+	word.text = "Pantry"
+	word.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	MenuStyleScript.style_label(word, 18, INK_SOFT)
+	word.add_theme_constant_override(&"outline_size", 0)
+	_pantry.add_child(word)
+	_pantry_food = Label.new()
+	_pantry_food.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	MenuStyleScript.style_label(_pantry_food, 22, INK)
+	_pantry_food.add_theme_constant_override(&"outline_size", 0)
+	_pantry.add_child(_pantry_food)
+	_pantry_face = PantryIconScript.new()
+	_pantry_face.kind = &"hungry"
+	_pantry.add_child(_pantry_face)
+	_pantry_hungry = Label.new()
+	_pantry_hungry.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	MenuStyleScript.style_label(_pantry_hungry, 22, INK)
+	_pantry_hungry.add_theme_constant_override(&"outline_size", 0)
+	_pantry.add_child(_pantry_hungry)
+
+
+## `food` items of feed in the pantry and `hungry` penned ponies; `food` below zero hides the
+## row (no pen yet, nothing to feed).
+func set_pantry(food: int, hungry: int) -> void:
+	if _pantry == null:
+		return
+	_pantry.visible = food >= 0
+	_pantry_food.text = str(maxi(0, food))
+	_pantry_face.visible = hungry > 0
+	_pantry_hungry.visible = hungry > 0
+	_pantry_hungry.text = str(hungry) if hungry > 0 else ""
+	_pantry_warn = hungry > 0 and food <= 0
+	var c := PANTRY_WARN if _pantry_warn else INK
+	_pantry_food.add_theme_color_override(&"font_color", c)
+	_pantry_hungry.add_theme_color_override(&"font_color", c)
+
+
+## The pantry row as read: {visible, food, hungry, warn}.
+func pantry_state() -> Dictionary:
+	if _pantry == null:
+		return {"visible": false, "food": "", "hungry": "", "warn": false}
+	return {"visible": _pantry.visible, "food": _pantry_food.text,
+		"hungry": _pantry_hungry.text if _pantry_hungry.visible else "", "warn": _pantry_warn}
+
+
 func set_bits(total: int) -> void:
 	_bits.text = "%d bits" % maxi(0, total)
 
