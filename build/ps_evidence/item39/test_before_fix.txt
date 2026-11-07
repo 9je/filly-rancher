@@ -1,0 +1,32 @@
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+RANCH props placed=112 expected=112 shapes=229 missing=-
+[31m    [Failed]:  [0mARRAY(["bonbon x2"]) != ARRAY([]).
+      at line 128
+RANCH props placed=112 expected=112 shapes=229 missing=-
+[31m    [Failed]:  [0mExpected [Guest01_lotusblossom:<CharacterBody3D#1134576017769>(pony.gd)] to be NULL:  no second lotusblossom next to the first
+      at line 160
+[31m    [Failed]:  [0mARRAY(["lotusblossom x2"]) != ARRAY([]).
+      at line 161
+RANCH props placed=112 expected=112 shapes=229 missing=-
+[31m    [Failed]:  [0mExpected [Guest01_sweetiebelle:<CharacterBody3D#1564710284108>(pony.gd)] to be NULL:  no wild Sweetie Belle while hers is in the bag
+      at line 173
+RANCH props placed=112 expected=112 shapes=229 missing=-
+[31m    [Failed]:  [0mlotusblossom, walking off and still catchable, is not drawn a second time
+      at line 184
+[31m    [Failed]:  [0mARRAY(["bonbon x2"]) != ARRAY([]).
+          at line 128
+[31m    [Failed]:  [0mExpected [Guest01_lotusblossom:<CharacterBody3D#1134576017769>(pony.gd)] to be NULL:  no second lotusblossom next to the first
+          at line 160
+[31m    [Failed]:  [0mARRAY(["lotusblossom x2"]) != ARRAY([]).
+          at line 161
+[31m    [Failed]:  [0mExpected [Guest01_sweetiebelle:<CharacterBody3D#1564710284108>(pony.gd)] to be NULL:  no wild Sweetie Belle while hers is in the bag
+          at line 173
+[31m    [Failed]:  [0mlotusblossom, walking off and still catchable, is not drawn a second time
+          at line 184
+Tests                 4
+Passing Tests      none
+Failing Tests         4
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 4 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)

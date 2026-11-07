@@ -504,11 +504,13 @@ func _owned() -> Dictionary:
 	return out
 
 
+## WALKING OFF COUNTS (playtest 2026-11-05 item 39). A pony leaving the map can still be
+## caught until she is gone, so a refresh that struck out only the ones staying could draw
+## her again as the next hour's newcomer while she was still there, and two of her stood in
+## the grass at once (a seeded ten-night run drew a second Bon Bon this way).
 func _standing_ids() -> Dictionary:
 	var ids := _owned()
 	for pony in get_spawned():
-		if pony.is_leaving():
-			continue
 		var data: PonyData = pony.get_data()
 		if data != null:
 			ids[data.id] = true
@@ -948,8 +950,14 @@ func _spawn_one(data: PonyData, marker: ZoneMarker, slot: int,
 ## sighting, a sun shower), built exactly as _spawn_one builds a marker's pony and tracked
 ## the same way, so the Scoop, the pens and the HUD treat her like any other wild pony.
 ## She belongs to no marker, so refresh() never evicts her.
+##
+## NEVER A SECOND OF ANYBODY (playtest 2026-11-05 item 39): a named guest the player already
+## owns, or who is already standing on the map, is refused (null), the same rule the herd's
+## own draw keeps. Drifters (stock) repeat freely, as the crowd always has.
 func spawn_guest(data: PonyData, look: Dictionary, at: Vector3, roam: float = 7.0) -> CharacterBody3D:
 	if data == null:
+		return null
+	if not StockPaletteScript.is_stock_id(data.id) and _standing_ids().has(data.id):
 		return null
 	var pony: CharacterBody3D = PonyScene.instantiate()
 	_guest_count += 1
