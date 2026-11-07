@@ -43,7 +43,7 @@ const STANDING_STONE_PH := Vector2(1.05, 1.35)
 const GREEN := Color(0.42, 0.66, 0.3)
 const GREEN_DARK := Color(0.2, 0.36, 0.2)
 const GREEN_EVERFREE := Color(0.16, 0.3, 0.2)
-## NO LEAF TINT AT ALL. The parameters' own default, Color(), is opaque BLACK, and _parts()
+## NO LEAF TINT AT ALL, and every placing function's default. Color() is opaque BLACK, and _parts()
 ## tints a part whenever the colour's alpha is above zero, so a prop placed without a green had
 ## every "leaf" or "grass" material painted black: the lake's canoe (its hull is Kenney's
 ## leafsFall) and the mossy tops of its shore stones were the black wedges by the water
@@ -156,7 +156,7 @@ func _night_meadow(r: RegionData) -> void:
 	var stones := ["stone_tallA", "stone_tallB", "stone_tallC", "stone_tallD", "stone_tallE"]
 	for i in 9:
 		var a := TAU * float(i) / 9.0
-		_place(r, stones[i % stones.size()], a, 5.5, STANDING_STONE_PH * PH, true, Color(), false, true, true)
+		_place(r, stones[i % stones.size()], a, 5.5, STANDING_STONE_PH * PH, true, NO_TINT, false, true, true)
 	for i in 22:
 		_tree(r, ["tree_pineRoundC", "tree_pineTallB_detailed"][_rng.randi() % 2], _rng.randf() * TAU, r.radius * _rng.randf_range(0.95, 1.4), _ph(MEADOW_TREE_PH), GREEN_DARK)
 
@@ -239,7 +239,7 @@ func _tree(r: RegionData, model: String, a: float, d: float, h: float, leaves: C
 
 
 func _scatter(r: RegionData, models: Array, n: int, inner: float, outer: float, scale: Vector2,
-		solid: bool = false, leaves: Color = Color(), glow: bool = false) -> void:
+		solid: bool = false, leaves: Color = NO_TINT, glow: bool = false) -> void:
 	for i in n:
 		var a := _rng.randf() * TAU
 		var d := r.radius * sqrt(_rng.randf_range(inner * inner, outer * outer))
@@ -249,7 +249,7 @@ func _scatter(r: RegionData, models: Array, n: int, inner: float, outer: float, 
 ## `scale` is a range of scale factors, or with `by_height` a range of HEIGHTS in metres that
 ## the model is scaled to off its own measured height (see the PH constants above).
 func _place(r: RegionData, model: String, a: float, d: float, scale: Vector2, solid: bool = false,
-		leaves: Color = Color(), glow: bool = false, face_centre: bool = false,
+		leaves: Color = NO_TINT, glow: bool = false, face_centre: bool = false,
 		by_height: bool = false) -> void:
 	var x := r.centre.x + cos(a) * d
 	var z := r.centre.y + sin(a) * d
@@ -262,7 +262,7 @@ func _place(r: RegionData, model: String, a: float, d: float, scale: Vector2, so
 	_add(model, Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3.ONE * s), Vector3(x, y - 0.03, z)), solid, leaves, glow)
 
 
-func _add(model: String, xf: Transform3D, solid: bool, leaves: Color = Color(), glow: bool = false) -> void:
+func _add(model: String, xf: Transform3D, solid: bool, leaves: Color = NO_TINT, glow: bool = false) -> void:
 	if _dry:
 		_wanted["%s|%s|%s" % [model, str(leaves), str(glow)]] = [model, leaves, glow]
 		return

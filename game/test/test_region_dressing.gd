@@ -66,3 +66,25 @@ func _transforms(d: Node) -> Dictionary:
 		elif c is StaticBody3D:
 			out["colliders"] = out.get("colliders", Vector3.ZERO) + (c as StaticBody3D).global_position
 	return out
+
+
+## NOTHING IS PAINTED BLACK (PS2 item 61's black wedges, every region): a prop placed without
+## a leaf green keeps its own colours. The tint's old default, Color(), was opaque black, and
+## any "leaf", "grass", "green" or "plant" material on such a prop (the lake's canoe, the
+## standing stones' moss) came out pure black.
+func test_no_dressing_material_is_painted_black() -> void:
+	var d: Node3D = DressingScript.new()
+	add_child_autofree(d)
+	d.dress(_regions())
+	var black: Array[String] = []
+	for c in d.get_children():
+		if not c is MultiMeshInstance3D:
+			continue
+		var mesh: Mesh = (c as MultiMeshInstance3D).multimesh.mesh
+		if mesh == null:
+			continue
+		for i in mesh.get_surface_count():
+			var m := mesh.surface_get_material(i) as BaseMaterial3D
+			if m != null and m.albedo_color.v < 0.03 and m.albedo_texture == null:
+				black.append("%s/%s" % [c.name, m.resource_name])
+	assert_eq(black, [] as Array[String], "painted black: %s" % ", ".join(black))

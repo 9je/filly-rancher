@@ -242,3 +242,30 @@ func test_no_wild_pony_is_spawned_in_the_lake() -> void:
 			gut.p("%s stands in the lake, %.1f m from its middle" % [p.name, r])
 	assert_gt(near, 0, "the lake has its wild ponies")
 	assert_eq(wet, 0, "none of them stands in the water")
+
+
+## A lake pony's wander never picks a spot in the water (she would only walk to the shore ring
+## and stand there).
+func test_a_lake_pony_never_wanders_toward_the_water() -> void:
+	var ranch = RanchScene.instantiate()
+	add_child_autofree(ranch)
+	await wait_physics_frames(4)
+	var lake: RegionData = ranch.terrain.regions.by_id(&"lake")
+	var waters: Array = ranch.find_children("Water_lake", "MeshInstance3D", true, false)
+	if waters.is_empty():
+		fail_test("no lake")
+		return
+	var keep_out := float((waters[0] as Node).get_meta(&"pony_keep_out", 0.0))
+	var at: Vector3 = (waters[0] as Node3D).global_position
+	var picked := 0
+	var wet := 0
+	for p: CharacterBody3D in ranch.spawner.get_spawned():
+		if Vector2(p.global_position.x, p.global_position.z).distance_to(lake.centre) > lake.radius:
+			continue
+		for i in 50:
+			var t: Vector3 = p.call("_pick_wander_target")
+			picked += 1
+			if Vector2(t.x - at.x, t.z - at.z).length() < keep_out:
+				wet += 1
+	assert_gt(picked, 0, "the lake has its wild ponies")
+	assert_eq(wet, 0, "no wander spot in the water (%d of %d)" % [wet, picked])

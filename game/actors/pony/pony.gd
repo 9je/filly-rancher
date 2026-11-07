@@ -1621,14 +1621,32 @@ func _pick_routine() -> int:
 ## target crowds toward the centre and she paces the same short line all day.
 func _pick_wander_target() -> Vector3:
 	var target := _home
+	# The last dry pick, kept for when every attempt lands short or wet; else where she stands.
+	var dry := Vector3(global_position.x, _home.y, global_position.z)
 	for attempt in WANDER_TARGET_ATTEMPTS:
 		var angle := _rng.randf() * TAU
 		var radius := sqrt(_rng.randf()) * roam_radius
 		target = _home + Vector3(cos(angle), 0.0, sin(angle)) * radius
 		target.y = _home.y
+		# Not a spot in a lake (PS2 item 61): she would only walk to the shore ring and stand.
+		if _in_lake(target):
+			continue
+		dry = target
 		if Vector2(target.x - global_position.x, target.z - global_position.z).length() > ARRIVAL_RADIUS * 3.0:
 			break
-	return target
+	return dry
+
+
+## Inside a lake's pony keep-out ring (Terrain.build_water: the "lake_water" group and its
+## "pony_keep_out" radius; the spawner's own test, Spawner._dry_from).
+func _in_lake(p: Vector3) -> bool:
+	if not is_inside_tree():
+		return false
+	for water: Node in get_tree().get_nodes_in_group(&"lake_water"):
+		var at := (water as Node3D).global_position
+		if Vector2(p.x - at.x, p.z - at.z).length() < float(water.get_meta(&"pony_keep_out", 0.0)):
+			return true
+	return false
 
 
 ## Keep `direction` from taking her further outside her roam circle: the outward part of
