@@ -17,8 +17,13 @@ ln -sfn "$PWD/game/assets/converted" "$DIR/game/assets/converted"
 if [ -d game/.godot ] && [ ! -d "$DIR/game/.godot" ]; then cp -r game/.godot "$DIR/game/.godot"; fi
 echo "suite on $SHA in $DIR"
 set +e
-( cd "$DIR" && tools/run_tests.sh )
+LOG="${TMPDIR:-/tmp}/filly_suite_$SHA.log"
+( cd "$DIR" && tools/run_tests.sh ) > "$LOG" 2>&1
 CODE=$?
+# The summary, and every failing test by name (the full log stays at $LOG).
+grep -a -E "^(Tests|Passing Tests|Failing Tests) " "$LOG"
+grep -a -B1 -E "\[Failed\]" "$LOG" | grep -a -E "^\* test_|res://test/|\[Failed\]" | head -40
+echo "full log: $LOG"
 set -e
 git worktree remove --force "$DIR"
 exit $CODE
