@@ -1259,6 +1259,11 @@ func _state_wander() -> Vector3:
 	if to_target.length() < ARRIVAL_RADIUS or _state_timer <= 0.0:
 		_transition_to(State.IDLE)
 		return Vector3.ZERO
+	# NOT THROUGH A CONVERSATION (PS1, playtest 2026-11-05 item 10): with the player talking
+	# to somepony across her way, she thinks better of it and stops to pick somewhere else.
+	if BodySpaceScript.crosses_zone(global_position, _wander_target):
+		_transition_to(State.IDLE)
+		return Vector3.ZERO
 	return _leash(to_target.normalized()) * _wander_speed
 
 

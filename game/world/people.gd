@@ -13,6 +13,7 @@ extends Node3D
 signal effect(kind: StringName, value: String)
 signal talk_finished(speaker: StringName, dialogue_id: StringName)
 
+const BodySpaceScript := preload("res://systems/body_space.gd")
 const NpcScript := preload("res://actors/npc/npc.gd")
 const LibraryScript := preload("res://systems/talk_library.gd")
 const RunnerScript := preload("res://systems/dialogue_runner.gd")
@@ -179,6 +180,19 @@ func _entry_point() -> Vector3:
 	return at + back * ENTRY_M
 
 
+## THE GROUND BETWEEN TWO TALKING IS KEPT CLEAR (PS1, playtest 2026-11-05 item 10: "A pony
+## walked through the conversation"): while she talks, a keep-out zone from the player to the
+## speaker (systems/body_space.gd), re-laid each frame as they shift; gone when the talk ends.
+func _keep_talk_clear() -> void:
+	var speaker := npc(_speaker) if is_talking() else null
+	if speaker == null or player == null:
+		if BodySpaceScript.has_zone(&"talk"):
+			BodySpaceScript.clear_zone(&"talk")
+		return
+	BodySpaceScript.set_zone(&"talk", player.global_position, speaker.global_position,
+		BodySpaceScript.TALK_RADIUS, [player, speaker])
+
+
 ## Interaction candidates: the nearest character in reach, as a TALK action.
 func candidates(at: Vector3) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
@@ -322,6 +336,7 @@ func _show() -> void:
 func _process(delta: float) -> void:
 	_tumble_finder(delta)
 	_update_news(delta)
+	_keep_talk_clear()
 	if not is_talking():
 		return
 	var who: StringName = runner.current().get("who", _speaker)
@@ -366,6 +381,7 @@ func _on_finished(dialogue_id: StringName) -> void:
 		(npcs[id] as Npc).set_talking(false)
 	var who := _speaker
 	_speaker = &""
+	_keep_talk_clear()
 	var bus := get_node_or_null("/root/Events")
 	if bus != null:
 		bus.emit_signal("talk_ended", who)

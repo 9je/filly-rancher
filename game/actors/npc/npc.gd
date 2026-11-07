@@ -229,6 +229,10 @@ func _room_push() -> Vector3:
 	# Following (Tumble at her heels): she makes room like a pony does (systems/body_space.gd).
 	if mode == Mode.FOLLOW:
 		push += BodySpaceScript.push_on(self)
+	elif BodySpaceScript.has_zone(&"talk"):
+		# Standing or walking to a spot she is weightless, so her push is the talk's keep-out
+		# zone alone (PS1 item 10): she steps out of a conversation she is not in.
+		push += BodySpaceScript.push_on(self)
 	return push
 
 

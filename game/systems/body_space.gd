@@ -31,6 +31,33 @@ const NEAR_FIXED := 0.6
 ## Bodies further apart than this in height are on different floors.
 const SAME_FLOOR := 3.0
 
+## KEEP-OUT ZONES (PS1, playtest 2026-11-05 item 10: "A pony walked through the
+## conversation"): a flat capsule (segment a-b, radius r) nobody but its exempt bodies stands
+## in, by key. People sets one from the player to whoever she talks to while they talk.
+const TALK_RADIUS := 1.3
+## Within this much of a zone's edge a walker heading in slides round it instead.
+const ZONE_ASIDE := 0.8
+static var _zones := {}
+
+
+static func set_zone(key: StringName, a: Vector3, b: Vector3, r: float, exempt: Array) -> void:
+	var ids := {}
+	for n in exempt:
+		if n is Object and is_instance_valid(n):
+			ids[(n as Object).get_instance_id()] = true
+	_zones[key] = {"a": a, "b": b, "r": r, "exempt": ids}
+	_frame = -1
+
+
+static func clear_zone(key: StringName) -> void:
+	_zones.erase(key)
+	_frame = -1
+
+
+static func has_zone(key: StringName) -> bool:
+	return _zones.has(key)
+
+
 static var _members: Array[Node3D] = []
 static var _frame := -1
 static var _pushes := {}
@@ -254,3 +281,54 @@ static func _solve() -> void:
 			_pushes[owners[i]] = push.limit_length(MAX_PUSH)
 		if aside != Vector3.ZERO:
 			_aside[owners[i]] = aside.normalized()
+	if not _zones.is_empty():
+		_solve_zones()
+
+
+## Every member out of every keep-out zone it is not exempt from: inside, eased out like an
+## overlap; near the edge, turned aside (aside_on) so a walker slides round.
+static func _solve_zones() -> void:
+	for m in _members:
+		if not is_instance_valid(m):
+			continue
+		var id := m.get_instance_id()
+		var p := m.global_position
+		for z: Dictionary in _zones.values():
+			if (z.exempt as Dictionary).has(id):
+				continue
+			var a: Vector3 = z.a
+			var b: Vector3 = z.b
+			var ab := Vector3(b.x - a.x, 0.0, b.z - a.z)
+			var t := 0.0
+			if ab.length_squared() > 1e-6:
+				t = clampf(Vector3(p.x - a.x, 0.0, p.z - a.z).dot(ab) / ab.length_squared(), 0.0, 1.0)
+			var q := a + ab * t
+			var away := Vector3(p.x - q.x, 0.0, p.z - q.z)
+			var d := away.length()
+			var r: float = z.r
+			if d >= r + ZONE_ASIDE:
+				continue
+			if d < 1e-4:
+				away = ab.cross(Vector3.UP) if ab.length_squared() > 1e-6 else Vector3.RIGHT
+			away = away.normalized()
+			# Aside leans along the zone toward its nearer end, so a walker heading straight
+			# at it slides round instead of stopping dead at the edge (render, 2026-11-07).
+			var along := ab.normalized() * (1.0 if t >= 0.5 else -1.0) \
+				if ab.length_squared() > 1e-6 else Vector3.ZERO
+			var side: Vector3 = _aside.get(id, Vector3.ZERO)
+			_aside[id] = (side + away + along).normalized()
+			if d < r:
+				var push: Vector3 = _pushes.get(id, Vector3.ZERO)
+				_pushes[id] = (push + away * (r - d) * STIFFNESS).limit_length(MAX_PUSH)
+
+
+## Whether the straight walk from `from` to `to` passes through a keep-out zone (within its
+## radius of the zone's segment), for a walker that would rather go somewhere else.
+static func crosses_zone(from: Vector3, to: Vector3) -> bool:
+	for z: Dictionary in _zones.values():
+		var c := _closest(Vector3(z.a), Vector3(z.b), from, to)
+		var d := Vector3(c[0] - c[1])
+		d.y = 0.0
+		if d.length() < float(z.r):
+			return true
+	return false
