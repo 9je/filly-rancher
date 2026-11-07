@@ -112,3 +112,80 @@ func test_the_selected_tile_is_scrolled_into_view() -> void:
 	var last: Control = _menu.row_nodes()[_menu.selected_index()]
 	var view := (_menu.get_node(^"Centre/Panel/Margin/Column/Scroll") as Control).get_global_rect()
 	assert_true(view.grow(2.0).encloses(last.get_global_rect()), "the last tile scrolled into view")
+
+
+## G6 (playtest ledger), FS6.1: "tiles stagger in 30 ms apart". On opening, tile i starts its
+## scale-and-fade 0.03 s * i after the first, so the grid deals itself in rather than the whole
+## panel fading as one sheet; a cursor move afterwards does not deal it again.
+func test_the_tiles_stagger_in_30_ms_apart() -> void:
+	_menu.open()
+	var tiles := _menu.row_nodes()
+	assert_gt(tiles.size(), 6, "a full BUY grid")
+	for t: Control in tiles:
+		assert_eq(t.modulate.a, 0.0, "%s waits for the clock" % t.name)
+	var now := 0.0
+	for k in 6:
+		var at := 0.03 * k + 0.01
+		_menu.advance_entrance(at - now)
+		now = at
+		assert_gt((tiles[k] as Control).modulate.a, 0.0, "tile %d is on its way at %.2f s" % [k, at])
+		assert_eq((tiles[k + 1] as Control).modulate.a, 0.0, "tile %d not yet at %.2f s" % [k + 1, at])
+		assert_lt((tiles[k] as Control).scale.x, 1.0, "tile %d grows in" % k)
+	_menu.advance_entrance(2.0)
+	for t: Control in tiles:
+		assert_almost_eq(t.modulate.a, 1.0, 0.001, "%s is in" % t.name)
+		assert_almost_eq(t.scale.x, 1.0, 0.001, "%s at full size" % t.name)
+	_menu.move_selection(1)
+	for t: Control in _menu.row_nodes():
+		assert_almost_eq(t.modulate.a, 1.0, 0.001, "a cursor move does not deal the grid again")
+
+
+## G6 (playtest ledger), FS6.1: "a purchase flies a coin to the wallet". A buy that goes
+## through emits `purchased`, and a coin leaves the tile and ends on the wallet.
+func test_a_purchase_flies_a_coin_to_the_wallet() -> void:
+	_menu.buy_requested.connect(func(item: ShopItem) -> void:
+		_shop.buy(item)
+		_menu.refresh())
+	_menu.open()
+	_menu.advance_entrance(2.0)
+	await wait_frames(3)
+	var pick := -1
+	var rows := _menu.buy_rows()
+	for i in rows.size():
+		if _shop.can_buy(rows[i]) and rows[i].cost > 0:
+			pick = i
+			break
+	assert_gt(pick, -1, "something she can afford")
+	watch_signals(_menu)
+	_menu.take_row(pick)
+	assert_signal_emitted(_menu, "purchased")
+	# The coin leaves on the next frame, from the tile where the grid has settled it.
+	await wait_process_frames(3)
+	var tile := (_menu.row_nodes()[pick] as Control).get_global_rect()
+	var coins := _menu.find_children("Coin", "", true, false)
+	assert_eq(coins.size(), 1, "one coin")
+	if coins.size() != 1:
+		return
+	var coin := coins[0] as Control
+	assert_true(tile.grow(8.0).has_point(coin.get_global_rect().get_center()), "it leaves from the tile")
+	# Followed frame by frame to the end of its flight: where it was last seen is where it ended.
+	var last := coin.get_global_rect().get_center()
+	var waited := 0
+	while is_instance_valid(coin) and waited < 300:
+		last = coin.get_global_rect().get_center()
+		await wait_process_frames(1)
+		waited += 1
+	assert_false(is_instance_valid(coin), "it lands and goes")
+	assert_almost_eq(last.distance_to(_menu.wallet_target()), 0.0, 6.0, "and it ends on the wallet")
+
+
+## A purchase the Shop refuses moves no money, so no coin flies.
+func test_a_refused_purchase_flies_nothing() -> void:
+	_menu.open()
+	watch_signals(_menu)
+	var rows := _menu.buy_rows()
+	for i in rows.size():
+		if not _shop.can_buy(rows[i]):
+			_menu.take_row(i)
+			break
+	assert_eq(_menu.find_children("Coin", "", true, false).size(), 0)

@@ -1,0 +1,77 @@
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+* test_the_buy_tab_fits_the_screen
+* test_every_tile_has_its_own_icon
+* test_every_icon_kind_draws_something
+* test_every_thing_for_sale_has_a_picture_not_a_blank_disc
+* test_the_tabs_are_buttons_a_mouse_can_press
+* test_the_selected_tile_is_scrolled_into_view
+* test_the_tiles_stagger_in_30_ms_apart
+    [Failed]:  [1.0] expected to equal [0.0]:  @PanelContainer@11123 waits for the clock
+    [Failed]:  [1.0] expected to equal [0.0]:  @PanelContainer@11133 waits for the clock
+    [Failed]:  [1.0] expected to equal [0.0]:  @PanelContainer@11143 waits for the clock
+    [Failed]:  [1.0] expected to equal [0.0]:  @PanelContainer@11153 waits for the clock
+    [Failed]:  [1.0] expected to equal [0.0]:  @PanelContainer@11163 waits for the clock
+    [Failed]:  [1.0] expected to equal [0.0]:  @PanelContainer@11173 waits for the clock
+    [Failed]:  [1.0] expected to equal [0.0]:  @PanelContainer@11183 waits for the clock
+    [Failed]:  [1.0] expected to equal [0.0]:  @PanelContainer@11193 waits for the clock
+    [Failed]:  [1.0] expected to equal [0.0]:  @PanelContainer@11203 waits for the clock
+    [Failed]:  [1.0] expected to equal [0.0]:  @PanelContainer@11213 waits for the clock
+    [Failed]:  [1.0] expected to equal [0.0]:  @PanelContainer@11223 waits for the clock
+    [Failed]:  [1.0] expected to equal [0.0]:  @PanelContainer@11233 waits for the clock
+    [Failed]:  [1.0] expected to equal [0.0]:  @PanelContainer@11243 waits for the clock
+    [Failed]:  [1.0] expected to equal [0.0]:  @PanelContainer@11253 waits for the clock
+    [Failed]:  [1.0] expected to equal [0.0]:  @PanelContainer@11263 waits for the clock
+    [Failed]:  [1.0] expected to equal [0.0]:  @PanelContainer@11273 waits for the clock
+    [Failed]:  [1.0] expected to equal [0.0]:  @PanelContainer@11283 waits for the clock
+    [Failed]:  [1.0] expected to equal [0.0]:  @PanelContainer@11293 waits for the clock
+    [Failed]:  [1.0] expected to equal [0.0]:  @PanelContainer@11303 waits for the clock
+    [Failed]:  [1.0] expected to equal [0.0]:  @PanelContainer@11313 waits for the clock
+    [Failed]:  [1.0] expected to equal [0.0]:  @PanelContainer@11323 waits for the clock
+    [Failed]:  [1.0] expected to equal [0.0]:  @PanelContainer@11333 waits for the clock
+    [Failed]:  [1.0] expected to equal [0.0]:  @PanelContainer@11343 waits for the clock
+    [Failed]:  [1.0] expected to equal [0.0]:  @PanelContainer@11353 waits for the clock
+    [Failed]:  [1.0] expected to equal [0.0]:  @PanelContainer@11363 waits for the clock
+    [Failed]:  [1.0] expected to equal [0.0]:  @PanelContainer@11373 waits for the clock
+    [Failed]:  [1.0] expected to equal [0.0]:  @PanelContainer@11383 waits for the clock
+    [Failed]:  [1.0] expected to equal [0.0]:  @PanelContainer@11393 waits for the clock
+    [Failed]:  [1.0] expected to equal [0.0]:  @PanelContainer@11403 waits for the clock
+SCRIPT ERROR: Invalid call. Nonexistent function 'advance_entrance' in base 'CanvasLayer (MarketMenu)'.
+    [Failed]:  Unexpected Errors:
+* test_a_purchase_flies_a_coin_to_the_wallet
+* test_a_refused_purchase_flies_nothing
+* test_it_opens_and_closes_and_reports_which_it_is
+* test_it_refuses_to_open_over_another_menu
+* test_the_deliver_tab_lists_stock_first_then_named_with_their_credit
+* test_confirming_a_row_emits_the_uid_and_pays_for_nothing_itself
+* test_clicking_a_tab_button_switches_to_it
+* test_the_pay_tab_offers_amounts_the_wallet_can_actually_cover
+* test_confirming_a_pay_row_emits_the_amount
+* test_the_statement_tab_repeats_the_ledger_without_editing_it
+* test_no_string_the_menu_draws_carries_a_dash
+* test_an_empty_pen_shows_a_note_rather_than_an_empty_box
+* test_a_named_pony_asks_before_she_is_handed_over
+* test_the_cursor_starts_on_no_so_a_double_press_keeps_her
+* test_answering_yes_hands_her_over
+* test_a_stock_pony_still_goes_on_one_press
+* test_changing_tab_drops_the_question
+* test_the_confirm_rows_carry_no_dash
+* test_the_cursor_is_clamped_back_onto_the_list_when_the_pens_empty
+* test_rows_of_equal_credit_come_back_in_one_fixed_order
+* test_a_stock_row_draws_the_coat_word_the_provider_hands_over
+* test_a_provider_with_no_coat_word_draws_the_bare_name
+* test_the_pay_tab_never_offers_more_than_the_ledger_will_take
+* test_a_ledger_at_the_floor_offers_nothing_to_pay
+* test_three_deliveries_roll_up_one_by_one_and_land_once_on_the_balance
+SCRIPT ERROR: Invalid call. Nonexistent function 'wallet_text' in base 'CanvasLayer (DepotMenu)'.
+* test_the_roll_up_counts_on_the_tile_she_left_from
+SCRIPT ERROR: Invalid call. Nonexistent function 'row_nodes' in base 'CanvasLayer (DepotMenu)'.
+* test_a_refused_delivery_rolls_nothing_up
+SCRIPT ERROR: Invalid call. Nonexistent function 'payout_count' in base 'CanvasLayer (DepotMenu)'.
+* test_every_pony_tile_carries_her_rarity_shape
+    [Failed]:  [0] expected to equal [1]:  one shape on Pony's tile
+    [Failed]:  [0] expected to equal [1]:  one shape on Applejack's tile
+    [Failed]:  [0] expected to equal [1]:  one shape on Rarity's tile
+    [Failed]:  [0] expected to equal [1]:  one shape on Trixie's tile
+Tests                35
+Passing Tests        29
+Failing Tests         6

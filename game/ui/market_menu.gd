@@ -31,6 +31,7 @@ const TileStyleScript := preload("res://ui/tile_style.gd")
 const RarityGlyphScript := preload("res://ui/rarity_glyph.gd")
 const HoursIconScript := preload("res://ui/hours_icon.gd")
 const PonyInstanceScript := preload("res://systems/pony_instance.gd")
+const TileEntranceScript := preload("res://ui/tile_entrance.gd")
 
 ## The scroll area's tallest, in 1920 x 1080 base pixels: what is left of the screen once the
 ## title, the tabs, the footer and the Close button have theirs.
@@ -61,6 +62,9 @@ signal closed()
 signal sell_requested(rarity: int, count: int)
 signal sell_all_requested()
 signal buy_requested(item: ShopItem)
+## A buy went through: the Shop took her bits for `item` (PS10, G6). Emitted after
+## buy_requested's handler has run, when the wallet shows the price was paid.
+signal purchased(item: ShopItem)
 
 ## The Shop this menu reads from. Set by ranch.gd before open(); never mutated here.
 var shop: Shop = null
@@ -99,6 +103,17 @@ var _detail_kind: Label = null
 var _detail_buy: Button = null
 ## The permit's ponies (PS9 item 55); hidden for anything that is not a permit.
 var _detail_ponies: HFlowContainer = null
+## The deal-in clock for the tiles (PS10, G6; game/ui/tile_entrance.gd).
+var _entrance = TileEntranceScript.new()
+## Where the coins fly and the pops rise (PS10, G6): over the panel, never laid out by it.
+var _fx: Control = null
+## The coin at the head of the wallet line, which is where the coins land.
+var _purse_coin: TextureRect = null
+## The process frame the tiles were last built on. A tile built this frame already has its
+## minimum size but no place yet (the grid sorts at the end of the frame), so its rect lies.
+var _built_frame := -1
+## How long a pop over the wallet waits, unseen, for the coin flying to it.
+var _pop_delay := 0.0
 
 
 func _ready() -> void:
@@ -119,7 +134,40 @@ func _ready() -> void:
 		func(_index: int) -> void: close())
 	_build_detail()
 	$Centre/Panel/Margin/Column.add_child(_close)
+	_build_purse()
+	_fx = MenuStyleScript.effects_layer(self)
 	visible = false
+
+
+## THE WALLET IS A PURSE, NOT A DIM LINE (PS10, G6): the bits coin, her bits in gold, and the
+## pouch beside them, so a coin flying from a tile has somewhere to land.
+func _build_purse() -> void:
+	var column := $Centre/Panel/Margin/Column as VBoxContainer
+	var purse := HBoxContainer.new()
+	purse.name = "Purse"
+	purse.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	purse.add_theme_constant_override(&"separation", 10)
+	column.add_child(purse)
+	column.move_child(purse, _wallet.get_index())
+	_purse_coin = MenuStyleScript.coin_icon(34.0)
+	purse.add_child(_purse_coin)
+	_wallet.reparent(purse)
+	_wallet.add_theme_font_override(&"font", MenuStyleScript.numeral_font())
+	MenuStyleScript.style_label(_wallet, 26, MenuStyleScript.COLOR_VALUE)
+	_wallet.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var gap := Control.new()
+	gap.custom_minimum_size = Vector2(22, 0)
+	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	purse.add_child(gap)
+	_gems.reparent(purse)
+	_gems.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+
+
+## Where a coin lands: the middle of the purse's coin, in the menu's canvas.
+func wallet_target() -> Vector2:
+	if _purse_coin == null:
+		return Vector2.ZERO
+	return _purse_coin.get_global_rect().get_center()
 
 
 func _build_detail() -> void:
@@ -350,6 +398,7 @@ func open() -> bool:
 	_catalogue.assign(_all_items.filter(func(it: ShopItem) -> bool: return shop.listed(it)))
 	_last_bits = -1
 	visible = true
+	_entrance.restart()
 	refresh()
 	opened.emit()
 	MenuStyleScript.tick_open()
@@ -380,6 +429,7 @@ func set_tab(next: int) -> void:
 		return
 	_tab = next
 	_selected = 0
+	_entrance.restart()
 	refresh()
 	MenuStyleScript.tick_page()
 
@@ -462,16 +512,14 @@ func confirm() -> bool:
 			if _pouch_total() <= 0:
 				_refuse("You have no gems to sell.")
 				return false
-			sell_all_requested.emit()
-			refresh()
+			_paying(func() -> void: sell_all_requested.emit())
 			return true
 		var rarity: int = sell_rows()[_selected - 1]
 		var count := shop.gem_count(rarity)
 		if count <= 0:
 			_refuse("No %s gems to sell." % _rarity_name(rarity).to_lower())
 			return false
-		sell_requested.emit(rarity, count)
-		refresh()
+		_paying(func() -> void: sell_requested.emit(rarity, count))
 		return true
 	var item := _selected_item()
 	if item == null:
@@ -485,16 +533,50 @@ func confirm() -> bool:
 	if not why.is_empty():
 		_refuse(why)
 		return false
-	buy_requested.emit(item)
-	refresh()
+	if _paying(func() -> void: buy_requested.emit(item)) < 0:
+		purchased.emit(item)
 	return true
+
+
+## MONEY THAT MOVES FLIES (PS10, G6). Runs `request` (one of the signals ranch.gd answers by
+## calling Shop), and if her bits changed, a coin leaves the picked tile for the purse (a
+## sale sends a little shower of them), and the wallet's pop waits for it to land. Returns
+## the change in bits; a refusal moves none and flies nothing.
+##
+## THE COINS LEAVE ON THE NEXT FRAME. The press rebuilds the grid, and picking a tile can
+## scroll it into view, so this frame the tile has no place yet; next frame it is where the
+## player sees it, and that is where the coins start.
+func _paying(request: Callable) -> int:
+	var before := shop.bits()
+	_pop_delay = MenuStyleScript.COIN_SECONDS
+	request.call()
+	var moved := shop.bits() - before
+	if moved != 0 and _open:
+		_coins_due = {"index": _selected, "count": 1 if moved < 0 else clampi(1 + moved / 60, 1, 4)}
+	refresh()
+	_pop_delay = 0.0
+	return moved
+
+
+## Coins waiting for the grid to settle: {index, count}, or empty.
+var _coins_due := {}
+
+
+func _launch_coins() -> void:
+	var index := int(_coins_due["index"])
+	var count := int(_coins_due["count"])
+	_coins_due = {}
+	if index < 0 or index >= _rows.get_child_count() or _fx == null:
+		return
+	var from := (_rows.get_child(index) as Control).get_global_rect().get_center()
+	for k in count:
+		MenuStyleScript.fly_coin(_fx, from + Vector2(k * 9.0 - 13.0, 0.0), wallet_target(), k * 0.07)
 
 
 func sell_everything() -> bool:
 	if shop == null or _pouch_total() <= 0:
 		return false
-	sell_all_requested.emit()
-	refresh()
+	_paying(func() -> void: sell_all_requested.emit())
 	return true
 
 
@@ -557,16 +639,16 @@ func refresh() -> void:
 		return
 	_footer.text = MenuStyleScript.footer_tabs_and_rows("confirm", "back")
 	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
-	_wallet.text = "%d bits      %d gems in your pouch" % [shop.bits(), _pouch_total()]
-	# Money moving is a moment (FS6.2): a sale or a purchase pops over the wallet.
+	_wallet.text = "%d bits" % shop.bits()
+	# Money moving is a moment (FS6.2): a sale or a purchase pops over the wallet, once the
+	# coin flying to it has landed (PS10, G6).
 	var now := shop.bits()
-	if _last_bits >= 0 and now != _last_bits and _open:
-		var host := get_node_or_null(^"Centre/Panel") as Control
-		if host != null:
-			MenuStyleScript.payout_pop(host, _wallet.position + Vector2(_wallet.size.x * 0.25, _wallet.size.y * 0.5), now - _last_bits)
+	if _last_bits >= 0 and now != _last_bits and _open and _fx != null:
+		# Beside the purse line, clear of its words, rising into the empty top right.
+		var beside := Vector2(_gems.get_global_rect().end.x + 110.0, wallet_target().y)
+		MenuStyleScript.payout_pop(_fx, beside, now - _last_bits, _pop_delay)
 	_last_bits = now
 	_gems.text = "%d gems in your pouch" % _pouch_total()
-	_gems.visible = false
 	MouseRowsScript.tab_strip(_tabs, TAB_NAMES, _tab, Callable(),
 		func(i: int) -> void:
 			if i != _tab:
@@ -585,6 +667,7 @@ func refresh() -> void:
 	for child in _rows.get_children():
 		_rows.remove_child(child)
 		child.queue_free()
+	_built_frame = Engine.get_process_frames()
 	if _tab == Tab.SELL:
 		_add_row(0, "Sell everything", "every gem in your pouch, in one go",
 			"%d bits" % _sell_all_value(), _pouch_total() > 0, &"sell_all")
@@ -607,7 +690,23 @@ func refresh() -> void:
 			_add_row(i, item.display_name, item.description, price, shop.can_buy(item),
 				ShopIconScript.kind_for(item), kind_word(item))
 	_fill_detail()
+	_entrance.apply(_rows.get_children())
 	_fit_scroll.call_deferred()
+
+
+func _process(delta: float) -> void:
+	if not _open:
+		_coins_due = {}
+		return
+	if _entrance.running(_rows.get_child_count()):
+		_entrance.advance(delta, _rows.get_children())
+	if not _coins_due.is_empty() and _built_frame != Engine.get_process_frames():
+		_launch_coins()
+
+
+## Step the tiles' deal-in by `dt` seconds, as a frame would (the suite drives it so).
+func advance_entrance(dt: float) -> void:
+	_entrance.advance(dt, _rows.get_children())
 
 
 func _owned(item: ShopItem) -> bool:

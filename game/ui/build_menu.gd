@@ -62,6 +62,7 @@ const MenuStyleScript := preload("res://ui/menu_style.gd")
 const MouseRowsScript := preload("res://ui/mouse_rows.gd")
 const TileStyleScript := preload("res://ui/tile_style.gd")
 const ShopIconScript := preload("res://ui/shop_icon.gd")
+const TileEntranceScript := preload("res://ui/tile_entrance.gd")
 ## The picture on a tile (overnight bot review, 2026-10-26: the build card was the old dark
 ## text row). A fence the size of the pen, or the upgrade's arrow, or the clearing's shears.
 const ICON_SIZE := 64.0
@@ -88,6 +89,8 @@ signal closed()
 var _registry: PlotRegistry = null
 var _plots: Array[PlotData] = []
 var _row_nodes: Array[PanelContainer] = []
+## The tiles deal themselves in on opening (PS10, G6; game/ui/tile_entrance.gd).
+var _entrance = TileEntranceScript.new()
 
 var _slot: PlotSlot = null
 var _selected := 0
@@ -219,6 +222,8 @@ func _show(slot: PlotSlot) -> bool:
 	_hovered = -1
 	_open = true
 	visible = true
+	_entrance.restart()
+	_entrance.apply(_row_nodes)
 	_refresh()
 	opened.emit(slot)
 	MenuStyleScript.tick_open()
@@ -453,6 +458,11 @@ func _build_rows() -> void:
 
 		_rows.add_child(row)
 		_row_nodes.append(row)
+
+
+func _process(delta: float) -> void:
+	if _open and _entrance.running(_row_nodes.size()):
+		_entrance.advance(delta, _row_nodes)
 
 
 ## Repaint the selection highlight, the wallet line and the affordability colours.

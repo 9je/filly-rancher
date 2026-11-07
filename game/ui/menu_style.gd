@@ -571,20 +571,98 @@ const PAYOUT_GAIN := Color(1.0, 0.84, 0.3)
 const PAYOUT_SPEND := Color(0.98, 0.72, 0.78)
 
 
-static func payout_pop(host: Control, at: Vector2, bits: int) -> Label:
+##
+## `host` must be a plain Control (a menu's effects layer), not a container: a container lays
+## its children out and would put the pop at its own top left corner. `delay` holds it back,
+## unseen, while a coin is still on its way to `at`.
+static func payout_pop(host: Control, at: Vector2, bits: int, delay := 0.0) -> Label:
 	var pop := Label.new()
 	pop.name = "Payout"
 	pop.text = "%s%d bits" % ["+" if bits >= 0 else "-", absi(bits)]
 	pop.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	style_label(pop, 30, PAYOUT_GAIN if bits >= 0 else PAYOUT_SPEND)
+	pop.add_theme_font_override(&"font", numeral_font())
+	pop.add_theme_color_override(&"font_shadow_color", Color(0.1, 0.02, 0.12, 0.6))
+	pop.add_theme_constant_override(&"shadow_offset_y", 2)
 	host.add_child(pop)
 	pop.position = at - pop.get_combined_minimum_size() * 0.5
-	var tw := pop.create_tween().set_parallel(true)
+	var tw := pop.create_tween()
+	if delay > 0.0:
+		pop.modulate.a = 0.0
+		tw.tween_interval(delay)
+		tw.tween_property(pop, ^"modulate:a", 1.0, 0.06)
 	tw.tween_property(pop, ^"position:y", pop.position.y - PAYOUT_RISE, PAYOUT_SECONDS) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.tween_property(pop, ^"modulate:a", 0.0, PAYOUT_SECONDS * 0.45).set_delay(PAYOUT_SECONDS * 0.55)
-	tw.chain().tween_callback(pop.queue_free)
+	tw.parallel().tween_property(pop, ^"modulate:a", 0.0, PAYOUT_SECONDS * 0.45) \
+		.set_delay(PAYOUT_SECONDS * 0.55)
+	tw.tween_callback(pop.queue_free)
 	return pop
+
+
+## A COIN FLIES TO THE WALLET (PS10, G6; FS6.1: "a purchase flies a coin from the tile to the
+## wallet"). The bits coin the HUD and the signs already wear (PlaceSign's COIN icon), arcing
+## from `from` up and over to `to` on `host` (an effects layer, as payout_pop's), spinning as
+## it goes; it lands, swells and fades. Named "Coin" so the suite can find it.
+const COIN_SECONDS := 0.42
+const COIN_SIZE := 42.0
+const COIN_ARC := 110.0
+const COIN_LAND := 0.14
+
+
+static func fly_coin(host: Control, from: Vector2, to: Vector2, delay := 0.0) -> Control:
+	var coin := Control.new()
+	coin.name = "Coin"
+	coin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	coin.size = Vector2.ONE * COIN_SIZE
+	coin.pivot_offset = coin.size * 0.5
+	var face: Texture2D = PlaceSign.icon_texture(PlaceSign.Icon.COIN)
+	coin.draw.connect(func() -> void:
+		coin.draw_circle(coin.size * 0.5 + Vector2(0, 3), coin.size.x * 0.46, Color(0.1, 0.02, 0.12, 0.35))
+		coin.draw_texture_rect(face, Rect2(Vector2.ZERO, coin.size), false))
+	host.add_child(coin)
+	var place := func(t: float) -> void:
+		var arc := Vector2(0.0, -COIN_ARC * 4.0 * t * (1.0 - t))
+		coin.position = from.lerp(to, t) + arc - coin.size * 0.5
+		var swell := 1.0 + 0.3 * sin(t * PI)
+		# Turning over as it flies: the face narrows and widens three times.
+		coin.scale = Vector2(swell * maxf(0.2, absf(cos(t * PI * 3.0))), swell)
+	place.call(0.0)
+	if delay > 0.0:
+		coin.modulate.a = 0.0
+	var tw := coin.create_tween()
+	if delay > 0.0:
+		tw.tween_interval(delay)
+		tw.tween_property(coin, ^"modulate:a", 1.0, 0.04)
+	tw.tween_method(place, 0.0, 1.0, COIN_SECONDS).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tw.tween_property(coin, ^"scale", Vector2.ONE * 1.5, COIN_LAND)
+	tw.parallel().tween_property(coin, ^"modulate:a", 0.0, COIN_LAND)
+	tw.tween_callback(coin.queue_free)
+	return coin
+
+
+## A plain Control over the whole of a menu's CanvasLayer, for the coins and pops to fly on:
+## added last, so it draws over the panel, and never in the pointer's way.
+static func effects_layer(menu: CanvasLayer) -> Control:
+	var fx := Control.new()
+	fx.name = "Effects"
+	fx.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fx.set_anchors_preset(Control.PRESET_FULL_RECT)
+	menu.add_child(fx)
+	return fx
+
+
+## The bits coin as a small picture, for a wallet line to show where the coins land.
+static func coin_icon(size: float) -> TextureRect:
+	var icon := TextureRect.new()
+	icon.name = "PurseCoin"
+	icon.texture = PlaceSign.icon_texture(PlaceSign.Icon.COIN)
+	icon.custom_minimum_size = Vector2.ONE * size
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.pivot_offset = Vector2.ONE * size * 0.5
+	return icon
 
 
 static func tick_open() -> void:

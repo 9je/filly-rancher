@@ -69,27 +69,28 @@ func _shot(name: String) -> void:
 
 ## Film `seconds` of game time at SLOW speed, holding the frames in memory (saving a PNG takes
 ## longer than a frame) and writing them as <prefix>_<game ms>.png at the end.
-func _film(prefix: String, seconds: float) -> void:
+func _film(prefix: String, seconds: float, keep := KEEP, on_frame := Callable()) -> void:
 	Engine.time_scale = SLOW
+	# The first frame at or after each step of `seconds / keep`, so a film is a few frames.
 	var frames: Array = []
+	var seen := 0
+	var next := 0.0
 	var start := Time.get_ticks_usec()
 	while true:
+		if on_frame.is_valid():
+			on_frame.call(seen)
 		await process_frame
+		seen += 1
 		var ms := (Time.get_ticks_usec() - start) / 1000.0 * SLOW
-		frames.append([ms, root.get_texture().get_image()])
+		if ms + 0.001 >= next:
+			frames.append([ms, root.get_texture().get_image()])
+			next = ms + seconds * 1000.0 / keep
 		if ms > seconds * 1000.0:
 			break
 	Engine.time_scale = 1.0
-	# The first frame at or after each step of `seconds / KEEP`, so a film is a few frames.
-	var kept := 0
-	var next := 0.0
 	for f: Array in frames:
-		if float(f[0]) + 0.001 < next:
-			continue
 		(f[1] as Image).save_png(out.path_join("%s_%04d.png" % [prefix, int(f[0])]))
-		kept += 1
-		next = float(f[0]) + seconds * 1000.0 / KEEP
-	print("FSSHOT %s frames=%d kept=%d" % [prefix, frames.size(), kept])
+	print("FSSHOT %s frames=%d kept=%d" % [prefix, seen, frames.size()])
 
 
 func _chip(ranch: Node) -> void:
@@ -163,7 +164,7 @@ func _depot(ranch: Node) -> void:
 	if slot.is_empty():
 		slot.build(grand)
 	var pen: Pen = slot.get_built() as Pen
-	for id in ["twilight", "rarity", "fluttershy", "berrypunch", "octavia", "derpyhooves", "carrottop", "sweetiebelle"]:
+	for id in ["twilight", "rarity", "fluttershy", "berrypunch", "trixie", "derpyhooves", "carrottop", "sweetiebelle"]:
 		pen.add_pony(PonyInstanceScript.create(StringName(id)))
 	for i in 30:
 		await process_frame
@@ -173,16 +174,16 @@ func _depot(ranch: Node) -> void:
 	for i in 30:
 		await process_frame
 	_shot("depot_tiles")
-	# Three deliveries in a row, each answered yes, as fast as a player clicks them.
-	for k in 3:
-		depot.call("take_row", 1)
-		if bool(depot.call("is_confirming")):
-			depot.set("_selected", 0)
-			depot.call("confirm")
-		_point_at(Vector2(2, 2))
-		if k < 2:
-			await process_frame
-	await _film("depot_payout", 3.2)
+	# Three deliveries in a row, each a click on her tile and a click on "yes", a few frames
+	# apart as a quick hand clicks, filmed from the first click.
+	var clicks := func(frame: int) -> void:
+		if frame % 16 == 0 and frame < 48:
+			depot.call("take_row", 1)
+			_point_at(Vector2(2, 2))
+		elif frame % 16 == 8 and frame < 48 and bool(depot.call("is_confirming")):
+			depot.call("take_row", 0)
+			_point_at(Vector2(2, 2))
+	await _film("depot_payout", 3.6, 16, clicks)
 	for i in 30:
 		await process_frame
 	_shot("depot_after")
