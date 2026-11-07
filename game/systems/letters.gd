@@ -88,7 +88,10 @@ static func render(id: int, params: Dictionary) -> Dictionary:
 				"",
 				"Your %s shipment! What a find." % ordinal(count),
 				"Registered arrival: %s." % pony,
-				"Shipment quality: excellent. Yield: outstanding.",
+				# Not "Yield: outstanding" (playtest 2026-11-05 item 50: the hints were "too
+				# on the nose, too early"): a colour word, which only reads as a clue once
+				# Marigold has said what vivid coats are for.
+				"Shipment quality: excellent. Colour: very vivid!",
 				"Credit applied to your balance: %d bits." % credit,
 				"",
 				"You are in the top tier of partners this period!",

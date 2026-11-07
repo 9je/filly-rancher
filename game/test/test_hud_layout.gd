@@ -9,7 +9,7 @@ const StorageScript := preload("res://systems/storage.gd")
 const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const ObjectiveCardScript := preload("res://ui/objective_card.gd")
 const CANVAS := Rect2(0, 0, 1920, 1080)
-const LONG := "Pip: \"Smile! Cloudsdale wants you for the newsletter!\" Steward of the Week: 12 ponies placed, \"a yield of 124% above the valley average.\""
+const LONG := "Pip: \"Smile! You're in the Cloudsdale newsletter!\" Steward of the Week: 12 ponies placed. \"The whole valley will see your pens by Tuesday!\""
 
 
 func _rect(c: Control) -> Rect2:

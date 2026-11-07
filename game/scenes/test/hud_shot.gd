@@ -53,7 +53,7 @@ func _run() -> void:
 	var b: Node = hud.call("get_beam")
 	print("PERSON aiming=", hud.call("aiming_person"), " target=", b.call("has_target") if b != null else "nobeam", " holding=", b.call("is_holding") if b != null else "")
 	hud.call("set_aiming_person", false)
-	hud.call("toast", "Pip: \"Smile! Cloudsdale wants you for the newsletter!\" Steward of the Week: 12 ponies placed, \"a yield of 124% above the valley average.\"")
+	hud.call("toast", "Pip: \"Smile! You're in the Cloudsdale newsletter!\" Steward of the Week: 12 ponies placed. \"The whole valley will see your pens by Tuesday!\"")
 	hud.call("_on_captured", PonyInstanceScript.create(&"twilight"))
 	for i in 20:
 		await process_frame
