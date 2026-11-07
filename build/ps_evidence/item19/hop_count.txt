@@ -1,0 +1,1 @@
+JOY_HOPS hops=21 in 150.0 s, residents=8

@@ -1229,7 +1229,6 @@ func looks_hungry() -> bool:
 	return inst != null and inst.hunger >= NeedsScript.HUNGRY_THRESHOLD
 
 
-## A calm pony, not a shy one, who has the player in sight and not too close.
 ## THE LOOK, ON PURPOSE (PS1, playtest 2026-11-05 item 67: the half-lidded look "switch[ed]
 ## off as you get close (backwards)"; the owner liked it: "keep them, make them deliberate and
 ## shared by more ponies"). Any calm pony the player comes within COY_RADIUS of, close up
@@ -1291,6 +1290,9 @@ func is_coy() -> bool:
 ## Pause for a beat, then pick the next routine state.
 func _state_idle() -> Vector3:
 	if _state_timer <= 0.0:
+		# The global generator, not hers: her own keeps the wander reproducible.
+		if _action == &"" and wants_joy_hop(is_in_group(&"penned"), looks_hungry(), randf()):
+			play_action(&"hop")
 		_transition_to(_pick_routine())
 	return Vector3.ZERO
 
@@ -1593,6 +1595,19 @@ signal blinked
 ## WANDER or GRAZE. The first routine choice a freshly spawned pony makes is always
 ## WANDER: a herd dropped onto its spawn markers should walk off them and spread out,
 ## rather than a third of it standing rooted on the marker for the first few seconds.
+## A HOP FOR JOY (PS1, playtest 2026-11-05 items 19/23: "The rump bounce is barely seen: it
+## only fires on a pen flop or a hard landing"). A happy, fed pony in her pen, finishing an
+## idle beat, now and then hops instead (`roll` is a 0..1 draw); every hop bounces her rump as
+## she lands (play_action). Wild ponies have better things to do; a hungry one does not hop.
+const JOY_HOP_CHANCE := 0.05
+## Where in the hop clip her hooves meet the ground again, as a fraction of its length.
+const HOP_LAND_AT := 0.55
+
+
+static func wants_joy_hop(penned: bool, hungry: bool, roll: float) -> bool:
+	return penned and not hungry and roll < JOY_HOP_CHANCE
+
+
 func _pick_routine() -> int:
 	if not _has_wandered:
 		return State.WANDER
@@ -1859,6 +1874,12 @@ func play_action(clip: StringName) -> bool:
 	_action = clip
 	_anim.play(clip, 0.15)
 	_anim.speed_scale = 1.0
+	# Every hop lands rump first (items 19/23): her spring takes the kick as her hooves land.
+	if clip == &"hop" and is_inside_tree():
+		var land := _anim.get_animation(clip).length * HOP_LAND_AT
+		get_tree().create_timer(land, false, true).timeout.connect(func() -> void:
+			if is_instance_valid(self) and visuals != null:
+				RumpBounce.kick_on(visuals, 0.8))
 	if not _anim.animation_finished.is_connected(_on_action_finished):
 		_anim.animation_finished.connect(_on_action_finished)
 	return true
