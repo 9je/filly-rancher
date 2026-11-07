@@ -1,0 +1,17 @@
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+[31m    [Failed]:  [0m[3] expected to equal [1]:  Rarity is one of a kind; the two Sweetie Belles are not: ["from the crowd", "one of a kind: she asks before she goes", "one of a kind: she asks before she goes", "one of a kind: she asks before she goes"]
+      at line 55
+[31m    [Failed]:  [0m[0] expected to equal [2]:  each Sweetie Belle says she has a twin here: ["from the crowd", "one of a kind: she asks before she goes", "one of a kind: she asks before she goes", "one of a kind: she asks before she goes"]
+      at line 60
+[31m    [Failed]:  [0meach row says which character she is
+      at line 69
+[31m    [Failed]:  [0m[3] expected to equal [1]:  Rarity is one of a kind; the two Sweetie Belles are not: ["from the crowd", "one of a kind: she asks before she goes", "one of a kind: she asks before she goes", "one of a kind: she asks before she goes"]
+          at line 55
+[31m    [Failed]:  [0m[0] expected to equal [2]:  each Sweetie Belle says she has a twin here: ["from the crowd", "one of a kind: she asks before she goes", "one of a kind: she asks before she goes", "one of a kind: she asks before she goes"]
+          at line 60
+[31m    [Failed]:  [0meach row says which character she is
+          at line 69
+Tests                 2
+Passing Tests      none
+Failing Tests         2

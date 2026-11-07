@@ -359,6 +359,12 @@ func refresh() -> void:
 	var ponies: Array[Dictionary] = []
 	if _tab == Tab.DELIVER and not is_confirming():
 		ponies = deliver_rows()
+	# How many of each named character the pens hold, read once per draw for _tag().
+	_kind_counts = {}
+	for p: Dictionary in ponies:
+		var kind := String(p.get("kind", ""))
+		if not bool(p.get("stock", true)) and not kind.is_empty():
+			_kind_counts[kind] = int(_kind_counts.get(kind, 0)) + 1
 	_rows.columns = 2 if not ponies.is_empty() else 1
 	for i in lines.size():
 		var picked: bool = i == _selected and _tab != Tab.STATEMENT
@@ -421,8 +427,7 @@ func _pony_tile(holder: PanelContainer, pony: Dictionary) -> void:
 	who.add_theme_font_override(&"font", MenuStyleScript.title_font())
 	column.add_child(who)
 	var sub := Label.new()
-	sub.text = "from the crowd" if bool(pony.get("stock", true)) \
-		else "one of a kind: she asks before she goes"
+	sub.text = _tag(pony)
 	sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	MenuStyleScript.style_label(sub, 16, MenuStyleScript.COLOR_DIM)
 	column.add_child(sub)
@@ -434,6 +439,23 @@ func _pony_tile(holder: PanelContainer, pony: Dictionary) -> void:
 	price.add_theme_font_override(&"font", MenuStyleScript.numeral_font())
 	MenuStyleScript.style_label(price, 22, MenuStyleScript.COLOR_VALUE)
 	body.add_child(price)
+
+
+## THE LINE UNDER HER NAME (playtest 2026-11-05 item 63: 'everyone tagged "one of a kind"',
+## two Sweetie Belles among them). A Drifter is from the crowd; a named pony is one of a kind
+## only when no other pony in the pens is the same character. A save from before the
+## spawner stopped drawing owned ponies can still hold twins, and nobody owned is ever
+## deleted, so a twin says so rather than claiming to be unique.
+var _kind_counts := {}
+
+
+func _tag(pony: Dictionary) -> String:
+	if bool(pony.get("stock", true)):
+		return "from the crowd"
+	var same := int(_kind_counts.get(String(pony.get("kind", "")), 1))
+	if same <= 1:
+		return "one of a kind: she asks before she goes"
+	return "there are two of her here" if same == 2 else "there are %d of her here" % same
 
 
 ## A payment (a coin and its amount) or one of the two answers to a named pony's confirm.

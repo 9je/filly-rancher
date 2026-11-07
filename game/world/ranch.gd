@@ -2211,6 +2211,9 @@ func _penned_rows() -> Array[Dictionary]:
 				"uid": inst.uid,
 				"name": inst.display_name(),
 				"stock": inst.is_stock(),
+				# Which character she is, so the Depot tags "one of a kind" only on a pony who
+				# is (item 63: a save from before the spawner fix holds two Sweetie Belles).
+				"kind": String(inst.data_id),
 				"coat": _coat_word(inst),
 				"credit": _game_state.ledger.quote_delivery(rarity, inst.is_stock(),
 					_delivery_kind(inst), _delivery_cycle()) if _game_state != null
