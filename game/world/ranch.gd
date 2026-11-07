@@ -8599,10 +8599,22 @@ func _arrival(_delta: float) -> void:
 	if _arrival_started and not m.is_walking_to() \
 			and m.global_position.distance_to(player.global_position) > 6.0:
 		_arrival_started = false
-	if not _arrival_started:
+	# OUT OF THE SHOT (PS8, known gap M: "Marigold walks in front of the camera when she
+	# greets you"): she routes round the camera's line to the player and stops ahead of her,
+	# facing the camera (systems/greet_path.gd); the welcome opens once she is there.
+	var cam := get_viewport().get_camera_3d()
+	var eye: Vector3 = cam.global_position if cam != null \
+		else player.global_position + player.global_basis.z * 4.0
+	var stop: Vector3 = GreetPathScript.next_stop(m.global_position, player.global_position, eye)
+	# Re-aimed as she goes (each leg's stop moves with the player and the camera), and sent on
+	# again if the camera swung round while she stood.
+	var off_course: bool = m.walk_target.distance_to(stop) > 0.3 if m.is_walking_to() \
+		else m.global_position.distance_to(stop) > 0.6
+	if not _arrival_started or off_course:
 		_arrival_started = true
-		m.set_mode_walk_to(player.global_position + Vector3(1.6, 0, -2.2))
-	if m.global_position.distance_to(player.global_position) < 3.4:
+		m.set_mode_walk_to(stop)
+	if m.global_position.distance_to(player.global_position) < 3.4 \
+			and GreetPathScript.in_front(m.global_position, player.global_position, eye):
 		people.talk("marigold")
 
 
@@ -8642,6 +8654,7 @@ func _onboarding_state() -> Dictionary:
 
 const RanchToolsScript := preload("res://world/ranch_tools.gd")
 const HappeningsScript := preload("res://world/happenings.gd")
+const GreetPathScript := preload("res://systems/greet_path.gd")
 var happenings: Happenings
 const PonyTraitsScript := preload("res://systems/pony_traits.gd")
 const NeedsScript := preload("res://systems/needs.gd")
