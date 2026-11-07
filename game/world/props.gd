@@ -313,7 +313,7 @@ const LAYOUT := [
 	{"file": "saa_tree_narrow.glb", "at": Vector2(-17.0, -32.0), "yaw": 245.0, "s": 0.95, "family": &"mlp"},
 	# Copses rather than an even scatter: two or three trunks together read as
 	# woodland, evenly-spaced singles read as a car park.
-	{"file": "saa_tree_narrow.glb", "at": Vector2(-27.0, -14.0), "yaw": 60.0, "s": 1.20, "family": &"mlp"},
+	{"file": "saa_tree_narrow.glb", "at": Vector2(-30.0, -15.5), "yaw": 60.0, "s": 1.20, "family": &"mlp"},
 	{"file": "saa_tree_wide.glb", "at": Vector2(-27.5, -19.0), "yaw": 190.0, "s": 0.95, "family": &"mlp"},
 	{"file": "saa_tree_narrow.glb", "at": Vector2(30.0, 18.0), "yaw": 100.0, "s": 1.10, "family": &"mlp"},
 	{"file": "saa_tree_narrow.glb", "at": Vector2(33.0, 22.0), "yaw": 25.0, "s": 1.25, "family": &"mlp"},
@@ -551,11 +551,11 @@ const LAYOUT := [
 	# doors fit a pony, and the barn now reaches z -14, the Farmhouse x -9 to 11 and z -23 to
 	# -12, the Market x 12 to 28. The barn's working corner moved west of the Depot round the
 	# shed, the well and the coop went behind the house. test_nothing_inside_buildings checks it.
-	{"file": "saa_shed.glb", "at": Vector2(-22.0, -12.0), "yaw": 90.0, "family": &"mlp"},
-	{"file": "saa_wagon.glb", "at": Vector2(-24.0, -8.0), "yaw": 200.0, "family": &"mlp"},
-	{"file": "saa_hay_block.glb", "at": Vector2(-25.5, -14.5), "yaw": 15.0, "family": &"mlp"},
-	{"file": "saa_hay_pile.glb", "at": Vector2(-25.0, -11.8), "yaw": 40.0, "family": &"mlp"},
-	{"file": "saa_seed_bag.glb", "at": Vector2(-21.0, -9.5), "yaw": 300.0, "family": &"mlp"},
+	{"file": "saa_shed.glb", "at": Vector2(-22.4, -13.4), "yaw": 90.0, "family": &"mlp"},
+	{"file": "saa_wagon.glb", "at": Vector2(-22.6, -10.0), "yaw": 0.0, "family": &"mlp"},
+	{"file": "saa_hay_block.glb", "at": Vector2(-20.3, -15.3), "yaw": 15.0, "family": &"mlp"},
+	{"file": "saa_hay_pile.glb", "at": Vector2(-25.0, -13.6), "yaw": 40.0, "family": &"mlp"},
+	{"file": "saa_seed_bag.glb", "at": Vector2(-20.2, -11.6), "yaw": 300.0, "family": &"mlp"},
 	{"file": "mlp_farm_well.glb", "at": Vector2(-1.0, -26.5), "yaw": 60.0, "family": &"mlp"},
 	{"file": "mlp_chicken_coop.glb", "at": Vector2(4.5, -27.0), "yaw": 180.0, "family": &"mlp"},
 	{"file": "mlp_crate.glb", "at": Vector2(12.0, -11.2), "yaw": 30.0, "family": &"mlp"},

@@ -13,7 +13,7 @@ extends RefCounted
 const PROPS := "res://assets/converted/props/"
 const CATALOGUE: Array[Dictionary] = [
 	{"id": &"flower_bushes", "name": "Flower Bushes", "cost": 200, "at": Vector3(8.0, 0, -6.5), "yaw": 0.0, "clear": 1.2, "scene": PROPS + "mlp_bush.glb"},
-	{"id": &"hay_bales", "name": "Hay Bales", "cost": 300, "at": Vector3(-14.5, 0, -13.65), "yaw": 20.0, "clear": 1.2, "scene": PROPS + "saa_hay_pile.glb"},
+	{"id": &"hay_bales", "name": "Hay Bales", "cost": 300, "at": Vector3(-13.6, 0, -13.75), "yaw": 20.0, "clear": 1.2, "scene": PROPS + "saa_hay_pile.glb"},
 	{"id": &"picnic_table", "name": "Picnic Table", "cost": 450, "at": Vector3(10.0, 0, 4.0), "yaw": 15.0, "clear": 1.4, "scene": PROPS + "school_picnic_table.glb"},
 	{"id": &"wagon", "name": "Farm Wagon", "cost": 800, "at": Vector3(-5.0, 0, 2.8), "yaw": 70.0, "clear": 1.6, "scene": PROPS + "saa_wagon.glb"},
 	{"id": &"well", "name": "Wishing Well", "cost": 1200, "at": Vector3(6.0, 0, 12.0), "yaw": 0.0, "clear": 1.4, "scene": PROPS + "mlp_farm_well.glb"},
