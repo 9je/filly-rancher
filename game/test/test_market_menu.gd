@@ -143,7 +143,7 @@ func test_a_permit_in_the_unlocks_reads_as_owned_and_the_others_still_show_a_pri
 
 
 func test_confirm_on_an_affordable_item_asks_to_buy_it() -> void:
-	_econ.sell(PonyDataScript.Rarity.LEGENDARY, 1)  # 100 bits
+	_econ.grant(100)
 	_menu.open()
 	_menu.set_tab(MarketMenu.Tab.BUY)
 	var cheapest := _menu.buy_rows()[0]

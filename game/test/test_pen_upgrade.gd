@@ -72,8 +72,8 @@ func test_the_pens_form_an_upgrade_ladder() -> void:
 	assert_eq(small.upgrades_to, &"pen_large", "a Paddock grows into a Big Pen")
 	assert_eq(large.upgrades_to, &"pen_grand", "a Big Pen grows into a Grand Pen")
 	assert_eq(grand.upgrades_to, &"", "a Grand Pen is the top")
-	assert_eq(small.upgrade_price(large), 150, "Paddock to Big Pen is the Big Pen's own 150")
-	assert_eq(large.upgrade_price(grand), 330, "Big Pen to Grand Pen is the difference, 330")
+	assert_eq(small.upgrade_price(large), 175, "Paddock to Big Pen is the Big Pen's own 175")
+	assert_eq(large.upgrade_price(grand), 375, "Big Pen to Grand Pen is the difference, 375")
 
 
 # --- the slot ------------------------------------------------------------------------------
@@ -152,7 +152,7 @@ func test_an_empty_bag_at_a_paddock_offers_the_upgrade() -> void:
 	var act: Dictionary = ranch.current_interaction()
 	assert_eq(int(act.get("kind", 0)), InteractionScript.Kind.PEN_UPGRADE,
 		"with nothing in the bag, E at the Paddock is the upgrade: %s" % act)
-	assert_eq(int(act.get("price", 0)), 150)
+	assert_eq(int(act.get("price", 0)), 175)
 	assert_eq(String(act.get("what", "")), "Big Pen")
 
 

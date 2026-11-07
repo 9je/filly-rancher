@@ -7,6 +7,6 @@ script = ExtResource("1_shop")
 id = &"decor_statue_rainbowdash"
 display_name = "Rainbow Dash Statue"
 description = "Rainbow Dash in stone, on the plaza. Twenty percent cooler."
-cost = 20000
+cost = 23000
 kind = 4
 decor_id = &"statue_rainbowdash"

@@ -7,6 +7,6 @@ script = ExtResource("1_shop")
 id = &"decor_wagon"
 display_name = "Farm Wagon"
 description = "A farm wagon, parked west of the crossroads."
-cost = 800
+cost = 920
 kind = 4
 decor_id = &"wagon"

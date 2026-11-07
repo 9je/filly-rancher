@@ -90,7 +90,7 @@ func test_gem_price_reads_the_economy_table() -> void:
 # --- buying care --------------------------------------------------------------------------
 
 func test_buying_care_spends_bits_and_adds_the_food() -> void:
-	_econ.sell(PonyDataScript.Rarity.COMMON, 4)  # 20 bits
+	_econ.grant(20)
 	var hay := _care("hay", 5, "hay", 2)
 	assert_true(_shop.can_buy(hay))
 	watch_signals(_shop)
@@ -111,7 +111,7 @@ func test_buying_what_you_cannot_afford_is_refused_and_nothing_moves() -> void:
 
 
 func test_care_can_be_bought_repeatedly() -> void:
-	_econ.sell(PonyDataScript.Rarity.RARE, 1)  # 30 bits
+	_econ.grant(30)
 	var hay := _care("hay", 5, "hay")
 	assert_true(_shop.buy(hay))
 	assert_true(_shop.buy(hay))
@@ -122,7 +122,7 @@ func test_care_can_be_bought_repeatedly() -> void:
 # --- buying gear --------------------------------------------------------------------------
 
 func test_buying_gear_records_the_unlock_once() -> void:
-	_econ.sell(PonyDataScript.Rarity.LEGENDARY, 3)  # 300 bits
+	_econ.grant(300)
 	var bag := _gear("bigger_saddlebag", 120)
 	assert_false(_shop.owns_gear(&"bigger_saddlebag"))
 	assert_true(_shop.buy(bag))
@@ -133,7 +133,7 @@ func test_buying_gear_records_the_unlock_once() -> void:
 
 func test_gear_already_owned_cannot_be_bought_again() -> void:
 	_unlocks.append("long_beam")
-	_econ.sell(PonyDataScript.Rarity.LEGENDARY, 5)
+	_econ.grant(500)
 	var beam := _gear("long_beam", 200)
 	assert_true(_shop.owns_gear(&"long_beam"))
 	assert_false(_shop.can_buy(beam))
@@ -143,7 +143,7 @@ func test_gear_already_owned_cannot_be_bought_again() -> void:
 
 
 func test_a_care_item_with_no_food_is_refused_before_any_bits_move() -> void:
-	_econ.sell(PonyDataScript.Rarity.RARE, 1)
+	_econ.grant(30)
 	var broken := _care("broken", 5, "")
 	assert_false(_shop.can_buy(broken))
 	assert_false(_shop.buy(broken))
@@ -151,7 +151,7 @@ func test_a_care_item_with_no_food_is_refused_before_any_bits_move() -> void:
 
 
 func test_buying_a_permit_records_it_once_and_never_twice() -> void:
-	_econ.sell(PonyDataScript.Rarity.LEGENDARY, 5)  # 500 bits
+	_econ.grant(500)
 	var permit: ShopItem = ShopItemScript.new()
 	permit.id = &"permit_lake"
 	permit.display_name = "Permit: The Lake"
@@ -171,7 +171,7 @@ func test_buying_a_permit_records_it_once_and_never_twice() -> void:
 
 
 func test_a_permit_with_no_zone_is_refused() -> void:
-	_econ.sell(PonyDataScript.Rarity.LEGENDARY, 5)
+	_econ.grant(500)
 	var broken: ShopItem = ShopItemScript.new()
 	broken.id = &"permit_nowhere"
 	broken.cost = 1
@@ -181,7 +181,7 @@ func test_a_permit_with_no_zone_is_refused() -> void:
 
 
 func test_the_build_kind_is_still_refused() -> void:
-	_econ.sell(PonyDataScript.Rarity.LEGENDARY, 5)
+	_econ.grant(500)
 	var build: ShopItem = ShopItemScript.new()
 	build.id = &"pen"
 	build.cost = 1

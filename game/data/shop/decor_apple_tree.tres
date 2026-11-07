@@ -7,6 +7,6 @@ script = ExtResource("1_shop")
 id = &"decor_apple_tree"
 display_name = "Apple Tree"
 description = "Your own apple tree, south of the yard."
-cost = 3500
+cost = 4025
 kind = 4
 decor_id = &"apple_tree"

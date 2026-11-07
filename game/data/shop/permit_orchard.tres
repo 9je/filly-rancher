@@ -7,6 +7,6 @@ script = ExtResource("1_shop")
 id = &"permit_orchard"
 display_name = "Permit: The Orchard"
 description = "Opens the gate east of the homestead. Apple country, and the ponies who farm it."
-cost = 150
+cost = 175
 kind = 1
 permit_zone = &"orchard"

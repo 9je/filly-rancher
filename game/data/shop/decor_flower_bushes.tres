@@ -7,6 +7,6 @@ script = ExtResource("1_shop")
 id = &"decor_flower_bushes"
 display_name = "Flower Bushes"
 description = "A bank of flowering bushes for the plaza."
-cost = 200
+cost = 230
 kind = 4
 decor_id = &"flower_bushes"

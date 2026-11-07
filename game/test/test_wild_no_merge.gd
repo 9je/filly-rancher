@@ -48,7 +48,7 @@ func test_ten_wild_ponies_never_go_into_each_other() -> void:
 	floor.add_child(shape)
 	floor.collision_layer = 0xFFFF
 	add_child_autofree(floor)
-	var reg: PonyRegistry = GameState.get_registry()
+	var reg: PonyRegistry = preload("res://systems/pony_instance.gd").get_registry()
 	var ponies: Array[Node3D] = []
 	for i in TEN.size():
 		var p: Node3D = PonyScene.instantiate()

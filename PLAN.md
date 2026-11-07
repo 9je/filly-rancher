@@ -512,6 +512,7 @@ Also in PS6: fullscreen chosen during loading stays fullscreen (1; `test_fullscr
 - Fleeing: the notice radius grows by a quarter; a fleeing pony probes ahead and bends toward the open side of a tree or prop rather than running straight into it.
 - Repeat deliveries: `Ledger` counts deliveries per kind per cycle (every Drifter is one kind) and scales the credit and the handler share by 1.0, 0.7, 0.5, then 0.35; the count resets at a new cycle.
 - Halfway: gem sales pay 0.85 of today; pens, permits, gear and decor cost 1.15 of today, rounded to 5.
+- **Built 2026-11-06 (item 69 FIXED-UNREVIEWED in the ledger):** as above, except the shy notice range is 16.5 m, not 17.5 (the sneak must stay inside beam reach), gem values are lowered to whole bits (4/10/26/85) rather than scaled per sale, and the first-hour delivery count is left to the owner's playtest (see DECISIONS.md).
 - The pacing check is a model, not the bot: `tools/pacing.sh` is a bot playthrough (banned by the owner), so `test_pacing_model.gd` replays the sell-the-repeats strategy from the game's own constants and asserts the three bands.
 
 ### Task PS10: The FS parts built short (from the review on 2026-11-06)

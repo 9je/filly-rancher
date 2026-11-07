@@ -444,7 +444,7 @@ const MAX_PLOT_SLOTS := 6
 ## and the fourth costs more than either so it is the mid-game goal. Reasoning in
 ## DECISIONS.md, 2026-10-25. Keyed by slot_id (ranch.tscn), so a re-laid-out map keeps the
 ## rule as long as it keeps the ids.
-const PLOT_CLEAR_COSTS := {"slot_3": 100, "slot_4": 250}
+const PLOT_CLEAR_COSTS := {"slot_3": 115, "slot_4": 290}
 
 ## The story flag that remembers a plot was cleared (saved with the story, so no save
 ## format change). Also set for any overgrown-by-rule plot a save already built on.
@@ -2175,7 +2175,9 @@ func _penned_rows() -> Array[Dictionary]:
 				"name": inst.display_name(),
 				"stock": inst.is_stock(),
 				"coat": _coat_word(inst),
-				"credit": LedgerScript.delivery_credit(rarity, inst.is_stock()),
+				"credit": _game_state.ledger.quote_delivery(rarity, inst.is_stock(),
+					_delivery_kind(inst), _delivery_cycle()) if _game_state != null
+					else LedgerScript.delivery_credit(rarity, inst.is_stock()),
 				# For the Depot's tile: her race's icon on a disc of her coat.
 				"race": PonyTraitsScript.race_of(inst),
 				"coat_color": _coat_colour(inst),
@@ -3261,7 +3263,8 @@ func deliver_pony(uid: StringName) -> Dictionary:
 
 	var data: PonyData = inst.data()
 	var rarity: int = data.rarity if data != null else PonyDataScript.Rarity.COMMON
-	var credit: int = _game_state.ledger.credit_delivery(rarity, inst.is_stock())
+	var credit: int = _game_state.ledger.credit_delivery(rarity, inst.is_stock(),
+		_delivery_kind(inst), _delivery_cycle())
 	var named: bool = not inst.is_stock()
 	if named:
 		_game_state.compendium.mark_processed(inst.data_id)
@@ -5044,6 +5047,15 @@ static func delivery_toast(sender: String, shipments: int, credit: int, balance_
 
 
 ## The handler's share of a delivery (Ledger.handler_share, PT9).
+## Which kind she counts as for the repeat price (Ledger.REPEAT_FALLOFF): every Drifter is one.
+static func _delivery_kind(inst: PonyInstance) -> StringName:
+	return LedgerScript.DRIFTER_KIND if inst.is_stock() else inst.data_id
+
+
+func _delivery_cycle() -> int:
+	return _world.cycle_index() if _world != null else 0
+
+
 static func handler_share(credit: int) -> int:
 	return LedgerScript.handler_share(credit)
 

@@ -7,6 +7,6 @@ script = ExtResource("1_shop")
 id = &"decor_picnic_table"
 display_name = "Picnic Table"
 description = "Somewhere to sit by the mailbox."
-cost = 450
+cost = 520
 kind = 4
 decor_id = &"picnic_table"

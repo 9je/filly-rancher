@@ -1148,8 +1148,12 @@ static func secure_bounds() -> Vector2:
 ## weave_for(rarity) radians a second and the aim reels her back at WEAVE_REEL a second, so
 ## left untracked she settles weave / reel off it, past ON_TARGET_RAD; only time with her on
 ## the crosshair counts toward securing her (_steady_seconds), while her struggle clock runs
-## regardless. A common or a Drifter does not weave at all: caught exactly as before.
-const WEAVE_BY_RARITY := [0.0, 0.42, 0.66, 0.9]
+## regardless. PS9 (item 69: "Catching is too easy (all but the toughest)"): EVERY wild pony
+## weaves now, a Drifter least (WEAVE_DRIFTER), and every weaving hold needs
+## WEAVE_STEADY_EXTRA more seconds on the crosshair, so even a common takes two.
+const WEAVE_BY_RARITY := [0.55, 0.8, 1.0, 1.2]
+const WEAVE_DRIFTER := 0.35
+const WEAVE_STEADY_EXTRA := 1.2
 const WEAVE_REEL := 2.6
 const ON_TARGET_RAD := 0.12
 ## Extra seconds of struggle a weaving hold is given, so tracking her is a test and not a coin
@@ -1157,7 +1161,9 @@ const ON_TARGET_RAD := 0.12
 const WEAVE_GRACE := 1.6
 
 
-static func weave_for(rarity: int) -> float:
+static func weave_for(rarity: int, is_stock: bool = false) -> float:
+	if is_stock:
+		return WEAVE_DRIFTER
 	return float(WEAVE_BY_RARITY[clampi(rarity, 0, WEAVE_BY_RARITY.size() - 1)])
 
 
@@ -1227,9 +1233,9 @@ static func wrench_chance_for(personality: int, prior_holds: int) -> float:
 ## else, and on any other attempt the wrench moment is not.
 static func roll_clocks(personality: int, prior_holds: int,
 		wrench_roll: float, secure_roll: float, window_roll: float,
-		catches: int = 0) -> Dictionary:
+		catches: int = 0, steady_extra: float = 0.0) -> Dictionary:
 	var secure: float = secure_seconds_for(personality, catches) \
-		+ lerpf(-SECURE_JITTER, SECURE_JITTER, clampf(secure_roll, 0.0, 1.0))
+		+ lerpf(-SECURE_JITTER, SECURE_JITTER, clampf(secure_roll, 0.0, 1.0)) + steady_extra
 	var wrenches: bool = wrench_roll < wrench_chance_for(personality, prior_holds)
 	var bounds: Vector2 = window_bounds_for(personality)
 	var struggle: float = secure + lerpf(bounds.x, bounds.y, clampf(window_roll, 0.0, 1.0))
@@ -1680,13 +1686,15 @@ func _begin_hold(body: Node3D) -> void:
 		body.beam_holds += 1
 		if first_catch_grace:
 			prior_holds = maxi(prior_holds, WRENCH_GRACE_HOLDS)
+		if data != null:
+			_weave = weave_for(data.rarity, body.is_stock())
 		var clocks := roll_clocks(personality, prior_holds,
-			_rng.randf(), _rng.randf(), _rng.randf(), catch_count)
+			_rng.randf(), _rng.randf(), _rng.randf(), catch_count,
+			WEAVE_STEADY_EXTRA if _weave > 0.0 else 0.0)
 		_secure_seconds = clocks["secure"]
 		_struggle_seconds = clocks["struggle"]
 		_wrenching = clocks["wrenches"]
-		if data != null and not body.is_stock():
-			_weave = weave_for(data.rarity)
+		if _weave > 0.0:
 			# Not on a wrench: a wrench is a struggle shorter than the subdue (roll_clocks), and
 			# the grace would turn it into a catch (checkpoint review).
 			if _weave > 0.0 and not _wrenching:

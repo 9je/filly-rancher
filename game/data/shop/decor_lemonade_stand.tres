@@ -7,6 +7,6 @@ script = ExtResource("1_shop")
 id = &"decor_lemonade_stand"
 display_name = "Lemonade Stand"
 description = "A stand of your own past the pens. Nopony buys anything, but it looks the part."
-cost = 9000
+cost = 10350
 kind = 4
 decor_id = &"lemonade_stand"

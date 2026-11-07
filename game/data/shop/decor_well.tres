@@ -7,6 +7,6 @@ script = ExtResource("1_shop")
 id = &"decor_well"
 display_name = "Wishing Well"
 description = "Make a wish. It costs nothing more."
-cost = 1200
+cost = 1380
 kind = 4
 decor_id = &"well"

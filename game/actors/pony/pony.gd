@@ -111,6 +111,7 @@ const LAND_BOUNCE_FROM := 3.0
 const PonyTraitsScript := preload("res://systems/pony_traits.gd")
 const PonyLodScript := preload("res://actors/pony/pony_lod.gd")
 const GaitScript := preload("res://systems/gait.gd")
+const LayersScript := preload("res://world/collision_layers.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const PonyVisualsScript := preload("res://actors/pony/pony_visuals.gd")
 const PlayerScript := preload("res://actors/player/player.gd")
@@ -191,7 +192,12 @@ const DETECTION_RADIUS := 12.0
 ## clamped by flee_speed_for()'s own FLEE_TOP_SPEED (4.29 m/s, pinned for capture balance,
 ## not for what the gallop clip can depict), so pushing difficulty through it would saturate
 ## there and leave a chase that closes at 0.91 m/s -- which is not "difficult", it is "long".
-const SHY_NOTICE_BONUS := 2.0
+##
+## PS9 (playtest 2026-11-05 item 69, "Catching is too easy"): 16.5 m in all (was 14). The
+## plan said a quarter further, 17.5; it stops at 16.5 because the sneak must still beat
+## the beam (half of 16.5 is 8.25, inside MagicBeam.REACH's 8.5; test_magic_beam). Only SHY
+## reacts by running, so only she sees further; a CURIOUS pony still walks over from 12 m.
+const SHY_NOTICE_BONUS := 4.5
 
 ## What a pony's notice radius is MULTIPLIED BY while the player is sneaking (holding
 ## Player.SNEAK_ACTION). SHY 14.0 -> 7.0 m, everyone else 12.0 -> 6.0 m.
@@ -1196,7 +1202,46 @@ func _state_flee() -> Vector3:
 		# rather than dividing by zero.
 		away = -visuals.global_transform.basis.z
 		away.y = 0.0
-	return _leash(away.normalized()) * _flee_speed
+	return _leash(_bend_round(away.normalized())) * _flee_speed
+
+
+## SMARTER FLEEING (PS9, item 69). How far ahead a fleeing pony looks for a tree or a prop,
+## the turns she tries to get round one (radians, nearest first), and how far either side
+## of her middle she looks, so a trunk that would catch her shoulder counts.
+const FLEE_LOOK_AHEAD := 2.5
+const FLEE_BENDS := [0.5, 1.0, 1.5]
+const FLEE_SHOULDER := 0.35
+
+## Which way she last bent (+1 or -1), so she keeps to one side of an obstacle instead of
+## dithering in front of it.
+var _bend_side := 1.0
+
+
+## `away` if the way ahead is clear, else the smallest turn off it that is, on the side she
+## last chose first. Straight on when nothing is clear: the pinned rule (_settle_wary) has her.
+func _bend_round(away: Vector3) -> Vector3:
+	if not is_inside_tree() or not _flee_blocked(away):
+		return away
+	for turn: float in FLEE_BENDS:
+		for side: float in [_bend_side, -_bend_side]:
+			var heading := away.rotated(Vector3.UP, turn * side)
+			if not _flee_blocked(heading):
+				_bend_side = side
+				return heading
+	return away
+
+
+func _flee_blocked(heading: Vector3) -> bool:
+	var space := get_world_3d().direct_space_state
+	var side := heading.cross(Vector3.UP).normalized() * FLEE_SHOULDER
+	for offset: Vector3 in [Vector3.ZERO, side, -side]:
+		var from := global_position + Vector3(0.0, 0.6, 0.0) + offset
+		var q := PhysicsRayQueryParameters3D.create(from, from + heading * FLEE_LOOK_AHEAD,
+			LayersScript.PROPS)
+		q.exclude = [get_rid()]
+		if not space.intersect_ray(q).is_empty():
+			return true
+	return false
 
 
 ## Walk toward the player and stop APPROACH_STOP_DISTANCE short, watching them. Ends

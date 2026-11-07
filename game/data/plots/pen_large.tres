@@ -6,7 +6,7 @@
 script = ExtResource("1_pen02")
 id = &"pen_large"
 display_name = "Big Pen"
-cost = 150
+cost = 175
 scene_path = "res://world/pen.tscn"
 description = "Same square of ground, twice the ponies. Six of them, on proper sawn rails."
 capacity = 6

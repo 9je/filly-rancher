@@ -7,6 +7,6 @@ script = ExtResource("1_shop")
 id = &"decor_hay_bales"
 display_name = "Hay Bales"
 description = "A cosy heap of hay by the crossroads."
-cost = 300
+cost = 345
 kind = 4
 decor_id = &"hay_bales"

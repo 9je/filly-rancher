@@ -42,11 +42,15 @@ extends RefCounted
 ## because catching a legendary pony is itself far rarer than twenty times as hard, and
 ## the payoff for having found and kept one happy should read as a real windfall, not a
 ## rounding error next to a common pony's output.
+##
+## PS9 (playtest 2026-11-05 item 69: "~800 gems per Market trip mid-game"): about 15% under
+## the 5 / 12 / 30 / 100 they were, the owner's "halfway". Whole bits, so the price a tile
+## shows is the price paid. Deliveries are priced off Ledger's own table, not this one.
 const GEM_VALUE_BY_RARITY: Dictionary = {
-	PonyData.Rarity.COMMON: 5,
-	PonyData.Rarity.UNCOMMON: 12,
-	PonyData.Rarity.RARE: 30,
-	PonyData.Rarity.LEGENDARY: 100,
+	PonyData.Rarity.COMMON: 4,
+	PonyData.Rarity.UNCOMMON: 10,
+	PonyData.Rarity.RARE: 26,
+	PonyData.Rarity.LEGENDARY: 85,
 }
 
 ## Emitted whenever `bits` actually changes -- once per sale that earned something, once

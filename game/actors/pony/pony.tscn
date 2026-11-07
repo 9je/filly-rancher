@@ -7,7 +7,7 @@ radius = 0.42
 height = 1.3
 
 [sub_resource type="SphereShape3D" id="DetectionSphere"]
-radius = 14.0
+radius = 16.5
 
 [node name="Pony" type="CharacterBody3D"]
 script = ExtResource("1")

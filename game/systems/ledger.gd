@@ -78,12 +78,19 @@ const UPKEEP_PER_PERMIT := 450
 const INTEREST_RATE := 0.04
 const MIN_SERVICE_CHARGE := 25
 
-## Credit for delivering one pony of the crowd, and the multiplier a NAMED pony's gem value
-## is scaled by (game/systems/economy.gd GEM_VALUE_BY_RARITY times this), so a legendary
-## clears 4,000. A named delivery is the best money in the game by a wide margin. That is
+## Credit for delivering one pony of the crowd, and the multiplier a NAMED pony's unit value
+## is scaled by (DELIVERY_UNIT_BY_RARITY times this), so a legendary clears 4,000. The units
+## are the gem values from before PS9 trimmed gem sales, kept here so a delivery is not cut
+## twice (the repeat falloff is its trim). A named delivery is the best money in the game by a wide margin. That is
 ## deliberate, and it is the whole hinge of the story.
 const DELIVERY_CREDIT_STOCK := 300
 const DELIVERY_NAMED_MULTIPLIER := 40
+const DELIVERY_UNIT_BY_RARITY := {
+	PonyData.Rarity.COMMON: 5,
+	PonyData.Rarity.UNCOMMON: 12,
+	PonyData.Rarity.RARE: 30,
+	PonyData.Rarity.LEGENDARY: 100,
+}
 
 ## What the first rung of the ladder costs in bits.
 const COLLECTOR_FEE := 500
@@ -145,6 +152,15 @@ var padlocked_slots: Array = []
 ## Cycle index the beam comes back at, or -1 when it was never recalled.
 var beam_recalled_until := -1
 
+## A REPEAT PAYS LESS (PS9, playtest 2026-11-05 item 69: the owner's money came from sending
+## up every pony who was not one of a kind). Within one cycle the same kind is credited full,
+## then 70%, 50%, and 35% from the fourth on; every Drifter is one kind (DRIFTER_KIND); a new
+## cycle starts the count again. `repeats` is {kind: deliveries this cycle} for repeats_cycle.
+const REPEAT_FALLOFF := [1.0, 0.7, 0.5, 0.35]
+const DRIFTER_KIND := &"drifter"
+var repeats := {}
+var repeats_cycle := -1
+
 
 ## Which collection period `cycle` falls in.
 static func period_of(cycle: int) -> int:
@@ -173,8 +189,17 @@ static func handler_share(credit: int) -> int:
 static func delivery_credit(rarity: int, is_stock: bool) -> int:
 	if is_stock:
 		return DELIVERY_CREDIT_STOCK
-	var unit: int = int(EconomyScript.GEM_VALUE_BY_RARITY.get(rarity, 0))
+	var unit: int = int(DELIVERY_UNIT_BY_RARITY.get(rarity, 0))
 	return unit * DELIVERY_NAMED_MULTIPLIER
+
+
+## What delivering her would credit now, counting the repeats so far this cycle. Spends nothing.
+func quote_delivery(rarity: int, is_stock: bool, kind: StringName = &"", cycle: int = -1) -> int:
+	var base: int = delivery_credit(rarity, is_stock)
+	if kind == &"" or cycle != repeats_cycle:
+		return base
+	var n: int = int(repeats.get(String(kind), 0))
+	return int(round(float(base) * float(REPEAT_FALLOFF[mini(n, REPEAT_FALLOFF.size() - 1)])))
 
 
 func upkeep_for(built_plots: int, open_permits: int, rank_multiplier: float = 1.0) -> int:
@@ -254,10 +279,16 @@ func run_collection_day(cycle: int, built_plots: int, open_permits: int,
 
 ## One pony delivered. Returns the credit applied, counts her toward the quota, and MAY
 ## take the balance below the floor and into credit: stock settles the principal.
-func credit_delivery(rarity: int, is_stock: bool) -> int:
-	var credit: int = delivery_credit(rarity, is_stock)
+## `kind` and `cycle` price her as a repeat (REPEAT_FALLOFF); an empty kind is not counted.
+func credit_delivery(rarity: int, is_stock: bool, kind: StringName = &"", cycle: int = -1) -> int:
+	var credit: int = quote_delivery(rarity, is_stock, kind, cycle)
 	if credit <= 0:
 		return 0
+	if kind != &"":
+		if cycle != repeats_cycle:
+			repeats = {}
+			repeats_cycle = cycle
+		repeats[String(kind)] = int(repeats.get(String(kind), 0)) + 1
 	balance -= credit
 	delivered_this_period += 1
 	shipments += 1
@@ -371,6 +402,8 @@ func to_dict() -> Dictionary:
 		"revoked_permits": revoked_permits.duplicate(),
 		"padlocked_slots": padlocked_slots.duplicate(),
 		"beam_recalled_until": beam_recalled_until,
+		"repeats": repeats.duplicate(),
+		"repeats_cycle": repeats_cycle,
 	}
 
 
@@ -396,6 +429,11 @@ static func from_dict(d: Dictionary) -> Ledger:
 	out.revoked_permits = _string_list(d.get("revoked_permits", []))
 	out.padlocked_slots = _string_list(d.get("padlocked_slots", []))
 	out.beam_recalled_until = int(d.get("beam_recalled_until", -1))
+	out.repeats_cycle = int(d.get("repeats_cycle", -1))
+	var reps: Variant = d.get("repeats", {})
+	if typeof(reps) == TYPE_DICTIONARY:
+		for k in (reps as Dictionary):
+			out.repeats[str(k)] = maxi(0, int(reps[k]))
 	return out
 
 

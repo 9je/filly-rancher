@@ -7,6 +7,6 @@ script = ExtResource("1_shop")
 id = &"decor_chicken_coop"
 display_name = "Chicken Coop"
 description = "A coop east of the Market. Fluttershy would approve."
-cost = 12000
+cost = 13800
 kind = 4
 decor_id = &"chicken_coop"

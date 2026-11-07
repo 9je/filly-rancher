@@ -133,7 +133,7 @@ func test_clearing_spends_and_is_remembered() -> void:
 	var before: int = econ.bits
 	ranch.call("_on_clear_chosen", slot, slot.clear_cost())
 	assert_false(slot.is_overgrown())
-	assert_eq(econ.bits, before - 100)
+	assert_eq(econ.bits, before - 115)
 	var gs = ranch.get("_game_state")
 	assert_true(gs.story.has_flag("plot_cleared_slot_3"), "a save remembers it")
 	ranch.call("_apply_overgrowth")

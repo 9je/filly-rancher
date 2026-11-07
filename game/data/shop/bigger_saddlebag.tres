@@ -7,6 +7,6 @@ script = ExtResource("1_shop")
 id = &"bigger_saddlebag"
 display_name = "Bigger Saddlebag"
 description = "Six more pockets. Carry eighteen ponies before you have to walk home."
-cost = 120
+cost = 140
 kind = 0
 gear_id = &"bigger_saddlebag"
