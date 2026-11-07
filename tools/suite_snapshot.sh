@@ -8,8 +8,11 @@ SHA=$(git rev-parse --short "$REV")
 DIR="${TMPDIR:-/tmp}/filly_suite_$SHA"
 git worktree remove --force "$DIR" 2>/dev/null || true
 git worktree add -q --detach "$DIR" "$SHA"
-# The engine is gitignored: link it in.
-mkdir -p "$DIR/tools/bin" && ln -sf "$PWD/tools/bin/godot" "$DIR/tools/bin/godot"
+# The engine, GUT and the converted models are gitignored: link them in.
+mkdir -p "$DIR/tools/bin" "$DIR/game/addons" "$DIR/game/assets"
+ln -sf "$PWD/tools/bin/godot" "$DIR/tools/bin/godot"
+ln -sfn "$PWD/game/addons/gut" "$DIR/game/addons/gut"
+ln -sfn "$PWD/game/assets/converted" "$DIR/game/assets/converted"
 # Reuse the main tree's import cache so the snapshot doesn't re-import every asset.
 if [ -d game/.godot ] && [ ! -d "$DIR/game/.godot" ]; then cp -r game/.godot "$DIR/game/.godot"; fi
 echo "suite on $SHA in $DIR"
