@@ -1,0 +1,18 @@
+SCRIPT ERROR: Trying to assign value of type 'Nil' to a variable of type 'bool'.
+          at: _static_init (res://addons/gut/gut_loader.gd:35)
+RANCH props placed=112 expected=112 shapes=229 missing=-
+[31m    [Failed]:  [0m[Slot1:<Area3D#173660965273>(plot_slot.gd)] expected to not equal [Slot1:<Area3D#173660965273>(plot_slot.gd)]:  not the paddock she has upgraded and filled
+      at line 79
+[31m    [Failed]:  [0m[Slot1:<Area3D#173660965273>(plot_slot.gd)] expected to equal [Slot3:<Area3D#173694519707>(plot_slot.gd)]:  the pen with the Drifter who can Bloom
+      at line 80
+RANCH props placed=112 expected=112 shapes=229 missing=-
+[31m    [Failed]:  [0m[Slot1:<Area3D#173660965273>(plot_slot.gd)] expected to not equal [Slot1:<Area3D#173660965273>(plot_slot.gd)]:  not the paddock she has upgraded and filled
+          at line 79
+[31m    [Failed]:  [0m[Slot1:<Area3D#173660965273>(plot_slot.gd)] expected to equal [Slot3:<Area3D#173694519707>(plot_slot.gd)]:  the pen with the Drifter who can Bloom
+          at line 80
+Tests                 2
+Passing Tests         1
+Failing Tests         1
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 4 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)

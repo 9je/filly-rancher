@@ -12,8 +12,9 @@ extends RefCounted
 ## (PathRules.contract: want, kind, got).
 ##
 ## Returns {id, goal, icon (PlaceSign.Icon), words} or {} for no objective. goal is a Guide
-## goal (&"marigold", &"static", &"catch", &"pens", &"depot") or &"" when the objective is a
-## wait, not a place.
+## goal (&"marigold", &"static", &"catch", &"pens", &"depot", &"bloom" (the pen holding a
+## Drifter who can Bloom), &"drifter" (a wild Drifter)) or &"" when the objective is a wait,
+## not a place.
 
 ## The invitation's gate (data/dialogue_src/act2.txt, marigold_invites).
 const INVITE_DELIVERIES := 6
@@ -94,11 +95,14 @@ static func _acts_one_two(s: Dictionary, flags: Array) -> Dictionary:
 		if b < INVITE_BLOOMS:
 			# ONLY A DRIFTER BLOOMS (PT3; playtest 2026-11-05 item 53): with every Drifter
 			# delivered and the named ponies kept, "Help ponies Bloom" pointed at pens where
-			# nobody could. Say who, and send her for one when none is penned.
+			# nobody could. Say who, and send her for one when none is penned. The goals are
+			# her own, not &"pens" and &"catch": those lead to a pen with ROOM and the nearest
+			# wild pony of any kind, so with every pen upgraded and full the trail fell back
+			# to the old Paddock and stayed there ("0/2", item 53).
 			if int(s.get("drifters", 1)) <= 0:
-				return _o(&"bloom", &"catch", PlaceSign.Icon.STAR,
+				return _o(&"bloom", &"drifter", PlaceSign.Icon.STAR,
 					"Pen a Drifter to Bloom %d/%d" % [b, INVITE_BLOOMS])
-			return _o(&"bloom", &"pens", PlaceSign.Icon.FENCE,
+			return _o(&"bloom", &"bloom", PlaceSign.Icon.FENCE,
 				"Feed Drifters to Bloom %d/%d" % [b, INVITE_BLOOMS])
 		return _o(&"invite", &"marigold", PlaceSign.Icon.STAR, "Marigold wants a word")
 	if not flags.has("color_day"):

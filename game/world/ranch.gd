@@ -9620,6 +9620,10 @@ func _guide_place(goal: StringName) -> Array:
 			return [_guide_pen_target(), PlaceSign.Icon.FENCE]
 		&"catch":
 			return [_guide_wild_pony(), PlaceSign.Icon.ARROW]
+		&"bloom":
+			return [_guide_bloom_pen(), PlaceSign.Icon.FENCE]
+		&"drifter":
+			return [_guide_wild_pony(true), PlaceSign.Icon.ARROW]
 		&"depot":
 			return [get_node_or_null(^"Buildings/Depot"), PlaceSign.Icon.CRATE]
 		&"marigold", &"static":
@@ -9668,6 +9672,27 @@ func _guide_sighting() -> Node3D:
 	return who
 
 
+## THE BLOOM STEP'S PLACE (playtest 2026-11-05 item 53): the nearest pen holding an unmarked
+## Drifter, the only kind who Blooms, full or not. Null when none is penned (the step then
+## asks for a wild Drifter instead, see Objective).
+func _guide_bloom_pen() -> Node3D:
+	var best: Node3D = null
+	var best_d := INF
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen == null:
+			continue
+		for inst: PonyInstance in pen.ponies():
+			if inst.is_stock() and not inst.is_marked():
+				var d := slot.global_position.distance_squared_to(player.global_position) \
+					if player != null else 0.0
+				if d < best_d:
+					best_d = d
+					best = slot
+				break
+	return best
+
+
 ## A built pen with room, nearest first; else the nearest plot ready to build on; else the
 ## first plot (an overgrown one still shows her where the pens go).
 func _guide_pen_target() -> Node3D:
@@ -9691,7 +9716,8 @@ func _guide_pen_target() -> Node3D:
 	return get_node_or_null(^"Plots/Slot1") as Node3D
 
 
-func _guide_wild_pony() -> Node3D:
+## The nearest wild pony within 70 m; a Drifter only when `drifter` (the Bloom step, item 53).
+func _guide_wild_pony(drifter: bool = false) -> Node3D:
 	if spawner == null or player == null:
 		return null
 	var best: Node3D = null
@@ -9699,6 +9725,10 @@ func _guide_wild_pony() -> Node3D:
 	for p: Node3D in spawner.call("get_spawned"):
 		if not is_instance_valid(p) or p.is_in_group(&"penned"):
 			continue
+		if drifter:
+			var data: PonyData = p.call("get_data") if p.has_method("get_data") else null
+			if data == null or not StockPaletteScript.is_stock_id(data.id):
+				continue
 		var d: float = p.global_position.distance_squared_to(player.global_position)
 		if d < best_d:
 			best_d = d
