@@ -25,6 +25,15 @@ var mark: Dictionary = {}
 var mark_png: String = ""
 ## Rare variant id (&"" for an ordinary pony): &"pearl", &"starry", &"ember".
 var variant: StringName = &""
+## MORE CUSTOMISATION (PS7, playtest 2026-11-05 item 6): a coat marking in its own colour, an
+## eye shape and an accessory (PonyPaint draws all three; Accessories wears the last).
+enum Marking { NONE, SOCKS, BLAZE, STAR, DAPPLES }
+enum EyeShape { ROUND, ALMOND, SLEEPY }
+var marking: int = Marking.NONE
+var marking_color: Color = Color(0.98, 0.97, 0.94)
+var eye_shape: int = EyeShape.ROUND
+## An index into Accessories.LIST, or -1 for none.
+var accessory: int = -1
 var rng_seed: int = 0
 
 
@@ -51,6 +60,13 @@ func to_dict() -> Dictionary:
 		}
 	if not mark_png.is_empty():
 		d["mark_png"] = mark_png
+	if marking != Marking.NONE:
+		d["marking"] = marking
+		d["marking_color"] = marking_color.to_html(false)
+	if eye_shape != EyeShape.ROUND:
+		d["eye_shape"] = eye_shape
+	if accessory >= 0:
+		d["accessory"] = accessory
 	return d
 
 
@@ -76,6 +92,10 @@ static func from_dict(d: Dictionary) -> PonyLook:
 			"a": _color(md.get("a"), Color.WHITE), "b": _color(md.get("b"), Color.WHITE),
 		}
 	l.mark_png = str(d.get("mark_png", ""))
+	l.marking = clampi(int(d.get("marking", Marking.NONE)), Marking.NONE, Marking.DAPPLES)
+	l.marking_color = _color(d.get("marking_color"), l.marking_color)
+	l.eye_shape = clampi(int(d.get("eye_shape", EyeShape.ROUND)), EyeShape.ROUND, EyeShape.SLEEPY)
+	l.accessory = maxi(-1, int(d.get("accessory", -1)))
 	return l
 
 

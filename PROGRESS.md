@@ -12,6 +12,8 @@ The PT section below claimed items that were not met; the owner's audit found ni
 - **PS1 item 17b re-fixed** (c255da7): the last merges were turns; seeded test.
 - **PS9 items 55 and 64** (c6c069c, a10c495): permit tiles show the region's ponies and hours; a Pantry row and hungry ponies' bubbles. **G15** found and fixed: decorations could never be bought.
 - **PS4 items 29, 32, 36, 37, 40** (a8985f3, 1d581f3, f341692, d4ddb77, and the item 40 commit): painted doors measured at 0.43 to 0.84 pony heights and the buildings and town row grown to 1.32; the homestead re-laid round them; the barn yard one working corner; a paved street with yards through the row and the Strip's rim clipped to its circle; the Strip verified plumb and seated; rain at night keeps 95% of a clear night's light. Suite 2075/2075.
+- **PS5 items 44, 46, 48** (c5d30bc, c01947b, f5256ac) and **PS7 item 3 + G16** (f7497af): patrons alive, bigger chips, blackjack Split, a stamp mark editor; marks had never shown on a pony (laid on the head), now on the body. Suite 2101/2101.
+- **PS7 item 6 in progress** (this commit): markings and eye shapes done and tested; accessories and the creator UI rows next (see the ledger row).
 - **Found on the way:** `test_casino_rounds` (wheel) flakes in a full run: an unseeded wheel can bust the 500-chip purse in 30 spins. Pre-existing (06b3d47).
 
 ## Overnight sweep, 2026-11-05 (the owner's 70-item playtest; PLAN.md section PT) -- SUPERSEDED: these claims were not all true; see PS above

@@ -20,6 +20,10 @@ uniform float lid : hint_range(0.0, 1.0) = 0.0;
 uniform vec3 lid_color : source_color = vec3(0.95, 0.9, 0.85);
 uniform float lid_top = 0.08;
 uniform float lid_bottom = 0.92;
+// HER EYE SHAPE (PS7 item 6): the lid never rises above rest_lid (a sleepy eye), and
+// lower_lid closes the eye from below by that much (an almond eye).
+uniform float rest_lid : hint_range(0.0, 1.0) = 0.0;
+uniform float lower_lid : hint_range(0.0, 1.0) = 0.0;
 // THE IRIS, SHRUNK THE WAY SOURCE DRAWS IT. A PonySFM eyeball's UVs cover only the middle of
 // its iris texture (Source's "eyes" shader projected the iris small onto a white eyeball; the
 // conversion pasted it across the whole ball), so the pupil filled the eye. Above 1 the iris
@@ -64,11 +68,17 @@ void fragment() {
 	vec3 c = recolor ? mix(t, ramp, iris_mask) : t;
 	float l2 = dot(c, vec3(0.299, 0.587, 0.114));
 	c = mix(c, vec3(l2), clamp(dread, 0.0, 1.0) * 0.55);
-	float edge = mix(lid_top, lid_bottom, lid);
-	float lidded = 1.0 - smoothstep(edge - 0.01, edge + 0.01, UV.y);
-	float lash = smoothstep(edge - 0.045, edge - 0.01, UV.y) * lidded * step(0.02, lid);
+	float shut = max(lid, rest_lid);
+	float edge = mix(lid_top, lid_bottom, shut);
+	float top_lidded = (1.0 - smoothstep(edge - 0.01, edge + 0.01, UV.y)) * step(0.001, shut);
+	float low_edge = mix(lid_bottom, lid_top, lower_lid);
+	float low_lidded = step(0.001, lower_lid) * smoothstep(low_edge - 0.01, low_edge + 0.01, UV.y);
+	float lidded = max(top_lidded, low_lidded);
+	// The lash line along each lid's own edge, dark; the rest of the lid is her coat.
+	float lash = smoothstep(edge - 0.045, edge - 0.01, UV.y) * top_lidded * step(0.02, shut);
+	lash = max(lash, (1.0 - smoothstep(low_edge + 0.01, low_edge + 0.035, UV.y)) * low_lidded * 0.7);
 	vec3 lc = mix(lid_color, lid_color * 0.18, lash);
-	c = mix(c, lc, lidded * step(0.001, lid));
+	c = mix(c, lc, lidded);
 	ALBEDO = c;
 	EMISSION = c * white * highlight_boost * (1.0 - lidded);
 	ROUGHNESS = 1.0;

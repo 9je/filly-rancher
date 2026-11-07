@@ -65,6 +65,12 @@ const LEGACY_UNICORN_STYLES: Array[StringName] = [&"pokeypierce", &"vinylscratch
 var race := RACE_UNICORN
 var mane2 := -1
 var tail := -1
+## PS7 item 6: a coat marking (PonyLook.Marking) in a coat-palette colour (-1 is white), an eye
+## shape (PonyLook.EyeShape) and an accessory (Accessories.LIST index, -1 for none).
+var marking := 0
+var marking_colour := -1
+var eye_shape := 0
+var accessory := -1
 
 var _mark: Image = null
 
@@ -110,6 +116,11 @@ func to_pony_look(palette: StockPalette) -> PonyLook:
 	if has_mark():
 		var png := mark().save_png_to_buffer()
 		l.mark_png = Marshalls.raw_to_base64(png)
+	l.marking = marking
+	if marking_colour >= 0 and palette != null and palette.is_valid():
+		l.marking_color = palette.coat_at(marking_colour)
+	l.eye_shape = eye_shape
+	l.accessory = accessory
 	return l
 
 
@@ -159,6 +170,10 @@ func to_dict() -> Dictionary:
 		"mane2": mane2,
 		"tail": tail,
 		"mark_png": _encoded_mark(),
+		"marking": marking,
+		"marking_colour": marking_colour,
+		"eye_shape": eye_shape,
+		"accessory": accessory,
 	}
 
 
@@ -185,6 +200,10 @@ static func from_dict(d: Dictionary) -> PlayerLook:
 	out.race = clampi(int(d.get("race", RACE_UNICORN)), RACE_EARTH, RACE_UNICORN)
 	out.mane2 = maxi(-1, int(d.get("mane2", -1)))
 	out.tail = maxi(-1, int(d.get("tail", -1)))
+	out.marking = clampi(int(d.get("marking", 0)), 0, 4)
+	out.marking_colour = maxi(-1, int(d.get("marking_colour", -1)))
+	out.eye_shape = clampi(int(d.get("eye_shape", 0)), 0, 2)
+	out.accessory = maxi(-1, int(d.get("accessory", -1)))
 	var encoded := str(d.get("mark_png", ""))
 	if encoded.is_empty():
 		return out

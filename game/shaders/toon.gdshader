@@ -36,8 +36,70 @@ uniform bool mark_sides_only = false;
 uniform vec4 mark_coat : source_color = vec4(1.0);
 varying vec3 model_normal;
 
+// A COAT MARKING (PS7, playtest 2026-11-05 item 6): 0 none, 1 socks, 2 a blaze, 3 a star,
+// 4 dapples (PonyLook.Marking), in marking_color. Masked on her REST pose, which PonyPaint
+// bakes into CUSTOM0 on the coat meshes of a pony who has one, in model metres facing -Z.
+uniform int marking = 0;
+uniform vec4 marking_color : source_color = vec4(0.98, 0.97, 0.94, 1.0);
+varying vec3 rest_pos;
+
+float marking_hash(vec3 p) {
+	return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+}
+
+// Cellular: the distance to the nearest of one jittered point per cell.
+float marking_cells(vec3 p) {
+	vec3 i = floor(p);
+	vec3 f = fract(p);
+	float best = 8.0;
+	for (int x = -1; x <= 1; x++) {
+		for (int y = -1; y <= 1; y++) {
+			for (int z = -1; z <= 1; z++) {
+				vec3 g = vec3(float(x), float(y), float(z));
+				vec3 o = vec3(marking_hash(i + g), marking_hash(i + g + 17.0), marking_hash(i + g + 41.0));
+				best = min(best, length(g + o - f));
+			}
+		}
+	}
+	return best;
+}
+
+float marking_star(vec2 q, float r) {
+	// A five point star of outer radius r, as a 0..1 coverage with a soft edge.
+	float a = atan(q.x, q.y);
+	float seg = 6.2831853 / 5.0;
+	float k = cos(seg * 0.5) / cos(mod(a, seg) - seg * 0.5);
+	float edge = mix(r * 0.45, r, pow(clamp(k, 0.0, 1.0), 6.0));
+	return 1.0 - smoothstep(edge - 0.006, edge + 0.006, length(q));
+}
+
+float marking_mask(vec3 p) {
+	if (marking == 1) {
+		return 1.0 - smoothstep(0.27, 0.31, p.y);
+	}
+	if (marking == 2) {
+		// Narrow between the eyes, wider down the nose, ending at its tip.
+		float face = smoothstep(-0.70, -0.78, p.z);
+		float half_w = mix(0.022, 0.05, smoothstep(1.62, 1.25, p.y));
+		float stripe = 1.0 - smoothstep(half_w - 0.008, half_w + 0.004, abs(p.x));
+		float band = smoothstep(1.17, 1.21, p.y) * (1.0 - smoothstep(1.66, 1.72, p.y));
+		return face * stripe * band;
+	}
+	if (marking == 3) {
+		float face = smoothstep(-0.66, -0.74, p.z);
+		return face * marking_star(vec2(p.x, p.y - 1.63), 0.075);
+	}
+	if (marking == 4) {
+		float rear = smoothstep(-0.12, 0.05, p.z) * smoothstep(0.62, 0.72, p.y) * step(p.y, 1.3);
+		float spot = 1.0 - smoothstep(0.30, 0.36, marking_cells(p * 10.0));
+		return rear * spot;
+	}
+	return 0.0;
+}
+
 void vertex() {
 	model_normal = NORMAL;
+	rest_pos = CUSTOM0.xyz;
 	VERTEX += bounce_offset(VERTEX);
 }
 
@@ -53,6 +115,9 @@ void fragment() {
 	}
 	if (alpha_scissor > 0.0 && c.a < alpha_scissor) {
 		discard;
+	}
+	if (marking > 0) {
+		c.rgb = mix(c.rgb, marking_color.rgb, marking_mask(rest_pos));
 	}
 	vec3 rgb = c.rgb;
 	if (!spectral) {

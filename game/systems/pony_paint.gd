@@ -13,6 +13,7 @@ extends RefCounted
 ## same donor never share a color.
 
 const ToonStylerScript := preload("res://systems/toon_styler.gd")
+const PonyLookScript := preload("res://systems/pony_look.gd")
 const DonorTableScript := preload("res://systems/donor_table.gd")
 const CutieMarkScript := preload("res://systems/cutie_mark.gd")
 const MarkComposerScript := preload("res://systems/mark_composer.gd")
@@ -64,6 +65,12 @@ static func apply(body: Node3D, look: PonyLook) -> int:
 		var mi: MeshInstance3D = node
 		if mi.mesh == null:
 			continue
+		# A COAT MARKING NEEDS HER REST POSE (PS7 item 6): the coat meshes wear a copy that
+		# carries each vertex's rest position in CUSTOM0, so the toon shader's mask stays put
+		# on her face and legs however the rig moves them.
+		if look.marking != PonyLookScript.Marking.NONE and mi.mesh is ArrayMesh \
+				and _has_coat(mi.mesh, donor):
+			mi.mesh = rest_baked(mi.mesh as ArrayMesh)
 		# Race: a whole mesh that is only horn (or only wings) is shown or hidden.
 		var names: Array[String] = []
 		for i in range(mi.mesh.get_surface_count()):
@@ -90,6 +97,47 @@ static func apply(body: Node3D, look: PonyLook) -> int:
 	return painted
 
 
+static var _baked: Dictionary = {}
+
+
+static func _has_coat(mesh: Mesh, donor: Dictionary) -> bool:
+	for i in mesh.get_surface_count():
+		var m: Material = mesh.surface_get_material(i)
+		if role_of(m.resource_name if m != null else "", donor) == Role.COAT:
+			return true
+	return false
+
+
+## `mesh` with each vertex's own position copied into CUSTOM0 (RGBA float), every surface and
+## material kept. One copy per donor mesh, shared: the marking itself is a shader parameter.
+static func rest_baked(mesh: ArrayMesh) -> ArrayMesh:
+	if mesh.surface_get_format(0) & Mesh.ARRAY_FORMAT_CUSTOM0 != 0:
+		return mesh
+	var key := mesh.get_instance_id()
+	if _baked.has(key) and is_instance_valid(_baked[key]):
+		return _baked[key]
+	var out := ArrayMesh.new()
+	for s in mesh.get_surface_count():
+		var arrays: Array = mesh.surface_get_arrays(s)
+		var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var custom := PackedFloat32Array()
+		custom.resize(verts.size() * 4)
+		for i in verts.size():
+			custom[i * 4] = verts[i].x
+			custom[i * 4 + 1] = verts[i].y
+			custom[i * 4 + 2] = verts[i].z
+			custom[i * 4 + 3] = 1.0
+		arrays[Mesh.ARRAY_CUSTOM0] = custom
+		var flags: int = (Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT) \
+			| (mesh.surface_get_format(s) & Mesh.ARRAY_FLAG_USE_8_BONE_WEIGHTS)
+		out.add_surface_from_arrays(mesh.surface_get_primitive_type(s), arrays, [], {}, flags)
+		out.surface_set_material(s, mesh.surface_get_material(s))
+		out.surface_set_name(s, mesh.surface_get_name(s))
+	out.resource_name = mesh.resource_name
+	_baked[key] = out
+	return out
+
+
 static var _hidden: ShaderMaterial
 
 
@@ -110,7 +158,15 @@ static func body_scale(look: PonyLook) -> float:
 static func _material_for(r: int, src: Material, look: PonyLook, donor: Dictionary) -> Material:
 	match r:
 		Role.COAT:
-			return _toon(look.coat, r)
+			var coat := _toon(look.coat, r)
+			if look.marking != PonyLookScript.Marking.NONE:
+				coat.set_shader_parameter(&"marking", look.marking)
+				coat.set_shader_parameter(&"marking_color", look.marking_color)
+				var bare: Variant = coat.get_meta(ToonStylerScript.BARE_META, null)
+				if bare is ShaderMaterial:
+					(bare as ShaderMaterial).set_shader_parameter(&"marking", look.marking)
+					(bare as ShaderMaterial).set_shader_parameter(&"marking_color", look.marking_color)
+			return coat
 		Role.MANE:
 			return _toon(look.mane, r)
 		Role.MANE2:
@@ -171,6 +227,14 @@ static func _eye(src: Material, look: PonyLook, donor: Dictionary) -> ShaderMate
 	# The same Source iris size the canon cast gets (ToonStyler.sfm_eye), so a Drifter's eyes
 	# match the roster's instead of being all pupil.
 	m.set_shader_parameter(&"iris_scale", ToonStylerScript.SFM_IRIS_SCALE)
+	# HER EYE SHAPE (PS7 item 6): a sleepy eye rests with its lid partly down, an almond eye
+	# has a lower lid too; the blink and the moods still draw over either.
+	match look.eye_shape:
+		PonyLookScript.EyeShape.SLEEPY:
+			m.set_shader_parameter(&"rest_lid", 0.34)
+		PonyLookScript.EyeShape.ALMOND:
+			m.set_shader_parameter(&"rest_lid", 0.16)
+			m.set_shader_parameter(&"lower_lid", 0.26)
 	return m
 
 
