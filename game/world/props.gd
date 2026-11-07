@@ -143,6 +143,28 @@ const SKIRT_COLOUR := Color(0.21, 0.17, 0.13)
 ##
 ## Every number below is target_height / (native_height * MLP_SCALE), with native_height
 ## read off scenes/test/model_gallery.tscn in its props mode.
+## THE DOOR PAINTED ON EACH TOWN HOUSE, in metres at its SCALE_FIX size (entry scale 1):
+## the clear opening, read off orthographic renders with a half-metre grid (2026-11-07,
+## PS4 item 29). A house's door in the world is this times its entry's `s`;
+## test_doors_fit holds every Ponyville house in LAYOUT to SCALE.md's door row.
+const PAINTED_DOOR := {
+	"pv_pink_b.glb": 1.85,
+	"pv_courtyard_b.glb": 1.60,
+	"pv_courtyard_b_balcony.glb": 1.60,
+	"pv_ogb_1.glb": 0.95,
+	"pv_ogb_2.glb": 1.30,
+	"pv_balcony_b.glb": 1.05,
+}
+
+## Where each town house's door sits along the model's own x axis from its middle, in metres at
+## its placed scale (read off the same renders): the pink house's door is right of centre, the
+## courtyard houses' in the middle. world/street.gd puts each yard's gate there.
+const DOOR_OFFSET := {
+	"pv_pink_b.glb": 0.85,
+	"pv_courtyard_b.glb": 0.0,
+	"pv_courtyard_b_balcony.glb": 0.0,
+}
+
 const SCALE_FIX := {
 	"kenney_survival_structure.glb": 4.0,  # FBX unit-conversion defect, quirk 4.
 	# --- Sweet Apple Acres: the farm on the walk to the Orchard ----------------------
@@ -472,19 +494,18 @@ const LAYOUT := [
 	# `game/world/terrain.gdshader`'s path mask -- same centreline (x = 1.5), same run,
 	# conforming to the real height field by construction because it IS the height field,
 	# with no plate, no seam and no step to gap.
-	{"file": "pv_pink_b.glb", "at": Vector2(15.0, 36.0), "yaw": 270.0, "family": &"mlp", "skirt": true},
-	{"file": "pv_ogb_1.glb", "at": Vector2(15.0, 43.0), "yaw": 270.0, "family": &"mlp", "skirt": true},
-	{"file": "pv_courtyard_b.glb", "at": Vector2(15.0, 50.0), "yaw": 270.0, "family": &"mlp", "skirt": true},
-	# The tall courtyard-balcony block stands at z 36, BEHIND shot 19's camera (aim
-	# (-10, 61.6), eye offset -22 puts the lens near z 39.6): at z 50 it cropped the
-	# marquee out of the one screenshot that exists to showcase it. The shorter
-	# balcony_b takes z 50; the street keeps all three buildings either way.
-	# THE WEST ROW STEPPED SOUTH WHEN IT GREW (z 31 / 39.5 / 48, was 36 / 43 / 50): at SCALE.md's
-	# house size pv_ogb_2 is 8.9 m along the street and the three no longer fit between z 33
-	# and the Palace's own front at z 53.9 (docs/playtest_fixes/scale.md).
-	{"file": "pv_courtyard_b_balcony.glb", "at": Vector2(-12.0, 31.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
-	{"file": "pv_ogb_2.glb", "at": Vector2(-12.0, 39.5), "yaw": 90.0, "family": &"mlp", "skirt": true},
-	{"file": "pv_balcony_b.glb", "at": Vector2(-12.0, 48.0), "yaw": 90.0, "family": &"mlp", "skirt": true},
+	# DOORS A PONY FITS THROUGH (PS4 items 29 and 36, 2026-11-07). Measured off orthographic
+	# renders at their SCALE_FIX size, the row's painted doors stood 0.95 to 1.85 m, 0.43 to
+	# 0.84 pony heights (PAINTED_DOOR below). Each house now stands at the scale `s` that puts
+	# its door at about 2.9 m, 1.32 PH. Three models left the row: pv_ogb_1, pv_ogb_2 and
+	# pv_balcony_b have only a small side door on a big front, and at a pony's door they
+	# would stand 18 to 29 m tall; the row is two of each of the two whose doors make a house
+	# (pv_pink_b, pv_courtyard_b and its balcony twin), two a side, front walls about 9 m
+	# from the road's centre line so each has a yard.
+	{"file": "pv_courtyard_b.glb", "at": Vector2(15.0, 34.0), "yaw": 270.0, "s": 1.82, "family": &"mlp", "skirt": true},
+	{"file": "pv_pink_b.glb", "at": Vector2(15.0, 45.5), "yaw": 270.0, "s": 1.58, "family": &"mlp", "skirt": true},
+	{"file": "pv_pink_b.glb", "at": Vector2(-12.0, 32.5), "yaw": 90.0, "s": 1.58, "family": &"mlp", "skirt": true},
+	{"file": "pv_courtyard_b_balcony.glb", "at": Vector2(-12.0, 44.8), "yaw": 90.0, "s": 1.82, "family": &"mlp", "skirt": true},
 	# --- the schoolyard, west of the road --------------------------------------------
 	# A SCHOOLYARD AND NO SCHOOL, and that is the pack rather than an omission.
 	# ponysfm-schoolhouse ships school_roof, school_door, school_window, school_sign,

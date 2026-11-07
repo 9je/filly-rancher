@@ -84,6 +84,7 @@ without `.glb`, or the name the test gives a code-built thing.
 | race_wire_post | structure | the race track's finish posts |
 | race_gate_post | marker | the race track's lane starting posts |
 | saa_fence_old | fence | Sweet Apple Acres |
+| yard_fence | fence | the town row's yards (`game/world/street.gd`) |
 | pen | fence | built pens |
 | saa_tree_* | tree | treeline, regions |
 | saa_dead_tree_large | tree | the Everfree landmark |

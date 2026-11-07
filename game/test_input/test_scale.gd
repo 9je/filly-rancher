@@ -145,6 +145,13 @@ func _collect() -> void:
 	if strip != null and strip.get_node_or_null(^"MarqueeBoard") != null:
 		_add("strip_marquee", "Strip/MarqueeBoard",
 			PropsScript.world_aabb(strip.get_node(^"MarqueeBoard")).size.y)
+	# The town row's street (PS4 item 36): its paving and kerbs are paint on the ground like
+	# the Strip's; its yard fences are fences.
+	var street: Node = ranch.get_node_or_null(^"Street")
+	for s: Node in (street.get_children() if street != null else []):
+		if s.name == &"YardFences":
+			_add("yard_fence", "Street/YardFences", float(street.get("FENCE_HEIGHT")))
+		_cover(s)
 	var plots: Node = ranch.get_node_or_null(^"Plots")
 	for slot: Node in (plots.get_children() if plots != null else []):
 		for c: Node in slot.get_children():

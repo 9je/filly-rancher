@@ -368,21 +368,31 @@ func _paving() -> void:
 	var c := Vector2(_region.centre.x, _region.centre.y)
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var n := int(ceil(r * 2.0 / PAVING_STEP))
+	var n := int(ceil(r * 2.0 / PAVING_STEP)) + 1
 	for ix in n:
 		for iz in n:
 			var x0 := c.x - r + float(ix) * PAVING_STEP
 			var z0 := c.y - r + float(iz) * PAVING_STEP
 			var mid := Vector2(x0 + PAVING_STEP * 0.5, z0 + PAVING_STEP * 0.5)
-			if mid.distance_to(c) > r or PAVING_TRACK.has_point(mid) or _avoided(mid):
+			if PAVING_TRACK.has_point(mid) or _avoided(mid):
 				continue
-			var q: Array[Vector3] = []
-			for corner: Vector2 in [Vector2(x0, z0), Vector2(x0 + PAVING_STEP, z0),
-					Vector2(x0 + PAVING_STEP, z0 + PAVING_STEP), Vector2(x0, z0 + PAVING_STEP)]:
-				q.append(Vector3(corner.x, _y(corner.x, corner.y) + PAVING_LIFT, corner.y))
-			for i: int in [0, 1, 2, 0, 2, 3]:
-				st.set_normal(Vector3.UP)
-				st.add_vertex(q[i])
+			var cell: Array[Vector2] = [Vector2(x0, z0), Vector2(x0 + PAVING_STEP, z0),
+				Vector2(x0 + PAVING_STEP, z0 + PAVING_STEP), Vector2(x0, z0 + PAVING_STEP)]
+			var outside := 0
+			for p: Vector2 in cell:
+				if p.distance_to(c) > r:
+					outside += 1
+			if outside == 4 and mid.distance_to(c) > r:
+				continue
+			# THE RIM IS A CIRCLE, NOT A STAIRCASE (PS4 item 36; playtest 2026-11-05: "grey road
+			# meets dirt road badly" [33]): a square that crosses it is clipped to the circle.
+			var poly: Array[Vector2] = cell if outside == 0 else _clip_to_circle(cell, c, r)
+			if poly.size() < 3:
+				continue
+			for i in range(1, poly.size() - 1):
+				for p: Vector2 in [poly[0], poly[i], poly[i + 1]]:
+					st.set_normal(Vector3.UP)
+					st.add_vertex(Vector3(p.x, _y(p.x, p.y) + PAVING_LIFT, p.y))
 	st.generate_normals()
 	var mesh := st.commit()
 	var mi := MeshInstance3D.new()
@@ -399,6 +409,49 @@ func _paving() -> void:
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mi)
 	mi.global_transform = Transform3D.IDENTITY
+
+
+## `poly` clipped to the circle of radius `r` round `c`, the circle taken as a 360-sided polygon
+## (Sutherland-Hodgman against each of its edges in the polygon's own angular span).
+static func _clip_to_circle(poly: Array[Vector2], c: Vector2, r: float) -> Array[Vector2]:
+	var angles: Array[float] = []
+	for p: Vector2 in poly:
+		angles.append(rad_to_deg((p - c).angle()))
+	var lo: float = angles.min()
+	var hi: float = angles.max()
+	if hi - lo > 180.0:
+		# Straddles the -180 / 180 seam: shift the negative ones up a turn.
+		for i in angles.size():
+			if angles[i] < 0.0:
+				angles[i] += 360.0
+		lo = angles.min()
+		hi = angles.max()
+	var out := poly
+	for k in range(int(floor(lo)) - 1, int(ceil(hi)) + 1):
+		var a := c + Vector2.from_angle(deg_to_rad(float(k))) * r
+		var b := c + Vector2.from_angle(deg_to_rad(float(k + 1))) * r
+		out = _clip_half_plane(out, a, b, c)
+		if out.size() < 3:
+			return out
+	return out
+
+
+## Keep the part of `poly` on the same side of the line a-b as `inside`.
+static func _clip_half_plane(poly: Array[Vector2], a: Vector2, b: Vector2, inside: Vector2) -> Array[Vector2]:
+	var edge := b - a
+	var keep_sign := signf(edge.cross(inside - a))
+	var out: Array[Vector2] = []
+	for i in poly.size():
+		var p: Vector2 = poly[i]
+		var q: Vector2 = poly[(i + 1) % poly.size()]
+		var sp := edge.cross(p - a) * keep_sign
+		var sq := edge.cross(q - a) * keep_sign
+		if sp >= 0.0:
+			out.append(p)
+		if (sp >= 0.0) != (sq >= 0.0):
+			var t := sp / (sp - sq)
+			out.append(p.lerp(q, t))
+	return out
 
 
 func _avoided(p: Vector2) -> bool:

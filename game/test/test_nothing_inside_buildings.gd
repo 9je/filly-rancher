@@ -39,6 +39,11 @@ func _footprints() -> Dictionary:
 			continue
 		var box: AABB = PropsScript.world_aabb(model)
 		out[b.name] = Rect2(box.position.x, box.position.z, box.size.x, box.size.z)
+	# The town row's houses are props (Props.LAYOUT), but they are buildings to a pony.
+	for p: Node3D in _ranch.get("props").call("get_placed"):
+		if String(p.name).begins_with("pv_"):
+			var pb: AABB = PropsScript.world_aabb(p)
+			out[p.name] = Rect2(pb.position.x, pb.position.z, pb.size.x, pb.size.z)
 	return out
 
 
@@ -49,6 +54,8 @@ func _inside(p: Vector2, r: Rect2, margin: float) -> bool:
 func _spots() -> Dictionary:
 	var s := {}
 	for e: Dictionary in PropsScript.LAYOUT:
+		if String(e.file).begins_with("pv_"):
+			continue  # a town row house is itself one of the buildings
 		s["prop %s at %s" % [e.file, str(e.at)]] = [e.at, 0.8]
 	for who: StringName in PeopleScript.SPOTS:
 		var h: Vector3 = PeopleScript.SPOTS[who][0]

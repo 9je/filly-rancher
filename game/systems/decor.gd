@@ -21,7 +21,7 @@ const CATALOGUE: Array[Dictionary] = [
 	{"id": &"garden_arch", "name": "Garden Arch", "cost": 2500, "at": Vector3(-2.2, 0, 24.0), "yaw": 90.0, "clear": 1.2, "scene": PROPS + "saa_wire_arch.glb"},
 	{"id": &"apple_tree", "name": "Apple Tree", "cost": 3500, "at": Vector3(7.0, 0, 26.0), "yaw": 0.0, "clear": 2.0, "scene": PROPS + "mlp_apple_tree.glb"},
 	{"id": &"statue_fluttershy", "name": "Fluttershy Statue", "cost": 6000, "at": Vector3(-1.2, 0, -6.6), "yaw": 180.0, "clear": 1.0, "statue": &"fluttershy"},
-	{"id": &"lemonade_stand", "name": "Lemonade Stand", "cost": 9000, "at": Vector3(-6.0, 0, 30.0), "yaw": 90.0, "clear": 2.0, "scene": PROPS + "kenney_market_stall.glb"},
+	{"id": &"lemonade_stand", "name": "Lemonade Stand", "cost": 9000, "at": Vector3(5.8, 0, 30.5), "yaw": 270.0, "clear": 2.0, "scene": PROPS + "kenney_market_stall.glb"},
 	{"id": &"chicken_coop", "name": "Chicken Coop", "cost": 12000, "at": Vector3(32.5, 0, 4.0), "yaw": 270.0, "clear": 2.5, "scene": PROPS + "mlp_chicken_coop.glb"},
 	{"id": &"statue_rainbowdash", "name": "Rainbow Dash Statue", "cost": 20000, "at": Vector3(5.2, 0, -6.6), "yaw": 180.0, "clear": 1.0, "statue": &"rainbowdash"},
 ]

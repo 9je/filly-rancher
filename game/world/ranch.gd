@@ -1122,6 +1122,7 @@ func _ready() -> void:
 		prop_count += await props.build_paced(_boot_pace(0.38, 0.52, "Dressing the valley"))
 	else:
 		prop_count += props.build()
+	_lay_street()
 
 	# THE BEAM'S CATCHES, BEFORE THERE IS ANYTHING ON THE MAP TO CATCH. The beam is a child
 	# of the player scene and so has existed since the first line of this function; the
@@ -8693,6 +8694,24 @@ func pantry_counts() -> Vector2i:
 			if NeedsScript.resolve_food(id) != null:
 				food += inv.count(id)
 	return Vector2i(food, hungry)
+
+
+## THE TOWN ROW'S STREET AND YARDS (PS4 item 36, world/street.gd), laid once the row's houses
+## stand, since each yard is fenced off its house's own footprint.
+const StreetScript := preload("res://world/street.gd")
+
+
+func _lay_street() -> void:
+	if props == null or terrain == null or get_node_or_null(^"Street") != null:
+		return
+	var houses: Array[Node3D] = []
+	for p: Node3D in props.call("get_placed"):
+		if String(p.name).begins_with("pv_"):
+			houses.append(p)
+	var street: Node3D = StreetScript.new()
+	street.name = "Street"
+	add_child(street)
+	street.call("build", Callable(terrain, "height_at"), houses, PropsScript.DOOR_OFFSET)
 
 
 ## What Spike's tips read (SpikeTips' keys).
