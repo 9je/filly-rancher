@@ -27,8 +27,11 @@ func _play() -> void:
 	await close_letter()
 	await _settle(40.0)
 
+	# PRICES FROM THE CATALOGUE, not pinned here (PS9 item 69 raised them by 15%): her bits
+	# are the Big Pen's price and 50 more, so the upgrade leaves 50, short of any clearing.
+	var big_cost := int((load("res://data/plots/pen_large.tres") as Resource).get("cost"))
 	var econ: Object = ranch.call("get_economy")
-	econ.set("bits", 200)
+	econ.set("bits", big_cost + 50)
 	var slots: Array = ranch.call("plot_slots")
 	var s1: Node3D = _slot(slots, "slot_1")
 	var s3: Node3D = _slot(slots, "slot_3")
@@ -61,7 +64,7 @@ func _play() -> void:
 		return
 	var tip := _prompt()
 	note("prompt at the Paddock: '%s'" % tip)
-	if not check(tip.contains("upgrade to Big Pen (150 bits)"),
+	if not check(tip.contains("upgrade to Big Pen (%d bits)" % big_cost),
 			"the Paddock's prompt does not name the upgrade: '%s'" % tip):
 		return
 	await wait(0.4)
@@ -79,18 +82,19 @@ func _play() -> void:
 	if not check(String(s1.call("saved_plot_id")) == "pen_large" and int(pen.get("capacity")) == 6,
 			"the upgrade did not make a Big Pen (%s)" % s1.call("saved_plot_id")):
 		return
-	if not check(int(econ.get("bits")) == 50, "it should have cost 150 of 200 bits, left %d"
-			% int(econ.get("bits"))):
+	if not check(int(econ.get("bits")) == 50, "it should have cost %d of %d bits, left %d"
+			% [big_cost, big_cost + 50, int(econ.get("bits"))]):
 		return
 	note("upgraded: %s, %d bits left" % [s1.call("saved_plot_id"), int(econ.get("bits"))])
 
-	# 3. The brambles on plot 3, with 50 bits to a 100 bit clearing.
+	# 3. The brambles on plot 3, with 50 bits to a dearer clearing.
 	await _walk_round_to(s3)
 	if not await _stand_at(s3, InteractionScript.Kind.PLOT_CLEAR, 4.5, false):
 		return
 	tip = _prompt()
 	note("prompt at plot 3: '%s'" % tip)
-	if not check(tip.contains("clear this plot (100 bits), not enough bits"),
+	var clear_cost := int(s3.call("clear_cost"))
+	if not check(tip.contains("clear this plot (%d bits), not enough bits" % clear_cost),
 			"plot 3's prompt does not name the clearing and the shortfall: '%s'" % tip):
 		return
 	await look_at_point(s3.global_position + Vector3(0, 1.6, 0), true, 0.05, 60)
@@ -112,7 +116,7 @@ func _play() -> void:
 			"an unaffordable clearing changed something"):
 		return
 	await tap(&"ui_cancel")
-	ok("built a Paddock, upgraded it to a Big Pen for 150, and was told plot 3 needs 100")
+	ok("built a Paddock, upgraded it to a Big Pen for %d, and was told plot 3 needs %d" % [big_cost, clear_cost])
 
 
 func _slot(slots: Array, id: String) -> Node3D:

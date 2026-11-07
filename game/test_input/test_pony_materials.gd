@@ -168,7 +168,14 @@ func _stand_everypony(spawner: Node, marker: Node3D) -> void:
 			continue
 		var at: Vector3 = spawner.call("_ground_point", marker, slot)
 		slot += 1
-		var p: Node3D = spawner.call("spawn_guest", load("res://data/ponies/" + f), {}, at, 4.0)
+		var data: Resource = load("res://data/ponies/" + f)
+		var p: Node3D = spawner.call("spawn_guest", data, {}, at, 4.0)
+		# A named pony already out in the wild is not stood up twice (PS3 item 39: the spawner
+		# refuses a second of anypony): audit the one already standing instead.
+		if p == null:
+			p = _standing(spawner, StringName(data.get("id")))
+			if p != null:
+				p.global_position = at
 		_add_guest("roster:" + f.get_basename(), p)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 20261024
@@ -180,6 +187,15 @@ func _stand_everypony(spawner: Node, marker: Node3D) -> void:
 		slot += 1
 		var p: Node3D = spawner.call("spawn_guest", data, look.to_dict(), at, 4.0)
 		_add_guest("drifter%02d:%s" % [i, look.donor], p)
+
+
+## The wild pony with PonyData `id` already on the map, or null.
+func _standing(spawner: Object, id: StringName) -> Node3D:
+	for q in spawner.call("get_spawned"):
+		var d: Resource = (q as Node).call("get_data") if (q as Node).has_method("get_data") else null
+		if d != null and StringName(d.get("id")) == id:
+			return q
+	return null
 
 
 func _add_guest(label: String, p: Node3D) -> void:

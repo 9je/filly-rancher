@@ -73,9 +73,12 @@ func _play() -> void:
 	await _leg(Vector3(1.5, 0, 13.0), false, false)          # onto the path's south end
 	await _leg(Vector3(1.5, 0, 36.0), true, false)           # RUN on dirt
 	await _leg(Vector3(1.5, 0, 28.0), true, true)            # WALK on dirt
-	await _leg(Vector3(13.0, 0, 30.0), false, false)         # off into the meadow
-	await _leg(Vector3(13.0, 0, 16.0), true, false)          # RUN on grass
-	await _leg(Vector3(13.0, 0, 22.0), true, true)           # WALK on grass
+	# Into the meadow SOUTH of the town row (PS2 item 36's fenced yards start at z 26.5 and
+	# the old turn east at z 30 walked her into one).
+	await _leg(Vector3(1.5, 0, 20.0), false, false)          # back down the path
+	await _leg(Vector3(13.0, 0, 20.0), false, false)         # off into the meadow
+	await _leg(Vector3(13.0, 0, 10.0), true, false)          # RUN on grass
+	await _leg(Vector3(13.0, 0, 4.0), true, true)            # WALK on grass, straight on
 	process_frame.disconnect(_sample)
 	_judge()
 
