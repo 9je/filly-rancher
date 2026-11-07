@@ -47,8 +47,17 @@ func test_a_full_bag_always_points_at_the_pens() -> void:
 	assert_eq(GuideScript.pick(_state({"bag": 12, "bag_full": true, "news": true})), &"pens")
 
 
-func test_mail_beats_news_and_news_beats_lessons() -> void:
-	var tasks := [_task("tutorial_catch")]
+## THE FIRST CATCH FIRST (PS1, playtest 2026-11-05 item 16: "The start doesn't show where to
+## go for a first catch"). In a real new game the welcome letter and four townsfolk's news are
+## all waiting when she gets the Scoop, and the trail went to each of them before a pony
+## (render, build/ps_evidence/item16/). Until her first catch, the trail goes to a pony.
+func test_the_first_catch_beats_the_mail_and_the_news() -> void:
+	var tasks := [_task("tutorial_catch"), _task("tutorial_pen"), _task("tutorial_sell")]
+	assert_eq(GuideScript.pick(_state({"mail": true, "news": true, "tasks": tasks})), &"catch")
+
+
+func test_mail_beats_news_and_news_beats_the_later_lessons() -> void:
+	var tasks := [_task("tutorial_catch", true), _task("tutorial_pen")]
 	assert_eq(GuideScript.pick(_state({"mail": true, "news": true, "tasks": tasks})), &"mail")
 	assert_eq(GuideScript.pick(_state({"news": true, "tasks": tasks})), &"talk")
 

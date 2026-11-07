@@ -39,6 +39,11 @@ static func pick(s: Dictionary) -> StringName:
 	# the mail and the news.
 	if not learning and bool(s.get("sighting", false)):
 		return &"sighting"
+	# THE FIRST CATCH FIRST (PS1, playtest 2026-11-05 item 16: "The start doesn't show where to
+	# go for a first catch"): the welcome letter and four townsfolk's news are all waiting when
+	# she gets the Scoop, and the trail went to each of them before it ever showed a pony.
+	if open.has("tutorial_catch"):
+		return &"catch"
 	if bool(s.get("mail", false)):
 		return &"mail"
 	if news:
