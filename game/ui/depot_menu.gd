@@ -16,6 +16,14 @@ extends CanvasLayer
 ## what the Company pays for her; each payment is a coin. Two columns of ponies in a scroll
 ## area that never grows past SCROLL_MAX (four full pens no longer run off the screen). The
 ## statement stays plain lines. drawn_lines() is still the text of every row.
+##
+## THE PAYOUT (PS10, G7; FS6.2: "the Depot pays out per tile with a counter sound; the total
+## lands on the balance"). A delivery used to pop one number off the panel's corner. Now her
+## tile turns into a receipt card where it stood, her pay counts up on it and ends on a
+## counter tick, a coin flies from it to the purse, and once every card in the queue has paid,
+## the purse at the top (her bits, and what she still owes) rolls to the new totals in one go.
+## Several quick deliveries queue and pay one by one. The menu still moves no money: the cards
+## count what ranch.gd already paid, and the purse lands on what the providers say.
 
 const MenuStyleScript := preload("res://ui/menu_style.gd")
 const MouseRowsScript := preload("res://ui/mouse_rows.gd")
@@ -23,11 +31,23 @@ const TileStyleScript := preload("res://ui/tile_style.gd")
 const ShopIconScript := preload("res://ui/shop_icon.gd")
 const CatchIconScript := preload("res://ui/catch_icon.gd")
 const PaintScript := preload("res://ui/casino_paint.gd")
+const TileEntranceScript := preload("res://ui/tile_entrance.gd")
+const RarityGlyphScript := preload("res://ui/rarity_glyph.gd")
+const LedgerScript := preload("res://systems/ledger.gd")
 
 const SCROLL_MAX := 600.0
 const PONY_TILE := Vector2(546.0, 76.0)
 const WIDE_TILE := Vector2(1104.0, 64.0)
 const ICON_SIZE := 44.0
+
+## The payout's beats, in seconds: each card counts up for PAYOUT_ROLL, holds its total for
+## PAYOUT_HOLD (the next card starts as this one's coin leaves), and the purse rolls to the new
+## totals over PAYOUT_LAND once the last coin is in.
+const PAYOUT_ROLL := 0.55
+const PAYOUT_HOLD := 0.22
+const PAYOUT_LAND := 0.5
+## What she owes, in the purse: a soft red, the colour every "too dear" in the menus wears.
+const OWED_COLOUR := Color(1.0, 0.62, 0.58, 0.95)
 
 enum Tab { DELIVER, PAY, STATEMENT }
 
@@ -59,6 +79,10 @@ signal opened()
 signal closed()
 signal deliver_requested(uid: StringName)
 signal pay_requested(bits: int)
+## A card's count reached her pay: the counter's tick (PS10, G7). One per delivered tile.
+signal counter_ticked(paid: int)
+## The purse took the queue's total in one go: bits into the wallet, debt off the balance.
+signal balance_landed(bits_gained: int, debt_cleared: int)
 
 ## Injected by ranch.gd. Every one of them is a question this menu is not allowed to answer
 ## for itself.
@@ -71,6 +95,9 @@ var bits_provider := Callable()
 ## trim, which is what this menu did before the provider existed.
 var payable_provider := Callable()
 var statement_provider := Callable()
+## What she still owes the Company (Ledger.balance), for the purse. Optional: without it the
+## purse shows only her bits.
+var balance_provider := Callable()
 
 var _tab: int = Tab.DELIVER
 var _selected := 0
@@ -93,6 +120,30 @@ var _confirming_name := ""
 @onready var _rows: GridContainer = $Centre/Panel/Margin/Column/Scroll/Rows
 @onready var _footer: Label = $Centre/Panel/Margin/Column/Footer
 
+## The tiles deal themselves in (PS10, G6; game/ui/tile_entrance.gd).
+var _entrance = TileEntranceScript.new()
+## Where the receipt cards and the coins live: over the panel, never laid out by it.
+var _fx: Control = null
+var _purse_coin: TextureRect = null
+var _wallet_label: Label = null
+var _owed_label: Label = null
+## What the purse SHOWS, which trails what the providers say while a payout is running.
+var _shown_bits := 0
+var _shown_owed := 0
+## The payout queue: one entry per delivered tile, {start, card, paid, credit, shown, ticked,
+## flown}, timed on _pay_clock.
+var _payouts: Array[Dictionary] = []
+var _pay_clock := 0.0
+## The purse rolling to its new totals: {from_bits, to_bits, from_owed, to_owed, t}, or empty.
+var _landing := {}
+## Each tile's place at the last laid-out redraw (see market_menu.gd's own _tile_rects).
+var _tile_rects: Array[Rect2] = []
+## The process frame the tiles were last built on. A tile built this frame already has its
+## minimum size but no place yet (the grid sorts at the end of the frame), so its rect lies.
+var _built_frame := -1
+## The row a named pony's question is about, for her receipt card.
+var _confirming_row := {}
+
 
 func _ready() -> void:
 	MenuStyleScript.apply_panel($Centre/Panel as PanelContainer)
@@ -104,6 +155,64 @@ func _ready() -> void:
 	_close = MouseRowsScript.close_button(MouseRowsScript.CLOSE_TEXT,
 		func(_index: int) -> void: close())
 	$Centre/Panel/Margin/Column.add_child(_close)
+	_build_purse()
+	_fx = MenuStyleScript.effects_layer(self)
+
+
+## THE PURSE, under the title: the bits coin and her bits in gold, and on the right what she
+## still owes. It is where the payout lands.
+func _build_purse() -> void:
+	var column := $Centre/Panel/Margin/Column as VBoxContainer
+	var purse := HBoxContainer.new()
+	purse.name = "Purse"
+	purse.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	purse.add_theme_constant_override(&"separation", 10)
+	column.add_child(purse)
+	column.move_child(purse, _title.get_index() + 1)
+	_purse_coin = MenuStyleScript.coin_icon(34.0)
+	purse.add_child(_purse_coin)
+	_wallet_label = Label.new()
+	_wallet_label.name = "Wallet"
+	_wallet_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_wallet_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	MenuStyleScript.style_label(_wallet_label, 26, MenuStyleScript.COLOR_VALUE)
+	_wallet_label.add_theme_font_override(&"font", MenuStyleScript.numeral_font())
+	purse.add_child(_wallet_label)
+	_owed_label = Label.new()
+	_owed_label.name = "Owed"
+	_owed_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	MenuStyleScript.style_label(_owed_label, 22, OWED_COLOUR)
+	_owed_label.add_theme_font_override(&"font", MenuStyleScript.numeral_font())
+	purse.add_child(_owed_label)
+
+
+func wallet_text() -> String:
+	return _wallet_label.text if _wallet_label != null else ""
+
+
+func owed_text() -> String:
+	return _owed_label.text if _owed_label != null and _owed_label.visible else ""
+
+
+## Where a coin lands: the middle of the purse's coin.
+func wallet_target() -> Vector2:
+	return _purse_coin.get_global_rect().get_center() if _purse_coin != null else Vector2.ZERO
+
+
+func _provided_bits() -> int:
+	return int(bits_provider.call()) if bits_provider.is_valid() else 0
+
+
+func _provided_owed() -> int:
+	return int(balance_provider.call()) if balance_provider.is_valid() else 0
+
+
+func _draw_purse() -> void:
+	if _wallet_label == null:
+		return
+	_wallet_label.text = "%d bits" % _shown_bits
+	_owed_label.visible = balance_provider.is_valid()
+	_owed_label.text = "%d owed" % _shown_owed
 
 
 func open() -> bool:
@@ -116,7 +225,10 @@ func open() -> bool:
 	_selected = 0
 	_hovered = -1
 	_cancel_confirm()
+	_shown_bits = _provided_bits()
+	_shown_owed = _provided_owed()
 	visible = true
+	_entrance.restart()
 	refresh()
 	opened.emit()
 	MenuStyleScript.tick_open()
@@ -130,6 +242,7 @@ func close() -> void:
 	_open = false
 	_hovered = -1
 	_cancel_confirm()
+	_end_payout()
 	visible = false
 	closed.emit()
 	MenuStyleScript.tick_back()
@@ -147,6 +260,7 @@ func set_tab(value: int) -> void:
 	_tab = clampi(value, Tab.DELIVER, Tab.STATEMENT)
 	_selected = 0
 	_cancel_confirm()
+	_entrance.restart()
 	refresh()
 
 
@@ -218,6 +332,7 @@ func is_confirming() -> bool:
 func _cancel_confirm() -> void:
 	_confirming = &""
 	_confirming_name = ""
+	_confirming_row = {}
 
 
 ## The amounts the Pay tab offers: the steps above, cut to what is in the wallet AND to what
@@ -244,51 +359,38 @@ func pay_amounts() -> Array[int]:
 ## The button. On the Deliver tab a member of the crowd goes on one press; a NAMED pony
 ## turns this into the question CONFIRM_YES asks, and the next press answers it. Returns
 ## whether the press did anything at all.
-var _confirming_credit := 0
-var _confirming_credit_kept := 0
-
-
-## Money moving is a moment (FS6.2): her credit pops off the tile she was delivered from.
-func _pop_credit(credit: int) -> void:
-	var host := get_node_or_null(^"Centre/Panel") as Control
-	if host == null or credit <= 0:
-		return
-	var at := host.size * 0.5
-	if _selected >= 0 and _selected < _rows.get_child_count():
-		var tile := _rows.get_child(_selected) as Control
-		if tile != null:
-			at = tile.global_position - host.global_position + tile.size * 0.5
-	MenuStyleScript.payout_pop(host, at, credit)
-
-
 func confirm() -> bool:
 	match _tab:
 		Tab.DELIVER:
 			if is_confirming():
 				var uid: StringName = _confirming
 				var yes: bool = _selected == 0
-				_confirming_credit_kept = _confirming_credit
+				var asked: Dictionary = _confirming_row
+				# Her card starts where "yes" was pressed: her own tile is not on screen while
+				# the counter asks.
+				var rect := _tile_rect(0)
 				_cancel_confirm()
 				_selected = 0
 				refresh()
 				if yes:
-					_pop_credit(_confirming_credit_kept)
-					deliver_requested.emit(uid)
+					_deliver(uid)
+					_after_delivery(asked, rect)
 				return true
 			var rows: Array[Dictionary] = deliver_rows()
 			if _selected < 0 or _selected >= rows.size():
 				return false
 			var row: Dictionary = rows[_selected]
 			if not bool(row.get("stock", false)):
-				_confirming_credit = int(row.get("credit", 0))
 				_confirming = StringName(row["uid"])
 				_confirming_name = String(row.get("name", ""))
+				_confirming_row = row
 				# On "no", for the reason CONFIRM_NO's comment gives.
 				_selected = 1
 				refresh()
 				return true
-			_pop_credit(int(row.get("credit", 0)))
-			deliver_requested.emit(StringName(row["uid"]))
+			var from := _tile_rect(_selected)
+			_deliver(StringName(row["uid"]))
+			_after_delivery(row, from)
 			return true
 		Tab.PAY:
 			var amounts: Array[int] = pay_amounts()
@@ -351,9 +453,17 @@ func refresh() -> void:
 	var count: int = _row_count()
 	_selected = clampi(_selected, 0, maxi(0, count - 1)) if count > 0 else 0
 	MouseRowsScript.tab_strip(_tabs, TAB_NAMES, _tab, point_at_tab, take_tab)
+	var drawn: Array[Rect2] = []
 	for child in _rows.get_children():
+		var was := child as Control
+		drawn.append(was.get_global_rect() if was != null and was.is_inside_tree() else Rect2())
 		_rows.remove_child(child)
 		child.queue_free()
+	# Kept only from a laid-out grid: a grid rebuilt twice in one frame has no rects yet.
+	if not drawn.is_empty() and _built_frame != Engine.get_process_frames():
+		_tile_rects = drawn
+	_built_frame = Engine.get_process_frames()
+	_sync_purse()
 	MenuStyleScript.apply_title(_title)
 	var lines: Array[String] = drawn_lines()
 	var ponies: Array[Dictionary] = []
@@ -386,7 +496,260 @@ func refresh() -> void:
 		else:
 			_word_tile(holder, lines[i], _tab == Tab.PAY)
 		_rows.add_child(holder)
+	_entrance.apply(_rows.get_children())
 	_fit_scroll.call_deferred()
+
+
+## The tiles on screen, in row order (notes included).
+func row_nodes() -> Array[Node]:
+	return _rows.get_children()
+
+
+func _process(delta: float) -> void:
+	if not _open:
+		return
+	if _entrance.running(_rows.get_child_count()):
+		_entrance.advance(delta, _rows.get_children())
+	advance_payout(delta)
+
+
+## Step the tiles' deal-in by `dt` seconds, as a frame would.
+func advance_entrance(dt: float) -> void:
+	_entrance.advance(dt, _rows.get_children())
+
+
+## Row `index`'s tile on screen: its laid-out rect, or where it was drawn last.
+func _tile_rect(index: int) -> Rect2:
+	if index >= 0 and index < _rows.get_child_count():
+		var tile := _rows.get_child(index) as Control
+		if tile != null and tile.is_inside_tree() and _built_frame != Engine.get_process_frames():
+			return tile.get_global_rect()
+	if index >= 0 and index < _tile_rects.size():
+		return _tile_rects[index]
+	var host := get_node_or_null(^"Centre/Panel") as Control
+	return host.get_global_rect() if host != null else Rect2()
+
+
+# --- the payout -----------------------------------------------------------------------------
+
+## True while deliver_requested's handler runs: ranch.gd pays and redraws inside it, and the
+## purse must not land that pay before her card has counted it.
+var _delivering := false
+
+
+func _deliver(uid: StringName) -> void:
+	_delivering = true
+	deliver_requested.emit(uid)
+	_delivering = false
+
+
+## The purse follows the providers whenever nothing is paying out. A change it did not see
+## coming (a payment on the Pay tab) rolls in the same way a payout lands.
+func _sync_purse() -> void:
+	if _open and not payout_busy() and not _delivering \
+			and (_provided_bits() != _shown_bits or _provided_owed() != _shown_owed):
+		_start_landing()
+	_draw_purse()
+
+
+## A delivery the counter took: queue her card. One it refused (she is racing, she has her
+## mark) is still in the pens and paid nothing, so nothing rolls.
+func _after_delivery(row: Dictionary, from: Rect2) -> void:
+	if row.is_empty() or not _open:
+		return
+	for r: Dictionary in deliver_rows():
+		if r["uid"] == row["uid"]:
+			return
+	_finish_landing()
+	var start := _pay_clock
+	if not _payouts.is_empty():
+		start = maxf(start, float(_payouts[-1]["start"]) + PAYOUT_ROLL + PAYOUT_HOLD)
+	var credit := int(row.get("credit", 0))
+	var card := _receipt_card(row, from)
+	card.visible = false
+	_payouts.append({"start": start, "card": card, "paid": LedgerScript.handler_share(credit),
+		"credit": credit, "shown": 0, "ticked": false, "flown": false})
+
+
+func payout_busy() -> bool:
+	return not _payouts.is_empty() or not _landing.is_empty()
+
+
+func payout_count() -> int:
+	return _payouts.size()
+
+
+func payout_cards() -> Array[Control]:
+	var out: Array[Control] = []
+	for e: Dictionary in _payouts:
+		out.append(e["card"] as Control)
+	return out
+
+
+## What card `index` shows right now, in bits (0 before it starts counting).
+func payout_figure(index: int) -> int:
+	return int(_payouts[index]["shown"]) if index >= 0 and index < _payouts.size() else 0
+
+
+## Run the payout `dt` seconds on: every card's count, its tick, its coin, and the landing.
+## Called every frame by _process(); the suite steps it directly.
+func advance_payout(dt: float) -> void:
+	if not payout_busy():
+		return
+	_pay_clock += dt
+	var done := true
+	for e: Dictionary in _payouts:
+		var t: float = _pay_clock - float(e["start"])
+		if t < 0.0:
+			done = false
+			continue
+		var card := e["card"] as Control
+		if not bool(e["flown"]):
+			_count_up(e, card, t)
+		if t >= PAYOUT_ROLL and not bool(e["ticked"]):
+			e["ticked"] = true
+			counter_ticked.emit(int(e["paid"]))
+			MenuStyleScript.tick_move()
+		if t >= PAYOUT_ROLL + PAYOUT_HOLD and not bool(e["flown"]):
+			e["flown"] = true
+			MenuStyleScript.fly_coin(_fx, card.get_global_rect().get_center(), wallet_target())
+			var tw := card.create_tween().set_parallel(true)
+			tw.tween_property(card, ^"scale", Vector2.ONE * 0.7, 0.22).set_ease(Tween.EASE_IN)
+			tw.tween_property(card, ^"modulate:a", 0.0, 0.22)
+		if t < PAYOUT_ROLL + PAYOUT_HOLD + MenuStyleScript.COIN_SECONDS:
+			done = false
+	if done and not _payouts.is_empty():
+		for e: Dictionary in _payouts:
+			(e["card"] as Node).queue_free()
+		_payouts.clear()
+		_start_landing()
+	if not _landing.is_empty():
+		_landing["t"] = float(_landing["t"]) + dt
+		var g := clampf(float(_landing["t"]) / PAYOUT_LAND, 0.0, 1.0)
+		var eased := 1.0 - pow(1.0 - g, 2.0)
+		_shown_bits = int(round(lerpf(float(_landing["from_bits"]), float(_landing["to_bits"]), eased)))
+		_shown_owed = int(round(lerpf(float(_landing["from_owed"]), float(_landing["to_owed"]), eased)))
+		_draw_purse()
+		if g >= 1.0:
+			_finish_landing()
+
+
+## Card `e`, `t` seconds into its count: the figures ease up to her pay and her credit, and
+## the card comes in with a little pop and swells for a beat when the count lands.
+func _count_up(e: Dictionary, card: Control, t: float) -> void:
+	card.visible = true
+	var f := clampf(t / PAYOUT_ROLL, 0.0, 1.0)
+	var eased := 1.0 - pow(1.0 - f, 3.0)
+	e["shown"] = int(round(float(e["paid"]) * eased))
+	(card.find_child("Figure", true, false) as Label).text = "+%d bits" % int(e["shown"])
+	(card.find_child("Debt", true, false) as Label).text = \
+		"-%d debt" % int(round(float(e["credit"]) * eased))
+	var s := lerpf(0.9, 1.0, clampf(t / 0.12, 0.0, 1.0))
+	if f >= 1.0:
+		s += 0.07 * maxf(0.0, 1.0 - (t - PAYOUT_ROLL) / PAYOUT_HOLD)
+	card.scale = Vector2.ONE * s
+	card.modulate.a = clampf(t / 0.08, 0.0, 1.0)
+
+
+## The queue has paid in: the purse rolls from what it shows to what the providers say, once.
+func _start_landing() -> void:
+	var to_bits := _provided_bits()
+	var to_owed := _provided_owed()
+	_landing = {"from_bits": _shown_bits, "to_bits": to_bits, "from_owed": _shown_owed,
+		"to_owed": to_owed, "t": 0.0}
+	balance_landed.emit(to_bits - _shown_bits, _shown_owed - to_owed)
+	MenuStyleScript.tick_confirm()
+	if _fx != null and to_bits != _shown_bits:
+		MenuStyleScript.payout_pop(_fx, wallet_target() + Vector2(230.0, 0.0), to_bits - _shown_bits)
+	if _purse_coin != null and _purse_coin.is_inside_tree():
+		_purse_coin.scale = Vector2.ONE * 1.35
+		_purse_coin.create_tween().tween_property(_purse_coin, ^"scale", Vector2.ONE, 0.3) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+func _finish_landing() -> void:
+	if _landing.is_empty():
+		return
+	_shown_bits = int(_landing["to_bits"])
+	_shown_owed = int(_landing["to_owed"])
+	_landing = {}
+	_draw_purse()
+
+
+## Closing mid payout: the cards go, and the purse is simply right.
+func _end_payout() -> void:
+	for e: Dictionary in _payouts:
+		var card := e["card"] as Node
+		if is_instance_valid(card):
+			card.queue_free()
+	_payouts.clear()
+	_landing = {}
+	_shown_bits = _provided_bits()
+	_shown_owed = _provided_owed()
+	_draw_purse()
+
+
+## HER RECEIPT: her tile again, lifted off the grid where it stood, with the count on it.
+func _receipt_card(row: Dictionary, from: Rect2) -> PanelContainer:
+	var card := PanelContainer.new()
+	card.name = "Receipt"
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var box := TileStyleScript.box(true, true)
+	box.bg_color = PaintScript.PLUM.lightened(0.06)
+	card.add_theme_stylebox_override(&"panel", box)
+	_fx.add_child(card)
+	var body := HBoxContainer.new()
+	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	body.add_theme_constant_override(&"separation", 12)
+	card.add_child(body)
+	var plate := TileStyleScript.disc(ICON_SIZE, row.get("coat_color", PaintScript.CARD_FACE))
+	body.add_child(plate)
+	var icon: Control = CatchIconScript.new()
+	icon.kind = StringName(row.get("race", &"earth"))
+	icon.custom_minimum_size = Vector2(ICON_SIZE, ICON_SIZE)
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	plate.add_child(icon)
+	body.add_child(_rarity_glyph(row))
+	var who := Label.new()
+	who.text = _row_name(row)
+	who.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	who.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	who.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	who.clip_text = true
+	who.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	MenuStyleScript.style_label(who, 22, MenuStyleScript.COLOR_TITLE)
+	who.add_theme_font_override(&"font", MenuStyleScript.title_font())
+	body.add_child(who)
+	var sums := VBoxContainer.new()
+	sums.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	sums.alignment = BoxContainer.ALIGNMENT_CENTER
+	sums.add_theme_constant_override(&"separation", -4)
+	body.add_child(sums)
+	for line: Array in [["Figure", "+0 bits", 30, MenuStyleScript.COLOR_VALUE],
+			["Debt", "-0 debt", 17, MenuStyleScript.COLOR_NAME]]:
+		var l := Label.new()
+		l.name = String(line[0])
+		l.text = String(line[1])
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		l.add_theme_font_override(&"font", MenuStyleScript.numeral_font())
+		MenuStyleScript.style_label(l, int(line[2]), line[3])
+		sums.add_child(l)
+	card.size = PONY_TILE
+	card.position = from.get_center() - PONY_TILE * 0.5
+	card.pivot_offset = PONY_TILE * 0.5
+	return card
+
+
+## Her rarity as a shape as well as a colour (PS10, G8; FS8.3: "not colour alone"): the gem's
+## colour from the Market's Sell tab, in the shape RarityGlyph gives each rarity.
+func _rarity_glyph(row: Dictionary) -> Control:
+	var glyph := RarityGlyphScript.new()
+	var rarity := int(row.get("rarity", 0))
+	glyph.rarity = rarity
+	glyph.colour = ShopIconScript.GEM_COLOURS[clampi(rarity, 0, ShopIconScript.GEM_COLOURS.size() - 1)]
+	glyph.custom_minimum_size = Vector2(22, 22)
+	return glyph
 
 
 func _fit_scroll() -> void:
@@ -418,14 +781,21 @@ func _pony_tile(holder: PanelContainer, pony: Dictionary) -> void:
 	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	column.alignment = BoxContainer.ALIGNMENT_CENTER
 	body.add_child(column)
+	# Her name, with her rarity's shape in front of it (PS10, G8).
+	var name_line := HBoxContainer.new()
+	name_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	name_line.add_theme_constant_override(&"separation", 8)
+	column.add_child(name_line)
+	name_line.add_child(_rarity_glyph(pony))
 	var who := Label.new()
 	who.text = _row_name(pony)
 	who.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	who.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	who.clip_text = true
 	who.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	MenuStyleScript.style_label(who, 22, MenuStyleScript.COLOR_TITLE)
 	who.add_theme_font_override(&"font", MenuStyleScript.title_font())
-	column.add_child(who)
+	name_line.add_child(who)
 	var sub := Label.new()
 	sub.text = _tag(pony)
 	sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -434,7 +804,7 @@ func _pony_tile(holder: PanelContainer, pony: Dictionary) -> void:
 	var price := Label.new()
 	# What she is worth, both ways (PT9): off the balance, and the handler's share to her.
 	var credit := int(pony.get("credit", 0))
-	price.text = "-%d debt\n+%d bits" % [credit, preload("res://systems/ledger.gd").handler_share(credit)]
+	price.text = "-%d debt\n+%d bits" % [credit, LedgerScript.handler_share(credit)]
 	price.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	price.add_theme_font_override(&"font", MenuStyleScript.numeral_font())
 	MenuStyleScript.style_label(price, 22, MenuStyleScript.COLOR_VALUE)

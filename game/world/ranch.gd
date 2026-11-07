@@ -2067,6 +2067,9 @@ func _bind_depot_menu() -> void:
 	depot_menu.set("payable_provider", func() -> int:
 		return _game_state.ledger.payable() if _game_state != null else 0)
 	depot_menu.set("statement_provider", func() -> Array[String]: return _statement())
+	# The purse's "owed", where a delivery's payout lands (PS10, G7).
+	depot_menu.set("balance_provider", func() -> int:
+		return _game_state.ledger.balance if _game_state != null else 0)
 	for pair in [["opened", _on_menu_opened_any], ["closed", _on_menu_closed],
 			["deliver_requested", _on_deliver_requested],
 			["pay_requested", _on_pay_requested]]:
@@ -2228,6 +2231,8 @@ func _penned_rows() -> Array[Dictionary]:
 				# For the Depot's tile: her race's icon on a disc of her coat.
 				"race": PonyTraitsScript.race_of(inst),
 				"coat_color": _coat_colour(inst),
+				# Her rarity's shape on the tile (PS10, G8).
+				"rarity": rarity,
 			})
 	return rows
 
