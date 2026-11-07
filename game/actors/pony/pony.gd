@@ -1124,7 +1124,7 @@ func _update_gaze_target() -> void:
 		return
 	var calm := state == State.IDLE or state == State.GRAZE or state == State.WANDER or state == State.APPROACH
 	if calm and _player != null and is_instance_valid(_player) \
-			and _player.global_position.distance_to(global_position) < GAZE_RADIUS:
+			and (is_coy() or _player.global_position.distance_to(global_position) < GAZE_RADIUS):
 		face.gaze_at = _player.global_position + Vector3(0, 1.2, 0)
 	else:
 		face.gaze_at = Vector3.INF
@@ -1230,13 +1230,57 @@ func looks_hungry() -> bool:
 
 
 ## A calm pony, not a shy one, who has the player in sight and not too close.
+## THE LOOK, ON PURPOSE (PS1, playtest 2026-11-05 item 67: the half-lidded look "switch[ed]
+## off as you get close (backwards)"; the owner liked it: "keep them, make them deliberate and
+## shared by more ponies"). Any calm pony the player comes within COY_RADIUS of, close up
+## included, Drifters and shy ones too, gives her the look for COY_HOLD seconds with her eyes
+## on her, then looks away and rests COY_REST seconds before she can give it again: a moment,
+## not a face she wears.
+const COY_HOLD := 4.0
+const COY_REST := Vector2(20.0, 40.0)
+
+
+static func coy_near(d: float, calm: bool) -> bool:
+	return calm and d < COY_RADIUS
+
+
+## Every pony has it: a Drifter (no PonyData) and a shy one (a shy glance) as well.
+static func coy_allowed(_data: PonyData) -> bool:
+	return true
+
+
+## One step of the look for state `st` ({until, rest} in ms): true while she gives it. `roll`
+## (0..1) picks the rest that follows.
+static func coy_next(st: Dictionary, near: bool, now: int, roll: float) -> bool:
+	var until := int(st.get("until", -1))
+	if now < until:
+		if near:
+			return true
+		st["until"] = -1
+		return false
+	if now < int(st.get("rest", -1)):
+		return false
+	if not near:
+		return false
+	st["until"] = now + int(COY_HOLD * 1000.0)
+	st["rest"] = int(st.until) + int(lerpf(COY_REST.x, COY_REST.y, roll) * 1000.0)
+	return true
+
+
+var _coy := {}
+
+
 func _coy_at_player() -> bool:
-	if _player == null or not is_instance_valid(_player) or _data == null:
+	if _player == null or not is_instance_valid(_player) or not coy_allowed(_data):
 		return false
-	if _personality() == PonyDataScript.Personality.SHY:
-		return false
-	var d := _player.global_position.distance_to(global_position)
-	return d > 2.0 and d < COY_RADIUS
+	var calm := state == State.IDLE or state == State.GRAZE or state == State.APPROACH
+	return coy_next(_coy, coy_near(_player.global_position.distance_to(global_position), calm),
+		Time.get_ticks_msec(), randf())  # the global generator: hers keeps the wander reproducible
+
+
+## True while she is giving the look (her eyes stay on the player for it, past GAZE_RADIUS).
+func is_coy() -> bool:
+	return Time.get_ticks_msec() < int(_coy.get("until", -1))
 
 
 # --- states -----------------------------------------------------------------------
