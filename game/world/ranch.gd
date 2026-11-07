@@ -3450,7 +3450,7 @@ func play_blackjack(stake: int) -> Dictionary:
 	return _blackjack_step()
 
 
-## HIT, STAND OR DOUBLE on the live hand (a BlackjackRound.Action). A Double's second stake
+## HIT, STAND, DOUBLE OR SPLIT on the live hand (a BlackjackRound.Action). A Double's or a Split's second stake
 ## comes out of the purse BEFORE the card, and a purse that cannot cover it refuses the
 ## Double having changed nothing.
 func blackjack_action(action: int) -> Dictionary:
@@ -3459,6 +3459,12 @@ func blackjack_action(action: int) -> Dictionary:
 		return refused
 	if action == BlackjackRoundScript.Action.DOUBLE:
 		if not _blackjack_round.can_double():
+			return refused
+		if not _game_state.casino.remove_chips(int(_blackjack_round.stake)):
+			return refused
+	# A Split's second hand is staked the same way, before any card moves (PS5 item 48).
+	if action == BlackjackRoundScript.Action.SPLIT:
+		if not _blackjack_round.can_split():
 			return refused
 		if not _game_state.casino.remove_chips(int(_blackjack_round.stake)):
 			return refused

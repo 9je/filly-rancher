@@ -43,9 +43,11 @@ const CHIP_RADIUS := 36.0
 const CHIP_PITCH := 96.0
 const CHIPS_LEFT := 300.0
 const DEAL := Rect2(610.0, 462.0, 300.0, 86.0)
-const HIT := Rect2(300.0, 462.0, 230.0, 86.0)
-const STAND := Rect2(545.0, 462.0, 230.0, 86.0)
-const DOUBLE := Rect2(790.0, 462.0, 300.0, 86.0)
+const HIT := Rect2(300.0, 462.0, 190.0, 86.0)
+const STAND := Rect2(502.0, 462.0, 190.0, 86.0)
+const DOUBLE := Rect2(704.0, 462.0, 190.0, 86.0)
+## Split (PS5 item 48): a pair on her first two cards becomes two hands.
+const SPLIT := Rect2(906.0, 462.0, 190.0, 86.0)
 const COUNTER := Rect2(930.0, 476.0, 160.0, 58.0)
 const RULES := Rect2(40.0, 20.0, 1040.0, 520.0)
 
@@ -177,6 +179,33 @@ func can_double() -> bool:
 		and _purse() >= int(_view.get("stake", 0))
 
 
+func can_split() -> bool:
+	return hand_live() and not _dealing and bool(_view.get("can_split", false)) \
+		and _purse() >= int(_view.get("stake", 0))
+
+
+## The hand she is playing in a split round (0 otherwise).
+func active_hand() -> int:
+	return int(_view.get("active", 0))
+
+
+func _split_round() -> bool:
+	return bool(_view.get("split", false))
+
+
+## The player's cards as the felt shows them, one array per hand: a split shows both.
+func shown_hands() -> Array:
+	if not _split_round():
+		return [shown_player_cards()]
+	var out: Array = []
+	for h: Dictionary in _view.get("hands", []) as Array:
+		var cards: Array[int] = []
+		for c in h.get("cards", []) as Array:
+			cards.append(int(c))
+		out.append(cards)
+	return out
+
+
 func shown_chips() -> int:
 	return _held_chips if _held_chips >= 0 else _purse()
 
@@ -225,11 +254,25 @@ func banner_up() -> bool:
 
 
 func headline() -> String:
+	if _split_round():
+		return RoundScript.split_headline(_view)
 	return RoundScript.headline(int(_view.get("ending", RoundScript.Ending.NONE)))
 
 
 func detail() -> String:
+	if _split_round():
+		return RoundScript.split_detail(_view)
 	return RoundScript.detail(_view)
+
+
+## Chips riding on the round: every hand's stake, doubled where she doubled.
+func _riding() -> int:
+	if _split_round():
+		var total := 0
+		for h: Dictionary in _view.get("hands", []) as Array:
+			total += int(_view.get("stake", 0)) * (2 if bool(h.get("doubled", false)) else 1)
+		return total
+	return int(_view.get("stake", 0)) * (2 if bool(_view.get("doubled", false)) else 1)
 
 
 # --- the controls -----------------------------------------------------------------------------
@@ -260,6 +303,7 @@ func stage_buttons() -> Array[Dictionary]:
 		out.append({"id": &"hit", "rect": HIT, "enabled": not _dealing})
 		out.append({"id": &"stand", "rect": STAND, "enabled": not _dealing})
 		out.append({"id": &"double", "rect": DOUBLE, "enabled": can_double()})
+		out.append({"id": &"split", "rect": SPLIT, "enabled": can_split()})
 		return out
 	for i: int in STAKES.size():
 		out.append({"id": StringName("stake:%d" % i), "rect": stake_chip_rect(i),
@@ -296,6 +340,11 @@ func activate(id: StringName) -> bool:
 				return false
 			_sound_call(&"play", [&"chip_clink"])
 			return _act(RoundScript.Action.DOUBLE)
+		&"split":
+			if not can_split():
+				return false
+			_sound_call(&"play", [&"chip_clink"])
+			return _act(RoundScript.Action.SPLIT)
 	return false
 
 
@@ -383,7 +432,7 @@ func show_result(lines: Array[String]) -> void:
 
 
 func drawn_lines() -> Array[String]:
-	var lines: Array[String] = ["Dealer", "You", "Deal", "Hit", "Stand", "Double"]
+	var lines: Array[String] = ["Dealer", "You", "Deal", "Hit", "Stand", "Double", "Split"]
 	for line in BlackjackScript.placard_lines():
 		lines.append(line)
 	if banner_up():
@@ -425,15 +474,18 @@ func paint(ci: Control) -> void:
 	for i: int in dealer.size():
 		var card: int = dealer[i]
 		PaintScript.draw_card(ci, card_rect(1, i, dealer.size()), title_font, card, card >= 0)
-	var player: Array[int] = shown_player_cards()
-	for i: int in player.size():
-		PaintScript.draw_card(ci, card_rect(0, i, player.size()), title_font, player[i], true)
+	if _split_round():
+		_paint_split_hands(ci, title_font, numeral_font)
+	else:
+		var player: Array[int] = shown_player_cards()
+		for i: int in player.size():
+			PaintScript.draw_card(ci, card_rect(0, i, player.size()), title_font, player[i], true)
 
 	# --- her bet on its spot -------------------------------------------------------------------
 	ci.draw_arc(BET_SPOT, 54.0, 0.0, TAU, 64, PaintScript.FELT_LINE, 3.0, true)
 	var riding: int = 0
 	if not _view.is_empty() and (hand_live() or banner_up()):
-		riding = int(_view.get("stake", 0)) * (2 if bool(_view.get("doubled", false)) else 1)
+		riding = _riding()
 	elif selected_stake() > 0:
 		riding = selected_stake()
 	if riding > 0:
@@ -448,8 +500,10 @@ func paint(ci: Control) -> void:
 			is_lit(&"hit"))
 		PaintScript.button(ci, STAND, "Stand", Color(0.86, 0.30, 0.32),
 			button_enabled(&"stand"), is_lit(&"stand"))
-		PaintScript.button(ci, DOUBLE, "Double  x2", Color(0.95, 0.62, 0.18),
+		PaintScript.button(ci, DOUBLE, "Double", Color(0.95, 0.62, 0.18),
 			button_enabled(&"double"), is_lit(&"double"))
+		PaintScript.button(ci, SPLIT, "Split", Color(0.42, 0.52, 0.92),
+			button_enabled(&"split"), is_lit(&"split"))
 	else:
 		for i: int in STAKES.size():
 			var box: Rect2 = stake_chip_rect(i)
@@ -497,11 +551,31 @@ func _paint_badge(ci: Control, title_font: Font, numeral_font: Font, rect: Rect2
 		Color.WHITE if bust else PaintScript.CARD_INK)
 
 
+## TWO HANDS SIDE BY SIDE on her half of the felt, each with its total over it and a gold bar
+## under the one she is playing.
+func _paint_split_hands(ci: Control, title_font: Font, numeral_font: Font) -> void:
+	var hands: Array = shown_hands()
+	var gap := 40.0
+	var half: float = (CARDS_RIGHT - CARDS_LEFT - gap) * 0.5
+	for h: int in hands.size():
+		var cards: Array = hands[h]
+		var left: float = CARDS_LEFT + float(h) * (half + gap)
+		var pitch: float = minf(CARD_PITCH * 0.6, (half - CARD_SIZE.x) / maxf(1.0, float(cards.size() - 1)))
+		for i: int in cards.size():
+			PaintScript.draw_card(ci, Rect2(Vector2(left + pitch * float(i), PLAYER_ROW_Y), CARD_SIZE),
+				title_font, int(cards[i]), true)
+		var total: int = BlackjackScript.hand_total(cards as Array[int]) if cards.size() > 0 else 0
+		PaintScript.label(ci, numeral_font, Rect2(left, PLAYER_ROW_Y - 30.0, half, 28.0),
+			("Bust" if total > 21 else str(total)), 22, PaintScript.GOLD, HORIZONTAL_ALIGNMENT_LEFT)
+		if hand_live() and h == active_hand():
+			PaintScript.rounded(ci, Rect2(left, PLAYER_ROW_Y + CARD_SIZE.y + 8.0, half, 6.0), 3.0,
+				PaintScript.GOLD, Color(0, 0, 0, 0), 0.0)
+
+
 func _paint_banner(ci: Control, title_font: Font, numeral_font: Font, t: float) -> void:
 	var grow: float = lerpf(0.85, 1.0, _banner)
 	var rect := Rect2(BANNER.get_center() - BANNER.size * grow * 0.5, BANNER.size * grow)
-	var good: bool = _won > int(_view.get("stake", 0)) * (2 if bool(_view.get("doubled",
-		false)) else 1)
+	var good: bool = _won > _riding()
 	var push: bool = int(_view.get("outcome", -1)) == BlackjackScript.Outcome.PUSH
 	var edge: Color = PaintScript.GOLD if good else (Color(0.8, 0.8, 0.85) if push
 		else Color(0.86, 0.30, 0.32))

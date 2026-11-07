@@ -135,6 +135,24 @@ func _blackjack(tag: String) -> void:
 	menu.call("show_hand", hand.view(), hand.payout(), 50)
 	menu.call("finish_animation")
 	await _shot("blackjack_%s_dealer_busts" % tag)
+	# A PAIR, SPLIT (PS5 item 48): the pair with Split lit, both hands mid round, the verdict.
+	var pair: RefCounted = _find_hand(func(h) -> bool:
+		return not h.is_settled() and h.player[0] % 13 == h.player[1] % 13 and h.player[0] % 13 != 0)
+	chips = 450
+	menu.call("show_hand", pair.view(), 0, 50)
+	menu.call("finish_animation")
+	await _shot("blackjack_%s_pair" % tag)
+	pair.split()
+	chips = 400
+	menu.call("show_hand", pair.view(), 0, 100)
+	menu.call("finish_animation")
+	await _shot("blackjack_%s_split" % tag)
+	while not pair.is_settled():
+		pair.stand()
+	chips = 400 + pair.payout()
+	menu.call("show_hand", pair.view(), pair.payout(), 100)
+	menu.call("finish_animation")
+	await _shot("blackjack_%s_split_settled" % tag)
 	menu.call("set_tab", 1)
 	await _shot("blackjack_%s_rules" % tag)
 	menu.call("set_tab", 0)

@@ -23,8 +23,13 @@ extends RefCounted
 ##   - the dealer turns the hole card over only when she is done, then draws below 17 and
 ##     stands on any 17, hard or soft (Blackjack.DEALER_STANDS_ON);
 ##   - a player bust loses at once and the dealer draws nothing.
-## No splitting and no insurance: both are a second hand the table would have to lay out, and
-## the owner's ask was decisions, not every decision a casino has ever sold.
+##   - a PAIR on her first two cards may be SPLIT, once, into two hands, each carrying the
+##     stake again and each dealt one more card; she plays the first to its end, then the
+##     second (she may Double either); split aces take one card each and stand; twenty one on
+##     a split hand is a win, not a blackjack; the dealer plays once, after both hands, and
+##     each hand settles on its own (PS5, playtest 2026-11-05 item 48: "no Hit/Stand/Double/
+##     Split").
+## No insurance and no resplitting.
 ##
 ## Preloaded by path, never by a class_name (the class cache lives in the gitignored .godot/).
 
@@ -33,7 +38,7 @@ const BlackjackScript := preload("res://systems/blackjack.gd")
 enum Phase { PLAYER, SETTLED }
 
 ## What she can ask for. The menu's request signal carries one of these.
-enum Action { HIT, STAND, DOUBLE }
+enum Action { HIT, STAND, DOUBLE, SPLIT }
 
 ## HOW THE HAND ENDED, finer than Blackjack.Outcome, which only says who is paid. The table's
 ## banner reads this: "Dealer busts" and "Dealer wins" are both a settle, but they are not the
@@ -48,6 +53,15 @@ var doubled := false
 var phase: int = Phase.PLAYER
 var outcome: int = BlackjackScript.Outcome.PUSH
 var ending: int = Ending.NONE
+
+## Every hand she plays: `player` is the first, and a split adds a second. `_hand_doubled`,
+## `_hand_outcome` and `_hand_ending` run alongside; `_active` is the hand she is playing.
+var _hands: Array = []
+var _hand_doubled: Array[bool] = []
+var _hand_outcome: Array[int] = []
+var _hand_ending: Array[int] = []
+var _active := 0
+var _split := false
 
 var _deck: Array[int] = []
 var _dealt := 0
@@ -72,6 +86,10 @@ func _begin(rng: RandomNumberGenerator, stake_chips: int) -> void:
 	for i in 2:
 		player.append(_draw())
 		dealer.append(_draw())
+	_hands = [player]
+	_hand_doubled = [false]
+	_hand_outcome = [BlackjackScript.Outcome.PUSH]
+	_hand_ending = [Ending.NONE]
 	var player_natural: bool = BlackjackScript.is_blackjack(player)
 	var dealer_natural: bool = BlackjackScript.is_blackjack(dealer)
 	if player_natural and dealer_natural:
@@ -107,30 +125,71 @@ func can_stand() -> bool:
 	return phase == Phase.PLAYER
 
 
-## Her first two cards only, and once.
+## The hand she is playing's first two cards only, and once.
 func can_double() -> bool:
-	return phase == Phase.PLAYER and player.size() == 2 and not doubled
+	return phase == Phase.PLAYER and _cur().size() == 2 and not bool(_hand_doubled[_active])
 
 
+## A pair on her first two cards, before anything else, once.
+func can_split() -> bool:
+	return phase == Phase.PLAYER and not _split and player.size() == 2 and not doubled \
+		and player[0] % BlackjackScript.RANKS == player[1] % BlackjackScript.RANKS
+
+
+func hand_count() -> int:
+	return _hands.size()
+
+
+func hand_cards(i: int) -> Array[int]:
+	var out: Array[int] = []
+	if i >= 0 and i < _hands.size():
+		for c in _hands[i] as Array:
+			out.append(int(c))
+	return out
+
+
+func hand_outcome(i: int) -> int:
+	return int(_hand_outcome[i]) if i >= 0 and i < _hand_outcome.size() else BlackjackScript.Outcome.PUSH
+
+
+func hand_ending(i: int) -> int:
+	return int(_hand_ending[i]) if i >= 0 and i < _hand_ending.size() else Ending.NONE
+
+
+func active_hand() -> int:
+	return _active
+
+
+func _cur() -> Array:
+	return _hands[_active]
+
+
+## The total of the hand she is playing.
 func player_total() -> int:
-	return BlackjackScript.hand_total(player)
+	return BlackjackScript.hand_total(hand_cards(_active))
 
 
 func dealer_total() -> int:
 	return BlackjackScript.hand_total(dealer)
 
 
-## Chips riding on this hand: the stake, twice over once she has doubled.
+## Chips riding on the round: the stake on each hand, twice over on a hand she doubled.
 func total_staked() -> int:
-	return stake * (2 if doubled else 1)
+	var total := 0
+	for i in _hands.size():
+		total += stake * (2 if bool(_hand_doubled[i]) else 1)
+	return total
 
 
-## What the settle hands back, the stake included, under the contract every game in this
-## Palace shares (Slots.payout()). Zero while the hand is still being played.
+## What the settle hands back, the stakes included, under the contract every game in this
+## Palace shares (Slots.payout()): each hand paid on its own. Zero while it is being played.
 func payout() -> int:
 	if not is_settled():
 		return 0
-	return BlackjackScript.payout(outcome, total_staked())
+	var total := 0
+	for i in _hands.size():
+		total += BlackjackScript.payout(int(_hand_outcome[i]), stake * (2 if bool(_hand_doubled[i]) else 1))
+	return total
 
 
 ## Returns whether the action was taken. Anything asked of a settled hand is refused.
@@ -142,25 +201,25 @@ func act(action: int) -> bool:
 			return stand()
 		Action.DOUBLE:
 			return double_down()
+		Action.SPLIT:
+			return split()
 	return false
 
 
 func hit() -> bool:
 	if not can_hit():
 		return false
-	player.append(_draw())
+	_cur().append(_draw())
 	var total: int = player_total()
-	if total > 21:
-		_settle(BlackjackScript.Outcome.DEALER_WIN, Ending.PLAYER_BUST)
-	elif total == 21:
-		_dealer_plays()
+	if total >= 21:
+		_finish_hand()
 	return true
 
 
 func stand() -> bool:
 	if not can_stand():
 		return false
-	_dealer_plays()
+	_finish_hand()
 	return true
 
 
@@ -169,34 +228,87 @@ func stand() -> bool:
 func double_down() -> bool:
 	if not can_double():
 		return false
-	doubled = true
-	player.append(_draw())
-	if player_total() > 21:
-		_settle(BlackjackScript.Outcome.DEALER_WIN, Ending.PLAYER_BUST)
-	else:
-		_dealer_plays()
+	_hand_doubled[_active] = true
+	if _active == 0:
+		doubled = true
+	_cur().append(_draw())
+	_finish_hand()
 	return true
 
 
+## THE CALLER HAS ALREADY TAKEN THE SECOND HAND'S STAKE, as for a Double.
+func split() -> bool:
+	if not can_split():
+		return false
+	_split = true
+	var second: Array[int] = [player[1]]
+	player.remove_at(1)
+	_hands.append(second)
+	_hand_doubled.append(false)
+	_hand_outcome.append(BlackjackScript.Outcome.PUSH)
+	_hand_ending.append(Ending.NONE)
+	player.append(_draw())
+	second.append(_draw())
+	_active = 0
+	if BlackjackScript.is_ace(player[0]):
+		# Split aces take one card each and stand.
+		_active = _hands.size() - 1
+		_finish_hand()
+	elif BlackjackScript.hand_total(hand_cards(0)) == 21:
+		_finish_hand()
+	return true
+
+
+## The hand she is playing is done (stood, bust, doubled or at 21): on to the next, or the
+## dealer's turn after the last.
+func _finish_hand() -> void:
+	if _active < _hands.size() - 1:
+		_active += 1
+		if BlackjackScript.hand_total(hand_cards(_active)) == 21:
+			_finish_hand()
+		return
+	_dealer_plays()
+
+
+## The dealer plays once, after every hand, unless every hand bust; then each hand settles.
 func _dealer_plays() -> void:
-	while dealer_total() < BlackjackScript.DEALER_STANDS_ON \
-			and _dealt < BlackjackScript.DECK_SIZE:
-		dealer.append(_draw())
-	var mine: int = player_total()
+	var any_live := false
+	for i in _hands.size():
+		if BlackjackScript.hand_total(hand_cards(i)) <= 21:
+			any_live = true
+	if any_live:
+		while dealer_total() < BlackjackScript.DEALER_STANDS_ON \
+				and _dealt < BlackjackScript.DECK_SIZE:
+			dealer.append(_draw())
 	var theirs: int = dealer_total()
-	if theirs > 21:
-		_settle(BlackjackScript.Outcome.PLAYER_WIN, Ending.DEALER_BUST)
-	elif mine > theirs:
-		_settle(BlackjackScript.Outcome.PLAYER_WIN, Ending.PLAYER_HIGHER)
-	elif mine < theirs:
-		_settle(BlackjackScript.Outcome.DEALER_WIN, Ending.DEALER_HIGHER)
-	else:
-		_settle(BlackjackScript.Outcome.PUSH, Ending.TIE)
+	for i in _hands.size():
+		var mine: int = BlackjackScript.hand_total(hand_cards(i))
+		if mine > 21:
+			_hand_outcome[i] = BlackjackScript.Outcome.DEALER_WIN
+			_hand_ending[i] = Ending.PLAYER_BUST
+		elif theirs > 21:
+			_hand_outcome[i] = BlackjackScript.Outcome.PLAYER_WIN
+			_hand_ending[i] = Ending.DEALER_BUST
+		elif mine > theirs:
+			_hand_outcome[i] = BlackjackScript.Outcome.PLAYER_WIN
+			_hand_ending[i] = Ending.PLAYER_HIGHER
+		elif mine < theirs:
+			_hand_outcome[i] = BlackjackScript.Outcome.DEALER_WIN
+			_hand_ending[i] = Ending.DEALER_HIGHER
+		else:
+			_hand_outcome[i] = BlackjackScript.Outcome.PUSH
+			_hand_ending[i] = Ending.TIE
+	outcome = int(_hand_outcome[0])
+	ending = int(_hand_ending[0])
+	phase = Phase.SETTLED
 
 
 func _settle(settled_outcome: int, settled_ending: int) -> void:
 	outcome = settled_outcome
 	ending = settled_ending
+	if _hand_outcome.size() > 0:
+		_hand_outcome[0] = settled_outcome
+		_hand_ending[0] = settled_ending
 	phase = Phase.SETTLED
 
 
@@ -218,7 +330,20 @@ func view() -> Dictionary:
 		"doubled": doubled,
 		"stake": stake,
 		"can_double": can_double(),
+		"can_split": can_split(),
+		"split": _split,
+		"active": _active,
+		"hands": _hands_view(),
 	}
+
+
+func _hands_view() -> Array:
+	var out: Array = []
+	for i in _hands.size():
+		out.append({"cards": hand_cards(i), "total": BlackjackScript.hand_total(hand_cards(i)),
+			"doubled": bool(_hand_doubled[i]), "ending": int(_hand_ending[i]),
+			"outcome": int(_hand_outcome[i])})
+	return out
 
 
 ## The banner's big line. Never "stands" for a dealer who went over: the one wording bug the
@@ -242,6 +367,35 @@ static func headline(settled_ending: int) -> String:
 		Ending.TIE:
 			return "Push"
 	return ""
+
+
+## A SPLIT ROUND'S BANNER: how many of the two hands won, then each hand's own verdict.
+static func split_headline(view_dict: Dictionary) -> String:
+	var won := 0
+	var lost := 0
+	for h: Dictionary in view_dict.get("hands", []) as Array:
+		match int(h.get("outcome", -1)):
+			BlackjackScript.Outcome.PLAYER_WIN, BlackjackScript.Outcome.PLAYER_BLACKJACK:
+				won += 1
+			BlackjackScript.Outcome.DEALER_WIN:
+				lost += 1
+	var n := (view_dict.get("hands", []) as Array).size()
+	if won == n:
+		return "Both hands win"
+	if lost == n:
+		return "Both hands lose"
+	if won == 0 and lost == 0:
+		return "Push"
+	return "Won %d of %d" % [won, n]
+
+
+static func split_detail(view_dict: Dictionary) -> String:
+	var parts: Array[String] = []
+	var i := 1
+	for h: Dictionary in view_dict.get("hands", []) as Array:
+		parts.append("Hand %d: %s" % [i, headline(int(h.get("ending", Ending.NONE)))])
+		i += 1
+	return " \u00b7 ".join(parts)
 
 
 ## The banner's small line: the numbers behind the headline, or nothing when the headline is

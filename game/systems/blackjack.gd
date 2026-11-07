@@ -185,7 +185,7 @@ static func placard_lines() -> Array[String]:
 		"Blackjack pays %d to %d. A tie is a push."
 			% [BLACKJACK_PAYS_NUMERATOR, BLACKJACK_PAYS_DENOMINATOR],
 		"Double on your first two cards: twice the stake, one more card.",
-		"No splitting, no insurance.",
+		"Split a pair once into two hands, one more card each; split aces stand. No insurance.",
 		"The lobby sign's edge is for the house card: draw below %d, never double."
 			% STRATEGY_DRAWS_BELOW,
 	]

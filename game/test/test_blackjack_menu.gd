@@ -71,7 +71,7 @@ func test_a_live_hand_offers_hit_stand_and_double_and_each_emits_its_action() ->
 	var ids: Array[String] = []
 	for b: Dictionary in _menu.stage_buttons():
 		ids.append(String(b["id"]))
-	assert_eq(ids, ["hit", "stand", "double"] as Array[String])
+	assert_eq(ids, ["hit", "stand", "double", "split"] as Array[String], "Split greyed without a pair")
 	assert_eq(String(_menu.focused_id()), "hit", "the cursor waits on Hit")
 	watch_signals(_menu)
 	for pair: Array in [[&"hit", RoundScript.Action.HIT], [&"stand", RoundScript.Action.STAND],
@@ -196,3 +196,62 @@ func test_a_broken_push_is_a_still_frame() -> void:
 func test_nothing_it_draws_carries_a_dash() -> void:
 	for line: String in _menu.drawn_lines():
 		assert_false(line.contains("--") or line.contains("—"), line)
+
+
+# --- split (PS5, playtest 2026-11-05 item 48: "no Hit/Stand/Double/Split") ----------------------
+
+func _pair() -> RoundScript:
+	return _find(func(h) -> bool:
+		return not h.is_settled() and h.player[0] % BlackjackScript.RANKS == h.player[1] % BlackjackScript.RANKS \
+			and not BlackjackScript.is_ace(h.player[0]))
+
+
+func _split_enabled() -> bool:
+	for b: Dictionary in _menu.stage_buttons():
+		if b["id"] == &"split":
+			return bool(b["enabled"])
+	return false
+
+
+func test_a_pair_lights_split_and_it_asks_for_a_split() -> void:
+	_push(_pair())
+	assert_true(_split_enabled(), "a pair can be split")
+	watch_signals(_menu)
+	_menu.on_stage_hit(_menu.button_index(&"split"))
+	assert_signal_emitted_with_parameters(_menu, "action_requested", [RoundScript.Action.SPLIT])
+
+
+func test_split_is_greyed_without_a_pair_or_the_chips_for_it() -> void:
+	_push(_find(func(h) -> bool:
+		return not h.is_settled() and h.player[0] % BlackjackScript.RANKS != h.player[1] % BlackjackScript.RANKS))
+	assert_false(_split_enabled(), "two different cards")
+	_chips = 10
+	_push(_pair())
+	assert_false(_split_enabled(), "a purse that cannot stake the second hand")
+
+
+func test_a_split_round_shows_both_hands() -> void:
+	var hand := _pair()
+	hand.split()
+	_push(hand)
+	var groups: Array = _menu.shown_hands()
+	assert_eq(groups.size(), 2, "two hands on the felt")
+	for g: Array in groups:
+		assert_eq(g.size(), 2)
+	assert_eq(_menu.active_hand(), 0)
+
+
+func test_the_split_banner_says_both_hands_and_fits() -> void:
+	var hand := _pair()
+	hand.split()
+	while not hand.is_settled():
+		hand.stand()
+	_push(hand)
+	assert_true(_menu.banner_up())
+	assert_string_contains(_menu.detail(), "Hand 1")
+	assert_string_contains(_menu.detail(), "Hand 2")
+	var font: Font = MenuStyleScript.title_font()
+	var box: Rect2 = _menu.banner_rect()
+	for line: String in [_menu.headline()]:
+		var px: int = PaintScript.fit_size(font, line, 50, box.size.x - 48.0 - 150.0)
+		assert_lte(font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x, box.size.x - 48.0 - 150.0)
