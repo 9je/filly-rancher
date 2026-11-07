@@ -84,6 +84,22 @@ func setup(d: CharacterDef) -> void:
 	var body: Node3D = (load(path) as PackedScene).instantiate()
 	PonyRigScript.attach_hair_simulation(body)
 	_visuals.add_child(body)
+	# HER HEAD IS PART OF HER (PS8 item 34): the capsule stops at 1.6 m and her head stands
+	# higher and forward of it, so a crosshair on her face found nothing. An aim-only box
+	# round her head and neck, in her body's own space so it turns and scales with her;
+	# nothing that moves her ever queries areas.
+	var aim := Area3D.new()
+	aim.name = "AimHead"
+	aim.collision_layer = LayersScript.PONY
+	aim.collision_mask = 0
+	aim.monitoring = false
+	var box := CollisionShape3D.new()
+	var bs := BoxShape3D.new()
+	bs.size = Vector3(0.7, 0.85, 0.95)
+	box.shape = bs
+	box.position = Vector3(0.0, 1.55, -0.55)
+	aim.add_child(box)
+	body.add_child(aim)
 	PonyLodScript.apply(body)
 	PonyPaintScript.apply(body, look)
 	_visuals.scale = Vector3.ONE * PonyPaintScript.body_scale(look)

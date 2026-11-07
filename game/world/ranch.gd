@@ -9658,10 +9658,18 @@ func _update_person_aim() -> void:
 	var to := from - cam.global_transform.basis.z * PERSON_AIM_M
 	var q := PhysicsRayQueryParameters3D.create(from, to,
 		LayersScript.PONY | LayersScript.PROPS | LayersScript.TERRAIN)
+	q.collide_with_areas = true
 	if player != null:
 		q.exclude = [player.get_rid()]
 	var hit := get_world_3d().direct_space_state.intersect_ray(q)
-	hud.call("set_aiming_person", not hit.is_empty() and hit.collider is Npc)
+	var who: Object = hit.get("collider")
+	# Her body, or the aim box round her head (npc.gd AimHead).
+	if who is Area3D and (who as Node).name == &"AimHead":
+		var up: Node = (who as Node).get_parent()
+		while up != null and not up is Npc:
+			up = up.get_parent()
+		who = up
+	hud.call("set_aiming_person", who is Npc)
 
 
 ## The pony Tumble last pointed out, while she is still out there to be found (Happenings).
