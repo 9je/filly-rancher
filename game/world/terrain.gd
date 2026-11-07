@@ -610,8 +610,107 @@ func _build_mesh() -> ArrayMesh:
 	mat.set_shader_parameter(&"path_edge_softness", PATH_EDGE_SOFTNESS)
 	mat.set_shader_parameter(&"path_edge_noise", PATH_EDGE_NOISE)
 	mat.set_shader_parameter(&"path_glow", PATH_GLOW)
+	mat.set_shader_parameter(&"grain_amount", GRAIN_AMOUNT)
+	mat.set_shader_parameter(&"contact_dark", CONTACT_DARK)
 	mesh.surface_set_material(0, mat)
 	return mesh
+
+
+# --- the grass at things' feet (PS10 gap G2; FS2.2) ---------------------------------------
+
+## A brushed grain finer than the 0.9 m noise, and darker grass round everything that stands on
+## the ground: a contact mask painted from every solid prop's footprint once the ranch stands
+## (paint_contact), sampled by terrain.gdshader.
+const GRAIN_AMOUNT := 0.05
+const CONTACT_DARK := 0.32
+## Metres per texel of the mask, and how far past a footprint's edge the shade fades out.
+const CONTACT_TEXEL := 0.5
+const CONTACT_FALLOFF := 0.7
+var _contact: Image = null
+
+
+## The ground's ShaderMaterial.
+func ground_material() -> ShaderMaterial:
+	if _mesh_instance == null or _mesh_instance.mesh == null:
+		return null
+	return _mesh_instance.mesh.surface_get_material(0) as ShaderMaterial
+
+
+## Paint the contact mask from every solid prop under `root` (StaticBody3D on the PROPS layer:
+## props, trees, stones, fence rails and posts), and hand it to the ground shader. A box is
+## painted as a band along its long side, anything else as a disc; a shape whose bottom is
+## more than a metre off the ground (a canopy) is not at its foot.
+func paint_contact(root: Node) -> void:
+	var n := int(HALF * 2.0 / CONTACT_TEXEL)
+	_contact = Image.create(n, n, false, Image.FORMAT_R8)
+	for body: Node in root.find_children("*", "StaticBody3D", true, false):
+		if not (body as StaticBody3D).collision_layer & LayersScript.PROPS:
+			continue
+		for shape: CollisionShape3D in body.find_children("*", "CollisionShape3D", false, false):
+			if shape.shape == null or shape.disabled:
+				continue
+			_paint_shape(shape)
+	var mat := ground_material()
+	if mat != null:
+		mat.set_shader_parameter(&"contact_mask", ImageTexture.create_from_image(_contact))
+		mat.set_shader_parameter(&"contact_origin", Vector2(-HALF, -HALF))
+		mat.set_shader_parameter(&"contact_size", Vector2(HALF * 2.0, HALF * 2.0))
+
+
+func _paint_shape(cs: CollisionShape3D) -> void:
+	var xf := cs.global_transform
+	var aabb := xf * cs.shape.get_debug_mesh().get_aabb()
+	if aabb.position.y > height_at(aabb.get_center().x, aabb.get_center().z) + 1.0:
+		return
+	if cs.shape is BoxShape3D:
+		var half: Vector3 = (cs.shape as BoxShape3D).size * 0.5
+		var ax := Vector3(xf.basis.x.x, 0.0, xf.basis.x.z) * half.x
+		var az := Vector3(xf.basis.z.x, 0.0, xf.basis.z.z) * half.z
+		var along := ax if ax.length() >= az.length() else az
+		var across := az.length() if ax.length() >= az.length() else ax.length()
+		var c := xf.origin
+		var steps := maxi(1, int(along.length() * 2.0 / CONTACT_TEXEL))
+		for i in steps + 1:
+			var p := c + along * (float(i) / float(steps) * 2.0 - 1.0)
+			_paint_disc(p.x, p.z, across)
+		return
+	var r := maxf(aabb.size.x, aabb.size.z) * 0.5
+	_paint_disc(aabb.get_center().x, aabb.get_center().z, r)
+
+
+func _paint_disc(x: float, z: float, r: float) -> void:
+	var n := _contact.get_width()
+	var reach := r + CONTACT_FALLOFF
+	var cx := (x + HALF) / CONTACT_TEXEL
+	var cz := (z + HALF) / CONTACT_TEXEL
+	var span := int(ceil(reach / CONTACT_TEXEL))
+	for iz in range(maxi(0, int(cz) - span), mini(n, int(cz) + span + 1)):
+		for ix in range(maxi(0, int(cx) - span), mini(n, int(cx) + span + 1)):
+			var d := Vector2((ix + 0.5 - cx) * CONTACT_TEXEL, (iz + 0.5 - cz) * CONTACT_TEXEL).length()
+			var v := 1.0 - smoothstep(r * 0.7, reach, d)
+			if v > _contact.get_pixel(ix, iz).r:
+				_contact.set_pixel(ix, iz, Color(v, v, v))
+
+
+## How dark the grass is at (x, z) from things standing there, 0 (open) to 1 (at a base).
+func contact_at(x: float, z: float) -> float:
+	if _contact == null:
+		return 0.0
+	var ix := clampi(int((x + HALF) / CONTACT_TEXEL), 0, _contact.get_width() - 1)
+	var iz := clampi(int((z + HALF) / CONTACT_TEXEL), 0, _contact.get_height() - 1)
+	return _contact.get_pixel(ix, iz).r
+
+
+## The mask's mean over the whole map (most ground should be open).
+func contact_mean() -> float:
+	if _contact == null:
+		return 0.0
+	var total := 0.0
+	var n := _contact.get_width()
+	for iz in range(0, n, 4):
+		for ix in range(0, n, 4):
+			total += _contact.get_pixel(ix, iz).r
+	return total / pow(ceil(float(n) / 4.0), 2.0)
 
 
 ## PATH_POINTS, padded out to PATH_SHADER_SLOTS by repeating its own last entry -- the fixed

@@ -37,6 +37,15 @@ uniform float fine_amount = 0.055;
 uniform float coarse_amount = 0.030;
 // THE MEADOW IS NOT ONE GREEN (FS2.2): over patches about macro_metres across the grass drifts
 // toward a warmer, sun-dried green, so the valley reads as ground and not as a painted floor.
+// THE GRASS AT THINGS' FEET AND A BRUSHED GRAIN (PS10 gap G2; FS2.2). contact_mask is
+// painted on the CPU from every solid prop's footprint (Terrain.paint_contact): 1 at a base,
+// fading to 0 in the open; it darkens the grass by contact_dark. The grain is a stretched,
+// fine noise, like brush strokes laid one way, near the camera only.
+uniform sampler2D contact_mask : filter_linear, repeat_disable;
+uniform vec2 contact_origin = vec2(-110.0, -110.0);
+uniform vec2 contact_size = vec2(220.0, 220.0);
+uniform float contact_dark = 0.0;
+uniform float grain_amount = 0.0;
 uniform float macro_metres = 42.0;
 uniform float macro_amount = 0.5;
 uniform vec3 macro_warm = vec3(1.12, 1.04, 0.72);
@@ -184,7 +193,12 @@ void fragment() {
 	float macro = smoothstep(0.25, 0.75, value_noise(v_world_pos.xz / macro_metres + vec2(17.3, 4.1)));
 	base = mix(base, base * macro_warm, macro * macro_amount);
 
-	// A SLOPE YOU CAN SEE IS A SLOPE YOU CAN PLAN A WALK AROUND. Hillsides and the lake basin
+	// The brushed grain: noise stretched 4:1 along a fixed stroke direction, 0.25 m across.
+	vec2 stroke = mat2(vec2(0.8, 0.6), vec2(-0.6, 0.8)) * v_world_pos.xz;
+	float grain = (value_noise(stroke * vec2(1.0, 4.0) / 1.0) - 0.5) * 2.0;
+	base *= 1.0 + grain * grain_amount * fine_fade;
+
+		// A SLOPE YOU CAN SEE IS A SLOPE YOU CAN PLAN A WALK AROUND. Hillsides and the lake basin
 	// walls become earth, which is both more believable and free relief reading.
 	float slope = 1.0 - clamp(v_world_normal.y, 0.0, 1.0);
 	float earth = smoothstep(slope_low, slope_high, slope);
@@ -230,6 +244,10 @@ void fragment() {
 		// road entirely.
 		EMISSION += dirt * path * path_glow;
 	}
+
+	// Darker grass round whatever stands on it (the contact mask), a little cooler too.
+	float contact = texture(contact_mask, (v_world_pos.xz - contact_origin) / contact_size).r;
+	base *= 1.0 - contact * contact_dark * vec3(1.0, 0.92, 0.85);
 
 	float lum = dot(base, vec3(0.299, 0.587, 0.114));
 	base = mix(base, vec3(lum) * vec3(0.96, 0.99, 1.02), clamp(dread, 0.0, 1.0) * 0.55);

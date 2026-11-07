@@ -1123,6 +1123,11 @@ func _ready() -> void:
 	else:
 		prop_count += props.build()
 	_lay_street()
+	# The grass darkens at the foot of everything now standing on it (PS10 gap G2).
+	var contact_t := Time.get_ticks_usec()
+	terrain.paint_contact(self)
+	print("RANCH contact painted in %.0f ms, mean %.3f" % [(Time.get_ticks_usec() - contact_t) / 1000.0,
+		terrain.contact_mean()])
 
 	# THE BEAM'S CATCHES, BEFORE THERE IS ANYTHING ON THE MAP TO CATCH. The beam is a child
 	# of the player scene and so has existed since the first line of this function; the
