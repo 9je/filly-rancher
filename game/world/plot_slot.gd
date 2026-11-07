@@ -671,18 +671,24 @@ const WILD_WOOD := Color(0.45, 0.31, 0.19)
 ## from (two of ranch.tscn's slots are turned 180 degrees) she reads it the right way round.
 ## Tall enough to clear the tallest clump.
 const SIGN_BOARD_Y := 2.05
+## The board's height (PlaceSign.build's).
+const SIGN_BOARD_H := 0.55
 
 
 func _make_sign() -> Node3D:
 	var sign := Node3D.new()
 	sign.name = "Sign"
 	var wood := _solid(SIGN_WOOD, 0.95)
+	# THE POST HOLDS THE BOARD FROM BELOW (PS4 item 26): it used to run up through the board's
+	# middle and stood in front of the price on both faces ("…5 bits"); it stops at the
+	# board's bottom edge, just into it.
+	var post_h := SIGN_BOARD_Y - SIGN_BOARD_H * 0.5 + 0.04
 	var post := MeshInstance3D.new()
 	var pm := BoxMesh.new()
-	pm.size = Vector3(0.16, SIGN_BOARD_Y + 0.2, 0.16)
+	pm.size = Vector3(0.16, post_h, 0.16)
 	pm.material = wood
 	post.mesh = pm
-	post.position = Vector3(0.0, (SIGN_BOARD_Y + 0.2) * 0.5, 0.0)
+	post.position = Vector3(0.0, post_h * 0.5, 0.0)
 	sign.add_child(post)
 	# A PAPER FACED BOARD LIKE EVERY OTHER SIGN (PT7; playtest 2026-11-05: "signs dont have
 	# white bg", dark paint on dark wood, and paint 5 mm off the board that flickered): the
@@ -690,7 +696,7 @@ func _make_sign() -> Node3D:
 	var board: Node3D = (load("res://world/place_sign.gd") as GDScript).new()
 	board.name = "Board"
 	sign.add_child(board)
-	board.call("build", "%d bits" % _clear_cost, PlaceSign.Icon.COIN, 1.5, 0.55, 0.0, true)
+	board.call("build", "%d bits" % _clear_cost, PlaceSign.Icon.COIN, 1.5, SIGN_BOARD_H, 0.0, true)
 	board.position = Vector3(0.0, SIGN_BOARD_Y, 0.0)
 	board.rotation = Vector3(0.0, PI * 0.5, 0.0)
 	return sign
