@@ -180,3 +180,23 @@ func test_the_windows_sit_left_to_right_and_the_payline_crosses_their_middles() 
 func test_nothing_it_draws_carries_a_dash() -> void:
 	for line: String in _menu.drawn_lines():
 		assert_false(line.contains("--") or line.contains("—"), line)
+
+
+## BIGGER CHIPS (PS5, playtest 2026-11-05 item 46: "... a real lever; bigger chips; a spin
+## button" [40]). The batch check found the chips about 50 px across beside 140 px reels. Each
+## chip is now at least 45% of a reel's width, and the chips, the counter and the Spin button
+## keep clear of each other.
+func test_the_chips_are_big_beside_the_reels_and_nothing_in_the_row_overlaps() -> void:
+	var SlotsMenuScript := preload("res://ui/slots_menu.gd")
+	assert_gte(SlotsMenuScript.CHIP_RADIUS * 2.0, SlotsMenuScript.REEL_SIZE_PX.x * 0.45,
+		"a chip %.0f across beside a %.0f reel" % [SlotsMenuScript.CHIP_RADIUS * 2.0, SlotsMenuScript.REEL_SIZE_PX.x])
+	var boxes: Array[Rect2] = []
+	for i in 3:
+		boxes.append(_menu.stake_chip_rect(i))
+	boxes.append(SlotsMenuScript.COUNTER)
+	boxes.append(SlotsMenuScript.SPIN)
+	for a in boxes.size():
+		for b in range(a + 1, boxes.size()):
+			assert_false(boxes[a].intersects(boxes[b]), "%s and %s overlap" % [boxes[a], boxes[b]])
+	for r: Rect2 in boxes:
+		assert_lte(r.end.y, SlotsMenuScript.STAGE_HEIGHT, "%s stays on the stage" % r)

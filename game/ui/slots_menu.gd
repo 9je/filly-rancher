@@ -41,9 +41,10 @@ const LEVER_PIVOT := Vector2(758.0, 300.0)
 const LEVER_LENGTH := 210.0
 const LEVER_HIT := Rect2(728.0, 60.0, 60.0, 270.0)
 const CHIP_ROW_Y := 512.0
-const CHIP_RADIUS := 36.0
-const CHIP_PITCH := 98.0
-const COUNTER := Rect2(330.0, 484.0, 180.0, 56.0)
+## Half a reel wide (PS5 item 46: "bigger chips"; they were 72 beside a 200 reel).
+const CHIP_RADIUS := 48.0
+const CHIP_PITCH := 114.0
+const COUNTER := Rect2(386.0, 484.0, 136.0, 56.0)
 const SPIN := Rect2(530.0, 466.0, 250.0, 92.0)
 const PAYTABLE := Rect2(808.0, 0.0, 312.0, 580.0)
 const BANNER := Rect2(170.0, 360.0, 400.0, 70.0)
@@ -492,7 +493,7 @@ func paint(ci: Control) -> void:
 				Color(PaintScript.GOLD, 0.75 + 0.25 * sin(t * 4.0)), 4.0, true)
 		PaintScript.chip(ci, centre, CHIP_RADIUS, colour, true)
 		PaintScript.label(ci, numeral_font, Rect2(centre - Vector2(CHIP_RADIUS * 0.66, 14.0),
-			Vector2(CHIP_RADIUS * 1.32, 28.0)), str(STAKES[i]), 22,
+			Vector2(CHIP_RADIUS * 1.32, 34.0)), str(STAKES[i]), 28,
 			Color.WHITE if i == 2 or not usable else PaintScript.CARD_INK)
 
 	# --- the chip counter, holding until the last reel stops -------------------------------------
