@@ -520,7 +520,8 @@ func set_tasks(rows: Array) -> void:
 		var kind: Array = TASK_CHIPS.get(String(row.get("id", "")),
 			[String(row.get("text", "")).get_slice(" ", 0), PlaceSign.Icon.STAR])
 		var chip := {"word": String(kind[0]), "done": bool(row.get("done", false)),
-			"icon": PlaceSign.icon_texture(int(kind[1])), "reward": int(row.get("reward_bits", 0))}
+			"icon": PlaceSign.icon_texture(int(kind[1])), "reward": int(row.get("reward_bits", 0)),
+			"text": String(row.get("text", ""))}
 		_chips.append(chip)
 		strip.add_child(_task_chip(chip))
 	var card := get_node_or_null("TasksCard") as Panel
@@ -538,15 +539,43 @@ const TASK_CHIPS := {
 var _chips: Array[Dictionary] = []
 
 
-## The checklist's chips as drawn: [{word, done, icon, reward}].
+## The checklist's chips as drawn: [{word, done, icon, reward, text}].
 func task_chips() -> Array[Dictionary]:
 	return _chips.duplicate()
 
 
+## A LESSON CHIP TAKES THE POINTER (PS10, G1; FS1.4 promised it and the chips were built
+## ignoring the mouse). The chip is one word; resting the pointer on it brings up the lesson's
+## whole sentence on one of the HUD's own cards, with what it pays, so the word never has to
+## carry the instruction alone. PASS, not STOP: the chip wants the hover, never the click.
+class LessonChip extends VBoxContainer:
+	var reward := 0
+	var done := false
+
+	func _make_custom_tooltip(for_text: String) -> Object:
+		var card := VBoxContainer.new()
+		card.add_theme_constant_override(&"separation", 2)
+		var line := Label.new()
+		line.text = for_text
+		MenuStyleScript.style_label(line, 19, MenuStyleScript.TOOLTIP_INK)
+		line.add_theme_constant_override("outline_size", 0)
+		line.add_theme_font_override("font", MenuStyleScript.title_font())
+		card.add_child(line)
+		var pay := Label.new()
+		pay.text = ("Done!  +%d bits" if done else "Worth %d bits") % reward
+		MenuStyleScript.style_label(pay, 16, TASK_TICK.darkened(0.2) if done else Color(0.6, 0.45, 0.12))
+		pay.add_theme_constant_override("outline_size", 0)
+		card.add_child(pay)
+		return card
+
+
 func _task_chip(chip: Dictionary) -> VBoxContainer:
-	var col := VBoxContainer.new()
+	var col := LessonChip.new()
 	col.add_theme_constant_override(&"separation", 2)
-	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.mouse_filter = Control.MOUSE_FILTER_PASS
+	col.tooltip_text = String(chip.get("text", ""))
+	col.reward = int(chip.reward)
+	col.done = bool(chip.done)
 	var done: bool = chip.done
 	var tile := Control.new()
 	tile.custom_minimum_size = Vector2(52, 52)

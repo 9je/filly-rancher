@@ -649,3 +649,38 @@ func test_the_lessons_are_icon_chips_one_word_each_lit_when_done() -> void:
 	assert_eq(chips.map(func(c: Dictionary) -> bool: return c.done), [true, false, false])
 	for c: Dictionary in chips:
 		assert_not_null(c.icon, "%s has an icon" % c.word)
+
+
+## G1 (playtest ledger), FS1.4: "hovering a lesson chip shows its sentence as a tooltip." Each
+## chip takes the pointer, its tooltip is the lesson's sentence, and what pops up is a drawn
+## card carrying that sentence (and the reward), not the engine's bare grey box.
+func test_hovering_a_lesson_chip_shows_its_sentence() -> void:
+	var sentences := ["Catch a pony with your magic beam.", "Move a pony into a pen.",
+		"Sell a gem at the market."]
+	_hud.set_tasks([
+		{"id": "tutorial_catch", "text": sentences[0], "done": true, "paid": false, "reward_bits": 20},
+		{"id": "tutorial_pen", "text": sentences[1], "done": false, "paid": false, "reward_bits": 30},
+		{"id": "tutorial_sell", "text": sentences[2], "done": false, "paid": false, "reward_bits": 50},
+	])
+	var strip := _hud.get_node("Tasks").get_child(1) as HBoxContainer
+	assert_not_null(strip, "the chip strip under the title")
+	var chips := strip.get_children()
+	assert_eq(chips.size(), 3)
+	for i in chips.size():
+		var chip := chips[i] as Control
+		assert_ne(chip.mouse_filter, Control.MOUSE_FILTER_IGNORE, "chip %d takes the pointer" % i)
+		assert_eq(chip.get_tooltip(chip.size * 0.5), sentences[i], "chip %d's tooltip" % i)
+		assert_true(chip.has_method("_make_custom_tooltip"), "chip %d draws its own tooltip" % i)
+		if not chip.has_method("_make_custom_tooltip"):
+			continue
+		var tip: Control = chip.call("_make_custom_tooltip", sentences[i])
+		assert_not_null(tip)
+		if tip == null:
+			continue
+		var words: Array = tip.find_children("*", "Label", true, false).map(
+			func(l: Node) -> String: return (l as Label).text)
+		assert_has(words, sentences[i], "the card carries the sentence")
+		tip.free()
+	# The engine's tooltip box wears the HUD's card, not the default grey.
+	var theme: Theme = load(MenuStyle.THEME_PATH)
+	assert_true(theme.has_stylebox(&"panel", &"TooltipPanel"), "the theme styles the tooltip box")

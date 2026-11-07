@@ -1,0 +1,15 @@
+rc=1 log=/tmp/tmp.4jpG5dfiBY/out.txt
+* test_hovering_a_lesson_chip_shows_its_sentence
+    [Failed]:  [2] expected to not equal [2]:  chip 0 takes the pointer
+    [Failed]:  [""] expected to equal ["Catch a pony with your magic beam."]:  chip 0's tooltip
+    [Failed]:  chip 0 draws its own tooltip
+    [Failed]:  [2] expected to not equal [2]:  chip 1 takes the pointer
+    [Failed]:  [""] expected to equal ["Move a pony into a pen."]:  chip 1's tooltip
+    [Failed]:  chip 1 draws its own tooltip
+    [Failed]:  [2] expected to not equal [2]:  chip 2 takes the pointer
+    [Failed]:  [""] expected to equal ["Sell a gem at the market."]:  chip 2's tooltip
+    [Failed]:  chip 2 draws its own tooltip
+    [Failed]:  the theme styles the tooltip box
+Tests                42
+Passing Tests        41
+Failing Tests         1

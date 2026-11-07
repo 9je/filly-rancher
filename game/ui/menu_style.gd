@@ -379,6 +379,28 @@ static func paper_box() -> StyleBoxFlat:
 	return box
 
 
+## THE TOOLTIP IS ONE OF THE HUD'S CARDS (PS10, G1: a lesson chip shows its sentence under the
+## pointer). The engine's own tooltip box is a grey slab with white words, the "text
+## scaffolding" look the owner turned down; the theme gives every tooltip in the game the
+## HUD's cream card with its plum edge and ink words instead. The two colours are
+## game/ui/hud.gd's CARD_FILL and INK, copied because a const cannot reach across.
+const TOOLTIP_FILL := Color(1.0, 0.97, 0.91, 0.97)
+const TOOLTIP_LINE := Color(0.47, 0.31, 0.64)
+const TOOLTIP_INK := Color(0.24, 0.17, 0.3)
+
+
+static func tooltip_box() -> StyleBoxFlat:
+	var box := _box(TOOLTIP_FILL, TOOLTIP_LINE, 2, 14)
+	box.content_margin_left = 14.0
+	box.content_margin_right = 14.0
+	box.content_margin_top = 8.0
+	box.content_margin_bottom = 9.0
+	box.shadow_color = Color(0.15, 0.05, 0.2, 0.25)
+	box.shadow_size = 6
+	box.shadow_offset = Vector2(0.0, 3.0)
+	return box
+
+
 ## A BUTTON THAT SITS ON PAPER (PS6, G13; batch check of the 2026-11-05 playtest: the welcome
 ## letter's Back and the survey's answers were "white on cream, nearly invisible"). The theme's
 ## Button is made for the dark menu panels: a 4% white face and white words, which on a sheet

@@ -63,6 +63,13 @@ func _init() -> void:
 	theme.set_stylebox(&"panel", &"FillyPaper", MenuStyleScript.paper_box())
 	theme.set_stylebox(&"panel", &"FillyFrame", MenuStyleScript.frame_box())
 
+	# Every tooltip is a HUD card (PS10, G1), not the engine's grey slab.
+	theme.set_stylebox(&"panel", &"TooltipPanel", MenuStyleScript.tooltip_box())
+	theme.set_color(&"font_color", &"TooltipLabel", MenuStyleScript.TOOLTIP_INK)
+	theme.set_color(&"font_outline_color", &"TooltipLabel", MenuStyleScript.OUTLINE_COLOR)
+	theme.set_constant(&"outline_size", &"TooltipLabel", 0)
+	theme.set_font_size(&"font_size", &"TooltipLabel", MenuStyleScript.SUBTITLE_SIZE)
+
 	if not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(OUT_DIR)):
 		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT_DIR))
 	var err: int = ResourceSaver.save(theme, OUT_PATH)
