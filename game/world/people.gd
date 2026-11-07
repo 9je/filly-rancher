@@ -128,7 +128,7 @@ func _spawn(id: StringName) -> void:
 	add_child(n)
 	n.watch = player
 	if id == &"tumble" and player != null:
-		n.position = player.global_position + Vector3(2.0, 0.0, 1.5)
+		n.global_position = _entry_point()
 		n.set_mode_follow(player)
 	npcs[id] = n
 
@@ -157,6 +157,26 @@ func unpark_companions() -> void:
 		if n != null and is_instance_valid(n):
 			n.set_mode_follow(player)
 	_parked.clear()
+
+
+## WHERE TUMBLE COMES IN FROM (PS1, playtest 2026-11-05 item 13: "Tumble spawned
+## mid-conversation, inside the player"). She used to be stood up 2.5 m from the player in
+## the middle of Marigold's welcome. Now she is stood up ENTRY_M out, behind the camera (out
+## of the shot), on the first bearing clear of buildings, and trots in to her heel.
+const ENTRY_M := 10.0
+
+
+func _entry_point() -> Vector3:
+	var at := player.global_position
+	var cam := get_viewport().get_camera_3d() if is_inside_tree() else null
+	var back: Vector3 = cam.global_transform.basis.z if cam != null else player.global_basis.z
+	back.y = 0.0
+	back = back.normalized() if back.length_squared() > 1e-6 else Vector3.BACK
+	for deg: float in [0.0, 30.0, -30.0, 55.0, -55.0, 80.0, -80.0]:
+		var p := at + back.rotated(Vector3.UP, deg_to_rad(deg)) * ENTRY_M
+		if Building.rescue_point(p) == Vector3.INF:
+			return p
+	return at + back * ENTRY_M
 
 
 ## Interaction candidates: the nearest character in reach, as a TALK action.
