@@ -11,6 +11,10 @@ const TRACKS := {
 	&"day": "res://assets/audio/music/day_morning.ogg",
 	&"night": "res://assets/audio/music/night_evening.ogg",
 	&"town": "res://assets/audio/music/town_carefree.ogg",
+	# THE COUNTERS (PS10 gap G5; FS5.2): the town's carefree tune at the Market, and the same
+	# tune behind the Depot's glass (DEPOT_CUTOFF_HZ on the bus's low pass).
+	&"market": "res://assets/audio/music/town_carefree.ogg",
+	&"depot": "res://assets/audio/music/town_carefree.ogg",
 	&"casino": "res://assets/audio/music/casino_backbay.ogg",
 	&"works": "res://assets/audio/music/works_gone_beyond.ogg",
 	&"stealth": "res://assets/audio/music/stealth_stay_the_course.ogg",
@@ -26,7 +30,10 @@ const STINGS := {
 	&"delivery": "res://assets/audio/music/sting_delivery.wav",
 	&"bloom": "res://assets/audio/music/sting_bloom.wav",
 }
-const DUCK_DB := 5.0
+const DUCK_DB := 4.0
+## The Depot's muffle: the low pass on the music bus while its counter is open.
+const DEPOT_CUTOFF_HZ := 1100.0
+var _muffled := false
 const BUS := &"Music"
 const FADE_SECONDS := 2.5
 const SILENT_DB := -60.0
@@ -108,6 +115,8 @@ func play_context(ctx: StringName) -> void:
 	if ctx == context:
 		return
 	context = ctx
+	_muffled = ctx == &"depot"
+	_apply_cutoff()
 	if _a == null:
 		# Asked before _ready (a scene's own _ready can run first): _ready starts it.
 		return
@@ -156,8 +165,23 @@ func set_dread(d: float) -> void:
 	_drone.volume_db = linear_to_db(maxf(0.0001, smoothstep(0.1, 0.9, dread))) - 4.0
 	for p in [_a, _b]:
 		(p as AudioStreamPlayer).pitch_scale = 1.0 - 0.04 * dread
-	if _lowpass != null:
-		_lowpass.cutoff_hz = lerpf(20000.0, 900.0, pow(dread, 1.4))
+	_apply_cutoff()
+
+
+## The bus's low pass: dread closes it as it climbs, the Depot's glass to DEPOT_CUTOFF_HZ;
+## whichever is lower wins.
+func _apply_cutoff() -> void:
+	if _lowpass == null:
+		return
+	var hz := lerpf(20000.0, 900.0, pow(dread, 1.4))
+	if _muffled:
+		hz = minf(hz, DEPOT_CUTOFF_HZ)
+	_lowpass.cutoff_hz = hz
+
+
+## True while the score is heard through the Depot's glass.
+func muffled() -> bool:
+	return _muffled
 
 
 ## The cozy track's level: full at dread 0, sinking under the drone as it climbs, and dipped

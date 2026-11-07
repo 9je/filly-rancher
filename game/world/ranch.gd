@@ -1653,6 +1653,7 @@ func _bind_build_menu() -> void:
 ## you cannot get the pointer back from is a menu players close with Alt-F4.
 func _on_menu_opened(_slot: PlotSlot) -> void:
 	get_tree().paused = true
+	_update_music.call_deferred(_music_zone)
 	_menu_opened_msec = Time.get_ticks_msec()
 	_menu_clock_owed = true
 	_set_cursor_captured(false)
@@ -1660,6 +1661,7 @@ func _on_menu_opened(_slot: PlotSlot) -> void:
 
 
 func _on_menu_closed() -> void:
+	_update_music.call_deferred(_music_zone)
 	if _talk_hidden_for_pause:
 		_talk_hidden_for_pause = false
 		var talk: CanvasLayer = people.get("talk_box") if people != null else null
@@ -8547,12 +8549,26 @@ func _update_music(zone: StringName) -> void:
 	var music := get_node_or_null("/root/Music")
 	if music == null:
 		return
-	var ctx: StringName = &"day"
+	_music_zone = zone
+	music.call("play_context", music_context(zone,
+		_world != null and _world.phase() == WorldStateScript.Phase.NIGHT,
+		market_menu != null and market_menu.has_method("is_open") and bool(market_menu.is_open()),
+		depot_menu != null and depot_menu.has_method("is_open") and bool(depot_menu.is_open())))
+
+
+## Which score plays: the Market's or the Depot's while its counter is open (PS10 gap G5),
+## else the casino on the Strip, night by the clock, or day.
+static func music_context(zone: StringName, night: bool, market_open: bool, depot_open: bool) -> StringName:
+	if market_open:
+		return &"market"
+	if depot_open:
+		return &"depot"
 	if zone == SoundScript.ZONE_CASINO or zone == SoundScript.ZONE_STRIP:
-		ctx = &"casino"
-	elif _world != null and _world.phase() == WorldStateScript.Phase.NIGHT:
-		ctx = &"night"
-	music.call("play_context", ctx)
+		return &"casino"
+	return &"night" if night else &"day"
+
+
+var _music_zone: StringName = &""
 
 
 ## Every postcard queued since the last dawn goes in the mailbox now.
