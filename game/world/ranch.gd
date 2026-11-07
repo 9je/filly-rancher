@@ -356,7 +356,16 @@ const MAIL_ARRIVED := "Post! The flag is up on your mailbox."
 ## room (the shipped Teller lands at 5.62) and covers the upper half of the ramp besides.
 ## Nothing else on the map is affected: the Palace stands alone on the Strip, seventy metres
 ## from the nearest other interactable, and Interaction.PRIORITY ranks it last regardless.
-const PALACE_RADIUS := 6.0
+##
+## 6.5 SINCE ITEM 43 (playtest 2026-11-05: "A townspony stuck half inside the Palace plinth
+## wall"). The arithmetic above used the shell's 4.5 m and the Teller's 0.55 m capsule; the
+## plinth he stands against is the worn model's, its face at 4.83 m, and he faces out, so his
+## hindquarters reach about a metre back from his origin. Stood clear of both (_stand_one()):
+##
+##     sqrt((4.83 + 1.03 + 0.10)^2 + (1.6 + 0.38 + 0.10)^2) = 6.32
+##
+## past 6.0. Half a metre more keeps him inside the ground that opens his own counter.
+const PALACE_RADIUS := 6.5
 
 ## THE BOARD BESIDE THE PALACE DOOR. Its width is a fraction of the building's own, its base
 ## sits ABOVE the Palace's local y = 0 (which is its plinth top, not the ground) so nothing on
@@ -420,6 +429,9 @@ const REQUEST_BOARD_SUBLINE := "ask inside, paid on delivery"
 ## radius, so anything less would have her leaning into the wall or into the ramp. Deriving
 ## it means a future change to her size moves her rather than embedding her.
 const ATTENDANT_CLEARANCE := AttendantScript.BODY_RADIUS + 0.10
+## The daylight between an attendant's drawn body and the brick or the ramp beside him.
+## _stand_one() measures the body itself (item 43); this is only the hair left over.
+const ATTENDANT_GAP := 0.10
 
 ## Their looks, pinned rather than drawn. A shopkeeper who is a different colour every boot
 ## is a shopkeeper nobody recognises, and a gate that screenshots the Market wants the same
@@ -5842,14 +5854,31 @@ func _stand_one(registry: PonyRegistry, who: String, building_path: NodePath,
 	if side_dir.length_squared() <= 0.0:
 		return
 	side_dir = side_dir.normalized()
-	var at: Vector3 = building.global_position \
-		+ out_dir * (building.depth * 0.5 + ATTENDANT_CLEARANCE) \
-		+ side_dir * signf(side) * (building.door_width * 0.5 + ATTENDANT_CLEARANCE)
+	# OFF THE PLINTH AS BUILT AND HIS BODY AS DRAWN (playtest 2026-11-05 item 43: "A
+	# townspony stuck half inside the Palace plinth wall"). He used to stand ATTENDANT_CLEARANCE
+	# past `depth * 0.5`, but the Palace wears a model and its plinth is sized to the model's
+	# ground contact, whose front face is at 4.83 m, not 4.5; and he faces out, so what
+	# reaches back toward the wall is his hindquarters and tail (about a metre behind his
+	# origin), not his capsule's 0.55 m. Both measured, so a re-sized plinth or a longer body
+	# moves him instead of burying him. He is dressed first, at the origin, to be measured.
 	var node: Attendant = AttendantScript.new()
 	node.name = who
 	attendants.add_child(node)
-	node.global_position = Vector3(at.x, terrain.height_at(at.x, at.z), at.z)
+	node.global_position = building.global_position
 	node.dress(data, look, out_dir)
+	var plinth: Rect2 = building.plinth_rect()
+	var front: float = maxf(building.depth * 0.5, plinth.end.y)
+	var drawn: Rect2 = node.drawn_rect(building.global_transform)
+	var back := AttendantScript.BODY_RADIUS
+	var toward_door := AttendantScript.BODY_RADIUS
+	if drawn.has_area():
+		# Measured with his origin at the building's own, so these are reaches from his origin.
+		back = maxf(back, -drawn.position.y)
+		toward_door = maxf(toward_door, -drawn.position.x if side > 0.0 else drawn.end.x)
+	var at: Vector3 = building.global_position \
+		+ out_dir * (front + back + ATTENDANT_GAP) \
+		+ side_dir * signf(side) * (building.door_width * 0.5 + toward_door + ATTENDANT_GAP)
+	node.global_position = Vector3(at.x, terrain.height_at(at.x, at.z), at.z)
 	PropsScript.seat(node, terrain.height_at(at.x, at.z))
 
 

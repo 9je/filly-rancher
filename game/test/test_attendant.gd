@@ -112,7 +112,7 @@ func test_a_null_record_is_refused_and_leaves_no_body() -> void:
 ## ramp's foot.
 const ATTENDANTS := {
 	"Vendor": {"building": ^"Buildings/Market", "radius": 4.0, "from_door": true},  # ranch.gd MARKET_RADIUS, from the door (PS4 item 29)
-	"Teller": {"building": ^"Buildings/Palace", "radius": 6.0},
+	"Teller": {"building": ^"Buildings/Palace", "radius": 6.5},  # ranch.gd PALACE_RADIUS (item 43)
 }
 
 

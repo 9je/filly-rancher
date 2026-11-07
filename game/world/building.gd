@@ -276,6 +276,8 @@ const GROUND_CONTACT_SLICE := 0.5
 
 var _built := false
 var _wearing := false
+## The plinth as built (the `Floor` slab's own XZ rectangle, local metres). See plinth_rect().
+var _plinth_rect := Rect2()
 
 
 ## Every building standing on the map, for rescue_point().
@@ -406,6 +408,8 @@ func build() -> void:
 	var plinth_centre: Vector2 = plinth_rect.position + plinth_rect.size * 0.5
 	var plinth_size: Vector2 = plinth_rect.size
 	var plinth: float = FLOOR_TOP + SKIRT_DEPTH
+	_plinth_rect = Rect2(plinth_rect.position + Vector2(PLINTH_INSET, PLINTH_INSET),
+		plinth_size - Vector2(PLINTH_INSET, PLINTH_INSET) * 2.0)
 	_slab("Floor",
 		Vector3(plinth_size.x - PLINTH_INSET * 2.0, plinth, plinth_size.y - PLINTH_INSET * 2.0),
 		Vector3(plinth_centre.x, FLOOR_TOP - plinth * 0.5, plinth_centre.y), plinth_mat)
@@ -568,6 +572,20 @@ func door_clear_height() -> float:
 	if model_door_height > 0.0 and not model_file.is_empty():
 		return model_door_height * PropsScript.MLP_SCALE * model_scale
 	return door_height
+
+
+## THE PLINTH AS BUILT, in this building's own XZ metres (x across, y = local z): the solid
+## `Floor` slab's outer faces. For a primitive shell that is the wall rectangle less
+## PLINTH_INSET; for a worn model it is the model's own ground contact
+## (_model_ground_contact_footprint()), which can stand PAST `depth * 0.5`: the Palace's
+## front face is at 4.83 m, not 4.5. Anything placed "outside the plinth" measures from this,
+## not from `depth` (playtest 2026-11-05 item 43: the Teller, stood off `depth`, had his
+## hindquarters in the Palace's brickwork). Before build() it is the shell's own rectangle.
+func plinth_rect() -> Rect2:
+	if _plinth_rect.has_area():
+		return _plinth_rect
+	return Rect2(-width * 0.5 + PLINTH_INSET, -depth * 0.5 + PLINTH_INSET,
+		width - PLINTH_INSET * 2.0, depth - PLINTH_INSET * 2.0)
 
 
 func apron_foot_z() -> float:

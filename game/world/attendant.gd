@@ -83,6 +83,26 @@ func dress(data: PonyData, look: Dictionary, facing: Vector3) -> bool:
 	return true
 
 
+## EVERYTHING DRAWN OF HER, flattened to XZ in `frame` (a building's global transform, say):
+## x across, y = that frame's z. Her collider is a capsule round her barrel, but a pony is
+## longer than she is wide -- muzzle to tail about two metres -- so "her capsule clears the
+## wall" is not "her hindquarters do" (playtest 2026-11-05 item 43). Empty when undressed.
+func drawn_rect(frame: Transform3D) -> Rect2:
+	var to_frame := frame.affine_inverse()
+	var out := Rect2()
+	var first := true
+	if not has_model():
+		return out
+	for m: MeshInstance3D in _model.find_children("*", "MeshInstance3D", true, false):
+		if not m.visible or m.mesh == null:
+			continue
+		var box: AABB = (to_frame * m.global_transform) * m.get_aabb()
+		var r := Rect2(box.position.x, box.position.z, box.size.x, box.size.z)
+		out = r if first else out.merge(r)
+		first = false
+	return out
+
+
 func has_model() -> bool:
 	return _model != null and is_instance_valid(_model)
 

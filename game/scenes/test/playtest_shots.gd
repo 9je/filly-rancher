@@ -31,6 +31,9 @@ const POSES := [
 	{"items": [37], "shot": 34, "label": "strip", "anchor": "aabb:Strip", "front": 14.0, "zoom": 2.0, "world": true},
 	{"items": [41, 68], "shot": 35, "label": "depot_inside", "anchor": ^"Buildings/Depot", "front": 0.3, "world": true},
 	{"items": [43], "shot": 37, "label": "palace_plinth", "anchor": ^"Buildings/Palace", "front": 3.5, "side": 4.0, "world": true},
+	# Item 43's side view: along the Palace's front wall, so the Teller's four legs and the gap
+	# between his hindquarters and the plinth's brick face read in profile.
+	{"items": [43], "shot": 37, "label": "palace_plinth_side", "anchor": ^"Buildings/Palace", "front": 7.2, "side": 5.6, "look": 30.0, "zoom": -1.0, "world": true},
 	{"items": [40, 53], "shot": 45, "label": "paddock_trail", "anchor": ^"PenPlots", "front": 8.0, "world": true},
 	{"items": [61], "shot": 48, "label": "lake_bank", "anchor": ^"Zones/Lake", "front": 24.0, "world": true},
 	{"items": [61], "shot": 49, "label": "lake_close", "anchor": ^"Zones/Lake", "front": 19.0, "side": 4.0, "world": true},
