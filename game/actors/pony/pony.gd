@@ -934,6 +934,13 @@ func _physics_process(delta: float) -> void:
 		var into := desired.dot(-out_of)
 		if into > 0.0:
 			desired += out_of * into
+	# Held from turning (_update_facing), she does not walk off backwards or sideways: she
+	# waits for the room to turn, which the push gives her.
+	if _turn_held and desired != Vector3.ZERO:
+		var facing := -visuals.global_transform.basis.z
+		facing.y = 0.0
+		if facing.normalized().dot(desired.normalized()) < 0.0:
+			desired = Vector3.ZERO
 	var rate := ACCELERATION if desired.length_squared() > 0.0 else DECELERATION
 	var horizontal := Vector3(velocity.x, 0.0, velocity.z).move_toward(desired, rate * delta)
 	# The speed she already carries is trimmed the same way: easing toward a trimmed wish
@@ -1659,6 +1666,10 @@ func face(direction: Vector3) -> void:
 	visuals.rotation.y = _visual_yaw
 
 
+## Whether her last turn was held by BodySpace.turn_allowed (a neighbour in the way).
+var _turn_held := false
+
+
 func _update_facing(direction: Vector3, delta: float) -> void:
 	if direction.length_squared() > 0.0:
 		# The asset's forward is -Z (baked in by export_blend.py --rotate-z 180), same
@@ -1666,7 +1677,19 @@ func _update_facing(direction: Vector3, delta: float) -> void:
 		_visual_yaw = atan2(-direction.x, -direction.z)
 	var weight := 1.0 - exp(-TURN_RESPONSE * delta)
 	var before := visuals.rotation.y
+	var room_before := body_footprint()
 	visuals.rotation.y = lerp_angle(visuals.rotation.y, _visual_yaw, weight)
+	# Not into the pony beside her (BodySpace.turn_allowed): she holds her heading and finishes
+	# the turn once she has room; her walking is not held, so she can always step away.
+	# The short way round blocked, she turns the long way, away from her; held only when both are.
+	_turn_held = false
+	var step := angle_difference(before, visuals.rotation.y)
+	if not room_before.is_empty() and absf(step) > 1e-4 \
+			and not BodySpaceScript.turn_allowed(self, room_before, body_footprint()):
+		visuals.rotation.y = before - step
+		if not BodySpaceScript.turn_allowed(self, room_before, body_footprint()):
+			visuals.rotation.y = before
+			_turn_held = true
 	# Into a sharp turn she banks (FS4.2, systems/gait_blend.gd).
 	if delta > 0.0:
 		visuals.rotation.z = _gait_blend.lean(angle_difference(before, visuals.rotation.y) / delta,

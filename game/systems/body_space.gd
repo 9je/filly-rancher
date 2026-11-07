@@ -181,6 +181,37 @@ static func aside_on(n: Node3D) -> Vector3:
 	return _aside.get(n.get_instance_id(), Vector3.ZERO)
 
 
+## The narrowest gap between footprint `fp` (of member `n`) and every other member nearby,
+## INF when nobody is in reach.
+static func closest_gap(n: Node3D, fp: Dictionary) -> float:
+	var best := INF
+	if fp.is_empty():
+		return best
+	var reach := (HALF + RADIUS) * 2.0 * 1.3
+	for m in _members:
+		if m == n or not is_instance_valid(m):
+			continue
+		var other := footprint_of(m)
+		if other.is_empty() or Vector3(fp.at).distance_squared_to(other.at) > reach * reach:
+			continue
+		if absf(float(fp.get("y", 0.0)) - float(other.get("y", 0.0))) > SAME_FLOOR:
+			continue
+		best = minf(best, gap(fp, other))
+	return best
+
+
+## NOT A HEAD SWUNG INTO A NEIGHBOUR (PS1 item 17b): a pony turning on the spot swept her
+## head 0.3 m into the pony beside her in a tenth of a second, with neither of them walking
+## (seeded trace, 2026-11-06). A turn from footprint `before` to `after` is allowed while it
+## leaves her CLEARANCE from everybody, or when she is already closer and it does not close
+## the gap further.
+static func turn_allowed(n: Node3D, before: Dictionary, after: Dictionary) -> bool:
+	var now := closest_gap(n, after)
+	if now >= CLEARANCE:
+		return true
+	return now >= closest_gap(n, before) - 0.001
+
+
 static func _solve() -> void:
 	_pushes.clear()
 	_aside.clear()
