@@ -79,6 +79,7 @@ func _track(p: Node3D) -> String:
 	var top := 0.0
 	var landed := -1.0
 	var fastest := 0.0
+	var fast_at := ""
 	var last := p.global_position
 	var s := 0.0
 	while s < 3.0 and is_instance_valid(p):
@@ -89,9 +90,12 @@ func _track(p: Node3D) -> String:
 		top = maxf(top, above)
 		if landed < 0.0 and above < 0.15:
 			landed = s
-		fastest = maxf(fastest, (pos - last).length() * 60.0)
+		var v := (pos - last).length() * 60.0
+		if v > fastest:
+			fastest = v
+			fast_at = " (at %.2f s: %s, state %s)" % [s, str(pos - last), str(p.get(&"state"))]
 		last = pos
-	var r := "top %.2f m over the ground, landed at %.2f s, fastest %.1f m/s" % [top, landed, fastest]
+	var r := "top %.2f m over the ground, landed at %.2f s, fastest %.1f m/s%s" % [top, landed, fastest, fast_at]
 	if top > MAX_ABOVE or landed < 0.0 or landed > LAND_S or fastest > MAX_SPEED:
 		return "BAD " + r
 	return r

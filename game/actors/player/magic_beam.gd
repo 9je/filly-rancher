@@ -311,6 +311,10 @@ const HELD_SPIN_RATE := 0.9
 ## spawn interpenetrating and shove each other apart. RELEASE_LIFT is deliberately small:
 ## enough that a slight rise in the ground under her does not bury her hooves, little
 ## enough that the drop reads as her landing rather than as her falling.
+## How far over a held pony's feet the ground under her is looked for (_keep_over_ground):
+## more than one frame's pull can sink her at PULL_RESPONSE.
+const GROUND_PROBE_UP := 1.5
+
 const RELEASE_LEAD := 2.0
 const RELEASE_LIFT := 0.15
 
@@ -1730,8 +1734,24 @@ func _pull(delta: float) -> void:
 		target = _aim_origin + _held_dir * reach_m + _hold_offset
 	var weight := 1.0 - exp(-PULL_RESPONSE * delta)
 	_held.global_position = _held.global_position.lerp(target, weight)
+	_keep_over_ground(_held)
 	_held.rotation.y += HELD_SPIN_RATE * delta
 	_wobble(_held)
+
+
+## Aimed low, the hold point runs under the ground, and the lerp above reeled her into it;
+## let go there, the floor shoved her back out at 17 to 20 m/s, a pony who "just flew"
+## (PS11 G10, the slip_flight flake). Her feet are her origin, so she is set on the ground
+## under her whenever the pull would bury them. TERRAIN only: a probe that met props would
+## lift her onto a roof or a fence top she was merely held beside. Checked every frame, so
+## she is never more than one frame's pull under it and a short probe finds it.
+func _keep_over_ground(body: Node3D) -> void:
+	var at := body.global_position
+	var query := PhysicsRayQueryParameters3D.create(
+		at + Vector3.UP * GROUND_PROBE_UP, at, LayersScript.TERRAIN)
+	var hit := body.get_world_3d().direct_space_state.intersect_ray(query)
+	if not hit.is_empty() and at.y < hit["position"].y:
+		body.global_position.y = hit["position"].y
 
 
 ## Count the hold, and hand the body back if it outlasts its struggle time. This is the

@@ -824,6 +824,29 @@ func test_capture_charge_stops_when_the_grab_is_released_before_it_secures() -> 
 		"an aborted grab must not let the charge ring out")
 
 
+## PS11 G10 (the input batch's slip_flight flake): aimed low, the hold point runs under the
+## ground, and the beam reeled her into it; let go there, the floor shoved her back out at
+## 17 to 20 m/s, a pony who "just flew". Held, she never goes below the ground under her.
+func test_a_held_pony_is_never_pulled_into_the_ground() -> void:
+	var beam: MagicBeam = _beam()
+	var pony: Pony = PonyScene.instantiate()
+	add_child_autofree(pony)
+	pony.setup(_stock_data())
+	pony.global_position = Vector3(0.0, 0.0, -3.0)
+	await wait_physics_frames(2)
+	beam._begin_hold(pony)
+	# Aimed steeply down past her: the hold point is metres under the floor.
+	beam._aim_origin = Vector3(0.0, 1.6, 0.0)
+	beam._aim_direction = Vector3(0.0, -0.8, -0.6).normalized()
+	assert_lt(beam.get_hold_point().y + beam._hold_offset.y, -0.5, "the fixture aims under the floor")
+	var lowest := INF
+	for i in 120:
+		beam._pull(1.0 / 60.0)
+		lowest = minf(lowest, pony.global_position.y)
+	assert_gte(lowest, -0.01, "held, she stays on or over the ground (lowest %.2f m)" % lowest)
+	beam.release()
+
+
 ## PLAYTEST: "could not collect the first pony". A new player's nearest pony can be BOLD,
 ## and a HARD hold wrenches free half the time, so the very first catch the tips teach was a
 ## coin toss. While the ranch says this steward has never caught anyone, no hold wrenches;
