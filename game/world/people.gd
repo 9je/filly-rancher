@@ -174,6 +174,9 @@ func candidates(at: Vector3) -> Array[Dictionary]:
 		if d < best_d and (n as Npc).mode == NpcScript.Mode.FOLLOW and not has_news(id) \
 				and not _looked_at(n):
 			continue
+		# A wild pony in the aim: a companion is not offered at all, news or none.
+		if d < best_d and (n as Npc).mode == NpcScript.Mode.FOLLOW and _wild_in_aim(at):
+			continue
 		if d < best_d:
 			best_d = d
 			best = id
@@ -191,6 +194,20 @@ func candidates(at: Vector3) -> Array[Dictionary]:
 			c["companion"] = true
 		out.append(c)
 	return out
+
+
+## AT CATCH TIME E IS FOR THE CATCH (PS8, playtest 2026-11-05 item 18: "her talk prompt
+## steals E"): a wild pony the camera is turned toward, within beam range of `at`.
+const AIM_RANGE := 16.0
+
+
+func _wild_in_aim(at: Vector3) -> bool:
+	for p in wild_provider.call():
+		var pony := p as Node3D
+		if pony != null and is_instance_valid(pony) \
+				and pony.global_position.distance_to(at) < AIM_RANGE and _looked_at(pony):
+			return true
+	return false
 
 
 ## Whether the camera is turned toward `n` (within LOOK_CONE of straight ahead, flat).

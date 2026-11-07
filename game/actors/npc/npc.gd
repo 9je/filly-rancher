@@ -317,6 +317,10 @@ func _physics_process(delta: float) -> void:
 				var stop := HEEL_STOP if heel != follow_target.global_position else follow_distance
 				if d > stop:
 					var speed := run_speed if d > follow_distance * 3.0 else walk_speed * 1.4
+					var cam_back := _heel_back()
+					if cam_back != Vector3.ZERO:
+						speed = maxf(speed, heel_speed(global_position,
+							follow_target.global_position, cam_back, walk_speed, run_speed))
 					desired = to.normalized() * minf(speed, (d - stop) * 2.0 + 0.4)
 				_catch_up(d, delta)
 		Mode.WALK_TO:
@@ -346,7 +350,12 @@ func _physics_process(delta: float) -> void:
 		_yield = _yield.move_toward(Vector3.ZERO, YIELD_RETURN * delta)
 	if not is_on_floor():
 		velocity += get_gravity() * delta
-	var h := Vector3(velocity.x, 0, velocity.z).move_toward(desired, 6.0 * delta)
+	var accel := ACCEL
+	if mode == Mode.FOLLOW and follow_target != null and is_instance_valid(follow_target):
+		var cam_b := _heel_back()
+		if cam_b != Vector3.ZERO:
+			accel = heel_accel(global_position, follow_target.global_position, cam_b)
+	var h := Vector3(velocity.x, 0, velocity.z).move_toward(desired, accel * delta)
 	velocity.x = h.x
 	velocity.z = h.z
 	# Standing at home on solid ground: nothing for move_and_slide to resolve.
@@ -399,28 +408,71 @@ func _catch_up(gap: float, delta: float) -> void:
 
 
 ## AT HER HEEL, NOT IN THE SHOT (PT4; playtest 2026-11-05 item 18: "tumble gets in the way
-## when i catch ponies"). Following, she makes for a spot behind the player and to one side,
+## when i catch ponies"). Following, she makes for a spot level with the player and well to one
+## side (2 m: at 1.5 m and a metre behind she filled a corner of the screen; render 2026-11-07),
 ## as the camera sees it, so she is never between the lens and what the player aims at. The
 ## side is whichever she is already on. With no camera (a test) it is the player herself.
-const HEEL_BACK := 1.1
-const HEEL_SIDE := 1.5
+const HEEL_BACK := 0.3
+const HEEL_SIDE := 2.0
 const HEEL_STOP := 0.6
 
 
+## Where a companion at `x` makes for, following the player at `at`, with the camera's ground
+## `back` (player toward camera). Behind the player, her heel spot behind and to her side; but
+## AHEAD of the player (the camera has just swung round, as it does when aiming at a pony;
+## PS8 item 18) she first scoots out of the shot to her own side, wide of the edge of the
+## view, mostly sideways and drifting back, and only then comes in to the heel: the straight line to the heel
+## went right across what the player was aiming at.
+static func heel_route(x: Vector3, at: Vector3, back: Vector3) -> Vector3:
+	var side := back.cross(Vector3.UP)
+	if (x - at).dot(side) < 0.0:
+		side = -side
+	var along := (x - at).dot(-back)
+	if along > HEEL_AHEAD:
+		# Past the view's edge at her depth (the camera sits about HEEL_CAM_BACK behind).
+		var clear := (along + HEEL_CAM_BACK) * 0.5 + 0.6
+		# Mostly sideways, the quickest way out of the view, drifting back as she goes.
+		return at + side * maxf(clear, HEEL_SIDE + 0.9) - back * (along - 1.2)
+	return at + back * HEEL_BACK + side * HEEL_SIDE
+
+
+## How fast she goes: a filly's dash while she is ahead of the player, else her follow pace.
+static func heel_speed(x: Vector3, at: Vector3, back: Vector3, walk: float, run: float) -> float:
+	return run * 1.3 if (x - at).dot(-back) > HEEL_AHEAD else walk * 1.4
+
+
+## How quickly she gets going: a dart while she is ahead of the player (a second matters:
+## at the usual 6 she spent most of it just getting up to speed), else her usual pick-up.
+static func heel_accel(x: Vector3, at: Vector3, back: Vector3) -> float:
+	return HEEL_DART_ACCEL if (x - at).dot(-back) > HEEL_AHEAD else ACCEL
+
+
+const ACCEL := 6.0
+const HEEL_DART_ACCEL := 14.0
+
+
+## Ahead of the player by more than this, she is in the shot.
+const HEEL_AHEAD := 0.3
+## About where the camera sits behind the player (camera_rig.gd's arm at its usual length).
+const HEEL_CAM_BACK := 4.5
+
+
 func _heel_point() -> Vector3:
-	var at := follow_target.global_position
+	var back := _heel_back()
+	if back == Vector3.ZERO:
+		return follow_target.global_position
+	return heel_route(global_position, follow_target.global_position, back)
+
+
+## The camera's ground direction toward itself from ahead (its basis z, flat), or ZERO with no
+## camera (a test, headless), when she simply follows the player.
+func _heel_back() -> Vector3:
 	var cam := get_viewport().get_camera_3d() if is_inside_tree() else null
 	if cam == null or DisplayServer.get_name() == "headless":
-		return at
+		return Vector3.ZERO
 	var back := cam.global_transform.basis.z
 	back.y = 0.0
-	if back.length_squared() < 1e-6:
-		return at
-	back = back.normalized()
-	var side := back.cross(Vector3.UP)
-	if (global_position - at).dot(side) < 0.0:
-		side = -side
-	return at + back * HEEL_BACK + side * HEEL_SIDE
+	return back.normalized() if back.length_squared() > 1e-6 else Vector3.ZERO
 
 
 func _clear_at(at: Vector3) -> bool:
