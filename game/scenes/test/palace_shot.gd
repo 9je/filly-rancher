@@ -13,12 +13,20 @@ var out := ""
 var views: PackedStringArray = ["front", "player", "hall", "slots", "wheel", "tables", "cage", "racing",
 	"door"]
 var night := false
+## --strip=N: N frames of each hall view, the hall stepped 8 s between them (PS5 item 44: the
+## patrons are not frozen, so a still proves nothing).
+var strip := 1
+var strip_step := 8.0
 
 
 func _initialize() -> void:
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--out="):
 			out = a.substr(6)
+		elif a.begins_with("--step="):
+			strip_step = float(a.substr(7))
+		elif a.begins_with("--strip="):
+			strip = maxi(1, int(a.substr(8)))
 		elif a.begins_with("--views="):
 			views = a.substr(8).split(",")
 		elif a == "--night":
@@ -90,10 +98,17 @@ func _run() -> void:
 				cam.global_position = interior.to_global(pose[0])
 				cam.look_at(interior.to_global(pose[1]), Vector3.UP)
 				cam.make_current()
-		for i in 40:
-			await process_frame
-		var file := out.path_join("palace_interior_%s%s.png" % [v, "_night" if night else ""])
-		root.get_texture().get_image().save_png(file)
-		print("SHOT ", file)
+		for k in strip:
+			if k > 0:
+				var hall: Node = ranch.get("palace_interior")
+				if hall != null and hall.has_method("tick_patrons"):
+					for q in int(strip_step * 10.0):
+						hall.call("tick_patrons", 0.1)
+			for i in 40:
+				await process_frame
+			var suffix := "_%d" % k if strip > 1 else ""
+			var file := out.path_join("palace_interior_%s%s%s.png" % [v, "_night" if night else "", suffix])
+			root.get_texture().get_image().save_png(file)
+			print("SHOT ", file)
 	print("PALACE_SHOT_OK")
 	quit()

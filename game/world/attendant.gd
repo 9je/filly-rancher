@@ -102,3 +102,105 @@ func _ensure_collider() -> void:
 	shape.shape = capsule
 	shape.position = Vector3(0.0, BODY_HEIGHT * 0.5, 0.0)
 	add_child(shape)
+
+
+# --- a routine, so she is not a statue (PS5, playtest 2026-11-05 item 44: "Casino patrons
+# frozen in place" [38]) ------------------------------------------------------------------------
+
+## The clips she runs through between idles, and how long she idles between them (seconds).
+const ROUTINE_GAP := Vector2(3.0, 9.0)
+## How fast she walks to another machine, metres a second (the walk clip's own pace).
+const WALK_SPEED := 1.1
+
+var _routine: Array[StringName] = []
+var _rng := RandomNumberGenerator.new()
+var _until_next := 0.0
+var _acting := 0.0
+var _clips_started := 0
+var _walk_to := Vector3.ZERO
+var _walk_face := Vector3.ZERO
+var _walking := false
+
+
+## Give her a routine: `clips` she plays one at a time, every few seconds, starting at a time
+## drawn from `seed_value` so the hall's patrons are never in step.
+func start_routine(clips: Array[StringName], seed_value: int) -> void:
+	_routine = []
+	var anim := _anim()
+	for c: StringName in clips:
+		if anim == null or anim.has_animation(c):
+			_routine.append(c)
+	_rng.seed = seed_value
+	_until_next = _rng.randf_range(0.5, ROUTINE_GAP.y)
+
+
+func clips_started() -> int:
+	return _clips_started
+
+
+func is_walking() -> bool:
+	return _walking
+
+
+## Walk to `to` (this node's parent's space), then turn to look at `face`.
+func walk_to(to: Vector3, face: Vector3) -> void:
+	_walk_to = to
+	_walk_face = face
+	_walking = true
+	_acting = 0.0
+	_play(&"walk")
+
+
+## One step of her routine (driven by whoever stands her: the Palace hall's tick_patrons()): walking, acting out a clip, or idling until the next one.
+func tick(delta: float) -> void:
+	if _walking:
+		var to := _walk_to - position
+		to.y = 0.0
+		var step := WALK_SPEED * delta
+		if to.length() <= step:
+			position = Vector3(_walk_to.x, position.y, _walk_to.z)
+			_walking = false
+			_turn_to(_walk_face - position)
+			_play(&"idle")
+			_until_next = _rng.randf_range(ROUTINE_GAP.x, ROUTINE_GAP.y)
+		else:
+			position += to.normalized() * step
+			_turn_to(to)
+		return
+	if _routine.is_empty():
+		return
+	if _acting > 0.0:
+		_acting -= delta
+		if _acting <= 0.0:
+			_play(&"idle")
+			_until_next = _rng.randf_range(ROUTINE_GAP.x, ROUTINE_GAP.y)
+		return
+	_until_next -= delta
+	if _until_next > 0.0:
+		return
+	var clip: StringName = _routine[_rng.randi_range(0, _routine.size() - 1)]
+	_play(clip)
+	_clips_started += 1
+	var anim := _anim()
+	_acting = anim.get_animation(clip).length if anim != null and anim.has_animation(clip) else 2.0
+	_acting = clampf(_acting, 1.0, 4.0)
+
+
+func _turn_to(dir: Vector3) -> void:
+	dir.y = 0.0
+	if dir.length_squared() < 1e-6:
+		return
+	_facing = dir.normalized()
+	rotation.y = atan2(-_facing.x, -_facing.z)
+
+
+func _anim() -> AnimationPlayer:
+	if _model == null or not is_instance_valid(_model):
+		return null
+	return _model.get_node_or_null(PonyVisualsScript.ANIMATION_PLAYER_PATH) as AnimationPlayer
+
+
+func _play(clip: StringName) -> void:
+	var anim := _anim()
+	if anim != null and anim.has_animation(clip):
+		anim.play(clip, 0.25)

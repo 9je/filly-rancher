@@ -134,6 +134,7 @@ func set_active(on: bool) -> void:
 
 
 func _process(delta: float) -> void:
+	tick_patrons(delta)
 	_t += delta
 	if _wheel != null:
 		_wheel.rotate_object_local(Vector3.FORWARD, -WHEEL_IDLE_SPIN * delta)
@@ -275,6 +276,70 @@ func station_points(id: StringName) -> Array[Vector3]:
 	for p: Vector3 in _spots.get(id, []):
 		out.append(to_global(p))
 	return out
+
+
+## WHICH MACHINE EACH SLOT REGULAR IS AT (an index into SLOT_ROW), live: they move.
+var _regular_slot := {}
+var _move_rng := RandomNumberGenerator.new()
+var _until_move := 45.0
+
+
+## The machines a regular is at right now; E is not offered at these.
+func slots_taken() -> Array[int]:
+	var out: Array[int] = []
+	for n in _regular_slot:
+		out.append(int(_regular_slot[n]))
+	out.sort()
+	return out
+
+
+## The rows a regular may walk along: the wall row and each side of the island.
+static func _slot_group(i: int) -> int:
+	return 0 if i < 8 else (1 if i < 11 else 2)
+
+
+## Every 30 to 90 s a slot regular walks to a free machine in her own row. Public so the
+## suite can step two minutes of the hall at once; the staff tick themselves the same way.
+func tick_patrons(delta: float) -> void:
+	if _staff == null:
+		return
+	for n in _staff.get_children():
+		if n.has_method("tick"):
+			n.call("tick", delta)
+	_until_move -= delta
+	if _until_move > 0.0:
+		return
+	if _move_rng.seed == 0:
+		_move_rng.seed = 3082026
+	_until_move = _move_rng.randf_range(30.0, 90.0)
+	var who: Array = _regular_slot.keys().filter(func(n) -> bool: return not n.call("is_walking"))
+	if who.is_empty():
+		return
+	var mover: Node3D = who[_move_rng.randi_range(0, who.size() - 1)]
+	var from: int = int(_regular_slot[mover])
+	var free: Array[int] = []
+	for i in SLOT_ROW.size():
+		if _slot_group(i) == _slot_group(from) and not (i in slots_taken()):
+			free.append(i)
+	if free.is_empty():
+		return
+	var to: int = free[_move_rng.randi_range(0, free.size() - 1)]
+	var row: Array = SLOT_ROW[to]
+	var at := Vector3(float(row[0]), 0.0, float(row[1]))
+	_regular_slot[mover] = to
+	mover.call("walk_to", at + _facing(float(row[2])) * 1.35, at)
+	_refresh_slot_spots()
+
+
+## The slots station's spots: in front of every machine nobody is playing.
+func _refresh_slot_spots() -> void:
+	var spots: Array[Vector3] = []
+	var taken := slots_taken()
+	for i in SLOT_ROW.size():
+		if not (i in taken):
+			var row: Array = SLOT_ROW[i]
+			spots.append(Vector3(float(row[0]), 0.0, float(row[1])) + _facing(float(row[2])) * 1.45)
+	_spots[&"slots"] = spots
 
 
 func staff_count() -> int:
@@ -513,10 +578,12 @@ func _stand_staff(pony_dir: String) -> void:
 	]
 	for t: Vector3 in TABLES:
 		cast.append(["Dealer", t + Vector3(1.3, 0, 0), t + Vector3(-4, 0, 0)])
+	var slot_order: Array[int] = []
 	for i: int in SLOT_TAKEN:
 		var row: Array = SLOT_ROW[i]
 		var at := Vector3(float(row[0]), 0.0, float(row[1]))
 		cast.append(["Regular", at + _facing(float(row[2])) * 1.35, at])
+		slot_order.append(i)
 	cast.append(["Regular", TABLES[1] + Vector3(-1.6, 0, -2.0), TABLES[1]])
 	cast.append(["Regular", Vector3(-1.8, 0, 3.4), Vector3(4.0, 0, 2.6)])
 	for i in cast.size():
@@ -532,3 +599,12 @@ func _stand_staff(pony_dir: String) -> void:
 		var to: Vector3 = (who[2] as Vector3) - (who[1] as Vector3)
 		to.y = 0.0
 		node.dress(data, look, global_transform.basis * to.normalized())
+		# NOT A STATUE (PS5 item 44): every one runs a routine on her own seeded timing; the
+		# regulars at the slots also move between machines (tick_patrons()).
+		var role := String(who[0])
+		var clips: Array[StringName] = [&"look", &"nod", &"talk"]
+		if role == "Regular":
+			clips = [&"look", &"nod", &"laugh", &"talk", &"shake", &"hop"]
+		node.start_routine(clips, 7100 + i * 13)
+		if role == "Regular" and slot_order.size() > 0:
+			_regular_slot[node] = slot_order.pop_front()
