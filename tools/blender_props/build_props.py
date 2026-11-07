@@ -352,6 +352,83 @@ def goggles():
     export("goggles")
 
 
+@prop("hair_bow")
+def hair_bow():
+    """A wearable hair bow (PS7 item 6): two rounded loops and a knot, ribbon tails below."""
+    knot = ball("knot", 0.06, (0, 0, 0), "magenta", scale=(1.0, 0.8, 1.0))
+    loops = [ball("loopL", 0.12, (-0.13, 0, 0.02), "magenta", scale=(1.2, 0.45, 0.8)),
+             ball("loopR", 0.12, (0.13, 0, 0.02), "magenta", scale=(1.2, 0.45, 0.8))]
+    tails = [box("tailL", (0.06, 0.02, 0.18), (-0.05, 0, -0.12), "magenta", bevel=0.01, rot=(0, math.radians(-18), 0)),
+             box("tailR", (0.06, 0.02, 0.18), (0.05, 0, -0.12), "magenta", bevel=0.01, rot=(0, math.radians(18), 0))]
+    join([knot] + loops + tails, "hair_bow")
+    export("hair_bow")
+
+
+@prop("scarf")
+def scarf():
+    """A wearable knitted scarf (PS7 item 6): a soft ring for the neck and one tail hanging in
+    front (Blender +Y is the game's -Z, her face)."""
+    ring = torus("ring", 0.3, 0.075, (0, 0, 0), "brightsky_dark")
+    ring.scale = (1.0, 0.85, 1.0)
+    bpy.ops.object.transform_apply(scale=True)
+    tail = box("tail", (0.14, 0.05, 0.36), (0.12, 0.27, -0.16), "brightsky_dark", bevel=0.025, rot=(math.radians(-12), 0, 0))
+    stripe = box("stripe", (0.145, 0.055, 0.04), (0.12, 0.275, -0.26), "cream", bevel=0.01, rot=(math.radians(-12), 0, 0))
+    join([ring, tail, stripe], "scarf")
+    export("scarf")
+
+
+@prop("pony_sash")
+def pony_sash():
+    """A wearable sash for the player (PS7 item 6): a flat band round a pony's barrel (0.27 wide,
+    0.38 tall, just over her coat), its axis along her length, a gold rosette on one side."""
+    band = torus("band", 0.3, 0.03, (0, 0, 0), "wine", rot=(math.radians(90), 0, 0))
+    # Turn first, then stretch in the world's axes (a scale on a turned object stretches its own).
+    bpy.ops.object.transform_apply(rotation=True)
+    band.scale = (0.92, 2.4, 1.27)
+    bpy.ops.object.transform_apply(scale=True)
+    rosette = cyl("rosette", 0.07, 0.03, (0.285, 0, 0.12), "gold", verts=16, rot=(0, math.radians(90), 0))
+    join([band, rosette], "pony_sash")
+    export("pony_sash")
+
+
+@prop("saddlebags")
+def saddlebags():
+    """Wearable saddlebags (PS7 item 6): a bag on each flank on a girth strap round a pony's barrel."""
+    parts = []
+    for side in (-1, 1):
+        parts.append(box("bag%d" % side, (0.09, 0.28, 0.22), (side * 0.31, 0, -0.06), "leather", bevel=0.035))
+        parts.append(box("flap%d" % side, (0.1, 0.29, 0.08), (side * 0.315, 0, 0.03), "wood_dark", bevel=0.025))
+        parts.append(box("buckle%d" % side, (0.02, 0.06, 0.05), (side * 0.37, 0, 0.0), "gold", bevel=0.008))
+    strap = torus("strap", 0.3, 0.02, (0, 0, 0), "leather", rot=(math.radians(90), 0, 0))
+    bpy.ops.object.transform_apply(rotation=True)
+    strap.scale = (0.92, 2.0, 1.27)
+    bpy.ops.object.transform_apply(scale=True)
+    join(parts + [strap], "saddlebags")
+    export("saddlebags")
+
+
+@prop("pony_goggles")
+def pony_goggles():
+    """Wearable goggles for the player (PS7 item 6), in a pony's own units: two brass-rimmed lenses
+    0.34 apart looking forward (Blender +Y, the game's -Z) and a strap round her head behind them.
+    Every turn is applied before the parts are joined, so the file carries no turn of its own."""
+    parts = []
+    for side in (-1, 1):
+        rim = torus("rim%d" % side, 0.1, 0.025, (side * 0.17, 0, 0), "brass", rot=(math.radians(90), 0, 0))
+        glass = cyl("glass%d" % side, 0.095, 0.02, (side * 0.17, 0, 0), "brightsky_dark", rot=(math.radians(90), 0, 0))
+        parts += [rim, glass]
+    bridge = box("bridge", (0.1, 0.03, 0.03), (0, 0, 0), "brass", bevel=0.008)
+    strap = torus("strap", 0.38, 0.022, (0, -0.38, 0), "leather")
+    parts += [bridge, strap]
+    for o in parts:
+        bpy.ops.object.select_all(action="DESELECT")
+        o.select_set(True)
+        bpy.context.view_layer.objects.active = o
+        bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+    join(parts, "pony_goggles")
+    export("pony_goggles")
+
+
 @prop("patch")
 def patch():
     """Static's Brightsky flank patch: a rounded badge that hides her mark."""

@@ -27,6 +27,8 @@ signal picked(index: int)
 ## target and brings the whole column back inside the base viewport.
 const CELL_SIZE := Vector2(56.0, 56.0)
 const CARD_SIZE := Vector2(168.0, 96.0)
+## A picture card (set_icons): big enough to read a marking or a hat at a glance.
+const PICTURE_SIZE := Vector2(76.0, 76.0)
 
 const CELL_RADIUS := 8
 const IDLE_BORDER := 2
@@ -38,6 +40,7 @@ const DEFAULT_COLUMNS := 6
 var _colours: Array[Color] = []
 var _labels: Array[String] = []
 var _cells: Array[Button] = []
+var _icons: Array[Texture2D] = []
 var _selected := 0
 
 ## THE KEYBOARD CURSOR, SEPARATE FROM THE PICK. -1 when nothing outside a mouse is pointing
@@ -95,6 +98,21 @@ func set_swatches(colours: Array[Color], labels: Array[String]) -> void:
 			picked.emit(index))
 		_cells.append(cell)
 		add_child(cell)
+	_restyle()
+
+
+## PICTURE CARDS (PS7 item 6): each cell shows `icons[i]` (a baked render of the option) over
+## its swatch colour. Called after set_swatches(); an empty list makes the cells plain again.
+func set_icons(icons: Array[Texture2D]) -> void:
+	_icons = icons.duplicate()
+	for i in _cells.size():
+		var tex: Texture2D = _icons[i] if i < _icons.size() else null
+		_cells[i].icon = tex
+		_cells[i].expand_icon = tex != null
+		_cells[i].icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_cells[i].vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
+		if tex != null:
+			_cells[i].custom_minimum_size = PICTURE_SIZE
 	_restyle()
 
 
@@ -160,6 +178,8 @@ func _restyle() -> void:
 			if state == &"hover" or state == &"pressed":
 				border = maxi(border, CHOSEN_BORDER - 1)
 			box.set_border_width_all(border)
+			if i < _icons.size() and _icons[i] != null:
+				box.set_content_margin_all(float(border) + 2.0)
 			box.border_color = MenuStyleScript.COLOR_TAB_ON if chosen \
 				else (MenuStyleScript.COLOR_HOVER_BORDER if (cursor or state == &"hover") \
 					else MenuStyleScript.ROW_IDLE_BORDER)

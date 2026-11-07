@@ -126,3 +126,49 @@ func test_an_eye_shape_reaches_her_eyes() -> void:
 					PonyLookScript.EyeShape.SLEEPY:
 						assert_gt(rest, 0.2, "a sleepy eye rests half shut")
 		assert_eq(eyes, 2, "both eyes")
+
+
+const AccessoriesScript := preload("res://systems/accessories.gd")
+
+
+func _worn(body: Node3D) -> Node3D:
+	var sk: Skeleton3D = body.find_children("*", "Skeleton3D", true, false)[0]
+	var attach := sk.get_node_or_null(NodePath(AccessoriesScript.NODE_NAME)) as BoneAttachment3D
+	return null if attach == null or attach.get_child_count() == 0 else attach.get_child(0)
+
+
+func test_six_accessories_each_worn_on_its_bone_and_swapped_cleanly() -> void:
+	assert_eq(AccessoriesScript.count(), 6)
+	var pl := PonyLookScript.new()
+	var body := _painted(pl)
+	assert_null(_worn(body), "none by default")
+	var sk: Skeleton3D = body.find_children("*", "Skeleton3D", true, false)[0]
+	for i in AccessoriesScript.count():
+		pl.accessory = i
+		PonyPaintScript.apply(body, pl)
+		var piece := _worn(body)
+		assert_not_null(piece, "%s is worn" % AccessoriesScript.label(i))
+		if piece == null:
+			continue
+		assert_eq(String(piece.name), String(AccessoriesScript.LIST[i].id))
+		var attach := piece.get_parent() as BoneAttachment3D
+		assert_eq(sk.get_bone_name(attach.bone_idx), String(AccessoriesScript.LIST[i].bone))
+		var only_one := 0
+		for c in sk.get_children():
+			if c.name == AccessoriesScript.NODE_NAME:
+				only_one += 1
+		assert_eq(only_one, 1, "the last one was taken off")
+	pl.accessory = -1
+	PonyPaintScript.apply(body, pl)
+	assert_null(_worn(body), "and -1 takes it off")
+
+
+func test_a_piece_sits_where_its_list_says_on_her_rest_pose() -> void:
+	var pl := PonyLookScript.new()
+	pl.accessory = 0
+	var body := _painted(pl)
+	var piece := _worn(body)
+	var sk: Skeleton3D = body.find_children("*", "Skeleton3D", true, false)[0]
+	var bone := sk.find_bone(String(AccessoriesScript.LIST[0].bone))
+	var at: Vector3 = (AccessoriesScript._relative(body, sk) * sk.get_bone_global_rest(bone) * piece.transform).origin
+	assert_almost_eq(at.distance_to(AccessoriesScript.LIST[0].at as Vector3), 0.0, 0.01)

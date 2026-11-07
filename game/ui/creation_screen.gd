@@ -50,6 +50,17 @@ const TAIL_LABEL := "Tail"
 ## The first cell of the streak and tail rows: no colour of its own, the mane's.
 const SAME_AS_MANE := "="
 const PonyPaintScript := preload("res://systems/pony_paint.gd")
+const PonyLookScript := preload("res://systems/pony_look.gd")
+const AccessoriesScript := preload("res://systems/accessories.gd")
+## PS7 item 6: the fourth step, its rows and their picture cards (baked by
+## game/scenes/test/style_icons.gd).
+const STEP_STYLE_LABEL := "Finishing touches"
+const MARKING_LABEL := "Markings"
+const MARKING_COLOUR_LABEL := "Marking colour"
+const EYE_SHAPE_LABEL := "Eye shape"
+const WEAR_LABEL := "Wear"
+const STYLE_ICONS := "res://assets/ui/style_icons/"
+const MARKING_WHITE := Color(0.98, 0.97, 0.94)
 const DonorTableScript := preload("res://systems/donor_table.gd")
 const MANE_STYLE_LABEL := "Mane style"
 const EYES_LABEL := "Eyes"
@@ -59,7 +70,7 @@ const HINT := "Left click to draw. Click a symbol to stamp it, up to three: drag
 
 ## HAIR is appended (not inserted) so LOOK and MARK keep their values; the tabs show it
 ## between them: Your pony, Mane and tail, Your cutie mark.
-enum Step { LOOK, MARK, HAIR }
+enum Step { LOOK, MARK, HAIR, STYLE }
 
 const STEP_LOOK_LABEL := "Your pony"
 const STEP_MARK_LABEL := "Your cutie mark"
@@ -121,6 +132,8 @@ const HAIR_REGIONS: Array[StringName] = [&"step", &"mane_style", &"mane", &"mane
 	&"confirm"]
 const MARK_REGIONS: Array[StringName] = [&"step", &"ink", &"stamp", &"tool", &"action",
 	&"confirm"]
+const STYLE_REGIONS: Array[StringName] = [&"step", &"marking", &"marking_colour", &"eye_shape",
+	&"wear", &"confirm"]
 
 signal confirmed(look: PlayerLook)
 
@@ -159,6 +172,11 @@ var _kb_on_name := false
 @onready var _race_grid: SwatchGrid = get_node_or_null(^"Layout/Panel/Margin/Column/RaceGrid")
 @onready var _mane2_grid: SwatchGrid = get_node_or_null(^"Layout/Panel/Margin/Column/Mane2Grid")
 @onready var _tail_grid: SwatchGrid = get_node_or_null(^"Layout/Panel/Margin/Column/TailGrid")
+@onready var _marking_grid: SwatchGrid = get_node_or_null(^"Layout/Panel/Margin/Column/MarkingGrid")
+@onready var _marking_colour_grid: SwatchGrid = get_node_or_null(
+	^"Layout/Panel/Margin/Column/MarkingColourGrid")
+@onready var _eye_shape_grid: SwatchGrid = get_node_or_null(^"Layout/Panel/Margin/Column/EyeShapeGrid")
+@onready var _wear_grid: SwatchGrid = get_node_or_null(^"Layout/Panel/Margin/Column/WearGrid")
 
 ## The ink she is drawing in right now, shown beside the ink buttons the same way each
 ## colour row shows its own pick. The canvas is the authority on which ink is loaded; this
@@ -191,7 +209,9 @@ func _ready() -> void:
 	_coat_label.text = COAT_LABEL
 	_mane_label.text = MANE_LABEL
 	_mane_style_label.text = MANE_STYLE_LABEL
-	for pair in [["RaceLabel", RACE_LABEL], ["Mane2Label", MANE2_LABEL], ["TailLabel", TAIL_LABEL]]:
+	for pair in [["RaceLabel", RACE_LABEL], ["Mane2Label", MANE2_LABEL], ["TailLabel", TAIL_LABEL],
+			["MarkingLabel", MARKING_LABEL], ["MarkingColourLabel", MARKING_COLOUR_LABEL],
+			["EyeShapeLabel", EYE_SHAPE_LABEL], ["WearLabel", WEAR_LABEL]]:
 		var l := get_node_or_null(NodePath("Layout/Panel/Margin/Column/" + pair[0])) as Label
 		if l != null:
 			l.text = pair[1]
@@ -262,12 +282,15 @@ const _PAPER_LABEL_PATHS: Array[NodePath] = [^"Layout/Panel/Margin/Column/Title"
 	^"Layout/Panel/Margin/Column/ManeLabel", ^"Layout/Panel/Margin/Column/ManeStyleLabel",
 	^"Layout/Panel/Margin/Column/EyesLabel", ^"Layout/Panel/Margin/Column/MarkLabel",
 	^"Layout/Panel/Margin/Column/HintLabel", ^"Layout/Panel/Margin/Column/RaceLabel",
-	^"Layout/Panel/Margin/Column/Mane2Label", ^"Layout/Panel/Margin/Column/TailLabel"]
+	^"Layout/Panel/Margin/Column/Mane2Label", ^"Layout/Panel/Margin/Column/TailLabel",
+	^"Layout/Panel/Margin/Column/MarkingLabel", ^"Layout/Panel/Margin/Column/MarkingColourLabel",
+	^"Layout/Panel/Margin/Column/EyeShapeLabel", ^"Layout/Panel/Margin/Column/WearLabel"]
 
 const _PAPER_BUTTON_PATHS: Array[NodePath] = [
 	^"Layout/Panel/Margin/Column/StepRow/StepLook",
 	^"Layout/Panel/Margin/Column/StepRow/StepHair",
 	^"Layout/Panel/Margin/Column/StepRow/StepMark",
+	^"Layout/Panel/Margin/Column/StepRow/StepStyle",
 	^"Layout/Panel/Margin/Column/InkRow/Ink0", ^"Layout/Panel/Margin/Column/InkRow/Ink1",
 	^"Layout/Panel/Margin/Column/InkRow/Ink2", ^"Layout/Panel/Margin/Column/InkRow/Ink3",
 	^"Layout/Panel/Margin/Column/InkRow/Ink4", ^"Layout/Panel/Margin/Column/InkRow/Ink5",
@@ -426,10 +449,41 @@ func _build_grids() -> void:
 		for i in _palette.manes.size():
 			lab.append("")
 		grid.set_swatches(sw, lab)
+	_build_style_grids()
 	if _mane2_grid != null:
 		_mane2_grid.picked.connect(func(i: int) -> void: set_mane2(i - 1))
 	if _tail_grid != null:
 		_tail_grid.picked.connect(func(i: int) -> void: set_tail(i - 1))
+
+
+## THE FINISHING TOUCHES (PS7 item 6): picture cards for the marking, eye shape and wear rows
+## (a baked render of each on a plain pony), and the marking colours as swatches, white first.
+func _build_style_grids() -> void:
+	var paper := Color(0.97, 0.94, 0.88)
+	var rows: Array = [[_marking_grid, "marking_%d", 5, set_marking, 0],
+		[_eye_shape_grid, "eye_%d", 3, set_eye_shape, 0],
+		[_wear_grid, "acc_%d", AccessoriesScript.count() + 1, set_accessory, -1]]
+	for row: Array in rows:
+		var grid: SwatchGrid = row[0]
+		if grid == null:
+			continue
+		var sw: Array[Color] = []
+		var icons: Array[Texture2D] = []
+		for i in int(row[2]):
+			sw.append(paper)
+			var value: int = i + int(row[4])
+			var file: String = "acc_none" if value < 0 and row[1] == "acc_%d" else String(row[1]) % value
+			icons.append(load(STYLE_ICONS + file + ".png") as Texture2D)
+		grid.set_swatches(sw, [] as Array[String])
+		grid.set_icons(icons)
+		var setter: Callable = row[3]
+		var shift: int = int(row[4])
+		grid.picked.connect(func(i: int) -> void: setter.call(i + shift))
+	if _marking_colour_grid != null:
+		var cols: Array[Color] = [MARKING_WHITE]
+		cols.append_array(_palette.coats)
+		_marking_colour_grid.set_swatches(cols, [] as Array[String])
+		_marking_colour_grid.picked.connect(func(i: int) -> void: set_marking_colour(i - 1))
 
 
 ## THE CARDS ARE TINTED BY THE MANE COLOUR SHE IS ON, so they read as manes rather than as
@@ -511,6 +565,32 @@ func set_tail(index: int) -> void:
 	_refresh_swatches()
 
 
+func set_marking(index: int) -> void:
+	_look.marking = clampi(index, PonyLookScript.Marking.NONE, PonyLookScript.Marking.DAPPLES)
+	_restyle()
+	_refresh_swatches()
+
+
+## -1 is white.
+func set_marking_colour(index: int) -> void:
+	_look.marking_colour = clampi(index, -1, _palette.coats.size() - 1)
+	_restyle()
+	_refresh_swatches()
+
+
+func set_eye_shape(index: int) -> void:
+	_look.eye_shape = clampi(index, PonyLookScript.EyeShape.ROUND, PonyLookScript.EyeShape.SLEEPY)
+	_restyle()
+	_refresh_swatches()
+
+
+## -1 is nothing.
+func set_accessory(index: int) -> void:
+	_look.accessory = clampi(index, -1, AccessoriesScript.count() - 1)
+	_restyle()
+	_refresh_swatches()
+
+
 func cycle_coat(step: int) -> void:
 	set_coat(_look.coat + step)
 
@@ -581,7 +661,8 @@ func confirm() -> bool:
 func drawn_lines() -> Array[String]:
 	var lines: Array[String] = [TITLE, NAME_LABEL, COAT_LABEL, MANE_LABEL, MANE_STYLE_LABEL,
 		EYES_LABEL, MARK_LABEL, CONFIRM_LABEL, HINT, STEP_LOOK_LABEL, STEP_MARK_LABEL,
-		STEP_HAIR_LABEL, RACE_LABEL, MANE2_LABEL, TAIL_LABEL, SAME_AS_MANE]
+		STEP_HAIR_LABEL, RACE_LABEL, MANE2_LABEL, TAIL_LABEL, SAME_AS_MANE, STEP_STYLE_LABEL,
+		MARKING_LABEL, MARKING_COLOUR_LABEL, EYE_SHAPE_LABEL, WEAR_LABEL]
 	for i in StockPaletteScript.mane_style_count():
 		lines.append(StockPaletteScript.mane_style_label(i))
 	for id: int in MarkStampsScript.ids():
@@ -600,7 +681,7 @@ func step() -> int:
 ## a canvas, six inks, six stamps, four brushes and four buttons on one column, and the owner
 ## read that as cheap. Meeting the pony is one job; drawing her mark is another.
 func set_step(value: int) -> void:
-	_step = clampi(value, Step.LOOK, Step.HAIR)
+	_step = clampi(value, Step.LOOK, Step.STYLE)
 	var shown: Dictionary = {
 		Step.LOOK: ["NameLabel", "NameBox", "RaceLabel", "RaceGrid", "CoatLabel", "CoatGrid",
 			"EyesLabel", "EyesGrid"],
@@ -608,6 +689,8 @@ func set_step(value: int) -> void:
 			"Mane2Grid", "TailLabel", "TailGrid"],
 		Step.MARK: ["MarkLabel", "MarkCanvas", "HintLabel", "InkRow", "TalentLabel", "TalentGrid",
 			"ShapeGrid", "ToolRow", "ActionRow"],
+		Step.STYLE: ["MarkingLabel", "MarkingGrid", "MarkingColourLabel", "MarkingColourGrid",
+			"EyeShapeLabel", "EyeShapeGrid", "WearLabel", "WearGrid"],
 	}
 	for step: int in shown:
 		for n: String in shown[step]:
@@ -627,6 +710,7 @@ func _wire_steps() -> void:
 	for pair: Array in [[^"Layout/Panel/Margin/Column/StepRow/StepLook", Step.LOOK,
 			STEP_LOOK_LABEL],
 			[^"Layout/Panel/Margin/Column/StepRow/StepHair", Step.HAIR, STEP_HAIR_LABEL],
+			[^"Layout/Panel/Margin/Column/StepRow/StepStyle", Step.STYLE, STEP_STYLE_LABEL],
 			[^"Layout/Panel/Margin/Column/StepRow/StepMark", Step.MARK, STEP_MARK_LABEL]]:
 		var button := get_node_or_null(pair[0] as NodePath) as Button
 		if button == null:
@@ -652,6 +736,8 @@ func _regions() -> Array[StringName]:
 			return MARK_REGIONS
 		Step.HAIR:
 			return HAIR_REGIONS
+		Step.STYLE:
+			return STYLE_REGIONS
 	return LOOK_REGIONS
 
 
@@ -669,6 +755,14 @@ func _region_grid(region: StringName) -> SwatchGrid:
 			return _mane2_grid
 		&"tail":
 			return _tail_grid
+		&"marking":
+			return _marking_grid
+		&"marking_colour":
+			return _marking_colour_grid
+		&"eye_shape":
+			return _eye_shape_grid
+		&"wear":
+			return _wear_grid
 	return null
 
 
@@ -687,7 +781,8 @@ func _region_buttons(region: StringName) -> Array[BaseButton]:
 		&"step":
 			paths = [^"Layout/Panel/Margin/Column/StepRow/StepLook",
 				^"Layout/Panel/Margin/Column/StepRow/StepHair",
-				^"Layout/Panel/Margin/Column/StepRow/StepMark"]
+				^"Layout/Panel/Margin/Column/StepRow/StepMark",
+				^"Layout/Panel/Margin/Column/StepRow/StepStyle"]
 		&"ink":
 			for i in ink_count():
 				paths.append(NodePath("Layout/Panel/Margin/Column/InkRow/Ink%d" % i))
@@ -1189,3 +1284,11 @@ func _refresh_swatches() -> void:
 		_mane2_grid.set_selected(_look.mane2 + 1)
 	if _tail_grid != null:
 		_tail_grid.set_selected(_look.tail + 1)
+	if _marking_grid != null:
+		_marking_grid.set_selected(_look.marking)
+	if _marking_colour_grid != null:
+		_marking_colour_grid.set_selected(_look.marking_colour + 1)
+	if _eye_shape_grid != null:
+		_eye_shape_grid.set_selected(_look.eye_shape)
+	if _wear_grid != null:
+		_wear_grid.set_selected(_look.accessory + 1)

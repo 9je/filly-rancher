@@ -114,6 +114,9 @@ layout_mode = 2
 [node name="StepMark" type="Button" parent="Layout/Panel/Margin/Column/StepRow"]
 layout_mode = 2
 
+[node name="StepStyle" type="Button" parent="Layout/Panel/Margin/Column/StepRow"]
+layout_mode = 2
+
 [node name="NameLabel" type="Label" parent="Layout/Panel/Margin/Column"]
 layout_mode = 2
 
@@ -159,6 +162,38 @@ layout_mode = 2
 [node name="TailGrid" type="GridContainer" parent="Layout/Panel/Margin/Column"]
 layout_mode = 2
 columns = 9
+script = ExtResource("4")
+
+[node name="MarkingLabel" type="Label" parent="Layout/Panel/Margin/Column"]
+layout_mode = 2
+
+[node name="MarkingGrid" type="GridContainer" parent="Layout/Panel/Margin/Column"]
+layout_mode = 2
+columns = 5
+script = ExtResource("4")
+
+[node name="MarkingColourLabel" type="Label" parent="Layout/Panel/Margin/Column"]
+layout_mode = 2
+
+[node name="MarkingColourGrid" type="GridContainer" parent="Layout/Panel/Margin/Column"]
+layout_mode = 2
+columns = 9
+script = ExtResource("4")
+
+[node name="EyeShapeLabel" type="Label" parent="Layout/Panel/Margin/Column"]
+layout_mode = 2
+
+[node name="EyeShapeGrid" type="GridContainer" parent="Layout/Panel/Margin/Column"]
+layout_mode = 2
+columns = 3
+script = ExtResource("4")
+
+[node name="WearLabel" type="Label" parent="Layout/Panel/Margin/Column"]
+layout_mode = 2
+
+[node name="WearGrid" type="GridContainer" parent="Layout/Panel/Margin/Column"]
+layout_mode = 2
+columns = 7
 script = ExtResource("4")
 
 [node name="EyesLabel" type="Label" parent="Layout/Panel/Margin/Column"]

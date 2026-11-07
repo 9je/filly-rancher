@@ -17,6 +17,7 @@ const PonyLookScript := preload("res://systems/pony_look.gd")
 const DonorTableScript := preload("res://systems/donor_table.gd")
 const CutieMarkScript := preload("res://systems/cutie_mark.gd")
 const MarkComposerScript := preload("res://systems/mark_composer.gd")
+const AccessoriesScript := preload("res://systems/accessories.gd")
 const TOON := preload("res://shaders/toon.gdshader")
 const EYE := preload("res://shaders/pony_eye.gdshader")
 const HIDDEN := preload("res://shaders/hidden.gdshader")
@@ -94,7 +95,22 @@ static func apply(body: Node3D, look: PonyLook) -> int:
 				mi.set_surface_override_material(i, mat)
 				painted += 1
 	_apply_mark(body, look)
+	var piece: Node3D = AccessoriesScript.wear(body, look.accessory)
+	if piece != null and ToonStylerScript.shading_enabled:
+		_paint_piece(piece)
 	return painted
+
+
+## A worn piece in her own toon, each surface its model colour with her coat's outline: the
+## props' style bleached a leather bag to cream beside her coat (render, 2026-11-07).
+static func _paint_piece(piece: Node3D) -> void:
+	for node: Node in piece.find_children("*", "MeshInstance3D", true, false):
+		var mi: MeshInstance3D = node
+		for i in mi.mesh.get_surface_count():
+			var src := mi.mesh.surface_get_material(i) as BaseMaterial3D
+			# The importer hands back the file's linear colour as sRGB; her toon takes it as made.
+			var c: Color = src.albedo_color.srgb_to_linear() if src != null else Color.WHITE
+			mi.set_surface_override_material(i, _toon(c, Role.COAT))
 
 
 static var _baked: Dictionary = {}
