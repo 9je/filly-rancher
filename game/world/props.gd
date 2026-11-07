@@ -314,7 +314,7 @@ const LAYOUT := [
 	# Copses rather than an even scatter: two or three trunks together read as
 	# woodland, evenly-spaced singles read as a car park.
 	{"file": "saa_tree_narrow.glb", "at": Vector2(-27.0, -14.0), "yaw": 60.0, "s": 1.20, "family": &"mlp"},
-	{"file": "saa_tree_wide.glb", "at": Vector2(-24.0, -17.0), "yaw": 190.0, "s": 0.95, "family": &"mlp"},
+	{"file": "saa_tree_wide.glb", "at": Vector2(-27.5, -19.0), "yaw": 190.0, "s": 0.95, "family": &"mlp"},
 	{"file": "saa_tree_narrow.glb", "at": Vector2(30.0, 18.0), "yaw": 100.0, "s": 1.10, "family": &"mlp"},
 	{"file": "saa_tree_narrow.glb", "at": Vector2(33.0, 22.0), "yaw": 25.0, "s": 1.25, "family": &"mlp"},
 	{"file": "saa_tree_wide.glb", "at": Vector2(-12.0, -36.0), "yaw": 140.0, "s": 1.15, "family": &"mlp"},
@@ -547,17 +547,21 @@ const LAYOUT := [
 	# clears the Market's own new footprint (10.62 m wide at 45 degrees about (-2, -1),
 	# reaching 5.9 m on the diagonal) by at least 0.6 m, and clears every interaction radius
 	# on the map by more.
+	# RE-LAID 2026-11-07 (PS4 item 29): the buildings grew two to almost three times so their
+	# doors fit a pony, and the barn now reaches z -14, the Farmhouse x -9 to 11 and z -23 to
+	# -12, the Market x 12 to 28. The barn's working corner moved west of the Depot round the
+	# shed, the well and the coop went behind the house. test_nothing_inside_buildings checks it.
 	{"file": "saa_shed.glb", "at": Vector2(-22.0, -12.0), "yaw": 90.0, "family": &"mlp"},
-	{"file": "saa_wagon.glb", "at": Vector2(-20.5, -8.5), "yaw": 200.0, "family": &"mlp"},
-	{"file": "saa_hay_block.glb", "at": Vector2(-21.5, -16.0), "yaw": 15.0, "family": &"mlp"},
-	{"file": "saa_hay_pile.glb", "at": Vector2(-17.0, -20.5), "yaw": 40.0, "family": &"mlp"},
-	{"file": "saa_seed_bag.glb", "at": Vector2(-13.8, -11.0), "yaw": 300.0, "family": &"mlp"},
-	{"file": "mlp_farm_well.glb", "at": Vector2(-4.5, -16.5), "yaw": 60.0, "family": &"mlp"},
-	{"file": "mlp_chicken_coop.glb", "at": Vector2(9.5, -17.0), "yaw": 180.0, "family": &"mlp"},
+	{"file": "saa_wagon.glb", "at": Vector2(-24.0, -8.0), "yaw": 200.0, "family": &"mlp"},
+	{"file": "saa_hay_block.glb", "at": Vector2(-25.5, -14.5), "yaw": 15.0, "family": &"mlp"},
+	{"file": "saa_hay_pile.glb", "at": Vector2(-25.0, -11.8), "yaw": 40.0, "family": &"mlp"},
+	{"file": "saa_seed_bag.glb", "at": Vector2(-21.0, -9.5), "yaw": 300.0, "family": &"mlp"},
+	{"file": "mlp_farm_well.glb", "at": Vector2(-1.0, -26.5), "yaw": 60.0, "family": &"mlp"},
+	{"file": "mlp_chicken_coop.glb", "at": Vector2(4.5, -27.0), "yaw": 180.0, "family": &"mlp"},
 	{"file": "mlp_crate.glb", "at": Vector2(12.0, -11.2), "yaw": 30.0, "family": &"mlp"},
 	{"file": "mlp_basket.glb", "at": Vector2(9.0, -11.5), "yaw": 0.0, "family": &"mlp"},
-	{"file": "mlp_bush.glb", "at": Vector2(-3.5, -10.5), "yaw": 120.0, "family": &"mlp"},
-	{"file": "mlp_bush.glb", "at": Vector2(23.5, -12.0), "yaw": 20.0, "family": &"mlp"},
+	{"file": "mlp_bush.glb", "at": Vector2(-3.0, -12.3), "yaw": 120.0, "family": &"mlp"},
+	{"file": "mlp_bush.glb", "at": Vector2(30.5, -12.0), "yaw": 20.0, "family": &"mlp"},
 	# (The small dirt pile that stood at (-18.5, 3.5) is gone: in the toon light it read as a
 	# flat yellow blob with marks on it, and nobody could tell what it was. PT7, playtest
 	# 2026-11-05 item 27.)

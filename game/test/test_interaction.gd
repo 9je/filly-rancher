@@ -175,8 +175,11 @@ func _ranch_at_the_market() -> Node3D:
 	await get_tree().process_frame
 	var market: Node3D = ranch.get_node(^"Buildings/Market")
 	var player: Node3D = ranch.get_node(^"Player")
-	player.global_position = Vector3(market.global_position.x,
-		player.global_position.y, market.global_position.z)
+	# A pace and a half in front of the door: the Market opens from its door (PS4 item 29),
+	# and its origin is now inside a building grown to fit that door to a pony.
+	var out_dir: Vector3 = market.global_transform.basis.z
+	var door: Vector3 = market.global_position + out_dir * (float(market.get("depth")) * 0.5 + 1.5)
+	player.global_position = Vector3(door.x, player.global_position.y, door.z)
 	await get_tree().physics_frame
 	return ranch
 
@@ -186,7 +189,7 @@ func test_the_ranch_offers_the_verb_when_nothing_is_in_the_way() -> void:
 	var action: Dictionary = ranch.current_interaction()
 	assert_eq(int(action.get("kind", InteractionScript.Kind.NONE)),
 		InteractionScript.Kind.MARKET,
-		"standing on the Market's own origin, the interact key means the Market")
+		"standing at the Market's door, the interact key means the Market")
 	assert_ne(InteractionScript.prompt_for(action, "E"), "",
 		"...and the HUD has a line to print about it")
 

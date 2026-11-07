@@ -35,9 +35,9 @@ are. Heights are in PH; `-` means no bound.
 
 | category | min_ph | max_ph | min_width_ph | what it is and how it is measured |
 |---|---|---|---|---|
-| house | 3.0 | 6.0 | - | homes, shops, the town row, the Depot: the model from its own floor to the ridge. Several ponies tall. |
-| landmark | 3.0 | 8.0 | - | the barns and the Spectra Palace: at least as tall as the houses round them |
-| door | 1.3 | 2.2 | 0.6 | a doorway's CLEAR opening, from the floor the pony stands on to the lintel; width between the jambs. A pony walks in with room over her ears. |
+| house | 3.0 | 9.0 | - | homes, shops, the town row, the Depot: the model from its own floor to the ridge. Several ponies tall; up to 9 since PS4 item 29 grew the homestead's buildings until their painted doors fit a pony (the Depot's tower is the tallest, 8.4). |
+| landmark | 3.0 | 10.0 | - | the barns and the Spectra Palace: at least as tall as the houses round them (the homestead barn is 8.9 since its door was made pony sized, PS4 item 29) |
+| door | 1.3 | 2.2 | 0.6 | a doorway's CLEAR opening, from the floor the pony stands on to the lintel; width between the jambs. A pony walks in with room over her ears. For a building wearing a model, the door PAINTED ON THE MODEL (Building.model_door_height, measured off orthographic renders), not the hidden shell's opening: the shell's 3.85 m passed while the doors a player saw were 0.47 to 0.69 PH (PS4 item 29). |
 | outbuilding | 1.4 | 3.0 | - | a shed: taller than a pony, smaller than a house |
 | stall | 1.2 | 2.5 | - | a market stall: its awning is over the head of a pony standing at it |
 | structure | 1.0 | 3.0 | - | things a pony stands under or beside: swing frame, wire arch, bell tower, tetherball pole, lamp posts, a yard sign |

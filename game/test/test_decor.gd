@@ -10,11 +10,31 @@ const TerrainScript := preload("res://world/terrain.gd")
 const PropsScript := preload("res://world/props.gd")
 const PeopleScript := preload("res://world/people.gd")
 
-const BUILDINGS := {"Farmhouse": Vector2(2, -16), "Board": Vector2(-8, -13), "Market": Vector2(18, -3),
-	"Depot": Vector2(-14, -3), "Barn": Vector2(-17, -19)}
+## The buildings' own rectangles, read off ranch.tscn (PS4 item 29 grew them two to almost
+## three times, so a fixed centre and radius no longer described them).
+const RanchScene := preload("res://world/ranch.tscn")
+const BUILDINGS := ["Farmhouse", "Board", "Market", "Depot", "Barn"]
 const SMALL_THINGS := {"Mailbox": Vector2(8, 7), "Spike": Vector2(5.5, 3.5),
 	"Signpost": Vector2(4.6, 0.9), "Yard sign": Vector2(-3.4, 12.6)}
 const PLOTS := [Vector2(-9.5, 11), Vector2(-9.5, 20), Vector2(-18.5, 11), Vector2(-18.5, 20)]
+
+
+var _rects := {}
+
+
+## How far `p` is from the building's shell rectangle (0 inside it), on the ground.
+func _gap_to(building: String, p: Vector2) -> float:
+	if _rects.is_empty():
+		var ranch: Node = RanchScene.instantiate()
+		for n: String in BUILDINGS:
+			var b: Node3D = ranch.get_node(NodePath("Buildings/" + n))
+			_rects[n] = [b.transform, float(b.get("width")) * 0.5, float(b.get("depth")) * 0.5]
+		ranch.free()
+	var r: Array = _rects[building]
+	var local: Vector3 = (r[0] as Transform3D).affine_inverse() * Vector3(p.x, 0.0, p.y)
+	var dx := maxf(absf(local.x) - float(r[1]), 0.0)
+	var dz := maxf(absf(local.z) - float(r[2]), 0.0)
+	return Vector2(dx, dz).length()
 
 
 func _at(d: Dictionary) -> Vector2:
@@ -34,7 +54,7 @@ func test_every_spot_keeps_clear_of_the_roads_buildings_pens_and_people() -> voi
 		var clear := float(d.get("clear", 1.5))
 		assert_gt(TerrainScript.path_distance(p), 1.6 + clear, "%s off the road" % d.id)
 		for b: String in BUILDINGS:
-			assert_gt(p.distance_to(BUILDINGS[b]), 6.0 + clear, "%s clear of the %s" % [d.id, b])
+			assert_gt(_gap_to(b, p), 1.5 + clear, "%s clear of the %s" % [d.id, b])
 		for b: String in SMALL_THINGS:
 			assert_gt(p.distance_to(SMALL_THINGS[b]), 1.5 + clear, "%s clear of the %s" % [d.id, b])
 		for plot: Vector2 in PLOTS:

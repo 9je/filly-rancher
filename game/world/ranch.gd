@@ -287,7 +287,13 @@ const HOUSE_SAVE_REARM := 9.0
 ## 6.0, WAS 4.5: the Market grew by 1.35 to SCALE.md's house size (docs/playtest_fixes/scale.md),
 ## so its front wall and the Vendor beside its door stand 1.35 times further from this origin;
 ## the radius grew with them.
-const MARKET_RADIUS := 6.0
+##
+## FROM THE DOOR, NOT THE CENTRE (PS4 item 29, 2026-11-07): the buildings grew two to almost
+## three times so their doors fit a pony, and the Market's door then stood 6.9 m from this
+## origin, outside a 6 m radius -- the Market could not be opened. Measured from the middle of
+## the front wall now (_door_gap), the radius is what "at the door" means: 4 m, the door's
+## width and the Vendor beside it.
+const MARKET_RADIUS := 4.0
 
 ## How close to the request board's post counts as "at the board", in metres. Narrower than
 ## MARKET_RADIUS because the board is a small thing (3.0 x 1.2 m) five metres from the
@@ -297,7 +303,8 @@ const BOARD_RADIUS := 3.0
 
 ## How near the loading dock she has to be for E to open the Depot. Tighter than the
 ## Market's radius because the Depot is a smaller building on a busier corner of the yard.
-const DEPOT_RADIUS := 4.0
+## From the door, as MARKET_RADIUS (PS4 item 29).
+const DEPOT_RADIUS := 3.5
 
 ## How close to the mailbox E opens the Mail page from. Narrower than the Depot's, because a
 ## mailbox is a small thing on a post and a wide radius would put its prompt on top of the
@@ -2330,9 +2337,7 @@ func is_near_depot() -> bool:
 	var depot := get_node_or_null(^"Buildings/Depot") as Node3D
 	if depot == null:
 		return false
-	var gap := Vector2(player.global_position.x - depot.global_position.x,
-		player.global_position.z - depot.global_position.z).length()
-	return gap <= DEPOT_RADIUS
+	return _door_gap(^"Buildings/Depot") <= DEPOT_RADIUS
 
 
 func get_mailbox() -> Mailbox:
@@ -3785,9 +3790,7 @@ func is_near_market() -> bool:
 	var market := get_node_or_null(^"Buildings/Market") as Node3D
 	if market == null:
 		return false
-	var gap := Vector2(player.global_position.x - market.global_position.x,
-		player.global_position.z - market.global_position.z).length()
-	return gap <= MARKET_RADIUS
+	return _door_gap(^"Buildings/Market") <= MARKET_RADIUS
 
 
 ## WALK UP TO A LOCKED FENCE AND BE TOLD WHAT IT IS AND WHAT IT COSTS. Once per approach,
@@ -4732,7 +4735,7 @@ func interaction_candidates() -> Array[Dictionary]:
 			out.append(_pen_candidate(slot, gap))
 	if is_near_market():
 		out.append(InteractionScript.candidate(
-			InteractionScript.Kind.MARKET, _flat_gap_to(^"Buildings/Market")))
+			InteractionScript.Kind.MARKET, _door_gap(^"Buildings/Market")))
 	if is_near_board():
 		out.append(InteractionScript.candidate(
 			InteractionScript.Kind.BOARD, _flat_gap_to(^"Buildings/Board")))
@@ -4746,7 +4749,7 @@ func interaction_candidates() -> Array[Dictionary]:
 			out.append(InteractionScript.candidate(InteractionScript.Kind.SPIKE, sg))
 	if is_near_depot():
 		out.append(InteractionScript.candidate(
-			InteractionScript.Kind.DEPOT, _flat_gap_to(^"Buildings/Depot")))
+			InteractionScript.Kind.DEPOT, _door_gap(^"Buildings/Depot")))
 	# THE BAN CLOSES THE DOOR RATHER THAN GREYING IT OUT. The shipped code showed no prompt
 	# under a ban but still let the press through to casino_menu.open(), which then refused
 	# on its own can_open; a player got a silent nothing. A banned Palace is simply not
@@ -4801,6 +4804,15 @@ func _next_in_the_bag() -> String:
 		return ""
 	var next: PonyInstance = storage.peek()
 	return next.display_name() if next != null else ""
+
+
+## How far the player stands from the middle of a building's front wall, on the ground.
+func _door_gap(path: NodePath) -> float:
+	var b := get_node_or_null(path) as Node3D
+	if b == null or player == null:
+		return INF
+	var door: Vector3 = b.global_position + b.global_transform.basis.z * (float(b.get("depth")) * 0.5)
+	return Vector2(player.global_position.x - door.x, player.global_position.z - door.z).length()
 
 
 func _flat_gap_to(path: NodePath) -> float:
@@ -7443,9 +7455,15 @@ func _interaction_doors() -> Array[Dictionary]:
 		var node := get_node_or_null(NodePath(path)) as Node3D
 		if node == null:
 			continue
+		var at := Vector2(node.global_position.x, node.global_position.z)
+		# The Market and the Depot open from the middle of their front walls (_door_gap).
+		if path == "Buildings/Market" or path == "Buildings/Depot":
+			var door: Vector3 = node.global_position \
+				+ node.global_transform.basis.z * (float(node.get("depth")) * 0.5)
+			at = Vector2(door.x, door.z)
 		doors.append({
 			"name": String(node.name),
-			"at": Vector2(node.global_position.x, node.global_position.z),
+			"at": at,
 			"radius": float(radii[path]),
 		})
 	return doors

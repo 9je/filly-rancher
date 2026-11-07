@@ -111,7 +111,7 @@ func test_a_null_record_is_refused_and_leaves_no_body() -> void:
 ## the radius that opens her building, outside the plinth, outside the apron, and short of the
 ## ramp's foot.
 const ATTENDANTS := {
-	"Vendor": {"building": ^"Buildings/Market", "radius": 6.0},  # ranch.gd MARKET_RADIUS (SCALE.md)
+	"Vendor": {"building": ^"Buildings/Market", "radius": 4.0, "from_door": true},  # ranch.gd MARKET_RADIUS, from the door (PS4 item 29)
 	"Teller": {"building": ^"Buildings/Palace", "radius": 6.0},
 }
 
@@ -133,10 +133,14 @@ func _local_spot(ranch: Node3D, who: String) -> Dictionary:
 		return {}
 	var flat := Vector3(node.global_position.x - building.global_position.x, 0.0,
 		node.global_position.z - building.global_position.z)
+	var gap := Vector2(flat.x, flat.z).length()
+	if bool(ATTENDANTS[who].get("from_door", false)):
+		var door: Vector3 = building.global_transform.basis.z * (building.depth * 0.5)
+		gap = Vector2(flat.x - door.x, flat.z - door.z).length()
 	return {
 		"building": building,
 		"local": building.global_transform.basis.inverse() * flat,
-		"gap": Vector2(flat.x, flat.z).length(),
+		"gap": gap,
 	}
 
 

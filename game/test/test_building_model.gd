@@ -169,12 +169,15 @@ const RanchScene := preload("res://world/ranch.tscn")
 ## SCALE.md: each shell is its model's seated footprint at MLP_SCALE TIMES its own model_scale,
 ## which stands the model several pony heights tall (docs/playtest_fixes/scale.md). `k` is that
 ## factor; the w / d / ridge here are the MLP_SCALE measurements times k.
+## PS4 item 29 (2026-11-07) raised k on the four with a door until the door painted on each
+## model stands 1.32 pony heights (test_doors_fit): Barn 2.78, Farmhouse 2.72, Market 2.72,
+## Depot 2.47. The Board has no ground-floor door and kept its 1.85.
 const SHIPPED := {
-	"Barn": {"file": "saa_barn.glb", "k": 1.0, "w": 4.86, "d": 4.93, "ridge": 7.00},
-	"Farmhouse": {"file": "pv_wide_b.glb", "k": 1.25, "w": 7.26 * 1.25, "d": 3.44 * 1.25, "ridge": 5.77 * 1.25},
-	"Market": {"file": "pv_general.glb", "k": 1.35, "w": 10.62 * 1.35, "d": 5.07 * 1.35, "ridge": 5.34 * 1.35},
+	"Barn": {"file": "saa_barn.glb", "k": 2.78, "w": 4.86 * 2.78, "d": 4.93 * 2.78, "ridge": 7.00 * 2.78},
+	"Farmhouse": {"file": "pv_wide_b.glb", "k": 2.72, "w": 7.26 * 2.72, "d": 3.44 * 2.72, "ridge": 5.77 * 2.72},
+	"Market": {"file": "pv_general.glb", "k": 2.72, "w": 10.62 * 2.72, "d": 5.07 * 2.72, "ridge": 5.34 * 2.72},
 	"Board": {"file": "pv_bridged_b.glb", "k": 1.85, "w": 2.82 * 1.85, "d": 2.14 * 1.85, "ridge": 3.60 * 1.85},
-	"Depot": {"file": "pv_tower_b.glb", "k": 1.3, "w": 6.29 * 1.3, "d": 3.05 * 1.3, "ridge": 7.43 * 1.3},
+	"Depot": {"file": "pv_tower_b.glb", "k": 2.47, "w": 6.29 * 2.47, "d": 3.05 * 2.47, "ridge": 7.43 * 2.47},
 }
 
 ## Every building origin the owner's live save was made against. THESE MAY NOT MOVE: the
@@ -187,11 +190,22 @@ const SHIPPED := {
 ##
 ## RE-LAID 2026-10-25 round a plaza (owner playtest: "the important buildings at the start
 ## are too close and not easy to navigate between"); DECISIONS.md has the plan.
+##
+## GROWN 2026-11-07 (PS4 item 29), DOORS KEPT. Each building grew backwards from its door, so
+## its origin moved back by half its new depth while its front wall stayed where its road
+## ends; the Market and the Depot open from that door now (ranch.gd's _door_gap), so the
+## promise above holds where it matters. The Farmhouse also stepped 1 m west (it stood 0.4 m
+## from the grown Market), and the Board moved to the lot west of the north road (the grown
+## Farmhouse covered its old spot).
 const ORIGINS := {
-	"Barn": Vector2(-17.0, -19.0), "Farmhouse": Vector2(2.0, -16.0),
-	"Market": Vector2(18.0, -3.0), "Board": Vector2(-8.0, -13.0),
-	"Depot": Vector2(-14.0, -3.0), "Palace": Vector2(-10.0, 61.6),
+	"Barn": Vector2(-17.0, -23.387), "Farmhouse": Vector2(1.0, -18.529),
+	"Market": Vector2(21.473, -3.0), "Board": Vector2(-6.5, -8.3),
+	"Depot": Vector2(-15.784, -3.0), "Palace": Vector2(-10.0, 61.6),
 	"Mailbox": Vector2(8.0, 7.0),
+}
+## Where each grown building's front wall stands: these did not move (ranch.tscn).
+const DOOR_FRONTS := {
+	"Barn": Vector2(-17.0, -16.535), "Market": Vector2(14.578, -3.0), "Depot": Vector2(-12.017, -3.0),
 }
 
 
@@ -236,4 +250,9 @@ func test_no_building_origin_moved_out_from_under_the_owners_save() -> void:
 		assert_almost_eq(at.x, (ORIGINS[who] as Vector2).x, 0.001, "%s x" % who)
 		assert_almost_eq(at.y, (ORIGINS[who] as Vector2).y, 0.001, "%s z" % who)
 	assert_eq(buildings.get_child_count(), 7, "the census term did not move")
+	for who: String in DOOR_FRONTS:
+		var b := buildings.get_node(NodePath(who)) as Building
+		var front: Vector3 = b.position + b.transform.basis.z * (b.depth * 0.5)
+		assert_almost_eq(Vector2(front.x, front.z).distance_to(DOOR_FRONTS[who]), 0.0, 0.02,
+			"%s's front wall is where its road ends" % who)
 	ranch.free()

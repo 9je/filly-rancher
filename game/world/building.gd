@@ -241,6 +241,11 @@ const GROUND_DROP := SKIRT_DEPTH - SEAT_CLEARANCE - PropsScript.SINK_BIAS
 ## its width, depth, walls and ridge are scaled by the same number, so the collision is still
 ## the box the model fills.
 @export var model_scale := 1.0
+## THE DOOR PAINTED ON THE MODEL, in the model's own units at scale one: the height of its
+## clear opening from the model's floor, read off an orthographic render with a half-metre
+## grid (PS4 item 29, 2026-11-07). Zero where the model has no ground-floor door. What a
+## player SEES as the door, unlike door_height, which is this shell's own hidden opening.
+@export var model_door_height := 0.0
 ## Degrees the model is turned about Y inside the shell, so its own entrance faces the
 ## shell's local plus Z -- which is where the doorway, the apron and the attendants are.
 ## The packs do not agree on which way a model faces, so this is a measurement, taken off a
@@ -557,6 +562,14 @@ func skirt_bottom_y() -> float:
 ## Public because things get placed in front of doors: it is the reach a placement beside a
 ## doorway has to stay clear of, and game/test/test_attendant.gd asserts the Vendor and the
 ## Teller stand beside this ramp rather than on it or past its foot.
+## How tall the door a player sees is, in metres: the model's painted door at its scale, or
+## this shell's own opening for a building that wears no measured model.
+func door_clear_height() -> float:
+	if model_door_height > 0.0 and not model_file.is_empty():
+		return model_door_height * PropsScript.MLP_SCALE * model_scale
+	return door_height
+
+
 func apron_foot_z() -> float:
 	if door_width <= 0.001:
 		return depth * 0.5

@@ -118,55 +118,58 @@ script = ExtResource("3")
 [node name="Buildings" type="Node3D" parent="."]
 
 [node name="Barn" type="StaticBody3D" parent="Buildings"]
-transform = Transform3D(1, 0, -0, 0, 1, 0, 0, 0, 1, -17, 0, -19)
+transform = Transform3D(1, 0, -0, 0, 1, 0, 0, 0, 1, -17, 0, -23.387)
 script = ExtResource("7")
-width = 4.86
-depth = 4.93
-wall_height = 4.34
-ridge_height = 7
+width = 13.511
+depth = 13.705
+wall_height = 12.065
+ridge_height = 19.46
 door_width = 3
 door_height = 3.85
 wall_color = Color(0.556863, 0.231373, 0.192157, 1)
 roof_color = Color(0.278431, 0.243137, 0.223529, 1)
 trim_color = Color(0.309804, 0.219608, 0.176471, 1)
 model_file = "saa_barn.glb"
-model_scale = 1.0
+model_scale = 2.78
+model_door_height = 2.0
 model_yaw = 0.0
 
 [node name="Farmhouse" type="StaticBody3D" parent="Buildings"]
-transform = Transform3D(1, 0, -0, 0, 1, 0, 0, 0, 1, 2, 0, -16)
+transform = Transform3D(1, 0, -0, 0, 1, 0, 0, 0, 1, 1, 0, -18.529)
 script = ExtResource("7")
-width = 9.075
-depth = 4.3
-wall_height = 4.475
-ridge_height = 7.212
+width = 19.747
+depth = 9.357
+wall_height = 9.738
+ridge_height = 15.693
 door_width = 2.25
 door_height = 3.85
 wall_color = Color(0.898039, 0.858824, 0.760784, 1)
 roof_color = Color(0.376471, 0.211765, 0.176471, 1)
 trim_color = Color(0.435294, 0.32549, 0.243137, 1)
 model_file = "pv_wide_b.glb"
-model_scale = 1.25
+model_scale = 2.72
+model_door_height = 2.05
 model_yaw = 0.0
 
 [node name="Market" type="StaticBody3D" parent="Buildings"]
-transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 18, 0, -3)
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 21.473, 0, -3)
 script = ExtResource("7")
-width = 14.337
-depth = 6.845
-wall_height = 4.469
-ridge_height = 7.209
+width = 28.886
+depth = 13.791
+wall_height = 9.004
+ridge_height = 14.525
 door_width = 3.24
 door_height = 3.85
 wall_color = Color(0.858824, 0.607843, 0.32549, 1)
 roof_color = Color(0.556863, 0.231373, 0.192157, 1)
 trim_color = Color(0.435294, 0.32549, 0.243137, 1)
 model_file = "pv_general.glb"
-model_scale = 1.35
+model_scale = 2.72
+model_door_height = 2.05
 model_yaw = 0.0
 
 [node name="Board" type="StaticBody3D" parent="Buildings"]
-transform = Transform3D(1, 0, -0, 0, 1, 0, 0, 0, 1, -8, 0, -13)
+transform = Transform3D(1, 0, -0, 0, 1, 0, 0, 0, 1, -6.5, 0, -8.3)
 script = ExtResource("7")
 width = 5.217
 depth = 3.959
@@ -182,22 +185,23 @@ model_scale = 1.85
 model_yaw = 180.0
 
 [node name="Depot" type="StaticBody3D" parent="Buildings"]
-transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -14, 0, -3)
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -15.784, 0, -3)
 script = ExtResource("7")
-width = 8.177
-depth = 3.965
-wall_height = 5.98
-ridge_height = 9.659
+width = 15.536
+depth = 7.534
+wall_height = 11.362
+ridge_height = 18.352
 door_width = 3.9
 door_height = 3.85
 wall_color = Color(0.62, 0.64, 0.68, 1)
 roof_color = Color(0.3, 0.34, 0.4, 1)
 model_file = "pv_tower_b.glb"
-model_scale = 1.3
+model_scale = 2.47
+model_door_height = 2.25
 model_yaw = 0.0
 
 [node name="Crate" type="Marker3D" parent="Buildings/Depot"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 5.8)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 7.585)
 
 [node name="Palace" type="StaticBody3D" parent="Buildings"]
 transform = Transform3D(-1, 0, -8.7422777e-08, 0, 1, 0, 8.7422777e-08, 0, -1, -10, 0, 61.6)

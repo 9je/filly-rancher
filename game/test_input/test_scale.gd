@@ -217,6 +217,9 @@ func _building(b: Node3D) -> void:
 	if float(b.get("door_width")) > 0.001 and floor_m != null and lintel != null \
 			and left != null and right != null:
 		var clear_h := PropsScript.world_aabb(lintel).position.y - PropsScript.world_aabb(floor_m).end.y
+		# The door a player SEES, where the model's own is measured (SCALE.md's door row).
+		if float(b.get("model_door_height")) > 0.0 and b.call("wears_a_model"):
+			clear_h = float(b.call("door_clear_height"))
 		var lb := left.mesh.get_aabb()
 		var rb := right.mesh.get_aabb()
 		var clear_w := (right.position.x + rb.position.x) - (left.position.x + lb.end.x)
