@@ -1559,6 +1559,21 @@ func _transition_to(next: int) -> void:
 		_:
 			# FLEE, APPROACH, HELD and LEAVING all end on a condition, not on a clock.
 			_state_timer = 0.0
+	if state == State.IDLE or state == State.GRAZE:
+		_face_out_of_the_pen()
+
+
+## A resident on the ring who stops turns to face out over the rails, as paddock horses do:
+## ring neighbours then stand side by side with a metre of grass between them, not nose to
+## rump in a chain round the middle (item 65's acceptance review). Turned smoothly by
+## _update_facing; the one in the middle keeps her heading.
+func _face_out_of_the_pen() -> void:
+	if pen_patch == Vector3.INF:
+		return
+	var out := Vector3(pen_patch.x - _home.x, 0.0, pen_patch.z - _home.z)
+	if out.length() < 0.5:
+		return
+	_visual_yaw = atan2(-out.x, -out.z)
 
 
 ## A startled unicorn blinks a few metres away (once in a while, never into a wall): she
@@ -1592,9 +1607,6 @@ func _maybe_blink() -> void:
 signal blinked
 
 
-## WANDER or GRAZE. The first routine choice a freshly spawned pony makes is always
-## WANDER: a herd dropped onto its spawn markers should walk off them and spread out,
-## rather than a third of it standing rooted on the marker for the first few seconds.
 ## A HOP FOR JOY (PS1, playtest 2026-11-05 items 19/23: "The rump bounce is barely seen: it
 ## only fires on a pen flop or a hard landing"). A happy, fed pony in her pen, finishing an
 ## idle beat, now and then hops instead (`roll` is a 0..1 draw); every hop bounces her rump as
@@ -1608,6 +1620,9 @@ static func wants_joy_hop(penned: bool, hungry: bool, roll: float) -> bool:
 	return penned and not hungry and roll < JOY_HOP_CHANCE
 
 
+## WANDER or GRAZE. The first routine choice a freshly spawned pony makes is always
+## WANDER: a herd dropped onto its spawn markers should walk off them and spread out,
+## rather than a third of it standing rooted on the marker for the first few seconds.
 func _pick_routine() -> int:
 	if not _has_wandered:
 		return State.WANDER
@@ -1620,6 +1635,8 @@ func _pick_routine() -> int:
 ## sqrt() on the radius makes the draw uniform over the disc's AREA; without it every
 ## target crowds toward the centre and she paces the same short line all day.
 func _pick_wander_target() -> Vector3:
+	if pen_patch != Vector3.INF:
+		return _patch_spot()
 	var target := _home
 	# The last dry pick, kept for when every attempt lands short or wet; else where she stands.
 	var dry := Vector3(global_position.x, _home.y, global_position.z)
@@ -1635,6 +1652,46 @@ func _pick_wander_target() -> Vector3:
 		if Vector2(target.x - global_position.x, target.z - global_position.z).length() > ARRIVAL_RADIUS * 3.0:
 			break
 	return dry
+
+
+## A RESIDENT WANDERS ROUND HER OWN PATCH (playtest item 65, and its acceptance review: "at
+## 60 to 75 s the residents are still one clump in the pen's middle"). Every resident's leash
+## is anchored at the pen's centre (Pen: the fence arithmetic), and drawing her spots from the
+## whole leash circle sent the residents across the pen through each other, where PS1 item
+## 17b's turn hold jammed them in one clump in the middle. Her spots are drawn round her patch
+## (Pen.resident_spot, about 2 m from the next) inside her leash: of PATCH_CANDIDATES there,
+## the one furthest from her penmates and where they are walking to, never one she stands on.
+## `pen_patch` is INF for a pony who is not a resident.
+var pen_patch := Vector3.INF
+const PATCH_WANDER := 0.6
+## The shortest walk within her patch (ARRIVAL_RADIUS * 3, the wild pony's, would not fit in it).
+const PATCH_MIN_WALK := 0.4
+const PATCH_CANDIDATES := 8
+
+
+func _patch_spot() -> Vector3:
+	var others: Array[Vector3] = []
+	for n: Node in get_parent().get_children():
+		if n != self and n is Pony and (n as Pony).pen_patch != Vector3.INF:
+			others.append((n as Node3D).global_position)
+			if (n as Pony).state == State.WANDER:
+				others.append((n as Pony)._wander_target)
+	var best := pen_patch
+	var room := -1.0
+	for attempt in PATCH_CANDIDATES:
+		var angle := _rng.randf() * TAU
+		var spot := pen_patch + Vector3(cos(angle), 0.0, sin(angle)) * sqrt(_rng.randf()) * PATCH_WANDER
+		if Vector2(spot.x - _home.x, spot.z - _home.z).length() > roam_radius:
+			continue
+		if Vector2(spot.x - global_position.x, spot.z - global_position.z).length() <= PATCH_MIN_WALK:
+			continue
+		var nearest := INF
+		for o in others:
+			nearest = minf(nearest, Vector2(spot.x - o.x, spot.z - o.z).length())
+		if nearest > room:
+			room = nearest
+			best = spot
+	return Vector3(best.x, _home.y, best.z)
 
 
 ## Inside a lake's pony keep-out ring (Terrain.build_water: the "lake_water" group and its

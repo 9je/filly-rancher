@@ -112,3 +112,46 @@ func test_with_the_farmer_at_a_corner_they_do_not_heap_against_it() -> void:
 	var pen := _full_pen()
 	_farmer_at_corner(pen)
 	await _watch(pen)
+
+
+## Mean distance from each resident to her nearest neighbour, centre to centre (pen-local, m).
+func _nearest_mean(pen: Pen) -> float:
+	var at: Array[Vector2] = []
+	for inst: PonyInstance in pen.ponies():
+		var l := pen.to_local(pen.body_for(inst.uid).global_position)
+		at.append(Vector2(l.x, l.z))
+	var sum := 0.0
+	for i in at.size():
+		var best := INF
+		for j in at.size():
+			if i != j:
+				best = minf(best, at[i].distance_to(at[j]))
+		sum += best
+	return sum / float(at.size())
+
+
+## The acceptance review of item 65: "at 60 to 75 s the residents are still one clump in the
+## pen's middle, bodies crossing each other". A full pen keeps daylight between its residents:
+## from the thirtieth second, every resident's nearest neighbour is on average more than a
+## body's width and a half away (centres 1.3 m; a pony is 0.72 m wide and 1.6 m long), and the
+## herd's average over the minute is wider still.
+const SPREAD_EACH := 1.3
+const SPREAD_MEAN := 1.6
+
+
+func test_a_full_pen_keeps_daylight_between_its_residents() -> void:
+	var pen := _full_pen()
+	var worst := INF
+	var total := 0.0
+	var checks := 0
+	for second in 90:
+		await wait_physics_frames(60)
+		if second < 30:
+			continue
+		var m := _nearest_mean(pen)
+		worst = minf(worst, m)
+		total += m
+		checks += 1
+	gut.p("nearest neighbour, mean per check: worst %.2f m, over the minute %.2f m" % [worst, total / checks])
+	assert_gt(worst, SPREAD_EACH, "never a clump (worst check %.2f m)" % worst)
+	assert_gt(total / checks, SPREAD_MEAN, "spread over the minute (%.2f m)" % (total / checks))

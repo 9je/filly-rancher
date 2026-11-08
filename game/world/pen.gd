@@ -197,13 +197,16 @@ const GATE_SWING_DEGREES_PER_SECOND := 220.0
 ## paddock (3.9 m away) leaves the gate shut behind you -- which is what a shut gate is for.
 const GATE_SENSOR_RADIUS := 3.0
 
-## Standing spots, as a golden-angle spiral out from the middle of the pen. A spiral rather
-## than a row: ponies arranged on a grid read as a car park, which is the same note
-## game/world/props.gd's LAYOUT makes about scattering trees. Bounded, hence
-## MAX_RESIDENT_SPOTS.
-const SPOT_INNER := 0.55
-const SPOT_STEP := 0.75
-const GOLDEN_ANGLE := 2.39996322972865332
+## Standing spots: one in the middle and the rest on a ring, each resident's own patch of the
+## paddock (Pony.pen_patch: she wanders round hers). Not a row (ponies on a grid read as a car
+## park, game/world/props.gd's LAYOUT note) and no longer a tight golden-angle spiral: that
+## set eight residents down 0.75 m apart, too close for any of them to turn without swinging
+## a head into a neighbour (PS1 item 17b's hold), so they stood where they were put, one clump
+## in the middle (item 65's acceptance review). On the ring neighbours are 1.74 m apart. Bounded,
+## hence MAX_RESIDENT_SPOTS.
+const SPOT_RING := 2.25
+const SPOT_RING_COUNT := 7
+const SPOT_RING_TURN := 0.3
 
 ## How many residents the spot spiral can seat before its radius runs past the leash.
 ## game/test/test_pen.gd asserts that no plot in the shipped catalogue asks for more,
@@ -737,12 +740,13 @@ static func roam_radius_for(half_extent: float) -> float:
 	return maxf(0.0, half_extent - WALK_OVERSHOOT - PONY_BODY_HALF_LENGTH - LEASH_MARGIN)
 
 
-## Where resident number `index` is set down, in pen-local space (y = 0). A golden-angle
-## spiral -- see SPOT_INNER. Static for the same reason roam_radius_for() is.
+## Where resident number `index` is set down, in pen-local space (y = 0): the middle, then
+## round the ring -- see SPOT_RING. Static for the same reason roam_radius_for() is.
 static func resident_spot(index: int) -> Vector3:
-	var angle := float(index) * GOLDEN_ANGLE
-	var radius := SPOT_INNER + SPOT_STEP * sqrt(float(index))
-	return Vector3(cos(angle) * radius, 0.0, sin(angle) * radius)
+	if index <= 0:
+		return Vector3.ZERO
+	var angle := SPOT_RING_TURN + TAU * float(index - 1) / float(SPOT_RING_COUNT)
+	return Vector3(cos(angle) * SPOT_RING, 0.0, sin(angle) * SPOT_RING)
 
 
 ## Ground height at a WORLD xz, via the injected sampler, or 0.0 if there is none.
@@ -861,6 +865,8 @@ func _seat_body(body: Node3D, index: int) -> void:
 	body.position = spot
 	if body is CharacterBody3D:
 		(body as CharacterBody3D).velocity = Vector3.ZERO
+	if "pen_patch" in body:
+		body.set(&"pen_patch", Vector3(world.x, global_position.y + spot.y, world.z))
 
 
 ## A resident reported that a beam hold on her became a capture. She stops living here.
