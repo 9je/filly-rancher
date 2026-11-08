@@ -3667,6 +3667,9 @@ func start_race(uid: StringName, stake: int) -> Dictionary:
 	if race_menu != null and race_menu.has_method("close"):
 		race_menu.close()
 	_toast("They are under orders at the Spectra Palace!")
+	# Watched, not read about (P8 items 63, 64): only for a person playing, never a gate.
+	if _interactive:
+		RaceCinematic.play(self, race_track, result, inst.display_name())
 	return {"ok": true, "field": field, "result": result,
 		"odds": RaceCardScript.decimal_odds(field, RaceCardScript.PLAYER_LANE)}
 
