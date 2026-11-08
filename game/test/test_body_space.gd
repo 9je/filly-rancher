@@ -100,3 +100,40 @@ func test_a_full_pen_spreads_out() -> void:
 			worst = maxf(worst, BodySpaceScript.overlap(BodySpaceScript.footprint_of(ponies[i]),
 				BodySpaceScript.footprint_of(ponies[j])))
 	assert_lt(worst, 0.12, "after 6 s no two ponies overlap by more than a hand's width")
+
+
+## PS11 G11 (the 60-pony check, 4.5 times the physics cost of the commit before the sweep):
+## every pony's turn asked for the footprint of every member of the herd, near or far, up to
+## three times a tick. A turn only weighs the bodies in reach; nobody else's is built.
+class Counted:
+	extends Node3D
+	var asked := 0
+	func body_footprint() -> Dictionary:
+		asked += 1
+		return BodySpace.default_footprint(self, 1.0)
+
+
+func test_a_turn_only_weighs_the_bodies_in_reach() -> void:
+	var near := Counted.new()
+	add_child_autofree(near)
+	near.global_position = Vector3(1.2, 0.0, 0.0)
+	var far: Array[Counted] = []
+	for i in 59:
+		var c := Counted.new()
+		add_child_autofree(c)
+		c.global_position = Vector3(10.0 + 3.0 * i, 0.0, 0.0)
+		far.append(c)
+	var me := Counted.new()
+	add_child_autofree(me)
+	for n: Node3D in [me, near] + far:
+		BodySpaceScript.join(n)
+	var fp := BodySpaceScript.default_footprint(me, 1.0)
+	var gap := BodySpaceScript.closest_gap(me, fp)
+	for n: Node3D in [me, near] + far:
+		BodySpaceScript.leave(n)
+	assert_lt(gap, INF, "the pony beside her is weighed")
+	assert_eq(near.asked, 1, "her neighbour's footprint is built once")
+	var built := 0
+	for c in far:
+		built += c.asked
+	assert_eq(built, 0, "no footprint is built for the 59 out of reach")

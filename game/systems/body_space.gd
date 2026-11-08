@@ -215,11 +215,18 @@ static func closest_gap(n: Node3D, fp: Dictionary) -> float:
 	if fp.is_empty():
 		return best
 	var reach := (HALF + RADIUS) * 2.0 * 1.3
+	var at: Vector3 = fp.at
 	for m in _members:
 		if m == n or not is_instance_valid(m):
 			continue
+		# Out of reach by where she stands, before her footprint is built: every pony asks this
+		# on every turn, and building the whole herd's was 4.5 times the physics cost at 60
+		# ponies (PS11 G11).
+		var p := m.global_position
+		if Vector2(p.x - at.x, p.z - at.z).length_squared() > reach * reach:
+			continue
 		var other := footprint_of(m)
-		if other.is_empty() or Vector3(fp.at).distance_squared_to(other.at) > reach * reach:
+		if other.is_empty():
 			continue
 		if absf(float(fp.get("y", 0.0)) - float(other.get("y", 0.0))) > SAME_FLOOR:
 			continue
