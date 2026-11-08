@@ -548,3 +548,17 @@ Marigold (in PS8), the FS parts (PS10), the batch flake and perf/Proton (PS11). 
 ### Order
 
 PS0 first: no fix starts before the ledger and the harness exist. Then PS1 (item 17 is the top priority), PS9 (69 is the biggest complaint), PS4, PS5, PS7, PS8, PS3, PS2, PS6, PS10 and PS11. PS13 last.
+
+## P8. Playtest 2026-11-08 (79 items, docs/playtest-2026-11-08.md)
+Not started. Order: blockers 1 to 3 first (the Color Day soft-lock, Bloom speed and meter,
+autosave), then a references pass (item 79) before any rebuild of the creator, casino UI,
+loading screen or town layout. Each item is ticked only with its evidence (a render or test
+of the owner's words), per the PS ledger rule.
+Design experiments to follow the blockers: docs/ideas-2026-11-08.md (catching, real days and
+gated rares, a staged collection day, pony jobs, visit cards). Each one is built small and
+playtested by the owner before it is kept.
+**The sprint plan is docs/sprint-plan-2026-11-08.md** (merges the playtest, the AAA review
+docs/aaa-review-2026-11-08.md and the retro docs/sprint-retro-2026-11-08.md): Sprint A is S0
+process, S1 blockers, S2 core loop, S3 catching, S4 lighting, S5 icons and UI kit, then an
+owner playtest; Sprint B is S6 ponies and creator, S7 town, S8 casino, S9 cinematics, S10
+loading and title. Item status lives in the ledger only. Resume file: docs/sprint-resume.md.
