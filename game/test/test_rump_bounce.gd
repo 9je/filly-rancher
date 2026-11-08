@@ -16,6 +16,28 @@ func test_at_rest_nothing_moves() -> void:
 	assert_eq(float(b.call("amount")), 0.0)
 
 
+## PS11 G11: a spring at rest stays at rest until it is kicked, so it stops stepping itself
+## every frame (108 of them were 0.4 ms of every frame of the 60-pony check doing nothing), and
+## a kick wakes it.
+func test_a_spring_at_rest_sleeps_until_kicked() -> void:
+	var b: Node = BounceScript.new()
+	add_child_autofree(b)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert_false(b.is_processing(), "at rest, it does not step every frame")
+	b.call("kick", 1.0)
+	assert_true(b.is_processing(), "a kick wakes it")
+	for i in 20:
+		await get_tree().process_frame
+	assert_ne(float(b.call("amount")), 0.0, "and it wobbles on its own")
+	for i in 900:
+		b.call("step", 1.0 / 60.0)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert_eq(float(b.call("amount")), 0.0, "settled")
+	assert_false(b.is_processing(), "and asleep again")
+
+
 func test_a_kick_wobbles_back_and_forth_and_settles() -> void:
 	var b: Node = BounceScript.new()
 	add_child_autofree(b)

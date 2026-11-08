@@ -10,7 +10,11 @@ extends SceneTree
 ## is 16.6 ms at the 99th percentile and for the worst one-second window (a "stable 60").
 ##
 ##   tools/bin/godot --path game --audio-driver Dummy -s res://scenes/test/perf.gd -- \
-##       [--ponies=60] [--seconds=20] [--quality=2] [--profile]
+##       [--ponies=60] [--seconds=20] [--quality=2] [--profile] [--window=1920x1080]
+##
+## --window draws the frames at another size (PS11 G11): under the invisible display, whose
+## presentation of each frame grows with its size, a smaller window shows what the game's own
+## threads cost.
 
 const RANCH := "res://world/ranch.tscn"
 const BootIntentScript := preload("res://world/boot_intent.gd")
@@ -26,6 +30,7 @@ var ponies := 60
 var seconds := 20.0
 var quality := 2
 var profile := false
+var window := Vector2i(1920, 1080)
 ## Experiments, to find what a frame is spent on: noshadow (ponies cast none), hide (ponies
 ## invisible), still (pony physics and scripts off), noworld (everything but ponies hidden).
 ## Added 2026-10-24: ticks (frame times split by physics ticks in the frame), steptime and
@@ -52,6 +57,9 @@ func _initialize() -> void:
 			quality = int(a.substr(10))
 		elif a == "--profile":
 			profile = true
+		elif a.begins_with("--window="):
+			var wh := a.substr(9).split("x")
+			window = Vector2i(int(wh[0]), int(wh[1]))
 		elif a.begins_with("--exp="):
 			exp = a.substr(6).split(",")
 	_run.call_deferred()
@@ -82,7 +90,7 @@ func _run() -> void:
 	if lp != null and bool(lp.call("is_open")):
 		lp.call("close")
 	paused = false
-	root.get_window().size = Vector2i(1920, 1080)
+	root.get_window().size = window
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 	Engine.max_fps = 0
 	var s := SettingsScript.new()

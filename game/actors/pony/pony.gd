@@ -1900,9 +1900,13 @@ func _update_facing(direction: Vector3, delta: float) -> void:
 		_visual_yaw = atan2(-direction.x, -direction.z)
 	var weight := 1.0 - exp(-TURN_RESPONSE * delta)
 	var before := visuals.rotation.y
-	# Only a pony who is turning has her room weighed (PS11 G11: it was every pony, every tick).
-	var turning := absf(angle_difference(before, lerp_angle(before, _visual_yaw, weight))) > 1e-4 \
-		and BodySpaceScript.has_near(self)
+	# Only a pony who is turning has her room weighed (PS11 G11: it was every pony, every tick),
+	# and only when somepony stands near enough for a turn to reach her (BodySpace.turn_is_free).
+	# Nor for the last of a turn, too small to bring her nose a millimetre nearer anypony
+	# (BodySpace.turn_too_small).
+	var swing := absf(angle_difference(before, lerp_angle(before, _visual_yaw, weight)))
+	var turning := swing > 1e-4 and not BodySpaceScript.turn_too_small(swing, absf(visuals.scale.x)) \
+		and BodySpaceScript.has_near(self) and not BodySpaceScript.turn_is_free(self)
 	var room_before := body_footprint() if turning else {}
 	visuals.rotation.y = lerp_angle(visuals.rotation.y, _visual_yaw, weight)
 	# Not into the pony beside her (BodySpace.turn_allowed): she holds her heading and finishes

@@ -46,6 +46,9 @@ static func kick_on(node: Node, strength: float) -> void:
 ## Shove the spring: 1.0 a good flop, 0.3 a little hop. Down first, the way weight lands.
 func kick(strength: float) -> void:
 	_v -= clampf(strength, 0.0, 2.0) * KICK_SPEED
+	if _asleep:
+		_asleep = false
+		set_process(true)
 
 
 func amount() -> float:
@@ -101,8 +104,17 @@ static func _mid(sk: Skeleton3D, names: Array, alt: Array) -> Vector3:
 	return Vector3.INF
 
 
+## AT REST IT SLEEPS (PS11 G11): a spring at rest with nothing left to hand the shaders steps
+## to exactly where it is, so it stops stepping itself every frame until kick() wakes it. A
+## herd of 108 springs doing nothing was 0.4 ms of every frame of the 60-pony check.
+var _asleep := false
+
+
 func _process(delta: float) -> void:
 	step(delta)
+	if _x == 0.0 and _v == 0.0 and not _written:
+		_asleep = true
+		set_process(false)
 
 
 ## Advance the spring `delta` seconds and hand the shaders where it is.
