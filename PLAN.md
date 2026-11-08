@@ -406,7 +406,7 @@ Each of these is covered by a test in the task that owns the code: PS0 (1), PS6 
 - [x] `test_ledger_complete.gd` parses the ledger and fails unless every number from 1 to 70 has a row and every row has a state. It also fails when a row says `MET` but its evidence column is empty.
 - [x] `playtest_shots.gd --item=N --out=DIR` loads a seeded save and puts the camera and the player at the pose that matches screenshot N. The pose table lives in the script, one pose per screenshot the doc references, estimated by eye from the owner's image. It writes `itemN_<label>.png` with a day and a night/rain variant where the item is about the world. For each pose, a render is taken and compared by eye with the owner's screenshot until they show the same place.
 - [x] Old-save check (review focus 1): `test_old_save_loads.gd` loads a save from 13d0c11 with placed decor, penned ponies, an escapee and a full bag, and asserts the counts survive.
-- [ ] Commit: "PS0: ledger and shot harness".
+- [x] Commit: "PS0: ledger and shot harness".
 
 **PS0 notes (2026-11-06):** the ledger has 84 rows: items 1 to 70 (17 split into 17/17b, 19/23 one row, 56 split into 56a/56b), Marigold (M) and the known gaps G1 to G12. The harness has 16 poses for the owner's world screenshots ([21] [24] [25] [27] [29] [30] [31] [32] [33] [34] [35] [37] [45] [48] [49] [52]), each looked at beside the owner's image; the before renders are in build/ps_evidence/before/. UI screenshots are PS6's (hud_shot), and the pony shots [19] [53] [54] are PS1's (they need posed ponies, not a camera spot). The old save is a fixture written by `scenes/test/make_old_save.gd` on the pre-sweep code. Loading it found a real bug: an Escape Artist home on a load (or at dawn) was missing from `_owned_named_ids()`, so the wild could spawn a second of her (items 39, 63, 70). The same cause sat in the Survey's picker (`owned_rows()`, item 51). Both now read the pens and the bag (`_owned_named_ids()` directly, the picker and its answer through the new `_owned_instances()`); tests `test_old_save_loads`, `test_ranch_mail.test_the_survey_can_name_a_pony_caught_since_the_last_save`.
 
@@ -425,7 +425,7 @@ Each of these is covered by a test in the task that owns the code: PS0 (1), PS6 
 | 9 | The player's tail stutters | claimed | A 60-frame strip at 144 Hz physics/render mismatch: tail positions change smoothly from frame to frame (test on the delta) |
 | 7 | Creator spin flings the mane; the tail clips the body | claimed | A turntable render at full spin speed: no spikes, no tail inside the body |
 
-- [ ] Run the item loop for each row. Commit per row: "PS1 item N: ...".
+- [x] Run the item loop for each row. Commit per row: "PS1 item N: ...".
 
 ### Task PS2: A solid world (items 31, 41, 43, 57, 58, 61, 68)
 
@@ -517,22 +517,22 @@ Also in PS6: fullscreen chosen during loading stays fullscreen (1; `test_fullscr
 
 ### Task PS10: The FS parts built short (from the review on 2026-11-06)
 
-- [ ] FS1.4: hovering a lesson chip shows its sentence as a tooltip (the chips take the mouse).
-- [ ] FS2.2: the ground's fine painted grain, and darker grass at prop and fence bases.
-- [ ] FS3.1: a hungry pony is SAD (shared with PS9's item 64).
-- [ ] FS4.3: a stumble when the player lands hard.
-- [ ] FS5.2: Market and Depot music contexts; the duck set to 4 dB.
-- [ ] FS6.1: tiles stagger in 30 ms apart, and a purchase flies a coin to the wallet.
-- [ ] FS6.2: the Depot pays out per tile, one by one, with a counter sound, and the total lands on the balance.
-- [ ] FS8.3: rarity shapes on the Depot tiles.
-- [ ] FS5.1: hoof loudness. A capture that records the 3D mix (a Movie Maker run at the listener), measured against the beds. If it still can't be measured, the ledger says so and the owner's ear decides it.
+- [x] (G1 to G9 all MET in PS13 round 1, docs/ps13/verdicts.md.) FS1.4: hovering a lesson chip shows its sentence as a tooltip (the chips take the mouse).
+- [x] FS2.2: the ground's fine painted grain, and darker grass at prop and fence bases.
+- [x] FS3.1: a hungry pony is SAD (shared with PS9's item 64).
+- [x] FS4.3: a stumble when the player lands hard.
+- [x] FS5.2: Market and Depot music contexts; the duck set to 4 dB.
+- [x] FS6.1: tiles stagger in 30 ms apart, and a purchase flies a coin to the wallet.
+- [x] FS6.2: the Depot pays out per tile, one by one, with a counter sound, and the total lands on the balance.
+- [x] FS8.3: rarity shapes on the Depot tiles.
+- [x] FS5.1: hoof loudness. A capture that records the 3D mix (a Movie Maker run at the listener), measured against the beds. If it still can't be measured, the ledger says so and the owner's ear decides it.
 
 Each part gets a test and a render under the item loop.
 
 ### Task PS11: The test bench itself
 
-- [ ] Find out why loading, pen_upgrade and sprint fail in a full `run_input_tests.sh` batch but pass alone. Fix the cause (shared save directory, leftover state, or timing), then run the whole batch twice with every test passing.
-- [ ] The 60-pony performance check (`tools/perf.sh`, p99 at or under 16.6 ms) and a Proton smoke run of the Windows build.
+- [x] Find out why loading, pen_upgrade and sprint fail in a full `run_input_tests.sh` batch but pass alone. Fix the cause (shared save directory, leftover state, or timing), then run the whole batch twice with every test passing. (Batch runs 7 and 8 at 9c17fc6, 21/21 twice; ledger G10, MET in PS13 round 3.)
+- [ ] The 60-pony performance check (`tools/perf.sh`, p99 at or under 16.6 ms) and a Proton smoke run of the Windows build. (Proton: done, G12 MET. Perf: NOT met, G11 OPEN: idle p99 32 to 36 ms; the world alone p99 21.5 and drawing the ponies is the rest. Next: pony LODs or visibility ranges, the world's draw calls.)
 
 ### Task PS12: Gaps outside the owner's list (known on 2026-11-06)
 
@@ -540,9 +540,9 @@ Marigold (in PS8), the FS parts (PS10), the batch flake and perf/Proton (PS11). 
 
 ### Task PS13: Acceptance (the gate)
 
-- [ ] A Fable reviewer gets **only** docs/playtest-2026-11-05.md, the owner's screenshots, the ledger's evidence column (renders and test names) and read access to the code. It does **not** get commit messages or my notes. For each of the 71 rows it answers MET or NOT-MET, with a sentence citing the evidence. It is told to treat a missing render or a test that doesn't assert the owner's words as NOT-MET.
-- [ ] Every NOT-MET goes back through the item loop, then to a fresh acceptance pass on those rows only.
-- [ ] Gates: full GUT; the full real-input batch twice (PS11); both exports built and the Linux build booted; owner logs untouched; PROGRESS.md and DECISIONS.md updated.
+- [x] A Fable reviewer gets **only** docs/playtest-2026-11-05.md, the owner's screenshots, the ledger's evidence column (renders and test names) and read access to the code. It does **not** get commit messages or my notes. For each of the 71 rows it answers MET or NOT-MET, with a sentence citing the evidence. It is told to treat a missing render or a test that doesn't assert the owner's words as NOT-MET. (Round 1, 2026-11-07: docs/ps13/verdicts.md.)
+- [ ] Every NOT-MET goes back through the item loop, then to a fresh acceptance pass on those rows only. (Rounds 2 and 3 done, docs/ps13/verdicts_round2.md and verdicts_round3.md; G11 alone remains NOT-MET.)
+- [x] Gates: full GUT; the full real-input batch twice (PS11); both exports built and the Linux build booted; owner logs untouched; PROGRESS.md and DECISIONS.md updated. (2026-11-08: suite 2196/2196 on 9c17fc6; batch runs 7 and 8 21/21 twice; Linux export of f2807d1 RANCH_OK; Windows export of e015fbb RANCH_OK under Proton, build/ps_evidence/itemG12/proton_run_e015fbb.txt; owner saves and settings untouched, owner logs NOT untouched: see DECISIONS, G18 again by my hand.)
 - [ ] The report to the owner is the ledger itself: per item, MET with its evidence or NOT-MET with the reason. No summary claims beyond it.
 
 ### Order
