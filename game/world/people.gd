@@ -211,6 +211,11 @@ func candidates(at: Vector3) -> Array[Dictionary]:
 		# A wild pony in the aim: a companion is not offered at all, news or none.
 		if d < best_d and (n as Npc).mode == NpcScript.Mode.FOLLOW and _wild_in_aim(at):
 			continue
+		# NOBODY OFF SCREEN IS OFFERED (P8, playtest 2026-11-08 item 54: "E: talk to Tumble"
+		# with Tumble out of view). A companion at her heels is often behind the camera; news
+		# or none, she is offered only once she is in the frame.
+		if d < best_d and (n as Npc).mode == NpcScript.Mode.FOLLOW and not _on_screen(n):
+			continue
 		if d < best_d:
 			best_d = d
 			best = id
@@ -247,6 +252,13 @@ func _wild_in_aim(at: Vector3) -> bool:
 ## Whether the camera is turned toward `n` (within LOOK_CONE of straight ahead, flat).
 ## True with no camera (headless), so the rule above never hides anybody from a test.
 const LOOK_CONE := 0.9
+
+
+func _on_screen(n: Node3D) -> bool:
+	var cam := get_viewport().get_camera_3d() if is_inside_tree() else null
+	if cam == null:
+		return true
+	return cam.is_position_in_frustum(n.global_position + Vector3(0, 1.0, 0))
 
 
 func _looked_at(n: Node3D) -> bool:
