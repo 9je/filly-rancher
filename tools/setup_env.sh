@@ -30,11 +30,17 @@ GODOT_VER="4.7.2-stable"   # latest stable as of 2026-10-22 (v1 overhaul, M0.1)
 # SHA512 pinned from the release's own SHA512-SUMS.txt:
 # https://github.com/godotengine/godot/releases/download/4.7.2-stable/SHA512-SUMS.txt
 GODOT_SHA512="9aa00f7a605200940bce3027a567b782f49bd8e940dd06ae9e987bd65aee1b1467edd56ed84fcdcbdd44354bf613bdbb4e5d2913e925850368e150c59ed54c65"
-if [ ! -x godot ]; then
+# The binary is godot-4.7.2; tools/bin/godot is a link to tools/godot_launch.sh, which gives
+# every scripted or headless launch its own log so none rotates the player's (G18).
+if [ -x godot ] && [ ! -L godot ] && [ ! -e godot-4.7.2 ]; then
+  mv godot godot-4.7.2   # a tree set up before the launcher
+fi
+if [ ! -x godot-4.7.2 ]; then
   curl -fL --connect-timeout 30 --max-time 900 -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VER}/Godot_v${GODOT_VER}_linux.x86_64.zip"
   verify_checksum godot.zip "$GODOT_SHA512" sha512sum
-  unzip -o godot.zip && mv "Godot_v${GODOT_VER}_linux.x86_64" godot && rm godot.zip
+  unzip -o godot.zip && mv "Godot_v${GODOT_VER}_linux.x86_64" godot-4.7.2 && rm godot.zip
 fi
+[ -L godot ] || ln -s ../godot_launch.sh godot
 
 BLENDER_VER="4.2.23"   # latest 4.2.x LTS as of 2026-08-26
 # download.blender.org fronts both the tarball and its .sha256 with a
