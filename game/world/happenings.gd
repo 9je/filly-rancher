@@ -9,7 +9,8 @@ extends Node
 ##
 ## The schedule (ALL in play minutes, each also waiting on its own condition):
 ##   9   sun_shower     three pegasus Drifters come down near you (after a couple of catches)
-##   13  sighting_1     a rare canon pony appears somewhere open; every 7 min after, another
+##   13  sighting_1     a rare canon pony appears somewhere open; then at most two a day, six
+##                      minutes apart (RareGate.sighting_due; playtest 2026-11-08 item 12)
 ##   17  palace_flyer   the Palace on the Strip opens (the casino was shut till now)
 ##   26  newsletter     Pip photographs the ranch for the Corporation newsletter (a clue)
 ##   30  race_day       the track's first race day (after the Palace is open)
@@ -20,8 +21,8 @@ extends Node
 const GeneratorScript := preload("res://systems/pony_generator.gd")
 const AccessoriesScript := preload("res://systems/accessories.gd")
 const PonyPaintScript := preload("res://systems/pony_paint.gd")
-const SIGHTING_FIRST := 13.0 * 60.0
-const SIGHTING_EVERY := 7.0 * 60.0
+const RareGateScript := preload("res://systems/rare_gate.gd")
+const WorldStateScript := preload("res://systems/world_state.gd")
 const LOST_FOAL_REWARD := 150
 
 var ranch: Node
@@ -60,7 +61,7 @@ func _physics_process(delta: float) -> void:
 	if _check_t < 1.0:
 		return
 	_check_t = 0.0
-	if not bool(ranch.call("_no_other_menu_open")):
+	if not out_and_free():
 		return
 	var story := _story()
 	var t := _t()
@@ -85,13 +86,41 @@ func _physics_process(delta: float) -> void:
 		_derpy_mail()
 	elif not _done("trixie_show") and t >= 63.0 * 60.0 and story.has_flag("palace_open"):
 		_trixie_show()
-	elif t >= SIGHTING_FIRST:
-		var n := int(story.get_var("sightings", 0))
-		if t >= SIGHTING_FIRST + SIGHTING_EVERY * n and (sighting == null or not is_instance_valid(sighting)
-				or t >= SIGHTING_FIRST + SIGHTING_EVERY * n + 120.0):
-			if _sighting():
-				story.set_var("sightings", n + 1)
+	elif _sighting_due(story, t):
+		if _sighting():
+			var day := _cycle()
+			if int(story.get_var("sighting_day", -1)) != day:
+				story.set_var("sighting_day", day)
+				story.set_var("sightings_today", 0)
+			story.set_var("sightings_today", int(story.get_var("sightings_today", 0)) + 1)
+			story.set_var("sighting_at", t)
+			story.set_var("sightings", int(story.get_var("sightings", 0)) + 1)
 	_check_lost_foal()
+
+
+## WORLD EVENTS WAIT UNTIL SHE IS OUT AND FREE (playtest 2026-11-08 item 13: sightings and
+## spotting fired while she was in the casino or a menu, and she missed them): outdoors (not
+## in the Palace), no menu up, nobody talking to her.
+func out_and_free() -> bool:
+	if not bool(ranch.call("_no_other_menu_open")) or bool(ranch.get("_in_palace")):
+		return false
+	var people: Node = ranch.get("people")
+	return people == null or not bool(people.call("is_talking"))
+
+
+func _cycle() -> int:
+	var world: WorldState = ranch.call("get_world_state")
+	return world.cycle_index() if world != null else 0
+
+
+## A sighting may fire: at most RareGate.SIGHTINGS_PER_DAY a day, spaced, and not while the
+## last one is still out there to be found.
+func _sighting_due(story: Story, t: float) -> bool:
+	if sighting != null and is_instance_valid(sighting) and not sighting.is_queued_for_deletion():
+		return false
+	var today := int(story.get_var("sightings_today", 0)) \
+		if int(story.get_var("sighting_day", -1)) == _cycle() else 0
+	return RareGateScript.sighting_due(today, float(story.get_var("sighting_at", -INF)), t)
 
 
 func _player() -> Node3D:
@@ -171,11 +200,18 @@ func _sighting() -> bool:
 	if reg == null:
 		return false
 	var pool: Array = []
+	var world: WorldState = ranch.call("get_world_state")
 	for d: PonyData in reg.call("all"):
 		if String(d.id).begins_with("stock_") or d.rarity < 1:
 			continue
 		# Caught (2) or delivered (3) already: Tumble points out somepony new.
 		if book != null and int(book.call("state_of", d.id)) >= 2:
+			continue
+		# HER HOURS, HER WEATHER, HER DECORATION, ONE NEW LEGENDARY A DAY (RareGate, item 12):
+		# Tumble only points out somepony who could really be out there now.
+		if world != null and not d.available(world.phase(), world.weather()):
+			continue
+		if not bool(ranch.call("rare_allowed", d)):
 			continue
 		pool.append(d)
 	if pool.is_empty():

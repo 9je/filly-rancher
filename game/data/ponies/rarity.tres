@@ -15,3 +15,5 @@ voice_bank = ""
 base_speed = 3.3
 base_stamina = 4.5
 base_spirit = 7.5
+phases = Array[int]([1])
+weathers = Array[int]([0])

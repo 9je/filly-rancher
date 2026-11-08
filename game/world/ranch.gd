@@ -1335,6 +1335,8 @@ func _bind_game_state() -> void:
 		_game_state.world_seed = spawner.spawn_seed
 	# Never a second of a named pony she already has (PT3): see Spawner.owned_ids.
 	spawner.owned_ids = _owned_named_ids
+	# Rares gated by what she has built and one new legendary a day (game/systems/rare_gate.gd).
+	spawner.gate = rare_allowed
 
 	# Every write -- the one at the house AND the one on quit -- pulls the live world in
 	# through this first. Without it, quitting would save whatever the state last happened
@@ -4454,7 +4456,27 @@ func _on_pony_captured(instance: PonyInstance) -> void:
 	# count can ever include.
 	if instance.is_stock():
 		return
+	# ONE NEW LEGENDARY A DAY (RareGate): the day she brought one in is remembered.
+	var data: PonyData = instance.data()
+	if data != null and data.rarity == PonyDataScript.Rarity.LEGENDARY \
+			and _game_state.compendium.state_of(instance.data_id) < CompendiumScript.State.CAUGHT:
+		_game_state.story.set_var(RareGateScript.LEGEND_DAY, _world.cycle_index() if _world != null else 0)
 	_game_state.compendium.mark_caught(instance.data_id)
+
+
+## THE GATE THE SPAWNER AND THE SIGHTINGS ASK (game/systems/rare_gate.gd): her decoration
+## built, and not a second new legendary today.
+const RareGateScript := preload("res://systems/rare_gate.gd")
+
+
+func rare_allowed(data: PonyData) -> bool:
+	if _game_state == null or data == null:
+		return true
+	var story: Story = _game_state.story
+	var caught: bool = _game_state.compendium.state_of(data.id) >= CompendiumScript.State.CAUGHT
+	return RareGateScript.allowed(data, Decor.owned(story),
+		int(story.get_var(RareGateScript.LEGEND_DAY, -1)),
+		_world.cycle_index() if _world != null else 0, caught)
 
 
 ## Mark every pony the player owns CAUGHT. The three places one can be: the save's own
@@ -9169,7 +9191,7 @@ func _spike_rare_hint() -> Dictionary:
 			continue
 		if book.state_of(data.id) != CompendiumScript.State.UNSEEN:
 			continue
-		if data.phases.is_empty() and data.weathers.is_empty():
+		if data.phases.is_empty() and data.weathers.is_empty() and data.needs_decor == &"":
 			continue
 		var zone: StringName = data.spawn_zones[0]
 		if zone != &"ranch" and not is_region_open(zone):
@@ -9181,6 +9203,10 @@ func _spike_rare_hint() -> Dictionary:
 			when.append("at " + WorldStateScript.phase_name(p).to_lower())
 		for w: int in data.weathers:
 			when.append("in the " + WorldStateScript.weather_name(w).to_lower())
+		# Her decoration (RareGate): Spike says what to build, ahead of when to look.
+		if data.needs_decor != &"" and not Decor.owns(_game_state.story, data.needs_decor):
+			var deco: Dictionary = Decor.find(data.needs_decor)
+			return {"region": where, "when": "once you put up the %s" % String(deco.get("name", data.needs_decor)).to_lower()}
 		return {"region": where, "when": " or ".join(when)}
 	return {}
 

@@ -14,3 +14,4 @@ voice_bank = "res://assets/audio/voice/fluttershy/"
 base_speed = 3.0
 base_stamina = 4.5
 base_spirit = 5.0
+needs_decor = &"flower_bushes"

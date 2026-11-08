@@ -45,6 +45,10 @@ enum Personality { SHY, BOLD, CURIOUS }
 @export var phases: Array[int] = []
 @export var weathers: Array[int] = []
 
+## WHAT THE RANCH MUST HAVE BUILT before she comes by: a decoration id (systems/decor.gd),
+## or &"" for nothing. Read by RareGate (game/systems/rare_gate.gd), idea C1.
+@export var needs_decor: StringName = &""
+
 ## WHICH WORD THE GAME USES FOR THEM: &"she" (the default, and every Drifter) or &"he"
 ## (playtest 2026-11-08 item 70: the Depot called Braeburn and Doctor Whooves "she").
 @export var pronoun: StringName = &"she"
