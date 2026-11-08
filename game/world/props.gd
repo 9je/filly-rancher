@@ -538,8 +538,8 @@ const LAYOUT := [
 	# They are cabinets, not tables: the games the player actually plays are casino_menu's,
 	# and nothing here is an interaction candidate. They are what makes the Strip look like
 	# somewhere people go.
-	{"file": "lp_skeeball.glb", "at": Vector2(4.0, 69.0), "yaw": 180.0, "family": &"mlp"},
-	{"file": "lp_dance_game.glb", "at": Vector2(11.0, 69.0), "yaw": 180.0, "family": &"mlp"},
+	# (The skeeball and dance cabinets stood here; cut, P8 item 46: on bare paving, playing
+	# nothing, they read as left behind rather than as a place.)
 	# --- the boardwalk up to the Palace -------------------------------------------------
 	# THE APPROACH IS THE HALF OF A DESTINATION NOBODY BUILDS. The Palace's door faces world
 	# minus Z at (-10, 57.1), which sits INSIDE its own PALACE_RADIUS (6.0 from (-10, 61.6)):

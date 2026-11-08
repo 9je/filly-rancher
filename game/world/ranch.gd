@@ -163,6 +163,7 @@ const StripScript := preload("res://world/strip.gd")
 const BootIntentScript := preload("res://world/boot_intent.gd")
 const CasinoSignScript := preload("res://systems/casino_sign.gd")
 const LobbySignScript := preload("res://world/lobby_sign.gd")
+const LOBBY_SIGN_SHOWN := false
 const PalaceFacadeScript := preload("res://world/palace_facade.gd")
 const InteractionScript := preload("res://world/interaction.gd")
 const PeopleScript := preload("res://world/people.gd")
@@ -1090,8 +1091,11 @@ func _ready() -> void:
 	# SIZED OFF THE PALACE'S OWN NUMBERS, the way strip.gd's mount_marquee() is, so a Palace
 	# resized in ranch.tscn resizes its own signage instead of leaving a board floating beside
 	# a building that moved.
+	# THE BOARD IS GONE (P8, playtest 2026-11-08 item 47: "don't need the House rules sign").
+	# The rules live on the lobby's page; the marquee names the place. Kept behind the flag so
+	# the measured placement can come back if a sign is ever wanted there again.
 	var palace_for_sign := get_node_or_null(^"Buildings/Palace") as Building
-	if palace_for_sign != null:
+	if palace_for_sign != null and LOBBY_SIGN_SHOWN:
 		var sign_out: Vector3 = palace_for_sign.global_transform.basis * Vector3(0.0, 0.0, 1.0)
 		sign_out.y = 0.0
 		sign_out = sign_out.normalized() if sign_out.length_squared() > 0.0 \
