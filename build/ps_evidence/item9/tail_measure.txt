@@ -13,3 +13,72 @@ TAIL_SPIKE 3.94
 TAIL_FRAMES jerk/motion 1.864  (motion 1.9934 m over 432 frames)
 SCREEN tail on screen jerk 3.7167 m, motion 1.9935 m
 SCREEN body on screen jerk 0.0002 m, motion 0.0001 m
+
+======== 2026-11-07: per DRAWN frame, the item-9 rework (her body and camera drawn between ticks) ========
+All runs: windowed under xvfb, tail_frames.gd, one build, back to back. The probe now samples at
+RenderingServer.frame_pre_draw (after every _process, i.e. what the frame shows; process_frame fires
+BEFORE the nodes' _process). Modes: --pt11 = PT11 as merged (clip+springs on the tick, body drawn on
+the tick); --old = before PT11 (clip+springs per drawn frame, body drawn on the tick); --built = this
+change (clip+springs per drawn frame, Visuals and camera pivot drawn between the last two ticks).
+"world on screen" = a fixed ground point 6 m away, in the camera's frame: how the world moves.
+
+-- exact 144 Hz cadence (engine --fixed-fps 144: every drawn frame is 1/144 s of game time)
+--pt11   TAIL_SPIKE 3.81  TAIL_FRAMES jerk/motion 1.993  tail on screen jerk 3.7755 m / motion 1.8949 m  world on screen jerk 31.1133 m / motion 15.6000 m  body on screen jerk 0.0001 m
+--old    TAIL_SPIKE 0.80  TAIL_FRAMES jerk/motion 0.135  tail on screen jerk 0.2557 m / motion 1.8981 m  world on screen jerk 31.1133 m / motion 15.6000 m  body on screen jerk 0.0001 m
+--built  TAIL_SPIKE 0.80  TAIL_FRAMES jerk/motion 0.135  tail on screen jerk 0.2557 m / motion 1.8981 m  world on screen jerk  0.0016 m / motion 15.5275 m  body on screen jerk 0.0002 m
+
+-- real time (Engine.max_fps 144; measured 147-156 drawn frames a second, 59.5-60 ticks a second)
+--pt11   TAIL_SPIKE 7.28  TAIL_FRAMES jerk/motion 1.872  tail on screen jerk 3.4662 m / motion 1.8518 m  world on screen jerk 27.9066 m / motion 15.1667 m
+--old    TAIL_SPIKE 0.86  TAIL_FRAMES jerk/motion 0.130  tail on screen jerk 0.2279 m / motion 1.7591 m  world on screen jerk 28.6866 m / motion 14.3000 m
+--built  TAIL_SPIKE 0.80  TAIL_FRAMES jerk/motion 0.137  tail on screen jerk 0.2412 m / motion 1.7627 m  world on screen jerk  0.2502 m / motion 14.3701 m
+(the same build at HEAD af7b457, before any change, old probe sampling at process_frame: TAIL_SPIKE 4.14, jerk/motion 2.000)
+
+-- per physics tick (--ticks), real time, for the record
+--pt11   jerk/motion 0.305   --old 0.441   --built 0.432
+Sampling once a tick something that now moves per drawn frame aliases: ticks land at uneven points
+between 144 Hz frames, so --old and --built read high here while they are smooth per drawn frame (above,
+both 0.135). The PT11 "0.45 -> 0.31" per-tick win was largely this artifact; per drawn frame PT11 made
+the tail step (0.135 -> 1.993).
+
+Reading: a smooth sway sampled at 144 Hz has jerk/motion of about 0.1 (its own curvature); 0.135 is the
+tail's own wag. The 60 Hz step was 2.0 (PT11). Before PT11 the tail was already smooth in her own frame,
+but the camera and so the whole world stepped at 60 Hz (world jerk 31 m over 15.6 m of motion); now the
+world moves evenly too (0.0016 m), her body stays put on screen (0.0002 m).
+
+-- frame strips, 12 consecutive drawn frames at exact 144 Hz, HUD hidden, crop round her tail
+build/ps_evidence/item9/strip144_before_pt11.png  (--pt11)
+build/ps_evidence/item9/strip144_after.png        (--built)
+before  STRIP frame 0  tail tip (772.0, 826.9) px  world mark (711.5, 1209.8) px  ticks 300
+before  STRIP frame 1  tail tip (771.9, 828.0) px  world mark (703.2, 1238.7) px  ticks 301
+before  STRIP frame 2  tail tip (771.9, 828.0) px  world mark (703.2, 1238.7) px  ticks 301
+before  STRIP frame 3  tail tip (771.9, 830.8) px  world mark (694.4, 1269.5) px  ticks 302
+before  STRIP frame 4  tail tip (771.9, 830.8) px  world mark (694.4, 1269.5) px  ticks 302
+before  STRIP frame 5  tail tip (771.9, 830.8) px  world mark (694.4, 1269.5) px  ticks 302
+before  STRIP frame 6  tail tip (771.9, 835.0) px  world mark (684.9, 1302.6) px  ticks 303
+before  STRIP frame 7  tail tip (771.9, 835.0) px  world mark (684.9, 1302.6) px  ticks 303
+before  STRIP frame 8  tail tip (772.0, 839.7) px  world mark (674.7, 1338.1) px  ticks 304
+before  STRIP frame 9  tail tip (772.0, 839.7) px  world mark (674.7, 1338.1) px  ticks 304
+before  STRIP frame 10  tail tip (772.2, 845.1) px  world mark (663.8, 1376.4) px  ticks 305
+before  STRIP frame 11  tail tip (772.2, 845.1) px  world mark (663.8, 1376.4) px  ticks 305
+before  STRIP /home/admin/Documents/filly-rancher/.claude/worktrees/agent-a6f0e08d5c35f4d65/build/ps_evidence/item9/strip144_before_pt11.png frame-to-frame change 0.0086, 0.0000, 0.0097, 0.0000, 0.0000, 0.0099, 0.0000, 0.0104, 0.0000, 0.0081, 0.0000
+before  TAIL_FRAMES jerk/motion 1.993  (motion 1.8949 m over 432 frames)
+before  SCREEN tail on screen jerk 3.7755 m, motion 1.8949 m
+before  SCREEN body on screen jerk 0.0001 m, motion 0.0000 m
+before  SCREEN world on screen jerk 31.1133 m, motion 15.6000 m
+after   STRIP frame 0  tail tip (772.0, 826.8) px  world mark (705.6, 1230.2) px  ticks 300
+after   STRIP frame 1  tail tip (771.9, 827.4) px  world mark (702.1, 1242.6) px  ticks 301
+after   STRIP frame 2  tail tip (771.9, 828.5) px  world mark (698.4, 1255.3) px  ticks 301
+after   STRIP frame 3  tail tip (771.9, 829.7) px  world mark (694.7, 1268.4) px  ticks 302
+after   STRIP frame 4  tail tip (771.9, 830.9) px  world mark (690.8, 1281.9) px  ticks 302
+after   STRIP frame 5  tail tip (771.9, 832.3) px  world mark (686.9, 1295.7) px  ticks 302
+after   STRIP frame 6  tail tip (771.9, 834.3) px  world mark (682.8, 1310.0) px  ticks 303
+after   STRIP frame 7  tail tip (772.0, 836.3) px  world mark (678.6, 1324.7) px  ticks 303
+after   STRIP frame 8  tail tip (772.0, 838.3) px  world mark (674.2, 1339.9) px  ticks 304
+after   STRIP frame 9  tail tip (772.1, 840.3) px  world mark (669.8, 1355.5) px  ticks 304
+after   STRIP frame 10  tail tip (772.1, 842.6) px  world mark (665.1, 1371.7) px  ticks 305
+after   STRIP frame 11  tail tip (772.2, 844.8) px  world mark (660.4, 1388.3) px  ticks 305
+after   STRIP /home/admin/Documents/filly-rancher/.claude/worktrees/agent-a6f0e08d5c35f4d65/build/ps_evidence/item9/strip144_after.png frame-to-frame change 0.0038, 0.0043, 0.0044, 0.0044, 0.0042, 0.0044, 0.0045, 0.0045, 0.0046, 0.0038, 0.0034
+after   TAIL_FRAMES jerk/motion 0.135  (motion 1.8981 m over 432 frames)
+after   SCREEN tail on screen jerk 0.2557 m, motion 1.8981 m
+after   SCREEN body on screen jerk 0.0002 m, motion 0.0001 m
+after   SCREEN world on screen jerk 0.0016 m, motion 15.5275 m

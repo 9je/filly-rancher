@@ -334,6 +334,8 @@ func body_footprint() -> Dictionary:
 
 func _ready() -> void:
 	_visual_yaw = visuals.rotation.y
+	_visuals_rest = visuals.position
+	_pivot_rest = camera_pivot.position
 	_build_visuals()
 
 
@@ -636,7 +638,106 @@ var speed_mult := 1.0
 var _rescue_check := 0.5
 
 
+## HER BODY IS DRAWN BETWEEN PHYSICS TICKS (item 9). She moves on the 60 Hz tick; a 144 Hz
+## display draws two or three frames per tick, so drawn at her body she stood still for two
+## frames and jumped on the third, and so did the camera that follows her and the springs in
+## her tail that ride on her. So each drawn frame her Visuals and the camera's pivot are
+## placed where her body was a FRACTION of the way between the last two ticks
+## (Engine.get_physics_interpolation_fraction()), her yaw likewise; her collision body, and
+## everything gameplay reads from it, stays exactly on the tick. Godot's own physics
+## interpolation would do this for the whole scene and would need every teleport and the
+## camera rig reworked; this is confined to her and her camera. A teleport (anything that sets
+## her position outside her own tick, or a tick step longer than TELEPORT_STEP) is drawn at
+## once, never smeared across the gap.
+## False draws her on the tick, as before (the measure probe's comparison).
+var draw_between_ticks := true
+## A tick step longer than this (metres; 120 m/s) is a teleport, not a stride.
+const TELEPORT_STEP := 2.0
+var _tick_prev := Vector3.ZERO
+var _tick_curr := Vector3.ZERO
+var _yaw_prev := 0.0
+var _yaw_curr := 0.0
+## The yaw her Visuals were last left at by this script; anything else found there was put
+## there by someone else (a shot script, face()), and is taken as a fresh start.
+var _yaw_expected := 0.0
+var _visuals_rest := Vector3.ZERO
+var _pivot_rest := Vector3.ZERO
+var _tick_seeded := false
+
+
+## Where between two ticks her body is drawn, as an offset from `curr` (world metres):
+## `prev` lerped to `curr` by `fraction`, minus `curr`. Zero for a teleport-sized step.
+static func drawn_offset(prev: Vector3, curr: Vector3, fraction: float) -> Vector3:
+	if prev.distance_to(curr) > TELEPORT_STEP:
+		return Vector3.ZERO
+	return prev.lerp(curr, clampf(fraction, 0.0, 1.0)) - curr
+
+
+## Forget the last tick: she is drawn where she is now, with no blend from where she was.
+func reset_tick_blend() -> void:
+	_tick_prev = global_position
+	_tick_curr = global_position
+	if visuals != null:
+		_yaw_prev = visuals.rotation.y
+		_yaw_curr = visuals.rotation.y
+		_yaw_expected = visuals.rotation.y
+	_tick_seeded = true
+
+
+## Put her Visuals and the camera pivot back on the tick (start of her tick), noticing a
+## position or yaw someone else set since she last looked.
+func _restore_tick_pose() -> void:
+	if not _tick_seeded:
+		reset_tick_blend()
+		return
+	visuals.position = _visuals_rest
+	camera_pivot.position = _pivot_rest
+	if absf(angle_difference(visuals.rotation.y, _yaw_expected)) > 1e-5:
+		_yaw_prev = visuals.rotation.y
+		_yaw_curr = visuals.rotation.y
+	else:
+		visuals.rotation.y = _yaw_curr
+	_yaw_expected = visuals.rotation.y
+	if global_position.distance_squared_to(_tick_curr) > 1e-8:
+		_tick_prev = global_position
+		_tick_curr = global_position
+
+
+## End of her tick: the step just taken becomes the one drawn frames blend across.
+func _record_tick() -> void:
+	_tick_prev = _tick_curr
+	_tick_curr = global_position
+	_yaw_prev = _yaw_curr
+	_yaw_curr = visuals.rotation.y
+	_yaw_expected = _yaw_curr
+
+
+func _process(_delta: float) -> void:
+	_draw_between_ticks(Engine.get_physics_interpolation_fraction())
+
+
+## Place her Visuals and the camera pivot `fraction` of the way through the last tick.
+func _draw_between_ticks(fraction: float) -> void:
+	if not _tick_seeded or visuals == null:
+		return
+	# Moved since her tick, or turned by someone else: a teleport, drawn where it lands.
+	if global_position.distance_squared_to(_tick_curr) > 1e-8 \
+			or absf(angle_difference(visuals.rotation.y, _yaw_expected)) > 1e-5:
+		reset_tick_blend()
+	if not draw_between_ticks:
+		fraction = 1.0
+	var offset := global_basis.inverse() * drawn_offset(_tick_prev, _tick_curr, fraction)
+	visuals.position = _visuals_rest + offset
+	camera_pivot.position = _pivot_rest + offset
+	var yaw := _yaw_curr
+	if _tick_prev.distance_to(_tick_curr) <= TELEPORT_STEP:
+		yaw = lerp_angle(_yaw_prev, _yaw_curr, clampf(fraction, 0.0, 1.0))
+	visuals.rotation.y = yaw
+	_yaw_expected = yaw
+
+
 func _physics_process(delta: float) -> void:
+	_restore_tick_pose()
 	# Never trapped in a building (PT2): checked twice a second, see Building.rescue_body.
 	_rescue_check -= delta
 	if _rescue_check <= 0.0:
@@ -709,6 +810,7 @@ func _physics_process(delta: float) -> void:
 		_sound_call(&"play_at", [surface, global_position,
 			REAR_ACCENT_DB if _last_footfall_rear else 0.0])
 		hoofstep.emit(surface, _last_footfall_rear)
+	_record_tick()
 
 
 ## Basis whose -Z is "forward" for input purposes: the current camera's facing,
@@ -764,6 +866,7 @@ func face(yaw: float) -> void:
 	visuals.rotation.y = yaw
 	visuals.rotation.z = 0.0
 	_gait_blend.reset()
+	reset_tick_blend()
 
 
 ## Pick `idle` / `walk` / `gallop` and scale playback so the gait matches the ground.
@@ -847,14 +950,15 @@ func _build_visuals(mane_style: int = 0, donor: StringName = &"") -> void:
 	# Re-found on every rebuild rather than kept: apply_look() frees the whole body when the
 	# mane style changes, and a stale simulator reference would be a freed node.
 	_hair = PonyRigScript.hair_simulator(pony)
-	# HER POSE AND HER HAIR STEP WITH HER BODY (PT11; playtest 2026-11-05: "your tail bugs out
-	# as you walk ... it like stutters between frames"). She moves on the physics tick; her clip
-	# and her tail's springs ran on every drawn frame, so on a fast display the springs saw her
-	# stand still for a frame or two and then jump, and threw the tail each time. Both now run
-	# on the physics tick, in step with the body that carries them.
-	_anim.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_PHYSICS
+	# HER POSE AND HER HAIR MOVE ON EVERY DRAWN FRAME (item 9; playtest 2026-11-05: "your tail
+	# bugs out as you walk ... it like stutters between frames"). PT11 put both on the physics
+	# tick, which stopped the springs being thrown but left the tail moving only 60 times a
+	# second: on a 144 Hz display, with the camera holding her still on screen, it was the one
+	# thing visibly stepping (2-3-2-3 frames). Her body is now DRAWN between ticks (see
+	# _draw_between_ticks()), so the clip and the springs run per drawn frame on smooth motion.
+	_anim.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_IDLE
 	for sk: Skeleton3D in pony.find_children("*", "Skeleton3D", true, false):
-		sk.modifier_callback_mode_process = Skeleton3D.MODIFIER_CALLBACK_MODE_PROCESS_PHYSICS
+		sk.modifier_callback_mode_process = Skeleton3D.MODIFIER_CALLBACK_MODE_PROCESS_IDLE
 
 
 ## Move `BeamOrigin` onto the actual tip of the actual horn of the actual model.

@@ -1327,9 +1327,22 @@ func _physics_process(delta: float) -> void:
 		return
 
 	if _held != null:
-		_pull(delta)
 		_run_struggle(delta)
 
+
+## THE HOLD AND THE RIBBON MOVE ON EVERY DRAWN FRAME (item 9). Her body and the camera are drawn
+## between physics ticks (player.gd, _draw_between_ticks()), so a held pony reeled and a ribbon
+## drawn on the tick would step against them at 60 Hz on a fast display. Both are done here,
+## after the player and the camera rig have been placed for this frame (both come earlier in the
+## tree), from this frame's aim; the struggle's clock and the scan stay on the tick.
+func _process(delta: float) -> void:
+	if not _beaming:
+		return
+	if _held != null and not is_instance_valid(_held):
+		_held = null
+	_update_aim()
+	if _held != null:
+		_pull(delta)
 	_draw_effect()
 
 
