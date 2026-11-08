@@ -177,18 +177,32 @@ static var save_dir := DEFAULT_SAVE_DIR
 ## PURE, AND SEPARATE FROM THE READ BELOW ON PURPOSE. A value read once per process cannot be
 ## tested any other way: a test cannot restart the engine to read a different environment. The
 ## decision is the part worth testing, so the decision is the part that is a function.
-static func resolve_save_dir(env_value: String) -> String:
+##
+## A PROCESS STARTED WITH A SCRIPT (`-s`: GUT, a render probe, the perf check) THAT NAMED NO
+## DIRECTORY gets AUTOMATED_SAVE_DIR, never the player's: on 2026-11-07 single GUT files run
+## by hand without the variable rewrote the owner's slot 9. The game itself (play.sh, an
+## exported build) is never started with a script, so it is untouched by this.
+static func resolve_save_dir(env_value: String, launched_with_script := false) -> String:
 	var named := env_value.strip_edges()
 	if named.is_empty():
-		return DEFAULT_SAVE_DIR
+		return AUTOMATED_SAVE_DIR if launched_with_script else DEFAULT_SAVE_DIR
 	return named
+
+
+## Where a scripted run's saves go when it named no directory (resolve_save_dir).
+const AUTOMATED_SAVE_DIR := "user://automated_saves"
+
+
+static func _launched_with_script() -> bool:
+	var args := OS.get_cmdline_args()
+	return args.has("-s") or args.has("--script")
 
 
 ## THE ONE READ OF THE ENVIRONMENT. Godot calls this once, when the class is loaded, before any
 ## caller can reach a static member of it, which is what lets the redirect cover every consumer
 ## in the project with no call site changes at all.
 static func _static_init() -> void:
-	session_save_dir = resolve_save_dir(OS.get_environment(TEST_SAVE_DIR_ENV))
+	session_save_dir = resolve_save_dir(OS.get_environment(TEST_SAVE_DIR_ENV), _launched_with_script())
 	save_dir = session_save_dir
 
 

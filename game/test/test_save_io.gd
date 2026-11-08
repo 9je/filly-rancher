@@ -644,15 +644,32 @@ func test_a_native_absolute_path_is_taken_literally() -> void:
 
 ## THE WIRING, not the policy: that _static_init() really ran and really assigned. It claims
 ## something in BOTH directions on purpose -- under tools/run_tests.sh the variable is set and
-## the answer must NOT be the player's directory, and run bare it is unset and the answer must
-## BE the player's directory -- so there is no way to run this test and have it assert nothing.
+## the answer must NOT be the player's directory, and run bare (GUT is started with -s) it is
+## unset and the answer must be the scripted runs' own directory, still not the player's -- so
+## there is no way to run this test and have it assert nothing.
 func test_the_session_directory_is_the_one_the_environment_named() -> void:
 	var named := OS.get_environment(SaveIOScript.TEST_SAVE_DIR_ENV)
-	assert_eq(SaveIOScript.session_save_dir, SaveIOScript.resolve_save_dir(named),
+	assert_eq(SaveIOScript.session_save_dir,
+		SaveIOScript.resolve_save_dir(named, SaveIOScript._launched_with_script()),
 		"_static_init() must resolve the session directory through resolve_save_dir()")
 	if named.strip_edges().is_empty():
-		assert_eq(SaveIOScript.session_save_dir, SaveIOScript.DEFAULT_SAVE_DIR,
-			"nothing was exported, so this process saves where the player does")
+		assert_eq(SaveIOScript.session_save_dir, SaveIOScript.AUTOMATED_SAVE_DIR,
+			"nothing was exported, and a scripted run never saves where the player does")
 	else:
 		assert_ne(SaveIOScript.session_save_dir, SaveIOScript.DEFAULT_SAVE_DIR,
 			"a redirected process must not be able to reach the player's own slots")
+
+
+## A scripted run (GUT, a probe) that names no save directory never gets the player's own:
+## on 2026-11-07 GUT files run by hand without FILLY_TEST_SAVE_DIR rewrote the owner's slot 9.
+func test_a_scripted_run_that_names_no_directory_never_writes_the_players_saves() -> void:
+	assert_eq(SaveIOScript.resolve_save_dir("", true), SaveIOScript.AUTOMATED_SAVE_DIR)
+	assert_eq(SaveIOScript.resolve_save_dir("   ", true), SaveIOScript.AUTOMATED_SAVE_DIR)
+	assert_ne(SaveIOScript.AUTOMATED_SAVE_DIR, SaveIOScript.DEFAULT_SAVE_DIR)
+	assert_eq(SaveIOScript.resolve_save_dir("/tmp/x", true), "/tmp/x", "a named directory still wins")
+	assert_eq(SaveIOScript.resolve_save_dir("", false), SaveIOScript.DEFAULT_SAVE_DIR,
+		"the game itself, started with no script, keeps the player's saves")
+	# And this very process, started with -s and (when run by hand) maybe no variable:
+	assert_true(SaveIOScript._launched_with_script(), "GUT is started with -s")
+	assert_ne(SaveIOScript.session_save_dir, SaveIOScript.DEFAULT_SAVE_DIR,
+		"this test run is not writing the player's saves")
