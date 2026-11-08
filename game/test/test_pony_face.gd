@@ -144,3 +144,22 @@ func test_a_startle_cut_off_by_the_beam_does_not_freeze_her() -> void:
 	pony.call("_update_animation", 3.0, 0.5)
 	var anim: AnimationPlayer = pony.get("_anim")
 	assert_ne(anim.current_animation, &"struggle", "dropped, she walks again")
+
+
+## P8, playtest 2026-11-08 item 31: a pony beside an idle player vibrated her head. With the
+## target just behind her, crossing her centre line flipped the turn from one side's limit to
+## the other's. Behind her, she faces ahead, and her head is still.
+func test_a_target_behind_her_does_not_flip_her_head_side_to_side() -> void:
+	var body: Node3D = PonyVisuals.build(load("res://data/ponies/applebloom.tres"))
+	add_child_autofree(body)
+	var face := _face_of(body)
+	face.look_weight = 1.0
+	var yaws: Array[float] = []
+	# Built bare (no Pony root turning her), this body faces +Z, so -Z is behind her; the
+	# target wobbles across her centre line.
+	for i in 40:
+		face.look_target = body.global_position + Vector3(0.05 if i % 2 == 0 else -0.05, 1.0, -2.5)
+		face._tick(1.0 / 60.0)
+		yaws.append(face._look_yaw)
+	for y in yaws:
+		assert_almost_eq(y, 0.0, 0.001, "behind her, she looks ahead")

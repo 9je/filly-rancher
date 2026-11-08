@@ -51,6 +51,8 @@ var look_target: Vector3 = Vector3.INF
 @export var look_weight: float = 0.0
 ## Max head yaw toward a look target.
 @export var look_max := deg_to_rad(55.0)
+## How far past look_max a target may be before she stops trying and faces ahead.
+const LOOK_GIVE_UP := deg_to_rad(30.0)
 ## Held shut (sleeping, a contented sigh, the Bloom's eyes-closed beat). Blinks pause.
 var eyes_closed: bool = false
 ## True while a talk line is revealing: the jaw flaps with `talk_amount`.
@@ -239,7 +241,13 @@ func _tick(delta: float) -> void:
 		var local := sk.global_transform.affine_inverse() * look_target
 		# Donor rigs face -Z (export_blend.py --rotate-z 180, the convention pony.gd and
 		# player.gd use); yaw toward the target from there.
-		want = clampf(atan2(-local.x, -local.z), -look_max, look_max) * look_weight
+		var raw := atan2(-local.x, -local.z)
+		# BEHIND HER SHE LOOKS AHEAD (P8, playtest 2026-11-08 item 31: a pony next to an AFK
+		# player vibrated her head). With the target behind, the angle sits near +-180 and
+		# flips sign as the target crosses her centre line, so the clamp threw her head from
+		# +look_max to -look_max on alternate frames. Past what she can turn to, she doesn't.
+		if absf(raw) <= look_max + LOOK_GIVE_UP:
+			want = clampf(raw, -look_max, look_max) * look_weight
 	_look_yaw = lerpf(_look_yaw, want, clampf(delta * 6.0, 0.0, 1.0))
 
 
