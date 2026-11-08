@@ -172,6 +172,14 @@ Market (Bramble's portrait, Buy and Sell tabs, fixed size, item 68), caught card
 Done: the HUD over the noon plaza next to Slime Rancher's and Animal Crossing's; nothing
 clipped at 1600x900 or 2560x1440; no toast is a sentence.
 
+### Quality gate: the vertical slice (before S5 goes wide)
+Before the full icon set and every screen, one slice is taken all the way: the plaza at noon
+and at night under the new lighting, 12 icons from the spec, and the HUD plus the Depot on
+the kit. The owner sees it as renders and a short clip, side by side with the references,
+and says keep, change or switch route. If the drawn icons or painted skies fall short, the
+fallback is bought or commissioned art for those pieces (owner's call on spend), not more
+passes of the same route.
+
 ### Sprint A playtest
 A fresh start build. The owner plays as far as they like. Their list decides what Sprint B
 keeps, cuts or changes.
