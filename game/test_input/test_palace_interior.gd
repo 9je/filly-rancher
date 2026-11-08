@@ -139,7 +139,10 @@ func _sweep_in(hall: Node3D) -> int:
 		moves.append(Vector2(0, 40))
 	for m: Vector2 in moves:
 		RI.look(m)
-		await process_frame
+		# Sampled just before the frame is drawn, after the rig's _process has placed the lens
+		# for this frame's look: process_frame fires before it, when the mount is still where
+		# the spring arm's physics tick left it under the last frame's offset (G10).
+		await RenderingServer.frame_pre_draw
 		var p: Vector3 = hall.to_local(cam.global_position)
 		var inside: bool = absf(p.x) < PalaceInteriorScript.HALF_WIDTH - 0.05 \
 			and absf(p.z) < PalaceInteriorScript.HALF_DEPTH - 0.05 \

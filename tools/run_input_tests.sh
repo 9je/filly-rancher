@@ -44,7 +44,13 @@ for n in "${names[@]}"; do
   [ "${FILLY_INPUT_VERBOSE:-0}" = "1" ] && keep="^INPUT_TEST_|SCRIPT ERROR"
   echo "$out" | grep -E "$keep" | sed "s/^/[$n] /"
   rm -rf "$FILLY_TEST_SAVE_DIR"
-  if [ $rc -eq 0 ] && echo "$out" | grep -q "^INPUT_TEST_OK"; then pass=$((pass+1)); else fail=$((fail+1)); fi
+  if [ $rc -eq 0 ] && echo "$out" | grep -q "^INPUT_TEST_OK"; then pass=$((pass+1)); else
+    fail=$((fail+1))
+    # A failure that printed no FAILED line (a crash, a hang to the timeout, an error exit after
+    # its OK) says so, with the engine's last words: otherwise it is only a missing line.
+    echo "[$n] INPUT_TEST_EXIT rc=$rc"
+    echo "$out" | tail -5 | sed "s/^/[$n]   /"
+  fi
 done
 echo "INPUT_TESTS passed=$pass failed=$fail"
 [ $fail -eq 0 ]
