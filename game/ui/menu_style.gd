@@ -180,26 +180,11 @@ static var _numeral_font: FontVariation = null
 ## THE PANEL BEHIND EVERY MENU IN THE GAME, and until this function existed it was a
 ## StyleBoxFlat copy pasted verbatim into ten .tscn files. No content margin: the Margin
 ## node owns that.
-static func panel_style() -> StyleBoxFlat:
-	if _panel_style != null:
-		return _panel_style
-	var box := StyleBoxFlat.new()
-	# ONE LOOK WITH THE HUD (overnight review 2026-10-26: the menus were a black slab, the HUD
-	# a rounded card with a violet line). Deep Palace plum, the HUD cards' violet outline at
-	# their weight and roundness, and their soft drop shadow; the plum tiles sit on it.
-	box.bg_color = Color(0.15, 0.06, 0.19, 0.97)
-	box.set_border_width_all(4)
-	box.border_color = Color(0.62, 0.45, 0.80)
-	box.set_corner_radius_all(22)
-	box.shadow_color = Color(0.08, 0.02, 0.12, 0.45)
-	box.shadow_size = 14
-	box.shadow_offset = Vector2(0, 6)
-	box.content_margin_left = 0.0
-	box.content_margin_top = 0.0
-	box.content_margin_right = 0.0
-	box.content_margin_bottom = 0.0
-	_panel_style = box
-	return _panel_style
+static func panel_style() -> StyleBox:
+	# THE KIT (P8 S5): the menus' plum is a painted surface now, paper stock with grain, an
+	# ink edge and a drop shadow (tools/make_ui_kit.py), not a flat rounded rectangle. Still
+	# dark, so every menu's light words keep their contrast.
+	return kit(&"paper_dark")
 
 
 static func apply_panel(panel: PanelContainer) -> void:
@@ -208,9 +193,53 @@ static func apply_panel(panel: PanelContainer) -> void:
 	panel.add_theme_stylebox_override(&"panel", panel_style())
 
 
+## The Spectra Palace's panels are plum velvet with gold piping (P8 S5), so the casino reads as
+## a different place from the ranch at a glance.
+static func apply_palace_panel(panel: PanelContainer) -> void:
+	if panel == null:
+		return
+	panel.add_theme_stylebox_override(&"panel", kit(&"velvet"))
+
+
+# --- the kit (P8 S5; tools/make_ui_kit.py) --------------------------------------------------
+
+const KIT_DIR := "res://assets/ui/kit/"
+## Per surface: the nine-patch margin (px of the source PNG that stay unstretched: corner plus
+## shadow) and the content margin inside it.
+const KIT := {
+	&"paper": [40, 26], &"paper_dark": [40, 26], &"wood": [52, 40], &"velvet": [40, 26],
+	&"button": [30, 16], &"button_hover": [30, 16], &"button_pressed": [30, 16],
+	&"button_disabled": [30, 16], &"button_primary": [30, 16],
+	&"button_primary_hover": [30, 16], &"chip": [20, 8], &"tab_on": [26, 14],
+	&"tab_off": [26, 14],
+}
+
+static var _kit_boxes: Dictionary = {}
+
+
+## The kit's surface `name` as a StyleBoxTexture, shared (do not edit the one returned;
+## duplicate() it).
+static func kit(name: StringName) -> StyleBoxTexture:
+	if _kit_boxes.has(name):
+		return _kit_boxes[name]
+	var m: Array = KIT.get(name, [32, 16])
+	var box := StyleBoxTexture.new()
+	box.texture = load(KIT_DIR + String(name) + ".png") as Texture2D
+	box.texture_margin_left = float(m[0])
+	box.texture_margin_right = float(m[0])
+	box.texture_margin_top = float(m[0])
+	box.texture_margin_bottom = float(m[0])
+	box.content_margin_left = float(m[1]) + 6.0
+	box.content_margin_right = float(m[1]) + 6.0
+	box.content_margin_top = float(m[1])
+	box.content_margin_bottom = float(m[1])
+	_kit_boxes[name] = box
+	return box
+
+
 ## apply_panel() with the box named rather than assumed. The letter and the creation screen
 ## are paper and wood; every list in the game is still the navy panel apply_panel() applies.
-static func apply_panel_box(panel: PanelContainer, box: StyleBoxFlat) -> void:
+static func apply_panel_box(panel: PanelContainer, box: StyleBox) -> void:
 	if panel == null or box == null:
 		return
 	panel.add_theme_stylebox_override(&"panel", box)
@@ -332,27 +361,27 @@ static func _box(bg: Color, border: Color, width: int, radius: int) -> StyleBoxF
 ## A BUTTON, IN FIVE STATES, AND THEY LOOK DIFFERENT ON PURPOSE. An unknown state name
 ## answers normal rather than null: a Theme entry that came back null would style nothing
 ## and say nothing about why.
-static func button_box(state: StringName) -> StyleBoxFlat:
+static func button_box(state: StringName) -> StyleBox:
+	# The kit's cream pill (P8 S5) with ink words, on paper and on the dark panels alike, so a
+	# button looks like a button everywhere: lifted at rest, gold-rimmed under the pointer,
+	# pushed down when pressed.
 	match state:
-		&"hover":
-			return _box(COLOR_HOVER_BG, COLOR_HOVER_BORDER, 2, BUTTON_RADIUS)
+		&"hover", &"focus":
+			return kit(&"button_hover")
 		&"pressed":
-			return _box(ROW_SELECTED_BG, ROW_SELECTED_BORDER, 2, BUTTON_RADIUS)
-		&"focus":
-			return _box(Color(0, 0, 0, 0), COLOR_TAB_ON, 2, BUTTON_RADIUS)
+			return kit(&"button_pressed")
 		&"disabled":
-			return _box(Color(1.0, 1.0, 1.0, 0.02), Color(1.0, 1.0, 1.0, 0.06), 1,
-				BUTTON_RADIUS)
-	return _box(ROW_IDLE_BG, ROW_IDLE_BORDER, 1, BUTTON_RADIUS)
+			return kit(&"button_disabled")
+	return kit(&"button")
 
 
-static func tab_box(state: StringName) -> StyleBoxFlat:
+static func tab_box(state: StringName) -> StyleBox:
 	match state:
 		&"selected":
-			return _box(ROW_SELECTED_BG, ROW_SELECTED_BORDER, 2, BUTTON_RADIUS)
+			return kit(&"tab_on")
 		&"hovered":
-			return _box(COLOR_HOVER_BG, COLOR_HOVER_BORDER, 2, BUTTON_RADIUS)
-	return _box(Color(0, 0, 0, 0), COLOR_TAB_OFF, 1, BUTTON_RADIUS)
+			return kit(&"button_hover")
+	return kit(&"tab_off")
 
 
 ## THE NAME BOX. Ink on paper, because it is the one control in this game somebody types
@@ -371,12 +400,8 @@ static func slider_box(filled: bool) -> StyleBoxFlat:
 
 
 ## WARM PAPER, FOR THE PANELS THAT ARE PAGES: the letter, the statement, the house rules.
-static func paper_box() -> StyleBoxFlat:
-	var box := _box(COLOR_PAPER, COLOR_PAPER_EDGE, 1, 10)
-	box.shadow_color = Color(0.0, 0.0, 0.0, 0.28)
-	box.shadow_size = 8
-	box.shadow_offset = Vector2(3.0, 4.0)
-	return box
+static func paper_box() -> StyleBox:
+	return kit(&"paper")
 
 
 ## THE TOOLTIP IS ONE OF THE HUD'S CARDS (PS10, G1: a lesson chip shows its sentence under the
@@ -389,15 +414,12 @@ const TOOLTIP_LINE := Color(0.47, 0.31, 0.64)
 const TOOLTIP_INK := Color(0.24, 0.17, 0.3)
 
 
-static func tooltip_box() -> StyleBoxFlat:
-	var box := _box(TOOLTIP_FILL, TOOLTIP_LINE, 2, 14)
-	box.content_margin_left = 14.0
-	box.content_margin_right = 14.0
-	box.content_margin_top = 8.0
-	box.content_margin_bottom = 9.0
-	box.shadow_color = Color(0.15, 0.05, 0.2, 0.25)
-	box.shadow_size = 6
-	box.shadow_offset = Vector2(0.0, 3.0)
+static func tooltip_box() -> StyleBox:
+	var box: StyleBoxTexture = kit(&"paper").duplicate()
+	box.content_margin_left = 22.0
+	box.content_margin_right = 22.0
+	box.content_margin_top = 16.0
+	box.content_margin_bottom = 17.0
 	return box
 
 
@@ -411,22 +433,8 @@ const PAPER_BUTTON_EDGE := Color(0.42, 0.36, 0.30, 1.0)
 const PAPER_BUTTON_LIT := Color(1.0, 0.84, 0.48, 1.0)
 
 
-static func paper_button_box(state: StringName) -> StyleBoxFlat:
-	var box: StyleBoxFlat
-	match state:
-		&"hover", &"focus":
-			box = _box(PAPER_BUTTON_LIT, COLOR_INK, 2, BUTTON_RADIUS)
-		&"pressed":
-			box = _box(PAPER_BUTTON_LIT.darkened(0.12), COLOR_INK, 2, BUTTON_RADIUS)
-		&"disabled":
-			box = _box(Color(COLOR_PAPER, 1.0), COLOR_PAPER_EDGE, 2, BUTTON_RADIUS)
-		_:
-			box = _box(PAPER_BUTTON_FACE, PAPER_BUTTON_EDGE, 2, BUTTON_RADIUS)
-	box.content_margin_left = 18.0
-	box.content_margin_right = 18.0
-	box.content_margin_top = 8.0
-	box.content_margin_bottom = 8.0
-	return box
+static func paper_button_box(state: StringName) -> StyleBox:
+	return button_box(state)
 
 
 static func paper_button(button: Button) -> void:
@@ -441,13 +449,8 @@ static func paper_button(button: Button) -> void:
 
 ## THE WOODEN FRAME. Used around the turntable and the cutie mark canvas, which are the two
 ## things on screen that are pictures rather than text.
-static func frame_box() -> StyleBoxFlat:
-	var box := _box(COLOR_WOOD, COLOR_WOOD_LIT, FRAME_WIDTH, 10)
-	box.content_margin_left = float(FRAME_WIDTH) * 2.0
-	box.content_margin_right = float(FRAME_WIDTH) * 2.0
-	box.content_margin_top = float(FRAME_WIDTH) * 2.0
-	box.content_margin_bottom = float(FRAME_WIDTH) * 2.0
-	return box
+static func frame_box() -> StyleBox:
+	return kit(&"wood")
 
 
 ## THE THIRD ROW STATE. row_box() answers idle and selected; a pointer needs a third, and it

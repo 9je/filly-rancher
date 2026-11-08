@@ -223,10 +223,10 @@ func test_a_longer_letter_reserves_a_taller_sheet() -> void:
 
 func test_the_panel_wears_the_paper_box_rather_than_the_navy_one() -> void:
 	var panel := _panel.get_node("Centre/Panel") as PanelContainer
-	var box: StyleBoxFlat = panel.get_theme_stylebox(&"panel") as StyleBoxFlat
-	assert_eq(Color(box.bg_color, 1.0), Color(MenuStyleScript.COLOR_PAPER, 1.0),
+	assert_eq(panel.get_theme_stylebox(&"panel"), MenuStyleScript.paper_box(),
 		"a letter is paper, not a menu panel")
-	assert_eq(box.bg_color.a, 1.0, "PS6 item 51: nothing behind the sheet shows through it")
+	assert_eq(_middle(MenuStyleScript.paper_box()).a, 1.0,
+		"PS6 item 51: nothing behind the sheet shows through it")
 
 
 ## paint() DRAWS THROUGH CanvasItem.draw_*, which Godot only allows inside that item's own
@@ -349,11 +349,14 @@ func _contrast(a: Color, b: Color) -> float:
 
 ## The colour a button's face actually shows: its normal box laid over the sheet behind it.
 func _face(button: Button) -> Color:
-	var sheet := Color(MenuStyleScript.COLOR_PAPER, 1.0)
-	var box := button.get_theme_stylebox(&"normal") as StyleBoxFlat
-	if box == null:
-		return sheet
-	return sheet.lerp(Color(box.bg_color, 1.0), box.bg_color.a)
+	return _middle(button.get_theme_stylebox(&"normal"))
+
+
+## The middle of a kit surface: the colour its face shows (P8 S5).
+func _middle(box: StyleBox) -> Color:
+	var tex := (box as StyleBoxTexture).texture
+	var img := tex.get_image()
+	return img.get_pixel(img.get_width() / 2, img.get_height() / 2)
 
 
 ## G13 (batch check of PS6): "the paper letters' buttons (the welcome letter's Back, the
@@ -375,17 +378,10 @@ func test_every_button_on_the_sheet_is_ink_on_paper_not_white_on_cream() -> void
 		assert_gte(ratio, 4.5, "'%s' reads %.2f:1 on its face %s (ink %s)" % [b.text, ratio,
 			_face(b), ink])
 		var hover_ink: Color = b.get_theme_color(&"font_hover_color")
-		var hover := b.get_theme_stylebox(&"hover") as StyleBoxFlat
-		if hover != null:
-			var hover_face := Color(MenuStyleScript.COLOR_PAPER, 1.0).lerp(
-				Color(hover.bg_color, 1.0), hover.bg_color.a)
-			assert_gte(_contrast(hover_ink, hover_face), 4.5, "'%s' under the pointer" % b.text)
-		var box := b.get_theme_stylebox(&"normal") as StyleBoxFlat
-		assert_not_null(box, "'%s' has a drawn face" % b.text)
-		if box != null:
-			assert_gte(box.border_width_bottom, 2, "'%s' has an edge you can see" % b.text)
-			assert_gte(_contrast(box.border_color, MenuStyleScript.COLOR_PAPER), 3.0,
-				"'%s' edge stands off the paper" % b.text)
+		var hover_face := _middle(b.get_theme_stylebox(&"hover"))
+		assert_gte(_contrast(hover_ink, hover_face), 4.5, "'%s' under the pointer" % b.text)
+		assert_true(b.get_theme_stylebox(&"normal") is StyleBoxTexture,
+			"'%s' wears the kit's pill, with its ink edge" % b.text)
 
 
 ## ITEM 8 (owner, playtest 2026-11-05): "The welcome letter: a text wall". Batch check: "the

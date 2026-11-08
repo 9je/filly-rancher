@@ -24,11 +24,12 @@ func test_the_project_installs_the_theme_for_every_control() -> void:
 
 func test_every_button_state_is_styled_and_they_are_not_the_same_box() -> void:
 	var theme: Theme = MenuStyleScript.theme_resource()
-	var seen: Array[Color] = []
+	var seen: Array = []
 	for state: StringName in [&"normal", &"hover", &"pressed", &"disabled"]:
 		var box: StyleBox = theme.get_stylebox(state, &"Button")
-		assert_true(box is StyleBoxFlat, "Button/%s is not a StyleBoxFlat" % state)
-		seen.append((box as StyleBoxFlat).bg_color)
+		# P8 S5: the kit's painted pills, one picture per state.
+		assert_true(box is StyleBoxTexture, "Button/%s is not a kit surface" % state)
+		seen.append((box as StyleBoxTexture).texture)
 	assert_eq(seen.size(), 4)
 	for i in range(1, seen.size()):
 		assert_ne(seen[i], seen[0], "a hover state that looks like normal is not a state")
@@ -39,17 +40,17 @@ func test_the_slider_and_the_tab_bar_are_styled() -> void:
 	for pair: Array in [["slider", "HSlider"], ["grabber_area", "HSlider"],
 			["tab_selected", "TabBar"], ["tab_unselected", "TabBar"],
 			["tab_hovered", "TabBar"]]:
-		assert_true(theme.get_stylebox(StringName(pair[0]), StringName(pair[1]))
-			is StyleBoxFlat, "%s/%s is unstyled" % [pair[1], pair[0]])
+		var box := theme.get_stylebox(StringName(pair[0]), StringName(pair[1]))
+		assert_true(box is StyleBoxFlat or box is StyleBoxTexture,
+			"%s/%s is unstyled" % [pair[1], pair[0]])
 
 
 func test_the_panel_in_the_theme_is_the_panel_menu_style_hands_out() -> void:
 	var theme: Theme = MenuStyleScript.theme_resource()
-	var box: StyleBoxFlat = theme.get_stylebox(&"panel", &"PanelContainer") as StyleBoxFlat
+	var box := theme.get_stylebox(&"panel", &"PanelContainer") as StyleBoxTexture
 	assert_not_null(box)
-	assert_eq(box.bg_color, MenuStyleScript.panel_style().bg_color,
+	assert_eq(box.texture.resource_path, MenuStyleScript.panel_style().texture.resource_path,
 		"the theme and menu_style.gd have drifted; re-run bash tools/make_theme.sh")
-	assert_eq(box.border_color, MenuStyleScript.panel_style().border_color)
 
 
 func test_the_row_boxes_ride_along_so_a_drawn_row_and_a_themed_row_match() -> void:
@@ -72,7 +73,7 @@ func test_the_paper_menu_style_names_is_the_paper_the_stationery_kit_draws() -> 
 
 
 func test_the_wooden_frame_is_a_real_border_and_not_a_hairline() -> void:
-	var frame: StyleBoxFlat = MenuStyleScript.frame_box()
-	assert_eq(frame.border_width_left, MenuStyleScript.FRAME_WIDTH)
-	assert_eq(frame.border_color, MenuStyleScript.COLOR_WOOD_LIT)
-	assert_eq(frame.bg_color, MenuStyleScript.COLOR_WOOD)
+	# P8 S5: the kit's painted wood, its frame wide enough to read as a frame.
+	var frame := MenuStyleScript.frame_box() as StyleBoxTexture
+	assert_not_null(frame.texture)
+	assert_gte(frame.texture_margin_left, 32.0)

@@ -25,10 +25,11 @@ func _init() -> void:
 
 	for state: StringName in [&"normal", &"hover", &"pressed", &"focus", &"disabled"]:
 		theme.set_stylebox(state, &"Button", MenuStyleScript.button_box(state))
-	theme.set_color(&"font_color", &"Button", MenuStyleScript.COLOR_NAME)
-	theme.set_color(&"font_hover_color", &"Button", MenuStyleScript.COLOR_TITLE)
-	theme.set_color(&"font_pressed_color", &"Button", MenuStyleScript.COLOR_VALUE)
-	theme.set_color(&"font_disabled_color", &"Button", MenuStyleScript.COLOR_TAB_OFF)
+	# Ink on the kit's cream pill (P8 S5), in every state; the pill itself says hover and press.
+	for slot: StringName in [&"font_color", &"font_hover_color", &"font_pressed_color",
+			&"font_focus_color", &"font_hover_pressed_color"]:
+		theme.set_color(slot, &"Button", MenuStyleScript.COLOR_INK)
+	theme.set_color(&"font_disabled_color", &"Button", Color(MenuStyleScript.COLOR_INK, 0.45))
 	theme.set_color(&"font_outline_color", &"Button", MenuStyleScript.OUTLINE_COLOR)
 	theme.set_constant(&"outline_size", &"Button", MenuStyleScript.OUTLINE_SIZE)
 	theme.set_font_size(&"font_size", &"Button", MenuStyleScript.ROW_SIZE)
@@ -51,9 +52,9 @@ func _init() -> void:
 	theme.set_stylebox(&"tab_selected", &"TabBar", MenuStyleScript.tab_box(&"selected"))
 	theme.set_stylebox(&"tab_unselected", &"TabBar", MenuStyleScript.tab_box(&"unselected"))
 	theme.set_stylebox(&"tab_hovered", &"TabBar", MenuStyleScript.tab_box(&"hovered"))
-	theme.set_color(&"font_selected_color", &"TabBar", MenuStyleScript.COLOR_TAB_ON)
-	theme.set_color(&"font_unselected_color", &"TabBar", MenuStyleScript.COLOR_TAB_OFF)
-	theme.set_color(&"font_hovered_color", &"TabBar", MenuStyleScript.COLOR_TITLE)
+	theme.set_color(&"font_selected_color", &"TabBar", MenuStyleScript.COLOR_INK)
+	theme.set_color(&"font_unselected_color", &"TabBar", Color(MenuStyleScript.COLOR_INK, 0.7))
+	theme.set_color(&"font_hovered_color", &"TabBar", MenuStyleScript.COLOR_INK)
 
 	# THE THREE ROW BOXES AND THE TWO MATERIALS, under type names nothing in Godot owns, so a
 	# menu can ask the Theme for the same box game/ui/menu_style.gd hands its drawn rows.

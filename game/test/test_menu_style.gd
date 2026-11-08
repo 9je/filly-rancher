@@ -133,13 +133,12 @@ func test_a_real_panel_draws_its_rows_with_the_outline() -> void:
 ## every menu .tscn in the game, so "change the look of a panel" meant editing ten scene
 ## files and getting one of them wrong.
 func test_the_panel_style_is_one_shared_instance_with_the_shipped_numbers() -> void:
-	var a: StyleBoxFlat = MenuStyleScript.panel_style()
-	var b: StyleBoxFlat = MenuStyleScript.panel_style()
+	var a: StyleBox = MenuStyleScript.panel_style()
+	var b: StyleBox = MenuStyleScript.panel_style()
 	assert_eq(a, b, "cached: every panel in the game points at the same box")
-	assert_eq(a.bg_color, Color(0.15, 0.06, 0.19, 0.97))
-	assert_eq(a.border_color, Color(0.62, 0.45, 0.80))
-	assert_eq(a.corner_radius_top_left, 22)
-	assert_eq(a.border_width_top, 4)
+	# P8 S5: the kit's dark paper.
+	assert_eq((a as StyleBoxTexture).texture.resource_path, "res://assets/ui/kit/paper_dark.png")
+	assert_gte((a as StyleBoxTexture).texture_margin_top, 32.0, "the painted corner is not stretched")
 
 
 ## THE ROW TREATMENT THE STYLE FILE ALREADY INTENDED. These four constants shipped declared

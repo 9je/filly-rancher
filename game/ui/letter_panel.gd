@@ -82,9 +82,8 @@ func _ready() -> void:
 	var panel := $Centre/Panel as PanelContainer
 	# OPAQUE (PS6 item 51): at the box's own 0.97 the HUD's "Post! The flag is up on your
 	# mailbox." toast showed through the sheet as a ghost line beside the survey's answers.
-	var paper := MenuStyleScript.paper_box()
-	paper.bg_color.a = 1.0
-	panel.add_theme_stylebox_override(&"panel", paper)
+	# The kit's paper (P8 S5) is opaque already.
+	panel.add_theme_stylebox_override(&"panel", MenuStyleScript.paper_box())
 	var dim := get_node_or_null(^"Dim") as Control
 	if dim != null:
 		dim.mouse_filter = Control.MOUSE_FILTER_STOP
