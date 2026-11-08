@@ -40,13 +40,16 @@ const STAKE_PITCH := 96.0
 const CHIP_RADIUS := 30.0
 const CARD_PAGE := Rect2(40.0, 20.0, 1040.0, 400.0)
 
-## Where each thing on a card sits, measured from the card's own left edge.
-const SILKS_X := 18.0
-const NAME_X := 130.0
-const ODDS_X := 560.0
-const SPIRITS_X := 660.0
-const CHANCE_X := 830.0
-const CHANCE_WIDTH := 220.0
+## Where each thing on a card sits, measured from the card's own left edge (P8 S8 rebuild,
+## after Inside Track's form board: her face, her name and form, her chance, her price).
+const SILKS_X := 14.0
+const PORTRAIT := 78.0
+const NAME_X := 112.0
+const SPIRITS_X := 112.0
+const CHANCE_X := 560.0
+const CHANCE_WIDTH := 240.0
+const ODDS_X := 840.0
+const ODDS_SIZE := Vector2(210.0, 64.0)
 
 ## A pony with no coat in her row. See ranch.gd's NAMED_COAT for why a named character has no
 ## colour to read; this is also what a gate that builds a bare entrant dictionary gets.
@@ -207,9 +210,8 @@ func card_rect(index: int) -> Rect2:
 
 func stake_chip_rect(index: int) -> Rect2:
 	var shown: int = mini(entrants().size(), CARDS_VISIBLE)
-	var y: float = CARD_TOP + CARD_PITCH * float(shown) + 40.0
-	var centre := Vector2(CARD_LEFT + CHIP_RADIUS + STAKE_PITCH * float(index),
-		y - (8.0 if index == stake_index() else 0.0))
+	var y: float = CARD_TOP + CARD_PITCH * float(shown) + 48.0
+	var centre := Vector2(CARD_LEFT + 110.0 + CHIP_RADIUS + STAKE_PITCH * float(index), y)
 	return Rect2(centre - Vector2(CHIP_RADIUS, CHIP_RADIUS) * 1.1,
 		Vector2(CHIP_RADIUS, CHIP_RADIUS) * 2.2)
 
@@ -236,7 +238,9 @@ func row_rect(index: int) -> Rect2:
 func printed_lines() -> Array[String]:
 	if _tab != Tab.ENTER:
 		return [] as Array[String]
-	var lines: Array[String] = [chips_line(), keys_line()]
+	# The chips and the stake are drawn on the stage now (P8 item 61: a keyboard sentence and
+	# an invisible stake row were the worst of the old screen); only the last result is words.
+	var lines: Array[String] = []
 	lines.append_array(result_block())
 	return lines
 
@@ -290,69 +294,105 @@ func paint(ci: Control) -> void:
 		var entry: Dictionary = field[index]
 		var card: Rect2 = card_rect(index)
 		var picked: bool = index == _selected
-		PaintScript.rounded(ci, card, 12.0, Color(PaintScript.FELT, 1.0 if picked else 0.72),
-			PaintScript.GOLD_DIM, 2.0)
+		PaintScript.rounded(ci, card, 14.0, Color(PaintScript.FELT, 1.0 if picked else 0.78),
+			PaintScript.GOLD if picked else PaintScript.GOLD_DIM, 3.0 if picked else 2.0)
 
-		# Her silks: coat behind, mane in front, plus a lane flash in BAND_COLORS[0] because
-		# RaceCard.PLAYER_LANE is 0 and the pony you back always runs on the rail.
+		# HER FACE (PortraitBaker), on a plate in her coat colour, with the rail's lane flash
+		# under it; her coat and mane as a swatch only until the picture is baked.
 		var coat: Color = entry.get("coat", FALLBACK_COAT)
 		var mane: Color = entry.get("mane", FALLBACK_MANE)
-		PaintScript.rounded(ci, Rect2(card.position + Vector2(SILKS_X, 20.0),
-			Vector2(58.0, 58.0)), 8.0, coat, coat.darkened(0.25), 2.0)
-		PaintScript.rounded(ci, Rect2(card.position + Vector2(SILKS_X + 26.0, 34.0),
-			Vector2(42.0, 44.0)), 6.0, mane, mane.darkened(0.25), 2.0)
-		ci.draw_rect(Rect2(card.position + Vector2(SILKS_X, 82.0), Vector2(58.0, 6.0)),
-			PaintScript.BAND_COLORS[0])
+		var plate := Rect2(card.position + Vector2(SILKS_X, (card.size.y - PORTRAIT) * 0.5),
+			Vector2(PORTRAIT, PORTRAIT))
+		PaintScript.rounded(ci, plate, PORTRAIT * 0.5, coat.lerp(Color.WHITE, 0.55),
+			coat.darkened(0.35), 3.0)
+		var face: Texture2D = entry.get("portrait", null)
+		if face != null:
+			ci.draw_texture_rect(face, plate.grow(-3.0), false)
+		else:
+			ci.draw_circle(plate.get_center() + Vector2(-8.0, 4.0), PORTRAIT * 0.26, coat)
+			ci.draw_circle(plate.get_center() + Vector2(10.0, -8.0), PORTRAIT * 0.2, mane)
+		ci.draw_rect(Rect2(plate.position + Vector2(PORTRAIT * 0.2, PORTRAIT - 4.0),
+			Vector2(PORTRAIT * 0.6, 6.0)), PaintScript.BAND_COLORS[0])
 
 		PaintScript.text(ci, MenuStyleScript.title_font(),
-			card.position + Vector2(NAME_X, 58.0), String(entry.get("name", "Pony")), 26,
-			MenuStyleScript.COLOR_TITLE, HORIZONTAL_ALIGNMENT_LEFT, 400.0)
-
-		# The odds on a chip, in RaceCard.odds_text()'s own wording, which is what
-		# game/test/test_published_payouts.gd parses. Drawn on a chip instead of printed in a
-		# sentence; the string is byte for byte the same string.
-		var odds_at: Vector2 = card.position + Vector2(ODDS_X, card.size.y * 0.5)
-		PaintScript.chip(ci, odds_at, 34.0, PaintScript.GOLD, false)
-		PaintScript.text(ci, MenuStyleScript.numeral_font(), odds_at + Vector2(0.0, 6.0),
-			RaceCardScript.odds_text(float(entry.get("odds", 0.0))), 16,
-			PaintScript.CARD_INK, HORIZONTAL_ALIGNMENT_CENTER, -1.0)
-
-		# Ten pips, the same number form_lines() prints. A hungry pony is a slow pony.
-		var spirits: int = roundi(float(entry.get("happiness", 0.0)) * 10.0)
-		for pip: int in 10:
-			var at: Vector2 = card.position + Vector2(SPIRITS_X + 16.0 * float(pip), 48.0)
-			if pip < spirits:
-				ci.draw_circle(at, 6.0, PaintScript.GOLD)
+			card.position + Vector2(NAME_X, 44.0), String(entry.get("name", "Pony")), 28,
+			MenuStyleScript.COLOR_TITLE, HORIZONTAL_ALIGNMENT_LEFT, 420.0)
+		# Her spirits as five hearts (a hungry pony is a slow pony), labelled.
+		var spirits: float = clampf(float(entry.get("happiness", 0.0)), 0.0, 1.0) * 5.0
+		PaintScript.text(ci, font, card.position + Vector2(SPIRITS_X, 80.0), "Spirits",
+			MenuStyleScript.SUBTITLE_SIZE, MenuStyleScript.COLOR_DIM, HORIZONTAL_ALIGNMENT_LEFT,
+			-1.0)
+		for h: int in 5:
+			var at := Rect2(card.position + Vector2(SPIRITS_X + 78.0 + 26.0 * float(h), 60.0),
+				Vector2(22.0, 22.0))
+			if float(h) + 0.5 <= spirits:
+				IconSet.draw(ci, "suit_hearts", at)
 			else:
-				ci.draw_arc(at, 6.0, 0.0, TAU, 12, PaintScript.GOLD_DIM, 1.5, true)
+				ci.draw_arc(at.get_center(), 8.0, 0.0, TAU, 16, PaintScript.GOLD_DIM, 2.0, true)
 
-		# The win chance the odds are BUILT FROM. Showing it is what makes the odds legible:
-		# a price with no probability beside it is a number a player has to take on trust.
-		var track := Rect2(card.position + Vector2(CHANCE_X, 40.0),
-			Vector2(CHANCE_WIDTH, 16.0))
-		PaintScript.rounded(ci, track, 8.0, PaintScript.FELT_DARK, PaintScript.GOLD_DIM, 1.0)
+		# HER CHANCE, AS A NUMBER AND A BAR: what the odds are built from.
 		var chance: float = clampf(float(entry.get("chance", 0.0)), 0.0, 1.0)
+		PaintScript.text(ci, font, card.position + Vector2(CHANCE_X, 32.0), "Chance to win",
+			MenuStyleScript.SUBTITLE_SIZE, MenuStyleScript.COLOR_DIM, HORIZONTAL_ALIGNMENT_LEFT,
+			-1.0)
+		PaintScript.text(ci, MenuStyleScript.numeral_font(),
+			card.position + Vector2(CHANCE_X + CHANCE_WIDTH, 34.0), "%d%%" % roundi(chance * 100.0),
+			26, PaintScript.GOLD, HORIZONTAL_ALIGNMENT_RIGHT, -1.0)
+		var track := Rect2(card.position + Vector2(CHANCE_X, 52.0), Vector2(CHANCE_WIDTH, 16.0))
+		PaintScript.rounded(ci, track, 8.0, PaintScript.FELT_DARK, PaintScript.GOLD_DIM, 1.0)
 		PaintScript.rounded(ci, Rect2(track.position,
-			Vector2(track.size.x * chance, track.size.y)), 8.0,
+			Vector2(maxf(track.size.y, track.size.x * chance), track.size.y)), 8.0,
 			PaintScript.BAND_COLORS[3], PaintScript.BAND_COLORS[3], 0.0)
-		PaintScript.text(ci, font, card.position + Vector2(CHANCE_X, 80.0),
-			"%d in 100 by the card" % roundi(chance * 100.0),
-			MenuStyleScript.SUBTITLE_SIZE, MenuStyleScript.COLOR_DIM,
-			HORIZONTAL_ALIGNMENT_LEFT, CHANCE_WIDTH)
+
+		# HER PRICE ON A TICKET, wide enough for its words (the coin it sat on was not), in
+		# RaceCard.odds_text()'s own wording, which test_published_payouts.gd parses.
+		var ticket := Rect2(card.position + Vector2(ODDS_X, (card.size.y - ODDS_SIZE.y) * 0.5),
+			ODDS_SIZE)
+		PaintScript.rounded(ci, ticket, 10.0, PaintScript.GOLD, PaintScript.GOLD_DIM, 2.0)
+		var odds := RaceCardScript.odds_text(float(entry.get("odds", 0.0)))
+		PaintScript.label(ci, MenuStyleScript.numeral_font(), ticket.grow(-6.0), "pays " + odds,
+			24, PaintScript.CARD_INK)
 
 		if picked:
-			PaintScript.focus_ring(ci, card, 12.0, t)
+			PaintScript.focus_ring(ci, card, 14.0, t)
 
+	# THE STAKE, OR WHERE TO GET ONE. A stake row nobody could see, under a sentence saying
+	# there were no chips, was the old screen's whole failure (item 61).
+	var shown: int = mini(field.size(), CARDS_VISIBLE)
+	var row_y: float = CARD_TOP + CARD_PITCH * float(shown) + 6.0
 	var available: Array[int] = stakes()
+	var held: int = int(chips_provider.call()) if chips_provider.is_valid() else 0
+	if available.is_empty():
+		var note := Rect2(Vector2(CARD_LEFT, row_y), Vector2(CARD_SIZE.x, 72.0))
+		PaintScript.rounded(ci, note, 14.0, Color(0.0, 0.0, 0.0, 0.3), PaintScript.GOLD_DIM, 2.0)
+		IconSet.draw(ci, "coin", Rect2(note.position + Vector2(16.0, 10.0), Vector2(52.0, 52.0)))
+		PaintScript.text(ci, MenuStyleScript.title_font(), note.position + Vector2(84.0, 46.0),
+			"No chips yet: change bits for chips at the cage, by the door.", 24,
+			MenuStyleScript.COLOR_TITLE, HORIZONTAL_ALIGNMENT_LEFT, CARD_SIZE.x - 100.0)
+		return
+	PaintScript.text(ci, MenuStyleScript.title_font(), Vector2(CARD_LEFT + 4.0, row_y + 52.0),
+		"Stake", 26, MenuStyleScript.COLOR_TITLE, HORIZONTAL_ALIGNMENT_LEFT, -1.0)
 	for i: int in available.size():
 		var box: Rect2 = stake_chip_rect(i)
-		PaintScript.chip(ci, box.position + box.size * 0.5, CHIP_RADIUS,
+		var on: bool = i == stake_index()
+		var centre: Vector2 = box.get_center() - Vector2(0.0, 6.0 if on else 0.0)
+		if on:
+			ci.draw_arc(centre, CHIP_RADIUS + 6.0, 0.0, TAU, 40, PaintScript.GOLD, 4.0, true)
+		PaintScript.chip(ci, centre, CHIP_RADIUS,
 			PaintScript.CHIP_COLORS[i % PaintScript.CHIP_COLORS.size()], true)
-		PaintScript.text(ci, MenuStyleScript.numeral_font(),
-			box.position + Vector2(box.size.x * 0.5, box.size.y * 0.62), str(available[i]),
-			20, PaintScript.CARD_INK, HORIZONTAL_ALIGNMENT_CENTER, -1.0)
-		if _on_stake_row() and i == stake_index():
+		PaintScript.text(ci, MenuStyleScript.numeral_font(), centre + Vector2(0.0, 7.0),
+			str(available[i]), 20, Color.WHITE if i == 2 else PaintScript.CARD_INK,
+			HORIZONTAL_ALIGNMENT_CENTER, -1.0)
+		if _on_stake_row() and on:
 			PaintScript.focus_ring(ci, box.grow(6.0), 40.0, t)
+	# What she holds, and what pressing her card does, in one line under the chips' right.
+	var who: String = String(field[clampi(_selected, 0, field.size() - 1)].get("name", "her"))
+	PaintScript.text(ci, font, Vector2(CARD_LEFT + CARD_SIZE.x, row_y + 40.0),
+		"%d chips held" % held, MenuStyleScript.SUBTITLE_SIZE, MenuStyleScript.COLOR_DIM,
+		HORIZONTAL_ALIGNMENT_RIGHT, -1.0)
+	PaintScript.text(ci, MenuStyleScript.title_font(), Vector2(CARD_LEFT + CARD_SIZE.x, row_y + 72.0),
+		"Click her card to back %s for %d" % [who, selected_stake()], 22, PaintScript.GOLD,
+		HORIZONTAL_ALIGNMENT_RIGHT, -1.0)
 
 
 func confirm() -> bool:

@@ -2319,8 +2319,24 @@ func race_entrants() -> Array[Dictionary]:
 				"chance": chances[RaceCardScript.PLAYER_LANE] if not chances.is_empty() else 0.0,
 				"coat": coat,
 				"mane": mane,
+				# Her face on the form guide (P8 item 61); null until the baker has her.
+				"portrait": _portrait_of(String(inst.uid), pen.body_for(inst.uid)),
 			})
 	return out
+
+
+## A pony's baked portrait (PortraitBaker), or null while it bakes; the race guide redraws
+## when it lands.
+func _portrait_of(key: String, body: Node3D) -> Texture2D:
+	var baker := PortraitBaker.shared(get_tree())
+	if not baker.ready.is_connected(_on_portrait_ready):
+		baker.ready.connect(_on_portrait_ready)
+	return baker.portrait(key, body)
+
+
+func _on_portrait_ready(_key: String) -> void:
+	if race_menu != null and race_menu.has_method("is_open") and bool(race_menu.call("is_open")):
+		race_menu.call("refresh")
 
 
 ## ONE WORD THAT TELLS TWO STOCK PONIES APART, for the Deliver tab. Every member of the
