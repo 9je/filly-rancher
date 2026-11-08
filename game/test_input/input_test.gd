@@ -201,12 +201,15 @@ func close_letter() -> bool:
 
 
 ## Mouse-look until the camera faces `point` (yaw within `tol` radians). Pitch toward it too
-## when `pitch` is set, for aiming.
-func look_at_point(point: Vector3, pitch := false, tol := 0.03, max_frames := 120) -> void:
+## when `pitch` is set, for aiming. `from_body` measures the heading from her body instead of
+## the lens: walking goes where the camera faces FROM HER, and the lens sits 3.5 m behind and
+## off her shoulder, so near the point a heading taken from the lens swung her round it.
+func look_at_point(point: Vector3, pitch := false, tol := 0.03, max_frames := 120,
+		from_body := false) -> void:
 	var sens: float = rig.get("mouse_sensitivity")
 	for i in max_frames:
 		var cam: Camera3D = rig.call("get_camera")
-		var from := cam.global_position
+		var from := player.global_position if from_body else cam.global_position
 		var d := point - from
 		var yaw_t := atan2(-d.x, -d.z)
 		var err := wrapf(yaw_t - rig.global_rotation.y, -PI, PI)
@@ -237,7 +240,7 @@ func walk_to(point: Vector3, arrive := 1.5, max_s := 30.0, sneak := false) -> bo
 		var flat := Vector2(point.x - player.global_position.x, point.z - player.global_position.z)
 		if flat.length() < arrive:
 			break
-		await look_at_point(point, false, 0.08, 4)
+		await look_at_point(point, false, 0.08, 4, true)
 		await physics_frame
 		t += 1.0 / 60.0
 		if player.global_position.distance_to(last) < 0.02:
