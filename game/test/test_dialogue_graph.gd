@@ -111,6 +111,10 @@ func test_on_color_day_the_town_says_its_color_day_lines() -> void:
 	lib.load_all()
 	var ctx := {"chapter": 1, "path": "", "counts": {}, "name": "Juniper", "tumble": "Tumble",
 		"flags": {"invited": true, "color_day": true, "has_scoop": true}}
+	# By Color Day the town's one-off talks are long since had (the owner's save had them all).
+	for d: Dialogue in lib.all:
+		if not d.bark:
+			lib.seen[String(d.id)] = true
 	for who: StringName in [&"bramble", &"fennel", &"pip"]:
 		var d := lib.pick(who, ctx)
 		assert_not_null(d)
