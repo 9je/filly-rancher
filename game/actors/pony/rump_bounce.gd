@@ -21,6 +21,14 @@ const HAIR_THROW := 0.4
 
 ## A kick of 1.0 is a velocity of this many metres a second.
 const KICK_SPEED := 2.8
+## MADE TO READ ON EVERY BODY (P8, playtest 2026-11-08 item 36: "barely visible on small
+## ponies and on ponies with big tails"). The spring moves her in metres, so the same kick
+## was a smaller share of a filly or a Mane Six (whose rump radius is 0.27 against the
+## PonySFM cast's 0.33) and vanished under a big tail. Every body now bounces by
+## GAIN, and a smaller one by up to MAX_SIZE_GAIN more, toward the size of REF_RADIUS.
+const GAIN := 1.3
+const REF_RADIUS := 0.33
+const MAX_SIZE_GAIN := 1.7
 
 var _x := 0.0
 var _v := 0.0
@@ -31,6 +39,7 @@ var _meshes: Array[MeshInstance3D] = []
 var _skeleton: Skeleton3D
 var _hair: Array[SpringBoneSimulator3D] = []
 var _written := false
+var _gain := GAIN
 
 
 ## Kick the bounce of whatever body is under `node` (a pony's Visuals, the player); a no op
@@ -45,7 +54,7 @@ static func kick_on(node: Node, strength: float) -> void:
 
 ## Shove the spring: 1.0 a good flop, 0.3 a little hop. Down first, the way weight lands.
 func kick(strength: float) -> void:
-	_v -= clampf(strength, 0.0, 2.0) * KICK_SPEED
+	_v -= clampf(strength, 0.0, 2.0) * KICK_SPEED * _gain
 	if _asleep:
 		_asleep = false
 		set_process(true)
@@ -92,6 +101,19 @@ func bind(body: Node3D) -> void:
 	_centre = thighs + back * length * 0.37 + Vector3.UP * length * 0.017
 	_radius = length * 0.62
 	_back = back
+	scale_to(1.0)
+
+
+## The body is drawn at `world_scale` (Pony scales her Visuals by her size): size the gain.
+func scale_to(world_scale: float) -> void:
+	if _radius <= 0.0:
+		return
+	_gain = GAIN * clampf(REF_RADIUS / maxf(_radius * absf(world_scale), 0.01), 1.0, MAX_SIZE_GAIN)
+
+
+## How much harder than the base spring this body bounces (GAIN and its size).
+func gain() -> float:
+	return _gain
 
 
 ## The middle of a pair of bones, by either rig's names; INF when the skeleton has neither.
@@ -127,7 +149,7 @@ func step(delta: float) -> void:
 	while left > 0.0:
 		var h := minf(left, 1.0 / 120.0)
 		_v += (-w * w * _x - 2.0 * DAMPING * w * _v) * h
-		_x = clampf(_x + _v * h, -MAX_AMOUNT, MAX_AMOUNT)
+		_x = clampf(_x + _v * h, -MAX_AMOUNT * _gain, MAX_AMOUNT * _gain)
 		left -= h
 	if absf(_x) < 1e-4 and absf(_v) < 1e-3:
 		_x = 0.0

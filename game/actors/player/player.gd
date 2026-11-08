@@ -335,6 +335,7 @@ func body_footprint() -> Dictionary:
 func _ready() -> void:
 	_visual_yaw = visuals.rotation.y
 	_visuals_rest = visuals.position
+	BlobShadow.attach(self, 2.1, 1.1)
 	_pivot_rest = camera_pivot.position
 	_build_visuals()
 

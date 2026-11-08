@@ -502,6 +502,7 @@ func body_footprint() -> Dictionary:
 func _ready() -> void:
 	_visual_yaw = visuals.rotation.y
 	_home = global_position
+	BlobShadow.attach(self, 2.1, 1.1)
 
 	# One source of truth for the detection radius: the constant this file's logic
 	# reasons about, pushed into the shape pony.tscn ships. A scene edit that changed
@@ -565,6 +566,9 @@ func _apply_stock_tint() -> void:
 	var look := look()
 	PonyPaintScript.apply(body, look)
 	visuals.scale = Vector3.ONE * PonyPaintScript.body_scale(look)
+	# A smaller body bounces harder so her jiggle still reads (P8 item 36, RumpBounce.GAIN).
+	for rb: Node in visuals.find_children("RumpBounce", "", true, false):
+		rb.call("scale_to", visuals.scale.y)
 
 
 ## Her look as a PonyLook (a v2 record, or a legacy palette triple converted).

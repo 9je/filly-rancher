@@ -53,7 +53,8 @@ func test_a_kick_wobbles_back_and_forth_and_settles() -> void:
 			signs += 1
 		last = a
 	assert_gt(peak, 0.01, "a visible wobble")
-	assert_lte(peak, BounceScript.MAX_AMOUNT + 0.0001, "never more than the cap")
+	assert_lte(peak, BounceScript.MAX_AMOUNT * float(b.call("gain")) + 0.0001,
+		"never more than the cap, at this body's gain (P8 item 36)")
 	assert_gte(signs, 3, "it wobbles, not just sags")
 	# Long enough to read at full speed (owner: "at full speed it's too short and fast"), and
 	# still gone in a few seconds.
@@ -179,3 +180,18 @@ func test_a_pony_dropped_from_a_height_bounces_on_landing() -> void:
 			moved = true
 			break
 	assert_true(moved, "she bounced when she hit the ground")
+
+
+## P8, playtest 2026-11-08 item 36: the jiggle read on big ponies only. A smaller drawn body
+## bounces harder, up to the cap on the size gain, and every body at least GAIN.
+func test_a_small_body_bounces_harder_than_a_full_size_one() -> void:
+	var body: Node3D = PonyVisuals.build(load("res://data/ponies/applebloom.tres"))
+	add_child_autofree(body)
+	var b: Node = body.find_children("RumpBounce", "", true, false)[0]
+	b.call("scale_to", 1.0)
+	var full := float(b.call("gain"))
+	b.call("scale_to", 0.7)
+	var small := float(b.call("gain"))
+	assert_gte(full, BounceScript.GAIN - 0.0001)
+	assert_gt(small, full, "a 0.7 body bounces harder")
+	assert_lte(small, BounceScript.GAIN * BounceScript.MAX_SIZE_GAIN + 0.0001)

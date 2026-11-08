@@ -51,6 +51,7 @@ var _yaw := 0.0
 func _ready() -> void:
 	collision_layer = LayersScript.PONY
 	add_to_group(GROUP)
+	BlobShadow.attach(self, 2.0, 1.1)
 	collision_mask = LayersScript.PONY_WALKABLE
 	var shape := CollisionShape3D.new()
 	var capsule := CapsuleShape3D.new()
