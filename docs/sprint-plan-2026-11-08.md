@@ -12,13 +12,10 @@ each one side by side against a named reference game.
 
 ## 1. Shape of the sprint
 
-Two sprints with a full owner playtest between them, not one 79-item sweep.
-
-- **Sprint A: blockers, the loop and the foundation.** S0 to S5 below. Ends with a build the
-  owner plays from a fresh start. The question it answers: does the game now play right, and
-  does the base look (light, icons, UI) clear the bar?
-- **Sprint B: area rebuilds and cinematics.** S6 to S10. Built on what Sprint A's playtest
-  kept.
+**One giant sweep, non-stop, until it is better (owner, 2026-11-08).** S0 to S10 run back to
+back with no owner gates in between. Where the plan names an owner check (the S1 15-minute
+check, the vertical slice, the Sprint A playtest), a Fable acceptance pass against the
+references stands in, and the sweep carries on. The owner playtests at the end.
 
 Two lanes from hour 0 (retro rule 11): the main session takes the visual lane, one Opus 5.5
 worktree agent takes the gameplay lane. They touch different files. The agent never edits
@@ -39,7 +36,7 @@ PLAN, PROGRESS, DECISIONS or the ledger; it returns its rows in its report.
 | S9 | agent, then main | Cinematic player, story scenes, comedy events | 7, 15, 16, 18, 19, 22, 36, 78 |
 | S10 | main | Loading screen and title | 67 |
 
-S1 also gets a 15-minute owner check from the 14:58 save (retro rule 10). Item 79 (the
+S1's fix is checked from the owner's 14:58 save. Item 79 (the
 references pass) is the reference named in every batch's "done" below.
 
 ## 2. Design calls (logged in DECISIONS.md)
@@ -175,14 +172,14 @@ clipped at 1600x900 or 2560x1440; no toast is a sentence.
 ### Quality gate: the vertical slice (before S5 goes wide)
 Before the full icon set and every screen, one slice is taken all the way: the plaza at noon
 and at night under the new lighting, 12 icons from the spec, and the HUD plus the Depot on
-the kit. The owner sees it as renders and a short clip, side by side with the references,
-and says keep, change or switch route. If the drawn icons or painted skies fall short, the
+the kit. Fable judges it as renders and a short clip, side by side with the references,
+and says keep, change or redo; the sweep does not stop for the owner. If the drawn icons or painted skies fall short, the
 fallback is bought or commissioned art for those pieces (owner's call on spend), not more
 passes of the same route.
 
-### Sprint A playtest
-A fresh start build. The owner plays as far as they like. Their list decides what Sprint B
-keeps, cuts or changes.
+### Mid-sweep check
+A fresh-start build is played through by script to the Color Day lift (not the bot), and the
+regression sheet is regenerated before S6 starts.
 
 ### S6. Ponies and the creator studio (main; review 2.2, 2.5)
 The tipping and pen pile-up repeats (28, 29) checked on the stress scene, not a calm one; the

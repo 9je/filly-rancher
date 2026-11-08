@@ -1,7 +1,7 @@
 # Sprint resume (re-read this after any compaction, not the big docs)
 
 Sprint: P8, plan in docs/sprint-plan-2026-11-08.md. Branch v1-overhaul.
-Status: plan written 2026-11-08, waiting on the owner's go. Nothing started.
+Status: owner said go 2026-11-08: ONE NON-STOP SWEEP S0 to S10, no owner gates; Fable stands in at each check.
 
 Current batch: none. First up: S0 (process setup, 2 h box), then S1 (blockers) in main
 and S2 (core loop) in one Opus 5.5 worktree agent at the same time.
