@@ -26,7 +26,7 @@ const QUIRKS := {
 	&"social": {"name": "Social Butterfly", "text": "is a friend to every pony in her pen"},
 	&"loner": {"name": "Loner", "text": "frets in a crowd of three, and Blooms fastest on her own"},
 	&"sparkler": {"name": "Sparkler", "text": "turns a quarter of her gems a grade finer"},
-	&"skittish": {"name": "Skittish", "text": "spots you from twice as far, but gives up quickly in the Scoop"},
+	&"skittish": {"name": "Skittish", "text": "bolts the moment she sees you: walk up behind her"},
 	&"escapee": {"name": "Escape Artist", "text": "hops a Paddock fence at night (a Big or Grand Pen holds her)"},
 	&"sleepy": {"name": "Sleepyhead", "text": "never frets at night, and Blooms slowly"},
 	&"showoff": {"name": "Show-off", "text": "runs a faster race"},
@@ -209,6 +209,12 @@ static func bloom_mult(q: StringName, race: StringName, pen_count: int) -> float
 
 static func notice_mult(q: StringName) -> float:
 	return 2.0 if q == &"skittish" else 1.0
+
+
+## A skittish pony bolts the moment she notices you, whatever her temperament (P8 S3, idea A2):
+## the one who has to be crept up on from behind.
+static func bolts(q: StringName) -> bool:
+	return q == &"skittish"
 
 
 ## A skittish pony's struggle is short: she gives up in the Scoop almost at once.

@@ -9571,7 +9571,7 @@ func _act3_delivery(inst: PonyInstance, look: PonyLook) -> void:
 		return
 	var data: PonyData = inst.data()
 	var rarity: int = data.rarity if data != null else PonyDataScript.Rarity.COMMON
-	var base: int = LedgerScript.delivery_credit(rarity, inst.is_stock())
+	var base: int = LedgerScript.delivery_credit(rarity, inst.is_stock(), _is_blank(inst))
 	var pay := PathRulesScript.factory_pay(story, base, look.coat, _owns(&"yield_lens"))
 	var r := PathRulesScript.factory_delivery(story, look.coat)
 	var extra: int = pay - base + int(r.bonus)

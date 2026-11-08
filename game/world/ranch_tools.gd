@@ -5,7 +5,8 @@ extends Node
 ## not a bigger number. Built by ranch.gd, which owns the world; this node only reads the
 ## player's buttons and asks the ranch to do things.
 ##
-##   Treat Pouch      F    toss a treat where you look; a pony who loves it trots over, calm
+##   Treat Pouch      F    throw a treat where you look (without it, F drops one at your hooves);
+##                         a pony who loves it trots over and eats, calm
 ##                         (she holds easy in the Scoop), and a pen pony gets her favorite meal
 ##   Gallop Shoes     Ctrl a burst of speed
 ##   Pony Whistle     Q    every wild pony near you stops still for a few seconds
@@ -130,10 +131,18 @@ func whistle() -> int:
 
 # --- Treat Pouch ----------------------------------------------------------------------------
 
-## Toss a treat where the camera looks. Returns how many ponies came for it.
+## BAIT FOR EVERYONE (P8 S3; idea A3: "drop her favourite food, she comes to eat, and while
+## she eats she is easy"). Without the Treat Pouch the food is DROPPED at her hooves and a pony
+## within DROP_LURE_RADIUS who fancies it comes to eat; the Pouch THROWS it where she looks.
+const DROP_AHEAD := 1.6
+const DROP_LURE_RADIUS := 11.0
+
+
+## Toss (with the Pouch) or drop (without) a treat. Returns how many ponies came for it.
 func toss_treat() -> int:
-	if not owns(&"treat_pouch") or _treat_cd > 0.0:
+	if _treat_cd > 0.0:
 		return 0
+	var pouch := owns(&"treat_pouch")
 	var pantry: Inventory = _gs().get("inventory")
 	var target := _aimed_pony()
 	var food := _pick_food(pantry, target)
@@ -142,12 +151,13 @@ func toss_treat() -> int:
 		return 0
 	_treat_cd = TREAT_COOLDOWN
 	pantry.remove(food, 1)
-	var at := _landing()
+	var at := _landing() if pouch else _drop_point()
 	_fly(food, at)
 	var came := 0
 	var who := ""
+	var lure := TREAT_LURE_RADIUS if pouch else DROP_LURE_RADIUS
 	for p in _wild():
-		if p.global_position.distance_to(at) <= TREAT_LURE_RADIUS and bool(p.call("offer_treat", at, food)):
+		if p.global_position.distance_to(at) <= lure and bool(p.call("offer_treat", at, food)):
 			came += 1
 			who = _name_of(p)
 	var fed := _feed_pen_at(at, food)
@@ -158,7 +168,7 @@ func toss_treat() -> int:
 		ranch.call("_toast", "%s gets a %s from your hoof." % [fed, label])
 	else:
 		ranch.call("_toast", "Nopony nearby fancied the %s." % label)
-	ranch.call("_novelty", "mechanic", "first_treat", "Tossed a treat from the Treat Pouch")
+	ranch.call("_novelty", "mechanic", "first_treat", "Tossed a treat from the Treat Pouch" if pouch else "Dropped a treat for a pony")
 	used.emit(&"treat_pouch")
 	return came
 
@@ -390,6 +400,22 @@ func _aimed_pony() -> Node3D:
 	if c is CharacterBody3D and (c as Node).has_method("offer_treat") and not (c as Node).has_meta(&"penned"):
 		return c as Node3D
 	return null
+
+
+## Just in front of her hooves, on the ground.
+func _drop_point() -> Vector3:
+	var pl := _player()
+	var fwd := -pl.global_transform.basis.z
+	var r := _aim_ray()
+	if not r.is_empty():
+		fwd = r[1]
+	fwd.y = 0.0
+	fwd = fwd.normalized() if fwd.length_squared() > 1e-6 else Vector3.FORWARD
+	var at := pl.global_position + fwd * DROP_AHEAD
+	var terrain: Node = ranch.get("terrain")
+	if terrain != null and terrain.has_method("height_at"):
+		at.y = float(terrain.call("height_at", at.x, at.z))
+	return at
 
 
 func _landing() -> Vector3:

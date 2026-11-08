@@ -11,7 +11,7 @@ extends RefCounted
 ## not seen, in a place she can reach).
 
 const GENERAL: Array[String] = [
-	"Hold right mouse on a pony to scoop her up. The tricky ones wriggle, so keep your aim on her!",
+	"Hold right mouse on a pony to scoop her up. Skittish ones bolt if they see you: walk up behind them!",
 	"Every pony has a favorite food. Toss her a treat she loves and watch her glow!",
 	"Ponies in a pen with a friend are happier, and happy ponies make more gems.",
 	"Sell gems at the Market, then spend the bits on bigger pens and better gear.",
