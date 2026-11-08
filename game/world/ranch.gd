@@ -8593,10 +8593,13 @@ func _after_delivery(inst: PonyInstance) -> void:
 	_game_state.book.note_delivery(String(inst.uid), inst.display_name(), look,
 		story.collection_days, after_reveal)
 	# THE POSTCARD COMES A DAY LATER (clue 3): queued now, posted at the next dawn, the same
-	# words in the same hoofwriting whichever pony "sent" it.
-	var pending: Array = story.get_var("postcards", [])
-	pending.append(inst.display_name())
-	story.set_var("postcards", pending)
+	# words in the same hoofwriting whichever pony "sent" it. ONLY FROM A BLANK DRIFTER (P8,
+	# playtest 2026-11-08 item 18): "I found my talent!" from Shining Armor, who came with his
+	# mark, read as a bug rather than a lie; from a blank flank it is the lie.
+	if inst.is_stock() and not inst.is_marked():
+		var pending: Array = story.get_var("postcards", [])
+		pending.append(inst.display_name())
+		story.set_var("postcards", pending)
 	var bus := get_node_or_null("/root/Events")
 	if bus != null:
 		bus.emit_signal("delivered", String(inst.uid), inst.stock)
@@ -8647,9 +8650,11 @@ func _post_pending_postcards() -> void:
 	if pending.is_empty():
 		return
 	_novelty("clue", "first_postcard", "A postcard from a delivered pony, in hoofwriting that is not hers")
-	for pony_name in pending:
-		var n := story.add_var("postcard_count")
-		story.post(StringName("postcard#%d" % n), {"name": _player_name(), "pony": str(pony_name)})
+	# ONE CARD A DAWN (P8 items 18 and 20): after a big Depot run the mailbox filled with the
+	# same card forty times over. The newest sender writes; the rest are not lost to the
+	# story, only to the mailbox.
+	var n := story.add_var("postcard_count")
+	story.post(StringName("postcard#%d" % n), {"name": _player_name(), "pony": str(pending.back())})
 	story.set_var("postcards", [])
 	_refresh_mailbox_flag()
 
