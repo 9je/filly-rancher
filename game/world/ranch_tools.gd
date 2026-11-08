@@ -289,11 +289,15 @@ func _tick_lure(delta: float) -> void:
 
 # --- the Monocle and the Yield Lens ---------------------------------------------------------
 
+## WHO IS UNDER THE CROSSHAIR, FOR EVERYONE NOW (P8; playtest 2026-11-08 items 9, 10). A
+## Drifter, a Bloomed Drifter and a named pony looked alike out in the grass, and her
+## favourite food (the bait, S3) was the Monocle's secret. The plain line is free: what she
+## is and what she loves. The Monocle adds her quirk, the Yield Lens her vividness.
 func _update_monocle() -> void:
 	var hud := ranch.get_node_or_null(^"HUD")
 	if hud == null or not hud.has_method("set_target_info"):
 		return
-	if not (owns(&"steward_monocle") or owns(&"yield_lens")) or not _free_to_act():
+	if not _free_to_act():
 		hud.call("set_target_info", "")
 		return
 	var p := _aimed_pony()
@@ -305,10 +309,14 @@ func _update_monocle() -> void:
 	var data: PonyData = p.call("get_data")
 	if data != null:
 		inst.data_id = data.id
-	var q := PonyTraitsScript.quirk_for(inst.stock, inst.data_id)
 	var fav := PonyTraitsScript.favorite_for(inst.stock, data)
+	var loves := "loves %s" % PonyTraitsScript.FOOD_PLURAL.get(fav, "hay")
+	if not (owns(&"steward_monocle") or owns(&"yield_lens")):
+		hud.call("set_target_info", "%s, %s" % [kind_word(inst, data), loves])
+		return
+	var q := PonyTraitsScript.quirk_for(inst.stock, inst.data_id)
 	var line := "%s  --  %s%s" % [_name_of(p), (PonyTraitsScript.quirk_name(q) + ", ") if q != &"" else "",
-		"loves %s" % PonyTraitsScript.FOOD_PLURAL.get(fav, "hay")]
+		loves]
 	if owns(&"yield_lens") and not inst.stock.is_empty():
 		var coat := Color.html(str(inst.stock.get("coat", "ffffff")))
 		line += "  |  %s" % ("VIVID: pays triple" if PathRulesScript.is_vivid(coat) else
@@ -333,6 +341,13 @@ func _wild() -> Array:
 		if n is CharacterBody3D and n.has_method("offer_treat") and n.has_meta(&"escaped") and not (n in out):
 			out.append(n)
 	return out
+
+
+## "Drifter" (blank), "Bloomed Drifter", or a named pony's name: what she is to the ranch.
+static func kind_word(inst: PonyInstance, data: PonyData) -> String:
+	if inst != null and inst.is_stock():
+		return "Bloomed Drifter" if inst.is_marked() else "Drifter"
+	return data.display_name if data != null else "A pony"
 
 
 func _name_of(p: Node) -> String:
