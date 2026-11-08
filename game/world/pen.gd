@@ -312,6 +312,17 @@ func _ready() -> void:
 	# those residents get bodies.
 	for inst in _residents:
 		_spawn_body(inst)
+	# THE PEN SAYS HOW ITS PONIES ARE DOING (world/pen_readout.gd): a Bloom tag over each
+	# Drifter and a count at the gate that turns into "Pen full".
+	readout = PenReadoutScript.new()
+	readout.name = "Readout"
+	readout.pen = self
+	add_child(readout)
+
+
+## The in-world readout (world/pen_readout.gd); null for a pen that never entered the tree.
+const PenReadoutScript := preload("res://world/pen_readout.gd")
+var readout: Node3D = null
 
 
 ## Take this pen's size and address from the PlotData that built it. Called by
@@ -574,14 +585,53 @@ func _tick_bloom(inst: PonyInstance, delta: float) -> void:
 	inst.favorite_glow = maxf(0.0, inst.favorite_glow - delta)
 	if not inst.is_stock() or inst.is_marked():
 		return
-	var c := {"happiness": inst.happiness, "hunger": inst.hunger,
-		"favorite_glow": inst.favorite_glow, "has_friend": _has_friend(inst),
-		"pen_count": _residents.size(), "calm_lamp": calm_lamp, "marked": false}
-	var m := PonyTraitsScript.bloom_mult(PonyTraitsScript.quirk_of(inst), PonyTraitsScript.race_of(inst),
-		_residents.size())
-	inst.bloom = minf(1.0, inst.bloom + BloomScript.gain(c, delta) * m)
+	inst.bloom = minf(1.0, inst.bloom + bloom_rate(inst) * maxf(delta, 0.0))
 	if inst.bloom >= 1.0:
 		bloom_now(inst)
+
+
+## What Bloom.status() is asked about `inst` in this pen.
+func _bloom_circumstances(inst: PonyInstance) -> Dictionary:
+	return {"happiness": inst.happiness, "hunger": inst.hunger,
+		"favorite_glow": inst.favorite_glow, "has_friend": _has_friend(inst),
+		"pen_count": _residents.size(), "comfortable": BloomScript.comfortable_for(capacity),
+		"calm_lamp": calm_lamp, "marked": inst.is_marked() or not inst.is_stock()}
+
+
+## Her Bloom progress per second here, her race and quirk included.
+func bloom_rate(inst: PonyInstance) -> float:
+	var s := BloomScript.status(_bloom_circumstances(inst))
+	return float(s["rate"]) * PonyTraitsScript.bloom_mult(PonyTraitsScript.quirk_of(inst),
+		PonyTraitsScript.race_of(inst), _residents.size())
+
+
+## EVERYTHING THE PEN'S READOUT SHOWS ABOUT ONE RESIDENT (playtest 2026-11-08 items 2 and
+## 10), as data, so the art pass can reskin the readout without touching the rules:
+##   drifter (bool: blank and still able to Bloom), progress (0..1), reason (Bloom reason id,
+##   &"" at full speed), words (the reason as a line), seconds_left (INF when stopped),
+##   favorite (food id), favorite_stocked (her favourite is in the pantry).
+func bloom_status(inst: PonyInstance) -> Dictionary:
+	if inst == null:
+		return {}
+	var s := BloomScript.status(_bloom_circumstances(inst))
+	var fav: StringName = PonyTraitsScript.favorite_of(inst)
+	var fav_words: String = PonyTraitsScript.FOOD_PLURAL.get(fav, "hay")
+	var reason: StringName = s["reason"]
+	var stocked := false
+	if inventory_provider.is_valid():
+		var pantry: Inventory = inventory_provider.call()
+		stocked = pantry != null and pantry.count(fav) > 0
+	var rate := bloom_rate(inst)
+	var left := (1.0 - inst.bloom) / rate if rate > 0.0 else INF
+	return {
+		"drifter": inst.is_stock() and not inst.is_marked(),
+		"progress": inst.bloom,
+		"reason": reason,
+		"words": BloomScript.reason_words(reason, fav_words),
+		"seconds_left": left,
+		"favorite": fav,
+		"favorite_stocked": stocked,
+	}
 
 
 ## Give `inst` her mark and her name now (the meter filled, or a story beat says so).
