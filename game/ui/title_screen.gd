@@ -93,6 +93,7 @@ func _ready() -> void:
 	# test_the_footer_still_prints_the_keys check the rows and the footer with no row taken
 	# first, so this has to have already run by the time _ready() returns either way.
 	_refresh()
+	_dress_with_key_art()
 	if not is_interactive():
 		# STRAIGHT TO THE RANCH, and deliberately WITHOUT setting the boot latch, so the run
 		# reads the save slot exactly as a bare boot of ranch.tscn always has. call_deferred
@@ -101,6 +102,53 @@ func _ready() -> void:
 		call_deferred("_enter_world")
 		return
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+
+## THE KEY ART BEHIND THE TITLE (P8 S10; the loading screen's picture, LoadingScreen.ART): the
+## valley itself at the end of the day, drifting in slowly, with the menu on the left over a
+## soft dark band, the way Hades' and Cult of the Lamb's titles put their art first. Without the
+## picture the drawn backdrop stays.
+var _art: TextureRect
+var _art_t := 0.0
+
+
+func _dress_with_key_art() -> void:
+	var path: String = LoadingScreenScript.ART.get(LoadingScreenScript.Look.RANCH, "")
+	if path == "" or not ResourceLoader.exists(path):
+		return
+	_art = TextureRect.new()
+	_art.name = "KeyArt"
+	_art.texture = load(path) as Texture2D
+	_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_art.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_art)
+	move_child(_art, 1)
+	var shade := ColorRect.new()
+	shade.name = "Shade"
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	shade.set_anchors_preset(Control.PRESET_LEFT_WIDE)
+	shade.anchor_right = 0.5
+	shade.color = Color(0.08, 0.04, 0.12, 0.45)
+	add_child(shade)
+	move_child(shade, 2)
+	var backdrop := get_node_or_null(^"Backdrop") as Control
+	if backdrop != null:
+		backdrop.visible = false
+	var centre := get_node_or_null(^"Centre") as Control
+	if centre != null:
+		centre.anchor_left = 0.04
+		centre.anchor_right = 0.46
+
+
+func _process(delta: float) -> void:
+	if _art == null:
+		return
+	_art_t += delta
+	var k := 1.02 + 0.04 * (0.5 + 0.5 * sin(_art_t * 0.05))
+	_art.pivot_offset = _art.size * 0.5
+	_art.scale = Vector2(k, k)
 
 
 func row_count() -> int:
