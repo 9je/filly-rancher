@@ -2075,14 +2075,21 @@ func _bind_depot_menu() -> void:
 	depot_menu.set("bits_provider", func() -> int: return _current_bits())
 	# WHAT THE LEDGER WILL ACTUALLY ACCEPT, so the Pay tab never offers a row that would be
 	# trimmed on the way through (Ledger.pay() caps at payable(); bits settle the service
-	# charges, not the principal). The menu asks; this file answers.
+	# charges and the balance, down to zero). The menu asks; this file answers.
 	depot_menu.set("payable_provider", func() -> int:
 		return _game_state.ledger.payable() if _game_state != null else 0)
 	depot_menu.set("statement_provider", func() -> Array[String]: return _statement())
 	# The purse's "owed", where a delivery's payout lands (PS10, G7).
 	depot_menu.set("balance_provider", func() -> int:
 		return _game_state.ledger.balance if _game_state != null else 0)
+	# The quota card on the Pay tab (P8 item 4).
+	depot_menu.set("quota_provider", func() -> Dictionary:
+		return _game_state.ledger.quota_status(_world.cycle_index() if _world != null else 0) \
+			if _game_state != null else {})
+	# One toast for everything delivered between opening the counter and closing it (items
+	# 20, 21): the batch opens with the menu and is told when it closes.
 	for pair in [["opened", _on_menu_opened_any], ["closed", _on_menu_closed],
+			["opened", begin_delivery_batch], ["closed", end_delivery_batch],
 			["deliver_requested", _on_deliver_requested],
 			["pay_requested", _on_pay_requested]]:
 		if not depot_menu.is_connected(pair[0], pair[1]):
@@ -2238,8 +2245,13 @@ func _penned_rows() -> Array[Dictionary]:
 				"kind": String(inst.data_id),
 				"coat": _coat_word(inst),
 				"credit": _game_state.ledger.quote_delivery(rarity, inst.is_stock(),
-					_delivery_kind(inst), _delivery_cycle()) if _game_state != null
-					else LedgerScript.delivery_credit(rarity, inst.is_stock()),
+					_delivery_kind(inst), _delivery_cycle(), _is_blank(inst)) if _game_state != null
+					else LedgerScript.delivery_credit(rarity, inst.is_stock(), _is_blank(inst)),
+				# WHAT SHE IS TO THE COMPANY (item 9): a blank Drifter (a token fee, counts for
+				# nothing), a Bloomed Drifter, or a named pony. Her pronoun for the rows (70).
+				"blank": _is_blank(inst),
+				"bloomed": inst.is_stock() and inst.is_marked(),
+				"she": PonyDataScript.pronoun_of(data),
 				# For the Depot's tile: her race's icon on a disc of her coat.
 				"race": PonyTraitsScript.race_of(inst),
 				"coat_color": _coat_colour(inst),
@@ -2945,12 +2957,36 @@ func run_collection_day() -> Dictionary:
 	var letter: Dictionary = LettersScript.render(LettersScript.Id.COLLECTION_NOTICE, {
 		"name": _player_name(), "balance": int(summary["balance"]),
 		"upkeep": int(summary["upkeep"])})
-	_toast("%s. Balance: %d bits." % [letter["title"], int(summary["balance"])])
+	if bool(summary.get("closed_now", false)):
+		# THE COLLECTION DAY'S OWN LETTER FIRST (item 6: the rules arrive before the debt can
+		# clear), then the beat.
+		advance_story()
+		_on_debt_cleared()
+	elif not bool(summary.get("closed", false)):
+		_toast("%s. Balance: %d bits." % [letter["title"], int(summary["balance"])])
 	if not bool(summary["quota_met"]):
-		_toast("Quota: %d of %d delivered. An associate will call at the next dawn."
+		_toast("Quota: %d of %d coloured ponies delivered. An associate will call at the next dawn."
 			% [int(summary["delivered"]), int(summary["quota"])])
 	_push_balance()
 	return summary
+
+
+## THE DEBT CLEARED (P8 items 5, 6; idea F5). A story hook, not yet a scene: the flag Marigold's
+## talk keys on (dialogue_src/act1.txt, marigold_paid_up: "bits won't do for the rest, dear"),
+## a toast, a novelty, and the bus event a cinematic can hang off later.
+signal debt_cleared
+
+
+func _on_debt_cleared() -> void:
+	if _game_state == null or _game_state.story.has_flag("debt_cleared"):
+		return
+	_game_state.story.set_flag("debt_cleared")
+	_toast("Collection day: your account is paid in full. Marigold would like a word.")
+	_novelty("story", "debt_cleared", "Paid the Company in full")
+	debt_cleared.emit()
+	var bus := get_node_or_null("/root/Events")
+	if bus != null and bus.has_signal("debt_cleared"):
+		bus.emit_signal("debt_cleared")
 
 
 ## THE COLLECTOR CALLS. One rung of the ladder, served once, on the first DAWN OF A CYCLE
@@ -3286,13 +3322,10 @@ func deliver_pony(uid: StringName) -> Dictionary:
 	if is_racing(uid):
 		_toast("She is under orders at the Palace! The counter will take her after the race.")
 		return refused
-	# PLACEMENT IS FOR PONIES STILL LOOKING (STORY.md clue 2): a pony who has found her mark
-	# cannot be sent up. Said in the Company's cheerful voice, and never explained.
-	if inst.is_marked():
-		_toast("Oh! %s has found herself already. Placement is for ponies still looking!"
-			% inst.display_name())
-		refused["reason"] = "marked"
-		return refused
+	# THE FACTORY ONLY WANTS COLOUR (P8, docs/sprint-plan-2026-11-08.md section 2.1). A
+	# Bloomed pony used to be refused here ("placement is for ponies still looking"); now she
+	# is exactly what the Company wants, and a blank Drifter is the one taken for a token fee
+	# (Ledger.BLANK_INTAKE_FEE) that counts toward nothing. See _is_blank().
 
 	# HER BODY, STILL IN THE PEN. Read rather than released, so the two refusals below cost
 	# nothing to make: at this point the pen still holds her, the save still has her record,
@@ -3326,8 +3359,10 @@ func deliver_pony(uid: StringName) -> Dictionary:
 
 	var data: PonyData = inst.data()
 	var rarity: int = data.rarity if data != null else PonyDataScript.Rarity.COMMON
+	var blank := _is_blank(inst)
 	var credit: int = _game_state.ledger.credit_delivery(rarity, inst.is_stock(),
-		_delivery_kind(inst), _delivery_cycle())
+		_delivery_kind(inst), _delivery_cycle(), blank)
+	var overflow: int = _game_state.ledger.last_overflow
 	var named: bool = not inst.is_stock()
 	if named:
 		_game_state.compendium.mark_processed(inst.data_id)
@@ -3355,10 +3390,12 @@ func deliver_pony(uid: StringName) -> Dictionary:
 		LettersScript.Id.RECEIPT_NAMED if named else LettersScript.Id.RECEIPT_STOCK,
 		{"name": _player_name(), "count": shipments, "credit": credit,
 			"pony": inst.display_name()})
-	var paid := handler_share(credit)
+	# HER PAY: the handler's share of her credit, plus whatever a paid-off balance could not
+	# take (Ledger.last_overflow); a blank Drifter's is the token intake fee and nothing else.
+	var paid := LedgerScript.BLANK_INTAKE_FEE if blank else handler_share(credit) + overflow
 	if paid > 0 and _economy != null:
 		_economy.grant(paid)
-	_toast(delivery_toast(str(letter["sender"]), shipments, credit, _game_state.ledger.balance, paid))
+	_note_shipment(str(letter["sender"]), shipments, credit - overflow, paid, blank)
 	# The crate goes down and that is the whole of it. She says nothing, on purpose: the
 	# pony voice slots are cut by owner directive, and a real mare's neigh here would be
 	# the loudest wrong note in the game.
@@ -3367,11 +3404,83 @@ func deliver_pony(uid: StringName) -> Dictionary:
 		depot_menu.refresh()
 	_relieve_if_paid_down()
 	advance_story()
-	return {"ok": true, "credit": credit, "named": named, "name": inst.display_name()}
+	return {"ok": true, "credit": credit, "named": named, "name": inst.display_name(),
+		"blank": blank, "paid": paid}
 
 
-## PAY THE COMPANY. The ledger says how much it will accept (bits settle the service
-## charges, not the principal), the wallet is debited by exactly that, and the difference is
+## A BLANK DRIFTER: a stock pony with no mark yet. Worth a token fee and nothing else to the
+## Company (Ledger.BLANK_INTAKE_FEE); the Depot and the pen readout both call her a Drifter.
+static func _is_blank(inst: PonyInstance) -> bool:
+	return inst != null and inst.is_stock() and not inst.is_marked()
+
+
+# --- one toast and one letter per Depot batch (playtest 2026-11-08 items 20, 21) ----------
+
+## THE BATCH. A run of deliveries at the counter used to raise one toast each ("55th shipment
+## received", played back for minutes after the sale) and post one identical postcard each at
+## dawn. Now everything delivered while the Depot is open (or in one dawn's cart) is summed
+## here and told ONCE: one toast when the counter closes, and one card at the next dawn.
+## Outside a batch (a gate calling deliver_pony() directly) a delivery is its own batch of one.
+var _batch := {}
+
+
+func begin_delivery_batch() -> void:
+	if _batch.is_empty():
+		_batch = {"count": 0, "blanks": 0, "credit": 0, "paid": 0, "sender": "", "shipments": 0}
+
+
+func _note_shipment(sender: String, shipments: int, credit: int, paid: int, blank: bool) -> void:
+	var standalone := _batch.is_empty()
+	begin_delivery_batch()
+	_batch["count"] = int(_batch["count"]) + 1
+	_batch["blanks"] = int(_batch["blanks"]) + (1 if blank else 0)
+	_batch["credit"] = int(_batch["credit"]) + credit
+	_batch["paid"] = int(_batch["paid"]) + paid
+	_batch["sender"] = sender
+	_batch["shipments"] = shipments
+	if standalone:
+		end_delivery_batch()
+
+
+## Close the batch and say it once. Returns the toast it raised ("" for an empty batch).
+func end_delivery_batch() -> String:
+	if _batch.is_empty():
+		return ""
+	var b := _batch
+	_batch = {}
+	if int(b["count"]) <= 0:
+		return ""
+	var line := batch_toast(b, _game_state.ledger.balance if _game_state != null else 0)
+	_toast(line)
+	return line
+
+
+## The batch's one line: how many went, what came off the balance, what she was paid.
+static func batch_toast(b: Dictionary, balance_left: int) -> String:
+	var count := int(b.get("count", 0))
+	var blanks := int(b.get("blanks", 0))
+	var credit := int(b.get("credit", 0))
+	var paid := int(b.get("paid", 0))
+	if count == 1:
+		var one := delivery_toast(str(b.get("sender", "Intake")), int(b.get("shipments", 1)), credit,
+			balance_left, paid)
+		if blanks == 1:
+			one = "%s: a blank Drifter, taken for the intake fee. +%d bits for you." % [
+				str(b.get("sender", "Intake")), paid]
+		return one
+	var what := "%d ponies shipped" % count
+	if blanks > 0:
+		what += " (%d blank)" % blanks
+	var off := ""
+	if credit > 0:
+		off = " %s bits off your balance%s." % [group_thousands(credit),
+			", it is paid off" if balance_left <= 0 else ", %s to go" % group_thousands(balance_left)]
+	return "%s: %s.%s +%s bits for you." % [str(b.get("sender", "Intake")), what, off,
+		group_thousands(paid)]
+
+
+## PAY THE COMPANY. The ledger says how much it will accept (bits pay
+## the balance, down to zero), the wallet is debited by exactly that, and the difference is
 ## explained rather than silently swallowed. Returns what was actually paid.
 func _on_pay_requested(bits: int) -> void:
 	pay_the_company(bits)
@@ -3384,11 +3493,11 @@ func pay_the_company(bits: int) -> int:
 	var wanted: int = mini(bits, _economy.bits)
 	var taken: int = ledger.pay(wanted)
 	if taken <= 0:
-		_toast("Bits settle the service charges. The principal is settled in stock.")
+		_toast("Nothing is owed right now.")
 		return 0
 	_economy.spend(taken)
-	if taken < bits:
-		_toast("Paid %d bits. That is as low as bits will take it; the rest is stock."
+	if ledger.balance <= 0:
+		_toast("Paid %d bits. Paid in full! The account closes on collection day if the quota is met."
 			% taken)
 	else:
 		_toast("Paid %d bits. Balance: %d." % [taken, ledger.balance])
@@ -5123,9 +5232,17 @@ static func delivery_toast(sender: String, shipments: int, credit: int, balance_
 
 
 ## The handler's share of a delivery (Ledger.handler_share, PT9).
-## Which kind she counts as for the repeat price (Ledger.REPEAT_FALLOFF): every Drifter is one.
+## Which kind she counts as for the repeat price (Ledger.REPEAT_FALLOFF): every blank Drifter
+## is one; a Bloomed Drifter is her TALENT (P8: variety of marks is the strategy, idea D3, so
+## a pen of Bloomed ponies with different talents pays in full).
 static func _delivery_kind(inst: PonyInstance) -> StringName:
-	return LedgerScript.DRIFTER_KIND if inst.is_stock() else inst.data_id
+	if not inst.is_stock():
+		return inst.data_id
+	if inst.is_marked():
+		var mark: Variant = inst.stock.get("mark", {})
+		var talent := str((mark as Dictionary).get("talent", "")) if mark is Dictionary else ""
+		return StringName("bloomed_" + talent)
+	return LedgerScript.DRIFTER_KIND
 
 
 func _delivery_cycle() -> int:
@@ -8610,7 +8727,19 @@ static func music_context(zone: StringName, night: bool, market_open: bool, depo
 var _music_zone: StringName = &""
 
 
-## Every postcard queued since the last dawn goes in the mailbox now.
+## Who signs the dawn's one card: the first name, and the rest as cards in the same envelope.
+static func postcard_signature(names: Array) -> String:
+	if names.is_empty():
+		return ""
+	var first := str(names[0])
+	if names.size() == 1:
+		return first
+	var more := names.size() - 1
+	return "%s\n\n(%s in the envelope, word for word the same)" % [first,
+		"1 more card" if more == 1 else "%d more cards" % more]
+
+
+## Every postcard queued since the last dawn goes in the mailbox now, as one card.
 func _post_pending_postcards() -> void:
 	if _game_state == null:
 		return
@@ -8619,9 +8748,11 @@ func _post_pending_postcards() -> void:
 	if pending.is_empty():
 		return
 	_novelty("clue", "first_postcard", "A postcard from a delivered pony, in hoofwriting that is not hers")
-	for pony_name in pending:
-		var n := story.add_var("postcard_count")
-		story.post(StringName("postcard#%d" % n), {"name": _player_name(), "pony": str(pony_name)})
+	# ONE CARD A DAWN, NOT ONE A PONY (playtest 2026-11-08 item 20: a big Depot run filled the
+	# mailbox with identical letters). The rest are in the same envelope, word for word.
+	var n := story.add_var("postcard_count")
+	story.post(StringName("postcard#%d" % n), {"name": _player_name(),
+		"pony": postcard_signature(pending)})
 	story.set_var("postcards", [])
 	_refresh_mailbox_flag()
 
@@ -9069,6 +9200,7 @@ func _depot_cart() -> int:
 	if not _owns(&"depot_cart"):
 		return 0
 	var sent := 0
+	begin_delivery_batch()
 	for slot in _plot_slots():
 		var pen := slot.get_built() as Pen
 		if pen == null or not pen.is_full():
@@ -9078,6 +9210,8 @@ func _depot_cart() -> int:
 				continue
 			if bool(deliver_pony(inst.uid).get("ok", false)):
 				sent += 1
+	# The cart's own line below is the batch's one toast.
+	_batch = {}
 	if sent > 0:
 		_toast("The Depot cart called at dawn and took %d. Marigold sends her thanks." % sent)
 		_novelty("mechanic", "first_cart", "The Depot cart took ponies at dawn")
@@ -9293,6 +9427,7 @@ func _apply_factory_gear() -> void:
 const EXPRESS_BONUS := 25
 func _express_chute() -> int:
 	var sent := 0
+	begin_delivery_batch()
 	for slot in _plot_slots():
 		var pen := slot.get_built() as Pen
 		if pen == null:
@@ -9303,6 +9438,7 @@ func _express_chute() -> int:
 			if not bool(deliver_pony(inst.uid).get("ok", false)):
 				continue
 			sent += 1
+	_batch = {}
 	if sent > 0:
 		if _economy != null:
 			_economy.grant(EXPRESS_BONUS * sent)

@@ -81,24 +81,70 @@ func test_a_named_delivery_is_priced_by_rarity_and_a_legendary_clears_four_thous
 		"a named delivery is the best money in the game by a wide margin, deliberately")
 
 
-func test_a_delivery_may_take_the_balance_below_the_principal_floor() -> void:
+func test_a_delivery_never_takes_the_balance_below_zero() -> void:
+	# Playtest 2026-11-08 item 5: "-200 owed" in red, after the debt was paid. What a paid
+	# balance cannot take is handed back as last_overflow, for the purse.
 	var l := LedgerScript.new()
 	l.balance = 200
-	l.credit_delivery(PonyDataScript.Rarity.LEGENDARY, false)
-	assert_lt(l.balance, 0, "stock settles the principal, and may overshoot into credit")
+	var credit := l.credit_delivery(PonyDataScript.Rarity.LEGENDARY, false)
+	assert_eq(l.balance, 0, "a paid balance stops at zero")
+	assert_eq(l.last_overflow, credit - 200, "and the rest is the caller's to pay her")
 
 
-func test_bits_never_take_the_balance_below_the_principal_floor() -> void:
+func test_bits_pay_the_whole_balance_with_no_hidden_floor() -> void:
+	# Item 4: the 5,000 floor was never explained. Bits now go all the way.
 	var l := LedgerScript.new()
-	var allowed: int = l.payable()
-	assert_eq(allowed, LedgerScript.STARTING_BALANCE - LedgerScript.PRINCIPAL_FLOOR)
-	assert_eq(l.pay(1000000), allowed,
+	assert_eq(l.payable(), LedgerScript.STARTING_BALANCE)
+	assert_eq(l.pay(1000000), LedgerScript.STARTING_BALANCE,
 		"pay() takes what it may and answers with what it actually took")
-	assert_eq(l.balance, LedgerScript.PRINCIPAL_FLOOR)
-	assert_eq(l.pay(5000), 0, "and refuses to go further")
-	assert_eq(l.balance, LedgerScript.PRINCIPAL_FLOOR)
+	assert_eq(l.balance, 0)
+	assert_eq(l.pay(5000), 0, "and there is nothing left to take")
 
 
+func test_a_blank_drifter_pays_a_token_and_counts_for_nothing() -> void:
+	var l := LedgerScript.new()
+	var before: int = l.balance
+	assert_eq(l.credit_delivery(PonyDataScript.Rarity.COMMON, true, LedgerScript.DRIFTER_KIND, 0, true), 0)
+	assert_eq(l.balance, before, "no credit against the balance")
+	assert_eq(l.delivered_this_period, 0, "and not toward the quota")
+	assert_eq(l.shipments, 1, "she is still a shipment on the receipts")
+	assert_eq(l.quote_delivery(PonyDataScript.Rarity.COMMON, true, &"", -1, true), 0)
+	assert_gt(LedgerScript.BLANK_INTAKE_FEE, 0, "the intake fee is a token, not nothing")
+	assert_lt(LedgerScript.BLANK_INTAKE_FEE * 5, LedgerScript.DELIVERY_CREDIT_STOCK,
+		"and far below what a Bloomed one is worth")
+
+
+func test_the_account_closes_only_on_a_collection_day_with_the_quota_met() -> void:
+	var l := LedgerScript.new()
+	l.pay(LedgerScript.STARTING_BALANCE)
+	assert_eq(l.balance, 0)
+	assert_false(l.closed, "paid in full is not closed: that is the collection day's call")
+	# Short on the quota: it stays open and upkeep lands as usual.
+	var short: Dictionary = l.run_collection_day(3, 1, 0)
+	assert_false(bool(short["closed_now"]))
+	assert_gt(l.balance, 0, "upkeep is billed to an account that did not close")
+	l.pay(l.balance)
+	for i in LedgerScript.STARTING_QUOTA:
+		l.credit_delivery(PonyDataScript.Rarity.COMMON, true)
+	var met: Dictionary = l.run_collection_day(6, 1, 0)
+	assert_true(bool(met["closed_now"]), "paid and the quota met: closed")
+	assert_true(l.closed)
+	assert_eq(l.balance, 0, "and nothing is billed to a closed account")
+	var after: Dictionary = l.run_collection_day(9, 4, 2)
+	assert_eq(int(after["upkeep"]) + int(after["service_charge"]), 0)
+	assert_false(bool(after["closed_now"]), "it closes once")
+	assert_true(LedgerScript.from_dict(l.to_dict()).closed, "and stays closed through a save")
+
+
+func test_the_pay_tab_status_names_the_collection_day() -> void:
+	var l := LedgerScript.new()
+	l.credit_delivery(PonyDataScript.Rarity.COMMON, true)
+	var s: Dictionary = l.quota_status(1)
+	assert_eq(int(s["delivered"]), 1)
+	assert_eq(int(s["quota"]), LedgerScript.STARTING_QUOTA)
+	assert_eq(int(s["day"]), 4, "cycle 3 is the first collection: Day 4")
+	assert_eq(int(s["days_left"]), 2)
+	assert_true(bool(s["first"]))
 func test_paying_zero_or_less_changes_nothing() -> void:
 	var l := LedgerScript.new()
 	assert_eq(l.pay(0), 0)
@@ -240,47 +286,18 @@ func test_the_beam_recall_lasts_exactly_one_cycle() -> void:
 	assert_false(l.beam_is_recalled(6), "one cycle later she has her horn back")
 
 
-func test_gems_alone_never_clear_the_balance() -> void:
-	# THE BEST RANCH THE GAME PERMITS: six plot slots, all Grand Pens (eight spaces each),
-	# every space filled with the most valuable pony the roster can supply (one of each of
-	# the 3 legendary, 8 rare, 15 uncommon and 17 common characters, the remainder stock),
-	# every resident at happiness 1.0 and hunger 0.0, every gem sold at full price, every
-	# permit open, and not one pony ever delivered.
-	var per_pony: int = int(float(LedgerScript.PERIOD_CYCLES) * WorldStateScript.CYCLE_SECONDS
-		/ ProductionScript.PRODUCTION_PERIOD_SECONDS)
-	var values: Array[int] = []
-	for i in 3:
-		values.append(int(EconomyScript.GEM_VALUE_BY_RARITY[PonyDataScript.Rarity.LEGENDARY]))
-	for i in 8:
-		values.append(int(EconomyScript.GEM_VALUE_BY_RARITY[PonyDataScript.Rarity.RARE]))
-	for i in 15:
-		values.append(int(EconomyScript.GEM_VALUE_BY_RARITY[PonyDataScript.Rarity.UNCOMMON]))
-	while values.size() < 48:
-		values.append(int(EconomyScript.GEM_VALUE_BY_RARITY[PonyDataScript.Rarity.COMMON]))
-	var income := 0
-	for value in values:
-		income += per_pony * value
+func test_gems_alone_never_close_the_account() -> void:
+	# THE BEST RANCH THE GAME PERMITS, selling every gem at full price and paying it all in,
+	# and not one pony ever delivered. The balance may well reach zero now (there is no
+	# hidden floor any more); what keeps the promise is that the account only closes on a
+	# collection day with the quota met, and gems meet no quota.
 	var l := LedgerScript.new()
-	# WHAT THE FLOOR IS ACTUALLY DOING HERE, said as an assertion rather than left to be
-	# inferred from the ending balance. One period of that ranch out-earns one period of
-	# upkeep AND its service charge several times over, so the balance below is NOT held up
-	# by the arithmetic being tight: on interest and upkeep alone this player clears the
-	# account and the promise the class comment makes would be false. It is PRINCIPAL_FLOOR
-	# and nothing else that keeps it true, which is exactly what the class comment says and
-	# what a later retune of UPKEEP_BASE (Ruling 13 parks one) must not be allowed to hide.
-	var one_period_cost: int = l.upkeep_for(6, 4) + l.service_charge()
-	assert_gt(income, one_period_cost,
-		"the best ranch in the game out-earns its own upkeep and service charge; the floor,"
-		+ " not the tuning, is the mechanism this test is about")
 	for period in 50:
-		l.run_collection_day(LedgerScript.PERIOD_CYCLES * (period + 1), 6, 4)
-		l.pay(income)
-	assert_gt(l.balance, 0,
-		"a player who never delivers a pony cannot pay the balance off; that is the game")
-	assert_eq(l.balance, LedgerScript.PRINCIPAL_FLOOR,
-		"and she settles exactly at the principal, which is what the Depot tells her")
-
-
+		l.pay(l.balance)
+		var summary: Dictionary = l.run_collection_day(LedgerScript.PERIOD_CYCLES * (period + 1), 6, 4)
+		assert_false(bool(summary["closed_now"]))
+	assert_false(l.closed, "a player who never delivers a pony cannot close the account")
+	assert_gt(l.balance, 0, "and every collection day bills her again")
 func test_shipments_count_up_across_periods_and_never_reset() -> void:
 	var l := LedgerScript.new()
 	assert_eq(l.shipments, 0)

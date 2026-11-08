@@ -31,7 +31,7 @@ nodes = Array[Dictionary]([{
 "next": "three"
 }, {
 "id": "three",
-"text": "They find their talents up there so much faster. And Cloudsdale pays your ranch a stipend for each one, because helping is its own reward, but bits are nice too!",
+"text": "They shine so brightly up there, especially the ones who've found their color. And Cloudsdale pays your ranch a stipend for each one, because helping is its own reward, but bits are nice too!",
 "who": "marigold",
 "mood": "happy",
 "choices": [{
@@ -49,13 +49,13 @@ nodes = Array[Dictionary]([{
 "next": "quota"
 }, {
 "id": "have_to",
-"text": "Have to? Goodness, no. Well. There is a small quota on collection day, just to keep the program running. Two ponies. Easy!",
+"text": "Have to? Goodness, no. Well. There is a small quota on collection day, just to keep the program running. Two ponies with their color. Easy!",
 "who": "marigold",
 "mood": "happy",
 "next": "quota"
 }, {
 "id": "quota",
-"text": "One little thing. Ponies who've already found their mark can't go. Placement is for ponies who are still looking. Rules are rules!",
+"text": "One little thing. A Drifter who hasn't Bloomed yet, we take for a small intake fee, and she doesn't count. Help her find her mark first. The Academy adores a pony with color! Rules are rules!",
 "who": "marigold",
 "mood": "happy",
 "anim": "nod",

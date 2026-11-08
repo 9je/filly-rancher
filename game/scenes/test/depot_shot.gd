@@ -3,6 +3,7 @@ extends SceneTree
 ##   --mode=statement  the Statement tab after an hour of play, half of it spent in menus,
 ##                     with 31 delivered in the first period [50]
 ##   --mode=statement_first  the same 31 delivered at cycle 1, before the first collection
+##   --mode=colour     P8: blank and Bloomed Drifters, two stallions, one toast, the quota card
 ##   --mode=deliver    the Deliver tab over four Grand Pens holding the owner's roster as his
 ##                     save had it, two Sweetie Belles and two Scootaloos included [51]
 ##   xvfb-run ... godot --display-driver x11 --path game -s res://scenes/test/depot_shot.gd -- --out=/abs/dir --mode=statement
@@ -60,6 +61,8 @@ func _run() -> void:
 		await _statement(ranch, depot)
 	elif mode == "statement_first":
 		await _statement_first(ranch, depot)
+	elif mode == "colour":
+		await _colour(ranch, depot)
 	else:
 		await _deliver(ranch, depot)
 	quit()
@@ -88,6 +91,63 @@ func _statement(ranch: Node, depot: CanvasLayer) -> void:
 		await process_frame
 	root.get_texture().get_image().save_png(out.path_join("statement_after_an_hour.png"))
 	print("DEPOTSHOT lines:\n" + "\n".join(ranch.call("_statement")))
+
+
+## P8 (playtest 2026-11-08 items 4, 9, 20, 21, 70): blank and Bloomed Drifters and two named
+## stallions at the counter; three delivered in one visit and the ONE toast when it closes;
+## then the Pay tab's quota card.
+func _colour(ranch: Node, depot: CanvasLayer) -> void:
+	var gen: Script = load("res://systems/pony_generator.gd")
+	var grand: PlotData = ranch.call("_plots_catalogue").by_id(&"pen_grand")
+	var slot0: PlotSlot = ranch.call("plot_slots")[0]
+	if slot0.is_overgrown():
+		slot0.set_overgrown(false)
+	if slot0.is_empty():
+		slot0.build(grand)
+	var pen: Pen = slot0.get_built() as Pen
+	for inst in pen.ponies():
+		pen.remove_pony(inst.uid)
+	var blank := PonyInstanceScript.create(&"stock_shy", 7001)
+	blank.stock = gen.generate(7001).to_dict()
+	var bloomed := PonyInstanceScript.create(&"stock_curious", 7002)
+	bloomed.stock = gen.generate(7002).to_dict()
+	pen.add_pony(blank)
+	pen.add_pony(bloomed)
+	pen.bloom_now(bloomed)
+	pen.add_pony(PonyInstanceScript.create(&"braeburn", 7003))
+	pen.add_pony(PonyInstanceScript.create(&"drwhooves", 7004))
+	for i in 20:
+		await process_frame
+	depot.call("open")
+	for i in 30:
+		await process_frame
+	root.get_texture().get_image().save_png(out.path_join("colour_deliver_tab.png"))
+	# The blank, then the Bloomed one (both on one press), then Braeburn (asks first).
+	depot.call("confirm")
+	await process_frame
+	depot.call("confirm")
+	await process_frame
+	depot.call("confirm")
+	for i in 10:
+		await process_frame
+	root.get_texture().get_image().save_png(out.path_join("colour_confirm_he.png"))
+	print("DEPOTSHOT confirm lines: ", depot.call("drawn_lines"))
+	depot.call("move_selection", -1)
+	depot.call("confirm")
+	for i in 90:
+		await process_frame
+	depot.call("close")
+	var hud: Node = ranch.get_node("HUD")
+	print("DEPOTSHOT toast: ", hud.call("toast_text"), " pending: ", hud.call("pending_toasts"))
+	for i in 20:
+		await process_frame
+	root.get_texture().get_image().save_png(out.path_join("colour_one_toast.png"))
+	depot.call("open")
+	depot.call("set_tab", 1)
+	for i in 30:
+		await process_frame
+	root.get_texture().get_image().save_png(out.path_join("colour_pay_quota.png"))
+	print("DEPOTSHOT quota: ", depot.call("quota_card_text"))
 
 
 func _statement_first(ranch: Node, depot: CanvasLayer) -> void:

@@ -56,9 +56,9 @@ const TITLE := "Depot"
 const EMPTY_TEXT := "No ponies in your pens right now."
 
 ## The Pay tab with nothing on it. Not "you have no bits": the list is cut to what the
-## WALLET holds and to what the LEDGER will accept (pay_amounts), and a player sitting on a
-## pile of bits at the principal floor would read that as a bug in her own wallet.
-const EMPTY_PAY_TEXT := "Nothing to settle here today. Bits settle the service charges."
+## WALLET holds and to what the LEDGER will accept (pay_amounts), so a paid balance or an
+## empty purse both land here, and the quota card above says which.
+const EMPTY_PAY_TEXT := "Nothing to pay right now."
 
 ## THE SECOND PRESS A NAMED DELIVERY COSTS. A member of the crowd is 300 bits and there are
 ## dozens of her; a named pony is up to 4,000 bits and there is exactly one, and she is gone
@@ -69,7 +69,8 @@ const EMPTY_PAY_TEXT := "Nothing to settle here today. Bits settle the service c
 ## a second Enter arriving on the heels of the first, and a "yes" under the cursor would
 ## catch precisely nothing.
 const CONFIRM_YES := "Yes, hand %s to the Company"
-const CONFIRM_NO := "No, she stays here"
+## "%s" is her pronoun (PonyData.pronoun, item 70): "No, he stays here" for Braeburn.
+const CONFIRM_NO := "No, %s stays here"
 
 ## The amounts the Pay tab offers, before they are cut down to what she can afford and to
 ## what the ledger will accept.
@@ -98,6 +99,9 @@ var statement_provider := Callable()
 ## What she still owes the Company (Ledger.balance), for the purse. Optional: without it the
 ## purse shows only her bits.
 var balance_provider := Callable()
+## THE QUOTA CARD on the Pay tab (P8 item 4): Ledger.quota_status() for today. Optional:
+## without it the card is not drawn.
+var quota_provider := Callable()
 
 var _tab: int = Tab.DELIVER
 var _selected := 0
@@ -156,6 +160,7 @@ func _ready() -> void:
 		func(_index: int) -> void: close())
 	$Centre/Panel/Margin/Column.add_child(_close)
 	_build_purse()
+	_build_quota_card()
 	_fx = MenuStyleScript.effects_layer(self)
 
 
@@ -339,8 +344,8 @@ func _cancel_confirm() -> void:
 ## the ledger will accept, plus an "everything that will go" row when that is more than the
 ## largest step. Never an amount she cannot cover and never one that would be trimmed on the
 ## way through, because a menu row that always refuses is a menu row that lies, and
-## Ledger.pay() caps every payment at payable() (bits settle the service charges, not the
-## principal), so offering 10,000 to a player the ledger will only take 200 from was exactly
+## Ledger.pay() caps every payment at payable() (the balance owed; it used to be the balance
+## over a hidden floor), so offering 10,000 to a player the ledger will only take 200 from was exactly
 ## that lie.
 func pay_amounts() -> Array[int]:
 	var bits: int = int(bits_provider.call()) if bits_provider.is_valid() else 0
@@ -409,7 +414,7 @@ func drawn_lines() -> Array[String]:
 		Tab.DELIVER:
 			if is_confirming():
 				lines.append(CONFIRM_YES % _confirming_name)
-				lines.append(CONFIRM_NO)
+				lines.append(CONFIRM_NO % String(_confirming_row.get("she", "she")))
 				return lines
 			var rows: Array[Dictionary] = deliver_rows()
 			if rows.is_empty():
@@ -464,6 +469,7 @@ func refresh() -> void:
 		_tile_rects = drawn
 	_built_frame = Engine.get_process_frames()
 	_sync_purse()
+	_draw_quota_card()
 	MenuStyleScript.apply_title(_title)
 	var lines: Array[String] = drawn_lines()
 	var ponies: Array[Dictionary] = []
@@ -567,7 +573,7 @@ func _after_delivery(row: Dictionary, from: Rect2) -> void:
 	var credit := int(row.get("credit", 0))
 	var card := _receipt_card(row, from)
 	card.visible = false
-	_payouts.append({"start": start, "card": card, "paid": LedgerScript.handler_share(credit),
+	_payouts.append({"start": start, "card": card, "paid": paid_for(row),
 		"credit": credit, "shown": 0, "ticked": false, "flown": false})
 
 
@@ -802,9 +808,9 @@ func _pony_tile(holder: PanelContainer, pony: Dictionary) -> void:
 	MenuStyleScript.style_label(sub, 16, MenuStyleScript.COLOR_DIM)
 	column.add_child(sub)
 	var price := Label.new()
-	# What she is worth, both ways (PT9): off the balance, and the handler's share to her.
-	var credit := int(pony.get("credit", 0))
-	price.text = "-%d debt\n+%d bits" % [credit, LedgerScript.handler_share(credit)]
+	# What she is worth, both ways (PT9): off the balance, and the handler's share to her. A
+	# blank Drifter is only the intake fee, and says so.
+	price.text = price_text(pony)
 	price.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	price.add_theme_font_override(&"font", MenuStyleScript.numeral_font())
 	MenuStyleScript.style_label(price, 22, MenuStyleScript.COLOR_VALUE)
@@ -819,13 +825,130 @@ func _pony_tile(holder: PanelContainer, pony: Dictionary) -> void:
 var _kind_counts := {}
 
 
+## WHAT SHE IS TO THE COMPANY (playtest 2026-11-08 item 9): a blank Drifter (a token fee,
+## counts for nothing), a Bloomed Drifter (counts toward the quota), or a named pony, in
+## her own pronoun (item 70).
 func _tag(pony: Dictionary) -> String:
 	if bool(pony.get("stock", true)):
-		return "from the crowd"
+		if bool(pony.get("blank", false)):
+			return "Drifter, blank: intake fee only, no quota"
+		return "Drifter, Bloomed: counts toward the quota"
+	var she := String(pony.get("she", "she"))
+	var her := "him" if she == "he" else "her"
 	var same := int(_kind_counts.get(String(pony.get("kind", "")), 1))
 	if same <= 1:
-		return "one of a kind: she asks before she goes"
-	return "there are two of her here" if same == 2 else "there are %d of her here" % same
+		return "one of a kind: %s asks before %s goes" % [she, she]
+	return "there are two of %s here" % her if same == 2 else "there are %d of %s here" % [same, her]
+
+
+## Her price on her tile: "-300 debt / +75 bits", or a blank Drifter's "+30 bits / no credit".
+static func price_text(pony: Dictionary) -> String:
+	if bool(pony.get("blank", false)):
+		return "+%d bits\nno credit" % LedgerScript.BLANK_INTAKE_FEE
+	var credit := int(pony.get("credit", 0))
+	return "-%d debt\n+%d bits" % [credit, LedgerScript.handler_share(credit)]
+
+
+## What her receipt card counts up to: the intake fee for a blank, the share otherwise.
+static func paid_for(row: Dictionary) -> int:
+	if bool(row.get("blank", false)):
+		return LedgerScript.BLANK_INTAKE_FEE
+	return LedgerScript.handler_share(int(row.get("credit", 0)))
+
+
+# --- the quota card (P8 item 4) -------------------------------------------------------------
+
+## THE QUOTA, OUT LOUD. The Pay tab used to say "Nothing to settle" over a hidden 5,000 floor.
+## Now it opens on a card: the quota as a bar (coloured ponies delivered of the quota) and the
+## collection day it is due, and one line on how the account closes.
+var _quota_card: PanelContainer = null
+var _quota_bar: ProgressBar = null
+var _quota_words: Label = null
+var _quota_rule: Label = null
+
+
+func _build_quota_card() -> void:
+	var column := $Centre/Panel/Margin/Column as VBoxContainer
+	_quota_card = PanelContainer.new()
+	_quota_card.name = "QuotaCard"
+	_quota_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_quota_card.add_theme_stylebox_override(&"panel", TileStyleScript.box(false, false))
+	column.add_child(_quota_card)
+	column.move_child(_quota_card, _scroll.get_index())
+	var v := VBoxContainer.new()
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_theme_constant_override(&"separation", 6)
+	_quota_card.add_child(v)
+	_quota_words = Label.new()
+	_quota_words.name = "QuotaWords"
+	MenuStyleScript.style_label(_quota_words, 22, MenuStyleScript.COLOR_TITLE)
+	_quota_words.add_theme_font_override(&"font", MenuStyleScript.title_font())
+	v.add_child(_quota_words)
+	_quota_bar = ProgressBar.new()
+	_quota_bar.name = "QuotaBar"
+	_quota_bar.show_percentage = false
+	_quota_bar.custom_minimum_size = Vector2(WIDE_TILE.x - 40.0, 22.0)
+	_quota_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(1, 1, 1, 0.12)
+	bg.set_corner_radius_all(11)
+	var fg := StyleBoxFlat.new()
+	fg.bg_color = MenuStyleScript.COLOR_VALUE
+	fg.set_corner_radius_all(11)
+	_quota_bar.add_theme_stylebox_override(&"background", bg)
+	_quota_bar.add_theme_stylebox_override(&"fill", fg)
+	v.add_child(_quota_bar)
+	_quota_rule = Label.new()
+	_quota_rule.name = "QuotaRule"
+	_quota_rule.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_quota_rule.custom_minimum_size = Vector2(WIDE_TILE.x - 40.0, 0.0)
+	MenuStyleScript.style_label(_quota_rule, 18, MenuStyleScript.COLOR_DIM)
+	v.add_child(_quota_rule)
+	_quota_card.visible = false
+
+
+## The card's words, as {headline, rule}, for `q` (a Ledger.quota_status()). Static so the
+## tests read the words without a menu.
+static func quota_lines(q: Dictionary) -> Dictionary:
+	var delivered := int(q.get("delivered", 0))
+	var quota := int(q.get("quota", 0))
+	var days := int(q.get("days_left", 0))
+	var when := "today" if days <= 0 else ("tomorrow" if days == 1 else "in %d days" % days)
+	var head := "Quota: %d of %d coloured ponies by collection day, Day %d (%s)" % [
+		mini(delivered, quota), quota, int(q.get("day", 0)), when]
+	if delivered >= quota:
+		head = "Quota met: %d coloured ponies. Collection day is Day %d (%s)" % [delivered,
+			int(q.get("day", 0)), when]
+	var rule := ""
+	if bool(q.get("closed", false)):
+		rule = "Account closed. The quota stands. Thank you for choosing Cloudsdale!"
+	elif int(q.get("balance", 1)) <= 0:
+		rule = "Paid in full. The account closes on collection day if the quota is met."
+	else:
+		rule = ("Owed: %d bits. Bits pay the balance; the account closes on a collection day, "
+			+ "paid in full with the quota met. Blank Drifters do not count.") % int(q.get("balance", 0))
+	return {"headline": head, "rule": rule}
+
+
+## The card's two lines as drawn, or "" when it is not up.
+func quota_card_text() -> String:
+	if _quota_card == null or not _quota_card.visible:
+		return ""
+	return "%s\n%s" % [_quota_words.text, _quota_rule.text]
+
+
+func _draw_quota_card() -> void:
+	if _quota_card == null:
+		return
+	_quota_card.visible = _tab == Tab.PAY and quota_provider.is_valid()
+	if not _quota_card.visible:
+		return
+	var q: Dictionary = quota_provider.call()
+	var words := quota_lines(q)
+	_quota_words.text = String(words["headline"])
+	_quota_rule.text = String(words["rule"])
+	_quota_bar.max_value = maxf(1.0, float(q.get("quota", 1)))
+	_quota_bar.value = minf(float(q.get("delivered", 0)), _quota_bar.max_value)
 
 
 ## A payment (a coin and its amount) or one of the two answers to a named pony's confirm.

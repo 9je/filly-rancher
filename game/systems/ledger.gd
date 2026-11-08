@@ -12,19 +12,18 @@ extends RefCounted
 ##
 ## A player who never delivers a pony cannot pay the balance off. That is the premise of
 ## the whole phase: the ranch is not a business, it is a debt with a supply contract
-## attached, and the only thing that actually moves the principal is stock.
+## attached, and only coloured stock (the quota) can close it.
 ##
-## THE MECHANISM IS A FLOOR, NOT MERELY INTEREST, and it is worth writing down why. The
-## design doc attributes the promise to the service charge alone. The service charge cannot
-## carry it: three legendary ponies in a pen produce a gem each every twenty seconds at a
-## hundred bits a gem (game/systems/production.gd, game/systems/economy.gd), which is
-## 54,000 bits in one collection day against a 25,000 balance, and no small percentage of a
-## FALLING balance outruns that. So the rule is stated outright instead, and the Depot says
-## it in as many words: bits settle the service charges, stock settles the principal.
-## pay() will never take the balance below PRINCIPAL_FLOOR; credit_delivery() is the only
-## thing that reaches under it. The service charge and the upkeep are still exactly what
-## the player feels week to week; the floor is what makes the promise true.
-## test_gems_alone_never_clear_the_balance asserts the two of them together.
+## THE MECHANISM WAS A HIDDEN FLOOR, AND IS NOW A VISIBLE RULE (P8; playtest 2026-11-08
+## items 4 to 6). A 5,000 bit PRINCIPAL_FLOOR that bits could never go under kept the
+## promise, but nothing on screen said so and the owner read it as a grind trap. Now bits pay
+## the balance all the way down, and THE ACCOUNT CLOSES ONLY ON A COLLECTION DAY, AND ONLY
+## WITH THE QUOTA MET: a balance at zero with the quota short stays open, and the Pay tab
+## says so in as many words (quota_status()). The quota counts coloured ponies only (a
+## Bloomed Drifter or a named pony; a blank Drifter is a token intake fee, BLANK_INTAKE_FEE),
+## so gems alone still never close it. And since the first collection day is the earliest it
+## can close, the letter that explains the rules always arrives first (item 6).
+## test_gems_alone_never_close_the_account asserts it.
 ##
 ## --- NOTHING IS EVER DELETED ----------------------------------------------------------
 ##
@@ -61,8 +60,10 @@ const STARTING_QUOTA := 2
 ## stands until the balance is back under it.
 const CEILING := 40000
 
-## The balance bits will not go below. See the class comment.
-const PRINCIPAL_FLOOR := 5000
+## THE COLOUR LOOP (P8, docs/sprint-plan-2026-11-08.md section 2.1): the Factory only wants
+## colour. A blank Drifter (no mark yet) is taken for this token fee, paid into the purse; she
+## credits nothing against the balance and does not count toward the quota.
+const BLANK_INTAKE_FEE := 30
 
 ## Upkeep: a base, plus a charge per built plot and per open permit, times the rank
 ## multiplier. UPKEEP_BASE is 1800 for a pacing reason with a test on it: a fresh ranch is
@@ -116,6 +117,14 @@ var periods_run := 0
 ## receipt letter counts her shipments back to her ("your 12th delivery!"). Saved, so a
 ## reload does not start the count over and hand her a first receipt on her twentieth pony.
 var shipments := 0
+
+## THE ACCOUNT IS CLOSED: a collection day found the balance paid and the quota met (see the
+## class comment). From then on there is no upkeep and no service charge; the quota stands.
+var closed := false
+
+## Credit the last credit_delivery() could not take off a balance already at zero, for the
+## caller to pay into the purse instead (a balance never goes below zero any more).
+var last_overflow := 0
 
 ## How far up LADDER the next failure will reach. Raised by a failed collection day,
 ## lowered by one (not reset) by a good one, so recovering from a bad run takes as many
@@ -186,7 +195,9 @@ static func handler_share(credit: int) -> int:
 	return int(round(float(maxi(0, credit)) * HANDLER_SHARE))
 
 
-static func delivery_credit(rarity: int, is_stock: bool) -> int:
+static func delivery_credit(rarity: int, is_stock: bool, blank: bool = false) -> int:
+	if blank:
+		return 0
 	if is_stock:
 		return DELIVERY_CREDIT_STOCK
 	var unit: int = int(DELIVERY_UNIT_BY_RARITY.get(rarity, 0))
@@ -194,8 +205,10 @@ static func delivery_credit(rarity: int, is_stock: bool) -> int:
 
 
 ## What delivering her would credit now, counting the repeats so far this cycle. Spends nothing.
-func quote_delivery(rarity: int, is_stock: bool, kind: StringName = &"", cycle: int = -1) -> int:
-	var base: int = delivery_credit(rarity, is_stock)
+## `blank`: a Drifter with no mark yet, who credits nothing (BLANK_INTAKE_FEE).
+func quote_delivery(rarity: int, is_stock: bool, kind: StringName = &"", cycle: int = -1,
+		blank: bool = false) -> int:
+	var base: int = delivery_credit(rarity, is_stock, blank)
 	if kind == &"" or cycle != repeats_cycle:
 		return base
 	var n: int = int(repeats.get(String(kind), 0))
@@ -209,14 +222,14 @@ func upkeep_for(built_plots: int, open_permits: int, rank_multiplier: float = 1.
 
 
 func service_charge() -> int:
-	if balance <= 0:
+	if balance <= 0 or closed:
 		return 0
 	return maxi(MIN_SERVICE_CHARGE, int(round(float(balance) * INTEREST_RATE)))
 
 
-## The most bits pay() will accept right now. Never negative.
+## The most bits pay() will accept right now: the whole balance. Never negative.
 func payable() -> int:
-	return maxi(0, balance - PRINCIPAL_FLOOR)
+	return maxi(0, balance)
 
 
 ## WHETHER A COLLECTION DAY IS OWED FOR `cycle`: true only when `cycle` really is a
@@ -242,12 +255,17 @@ func is_collection_day_due(cycle: int) -> bool:
 ## question about a moment that has already passed.
 func run_collection_day(cycle: int, built_plots: int, open_permits: int,
 		rank_multiplier: float = 1.0) -> Dictionary:
-	var upkeep: int = upkeep_for(built_plots, open_permits, rank_multiplier)
+	var delivered: int = delivered_this_period
+	var quota_met: bool = delivered >= quota
+	# THE ACCOUNT CLOSES HERE OR NOWHERE (class comment): paid down and the quota met.
+	var closed_now: bool = not closed and balance <= 0 and quota_met
+	if closed_now:
+		closed = true
+		balance = 0
+	var upkeep: int = 0 if closed else upkeep_for(built_plots, open_permits, rank_multiplier)
 	var charge: int = service_charge()
 	balance += upkeep + charge
 
-	var delivered: int = delivered_this_period
-	var quota_met: bool = delivered >= quota
 	var over_ceiling: bool = balance > CEILING
 	var punishment: int = Punishment.NONE
 	if quota_met and not over_ceiling:
@@ -271,16 +289,27 @@ func run_collection_day(cycle: int, built_plots: int, open_permits: int,
 		"over_ceiling": over_ceiling,
 		"punishment": punishment,
 		"balance": balance,
+		"closed_now": closed_now,
+		"closed": closed,
 	}
 	changed.emit(balance)
 	collection_day.emit(summary)
 	return summary
 
 
-## One pony delivered. Returns the credit applied, counts her toward the quota, and MAY
-## take the balance below the floor and into credit: stock settles the principal.
-## `kind` and `cycle` price her as a repeat (REPEAT_FALLOFF); an empty kind is not counted.
-func credit_delivery(rarity: int, is_stock: bool, kind: StringName = &"", cycle: int = -1) -> int:
+## One pony delivered. Returns her credit, counts her toward the quota, and takes the balance
+## down by it, never below zero: what a paid-off balance cannot take is left in last_overflow
+## for the caller to pay into the purse. `kind` and `cycle` price her as a repeat
+## (REPEAT_FALLOFF); an empty kind is not counted.
+##
+## A BLANK DRIFTER (`blank`) is shipped and counted as a shipment, and that is all: no
+## credit, no quota. The caller pays her BLANK_INTAKE_FEE into the purse.
+func credit_delivery(rarity: int, is_stock: bool, kind: StringName = &"", cycle: int = -1,
+		blank: bool = false) -> int:
+	last_overflow = 0
+	if blank:
+		shipments += 1
+		return 0
 	var credit: int = quote_delivery(rarity, is_stock, kind, cycle)
 	if credit <= 0:
 		return 0
@@ -289,11 +318,29 @@ func credit_delivery(rarity: int, is_stock: bool, kind: StringName = &"", cycle:
 			repeats = {}
 			repeats_cycle = cycle
 		repeats[String(kind)] = int(repeats.get(String(kind), 0)) + 1
-	balance -= credit
+	var applied: int = mini(credit, maxi(0, balance))
+	last_overflow = credit - applied
+	balance -= applied
 	delivered_this_period += 1
 	shipments += 1
 	changed.emit(balance)
 	return credit
+
+
+## WHAT THE PAY TAB SHOWS (P8 item 4): the quota as a bar and the collection day, as data.
+## {delivered, quota, day (the collection day's number, Day 1 being cycle 0), days_left,
+## balance, closed, first (no collection day has run yet)}.
+func quota_status(cycle: int) -> Dictionary:
+	var next_cycle: int = (period_of(cycle) + 1) * PERIOD_CYCLES
+	return {
+		"delivered": delivered_this_period,
+		"quota": quota,
+		"day": next_cycle + 1,
+		"days_left": maxi(0, next_cycle - maxi(0, cycle)),
+		"balance": balance,
+		"closed": closed,
+		"first": periods_run == 0,
+	}
 
 
 ## Pay bits against the balance. Returns what was actually taken, which is zero for a
@@ -387,9 +434,12 @@ func statement_lines(player_name: String, built_plots: int, open_permits: int,
 			delivered_this_period, quota])
 	if periods_run > 0:
 		lines.append("Collections passed: %d" % periods_run)
-	lines.append("Bits settle the service charges. The principal is settled in stock.")
-	lines.append("You may pay down to %d bits here; thank you for choosing Cloudsdale!"
-		% PRINCIPAL_FLOOR)
+	lines.append("The quota counts coloured ponies: Bloomed Drifters and named ponies.")
+	lines.append("Blank Drifters are taken for a %d bit intake fee and do not count." % BLANK_INTAKE_FEE)
+	if closed:
+		lines.append("Account closed. The quota stands. Thank you for choosing Cloudsdale!")
+	else:
+		lines.append("The account closes on a collection day, paid in full with the quota met.")
 	return lines
 
 
@@ -408,6 +458,7 @@ func to_dict() -> Dictionary:
 		"beam_recalled_until": beam_recalled_until,
 		"repeats": repeats.duplicate(),
 		"repeats_cycle": repeats_cycle,
+		"closed": closed,
 	}
 
 
@@ -434,6 +485,7 @@ static func from_dict(d: Dictionary) -> Ledger:
 	out.padlocked_slots = _string_list(d.get("padlocked_slots", []))
 	out.beam_recalled_until = int(d.get("beam_recalled_until", -1))
 	out.repeats_cycle = int(d.get("repeats_cycle", -1))
+	out.closed = bool(d.get("closed", false))
 	var reps: Variant = d.get("repeats", {})
 	if typeof(reps) == TYPE_DICTIONARY:
 		for k in (reps as Dictionary):

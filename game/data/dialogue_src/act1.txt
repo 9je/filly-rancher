@@ -112,16 +112,30 @@ start [marigold happy] {name}! Look at you, a real rancher already. I've brought
   -> two
 two [marigold happy nod] The crate behind your barn is our Depot. Any Drifter you'd like to send up for Placement goes in there, and she rides the lift to the Cloudsdale Academy in the clouds.
   -> three
-three [marigold happy] They find their talents up there so much faster. And Cloudsdale pays your ranch a stipend for each one, because helping is its own reward, but bits are nice too!
+three [marigold happy] They shine so brightly up there, especially the ones who've found their color. And Cloudsdale pays your ranch a stipend for each one, because helping is its own reward, but bits are nice too!
   * What happens at the Academy? -> academy
   * Do I have to send them? -> have_to
 academy [marigold happy] Oh, all sorts! Lessons, sunshine, a lovely view. They'll write to you. Everypony always writes.
   -> quota
-have_to [marigold happy] Have to? Goodness, no. Well. There is a small quota on collection day, just to keep the program running. Two ponies. Easy!
+have_to [marigold happy] Have to? Goodness, no. Well. There is a small quota on collection day, just to keep the program running. Two ponies with their color. Easy!
   -> quota
-quota [marigold happy nod] One little thing. Ponies who've already found their mark can't go. Placement is for ponies who are still looking. Rules are rules!
+quota [marigold happy nod] One little thing. A Drifter who hasn't Bloomed yet, we take for a small intake fee, and she doesn't count. Help her find her mark first. The Academy adores a pony with color! Rules are rules!
   flag: depot_explained
   event: open_depot
+
+=== marigold_paid_up
+speaker: marigold
+priority: 90
+when: {"flags_all": ["debt_cleared"], "flags_none": ["marigold_paid_up"]}
+
+start [marigold happy] {name}! Paid in full! I don't think a steward has ever done it so quickly. The office sent a little card.
+  flag: marigold_paid_up
+  -> two
+two [marigold happy nod] Of course, bits won't do for the rest, dear. The quota stands, the same as always. The Academy is ever so grateful for every color you send up.
+  * What rest? -> rest
+  * Thank you, Marigold. -> thanks
+rest [marigold happy] Oh, the program! It runs on ponies, not bits. Silly me, I make it sound so serious.
+thanks [marigold happy nod] No, thank you. Truly. Now, back to those lovely pens!
 
 === marigold_first_collection
 speaker: marigold
