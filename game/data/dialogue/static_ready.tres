@@ -7,7 +7,7 @@ script = ExtResource("1_dlg")
 id = &"static_ready"
 speaker = &"static"
 priority = 115
-once = true
+once = false
 bark = false
 when = {
 "path": "rescue",

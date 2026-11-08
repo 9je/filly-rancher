@@ -27,6 +27,8 @@ start [static blank] Pylons first. Then the corrals, at night, past the lanterns
 === static_ready
 speaker: static
 priority: 115
+# Offered until the lift goes: "not yet" must leave it to ask again (P8 item 1).
+once: false
 when: {"path": "rescue", "flags_all": ["static_met"], "flags_none": ["climax_done"], "min": {"pylons": 4}}
 
 start [static happy] All four pylons. The rainbow's down to a smudge. They're scrambling up there.
@@ -87,6 +89,8 @@ two [marigold happy nod] Fill them and you'll climb. Regional Director, one day!
 === marigold_jubilee
 speaker: marigold
 priority: 120
+# Offered until the lift goes: "not yet" must leave it to ask again (P8 item 1).
+once: false
 when: {"path": "factory", "flags_all": ["jubilee_ready"], "flags_none": ["climax_done"]}
 
 start [marigold happy] Regional Director, the Jubilee order is in! Cloudsdale wants you on the stage. You'll pull the lever yourself.

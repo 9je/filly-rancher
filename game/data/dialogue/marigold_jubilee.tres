@@ -7,7 +7,7 @@ script = ExtResource("1_dlg")
 id = &"marigold_jubilee"
 speaker = &"marigold"
 priority = 120
-once = true
+once = false
 bark = false
 when = {
 "path": "factory",

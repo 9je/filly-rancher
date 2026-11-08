@@ -148,6 +148,8 @@ start [marigold happy] Happy ponies make the brightest colors!
 === marigold_color_day
 speaker: marigold
 priority: 120
+# Offered until the lift goes: "Give me a minute" must leave it to ask again (P8 item 1).
+once: false
 when: {"flags_all": ["invited", "color_day"], "flags_none": ["reveal_done"]}
 
 start [marigold happy] Happy Color Day, {name}! The lift is waiting, and so is the Rainbow Factory.
