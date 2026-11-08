@@ -8,10 +8,10 @@ extends Node
 ## One baker for the whole game (`shared(tree)`), one small SubViewport, one pony at a time:
 ## a request copies her visuals onto the stage (sharing every mesh and material, as the catch
 ## card's portrait does), waits two drawn frames, reads the picture back and caches it by
-## `key`. A request already cached answers at once; `ready` fires when a new one lands, so a
+## `key`. A request already cached answers at once; `baked` fires when a new one lands, so a
 ## menu can redraw.
 
-signal ready(key: String)
+signal baked(key: String)
 
 const SIZE := Vector2i(192, 192)
 const STUDIO_FILL := Color(0.92, 0.90, 1.0)
@@ -75,7 +75,7 @@ func _pump() -> void:
 		_clear_stage()
 		if img != null and not img.is_empty():
 			_cache[key] = ImageTexture.create_from_image(img)
-			ready.emit(key)
+			baked.emit(key)
 	_busy = false
 
 

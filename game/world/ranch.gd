@@ -2329,8 +2329,8 @@ func race_entrants() -> Array[Dictionary]:
 ## when it lands.
 func _portrait_of(key: String, body: Node3D) -> Texture2D:
 	var baker := PortraitBaker.shared(get_tree())
-	if not baker.ready.is_connected(_on_portrait_ready):
-		baker.ready.connect(_on_portrait_ready)
+	if not baker.baked.is_connected(_on_portrait_ready):
+		baker.baked.connect(_on_portrait_ready)
 	return baker.portrait(key, body)
 
 
