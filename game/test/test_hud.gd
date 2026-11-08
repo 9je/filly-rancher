@@ -241,7 +241,7 @@ func test_storing_a_pony_updates_the_pips_without_the_hud_polling() -> void:
 
 	# store() emits Storage.changed; nothing else is called, so if the pips update it is
 	# because the HUD is connected to that signal and not because it re-reads every frame.
-	beam.storage.store(_instance("fluttershy"))
+	beam.storage.store(_instance("applebloom"))
 	beam.storage.store(_instance("twilight"))
 	assert_eq(_hud.get_shown_rarities(),
 		[PonyDataScript.Rarity.UNCOMMON, PonyDataScript.Rarity.RARE] as Array[int],

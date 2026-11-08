@@ -147,7 +147,10 @@ func test_by_rarity_partitions_the_roster() -> void:
 	var uncommon_ids: Array = []
 	for p in buckets[PonyDataScript.Rarity.UNCOMMON]:
 		uncommon_ids.append(p.id)
-	assert_true(uncommon_ids.has(&"fluttershy"), "fluttershy is UNCOMMON")
+	assert_true(uncommon_ids.has(&"applebloom"), "applebloom is UNCOMMON")
+	# P8 (playtest 2026-11-08 item 71): the Mane Six are all RARE; Fluttershy was UNCOMMON.
+	for six in [&"fluttershy", &"pinkiepie", &"applejack", &"rarity"]:
+		assert_true(rare_ids.has(six), "%s is RARE" % six)
 	assert_false(uncommon_ids.has(&"twilight"), "by_rarity must not return everything")
 	var legendary_ids: Array = []
 	for p in buckets[PonyDataScript.Rarity.LEGENDARY]:
