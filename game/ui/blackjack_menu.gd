@@ -39,10 +39,18 @@ const SHOE := Rect2(990.0, 18.0, 104.0, 140.0)
 const BANNER := Rect2(250.0, 168.0, 620.0, 122.0)
 const BET_SPOT := Vector2(135.0, 470.0)
 const CHIP_ROW_Y := 506.0
-const CHIP_RADIUS := 36.0
-const CHIP_PITCH := 96.0
-const CHIPS_LEFT := 300.0
-const DEAL := Rect2(610.0, 462.0, 300.0, 86.0)
+const CHIP_RADIUS := 32.0
+const CHIP_PITCH := 74.0
+const CHIPS_LEFT := 296.0
+## CHIPS STACK ONTO THE BET (P8 S8; playtest 2026-11-08 item 58: "i hate i cant bet 100").
+## A chip used to SET the stake to one of three values; now each press adds that chip to the
+## bet on the spot, as at a real table, with Clear to take it back and Max to push the most
+## the table allows. The bet stays out after a round, so "again" is one press of Deal.
+const CHIPS: Array[int] = [10, 50, 100, 500]
+const TABLE_MAX := 1000
+const CLEAR := Rect2(604.0, 462.0, 90.0, 40.0)
+const MAX := Rect2(604.0, 508.0, 90.0, 40.0)
+const DEAL := Rect2(704.0, 462.0, 210.0, 86.0)
 const HIT := Rect2(300.0, 462.0, 190.0, 86.0)
 const STAND := Rect2(502.0, 462.0, 190.0, 86.0)
 const DOUBLE := Rect2(704.0, 462.0, 190.0, 86.0)
@@ -64,6 +72,7 @@ signal action_requested(action: int)
 
 var _tab: int = Tab.TABLE
 var _stake := 1
+var _bet := 0
 var _view: Dictionary = {}
 var _won := 0
 var _shown_player := 0
@@ -142,32 +151,44 @@ func hand_live() -> bool:
 	return not _view.is_empty() and not bool(_view.get("settled", true))
 
 
+## The chips she can still add to the bet.
 func stakes() -> Array[int]:
 	var out: Array[int] = []
-	for stake: int in STAKES:
-		if stake <= _purse():
-			out.append(stake)
+	for chip: int in CHIPS:
+		if can_add(chip):
+			out.append(chip)
 	return out
 
 
+## The last chip she put on.
 func stake_index() -> int:
 	return _stake
 
 
+## The bet on the spot, never more than she holds.
 func selected_stake() -> int:
-	return STAKES[_stake] if STAKES[_stake] <= _purse() else 0
+	return mini(_bet, _purse())
 
 
+func bet_cap() -> int:
+	return mini(TABLE_MAX, _purse())
+
+
+func can_add(chip: int) -> bool:
+	return not _dealing and _bet + chip <= bet_cap()
+
+
+## Put chip `index` on the bet (for shots and tests, as a press would).
 func set_stake_index(index: int) -> void:
-	if index >= 0 and index < STAKES.size() and STAKES[index] <= _purse():
+	if index >= 0 and index < CHIPS.size() and can_add(CHIPS[index]):
 		_stake = index
+		_bet += CHIPS[index]
 		if _stage != null:
 			_stage.queue_redraw()
 
 
 func _fit_stake() -> void:
-	while _stake > 0 and STAKES[_stake] > _purse():
-		_stake -= 1
+	_bet = mini(_bet, bet_cap())
 
 
 func can_deal() -> bool:
@@ -305,9 +326,11 @@ func stage_buttons() -> Array[Dictionary]:
 		out.append({"id": &"double", "rect": DOUBLE, "enabled": can_double()})
 		out.append({"id": &"split", "rect": SPLIT, "enabled": can_split()})
 		return out
-	for i: int in STAKES.size():
+	for i: int in CHIPS.size():
 		out.append({"id": StringName("stake:%d" % i), "rect": stake_chip_rect(i),
-			"enabled": not _dealing and STAKES[i] <= _purse()})
+			"enabled": can_add(CHIPS[i])})
+	out.append({"id": &"clear", "rect": CLEAR, "enabled": not _dealing and _bet > 0})
+	out.append({"id": &"max", "rect": MAX, "enabled": not _dealing and _bet < bet_cap()})
 	out.append({"id": &"deal", "rect": DEAL, "enabled": can_deal()})
 	return out
 
@@ -316,14 +339,26 @@ func activate(id: StringName) -> bool:
 	var name: String = String(id)
 	if name.begins_with("stake:"):
 		var index: int = int(name.substr(6))
-		if _dealing or STAKES[index] > _purse():
+		if index < 0 or index >= CHIPS.size() or not can_add(CHIPS[index]):
 			return false
-		_stake = index
-		MenuStyleScript.tick_confirm()
-		if _stage != null:
-			_stage.queue_redraw()
+		set_stake_index(index)
+		_sound_call(&"play", [&"chip_clink"])
 		return true
 	match id:
+		&"clear":
+			if _dealing or _bet <= 0:
+				return false
+			_bet = 0
+			MenuStyleScript.tick_back()
+			refresh()
+			return true
+		&"max":
+			if _dealing or _bet >= bet_cap():
+				return false
+			_bet = bet_cap()
+			_sound_call(&"play", [&"chip_clink"])
+			refresh()
+			return true
 		&"deal":
 			if not can_deal():
 				return false
@@ -505,21 +540,23 @@ func paint(ci: Control) -> void:
 		PaintScript.button(ci, SPLIT, "Split", Color(0.42, 0.52, 0.92),
 			button_enabled(&"split"), is_lit(&"split"))
 	else:
-		for i: int in STAKES.size():
+		for i: int in CHIPS.size():
 			var box: Rect2 = stake_chip_rect(i)
-			var usable: bool = STAKES[i] <= _purse()
-			var chosen: bool = i == _stake and usable
-			var centre: Vector2 = box.get_center() - Vector2(0.0, 8.0 if chosen else 0.0)
-			if chosen:
-				ci.draw_arc(centre, CHIP_RADIUS + 7.0, 0.0, TAU, 48,
-					Color(PaintScript.GOLD, 0.75 + 0.25 * sin(t * 4.0)), 4.0, true)
-			PaintScript.chip(ci, centre, CHIP_RADIUS, PaintScript.CHIP_COLORS[i] if usable
+			var usable: bool = can_add(CHIPS[i])
+			var centre: Vector2 = box.get_center() - Vector2(0.0, 6.0 if is_lit(StringName("stake:%d" % i)) else 0.0)
+			PaintScript.chip(ci, centre, CHIP_RADIUS, _chip_tint(i) if usable
 				else Color(0.30, 0.28, 0.32), true)
-			PaintScript.label(ci, numeral_font, Rect2(centre - Vector2(CHIP_RADIUS * 0.66,
-				14.0), Vector2(CHIP_RADIUS * 1.32, 28.0)), str(STAKES[i]), 22,
-				Color.WHITE if i == 2 or not usable else PaintScript.CARD_INK)
-		PaintScript.button(ci, DEAL, "Deal %d" % selected_stake() if selected_stake() > 0
-			else "No chips", Color(0.95, 0.62, 0.18), can_deal(), is_lit(&"deal"))
+			PaintScript.label(ci, numeral_font, Rect2(centre - Vector2(CHIP_RADIUS * 0.7,
+				14.0), Vector2(CHIP_RADIUS * 1.4, 28.0)), str(CHIPS[i]), 20,
+				Color.WHITE if i >= 2 or not usable else PaintScript.CARD_INK)
+		PaintScript.button(ci, CLEAR, "Clear", Color(0.62, 0.56, 0.66), button_enabled(&"clear"),
+			is_lit(&"clear"))
+		PaintScript.button(ci, MAX, "Max", Color(0.95, 0.78, 0.30), button_enabled(&"max"),
+			is_lit(&"max"))
+		var deal_text := "Deal %d" % selected_stake() if selected_stake() > 0 \
+			else ("Place a bet" if _purse() > 0 else "No chips")
+		PaintScript.button(ci, DEAL, deal_text, Color(0.95, 0.62, 0.18), can_deal(),
+			is_lit(&"deal"))
 		PaintScript.rounded(ci, COUNTER, 29.0, Color(0.0, 0.0, 0.0, 0.35),
 			Color(PaintScript.GOLD, 0.5), 2.0)
 		PaintScript.draw_chip_icon(ci, Rect2(COUNTER.position + Vector2(12.0, 14.0),
@@ -615,6 +652,13 @@ func _paint_rules(ci: Control, title_font: Font) -> void:
 	PaintScript.paragraph(ci, MenuStyleScript.numeral_font(), Rect2(RULES.position
 		+ Vector2(28.0, 80.0), RULES.size - Vector2(56.0, 100.0)), lines, 24,
 		MenuStyleScript.COLOR_NAME)
+
+
+## A chip's colour by its value: white 10, green 50, black 100, gold 500.
+func _chip_tint(index: int) -> Color:
+	if index < PaintScript.CHIP_COLORS.size():
+		return PaintScript.CHIP_COLORS[index]
+	return PaintScript.GOLD
 
 
 func _chip_colour(amount: int) -> int:

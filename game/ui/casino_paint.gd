@@ -446,8 +446,17 @@ static func card_pip_points(rect: Rect2, rank: int) -> PackedVector2Array:
 	return out
 
 
+## The icon set's picture per Slots.Symbol and per suit (hearts, diamonds, spades, clubs).
+const SYMBOL_ICONS: Array[String] = ["reel_apple", "reel_horseshoe", "reel_bell", "reel_gem",
+	"reel_star", "reel_rainbow"]
+const SUIT_ICONS: Array[String] = ["suit_hearts", "suit_diamonds", "suit_spades", "suit_clubs"]
+
+
 ## One per Slots.Symbol, in enum order: APPLE, HORSESHOE, BELL, GEM, STAR, RAINBOW.
 static func draw_symbol(ci: CanvasItem, box: Rect2, symbol: int) -> void:
+	# The icon set's reel pictures (P8 S8; playtest 2026-11-08 item 60: "flat clip-art").
+	if IconSet.draw(ci, SYMBOL_ICONS[clampi(symbol, 0, SYMBOL_ICONS.size() - 1)], box):
+		return
 	match symbol:
 		SlotsScript.Symbol.APPLE:
 			ci.draw_circle(_at(box, 0.5, 0.60), box.size.y * 0.32, Color(0.85, 0.20, 0.22))
@@ -503,6 +512,9 @@ static func draw_symbol(ci: CanvasItem, box: Rect2, symbol: int) -> void:
 ## triangulator refuses it outright. Slicing the same points into their four independent loops
 ## draws the identical club without asking the triangulator to close a shape that never was one.
 static func draw_suit(ci: CanvasItem, box: Rect2, suit: int) -> void:
+	# The icon set's suits (P8 S8; item 59: the clubs drew as broken dots).
+	if IconSet.draw(ci, SUIT_ICONS[clampi(suit, 0, 3)], box):
+		return
 	var colour: Color = SUIT_COLORS[clampi(suit, 0, SUIT_COLORS.size() - 1)]
 	match clampi(suit, 0, 3):
 		0: ci.draw_colored_polygon(heart_points(box), colour)
@@ -548,12 +560,16 @@ static func draw_card(ci: CanvasItem, rect: Rect2, font: Font, card: int,
 	rounded(ci, rect, 8.0, CARD_FACE, CARD_INK, 1.0)
 	var letter: String = CARD_RANK_LETTERS[rank]
 	var colour: Color = SUIT_COLORS[suit]
-	text(ci, font, rect.position + Vector2(7.0, 24.0), letter, 20, colour,
+	# THE INDEX SITS IN FROM THE EDGE (item 59: "corner numbers touch the edge"): a tenth of
+	# the card's width in, as a printed card's is, with its suit under it at both ends.
+	var inset: float = maxf(8.0, rect.size.x * 0.1)
+	text(ci, font, rect.position + Vector2(inset, inset + 18.0), letter, 20, colour,
 		HORIZONTAL_ALIGNMENT_LEFT, -1.0)
-	text(ci, font, rect.position + rect.size - Vector2(7.0, 7.0), letter, 20, colour,
+	text(ci, font, rect.position + rect.size - Vector2(inset, inset + 14.0), letter, 20, colour,
 		HORIZONTAL_ALIGNMENT_RIGHT, -1.0)
-	var corner := Rect2(rect.position + Vector2(6.0, 26.0), Vector2(14.0, 14.0))
-	draw_suit(ci, corner, suit)
+	draw_suit(ci, Rect2(rect.position + Vector2(inset - 1.0, inset + 22.0), Vector2(16.0, 16.0)), suit)
+	draw_suit(ci, Rect2(rect.position + rect.size - Vector2(inset + 15.0, inset + 12.0),
+		Vector2(16.0, 16.0)), suit)
 	if rank >= 10:
 		var panel := Rect2(rect.position + rect.size * Vector2(0.22, 0.26),
 			rect.size * Vector2(0.56, 0.48))
@@ -561,7 +577,7 @@ static func draw_card(ci: CanvasItem, rect: Rect2, font: Font, card: int,
 		text(ci, font, panel.position + Vector2(panel.size.x * 0.5, panel.size.y * 0.72),
 			letter, 30, colour, HORIZONTAL_ALIGNMENT_CENTER, -1.0)
 		return
-	var pip_size: float = rect.size.x * (0.30 if rank == 0 else 0.16)
+	var pip_size: float = rect.size.x * (0.34 if rank == 0 else 0.19)
 	for p: Vector2 in card_pip_points(rect, rank):
 		draw_suit(ci, Rect2(p - Vector2(pip_size, pip_size) * 0.5,
 			Vector2(pip_size, pip_size)), suit)

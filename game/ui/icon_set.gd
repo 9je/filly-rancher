@@ -30,3 +30,15 @@ static func texture(name: String, px: int = 64, plate: bool = true) -> ImageText
 
 static func has(name: String) -> bool:
 	return FileAccess.file_exists(DIR + name + ".svg")
+
+
+## Draw icon `name` (plate-less) into `rect` on `ci`, square and centred, rasterised at twice
+## its drawn size in 16 px steps so it stays crisp under the UI scale. False if the set lacks it.
+static func draw(ci: CanvasItem, name: String, rect: Rect2) -> bool:
+	if not has(name):
+		return false
+	var side: float = minf(rect.size.x, rect.size.y)
+	var px := clampi(int(ceil(side * 2.0 / 16.0)) * 16, 32, 256)
+	ci.draw_texture_rect(texture(name, px, false),
+		Rect2(rect.position + (rect.size - Vector2(side, side)) * 0.5, Vector2(side, side)), false)
+	return true

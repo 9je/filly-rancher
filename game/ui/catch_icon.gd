@@ -21,13 +21,10 @@ const OUTLINE := Color(0.24, 0.17, 0.3, 0.85)
 ## plate-less, centred in `area`; the shapes below are only for kinds it does not have yet.
 ## Rasterised at twice the drawn size, in 16 px steps, so it stays crisp under the UI scale.
 static func draw_from_set(ci: CanvasItem, name: String, area: Vector2) -> bool:
-	if name.is_empty() or not IconSet.has(name):
+	if name.is_empty():
 		return false
 	var side: float = minf(area.x, area.y) * 0.94
-	var px := clampi(int(ceil(side * 2.0 / 16.0)) * 16, 32, 256)
-	ci.draw_texture_rect(IconSet.texture(name, px, false),
-		Rect2((area - Vector2(side, side)) * 0.5, Vector2(side, side)), false)
-	return true
+	return IconSet.draw(ci, name, Rect2((area - Vector2(side, side)) * 0.5, Vector2(side, side)))
 
 
 func _draw() -> void:

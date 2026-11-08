@@ -49,6 +49,8 @@ func _push(hand: RoundScript) -> void:
 
 func test_before_a_hand_there_are_stakes_and_deal_and_deal_emits_the_stake() -> void:
 	assert_eq(String(_menu.focused_id()), "deal")
+	# Chips stack onto the bet (P8 item 58): 100 and 100 is 200.
+	_menu.on_stage_hit(_menu.button_index(&"stake:2"))
 	_menu.on_stage_hit(_menu.button_index(&"stake:2"))
 	watch_signals(_menu)
 	_menu.on_stage_hit(_menu.button_index(&"deal"))
@@ -255,3 +257,17 @@ func test_the_split_banner_says_both_hands_and_fits() -> void:
 	for line: String in [_menu.headline()]:
 		var px: int = PaintScript.fit_size(font, line, 50, box.size.x - 48.0 - 150.0)
 		assert_lte(font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x, box.size.x - 48.0 - 150.0)
+
+
+
+## P8, playtest 2026-11-08 item 58: "i hate i cant bet 100". Chips add up on the spot; Clear
+## takes the bet back and Max pushes what the table and the purse allow.
+func test_chips_stack_clear_takes_them_back_and_max_bets_the_most() -> void:
+	_menu.on_stage_hit(_menu.button_index(&"stake:1"))
+	_menu.on_stage_hit(_menu.button_index(&"stake:1"))
+	assert_eq(_menu.selected_stake(), 100, "50 and 50")
+	_menu.on_stage_hit(_menu.button_index(&"clear"))
+	assert_eq(_menu.selected_stake(), 0)
+	assert_false(_menu.can_deal(), "no bet, no deal")
+	_menu.on_stage_hit(_menu.button_index(&"max"))
+	assert_eq(_menu.selected_stake(), mini(_menu.TABLE_MAX, _chips))
