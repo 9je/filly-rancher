@@ -47,6 +47,23 @@ const FACTORY_CLOUD_SHADE := Color(0.36, 0.29, 0.42, 1.0)
 const BANDS: Array[Color] = [Color(0.96, 0.33, 0.36), Color(1.0, 0.62, 0.25),
 	Color(1.0, 0.86, 0.30), Color(0.45, 0.82, 0.42), Color(0.35, 0.62, 0.96),
 	Color(0.66, 0.45, 0.90)]
+## KEY ART (P8 S10; owner playtest 2026-11-08 item 67: "still felt kind of cheap"; references
+## Hades, Stardew): a painted-looking still of the valley itself, captured from the game at its
+## best hour (scenes/test/key_art_shot.gd), drifting in slowly behind the title, with one tip
+## and a slim rainbow bar along the bottom. Without the picture, the drawn valley below.
+const ART := {
+	Look.RANCH: "res://assets/ui/loading_ranch.png",
+	Look.FACTORY: "res://assets/ui/loading_factory.png",
+}
+const TIPS: Array[String] = [
+	"A happy pony Blooms sooner. A full pen is not a happy pen.",
+	"Every pony has a favourite food. Her card says which.",
+	"Skittish ponies bolt if they see you coming. Walk up behind them.",
+	"Bramble buys gems at the Market. The Depot takes ponies.",
+	"Sleep at the house to end the day. It saves, too.",
+	"The Company only wants ponies who have found their colour.",
+	"Hold the beam on her until she is lifted, and she is yours.",
+]
 const BAR_WOOD := Color(0.31, 0.20, 0.13, 1.0)
 const BAR_TRACK := Color(1.0, 0.98, 0.93, 0.95)
 
@@ -98,6 +115,8 @@ var _title: Label
 var _headline: Label
 var _caption_label: Label
 var _percent: Label
+var _art: Texture2D
+var _tip: Label
 
 
 ## Change to `path` behind the loading screen. The one door every interactive transition
@@ -208,14 +227,26 @@ func _build() -> void:
 	_canvas.draw.connect(_draw_canvas)
 	add_child(_canvas)
 
+	var art_path: String = ART.get(look, "")
+	if art_path != "" and ResourceLoader.exists(art_path):
+		_art = load(art_path) as Texture2D
 	_build_bar()
-	_title = _label(MenuStyleScript.title_font(), 84, MenuStyleScript.COLOR_TITLE)
+	_title = _label(MenuStyleScript.title_font(), 96 if _art != null else 84, MenuStyleScript.COLOR_TITLE)
 	_title.text = "Filly Rancher"
 	_headline = _label(MenuStyleScript.numeral_font(), 30, MenuStyleScript.COLOR_NAME)
 	_headline.text = headline if headline != "" else \
 		("Off to the ranch" if look == Look.RANCH else "Up to the Rainbow Factory")
 	_caption_label = _label(MenuStyleScript.numeral_font(), 26, MenuStyleScript.COLOR_NAME)
 	_percent = _label(MenuStyleScript.numeral_font(), 26, MenuStyleScript.COLOR_VALUE)
+	_tip = _label(MenuStyleScript.numeral_font(), 24, Color(1.0, 0.97, 0.9, 0.92))
+	_tip.text = TIPS[randi() % TIPS.size()] if look == Look.RANCH else ""
+	_tip.visible = _art != null
+	if _art != null:
+		for l: Label in [_title, _headline, _tip, _caption_label, _percent]:
+			l.add_theme_color_override(&"font_shadow_color", Color(0.08, 0.04, 0.12, 0.75))
+			l.add_theme_constant_override(&"shadow_offset_x", 0)
+			l.add_theme_constant_override(&"shadow_offset_y", 3)
+			l.add_theme_constant_override(&"shadow_outline_size", 6)
 	_canvas.resized.connect(_layout)
 	_layout()
 
@@ -232,6 +263,9 @@ func _label(font: Font, size: int, colour: Color) -> Label:
 
 func _bar_rect() -> Rect2:
 	var s := _canvas.size
+	if _art != null:
+		# Slim, along the bottom, under the tip: the picture is the screen, not the bar.
+		return Rect2(Vector2(s.x * 0.06, s.y * 0.9), Vector2(s.x * 0.88, clampf(s.y * 0.014, 10.0, 18.0)))
 	var w := clampf(s.x * 0.46, 320.0, 900.0)
 	var h := clampf(s.y * 0.06, 28.0, 56.0)
 	return Rect2(Vector2((s.x - w) * 0.5, s.y * 0.53), Vector2(w, h))
@@ -304,6 +338,23 @@ func _layout() -> void:
 	var cream := _track.get_theme_stylebox(&"panel") as StyleBoxFlat
 	cream.set_corner_radius_all(int(bar.size.y * 0.5))
 	_place_fill()
+	if _art != null:
+		_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		_headline.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		_title.position = Vector2(s.x * 0.06, s.y * 0.07)
+		_title.size = Vector2(s.x * 0.6, 116.0)
+		_headline.position = Vector2(s.x * 0.06 + 4.0, s.y * 0.07 + 112.0)
+		_headline.size = Vector2(s.x * 0.6, 40.0)
+		_tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		_tip.position = Vector2(bar.position.x, bar.position.y - 88.0)
+		_tip.size = Vector2(bar.size.x * 0.8, 36.0)
+		_caption_label.position = Vector2(bar.position.x, bar.position.y - 46.0)
+		_caption_label.size = Vector2(bar.size.x * 0.8, 36.0)
+		_caption_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		_percent.position = Vector2(bar.end.x - bar.size.x * 0.2, bar.position.y - 46.0)
+		_percent.size = Vector2(bar.size.x * 0.2, 36.0)
+		_percent.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		return
 	_title.position = Vector2(0.0, s.y * 0.25)
 	_title.size = Vector2(s.x, 104.0)
 	_headline.position = Vector2(0.0, s.y * 0.25 + 104.0)
@@ -424,6 +475,9 @@ func _input(event: InputEvent) -> void:
 
 func _draw_canvas() -> void:
 	var s := _canvas.size
+	if _art != null:
+		_draw_art(s)
+		return
 	var factory := look == Look.FACTORY
 	var top := FACTORY_TOP if factory else SKY_TOP
 	var bottom := FACTORY_BOTTOM if factory else SKY_BOTTOM
@@ -449,6 +503,25 @@ func _draw_canvas() -> void:
 		var x := fposmod(puff.x + drift, 1.2) - 0.1
 		_canvas.draw_circle(Vector2(x * s.x, puff.y * s.y), puff.z * s.x,
 			FACTORY_CLOUD if factory else CLOUD)
+
+
+## The key art, covering the screen, pushing in slowly (a Ken Burns drift, so the screen is
+## alive between load steps), with a dark band rising from the bottom for the words to sit on.
+func _draw_art(s: Vector2) -> void:
+	var tex := _art.get_size()
+	var zoom := 1.03 + 0.05 * clampf(_t / 24.0, 0.0, 1.0)
+	var cover := maxf(s.x / tex.x, s.y / tex.y) * zoom
+	var size := tex * cover
+	var drift := Vector2(-0.012 * s.x * clampf(_t / 24.0, 0.0, 1.0), 0.0)
+	_canvas.draw_texture_rect(_art, Rect2((s - size) * 0.5 + drift, size), false)
+	var fade_top := s.y * 0.58
+	var dark := Color(0.09, 0.05, 0.13, 0.86)
+	_canvas.draw_polygon(PackedVector2Array([Vector2(0, fade_top), Vector2(s.x, fade_top),
+		Vector2(s.x, s.y), Vector2(0, s.y)]),
+		PackedColorArray([Color(dark, 0.0), Color(dark, 0.0), dark, dark]))
+	_canvas.draw_polygon(PackedVector2Array([Vector2(0, 0), Vector2(s.x * 0.7, 0),
+		Vector2(s.x * 0.5, s.y * 0.32), Vector2(0, s.y * 0.38)]),
+		PackedColorArray([Color(dark, 0.5), Color(dark, 0.0), Color(dark, 0.0), Color(dark, 0.0)]))
 
 
 func _hill(s: Vector2, base: float, amp: float, waves: float, phase: float, colour: Color) -> void:
