@@ -3,15 +3,20 @@
 Sprint: P8, plan in docs/sprint-plan-2026-11-08.md. Branch v1-overhaul.
 Status: owner said go 2026-11-08: ONE NON-STOP SWEEP S0 to S10, no owner gates; Fable stands in at each check.
 
-Current batch: none. First up: S0 (process setup, 2 h box), then S1 (blockers) in main
-and S2 (core loop) in one Opus 5.5 worktree agent at the same time.
+Current batch (2026-11-08 evening): S0-S1 done; S4/S5/S8/S9/S10 code in, renders pending.
+Agent lane (worktree, Opus): S2 core loop + S3 catching, not back yet.
+Uncommitted on purpose until renders are looked at: project.godot shadow settings, toon.gdshader
+(stepped shadow, dither include), outline/pony_eye shaders, dither.gdshaderinc, ranch.tscn
+(env, sun, NightLights, SkyEvents nodes), sky_rig.gd (moon), night_lights.gd, sky_events.gd,
+camera_rig.gd (dither), test_sky_rig.gd, look_world.gd, beam_low_shot.gd.
 
-Next 5 steps:
-1. S0: create docs/playtest-2026-11-08-ledger.md (verbatim words, situation column).
-2. S0: dialogue-graph test, story reachability test, constant cross-checks.
-3. S0: scenes/test/stress_pen.gd and the regression sheet script.
-4. S1: item 1 (act2.txt `wait` branch leaves the lift offered again), then 3, 24, 17.
-5. Brief the S2 agent: section 2.1 and 2.2 of the plan; it never edits status docs.
+Next steps:
+1. Look at $SCRATCH/look_after (day/night) and $SCRATCH/checks (creator, beam, toast, spike,
+   flank, race, derpy, rainboom); fix, then commit the lighting batch.
+2. Capture key art (key_art_shot.gd) into game/assets/ui/loading_ranch.png.
+3. Merge the agent's S2/S3 branch (review diff, rerun its tests, parse sweep).
+4. Then: Depot/Market on the kit with portraits (S5), town relayout (S7), hair shading (S6).
+5. tools/parse_sweep.sh before each commit batch; commit only on green tests.
 
 Rules that bite: no em dashes; tick only with a render of the owner's situation; suite in the
 background on a snapshot, never blocking a commit; no bot playthroughs; at most 2 agents

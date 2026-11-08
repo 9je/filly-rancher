@@ -238,3 +238,4 @@ Fixed by cause, each with a test that sweeps every instance of its kind. Done so
 - **FS7 late game:** twelve decorations at the Market in hand-placed spots (DECISIONS.md). Collection sets (FS7.2) are not done.
 - **FS8 accessibility:** rarity is a shape as well as a colour; a Text size setting (100, 125, 150 percent); rebinding was already in, and a swap now says which action moved. Gamepad rebinding is not done.
 - **Process:** one subagent (FS8) stopped before starting because its worktree came from master; FS8 was done inline instead.
+- **P8 sweep, 2026-11-08 evening:** S0/S1 (Color Day soft-lock and two more like it, beam lift, Marigold's trail), icon set and UI kit, casino fixes (chips stack, race guide with portraits, cage beacon), cinematic player with Derpy and Rainboom events, loading key-art mode, Color Day town lines, postcards. Lighting reset is in the working tree pending renders. Details: docs/playtest-2026-11-08-ledger.md.
