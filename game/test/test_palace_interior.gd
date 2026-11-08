@@ -234,3 +234,18 @@ func test_a_ban_walks_her_out() -> void:
 	assert_true(ranch.call("enforce_palace_ban"), "a ban with her inside does something")
 	assert_false(ranch.call("is_in_palace"), "it walks her out")
 	ranch.set("_interactive", false)
+
+
+## P8, playtest 2026-11-08 item 57: the first visit points at the cage, and the pointer goes
+## once she has used it.
+func test_the_first_visit_points_at_the_cage_until_she_uses_it() -> void:
+	# An earlier test opens every station; this one starts from a steward who never has.
+	ranch.get("_game_state").story.set_flag("cage_visited", false)
+	ranch.call("enter_palace", true)
+	var hall: Node = ranch.get("palace_interior")
+	assert_true(bool(hall.call("cage_beacon_shown")), "a coin over the cage on the first visit")
+	ranch.call("_open_palace_station", "cage")
+	assert_false(bool(hall.call("cage_beacon_shown")), "gone once the cage is used")
+	var cm: Object = ranch.get("casino_menu")
+	if cm != null and cm.has_method("close"):
+		cm.call("close")

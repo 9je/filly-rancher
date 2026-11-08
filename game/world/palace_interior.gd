@@ -133,9 +133,35 @@ func set_active(on: bool) -> void:
 	set_process(on and _wheel != null)
 
 
+## THE FIRST VISIT GOES TO THE CAGE (P8, playtest 2026-11-08 item 57): a bobbing coin over
+## the cashier's window, until she has changed bits for chips there once.
+var _cage_beacon: Sprite3D
+
+
+func set_cage_beacon(on: bool) -> void:
+	if on and _cage_beacon == null:
+		_cage_beacon = Sprite3D.new()
+		_cage_beacon.name = "CageBeacon"
+		_cage_beacon.texture = IconSet.texture("coin", 128)
+		_cage_beacon.pixel_size = 0.009
+		_cage_beacon.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		_cage_beacon.no_depth_test = true
+		_cage_beacon.shaded = false
+		add_child(_cage_beacon)
+		_cage_beacon.position = CAGE_AT + Vector3(-1.2, 3.6, 0.0)
+	if _cage_beacon != null:
+		_cage_beacon.visible = on
+
+
+func cage_beacon_shown() -> bool:
+	return _cage_beacon != null and _cage_beacon.visible
+
+
 func _process(delta: float) -> void:
 	tick_patrons(delta)
 	_t += delta
+	if _cage_beacon != null and _cage_beacon.visible:
+		_cage_beacon.position.y = 3.6 + sin(_t * 2.6) * 0.18
 	if _wheel != null:
 		_wheel.rotate_object_local(Vector3.FORWARD, -WHEEL_IDLE_SPIN * delta)
 	# The bulbs breathe, each model's set a beat off the next, so a row of machines reads as

@@ -5753,6 +5753,11 @@ func _move_into_palace() -> void:
 	if people != null:
 		people.park_companions(_palace_step_point())
 	_novelty("area", "palace_hall", "Inside the Spectra Palace")
+	# First visit: the coin over the cage points the way (P8 item 57).
+	var first: bool = _game_state != null and not _game_state.story.has_flag("cage_visited")
+	palace_interior.set_cage_beacon(first)
+	if first:
+		_toast("Change bits for chips at the cage.")
 
 
 func _move_out_of_palace() -> void:
@@ -5823,6 +5828,9 @@ func _open_palace_station(id: String) -> bool:
 		"cage":
 			if casino_menu == null or not bool(casino_menu.open()):
 				return false
+			if _game_state != null:
+				_game_state.story.set_flag("cage_visited")
+			palace_interior.set_cage_beacon(false)
 			casino_menu.call("set_tab", CasinoMenuScript.Tab.CAGE)
 			return true
 		"slots":
