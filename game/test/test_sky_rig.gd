@@ -363,8 +363,10 @@ func test_a_pinned_night_storm_puts_the_sun_down_and_the_rain_up() -> void:
 	_build_world()
 	_rig.apply_immediately(_pinned_state(NIGHT, STORM))
 
-	assert_gt(_sun.rotation_degrees.x, 0.0,
-		"a positive pitch aims the light upward from below; the sun has set")
+	# P8 S4: with the sun down, the light is the moon, high up, never a light under the ground
+	# raking up the walls (playtest 2026-11-08 items 49 and 51).
+	assert_almost_eq(_sun.rotation_degrees.x, -SkyRigScript.MOON_ELEVATION, 0.01,
+		"the sun has set; the light shines down from the moon")
 	assert_lt(_sun.light_energy, SkyRigScript.light_energy(DAY, CLEAR),
 		"a stormy night must be dimmer than a clear day")
 	assert_almost_eq(_environment.fog_density, SkyRigScript.fog_density(STORM), 0.000001)

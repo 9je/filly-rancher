@@ -144,5 +144,20 @@ func _run() -> void:
 			await Boot.frames(self, 40)
 			await Boot.shot(self, out, "race_guide")
 			rm.call("close")
+	for ev: String in ["derpy", "rainboom"]:
+		if not _want(ev):
+			continue
+		var sky: Node = ranch.get_node(^"SkyEvents")
+		if ev == "derpy":
+			sky.call("derpy_crash")
+		else:
+			sky.call("sonic_rainboom")
+		# A strip through the scene: the software renderer draws a few frames a second, so a
+		# frame count is the only clock that lands shots inside it.
+		for k in 6:
+			await Boot.frames(self, 8)
+			await Boot.shot(self, out, "%s_%d" % [ev, k])
+		while Cinematic.shared(self).playing:
+			await process_frame
 	print("P8_CHECKS_OK")
 	quit(0)

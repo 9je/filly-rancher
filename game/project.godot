@@ -58,6 +58,13 @@ buses/default_bus_layout="res://default_bus_layout.tres"
 driver/threads/thread_model=2
 renderer/rendering_method="forward_plus"
 
+; P8 S4 (docs/aaa-review-2026-11-08.md 2.1): hard shadows. The soft filter's rotated samples
+; were the salt-and-pepper noise the toon shader had to ramp around, which made every cast
+; shadow a smudge; hard shadows are flats, as in the show. A bigger map keeps the edge clean.
+lights_and_shadows/directional_shadow/size=8192
+lights_and_shadows/directional_shadow/soft_shadow_filter_quality=0
+lights_and_shadows/positional_shadow/soft_shadow_filter_quality=0
+
 ; The HUD (game/ui/hud.gd) is authored in 1920x1080 units -- crosshair radii, pip
 ; sizes, font sizes -- and `canvas_items` stretch is what makes those units mean the
 ; same thing on a 1366x768 laptop and a 4K monitor instead of shrinking to a smear on

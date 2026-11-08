@@ -50,6 +50,14 @@ const ELEVATION_HORIZON_DIP := -4.0
 const ELEVATION_DAY_EDGE := 20.0
 const ELEVATION_NOON := 60.0
 const ELEVATION_NIGHT := -12.0
+## THE MOON (P8 S4; docs/aaa-review-2026-11-08.md 2.1). The sun's arc above still dips under
+## the ground at night, but the light does not follow it there: a light under the horizon
+## raked up the walls and threw tree shadows sideways across house fronts (playtest
+## 2026-11-08 items 49 and 51). Whenever the sun is down, the one directional light stands
+## where the moon is instead, high in the east, so night casts its own short hard shadows
+## from above in the moonlight's colour and energy (PHASE_LIGHT_COLORS / ENERGY at NIGHT).
+const MOON_ELEVATION := 38.0
+const MOON_AZIMUTH := 35.0
 
 ## THE BEARING, IN DEGREES OF YAW. It sweeps one way across DAWN, DAY and DUSK (east to
 ## west) and is parked at the western value all night, because there is no sun up there to
@@ -651,10 +659,12 @@ func _write_to_scene() -> void:
 			push_error(("SkyRig '%s' found no WorldEnvironment; the sky, the ambient fill "
 				+ "and the fog will not be written.") % [name])
 	if _sun != null:
-		_sun.rotation_degrees = Vector3(
-			-float(_current.get(KEY_SUN_ELEVATION, ELEVATION_DAY_EDGE)),
-			float(_current.get(KEY_SUN_AZIMUTH, AZIMUTH_DAY_START)),
-			0.0)
+		var elevation := float(_current.get(KEY_SUN_ELEVATION, ELEVATION_DAY_EDGE))
+		var azimuth := float(_current.get(KEY_SUN_AZIMUTH, AZIMUTH_DAY_START))
+		if elevation < 0.0:
+			elevation = MOON_ELEVATION
+			azimuth = MOON_AZIMUTH
+		_sun.rotation_degrees = Vector3(-elevation, azimuth, 0.0)
 		_sun.light_energy = float(_current.get(KEY_LIGHT_ENERGY, 1.0))
 		_sun.light_color = (_current.get(KEY_LIGHT_COLOR, _sun.light_color) as Color) \
 			* (_tone.get("sun_tint", Color.WHITE) as Color)

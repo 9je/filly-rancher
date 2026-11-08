@@ -850,7 +850,9 @@ func _update_subject_fade() -> void:
 			_subject_meshes.clear()
 			_subject_fade = -1.0
 			return
-		mesh.transparency = 1.0 - opacity
+		# A screen-door dither, not alpha (P8, item 33; shaders/dither.gdshaderinc): never a
+		# half-transparent ghost of her.
+		mesh.set_instance_shader_parameter(&"dither_fade", opacity)
 		# `visible` is only WRITTEN when the fade actually needs to flip it, not
 		# reassigned to the same value on every opacity change (which happens on every
 		# tiny camera-distance jitter while the arm sits in the fade band). This rig

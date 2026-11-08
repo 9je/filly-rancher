@@ -26,6 +26,8 @@ enum Role { NONE, COAT, MANE, MANE2, TAIL, BROW, LASH, EYE, MOUTH, HIDE }
 
 const COAT_NAMES: Array[String] = ["body", "wings", "horn"]
 const FOAL_SCALE := 0.78
+## How far a hair card's normal bends toward the hair's rounded mass (hair.gdshaderinc).
+const HAIR_ROUND := 0.6
 
 ## Line weight per role, in pixels before ToonStyler.outline_scale. Faces get none: an
 ## outline round an eyeball reads as a monocle.
@@ -82,6 +84,14 @@ static func apply(body: Node3D, look: PonyLook) -> int:
 				mi.visible = look.race == &"unicorn"
 			elif names[0] == "wings":
 				mi.visible = look.race == &"pegasus"
+		# A mesh that is only hair shades as one rounded mass (P8 item 34; hair.gdshaderinc).
+		var all_hair := not names.is_empty()
+		for n: String in names:
+			if not (role_of(n, donor) in [Role.MANE, Role.MANE2, Role.TAIL, Role.HIDE]):
+				all_hair = false
+		if all_hair:
+			var mid := mi.get_aabb().get_center()
+			mi.set_instance_shader_parameter(&"hair_center", Vector4(mid.x, mid.y, mid.z, HAIR_ROUND))
 		for i in range(names.size()):
 			var r: int = role_of(names[i], donor)
 			if not ToonStylerScript.shading_enabled:

@@ -3,11 +3,12 @@
 // stays the same weight at 2 m and at 20 m, as a drawn line would. The color is the
 // surface's own albedo darkened, not black: the show outlines a lilac pony in deep purple.
 //
-// Lines fade out past `fade_end` meters; distant ponies are small and a full-weight line on
-// a 30-pixel pony is a smudge.
+// Lines thin past `fade_start` meters to a one-pixel floor at `fade_end`; they never vanish.
 shader_type spatial;
 render_mode unshaded, cull_front, depth_draw_opaque, shadows_disabled, fog_disabled;
 #include "res://shaders/bounce.gdshaderinc"
+#include "res://shaders/dither.gdshaderinc"
+#include "res://shaders/hair.gdshaderinc"
 
 global uniform float dread;
 
@@ -38,7 +39,11 @@ void vertex() {
 		dir /= len;
 	}
 	float dist = -view_pos.z;
-	float fade = 1.0 - smoothstep(fade_start, fade_end, dist);
+	// NEVER FADED TO NOTHING (P8 S6; docs/aaa-review-2026-11-08.md 2.2): a herd at 25 m lost
+	// its drawing and read as colour blobs. The line thins from width_px to a one-pixel floor
+	// between fade_start and fade_end instead, the way a drawn line does at a distance.
+	float floor_w = min(1.0, width_px) / max(width_px, 0.0001);
+	float fade = mix(1.0, floor_w, smoothstep(fade_start, fade_end, dist));
 	float w = width_px;
 	if (highlight.a > 0.0) {
 		fade = 1.0;
@@ -56,6 +61,7 @@ void vertex() {
 }
 
 void fragment() {
+	dither_clip(FRAGCOORD.xy);
 	vec3 base = albedo.rgb;
 	if (use_texture) {
 		base *= texture(albedo_texture, UV).rgb;

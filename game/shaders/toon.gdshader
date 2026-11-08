@@ -10,6 +10,8 @@
 shader_type spatial;
 render_mode cull_back, depth_draw_opaque, specular_disabled;
 #include "res://shaders/bounce.gdshaderinc"
+#include "res://shaders/dither.gdshaderinc"
+#include "res://shaders/hair.gdshaderinc"
 
 global uniform float dread;
 
@@ -42,6 +44,7 @@ varying vec3 model_normal;
 uniform int marking = 0;
 uniform vec4 marking_color : source_color = vec4(0.98, 0.97, 0.94, 1.0);
 varying vec3 rest_pos;
+varying vec3 hair_mid_view;
 
 float marking_hash(vec3 p) {
 	return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
@@ -101,9 +104,11 @@ void vertex() {
 	model_normal = NORMAL;
 	rest_pos = CUSTOM0.xyz;
 	VERTEX += bounce_offset(VERTEX);
+	hair_mid_view = (MODELVIEW_MATRIX * vec4(hair_center.xyz, 1.0)).xyz;
 }
 
 void fragment() {
+	dither_clip(FRAGCOORD.xy);
 	vec4 c = albedo;
 	if (use_texture) {
 		vec4 tc = texture(albedo_texture, UV);
@@ -127,6 +132,9 @@ void fragment() {
 		rgb = mix(rgb, grey, clamp(dread, 0.0, 1.0) * 0.62);
 	}
 	ALBEDO = rgb;
+	if (hair_center.w > 0.0) {
+		NORMAL = normalize(mix(NORMAL, normalize(VERTEX - hair_mid_view), hair_center.w));
+	}
 	EMISSION = emission * emission_energy;
 	ROUGHNESS = 1.0;
 }
@@ -136,14 +144,12 @@ void light() {
 	float lit = smoothstep(band_center - band_softness, band_center + band_softness, ndl);
 	float falloff = 1.0;
 	if (LIGHT_IS_DIRECTIONAL) {
-		// ATTENUATION is the sun's shadow term. It is NOT banded hard like N.L: the ranch sun's
-		// soft shadows (PCSS, light_angular_distance 0.9, shadow_blur 1.1) sample the map with a
-		// per-pixel rotated pattern, so across a penumbra or a self-shadowed flank the term
-		// hovers round 0.5 with pixel noise in it. A 0.45..0.55 step turned that noise into
-		// full-contrast salt and pepper: ponies (and trees, and walls) came out grainy and
-		// dithered (playtest 2026-10-24, docs/playtest_fixes/ponies.md). A wide ramp keeps
-		// the shadow edge but passes the noise at a fifth of the contrast.
-		lit = min(lit, smoothstep(0.2, 0.8, ATTENUATION));
+		// ATTENUATION is the sun's (or the moon's) shadow term, stepped like N.L so a cast
+		// shadow is a flat, the same flat as the shadow side of a body. It was ramped 0.2..0.8
+		// while the ranch ran PCSS soft shadows, whose noisy penumbra a hard step turned to salt
+		// and pepper (playtest 2026-10-24); the shadows are hard now (P8 S4), so there is no
+		// noise to hide and the ramp only smeared every shadow edge.
+		lit = min(lit, smoothstep(0.42, 0.58, ATTENUATION));
 	} else {
 		// Omni and spot lights keep a soft distance falloff but still band the surface.
 		falloff = ATTENUATION;

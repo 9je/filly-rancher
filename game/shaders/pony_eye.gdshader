@@ -7,6 +7,11 @@
 // her head, and the show never does that to an eye.
 shader_type spatial;
 render_mode cull_back, specular_disabled;
+// The bounce include first, so dither_fade sits at the same instance slot as on the toon and
+// outline materials sharing her mesh (instance uniforms are matched by index).
+#include "res://shaders/bounce.gdshaderinc"
+#include "res://shaders/dither.gdshaderinc"
+#include "res://shaders/hair.gdshaderinc"
 
 global uniform float dread;
 
@@ -53,6 +58,7 @@ void vertex() {
 }
 
 void fragment() {
+	dither_clip(FRAGCOORD.xy);
 	vec2 base_uv = planar ? planar_uv : UV;
 	vec2 iuv = (planar ? base_uv : iris_centre + (UV - iris_centre) * iris_scale) - gaze;
 	vec4 tex = texture(eye_texture, iuv);

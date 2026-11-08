@@ -22,6 +22,8 @@ const TIMES := {
 var out := ""
 var views: Array = VIEWS.keys() + ["pony"]
 var times: Array = TIMES.keys()
+## --small: 960x540, about a third of the cost on the software renderer.
+var small := false
 
 
 func _initialize() -> void:
@@ -30,6 +32,8 @@ func _initialize() -> void:
 			out = a.substr(6)
 		elif a.begins_with("--views="):
 			views = Array(a.substr(8).split(","))
+		elif a == "--small":
+			small = true
 		elif a.begins_with("--times="):
 			times = Array(a.substr(8).split(","))
 	DirAccess.make_dir_recursive_absolute(out)
@@ -38,6 +42,8 @@ func _initialize() -> void:
 
 func _run() -> void:
 	var ranch: Node = await Boot.boot(self)
+	if small:
+		root.get_window().size = Vector2i(960, 540)
 	await Boot.frames(self, 60)
 	var player: Node3D = ranch.get("player")
 	var cam := Camera3D.new()
@@ -50,6 +56,9 @@ func _run() -> void:
 		var sky: Node = ranch.get("sky_rig")
 		if sky != null and sky.has_method("apply_immediately"):
 			sky.call("apply_immediately", w)
+		var lamps: Node = ranch.get_node_or_null(^"NightLights")
+		if lamps != null:
+			lamps.call("set_level", 0.0 if t == "day" else 1.0)
 		for v: String in views:
 			if v == "pony":
 				var at := player.global_position

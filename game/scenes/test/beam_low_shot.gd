@@ -33,9 +33,14 @@ func _run() -> void:
 	var fwd := -player.global_transform.basis.z
 	fwd.y = 0.0
 	pony.global_position = player.global_position + fwd.normalized() * 3.0
-	rig.set("_look_pitch", -60.0)
+	# Looking down at her, as low as the aim goes, and the beam held as the player holds it.
+	rig.set("_look_pitch", -35.0)
 	await Boot.frames(self, 10)
-	beam.call("_begin_hold", pony)
+	Input.action_press(beam.get("BEAM_ACTION"))
+	for i in 20:
+		await physics_frame
+	print("HELD %s" % (beam.get("_held") == pony))
+	rig.set("_look_pitch", -60.0)
 	for i in 60:
 		await physics_frame
 	var gap := _gap(pony)
@@ -44,6 +49,7 @@ func _run() -> void:
 		await physics_frame
 	print("GAP 1s=%.2f 3s=%.2f m (min wanted %.2f)" % [gap, _gap(pony), beam.get("HOLD_MIN_LIFT")])
 	await Boot.shot(self, out, "beam_low_3s")
+	Input.action_release(beam.get("BEAM_ACTION"))
 	quit(0)
 
 
