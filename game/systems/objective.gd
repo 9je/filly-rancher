@@ -107,7 +107,9 @@ static func _acts_one_two(s: Dictionary, flags: Array) -> Dictionary:
 		return _o(&"invite", &"marigold", PlaceSign.Icon.STAR, "Marigold wants a word")
 	if not flags.has("color_day"):
 		return _o(&"wait", &"", PlaceSign.Icon.HOUSE, "Color Day comes at dawn")
-	return _o(&"lift", &"depot", PlaceSign.Icon.CRATE, "Meet Marigold at the Depot")
+	# At HER, not the Depot (playtest 2026-11-08 item 17): the trail led to the building and
+	# E there opened the Depot instead of her lift talk.
+	return _o(&"lift", &"marigold", PlaceSign.Icon.STAR, "Meet Marigold at the Depot")
 
 
 static func _o(id: StringName, goal: StringName, icon: int, words: String) -> Dictionary:

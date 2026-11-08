@@ -55,7 +55,8 @@ func test_the_invitation_then_color_day_then_the_lift() -> void:
 	var f := ["has_scoop", "depot_explained", "invited"]
 	assert_eq(_goal({"chapter": 1, "flags": f}), &"", "Color Day comes at dawn: no place to go")
 	assert_false(_words({"chapter": 1, "flags": f}).is_empty(), "but it still says so")
-	assert_eq(_goal({"chapter": 2, "flags": f + ["color_day"]}), &"depot", "the lift is at the Depot")
+	assert_eq(_goal({"chapter": 2, "flags": f + ["color_day"]}), &"marigold",
+		"the trail leads to Marigold herself, not the Depot she stands at (2026-11-08 item 17)")
 
 
 func test_the_factory_path_is_the_contract_then_the_jubilee() -> void:

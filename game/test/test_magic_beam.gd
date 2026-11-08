@@ -843,7 +843,9 @@ func test_a_held_pony_is_never_pulled_into_the_ground() -> void:
 	for i in 120:
 		beam._pull(1.0 / 60.0)
 		lowest = minf(lowest, pony.global_position.y)
-	assert_gte(lowest, -0.01, "held, she stays on or over the ground (lowest %.2f m)" % lowest)
+	# Item 24 (playtest 2026-11-08): on the ground she looked uncaught; held, she floats clear.
+	assert_gte(lowest, MagicBeam.HOLD_MIN_LIFT - 0.01,
+		"held, she floats clear of the ground (lowest %.2f m)" % lowest)
 	beam.release()
 
 

@@ -314,6 +314,10 @@ const HELD_SPIN_RATE := 0.9
 ## How far over a held pony's feet the ground under her is looked for (_keep_over_ground):
 ## more than one frame's pull can sink her at PULL_RESPONSE.
 const GROUND_PROBE_UP := 1.5
+## The least air under a held pony's hooves. Aimed low, the hold point runs into the ground;
+## set on the ground there, she read as "caught but still standing" (playtest 2026-11-08
+## item 24). A held pony always floats clear, whatever the aim.
+const HOLD_MIN_LIFT := 0.6
 
 const RELEASE_LEAD := 2.0
 const RELEASE_LIFT := 0.15
@@ -1754,17 +1758,18 @@ func _pull(delta: float) -> void:
 
 ## Aimed low, the hold point runs under the ground, and the lerp above reeled her into it;
 ## let go there, the floor shoved her back out at 17 to 20 m/s, a pony who "just flew"
-## (PS11 G10, the slip_flight flake). Her feet are her origin, so she is set on the ground
-## under her whenever the pull would bury them. TERRAIN only: a probe that met props would
-## lift her onto a roof or a fence top she was merely held beside. Checked every frame, so
-## she is never more than one frame's pull under it and a short probe finds it.
+## (PS11 G10, the slip_flight flake). Her feet are her origin, so she is kept HOLD_MIN_LIFT
+## over the ground under her whenever the pull would take her lower (item 24: on the ground
+## itself she looked uncaught). TERRAIN only: a probe that met props would lift her onto a
+## roof or a fence top she was merely held beside. Checked every frame, so she is never more
+## than one frame's pull under it and a short probe finds it.
 func _keep_over_ground(body: Node3D) -> void:
 	var at := body.global_position
 	var query := PhysicsRayQueryParameters3D.create(
-		at + Vector3.UP * GROUND_PROBE_UP, at, LayersScript.TERRAIN)
+		at + Vector3.UP * GROUND_PROBE_UP, at + Vector3.DOWN * HOLD_MIN_LIFT, LayersScript.TERRAIN)
 	var hit := body.get_world_3d().direct_space_state.intersect_ray(query)
-	if not hit.is_empty() and at.y < hit["position"].y:
-		body.global_position.y = hit["position"].y
+	if not hit.is_empty() and at.y < hit["position"].y + HOLD_MIN_LIFT:
+		body.global_position.y = hit["position"].y + HOLD_MIN_LIFT
 
 
 ## Count the hold, and hand the body back if it outlasts its struggle time. This is the
