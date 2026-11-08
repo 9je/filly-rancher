@@ -1,0 +1,22 @@
+[beam_targeting] INPUT_TEST_OK test_beam_targeting highlight before the press, aim assist 0.9 m, and the press took her
+[camera_factory] INPUT_TEST_OK test_camera_factory 5838 frames, the camera never went through the Factory's floor or walls
+[camera_terrain] INPUT_TEST_OK test_camera_terrain 171323 frames at 27 stops, the camera never went under the terrain or into a building
+[catch_card] INPUT_TEST_OK test_catch_card caught on the first try; then a card with her portrait, 4 trait chips, clear of the crosshair and bag
+[find_market] INPUT_TEST_OK test_find_market the compass leads to the Market and to the pens
+[first_pony] INPUT_TEST_OK test_first_pony caught on the first try
+[footsteps] INPUT_TEST_OK test_footsteps 73 hoofsteps on 130 footfalls, all aligned, varied, on the right surface and clean
+[fullscreen_kept] INPUT_TEST_OK test_fullscreen_kept fullscreen chosen during the load is still fullscreen in the ranch
+[loading] INPUT_TEST_OK test_loading every transition showed a moving loading screen over every stall
+[news_marker] INPUT_TEST_OK test_news_marker Marigold wears the gold bubble until she talks
+[objective_card] INPUT_TEST_OK test_objective_card the card names 'Catch a Drifter', and walking the way it shows took it from 0 m to 0 m
+[palace_interior] INPUT_TEST_OK test_palace_interior walked in through the doors, played the slots screen, walked out with her 77 bits
+[pause_in_talk] INPUT_TEST_OK test_pause_in_talk paused mid conversation and came back to the same line, the world running
+[pen_upgrade] INPUT_TEST_OK test_pen_upgrade built a Paddock, upgraded it to a Big Pen for 175, and was told plot 3 needs 115
+[pony_materials] INPUT_TEST_OK test_pony_materials 93 ponies, cast, Spike and the player: no missing texture or eye, near and far
+[scale] INPUT_TEST_OK test_scale 919 placements of 119 assets all within SCALE.md (1 PH = 2.19 m)
+[settings] INPUT_TEST_OK test_settings keyboard, controller and mouse all drove every tab; apply, revert and the display timeout hold
+[shadows] INPUT_TEST_OK test_shadows shadows clean at every distance and hour (speckle near 0.00031, mid 0.00043, far 0.00027)
+[slip_flight] INPUT_TEST_OK test_slip_flight 5 slipped ponies all came down and ran along the ground
+[sprint] INPUT_TEST_OK test_sprint W runs 5.2 m/s, Shift sprints 7.8 m/s, C sneaks 1.3 m/s
+[window_size] INPUT_TEST_OK test_window_size the window stayed (1280, 720) in mode 0 from the title to the ranch
+INPUT_TESTS passed=21 failed=0
