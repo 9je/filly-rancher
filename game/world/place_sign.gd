@@ -23,7 +23,11 @@ const ICON_COLOURS := {
 	Icon.ARROW: Color(0.96, 0.7, 0.3),
 }
 
-static var _icon_cache: Dictionary = {}
+## Each Icon's picture in the icon set (tools/make_icons.py).
+const ICON_NAMES := {
+	Icon.COIN: "coin", Icon.CRATE: "crate", Icon.HOUSE: "house", Icon.SCROLL: "letter",
+	Icon.FENCE: "fence", Icon.STAR: "star", Icon.ARROW: "arrow",
+}
 
 ## A SIGN STEPS ASIDE FOR THE LENS (overnight bot review, 2026-10-26: the board beside the
 ## Depot's door filled the screen whenever the third-person camera came up behind it). Solid
@@ -197,75 +201,7 @@ func _mat(c: Color) -> StandardMaterial3D:
 	return m
 
 
-## The painted icon for `kind`, drawn once.
+## The icon for `kind`, from the icon set.
 static func icon_texture(kind: int) -> ImageTexture:
-	if _icon_cache.has(kind):
-		return _icon_cache[kind]
-	var n := 128
-	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
-	img.fill(Color(0, 0, 0, 0))
-	var c: Color = ICON_COLOURS.get(kind, Color.WHITE)
-	var dark := c.darkened(0.45)
-	var mid := Vector2(64, 64)
-	for y in n:
-		for x in n:
-			var p := Vector2(x + 0.5, y + 0.5)
-			var col := Color(0, 0, 0, 0)
-			match kind:
-				Icon.COIN:
-					var d := p.distance_to(mid)
-					if d < 54:
-						col = dark
-					if d < 48:
-						col = c
-					if d < 36 and d > 30:
-						col = dark
-					# a "b" for bits: stem and bowl
-					if (absf(x - 52.0) < 5 and y > 38 and y < 90) or (absf(p.distance_to(Vector2(64, 74)) - 13.0) < 4.5 and x > 50):
-						col = dark
-				Icon.CRATE:
-					if x > 14 and x < 114 and y > 22 and y < 110:
-						col = dark
-						if x > 22 and x < 106 and y > 30 and y < 102:
-							col = c
-							if absf(y - 66.0) < 4 or absf((x - 22.0) - (y - 30.0)) < 5:
-								col = dark
-				Icon.HOUSE:
-					var roof := y > 14 and y < 62 and absf(x - 64.0) < (y - 14.0) * 1.15
-					var body := x > 28 and x < 100 and y >= 58 and y < 112
-					if roof:
-						col = dark
-					if body:
-						col = c
-					if x > 54 and x < 74 and y > 80 and y < 112:
-						col = dark
-				Icon.SCROLL:
-					if x > 26 and x < 102 and y > 18 and y < 110:
-						col = c
-						if (y > 40 and y < 46) or (y > 58 and y < 64) or (y > 76 and y < 82):
-							if x > 38 and x < 90:
-								col = dark
-					if (y > 12 and y < 26 or y > 102 and y < 116) and x > 20 and x < 108:
-						col = dark
-				Icon.FENCE:
-					for post in [24, 64, 104]:
-						if absf(x - post) < 8 and y > 20 and y < 112:
-							col = c
-							if absf(x - post) >= 5:
-								col = dark
-					if (absf(y - 48.0) < 6 or absf(y - 84.0) < 6) and x > 16 and x < 112:
-						col = dark
-				Icon.STAR:
-					var a := atan2(p.y - 64.0, p.x - 64.0)
-					var r := p.distance_to(mid)
-					var lim := 26.0 + 30.0 * pow(absf(cos(a * 2.5 + PI * 0.25)), 3.0)
-					if r < lim:
-						col = c if r < lim - 6 else dark
-				Icon.ARROW:
-					if (y > 50 and y < 78 and x > 14 and x < 80) or (x >= 74 and x < 116 and absf(y - 64.0) < (116.0 - x) * 0.85):
-						col = c
-			if col.a > 0.0:
-				img.set_pixel(x, y, col)
-	var tex := ImageTexture.create_from_image(img)
-	_icon_cache[kind] = tex
-	return tex
+	# The one icon set (P8 S5, game/ui/icon_set.gd) replaces the per-pixel drawing that was here.
+	return IconSet.texture(ICON_NAMES.get(kind, "star"), 128)

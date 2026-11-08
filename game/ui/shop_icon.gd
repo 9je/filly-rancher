@@ -83,6 +83,8 @@ func _draw() -> void:
 	if kind in FOODS:
 		super._draw()
 		return
+	if draw_from_set(self, String(kind), size):
+		return
 	var s: float = minf(size.x, size.y) / 30.0
 	draw_set_transform(Vector2((size.x - 30.0 * s) * 0.5, (size.y - 30.0 * s) * 0.5),
 		0.0, Vector2(s, s))

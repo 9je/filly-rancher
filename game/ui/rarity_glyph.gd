@@ -61,4 +61,10 @@ static func outline(r: int, centre: Vector2, radius: float) -> PackedVector2Arra
 
 
 func _draw() -> void:
+	# The icon set's rarity pictures (P8 S5); the polygon stays for outline()'s callers.
+	if CatchIcon.draw_from_set(self, "rarity_" + _NAMES.get(shape(), "common"), size):
+		return
 	draw_colored_polygon(outline(rarity, size * 0.5, minf(size.x, size.y) * 0.45), colour)
+
+
+const _NAMES := {&"circle": "common", &"diamond": "uncommon", &"star": "rare", &"crown": "legendary"}

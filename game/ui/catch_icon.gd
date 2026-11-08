@@ -17,7 +17,22 @@ var kind: StringName = &"":
 const OUTLINE := Color(0.24, 0.17, 0.3, 0.85)
 
 
+## THE ICON SET FIRST (P8 S5): a kind the set has (game/ui/icon_set.gd) is drawn from it,
+## plate-less, centred in `area`; the shapes below are only for kinds it does not have yet.
+## Rasterised at twice the drawn size, in 16 px steps, so it stays crisp under the UI scale.
+static func draw_from_set(ci: CanvasItem, name: String, area: Vector2) -> bool:
+	if name.is_empty() or not IconSet.has(name):
+		return false
+	var side: float = minf(area.x, area.y) * 0.94
+	var px := clampi(int(ceil(side * 2.0 / 16.0)) * 16, 32, 256)
+	ci.draw_texture_rect(IconSet.texture(name, px, false),
+		Rect2((area - Vector2(side, side)) * 0.5, Vector2(side, side)), false)
+	return true
+
+
 func _draw() -> void:
+	if draw_from_set(self, String(kind), size):
+		return
 	var s: float = minf(size.x, size.y) / 30.0
 	draw_set_transform(Vector2((size.x - 30.0 * s) * 0.5, (size.y - 30.0 * s) * 0.5),
 		0.0, Vector2(s, s))
