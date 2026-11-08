@@ -24,7 +24,7 @@ extends RefCounted
 ## PEN_UPGRADE and PLOT_CLEAR are appended rather than slotted in beside the other ground
 ## kinds, so every int a driver or a test log already holds keeps its meaning.
 enum Kind { NONE, PLOT_BUILD, PEN_MOVE_IN, MARKET, BOARD, MAILBOX, DEPOT, PALACE, TALK,
-	PEN_UPGRADE, PLOT_CLEAR, PALACE_STATION, PALACE_EXIT, SPIKE }
+	PEN_UPGRADE, PLOT_CLEAR, PALACE_STATION, PALACE_EXIT, SPIKE, SLEEP }
 
 ## THE ORDER, HIGHEST FIRST, and every one of these positions is a decision.
 ##
@@ -60,7 +60,7 @@ enum Kind { NONE, PLOT_BUILD, PEN_MOVE_IN, MARKET, BOARD, MAILBOX, DEPOT, PALACE
 ## play.
 const PRIORITY: Array[int] = [Kind.PLOT_BUILD, Kind.PEN_MOVE_IN, Kind.PEN_UPGRADE,
 	Kind.PLOT_CLEAR, Kind.TALK, Kind.MARKET, Kind.BOARD, Kind.MAILBOX, Kind.SPIKE, Kind.DEPOT,
-	Kind.PALACE, Kind.PALACE_STATION, Kind.PALACE_EXIT]
+	Kind.PALACE, Kind.PALACE_STATION, Kind.PALACE_EXIT, Kind.SLEEP]
 
 ## What each station in the hall says it does (game/world/palace_interior.gd's STATIONS).
 const STATION_PROMPTS := {
@@ -224,6 +224,8 @@ static func prompt_for(action: Dictionary, key: String) -> String:
 			return "%s: leave the Palace" % key
 		Kind.TALK:
 			return "%s: talk to %s" % [key, subject]
+		Kind.SLEEP:
+			return "%s: sleep till dawn (the ranch saves)" % key
 	return ""
 
 

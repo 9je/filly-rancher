@@ -101,15 +101,37 @@ static func _acts_one_two(s: Dictionary, flags: Array) -> Dictionary:
 			# her own, not &"pens" and &"catch": those lead to a pen with ROOM and the nearest
 			# wild pony of any kind, so with every pen upgraded and full the trail fell back
 			# to the old Paddock and stayed there ("0/2", item 53).
+			# PLAIN WORDS (playtest 2026-11-08 item 74: "Feed Drifters to Bloom" meant nothing):
+			# what to do and what it gets her. The two terms are explained once, the first time
+			# they are on the card (EXPLAIN).
 			if int(s.get("drifters", 1)) <= 0:
 				return _o(&"bloom", &"drifter", PlaceSign.Icon.STAR,
-					"Pen a Drifter to Bloom %d/%d" % [b, INVITE_BLOOMS])
+					"Catch and pen a Drifter %d/%d" % [b, INVITE_BLOOMS])
 			return _o(&"bloom", &"bloom", PlaceSign.Icon.FENCE,
-				"Feed Drifters to Bloom %d/%d" % [b, INVITE_BLOOMS])
+				"Keep Drifters fed to Bloom %d/%d" % [b, INVITE_BLOOMS])
 		return _o(&"invite", &"marigold", PlaceSign.Icon.STAR, "Marigold wants a word")
 	if not flags.has("color_day"):
-		return _o(&"wait", &"", PlaceSign.Icon.HOUSE, "Color Day comes at dawn")
+		return _o(&"wait", &"", PlaceSign.Icon.HOUSE, "Sleep at home till Color Day")
 	return _o(&"lift", &"depot", PlaceSign.Icon.CRATE, "Meet Marigold at the Depot")
+
+
+## THE ONE-TIME EXPLAINERS (item 74): the first time a term is on the card, what it means.
+## {flag: [term, the explanation]}; the ranch shows each once and sets its flag.
+const EXPLAIN := {
+	"explained_drifter": ["Drifter", "A Drifter is a pony with no mark yet: a blank cutie mark. Catch her, pen her, and look after her."],
+	"explained_bloom": ["Bloom", "Bloom: a well kept Drifter finds her talent and her cutie mark appears. Her favourite food and a friend in the pen speed it up."],
+}
+
+
+## The explainer due for `words` given the story `flags` set, as {flag, text}, or {}.
+static func explainer_for(words: String, flags: Array) -> Dictionary:
+	for flag: String in EXPLAIN:
+		if flags.has(flag):
+			continue
+		var row: Array = EXPLAIN[flag]
+		if words.contains(String(row[0])):
+			return {"flag": flag, "text": String(row[1])}
+	return {}
 
 
 static func _o(id: StringName, goal: StringName, icon: int, words: String) -> Dictionary:

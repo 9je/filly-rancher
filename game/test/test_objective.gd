@@ -53,7 +53,7 @@ func test_a_bloom_needs_a_penned_drifter_and_the_card_says_so() -> void:
 
 func test_the_invitation_then_color_day_then_the_lift() -> void:
 	var f := ["has_scoop", "depot_explained", "invited"]
-	assert_eq(_goal({"chapter": 1, "flags": f}), &"", "Color Day comes at dawn: no place to go")
+	assert_eq(_goal({"chapter": 1, "flags": f}), &"", "Sleep at home till Color Day: no place to go")
 	assert_false(_words({"chapter": 1, "flags": f}).is_empty(), "but it still says so")
 	assert_eq(_goal({"chapter": 2, "flags": f + ["color_day"]}), &"depot", "the lift is at the Depot")
 
@@ -103,3 +103,29 @@ func test_the_card_names_what_the_ring_points_at() -> void:
 	for g: StringName in [&"mail", &"talk", &"market", &"pens", &"catch"]:
 		var o := ObjectiveScript.for_guide(g, story)
 		assert_between(String(o.words).split(" ", false).size(), 2, 6, String(o.words))
+
+
+# --- P8: plain words, and the two terms explained once (playtest 2026-11-08 item 74) --------
+
+func test_the_bloom_step_says_what_to_do_in_plain_words() -> void:
+	var f := ["has_scoop", "met_fennel", "depot_explained"]
+	var o := ObjectiveScript.current({"chapter": 1, "flags": f, "deliveries": 6, "blooms": 0,
+		"drifters": 2, "pens": 1})
+	assert_false(String(o["words"]).begins_with("Feed Drifters to Bloom"), "the old riddle is gone")
+	assert_string_contains(String(o["words"]), "fed")
+	var none := ObjectiveScript.current({"chapter": 1, "flags": f, "deliveries": 6, "blooms": 0,
+		"drifters": 0, "pens": 1})
+	assert_string_contains(String(none["words"]), "pen a Drifter")
+
+
+func test_each_term_is_explained_once() -> void:
+	var e := ObjectiveScript.explainer_for("Catch a Drifter", [])
+	assert_eq(e["flag"], "explained_drifter")
+	assert_string_contains(String(e["text"]), "no mark")
+	assert_true(ObjectiveScript.explainer_for("Catch a Drifter", ["explained_drifter"]).is_empty(),
+		"never twice")
+	var b := ObjectiveScript.explainer_for("Keep Drifters fed to Bloom 0/2",
+		["explained_drifter"])
+	assert_eq(b["flag"], "explained_bloom")
+	assert_false(String(b["text"]).contains("--"))
+	assert_true(ObjectiveScript.explainer_for("Ship ponies at the Depot", []).is_empty())

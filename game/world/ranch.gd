@@ -2984,7 +2984,7 @@ func _on_debt_cleared() -> void:
 	_toast("Collection day: your account is paid in full. Marigold would like a word.")
 	_novelty("story", "debt_cleared", "Paid the Company in full")
 	debt_cleared.emit()
-	var bus := get_node_or_null("/root/Events")
+	var bus := get_node_or_null("/root/Events") if is_inside_tree() else null
 	if bus != null and bus.has_signal("debt_cleared"):
 		bus.emit_signal("debt_cleared")
 
@@ -4923,6 +4923,9 @@ func interaction_candidates() -> Array[Dictionary]:
 	if is_near_depot():
 		out.append(InteractionScript.candidate(
 			InteractionScript.Kind.DEPOT, _door_gap(^"Buildings/Depot")))
+	if can_sleep_here():
+		out.append(InteractionScript.candidate(
+			InteractionScript.Kind.SLEEP, _door_gap(^"Buildings/Farmhouse")))
 	# THE BAN CLOSES THE DOOR RATHER THAN GREYING IT OUT. The shipped code showed no prompt
 	# under a ban but still let the press through to casino_menu.open(), which then refused
 	# on its own can_open; a player got a silent nothing. A banned Palace is simply not
@@ -5062,6 +5065,11 @@ func perform_interaction(action: Dictionary) -> bool:
 			return exit_palace()
 		InteractionScript.Kind.TALK:
 			return people != null and people.talk(String(action.get("subject", "")))
+		InteractionScript.Kind.SLEEP:
+			if _sleeping:
+				return false
+			_sleep_with_fade()
+			return true
 	return false
 
 
@@ -5421,6 +5429,7 @@ func _physics_process(delta: float) -> void:
 	_update_gate_prompt()
 	_update_sound_zone()
 	_update_pantry_chip(delta)
+	_tick_autosave(delta)
 	if _game_state == null:
 		return
 	var house := get_node_or_null(^"Buildings/Farmhouse") as Node3D
@@ -5440,9 +5449,98 @@ func _physics_process(delta: float) -> void:
 		return
 	_house_armed = false
 	var ok := save_game()
+	_autosave_t = 0.0
 	var hud := get_node_or_null(^"HUD")
 	if hud != null and hud.has_method("toast"):
 		hud.toast("Ranch saved" if ok else "SAVE FAILED. See the log.")
+
+
+# --- days: sleep and the autosave (P8; playtest 2026-11-08 items 3, 11; idea D1) ------------
+
+## REAL DAYS. From dusk, the farmhouse door offers sleep: the night is skipped to the next
+## dawn (every phase turning over on the way, so escapes, the dawn cart, postcards and a
+## collection day all still happen, and the pens eat and Bloom through the night), and the
+## ranch saves. By day there is no prompt: the day is for working.
+const SLEEP_DOOR_RADIUS := 4.0
+## How finely the night is stepped: the clock in MENU_CATCH_UP_STEP strides (every phase
+## turns over), the pens in SLEEP_PEN_STEP strides (a hungry pony eats on time).
+const SLEEP_PEN_STEP := 10.0
+## THE AUTOSAVE (item 3: the last save on disk was an hour and a half old mid-session). Every
+## AUTOSAVE_SECONDS of play outdoors with nothing open (no menu, no talk, no race), and the
+## clock starts again after any save.
+const AUTOSAVE_SECONDS := 300.0
+var _autosave_t := 0.0
+var _sleeping := false
+var autosaves := 0
+
+
+## Whether the farmhouse door offers sleep right now: at dusk or night, at the door, outdoors.
+func can_sleep_here() -> bool:
+	if _world == null or _in_palace or player == null or _world.is_pinned():
+		return false
+	var phase := _world.phase()
+	if phase != WorldStateScript.Phase.DUSK and phase != WorldStateScript.Phase.NIGHT:
+		return false
+	return _door_gap(^"Buildings/Farmhouse") <= SLEEP_DOOR_RADIUS
+
+
+## Seconds from now to the next dawn (the start of the next cycle).
+func seconds_to_dawn() -> float:
+	if _world == null:
+		return 0.0
+	return WorldStateScript.CYCLE_SECONDS - fposmod(_world.elapsed(), WorldStateScript.CYCLE_SECONDS)
+
+
+## SKIP TO DAWN, THEN SAVE. Synchronous and public, so a test can sleep a ranch; the door's
+## fade is _sleep_with_fade() around it. Returns the seconds slept (0 if she could not).
+func sleep_till_dawn() -> float:
+	if _world == null or _world.is_pinned() or _game_state == null:
+		return 0.0
+	var left := seconds_to_dawn()
+	var slept := left
+	var pens: Array[Pen] = []
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen != null:
+			pens.append(pen)
+	while left > 0.0:
+		var step := minf(left, SLEEP_PEN_STEP)
+		for pen in pens:
+			pen.tick(step)
+		_world.advance(step)
+		left -= step
+	var ok := save_game()
+	_autosave_t = 0.0
+	_toast("Good morning! Day %d. %s" % [_world.cycle_index() + 1,
+		"The ranch is saved." if ok else "SAVE FAILED. See the log."])
+	_novelty("mechanic", "first_sleep", "Slept the night through at the farmhouse")
+	return slept
+
+
+func _sleep_with_fade() -> void:
+	_sleeping = true
+	await _palace_fade_to(1.0, 0.6)
+	sleep_till_dawn()
+	await get_tree().create_timer(0.4).timeout
+	await _palace_fade_to(0.0, 0.8)
+	_sleeping = false
+
+
+## Outdoors, nothing open, nobody talking, no race: count toward the autosave.
+func _tick_autosave(delta: float) -> void:
+	if _game_state == null or _in_palace or _sleeping or not _no_other_menu_open():
+		return
+	if people != null and people.is_talking():
+		return
+	if race_track != null and bool(race_track.call("is_running")):
+		return
+	_autosave_t += delta
+	if _autosave_t < AUTOSAVE_SECONDS:
+		return
+	_autosave_t = 0.0
+	if save_game():
+		autosaves += 1
+		_toast("Autosaved.")
 
 
 # --- the two ponies behind counters --------------------------------------------------
@@ -8862,6 +8960,11 @@ func _v1_tick(delta: float) -> void:
 	if hud != null and hud.has_method("set_tip"):
 		var tip: Dictionary = _game_state.onboarding.current(_onboarding_state(),
 			func(action: StringName) -> String: return InputDeviceScript.hint(action))
+		# ONE THING TO DO AT A TIME (playtest 2026-11-08 item 75: "Read your new letter" on the
+		# card over "Sell gems to Bramble" in the tip line). A tip that sends her somewhere is
+		# only shown when the card is pointing there too, or nowhere.
+		if StringName(tip.get("id", &"")) == &"sell" and not (_guide_goal in [&"market", &""]):
+			tip = {}
 		hud.call("set_tip", str(tip.get("text", "")))
 
 
@@ -9935,6 +10038,19 @@ func _update_person_aim() -> void:
 	hud.call("set_aiming_person", who is Npc)
 
 
+## THE TERMS, EXPLAINED ONCE (item 74): the first time "Drifter" or "Bloom" is on the
+## objective card, a toast says what it means, and a story flag keeps it from saying it again.
+func _explain_once(words: String) -> void:
+	var story: Story = get_story()
+	if story == null or words.is_empty():
+		return
+	var e := ObjectiveScript.explainer_for(words, story.flags.keys())
+	if e.is_empty():
+		return
+	story.set_flag(String(e["flag"]))
+	_toast(String(e["text"]))
+
+
 ## The pony Tumble last pointed out, while she is still out there to be found (Happenings).
 func _guide_sighting() -> Node3D:
 	if happenings == null:
@@ -10048,5 +10164,6 @@ func _update_guide(delta: float) -> void:
 				d = Vector2(where.global_position.x - player.global_position.x,
 					where.global_position.z - player.global_position.z).length()
 			card.call("show_objective", o, d)
+			_explain_once(String(o.get("words", "")))
 	var target := guide_target()
 	_guide_trail.point(player.global_position, target.global_position if target != null else Vector3.INF)
