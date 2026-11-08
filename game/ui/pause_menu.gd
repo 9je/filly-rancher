@@ -58,7 +58,7 @@ const SettingsMenuScene := preload("res://ui/settings_menu.tscn")
 ## "Settings UI is awful and hard to navigate", docs/playtest_fixes/settings.md). The value
 ## stays in the enum so every other page keeps its number.
 enum Page { MAIN, SETTINGS, COMPENDIUM, REQUESTS, MAIL, LEDGER }
-enum Row { RESUME, COMPENDIUM, REQUESTS, MAIL, LEDGER, SAVE, LOAD, SETTINGS, QUIT }
+enum Row { RESUME, COMPENDIUM, REQUESTS, MAIL, LEDGER, SAVE, LOAD, SETTINGS, UNSTUCK, QUIT }
 
 ## THE ROWS, IN THE ENUM'S OWN ORDER, and the words on them.
 ##
@@ -71,7 +71,7 @@ enum Row { RESUME, COMPENDIUM, REQUESTS, MAIL, LEDGER, SAVE, LOAD, SETTINGS, QUI
 ## slice on; this page is the archive of what has already come, and calling it Mail is what
 ## made the owner ask why her mail was in a menu when the letter said it was by her house.
 const MAIN_ROWS := ["Resume", "Compendium", "Requests", "Saddlebag copies", "The ledger",
-	"Save game", "Load game", "Settings", "Quit to desktop"]
+	"Save game", "Load game", "Settings", "Get unstuck", "Quit to desktop"]
 
 ## How many character rows of the compendium are on screen at once. The roster is 43 long
 ## and the panel is not, so the list is a window over it rather than the whole thing.
@@ -132,6 +132,9 @@ signal closed()
 signal save_requested()
 signal load_requested()
 signal quit_requested()
+## "Get unstuck" (P8, playtest 2026-11-08 item 26: invisible walls and prop snags): the ranch
+## sets her down on open ground in the plaza.
+signal unstuck_requested()
 signal settings_changed()
 
 ## THE MAIL PAGE'S TWO PROVIDERS, injected by ranch.gd exactly as the five above are. This
@@ -508,6 +511,10 @@ func confirm() -> bool:
 			return true
 		Row.SETTINGS:
 			_open_settings()
+		Row.UNSTUCK:
+			close()
+			unstuck_requested.emit()
+			MenuStyleScript.tick_confirm()
 		Row.QUIT:
 			quit_requested.emit()
 			MenuStyleScript.tick_confirm()

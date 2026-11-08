@@ -706,7 +706,7 @@ func test_pointing_moves_the_cursor_and_the_keys_still_work() -> void:
 	assert_eq(_menu.selected_index(), PauseMenu.Row.SETTINGS)
 	assert_eq(_menu.hovered_index(), PauseMenu.Row.SETTINGS)
 	_menu.move_selection(1)
-	assert_eq(_menu.selected_index(), PauseMenu.Row.QUIT,
+	assert_eq(_menu.selected_index(), PauseMenu.Row.SETTINGS + 1,
 		"the mouse must never take the keyboard away")
 
 
@@ -869,3 +869,15 @@ func test_closing_the_pause_menu_drops_unapplied_settings() -> void:
 	_menu.close()
 	assert_false(_menu.settings_menu_open())
 	assert_almost_eq(_settings.master_volume, 1.0, 0.0001, "nothing unapplied leaks out")
+
+
+
+## P8, playtest 2026-11-08 item 26: "Get unstuck" closes the menu and asks the ranch to set
+## her down on open ground.
+func test_get_unstuck_closes_and_asks() -> void:
+	_menu.open()
+	watch_signals(_menu)
+	_menu.move_selection(PauseMenu.Row.UNSTUCK)
+	_menu.confirm()
+	assert_signal_emitted(_menu, "unstuck_requested")
+	assert_false(_menu.is_open())

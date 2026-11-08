@@ -2569,7 +2569,7 @@ func _bind_pause_menu() -> void:
 		_game_state.state_loaded.connect(inject_pages)
 	for pair in [["opened", _on_pause_opened], ["closed", _on_menu_closed],
 			["save_requested", _on_pause_save], ["load_requested", _on_load_requested],
-			["quit_requested", _on_pause_quit],
+			["quit_requested", _on_pause_quit], ["unstuck_requested", unstick],
 			["settings_changed", _on_settings_changed],
 			["mail_opened", _on_mail_opened], ["mail_reply", _on_mail_reply]]:
 		if not pause_menu.is_connected(pair[0], pair[1]):
@@ -2858,6 +2858,17 @@ func _on_pause_save() -> void:
 		return
 	var ok := save_game()
 	_toast("Ranch saved" if ok else "SAVE FAILED. See the log.")
+
+
+## GET UNSTUCK (P8 item 26): back on open ground by the fingerpost, facing the plaza. Out of
+## the Palace first if she is in it.
+func unstick() -> void:
+	if _in_palace:
+		exit_palace(true)
+	var at := SIGNPOST_AT + Vector3(-2.5, 0.0, 2.5)
+	at.y = float(terrain.call("height_at", at.x, at.z)) + 0.2 if terrain != null else 0.2
+	_place_player(at, 0.0)
+	_toast("Back on solid ground.")
 
 
 func _on_pause_quit() -> void:
