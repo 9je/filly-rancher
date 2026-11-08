@@ -62,6 +62,11 @@ static var _members: Array[Node3D] = []
 static var _frame := -1
 static var _pushes := {}
 static var _aside := {}
+## Each member's neighbours within reach this tick, by instance id (_solve): a turn weighs only
+## these (closest_gap), not the whole herd (PS11 G11).
+static var _near := {}
+## This tick's footprints by instance id (_solve), which a turn weighs its neighbours by.
+static var _fps := {}
 
 
 static func join(n: Node3D) -> void:
@@ -130,6 +135,39 @@ static func _closest(p0: Vector3, p1: Vector3, q0: Vector3, q1: Vector3) -> Arra
 				t = 1.0
 				s = clampf((b - c) / a, 0.0, 1.0)
 	return [p0 + d1 * s, q0 + d2 * t]
+
+
+## _closest()'s two points as one vector, from the second to the first, allocating nothing:
+## the per-pair hot path (_solve, closest_gap) runs this thousands of times a tick.
+static func _between(p0: Vector3, p1: Vector3, q0: Vector3, q1: Vector3) -> Vector3:
+	var d1 := p1 - p0
+	var d2 := q1 - q0
+	var r := p0 - q0
+	var a := d1.dot(d1)
+	var e := d2.dot(d2)
+	var f := d2.dot(r)
+	var s := 0.0
+	var t := 0.0
+	if a <= 1e-9 and e <= 1e-9:
+		return p0 - q0
+	if a <= 1e-9:
+		t = clampf(f / e, 0.0, 1.0)
+	else:
+		var c := d1.dot(r)
+		if e <= 1e-9:
+			s = clampf(-c / a, 0.0, 1.0)
+		else:
+			var b := d1.dot(d2)
+			var denom := a * e - b * b
+			s = clampf((b * f - c * e) / denom, 0.0, 1.0) if denom > 1e-9 else 0.0
+			t = (b * s + f) / e
+			if t < 0.0:
+				t = 0.0
+				s = clampf(-c / a, 0.0, 1.0)
+			elif t > 1.0:
+				t = 1.0
+				s = clampf((b - c) / a, 0.0, 1.0)
+	return (p0 + d1 * s) - (q0 + d2 * t)
 
 
 static func _ends(fp: Dictionary) -> Array:
@@ -216,22 +254,41 @@ static func closest_gap(n: Node3D, fp: Dictionary) -> float:
 		return best
 	var reach := (HALF + RADIUS) * 2.0 * 1.3
 	var at: Vector3 = fp.at
-	for m in _members:
+	var h: Vector3 = (fp.heading as Vector3) * float(fp.half)
+	var a0 := at - h
+	var a1 := at + h
+	var ry := float(fp.get("y", 0.0))
+	var rr := float(fp.radius)
+	# Only her neighbours from this tick's solve, and out of reach by where they stand before a
+	# footprint is built: every pony asks this on every turn, and weighing the whole herd was
+	# 4.5 times the physics cost at 60 ponies (PS11 G11).
+	var frame := Engine.get_physics_frames()
+	if frame != _frame:
+		_frame = frame
+		_solve()
+	for m: Node3D in _near.get(n.get_instance_id(), []):
 		if m == n or not is_instance_valid(m):
 			continue
-		# Out of reach by where she stands, before her footprint is built: every pony asks this
-		# on every turn, and building the whole herd's was 4.5 times the physics cost at 60
-		# ponies (PS11 G11).
-		var p := m.global_position
-		if Vector2(p.x - at.x, p.z - at.z).length_squared() > reach * reach:
-			continue
-		var other := footprint_of(m)
+		var other: Dictionary = _fps.get(m.get_instance_id(), {})
 		if other.is_empty():
 			continue
-		if absf(float(fp.get("y", 0.0)) - float(other.get("y", 0.0))) > SAME_FLOOR:
+		var p: Vector3 = other.at
+		if Vector2(p.x - at.x, p.z - at.z).length_squared() > reach * reach:
 			continue
-		best = minf(best, gap(fp, other))
+		if absf(ry - float(other.get("y", 0.0))) > SAME_FLOOR:
+			continue
+		best = minf(best, _between(a0, a1, other.p0, other.p1).length() - rr - float(other.radius))
 	return best
+
+
+## Whether anybody is within reach of `n` this tick (_solve): a turn with nobody near has
+## nothing to weigh (PS11 G11).
+static func has_near(n: Node3D) -> bool:
+	var frame := Engine.get_physics_frames()
+	if frame != _frame:
+		_frame = frame
+		_solve()
+	return _near.has(n.get_instance_id())
 
 
 ## NOT A HEAD SWUNG INTO A NEIGHBOUR (PS1 item 17b): a pony turning on the spot swept her
@@ -249,8 +306,11 @@ static func turn_allowed(n: Node3D, before: Dictionary, after: Dictionary) -> bo
 static func _solve() -> void:
 	_pushes.clear()
 	_aside.clear()
+	_near.clear()
+	_fps.clear()
 	var fps: Array[Dictionary] = []
 	var owners: Array[int] = []
+	var nodes: Array[Node3D] = []
 	for i in range(_members.size() - 1, -1, -1):
 		if not is_instance_valid(_members[i]):
 			_members.remove_at(i)
@@ -259,35 +319,86 @@ static func _solve() -> void:
 		if not fp.is_empty():
 			fps.append(fp)
 			owners.append(m.get_instance_id())
+			nodes.append(m)
+			_fps[m.get_instance_id()] = fp
+	# Each pair once, with one closest-points solve between their body lines feeding the gap,
+	# both pushes and both asides; and each body's line worked out once a tick. The same rules
+	# as push_between(), gap() and _ends(), which used to be called per pair over and over:
+	# that made this solve 4 ms a tick at 60 ponies, most of the physics frame (PS11 G11).
+	var n := fps.size()
+	var p0s: Array[Vector3] = []
+	var p1s: Array[Vector3] = []
+	var pushes: Array[Vector3] = []
+	var asides: Array[Vector3] = []
+	var fixed: Array = []
+	for fp in fps:
+		var at: Vector3 = fp.at
+		var h: Vector3 = (fp.heading as Vector3) * float(fp.half)
+		p0s.append(at - h)
+		p1s.append(at + h)
+		fp["p0"] = at - h
+		fp["p1"] = at + h
+		pushes.append(Vector3.ZERO)
+		asides.append(Vector3.ZERO)
+		fixed.append([] as Array[Dictionary])
 	var reach := (HALF + RADIUS) * 2.0 * 1.3 + NEAR_FIXED
-	for i in fps.size():
-		var push := Vector3.ZERO
-		var aside := Vector3.ZERO
+	for i in n:
 		var ai: Vector3 = fps[i].at
-		var fixed: Array[Dictionary] = []
-		for j in fps.size():
-			if i == j:
-				continue
+		var yi := float(fps[i].get("y", 0.0))
+		var wi := float(fps[i].get("weight", 1.0))
+		for j in range(i + 1, n):
 			if ai.distance_squared_to(fps[j].at) > reach * reach:
 				continue
 			# A floor apart (the Palace hall is under the map): not the same crowd.
-			if absf(float(fps[i].get("y", 0.0)) - float(fps[j].get("y", 0.0))) > SAME_FLOOR:
+			if absf(yi - float(fps[j].get("y", 0.0))) > SAME_FLOOR:
 				continue
-			push += push_between(fps[i], fps[j])
-			if float(fps[j].get("weight", 1.0)) <= 0.0:
-				fixed.append(fps[j])
-			if gap(fps[i], fps[j]) < CLEARANCE:
-				var c := _closest(_ends(fps[i])[0], _ends(fps[i])[1], _ends(fps[j])[0], _ends(fps[j])[1])
-				var away := Vector3(c[0] - c[1])
-				away.y = 0.0
-				if away.length_squared() > 1e-8:
-					aside += away.normalized()
-		if push != Vector3.ZERO and not fixed.is_empty():
-			push = _spare_the_fixed(fps[i], push, fixed)
+			if not _near.has(owners[i]):
+				_near[owners[i]] = []
+			if not _near.has(owners[j]):
+				_near[owners[j]] = []
+			(_near[owners[i]] as Array).append(nodes[j])
+			(_near[owners[j]] as Array).append(nodes[i])
+			var wj := float(fps[j].get("weight", 1.0))
+			if wj <= 0.0:
+				(fixed[i] as Array).append(fps[j])
+			if wi <= 0.0:
+				(fixed[j] as Array).append(fps[i])
+			var between := _between(p0s[i], p1s[i], p0s[j], p1s[j])
+			var g := between.length() - float(fps[i].radius) - float(fps[j].radius)
+			between.y = 0.0
+			if g < 0.0 and wi + wj > 0.0:
+				var dir := between
+				if dir.length_squared() < 1e-8:
+					# On the same line: apart sideways, each its own way.
+					dir = Vector3(fps[i].heading).cross(Vector3.UP)
+					if int(fps[i].get("id", 0)) > int(fps[j].get("id", 0)):
+						dir = -dir
+				dir = dir.normalized()
+				# push_between(i, j) and push_between(j, i): opposite ways, shared by weight.
+				if wi > 0.0:
+					pushes[i] += dir * -g * STIFFNESS * (wi / (wi + wj))
+				if wj > 0.0:
+					var back := -dir
+					if between.length_squared() < 1e-8:
+						back = Vector3(fps[j].heading).cross(Vector3.UP)
+						if int(fps[j].get("id", 0)) > int(fps[i].get("id", 0)):
+							back = -back
+						back = back.normalized()
+					pushes[j] += back * -g * STIFFNESS * (wj / (wi + wj))
+			if g < CLEARANCE and between.length_squared() > 1e-8:
+				var away := between.normalized()
+				asides[i] += away
+				asides[j] -= away
+	for i in n:
+		var push: Vector3 = pushes[i]
+		if push != Vector3.ZERO and not (fixed[i] as Array).is_empty():
+			var f: Array[Dictionary] = []
+			f.assign(fixed[i])
+			push = _spare_the_fixed(fps[i], push, f)
 		if push != Vector3.ZERO:
 			_pushes[owners[i]] = push.limit_length(MAX_PUSH)
-		if aside != Vector3.ZERO:
-			_aside[owners[i]] = aside.normalized()
+		if asides[i] != Vector3.ZERO:
+			_aside[owners[i]] = (asides[i] as Vector3).normalized()
 	if not _zones.is_empty():
 		_solve_zones()
 

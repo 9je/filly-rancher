@@ -7084,6 +7084,11 @@ func _probe_pen_containment() -> Dictionary:
 		var spot := Vector3(cos(angle) * edge, 0.35, sin(angle) * edge)
 		body.global_position = pen.to_global(spot)
 		started[probes[i].uid] = body.global_position
+		# Driven at the fence: a resident never flees in her own pen (PT4), so the decoy below
+		# no longer moves anyone, and her own short walks round her spot (item 65) may well have
+		# ended. Sent at a point past the rails, her leash and the fence are what stop her.
+		if body.has_method(&"wander_to"):
+			body.call(&"wander_to", pen.to_global(Vector3(spot.x * 2.0, 0.0, spot.z * 2.0)))
 
 	# A STAND-IN, NOT THE PLAYER HIMSELF. This used to teleport the real player into the
 	# middle of the pen and put him back sixty frames later. In a gate run nobody saw it; in

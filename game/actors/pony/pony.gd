@@ -1563,6 +1563,13 @@ func _transition_to(next: int) -> void:
 		_face_out_of_the_pen()
 
 
+## Walk to `point` now (a WANDER with that target): the ranch's pen probe drives residents
+## at their fence with it, since a resident never flees in her own pen.
+func wander_to(point: Vector3) -> void:
+	_transition_to(State.WANDER)
+	_wander_target = point
+
+
 ## A resident on the ring who stops turns to face out over the rails, as paddock horses do:
 ## ring neighbours then stand side by side with a metre of grass between them, not nose to
 ## rump in a chain round the middle (item 65's acceptance review). Turned smoothly by
@@ -1894,7 +1901,8 @@ func _update_facing(direction: Vector3, delta: float) -> void:
 	var weight := 1.0 - exp(-TURN_RESPONSE * delta)
 	var before := visuals.rotation.y
 	# Only a pony who is turning has her room weighed (PS11 G11: it was every pony, every tick).
-	var turning := absf(angle_difference(before, lerp_angle(before, _visual_yaw, weight))) > 1e-4
+	var turning := absf(angle_difference(before, lerp_angle(before, _visual_yaw, weight))) > 1e-4 \
+		and BodySpaceScript.has_near(self)
 	var room_before := body_footprint() if turning else {}
 	visuals.rotation.y = lerp_angle(visuals.rotation.y, _visual_yaw, weight)
 	# Not into the pony beside her (BodySpace.turn_allowed): she holds her heading and finishes

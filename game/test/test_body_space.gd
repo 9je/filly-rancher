@@ -104,7 +104,8 @@ func test_a_full_pen_spreads_out() -> void:
 
 ## PS11 G11 (the 60-pony check, 4.5 times the physics cost of the commit before the sweep):
 ## every pony's turn asked for the footprint of every member of the herd, near or far, up to
-## three times a tick. A turn only weighs the bodies in reach; nobody else's is built.
+## three times a tick. A turn only weighs the bodies in reach, by the footprints the tick's
+## solve already built; it builds none of its own.
 class Counted:
 	extends Node3D
 	var asked := 0
@@ -127,12 +128,17 @@ func test_a_turn_only_weighs_the_bodies_in_reach() -> void:
 	add_child_autofree(me)
 	for n: Node3D in [me, near] + far:
 		BodySpaceScript.join(n)
+	# The tick's own solve builds everyone's once; the turn must build no more.
+	BodySpaceScript.push_on(me)
+	near.asked = 0
+	for c in far:
+		c.asked = 0
 	var fp := BodySpaceScript.default_footprint(me, 1.0)
 	var gap := BodySpaceScript.closest_gap(me, fp)
 	for n: Node3D in [me, near] + far:
 		BodySpaceScript.leave(n)
 	assert_lt(gap, INF, "the pony beside her is weighed")
-	assert_eq(near.asked, 1, "her neighbour's footprint is built once")
+	assert_eq(near.asked, 0, "her neighbour is weighed by the footprint this tick's solve built")
 	var built := 0
 	for c in far:
 		built += c.asked
