@@ -107,7 +107,7 @@ promise [tumble sad] Okay. Okay. Hoof-shake promise. That's the realest kind of 
 speaker: fennel
 bark: true
 once: false
-when: {"chapters": [1]}
+when: {"chapters": [1], "flags_none": ["color_day"]}
 
 start [fennel neutral look] Another card from Clover today. Same as the last.
 
@@ -115,7 +115,7 @@ start [fennel neutral look] Another card from Clover today. Same as the last.
 speaker: pip
 bark: true
 once: false
-when: {"chapters": [1]}
+when: {"chapters": [1], "flags_none": ["color_day"]}
 
 start [pip neutral] The night carts were busy again. Up and down the lift till morning. Rattle rattle.
 
@@ -123,7 +123,7 @@ start [pip neutral] The night carts were busy again. Up and down the lift till m
 speaker: bramble
 bark: true
 once: false
-when: {"chapters": [1]}
+when: {"chapters": [1], "flags_none": ["color_day"]}
 
 start [bramble happy] Rainbow Dye's flying off the shelf! Everypony wants a bit of the sky.
 
@@ -142,6 +142,34 @@ once: false
 when: {"chapters": [1]}
 
 start [marigold happy] Happy ponies make the brightest colors!
+
+# ----- Color Day barks (P8, playtest 2026-11-08 item 16) ---------------------------------
+# The town on the morning of the lift. Innocent words; the unease is in the face and the beat
+# (memory: story cracks are emphasised, never said).
+
+=== bramble_bark_colorday
+speaker: bramble
+bark: true
+once: false
+when: {"flags_all": ["color_day"], "flags_none": ["reveal_done"]}
+
+start [bramble sad look] Sold the last bottle of Dye at sunup. We've never once sold out before.
+
+=== fennel_bark_colorday
+speaker: fennel
+bark: true
+once: false
+when: {"flags_all": ["color_day"], "flags_none": ["reveal_done"]}
+
+start [fennel neutral look] My Clover went up on a Color Day. You give her a wave from me, if you see her.
+
+=== pip_bark_colorday
+speaker: pip
+bark: true
+once: false
+when: {"flags_all": ["color_day"], "flags_none": ["reveal_done"]}
+
+start [pip neutral] Lift's been running since before dawn. Heavy going up. Light coming down.
 
 # ----- Color Day (STORY.md R.1): the lift up --------------------------------------------
 

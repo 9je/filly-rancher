@@ -102,3 +102,16 @@ func test_marigold_asks_again_in_the_owners_situation() -> void:
 	var d := lib.pick(&"marigold", ctx)
 	assert_not_null(d)
 	assert_eq(d.id, &"marigold_color_day")
+
+
+## P8, playtest 2026-11-08 item 16: on Color Day morning Bramble still said the Dye was flying
+## off the shelf. The town has its own Color Day lines, and the cheerful ones are put away.
+func test_on_color_day_the_town_says_its_color_day_lines() -> void:
+	var lib := TalkLibrary.new()
+	lib.load_all()
+	var ctx := {"chapter": 1, "path": "", "counts": {}, "name": "Juniper", "tumble": "Tumble",
+		"flags": {"invited": true, "color_day": true, "has_scoop": true}}
+	for who: StringName in [&"bramble", &"fennel", &"pip"]:
+		var d := lib.pick(who, ctx)
+		assert_not_null(d)
+		assert_eq(String(d.id), "%s_bark_colorday" % who)
