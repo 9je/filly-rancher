@@ -47,8 +47,16 @@ const HIDE_AT := 0.85
 ## Pens), and one on the edge of the fade flipped as the camera breathed. Now a board goes
 ## when the lens is within HIDE_M of it or it stands between the lens and her, and comes back
 ## only once the lens is past SHOW_M and it is out of the way.
-const HIDE_M := 1.4
-const SHOW_M := 2.2
+## P8 (playtest 2026-11-08 item 43: "signs disappear at a right angle", "all signs do that"):
+## the line test padded the board 15 cm all round, so a board seen side-on, covering a sliver
+## of the screen, counted as in the way and vanished. Now only a board whose FACE the line
+## crosses, seen at least FACE_ON off edge-on, gets out of her way; side-on it always stays.
+const HIDE_M := 0.9
+const SHOW_M := 1.6
+## The sine of how far off edge-on the lens must look through a board before it counts as
+## in the way (0.5: thirty degrees).
+const FACE_ON := 0.5
+const LayersScript := preload("res://world/collision_layers.gd")
 static var subject: Node3D = null
 
 var text := ""
@@ -70,6 +78,17 @@ func build(label: String, icon_kind: int, width: float, height: float, point: fl
 	frame.mesh = fm
 	frame.material_override = _mat(WOOD_DARK)
 	add_child(frame)
+	# SOLID (item 43: "you walk through them"): the board stops her and the herd like any prop.
+	var body := StaticBody3D.new()
+	body.collision_layer = LayersScript.PROPS
+	body.collision_mask = 0
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(width + 0.16 + point, height + 0.16, 0.14)
+	shape.shape = box
+	shape.position = Vector3(point * 0.5, 0.0, 0.0)
+	body.add_child(shape)
+	add_child(body)
 	var face := MeshInstance3D.new()
 	var bm := BoxMesh.new()
 	bm.size = Vector3(width, height, 0.12)
@@ -156,7 +175,9 @@ func update_fade(cam: Camera3D) -> void:
 	var blocking := false
 	if subject != null and is_instance_valid(subject) and subject.is_inside_tree():
 		var aim := to_local(subject.global_position + Vector3(0, 1.0, 0))
-		blocking = _segment_hits_box(local, aim, _half + Vector3(0.15, 0.15, 0.15))
+		var through := (aim - local).normalized()
+		blocking = absf(through.z) >= FACE_ON and _segment_hits_box(local, aim,
+			Vector3(_half.x + 0.05, _half.y + 0.05, _half.z))
 	var gone := _fade >= 1.0
 	if blocking or d < HIDE_M:
 		gone = true

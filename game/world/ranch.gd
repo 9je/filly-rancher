@@ -5439,10 +5439,15 @@ func _stand_place_signs() -> void:
 		["Depot", PlaceSign.Icon.CRATE, get_node_or_null(^"Buildings/Depot")],
 		["Home", PlaceSign.Icon.HOUSE, get_node_or_null(^"Buildings/Farmhouse")],
 		["Pens", PlaceSign.Icon.FENCE, get_node_or_null(^"Plots/Slot1")],
-		["Spectra Palace", PlaceSign.Icon.STAR, get_node_or_null(^"Buildings/Palace")],
+		["Palace", PlaceSign.Icon.STAR, get_node_or_null(^"Buildings/Palace")],
 	]
 	var h := 3.25
 	for f: Array in fingers:
+		# THREE ARMS, NOT FIVE (P8, playtest 2026-11-08 item 44: five overlapping arms, the
+		# Market and the Depot each signed twice). The Market and the Depot have their own
+		# boards at their doors, a few strides off; the post points where you cannot see.
+		if String(f[0]) in ["Market", "Depot"]:
+			continue
 		var target := f[2] as Node3D
 		if target == null:
 			continue
@@ -5453,12 +5458,12 @@ func _stand_place_signs() -> void:
 		var sign: Node3D = PlaceSignScript.new()
 		sign.name = "To" + String(f[0]).replace(" ", "")
 		post.add_child(sign)
-		sign.call("build", String(f[0]), int(f[1]), 1.9, 0.42, 0.32, true)
+		sign.call("build", String(f[0]), int(f[1]), 1.9, 0.5, 0.32, true)
 		# The finger's +X (its point) along `to`.
 		sign.rotation.y = atan2(-to.z, to.x)
 		var dir := to.normalized()
 		sign.position = Vector3(dir.x * 1.05, h, dir.z * 1.05)
-		h -= 0.5
+		h -= 0.62
 	_stand_sign_post("Pens", PlaceSign.Icon.FENCE, YARD_SIGN_AT,
 		Vector3(1.0, 0.0, -0.4).normalized(), 2.0, 0.7, 2.7)
 	_mount_compass(fingers)

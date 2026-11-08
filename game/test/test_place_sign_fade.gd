@@ -82,3 +82,23 @@ func test_a_board_between_the_lens_and_her_goes_nearly_all_the_way() -> void:
 	_sign.call("update_fade", _cam)
 	assert_eq(float(_sign.call("fade")), 0.0, "off to one side and 2.5 m off, it is back")
 	PlaceSignScript.subject = null
+
+
+
+## P8, playtest 2026-11-08 item 43: "signs disappear at a right angle". Seen side-on, a board
+## between the lens and her stays: it covers a sliver, and vanishing was the bug.
+func test_side_on_a_board_in_the_line_stays() -> void:
+	var her := Node3D.new()
+	add_child_autofree(her)
+	# Lens and her along the board's own width (its X), level with it: edge-on.
+	her.global_position = _sign.global_position + Vector3(-3.0, -1.0, 0.0)
+	PlaceSignScript.subject = her
+	_cam.global_position = _sign.global_position + Vector3(3.0, 0.0, 0.0)
+	_sign.call("update_fade", _cam)
+	assert_eq(float(_sign.call("fade")), 0.0, "side-on, the board stays")
+	PlaceSignScript.subject = null
+
+
+func test_a_board_stops_a_walker() -> void:
+	var bodies := _sign.find_children("*", "StaticBody3D", true, false)
+	assert_eq(bodies.size(), 1, "one solid body for the board (item 43: walked through)")
