@@ -76,9 +76,13 @@ func _play() -> void:
 	# Into the meadow SOUTH of the town row (PS2 item 36's fenced yards start at z 26.5 and
 	# the old turn east at z 30 walked her into one).
 	await _leg(Vector3(1.5, 0, 20.0), false, false)          # back down the path
-	await _leg(Vector3(13.0, 0, 20.0), false, false)         # off into the meadow
-	await _leg(Vector3(13.0, 0, 10.0), true, false)          # RUN on grass
-	await _leg(Vector3(13.0, 0, 4.0), true, true)            # WALK on grass, straight on
+	# At x 10.5, not 13: Pip stands at (13, 10.5) (people.gd SPOTS, since eef1ee8), and the run
+	# south at x 13 ended in him, then the walk pushed into him for 1.5 s at 0 to 0.6 m/s: a
+	# slow-motion stride whose shallow footfalls (11 mm of swing) this test cannot see, so a
+	# step on one read as 700 ms off in about one run in four.
+	await _leg(Vector3(10.5, 0, 20.0), false, false)         # off into the meadow
+	await _leg(Vector3(10.5, 0, 10.0), true, false)          # RUN on grass
+	await _leg(Vector3(10.5, 0, 4.0), true, true)            # WALK on grass, straight on
 	process_frame.disconnect(_sample)
 	_judge()
 
@@ -130,8 +134,13 @@ func _sample() -> void:
 	# (FS4.2) are footfalls on screen too, played on after her body has slowed under the
 	# "moving" line, and a judged step may sit at either edge of a recorded leg.
 	var gait: bool = player.is_on_floor() and MOVING_CLIPS.has(clip)
+	var hit := ""
+	for c in player.get_slide_collision_count():
+		var col := player.get_slide_collision(c).get_collider() as Node
+		if col != null:
+			hit += String(col.name) + ";"
 	_frames.append({"t": t, "moving": moving, "gait": gait, "clip": clip, "ys": ys, "speed": speed,
-		"floor": player.is_on_floor()})
+		"floor": player.is_on_floor(), "pos": player.global_position, "hit": hit})
 	# Every 3D one shot the Sound autoload started since last frame: its pool cursor moved.
 	var next: int = int(_sound.get("_next_3d"))
 	var pool: Array = _sound.get("_pool_3d")
@@ -213,7 +222,7 @@ func _judge() -> void:
 	if dump != "":
 		var f := FileAccess.open(dump, FileAccess.WRITE)
 		for row in _frames:
-			f.store_line("F %.4f %s %s %.2f %s %s" % [row.t, row.clip, row.moving, row.speed, row.floor, row.ys])
+			f.store_line("F %.4f %s %s %.2f %s %s %s %s" % [row.t, row.clip, row.moving, row.speed, row.floor, row.ys, row.pos, row.hit])
 		for s in _steps:
 			f.store_line("S %.4f %s %s %s" % [s.t, s.clip, s.moving, String(s.path).get_file()])
 		for t in falls:

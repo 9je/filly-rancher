@@ -1,0 +1,7 @@
+[footsteps] INPUT_TEST_OK test_footsteps 75 hoofsteps on 131 footfalls, all aligned, varied, on the right surface and clean
+[footsteps] INPUT_TEST_OK test_footsteps 73 hoofsteps on 130 footfalls, all aligned, varied, on the right surface and clean
+[footsteps] INPUT_TEST_OK test_footsteps 73 hoofsteps on 129 footfalls, all aligned, varied, on the right surface and clean
+[footsteps] INPUT_TEST_OK test_footsteps 75 hoofsteps on 131 footfalls, all aligned, varied, on the right surface and clean
+[footsteps] INPUT_TEST_OK test_footsteps 75 hoofsteps on 131 footfalls, all aligned, varied, on the right surface and clean
+[footsteps] INPUT_TEST_OK test_footsteps 73 hoofsteps on 130 footfalls, all aligned, varied, on the right surface and clean
+[footsteps] INPUT_TEST_OK test_footsteps 75 hoofsteps on 131 footfalls, all aligned, varied, on the right surface and clean

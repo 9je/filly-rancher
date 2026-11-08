@@ -1,0 +1,18 @@
+[footsteps] INPUT_TEST_NOTE 16.0s spawned at (2.0, 0.00013, 9.0)
+[footsteps] INPUT_TEST_NOTE 29.8s recorded 1518 frames, 146 footfalls, 85 hoofsteps (83 while moving)
+[footsteps] INPUT_TEST_NOTE 29.8s off by 883 ms: a walk step at 19.600 s (hoof_grass_1.wav)
+[footsteps] INPUT_TEST_NOTE 29.8s off by 267 ms: a walk step at 20.217 s (hoof_grass_4.wav)
+[footsteps] INPUT_TEST_NOTE 29.8s step to nearest footfall: mean 17.1 ms, worst 883.3 ms, 2 of 83 over 40 ms
+[footsteps] INPUT_TEST_NOTE 29.8s footfalls with a hoofstep within 40 ms: 146 of 146 (100%)
+[footsteps] INPUT_TEST_NOTE 29.8s pitch 0.941..1.070, volume -16.46..-12.57 dB
+[footsteps] INPUT_TEST_NOTE 29.8s steps by ground: { "dirt": 47, "grass": 36 }, 0 with the wrong sample set
+[footsteps] INPUT_TEST_NOTE 29.8s samples played: ["hoof_dirt_1.wav", "hoof_dirt_2.wav", "hoof_dirt_3.wav", "hoof_dirt_4.wav", "hoof_grass_1.wav", "hoof_grass_2.wav", "hoof_grass_4.wav", "hoof_grass_3.wav"]
+[footsteps] INPUT_TEST_NOTE 31.3s audit: AUDIO_AUDIT files=8 failed=0
+[footsteps] INPUT_TEST_FAILED test_footsteps 2 of 83 hoofsteps land more than 40 ms from any footfall (worst 883 ms)
+[footsteps] INPUT_TEST_EXIT rc=1
+[footsteps]   ERROR: 4 RID allocations of type 'PN18TextServerAdvanced12FontAdvancedE' were leaked at exit.
+[footsteps]   ERROR: Pages in use exist at exit in PagedAllocator: N12VariantPools12BucketMediumE
+[footsteps]      at: ~PagedAllocator (./core/templates/paged_allocator.h:170)
+[footsteps]   ERROR: Pages in use exist at exit in PagedAllocator: N12VariantPools11BucketSmallE
+[footsteps]      at: ~PagedAllocator (./core/templates/paged_allocator.h:170)
+INPUT_TESTS passed=0 failed=1
