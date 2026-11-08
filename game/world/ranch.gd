@@ -2328,6 +2328,8 @@ func race_entrants() -> Array[Dictionary]:
 ## A pony's baked portrait (PortraitBaker), or null while it bakes; the race guide redraws
 ## when it lands.
 func _portrait_of(key: String, body: Node3D) -> Texture2D:
+	if not is_inside_tree():
+		return null
 	var baker := PortraitBaker.shared(get_tree())
 	if not baker.baked.is_connected(_on_portrait_ready):
 		baker.baked.connect(_on_portrait_ready)
