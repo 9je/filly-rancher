@@ -22,10 +22,10 @@ background_mode = 2
 sky = SubResource("DawnSky")
 ambient_light_source = 2
 ambient_light_color = Color(0.93, 0.93, 1.0, 1.0)
-ambient_light_energy = 0.55
+ambient_light_energy = 0.32
 tonemap_mode = 2
 tonemap_white = 3.0
-tonemap_exposure = 0.95
+tonemap_exposure = 0.82
 
 [node name="CreationScreen" type="CanvasLayer"]
 layer = 4

@@ -219,6 +219,7 @@ func _ready() -> void:
 	_mark_label.text = MARK_LABEL
 	_hint_label.text = HINT
 	_confirm.text = CONFIRM_LABEL
+	MenuStyleScript.primary_button(_confirm)
 	_name_box.text_changed.connect(set_name_text)
 	# ENTER SUBMITS AND RELEASES. A LineEdit with focus consumes ui_accept itself (that is
 	# what text_submitted IS), so this is the one region where _unhandled_input below never

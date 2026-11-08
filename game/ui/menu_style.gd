@@ -437,6 +437,23 @@ static func paper_button_box(state: StringName) -> StyleBox:
 	return button_box(state)
 
 
+## THE ONE BUTTON THAT MOVES THINGS ON (P8 S5): gold, bigger, at the end of a screen
+## ("This is me", "Deal", "Place bet"), so the way forward is never a plain row.
+static func primary_button(button: Button) -> void:
+	if button == null:
+		return
+	button.add_theme_stylebox_override(&"normal", kit(&"button_primary"))
+	button.add_theme_stylebox_override(&"hover", kit(&"button_primary_hover"))
+	button.add_theme_stylebox_override(&"focus", kit(&"button_primary_hover"))
+	button.add_theme_stylebox_override(&"pressed", kit(&"button_pressed"))
+	for slot: StringName in [&"font_color", &"font_hover_color", &"font_pressed_color",
+			&"font_focus_color", &"font_hover_pressed_color"]:
+		button.add_theme_color_override(slot, COLOR_INK)
+	button.add_theme_font_override(&"font", title_font())
+	button.add_theme_font_size_override(&"font_size", font_px(28))
+	button.custom_minimum_size.y = maxf(button.custom_minimum_size.y, 64.0)
+
+
 static func paper_button(button: Button) -> void:
 	for state: StringName in [&"normal", &"hover", &"pressed", &"focus", &"disabled"]:
 		button.add_theme_stylebox_override(state, paper_button_box(state))
