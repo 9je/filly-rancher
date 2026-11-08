@@ -6068,7 +6068,9 @@ func _report(pony_count: int, prop_count: int) -> void:
 					and not skirted:
 				skirtless.append(prop.name)
 			if String(entry["file"]) == BARN_MODEL:
-				barn_ridge = box.size.y
+				# Per its own entry's `s`: the scale the MLP family is derived from is the
+				# model's, and a placement may stand it taller (P8 item 48).
+				barn_ridge = box.size.y / float(entry.get("s", 1.0))
 			# NOTHING THE MLP PACKS PUT ON THIS MAP IS EVER WALKED INTO. They are scenery:
 			# no attendant stands at one, no dock marker sits on one, and no interaction
 			# candidate names one. That only stays true if none of them is standing in a

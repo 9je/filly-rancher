@@ -169,7 +169,8 @@ const SCALE_FIX := {
 	"kenney_survival_structure.glb": 4.0,  # FBX unit-conversion defect, quirk 4.
 	# --- Sweet Apple Acres: the farm on the walk to the Orchard ----------------------
 	"saa_shed.glb": 1.93,  # 3.51 m: native metres, half the height of the barn beside it.
-	"saa_hay_pile.glb": 1.93,  # 2.11 m: native metres, a pile a pony cannot see over.
+	"saa_hay_pile.glb": 1.45,  # 1.58 m: a pile a pony can just see over; at its native 2.11 m
+	# it stood taller than the shed's door and dwarfed the barn behind it (P8 item 48).
 	"saa_hay_block.glb": 1.93,  # 0.70 m: native metres, one bale.
 	"saa_wagon.glb": 1.93,  # 0.98 m at 3.25 m long: native metres, a farm cart.
 	"saa_seed_bag.glb": 1.93,  # 0.65 m: native metres, a sack a pony could drag.
@@ -184,7 +185,8 @@ const SCALE_FIX := {
 	"mlp_apple_tree_bare.glb": 3.36,  # 5.60 m: the same target, the same species.
 	"mlp_bush.glb": 1.93,  # 0.80 m: native metres.
 	"mlp_chicken_coop.glb": 1.93,  # 1.57 m: native metres.
-	"mlp_farm_well.glb": 1.93,  # 1.42 m: native metres, a well a pony leans over.
+	"mlp_farm_well.glb": 2.9,  # 2.13 m to the roof: a well a pony stands at and leans into;
+	# its native 1.42 m to the roof put the rim at her knee (P8, playtest 2026-11-08 item 48).
 	"mlp_crate.glb": 3.40,  # 0.70 m: native 0.40 m is a doll's crate.
 	"mlp_basket.glb": 5.70,  # 0.50 m: native 0.17 m seats at 9 cm, effectively invisible.
 	# --- the schoolyard --------------------------------------------------------------
@@ -421,7 +423,10 @@ const LAYOUT := [
 	# case the skirt exists for. Everything within 29 m of the Orchard centre (72, 40) is
 	# inside its fence ring plus the 4 m margin every prop clears it by, so nothing below
 	# is: test_props.gd checks that on every entry.
-	{"file": "saa_barn.glb", "at": Vector2(41.0, 51.3), "yaw": 205.0, "family": &"mlp", "skirt": true},
+	# 1.5 times the model (10.5 m): Sweet Apple Acres' barn is the farm's landmark, and at
+	# 7 m, 25 m behind 2 m haystacks, it read as a toy (P8, playtest 2026-11-08 item 48).
+	{"file": "saa_barn.glb", "at": Vector2(41.0, 51.3), "yaw": 205.0, "family": &"mlp", "skirt": true,
+		"s": 1.5},
 	{"file": "saa_shed.glb", "at": Vector2(34.0, 45.0), "yaw": 160.0, "family": &"mlp", "skirt": true},
 	{"file": "saa_wagon.glb", "at": Vector2(46.0, 58.0), "yaw": 75.0, "family": &"mlp"},
 	{"file": "saa_hay_pile.glb", "at": Vector2(35.0, 42.0), "yaw": 20.0, "family": &"mlp"},
