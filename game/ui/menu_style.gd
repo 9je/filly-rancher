@@ -211,7 +211,7 @@ const KIT := {
 	&"button": [30, 16], &"button_hover": [30, 16], &"button_pressed": [30, 16],
 	&"button_disabled": [30, 16], &"button_primary": [30, 16],
 	&"button_primary_hover": [30, 16], &"chip": [20, 8], &"tab_on": [26, 14],
-	&"tab_off": [26, 14],
+	&"tab_off": [26, 14], &"card": [22, 10],
 }
 
 static var _kit_boxes: Dictionary = {}

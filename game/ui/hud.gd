@@ -377,12 +377,60 @@ func _show_toast(text: String) -> void:
 	_toast.text = text
 	_toast_left = toast_hold_for(text) + TOAST_FADE
 	_toast.modulate.a = 1.0
+	_set_toast_icon(toast_icon_for(text))
 	_fit_pill(_toast)
+	_place_toast_icon()
 	# A little pop on arrival, the way a show title card bounces in.
 	_toast.pivot_offset = _toast.size * 0.5
 	_toast.scale = Vector2(0.86, 0.86)
 	create_tween().tween_property(_toast, "scale", Vector2.ONE, 0.22).set_trans(
 		Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## A TOAST IS AN EVENT CARD (P8 S5; docs/aaa-review-2026-11-08.md 2.4): a picture from the
+## icon set at its left says what kind of news it is before a word is read. Picked from the
+## line's own words, first match wins, so every caller's toast gets one without a new argument.
+const TOAST_ICONS := [
+	["bloom", "bloom"], ["shipment", "sold"], ["deliver", "sold"], ["sold", "sold"],
+	["bits", "coin"], ["pen", "fence"], ["full", "full"], ["caught", "catch"],
+	["catch", "catch"], ["letter", "letter"], ["post", "letter"], ["mail", "letter"],
+	["spotted", "sighting"], ["sighting", "sighting"], ["saw ", "sighting"], ["lake", "lake_open"],
+	["night", "moon"], ["dawn", "sun"], ["color day", "sun"], ["rain", "rain"],
+	["market", "market"], ["depot", "crate"], ["saddlebag", "bag"], ["gem", "reel_gem"],
+	["pantry", "pantry"], ["food", "pantry"], ["permit", "letter"], ["unlock", "upgrade"],
+]
+const TOAST_ICON_PX := 44.0
+
+var _toast_icon: TextureRect
+
+
+static func toast_icon_for(text: String) -> String:
+	var t := text.to_lower()
+	for pair: Array in TOAST_ICONS:
+		if t.contains(String(pair[0])):
+			return String(pair[1])
+	return "star"
+
+
+func _set_toast_icon(icon_name: String) -> void:
+	if _toast_icon == null:
+		_toast_icon = TextureRect.new()
+		_toast_icon.name = "ToastIcon"
+		_toast_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		_toast_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		_toast_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_toast.add_child(_toast_icon)
+		var box := _toast.get_theme_stylebox(&"normal").duplicate() as StyleBox
+		box.content_margin_left = 18.0 + TOAST_ICON_PX + 8.0
+		_toast.add_theme_stylebox_override(&"normal", box)
+	_toast_icon.texture = IconSet.texture(icon_name, 96)
+
+
+func _place_toast_icon() -> void:
+	if _toast_icon == null:
+		return
+	_toast_icon.size = Vector2(TOAST_ICON_PX, TOAST_ICON_PX)
+	_toast_icon.position = Vector2(14.0, (_toast.size.y - TOAST_ICON_PX) * 0.5)
 
 
 ## LONG ENOUGH TO READ (PT5; owner: "some dialogue i dont read it goes too fast"): a short
@@ -1045,19 +1093,15 @@ const GOLD_INK := Color(0.72, 0.5, 0.08)
 var _chip: Label
 
 
-static func card_box(radius := 22, border := 4) -> StyleBoxFlat:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = CARD_FILL
-	sb.border_color = CARD_LINE
-	sb.set_border_width_all(border)
-	sb.set_corner_radius_all(radius)
+## The HUD's cards and pills are the kit's paper (P8 S5, tools/make_ui_kit.py "card"): grain,
+## a soft ink edge and a drop shadow, the same material as the letters and tooltips. The two
+## arguments are kept for the callers' sake; the painted corner sets the roundness now.
+static func card_box(_radius := 22, _border := 4) -> StyleBox:
+	var sb: StyleBoxTexture = MenuStyleScript.kit(&"card").duplicate()
 	sb.content_margin_left = 18
 	sb.content_margin_right = 18
 	sb.content_margin_top = 10
 	sb.content_margin_bottom = 10
-	sb.shadow_color = Color(0.15, 0.05, 0.2, 0.22)
-	sb.shadow_size = 6
-	sb.shadow_offset = Vector2(0, 3)
 	return sb
 
 
@@ -1181,11 +1225,13 @@ func _fit_pill(l: Label) -> void:
 		l.set_meta(&"pill_height", l.offset_bottom - l.offset_top)
 	# Back to one line before measuring, so a short toast after a long one is short again.
 	l.offset_bottom = l.offset_top + float(l.get_meta(&"pill_height"))
-	var one_line := font.get_string_size(l.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 56.0
+	# The toast's picture takes its own room at the left (P8 S5).
+	var pad := 56.0 + (TOAST_ICON_PX + 8.0 if l == _toast and _toast_icon != null else 0.0)
+	var one_line := font.get_string_size(l.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + pad
 	var w := minf(one_line, PILL_MAX_WIDTH)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if one_line > PILL_MAX_WIDTH \
 		else TextServer.AUTOWRAP_OFF
-	var h := font.get_multiline_string_size(l.text, HORIZONTAL_ALIGNMENT_CENTER, w - 56.0, fs).y \
+	var h := font.get_multiline_string_size(l.text, HORIZONTAL_ALIGNMENT_CENTER, w - pad, fs).y \
 		+ 22.0 if one_line > PILL_MAX_WIDTH else l.offset_bottom - l.offset_top
 	var centre := (l.offset_left + l.offset_right) * 0.5
 	l.offset_left = centre - w * 0.5

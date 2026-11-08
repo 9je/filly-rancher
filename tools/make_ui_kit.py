@@ -12,6 +12,7 @@ nine-patch PNGs and stretched by Godot's StyleBoxTexture, instead of a flat roun
   button   a cream pill with an ink edge, in idle, hover (gold rim, lifted) and pressed
            (pushed down a pixel, darker) states; plus a gold "primary" button.
   chip     a small round tag; tab_on / tab_off.
+  card     the HUD's paper at a tight radius, for pills and small cards.
 
 Writes game/assets/ui/kit/*.png at 2x (margins doubled) so it stays crisp under canvas
 stretch; make_theme.gd reads the margins from MARGINS below via ui_kit.gd.
@@ -124,17 +125,19 @@ def border(size, outer, inner, colour):
 def paper(name="paper", fill=CREAM, ink=INK, size=128, r=26, pad=10, seed=1):
     W = H = size
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    outer = rounded_mask(W, H, r, pad, 1.2, seed)
-    inner = rounded_mask(W, H, r - 4, pad + 4, 1.2, seed)
-    img.alpha_composite(shadow((W, H), outer, (0, 5), 5, 80))
+    wob = 1.2 if size > 96 else 0.5
+    edge = 4 if size > 96 else 3
+    outer = rounded_mask(W, H, r, pad, wob, seed)
+    inner = rounded_mask(W, H, r - edge, pad + edge, wob, seed)
+    img.alpha_composite(shadow((W, H), outer, (0, 5 if size > 96 else 3), 5 if size > 96 else 3, 80))
     body = grain(fill_mask((W, H), fill, outer), 5, seed)
     img.alpha_composite(body)
     img.alpha_composite(border((W, H), outer, inner, ink))
     # A faint inner rule, the printed edge of good stationery.
-    rule_o = rounded_mask(W, H, r - 8, pad + 9)
-    rule_i = rounded_mask(W, H, r - 9, pad + 10)
-    r_ = border((W, H), rule_o, rule_i, CREAM_DARK)
-    img.alpha_composite(r_)
+    if size > 96:
+        rule_o = rounded_mask(W, H, r - 8, pad + 9)
+        rule_i = rounded_mask(W, H, r - 9, pad + 10)
+        img.alpha_composite(border((W, H), rule_o, rule_i, CREAM_DARK))
     img.save(os.path.join(OUT, name + ".png"))
 
 
@@ -213,6 +216,9 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     paper()
     paper("paper_dark", (78, 52, 96), (36, 22, 48), seed=4)
+    # The HUD's small cards and pills: the same paper at a tighter radius, so a 44 px pill
+    # still has room for its corners.
+    paper("card", size=64, r=14, pad=5, seed=6)
     wood()
     velvet()
     button("button", CREAM, INK, 3)
