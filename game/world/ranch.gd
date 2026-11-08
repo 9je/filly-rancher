@@ -5410,6 +5410,7 @@ func _physics_process(delta: float) -> void:
 	# it. The gates call spawner.tick_stock() themselves, deliberately, where they mean to.
 	spawner.tick_stock(delta)
 	_update_interaction()
+	_tick_bloom_call(delta)
 	_update_guide(delta)
 	_update_person_aim()
 	_v1_tick(delta)
@@ -8651,6 +8652,7 @@ func _on_pony_bloomed(inst: PonyInstance) -> void:
 		if bus != null:
 			bus.emit_signal("bloomed", String(inst.uid), inst.stock)
 	_bloom_ceremony(inst)
+	_maybe_call_over(inst)
 	pony_bloomed.emit(inst)
 	_toast("%s found her mark: %s!" % [inst.display_name(),
 		MarkComposerScript.talent_name(StringName(str(inst.stock.get("mark", {}).get("talent", ""))))])
@@ -8667,6 +8669,68 @@ func _bloom_ceremony(inst: PonyInstance) -> void:
 	if body == null:
 		return
 	BloomCeremonyScript.play(body)
+
+
+## THE BLOOM CALLS HER OVER (P8; playtest 2026-11-08 item 22). A Drifter who Blooms while the
+## player is further than BLOOM_CALL_RANGE from her pen puts a "come and see" on the guide and
+## the objective card for up to BLOOM_CALL_SECONDS; when the player gets within
+## BLOOM_ARRIVE_RANGE the ceremony plays again for her, and the call is done. One call at a
+## time: a second Bloom while one is waiting replaces it (the newer one is the one to see).
+const BLOOM_CALL_RANGE := 14.0
+const BLOOM_ARRIVE_RANGE := 8.0
+const BLOOM_CALL_SECONDS := 120.0
+## {slot: PlotSlot, uid: StringName, name: String, left: float}, or empty.
+var _bloom_call := {}
+
+
+func _maybe_call_over(inst: PonyInstance) -> void:
+	var slot := _slot_holding(inst.uid)
+	if slot == null or player == null:
+		return
+	if player.global_position.distance_to(slot.global_position) <= BLOOM_CALL_RANGE:
+		return
+	_bloom_call = {"slot": slot, "uid": inst.uid, "name": inst.display_name(),
+		"left": BLOOM_CALL_SECONDS}
+
+
+## The pen a waiting Bloom calls her to, or null.
+func _bloom_call_place() -> Node3D:
+	if _bloom_call.is_empty():
+		return null
+	var slot: Node3D = _bloom_call.get("slot")
+	if slot == null or not is_instance_valid(slot):
+		_bloom_call = {}
+		return null
+	return slot
+
+
+## Count the call down; when she arrives, the ceremony plays again for her and it is done.
+func _tick_bloom_call(delta: float) -> void:
+	var place := _bloom_call_place()
+	if place == null:
+		return
+	_bloom_call["left"] = float(_bloom_call["left"]) - delta
+	if player != null and player.global_position.distance_to(place.global_position) <= BLOOM_ARRIVE_RANGE:
+		var pen := (place as PlotSlot).get_built() as Pen
+		var inst: PonyInstance = pen.find_pony(StringName(_bloom_call["uid"])) if pen != null else null
+		_bloom_call = {}
+		if inst != null:
+			_bloom_ceremony(inst)
+		return
+	if float(_bloom_call["left"]) <= 0.0:
+		_bloom_call = {}
+
+
+func bloom_call() -> Dictionary:
+	return _bloom_call.duplicate()
+
+
+func _slot_holding(uid: StringName) -> PlotSlot:
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen != null and pen.has_pony(uid):
+			return slot
+	return null
 
 
 # --- delivery feedback (v1): clue 1 -------------------------------------------------------
@@ -9759,6 +9823,7 @@ func _guide_state() -> Dictionary:
 		s["tasks"] = _board.tutorial_rows()
 	s["objective_goal"] = StringName(current_objective().get("goal", &""))
 	s["sighting"] = _guide_sighting() != null
+	s["bloomed"] = _bloom_call_place() != null
 	return s
 
 
@@ -9830,6 +9895,8 @@ func _guide_place(goal: StringName) -> Array:
 			return [who if who != null and is_instance_valid(who) and who.visible else null, PlaceSign.Icon.STAR]
 		&"sighting":
 			return [_guide_sighting(), PlaceSign.Icon.STAR]
+		&"bloomed":
+			return [_bloom_call_place(), PlaceSign.Icon.FENCE]
 	return [null, 0]
 
 
@@ -9969,7 +10036,12 @@ func _update_guide(delta: float) -> void:
 			if StringName(o.get("id", &"")) == &"sighting" and seen != null and seen.has_method("get_data") \
 					and seen.call("get_data") != null:
 				o = o.duplicate()
-				o["words"] = "Find %s" % (seen.call("get_data") as PonyData).display_name
+				# BRAMBLE'S SPOTTING, READABLE (item 14): the toast that said who was seen went
+				# by behind the queue, so the card says it for as long as the trail is up.
+				o["words"] = "Tumble saw %s: follow the sparkles" % (seen.call("get_data") as PonyData).display_name
+			if StringName(o.get("id", &"")) == &"bloomed" and not _bloom_call.is_empty():
+				o = o.duplicate()
+				o["words"] = "%s found her mark: come and see" % String(_bloom_call.get("name", "A Drifter"))
 			var where: Node3D = _guide_place(StringName(o.get("goal", &"")))[0] as Node3D if not o.is_empty() else null
 			var d := -1.0
 			if where != null and player != null:

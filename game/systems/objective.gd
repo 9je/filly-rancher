@@ -71,6 +71,8 @@ static func for_guide(goal: StringName, story: Dictionary) -> Dictionary:
 			return _o(&"catch", &"catch", PlaceSign.Icon.STAR, "Catch a Drifter")
 		&"sighting":
 			return _o(&"sighting", &"sighting", PlaceSign.Icon.STAR, "Find the pony Tumble saw")
+		&"bloomed":
+			return _o(&"bloomed", &"bloomed", PlaceSign.Icon.FENCE, "A Drifter found her mark: come and see")
 	return story
 
 
