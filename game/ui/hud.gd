@@ -82,6 +82,8 @@ const MenuStyleScript := preload("res://ui/menu_style.gd")
 const CatchCardScript := preload("res://ui/catch_card.gd")
 const PantryIconScript := preload("res://ui/pantry_icon.gd")
 const ShopIconScript := preload("res://ui/shop_icon.gd")
+const HouseStyleScript := preload("res://ui/house_style.gd")
+const PaintScript := preload("res://ui/casino_paint.gd")
 
 ## Radius of the reticle ring, in (1920x1080-base) pixels. Small: it has to mark a point
 ## precisely, and a big one would obscure the pony it is resting on.
@@ -153,10 +155,16 @@ const COLOR_WORLD_LINE := Color(0.82, 0.88, 1.0, 0.92)
 ## something you can do.
 const COLOR_PROMPT := Color(1.00, 0.86, 0.42, 1.0)
 
-## Saddlebag pip geometry.
-const PIP_SIZE := Vector2(26.0, 26.0)
-const PIP_GAP := 8.0
+## Saddlebag pip geometry. Compact (Fable AAA review round 1, #3: "the saddlebag box becomes a
+## compact painted widget"): small slots on one strip, the bag's own picture in a gold ring at
+## the left and the count in a gold chip at the right, all drawn on the one control.
+const PIP_SIZE := Vector2(20.0, 20.0)
+const PIP_GAP := 5.0
 const PIPS_PER_ROW := 12
+## The bag picture's disc and the count chip either side of the slots.
+const BAG_DISC := 44.0
+const COUNT_CHIP := Vector2(66.0, 30.0)
+const STRIP_GAP := 10.0
 const PIP_EMPTY := Color(1.0, 1.0, 1.0, 0.14)
 const PIP_BORDER := Color(0.0, 0.0, 0.0, 0.5)
 
@@ -303,6 +311,7 @@ func _process(delta: float) -> void:
 		_build_hints()
 
 	_elapsed += delta
+	_fade_tip(delta)
 
 	# See the class comment: sibling ready order is not something to depend on.
 	if _storage == null:
@@ -399,7 +408,7 @@ const TOAST_ICONS := [
 	["market", "market"], ["depot", "crate"], ["saddlebag", "bag"], ["gem", "reel_gem"],
 	["pantry", "pantry"], ["food", "pantry"], ["permit", "letter"], ["unlock", "upgrade"],
 ]
-const TOAST_ICON_PX := 44.0
+const TOAST_ICON_PX := 40.0
 
 var _toast_icon: TextureRect
 
@@ -419,18 +428,31 @@ func _set_toast_icon(icon_name: String) -> void:
 		_toast_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		_toast_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		_toast_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# The picture sits on a cream disc in a gold ring, the casino's chip as a frame.
+		var disc := Panel.new()
+		disc.name = "Disc"
+		disc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		disc.show_behind_parent = true
+		disc.add_theme_stylebox_override(&"panel", HouseStyleScript.disc_box(TOAST_ICON_PX + 10.0,
+			HouseStyleScript.KEY_FACE, HouseStyleScript.GOLD, 3))
+		disc.position = Vector2(-5, -5)
+		disc.size = Vector2(TOAST_ICON_PX + 10.0, TOAST_ICON_PX + 10.0)
+		_toast_icon.add_child(disc)
 		_toast.add_child(_toast_icon)
 		var box := _toast.get_theme_stylebox(&"normal").duplicate() as StyleBox
-		box.content_margin_left = 18.0 + TOAST_ICON_PX + 8.0
+		box.content_margin_left = 16.0 + TOAST_ICON_PX + 14.0
 		_toast.add_theme_stylebox_override(&"normal", box)
-	_toast_icon.texture = IconSet.texture(icon_name, 96)
+		# A Label centres its text in its whole rect, not between uneven margins, so a
+		# centred line slid under the picture. The pill is fitted to the line anyway.
+		_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_toast_icon.texture = IconSet.texture(icon_name, 96, false)
 
 
 func _place_toast_icon() -> void:
 	if _toast_icon == null:
 		return
 	_toast_icon.size = Vector2(TOAST_ICON_PX, TOAST_ICON_PX)
-	_toast_icon.position = Vector2(14.0, (_toast.size.y - TOAST_ICON_PX) * 0.5)
+	_toast_icon.position = Vector2(16.0, (_toast.size.y - TOAST_ICON_PX) * 0.5)
 
 
 ## LONG ENOUGH TO READ (PT5; owner: "some dialogue i dont read it goes too fast"): a short
@@ -475,6 +497,13 @@ func set_overlay_open(open: bool) -> void:
 	_overlay_open = open
 	if _hints != null:
 		_hints.visible = _hints_wanted and not _overlay_open
+	# The prompt and the monocle's card are about the world, and the world is behind the menu
+	# (the round 1 review's Depot shot still had "Hold Right Mouse" under it). The tip fades
+	# itself out in _fade_tip().
+	if _prompt_card != null:
+		_prompt_card.visible = not _overlay_open and not prompt_text().is_empty()
+	if _target != null:
+		_target.visible = not _overlay_open and not _target.text.is_empty()
 	_refresh_chip()
 
 
@@ -547,10 +576,8 @@ func set_tasks(rows: Array) -> void:
 			String(row.get("text", "")), int(row.get("reward_bits", 0))])
 	var title := Label.new()
 	title.text = TASK_TITLE
-	MenuStyleScript.style_label(title, 24, COLOR_WORLD_LINE)
-	title.add_theme_constant_override("outline_size", 0)
-	title.add_theme_color_override("font_color", INK)
-	title.add_theme_font_override("font", MenuStyleScript.title_font())
+	# Small gold words over the chips, the way the casino heads a plate: a label, not a headline.
+	HouseStyleScript.ink_label(title, 19, HouseStyleScript.GOLD)
 	_tasks.add_child(title)
 	# CHIPS, NOT SENTENCES (FS1.4; owner, visual-first UIs): each lesson is its action's icon
 	# on a tile that turns green with a tick when done, one word, and its reward. The
@@ -558,7 +585,7 @@ func set_tasks(rows: Array) -> void:
 	# still reads as it always has.
 	_chips = []
 	var strip := HBoxContainer.new()
-	strip.add_theme_constant_override(&"separation", 12)
+	strip.add_theme_constant_override(&"separation", 8)
 	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_tasks.add_child(strip)
 	for entry in rows:
@@ -619,48 +646,51 @@ class LessonChip extends VBoxContainer:
 
 func _task_chip(chip: Dictionary) -> VBoxContainer:
 	var col := LessonChip.new()
-	col.add_theme_constant_override(&"separation", 2)
+	col.add_theme_constant_override(&"separation", 0)
+	col.custom_minimum_size = Vector2(54, 0)
 	col.mouse_filter = Control.MOUSE_FILTER_PASS
 	col.tooltip_text = String(chip.get("text", ""))
 	col.reward = int(chip.reward)
 	col.done = bool(chip.done)
 	var done: bool = chip.done
+	# A CASINO CHIP PER LESSON (Fable AAA review round 1, #3): a plum disc in a gold ring with
+	# the action's picture, felt green with a tick once it is done.
 	var tile := Control.new()
-	tile.custom_minimum_size = Vector2(52, 52)
+	tile.custom_minimum_size = Vector2(TASK_DISC, TASK_DISC)
 	tile.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var icon: Texture2D = chip.icon
 	tile.draw.connect(func() -> void:
 		var r := Rect2(Vector2.ZERO, tile.size)
-		var sb := StyleBoxFlat.new()
-		sb.set_corner_radius_all(14)
-		sb.bg_color = TASK_TICK if done else Color(1, 1, 1, 0.75)
-		sb.border_color = TASK_TICK.darkened(0.25) if done else INK_SOFT
-		sb.set_border_width_all(2)
-		tile.draw_style_box(sb, r)
+		tile.draw_style_box(HouseStyleScript.disc_box(r.size.x,
+			HouseStyleScript.FELT if done else Color(1.0, 0.97, 0.9),
+			HouseStyleScript.GOLD if not done else HouseStyleScript.TICK_GREEN, 3), r)
 		if icon != null:
-			tile.draw_texture_rect(icon, Rect2(Vector2(9, 9), tile.size - Vector2(18, 18)), false,
-				Color(1, 1, 1, 0.55) if done else Color.WHITE)
+			tile.draw_texture_rect(icon, r.grow(-8.0), false,
+				Color(1, 1, 1, 0.45) if done else Color.WHITE)
 		if done:
-			# The tick, on a white badge at the corner.
-			var c := Vector2(tile.size.x - 9, 9)
-			tile.draw_circle(c, 9, Color.WHITE)
-			tile.draw_polyline(PackedVector2Array([c + Vector2(-4.5, 0), c + Vector2(-1, 3.5),
-				c + Vector2(5, -3.5)]), TASK_TICK, 2.5, true))
+			# The tick, on a gold badge at the corner.
+			var c := Vector2(tile.size.x - 7, 7)
+			tile.draw_circle(c, 8, HouseStyleScript.GOLD)
+			tile.draw_polyline(PackedVector2Array([c + Vector2(-4, 0), c + Vector2(-1, 3),
+				c + Vector2(4.5, -3)]), HouseStyleScript.PLUM_DARK, 2.5, true))
 	col.add_child(tile)
 	var word := Label.new()
 	word.text = String(chip.word)
 	word.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	MenuStyleScript.style_label(word, 17, INK)
-	word.add_theme_constant_override("outline_size", 0)
+	HouseStyleScript.ink_label(word, 15, HouseStyleScript.CREAM)
 	col.add_child(word)
 	var reward := Label.new()
 	reward.text = "+%d" % int(chip.reward)
 	reward.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	MenuStyleScript.style_label(reward, 15, Color(0.6, 0.45, 0.12))
-	reward.add_theme_constant_override("outline_size", 0)
+	HouseStyleScript.ink_label(reward, 13, HouseStyleScript.GOLD, false)
+	reward.add_theme_font_override(&"font", MenuStyleScript.numeral_font())
 	col.add_child(reward)
 	return col
+
+
+## The lesson chips' disc, across.
+const TASK_DISC := 44.0
 
 
 func task_lines() -> Array[String]:
@@ -718,9 +748,13 @@ func _on_storage_changed() -> void:
 	_bag_count.text = "%d / %d" % [_storage.count(), _capacity]
 	var rows := maxi(1, ceili(float(_capacity) / float(PIPS_PER_ROW)))
 	_pips.custom_minimum_size = Vector2(
-		float(mini(_capacity, PIPS_PER_ROW)) * (PIP_SIZE.x + PIP_GAP) - PIP_GAP,
-		float(rows) * (PIP_SIZE.y + PIP_GAP) - PIP_GAP)
+		BAG_DISC + STRIP_GAP + _slots_width() + STRIP_GAP + COUNT_CHIP.x,
+		maxf(BAG_DISC, float(rows) * (PIP_SIZE.y + PIP_GAP) - PIP_GAP))
 	_pips.queue_redraw()
+
+
+func _slots_width() -> float:
+	return float(mini(maxi(_capacity, 1), PIPS_PER_ROW)) * (PIP_SIZE.x + PIP_GAP) - PIP_GAP
 
 
 ## A CATCH IS A CARD, NOT A TOAST (owner playtest 2026-10-25: "i think the text and traits
@@ -914,25 +948,47 @@ func _draw_wriggle_ring(centre: Vector2) -> void:
 
 
 func _draw_pips() -> void:
+	var h := _pips.size.y
+	# The bag itself, on a gold-ringed plum disc, the way the casino frames a chip.
+	var disc := Rect2(Vector2(0.0, (h - BAG_DISC) * 0.5), Vector2(BAG_DISC, BAG_DISC))
+	_pips.draw_style_box(HouseStyleScript.disc_box(BAG_DISC, HouseStyleScript.PLUM), disc)
+	IconSet.draw(_pips, "bag", disc.grow(-7.0))
+	var rows := maxi(1, ceili(float(_capacity) / float(PIPS_PER_ROW)))
+	var slots_h := float(rows) * (PIP_SIZE.y + PIP_GAP) - PIP_GAP
+	var origin := Vector2(BAG_DISC + STRIP_GAP, (h - slots_h) * 0.5)
 	for i in range(_capacity):
 		# PIPS_PER_ROW to a row (PT5; playtest 2026-11-05: eighteen slots ran off the card).
-		var at := Vector2(float(i % PIPS_PER_ROW) * (PIP_SIZE.x + PIP_GAP),
+		var at := origin + Vector2(float(i % PIPS_PER_ROW) * (PIP_SIZE.x + PIP_GAP),
 			float(i / PIPS_PER_ROW) * (PIP_SIZE.y + PIP_GAP))
 		var rect := Rect2(at, PIP_SIZE)
-		var fill := PIP_EMPTY
-		if i < _rarities.size():
-			fill = RARITY_COLORS.get(_rarities[i], RARITY_COLORS[PonyDataScript.Rarity.COMMON])
-		# Rounded tiles in the card's own ink (v1): a filled slot is her rarity colour.
+		var filled := i < _rarities.size()
 		var sb := StyleBoxFlat.new()
-		sb.bg_color = fill if i < _rarities.size() else Color(0.92, 0.88, 0.96)
-		sb.border_color = CARD_LINE
-		sb.set_border_width_all(2)
-		sb.set_corner_radius_all(5)
+		sb.set_corner_radius_all(6)
+		sb.anti_aliasing = true
+		if filled:
+			# A filled slot is her rarity's colour, ringed in gold, with her rarity's shape.
+			sb.bg_color = RARITY_COLORS.get(_rarities[i], RARITY_COLORS[PonyDataScript.Rarity.COMMON])
+			sb.border_color = HouseStyleScript.GOLD
+			sb.set_border_width_all(2)
+		else:
+			# An empty slot is a socket sunk into the plum.
+			sb.bg_color = Color(0.0, 0.0, 0.0, 0.28)
+			sb.border_color = Color(HouseStyleScript.GOLD_DIM, 0.55)
+			sb.set_border_width_all(1)
 		_pips.draw_style_box(sb, rect)
 		# Not colour alone (FS8.3): her rarity's shape, in white on the tint.
-		if i < _rarities.size():
+		if filled:
 			_pips.draw_colored_polygon(RarityGlyph.outline(_rarities[i], rect.get_center(),
 				PIP_SIZE.x * 0.28), Color(1, 1, 1, 0.9))
+	# The count, in a gold chip at the strip's end: full reads warm red.
+	var chip := Rect2(Vector2(BAG_DISC + STRIP_GAP + _slots_width() + STRIP_GAP,
+		(h - COUNT_CHIP.y) * 0.5), COUNT_CHIP)
+	var full := _storage != null and _rarities.size() >= _capacity and _capacity > 0
+	PaintScript.rounded(_pips, chip, COUNT_CHIP.y * 0.5,
+		Color(0.86, 0.32, 0.28) if full else HouseStyleScript.GOLD, HouseStyleScript.PLUM_DARK, 2.0)
+	PaintScript.label(_pips, MenuStyleScript.numeral_font(), chip.grow(-5.0),
+		"%d/%d" % [_rarities.size(), _capacity], 22,
+		Color.WHITE if full else HouseStyleScript.INK)
 
 
 ## The rarity shapes the filled saddlebag slots carry (FS8.3), first slot first.
@@ -959,7 +1015,7 @@ func _ring(centre: Vector2, radius: float, color: Color, width: float) -> void:
 ## bits: a bale, the word, the food in stock, and when anypony penned is hungry a sad face and
 ## how many. Warm red when hungry ponies meet an empty pantry: they cannot eat.
 ## On the cream bag card, so the card's own inks (_restyle), not the white of the old HUD.
-const PANTRY_WARN := Color(0.76, 0.2, 0.14)
+const PANTRY_WARN := Color(1.0, 0.56, 0.5)
 var _pantry: HBoxContainer
 var _pantry_food: Label
 var _pantry_hungry: Label
@@ -981,12 +1037,12 @@ func _build_pantry() -> void:
 	var word := Label.new()
 	word.text = "Pantry"
 	word.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	MenuStyleScript.style_label(word, 18, INK_SOFT)
+	HouseStyleScript.ink_label(word, 18, HouseStyleScript.CREAM_DIM)
 	word.add_theme_constant_override(&"outline_size", 0)
 	_pantry.add_child(word)
 	_pantry_food = Label.new()
 	_pantry_food.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	MenuStyleScript.style_label(_pantry_food, 22, INK)
+	HouseStyleScript.numeral_label(_pantry_food, 22, HouseStyleScript.CREAM)
 	_pantry_food.add_theme_constant_override(&"outline_size", 0)
 	_pantry.add_child(_pantry_food)
 	_pantry_face = PantryIconScript.new()
@@ -994,7 +1050,7 @@ func _build_pantry() -> void:
 	_pantry.add_child(_pantry_face)
 	_pantry_hungry = Label.new()
 	_pantry_hungry.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	MenuStyleScript.style_label(_pantry_hungry, 22, INK)
+	HouseStyleScript.numeral_label(_pantry_hungry, 22, HouseStyleScript.CREAM)
 	_pantry_hungry.add_theme_constant_override(&"outline_size", 0)
 	_pantry.add_child(_pantry_hungry)
 
@@ -1010,7 +1066,7 @@ func set_pantry(food: int, hungry: int) -> void:
 	_pantry_hungry.visible = hungry > 0
 	_pantry_hungry.text = str(hungry) if hungry > 0 else ""
 	_pantry_warn = hungry > 0 and food <= 0
-	var c := PANTRY_WARN if _pantry_warn else INK
+	var c := PANTRY_WARN if _pantry_warn else HouseStyleScript.CREAM
 	_pantry_food.add_theme_color_override(&"font_color", c)
 	_pantry_hungry.add_theme_color_override(&"font_color", c)
 
@@ -1095,65 +1151,96 @@ const GOLD_INK := Color(0.72, 0.5, 0.08)
 var _chip: Label
 
 
-## The HUD's cards and pills are the kit's paper (P8 S5, tools/make_ui_kit.py "card"): grain,
-## a soft ink edge and a drop shadow, the same material as the letters and tooltips. The two
-## arguments are kept for the callers' sake; the painted corner sets the roundness now.
-static func card_box(_radius := 22, _border := 4) -> StyleBox:
-	var sb: StyleBoxTexture = MenuStyleScript.kit(&"card").duplicate()
-	sb.content_margin_left = 18
-	sb.content_margin_right = 18
-	sb.content_margin_top = 10
-	sb.content_margin_bottom = 10
-	return sb
+## THE HUD'S ONE SURFACE IS THE CASINO'S PLUM (Fable AAA review round 1, #3: "the HUD is six
+## text rectangles"). It was the kit's cream paper, the letters' material, and six cream boxes
+## over a green field read as a word processor's windows. Every card and pill on the HUD is
+## now game/ui/house_style.gd's pill: plum, a gold hairline, a soft drop, cream words, gold
+## numbers. The second argument is kept for the callers' sake.
+static func card_box(radius := 22, _border := 4) -> StyleBox:
+	return HouseStyleScript.pill_box(radius, 0.9, Vector2(18, 10))
 
 
-## Dress the plain labels as the show's UI: cards behind the bag and the tasks, pills for
-## the toast and the prompt, dark ink instead of white text with an outline.
+## Dress the HUD in the house style: a plum pill behind the bag and the lessons, plum pills for
+## the toast, the prompt and the tip, cream words and gold numbers.
 func _restyle() -> void:
-	for l: Label in [_bag_title, _bag_count, _balance, _world_line]:
-		l.add_theme_color_override("font_color", INK_SOFT if l != _bag_count else INK)
-		l.add_theme_constant_override("outline_size", 0)
-	_bits.add_theme_color_override("font_color", GOLD_INK)
-	_bits.add_theme_constant_override("outline_size", 0)
-	_bits.add_theme_font_size_override("font_size", MenuStyle.font_px(30))
-	_bits.add_theme_font_override("font", MenuStyleScript.numeral_font())
-	_bag_title.add_theme_font_override("font", MenuStyleScript.title_font())
-	_add_card_behind($Bag as Control, Vector2(18, 14))
-	_add_card_behind(_tasks, Vector2(18, 12))
-	for pill: Label in [_toast, _prompt]:
-		pill.add_theme_stylebox_override("normal", card_box(26, 4))
-		pill.add_theme_color_override("font_color", INK)
-		pill.add_theme_constant_override("outline_size", 0)
-		pill.add_theme_font_override("font", MenuStyleScript.title_font())
-	_toast.add_theme_font_size_override("font_size", MenuStyle.font_px(30))
-	_prompt.add_theme_font_size_override("font_size", MenuStyle.font_px(24))
-	_hints.add_theme_stylebox_override("panel", card_box(22, 4))
-	for c in _hints_grid.get_children():
-		if c is Label:
-			(c as Label).add_theme_color_override("font_color", INK)
-			(c as Label).add_theme_constant_override("outline_size", 0)
+	var bag := $Bag as VBoxContainer
+	# The bag's contents sit on the box's floor, so its card hugs the screen's bottom edge.
+	bag.alignment = BoxContainer.ALIGNMENT_END
+	bag.add_theme_constant_override(&"separation", 4)
+	# The title and the count are drawn on the slot strip now: the bag's picture at its left,
+	# the count in a gold chip at its right. The labels keep their text for the gates.
+	_bag_title.visible = false
+	_bag_count.visible = false
+	for l: Label in [_balance, _world_line]:
+		HouseStyleScript.ink_label(l, 18, HouseStyleScript.CREAM_DIM, false)
+	_style_bits()
+	_add_card_behind(bag, Vector2(16, 12))
+	_add_card_behind(_tasks, Vector2(14, 10))
+	_toast.add_theme_stylebox_override("normal", HouseStyleScript.pill_box(30, 0.92, Vector2(24, 10)))
+	HouseStyleScript.ink_label(_toast, 28, HouseStyleScript.CREAM)
 	_prompt.visible = false
+	_build_prompt_card()
+	_hints.add_theme_stylebox_override("panel", HouseStyleScript.pill_box(20, 0.94, Vector2(10, 8)))
 	_chip = Label.new()
 	_chip.name = "ControlsChip"
-	_chip.add_theme_stylebox_override("normal", card_box(16, 3))
-	_chip.add_theme_color_override("font_color", INK)
-	_chip.add_theme_font_size_override("font_size", MenuStyle.font_px(18))
+	_chip.add_theme_stylebox_override("normal", HouseStyleScript.pill_box(18, 0.78,
+		Vector2(14, 6)))
+	HouseStyleScript.ink_label(_chip, 17, HouseStyleScript.CREAM)
 	_chip.anchor_left = 1.0
 	_chip.anchor_right = 1.0
 	_chip.anchor_top = 1.0
 	_chip.anchor_bottom = 1.0
 	_chip.offset_left = -190.0
 	_chip.offset_right = -44.0
-	_chip.offset_top = -86.0
+	_chip.offset_top = -84.0
 	_chip.offset_bottom = -44.0
-	_chip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_chip.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_chip.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_chip.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_chip)
+	# The key is a drawn keycap at the chip's left, not a letter in the sentence.
+	_chip_key = HouseStyleScript.KeyGlyph.new()
+	_chip_key.set("glyph_height", 28.0)
+	_chip.add_child(_chip_key)
 	_refresh_chip()
+
+
+## THE WALLET IS A COIN AND A NUMBER: the bits coin at the left of the line and the count in
+## the casino's gold numerals, outlined so it stands on grass or sky.
+func _style_bits() -> void:
+	HouseStyleScript.numeral_label(_bits, 34)
+	var box := StyleBoxEmpty.new()
+	box.content_margin_left = BITS_COIN + 10.0
+	_bits.add_theme_stylebox_override(&"normal", box)
+	var coin := TextureRect.new()
+	coin.name = "Coin"
+	coin.texture = IconSet.texture("coin", 96, false)
+	coin.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	coin.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	coin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	coin.size = Vector2(BITS_COIN, BITS_COIN)
+	_bits.add_child(coin)
+	var place := func() -> void:
+		coin.position = Vector2(0.0, (_bits.size.y - BITS_COIN) * 0.5)
+	_bits.resized.connect(place)
+	place.call()
+
+
+const BITS_COIN := 36.0
+var _chip_key: Control
 
 
 func _refresh_chip() -> void:
 	if _chip != null:
-		_chip.text = "%s  controls" % InputDeviceScript.hint(&"toggle_hints")
+		# The word stays "controls"; the key itself is the drawn cap at the chip's left.
+		var key := InputDeviceScript.hint(&"toggle_hints")
+		_chip.text = "controls"
+		if _chip_key != null:
+			_chip_key.set("key", key)
+			var box := _chip.get_theme_stylebox(&"normal") as StyleBoxFlat
+			box.content_margin_left = 10.0 + _chip_key.custom_minimum_size.x + 10.0
+			_chip_key.position = Vector2(10.0, 6.0)
 		_chip.visible = _chip_enabled and not _hints.visible and not _overlay_open
 
 
@@ -1190,6 +1277,9 @@ func _add_card_behind(node: Control, pad: Vector2) -> void:
 	var fit := _fit_card.bind(card, node, pad)
 	node.resized.connect(fit)
 	node.visibility_changed.connect(fit)
+	# A box with a fixed rect never resizes when its contents grow (the bag's strip gains a
+	# row, the bits line a digit), so its card follows the contents' minimum size too.
+	node.minimum_size_changed.connect(func() -> void: fit.call_deferred())
 	fit.call_deferred()
 
 
@@ -1203,6 +1293,10 @@ func _fit_card(card: Panel, node: Control, pad: Vector2) -> void:
 	var w := minf(r.size.x, node.get_combined_minimum_size().x)
 	card.visible = node.visible and h > 2.0 and _has_content(node)
 	card.position = r.position - pad
+	# A box whose contents sit on its floor gets its card on the floor too.
+	var box := node as BoxContainer
+	if box != null and box.alignment == BoxContainer.ALIGNMENT_END:
+		card.position.y = r.end.y - h - pad.y
 	card.size = Vector2(w, h) + pad * 2.0
 
 
@@ -1228,7 +1322,7 @@ func _fit_pill(l: Label) -> void:
 	# Back to one line before measuring, so a short toast after a long one is short again.
 	l.offset_bottom = l.offset_top + float(l.get_meta(&"pill_height"))
 	# The toast's picture takes its own room at the left (P8 S5).
-	var pad := 56.0 + (TOAST_ICON_PX + 8.0 if l == _toast and _toast_icon != null else 0.0)
+	var pad := 56.0 + (TOAST_ICON_PX + 14.0 if l == _toast and _toast_icon != null else 0.0)
 	var one_line := font.get_string_size(l.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + pad
 	var w := minf(one_line, PILL_MAX_WIDTH)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if one_line > PILL_MAX_WIDTH \
@@ -1245,40 +1339,87 @@ func _fit_pill(l: Label) -> void:
 const PILL_MAX_WIDTH := 900.0
 
 
-## The onboarding tip (game/systems/onboarding.gd): one friendly line in a pill above the
+## THE ONBOARDING TIP (game/systems/onboarding.gd): one friendly line in a pill above the
 ## bottom of the screen, never blocking, gone when there is nothing to teach.
-var _tip: Label
+##
+## THE KEY IS A GLYPH, NOT A WORD (Fable AAA review round 1, #3): "Hold Right Mouse on a pony"
+## draws as "Hold [a mouse, its right button lit] on a pony", the way every PC game teaches.
+## The tip fades in and out rather than snapping, steps aside while a toast is speaking (the
+## two used to stack on each other), and is not drawn under a letter or a menu. It retires on
+## its own: onboarding.gd counts the action and drops the tip after RETIRE_AFTER, in the save.
+var _tip: PanelContainer
+var _tip_row: HBoxContainer
+var _tip_text := ""
+var _tip_alpha := 0.0
+const TIP_FADE := 0.35
+## Where the tip's pill sits: its bottom edge this far above the screen's (1920x1080 units).
+const TIP_BOTTOM := 100.0
 
 
 func set_tip(text: String) -> void:
 	if _tip == null:
-		_tip = Label.new()
+		_tip = PanelContainer.new()
 		_tip.name = "Tip"
-		_tip.add_theme_stylebox_override("normal", card_box(24, 4))
-		_tip.add_theme_color_override("font_color", INK)
-		_tip.add_theme_font_size_override("font_size", MenuStyle.font_px(24))
-		_tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		_tip.anchor_left = 0.5
-		_tip.anchor_right = 0.5
-		_tip.anchor_top = 1.0
-		_tip.anchor_bottom = 1.0
-		_tip.offset_left = -300.0
-		_tip.offset_right = 300.0
-		_tip.offset_top = -150.0
-		_tip.offset_bottom = -100.0
-		# Hidden until there is something to say: the first call is often "", and the
-		# early return below would otherwise leave an empty pill on screen.
+		_tip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_tip.add_theme_stylebox_override("panel", HouseStyleScript.pill_box(26, 0.88,
+			Vector2(22, 7)))
+		_tip_row = HBoxContainer.new()
+		_tip_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_tip_row.add_theme_constant_override(&"separation", 10)
+		_tip_row.alignment = BoxContainer.ALIGNMENT_CENTER
+		_tip.add_child(_tip_row)
+		_tip.modulate.a = 0.0
 		_tip.visible = false
 		add_child(_tip)
-	if _tip.text == text:
+	if _tip_text == text:
 		return
-	_tip.text = text
-	_tip.visible = not text.is_empty() and not _overlay_open
-	_fit_pill(_tip)
+	_tip_text = text
+	if not text.is_empty():
+		HouseStyleScript.fill_glyph_row(_tip_row, HouseStyleScript.split_on_key(text,
+			_glyph_keys()), 24, HouseStyleScript.CREAM, 42.0)
+		_place_bottom_card.call_deferred(_tip, TIP_BOTTOM)
+
+
+func _place_bottom_card(card: Control, bottom: float) -> void:
+	if not is_instance_valid(card):
+		return
+	var s := card.get_combined_minimum_size()
+	card.size = s
+	card.position = Vector2((_canvas_size().x - s.x) * 0.5, _canvas_size().y - bottom - s.y)
+
+
+func _canvas_size() -> Vector2:
+	return get_viewport().get_visible_rect().size if is_inside_tree() else Vector2(1920, 1080)
+
+
+## The tip fades toward shown when it has something to say, nothing is over it and no toast is
+## speaking; toward hidden otherwise.
+func _fade_tip(delta: float) -> void:
+	if _tip == null:
+		return
+	var want := not _tip_text.is_empty() and not _overlay_open and _toast_left <= 0.0
+	_tip_alpha = move_toward(_tip_alpha, 1.0 if want else 0.0, delta / TIP_FADE)
+	_tip.modulate.a = _tip_alpha
+	_tip.visible = _tip_alpha > 0.0
+
+
+## The keys a tip may name, on the device in hand: the beam, interact, the treat.
+func _glyph_keys() -> Array:
+	var keys := []
+	for a: StringName in [&"beam", &"interact", &"treat"]:
+		var k := InputDeviceScript.hint(a)
+		if not k.is_empty():
+			keys.append(k)
+	return keys
 
 
 func tip_text() -> String:
-	return _tip.text if _tip != null else ""
+	return _tip_text
+
+
+## Whether the tip is on screen now (fully faded in, or on its way).
+func tip_showing() -> bool:
+	return _tip != null and _tip.visible and _tip.modulate.a > 0.0
 
 
 ## THE MONOCLE'S CARD: who is under the crosshair, and what she is like ("Daisy Dapple --
@@ -1290,9 +1431,9 @@ func set_target_info(text: String) -> void:
 	if _target == null:
 		_target = Label.new()
 		_target.name = "TargetInfo"
-		_target.add_theme_stylebox_override("normal", card_box(18, 3))
-		_target.add_theme_color_override("font_color", INK)
-		_target.add_theme_font_size_override("font_size", MenuStyle.font_px(20))
+		_target.add_theme_stylebox_override("normal", HouseStyleScript.pill_box(18, 0.86,
+			Vector2(16, 5)))
+		HouseStyleScript.ink_label(_target, 20, HouseStyleScript.CREAM)
 		_target.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		_target.anchor_left = 0.5
 		_target.anchor_right = 0.5
@@ -1316,11 +1457,55 @@ func target_info() -> String:
 	return _target.text if _target != null else ""
 
 
+## WHAT THE INTERACT KEY WILL DO, AS A KEY AND A VERB (Fable AAA review round 1, #3: "E: talk
+## to Tumble" was a typed key string). ranch.gd still hands over "E: talk to Tumble"; the card
+## draws the E as a keycap and the rest as the verb, "Talk to Tumble". The Prompt label keeps
+## the whole line for prompt_text() and for anything that reads it back.
+var _prompt_card: PanelContainer
+var _prompt_row: HBoxContainer
+
+
+func _build_prompt_card() -> void:
+	_prompt_card = PanelContainer.new()
+	_prompt_card.name = "PromptCard"
+	_prompt_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_prompt_card.add_theme_stylebox_override("panel", HouseStyleScript.pill_box(24, 0.9,
+		Vector2(10, 6)))
+	_prompt_row = HBoxContainer.new()
+	_prompt_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_prompt_row.add_theme_constant_override(&"separation", 12)
+	_prompt_card.add_child(_prompt_row)
+	_prompt_card.visible = false
+	add_child(_prompt_card)
+
+
 func set_prompt(text: String) -> void:
-	if _prompt != null:
-		_prompt.text = text
-		_prompt.visible = not text.is_empty()
-		_fit_pill(_prompt)
+	if _prompt == null:
+		return
+	var changed := _prompt.text != text
+	_prompt.text = text
+	_prompt.visible = false
+	if _prompt_card == null:
+		return
+	_prompt_card.visible = not text.is_empty() and not _overlay_open
+	if changed and not text.is_empty():
+		var parts := HouseStyleScript.split_on_key(text, [InputDeviceScript.hint(&"interact")])
+		HouseStyleScript.fill_glyph_row(_prompt_row, parts, 24, HouseStyleScript.CREAM, 36.0)
+		_place_prompt_card.call_deferred()
+
+
+func _place_prompt_card() -> void:
+	if not is_instance_valid(_prompt_card):
+		return
+	var s := _prompt_card.get_combined_minimum_size()
+	_prompt_card.size = s
+	var c := _canvas_size() * 0.5
+	_prompt_card.position = Vector2(c.x - s.x * 0.5, c.y + 58.0)
+
+
+## The prompt as drawn: [words before the key, the key, the verb after it].
+func prompt_parts() -> Array:
+	return HouseStyleScript.split_on_key(prompt_text(), [InputDeviceScript.hint(&"interact")])
 
 
 func clear_prompt() -> void:
@@ -1369,15 +1554,40 @@ const HINTS := [
 
 func _build_hints() -> void:
 	_hints_grid.columns = 2
+	_hints_grid.add_theme_constant_override(&"h_separation", 16)
+	_hints_grid.add_theme_constant_override(&"v_separation", 6)
 	for child in _hints_grid.get_children():
 		child.queue_free()
 	var column: int = 2 if InputDeviceScript.using_gamepad() else 1
 	for row: Array in HINTS:
 		var label_text := String(row[0])
 		var note: bool = label_text == ""
-		for pair: Array in [[label_text, 0.60], [String(row[column if not note else 1]), 0.92]]:
-			var label := Label.new()
-			label.text = String(pair[0])
-			MenuStyleScript.style_label(label, 20, Color(1.0, 1.0, 1.0, float(pair[1])))
-			_hints_grid.add_child(label)
+		# The action in small gold caps; its key on a cream keycap (house style), or a note
+		# in soft cream under the row it explains.
+		var name_label := Label.new()
+		name_label.text = label_text
+		HouseStyleScript.ink_label(name_label, 16, HouseStyleScript.GOLD)
+		name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_hints_grid.add_child(name_label)
+		var value := Label.new()
+		value.text = String(row[column if not note else 1])
+		if note:
+			HouseStyleScript.ink_label(value, 16, HouseStyleScript.CREAM_DIM, false)
+		else:
+			HouseStyleScript.ink_label(value, 18, HouseStyleScript.INK)
+			var cap := StyleBoxFlat.new()
+			cap.bg_color = HouseStyleScript.KEY_FACE
+			cap.border_color = HouseStyleScript.KEY_LIP
+			cap.border_width_bottom = 4
+			cap.border_width_left = 1
+			cap.border_width_right = 1
+			cap.border_width_top = 1
+			cap.set_corner_radius_all(7)
+			cap.content_margin_left = 10
+			cap.content_margin_right = 10
+			cap.content_margin_top = 1
+			cap.content_margin_bottom = 2
+			value.add_theme_stylebox_override(&"normal", cap)
+			value.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		_hints_grid.add_child(value)
 	_hints_device = InputDeviceScript.last()

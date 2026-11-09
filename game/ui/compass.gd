@@ -8,13 +8,17 @@ extends Control
 ## off the strip's ends; one close by fades, since she can see it already.
 
 const PlaceSignScript := preload("res://world/place_sign.gd")
+const HouseStyleScript := preload("res://ui/house_style.gd")
 
 ## Degrees of view the strip spans, end to end.
 const SPAN_DEGREES := 150.0
-const WIDTH := 620.0
-const HEIGHT := 46.0
-const ICON := 34.0
-const TOP := 14.0
+## A THIN STRIP OF ICONS, NOT A BAR OVER THE SCENE (Fable AAA review round 1, #3: "a compass
+## bar"). It was a 46 px cream box across the top of the view; it is a hairline of gold on a
+## plum band that fades to nothing at both ends, the icons riding it on small discs.
+const WIDTH := 640.0
+const HEIGHT := 30.0
+const ICON := 24.0
+const TOP := 16.0
 ## Closer than this a place's icon fades out: she is already there.
 const NEAR_METRES := 9.0
 
@@ -47,17 +51,20 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_TOP_WIDE)
 	_back = Panel.new()
 	_back.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.97, 0.93, 0.84, 0.72)
-	sb.border_color = Color(0.45, 0.3, 0.55, 0.8)
-	sb.set_border_width_all(2)
-	sb.set_corner_radius_all(14)
-	_back.add_theme_stylebox_override("panel", sb)
+	_back.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	_back.draw.connect(_draw_band)
 	add_child(_back)
+	# The facing mark: a small gold pointer under the strip's middle.
 	var tick := ColorRect.new()
 	tick.name = "Tick"
-	tick.color = Color(0.45, 0.3, 0.55, 0.9)
+	tick.color = Color(0, 0, 0, 0)
 	tick.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tick.draw.connect(func() -> void:
+		var w := tick.size.x
+		tick.draw_colored_polygon(PackedVector2Array([Vector2(0, tick.size.y), Vector2(w, tick.size.y),
+			Vector2(w * 0.5, 0)]), HouseStyleScript.GOLD)
+		tick.draw_polyline(PackedVector2Array([Vector2(0, tick.size.y), Vector2(w * 0.5, 0),
+			Vector2(w, tick.size.y)]), HouseStyleScript.PLUM_DARK, 1.5, true))
 	add_child(tick)
 	_goal_mark = Control.new()
 	_goal_mark.name = "Goal"
@@ -65,12 +72,8 @@ func _ready() -> void:
 	_goal_mark.size = Vector2(ICON + 12.0, ICON + 12.0)
 	var ring := Panel.new()
 	ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var rb := StyleBoxFlat.new()
-	rb.bg_color = Color(1.0, 0.95, 0.75, 0.95)
-	rb.border_color = Color(0.95, 0.72, 0.2)
-	rb.set_border_width_all(3)
-	rb.set_corner_radius_all(int((ICON + 12.0) * 0.5))
-	rb.shadow_color = Color(1.0, 0.8, 0.3, 0.55)
+	var rb := HouseStyleScript.disc_box(ICON + 12.0, HouseStyleScript.KEY_FACE, HouseStyleScript.GOLD, 3)
+	rb.shadow_color = Color(1.0, 0.8, 0.3, 0.6)
 	rb.shadow_size = 6
 	ring.add_theme_stylebox_override("panel", rb)
 	ring.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -88,22 +91,18 @@ func _ready() -> void:
 	# under its ring, and a chevron beside it when it is behind her and pinned to an end.
 	_goal_dist = Label.new()
 	_goal_dist.name = "GoalDistance"
-	MenuStyle.style_label(_goal_dist, 17, Color(0.35, 0.24, 0.10))
+	HouseStyleScript.ink_label(_goal_dist, 15, HouseStyleScript.GOLD)
 	_goal_dist.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_goal_dist.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var pill := StyleBoxFlat.new()
-	pill.bg_color = Color(1.0, 0.95, 0.78, 0.95)
-	pill.border_color = Color(0.95, 0.72, 0.2)
-	pill.set_border_width_all(2)
-	pill.set_corner_radius_all(9)
-	pill.content_margin_left = 7
-	pill.content_margin_right = 7
-	_goal_dist.add_theme_stylebox_override("normal", pill)
+	_goal_dist.add_theme_stylebox_override("normal", HouseStyleScript.pill_box(9, 0.88,
+		Vector2(7, 0)))
 	_goal_dist.visible = false
 	add_child(_goal_dist)
 	_goal_chevron = Label.new()
 	_goal_chevron.name = "GoalChevron"
-	MenuStyle.style_label(_goal_chevron, 30, Color(0.95, 0.66, 0.15))
+	HouseStyleScript.ink_label(_goal_chevron, 26, HouseStyleScript.GOLD)
+	_goal_chevron.add_theme_constant_override(&"outline_size", 6)
+	_goal_chevron.add_theme_color_override(&"font_outline_color", HouseStyleScript.PLUM_DARK)
 	_goal_chevron.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_goal_chevron.visible = false
 	add_child(_goal_chevron)
@@ -112,10 +111,13 @@ func _ready() -> void:
 		var l := Label.new()
 		l.name = "Cardinal" + String(c[0])
 		l.text = String(c[0])
-		MenuStyle.style_label(l, 19 if String(c[0]).length() == 1 else 13, Color(0.45, 0.3, 0.55))
+		# On the band itself, in gold: the cardinal letters are the strip's own ticks.
+		HouseStyleScript.ink_label(l, 17 if String(c[0]).length() == 1 else 12,
+			HouseStyleScript.GOLD if String(c[0]).length() == 1 else HouseStyleScript.CREAM_DIM)
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		l.size = Vector2(30, 24)
+		l.size = Vector2(30, HEIGHT)
 		add_child(l)
 		_cardinals.append(l)
 
@@ -152,12 +154,9 @@ func set_places(list: Array[Dictionary]) -> void:
 		badge.name = "Badge"
 		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		badge.show_behind_parent = true
-		var bb := StyleBoxFlat.new()
-		bb.bg_color = Color(1.0, 0.98, 0.93)
-		bb.border_color = PlaceSignScript.ICON_COLOURS.get(int(p.get("icon", 0)), Color(0.6, 0.5, 0.7))
-		bb.set_border_width_all(3)
-		bb.set_corner_radius_all(int(ICON * 0.5 + 4.0))
-		bb.shadow_color = Color(0, 0, 0, 0.22)
+		var bb := HouseStyleScript.disc_box(ICON + 8.0, HouseStyleScript.KEY_FACE,
+			PlaceSignScript.ICON_COLOURS.get(int(p.get("icon", 0)), HouseStyleScript.GOLD_DIM), 2)
+		bb.shadow_color = Color(0, 0, 0, 0.25)
 		bb.shadow_size = 3
 		badge.add_theme_stylebox_override("panel", bb)
 		badge.position = Vector2(-4, -4)
@@ -206,8 +205,8 @@ func _process(delta: float) -> void:
 	_back.position = Vector2(left, TOP)
 	_back.size = Vector2(WIDTH, HEIGHT)
 	var tick := get_node(^"Tick") as ColorRect
-	tick.position = Vector2(vw * 0.5 - 1.5, TOP + HEIGHT - 10.0)
-	tick.size = Vector2(3.0, 8.0)
+	tick.position = Vector2(vw * 0.5 - 6.0, TOP + HEIGHT + 1.0)
+	tick.size = Vector2(12.0, 8.0)
 	if cam == null:
 		return
 	var forward := -cam.global_transform.basis.z
@@ -217,8 +216,8 @@ func _process(delta: float) -> void:
 		var cu := strip_position(bearing(forward, CARDINALS[k][1]))
 		var cl := _cardinals[k]
 		cl.visible = cu > 0.04 and cu < 0.96
-		# Hung just under the strip, so a letter never sits behind a place's badge.
-		cl.position = Vector2(left + cu * WIDTH - cl.size.x * 0.5, TOP + HEIGHT - 2.0)
+		# On the band, between the badges.
+		cl.position = Vector2(left + cu * WIDTH - cl.size.x * 0.5, TOP)
 		cl.modulate.a = clampf(minf(cu - 0.04, 0.96 - cu) / 0.1, 0.0, 1.0) * (1.0 if k < 4 else 0.6)
 	for i in places.size():
 		var node := places[i].get("node") as Node3D
@@ -260,3 +259,30 @@ func _process(delta: float) -> void:
 	else:
 		_goal_dist.visible = false
 		_goal_chevron.visible = false
+
+
+## THE BAND: plum, fading to nothing at both ends, with a gold hairline along its middle that
+## fades with it. Drawn rather than boxed, so the strip has no corners to sit over the scene.
+func _draw_band() -> void:
+	var w := _back.size.x
+	var h := _back.size.y
+	var fade := w * 0.16
+	var deep := Color(HouseStyleScript.PLUM_DARK, 0.62)
+	var clear := Color(HouseStyleScript.PLUM_DARK, 0.0)
+	var xs := [0.0, fade, w - fade, w]
+	var cs := [clear, deep, deep, clear]
+	for i in 3:
+		_back.draw_polygon(PackedVector2Array([Vector2(xs[i], 0), Vector2(xs[i + 1], 0),
+			Vector2(xs[i + 1], h), Vector2(xs[i], h)]),
+			PackedColorArray([cs[i], cs[i + 1], cs[i + 1], cs[i]]))
+	var gold := Color(HouseStyleScript.GOLD, 0.85)
+	for edge_y: float in [0.5, h - 0.5]:
+		_back.draw_line(Vector2(fade, edge_y), Vector2(w - fade, edge_y), gold, 1.5)
+		# draw_line takes one colour: the fades are drawn as short graded steps.
+		for k in 12:
+			var t0 := float(k) / 12.0
+			var t1 := float(k + 1) / 12.0
+			_back.draw_line(Vector2(fade * t0, edge_y), Vector2(fade * t1, edge_y),
+				Color(gold, t1 * gold.a), 1.5)
+			_back.draw_line(Vector2(w - fade * t1, edge_y), Vector2(w - fade * t0, edge_y),
+				Color(gold, t1 * gold.a), 1.5)

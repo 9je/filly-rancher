@@ -6,10 +6,11 @@ extends Control
 ## changes and is hidden when there is none. Drawn like the compass strip, so the two read as
 ## one piece of HUD.
 
-const ICON := 30.0
-## Clear of the compass strip AND what hangs under it (its N E S W letters, the goal's
-## distance pill): 92, not 68 (PT8).
-const TOP := 92.0
+const HouseStyleScript := preload("res://ui/house_style.gd")
+const ICON := 28.0
+## Clear of the compass strip AND what hangs under it (the goal's distance pill): the strip is
+## a thin band now (Fable AAA review round 1, #3), so the card sits closer under it.
+const TOP := 80.0
 const HERE_METRES := 4.0
 const SLIDE_SECONDS := 0.35
 
@@ -26,17 +27,9 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_TOP_LEFT)
 	_panel = PanelContainer.new()
 	_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.97, 0.93, 0.84, 0.86)
-	sb.border_color = Color(0.45, 0.3, 0.55, 0.85)
-	sb.set_border_width_all(2)
-	sb.set_corner_radius_all(16)
-	sb.content_margin_left = 8
-	sb.content_margin_right = 16
-	sb.content_margin_top = 5
-	sb.content_margin_bottom = 5
-	sb.shadow_color = Color(0, 0, 0, 0.18)
-	sb.shadow_size = 6
+	# The HUD's plum pill (game/ui/house_style.gd): the casino's palette, not cream paper.
+	var sb := HouseStyleScript.pill_box(22, 0.9, Vector2(16, 5))
+	sb.content_margin_left = 6
 	_panel.add_theme_stylebox_override("panel", sb)
 	add_child(_panel)
 	var row := HBoxContainer.new()
@@ -46,11 +39,8 @@ func _ready() -> void:
 	# The goal's icon in the gold ring the compass gives the goal.
 	var ring := PanelContainer.new()
 	ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var rb := StyleBoxFlat.new()
-	rb.bg_color = Color(1.0, 0.95, 0.75, 0.95)
-	rb.border_color = Color(0.95, 0.72, 0.2)
-	rb.set_border_width_all(3)
-	rb.set_corner_radius_all(int(ICON * 0.5 + 5.0))
+	var rb := HouseStyleScript.disc_box(ICON + 10.0, HouseStyleScript.KEY_FACE,
+		HouseStyleScript.GOLD, 3)
 	rb.set_content_margin_all(5)
 	ring.add_theme_stylebox_override("panel", rb)
 	row.add_child(ring)
@@ -61,11 +51,12 @@ func _ready() -> void:
 	_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ring.add_child(_icon)
 	_words = Label.new()
-	MenuStyle.style_label(_words, 22, Color(0.25, 0.18, 0.3))
+	HouseStyleScript.ink_label(_words, 22, HouseStyleScript.CREAM)
 	_words.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row.add_child(_words)
 	_distance = Label.new()
-	MenuStyle.style_label(_distance, 18, Color(0.55, 0.42, 0.18))
+	HouseStyleScript.ink_label(_distance, 18, HouseStyleScript.GOLD, false)
+	_distance.add_theme_font_override(&"font", MenuStyle.numeral_font())
 	_distance.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row.add_child(_distance)
 	visible = false
