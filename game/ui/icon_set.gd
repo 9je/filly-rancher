@@ -23,6 +23,8 @@ static func texture(name: String, px: int = 64, plate: bool = true) -> ImageText
 	if src.is_empty() or img.load_svg_from_string(src, px / 64.0) != OK:
 		push_warning("IconSet: no icon %s" % file)
 		img = Image.create(px, px, false, Image.FORMAT_RGBA8)
+	# Mipmapped, so a world sprite drawn smaller than its size (the news bubble) filters smoothly.
+	img.generate_mipmaps()
 	var tex := ImageTexture.create_from_image(img)
 	_cache[key] = tex
 	return tex

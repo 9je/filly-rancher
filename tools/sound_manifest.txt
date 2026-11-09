@@ -442,3 +442,7 @@ music/casino_backbay.ogg|https://incompetech.com/music/royalty-free/mp3-royaltyf
 # PENNING (2026-10-25, owner: "sound on paddock is pretty bad"): a latch and a two-note marimba
 # rise, made by tools/make_pen_sounds.py, in place of gate_open's door creak on every penning.
 world/pen_in.wav|synth:make_pen_sounds.py|
+
+# THE MARKET (P8, playtest 2026-11-08 item 66: "Carefree" is a recognisable stock track and
+# grating): an original loop made by tools/make_market_tune.py, for the Market, Depot and town.
+music/market_stalls.ogg|synth:make_market_tune.py|

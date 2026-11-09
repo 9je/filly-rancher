@@ -73,3 +73,4 @@ PASS  world/neigh_real.wav                dur=2.05      I=-19.2     TP=-8.0     
 PASS  world/pen_in.wav                    dur=0.94      I=-18.5     TP=-6.0     target=none
 PASS  world/scoop_pop.wav                 dur=0.28      I=-70.0     TP=-4.8     target=none
 PASS  world/sparkle.wav                   dur=0.28      I=-70.0     TP=-7.0     target=none
+PASS  music/market_stalls.ogg             dur=76.80     I=-20.90  TP=-7.74  target=-21
