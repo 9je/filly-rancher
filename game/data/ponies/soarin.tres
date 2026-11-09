@@ -17,3 +17,4 @@ base_stamina = 6.0
 base_spirit = 5.5
 phases = Array[int]([1, 0])
 weathers = Array[int]([0])
+pronoun = &"he"

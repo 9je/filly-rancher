@@ -213,6 +213,16 @@ const SHY_NOTICE_BONUS := 4.5
 ## game/test/test_pony.gd and demonstrated behaviourally in scenes/test/capture_test.gd.
 const SNEAK_NOTICE_FACTOR := 0.5
 
+## SHE SEES IN FRONT OF HER (P8 S3; playtest 2026-11-08 item 25, idea A2: "always running,
+## walking has no use"). A running player is HEARD, all round, at the full radius. A walking
+## (sneaking) player is SEEN: inside VIEW_HALF_ANGLE_DEG of the way she is facing she still
+## spots him at SNEAK_SEEN_FACTOR of the radius (a skittish pony bolts), and behind her she
+## only notices him at SNEAK_BEHIND_FACTOR. So the skill is to walk round and come up from
+## behind: SHY 16.5 m becomes 5.8 m, well inside MagicBeam.REACH.
+const VIEW_HALF_ANGLE_DEG := 70.0
+const SNEAK_SEEN_FACTOR := 0.85
+const SNEAK_BEHIND_FACTOR := 0.35
+
 ## Radius of the DetectionArea sphere, in metres. Applied to the shape in _ready() so this
 ## constant cannot drift from what pony.tscn ships.
 ##
@@ -661,11 +671,30 @@ static func reaction_state(personality: int) -> int:
 ## player's gait says how much of a target he is making of himself. Multiplying rather
 ## than subtracting means the sneak is worth the same FRACTION to everyone -- a flat
 ## "-6 m" would make the jumpiest pony the one it helped least, which is backwards.
-static func notice_radius_for(personality: int, sneaking: bool) -> float:
+##
+## `in_view` (P8): whether the player is inside her view cone. Only a sneaking player cares:
+## seen, he is noticed at SNEAK_SEEN_FACTOR; unseen, behind her, at SNEAK_BEHIND_FACTOR.
+## Called with `in_view` left out, the answer is the old even-handed sneak (the gates' and
+## the beam invariant's number, SNEAK_NOTICE_FACTOR).
+static func notice_radius_for(personality: int, sneaking: bool, in_view: Variant = null) -> float:
 	var radius := DETECTION_RADIUS
 	if personality == PonyDataScript.Personality.SHY:
 		radius += SHY_NOTICE_BONUS
-	return radius * (SNEAK_NOTICE_FACTOR if sneaking else 1.0)
+	if not sneaking:
+		return radius
+	if in_view == null:
+		return radius * SNEAK_NOTICE_FACTOR
+	return radius * (SNEAK_SEEN_FACTOR if bool(in_view) else SNEAK_BEHIND_FACTOR)
+
+
+## Whether `to_player` (from her, flat) is inside the view cone of a pony whose model faces
+## `yaw` (her _visual_yaw: forward is (-sin, 0, -cos)).
+static func in_view_cone(yaw: float, to_player: Vector3) -> bool:
+	var flat := Vector3(to_player.x, 0.0, to_player.z)
+	if flat.length_squared() < 1e-6:
+		return true
+	var forward := Vector3(-sin(yaw), 0.0, -cos(yaw))
+	return forward.angle_to(flat.normalized()) <= deg_to_rad(VIEW_HALF_ANGLE_DEG)
 
 
 ## Ambling speed for a pony with this `base_speed`, in m/s. Clamped so it always sits
@@ -1293,6 +1322,15 @@ func is_coy() -> bool:
 
 ## Pause for a beat, then pick the next routine state.
 func _state_idle() -> Vector3:
+	# A treat still waiting and the calm not yet worn off: back to it (a bump on the way, a
+	# slope read as a wall, must not cost the player the bait).
+	if _treat_at != Vector3.INF and calm > 0.0:
+		_transition_to(State.WANDER)
+		_wander_target = _treat_at
+		_state_timer = WANDER_TIMEOUT_SECONDS
+		return Vector3.ZERO
+	if _treat_at != Vector3.INF:
+		_treat_at = Vector3.INF
 	if _state_timer <= 0.0:
 		# The global generator, not hers: her own keeps the wander reproducible.
 		if _action == &"" and wants_joy_hop(is_in_group(&"penned"), looks_hungry(), randf()):
@@ -1306,7 +1344,14 @@ func _state_idle() -> Vector3:
 func _state_wander() -> Vector3:
 	var to_target := _wander_target - global_position
 	to_target.y = 0.0
+	if _treat_at != Vector3.INF and to_target.length() < ARRIVAL_RADIUS + 0.6:
+		# AT THE TREAT: head down and eat it, calm for as long as it takes.
+		_transition_to(State.GRAZE)
+		_state_timer = EAT_SECONDS
+		calm = maxf(calm, EAT_SECONDS + 1.0)
+		return Vector3.ZERO
 	if to_target.length() < ARRIVAL_RADIUS or _state_timer <= 0.0:
+		_treat_at = Vector3.INF
 		_transition_to(State.IDLE)
 		return Vector3.ZERO
 	# NOT THROUGH A CONVERSATION (PS1, playtest 2026-11-05 item 10): with the player talking
@@ -1314,6 +1359,10 @@ func _state_wander() -> Vector3:
 	if BodySpaceScript.crosses_zone(global_position, _wander_target):
 		_transition_to(State.IDLE)
 		return Vector3.ZERO
+	# To a treat she trots, a little quicker than an amble, and her leash does not turn her
+	# back from it (it lies where the player put it, which may be past her usual ground).
+	if _treat_at != Vector3.INF:
+		return to_target.normalized() * _wander_speed * TREAT_TROT
 	return _leash(to_target.normalized()) * _wander_speed
 
 
@@ -1321,6 +1370,7 @@ func _state_wander() -> Vector3:
 ## because her ground speed is zero).
 func _state_graze() -> Vector3:
 	if _state_timer <= 0.0:
+		_treat_at = Vector3.INF
 		_transition_to(State.IDLE)
 	return Vector3.ZERO
 
@@ -1501,6 +1551,9 @@ func _react_to_player() -> void:
 	if not _sees_player():
 		return
 	var reaction := reaction_state(_personality())
+	# SKITTISH KINDS BOLT IF THEY SEE YOU (P8 S3, idea A2), whatever their temperament.
+	if PonyTraitsScript.bolts(quirk):
+		reaction = State.FLEE
 	# SHE IS HOME. A resident does not bolt from her own farmer: her pen's leash is set for a
 	# walk, not a gallop (Pen.roam_radius_for), and a shy pony running laps of a full paddock
 	# was half of how eight of them ended up in one heap (playtest 2026-11-05 item 65).
@@ -1830,7 +1883,12 @@ func _on_detection_body_exited(body: Node3D) -> void:
 ## which is exactly what the sneak is supposed to feel like.
 ## How far off she notices the player as he moves now (her personality, his gait, her quirk).
 func _notice_radius() -> float:
-	return notice_radius_for(_personality(), _player_is_sneaking()) * PonyTraitsScript.notice_mult(quirk)
+	var sneaking := _player_is_sneaking()
+	var seen := in_view_cone(_visual_yaw, _player.global_position - global_position)
+	# A skittish pony's sharp eyes (PonyTraits.notice_mult) count where she can see: running
+	# at her, or walking into her view. From behind a walker is as quiet for her as for anypony.
+	var mult := PonyTraitsScript.notice_mult(quirk) if (seen or not sneaking) else 1.0
+	return notice_radius_for(_personality(), sneaking, seen) * mult
 
 
 func _sees_player() -> bool:
@@ -2078,7 +2136,25 @@ func offer_treat(at: Vector3, food: StringName) -> bool:
 	# AFTER the transition: entering WANDER picks a random target of its own, which used to
 	# overwrite the treat, so a tossed treat sent her strolling anywhere but to it.
 	_wander_target = at
+	_treat_at = at
+	# Time enough to get there: WANDER's own patience is six seconds, and a treat eight
+	# metres off at an amble used to time her out short of it.
+	var flat := Vector3(at.x - global_position.x, 0.0, at.z - global_position.z).length()
+	_state_timer = maxf(WANDER_TIMEOUT_SECONDS, flat / maxf(_wander_speed, 0.5) + 3.0)
 	return true
+
+
+## BAIT (P8 S3, idea A3): where the treat she is walking to lies, or INF. On arriving she
+## stands and eats it for EAT_SECONDS, calm the whole time (she does not notice you, and the
+## Scoop takes her as easily as a frozen Fluttershy).
+var _treat_at := Vector3.INF
+const EAT_SECONDS := 8.0
+const TREAT_TROT := 1.5
+
+
+## Whether she is head down over a treat right now.
+func is_eating() -> bool:
+	return state == State.GRAZE and _treat_at != Vector3.INF
 
 
 func _personality() -> int:

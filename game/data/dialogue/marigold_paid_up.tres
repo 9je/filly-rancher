@@ -1,0 +1,47 @@
+[gd_resource type="Resource" script_class="Dialogue" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://systems/dialogue.gd" id="1_dlg"]
+
+[resource]
+script = ExtResource("1_dlg")
+id = &"marigold_paid_up"
+speaker = &"marigold"
+priority = 90
+once = true
+bark = false
+when = {
+"flags_all": ["debt_cleared"],
+"flags_none": ["marigold_paid_up"]
+}
+nodes = Array[Dictionary]([{
+"id": "start",
+"text": "{name}! Paid in full! I don't think a steward has ever done it so quickly. The office sent a little card.",
+"who": "marigold",
+"mood": "happy",
+"flag": "marigold_paid_up",
+"next": "two"
+}, {
+"id": "two",
+"text": "Of course, bits won't do for the rest, dear. The quota stands, the same as always. The Academy is ever so grateful for every color you send up.",
+"who": "marigold",
+"mood": "happy",
+"anim": "nod",
+"choices": [{
+"text": "What rest?",
+"next": "rest"
+}, {
+"text": "Thank you, Marigold.",
+"next": "thanks"
+}]
+}, {
+"id": "rest",
+"text": "Oh, the program! It runs on ponies, not bits. Silly me, I make it sound so serious.",
+"who": "marigold",
+"mood": "happy"
+}, {
+"id": "thanks",
+"text": "No, thank you. Truly. Now, back to those lovely pens!",
+"who": "marigold",
+"mood": "happy",
+"anim": "nod"
+}])

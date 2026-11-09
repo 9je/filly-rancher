@@ -126,6 +126,9 @@ func show_catch(instance: PonyInstance, body: Node3D = null) -> void:
 	_name.text = who
 	_rarity = int(data.rarity) if data != null else 0
 	_rarity_word.text = String(RARITY_WORDS.get(_rarity, "Common"))
+	# A Drifter is a Drifter, not "Common" (P8 item 9): the word says what she is to the ranch.
+	if instance.is_stock():
+		_rarity_word.text = "Bloomed Drifter" if instance.is_marked() else "Drifter"
 	_rarity_word.add_theme_color_override("font_color", RARITY_INK.get(_rarity, INK_SOFT))
 	_stars.queue_redraw()
 

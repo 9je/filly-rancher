@@ -847,7 +847,9 @@ func _draw_crosshair() -> void:
 		# Outer first, inner second: the inner ring is the smaller of the two and drawing
 		# it last keeps it on top where the two outlines meet.
 		_draw_catch_ring(centre)
-		_draw_wriggle_ring(centre)
+		# One clean catch (P8): a pony has no struggle clock to drain, so no inner ring.
+		if is_finite(_beam.get_struggle_seconds()):
+			_draw_wriggle_ring(centre)
 
 
 ## THE CATCH METER: how far the beam has got toward subduing her, drawn as the OUTER ring
@@ -1349,15 +1351,16 @@ const HINTS := [
 	["MOVE (run)", "W A S D", "Left stick"],
 	["SPRINT", "Shift (hold)", "Left stick click (hold)"],
 	["WALK / SNEAK", "C (hold)", "LB (hold)"],
-	["", "creep quietly, and ponies notice you from half as far", ""],
+	["", "walk up behind a pony and she will not notice you", ""],
 	["JUMP", "Space", "A"],
 	["INTERACT", "E", "X"],
 	["", "the line under the crosshair says what it will do", ""],
 	["LOOK", "Mouse", "Right stick"],
 	["ZOOM", "Scroll / = -", "D-pad up down"],
 	["MAGIC BEAM", "Right mouse (hold)", "Right trigger (hold)"],
-	["", "hold until the OUTER PINK ring fills, then let go to stow her", ""],
-	["", "the INNER AMBER ring is her fight. Let it empty and she wriggles free", ""],
+	["", "hold on her until the ring fills and she is yours", ""],
+	["TREAT", "F", "Y"],
+	["", "drop her favourite food: she comes to eat, and eating she is easy", ""],
 	["SELL GEMS", "E at the Market", "X at the Market"],
 	["PAUSE", "Esc", "Start"],
 	["THIS CARD", "H", "Back"],

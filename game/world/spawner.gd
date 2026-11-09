@@ -555,6 +555,11 @@ func _evictable(marker: ZoneMarker, rng: RandomNumberGenerator) -> CharacterBody
 		var data: PonyData = pony.get_data()
 		if data == null or not data.phases.is_empty() or not data.weathers.is_empty():
 			continue
+		# NEVER THE CROWD: the stock field keeps its own count on its own timer (refresh()'s
+		# comment), and evicting a Drifter for a named newcomer emptied it at a change of sky
+		# once more of the ranch's roster kept hours (P8, RareGate).
+		if pony.has_method("is_stock") and pony.is_stock():
+			continue
 		candidates.append(pony)
 	if candidates.is_empty():
 		return null
@@ -577,10 +582,20 @@ func _pool_for(marker: ZoneMarker, entries: Array[PonyData], phase: int,
 	for data: PonyData in entries:
 		if not marker.zone_id in data.spawn_zones:
 			continue
-		if not data.available(phase, weather):
+		if not data.available(phase, weather) or not _gated_in(data):
 			continue
 		pool.append(data)
 	return pool
+
+
+## WHO MAY BE DRAWN AT ALL BEYOND THE HOUR (P8; playtest 2026-11-08 items 6, 12; idea C1):
+## the ranch's answer, if it gave one. It says no to a pony whose decoration is not built
+## (PonyData.needs_decor) and to a new legendary on a day that already had one.
+var gate: Callable
+
+
+func _gated_in(data: PonyData) -> bool:
+	return not gate.is_valid() or bool(gate.call(data))
 
 
 ## {marker instance id: how many of its ponies are ALREADY on their way out}. The eviction

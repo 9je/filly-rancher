@@ -1339,6 +1339,8 @@ func _bind_game_state() -> void:
 		_game_state.world_seed = spawner.spawn_seed
 	# Never a second of a named pony she already has (PT3): see Spawner.owned_ids.
 	spawner.owned_ids = _owned_named_ids
+	# Rares gated by what she has built and one new legendary a day (game/systems/rare_gate.gd).
+	spawner.gate = rare_allowed
 
 	# Every write -- the one at the house AND the one on quit -- pulls the live world in
 	# through this first. Without it, quitting would save whatever the state last happened
@@ -2079,14 +2081,21 @@ func _bind_depot_menu() -> void:
 	depot_menu.set("bits_provider", func() -> int: return _current_bits())
 	# WHAT THE LEDGER WILL ACTUALLY ACCEPT, so the Pay tab never offers a row that would be
 	# trimmed on the way through (Ledger.pay() caps at payable(); bits settle the service
-	# charges, not the principal). The menu asks; this file answers.
+	# charges and the balance, down to zero). The menu asks; this file answers.
 	depot_menu.set("payable_provider", func() -> int:
 		return _game_state.ledger.payable() if _game_state != null else 0)
 	depot_menu.set("statement_provider", func() -> Array[String]: return _statement())
 	# The purse's "owed", where a delivery's payout lands (PS10, G7).
 	depot_menu.set("balance_provider", func() -> int:
 		return _game_state.ledger.balance if _game_state != null else 0)
+	# The quota card on the Pay tab (P8 item 4).
+	depot_menu.set("quota_provider", func() -> Dictionary:
+		return _game_state.ledger.quota_status(_world.cycle_index() if _world != null else 0) \
+			if _game_state != null else {})
+	# One toast for everything delivered between opening the counter and closing it (items
+	# 20, 21): the batch opens with the menu and is told when it closes.
 	for pair in [["opened", _on_menu_opened_any], ["closed", _on_menu_closed],
+			["opened", begin_delivery_batch], ["closed", end_delivery_batch],
 			["deliver_requested", _on_deliver_requested],
 			["pay_requested", _on_pay_requested]]:
 		if not depot_menu.is_connected(pair[0], pair[1]):
@@ -2242,8 +2251,13 @@ func _penned_rows() -> Array[Dictionary]:
 				"kind": String(inst.data_id),
 				"coat": _coat_word(inst),
 				"credit": _game_state.ledger.quote_delivery(rarity, inst.is_stock(),
-					_delivery_kind(inst), _delivery_cycle()) if _game_state != null
-					else LedgerScript.delivery_credit(rarity, inst.is_stock()),
+					_delivery_kind(inst), _delivery_cycle(), _is_blank(inst)) if _game_state != null
+					else LedgerScript.delivery_credit(rarity, inst.is_stock(), _is_blank(inst)),
+				# WHAT SHE IS TO THE COMPANY (item 9): a blank Drifter (a token fee, counts for
+				# nothing), a Bloomed Drifter, or a named pony. Her pronoun for the rows (70).
+				"blank": _is_blank(inst),
+				"bloomed": inst.is_stock() and inst.is_marked(),
+				"she": PonyDataScript.pronoun_of(data),
 				# For the Depot's tile: her race's icon on a disc of her coat.
 				"race": PonyTraitsScript.race_of(inst),
 				"coat_color": _coat_colour(inst),
@@ -2978,12 +2992,36 @@ func run_collection_day() -> Dictionary:
 	var letter: Dictionary = LettersScript.render(LettersScript.Id.COLLECTION_NOTICE, {
 		"name": _player_name(), "balance": int(summary["balance"]),
 		"upkeep": int(summary["upkeep"])})
-	_toast("%s. Balance: %d bits." % [letter["title"], int(summary["balance"])])
+	if bool(summary.get("closed_now", false)):
+		# THE COLLECTION DAY'S OWN LETTER FIRST (item 6: the rules arrive before the debt can
+		# clear), then the beat.
+		advance_story()
+		_on_debt_cleared()
+	elif not bool(summary.get("closed", false)):
+		_toast("%s. Balance: %d bits." % [letter["title"], int(summary["balance"])])
 	if not bool(summary["quota_met"]):
-		_toast("Quota: %d of %d delivered. An associate will call at the next dawn."
+		_toast("Quota: %d of %d coloured ponies delivered. An associate will call at the next dawn."
 			% [int(summary["delivered"]), int(summary["quota"])])
 	_push_balance()
 	return summary
+
+
+## THE DEBT CLEARED (P8 items 5, 6; idea F5). A story hook, not yet a scene: the flag Marigold's
+## talk keys on (dialogue_src/act1.txt, marigold_paid_up: "bits won't do for the rest, dear"),
+## a toast, a novelty, and the bus event a cinematic can hang off later.
+signal debt_cleared
+
+
+func _on_debt_cleared() -> void:
+	if _game_state == null or _game_state.story.has_flag("debt_cleared"):
+		return
+	_game_state.story.set_flag("debt_cleared")
+	_toast("Collection day: your account is paid in full. Marigold would like a word.")
+	_novelty("story", "debt_cleared", "Paid the Company in full")
+	debt_cleared.emit()
+	var bus := get_node_or_null("/root/Events") if is_inside_tree() else null
+	if bus != null and bus.has_signal("debt_cleared"):
+		bus.emit_signal("debt_cleared")
 
 
 ## THE COLLECTOR CALLS. One rung of the ladder, served once, on the first DAWN OF A CYCLE
@@ -3319,13 +3357,10 @@ func deliver_pony(uid: StringName) -> Dictionary:
 	if is_racing(uid):
 		_toast("She is under orders at the Palace! The counter will take her after the race.")
 		return refused
-	# PLACEMENT IS FOR PONIES STILL LOOKING (STORY.md clue 2): a pony who has found her mark
-	# cannot be sent up. Said in the Company's cheerful voice, and never explained.
-	if inst.is_marked():
-		_toast("Oh! %s has found herself already. Placement is for ponies still looking!"
-			% inst.display_name())
-		refused["reason"] = "marked"
-		return refused
+	# THE FACTORY ONLY WANTS COLOUR (P8, docs/sprint-plan-2026-11-08.md section 2.1). A
+	# Bloomed pony used to be refused here ("placement is for ponies still looking"); now she
+	# is exactly what the Company wants, and a blank Drifter is the one taken for a token fee
+	# (Ledger.BLANK_INTAKE_FEE) that counts toward nothing. See _is_blank().
 
 	# HER BODY, STILL IN THE PEN. Read rather than released, so the two refusals below cost
 	# nothing to make: at this point the pen still holds her, the save still has her record,
@@ -3359,8 +3394,10 @@ func deliver_pony(uid: StringName) -> Dictionary:
 
 	var data: PonyData = inst.data()
 	var rarity: int = data.rarity if data != null else PonyDataScript.Rarity.COMMON
+	var blank := _is_blank(inst)
 	var credit: int = _game_state.ledger.credit_delivery(rarity, inst.is_stock(),
-		_delivery_kind(inst), _delivery_cycle())
+		_delivery_kind(inst), _delivery_cycle(), blank)
+	var overflow: int = _game_state.ledger.last_overflow
 	var named: bool = not inst.is_stock()
 	if named:
 		_game_state.compendium.mark_processed(inst.data_id)
@@ -3388,10 +3425,12 @@ func deliver_pony(uid: StringName) -> Dictionary:
 		LettersScript.Id.RECEIPT_NAMED if named else LettersScript.Id.RECEIPT_STOCK,
 		{"name": _player_name(), "count": shipments, "credit": credit,
 			"pony": inst.display_name()})
-	var paid := handler_share(credit)
+	# HER PAY: the handler's share of her credit, plus whatever a paid-off balance could not
+	# take (Ledger.last_overflow); a blank Drifter's is the token intake fee and nothing else.
+	var paid := LedgerScript.BLANK_INTAKE_FEE if blank else handler_share(credit) + overflow
 	if paid > 0 and _economy != null:
 		_economy.grant(paid)
-	_toast(delivery_toast(str(letter["sender"]), shipments, credit, _game_state.ledger.balance, paid))
+	_note_shipment(str(letter["sender"]), shipments, credit - overflow, paid, blank)
 	# The crate goes down and that is the whole of it. She says nothing, on purpose: the
 	# pony voice slots are cut by owner directive, and a real mare's neigh here would be
 	# the loudest wrong note in the game.
@@ -3400,11 +3439,83 @@ func deliver_pony(uid: StringName) -> Dictionary:
 		depot_menu.refresh()
 	_relieve_if_paid_down()
 	advance_story()
-	return {"ok": true, "credit": credit, "named": named, "name": inst.display_name()}
+	return {"ok": true, "credit": credit, "named": named, "name": inst.display_name(),
+		"blank": blank, "paid": paid}
 
 
-## PAY THE COMPANY. The ledger says how much it will accept (bits settle the service
-## charges, not the principal), the wallet is debited by exactly that, and the difference is
+## A BLANK DRIFTER: a stock pony with no mark yet. Worth a token fee and nothing else to the
+## Company (Ledger.BLANK_INTAKE_FEE); the Depot and the pen readout both call her a Drifter.
+static func _is_blank(inst: PonyInstance) -> bool:
+	return inst != null and inst.is_stock() and not inst.is_marked()
+
+
+# --- one toast and one letter per Depot batch (playtest 2026-11-08 items 20, 21) ----------
+
+## THE BATCH. A run of deliveries at the counter used to raise one toast each ("55th shipment
+## received", played back for minutes after the sale) and post one identical postcard each at
+## dawn. Now everything delivered while the Depot is open (or in one dawn's cart) is summed
+## here and told ONCE: one toast when the counter closes, and one card at the next dawn.
+## Outside a batch (a gate calling deliver_pony() directly) a delivery is its own batch of one.
+var _batch := {}
+
+
+func begin_delivery_batch() -> void:
+	if _batch.is_empty():
+		_batch = {"count": 0, "blanks": 0, "credit": 0, "paid": 0, "sender": "", "shipments": 0}
+
+
+func _note_shipment(sender: String, shipments: int, credit: int, paid: int, blank: bool) -> void:
+	var standalone := _batch.is_empty()
+	begin_delivery_batch()
+	_batch["count"] = int(_batch["count"]) + 1
+	_batch["blanks"] = int(_batch["blanks"]) + (1 if blank else 0)
+	_batch["credit"] = int(_batch["credit"]) + credit
+	_batch["paid"] = int(_batch["paid"]) + paid
+	_batch["sender"] = sender
+	_batch["shipments"] = shipments
+	if standalone:
+		end_delivery_batch()
+
+
+## Close the batch and say it once. Returns the toast it raised ("" for an empty batch).
+func end_delivery_batch() -> String:
+	if _batch.is_empty():
+		return ""
+	var b := _batch
+	_batch = {}
+	if int(b["count"]) <= 0:
+		return ""
+	var line := batch_toast(b, _game_state.ledger.balance if _game_state != null else 0)
+	_toast(line)
+	return line
+
+
+## The batch's one line: how many went, what came off the balance, what she was paid.
+static func batch_toast(b: Dictionary, balance_left: int) -> String:
+	var count := int(b.get("count", 0))
+	var blanks := int(b.get("blanks", 0))
+	var credit := int(b.get("credit", 0))
+	var paid := int(b.get("paid", 0))
+	if count == 1:
+		var one := delivery_toast(str(b.get("sender", "Intake")), int(b.get("shipments", 1)), credit,
+			balance_left, paid)
+		if blanks == 1:
+			one = "%s: a blank Drifter, taken for the intake fee. +%d bits for you." % [
+				str(b.get("sender", "Intake")), paid]
+		return one
+	var what := "%d ponies shipped" % count
+	if blanks > 0:
+		what += " (%d blank)" % blanks
+	var off := ""
+	if credit > 0:
+		off = " %s bits off your balance%s." % [group_thousands(credit),
+			", it is paid off" if balance_left <= 0 else ", %s to go" % group_thousands(balance_left)]
+	return "%s: %s.%s +%s bits for you." % [str(b.get("sender", "Intake")), what, off,
+		group_thousands(paid)]
+
+
+## PAY THE COMPANY. The ledger says how much it will accept (bits pay
+## the balance, down to zero), the wallet is debited by exactly that, and the difference is
 ## explained rather than silently swallowed. Returns what was actually paid.
 func _on_pay_requested(bits: int) -> void:
 	pay_the_company(bits)
@@ -3417,11 +3528,11 @@ func pay_the_company(bits: int) -> int:
 	var wanted: int = mini(bits, _economy.bits)
 	var taken: int = ledger.pay(wanted)
 	if taken <= 0:
-		_toast("Bits settle the service charges. The principal is settled in stock.")
+		_toast("Nothing is owed right now.")
 		return 0
 	_economy.spend(taken)
-	if taken < bits:
-		_toast("Paid %d bits. That is as low as bits will take it; the rest is stock."
+	if ledger.balance <= 0:
+		_toast("Paid %d bits. Paid in full! The account closes on collection day if the quota is met."
 			% taken)
 	else:
 		_toast("Paid %d bits. Balance: %d." % [taken, ledger.balance])
@@ -4381,7 +4492,27 @@ func _on_pony_captured(instance: PonyInstance) -> void:
 	# count can ever include.
 	if instance.is_stock():
 		return
+	# ONE NEW LEGENDARY A DAY (RareGate): the day she brought one in is remembered.
+	var data: PonyData = instance.data()
+	if data != null and data.rarity == PonyDataScript.Rarity.LEGENDARY \
+			and _game_state.compendium.state_of(instance.data_id) < CompendiumScript.State.CAUGHT:
+		_game_state.story.set_var(RareGateScript.LEGEND_DAY, _world.cycle_index() if _world != null else 0)
 	_game_state.compendium.mark_caught(instance.data_id)
+
+
+## THE GATE THE SPAWNER AND THE SIGHTINGS ASK (game/systems/rare_gate.gd): her decoration
+## built, and not a second new legendary today.
+const RareGateScript := preload("res://systems/rare_gate.gd")
+
+
+func rare_allowed(data: PonyData) -> bool:
+	if _game_state == null or data == null:
+		return true
+	var story: Story = _game_state.story
+	var caught: bool = _game_state.compendium.state_of(data.id) >= CompendiumScript.State.CAUGHT
+	return RareGateScript.allowed(data, Decor.owned(story),
+		int(story.get_var(RareGateScript.LEGEND_DAY, -1)),
+		_world.cycle_index() if _world != null else 0, caught)
 
 
 ## Mark every pony the player owns CAUGHT. The three places one can be: the save's own
@@ -4850,6 +4981,9 @@ func interaction_candidates() -> Array[Dictionary]:
 	if is_near_depot():
 		out.append(InteractionScript.candidate(
 			InteractionScript.Kind.DEPOT, _door_gap(^"Buildings/Depot")))
+	if can_sleep_here():
+		out.append(InteractionScript.candidate(
+			InteractionScript.Kind.SLEEP, _door_gap(^"Buildings/Farmhouse")))
 	# THE BAN CLOSES THE DOOR RATHER THAN GREYING IT OUT. The shipped code showed no prompt
 	# under a ban but still let the press through to casino_menu.open(), which then refused
 	# on its own can_open; a player got a silent nothing. A banned Palace is simply not
@@ -4989,6 +5123,11 @@ func perform_interaction(action: Dictionary) -> bool:
 			return exit_palace()
 		InteractionScript.Kind.TALK:
 			return people != null and people.talk(String(action.get("subject", "")))
+		InteractionScript.Kind.SLEEP:
+			if _sleeping:
+				return false
+			_sleep_with_fade()
+			return true
 	return false
 
 
@@ -5159,9 +5298,17 @@ static func delivery_toast(sender: String, shipments: int, credit: int, balance_
 
 
 ## The handler's share of a delivery (Ledger.handler_share, PT9).
-## Which kind she counts as for the repeat price (Ledger.REPEAT_FALLOFF): every Drifter is one.
+## Which kind she counts as for the repeat price (Ledger.REPEAT_FALLOFF): every blank Drifter
+## is one; a Bloomed Drifter is her TALENT (P8: variety of marks is the strategy, idea D3, so
+## a pen of Bloomed ponies with different talents pays in full).
 static func _delivery_kind(inst: PonyInstance) -> StringName:
-	return LedgerScript.DRIFTER_KIND if inst.is_stock() else inst.data_id
+	if not inst.is_stock():
+		return inst.data_id
+	if inst.is_marked():
+		var mark: Variant = inst.stock.get("mark", {})
+		var talent := str((mark as Dictionary).get("talent", "")) if mark is Dictionary else ""
+		return StringName("bloomed_" + talent)
+	return LedgerScript.DRIFTER_KIND
 
 
 func _delivery_cycle() -> int:
@@ -5329,6 +5476,7 @@ func _physics_process(delta: float) -> void:
 	# it. The gates call spawner.tick_stock() themselves, deliberately, where they mean to.
 	spawner.tick_stock(delta)
 	_update_interaction()
+	_tick_bloom_call(delta)
 	_update_guide(delta)
 	_update_person_aim()
 	_v1_tick(delta)
@@ -5339,6 +5487,7 @@ func _physics_process(delta: float) -> void:
 	_update_gate_prompt()
 	_update_sound_zone()
 	_update_pantry_chip(delta)
+	_tick_autosave(delta)
 	if _game_state == null:
 		return
 	var house := get_node_or_null(^"Buildings/Farmhouse") as Node3D
@@ -5358,9 +5507,98 @@ func _physics_process(delta: float) -> void:
 		return
 	_house_armed = false
 	var ok := save_game()
+	_autosave_t = 0.0
 	var hud := get_node_or_null(^"HUD")
 	if hud != null and hud.has_method("toast"):
 		hud.toast("Ranch saved" if ok else "SAVE FAILED. See the log.")
+
+
+# --- days: sleep and the autosave (P8; playtest 2026-11-08 items 3, 11; idea D1) ------------
+
+## REAL DAYS. From dusk, the farmhouse door offers sleep: the night is skipped to the next
+## dawn (every phase turning over on the way, so escapes, the dawn cart, postcards and a
+## collection day all still happen, and the pens eat and Bloom through the night), and the
+## ranch saves. By day there is no prompt: the day is for working.
+const SLEEP_DOOR_RADIUS := 4.0
+## How finely the night is stepped: the clock in MENU_CATCH_UP_STEP strides (every phase
+## turns over), the pens in SLEEP_PEN_STEP strides (a hungry pony eats on time).
+const SLEEP_PEN_STEP := 10.0
+## THE AUTOSAVE (item 3: the last save on disk was an hour and a half old mid-session). Every
+## AUTOSAVE_SECONDS of play outdoors with nothing open (no menu, no talk, no race), and the
+## clock starts again after any save.
+const AUTOSAVE_SECONDS := 300.0
+var _autosave_t := 0.0
+var _sleeping := false
+var autosaves := 0
+
+
+## Whether the farmhouse door offers sleep right now: at dusk or night, at the door, outdoors.
+func can_sleep_here() -> bool:
+	if _world == null or _in_palace or player == null or _world.is_pinned():
+		return false
+	var phase := _world.phase()
+	if phase != WorldStateScript.Phase.DUSK and phase != WorldStateScript.Phase.NIGHT:
+		return false
+	return _door_gap(^"Buildings/Farmhouse") <= SLEEP_DOOR_RADIUS
+
+
+## Seconds from now to the next dawn (the start of the next cycle).
+func seconds_to_dawn() -> float:
+	if _world == null:
+		return 0.0
+	return WorldStateScript.CYCLE_SECONDS - fposmod(_world.elapsed(), WorldStateScript.CYCLE_SECONDS)
+
+
+## SKIP TO DAWN, THEN SAVE. Synchronous and public, so a test can sleep a ranch; the door's
+## fade is _sleep_with_fade() around it. Returns the seconds slept (0 if she could not).
+func sleep_till_dawn() -> float:
+	if _world == null or _world.is_pinned() or _game_state == null:
+		return 0.0
+	var left := seconds_to_dawn()
+	var slept := left
+	var pens: Array[Pen] = []
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen != null:
+			pens.append(pen)
+	while left > 0.0:
+		var step := minf(left, SLEEP_PEN_STEP)
+		for pen in pens:
+			pen.tick(step)
+		_world.advance(step)
+		left -= step
+	var ok := save_game()
+	_autosave_t = 0.0
+	_toast("Good morning! Day %d. %s" % [_world.cycle_index() + 1,
+		"The ranch is saved." if ok else "SAVE FAILED. See the log."])
+	_novelty("mechanic", "first_sleep", "Slept the night through at the farmhouse")
+	return slept
+
+
+func _sleep_with_fade() -> void:
+	_sleeping = true
+	await _palace_fade_to(1.0, 0.6)
+	sleep_till_dawn()
+	await get_tree().create_timer(0.4).timeout
+	await _palace_fade_to(0.0, 0.8)
+	_sleeping = false
+
+
+## Outdoors, nothing open, nobody talking, no race: count toward the autosave.
+func _tick_autosave(delta: float) -> void:
+	if _game_state == null or _in_palace or _sleeping or not _no_other_menu_open():
+		return
+	if people != null and people.is_talking():
+		return
+	if race_track != null and bool(race_track.call("is_running")):
+		return
+	_autosave_t += delta
+	if _autosave_t < AUTOSAVE_SECONDS:
+		return
+	_autosave_t = 0.0
+	if save_game():
+		autosaves += 1
+		_toast("Autosaved.")
 
 
 # --- the two ponies behind counters --------------------------------------------------
@@ -8585,6 +8823,7 @@ func _on_pony_bloomed(inst: PonyInstance) -> void:
 		if bus != null:
 			bus.emit_signal("bloomed", String(inst.uid), inst.stock)
 	_bloom_ceremony(inst)
+	_maybe_call_over(inst)
 	pony_bloomed.emit(inst)
 	_toast("%s found her mark: %s!" % [inst.display_name(),
 		MarkComposerScript.talent_name(StringName(str(inst.stock.get("mark", {}).get("talent", ""))))])
@@ -8601,6 +8840,68 @@ func _bloom_ceremony(inst: PonyInstance) -> void:
 	if body == null:
 		return
 	BloomCeremonyScript.play(body)
+
+
+## THE BLOOM CALLS HER OVER (P8; playtest 2026-11-08 item 22). A Drifter who Blooms while the
+## player is further than BLOOM_CALL_RANGE from her pen puts a "come and see" on the guide and
+## the objective card for up to BLOOM_CALL_SECONDS; when the player gets within
+## BLOOM_ARRIVE_RANGE the ceremony plays again for her, and the call is done. One call at a
+## time: a second Bloom while one is waiting replaces it (the newer one is the one to see).
+const BLOOM_CALL_RANGE := 14.0
+const BLOOM_ARRIVE_RANGE := 8.0
+const BLOOM_CALL_SECONDS := 120.0
+## {slot: PlotSlot, uid: StringName, name: String, left: float}, or empty.
+var _bloom_call := {}
+
+
+func _maybe_call_over(inst: PonyInstance) -> void:
+	var slot := _slot_holding(inst.uid)
+	if slot == null or player == null:
+		return
+	if player.global_position.distance_to(slot.global_position) <= BLOOM_CALL_RANGE:
+		return
+	_bloom_call = {"slot": slot, "uid": inst.uid, "name": inst.display_name(),
+		"left": BLOOM_CALL_SECONDS}
+
+
+## The pen a waiting Bloom calls her to, or null.
+func _bloom_call_place() -> Node3D:
+	if _bloom_call.is_empty():
+		return null
+	var slot: Node3D = _bloom_call.get("slot")
+	if slot == null or not is_instance_valid(slot):
+		_bloom_call = {}
+		return null
+	return slot
+
+
+## Count the call down; when she arrives, the ceremony plays again for her and it is done.
+func _tick_bloom_call(delta: float) -> void:
+	var place := _bloom_call_place()
+	if place == null:
+		return
+	_bloom_call["left"] = float(_bloom_call["left"]) - delta
+	if player != null and player.global_position.distance_to(place.global_position) <= BLOOM_ARRIVE_RANGE:
+		var pen := (place as PlotSlot).get_built() as Pen
+		var inst: PonyInstance = pen.find_pony(StringName(_bloom_call["uid"])) if pen != null else null
+		_bloom_call = {}
+		if inst != null:
+			_bloom_ceremony(inst)
+		return
+	if float(_bloom_call["left"]) <= 0.0:
+		_bloom_call = {}
+
+
+func bloom_call() -> Dictionary:
+	return _bloom_call.duplicate()
+
+
+func _slot_holding(uid: StringName) -> PlotSlot:
+	for slot in _plot_slots():
+		var pen := slot.get_built() as Pen
+		if pen != null and pen.has_pony(uid):
+			return slot
+	return null
 
 
 # --- delivery feedback (v1): clue 1 -------------------------------------------------------
@@ -8664,7 +8965,19 @@ static func music_context(zone: StringName, night: bool, market_open: bool, depo
 var _music_zone: StringName = &""
 
 
-## Every postcard queued since the last dawn goes in the mailbox now.
+## Who signs the dawn's one card: the first name, and the rest as cards in the same envelope.
+static func postcard_signature(names: Array) -> String:
+	if names.is_empty():
+		return ""
+	var first := str(names[0])
+	if names.size() == 1:
+		return first
+	var more := names.size() - 1
+	return "%s\n\n(%s in the envelope, word for word the same)" % [first,
+		"1 more card" if more == 1 else "%d more cards" % more]
+
+
+## Every postcard queued since the last dawn goes in the mailbox now, as one card.
 func _post_pending_postcards() -> void:
 	if _game_state == null:
 		return
@@ -8673,11 +8986,11 @@ func _post_pending_postcards() -> void:
 	if pending.is_empty():
 		return
 	_novelty("clue", "first_postcard", "A postcard from a delivered pony, in hoofwriting that is not hers")
-	# ONE CARD A DAWN (P8 items 18 and 20): after a big Depot run the mailbox filled with the
-	# same card forty times over. The newest sender writes; the rest are not lost to the
-	# story, only to the mailbox.
+	# ONE CARD A DAWN, NOT ONE A PONY (playtest 2026-11-08 item 20: a big Depot run filled the
+	# mailbox with identical letters). The rest are in the same envelope, word for word.
 	var n := story.add_var("postcard_count")
-	story.post(StringName("postcard#%d" % n), {"name": _player_name(), "pony": str(pending.back())})
+	story.post(StringName("postcard#%d" % n), {"name": _player_name(),
+		"pony": postcard_signature(pending)})
 	story.set_var("postcards", [])
 	_refresh_mailbox_flag()
 
@@ -8723,6 +9036,11 @@ func _v1_tick(delta: float) -> void:
 	if hud != null and hud.has_method("set_tip"):
 		var tip: Dictionary = _game_state.onboarding.current(_onboarding_state(),
 			func(action: StringName) -> String: return InputDeviceScript.hint(action))
+		# ONE THING TO DO AT A TIME (playtest 2026-11-08 item 75: "Read your new letter" on the
+		# card over "Sell gems to Bramble" in the tip line). A tip that sends her somewhere is
+		# only shown when the card is pointing there too, or nowhere.
+		if StringName(tip.get("id", &"")) == &"sell" and not (_guide_goal in [&"market", &""]):
+			tip = {}
 		hud.call("set_tip", str(tip.get("text", "")))
 
 
@@ -8927,7 +9245,7 @@ func _spike_rare_hint() -> Dictionary:
 			continue
 		if book.state_of(data.id) != CompendiumScript.State.UNSEEN:
 			continue
-		if data.phases.is_empty() and data.weathers.is_empty():
+		if data.phases.is_empty() and data.weathers.is_empty() and data.needs_decor == &"":
 			continue
 		var zone: StringName = data.spawn_zones[0]
 		if zone != &"ranch" and not is_region_open(zone):
@@ -8939,6 +9257,10 @@ func _spike_rare_hint() -> Dictionary:
 			when.append("at " + WorldStateScript.phase_name(p).to_lower())
 		for w: int in data.weathers:
 			when.append("in the " + WorldStateScript.weather_name(w).to_lower())
+		# Her decoration (RareGate): Spike says what to build, ahead of when to look.
+		if data.needs_decor != &"" and not Decor.owns(_game_state.story, data.needs_decor):
+			var deco: Dictionary = Decor.find(data.needs_decor)
+			return {"region": where, "when": "once you put up the %s" % String(deco.get("name", data.needs_decor)).to_lower()}
 		return {"region": where, "when": " or ".join(when)}
 	return {}
 
@@ -9125,6 +9447,7 @@ func _depot_cart() -> int:
 	if not _owns(&"depot_cart"):
 		return 0
 	var sent := 0
+	begin_delivery_batch()
 	for slot in _plot_slots():
 		var pen := slot.get_built() as Pen
 		if pen == null or not pen.is_full():
@@ -9134,6 +9457,8 @@ func _depot_cart() -> int:
 				continue
 			if bool(deliver_pony(inst.uid).get("ok", false)):
 				sent += 1
+	# The cart's own line below is the batch's one toast.
+	_batch = {}
 	if sent > 0:
 		_toast("The Depot cart called at dawn and took %d. Marigold sends her thanks." % sent)
 		_novelty("mechanic", "first_cart", "The Depot cart took ponies at dawn")
@@ -9300,7 +9625,7 @@ func _act3_delivery(inst: PonyInstance, look: PonyLook) -> void:
 		return
 	var data: PonyData = inst.data()
 	var rarity: int = data.rarity if data != null else PonyDataScript.Rarity.COMMON
-	var base: int = LedgerScript.delivery_credit(rarity, inst.is_stock())
+	var base: int = LedgerScript.delivery_credit(rarity, inst.is_stock(), _is_blank(inst))
 	var pay := PathRulesScript.factory_pay(story, base, look.coat, _owns(&"yield_lens"))
 	var r := PathRulesScript.factory_delivery(story, look.coat)
 	var extra: int = pay - base + int(r.bonus)
@@ -9349,6 +9674,7 @@ func _apply_factory_gear() -> void:
 const EXPRESS_BONUS := 25
 func _express_chute() -> int:
 	var sent := 0
+	begin_delivery_batch()
 	for slot in _plot_slots():
 		var pen := slot.get_built() as Pen
 		if pen == null:
@@ -9359,6 +9685,7 @@ func _express_chute() -> int:
 			if not bool(deliver_pony(inst.uid).get("ok", false)):
 				continue
 			sent += 1
+	_batch = {}
 	if sent > 0:
 		if _economy != null:
 			_economy.grant(EXPRESS_BONUS * sent)
@@ -9679,6 +10006,7 @@ func _guide_state() -> Dictionary:
 		s["tasks"] = _board.tutorial_rows()
 	s["objective_goal"] = StringName(current_objective().get("goal", &""))
 	s["sighting"] = _guide_sighting() != null
+	s["bloomed"] = _bloom_call_place() != null
 	return s
 
 
@@ -9750,6 +10078,8 @@ func _guide_place(goal: StringName) -> Array:
 			return [who if who != null and is_instance_valid(who) and who.visible else null, PlaceSign.Icon.STAR]
 		&"sighting":
 			return [_guide_sighting(), PlaceSign.Icon.STAR]
+		&"bloomed":
+			return [_bloom_call_place(), PlaceSign.Icon.FENCE]
 	return [null, 0]
 
 
@@ -9786,6 +10116,19 @@ func _update_person_aim() -> void:
 			up = up.get_parent()
 		who = up
 	hud.call("set_aiming_person", who is Npc)
+
+
+## THE TERMS, EXPLAINED ONCE (item 74): the first time "Drifter" or "Bloom" is on the
+## objective card, a toast says what it means, and a story flag keeps it from saying it again.
+func _explain_once(words: String) -> void:
+	var story: Story = get_story()
+	if story == null or words.is_empty():
+		return
+	var e := ObjectiveScript.explainer_for(words, story.flags.keys())
+	if e.is_empty():
+		return
+	story.set_flag(String(e["flag"]))
+	_toast(String(e["text"]))
 
 
 ## The pony Tumble last pointed out, while she is still out there to be found (Happenings).
@@ -9889,12 +10232,18 @@ func _update_guide(delta: float) -> void:
 			if StringName(o.get("id", &"")) == &"sighting" and seen != null and seen.has_method("get_data") \
 					and seen.call("get_data") != null:
 				o = o.duplicate()
-				o["words"] = "Find %s" % (seen.call("get_data") as PonyData).display_name
+				# BRAMBLE'S SPOTTING, READABLE (item 14): the toast that said who was seen went
+				# by behind the queue, so the card says it for as long as the trail is up.
+				o["words"] = "Tumble saw %s: follow the sparkles" % (seen.call("get_data") as PonyData).display_name
+			if StringName(o.get("id", &"")) == &"bloomed" and not _bloom_call.is_empty():
+				o = o.duplicate()
+				o["words"] = "%s found her mark: come and see" % String(_bloom_call.get("name", "A Drifter"))
 			var where: Node3D = _guide_place(StringName(o.get("goal", &"")))[0] as Node3D if not o.is_empty() else null
 			var d := -1.0
 			if where != null and player != null:
 				d = Vector2(where.global_position.x - player.global_position.x,
 					where.global_position.z - player.global_position.z).length()
 			card.call("show_objective", o, d)
+			_explain_once(String(o.get("words", "")))
 	var target := guide_target()
 	_guide_trail.point(player.global_position, target.global_position if target != null else Vector3.INF)

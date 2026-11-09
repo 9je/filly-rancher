@@ -262,12 +262,12 @@ func test_the_pay_tab_never_offers_more_than_the_ledger_will_take() -> void:
 	assert_eq(amounts[amounts.size() - 1], 250, "and the last row is exactly what it will take")
 
 
-func test_a_ledger_at_the_floor_offers_nothing_to_pay() -> void:
+func test_a_paid_balance_offers_nothing_to_pay() -> void:
 	_menu.payable_provider = func() -> int: return 0
 	_menu.open()
 	_menu.switch_tab(1)
 	assert_eq(_menu.pay_amounts().size(), 0,
-		"bits settle the service charges; at the floor there are none to settle")
+		"nothing owed, nothing to pay")
 	assert_true("\n".join(_menu.drawn_lines()).contains(DepotMenu.EMPTY_PAY_TEXT))
 
 
@@ -401,3 +401,73 @@ func test_every_pony_tile_carries_her_rarity_shape() -> void:
 		assert_eq(glyphs.size(), 1, "one shape on %s's tile" % rows[i]["name"])
 		if glyphs.size() == 1:
 			assert_eq((glyphs[0] as RarityGlyph).shape(), RarityGlyph.shape_of(int(rows[i]["rarity"])))
+
+
+# --- P8: the colour loop at the counter (playtest 2026-11-08 items 4, 9, 70) ----------------
+
+func _tile_words(tile: Node) -> String:
+	var parts: Array[String] = []
+	for l in tile.find_children("*", "Label", true, false):
+		parts.append((l as Label).text)
+	return " | ".join(parts)
+
+
+func test_a_blank_drifter_reads_as_a_drifter_with_only_a_fee() -> void:
+	_menu.rows_provider = func() -> Array[Dictionary]:
+		var rows: Array[Dictionary] = []
+		rows.append({"uid": &"stock_shy#000001", "name": "Pony", "stock": true, "credit": 0,
+			"blank": true})
+		rows.append({"uid": &"stock_shy#000002", "name": "Daisy Dot", "stock": true, "credit": 300,
+			"bloomed": true})
+		return rows
+	_menu.open()
+	var tiles := _menu.row_nodes()
+	var blank := _tile_words(tiles[0])
+	var bloomed := _tile_words(tiles[1])
+	assert_true(blank.contains("Drifter, blank"), "the blank one says so: %s" % blank)
+	assert_true(blank.contains("+%d bits" % LedgerScript.BLANK_INTAKE_FEE), "and pays the fee")
+	assert_true(blank.contains("no credit"), "and nothing off the debt")
+	assert_true(bloomed.contains("Bloomed"), "a Bloomed Drifter says she counts: %s" % bloomed)
+	assert_true(bloomed.contains("-300 debt"))
+
+
+func test_a_named_stallion_is_he_at_the_counter() -> void:
+	_menu.rows_provider = func() -> Array[Dictionary]:
+		var rows: Array[Dictionary] = []
+		rows.append({"uid": &"braeburn#000003", "name": "Braeburn", "stock": false,
+			"credit": 480, "kind": "braeburn", "she": "he"})
+		return rows
+	_menu.open()
+	var tile := _tile_words(_menu.row_nodes()[0])
+	assert_true(tile.contains("he asks before he goes"), "his own pronoun: %s" % tile)
+	assert_false(tile.contains("she"), "not she")
+	_menu.confirm()
+	assert_eq(_menu.drawn_lines()[1], "No, he stays here")
+
+
+func test_the_pay_tab_shows_the_quota_and_the_collection_day() -> void:
+	_menu.quota_provider = func() -> Dictionary:
+		return {"delivered": 1, "quota": 2, "day": 4, "days_left": 2, "balance": 24000,
+			"closed": false, "first": true}
+	_menu.open()
+	assert_eq(_menu.quota_card_text(), "", "not on the Deliver tab")
+	_menu.set_tab(DepotMenu.Tab.PAY)
+	var text := _menu.quota_card_text()
+	assert_true(text.contains("1 of 2"), "the quota as a count: %s" % text)
+	assert_true(text.contains("Day 4"), "the collection day")
+	assert_true(text.contains("in 2 days"))
+	assert_false(text.contains("--"), "no double hyphen")
+	var bar := _menu.find_child("QuotaBar", true, false) as ProgressBar
+	assert_not_null(bar, "the quota is a bar too")
+	assert_eq(bar.value, 1.0)
+	assert_eq(bar.max_value, 2.0)
+
+
+func test_a_paid_balance_says_how_the_account_closes() -> void:
+	var paid: Dictionary = DepotMenu.quota_lines({"delivered": 0, "quota": 2, "day": 7,
+		"days_left": 1, "balance": 0, "closed": false})
+	assert_true(String(paid["rule"]).contains("closes on collection day"))
+	var closed: Dictionary = DepotMenu.quota_lines({"delivered": 3, "quota": 2, "day": 10,
+		"days_left": 3, "balance": 0, "closed": true})
+	assert_true(String(closed["rule"]).contains("Account closed"))
+	assert_true(String(closed["headline"]).contains("Quota met"))

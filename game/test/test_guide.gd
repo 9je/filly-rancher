@@ -139,3 +139,17 @@ func test_a_sighting_is_where_the_trail_goes() -> void:
 	s["bag_full"] = false
 	s["tasks"] = [{"id": "tutorial_catch", "done": false}]
 	assert_eq(GuideScript.pick(s), &"catch", "and the first lessons")
+
+
+func test_a_bloom_away_from_her_calls_her_over() -> void:
+	# P8, playtest 2026-11-08 item 22: the ceremony happened off-screen.
+	var s := {"has_scoop": true, "bloomed": true, "mail": true, "news": true, "objective_goal": &"depot"}
+	assert_eq(GuideScript.pick(s), &"bloomed", "a Bloom waiting beats the mail and the news")
+	s["sighting"] = true
+	assert_eq(GuideScript.pick(s), &"sighting", "a sighting will not wait; the Bloom will")
+	s["sighting"] = false
+	s["bag_full"] = true
+	assert_eq(GuideScript.pick(s), &"pens", "a full bag still comes first")
+	var o: Dictionary = load("res://systems/objective.gd").for_guide(&"bloomed", {})
+	assert_eq(o["goal"], &"bloomed")
+	assert_string_contains(String(o["words"]), "found her mark")

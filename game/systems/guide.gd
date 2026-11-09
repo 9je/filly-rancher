@@ -39,6 +39,11 @@ static func pick(s: Dictionary) -> StringName:
 	# the mail and the news.
 	if not learning and bool(s.get("sighting", false)):
 		return &"sighting"
+	# A BLOOM CALLS HER OVER (P8; playtest 2026-11-08 item 22: ceremonies happened off-screen
+	# while she was away). A Drifter who found her mark with the player far off holds her
+	# ceremony until she comes to see it, for a minute or two, lessons or not (it is one).
+	if bool(s.get("bloomed", false)):
+		return &"bloomed"
 	# THE FIRST CATCH FIRST (PS1, playtest 2026-11-05 item 16: "The start doesn't show where to
 	# go for a first catch"): the welcome letter and four townsfolk's news are all waiting when
 	# she gets the Scoop, and the trail went to each of them before it ever showed a pony.

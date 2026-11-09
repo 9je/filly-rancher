@@ -45,6 +45,31 @@ enum Personality { SHY, BOLD, CURIOUS }
 @export var phases: Array[int] = []
 @export var weathers: Array[int] = []
 
+## WHAT THE RANCH MUST HAVE BUILT before she comes by: a decoration id (systems/decor.gd),
+## or &"" for nothing. Read by RareGate (game/systems/rare_gate.gd), idea C1.
+@export var needs_decor: StringName = &""
+
+## WHICH WORD THE GAME USES FOR THEM: &"she" (the default, and every Drifter) or &"he"
+## (playtest 2026-11-08 item 70: the Depot called Braeburn and Doctor Whooves "she").
+@export var pronoun: StringName = &"she"
+
+## The word forms, by pronoun: subject, object, possessive, reflexive.
+const PRONOUNS := {
+	&"she": {"she": "she", "her": "her", "hers": "her", "herself": "herself"},
+	&"he": {"she": "he", "her": "him", "hers": "his", "herself": "himself"},
+}
+
+
+## "she" or "he" for `data` (null, a Drifter's hidden record, is "she").
+static func pronoun_of(data: PonyData) -> StringName:
+	return data.pronoun if data != null and PRONOUNS.has(data.pronoun) else &"she"
+
+
+## The `form` of `data`'s pronoun: form is one of "she", "her" (object), "hers"
+## (possessive), "herself".
+static func word(data: PonyData, form: String) -> String:
+	return str((PRONOUNS[pronoun_of(data)] as Dictionary).get(form, form))
+
 
 ## Whether this character can be drawn right now. Empty means any, in each list
 ## independently, so "[NIGHT], []" is a pony who keeps night hours in any weather

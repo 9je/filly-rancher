@@ -848,34 +848,46 @@ func test_a_held_pony_is_never_pulled_into_the_ground() -> void:
 		"held, she floats clear of the ground (lowest %.2f m)" % lowest)
 	beam.release()
 
-
-## PLAYTEST: "could not collect the first pony". A new player's nearest pony can be BOLD,
-## and a HARD hold wrenches free half the time, so the very first catch the tips teach was a
-## coin toss. While the ranch says this steward has never caught anyone, no hold wrenches;
-## without the grace the same seeds do, which is what keeps this sweep honest.
-func test_a_new_stewards_first_catch_never_wrenches() -> void:
+## ONE CLEAN CATCH (P8 S3; playtest 2026-11-08 item 23: "She slipped out! Hold her a little
+## longer" was "just annoying", and the keep-your-aim-on-her rule was never taught). Every pony,
+## the boldest included, is lifted and stowed on the first hold, with the button never let go
+## and the aim never on her: no wrench, no weave, no window to land.
+func test_every_pony_is_caught_on_the_first_hold() -> void:
 	var registry := PonyRegistryScript.new()
 	registry.load_all("res://data/ponies")
-	var bold: PonyData = registry.by_id(&"stock_bold")
-	var beam: MagicBeam = _beam()
-	var pony: Pony = PonyScene.instantiate()
-	add_child_autofree(pony)
-	pony.setup(bold)
-	var counts := {true: 0, false: 0}
-	for grace: bool in [false, true]:
-		beam.first_catch_grace = grace
-		for seed in 64:
+	for id: StringName in [&"stock_bold", &"stock_curious", &"stock_shy", &"rainbowdash", &"trixie"]:
+		var data: PonyData = registry.by_id(id)
+		if data == null:
+			continue
+		for seed in 16:
+			var beam: MagicBeam = _beam()
 			var rng := RandomNumberGenerator.new()
 			rng.seed = seed
 			beam.set_capture_rng(rng)
-			pony.beam_holds = 0
+			var pony: Pony = PonyScene.instantiate()
+			add_child_autofree(pony)
+			pony.setup(data)
+			beam._beaming = true
 			beam._begin_hold(pony)
-			if beam.is_wrenching():
-				counts[grace] += 1
-			beam._held = null
-			pony.set_held(false)
-	assert_gt(counts[false], 0, "test setup: a fresh BOLD pony must be able to wrench without the grace")
-	assert_eq(counts[true], 0, "a new steward's first catch must never be torn away (%d of 64 were)" % counts[true])
+			assert_false(beam.is_wrenching(), "%s never wrenches" % id)
+			assert_false(is_finite(beam.get_struggle_seconds()), "%s has no struggle clock" % id)
+			# The aim is pointed away from her the whole time: the look-at rule is gone.
+			beam._aim_direction = Vector3.UP
+			var t := 0.0
+			while beam.is_holding() and t < 3.0:
+				beam._run_struggle(1.0 / 60.0)
+				t += 1.0 / 60.0
+			assert_false(beam.is_holding(), "%s seed %d: the hold ended by itself" % [id, seed])
+			assert_eq(beam.get_storage().count(), 1, "%s seed %d: in the bag, first try" % [id, seed])
+			assert_lte(t, MagicBeamScript.CLEAN_CATCH_BY_GRADE[2] + 0.05, "and quickly (%.2f s)" % t)
+
+
+func test_a_calm_or_eating_pony_is_the_quickest_catch() -> void:
+	assert_lt(MagicBeamScript.clean_catch_seconds(PonyDataScript.Personality.SHY),
+		MagicBeamScript.clean_catch_seconds(PonyDataScript.Personality.BOLD))
+	for g in MagicBeamScript.CLEAN_CATCH_BY_GRADE:
+		assert_gt(g, 0.4, "long enough to see her lifted and reeled in")
+		assert_lt(g, 1.2, "short enough that it is a lift, not a contest")
 
 
 func after_each() -> void:

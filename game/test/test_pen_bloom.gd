@@ -8,6 +8,7 @@ const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const PlotDataScript := preload("res://systems/plot_data.gd")
 const GeneratorScript := preload("res://systems/pony_generator.gd")
 const PonyLookScript := preload("res://systems/pony_look.gd")
+const PenReadoutScript := preload("res://world/pen_readout.gd")
 
 
 func _pen() -> Pen:
@@ -73,3 +74,48 @@ func test_a_bloomed_pony_round_trips_through_a_save() -> void:
 	assert_eq(back.nickname, a.nickname)
 	assert_eq(back.stock, a.stock)
 	assert_eq(back.bloom, 1.0)
+
+
+# --- P8: the readout's data (playtest 2026-11-08 items 2, 10) --------------------------------
+
+func test_bloom_status_names_her_reason_and_her_favourite() -> void:
+	var pen := _pen()
+	var a := _drifter(41)
+	pen.add_pony(a)
+	var pantry := Inventory.new()
+	pen.inventory_provider = func() -> Inventory: return pantry
+	a.hunger = 0.9
+	var s := pen.bloom_status(a)
+	assert_true(bool(s["drifter"]), "a blank stock pony is a Drifter")
+	assert_eq(s["reason"], &"hungry")
+	assert_false(is_finite(float(s["seconds_left"])), "hungry: she is stopped, and it says so")
+	assert_false(bool(s["favorite_stocked"]))
+	pantry.add(PonyTraits.favorite_of(a), 2)
+	a.hunger = 0.1
+	s = pen.bloom_status(a)
+	assert_true(bool(s["favorite_stocked"]), "her favourite in the pantry is shown")
+	assert_ne(s["reason"], &"hungry")
+	var words: String = PenReadoutScript.words_for(s)
+	assert_true(words.begins_with("Drifter"), "the tag calls her a Drifter: %s" % words)
+	assert_true(words.contains("Loves"), "and names her favourite")
+
+
+func test_a_full_grand_pen_of_drifters_keeps_blooming() -> void:
+	var pen: Pen = PenScript.new()
+	var plot: PlotData = PlotDataScript.new()
+	plot.capacity = 8
+	pen.configure(plot, &"slot_grand")
+	autofree(pen)
+	var all: Array[PonyInstance] = []
+	for i in 8:
+		var d := _drifter(60 + i)
+		all.append(d)
+		pen.add_pony(d)
+	for i in range(120):
+		for d in all:
+			d.happiness = 1.0
+			d.hunger = 0.0
+			d.favorite_glow = 100.0
+		pen.tick(1.0)
+	for d in all:
+		assert_gt(d.bloom, 0.0, "eight in a Grand pen still make progress (CROWDED_AT froze them)")

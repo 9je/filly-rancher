@@ -346,6 +346,10 @@ const ESCAPE_COOLDOWN := 1.25
 ## that "she got me that time" is a beat rather than a punishment.
 const WRENCH_COOLDOWN := 0.55
 
+## After a clean catch, how long before a still-held beam takes the next pony: a breath, so
+## a held button is a sweep and not one blur of ponies.
+const CATCH_REARM := 0.35
+
 ## Seconds the beam must have a pony in it before she can be stowed -- the NOMINAL value,
 ## before the per-attempt jitter below. THE FIX FOR THE OWNER'S FIRST COMPLAINT: "catching
 ## is really quick -- it took me several tries to get a screenshot of one."
@@ -1169,6 +1173,16 @@ const ON_TARGET_RAD := 0.12
 const WEAVE_GRACE := 1.6
 
 
+## How long the beam has to have her before she is stowed, by grade (P8, one clean catch):
+## long enough to watch her lifted and reeled in (PULL_RESPONSE closes 90% in 0.38 s), short
+## enough that it is a lift and not a contest. A calm or eating pony holds as SHY (EASY).
+const CLEAN_CATCH_BY_GRADE: Array[float] = [0.55, 0.75, 0.95]
+
+
+static func clean_catch_seconds(personality: int) -> float:
+	return CLEAN_CATCH_BY_GRADE[clampi(grade_for(personality), 0, CLEAN_CATCH_BY_GRADE.size() - 1)]
+
+
 static func weave_for(rarity: int, is_stock: bool = false) -> float:
 	if is_stock:
 		return WEAVE_DRIFTER
@@ -1707,19 +1721,21 @@ func _begin_hold(body: Node3D) -> void:
 		body.beam_holds += 1
 		if first_catch_grace:
 			prior_holds = maxi(prior_holds, WRENCH_GRACE_HOLDS)
-		if data != null:
-			_weave = weave_for(data.rarity, body.is_stock())
-		var clocks := roll_clocks(personality, prior_holds,
-			_rng.randf(), _rng.randf(), _rng.randf(), catch_count,
-			WEAVE_STEADY_EXTRA if _weave > 0.0 else 0.0)
-		_secure_seconds = clocks["secure"]
-		_struggle_seconds = clocks["struggle"]
-		_wrenching = clocks["wrenches"]
-		if _weave > 0.0:
-			# Not on a wrench: a wrench is a struggle shorter than the subdue (roll_clocks), and
-			# the grace would turn it into a catch (checkpoint review).
-			if _weave > 0.0 and not _wrenching:
-				_struggle_seconds += WEAVE_GRACE
+		# ONE CLEAN CATCH (P8 S3; playtest 2026-11-08 item 23, idea A1). The window, the
+		# wrench, the weave and the experience ramp below were all "make the hold harder",
+		# and the owner found them "just annoying", with the keep-your-aim-on-her rule never
+		# taught. Now the beam takes every pony on the first hold: she is lifted, reeled in,
+		# and stowed by herself once the beam has had her for clean_catch_seconds(). Letting go
+		# before that is the one way to lose her (Loss.SLIPPED). The difficulty moved out into
+		# the world (a skittish pony bolts if she sees you; Pony.notice_radius_for), where
+		# walking up behind her is the skill. The rolled clocks are still drawn, so a seeded
+		# run's random stream is where it was, and roll_clocks() stays the published rule
+		# for the old contest; it is no longer what a live hold runs on.
+		roll_clocks(personality, prior_holds, _rng.randf(), _rng.randf(), _rng.randf(), catch_count)
+		_weave = 0.0
+		_secure_seconds = clean_catch_seconds(personality)
+		_struggle_seconds = STRUGGLE_NEVER
+		_wrenching = false
 		return
 
 	if body is RigidBody3D:
@@ -1779,6 +1795,17 @@ func _run_struggle(delta: float) -> void:
 	_hold_seconds += delta
 	if _weave <= 0.0 or on_target(_aim_direction, _held.global_position - _hold_offset - _aim_origin):
 		_steady_seconds += delta
+	# ONE CLEAN CATCH: a pony the beam has had long enough is stowed then and there, without
+	# waiting for the button to come up (see _begin_hold). The beam stays on, so a held
+	# button sweeps on to the next pony after a short breath (CATCH_REARM).
+	if _held is PonyScript and not is_finite(_struggle_seconds) and _steady_seconds >= _secure_seconds:
+		var caught := _held
+		_take_back_physics(caught)
+		_held = null
+		_settle_pony(caught)
+		_cooldown = CATCH_REARM
+		_hide_effect()
+		return
 	if _hold_seconds < _struggle_seconds:
 		return
 
