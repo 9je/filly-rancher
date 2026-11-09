@@ -37,6 +37,7 @@ func _run() -> void:
 			break
 	await Boot.frames(self, 90)
 	Boot.mouse_to_corner()
+	ranch.call("get_story").call("set_flag", "arrival_flyover")
 	var cs: Node = ranch.get("creation_screen")
 	if _want("creator") and cs != null and bool(cs.call("is_open")):
 		var table: Node3D = cs.get("_turntable")

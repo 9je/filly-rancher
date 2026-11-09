@@ -38,6 +38,11 @@ static func boot(tree: SceneTree) -> Node:
 			break
 	await frames(tree, 120)
 	mouse_to_corner()
+	# A probe looks at the world, not at the new game's valley flyover (idea F1), which would
+	# take the camera and freeze her.
+	var story: Object = ranch.call("get_story")
+	if story != null:
+		story.call("set_flag", "arrival_flyover")
 	var cs: Node = ranch.get("creation_screen")
 	if cs != null and bool(cs.call("is_open")):
 		cs.call("confirm")
