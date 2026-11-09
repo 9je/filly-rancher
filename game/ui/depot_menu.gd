@@ -36,7 +36,8 @@ const RarityGlyphScript := preload("res://ui/rarity_glyph.gd")
 const LedgerScript := preload("res://systems/ledger.gd")
 const HouseStyleScript := preload("res://ui/house_style.gd")
 
-const SCROLL_MAX := 600.0
+## Under the clerk and her counter, the tiles get what is left of a 1080 p screen.
+const SCROLL_MAX := 470.0
 const PONY_TILE := Vector2(546.0, 76.0)
 const WIDE_TILE := Vector2(1104.0, 64.0)
 const ICON_SIZE := 44.0
@@ -165,9 +166,159 @@ func _ready() -> void:
 		func(_index: int) -> void: close())
 	$Centre/Panel/Margin/Column.add_child(_close)
 	_build_purse()
+	_build_clerk()
 	_build_quota_card()
 	_build_deliver_all()
 	_fx = MenuStyleScript.effects_layer(self)
+
+
+## THE COUNTER HAS A CLERK (Fable AAA round 4: "the Depot reads as an admin panel"). Marigold
+## Mayfair runs the Depot (STORY.md), so she stands behind it: her face in a gold ring (baked
+## once by scenes/test/counter_portraits.gd) and one line of hers in a speech bubble, which
+## carries what the rules sentences used to say, in her voice. A wooden counter edge runs
+## under her.
+const CLERK_PORTRAIT := "res://assets/ui/portraits/marigold.png"
+const CLERK_NAME := "Marigold Mayfair"
+const CLERK_FACE := 120.0
+## Cloudsdale sky behind her, so a buttercup coat stands off it.
+const CLERK_BACKDROP := Color(0.62, 0.79, 0.97)
+const COUNTER_WOOD := Color(0.62, 0.40, 0.24)
+
+var _clerk_line: Label = null
+
+
+func _build_clerk() -> void:
+	var column := $Centre/Panel/Margin/Column as VBoxContainer
+	var clerk := HBoxContainer.new()
+	clerk.name = "Clerk"
+	clerk.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	clerk.add_theme_constant_override(&"separation", 26)
+	column.add_child(clerk)
+	column.move_child(clerk, _title.get_index() + 1)
+	# Her face: the picture clipped to a disc of buttercup, a gold ring over its edge (a
+	# sibling drawn after the disc, so the clip does not cut it).
+	var holder := Control.new()
+	holder.name = "Face"
+	holder.custom_minimum_size = Vector2(CLERK_FACE, CLERK_FACE)
+	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	holder.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	clerk.add_child(holder)
+	var face := Panel.new()
+	face.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	face.set_anchors_preset(Control.PRESET_FULL_RECT)
+	face.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
+	var disc := StyleBoxFlat.new()
+	disc.bg_color = CLERK_BACKDROP
+	disc.set_corner_radius_all(int(CLERK_FACE * 0.5))
+	disc.anti_aliasing = true
+	face.add_theme_stylebox_override(&"panel", disc)
+	holder.add_child(face)
+	if ResourceLoader.exists(CLERK_PORTRAIT):
+		var pic := TextureRect.new()
+		pic.texture = load(CLERK_PORTRAIT) as Texture2D
+		pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		pic.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+		pic.set_anchors_preset(Control.PRESET_FULL_RECT)
+		# A little closer than the bake, her eyes at the disc's middle.
+		pic.offset_left = -CLERK_FACE * 0.14
+		pic.offset_right = CLERK_FACE * 0.06
+		pic.offset_top = -CLERK_FACE * 0.04
+		pic.offset_bottom = CLERK_FACE * 0.16
+		face.add_child(pic)
+	var ring := Panel.new()
+	ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ring.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var rb := StyleBoxFlat.new()
+	rb.draw_center = false
+	rb.border_color = PaintScript.GOLD
+	rb.set_border_width_all(4)
+	rb.set_corner_radius_all(int(CLERK_FACE * 0.5))
+	rb.anti_aliasing = true
+	ring.add_theme_stylebox_override(&"panel", rb)
+	holder.add_child(ring)
+	# Her line, on paper, with a tail pointing at her.
+	var bubble := PanelContainer.new()
+	bubble.name = "Speech"
+	bubble.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bubble.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bubble.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var paper := StyleBoxFlat.new()
+	paper.bg_color = Color(1.0, 0.97, 0.90)
+	paper.border_color = Color(PaintScript.GOLD_DIM, 0.9)
+	paper.set_border_width_all(2)
+	paper.set_corner_radius_all(18)
+	paper.content_margin_left = 20.0
+	paper.content_margin_right = 20.0
+	paper.content_margin_top = 10.0
+	paper.content_margin_bottom = 12.0
+	paper.anti_aliasing = true
+	bubble.add_theme_stylebox_override(&"panel", paper)
+	bubble.draw.connect(func() -> void:
+		var mid := bubble.size.y * 0.5
+		bubble.draw_colored_polygon(PackedVector2Array([Vector2(1.0, mid - 11.0),
+			Vector2(-17.0, mid + 4.0), Vector2(1.0, mid + 9.0)]), paper.bg_color)
+		bubble.draw_polyline(PackedVector2Array([Vector2(0.0, mid - 11.0),
+			Vector2(-17.0, mid + 4.0), Vector2(0.0, mid + 9.0)]), paper.border_color, 2.0, true))
+	clerk.add_child(bubble)
+	var words := VBoxContainer.new()
+	words.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	words.add_theme_constant_override(&"separation", 0)
+	bubble.add_child(words)
+	var who := Label.new()
+	who.text = CLERK_NAME
+	who.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	MenuStyleScript.style_label(who, 17, Color(0.62, 0.40, 0.08))
+	who.add_theme_font_override(&"font", MenuStyleScript.title_font())
+	who.add_theme_constant_override(&"outline_size", 0)
+	words.add_child(who)
+	_clerk_line = Label.new()
+	_clerk_line.name = "Line"
+	_clerk_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_clerk_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	MenuStyleScript.style_label(_clerk_line, 23, MenuStyleScript.COLOR_INK)
+	_clerk_line.add_theme_constant_override(&"outline_size", 0)
+	words.add_child(_clerk_line)
+	# The counter's edge under her: a wooden rail across the panel.
+	var rail := Control.new()
+	rail.name = "Counter"
+	rail.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rail.custom_minimum_size = Vector2(0.0, 16.0)
+	rail.draw.connect(func() -> void:
+		var w := rail.size.x
+		rail.draw_rect(Rect2(-8.0, 2.0, w + 16.0, 10.0), COUNTER_WOOD)
+		rail.draw_rect(Rect2(-8.0, 2.0, w + 16.0, 3.0), COUNTER_WOOD.lightened(0.3))
+		rail.draw_rect(Rect2(-8.0, 12.0, w + 16.0, 4.0), Color(0.05, 0.01, 0.06, 0.4)))
+	column.add_child(rail)
+	column.move_child(rail, clerk.get_index() + 1)
+
+
+## What Marigold says at the counter right now, by tab and state.
+func clerk_line() -> String:
+	match _tab:
+		Tab.DELIVER:
+			if is_confirming():
+				return "She'll be ever so happy up there. Shall I take her?"
+			if deliver_rows().is_empty():
+				return "Nopony in your pens yet! Bring me a Drifter and I'll see her placed."
+			return "Every Drifter you bring goes up for Placement. Cloudsdale pays so well!"
+		Tab.PAY:
+			if quota_provider.is_valid():
+				var q: Dictionary = quota_provider.call()
+				if bool(q.get("closed", false)):
+					return "Your account is closed. Thank you for choosing Cloudsdale!"
+				if int(q.get("balance", 1)) <= 0:
+					return "Paid in full! Meet the quota and the account closes."
+				return "%d coloured ponies by Day %d and the balance paid, and we're square!" % [
+					int(q.get("quota", 0)), int(q.get("day", 0))]
+			return "Bits against the balance, whenever you like."
+	return "Every bit, accounted for. We do love a tidy ledger."
+
+
+func _draw_clerk() -> void:
+	if _clerk_line != null:
+		_clerk_line.text = clerk_line()
 
 
 ## THE PURSE, under the title: the bits coin and her bits in gold, and on the right what she
@@ -475,6 +626,7 @@ func refresh() -> void:
 		_tile_rects = drawn
 	_built_frame = Engine.get_process_frames()
 	_sync_purse()
+	_draw_clerk()
 	_draw_quota_card()
 	_draw_deliver_all()
 	MenuStyleScript.apply_title(_title)
@@ -956,6 +1108,8 @@ func _build_quota_card() -> void:
 	MenuStyleScript.style_label(_quota_words, 22, MenuStyleScript.COLOR_TITLE)
 	_quota_words.add_theme_font_override(&"font", MenuStyleScript.title_font())
 	v.add_child(_quota_words)
+	# The count is the stamps, the day is a chip: the headline stays as words for the record.
+	_quota_words.visible = false
 	_quota_bar = ProgressBar.new()
 	_quota_bar.name = "QuotaBar"
 	_quota_bar.show_percentage = false
@@ -1045,7 +1199,6 @@ func _draw_quota_card() -> void:
 var _quota_stamps: HBoxContainer = null
 var _quota_rows: VBoxContainer = null
 const STAMP := 64.0
-const FACT_ICON := 76.0
 const WELL_SIZE := 56.0
 
 
@@ -1084,11 +1237,7 @@ func _fill_stamps(delivered: int, quota: int) -> void:
 	_quota_stamps.add_child(count)
 
 
-## The rule, one clause a row, each with the picture of what it is about.
-const RULE_ICONS := [["Drifter", "escapee"], ["Owed", "coin"], ["Bits", "coin"],
-	["closes", "sun"], ["closed", "letter"], ["Paid", "sold"], ["quota", "crate"]]
-
-
+## The rule, one clause a row.
 static func rule_clauses(rule: String) -> Array[String]:
 	var out: Array[String] = []
 	for sentence in rule.replace("; ", ". ").split(". ", false):
@@ -1105,95 +1254,40 @@ func _fill_rule_rows(rule: String, q: Dictionary = {}) -> void:
 	for c in _quota_rows.get_children():
 		_quota_rows.remove_child(c)
 		c.queue_free()
-	# THE TERMS AS PICTURES (Fable AAA round 2, #8: "Depot Pay is a bulleted 13 px rule
-	# list"): while money is owed, three tiles side by side, each a picture in its window, a
-	# big figure and a caption (what is owed, the collection day, who counts), and the one
-	# sentence the three add up to under them. A paid or closed account is one row.
+	# ONE LINE OF TERMS (Fable AAA round 4: three sentences of rules and a wall of tiles): what
+	# is owed, the collection day and who counts, as three small chips; Marigold says the rest.
 	var owed := int(q.get("balance", 0))
-	if not q.is_empty() and owed > 0 and not bool(q.get("closed", false)):
+	var strip := HBoxContainer.new()
+	strip.name = "Terms"
+	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	strip.add_theme_constant_override(&"separation", 26)
+	if not q.is_empty() and not bool(q.get("closed", false)):
 		var days := int(q.get("days_left", 0))
-		var strip := HBoxContainer.new()
-		strip.name = "Facts"
-		strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		strip.add_theme_constant_override(&"separation", 14)
-		strip.add_child(_fact_tile("coin", str(owed), "bits owed to the Company",
-			TileStyleScript.WELL_TINTS[&"gem"]))
-		strip.add_child(_fact_tile("sun", "Day %d" % int(q.get("day", 0)),
-			"collection day, " + ("today" if days <= 0 else ("tomorrow" if days == 1
-				else "in %d days" % days)), TileStyleScript.WELL_TINTS[&"place"]))
-		strip.add_child(_fact_tile("escapee", "Coloured", "Blank Drifters do not count",
-			TileStyleScript.WELL_TINTS[&"food"]))
-		_quota_rows.add_child(strip)
-		var close := _icon_row("letter",
-			"Bits pay the balance. The account closes on a collection day, paid in full with the quota met.")
-		_quota_rows.add_child(close)
-		return
-	for clause in rule_clauses(rule):
-		var icon := "star"
-		for pair: Array in RULE_ICONS:
-			if clause.contains(String(pair[0])):
-				icon = String(pair[1])
-				break
-		_quota_rows.add_child(_icon_row(icon, clause))
+		if owed > 0:
+			strip.add_child(_term_chip("coin", "%d owed" % owed))
+		strip.add_child(_term_chip("sun", "Day %d, %s" % [int(q.get("day", 0)),
+			"today" if days <= 0 else ("tomorrow" if days == 1 else "in %d days" % days)]))
+		strip.add_child(_term_chip("escapee", "coloured ponies only"))
+	else:
+		var clauses := rule_clauses(rule)
+		var first: String = clauses[0] if not clauses.is_empty() else rule
+		strip.add_child(_term_chip("letter", first))
+	_quota_rows.add_child(strip)
 
 
-## One of the Pay tab's terms: `icon` in a lit window of `tint`, `figure` big in gold and
-## `caption` under it.
-func _fact_tile(icon: String, figure: String, caption: String, tint: Color) -> PanelContainer:
-	var tile := PanelContainer.new()
-	tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	tile.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var box := TileStyleScript.box(false, false)
-	box.content_margin_top = 12.0
-	box.content_margin_bottom = 12.0
-	tile.add_theme_stylebox_override(&"panel", box)
-	var line := HBoxContainer.new()
-	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	line.add_theme_constant_override(&"separation", 14)
-	tile.add_child(line)
-	var well := TileStyleScript.well(FACT_ICON, tint)
-	var pic := Control.new()
-	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	pic.set_anchors_preset(Control.PRESET_FULL_RECT)
-	pic.draw.connect(func() -> void:
-		IconSet.draw(pic, icon, Rect2(Vector2(FACT_ICON, FACT_ICON) * 0.14,
-			Vector2(FACT_ICON, FACT_ICON) * 0.68)))
-	well.add_child(pic)
-	line.add_child(well)
-	var words := VBoxContainer.new()
-	words.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	words.alignment = BoxContainer.ALIGNMENT_CENTER
-	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	words.add_theme_constant_override(&"separation", 0)
-	line.add_child(words)
-	var big := Label.new()
-	big.text = figure
-	HouseStyleScript.numeral_label(big, 32)
-	words.add_child(big)
-	var small := Label.new()
-	small.text = caption
-	small.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	small.custom_minimum_size = Vector2(170.0, 0.0)
-	HouseStyleScript.ink_label(small, 18, HouseStyleScript.CREAM, false)
-	words.add_child(small)
-	return tile
-
-
-## A row of the house style's reading matter: a picture on a cream disc and one line beside it.
-func _icon_row(icon: String, text: String) -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_theme_constant_override(&"separation", 14)
-	row.add_child(_icon_disc(icon, 46.0))
+## One term: its picture on a small cream disc and a few words beside it.
+func _term_chip(icon: String, text: String) -> HBoxContainer:
+	var chip := HBoxContainer.new()
+	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chip.add_theme_constant_override(&"separation", 8)
+	chip.add_child(_icon_disc(icon, 38.0))
 	var l := Label.new()
 	l.text = text
-	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	l.custom_minimum_size = Vector2(WIDE_TILE.x - 120.0, 0.0)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	HouseStyleScript.ink_label(l, 21, HouseStyleScript.CREAM, false)
-	row.add_child(l)
-	return row
+	chip.add_child(l)
+	return chip
 
 
 ## A picture on a cream disc in a dim gold ring, `px` across.
