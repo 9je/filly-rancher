@@ -9105,6 +9105,21 @@ func _arrival(_delta: float) -> void:
 	# and Marigold used to start talking underneath it.
 	if _new_game and not _creation_done:
 		return
+	# THE VALLEY FIRST (P8 idea F1): a new steward's first sight of the ranch is the camera
+	# coming over the hills to the plaza and down behind her, before Marigold walks up.
+	if _interactive and not _game_state.story.has_flag("arrival_flyover"):
+		_game_state.story.set_flag("arrival_flyover")
+		var behind := player.global_position + player.global_basis.z * 4.0 + Vector3.UP * 2.4
+		Cinematic.shared(get_tree()).play([
+			{"from": Vector3(70.0, 46.0, 70.0), "to": Vector3(42.0, 30.0, 40.0),
+				"look": Vector3(-5.0, 2.0, 10.0), "time": 3.4, "fov": 55.0,
+				"caption": "Welcome to the valley"},
+			{"from": Vector3(42.0, 30.0, 40.0), "to": behind, "look": player.global_position + Vector3.UP,
+				"look_to": player.global_position + Vector3.UP * 1.2, "time": 3.0},
+		], {"freeze": [player], "host": self})
+		return
+	if Cinematic.shared(get_tree()).playing:
+		return
 	var m := people.npc(&"marigold")
 	if m == null:
 		return
