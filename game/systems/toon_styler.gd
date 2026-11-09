@@ -18,7 +18,11 @@ const OUTLINE := preload("res://shaders/outline.gdshader")
 
 ## Per-category defaults. `outline_px` 0 means no outline pass at all.
 const PRESETS := {
-	&"pony": {"outline_px": 1.7, "rim": 0.18, "shadow_fill": 0.36, "fade_end": 42.0},
+	# A softer terminator on a pony (Fable AAA round 1, #6: "the toon terminator cuts faces at
+	# arbitrary angles"): a low sun still shades half her face, but as a short ramp the eye
+	# reads as a rounded cheek, not a line drawn across it.
+	&"pony": {"outline_px": 1.7, "rim": 0.18, "shadow_fill": 0.40, "fade_end": 42.0,
+		"band_softness": 0.075},
 	&"prop": {"outline_px": 1.1, "rim": 0.0, "shadow_fill": 0.34, "fade_end": 60.0},
 	&"building": {"outline_px": 1.3, "rim": 0.0, "shadow_fill": 0.34, "fade_end": 90.0},
 	&"foliage": {"outline_px": 0.9, "rim": 0.0, "shadow_fill": 0.42, "fade_end": 50.0},
@@ -486,6 +490,8 @@ static func _toon_from(src: StandardMaterial3D, preset: Dictionary) -> ShaderMat
 		m.set_shader_parameter(&"albedo_texture", tex)
 	m.set_shader_parameter(&"shadow_fill", float(preset.get("shadow_fill", 0.34)))
 	m.set_shader_parameter(&"rim_strength", float(preset.get("rim", 0.0)))
+	if preset.has("band_softness"):
+		m.set_shader_parameter(&"band_softness", float(preset.band_softness))
 	if src.transparency == BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR:
 		m.set_shader_parameter(&"alpha_scissor", src.alpha_scissor_threshold)
 	elif src.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:

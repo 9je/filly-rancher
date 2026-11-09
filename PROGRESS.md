@@ -3,6 +3,12 @@
 ## Owner direction (2026-10-22)
 Canon MLP stays: real names, looks and places ("lean into mlp fully", private build). The roster de-canon was reverted; the Company is the Cloudsdale Weather Corporation, the cloud palace is the Rainbow Factory, the town is Ponyville. The OC story cast lives alongside the canon ponies.
 
+## The AAA gate, 2026-11-09 (P8 continued)
+The owner's goal for this session: an unbiased Fable 5 judging the game AAA, plus the bug fixes. Round 1, from 70 fresh renders, was NOT YET (docs/fable-aaa-round1-2026-11-09.md: world 5, characters 5, UI 4, menus 5, cinematics 3, cohesion 5). Answered so far:
+- **World:** a painted horizon with Canterlot, stars and moon; lit windows and lamp halos; night haze; staked plots; grass and flowers; near-lens fade; cinematic flash, shake and long lenses (eb032bc, 26ffa41).
+- **HUD and screens** (UI agent; 442c99c..993581f): plum and gold throughout; a drawn logotype; icon-row Depot rules and blackjack rules; sealed letters; market copy shown in full; race pictures in the creator.
+- **Bug fixes:** duplicate ponies across spawn markers (7b15fce, 1832ce3; suite 2259/2259); the blackjack dealer's portrait (e979ba2).
+
 ## Playtest sweep PS, 2026-11-06 (PLAN.md section PS; the ledger is docs/playtest-2026-11-05-ledger.md)
 The PT section below claimed items that were not met; the owner's audit found nine not done and four unverified. Every item re-opened under a ledger; a row moves only with evidence (a test of the owner's words or a render at the owner's screenshot spot), and only the PS13 acceptance reviewer marks MET.
 - **PS0 (ledger and harness):** ledger of 84 rows (70 items, Marigold, 12 known gaps), `test_ledger_complete`; `scenes/test/playtest_shots.gd --item=N` renders 16 poses matched by eye to the owner's world screenshots, day and night-in-rain (before renders in build/ps_evidence/before/); the old-save fixture and `test_old_save_loads`. That test found an Escape Artist home on a load not counted as owned (a second of her could spawn), and the same cause in the Survey's picker; both fixed.
