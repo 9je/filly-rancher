@@ -644,3 +644,47 @@ same row read as a fifth configuration step. Calls made:
 - New `wet` shader global (night_lights.gd, from the weather): puddles on the tracks and darker ground in rain; the terrain desaturates toward blue-grey at night. The poured rainbow keeps 8% at night (the Works never stops).
 - Fades (subject and lens proximity) apply only while the rig's camera is the one drawing.
 - Owner: "indie toon AAA rather than ultra hyperrealistic AAA". The reviewer brief now says so and forbids realism as a fix.
+
+## 2026-11-09: Fable AAA round 2's UI items (#8, #9, #10 and the lower list)
+
+The lead takes the world, the ponies and the cinematics; an Opus agent in a worktree takes the
+2D surfaces. Calls made:
+
+- **One Back (#8):** every menu's Back comes from MouseRows.close_button, so it is dressed there
+  once (MenuStyle.back_button): a 176 x 58 deep plum pill, gold rim, heavier lip, cream words and
+  a drawn chevron. Plum, not gold, so it never competes with the one gold confirm on a screen;
+  the same on the paper letter, where it reads well on cream.
+- **The Market (#8):** a Buy tile is a picture, a name, a family chip and a price; the
+  description lives once, whole, on the detail strip (a tile that wrapped a long first sentence
+  grew to twice the height of its row). The picture is 112 px in a lit window of its family's
+  colour (TileStyle.well). Prices are the bits coin and a number. The Buy is a 270 x 92 gold
+  pill with the price on it; out of reach it turns plum and says "Need" and how much.
+- **Food pictures, not new icons:** the five foods get fuller drawings (make_icons.py
+  <food>_art) used only where a picture is 64 px or more, so the small icons on chips and
+  markers keep reading at 24 px. Drawn in the icon set's own style; no outside assets.
+- **The Depot's Pay (#8):** while money is owed, three picture tiles (owed, collection day, who
+  counts) and the one sentence they add up to; paid or closed accounts keep the icon rows.
+- **Menus soften the world behind (lower list):** a menu's Dim reads the screen back blurred and
+  washed toward plum (MenuStyle.soften_dim), so the casino hall stays behind its tables. The
+  "void" in the review was partly the casino probe's flat backdrop: casino_shot takes --bg now.
+- **The Scoop line (#9)** shows while a wild pony is the beam's target, and 1.5 s after so a pony
+  crossing the reticle does not blink it. Getting started already leaves once its three lessons
+  are paid (paid the moment they are done): unchanged.
+- **The news bubble (#9)** keeps its world size far off and shrinks inside 7 m, so on screen it
+  is never bigger than it is at 7 m, and it is gone within 3 m of the lens
+  (ui/world_marker.gd). It stays a world object hidden by walls (round 1 asked for that), so it
+  does not clamp to the screen edge: off-screen goals are the compass strip's job.
+- **The compass (#9):** N/E/S/W 28 px gold, the four between 21 px cream, both with a plum
+  outline, on a 40 px band. The "0/0" chip hides while the bag has no slots; the faded "0/12"
+  under it in the review was the probe's still, which had an older HUD baked in. The fast probes
+  now use stills cropped clear of any HUD.
+- **The catch card (#10):** the portrait aims at her head bone and stands 1.5 heights back, so
+  every rig gets the same head-and-shoulders crop, centred, over a pool of her own coat colours.
+  Stars show once (the card's own pop in; the big row under it is gone). Rays alternate solid gold
+  and warm cream over a deeper dim and a vignette; her rarity's hue moves to the shock ring. The
+  card rides a CatchLayer above the HUD and the HUD hides for the moment.
+- **No menu over a shot:** _no_menu_but counts a playing Cinematic as a menu.
+- **Creator cards in her colours:** the cards are baked on a ginger-coat, green-mane pony and
+  the two keys are swapped for hers on the CPU (ui/style_icon_tint.gd, cached per colour pair)
+  when Finishing touches opens. The stray gold half-ring was the keyboard cursor's kit pill
+  folded on a 44 px tab; the cursor now marks a button with its own pill and a gold edge.
