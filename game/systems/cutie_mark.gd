@@ -35,11 +35,15 @@ const RIGHT_NAME := &"CutieMarkRight"
 ## the decals on its root, which does not animate but does at least show the mark.
 const BONE_NAMES: Array[StringName] = [&"Pelvis", &"Chest1"]
 
-## Model space (x out to the flank, y up the barrel, z back toward the haunch).
-const FLANK := Vector3(0.26, 0.86, 0.22)
+## Model space (x out to the flank, y up the barrel, z back toward the haunch). P8 item 40
+## ("the show puts it larger, centred on the upper haunch"): the old (0.26, 0.86, 0.22) sat
+## down by the stifle, half under a wing. Raised onto the top of the haunch and a little further
+## back, placed by eye on a side render of the player (p8_checks, player_flank).
+const FLANK := Vector3(0.26, 1.06, 0.3)
 
-## Decal box: across the flank, INTO the pony (the projection depth), and along her.
-const DECAL_SIZE := Vector3(0.30, 0.26, 0.30)
+## Decal box: across the flank, INTO the pony (the projection depth), and along her. Larger
+## than it was (0.30), as the show draws marks.
+const DECAL_SIZE := Vector3(0.38, 0.26, 0.38)
 ## THE MARK PAINTS HER BODY AND NOTHING ELSE. A Decal paints whatever is in its box: a tail
 ## swinging through, a wing, a mane thrown by the bounce (owner 2026-11-05: "Make sure this
 ## cutie mark bug doesn't happen anywhere"). Her body mesh carries this render layer, and the

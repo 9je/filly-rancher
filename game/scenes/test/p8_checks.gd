@@ -126,7 +126,8 @@ func _run() -> void:
 		var cam2 := Camera3D.new()
 		ranch.add_child(cam2)
 		var side := vis.global_basis.x
-		cam2.global_position = player.global_position + side * 3.0 + Vector3(0, 1.2, 0)
+		# Square side-on, the way the show draws a mark.
+		cam2.global_position = player.global_position + side * 3.4 + Vector3(0, 1.1, 0)
 		cam2.look_at(player.global_position + Vector3(0, 0.95, 0))
 		cam2.current = true
 		await Boot.frames(self, 12)
