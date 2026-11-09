@@ -95,6 +95,24 @@ func _body(path: String) -> Node3D:
 	return holder
 
 
+## Her mouth moving on her line for `secs` (Fable AAA round 3, #4: "same closed mouth" on
+## three frames of dialogue): the face's jaw driven like a townspony's babble.
+func _say(holder: Node3D, secs: float) -> void:
+	var faces := holder.find_children("*", "PonyFace", true, false)
+	if faces.is_empty():
+		return
+	var face: PonyFace = faces[0]
+	face.talking = true
+	var tw := create_tween()
+	tw.tween_method(func(t: float) -> void:
+		if is_instance_valid(face):
+			face.talk_amount = 0.5 + 0.5 * sin(t * TAU * 4.5) * (0.7 + 0.3 * sin(t * 7.0)), 0.0, secs, secs)
+	tw.tween_callback(func() -> void:
+		if is_instance_valid(face):
+			face.talking = false
+			face.talk_amount = 0.0)
+
+
 func _play(holder: Node3D, clip: StringName) -> void:
 	for ap: AnimationPlayer in holder.find_children("*", "AnimationPlayer", true, false):
 		if ap.has_animation(clip):
@@ -153,7 +171,9 @@ func derpy_crash() -> void:
 		{"from": close, "to": close.lerp(face, 0.04), "look": face, "time": 2.4,
 			"fov": 42.0, "fov_to": 38.0,
 			"caption": "\"I just don't know what went wrong!\"",
-			"call": func() -> void: _play(derpy, &"shake")},
+			"call": func() -> void:
+				_play(derpy, &"shake")
+				_say(derpy, 2.2)},
 		{"from": "here", "to": player.global_position - fwd * 4.0 + Vector3.UP * 3.0,
 			"look": land + Vector3.UP * 4.0, "time": 1.6, "fov": 55.0,
 			"call": func() -> void: _fly_off(derpy, land, fwd)},
@@ -401,49 +421,30 @@ func _ring(at: Vector3, fwd: Vector3) -> void:
 	_cloud_ring(at, fwd)
 
 
-## THE BOOM PUSHES THE SKY (Fable AAA round 2, #6: "the boom is a soft flat gradient ring
-## that reads as a 2D overlay; no cloud ring"). A ring of the show's flat cloud puffs blown
-## out from where she broke the barrier, riding just behind the rainbow ring, so the boom has
-## something in the world to shove.
+## THE SHOCK RING (Fable AAA round 2, #6 and round 3, #4: puffs of cloud read as "a
+## soap-bubble hoop"). The show draws the boom as a hard white ring racing out ahead of the
+## rainbow one: a flat, opaque, unshaded torus, thin, out fast, gone fast.
 func _cloud_ring(at: Vector3, fwd: Vector3) -> void:
-	var u := fwd.cross(Vector3.UP).normalized()
-	if u.length() < 0.1:
-		u = Vector3.RIGHT
-	var v := u.cross(fwd).normalized()
+	var ring := MeshInstance3D.new()
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.93
+	torus.outer_radius = 1.0
+	torus.rings = 160
+	torus.ring_segments = 8
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.disable_fog = true
-	mat.albedo_color = Color(1.0, 1.0, 1.0, 0.95)
-	var puff := SphereMesh.new()
-	puff.radius = 1.0
-	puff.height = 2.0
-	puff.radial_segments = 20
-	puff.rings = 10
-	puff.material = mat
-	var count := 26
-	for i in count:
-		var a := TAU * float(i) / float(count) + randf_range(-0.08, 0.08)
-		var out := u * cos(a) + v * sin(a)
-		var p := MeshInstance3D.new()
-		p.mesh = puff
-		p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		add_child(p)
-		p.global_position = at + out * 2.0
-		# Squashed along the blast, so each reads as a puff driven outward.
-		p.look_at(at + out * 3.0 + fwd * 0.01, fwd)
-		var size := randf_range(1.6, 2.6)
-		p.scale = Vector3(size, size * 0.8, size * 0.55) * 0.3
-		var reach := randf_range(20.0, 26.0)
-		var tw := create_tween().set_parallel(true)
-		tw.tween_property(p, "global_position", at + out * reach, 1.6).set_trans(Tween.TRANS_EXPO) \
-			.set_ease(Tween.EASE_OUT)
-		tw.tween_property(p, "scale", Vector3(size, size * 0.8, size * 0.55), 0.7) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	var fade := create_tween()
-	fade.tween_interval(1.2)
-	fade.tween_property(mat, "albedo_color:a", 0.0, 1.6)
-	fade.tween_callback(func() -> void:
-		for c in get_children():
-			if c is MeshInstance3D and (c as MeshInstance3D).mesh == puff:
-				c.queue_free())
+	mat.albedo_color = Color(1.0, 1.0, 1.0, 1.0)
+	torus.material = mat
+	ring.mesh = torus
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(ring)
+	ring.global_position = at
+	ring.look_at(at - fwd, Vector3.UP)
+	ring.rotate_object_local(Vector3.RIGHT, PI * 0.5)
+	var tw := create_tween().set_parallel(true)
+	tw.tween_property(ring, "scale", Vector3.ONE * 40.0, 0.9).set_trans(Tween.TRANS_EXPO) \
+		.set_ease(Tween.EASE_OUT)
+	tw.tween_property(mat, "albedo_color:a", 0.0, 0.5).set_delay(0.45)
+	tw.chain().tween_callback(ring.queue_free)
