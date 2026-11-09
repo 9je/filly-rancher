@@ -97,9 +97,9 @@ func derpy_crash() -> void:
 	fwd.y = 0.0
 	fwd = fwd.normalized() if fwd.length() > 0.1 else Vector3.FORWARD
 	var side := fwd.cross(Vector3.UP).normalized()
-	var land := player.global_position + fwd * 7.0 + side * 1.5
+	var land := _clear_spot(player.global_position + fwd * 7.0, side, fwd)
 	land.y = _ground(land.x, land.z)
-	var start := land - side * 26.0 + Vector3.UP * 22.0 - fwd * 6.0
+	var start := land - side * 14.0 + Vector3.UP * 11.0 - fwd * 3.0
 	var derpy := _body(DERPY)
 	if derpy == null:
 		_busy = false
@@ -167,6 +167,35 @@ func _fly_off(derpy: Node3D, land: Vector3, fwd: Vector3) -> void:
 	var tw := create_tween()
 	tw.tween_property(derpy, "global_position", land + fwd * 6.0 + Vector3.UP * 16.0, 1.6) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+
+
+## Somewhere near `around` with nobody standing on it (P8 render check: Derpy came down on
+## Spike): the first of a few spots round it with no pony, townspony or companion within 2.5 m.
+func _clear_spot(around: Vector3, side: Vector3, fwd: Vector3) -> Vector3:
+	var bodies: Array[Node3D] = []
+	for g: StringName in [&"townsfolk"]:
+		for n: Node in get_tree().get_nodes_in_group(g):
+			if n is Node3D:
+				bodies.append(n as Node3D)
+	var spawner: Node = _ranch().get("spawner")
+	if spawner != null:
+		for p: Node3D in spawner.call("get_spawned"):
+			bodies.append(p)
+	var spike: Node3D = _ranch().get("spike")
+	if spike != null:
+		bodies.append(spike)
+	for offset: Vector3 in [side * 1.5, -side * 2.5, side * 4.0, fwd * 3.0 + side * 2.0,
+			-side * 5.0, fwd * 5.0, fwd * 2.0 - side * 4.0]:
+		var at := around + offset
+		var free := true
+		for b in bodies:
+			if is_instance_valid(b) and Vector2(b.global_position.x - at.x,
+					b.global_position.z - at.z).length() < 2.5:
+				free = false
+				break
+		if free:
+			return at
+	return around + side * 1.5
 
 
 ## Rainbow Dash breaks the sound barrier across the sky.

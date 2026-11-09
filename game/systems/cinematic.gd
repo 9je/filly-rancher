@@ -40,6 +40,8 @@ var _skip_hint: Label
 var _skip_held := 0.0
 var _skip := false
 var _frozen: Array[Node] = []
+## The game's own screen layers hidden for the scene (the HUD, a talk box), to show again after.
+var _hidden_layers: Array[CanvasLayer] = []
 
 
 static func shared(tree: SceneTree) -> Cinematic:
@@ -101,6 +103,7 @@ func play(shots: Array, opts: Dictionary = {}) -> bool:
 		_camera.global_transform = _was_current.global_transform
 		_camera.fov = _was_current.fov
 	_camera.current = true
+	_hide_layers()
 	visible = true
 	_skip_hint.text = "Hold %s to skip" % InputDeviceScript.hint(&"ui_cancel")
 	_skip_hint.visible = bool(opts.get("skippable", true))
@@ -117,6 +120,7 @@ func play(shots: Array, opts: Dictionary = {}) -> bool:
 	_camera.queue_free()
 	_camera = null
 	visible = false
+	_show_layers()
 	_thaw()
 	playing = false
 	finished.emit(_skip)
@@ -185,6 +189,24 @@ func _bars(to: float) -> void:
 	tw.tween_property(_top, "position:y", -h + h * to, BAR_SECONDS)
 	tw.tween_property(_bottom, "position:y", size.y - h * to, BAR_SECONDS)
 	await tw.finished
+
+
+## THE FRAME IS THE SCENE'S (P8 render check: the HUD and a talk box sat over Derpy's crash).
+## Every other visible screen layer is put away for the scene and put back after.
+func _hide_layers() -> void:
+	_hidden_layers.clear()
+	for n: Node in get_tree().root.find_children("*", "CanvasLayer", true, false):
+		var l := n as CanvasLayer
+		if l != self and l.visible and l.layer < layer:
+			l.visible = false
+			_hidden_layers.append(l)
+
+
+func _show_layers() -> void:
+	for l: CanvasLayer in _hidden_layers:
+		if is_instance_valid(l):
+			l.visible = true
+	_hidden_layers.clear()
 
 
 func _freeze(nodes: Array) -> void:

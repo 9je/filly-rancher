@@ -39,9 +39,15 @@ func _run() -> void:
 	Boot.mouse_to_corner()
 	var cs: Node = ranch.get("creation_screen")
 	if _want("creator") and cs != null and bool(cs.call("is_open")):
+		var table: Node3D = cs.get("_turntable")
 		for r in 3:
 			cs.call("set_race", r)
-			await Boot.frames(self, 20)
+			# Three-quarter on, held there: the turntable is stopped by a "drag" pause.
+			for k in 20:
+				cs.set("_drag_rest", 5.0)
+				if table != null:
+					table.rotation.y = deg_to_rad(-35.0)
+				await process_frame
 			await Boot.shot(self, out, "creator_race%d" % r)
 	if cs != null and bool(cs.call("is_open")):
 		cs.call("confirm")
@@ -62,6 +68,8 @@ func _run() -> void:
 		await Boot.shot(self, out, "toast_pen")
 
 	if _want("beam"):
+		# A new game has no Scoop until Marigold hands it over; the check is about the beam.
+		ranch.call("get_story").call("set_flag", "has_scoop")
 		var beam: Node = player.call("get_magic_beam")
 		var rig: Node = player.call("get_camera_pivot").get_node("CameraRig")
 		var spawner: Node = ranch.get("spawner")
@@ -97,8 +105,11 @@ func _run() -> void:
 		if spike != null:
 			var cam := Camera3D.new()
 			ranch.add_child(cam)
-			var front := -spike.global_basis.z
-			cam.global_position = spike.global_position + front * 2.2 + Vector3(0.6, 1.0, 0)
+			# From the player's side of him, wherever he is facing.
+			var to_player := player.global_position - spike.global_position
+			to_player.y = 0.0
+			to_player = to_player.normalized() if to_player.length() > 0.1 else Vector3.BACK
+			cam.global_position = spike.global_position + to_player * 1.8 + Vector3(0, 0.9, 0)
 			cam.look_at(spike.global_position + Vector3(0, 0.7, 0))
 			cam.current = true
 			await Boot.frames(self, 12)
@@ -140,6 +151,8 @@ func _run() -> void:
 				r["portrait"] = ranch.call("_portrait_of", String(r.uid), r.body)
 			rm.set("entrants_provider", func() -> Array: return runners)
 			rm.set("chips_provider", func() -> int: return 400)
+			rm.set("can_open", func() -> bool: return true)
+			paused = false
 			rm.call("open")
 			await Boot.frames(self, 40)
 			await Boot.shot(self, out, "race_guide")
