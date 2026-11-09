@@ -24,5 +24,22 @@ func _run() -> void:
 			await process_frame
 		await RenderingServer.frame_post_draw
 		root.get_texture().get_image().save_png("%s/creator_step%d.png" % [out, step])
+	# The mark step again with three stamps down, in their own colours: the canvas and the
+	# flank on the turntable show the same mark.
+	screen.call("set_step", 1)
+	for kind: StringName in [&"talent:kindness", &"talent:kindness", &"talent:kindness"]:
+		screen.call("stamp_symbol", kind)
+	# Spread like Fluttershy's three butterflies (a probe reaching into the canvas's stamps).
+	var canvas: Node = screen.call("canvas")
+	var laid: Array = canvas.get("_stamps")
+	for i in laid.size():
+		laid[i].at = [Vector2(0.32, 0.34), Vector2(0.68, 0.40), Vector2(0.46, 0.70)][i]
+		laid[i].scale = 0.42
+	canvas.call("_refresh")
+	screen.call("_sync_mark")
+	for i in 20:
+		await process_frame
+	await RenderingServer.frame_post_draw
+	root.get_texture().get_image().save_png("%s/creator_stamped.png" % out)
 	print("CREATOR_PROBE_OK")
 	quit(0)

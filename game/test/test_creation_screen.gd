@@ -2,6 +2,7 @@ extends GutTest
 ## The creation screen, driven through its own methods rather than through a mouse.
 
 const CreationScreenScene := preload("res://ui/creation_screen.tscn")
+const MarkLayoutScript := preload("res://systems/mark_layout.gd")
 const PlayerLookScript := preload("res://systems/player_look.gd")
 const StockPaletteScript := preload("res://systems/stock_palette.gd")
 const MarkPaintScript := preload("res://systems/mark_paint.gd")
@@ -550,3 +551,23 @@ func test_the_streak_row_shows_only_for_a_style_with_a_streak() -> void:
 	_screen.set_step(CreationScreen.Step.HAIR)
 	var row := _screen.find_child("Mane2Grid", true, false) as Control
 	assert_eq(row.visible, _screen.style_has_streak())
+
+
+## Fable AAA round 3, #9: the sheet was wider on the cutie mark step, so the turntable jumped.
+func test_the_sheet_is_one_width_on_every_step() -> void:
+	var panel := _screen.get_node(^"Layout/Panel") as Control
+	var widths: Array[float] = []
+	for step: int in [CreationScreen.Step.LOOK, CreationScreen.Step.HAIR, CreationScreen.Step.MARK,
+			CreationScreen.Step.STYLE]:
+		_screen.set_step(step)
+		widths.append(maxf(panel.custom_minimum_size.x, panel.get_combined_minimum_size().x))
+	for w: float in widths:
+		assert_almost_eq(w, widths[0], 0.5, "every step asks for the same sheet width")
+
+
+## Fable AAA round 3, #6: a stamp lands in its own colours, not the ink's charcoal.
+func test_a_stamp_lands_in_its_own_colours() -> void:
+	_screen.set_step(CreationScreen.Step.MARK)
+	assert_true(_screen.stamp_symbol(&"talent:orchards"))
+	var laid: Dictionary = _screen.canvas().stamps()[0]
+	assert_eq(laid.a, MarkLayoutScript.palette(&"talent:orchards")[0], "an apple is apple red")

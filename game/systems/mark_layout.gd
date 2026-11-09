@@ -1,7 +1,7 @@
 extends RefCounted
 ## A CUTIE MARK MADE OF STAMPS (PS7, playtest 2026-11-05 item 3: "Better cutie mark creation").
 ## Up to MAX_STAMPS symbols, each one of the 24 talents (MarkComposer.TALENTS, its shape and its
-## detail) or one of 12 plain SHAPES, with a place, a size, a turn and two colours. Composed
+## detail) or one of the 8 Equestrian SHAPES, with a place, a size, a turn and two colours. Composed
 ## with MarkComposer's own shapes and its fill, detail and outline, so a stamped mark is drawn
 ## exactly like the valley's own marks.
 ##
@@ -19,9 +19,17 @@ const SHADE_NUDGE := Vector2(0.07, 0.07)
 ## How much every stamp's shape is grown (stamp space), so line-like symbols have a body.
 const FATTEN := 0.035
 const SCALE_RANGE := Vector2(0.18, 1.0)
-## The plain shapes, beside the talents.
-const SHAPES: Array[StringName] = [&"circle", &"square", &"diamond", &"triangle", &"star",
-	&"heart", &"moon", &"ring", &"drop", &"bolt", &"cross", &"wave"]
+## THE EQUESTRIAN SYMBOLS beside the talents (Fable AAA round 3, #6: the old twelve were
+## geometry, a circle, a square, a cross, and a ring that read as a gender symbol). Each is a
+## thing a pony in the valley might be marked with, with its detail drawn in a second colour.
+## The plain shapes still draw (MarkComposer.shape), they are only no longer offered.
+const SHAPES: Array[StringName] = [&"horseshoe", &"sparkle", &"balloons", &"crown", &"quill",
+	&"hourglass", &"cherries", &"shooting_star"]
+const SHAPE_DETAIL := {
+	&"horseshoe": "horseshoe_nails", &"sparkle": "sparkle_core", &"balloons": "balloon_b",
+	&"crown": "crown_gems", &"quill": "quill_shaft", &"hourglass": "hourglass_sand",
+	&"cherries": "cherry_stems", &"shooting_star": "star_tail",
+}
 
 
 ## Every symbol a stamp can be: the talents first, then the shapes.
@@ -40,7 +48,12 @@ static func parts(kind: StringName) -> Array:
 	if k.begins_with("talent:"):
 		var spec: Array = MarkComposerScript.TALENTS.get(StringName(k.substr(7)), ["dot", "", ""])
 		return [String(spec[0]), String(spec[1])]
-	return [k.substr(6), ""]
+	return [k.substr(6), String(SHAPE_DETAIL.get(StringName(k.substr(6)), ""))]
+
+
+## The colours a kind is laid in until an ink recolours it: its own (MarkComposer.PALETTE).
+static func palette(kind: StringName) -> Array:
+	return MarkComposerScript.palette(String(parts(kind)[0]))
 
 
 static func new_stamp(kind: StringName, a: Color, b: Color) -> Dictionary:

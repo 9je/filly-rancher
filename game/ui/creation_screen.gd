@@ -675,8 +675,6 @@ func set_ink(index: int) -> void:
 	_canvas.set_colour(ink_at(index))
 	if _ink_swatch != null:
 		_ink_swatch.color = ink_at(index)
-	if not _talent_buttons.is_empty():
-		_refresh_talent_thumbs()
 
 
 ## Take the look as it stands and hand it over. Returns whether anything happened; a second
@@ -719,21 +717,8 @@ func step() -> int:
 ## read that as cheap. Meeting the pony is one job; drawing her mark is another.
 func set_step(value: int) -> void:
 	_step = clampi(value, Step.LOOK, Step.STYLE)
-	var shown: Dictionary = {
-		Step.LOOK: ["NameLabel", "NameBox", "RaceLabel", "RaceGrid", "CoatLabel", "CoatGrid",
-			"EyesLabel", "EyesGrid"],
-		Step.HAIR: ["ManeStyleLabel", "StyleRow", "ManeLabel", "ManeGrid", "Mane2Label",
-			"Mane2Grid", "TailLabel", "TailGrid"],
-		Step.MARK: ["MarkLabel", "MarkCanvas", "HintLabel", "InkRow", "TalentLabel", "TalentGrid",
-			"ShapeGrid", "ToolRow", "ActionRow"],
-		Step.STYLE: ["MarkingLabel", "MarkingGrid", "MarkingColourLabel", "MarkingColourGrid",
-			"EyeShapeLabel", "EyeShapeGrid", "WearLabel", "WearGrid"],
-	}
-	for step: int in shown:
-		for n: String in shown[step]:
-			var node := get_node_or_null(NodePath("Layout/Panel/Margin/Column/" + n)) as Control
-			if node != null:
-				node.visible = step == _step
+	_lock_panel_width()
+	_show_step_nodes(_step)
 	_show_streak()
 	_style_steps()
 	if _step == Step.STYLE:
@@ -744,6 +729,46 @@ func set_step(value: int) -> void:
 	# on the last step's region index would either point at a hidden control or an unrelated
 	# one now sitting at that index.
 	_enter_kb_region(0)
+
+
+## Which of the column's rows each step shows.
+static func _step_nodes() -> Dictionary:
+	return {
+		Step.LOOK: ["NameLabel", "NameBox", "RaceLabel", "RaceGrid", "CoatLabel", "CoatGrid",
+			"EyesLabel", "EyesGrid"],
+		Step.HAIR: ["ManeStyleLabel", "StyleRow", "ManeLabel", "ManeGrid", "Mane2Label",
+			"Mane2Grid", "TailLabel", "TailGrid"],
+		Step.MARK: ["MarkLabel", "MarkCanvas", "HintLabel", "InkRow", "TalentLabel", "TalentGrid",
+			"ShapeGrid", "ToolRow", "ActionRow"],
+		Step.STYLE: ["MarkingLabel", "MarkingGrid", "MarkingColourLabel", "MarkingColourGrid",
+			"EyeShapeLabel", "EyeShapeGrid", "WearLabel", "WearGrid"],
+	}
+
+
+func _show_step_nodes(which: int) -> void:
+	var shown := _step_nodes()
+	for step: int in shown:
+		for n: String in shown[step]:
+			var node := get_node_or_null(NodePath("Layout/Panel/Margin/Column/" + n)) as Control
+			if node != null:
+				node.visible = step == which
+
+
+## ONE SHEET WIDTH FOR EVERY STEP (Fable AAA round 3, #9: the turntable ended at a different x
+## on the cutie mark step, whose ink row is wider than the rest, so the stage jumped between
+## tabs). The sheet is measured once with each step's rows shown and held at the widest.
+var _panel_width := 0.0
+
+
+func _lock_panel_width() -> void:
+	var panel := get_node_or_null(^"Layout/Panel") as Control
+	if panel == null:
+		return
+	if _panel_width <= 0.0:
+		for step: int in _step_nodes():
+			_show_step_nodes(step)
+			_panel_width = maxf(_panel_width, panel.get_combined_minimum_size().x)
+	panel.custom_minimum_size.x = maxf(panel.custom_minimum_size.x, _panel_width)
 
 
 const STEP_PLUM := MenuStyleScript.PILL_PLUM
@@ -1082,6 +1107,33 @@ func _sync_mark() -> void:
 	_look.set_mark(_canvas.image())
 	if _model != null:
 		CutieMarkScript.apply(_model, _look.mark())
+	if _step == Step.MARK:
+		show_flank()
+
+
+## THE MARK, LIVE, WHERE SHE WEARS IT (Fable AAA round 3, #6): while she draws or stamps, the
+## turntable swings to the nearer flank and holds there, so the mark is seen on the pony as it
+## is made; the auto spin picks up again a few seconds after she stops.
+const FLANK_HOLD_SECONDS := 4.0
+var _flank_tween: Tween = null
+
+
+func show_flank() -> void:
+	if _turntable == null or not is_inside_tree():
+		return
+	var yaw: float = wrapf(_turntable.rotation.y, -PI, PI)
+	# At 0 she faces away from the lens; a quarter turn either way shows a flank, and both
+	# wear the mark.
+	var target: float = PI * 0.5 if yaw >= 0.0 else -PI * 0.5
+	_drag_rest = FLANK_HOLD_SECONDS
+	if absf(target - yaw) < 0.02:
+		return
+	_turntable.rotation.y = yaw
+	if _flank_tween != null and _flank_tween.is_valid():
+		_flank_tween.kill()
+	_flank_tween = create_tween()
+	_flank_tween.tween_property(_turntable, ^"rotation:y", target, 0.4) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
 
 ## The grassy hillock she stands on (Blender-built, tools/blender_props/build_props.py), so
@@ -1150,10 +1202,55 @@ func surprise(seed_value: int = -1) -> void:
 ## chosen ink with a gold accent, alone, in a pair or in three: click one and it lands on the
 ## canvas, ready to draw over.
 var _motif := 0
-var _talent_buttons: Array[TextureButton] = []
-var _shape_buttons: Array[TextureButton] = []
+var _talent_buttons: Array[Button] = []
+var _shape_buttons: Array[Button] = []
 const ACCENT := Color(1.0, 0.86, 0.42)
-const TALENT_THUMB := 44
+const TALENT_THUMB := 52
+
+
+## A STAMP IS A LITTLE COLOURED TILE (Fable AAA round 3, #6: "black Unicode-style
+## silhouettes"). Each symbol is shown in its own colours (MarkComposer.PALETTE) on a cream
+## tile with a soft plum rim that turns gold under the pointer, and lands on the mark in those
+## colours; an ink recolours it after.
+static func _stamp_tile_box(state: StringName) -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color(1.0, 0.98, 0.93) if state == &"normal" else Color(1.0, 0.94, 0.78)
+	box.border_color = MenuStyleScript.PILL_PLUM.lerp(MenuStyleScript.PILL_CREAM, 0.55)
+	if state == &"hover":
+		box.border_color = MenuStyleScript.COLOR_TAB_ON.darkened(0.12)
+	elif state == &"pressed":
+		box.border_color = MenuStyleScript.PILL_PLUM
+	box.set_border_width_all(2)
+	box.border_width_bottom = 2 if state == &"pressed" else 4
+	box.set_corner_radius_all(12)
+	box.set_content_margin_all(4.0)
+	box.anti_aliasing = true
+	return box
+
+
+func _stamp_tile(node_name: String, tip: String, kind: StringName) -> Button:
+	var b := Button.new()
+	b.name = node_name
+	b.custom_minimum_size = Vector2(TALENT_THUMB, TALENT_THUMB)
+	b.expand_icon = true
+	b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	b.tooltip_text = tip
+	b.focus_mode = Control.FOCUS_NONE
+	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	for state: StringName in [&"normal", &"hover", &"pressed", &"hover_pressed"]:
+		b.add_theme_stylebox_override(state,
+			_stamp_tile_box(&"pressed" if state == &"hover_pressed" else state))
+	b.add_theme_stylebox_override(&"focus", StyleBoxEmpty.new())
+	var st: Dictionary = MarkLayoutScript.new_stamp(kind, Color.WHITE, Color.WHITE)
+	var colours: Array = MarkLayoutScript.palette(kind)
+	st.a = colours[0]
+	st.b = colours[1]
+	st.scale = 0.92
+	b.icon = ImageTexture.create_from_image(MarkLayoutScript.compose([st], 96))
+	# STAMPED, NOT PASTED (PS7 item 3): the symbol lands as a stamp she can move, size, turn
+	# and recolour, over whatever she has drawn.
+	b.pressed.connect(func() -> void: stamp_symbol(kind))
+	return b
 
 
 func _build_talent_gallery() -> void:
@@ -1170,42 +1267,27 @@ func _build_talent_gallery() -> void:
 	var grid := GridContainer.new()
 	grid.name = "TalentGrid"
 	grid.columns = 12
-	grid.add_theme_constant_override(&"h_separation", 6)
-	grid.add_theme_constant_override(&"v_separation", 6)
+	grid.add_theme_constant_override(&"h_separation", 5)
+	grid.add_theme_constant_override(&"v_separation", 5)
 	column.add_child(grid)
 	column.move_child(grid, stamps.get_index())
 	for t: StringName in MarkComposerScript.talent_ids():
-		var b := TextureButton.new()
-		b.name = "Talent_" + String(t)
-		b.custom_minimum_size = Vector2(TALENT_THUMB, TALENT_THUMB)
-		b.ignore_texture_size = true
-		b.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-		b.tooltip_text = MarkComposerScript.talent_name(t)
-		b.focus_mode = Control.FOCUS_NONE
-		var talent := t
-		# STAMPED, NOT PASTED (PS7 item 3): the talent lands as a stamp she can move, size, turn
-		# and recolour, over whatever she has drawn.
-		b.pressed.connect(func() -> void: stamp_symbol(StringName("talent:" + String(talent))))
+		var b := _stamp_tile("Talent_" + String(t), MarkComposerScript.talent_name(t),
+			StringName("talent:" + String(t)))
 		grid.add_child(b)
 		_talent_buttons.append(b)
-	# THE TWELVE PLAIN SHAPES beside the talents (MarkLayout.SHAPES). The old one, pair and three
-	# arrangements and the six whole-canvas stamps are gone: a stamp is placed by hand now.
+	# THE EQUESTRIAN SYMBOLS beside the talents (MarkLayout.SHAPES): a horseshoe, a sparkle,
+	# balloons, a crown and the rest. The old one, pair and three arrangements and the six
+	# whole-canvas stamps are gone: a stamp is placed by hand now.
 	var shapes := GridContainer.new()
 	shapes.name = "ShapeGrid"
 	shapes.columns = 12
-	shapes.add_theme_constant_override(&"h_separation", 6)
+	shapes.add_theme_constant_override(&"h_separation", 5)
 	column.add_child(shapes)
 	column.move_child(shapes, stamps.get_index())
 	for sh: StringName in MarkLayoutScript.SHAPES:
-		var b := TextureButton.new()
-		b.name = "Shape_" + String(sh)
-		b.custom_minimum_size = Vector2(TALENT_THUMB, TALENT_THUMB)
-		b.ignore_texture_size = true
-		b.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-		b.tooltip_text = String(sh).capitalize()
-		b.focus_mode = Control.FOCUS_NONE
-		var kind := StringName("shape:" + String(sh))
-		b.pressed.connect(func() -> void: stamp_symbol(kind))
+		var b := _stamp_tile("Shape_" + String(sh), String(sh).capitalize(),
+			StringName("shape:" + String(sh)))
 		shapes.add_child(b)
 		_shape_buttons.append(b)
 	stamps.visible = false
@@ -1220,25 +1302,12 @@ func _build_talent_gallery() -> void:
 				_canvas.remove_selected())
 		_paper_button(rm)
 		actions.add_child(rm)
-	_refresh_talent_thumbs()
 
 
-func _refresh_talent_thumbs() -> void:
-	var ink: Color = _canvas.get("_colour") if _canvas != null and _canvas.get("_colour") is Color else ink_at(0)
-	var talents := MarkComposerScript.talent_ids()
-	for i in mini(_talent_buttons.size(), talents.size()):
-		var img: Image = MarkComposerScript.compose({"talent": talents[i], "motif": 0, "a": ink, "b": ACCENT})
-		if img != null:
-			_talent_buttons[i].texture_normal = ImageTexture.create_from_image(img)
-	for i in mini(_shape_buttons.size(), MarkLayoutScript.SHAPES.size()):
-		var st: Dictionary = MarkLayoutScript.new_stamp(StringName("shape:" + String(MarkLayoutScript.SHAPES[i])), ink, ACCENT)
-		st.scale = 0.9
-		_shape_buttons[i].texture_normal = ImageTexture.create_from_image(MarkLayoutScript.compose([st], 64))
-
-
-## Stamp a symbol (a MarkLayout kind) on her mark, selected and ready to move.
+## Stamp a symbol (a MarkLayout kind) on her mark, in its own colours, selected and ready to
+## move.
 func stamp_symbol(kind: StringName) -> bool:
-	if _canvas == null or not _canvas.add_stamp(kind):
+	if _canvas == null or not _canvas.add_stamp(kind, MarkLayoutScript.palette(kind)):
 		return false
 	_sync_mark()
 	return true

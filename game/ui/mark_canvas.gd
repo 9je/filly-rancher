@@ -103,13 +103,16 @@ func selected() -> int:
 	return _sel
 
 
-## Lay a symbol (a MarkLayout kind) in the middle of the mark, in the current ink, selected.
+## Lay a symbol (a MarkLayout kind) in the middle of the mark, selected: in `colours` ([fill,
+## detail], the symbol's own from the gallery) or, without them, the current ink and gold.
 ## False when MAX_STAMPS are already down.
-func add_stamp(kind: StringName) -> bool:
+func add_stamp(kind: StringName, colours: Array = []) -> bool:
 	if _stamps.size() >= LayoutScript.MAX_STAMPS:
 		return false
 	_push_undo()
-	_stamps = LayoutScript.added(_stamps, LayoutScript.new_stamp(kind, _colour, ACCENT))
+	var a: Color = colours[0] if colours.size() > 0 else _colour
+	var b: Color = colours[1] if colours.size() > 1 else ACCENT
+	_stamps = LayoutScript.added(_stamps, LayoutScript.new_stamp(kind, a, b))
 	_sel = _stamps.size() - 1
 	_refresh()
 	changed.emit()
@@ -276,8 +279,22 @@ func _to_pixels(point: Vector2) -> Vector2i:
 		clampi(int(point.y / box.y * float(MarkPaintScript.SIZE)), 0, MarkPaintScript.SIZE - 1))
 
 
+## THE CANVAS SHOWS THE STAMPS CRISP (Fable AAA round 3, #6). The mark itself is SIZE pixels
+## (what the flank wears and the save keeps); the canvas is four times that across, where a
+## stamp drawn at SIZE and blown up read as a block of pixels. So the canvas draws its own
+## picture: the painted layer, smoothed, and the stamps drawn again at DISPLAY_SIZE over it.
+const DISPLAY_SIZE := 128
+
+
+func display_image() -> Image:
+	var out := MarkPaintScript.copy_of(_image)
+	out.resize(DISPLAY_SIZE, DISPLAY_SIZE, Image.INTERPOLATE_BILINEAR)
+	LayoutScript.draw_over(out, _stamps)
+	return out
+
+
 func _refresh() -> void:
-	_texture = ImageTexture.create_from_image(image())
+	_texture = ImageTexture.create_from_image(display_image())
 	if _surface != null:
 		_surface.texture = _texture
 	if _handles != null:

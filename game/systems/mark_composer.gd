@@ -22,7 +22,7 @@ const TALENTS := {
 	&"gemcutting": ["gem", "gem_facet", "Gem cutting"],
 	&"sewing": ["button", "button_holes", "Sewing"],
 	&"reading": ["book", "book_line", "Reading"],
-	&"painting": ["drop", "dot", "Painting"],
+	&"painting": ["drop", "", "Painting"],
 	&"speed": ["bolt", "", "Speed"],
 	&"swimming": ["wave", "", "Swimming"],
 	&"sweets": ["candy", "candy_swirl", "Sweets"],
@@ -30,13 +30,58 @@ const TALENTS := {
 	&"moonlight": ["moon", "", "Moonlight"],
 	&"luck": ["clover", "", "Luck"],
 	&"carrots": ["carrot", "carrot_top", "Carrots"],
-	&"kindness": ["heart", "", "Kindness"],
+	&"kindness": ["butterfly", "butterfly_body", "Kindness"],
 	&"lanterns": ["flame", "flame_core", "Lanterns"],
 	&"bells": ["bell", "dot", "Bells"],
 	&"forestry": ["leaf", "leaf_vein", "Forestry"],
-	&"bubbles": ["ring", "", "Bubbles"],
+	&"bubbles": ["bubbles", "bubble_shine", "Bubbles"],
 	&"snow": ["snowflake", "", "Snow"],
 }
+
+## EVERY SYMBOL'S OWN COLOURS (Fable AAA round 3, #6: the creator's stamps were black
+## silhouettes). A mark in the show is coloured the way the thing is: a red apple with a green
+## leaf, a gold shoe, a pink butterfly with a teal body. [fill, detail], by shape name; the
+## stamp gallery shows and lays a symbol in these, and an ink recolours its fill after.
+const PALETTE := {
+	"cupcake": [Color(0.97, 0.64, 0.80), Color(0.86, 0.18, 0.26)],
+	"note": [Color(0.56, 0.42, 0.86), Color(1.0, 0.86, 0.42)],
+	"flower": [Color(0.98, 0.60, 0.76), Color(1.0, 0.84, 0.30)],
+	"cloud": [Color(0.95, 0.96, 1.0), Color(1.0, 0.82, 0.25)],
+	"star": [Color(1.0, 0.80, 0.28), Color(1.0, 0.95, 0.70)],
+	"heart": [Color(0.96, 0.46, 0.60), Color(1.0, 1.0, 1.0)],
+	"apple": [Color(0.88, 0.22, 0.24), Color(0.46, 0.76, 0.34)],
+	"gem": [Color(0.46, 0.66, 0.98), Color(0.80, 0.90, 1.0)],
+	"button": [Color(0.55, 0.78, 0.96), Color(0.24, 0.36, 0.62)],
+	"book": [Color(0.58, 0.36, 0.76), Color(1.0, 0.84, 0.40)],
+	"drop": [Color(0.34, 0.60, 0.96), Color(0.92, 0.96, 1.0)],
+	"bolt": [Color(1.0, 0.82, 0.25), Color(1.0, 0.95, 0.70)],
+	"wave": [Color(0.30, 0.64, 0.92), Color(0.85, 0.95, 1.0)],
+	"candy": [Color(0.98, 0.55, 0.76), Color(1.0, 1.0, 1.0)],
+	"sun": [Color(1.0, 0.76, 0.26), Color(0.98, 0.52, 0.20)],
+	"moon": [Color(0.40, 0.44, 0.84), Color(0.85, 0.88, 1.0)],
+	"clover": [Color(0.36, 0.72, 0.40), Color(0.75, 0.92, 0.55)],
+	# The carrot's detail is its root, so the fill is the leafy top.
+	"carrot": [Color(0.42, 0.74, 0.32), Color(0.98, 0.56, 0.20)],
+	"butterfly": [Color(0.98, 0.62, 0.80), Color(0.36, 0.78, 0.82)],
+	"flame": [Color(0.98, 0.56, 0.20), Color(1.0, 0.90, 0.40)],
+	"bell": [Color(0.96, 0.76, 0.30), Color(0.72, 0.42, 0.18)],
+	"leaf": [Color(0.40, 0.72, 0.36), Color(0.78, 0.94, 0.58)],
+	"bubbles": [Color(0.62, 0.84, 1.0), Color(1.0, 1.0, 1.0)],
+	"snowflake": [Color(0.66, 0.86, 1.0), Color(1.0, 1.0, 1.0)],
+	"horseshoe": [Color(0.96, 0.76, 0.30), Color(0.50, 0.32, 0.16)],
+	"sparkle": [Color(0.90, 0.32, 0.62), Color(1.0, 1.0, 1.0)],
+	"balloons": [Color(0.40, 0.70, 0.96), Color(1.0, 0.86, 0.30)],
+	"crown": [Color(1.0, 0.80, 0.30), Color(0.94, 0.38, 0.60)],
+	"quill": [Color(0.97, 0.96, 1.0), Color(0.52, 0.42, 0.66)],
+	"hourglass": [Color(0.74, 0.50, 0.30), Color(1.0, 0.86, 0.50)],
+	"cherries": [Color(0.88, 0.18, 0.28), Color(0.42, 0.74, 0.32)],
+	"shooting_star": [Color(1.0, 0.82, 0.28), Color(0.62, 0.48, 0.92)],
+}
+
+
+## [fill, detail] for a shape, or a rose and gold pair for one without its own.
+static func palette(shape_name: String) -> Array:
+	return PALETTE.get(shape_name, [Color(0.9, 0.3, 0.4), Color(1.0, 0.9, 0.5)])
 
 ## motif 0: one, 1: a pair (offset diagonal), 2: a trio (triangle). [centers, scale].
 const ARRANGE := [
@@ -207,11 +252,91 @@ static func shape(name: String, p: Vector2) -> float:
 		"flame_core":
 			return _drop(q + Vector2(0.0, -0.14), 0.15)
 		"bell":
-			return minf(_poly(q, [Vector2(-0.12, -0.3), Vector2(0.12, -0.3), Vector2(0.3, 0.18), Vector2(-0.3, 0.18)]),
-				_circle(q - Vector2(0.0, -0.28), 0.12))
+			# A domed bell with a flared lip and a knob on top (it was a cone, and read as one).
+			var dome := _circle(q - Vector2(0.0, -0.1), 0.2)
+			var skirt := _poly(q, [Vector2(-0.2, -0.1), Vector2(0.2, -0.1), Vector2(0.24, 0.1),
+				Vector2(0.33, 0.2), Vector2(-0.33, 0.2), Vector2(-0.24, 0.1)])
+			return minf(minf(dome, skirt), minf(_circle(q - Vector2(0.0, -0.33), 0.06),
+				_circle(q - Vector2(0.0, 0.25), 0.07)))
 		"ring":
 			return minf(absf(_circle(q - Vector2(-0.08, 0.06), 0.26)) - 0.045,
 				absf(_circle(q - Vector2(0.24, -0.24), 0.1)) - 0.03)
+		# Fable AAA round 3, #6: the old Bubbles ring with its small ring read as a gender
+		# symbol. Three whole bubbles, each with a shine.
+		"bubbles":
+			return minf(_circle(q - Vector2(-0.11, 0.09), 0.23),
+				minf(_circle(q - Vector2(0.21, -0.19), 0.13), _circle(q - Vector2(0.24, 0.21), 0.085)))
+		"bubble_shine":
+			return minf(_circle(q - Vector2(-0.2, -0.01), 0.06),
+				minf(_circle(q - Vector2(0.16, -0.24), 0.035), _circle(q - Vector2(0.21, 0.18), 0.022)))
+		"butterfly":
+			var wings := minf(minf(_circle(q - Vector2(-0.17, -0.11), 0.17), _circle(q - Vector2(0.17, -0.11), 0.17)),
+				minf(_circle(q - Vector2(-0.13, 0.15), 0.12), _circle(q - Vector2(0.13, 0.15), 0.12)))
+			return minf(wings, shape("butterfly_body", p))
+		"butterfly_body":
+			var fly_body := _segment(q, Vector2(0.0, -0.2), Vector2(0.0, 0.26), 0.04)
+			return minf(fly_body, minf(_circle(q - Vector2(-0.19, -0.13), 0.06), _circle(q - Vector2(0.19, -0.13), 0.06)))
+		"horseshoe":
+			var hr := 0.24
+			var hw := 0.085
+			var arc := maxf(absf(q.length() - hr) - hw, q.y)
+			var legs := minf(_box(q - Vector2(-hr, 0.13), Vector2(hw, 0.13)), _box(q - Vector2(hr, 0.13), Vector2(hw, 0.13)))
+			var heels := minf(_box(q - Vector2(-hr, 0.27), Vector2(hw + 0.025, 0.035)),
+				_box(q - Vector2(hr, 0.27), Vector2(hw + 0.025, 0.035)))
+			return minf(arc, minf(legs, heels))
+		"horseshoe_nails":
+			var nails := 1.0
+			for deg: float in [-160.0, -120.0, -60.0, -20.0]:
+				nails = minf(nails, _circle(q - Vector2(0.24, 0.0).rotated(deg_to_rad(deg)), 0.026))
+			return minf(nails, minf(_circle(q - Vector2(-0.24, 0.12), 0.026), _circle(q - Vector2(0.24, 0.12), 0.026)))
+		"sparkle":
+			return _star_n(q, 0.44, 0.2, 6)
+		"sparkle_core":
+			return _star_n(q, 0.15, 0.07, 6)
+		"balloons":
+			var strings := minf(_segment(q, Vector2(-0.15, 0.0), Vector2(0.0, 0.42), 0.014),
+				minf(_segment(q, Vector2(0.15, -0.04), Vector2(0.0, 0.42), 0.014),
+				_segment(q, Vector2(0.0, 0.12), Vector2(0.0, 0.42), 0.014)))
+			return minf(strings, minf(minf(_ellipse(q - Vector2(-0.16, -0.16), Vector2(0.14, 0.17)),
+				_ellipse(q - Vector2(0.0, -0.03), Vector2(0.14, 0.17))), shape("balloon_b", p)))
+		"balloon_b":
+			return _ellipse(q - Vector2(0.17, -0.2), Vector2(0.14, 0.17))
+		"crown":
+			var band := _box(q - Vector2(0.0, 0.17), Vector2(0.33, 0.08))
+			var points := _poly(q, [Vector2(-0.33, 0.12), Vector2(-0.33, -0.22), Vector2(-0.16, -0.02),
+				Vector2(0.0, -0.3), Vector2(0.16, -0.02), Vector2(0.33, -0.22), Vector2(0.33, 0.12)])
+			return minf(minf(band, points), minf(minf(_circle(q - Vector2(-0.33, -0.25), 0.05),
+				_circle(q - Vector2(0.33, -0.25), 0.05)), _circle(q - Vector2(0.0, -0.33), 0.05)))
+		"crown_gems":
+			return minf(_circle(q - Vector2(0.0, 0.17), 0.05),
+				minf(_circle(q - Vector2(-0.19, 0.17), 0.04), _circle(q - Vector2(0.19, 0.17), 0.04)))
+		"quill":
+			var vane := _vesica(_rot(q - Vector2(0.06, -0.08), 0.62), 0.34, 0.13)
+			return minf(vane, _segment(q, Vector2(-0.3, 0.36), Vector2(0.0, -0.0), 0.025))
+		"quill_shaft":
+			return _segment(q, Vector2(-0.3, 0.36), Vector2(0.24, -0.36), 0.016)
+		"hourglass":
+			var glass := _poly(q, [Vector2(-0.2, -0.29), Vector2(0.2, -0.29), Vector2(0.04, 0.0),
+				Vector2(0.2, 0.29), Vector2(-0.2, 0.29), Vector2(-0.04, 0.0)])
+			var bars := minf(_box(q - Vector2(0.0, -0.33), Vector2(0.27, 0.05)),
+				_box(q - Vector2(0.0, 0.33), Vector2(0.27, 0.05)))
+			return minf(glass, bars)
+		"hourglass_sand":
+			return minf(_poly(q, [Vector2(-0.15, 0.27), Vector2(0.15, 0.27), Vector2(0.0, 0.1)]),
+				_poly(q, [Vector2(-0.11, -0.17), Vector2(0.11, -0.17), Vector2(0.0, -0.04)]))
+		"cherries":
+			return minf(minf(_circle(q - Vector2(-0.15, 0.19), 0.15), _circle(q - Vector2(0.16, 0.21), 0.14)),
+				shape("cherry_stems", p))
+		"cherry_stems":
+			var stems := minf(_segment(q, Vector2(-0.14, 0.06), Vector2(0.05, -0.3), 0.025),
+				_segment(q, Vector2(0.15, 0.09), Vector2(0.05, -0.3), 0.025))
+			return minf(stems, _vesica(_rot(q - Vector2(0.18, -0.3), 1.2), 0.13, 0.06))
+		"shooting_star":
+			return minf(_star(q - Vector2(0.13, -0.12), 0.27, 0.12), shape("star_tail", p))
+		"star_tail":
+			return minf(_segment(q, Vector2(-0.38, 0.36), Vector2(0.02, -0.02), 0.05),
+				minf(_segment(q, Vector2(-0.4, 0.14), Vector2(-0.06, -0.06), 0.035),
+				_segment(q, Vector2(-0.16, 0.4), Vector2(0.06, 0.06), 0.035)))
 		"snowflake":
 			var best := 1.0
 			for i in range(3):
@@ -246,6 +371,26 @@ static func _box(q: Vector2, half: Vector2) -> float:
 
 static func _rot(q: Vector2, a: float) -> Vector2:
 	return q.rotated(-a)
+
+
+## A capsule: the segment from `a` to `b`, `r` thick either side.
+static func _segment(q: Vector2, a: Vector2, b: Vector2, r: float) -> float:
+	var ab := b - a
+	var t := clampf((q - a).dot(ab) / ab.dot(ab), 0.0, 1.0)
+	return (q - a - ab * t).length() - r
+
+
+## An ellipse with half axes `radii` (an approximation, close enough at mark sizes).
+static func _ellipse(q: Vector2, radii: Vector2) -> float:
+	return (q / radii).length() * minf(radii.x, radii.y) - minf(radii.x, radii.y)
+
+
+## An n pointed star.
+static func _star_n(q: Vector2, ro: float, ri: float, n: int) -> float:
+	var pts: Array[Vector2] = []
+	for i in range(n * 2):
+		pts.append(Vector2(0.0, -(ro if i % 2 == 0 else ri)).rotated(float(i) * PI / float(n)))
+	return _poly(q, pts)
 
 
 static func _vesica(q: Vector2, h: float, w: float) -> float:
