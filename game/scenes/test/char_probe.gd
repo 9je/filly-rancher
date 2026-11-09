@@ -9,12 +9,17 @@ const ToonStylerScript := preload("res://systems/toon_styler.gd")
 const SkyRigScript := preload("res://world/sky_rig.gd")
 const PONIES := ["fluttershy", "derpyhooves", "rainbowdash", "twilight"]
 var out := ""
+## --phase=0..3 (dawn, day, dusk, night): the rig's light and fill for that hour, a low sun at
+## dawn and dusk.
+var phase := 1
 
 
 func _initialize() -> void:
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--out="):
 			out = a.substr(6)
+		elif a.begins_with("--phase="):
+			phase = int(a.substr(8))
 	DirAccess.make_dir_recursive_absolute(out)
 	_run.call_deferred()
 
@@ -35,7 +40,8 @@ func _run() -> void:
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	env.ambient_light_sky_contribution = SkyRigScript.AMBIENT_SKY_CONTRIBUTION
 	env.ambient_light_color = Color(0.729412, 0.803922, 0.878431)
-	env.ambient_light_energy = SkyRigScript.PHASE_AMBIENT_ENERGY[1]
+	env.ambient_light_energy = SkyRigScript.PHASE_AMBIENT_ENERGY[phase]
+	env.ambient_light_color = SkyRigScript.PHASE_AMBIENT_COLORS[phase]
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.tonemap_white = 4.5
 	env.tonemap_exposure = 0.8
@@ -48,8 +54,10 @@ func _run() -> void:
 	var sun := DirectionalLight3D.new()
 	sun.transform = Transform3D(Basis(Vector3(0.7071068, 0, -0.7071068), Vector3(-0.3535534, 0.8660254, -0.3535534),
 		Vector3(0.6123724, 0.5, 0.6123724)), Vector3(0, 22, 0))
-	sun.light_color = Color(1, 0.968627, 0.905882)
-	sun.light_energy = 1.15
+	sun.light_color = SkyRigScript.PHASE_LIGHT_COLORS[phase]
+	sun.light_energy = SkyRigScript.PHASE_LIGHT_ENERGY[phase]
+	if phase == 0 or phase == 2:
+		sun.rotation = Vector3(deg_to_rad(-14.0), deg_to_rad(60.0 if phase == 2 else -60.0), 0.0)
 	sun.shadow_enabled = true
 	sun.sky_mode = DirectionalLight3D.SKY_MODE_LIGHT_ONLY
 	world.add_child(sun)
@@ -88,7 +96,7 @@ func _run() -> void:
 	cam.current = true
 	for k in 40:
 		await process_frame
-	await _shot("chars_line")
+	await _shot("chars_line_p%d" % phase if phase != 1 else "chars_line")
 	cam.fov = 28.0
 	var head := bodies[0].global_position + Vector3(0, 1.15, 0)
 	cam.position = head + Vector3(0.4, 0.15, 2.4)

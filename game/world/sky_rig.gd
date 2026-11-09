@@ -84,7 +84,7 @@ const PHASE_LIGHT_COLORS: Array[Color] = [
 ## look at the valley, and in their playtest it read as an overcast purple haze over olive
 ## grass ("starting area is terrible"). Now a show sunrise: a soft periwinkle zenith over the
 ## same peach horizon, a gentler sun, and enough of it that the plaza reads at once.
-const PHASE_LIGHT_ENERGY: Array[float] = [0.85, 1.15, 0.58, 0.38]
+const PHASE_LIGHT_ENERGY: Array[float] = [0.85, 1.15, 0.72, 0.38]
 const PHASE_SKY_TOP: Array[Color] = [
 	Color(0.50, 0.62, 0.88),
 	Color(0.31, 0.51, 0.76),
@@ -126,10 +126,13 @@ const PHASE_AMBIENT_ENERGY: Array[float] = [0.28, 0.32, 0.22, 0.48]
 ## hemisphere was accidentally daylight grass. Driving that half correctly (see
 ## GROUND_HORIZON_DARKEN) removed the accidental fill and left all four NIGHT cells of the
 ## sky sheet too dark to play in. The fix is to stop asking a night sky to be a lamp.
+## DAWN AND DUSK FILL COOL AGAINST A WARM KEY (Fable AAA round 2, #7: "dusk is a flat sepia
+## multiply ... should be directional, long warm key, cool fill"). A warm fill under a warm
+## sun tinted everything one colour; lavender shadows are what make the light read as low.
 const PHASE_AMBIENT_COLORS: Array[Color] = [
-	Color(0.86, 0.78, 0.74),
+	Color(0.74, 0.74, 0.90),
 	Color(0.80, 0.86, 0.94),
-	Color(0.82, 0.68, 0.64),
+	Color(0.64, 0.62, 0.88),
 	Color(0.48, 0.56, 0.80),
 ]
 ## How far the fill light is dragged toward the same cloud the sky is mixed with, so an
