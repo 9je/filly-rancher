@@ -143,6 +143,7 @@ func _run() -> void:
 			to_player = to_player.normalized() if to_player.length() > 0.1 else Vector3.BACK
 			cam.global_position = spike.global_position + to_player * 1.8 + Vector3(0, 0.9, 0)
 			cam.look_at(spike.global_position + Vector3(0, 0.7, 0))
+			_clear_lens(ranch, cam, [spike])
 			cam.current = true
 			await Boot.frames(self, 12)
 			await Boot.shot(self, out, "spike_close")
@@ -161,6 +162,7 @@ func _run() -> void:
 		# Square side-on, the way the show draws a mark.
 		cam2.global_position = player.global_position + side * 3.4 + Vector3(0, 1.1, 0)
 		cam2.look_at(player.global_position + Vector3(0, 0.95, 0))
+		_clear_lens(ranch, cam2, [player])
 		cam2.current = true
 		await Boot.frames(self, 12)
 		await Boot.shot(self, out, "player_flank")
@@ -266,3 +268,16 @@ func _run() -> void:
 			await process_frame
 	print("P8_CHECKS_OK")
 	quit(0)
+
+
+## The game's own camera fades whoever stands at its lens (camera_rig.gd); a probe camera
+## does not, so anyone but `keep` within 2.6 m of it steps clear of the frame first (Fable
+## round 3: Spike's head round a probe lens, a follower dissolved at the edge).
+func _clear_lens(ranch: Node, cam: Camera3D, keep: Array) -> void:
+	for body: Node in ranch.find_children("*", "CharacterBody3D", true, false):
+		var b := body as Node3D
+		if b in keep or b.global_position.distance_to(cam.global_position) > 2.6:
+			continue
+		var away := b.global_position - cam.global_position
+		away.y = 0.0
+		b.global_position += (away.normalized() if away.length() > 0.01 else Vector3.RIGHT) * 4.0
