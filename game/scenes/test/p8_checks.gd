@@ -244,6 +244,15 @@ func _run() -> void:
 		if not _want(ev):
 			continue
 		var sky: Node = ranch.get_node(^"SkyEvents")
+		# The shows are for a clear day (sky_events.gd's _free_to_show); the clock has run on.
+		var w: Object = ranch.get("_world")
+		w.call("pin", WorldState.Phase.DAY, WorldState.Weather.CLEAR)
+		var rig: Node = ranch.get("sky_rig")
+		if rig != null and rig.has_method("apply_immediately"):
+			rig.call("apply_immediately", w)
+		var lamps: Node = ranch.get_node_or_null(^"NightLights")
+		if lamps != null:
+			lamps.call("set_level", 0.0)
 		if ev == "derpy":
 			sky.call("derpy_crash")
 		else:

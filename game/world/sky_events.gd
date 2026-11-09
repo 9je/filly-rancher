@@ -18,6 +18,11 @@ const RAINBOW_SHADER := preload("res://shaders/rainbow.gdshader")
 const BloomCeremonyScript := preload("res://world/bloom_ceremony.gd")
 const LayersScript := preload("res://world/collision_layers.gd")
 
+## The Rainboom's cutaway: a lens on the open slope south of the plaza (metres over the
+## ground at this spot), looking out over the southern hills.
+const RAINBOOM_EYE := Vector3(6.0, 2.6, -2.0)
+const RAINBOOM_LOOK := Vector3(-10.0, 6.0, 61.6)
+
 ## Seconds of outdoor play between shows, the first one later than the rest.
 const FIRST_GAP := Vector2(360.0, 540.0)
 const EVENT_GAP := Vector2(480.0, 780.0)
@@ -63,6 +68,11 @@ func _free_to_show() -> bool:
 		return false
 	var people: Node = r.get("people")
 	if people != null and people.has_method("is_talking") and bool(people.call("is_talking")):
+		return false
+	# Shows for a clear day: a Rainboom in the rain at night is neither (render check).
+	var w: Object = r.get("_world")
+	if w != null and (int(w.call("phase")) != WorldState.Phase.DAY
+			or int(w.call("weather")) != WorldState.Weather.CLEAR):
 		return false
 	return not Cinematic.shared(get_tree()).playing
 
@@ -119,15 +129,16 @@ func derpy_crash() -> void:
 	# HER FACE IS THE PAYOFF (Fable AAA round 1, #10: "the payoff shot is two grey lumps ...
 	# her face is never shown"). She is turned on landing to face the impact lens (render
 	# check: a holder's -Z is her tail, so both shots had her rump), and the close-up stands
-	# off her nose a little to the side, at her own eye height lying down.
+	# off her nose a little to the side, at her eye height sitting up.
 	var facing := cam_side - land
 	facing.y = 0.0
 	facing = facing.normalized()
 	var fside := facing.cross(Vector3.UP).normalized()
-	var face := land + facing * 0.75 + Vector3.UP * 0.45
-	var close := face + facing * 1.5 + fside * 0.55 + Vector3.UP * 0.2
+	# She comes to rest sitting up, dazed: her face is about a metre off the ground.
+	var face := land + facing * 0.45 + Vector3.UP * 1.0
+	var close := face + facing * 1.7 + fside * 0.5 + Vector3.UP * 0.05
 	if not _clear_line(close, face):
-		close = face + facing * 1.5 - fside * 0.55 + Vector3.UP * 0.2
+		close = face + facing * 1.7 - fside * 0.5 + Vector3.UP * 0.05
 	var shots := [
 		# A long lens on the way down, so she fills the frame instead of a smudge by a roof.
 		{"from": "here", "to": player.global_position - fwd * 1.0 + Vector3.UP * 2.6,
@@ -250,9 +261,17 @@ func _clear_line(from: Vector3, to: Vector3) -> bool:
 func sonic_rainboom() -> void:
 	_busy = true
 	var player: Node3D = _ranch().get("player")
-	var fwd := _open_sky(player)
+	# A CUTAWAY TO THE MEADOW, NOT A LENS AT HER SHOULDER (two render checks: from wherever she
+	# stood, a cottage wall or an awning filled the frame; their trims have no collision, so no
+	# sightline test can see them). The lens cuts to the open slope south of the plaza, looking
+	# out over the hills, and the boom happens in that sky.
+	var eye := RAINBOOM_EYE
+	eye.y = _ground(eye.x, eye.z) + RAINBOOM_EYE.y
+	var fwd := RAINBOOM_LOOK - RAINBOOM_EYE
+	fwd.y = 0.0
+	fwd = fwd.normalized()
 	var side := fwd.cross(Vector3.UP).normalized()
-	var mid := player.global_position + fwd * 40.0 + Vector3.UP * 22.0
+	var mid := eye + fwd * 42.0 + Vector3.UP * 18.0
 	var a := mid - side * 55.0 + Vector3.UP * 5.0
 	var b := mid + side * 55.0 - Vector3.UP * 3.0
 	var dash := _body(DASH)
@@ -264,21 +283,18 @@ func sonic_rainboom() -> void:
 	dash.look_at(b, Vector3.UP)
 	_play(dash, &"gallop")
 	var trail := _trail()
-	# Off her shoulder and over her head: straight behind at head height, the lens sat in her
-	# mane (render check: the near dither greyed the whole first shot).
-	var eye := player.global_position + Vector3.UP * 2.4 - fwd * 2.2 + side * 1.4
 	var streak := 2.6
 	# A LONG LENS ON HER, THEN THE BOOM (Fable AAA round 1, #10: "Rainbow Dash is a 30 px
 	# sprite ... no bloom, flash, shake"). The streak is followed on a telephoto so she is the
 	# size of a hand in the frame; the boom whites the screen out and kicks the camera.
 	var shots := [
-		{"from": "here", "to": eye, "look_node": dash, "look_height": 0.0, "time": streak * 0.5,
-			"fov": 30.0, "fov_to": 20.0,
+		{"from": eye, "to": eye + side * 0.6, "look_node": dash, "look_height": 0.0,
+			"time": streak * 0.5, "fov": 30.0, "fov_to": 20.0,
 			"call": func() -> void: _streak(dash, trail, a, b, streak)},
-		{"from": eye, "to": eye - fwd * 2.0 + Vector3.UP * 0.5, "look": mid, "time": 1.8,
+		{"from": eye, "to": eye + Vector3.UP * 0.5, "look": mid, "time": 1.8,
 			"fov": 52.0, "fov_to": 60.0, "flash": 0.55, "shake": 0.35,
 			"call": func() -> void: _ring(mid, fwd)},
-		{"from": "here", "to": eye - fwd * 3.0 + Vector3.UP * 1.0, "look": mid,
+		{"from": "here", "to": eye + Vector3.UP * 1.6 - side * 1.5, "look": mid,
 			"look_to": b, "time": 2.4, "caption": "A Sonic Rainboom!"},
 	]
 	await Cinematic.shared(get_tree()).play(shots, {"freeze": [player], "host": _ranch()})
@@ -291,27 +307,6 @@ func sonic_rainboom() -> void:
 		0.9, 0.0, 6.0)
 	fade.tween_callback(trail.queue_free)
 	_busy = false
-
-
-## The way to look for the boom: the player's own facing if the sky is open that way, else
-## the first turn of her that is (Fable round 2 renders: every shot was a house wall). Open
-## means the lens, its pull-back, and the streak's ends and middle all see each other.
-func _open_sky(player: Node3D) -> Vector3:
-	var base := -player.global_basis.z
-	base.y = 0.0
-	base = base.normalized() if base.length() > 0.1 else Vector3.FORWARD
-	var head := player.global_position + Vector3.UP * 1.6
-	for turn: float in [0.0, 40.0, -40.0, 80.0, -80.0, 120.0, -120.0, 160.0, -160.0]:
-		var fwd := base.rotated(Vector3.UP, deg_to_rad(turn))
-		var side := fwd.cross(Vector3.UP).normalized()
-		var eye := player.global_position + Vector3.UP * 2.4 - fwd * 2.2 + side * 1.4
-		var back := eye - fwd * 3.0 + Vector3.UP * 1.0
-		var mid := player.global_position + fwd * 40.0 + Vector3.UP * 22.0
-		if _clear_line(head, eye) and _clear_line(eye, back) and _clear_line(eye, mid) \
-				and _clear_line(back, mid) and _clear_line(eye, mid - side * 40.0) \
-				and _clear_line(eye, mid + side * 40.0):
-			return fwd
-	return base
 
 
 func _trail() -> MeshInstance3D:
