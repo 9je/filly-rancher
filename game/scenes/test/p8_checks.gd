@@ -97,6 +97,10 @@ func _run() -> void:
 				pony.global_position.y - float(ranch.get("terrain").call("height_at",
 				pony.global_position.x, pony.global_position.z))])
 			await Boot.shot(self, out, "beam_low")
+			for i in 90:
+				await physics_frame
+			# Item 71: the caught card, if the hold made a catch.
+			await Boot.shot(self, out, "catch_card")
 			Input.action_release(beam.get("BEAM_ACTION"))
 			rig.set("_look_pitch", -10.0)
 			await Boot.frames(self, 20)

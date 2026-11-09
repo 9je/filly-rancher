@@ -428,10 +428,12 @@ func _frame(model: Node3D) -> void:
 		box = AABB(Vector3(-0.5, 0.0, -0.8), Vector3(1.0, 2.0, 1.6))
 	var height := box.size.y
 	# Her head is the top third of her, at the front.
-	var head := Vector3(box.get_center().x, box.position.y + height * 0.70,
-		box.position.z + box.size.z * 0.12)
-	var dist := height * 1.4
-	var from := head + Vector3(dist * 0.55, height * 0.08, -dist * 0.84)
+	# Head and withers, centred, with room round her ears (P8 item 71: "off-centre and
+	# cropped"): aimed a little lower and from further back than it was.
+	var head := Vector3(box.get_center().x, box.position.y + height * 0.64,
+		box.position.z + box.size.z * 0.16)
+	var dist := height * 1.7
+	var from := head + Vector3(dist * 0.5, height * 0.06, -dist * 0.86)
 	_camera.look_at_from_position(from, head, Vector3.UP)
 	_camera.set_meta(&"head", head)
 
