@@ -228,6 +228,17 @@ func _sighting() -> bool:
 	# THE TRAIL TAKES YOU TO HER, not a compass word (PT8; the owner could not tell which way
 	# was north-east and never found Octavia). Ranch.guide picks her up as &"sighting".
 	ranch.call("_toast", "Tumble: \"Look, look! It's %s! Follow the sparkles, quick!\"" % pick.display_name)
+	# A RARE ONE IS SHOWN, NOT ONLY NAMED (P8 idea F11): three seconds of where she is, from
+	# over the player's shoulder, then the trail.
+	if pick.rarity >= PonyData.Rarity.RARE and bool(ranch.get("_interactive")):
+		var player: Node3D = ranch.get("player")
+		if player != null:
+			var eye := player.global_position + Vector3.UP * 3.0 + (player.global_position - at).normalized() * 3.0
+			Cinematic.shared(ranch.get_tree()).play([
+				{"from": "here", "to": eye, "look_node": sighting, "look_height": 1.0, "time": 1.2},
+				{"from": eye, "to": eye.lerp(at, 0.35) + Vector3.UP, "look_node": sighting,
+					"look_height": 1.0, "time": 2.2, "caption": "Tumble: \"Look! It's %s!\"" % pick.display_name},
+			], {"freeze": [player], "host": ranch})
 	ranch.call("_novelty", "event", "sighting_" + String(pick.id), "Tumble spots %s out in the grass" % pick.display_name)
 	return true
 
