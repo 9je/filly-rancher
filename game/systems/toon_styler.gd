@@ -165,7 +165,7 @@ static func baked_ao(mi: Node) -> Texture2D:
 
 
 static func _wear_ao(m: ShaderMaterial, ao: Texture2D) -> void:
-	for each: Variant in [m, m.get_meta(BARE_META, null)]:
+	for each: Variant in [m, m.get_meta(BARE_META) if m.has_meta(BARE_META) else null]:
 		if each is ShaderMaterial:
 			(each as ShaderMaterial).set_shader_parameter(&"use_ao", true)
 			(each as ShaderMaterial).set_shader_parameter(&"ao_texture", ao)

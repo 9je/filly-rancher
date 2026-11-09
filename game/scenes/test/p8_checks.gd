@@ -61,7 +61,7 @@ func _run() -> void:
 	paused = false
 	await Boot.frames(self, 30)
 	var player: Node3D = ranch.get("player")
-	var hud: Node = ranch.get("hud")
+	var hud: Node = ranch.get_node_or_null(^"HUD")
 
 	if "--talk" in OS.get_cmdline_user_args():
 		# Past the creator, the world as a player sees it after the welcome dialogue.
@@ -110,7 +110,7 @@ func _run() -> void:
 
 	if _want("card"):
 		# Item 71: the caught card as a real catch shows it, read off a wild named pony.
-		var hud2: Node = ranch.get("hud")
+		var hud2: Node = ranch.get_node_or_null(^"HUD")
 		var card: Node = hud2.get("_catch_card") if hud2 != null else null
 		for p: Node3D in ranch.get("spawner").call("get_spawned"):
 			var d: PonyData = p.call("get_data")
