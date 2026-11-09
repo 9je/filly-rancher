@@ -57,6 +57,19 @@ const SUBLINE_SCALE := 0.55
 const FONT_SIZE := 96
 
 var _size := Vector2.ZERO
+## The look, set before build(): the Palace's gold-on-plum by default. The town's Requests
+## board wears cork in a wood frame with pinned notes instead (Fable AAA round 2: "the
+## Requests board is a black box with unreadable text").
+var board_color := BOARD_COLOR
+var trim_color := TRIM_COLOR
+var text_color := TEXT_COLOR
+var outline_color := Color(0.0, 0.0, 0.0, 1.0)
+## Paper notes pinned below the headline (0 for none).
+var notes := 0
+const NOTE_PAPER := Color(1.0, 0.97, 0.88)
+const NOTE_PINS: Array[Color] = [Color(0.92, 0.3, 0.4), Color(0.35, 0.6, 0.95),
+	Color(0.98, 0.78, 0.25), Color(0.55, 0.8, 0.4)]
+
 var _facing := Vector3(0.0, 0.0, 1.0)
 ## The same direction expressed in THIS node's own space, which is the space every child
 ## position and child yaw below is written in. See build() for why the two are not the same
@@ -103,7 +116,7 @@ func build(board_width: float, board_height: float, facing: Vector3,
 	# would drag the Palace's measured AABB down past its seat.
 	var anchor: float = board_height * 0.5 + TRIM
 	_slab("Trim", Vector3(board_width + TRIM * 2.0, board_height + TRIM * 2.0, THICKNESS),
-		Vector3(0.0, anchor, 0.0), TRIM_COLOR)
+		Vector3(0.0, anchor, 0.0), trim_color)
 
 	# THE BOARD IS THINNER THAN THE TRIM (0.6x its depth), so a bare STANDOFF added to the
 	# CENTRE offset under-delivers: half of the trim's own depth minus half of the board's own
@@ -113,16 +126,30 @@ func build(board_width: float, board_height: float, facing: Vector3,
 	var board_depth: float = THICKNESS * 0.6
 	var board_offset: float = THICKNESS * 0.5 - board_depth * 0.5 + STANDOFF
 	_slab("Board", Vector3(board_width, board_height, board_depth),
-		Vector3(0.0, anchor, 0.0) + _local_facing * board_offset, BOARD_COLOR)
+		Vector3(0.0, anchor, 0.0) + _local_facing * board_offset, board_color)
 
 	# THE LETTERS STAND ANOTHER STANDOFF PAST THE BOARD'S OWN FRONT FACE, not past its centre,
 	# for the same reason the board's own offset above is not a bare STANDOFF.
 	var headline_height: float = board_height * HEADLINE_FRACTION
 	var label_offset: float = THICKNESS * 0.5 + STANDOFF * 2.0
+	var head_y := anchor + board_height * (0.28 if notes > 0 else 0.18)
 	_label("Headline", headline, headline_height,
-		Vector3(0.0, anchor + board_height * 0.18, 0.0) + _local_facing * label_offset)
-	_label("Subline", subline, headline_height * SUBLINE_SCALE,
-		Vector3(0.0, anchor - board_height * 0.20, 0.0) + _local_facing * label_offset)
+		Vector3(0.0, head_y, 0.0) + _local_facing * label_offset)
+	if subline != "":
+		_label("Subline", subline, headline_height * SUBLINE_SCALE,
+			Vector3(0.0, anchor - board_height * 0.20, 0.0) + _local_facing * label_offset)
+	# Pinned notes across the lower half, each a little askew, with a coloured pin.
+	var side := Vector3(_local_facing.z, 0.0, -_local_facing.x)
+	for i in notes:
+		var t := (float(i) + 0.5) / float(notes) - 0.5
+		var w := board_width * 0.8 / float(notes) * 0.78
+		var at := Vector3(0.0, anchor - board_height * 0.14 + (0.03 if i % 2 == 0 else -0.03), 0.0) \
+			+ side * (t * board_width * 0.8) + _local_facing * (board_offset + board_depth * 0.5 + 0.006)
+		_slab("Note%d" % i, Vector3(w, board_height * 0.42, 0.008), at, NOTE_PAPER)
+		(get_child(get_child_count() - 1) as Node3D).rotate_object_local(Vector3.BACK,
+			deg_to_rad([-6.0, 4.0, -3.0, 7.0][i % 4]))
+		_slab("Pin%d" % i, Vector3(0.05, 0.05, 0.03),
+			at + Vector3(0.0, board_height * 0.17, 0.0) + _local_facing * 0.012, NOTE_PINS[i % NOTE_PINS.size()])
 
 
 func _slab(slab_name: String, size: Vector3, at: Vector3, colour: Color) -> void:
@@ -155,7 +182,8 @@ func _label(label_name: String, text: String, cap_height: float, at: Vector3) ->
 	label.width = _size.x / pixel
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.modulate = TEXT_COLOR
+	label.modulate = text_color
+	label.outline_modulate = outline_color
 	label.outline_size = 10
 	label.billboard = BaseMaterial3D.BILLBOARD_DISABLED
 	label.double_sided = false

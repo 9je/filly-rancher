@@ -5710,8 +5710,13 @@ func _stand_request_board() -> void:
 	panel.position = Vector3(0.0, REQUEST_BOARD_BASE, 0.0) \
 		+ board.to_local(board.global_position
 			+ out_dir * (board.depth * 0.5 + REQUEST_BOARD_STANDOFF))
+	panel.board_color = Color(0.78, 0.58, 0.38)
+	panel.trim_color = Color(0.50, 0.32, 0.19)
+	panel.text_color = Color(0.36, 0.16, 0.40)
+	panel.outline_color = Color(1.0, 0.96, 0.86)
+	panel.notes = 4
 	panel.build(board.width * REQUEST_BOARD_WIDTH_FRACTION, REQUEST_BOARD_HEIGHT, out_dir,
-		REQUEST_BOARD_HEADLINE, REQUEST_BOARD_SUBLINE)
+		REQUEST_BOARD_HEADLINE, "")
 
 
 ## WAYFINDING (owner playtest 2026-10-25: "i cant find the market and the important
