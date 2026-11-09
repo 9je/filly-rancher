@@ -47,6 +47,11 @@ var _frozen: Array[Node] = []
 var _hidden_layers: Array[CanvasLayer] = []
 
 
+## Whether a shot is running now, without making the shared Cinematic to ask it.
+static func is_playing() -> bool:
+	return _shared != null and is_instance_valid(_shared) and _shared.playing
+
+
 static func shared(tree: SceneTree) -> Cinematic:
 	if _shared == null or not is_instance_valid(_shared):
 		_shared = Cinematic.new()

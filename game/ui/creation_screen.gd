@@ -60,6 +60,7 @@ const MARKING_COLOUR_LABEL := "Marking colour"
 const EYE_SHAPE_LABEL := "Eye shape"
 const WEAR_LABEL := "Wear"
 const STYLE_ICONS := "res://assets/ui/style_icons/"
+const StyleIconTintScript := preload("res://ui/style_icon_tint.gd")
 const MARKING_WHITE := Color(0.98, 0.97, 0.94)
 const DonorTableScript := preload("res://systems/donor_table.gd")
 const MANE_STYLE_LABEL := "Mane style"
@@ -473,6 +474,7 @@ func _build_style_grids() -> void:
 			icons.append(load(STYLE_ICONS + file + ".png") as Texture2D)
 		grid.set_swatches(sw, [] as Array[String])
 		grid.set_icons(icons)
+		_style_sources.append([grid, icons])
 		var setter: Callable = row[3]
 		var shift: int = int(row[4])
 		grid.picked.connect(func(i: int) -> void: setter.call(i + shift))
@@ -481,6 +483,32 @@ func _build_style_grids() -> void:
 		cols.append_array(_palette.coats)
 		_marking_colour_grid.set_swatches(cols, [] as Array[String])
 		_marking_colour_grid.picked.connect(func(i: int) -> void: set_marking_colour(i - 1))
+
+
+## The Finishing touches cards as baked: [grid, Array[Texture2D]] per row.
+var _style_sources: Array = []
+## The coat and mane the cards were last tinted for.
+var _style_tint := ""
+
+
+## HER OWN COLOURS ON THE FINISHING TOUCHES CARDS (Fable AAA round 2: the marking, eye and
+## wear cards showed somebody else's brown pony). The bake's key colours are swapped for her
+## coat and mane (ui/style_icon_tint.gd) whenever the step comes up with a look it has not
+## been tinted for.
+func _tint_style_cards() -> void:
+	if _look == null or _palette == null:
+		return
+	var coat: Color = _palette.coat_at(_look.coat)
+	var mane: Color = _palette.mane_at(_look.mane)
+	var key := coat.to_html() + mane.to_html()
+	if key == _style_tint:
+		return
+	_style_tint = key
+	for pair: Array in _style_sources:
+		var tinted: Array[Texture2D] = []
+		for tex: Texture2D in pair[1]:
+			tinted.append(StyleIconTintScript.tinted(tex, coat, mane))
+		(pair[0] as SwatchGrid).set_icons(tinted)
 
 
 ## THE CARDS ARE TINTED BY THE MANE COLOUR SHE IS ON, so they read as manes rather than as
@@ -708,6 +736,8 @@ func set_step(value: int) -> void:
 				node.visible = step == _step
 	_show_streak()
 	_style_steps()
+	if _step == Step.STYLE:
+		_tint_style_cards()
 	MenuStyleScript.tick_page()
 	# THE CURSOR MOVES WITH THE STEP. The two steps do not share a region list (MARK has no
 	# name field or colour grids; LOOK has no ink/stamp/tool/action rows), so a cursor left
@@ -749,6 +779,13 @@ func _style_steps() -> void:
 		b.add_theme_font_size_override(&"font_size", MenuStyle.font_px(19))
 		b.add_theme_constant_override(&"outline_size", 0)
 		b.custom_minimum_size.y = 44.0
+
+
+## Which step a step-row button opens, or -1 for any other button.
+func _step_of(b: Button) -> int:
+	var names := {&"StepLook": Step.LOOK, &"StepHair": Step.HAIR, &"StepMark": Step.MARK,
+		&"StepStyle": Step.STYLE}
+	return int(names.get(b.name, -1))
 
 
 func _wire_steps() -> void:
@@ -992,9 +1029,14 @@ func _apply_kb_highlight() -> void:
 		return
 	var buttons := _region_buttons(region)
 	if _kb_item >= 0 and _kb_item < buttons.size():
-		buttons[_kb_item].add_theme_stylebox_override(&"normal",
-			MenuStyleScript.button_box(&"hover"))
-		_kb_button = buttons[_kb_item]
+		# The cursor's mark is the button's own pill with a gold edge, never the kit's textured
+		# pill: squeezed onto a 44 px step tab, that one folded into a stray gold half-ring
+		# under "Your pony" (Fable AAA round 2).
+		var b := buttons[_kb_item]
+		var fill := MenuStyleScript.PILL_PLUM if _step_of(b) == _step else MenuStyleScript.PILL_CREAM
+		b.add_theme_stylebox_override(&"normal",
+			MenuStyleScript.pill_box(fill, MenuStyleScript.COLOR_TAB_ON.darkened(0.15)))
+		_kb_button = b
 
 
 ## THE VEIL, RAISED BEFORE THE WORLD HAS FINISHED BUILDING. Acceptance item 1: "New save: no
@@ -1099,6 +1141,8 @@ func surprise(seed_value: int = -1) -> void:
 	_retint_mane_style_grid()
 	_restyle()
 	_show_streak()
+	if _step == Step.STYLE:
+		_tint_style_cards()
 
 
 ## A GALLERY OF REAL MARKS TO START FROM (PT11; playtest 2026-11-05: "cutie mark creation has to

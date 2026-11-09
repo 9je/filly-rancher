@@ -8,6 +8,7 @@ const PonyPaintScript := preload("res://systems/pony_paint.gd")
 const PonyLookScript := preload("res://systems/pony_look.gd")
 const AccessoriesScript := preload("res://systems/accessories.gd")
 const StockPaletteScript := preload("res://systems/stock_palette.gd")
+const StyleIconTintScript := preload("res://ui/style_icon_tint.gd")
 const OUT := "res://assets/ui/style_icons"
 const SIZE := 128
 
@@ -56,8 +57,11 @@ func _run() -> void:
 		var body: Node3D = PonyVisualsScript.build(reg.by_id(StockPaletteScript.IDS[0]), "")
 		root.add_child(body)
 		var look := PonyLookScript.new()
-		look.coat = Color(0.55, 0.36, 0.24)
-		look.mane = Color(0.15, 0.12, 0.14)
+		# The two key colours ui/style_icon_tint.gd swaps for her own in the creator.
+		look.coat = StyleIconTintScript.KEY_COAT
+		look.mane = StyleIconTintScript.KEY_MANE
+		look.mane2 = StyleIconTintScript.KEY_MANE
+		look.tail = StyleIconTintScript.KEY_MANE
 		look.race = &"earth"
 		look.marking = int(c[1])
 		look.eye_shape = int(c[2])

@@ -2625,6 +2625,10 @@ func _no_menu_but(menu: CanvasLayer, over_talk := false) -> bool:
 		return false
 	if epilogue != null and is_instance_valid(epilogue):
 		return false
+	# NO MENU OVER A SHOT (Fable AAA round 2: a Market panel stood inside the letterbox with
+	# "Welcome to the valley" written across it): a cinematic is a menu for this purpose.
+	if Cinematic.is_playing():
+		return false
 	return true
 
 
