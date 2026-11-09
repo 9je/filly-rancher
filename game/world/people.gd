@@ -540,35 +540,16 @@ func shows_news(id: StringName) -> bool:
 	return m != null and is_instance_valid(m) and m.visible
 
 
-## The gold speech bubble with a "!" in it, drawn once.
+## The gold speech bubble with a "!" in it, from the icon set.
 static func news_marker() -> Node3D:
 	if _news_tex == null:
-		var n := 96
-		var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
-		img.fill(Color(0, 0, 0, 0))
-		var gold := Color(1.0, 0.8, 0.25)
-		var rim := Color(0.45, 0.25, 0.55)
-		var c := Vector2(48, 42)
-		for y in n:
-			for x in n:
-				var p := Vector2(x + 0.5, y + 0.5)
-				var d := p.distance_to(c)
-				# The tail: a triangle under the bubble, pointing down at her.
-				var tail := y > 70 and y < 92 and absf(x - 48.0) < (92.0 - y) * 0.45
-				if d < 38.0 or tail:
-					img.set_pixel(x, y, gold)
-				if (d >= 38.0 and d < 42.0 and y < 74) or (tail and absf(x - 48.0) >= (92.0 - y) * 0.45 - 2.5):
-					img.set_pixel(x, y, rim)
-				# The "!": a bar and a dot.
-				if (absf(x - 48.0) < 6.0 and y > 16 and y < 52) or p.distance_to(Vector2(48, 62)) < 6.0:
-					img.set_pixel(x, y, rim)
-		img.generate_mipmaps()
-		_news_tex = ImageTexture.create_from_image(img)
+		# The icon set's speech bubble (P8 S5; item 73: the old drawn "!" was a giant).
+		_news_tex = IconSet.texture("news", 128, false)
 	var root := Node3D.new()
 	root.name = "NewsMarker"
 	var q := MeshInstance3D.new()
 	var quad := QuadMesh.new()
-	quad.size = Vector2(0.95, 0.95)
+	quad.size = Vector2(0.72, 0.72)
 	q.mesh = quad
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED

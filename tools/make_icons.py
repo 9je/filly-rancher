@@ -292,6 +292,15 @@ def _hint(i):
     i.ink("M27,44 H37", "stone", 2)
 
 
+@icon("news")
+def _news(i):
+    # A townspony has something new to say: a gold speech bubble with an ink "!".
+    i.fill(path("M32,8 C46,8 56,17 56,28 C56,39 46,47 34,47 L26,57 L26,46 C15,44 8,37 8,28 "
+                "C8,17 18,8 32,8 Z", (8, 8, 56, 57)), "gold")
+    i.fill(rrect(28.5, 15, 7, 19, 3.5), "ink", hl=False, stroke=0)
+    i.fill(circle(32, 40, 3.8), "ink", hl=False, stroke=0)
+
+
 # ---- pony kinds ---------------------------------------------------------------------------
 
 @icon("unicorn")
