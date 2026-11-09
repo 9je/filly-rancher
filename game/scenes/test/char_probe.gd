@@ -90,6 +90,32 @@ func _run() -> void:
 		# Three-quarter on to the lens (a holder's -Z is her tail).
 		holder.rotation.y = deg_to_rad(200.0)
 		bodies.append(holder)
+	if "--player" in OS.get_cmdline_user_args():
+		# The player as she is built in the ranch (her Scoop and all), from behind and to the
+		# side, the way the game's camera sees her: chars_player.png.
+		var player: Node3D = (load("res://actors/player/player.tscn") as PackedScene).instantiate()
+		var floor_body := StaticBody3D.new()
+		var floor_shape := CollisionShape3D.new()
+		floor_shape.shape = WorldBoundaryShape3D.new()
+		floor_body.add_child(floor_shape)
+		world.add_child(floor_body)
+		world.add_child(player)
+		player.global_position = Vector3(0, 0, 3.0)
+		for k in 30:
+			await process_frame
+		# Held still where she stands: the probe is about how she looks, not how she moves.
+		player.process_mode = Node.PROCESS_MODE_DISABLED
+		var pc := Camera3D.new()
+		world.add_child(pc)
+		pc.fov = 60.0
+		pc.global_position = player.global_position + Vector3(1.2, 1.9, 3.4)
+		pc.look_at(player.global_position + Vector3(0, 1.1, 0))
+		pc.current = true
+		for k in 10:
+			await process_frame
+		await _shot("chars_player")
+		pc.current = false
+		player.queue_free()
 	var cam := Camera3D.new()
 	world.add_child(cam)
 	cam.fov = 40.0

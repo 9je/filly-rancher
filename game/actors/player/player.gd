@@ -986,9 +986,12 @@ func _build_visuals(mane_style: int = 0, donor: StringName = &"") -> void:
 ## on a BoneAttachment to the chest so it moves with her stride; the beam leaves from its
 ## nozzle. Every kind of pony carries one (GDD 4.1), so the horn is no longer the source.
 const SCOOP_MODEL := "res://assets/models/scoop.glb"
-const SCOOP_AT := Vector3(-0.47, 1.12, -0.2)
-const SCOOP_NOZZLE := Vector3(-0.47, 1.16, -0.66)
-const SCOOP_SCALE := 1.35
+## Back on her barrel and below the neck, like a saddle lantern (Fable AAA round 3, #5: at
+## the shoulder, from the camera behind her, it sat beside her muzzle and "reads as a ball in
+## the mouth").
+const SCOOP_AT := Vector3(-0.42, 0.98, 0.08)
+const SCOOP_NOZZLE := Vector3(-0.42, 1.01, -0.30)
+const SCOOP_SCALE := 1.1
 
 
 func _mount_scoop(pony: Node3D) -> void:
