@@ -751,3 +751,6 @@ the cinematics. Calls made:
 
 ## 2026-11-09: Fewer full review rounds (owner: "thats a lot of time being spent on reviews")
 - A full showcase is ~2 h of software rendering; the Fable read is ~6 min. Fixes are checked on the one-minute probes (char_probe --player/--plot/--rim/--phase, sun_probe, creator/menu/hud/casino fast shots) and a full showcase plus fresh Fable round happens only after a large batch, at most one more before the final verdict. Mid-course reads use only the changed areas' probe images.
+
+## 2026-11-09: Renders on the GPU (owner: "why does it take 2 hours to screenshot")
+- Every probe and showcase ran under xvfb, which leaves Godot only llvmpipe (software Vulkan on the CPU); the machine has a Radeon RX 9070 XT. A user-space weston 13 (unpacked from the distro's .debs, no root) runs headless with the GL renderer on the Radeon, and Godot renders into it through its Wayland driver: the character probe took 14 s, with the same image. Nothing shows on the owner's desktop. Showcases now run this way.
