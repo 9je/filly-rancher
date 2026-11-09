@@ -3,20 +3,20 @@
 Sprint: P8, plan in docs/sprint-plan-2026-11-08.md. Branch v1-overhaul.
 Status: owner said go 2026-11-08: ONE NON-STOP SWEEP S0 to S10, no owner gates; Fable stands in at each check.
 
-Current batch (2026-11-08 evening): S0-S1 done; S4/S5/S8/S9/S10 code in, renders pending.
-Agent lane (worktree, Opus): S2 core loop + S3 catching, not back yet.
-Uncommitted on purpose until renders are looked at: project.godot shadow settings, toon.gdshader
-(stepped shadow, dither include), outline/pony_eye shaders, dither.gdshaderinc, ranch.tscn
-(env, sun, NightLights, SkyEvents nodes), sky_rig.gd (moon), night_lights.gd, sky_events.gd,
-camera_rig.gd (dither), test_sky_rig.gd, look_world.gd, beam_low_shot.gd.
+Current batch (2026-11-08, ~20:15): most of S1-S10 in; ledger docs/playtest-2026-11-08-ledger.md
+has the statuses. S2/S3 (agent) merged at ca3b40c. S7 town agent running in a worktree.
+Uncommitted: game/systems/cutie_mark.gd (mark on the upper haunch) waiting on the flank render.
+
+Running in the background: stress_pen (then checks3: flank, hall, derpy), a flank/market/depot
+check, the mane card re-bake (game/assets/ui/style_icons/mane_*.png, commit them after a look).
 
 Next steps:
-1. Look at $SCRATCH/look_after (day/night) and $SCRATCH/checks (creator, beam, toast, spike,
-   flank, race, derpy, rainboom); fix, then commit the lighting batch.
-2. Capture key art (key_art_shot.gd) into game/assets/ui/loading_ranch.png.
-3. Merge the agent's S2/S3 branch (review diff, rerun its tests, parse sweep).
-4. Then: Depot/Market on the kit with portraits (S5), town relayout (S7), hair shading (S6).
-5. tools/parse_sweep.sh before each commit batch; commit only on green tests.
+1. Look at $SCRATCH/stress/sheet.png and the STRESS line (items 28, 29, 30, 32); fix what shows.
+2. Look at the flank render (item 40 mark; item 34 hair; item 33 dither) and commit cutie_mark.gd.
+3. Look at the hall (item 56 crowd), Market and Depot renders.
+4. When the S7 agent reports: review, merge, parse sweep, focused tests; then recapture the key
+   art (key_art_shot.gd -> game/assets/ui/loading_ranch.png) on the new town.
+5. Full suite on a snapshot after the S7 merge; fix failures; final ledger pass; report.
 
 Rules that bite: no em dashes; tick only with a render of the owner's situation; suite in the
 background on a snapshot, never blocking a commit; no bot playthroughs; at most 2 agents
