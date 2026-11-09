@@ -161,6 +161,21 @@ func _run() -> void:
 			await Boot.frames(self, 40)
 			await Boot.shot(self, out, "race_guide")
 			rm.call("close")
+	for menu_name: String in ["market_menu", "depot_menu"]:
+		if not _want(menu_name):
+			continue
+		var m: Node = ranch.get(menu_name)
+		if m != null and bool(m.call("open")):
+			await Boot.frames(self, 30)
+			await Boot.shot(self, out, menu_name)
+			if m.has_method("set_tab"):
+				m.call("set_tab", 1)
+				await Boot.frames(self, 20)
+				await Boot.shot(self, out, menu_name + "_tab2")
+			m.call("close")
+			paused = false
+			await Boot.frames(self, 10)
+
 	if _want("hall"):
 		# The casino hall's crowd (item 56): from the door, looking in.
 		ranch.call("enter_palace", true)

@@ -37,6 +37,8 @@ const TileEntranceScript := preload("res://ui/tile_entrance.gd")
 ## title, the tabs, the footer and the Close button have theirs.
 const SCROLL_MAX := 640.0
 const SCROLL_MAX_BUY := 400.0
+## The detail strip's one height (item 68).
+const DETAIL_HEIGHT := 170.0
 const BUY_COLUMNS := 3
 const BUY_TILE := Vector2(360.0, 128.0)
 const SELL_TILE := Vector2(1104.0, 84.0)
@@ -126,7 +128,9 @@ func _ready() -> void:
 	MenuStyleScript.style_label(_title, MenuStyleScript.TITLE_SIZE, MenuStyleScript.COLOR_TITLE)
 	MenuStyleScript.style_label(_wallet, MenuStyleScript.ROW_SIZE, MenuStyleScript.COLOR_DIM)
 	MenuStyleScript.style_label(_gems, MenuStyleScript.ROW_SIZE, MenuStyleScript.COLOR_DIM)
-	_title.text = "MARKET"
+	# WHAT THE PLACE IS, IN ITS NAME (P8, playtest 2026-11-08 item 68: "not clear the Market is
+	# for buying and selling"; Pierre's shop is the reference): whose stall, and both trades.
+	_title.text = "Bramble's Market: gems bought, food and gear sold"
 	var dim := get_node_or_null(^"Dim") as Control
 	if dim != null:
 		dim.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -180,6 +184,10 @@ func _build_detail() -> void:
 	_detail.add_theme_stylebox_override(&"panel", box)
 	column.add_child(_detail)
 	column.move_child(_detail, _scroll.get_index() + 1)
+	# ONE SIZE, WHATEVER IS PICKED (item 68: "the window resizes as the pony list scrolls"):
+	# the strip keeps a fixed height and clips, so the panel never breathes under the cursor.
+	_detail.custom_minimum_size = Vector2(0, DETAIL_HEIGHT)
+	_detail.clip_contents = true
 	var line := HBoxContainer.new()
 	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	line.add_theme_constant_override(&"separation", 18)
@@ -731,7 +739,9 @@ func _fit_scroll() -> void:
 		return
 	# The BUY tab gives the detail strip its room, so the whole panel fits a 720 p screen.
 	var cap := SCROLL_MAX if _tab == Tab.SELL else SCROLL_MAX_BUY
-	_scroll.custom_minimum_size.y = minf(_rows.get_combined_minimum_size().y, cap)
+	# Always the cap, never "as tall as its tiles": a panel that grew and shrank with its list
+	# read as the window resizing (item 68).
+	_scroll.custom_minimum_size.y = cap
 	# The first row is the top (PS10 gap G17): ensure_control_visible on a grid whose layout
 	# had not settled scrolled the Buy tab 256 px past its pick, Hay out of view.
 	if _selected == 0:
