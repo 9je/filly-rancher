@@ -206,14 +206,14 @@ func sonic_rainboom() -> void:
 	fwd.y = 0.0
 	fwd = fwd.normalized() if fwd.length() > 0.1 else Vector3.FORWARD
 	var side := fwd.cross(Vector3.UP).normalized()
-	var mid := player.global_position + fwd * 60.0 + Vector3.UP * 34.0
-	var a := mid - side * 70.0 + Vector3.UP * 6.0
-	var b := mid + side * 70.0 - Vector3.UP * 4.0
+	var mid := player.global_position + fwd * 40.0 + Vector3.UP * 22.0
+	var a := mid - side * 55.0 + Vector3.UP * 5.0
+	var b := mid + side * 55.0 - Vector3.UP * 3.0
 	var dash := _body(DASH)
 	if dash == null:
 		_busy = false
 		return
-	dash.scale = Vector3.ONE * 1.4
+	dash.scale = Vector3.ONE * 2.2
 	dash.global_position = a
 	dash.look_at(b, Vector3.UP)
 	_play(dash, &"gallop")
@@ -235,7 +235,7 @@ func sonic_rainboom() -> void:
 	fade.tween_method(func(v: float) -> void:
 		if is_instance_valid(trail):
 			(trail.material_override as ShaderMaterial).set_shader_parameter(&"alpha", v),
-		0.72, 0.0, 6.0)
+		0.9, 0.0, 6.0)
 	fade.tween_callback(trail.queue_free)
 	_busy = false
 
@@ -243,11 +243,12 @@ func sonic_rainboom() -> void:
 func _trail() -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
 	var quad := QuadMesh.new()
-	quad.size = Vector2(1.0, 3.2)
+	quad.size = Vector2(1.0, 5.5)
 	mi.mesh = quad
 	var mat := ShaderMaterial.new()
 	mat.shader = RAINBOW_SHADER
-	mat.set_shader_parameter(&"alpha", 0.72)
+	mat.set_shader_parameter(&"alpha", 0.9)
+	mat.set_shader_parameter(&"brightness", 1.3)
 	mi.material_override = mat
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mi)
@@ -266,7 +267,7 @@ func _streak(dash: Node3D, trail: MeshInstance3D, a: Vector3, b: Vector3, secs: 
 		var length := a.distance_to(p)
 		if length > 0.5 and is_instance_valid(trail):
 			trail.visible = true
-			(trail.mesh as QuadMesh).size = Vector2(length, 3.2)
+			(trail.mesh as QuadMesh).size = Vector2(length, 5.5)
 			var midp := (a + p) * 0.5
 			var along := (p - a).normalized()
 			var cam := get_viewport().get_camera_3d()
@@ -279,14 +280,14 @@ func _streak(dash: Node3D, trail: MeshInstance3D, a: Vector3, b: Vector3, secs: 
 func _ring(at: Vector3, fwd: Vector3) -> void:
 	var ring := MeshInstance3D.new()
 	var torus := TorusMesh.new()
-	torus.inner_radius = 0.82
+	torus.inner_radius = 0.7
 	torus.outer_radius = 1.0
 	torus.rings = 48
 	ring.mesh = torus
 	var mat := ShaderMaterial.new()
 	mat.shader = RAINBOW_SHADER
-	mat.set_shader_parameter(&"alpha", 0.85)
-	mat.set_shader_parameter(&"brightness", 1.4)
+	mat.set_shader_parameter(&"alpha", 1.0)
+	mat.set_shader_parameter(&"brightness", 1.8)
 	ring.material_override = mat
 	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(ring)
@@ -298,5 +299,5 @@ func _ring(at: Vector3, fwd: Vector3) -> void:
 	var tw := create_tween().set_parallel(true)
 	tw.tween_property(ring, "scale", Vector3.ONE * 26.0, 1.4).set_trans(Tween.TRANS_EXPO) \
 		.set_ease(Tween.EASE_OUT)
-	tw.tween_method(func(v: float) -> void: mat.set_shader_parameter(&"alpha", v), 0.85, 0.0, 2.2)
+	tw.tween_method(func(v: float) -> void: mat.set_shader_parameter(&"alpha", v), 1.0, 0.0, 2.6)
 	tw.chain().tween_callback(ring.queue_free)
