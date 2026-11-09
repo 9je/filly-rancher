@@ -313,13 +313,8 @@ const _PAPER_BUTTON_PATHS: Array[NodePath] = [
 
 ## Paper chrome on a button built in code (the gallery's, Surprise me).
 static func _paper_button(button: Button) -> void:
-	for state: StringName in [&"normal", &"hover", &"pressed", &"focus", &"disabled"]:
-		button.add_theme_stylebox_override(state, MenuStyleScript.field_box(
-			state == &"hover" or state == &"pressed" or state == &"focus"))
-	button.add_theme_color_override("font_color", MenuStyleScript.COLOR_INK)
-	button.add_theme_color_override("font_hover_color", MenuStyleScript.COLOR_INK)
-	button.add_theme_color_override("font_pressed_color", MenuStyleScript.COLOR_INK)
-	button.add_theme_constant_override("outline_size", 0)
+	# The kit's cream pill (P8 S5), like every button on paper.
+	MenuStyleScript.paper_button(button)
 
 
 func _style_paper() -> void:
@@ -334,15 +329,9 @@ func _style_paper() -> void:
 		var button := get_node_or_null(path) as Button
 		if button == null:
 			continue
-		for state: StringName in [&"normal", &"hover", &"pressed", &"focus", &"disabled"]:
-			button.add_theme_stylebox_override(state, MenuStyleScript.field_box(
-				state == &"hover" or state == &"pressed" or state == &"focus"))
-		button.add_theme_color_override("font_color", MenuStyleScript.COLOR_INK)
-		button.add_theme_color_override("font_hover_color", MenuStyleScript.COLOR_INK)
-		button.add_theme_color_override("font_pressed_color", MenuStyleScript.COLOR_INK)
-		button.add_theme_color_override("font_focus_color", MenuStyleScript.COLOR_INK)
-		button.add_theme_color_override("font_outline_color", MenuStyleScript.OUTLINE_COLOR)
-		button.add_theme_constant_override("outline_size", 0)
+		MenuStyleScript.paper_button(button)
+	# The way forward is the gold one (P8 S5).
+	MenuStyleScript.primary_button(_confirm)
 
 
 func _unhandled_input(event: InputEvent) -> void:

@@ -231,8 +231,11 @@ static func kit(name: StringName) -> StyleBoxTexture:
 	box.texture_margin_bottom = float(m[0])
 	box.content_margin_left = float(m[1]) + 6.0
 	box.content_margin_right = float(m[1]) + 6.0
-	box.content_margin_top = float(m[1])
-	box.content_margin_bottom = float(m[1])
+	# A pill's painted lip is mostly sideways room; up and down it needs little, or a column
+	# of buttons grows taller than its screen (the creator's step 1).
+	var tight := String(name).begins_with("button") or String(name).begins_with("tab")
+	box.content_margin_top = float(m[1]) * (0.5 if tight else 1.0)
+	box.content_margin_bottom = float(m[1]) * (0.5 if tight else 1.0)
 	_kit_boxes[name] = box
 	return box
 
