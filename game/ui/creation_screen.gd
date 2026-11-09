@@ -241,6 +241,8 @@ func _ready() -> void:
 	_build_grids()
 	_build_talent_gallery()
 	_build_surprise_button()
+	_pin_confirm()
+	_dot_inks()
 	# Mane style first on the hair step, the first thing you pick about a mane.
 	var col := get_node_or_null(^"Layout/Panel/Margin/Column") as VBoxContainer
 	var mane_label := get_node_or_null(^"Layout/Panel/Margin/Column/ManeLabel") as Control
@@ -714,27 +716,15 @@ func set_step(value: int) -> void:
 	_enter_kb_region(0)
 
 
-const STEP_PLUM := Color(0.47, 0.31, 0.64)
-const STEP_CREAM := Color(1.0, 0.97, 0.9)
+const STEP_PLUM := MenuStyleScript.PILL_PLUM
+const STEP_CREAM := MenuStyleScript.PILL_CREAM
 
 
 ## THE STEPS ARE A TAB STRIP (owner, 2026-11-09: the kit's pill, squeezed under its own corner
-## size, folded its ends over the words, and nothing said which step she was on). Flat boxes,
-## tall enough for their radius: the step she is on is filled plum with cream words, the rest
-## are cream with a plum edge, gold-edged under the pointer.
+## size, folded its ends over the words, and nothing said which step she was on): the step she
+## is on is filled plum with cream words, the rest are the paper pill.
 static func _step_box(fill: Color, edge: Color) -> StyleBoxFlat:
-	var box := StyleBoxFlat.new()
-	box.bg_color = fill
-	box.border_color = edge
-	box.set_border_width_all(2)
-	box.border_width_bottom = 4
-	box.set_corner_radius_all(18)
-	box.content_margin_left = 14.0
-	box.content_margin_right = 14.0
-	box.content_margin_top = 6.0
-	box.content_margin_bottom = 8.0
-	box.anti_aliasing = true
-	return box
+	return MenuStyleScript.pill_box(fill, edge)
 
 
 func _style_steps() -> void:
@@ -1223,6 +1213,53 @@ func use_talent(talent: StringName) -> void:
 	_sync_mark()
 
 
+## "This is me" sits at the foot of the sheet, not under whichever step is shortest with a
+## third of the page empty below it: a spacer that takes the slack goes in above it.
+func _pin_confirm() -> void:
+	if _confirm == null or _confirm.get_parent() == null:
+		return
+	var column := _confirm.get_parent()
+	var gap := Control.new()
+	gap.name = "ConfirmGap"
+	gap.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(gap)
+	column.move_child(gap, _confirm.get_index())
+
+
+## THE CANVAS IS HER FLANK (owner's flag on the creator, 2026-11-09; a grey square read as a
+## placeholder): a round patch of her own coat, plum-rimmed, so the mark is drawn on what it
+## will be worn on.
+func _tint_canvas() -> void:
+	var backing := _canvas.get_node_or_null(^"Backing") as Panel if _canvas != null else null
+	if backing == null or _palette == null or _palette.coats.is_empty():
+		return
+	var box := StyleBoxFlat.new()
+	box.bg_color = _palette.coats[posmod(_look.coat, _palette.coats.size())]
+	box.border_color = STEP_PLUM
+	box.set_border_width_all(3)
+	box.set_corner_radius_all(512)
+	box.anti_aliasing = true
+	backing.add_theme_stylebox_override(&"panel", box)
+
+
+## A dot of each ink on its button, so the row reads as colours, not six words.
+func _dot_inks() -> void:
+	for i in INK_COLOURS.size():
+		var b := get_node_or_null(NodePath("Layout/Panel/Margin/Column/InkRow/Ink%d" % i)) as Button
+		if b == null:
+			continue
+		var img := Image.create(24, 24, false, Image.FORMAT_RGBA8)
+		for y in 24:
+			for x in 24:
+				var d := Vector2(x + 0.5, y + 0.5).distance_to(Vector2(12, 12))
+				if d <= 11.0:
+					img.set_pixel(x, y, STEP_PLUM.darkened(0.2) if d > 9.5 else INK_COLOURS[i])
+				elif d <= 11.8:
+					img.set_pixel(x, y, Color(STEP_PLUM, 11.8 - d))
+		b.icon = ImageTexture.create_from_image(img)
+
+
 ## SURPRISE ME LIVES ON HER PICTURE, NOT IN THE STEPS (owner, 2026-11-09: "surprise me being in
 ## line also reads as another configuration option"). It re-rolls the pony on the stage, so it
 ## sits on the stage: a gold pill with a sparkle at the foot of the frame, over the grass.
@@ -1278,6 +1315,7 @@ func _build_model() -> void:
 
 
 func _restyle() -> void:
+	_tint_canvas()
 	if _model == null:
 		return
 	# The same paint every pony in the game wears (game/systems/pony_paint.gd).

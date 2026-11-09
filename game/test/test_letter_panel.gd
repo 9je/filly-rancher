@@ -352,8 +352,10 @@ func _face(button: Button) -> Color:
 	return _middle(button.get_theme_stylebox(&"normal"))
 
 
-## The middle of a kit surface: the colour its face shows (P8 S5).
+## The middle of a kit surface: the colour its face shows (P8 S5). A flat pill's is its fill.
 func _middle(box: StyleBox) -> Color:
+	if box is StyleBoxFlat:
+		return (box as StyleBoxFlat).bg_color
 	var tex := (box as StyleBoxTexture).texture
 	var img := tex.get_image()
 	return img.get_pixel(img.get_width() / 2, img.get_height() / 2)
@@ -380,8 +382,11 @@ func test_every_button_on_the_sheet_is_ink_on_paper_not_white_on_cream() -> void
 		var hover_ink: Color = b.get_theme_color(&"font_hover_color")
 		var hover_face := _middle(b.get_theme_stylebox(&"hover"))
 		assert_gte(_contrast(hover_ink, hover_face), 4.5, "'%s' under the pointer" % b.text)
-		assert_true(b.get_theme_stylebox(&"normal") is StyleBoxTexture,
-			"'%s' wears the kit's pill, with its ink edge" % b.text)
+		# The flat paper pill (2026-11-09: the kit texture folded on short buttons).
+		var pill := b.get_theme_stylebox(&"normal") as StyleBoxFlat
+		assert_not_null(pill, "'%s' wears the paper pill" % b.text)
+		if pill != null:
+			assert_gt(pill.border_width_bottom, 0, "'%s' has its edge" % b.text)
 
 
 ## ITEM 8 (owner, playtest 2026-11-05): "The welcome letter: a text wall". Batch check: "the

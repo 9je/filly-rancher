@@ -614,3 +614,24 @@ An independent Fable 5 review of 70 fresh renders (docs/fable-aaa-round1-2026-11
 - **Ground (#6):** grass tufts and five-petal flowers in chunked MultiMeshes, thicker on the path verges, only where a ray from above meets bare terrain.
 - **Cinematics (#10):** Cinematic gains `fov_to`, `shake` and `flash`. Derpy is followed on a long lens and ends on a close-up of her face. The Rainboom tracks Dash on a telephoto, and the boom flashes, shakes and leaves a hot core inside a smooth ring.
 - **Rain missing from houses_nightrain (#7):** a probe artifact. The rain is a column over the player, and that lens stood across town. look_world now points the rain at its own lens.
+
+## 2026-11-09: Paper buttons are a flat pill; Surprise me lives on the stage (owner flag)
+
+The owner flagged the creator's step row mid-session: the kit's pill texture, drawn on a button
+shorter than its own 9-patch corners, folded its ends over the words, and "Surprise me" in the
+same row read as a fifth configuration step. Calls made:
+
+- Every paper button (MenuStyle.paper_button_box) is a flat StyleBoxFlat pill: cream face, plum
+  edge with a heavier lip, gold edge on hover. Crisp at any size. The dark-panel buttons keep
+  the kit texture (they are tall enough for it).
+- The creator's four steps are a tab strip: the current step filled plum, the rest paper.
+- "Surprise me" is a gold sparkle pill at the foot of the turntable stage: it re-rolls the
+  pony, so it sits on the pony.
+- "This is me" is pinned to the foot of the sheet on every step.
+- The mark canvas is a plum-rimmed disc of her own coat colour (it was a grey square), and the
+  ink buttons carry a dot of their colour.
+- Round 2 render fixes in the same stretch: Derpy lands right way up facing the lens, the
+  Rainboom picks a heading with open sky and a lens over the player's shoulder, the burst core
+  is additive, the path edge has a fine second octave, the creator knoll is deepened (lift
+  0.62) under a bluer sky, race portraits sit on a mane-coloured plate, and the Rainbow thins
+  by 45% at night.

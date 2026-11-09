@@ -436,8 +436,40 @@ const PAPER_BUTTON_EDGE := Color(0.42, 0.36, 0.30, 1.0)
 const PAPER_BUTTON_LIT := Color(1.0, 0.84, 0.48, 1.0)
 
 
+## A FLAT PILL, CRISP AT ANY SIZE (owner, 2026-11-09, the creator's step row: the kit's pill
+## texture, drawn on a button shorter than its own corners, folded its ends over the words).
+## Cream face, a plum edge with a heavier lip underneath; gold-edged under the pointer, plum when
+## pressed or picked.
+const PILL_PLUM := Color(0.47, 0.31, 0.64)
+const PILL_CREAM := Color(1.0, 0.97, 0.9)
+
+
+static func pill_box(fill: Color, edge: Color) -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = fill
+	box.border_color = edge
+	box.set_border_width_all(2)
+	box.border_width_bottom = 4
+	box.set_corner_radius_all(18)
+	box.content_margin_left = 14.0
+	box.content_margin_right = 14.0
+	box.content_margin_top = 6.0
+	box.content_margin_bottom = 8.0
+	box.anti_aliasing = true
+	return box
+
+
 static func paper_button_box(state: StringName) -> StyleBox:
-	return button_box(state)
+	match state:
+		&"hover":
+			return pill_box(PILL_CREAM, COLOR_TAB_ON.darkened(0.15))
+		&"pressed":
+			return pill_box(PILL_PLUM.lerp(PILL_CREAM, 0.55), PILL_PLUM)
+		&"focus":
+			return StyleBoxEmpty.new()
+		&"disabled":
+			return pill_box(Color(PILL_CREAM, 0.6), Color(PILL_PLUM, 0.3))
+	return pill_box(PILL_CREAM, PILL_PLUM.lerp(PILL_CREAM, 0.35))
 
 
 ## THE ONE BUTTON THAT MOVES THINGS ON (P8 S5): gold, bigger, at the end of a screen
