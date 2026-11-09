@@ -67,6 +67,9 @@ const BANNER_SECONDS := 0.30
 
 enum Tab { TABLE, RULES }
 
+## Injected by the ranch: the dealer's baked portrait, or null while it bakes (item 65).
+var dealer_portrait := Callable()
+
 signal deal_requested(stake: int)
 signal action_requested(action: int)
 
@@ -525,6 +528,14 @@ func paint(ci: Control) -> void:
 
 	# --- the two badges and their totals ------------------------------------------------------
 	_paint_badge(ci, title_font, numeral_font, DEALER_BADGE, "Dealer", dealer_total_text())
+	# THE DEALER HAS A FACE (P8 item 65; review 2.9: "the dealer is a word"): the table's own
+	# dealer, baked by the PortraitBaker, on a plate at the badge's left.
+	var face: Texture2D = dealer_portrait.call() if dealer_portrait.is_valid() else null
+	if face != null:
+		var plate := Rect2(DEALER_BADGE.position + Vector2(DEALER_BADGE.size.x + 10.0, -14.0),
+			Vector2(74.0, 74.0))
+		PaintScript.rounded(ci, plate, 37.0, Color(0.95, 0.9, 0.82), PaintScript.GOLD_DIM, 2.0)
+		ci.draw_texture_rect(face, plate.grow(-3.0), false)
 	_paint_badge(ci, title_font, numeral_font, PLAYER_BADGE, "You", player_total_text())
 
 	# --- the hands ---------------------------------------------------------------------------

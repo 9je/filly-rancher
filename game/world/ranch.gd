@@ -5997,6 +5997,16 @@ func ensure_palace_interior() -> PalaceInterior:
 	add_child(palace_interior)
 	palace_interior.global_position = Vector3(at.x, at.y - PALACE_INTERIOR_DEPTH, at.z)
 	palace_interior.build(spawner.pony_dir if spawner != null else "res://data/ponies")
+	# The blackjack dealer's face is the hall's own dealer (P8 item 65).
+	if blackjack_menu != null:
+		blackjack_menu.set("dealer_portrait", func() -> Texture2D:
+			var staff := palace_interior.get_node_or_null(^"Staff")
+			if staff == null:
+				return null
+			for n: Node in staff.get_children():
+				if String(n.name).begins_with("Dealer"):
+					return _portrait_of("dealer", n as Node3D)
+			return null)
 	# The hall's tote mirrors the real race on the Strip, names and all (P8 item 62).
 	if race_track != null:
 		palace_interior.set("race_source", func() -> Array: return race_track.call("progress"))

@@ -82,15 +82,18 @@ func _pump() -> void:
 func _pose(body: Node3D) -> bool:
 	_ensure_viewport()
 	_clear_stage()
+	# A pony keeps her body under `visuals`; an Attendant (the casino's staff) keeps it as her
+	# own first child.
 	var vis := body.get("visuals") as Node3D
-	var source: Node3D = vis.get_child(0) as Node3D if vis != null and vis.get_child_count() > 0 \
-		else null
+	if vis == null:
+		vis = body
+	var source: Node3D = vis.get_child(0) as Node3D if vis.get_child_count() > 0 else null
 	if source == null:
 		return false
 	var copy := source.duplicate(0) as Node3D
 	if copy == null:
 		return false
-	copy.transform = Transform3D(Basis.from_scale(vis.scale), Vector3.ZERO)
+	copy.transform = Transform3D(Basis.from_scale(vis.scale if vis != body else source.scale), Vector3.ZERO)
 	_stage.add_child(copy)
 	for sk in copy.find_children("*", "Skeleton3D", true, false):
 		(sk as Skeleton3D).reset_bone_poses()
