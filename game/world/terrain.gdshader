@@ -81,7 +81,7 @@ uniform float ground_roughness = 0.95;
 // a field in, plus clover dots close to the lens.
 uniform float patch_metres = 5.0;
 uniform float patch_light = 0.24;
-uniform float patch_dark = 0.22;
+uniform float patch_dark = 0.14;
 uniform float clover_amount = 0.18;
 
 // THE ROAD, PAINTED RATHER THAN LAID. A rigid dirt_road.glb plate cannot follow 0.70 m of
@@ -210,8 +210,8 @@ void fragment() {
 
 	vec2 pq = v_world_pos.xz / patch_metres;
 	float pn = value_noise(pq + vec2(3.7, 9.2)) * 0.62 + value_noise(pq * 2.7 + vec2(1.1, 5.3)) * 0.38;
-	float lit_patch = smoothstep(0.645, 0.665, pn);
-	float deep_patch = smoothstep(0.355, 0.335, pn);
+	float lit_patch = smoothstep(0.62, 0.70, pn);
+	float deep_patch = smoothstep(0.37, 0.29, pn);
 	base *= 1.0 + lit_patch * patch_light - deep_patch * patch_dark;
 	base = mix(base, base * vec3(1.07, 1.04, 0.80), lit_patch * 0.7);
 	base = mix(base, base * vec3(0.88, 1.0, 1.10), deep_patch * 0.6);

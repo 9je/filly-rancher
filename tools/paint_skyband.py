@@ -191,15 +191,16 @@ def paint_clouds():
     az = -180.0
     while az < 180.0:
         elev = rng.uniform(9.0, 30.0)
-        size = rng.uniform(2.2, 4.2) * (1.0 - (elev - 9.0) / 60.0)
+        size = rng.uniform(2.6, 5.0) * (1.0 - (elev - 9.0) / 60.0)
         clouds.append(cloud(None, rng, az, elev, size))
-        az += rng.uniform(22, 40)
-    m = Image.new("L", (W * SS, H * SS), 0)
-    d = ImageDraw.Draw(m)
-    bottoms = []
+        az += rng.uniform(11, 21)
+    fill = np.zeros((H * SS, W * SS), bool)
     for puffs in clouds:
+        # Each cloud on its own sheet, so one cloud's flat underside never slices a
+        # neighbour that overlaps it (render check: hard vertical cuts where two met).
+        m = Image.new("L", (W * SS, H * SS), 0)
+        d = ImageDraw.Draw(m)
         bottom = min(e - r * 0.35 for _, e, r in puffs) + 0.2
-        bottoms.append(bottom)
         for shift in (-W * SS, 0, W * SS):
             for a, e, r in puffs:
                 cx, cy, rr = x_of(a) + shift, y_of(e), r * PX_DEG * SS
@@ -209,7 +210,7 @@ def paint_clouds():
             a0 = x_of(puffs[0][0]) + shift - puffs[0][2] * PX_DEG * SS
             a1 = x_of(puffs[-1][0]) + shift + puffs[-1][2] * PX_DEG * SS
             d.rectangle([a0, yb, a1, H * SS], fill=0)
-    fill = np.asarray(m) > 0
+        fill |= np.asarray(m) > 0
     # The one hard shadow shape: the underside, where the cloud is not also above itself.
     lift = int(0.9 * PX_DEG * SS)
     above = np.zeros_like(fill)
