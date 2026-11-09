@@ -32,6 +32,118 @@ func _ready() -> void:
 	_stand(RIM, Vector3(0, -3.0, 0), 1.0, &"building")
 	_stand(WORKS, WORKS_AT, WORKS_SCALE, &"building")
 	_build_rainbow()
+	_plant_ridges()
+
+
+## TREE LINES ON THE RIDGES (Fable AAA round 3, #2 and #10: "the far hills are bald pale
+## domes"). The show's round puffy trees, in clumps along the upper slopes of the rim hills:
+## one MultiMesh, placed on the rim mesh's own up-facing vertices, seeded so it never moves.
+const RIDGE_GREENS: Array[Color] = [Color(0.26, 0.62, 0.20), Color(0.34, 0.72, 0.24),
+	Color(0.20, 0.54, 0.22), Color(0.44, 0.76, 0.28)]
+
+
+func _plant_ridges() -> void:
+	var rim: Node3D = get_node_or_null(^"Rim") as Node3D
+	if rim == null:
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 20261109
+	# Random points over the rim's up-facing triangles, as many per triangle as its area
+	# earns (the rim is low-poly: its vertices alone were a handful of spots).
+	var picks: Array[Vector3] = []
+	for mi: MeshInstance3D in rim.find_children("*", "MeshInstance3D", true, false):
+		if mi.mesh == null:
+			continue
+		for si in mi.mesh.get_surface_count():
+			var arrays := mi.mesh.surface_get_arrays(si)
+			var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+			var idx: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX] != null \
+				else PackedInt32Array()
+			var tri_count := idx.size() / 3 if idx.size() > 0 else verts.size() / 3
+			for t in tri_count:
+				var i0 := idx[t * 3] if idx.size() > 0 else t * 3
+				var i1 := idx[t * 3 + 1] if idx.size() > 0 else t * 3 + 1
+				var i2 := idx[t * 3 + 2] if idx.size() > 0 else t * 3 + 2
+				var a := mi.global_transform * verts[i0]
+				var b := mi.global_transform * verts[i1]
+				var c := mi.global_transform * verts[i2]
+				var cross := (b - a).cross(c - a)
+				var area := cross.length() * 0.5
+				var n := cross.normalized()
+				if absf(n.y) < 0.55:
+					continue
+				var mid := (a + b + c) / 3.0
+				if mid.y < 3.0 or maxf(absf(mid.x), absf(mid.z)) < 114.0:
+					continue
+				var want := area / 260.0
+				var count := int(want) + (1 if rng.randf() < fmod(want, 1.0) else 0)
+				for k in count:
+					var u := rng.randf()
+					var v := rng.randf()
+					if u + v > 1.0:
+						u = 1.0 - u
+						v = 1.0 - v
+					var base := a + (b - a) * u + (c - a) * v
+					# A clump of one to three round the spot.
+					for j in rng.randi_range(1, 3):
+						picks.append(base + Vector3(rng.randf_range(-3.0, 3.0), -0.4, rng.randf_range(-3.0, 3.0)))
+	if picks.is_empty():
+		return
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.mesh = _ridge_tree_mesh()
+	mm.instance_count = picks.size()
+	for i in picks.size():
+		var sz := rng.randf_range(3.2, 5.6)
+		var xf := Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(sz, sz * rng.randf_range(0.9, 1.25), sz)), picks[i])
+		mm.set_instance_transform(i, xf)
+		mm.set_instance_color(i, RIDGE_GREENS[rng.randi() % RIDGE_GREENS.size()])
+	var mmi := MultiMeshInstance3D.new()
+	mmi.name = "RidgeTrees"
+	mmi.multimesh = mm
+	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mmi)
+
+
+## One show tree: a short trunk under a round canopy, flat-shaded in the toon band.
+static func _ridge_tree_mesh() -> Mesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var canopy := SphereMesh.new()
+	canopy.radius = 0.55
+	canopy.height = 1.0
+	canopy.radial_segments = 12
+	canopy.rings = 6
+	var canopy_mesh := ArrayMesh.new()
+	var carr := canopy.get_mesh_arrays()
+	var ccols := PackedColorArray()
+	ccols.resize((carr[Mesh.ARRAY_VERTEX] as PackedVector3Array).size())
+	ccols.fill(Color.WHITE)
+	carr[Mesh.ARRAY_COLOR] = ccols
+	canopy_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, carr)
+	st.append_from(canopy_mesh, 0, Transform3D(Basis(), Vector3(0, 1.0, 0)))
+	var trunk := CylinderMesh.new()
+	trunk.top_radius = 0.08
+	trunk.bottom_radius = 0.11
+	trunk.height = 0.6
+	trunk.radial_segments = 6
+	var trunk_mesh := ArrayMesh.new()
+	var arr := trunk.get_mesh_arrays()
+	var cols := PackedColorArray()
+	cols.resize((arr[Mesh.ARRAY_VERTEX] as PackedVector3Array).size())
+	cols.fill(Color(0.55, 0.38, 0.28))
+	arr[Mesh.ARRAY_COLOR] = cols
+	trunk_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+	st.append_from(trunk_mesh, 0, Transform3D(Basis(), Vector3(0, 0.3, 0)))
+	var mesh := st.commit()
+	var m := StandardMaterial3D.new()
+	m.vertex_color_use_as_albedo = true
+	m.diffuse_mode = BaseMaterial3D.DIFFUSE_TOON
+	m.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+	m.roughness = 1.0
+	mesh.surface_set_material(0, m)
+	return mesh
 
 
 func _stand(path: String, at: Vector3, s: float, category: StringName) -> void:
@@ -40,6 +152,8 @@ func _stand(path: String, at: Vector3, s: float, category: StringName) -> void:
 	var inst: Node3D = (load(path) as PackedScene).instantiate()
 	inst.position = at
 	inst.scale = Vector3.ONE * s
+	if path == RIM:
+		inst.name = "Rim"
 	add_child(inst)
 	ToonStylerScript.style(inst, category)
 	for node in inst.find_children("*", "MeshInstance3D", true, false):

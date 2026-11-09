@@ -90,6 +90,22 @@ func _run() -> void:
 		# Three-quarter on to the lens (a holder's -Z is her tail).
 		holder.rotation.y = deg_to_rad(200.0)
 		bodies.append(holder)
+	if "--rim" in OS.get_cmdline_user_args():
+		# The valley's rim hills from inside the valley: chars_rim.png.
+		var vf := Node3D.new()
+		vf.set_script(load("res://world/valley_frame.gd"))
+		world.add_child(vf)
+		var rc := Camera3D.new()
+		world.add_child(rc)
+		rc.fov = 60.0
+		rc.far = 1000.0
+		rc.global_position = Vector3(20, 6, 40)
+		rc.look_at(Vector3(60, 8, 120))
+		rc.current = true
+		for k in 20:
+			await process_frame
+		await _shot("chars_rim")
+		rc.current = false
 	if "--plot" in OS.get_cmdline_user_args():
 		# A free plot as the pen yard has it: chars_plot.png.
 		var slot: Node3D = load("res://world/plot_slot.gd").new()
