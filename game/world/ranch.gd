@@ -9192,6 +9192,11 @@ func _arrival(_delta: float) -> void:
 		people.talk("marigold")
 
 
+## When a wild pony was last under the crosshair in reach, for the Scoop tip (seconds).
+var _scoop_tip_seen := -1.0
+const SCOOP_TIP_LINGER := 1.5
+
+
 ## What onboarding.gd's tips read (Onboarding.TIPS' condition keys).
 func _onboarding_state() -> Dictionary:
 	var st := {}
@@ -9199,13 +9204,19 @@ func _onboarding_state() -> Dictionary:
 	var storage: Storage = beam.get_storage() if beam != null else null
 	var bagged: int = storage.count() if storage != null else 0
 	var has_scoop: bool = _game_state.story.has_flag("has_scoop")
-	var near_wild := false
-	if has_scoop and storage != null and not storage.is_full():
-		for p in spawner.get_spawned():
-			if (p as Node3D).global_position.distance_to(player.global_position) < 18.0:
-				near_wild = true
-				break
-	st["pony_in_view"] = near_wild
+	# ONLY WHEN THERE IS A PONY TO SCOOP (Fable AAA round 2, #9: the Scoop line sat on screen
+	# whatever was in front of her): a wild pony under the crosshair and in the beam's reach,
+	# kept up for SCOOP_TIP_LINGER seconds after, so a pony stepping across the reticle does
+	# not blink the line on and off.
+	var aimed := false
+	if has_scoop and storage != null and not storage.is_full() and beam != null \
+			and beam.has_method("get_target"):
+		var t: Node3D = beam.call("get_target")
+		aimed = t != null and t in spawner.get_spawned()
+	var now := Time.get_ticks_msec() / 1000.0
+	if aimed:
+		_scoop_tip_seen = now
+	st["pony_in_view"] = aimed or (_scoop_tip_seen > 0.0 and now - _scoop_tip_seen < SCOOP_TIP_LINGER)
 	var pens := _built_pen_count()
 	var near_pen := false
 	for slot in _plot_slots():

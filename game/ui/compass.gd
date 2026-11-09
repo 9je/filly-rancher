@@ -15,9 +15,9 @@ const SPAN_DEGREES := 150.0
 ## A THIN STRIP OF ICONS, NOT A BAR OVER THE SCENE (Fable AAA review round 1, #3: "a compass
 ## bar"). It was a 46 px cream box across the top of the view; it is a hairline of gold on a
 ## plum band that fades to nothing at both ends, the icons riding it on small discs.
-const WIDTH := 640.0
-const HEIGHT := 30.0
-const ICON := 24.0
+const WIDTH := 700.0
+const HEIGHT := 40.0
+const ICON := 28.0
 const TOP := 16.0
 ## Closer than this a place's icon fades out: she is already there.
 const NEAR_METRES := 9.0
@@ -42,8 +42,8 @@ var _clock := 0.0
 ## [letter, world direction]: north is minus Z on this map (Happenings' old compass words
 ## used the same convention).
 const CARDINALS := [["N", Vector3(0, 0, -1)], ["E", Vector3(1, 0, 0)], ["S", Vector3(0, 0, 1)],
-	["W", Vector3(-1, 0, 0)], ["ne", Vector3(1, 0, -1)], ["se", Vector3(1, 0, 1)],
-	["sw", Vector3(-1, 0, 1)], ["nw", Vector3(-1, 0, -1)]]
+	["W", Vector3(-1, 0, 0)], ["NE", Vector3(1, 0, -1)], ["SE", Vector3(1, 0, 1)],
+	["SW", Vector3(-1, 0, 1)], ["NW", Vector3(-1, 0, -1)]]
 
 
 func _ready() -> void:
@@ -111,13 +111,18 @@ func _ready() -> void:
 		var l := Label.new()
 		l.name = "Cardinal" + String(c[0])
 		l.text = String(c[0])
-		# On the band itself, in gold: the cardinal letters are the strip's own ticks.
-		HouseStyleScript.ink_label(l, 17 if String(c[0]).length() == 1 else 12,
-			HouseStyleScript.GOLD if String(c[0]).length() == 1 else HouseStyleScript.CREAM_DIM)
+		# On the band itself, in gold: the cardinal letters are the strip's own ticks. Read at a
+		# glance at 720 p (Fable AAA round 2, #9: "SE S SW" were 8 px): the four big and gold,
+		# the four between in cream, all with a plum outline so they hold on sky or grass.
+		var major := String(c[0]).length() == 1
+		HouseStyleScript.ink_label(l, 28 if major else 21,
+			HouseStyleScript.GOLD if major else HouseStyleScript.CREAM)
+		l.add_theme_constant_override(&"outline_size", 7)
+		l.add_theme_color_override(&"font_outline_color", HouseStyleScript.PLUM_DARK)
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		l.size = Vector2(30, HEIGHT)
+		l.size = Vector2(44, HEIGHT)
 		add_child(l)
 		_cardinals.append(l)
 
@@ -218,7 +223,7 @@ func _process(delta: float) -> void:
 		cl.visible = cu > 0.04 and cu < 0.96
 		# On the band, between the badges.
 		cl.position = Vector2(left + cu * WIDTH - cl.size.x * 0.5, TOP)
-		cl.modulate.a = clampf(minf(cu - 0.04, 0.96 - cu) / 0.1, 0.0, 1.0) * (1.0 if k < 4 else 0.6)
+		cl.modulate.a = clampf(minf(cu - 0.04, 0.96 - cu) / 0.1, 0.0, 1.0) * (1.0 if k < 4 else 0.85)
 	for i in places.size():
 		var node := places[i].get("node") as Node3D
 		var r := _icons[i]
