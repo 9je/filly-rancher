@@ -50,6 +50,20 @@ const GREEN_EVERFREE := Color(0.16, 0.3, 0.2)
 ## (playtest 2026-11-05 item 61, the PS batch check).
 const NO_TINT := Color(0, 0, 0, 0)
 const WOOD := Color(0.4, 0.27, 0.18)
+## THE LAKE'S EDGE, REDONE (P8 S7, playtest 2026-11-08 item 55: "reeds and grass by the lake are
+## sharp shards; dock planks are flat dark slabs"; docs/aaa-review-2026-11-08.md 2.14: "reeds as
+## crossed cards with a painted texture, a dock with real planks"). The shore's reeds were the
+## Nature Kit's flat plants blown up three to four and a half times, which made every facet a
+## blade-sized shard; they are now clumps of painted reeds on two crossed cards (REED_CARD, its
+## texture drawn here). The jetty was five 2 m tiles laid end on end in the kit's dark dirt
+## colour; it is now planks laid across the jetty with a finger's gap between them, in weathered
+## timber, on pilings, and it is one walkable deck to the player instead of five posts.
+const REED_CARD := "reed_card"
+const REED_HEIGHT := Vector2(1.0, 1.55)
+const DOCK_WOOD := Color(0.68, 0.53, 0.37)
+const DOCK_PLANK_PITCH := 0.34
+const DOCK_LENGTH := 6.4
+const DOCK_WIDTH := 1.9
 const STONE := Color(0.55, 0.57, 0.62)
 
 var height_at: Callable = func(_x: float, _z: float) -> float: return 0.0
@@ -170,24 +184,151 @@ func _lake(r: RegionData) -> void:
 		var d := water_r * sqrt(_rng.randf_range(0.05, 0.85))
 		var at := Vector3(r.centre.x + cos(a) * d, wy + 0.03, r.centre.y + sin(a) * d)
 		_add(["lily_large", "lily_small"][_rng.randi() % 2], Transform3D(Basis(Vector3.UP, _rng.randf() * TAU).scaled(Vector3.ONE * _rng.randf_range(1.8, 2.8)), at), false, GREEN)
-	# Reeds and flat stones along the shore.
+	# Reeds and flat stones along the shore. The reeds are card clumps (REED_CARD), drawn with
+	# the same five draws per clump the kit's plants took, so everything after them on this
+	# seed still stands where it stood.
 	for i in 70:
 		var a := _rng.randf() * TAU
 		var d := water_r * _rng.randf_range(0.92, 1.12)
-		_place(r, ["plant_flatTall", "plant_flatShort", "grass_leafsLarge"][_rng.randi() % 3], a, d, Vector2(3.0, 4.6), false, GREEN)
+		var pick := _rng.randi() % 3
+		var h := lerpf(REED_HEIGHT.x, REED_HEIGHT.y, inverse_lerp(3.0, 4.6, _rng.randf_range(3.0, 4.6)))
+		var yaw := _rng.randf() * TAU
+		var rx := r.centre.x + cos(a) * d
+		var rz := r.centre.y + sin(a) * d
+		var ry := maxf(float(height_at.call(rx, rz)), wy - 0.25)
+		# The short kind is a little squatter and wider: a clump, not a copy.
+		var squat := 1.25 if pick == 1 else 1.0
+		_add(REED_CARD, Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3(h * 0.75 * squat, h / squat, h * 0.75 * squat)),
+			Vector3(rx, ry - 0.04, rz)), false)
 	for i in 18:
 		_place(r, ["rock_smallFlatA", "rock_smallFlatB", "rock_smallA"][_rng.randi() % 3], _rng.randf() * TAU,
 			water_r * _rng.randf_range(0.95, 1.25), Vector2(1.4, 2.2), false, GREEN)
 	# A canoe on the bank, and a short jetty of planks out over the water.
 	var jetty_a := 0.6
-	_place(r, "canoe", jetty_a + 0.35, water_r * 1.08, Vector2(3.2, 3.2), true, NO_TINT)
-	for k in 5:
-		var d := water_r * 1.04 - float(k) * 1.1
-		var at := Vector3(r.centre.x + cos(jetty_a) * d, maxf(wy + 0.12, float(height_at.call(r.centre.x + cos(jetty_a) * d, r.centre.y + sin(jetty_a) * d)) + 0.05), r.centre.y + sin(jetty_a) * d)
-		_add("path_wood", Transform3D(Basis(Vector3.UP, -jetty_a).scaled(Vector3(2.0, 1.6, 2.0)), at), true)
+	# The canoe's collider is its hull, low and long, not a 2.4 m post in its middle that
+	# stopped the player a stride short of a boat (item 26).
+	var canoe := _place(r, "canoe", jetty_a + 0.35, water_r * 1.08, Vector2(3.2, 3.2), false, NO_TINT)
+	if not _dry:
+		var cs := canoe.basis.get_scale().x
+		_box_collider(Transform3D(Basis(Vector3.UP, canoe.basis.orthonormalized().get_euler().y), canoe.origin
+			+ Vector3(0.0, 0.3, 0.0)), Vector3(0.3 * cs, 0.6, 1.15 * cs))
+	_jetty(r, wy, water_r, jetty_a)
 	for i in 8:
 		_tree(r, ["tree_default_dark", "tree_oak_dark", "tree_fat_darkh"][_rng.randi() % 3], _rng.randf() * TAU,
 			r.radius * _rng.randf_range(1.0, 1.3), _ph(LAKE_TREE_PH), GREEN)
+
+
+## The jetty: planks across it from a pace up the bank out over the water, on pilings, with
+## one flat deck collider at the planks' top so she walks out on it and nothing snags.
+func _jetty(r: RegionData, wy: float, water_r: float, jetty_a: float) -> void:
+	var out := Vector2(cos(jetty_a), sin(jetty_a))
+	var start := water_r * 1.04 + 0.8
+	var deck_y := wy + 0.28
+	var n := int(DOCK_LENGTH / DOCK_PLANK_PITCH)
+	for k in n:
+		var d := start - (float(k) + 0.5) * DOCK_PLANK_PITCH
+		var p := r.centre + out * d
+		var y := maxf(deck_y, float(height_at.call(p.x, p.y)) + 0.06)
+		# path_wood is 1 m by 0.51 m: across the jetty, a plank's width along it.
+		var plank := Basis(Vector3.UP, -jetty_a + PI * 0.5).scaled(Vector3(DOCK_WIDTH, 1.8, 0.58))
+		_add("path_wood", Transform3D(plank, Vector3(p.x, y - 0.09, p.y)), false)
+	# Pilings at the corners and the middle, from the bed up through the deck.
+	var side := Vector2(-out.y, out.x) * (DOCK_WIDTH * 0.5 + 0.06)
+	for f: float in [0.15, 0.55, 0.95]:
+		for s: float in [-1.0, 1.0]:
+			var q := r.centre + out * (start - DOCK_LENGTH * f) + side * s
+			var bed := float(height_at.call(q.x, q.y))
+			var tall := deck_y + 0.18 - bed
+			if tall <= 0.05:
+				continue
+			_add("stump_round", Transform3D(Basis().scaled(Vector3(0.62, tall / 0.206, 0.62)),
+				Vector3(q.x, bed - 0.02, q.y)), false)
+	if _dry:
+		return
+	var mid := r.centre + out * (start - DOCK_LENGTH * 0.5)
+	_box_collider(Transform3D(Basis(Vector3.UP, -jetty_a + PI * 0.5), Vector3(mid.x, deck_y - 0.2, mid.y)),
+		Vector3(DOCK_WIDTH, 0.4, DOCK_LENGTH))
+
+
+## A solid box at `xf` (its origin the box's middle), on the props layer.
+func _box_collider(xf: Transform3D, size: Vector3) -> void:
+	var body := StaticBody3D.new()
+	body.collision_layer = LayersScript.PROPS
+	body.collision_mask = 0
+	body.set_meta(&"step_surface", &"hoof_wood")
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = size
+	shape.shape = box
+	body.add_child(shape)
+	add_child(body)
+	body.global_transform = xf
+
+
+## Two crossed cards with a clump of painted reeds on them (REED_CARD): 1 m tall and 1 m wide
+## at scale 1, standing on their foot. The texture is drawn here: tapered blades in two greens,
+## darker at the root, and a few bulrush heads.
+static func _reed_card_mesh() -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for k in 2:
+		var ang := PI * 0.25 + PI * 0.5 * k
+		var dx := Vector3(cos(ang), 0.0, sin(ang)) * 0.5
+		var q: Array[Vector3] = [-dx, dx, dx + Vector3.UP, -dx + Vector3.UP]
+		var uv: Array[Vector2] = [Vector2(0, 1), Vector2(1, 1), Vector2(1, 0), Vector2(0, 0)]
+		var n := dx.cross(Vector3.UP).normalized()
+		for i: int in [0, 2, 1, 0, 3, 2]:
+			st.set_normal(n)
+			st.set_uv(uv[i])
+			st.add_vertex(q[i])
+	var mesh := st.commit()
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = _reed_texture()
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+	mat.alpha_scissor_threshold = 0.5
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mat.roughness = 0.95
+	mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	mesh.surface_set_material(0, mat)
+	return mesh
+
+
+static func _reed_texture() -> ImageTexture:
+	const W := 96
+	const H := 160
+	var img := Image.create(W, H, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0.3, 0.45, 0.25, 0.0))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1171
+	var light := Color(0.47, 0.66, 0.31)
+	var dark := Color(0.24, 0.40, 0.2)
+	for b in 15:
+		var x0 := rng.randf_range(W * 0.25, W * 0.75)
+		var lean := rng.randf_range(-0.35, 0.35) * W
+		var top := rng.randf_range(0.05, 0.4) * H
+		var w0 := rng.randf_range(2.2, 3.6)
+		var col := light.lerp(dark, rng.randf())
+		for y in range(int(top), H):
+			var t := (float(y) - top) / (H - top)
+			var x := x0 + lean * pow(1.0 - t, 2.0)
+			var w := w0 * (0.15 + 0.85 * t)
+			var c := col.darkened(0.35 * t)
+			for xi in range(int(x - w), int(x + w) + 1):
+				if xi >= 0 and xi < W:
+					img.set_pixel(xi, y, Color(c, 1.0))
+	# Bulrush heads on three straight stalks.
+	for h in 3:
+		var sx := int(rng.randf_range(W * 0.3, W * 0.7))
+		var hy := int(rng.randf_range(0.04, 0.18) * H)
+		for y in range(hy, H):
+			for xi in [sx, sx + 1]:
+				img.set_pixel(xi, y, Color(0.36, 0.5, 0.26, 1.0))
+		for y in range(hy + 4, hy + 22):
+			for xi in range(sx - 2, sx + 4):
+				img.set_pixel(xi, y, Color(0.42, 0.27, 0.16, 1.0))
+	img.generate_mipmaps()
+	return ImageTexture.create_from_image(img)
 
 
 func _orchard(r: RegionData) -> void:
@@ -250,7 +391,7 @@ func _scatter(r: RegionData, models: Array, n: int, inner: float, outer: float, 
 ## the model is scaled to off its own measured height (see the PH constants above).
 func _place(r: RegionData, model: String, a: float, d: float, scale: Vector2, solid: bool = false,
 		leaves: Color = NO_TINT, glow: bool = false, face_centre: bool = false,
-		by_height: bool = false) -> void:
+		by_height: bool = false) -> Transform3D:
 	var x := r.centre.x + cos(a) * d
 	var z := r.centre.y + sin(a) * d
 	var y := float(height_at.call(x, z))
@@ -259,7 +400,9 @@ func _place(r: RegionData, model: String, a: float, d: float, scale: Vector2, so
 		var native := _native_height(model, leaves, glow)
 		s = s / native if native > 0.001 else 1.0
 	var yaw := -a + PI * 0.5 if face_centre else _rng.randf() * TAU
-	_add(model, Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3.ONE * s), Vector3(x, y - 0.03, z)), solid, leaves, glow)
+	var xf := Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3.ONE * s), Vector3(x, y - 0.03, z))
+	_add(model, xf, solid, leaves, glow)
+	return xf
 
 
 func _add(model: String, xf: Transform3D, solid: bool, leaves: Color = NO_TINT, glow: bool = false) -> void:
@@ -296,6 +439,10 @@ func _parts(model: String, leaves: Color, glow: bool) -> Array:
 	if _meshes.has(key):
 		return _meshes[key]
 	var out: Array = []
+	if model == REED_CARD:
+		out.append([_reed_card_mesh(), Transform3D.IDENTITY, 0])
+		_meshes[key] = out
+		return out
 	var path := NATURE + model + ".glb"
 	if not ResourceLoader.exists(path):
 		_meshes[key] = out
@@ -319,6 +466,9 @@ func _parts(model: String, leaves: Color, glow: bool) -> Array:
 			# show's trunks are a warm brown, its rocks a cool grey.
 			if "inner" in lname:
 				mat.albedo_color = Color(0.8, 0.66, 0.48)
+			elif model == "path_wood":
+				# Weathered planks, a board or two a shade darker (the kit's dirtDark).
+				mat.albedo_color = DOCK_WOOD * (0.82 if "dark" in lname else 1.0)
 			elif "wood" in lname or "bark" in lname or "trunk" in lname or "log" in lname or "dirt" in lname:
 				mat.albedo_color = WOOD.lerp(WOOD * 1.25, clampf(src.albedo_color.v - 0.5, 0.0, 1.0))
 			elif "stone" in lname or "rock" in lname:
