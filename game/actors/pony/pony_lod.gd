@@ -71,8 +71,12 @@ static func _key(mesh: ArrayMesh) -> String:
 ## Queue `mesh`'s chain on a worker (once per key) and remember `mi` to receive it.
 static func _request(key: String, mesh: ArrayMesh, mi: MeshInstance3D) -> void:
 	if not _pending.has(key):
-		var job := {"mesh": mesh, "arrays": [], "shape": _shape_of(mesh), "result": {},
-			"users": []}
+		# The arrays are read HERE, on the main thread: read on the worker they reached into
+		# the renderer from the wrong thread, which on a real GPU (RADV) broke the frame,
+		# "Found open draw list at the end of the frame", every frame (2026-11-09, the first
+		# render off the software rasteriser). Once per model, cached after.
+		var job := {"mesh": mesh, "arrays": _surface_arrays(mesh), "shape": _shape_of(mesh),
+			"result": {}, "users": []}
 		job["task"] = WorkerThreadPool.add_task(_work.bind(job), false, "PonyLod")
 		_pending[key] = job
 	(_pending[key].users as Array).append(weakref(mi))
@@ -83,10 +87,8 @@ static func _request(key: String, mesh: ArrayMesh, mi: MeshInstance3D) -> void:
 			_polling = true
 
 
-## WORKER THREAD: the arrays are read here too (a read off the render thread's copy, which
-## on the main thread stalls it once per surface), then decimated.
+## WORKER THREAD: the decimation only, on arrays already read (see _request).
 static func _work(job: Dictionary) -> void:
-	job["arrays"] = _surface_arrays(job.mesh)
 	job["result"] = _lod_indices(job.shape, job.arrays)
 
 
