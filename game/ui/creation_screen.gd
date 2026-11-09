@@ -1136,23 +1136,29 @@ func show_flank() -> void:
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
 
-## The grassy hillock she stands on (Blender-built, tools/blender_props/build_props.py), so
-## the turntable pony is on the ground of a little world rather than floating in a void.
-## Static: only the pony on the turntable turns.
-const STAGE_LIFT := 0.62
+## THE STAGE IS THE BOUTIQUE (Fable AAA round 4: the grassy hillock under a gradient sky read
+## as "a flat green plane with a lone fence"): ui/boutique_stage.gd builds the show's Carousel
+## Boutique round the turntable, and the room's own warm air replaces the dawn sky.
+const BoutiqueStageScript := preload("res://ui/boutique_stage.gd")
+const ROOM_AIR := Color(0.30, 0.20, 0.34)
 
 
 func _stand_stage() -> void:
-	var path := "res://assets/models/creator_stage.glb"
-	if _turntable == null or not ResourceLoader.exists(path):
+	if _turntable == null:
 		return
-	var stage: Node3D = (load(path) as PackedScene).instantiate()
+	var stage: Node3D = BoutiqueStageScript.new()
 	stage.name = "Stage"
 	_turntable.get_parent().add_child(stage)
 	stage.position = _turntable.position
-	# Deepened: under the studio key and fill the leaf green clipped to a mint white, a snow
-	# hill under the pony (Fable round 2 renders).
-	ToonStyler.style(stage, &"prop", {}, STAGE_LIFT)
+	var world := _turntable.get_parent().get_node_or_null(^"WorldEnvironment") as WorldEnvironment
+	if world != null and world.environment != null:
+		var env := world.environment.duplicate() as Environment
+		env.background_mode = Environment.BG_COLOR
+		env.background_color = ROOM_AIR
+		env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+		env.ambient_light_color = Color(1.0, 0.92, 0.94)
+		env.ambient_light_energy = 0.6
+		world.environment = env
 
 
 ## THE STREAK ROW ONLY WHERE THERE IS A STREAK (PT11; playtest 2026-11-05: "mane streak is

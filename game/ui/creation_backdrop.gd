@@ -38,21 +38,41 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
 
+## THE BOUTIQUE'S WALL, NOT A SKY (Fable AAA round 4: the creator is the Carousel Boutique
+## now, ui/boutique_stage.gd): what shows round the two panels is the same striped lavender
+## wallpaper with its gold diamonds, over a cream wainscot with a gold rail, so the screen is
+## one room. The sky constants above stay for anything that still asks for them.
+const PAPER := Color(0.80, 0.70, 0.92)
+const PAPER_STRIPE := Color(0.88, 0.80, 0.97)
+const DIAMOND := Color(0.96, 0.78, 0.36)
+const WAINSCOT := Color(0.99, 0.95, 0.90)
+const STRIPE_PX := 56.0
+const WAINSCOT_AT := 0.8
+
+
 func _draw() -> void:
 	var box := Rect2(Vector2.ZERO, size)
-	var horizon: float = box.size.y * HORIZON
-	# THE SKY, AS A VERTICAL GRADIENT, drawn as one polygon with per vertex colours rather
-	# than as a stack of rectangles: one call, no banding.
-	draw_polygon(
-		PackedVector2Array([Vector2(0.0, 0.0), Vector2(box.size.x, 0.0),
-			Vector2(box.size.x, horizon), Vector2(0.0, horizon)]),
-		PackedColorArray([SKY_TOP, SKY_TOP, SKY_BOTTOM, SKY_BOTTOM]))
-	draw_rect(Rect2(0.0, horizon, box.size.x, box.size.y - horizon), GROUND)
-	for puff: Vector3 in CLOUDS:
-		var centre := Vector2(puff.x * box.size.x, puff.y * box.size.y)
-		var radius: float = puff.z * box.size.x
-		draw_circle(centre + Vector2(0.0, radius * 0.18), radius, CLOUD_SHADE)
-		draw_circle(centre, radius, CLOUD)
+	draw_rect(box, PAPER)
+	var foot: float = box.size.y * WAINSCOT_AT
+	var x := 0.0
+	var k := 0
+	while x < box.size.x:
+		if k % 2 == 1:
+			draw_rect(Rect2(x, 0.0, STRIPE_PX, foot), PAPER_STRIPE)
+		else:
+			# A gold diamond down the middle of every darker stripe.
+			var y := STRIPE_PX * 0.9
+			while y < foot - STRIPE_PX * 0.4:
+				var c := Vector2(x + STRIPE_PX * 0.5, y)
+				draw_colored_polygon(PackedVector2Array([c + Vector2(0.0, -9.0),
+					c + Vector2(5.5, 0.0), c + Vector2(0.0, 9.0), c + Vector2(-5.5, 0.0)]),
+					DIAMOND)
+				y += STRIPE_PX * 1.8
+		x += STRIPE_PX
+		k += 1
+	draw_rect(Rect2(0.0, foot, box.size.x, box.size.y - foot), WAINSCOT)
+	draw_rect(Rect2(0.0, foot - 6.0, box.size.x, 12.0), DIAMOND)
+	draw_rect(Rect2(0.0, foot + 6.0, box.size.x, 4.0), Color(0.0, 0.0, 0.0, 0.08))
 
 
 func _notification(what: int) -> void:
