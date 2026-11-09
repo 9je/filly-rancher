@@ -3,7 +3,8 @@ extends SceneTree
 ## (no ranch, so a shot takes seconds), puts it in the states worth looking at (idle, mid
 ## animation, a win, a bust), and saves a PNG of each at every text size the settings offer.
 ##   xvfb-run ... godot --display-driver x11 --path game -s res://scenes/test/casino_shot.gd \
-##     -- --out=/abs/dir [--game=wheel|slots|blackjack|all] [--scales=1.0,1.25,1.5]
+##     -- --out=/abs/dir [--game=wheel|slots|blackjack|all] [--scales=1.0,1.25,1.5] [--bg=/abs/hall.png]
+## --bg puts a still of the hall behind the tables, as the game has it, for the softened dim.
 const MenuStyleScript := preload("res://ui/menu_style.gd")
 const WheelScript := preload("res://systems/wheel.gd")
 const RoundScript := preload("res://systems/blackjack_round.gd")
@@ -12,12 +13,15 @@ var out := ""
 var game := "all"
 var scales: Array[float] = [1.0, 1.25, 1.5]
 var chips := 1205
+var bg := ""
 
 
 func _initialize() -> void:
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--out="):
 			out = a.substr(6)
+		elif a.begins_with("--bg="):
+			bg = a.substr(5)
 		elif a.begins_with("--game="):
 			game = a.substr(7)
 		elif a.begins_with("--scales="):
@@ -35,6 +39,13 @@ func _backdrop() -> void:
 	rect.color = Color(0.20, 0.10, 0.24)
 	rect.set_anchors_preset(Control.PRESET_FULL_RECT)
 	layer.add_child(rect)
+	if bg != "":
+		var still := TextureRect.new()
+		still.texture = ImageTexture.create_from_image(Image.load_from_file(bg))
+		still.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		still.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		still.set_anchors_preset(Control.PRESET_FULL_RECT)
+		layer.add_child(still)
 	root.add_child(layer)
 
 

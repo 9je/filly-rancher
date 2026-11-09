@@ -87,6 +87,8 @@ func _ready() -> void:
 	var dim := get_node_or_null(^"Dim") as Control
 	if dim != null:
 		dim.mouse_filter = Control.MOUSE_FILTER_STOP
+		# The world behind, softened rather than blacked out (MenuStyle.soften_dim).
+		MenuStyleScript.soften_dim(dim)
 		# M10, final-review.md M2: A CLICK ON THE DIM CLOSES THE LETTER, FOR REAL THIS TIME.
 		# Every Control between here and the sheet (Centre, Panel, Margin, Column, Stage,
 		# Footer) is MOUSE_FILTER_IGNORE, so a click anywhere on this panel -- on the sheet
@@ -108,10 +110,8 @@ func _ready() -> void:
 	$Centre/Panel/Margin/Column.add_child(_replies)
 	_close = MouseRowsScript.close_button(MouseRowsScript.CLOSE_TEXT,
 		func(_index: int) -> void: close())
-	# EVERY BUTTON ON THE SHEET IS INK ON PAPER (PS6, G13): the theme's Button is white words
-	# on a 4% white face, made for the dark menus, and on cream it all but vanished.
-	MenuStyleScript.paper_button(_close)
-	_close.add_theme_font_size_override(&"font_size", MenuStyleScript.font_px(MenuStyleScript.ROW_SIZE))
+	# The kit's one Back (MenuStyle.back_button): its plum pill stands on cream as well as it
+	# does on velvet, so the sheet no longer needs a paper button of its own here.
 	$Centre/Panel/Margin/Column.add_child(_close)
 	visible = false
 

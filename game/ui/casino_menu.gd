@@ -135,6 +135,8 @@ func _ready() -> void:
 	var dim := get_node_or_null(^"Dim") as Control
 	if dim != null:
 		dim.mouse_filter = Control.MOUSE_FILTER_STOP
+		# The world behind, softened rather than blacked out (MenuStyle.soften_dim).
+		MenuStyleScript.soften_dim(dim)
 	if _stage != null:
 		_stage.mouse_filter = Control.MOUSE_FILTER_STOP
 		_stage.focus_mode = Control.FOCUS_NONE

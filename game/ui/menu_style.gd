@@ -499,6 +499,118 @@ static func paper_button(button: Button) -> void:
 	button.add_theme_constant_override(&"outline_size", 0)
 
 
+## THE WORLD BEHIND A MENU, SOFTENED (Fable AAA round 2: "casino game panels float on a solid
+## dark void"). A menu's Dim takes this: the screen behind it read back blurred (a low mip of
+## the screen texture, averaged over a few taps) and washed toward deep plum, so the hall or
+## the plaza stays there, recognisable, without competing with the panel.
+const DIM_SHADER := """
+shader_type canvas_item;
+uniform sampler2D screen_tex : hint_screen_texture, filter_linear_mipmap;
+uniform vec4 wash : source_color = vec4(0.16, 0.06, 0.2, 1.0);
+uniform float amount = 0.5;
+uniform float lod = 3.0;
+void fragment() {
+	vec2 px = SCREEN_PIXEL_SIZE * exp2(lod);
+	vec3 c = textureLod(screen_tex, SCREEN_UV, lod).rgb * 0.2;
+	for (int i = 0; i < 8; i++) {
+		float a = float(i) * 0.785398;
+		c += textureLod(screen_tex, SCREEN_UV + vec2(cos(a), sin(a)) * px * 0.8, lod).rgb * 0.1;
+	}
+	COLOR = vec4(mix(c, wash.rgb, amount), 1.0);
+}
+"""
+static var _dim_shader: Shader = null
+
+
+static func soften_dim(dim: Control) -> void:
+	var rect := dim as ColorRect
+	if rect == null:
+		return
+	if _dim_shader == null:
+		_dim_shader = Shader.new()
+		_dim_shader.code = DIM_SHADER
+	var mat := ShaderMaterial.new()
+	mat.shader = _dim_shader
+	rect.material = mat
+
+
+## THE ONE WAY OUT (Fable AAA round 2, #8: "every menu's Back button is a tiny white pill in
+## the corner"). A deep plum pill with a gold rim and a heavier lip, cream words and a cream
+## chevron pointing back, big enough to hit without aiming: the panel's own colours, so it
+## reads as part of the panel rather than a browser control dropped on it. The same on the
+## velvet menus, the casino tables and the paper letter.
+const BACK_SIZE := Vector2(176.0, 58.0)
+const BACK_FILL := Color(0.25, 0.12, 0.31)
+const BACK_FILL_LIT := Color(0.38, 0.20, 0.47)
+const BACK_RIM := Color(0.98, 0.86, 0.45)
+const BACK_LIP := Color(0.13, 0.05, 0.17)
+
+
+static func back_box(state: StringName) -> StyleBox:
+	if state == &"focus":
+		return StyleBoxEmpty.new()
+	var box := StyleBoxFlat.new()
+	box.bg_color = BACK_FILL_LIT if state == &"hover" else BACK_FILL
+	box.border_color = BACK_RIM if state in [&"hover", &"pressed"] else Color(BACK_RIM, 0.7)
+	box.set_border_width_all(3)
+	# The lip: a darker band under the pill, gone when pressed so the pill sinks onto it.
+	box.border_width_bottom = 3 if state == &"pressed" else 7
+	box.set_corner_radius_all(26)
+	box.content_margin_left = 50.0
+	box.content_margin_right = 26.0
+	box.content_margin_top = 7.0 if state != &"pressed" else 10.0
+	box.content_margin_bottom = 9.0
+	box.shadow_color = Color(0.08, 0.02, 0.1, 0.45)
+	box.shadow_size = 6
+	box.shadow_offset = Vector2(0, 3)
+	box.anti_aliasing = true
+	if state == &"disabled":
+		box.bg_color = Color(BACK_FILL, 0.6)
+		box.border_color = Color(BACK_RIM, 0.3)
+	return box
+
+
+static func back_button(button: Button) -> void:
+	if button == null:
+		return
+	for state: StringName in [&"normal", &"hover", &"pressed", &"focus", &"disabled",
+			&"hover_pressed"]:
+		button.add_theme_stylebox_override(state,
+			back_box(&"pressed" if state == &"hover_pressed" else state))
+	for slot: StringName in [&"font_color", &"font_hover_color", &"font_pressed_color",
+			&"font_focus_color", &"font_hover_pressed_color"]:
+		button.add_theme_color_override(slot, COLOR_TITLE)
+	button.add_theme_color_override(&"font_hover_color", Color(1.0, 0.93, 0.62))
+	button.add_theme_color_override(&"font_disabled_color", Color(COLOR_TITLE, 0.45))
+	button.add_theme_constant_override(&"outline_size", 0)
+	button.add_theme_font_override(&"font", title_font())
+	button.add_theme_font_size_override(&"font_size", font_px(24))
+	button.custom_minimum_size = Vector2(maxf(button.custom_minimum_size.x, BACK_SIZE.x),
+		maxf(button.custom_minimum_size.y, BACK_SIZE.y))
+	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	# The chevron, drawn on the pill's left in the words' colour.
+	if button.get_node_or_null(^"Chevron") != null:
+		return
+	var chevron := Control.new()
+	chevron.name = "Chevron"
+	chevron.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chevron.set_anchors_preset(Control.PRESET_FULL_RECT)
+	chevron.draw.connect(func() -> void:
+		var h := chevron.size.y
+		var lip := 3.0 if button.is_pressed() else 0.0
+		var c := Vector2(28.0, h * 0.5 - 2.0 + lip)
+		var s := 8.0
+		var ink: Color = Color(1.0, 0.93, 0.62) if button.is_hovered() else COLOR_TITLE
+		chevron.draw_polyline(PackedVector2Array([c + Vector2(s * 0.55, -s), c + Vector2(-s * 0.55, 0.0),
+			c + Vector2(s * 0.55, s)]), ink, 4.5, true)
+		chevron.draw_circle(c + Vector2(s * 0.55, -s), 2.2, ink)
+		chevron.draw_circle(c + Vector2(-s * 0.55, 0.0), 2.2, ink)
+		chevron.draw_circle(c + Vector2(s * 0.55, s), 2.2, ink))
+	button.add_child(chevron)
+	for sig: StringName in [&"mouse_entered", &"mouse_exited", &"button_down", &"button_up"]:
+		button.connect(sig, chevron.queue_redraw)
+
+
 ## THE WOODEN FRAME. Used around the turntable and the cutie mark canvas, which are the two
 ## things on screen that are pictures rather than text.
 static func frame_box() -> StyleBox:

@@ -96,6 +96,8 @@ func _ready() -> void:
 	var dim := get_node_or_null(^"Dim") as Control
 	if dim != null:
 		dim.mouse_filter = Control.MOUSE_FILTER_STOP
+		# The world behind, softened rather than blacked out (MenuStyle.soften_dim).
+		MenuStyleScript.soften_dim(dim)
 	if _stage != null:
 		# STOP, not IGNORE: this is the felt, and the felt is where the game is.
 		_stage.mouse_filter = Control.MOUSE_FILTER_STOP

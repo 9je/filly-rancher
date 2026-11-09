@@ -1022,6 +1022,9 @@ func _build() -> void:
 		b.custom_minimum_size = Vector2(190, 64)
 		bar.add_child(b)
 		_bar_buttons.append(b)
+	# The kit's one Back (MenuStyle.back_button), with this menu's focus ring kept for the pad.
+	MenuStyleScript.back_button(_back_button)
+	_back_button.add_theme_stylebox_override(&"focus", focus_box(26))
 
 	_build_modal()
 

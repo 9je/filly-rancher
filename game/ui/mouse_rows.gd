@@ -100,6 +100,8 @@ static func close_button(label: String, on_click: Callable) -> Button:
 	button.text = label
 	button.focus_mode = Control.FOCUS_NONE
 	button.size_flags_horizontal = Control.SIZE_SHRINK_END
+	# ONE BACK BUTTON, KIT-WIDE (Fable AAA round 2, #8): the plum pill with its gold rim.
+	MenuStyleScript.back_button(button)
 	if on_click.is_valid():
 		button.pressed.connect(func() -> void: on_click.call(-1))
 	return button
