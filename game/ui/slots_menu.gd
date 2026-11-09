@@ -592,8 +592,9 @@ func paint(ci: Control) -> void:
 		HORIZONTAL_ALIGNMENT_LEFT)
 
 	# --- spin ------------------------------------------------------------------------------------
-	PaintScript.button(ci, SPIN, "Spin %d" % selected_stake() if selected_stake() > 0
-		else "No chips", Color(0.95, 0.62, 0.18), can_spin(), is_lit(&"spin"))
+	# The kit's one gold primary (the round 3 kit pass left Spin its old orange).
+	PaintScript.kit_button(ci, SPIN, "Spin %d" % selected_stake() if selected_stake() > 0
+		else "No chips", true, can_spin(), is_lit(&"spin"))
 
 	_paint_paytable(ci, title_font, numeral_font)
 	paint_focus(ci)

@@ -217,16 +217,15 @@ func keys_line() -> String:
 		InputDeviceScript.hint(&"ui_accept"), InputDeviceScript.hint(&"ui_cancel")]
 
 
-## THE LAST HAND, AS ITS OWN BLOCK, with a rule above it so it does not read as another
-## row. Empty until something has been settled, which is the correct state for a table
-## nobody has played yet.
+## THE LAST HAND, AS ITS OWN BLOCK, set off by a blank line either side (the "= = =" rules
+## that once boxed it were typewriter art in a drawn screen; Fable AAA round 3). Empty until
+## something has been settled, which is the correct state for a table nobody has played yet.
 func result_block() -> Array[String]:
 	if _result.is_empty():
 		return []
-	var out: Array[String] = ["", "= = = = = = = = = = = = = = = = = = = ="]
+	var out: Array[String] = [""]
 	for line in _result:
 		out.append(line)
-	out.append("= = = = = = = = = = = = = = = = = = = =")
 	out.append("")
 	return out
 
