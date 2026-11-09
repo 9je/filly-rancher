@@ -202,7 +202,7 @@ const WEATHER_SKY_DARKEN: Array[float] = [1.0, 0.75, 0.85, 0.55]
 ## out, which is not weather, it is a wall.
 const WEATHER_FOG_DENSITY: Array[float] = [0.0011, 0.004, 0.010, 0.0065]
 ## The least fog each phase stands in (see fog_density): dawn, day, dusk, night.
-const PHASE_HAZE_FLOOR: Array[float] = [0.0016, 0.0, 0.0024, 0.0065]
+const PHASE_HAZE_FLOOR: Array[float] = [0.0016, 0.0, 0.0024, 0.010]
 
 
 ## Drops alive at once. Rain is a wash of streaks around the player, not a simulation of a

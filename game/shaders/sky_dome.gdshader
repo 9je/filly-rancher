@@ -8,9 +8,11 @@ render_mode unshaded, cull_front, depth_draw_never, fog_disabled, shadows_disabl
 
 uniform sampler2D band : source_color, filter_linear, repeat_enable;
 uniform sampler2D clouds : source_color, filter_linear, repeat_enable;
-// The bands' elevation range in degrees: their top and bottom rows.
-uniform float elev_hi = 39.0;
-uniform float elev_lo = -6.0;
+// The bands' elevation range in degrees: their top and bottom rows. Painted for -6..39 and
+// lifted 7 degrees here, so the range's feet sit behind the map's own rim of hills and the
+// peaks stand clear over them.
+uniform float elev_hi = 46.0;
+uniform float elev_lo = 1.0;
 uniform vec3 horizon : source_color = vec3(0.8, 0.9, 1.0);
 uniform vec3 light : source_color = vec3(1.0);
 uniform float haze : hint_range(0.0, 1.0) = 0.3;

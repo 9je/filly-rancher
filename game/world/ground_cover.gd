@@ -17,7 +17,7 @@ const STEP := 1.15
 const CHUNK := 27.5
 const VISIBLE_METRES := 62.0
 ## Chance of a clump in open meadow, and along a path's verge.
-const MEADOW := 0.32
+const MEADOW := 0.45
 const VERGE := 0.95
 const FLOWERS := 0.05
 const FLOWER_COLOURS: Array[Color] = [Color(1.0, 1.0, 0.97), Color(1.0, 0.72, 0.84),
@@ -64,7 +64,7 @@ func build(terrain: Node, region_list: Array) -> int:
 				var s := _rng.randf_range(0.75, 1.25) * (1.15 if verge else 1.0)
 				xf = xf.scaled_local(Vector3(s, s * _rng.randf_range(0.85, 1.2), s))
 				# A shade darker and warmer than the ground under it, so a clump reads as a clump.
-				_add(tufts, key, xf, grass.darkened(0.12).lerp(Color(0.55, 0.62, 0.22), 0.12))
+				_add(tufts, key, xf, grass.darkened(0.10).lerp(Color(0.30, 0.62, 0.20), 0.25))
 			placed += 1
 		x += STEP
 	var tuft_mesh := _tuft_mesh()
@@ -130,24 +130,24 @@ static func _material() -> StandardMaterial3D:
 	return m
 
 
-## Three blades leaning out from one root, dark at the foot and light at the tip.
+## Five blades leaning out from one root, dark at the foot and light at the tip.
 static func _tuft_mesh() -> ArrayMesh:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	for k in 3:
-		var a := TAU * float(k) / 3.0 + 0.4
+	for k in 5:
+		var a := TAU * float(k) / 5.0 + 0.4
 		var out := Vector3(cos(a), 0.0, sin(a))
-		var side := Vector3(-out.z, 0.0, out.x) * 0.055
-		var tip := out * 0.13 + Vector3.UP * (0.30 + 0.06 * float(k % 2))
-		var n := (out + Vector3.UP * 0.6).normalized()
+		var side := Vector3(-out.z, 0.0, out.x) * 0.075
+		var tip := out * 0.16 + Vector3.UP * (0.30 + 0.08 * float(k % 3))
+		var n := (out + Vector3.UP * 0.8).normalized()
 		st.set_normal(n)
-		st.set_color(Color(0.72, 0.72, 0.72))
-		st.add_vertex(-side)
+		st.set_color(Color(0.82, 0.82, 0.82))
+		st.add_vertex(-side + out * 0.03)
 		st.set_normal(n)
-		st.set_color(Color(0.72, 0.72, 0.72))
-		st.add_vertex(side)
+		st.set_color(Color(0.82, 0.82, 0.82))
+		st.add_vertex(side + out * 0.03)
 		st.set_normal(n)
-		st.set_color(Color(1.18, 1.18, 1.0))
+		st.set_color(Color(1.15, 1.15, 0.95))
 		st.add_vertex(tip)
 	var mesh := st.commit()
 	mesh.surface_set_material(0, _material())

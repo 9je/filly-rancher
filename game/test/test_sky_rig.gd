@@ -369,7 +369,7 @@ func test_a_pinned_night_storm_puts_the_sun_down_and_the_rain_up() -> void:
 		"the sun has set; the light shines down from the moon")
 	assert_lt(_sun.light_energy, SkyRigScript.light_energy(DAY, CLEAR),
 		"a stormy night must be dimmer than a clear day")
-	assert_almost_eq(_environment.fog_density, SkyRigScript.fog_density(STORM), 0.000001)
+	assert_almost_eq(_environment.fog_density, SkyRigScript.fog_density(STORM, NIGHT), 0.000001)
 	assert_almost_eq(_sky_material.sky_top_color.get_luminance(),
 		SkyRigScript.sky_top(NIGHT, STORM).get_luminance(), 0.001)
 
@@ -460,18 +460,18 @@ func test_a_transition_is_a_ramp_that_actually_arrives() -> void:
 	_rig.step(SkyRigScript.TRANSITION_SECONDS * 0.5)
 	var halfway: float = _environment.fog_density
 	assert_gt(halfway, clear_density, "half a ramp has left the clear sky behind")
-	assert_lt(halfway, SkyRigScript.fog_density(STORM), "and has not arrived at the storm")
+	assert_lt(halfway, SkyRigScript.fog_density(STORM, NIGHT), "and has not arrived at the storm")
 
 	_rig.step(SkyRigScript.TRANSITION_SECONDS * 0.5)
 	# Read the arrival off the rig, not off the light: Environment.fog_density and
 	# DirectionalLight3D.light_energy are 32 bit float properties, so a value that IS exact
 	# comes back off them a rounding error away from the double it went in as.
 	var arrived: Dictionary = _rig.current_values()
-	assert_eq(float(arrived["fog_density"]), SkyRigScript.fog_density(STORM),
+	assert_eq(float(arrived["fog_density"]), SkyRigScript.fog_density(STORM, NIGHT),
 		"a full TRANSITION_SECONDS of steps lands exactly on the target")
 	assert_eq(float(arrived["light_energy"]), SkyRigScript.light_energy(NIGHT, STORM),
 		"and lands the light exactly too, not a rounding error short")
-	assert_almost_eq(_environment.fog_density, SkyRigScript.fog_density(STORM), 0.0000001,
+	assert_almost_eq(_environment.fog_density, SkyRigScript.fog_density(STORM, NIGHT), 0.0000001,
 		"and the scene has it, to whatever precision a float property can hold")
 
 
@@ -528,7 +528,7 @@ func test_current_targets_reports_what_was_asked_for() -> void:
 	_build_world()
 	_rig.apply(_pinned_state(NIGHT, STORM))
 	var targets: Dictionary = _rig.current_targets()
-	assert_almost_eq(float(targets["fog_density"]), SkyRigScript.fog_density(STORM), 0.000001)
+	assert_almost_eq(float(targets["fog_density"]), SkyRigScript.fog_density(STORM, NIGHT), 0.000001)
 	assert_eq(int(targets["rain_amount"]), SkyRigScript.rain_amount(STORM))
 	assert_almost_eq(float(targets["sun_elevation"]),
 		SkyRigScript.sun_elevation_degrees(NIGHT, 0.5), 0.01)

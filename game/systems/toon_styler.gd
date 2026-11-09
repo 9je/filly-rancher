@@ -184,15 +184,20 @@ static var _win_maps := {}
 static func window_mask(mi: Node, src: StandardMaterial3D) -> Texture2D:
 	if src == null or src.albedo_texture == null:
 		return null
-	var image_name := src.albedo_texture.resource_name
-	if image_name.is_empty():
-		return null
 	var n: Node = mi
 	while n != null and not n.scene_file_path.ends_with(".glb"):
 		n = n.get_parent()
 	if n == null:
 		return null
-	var path := "%s_win_%s.png" % [n.scene_file_path.get_basename(), image_name]
+	# The import extracts each image beside the model as <model>_<image name>.png.
+	var model := n.scene_file_path.get_basename()
+	var tex_path := src.albedo_texture.resource_path
+	var image_name := src.albedo_texture.resource_name
+	if tex_path.begins_with(model + "_"):
+		image_name = tex_path.substr(model.length() + 1).get_basename()
+	if image_name.is_empty():
+		return null
+	var path := "%s_win_%s.png" % [model, image_name]
 	if not _win_maps.has(path):
 		_win_maps[path] = load(path) if ResourceLoader.exists(path) else null
 	return _win_maps[path]
