@@ -335,9 +335,10 @@ func paint(ci: Control) -> void:
 		PaintScript.text(ci, font, card.position + Vector2(CHANCE_X, 32.0), "Chance to win",
 			MenuStyleScript.SUBTITLE_SIZE, MenuStyleScript.COLOR_DIM, HORIZONTAL_ALIGNMENT_LEFT,
 			-1.0)
+		# Right-aligned text needs its box's width, or it starts at the point and runs on.
 		PaintScript.text(ci, MenuStyleScript.numeral_font(),
-			card.position + Vector2(CHANCE_X + CHANCE_WIDTH, 34.0), "%d%%" % roundi(chance * 100.0),
-			26, PaintScript.GOLD, HORIZONTAL_ALIGNMENT_RIGHT, -1.0)
+			card.position + Vector2(CHANCE_X, 34.0), "%d%%" % roundi(chance * 100.0),
+			26, PaintScript.GOLD, HORIZONTAL_ALIGNMENT_RIGHT, CHANCE_WIDTH)
 		var track := Rect2(card.position + Vector2(CHANCE_X, 52.0), Vector2(CHANCE_WIDTH, 16.0))
 		PaintScript.rounded(ci, track, 8.0, PaintScript.FELT_DARK, PaintScript.GOLD_DIM, 1.0)
 		PaintScript.rounded(ci, Rect2(track.position,
@@ -387,12 +388,12 @@ func paint(ci: Control) -> void:
 			PaintScript.focus_ring(ci, box.grow(6.0), 40.0, t)
 	# What she holds, and what pressing her card does, in one line under the chips' right.
 	var who: String = String(field[clampi(_selected, 0, field.size() - 1)].get("name", "her"))
-	PaintScript.text(ci, font, Vector2(CARD_LEFT + CARD_SIZE.x, row_y + 40.0),
+	PaintScript.text(ci, font, Vector2(CARD_LEFT, row_y + 40.0),
 		"%d chips held" % held, MenuStyleScript.SUBTITLE_SIZE, MenuStyleScript.COLOR_DIM,
-		HORIZONTAL_ALIGNMENT_RIGHT, -1.0)
-	PaintScript.text(ci, MenuStyleScript.title_font(), Vector2(CARD_LEFT + CARD_SIZE.x, row_y + 72.0),
+		HORIZONTAL_ALIGNMENT_RIGHT, CARD_SIZE.x)
+	PaintScript.text(ci, MenuStyleScript.title_font(), Vector2(CARD_LEFT, row_y + 72.0),
 		"Click her card to back %s for %d" % [who, selected_stake()], 22, PaintScript.GOLD,
-		HORIZONTAL_ALIGNMENT_RIGHT, -1.0)
+		HORIZONTAL_ALIGNMENT_RIGHT, CARD_SIZE.x)
 
 
 func confirm() -> bool:
