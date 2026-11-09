@@ -79,10 +79,10 @@ uniform float ground_roughness = 0.95;
 // the strongest Roblox baseplate tell"). Hard-edged patches a few metres across in a sunnier
 // and a deeper green, flat fills with crisp edges the way the show's background painters lay
 // a field in, plus clover dots close to the lens.
-uniform float patch_metres = 6.5;
-uniform float patch_light = 0.14;
-uniform float patch_dark = 0.13;
-uniform float clover_amount = 0.10;
+uniform float patch_metres = 5.0;
+uniform float patch_light = 0.24;
+uniform float patch_dark = 0.22;
+uniform float clover_amount = 0.18;
 
 // THE ROAD, PAINTED RATHER THAN LAID. A rigid dirt_road.glb plate cannot follow 0.70 m of
 // relief across a 2.28 m footprint -- it either buries its far end or floats its near one,
