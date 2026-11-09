@@ -228,10 +228,40 @@ func _stand_tote() -> void:
 		_tokens.append(bead)
 		_token_at.append(0.0)
 		_token_speed.append(_tote_rng.randf_range(0.07, 0.13))
+		var tag := Label3D.new()
+		tag.name = "Name%d" % i
+		tag.font_size = 48
+		tag.pixel_size = 0.004
+		tag.outline_size = 8
+		tag.modulate = Color(1.0, 0.97, 0.9)
+		tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		tag.position = Vector3(LANE_FROM - 0.12, LANE_TOP - i * LANE_PITCH, 0.27)
+		tag.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		tote.add_child(tag)
+		_tote_names.append(tag)
+
+
+## THE BOARD SHOWS THE REAL RACE (P8, playtest 2026-11-08 item 62: "the race board runs on
+## its own loop, one race then another, with no names"). Injected by the ranch: each lane's
+## progress (RaceTrack.progress()) and the runners' names; empty when nothing runs, and then
+## the beads wait at the gate and the board says when the next race goes.
+var race_source := Callable()
+var names_source := Callable()
+var _tote_names: Array[Label3D] = []
 
 
 func _run_tote(delta: float) -> void:
 	if _tokens.is_empty():
+		return
+	if race_source.is_valid():
+		var prog: Array = race_source.call()
+		var names: Array = names_source.call() if names_source.is_valid() else []
+		for i in _tokens.size():
+			var t: float = float(prog[i]) if i < prog.size() else 0.0
+			_tokens[i].position.x = lerpf(LANE_FROM, LANE_TO, t)
+			if i < _tote_names.size():
+				_tote_names[i].text = String(names[i]) if i < names.size() and not prog.is_empty() \
+					else ("Next race: when a bet goes down" if i == 0 else "")
 		return
 	if _tote_hold > 0.0:
 		_tote_hold -= delta

@@ -5968,6 +5968,14 @@ func ensure_palace_interior() -> PalaceInterior:
 	add_child(palace_interior)
 	palace_interior.global_position = Vector3(at.x, at.y - PALACE_INTERIOR_DEPTH, at.z)
 	palace_interior.build(spawner.pony_dir if spawner != null else "res://data/ponies")
+	# The hall's tote mirrors the real race on the Strip, names and all (P8 item 62).
+	if race_track != null:
+		palace_interior.set("race_source", func() -> Array: return race_track.call("progress"))
+		palace_interior.set("names_source", func() -> Array:
+			var out: Array = []
+			for f: Dictionary in _race_field:
+				out.append(String(f.get("name", "")))
+			return out)
 	palace_interior.visible = false
 	palace_interior.exit_walked_into.connect(func() -> void:
 		if _in_palace and not _palace_moving and _no_other_menu_open():

@@ -152,6 +152,17 @@ func start(field: Array[Dictionary], result: Dictionary) -> bool:
 	return true
 
 
+## Each lane's way down the track, 0 at the gate to 1 at the wire, while a race runs; empty
+## when none does. The hall's tote board mirrors this (P8 item 62).
+func progress() -> Array[float]:
+	var out: Array[float] = []
+	if not _running:
+		return out
+	for lane in LANES:
+		out.append(clampf(_elapsed / _times[lane], 0.0, 1.0) if lane < _times.size() else 0.0)
+	return out
+
+
 func _process(delta: float) -> void:
 	if not _running:
 		return
