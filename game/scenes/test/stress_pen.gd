@@ -72,7 +72,7 @@ func _run() -> void:
 			player.global_position = p
 			var to := (b - a)
 			if player.has_method("face"):
-				player.call("face", to)
+				player.call("face", atan2(-to.x, -to.z))
 			await physics_frame
 			f += 1
 			_measure(pen, terrain)
