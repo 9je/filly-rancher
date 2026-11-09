@@ -1,4 +1,10 @@
 extends GutTest
+
+
+## The card's wait for the world's catch beat (catch_card.gd) is off here: these read the
+## card the moment it is shown.
+func before_all() -> void:
+	load("res://ui/catch_card.gd").default_entrance_delay = 0.0
 ## Fable AAA round 3's UI items, the facts under the renders (docs/fable-aaa-round3-2026-11-09.md
 ## #6 and #9).
 

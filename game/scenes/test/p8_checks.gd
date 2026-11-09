@@ -108,6 +108,42 @@ func _run() -> void:
 			rig.set("_look_pitch", -10.0)
 			await Boot.frames(self, 20)
 
+	if _want("catchstrip"):
+		# The catch as it plays in the world (Fable round 4, #7: "no in-world beat" -- the
+		# review's catch/* frames are the card over a still): the beam held on a real wild
+		# pony, a frame every 0.3 s until she is in the Scoop and the card has landed.
+		ranch.call("get_story").call("set_flag", "has_scoop")
+		var beam2: Node = player.call("get_magic_beam")
+		var rig2: Node = player.call("get_camera_pivot").get_node("CameraRig")
+		var target: Node3D = null
+		var near := INF
+		for p: Node3D in ranch.get("spawner").call("get_spawned"):
+			var d := p.global_position.distance_to(player.global_position)
+			if d < near and not p.is_in_group(&"penned"):
+				near = d
+				target = p
+		if target != null:
+			var ahead := -player.global_transform.basis.z
+			ahead.y = 0.0
+			target.global_position = player.global_position + ahead.normalized() * 4.0
+			rig2.set("_look_pitch", -14.0)
+			var caught := [false]
+			beam2.connect(&"captured", func(_i: PonyInstance) -> void: caught[0] = true)
+			await Boot.frames(self, 6)
+			Input.action_press(beam2.get("BEAM_ACTION"))
+			var k := 0
+			var after := 0
+			while k < 40 and after < 6:
+				await create_timer(0.15).timeout
+				await Boot.shot(self, out, "catchreal_%02d" % k)
+				k += 1
+				if caught[0]:
+					after += 1
+			Input.action_release(beam2.get("BEAM_ACTION"))
+			print("CATCHSTRIP caught=%s frames=%d" % [caught[0], k])
+			rig2.set("_look_pitch", -10.0)
+			await Boot.frames(self, 20)
+
 	if _want("card"):
 		# Item 71: the caught card as a real catch shows it, read off a wild named pony.
 		var hud2: Node = ranch.get_node_or_null(^"HUD")

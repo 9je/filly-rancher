@@ -1,4 +1,10 @@
 extends GutTest
+
+
+## The card's wait for the world's catch beat (catch_card.gd) is off here: these read the
+## card the moment it is shown.
+func before_all() -> void:
+	load("res://ui/catch_card.gd").default_entrance_delay = 0.0
 ## OWNER PLAYTEST 2026-10-25, note 3: "i think the text and traits on catch can be better
 ## maybe icons and stuff instead of basic text on the top". A catch slides in a card (name,
 ## portrait, rarity stars, trait icons) instead of raising a toast line.

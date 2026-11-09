@@ -192,7 +192,24 @@ func show_catch(instance: PonyInstance, body: Node3D = null) -> void:
 
 	_panel.reset_size()
 	_panel.size.x = CARD_WIDTH
+	# THE WORLD'S BEAT FIRST (Fable AAA round 4, #7: "no in-world beat"; an in-game strip
+	# showed the sunburst landing the frame after the catch, over her flight into the Scoop,
+	# the burst and the squash). The portrait is taken above, now, while her body exists; the
+	# card waits until she is in the Scoop.
+	_entrance_token += 1
+	var token := _entrance_token
+	if entrance_delay > 0.0 and is_inside_tree():
+		await get_tree().create_timer(entrance_delay).timeout
+		if token != _entrance_token:
+			return
 	_slide()
+
+
+## Seconds between the catch and the card: the beam's ghost flight (MagicBeam.GHOST_SECONDS)
+## and the pop after it. Tests set 0.
+static var default_entrance_delay := 0.65
+var entrance_delay := default_entrance_delay
+var _entrance_token := 0
 
 
 func is_showing() -> bool:
