@@ -13,7 +13,7 @@ const DonorTableScript := preload("res://systems/donor_table.gd")
 const StockPaletteScript := preload("res://systems/stock_palette.gd")
 const OUT := "res://assets/ui/style_icons"
 const SIZE := 128
-const VIEW := [Vector3(0.7, 0.2, -1.0), Vector3(0, 1.62, -0.45), 0.72]
+const VIEW := [Vector3(0.7, 0.15, -1.0), Vector3(0, 1.72, -0.4), 0.9]
 
 
 func _initialize() -> void:
