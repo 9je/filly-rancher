@@ -77,6 +77,10 @@ func _tick(delta: float, snap: bool) -> void:
 	_mat.set_shader_parameter(&"stars", _stars)
 	var sun := _sun()
 	if sun != null:
+		# Held every frame, not set once: in the full ranch the engine's own sun still drew
+		# (a showcase render after the change), whatever reset it.
+		if sun.sky_mode != DirectionalLight3D.SKY_MODE_LIGHT_ONLY:
+			sun.sky_mode = DirectionalLight3D.SKY_MODE_LIGHT_ONLY
 		var to_sun := sun.global_basis.z
 		_mat.set_shader_parameter(&"sun_dir", to_sun)
 		# By day only (at night the light is the moon's), faded under the horizon and in murk.
