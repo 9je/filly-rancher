@@ -399,9 +399,10 @@ func _show_toast(text: String) -> void:
 	_toast.modulate.a = 1.0
 	_set_toast_icon(toast_icon_for(text))
 	_fit_pill(_toast)
+	_place_toast()
 	_place_toast_icon()
-	# A little pop on arrival, the way a show title card bounces in.
-	_toast.pivot_offset = _toast.size * 0.5
+	# A little pop on arrival, the way a show title card bounces in, from its left end.
+	_toast.pivot_offset = Vector2(0.0, _toast.size.y * 0.5)
 	_toast.scale = Vector2(0.86, 0.86)
 	create_tween().tween_property(_toast, "scale", Vector2.ONE, 0.22).set_trans(
 		Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
@@ -457,6 +458,36 @@ func _set_toast_icon(icon_name: String) -> void:
 		# centred line slid under the picture. The pill is fitted to the line anyway.
 		_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_toast_icon.texture = IconSet.texture(icon_name, 96, false)
+
+
+## THE TOAST SITS ON THE SADDLEBAG (Fable AAA round 3, #9: "the toast pill sits dead centre
+## over the player"). Its left end is the bag card's, its foot TOAST_GAP above the card's top,
+## so news stacks over the strip it is mostly about (a catch, a pen, a sale) and the pony in
+## the middle of the screen stays clear. Measured at each toast: the card grows with the bag.
+const TOAST_GAP := 18.0
+
+
+func _place_toast() -> void:
+	var w := _toast.offset_right - _toast.offset_left
+	var h := _toast.offset_bottom - _toast.offset_top
+	var card := get_node_or_null(^"BagCard") as Control
+	var left := 28.0
+	var top := _canvas_size().y - 200.0
+	if card != null and card.visible:
+		left = card.position.x
+		top = card.position.y
+	_toast.anchor_left = 0.0
+	_toast.anchor_right = 0.0
+	_toast.anchor_top = 0.0
+	_toast.anchor_bottom = 0.0
+	_toast.offset_left = left
+	_toast.offset_right = left + w
+	_toast.offset_bottom = top - TOAST_GAP
+	_toast.offset_top = _toast.offset_bottom - h
+
+
+func toast_rect() -> Rect2:
+	return Rect2(_toast.position, _toast.size)
 
 
 func _place_toast_icon() -> void:

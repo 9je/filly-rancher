@@ -68,9 +68,33 @@ func _run() -> void:
 		layer.add_child(still)
 	var hud: CanvasLayer = HudScene.instantiate()
 	root.add_child(hud)
+	# The rest of the HUD as ranch.gd mounts it (Fable AAA round 3, #9: the compass and Getting
+	# started stood at full strength under the sunburst): the compass strip, the objective card
+	# and the three lessons, so the frames show the HUD stepping out for the beat. Use a --bg
+	# still with no HUD baked into it.
+	var compass: Control = (load("res://ui/compass.gd") as GDScript).new()
+	compass.name = "Compass"
+	hud.add_child(compass)
+	compass.set("camera_provider", func() -> Camera3D: return cam)
+	var spot := Node3D.new()
+	world.add_child(spot)
+	spot.position = Vector3(10, 0, -30)
+	var places: Array[Dictionary] = [{"name": "Pens", "icon": int(PlaceSign.Icon.FENCE), "node": spot}]
+	compass.call("set_places", places)
+	compass.call("set_goal", spot, int(PlaceSign.Icon.STAR))
+	var objective: Control = (load("res://ui/objective_card.gd") as GDScript).new()
+	objective.name = "ObjectiveCard"
+	hud.add_child(objective)
+	objective.call("show_objective", {"id": &"probe", "words": "Catch a Drifter",
+		"icon": int(PlaceSign.Icon.STAR)}, 7.0)
+	var rows: Array = []
+	for id: String in ["tutorial_catch", "tutorial_pen", "tutorial_sell"]:
+		rows.append({"id": id, "text": id, "done": false, "paid": false, "reward_bits": 20})
+	hud.call("set_tasks", rows)
 	var body := _body(StringName(pony))
 	for i in 10:
 		await process_frame
+	await _shot("catch_before")
 	var card: Control = hud.call("catch_card")
 	Engine.time_scale = 0.08
 	card.call("show_catch", PonyInstanceScript.create(StringName(pony)), body)

@@ -185,6 +185,26 @@ func _dress_as_title() -> void:
 		column.move_child(_logo, 0)
 	if _rows != null:
 		_rows.add_theme_constant_override(&"separation", 12)
+		# THE MENU HAS A BACKING (Fable AAA round 3, #9: the key art's Pens signpost poked
+		# through the Quit row): a deep plum velvet card under the four rows, a gold hairline
+		# round it, wider than the rows, so nothing in the picture shows through or meets a
+		# button. Drawn by the rows' box itself, under its children.
+		_rows.draw.connect(func() -> void:
+			_rows.draw_style_box(menu_backing_box(),
+				Rect2(Vector2.ZERO, _rows.size).grow_individual(26.0, 22.0, 34.0, 24.0)))
+		_rows.resized.connect(_rows.queue_redraw)
+
+
+static func menu_backing_box() -> StyleBoxFlat:
+	var b := StyleBoxFlat.new()
+	b.bg_color = Color(HouseStyleScript.PLUM_DARK.darkened(0.25), 0.94)
+	b.border_color = Color(HouseStyleScript.GOLD_DIM, 0.75)
+	b.set_border_width_all(2)
+	b.set_corner_radius_all(44)
+	b.shadow_color = Color(0.04, 0.0, 0.06, 0.5)
+	b.shadow_size = 22
+	b.anti_aliasing = true
+	return b
 
 
 ## Each row's picture: a fresh start, home, the settings gear, the way out.
@@ -197,7 +217,7 @@ const ROW_HEIGHT := 64.0
 static func row_button_box(picked: bool, hovered: bool) -> StyleBoxFlat:
 	var b := StyleBoxFlat.new()
 	b.bg_color = HouseStyleScript.PLUM.lightened(0.06) if picked else \
-		(HouseStyleScript.PLUM if hovered else Color(HouseStyleScript.PLUM_DARK, 0.86))
+		(HouseStyleScript.PLUM if hovered else HouseStyleScript.PLUM_DARK)
 	b.border_color = HouseStyleScript.GOLD if picked or hovered else Color(HouseStyleScript.GOLD_DIM, 0.8)
 	b.set_border_width_all(3 if picked else 2)
 	b.set_corner_radius_all(int(ROW_HEIGHT * 0.5))

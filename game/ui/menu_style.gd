@@ -462,7 +462,15 @@ static func pill_box(fill: Color, edge: Color) -> StyleBoxFlat:
 static func paper_button_box(state: StringName) -> StyleBox:
 	match state:
 		&"hover":
-			return pill_box(PILL_CREAM, COLOR_TAB_ON.darkened(0.15))
+			# A DELTA YOU CAN SEE (Fable AAA round 3, #9: a letter's answers looked the same
+			# under the pointer): the face warms to gold, the edge goes gold and heavier, and
+			# a soft gold glow lifts it off the page.
+			var lit := pill_box(PILL_CREAM.lerp(PAPER_BUTTON_LIT, 0.45), COLOR_TAB_ON.darkened(0.28))
+			lit.set_border_width_all(3)
+			lit.border_width_bottom = 5
+			lit.shadow_color = Color(PAPER_BUTTON_LIT, 0.55)
+			lit.shadow_size = 8
+			return lit
 		&"pressed":
 			return pill_box(PILL_PLUM.lerp(PILL_CREAM, 0.55), PILL_PLUM)
 		&"focus":
@@ -496,7 +504,9 @@ static func paper_button(button: Button) -> void:
 			&"font_focus_color", &"font_hover_pressed_color"]:
 		button.add_theme_color_override(slot, COLOR_INK)
 	button.add_theme_color_override(&"font_disabled_color", Color(COLOR_INK, 0.45))
+	button.add_theme_color_override(&"font_hover_color", PILL_PLUM.darkened(0.35))
 	button.add_theme_constant_override(&"outline_size", 0)
+	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
 
 ## THE WORLD BEHIND A MENU, SOFTENED (Fable AAA round 2: "casino game panels float on a solid

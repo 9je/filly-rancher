@@ -74,6 +74,27 @@ func _ready() -> void:
 	super._ready()
 
 
+## THE GUIDE IS AS TALL AS ITS CARDS (Fable AAA round 3, #9: "the race guide's lower 40% is
+## empty purple"). TableMenu pads the Rows column with an empty hit holder per row for tables
+## that draw their rows on the stage; the guide's cards and stake chips take their clicks on
+## the stage itself (stage_hit_rects()), so those holders were only blank height under the
+## stake row. Only the printed result lines stay.
+func refresh() -> void:
+	super.refresh()
+	if _rows == null:
+		return
+	var keep: int = printed_lines().size()
+	# The last refresh's holders are only queued for deletion: skip them, they go this frame.
+	var kids: Array[Node] = []
+	for child in _rows.get_children():
+		if not child.is_queued_for_deletion():
+			kids.append(child)
+	for i in range(keep, kids.size()):
+		_rows.remove_child(kids[i])
+		kids[i].queue_free()
+	_rows.visible = keep > 0
+
+
 func title_text() -> String:
 	return TITLE
 

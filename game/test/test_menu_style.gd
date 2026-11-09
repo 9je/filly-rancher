@@ -186,6 +186,9 @@ func test_a_table_draws_its_rows_with_the_outline_and_in_a_row_box() -> void:
 		{"uid": &"a", "name": "Mote", "happiness": 0.8, "odds": 3.5, "chance": 0.28},
 	] as Array[Dictionary])
 	assert_true(bool(menu.call("open")))
+	# The guide's cards are drawn on its stage (Fable AAA round 3, #9: no blank hit rows under
+	# them); what it still prints is the last race's result.
+	menu.call("show_result", ["Mote won by a nose."] as Array[String])
 	var rows := menu.get_node(^"Centre/Panel/Margin/Column/Rows") as VBoxContainer
 	assert_gt(rows.get_child_count(), 0, "the table drew rows to check")
 	var holder := rows.get_child(0) as PanelContainer
@@ -230,3 +233,15 @@ func test_a_payout_pops_up_and_fades_away() -> void:
 	assert_false(is_instance_valid(pop), "and is gone")
 	var spend: Label = MenuStyle.payout_pop(host, Vector2(200, 150), -120)
 	assert_eq(spend.text, "-120 bits")
+
+
+## Fable AAA round 3, #9: a letter's answer looked the same under the pointer. The paper
+## pill's hover face is visibly warmer, its edge heavier, and it glows.
+func test_a_paper_button_lights_up_under_the_pointer() -> void:
+	var rest := MenuStyleScript.paper_button_box(&"normal") as StyleBoxFlat
+	var lit := MenuStyleScript.paper_button_box(&"hover") as StyleBoxFlat
+	var face_delta: float = absf(rest.bg_color.r - lit.bg_color.r) + absf(rest.bg_color.g - lit.bg_color.g) \
+		+ absf(rest.bg_color.b - lit.bg_color.b)
+	assert_gt(face_delta, 0.12, "the face changes colour, not just the edge")
+	assert_gt(lit.border_width_left, rest.border_width_left, "the edge gets heavier")
+	assert_gt(lit.shadow_size, 0, "and it glows")

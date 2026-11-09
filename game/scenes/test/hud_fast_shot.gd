@@ -88,5 +88,9 @@ func _run() -> void:
 	for i in 30:
 		await process_frame
 	await _shot("hud_pony_in_reach_720")
+	# A toast (Fable AAA round 3, #9): on the saddlebag, not over the pony.
+	hud.call("toast", "Lark Wish moved into the pen. It is now full.")
+	await _shot("hud_toast_720")
+	print("TOAST_RECT ", hud.call("toast_rect"))
 	print("HUD_FAST_SHOT_OK")
 	quit()

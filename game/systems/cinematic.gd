@@ -39,6 +39,7 @@ var _top: ColorRect
 var _bottom: ColorRect
 var _caption: Label
 var _skip_hint: Label
+var _skip_fill: ColorRect
 var _flash: ColorRect
 var _skip_held := 0.0
 var _skip := false
@@ -92,10 +93,28 @@ func _ready() -> void:
 	_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_flash)
+	# THE SKIP HINT IS A KIT PILL (Fable AAA round 3, #9: "tiny grey text"): cream words on a
+	# small plum pill with a gold hairline, and a gold bar along its foot that fills while the
+	# key is held, so the hold reads as a hold.
 	_skip_hint = Label.new()
 	_skip_hint.add_theme_font_override(&"font", MenuStyle.title_font())
-	_skip_hint.add_theme_font_size_override(&"font_size", 20)
-	_skip_hint.add_theme_color_override(&"font_color", Color(1.0, 0.92, 0.70, 0.8))
+	_skip_hint.add_theme_font_size_override(&"font_size", MenuStyle.font_px(28))
+	_skip_hint.add_theme_color_override(&"font_color", Color(1.0, 0.95, 0.82))
+	var pill := StyleBoxFlat.new()
+	pill.bg_color = Color(0.25, 0.13, 0.32, 0.9)
+	pill.border_color = Color(0.98, 0.78, 0.36, 0.8)
+	pill.set_border_width_all(2)
+	pill.set_corner_radius_all(20)
+	pill.content_margin_left = 20.0
+	pill.content_margin_right = 20.0
+	pill.content_margin_top = 5.0
+	pill.content_margin_bottom = 7.0
+	pill.anti_aliasing = true
+	_skip_hint.add_theme_stylebox_override(&"normal", pill)
+	_skip_fill = ColorRect.new()
+	_skip_fill.color = Color(0.98, 0.78, 0.36)
+	_skip_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_skip_hint.add_child(_skip_fill)
 	_skip_hint.visible = false
 	add_child(_skip_hint)
 	visible = false
@@ -208,7 +227,11 @@ func _process(delta: float) -> void:
 		if InputMap.has_action(a) and Input.is_action_pressed(a):
 			held = true
 	_skip_held = _skip_held + delta if held else 0.0
-	_skip_hint.modulate.a = 0.7 + 0.3 * clampf(_skip_held / SKIP_HOLD, 0.0, 1.0)
+	var held_k := clampf(_skip_held / SKIP_HOLD, 0.0, 1.0)
+	_skip_hint.modulate.a = 0.85 + 0.15 * held_k
+	var inset := 18.0
+	_skip_fill.position = Vector2(inset, _skip_hint.size.y - 6.0)
+	_skip_fill.size = Vector2((_skip_hint.size.x - inset * 2.0) * held_k, 3.0)
 	if _skip_held >= SKIP_HOLD:
 		_skip = true
 
@@ -223,7 +246,10 @@ func _bars(to: float) -> void:
 	_top.size = Vector2(size.x, h)
 	_bottom.size = Vector2(size.x, h)
 	_place_caption()
-	_skip_hint.position = Vector2(size.x - 260.0, size.y - h * 0.5 - 14.0)
+	_skip_hint.size = Vector2.ZERO
+	var pill_size := _skip_hint.get_combined_minimum_size()
+	_skip_hint.size = pill_size
+	_skip_hint.position = Vector2(size.x - pill_size.x - 40.0, size.y - h * 0.5 - pill_size.y * 0.5)
 	var tw := create_tween().set_parallel(true)
 	tw.tween_property(_top, "position:y", -h + h * to, BAR_SECONDS)
 	tw.tween_property(_bottom, "position:y", size.y - h * to, BAR_SECONDS)
