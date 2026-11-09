@@ -748,3 +748,6 @@ the cinematics. Calls made:
   key is held.
 - **Blackjack:** one gold primary per row (Hit during a hand, Deal before it); Stand, Double,
   Split, Clear and Max are the plum secondary with a gold hairline (CasinoPaint.kit_button).
+
+## 2026-11-09: Fewer full review rounds (owner: "thats a lot of time being spent on reviews")
+- A full showcase is ~2 h of software rendering; the Fable read is ~6 min. Fixes are checked on the one-minute probes (char_probe --player/--plot/--rim/--phase, sun_probe, creator/menu/hud/casino fast shots) and a full showcase plus fresh Fable round happens only after a large batch, at most one more before the final verdict. Mid-course reads use only the changed areas' probe images.
