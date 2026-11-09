@@ -134,12 +134,13 @@ func derpy_crash() -> void:
 	facing.y = 0.0
 	facing = facing.normalized()
 	var fside := facing.cross(Vector3.UP).normalized()
-	# She comes to rest sitting up, dazed: her face is about a metre off the ground.
-	var face := land + facing * 0.45 + Vector3.UP * 1.0
-	# Far enough back that she can get to her hooves (the shake) without filling the lens.
-	var close := face + facing * 2.3 + fside * 0.6 + Vector3.UP * 0.15
+	# She comes to rest sitting up, dazed, and gets to her hooves on the line (the shake): the
+	# frame is aimed between her sitting face (1.0 m) and her standing one (1.7 m), far enough
+	# back that standing up never takes her head out of the top (render check: it did at 2.3 m).
+	var face := land + facing * 0.5 + Vector3.UP * 1.3
+	var close := face + facing * 3.4 + fside * 0.7 + Vector3.UP * 0.1
 	if not _clear_line(close, face):
-		close = face + facing * 2.3 - fside * 0.6 + Vector3.UP * 0.15
+		close = face + facing * 3.4 - fside * 0.7 + Vector3.UP * 0.1
 	var shots := [
 		# A long lens on the way down, so she fills the frame instead of a smudge by a roof.
 		{"from": "here", "to": player.global_position - fwd * 1.0 + Vector3.UP * 2.6,
@@ -149,8 +150,8 @@ func derpy_crash() -> void:
 			"look": land + Vector3.UP * 0.6, "time": 2.2, "fov": 50.0, "fov_to": 44.0,
 			"shake": 0.16, "caption": "Derpy!",
 			"call": func() -> void: _flop(derpy, land, facing)},
-		{"from": close, "to": close.lerp(face, 0.05), "look": face, "time": 2.4,
-			"fov": 40.0, "fov_to": 34.0,
+		{"from": close, "to": close.lerp(face, 0.04), "look": face, "time": 2.4,
+			"fov": 42.0, "fov_to": 38.0,
 			"caption": "\"I just don't know what went wrong!\"",
 			"call": func() -> void: _play(derpy, &"shake")},
 		{"from": "here", "to": player.global_position - fwd * 4.0 + Vector3.UP * 3.0,

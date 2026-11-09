@@ -15,6 +15,11 @@ Fixes landed: the world pass (eb032bc, 26ffa41), the HUD and 2D screens from the
 reel blur and the catch moment. Next: render, look, then re-render the full showcase
 (scratchpad showcase.sh) and send it to a FRESH Fable with fable_brief.md only; loop until AAA.
 
+2026-11-09 later: round-2 fixes landed (75560ad..410816f): Derpy lands facing the lens with a
+face close-up; the Rainboom cuts to a fixed meadow vantage, only on a clear day; flat paper
+pills kit-wide (owner flag on the creator steps); Surprise me on the stage; lens proximity fade.
+A fresh Fable round 2 reviews $S/showcase2 (87 images). Next: fix its ranked list, loop.
+
 If the owner reports back: start a NEW session, read this file and the ledger, and work from
 their new list. Open items to carry: 26, 29, 37, 50, 65, 71, 77.
 
