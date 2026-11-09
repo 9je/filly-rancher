@@ -7,6 +7,7 @@ Canon MLP stays: real names, looks and places ("lean into mlp fully", private bu
 The owner's goal for this session: an unbiased Fable 5 judging the game AAA, plus the bug fixes. Round 1, from 70 fresh renders, was NOT YET (docs/fable-aaa-round1-2026-11-09.md: world 5, characters 5, UI 4, menus 5, cinematics 3, cohesion 5). Answered so far:
 - **World:** a painted horizon with Canterlot, stars and moon; lit windows and lamp halos; night haze; staked plots; grass and flowers; near-lens fade; cinematic flash, shake and long lenses (eb032bc, 26ffa41).
 - **HUD and screens** (UI agent; 442c99c..993581f): plum and gold throughout; a drawn logotype; icon-row Depot rules and blackjack rules; sealed letters; market copy shown in full; race pictures in the creator.
+- **Round 2** (docs/fable-aaa-round2-2026-11-09.md): NOT YET, world 5, characters 4, UI 6, menus 6, cinematics 3, cohesion 5. Fixes in 08d32a0 (sun, plot preview, meadow, puddles, flat fill, caption cards); Derpy's close-up c8e2373. Suite on c8e2373: 2262/2263 (test_market_tiles coin flight, passes alone 10/10: a load flake); the stale-import failures of 874b0bf are gone. UI items with an Opus 5.5 agent.
 - **Bug fixes:** duplicate ponies across spawn markers (7b15fce, 1832ce3; suite 2259/2259); the blackjack dealer's portrait (e979ba2).
 
 ## Playtest sweep PS, 2026-11-06 (PLAN.md section PS; the ledger is docs/playtest-2026-11-05-ledger.md)

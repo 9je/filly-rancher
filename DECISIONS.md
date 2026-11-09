@@ -635,3 +635,12 @@ same row read as a fifth configuration step. Calls made:
   is additive, the path edge has a fine second octave, the creator knoll is deepened (lift
   0.62) under a bluer sky, race portraits sit on a mane-coloured plate, and the Rainbow thins
   by 45% at night.
+
+## 2026-11-09: Fable round 2 fixes; the bar is stylised toon AAA (owner)
+- Fable round 2 (docs/fable-aaa-round2-2026-11-09.md): NOT YET, 5/4/6/6/3/5. UI items (Market/Depot art, Back button, HUD prompt and markers, compass, catch card) went to an Opus 5.5 worktree agent; world and characters done here.
+- The sun is painted by the sky dome (flat disc and halo); the light is SKY_MODE_LIGHT_ONLY, because the engine's disc came out ringed with black dots and drew the same ring round the moon.
+- The plot build preview is a glowing fence (posts and two rails), not translucent walls.
+- Ambient sky contribution 0 (flat fill colour) so bodies show only the toon band; night base energy 0.70 -> 0.48 keeps the same effective storm-night luminance (0.12).
+- New `wet` shader global (night_lights.gd, from the weather): puddles on the tracks and darker ground in rain; the terrain desaturates toward blue-grey at night. The poured rainbow keeps 8% at night (the Works never stops).
+- Fades (subject and lens proximity) apply only while the rig's camera is the one drawing.
+- Owner: "indie toon AAA rather than ultra hyperrealistic AAA". The reviewer brief now says so and forbids realism as a fix.
