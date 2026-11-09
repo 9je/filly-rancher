@@ -429,6 +429,11 @@ func _build_grids() -> void:
 		var race_labels: Array[String] = []
 		race_labels.assign(PlayerLookScript.RACE_LABELS)
 		_race_grid.set_swatches(race_swatches, race_labels)
+		# Each kind's own picture beside its word: a horseshoe, a wing, a horn.
+		var race_icons: Array[Texture2D] = []
+		for icon_name: String in ["earth", "pegasus", "unicorn"]:
+			race_icons.append(IconSet.texture(icon_name, 96))
+		_race_grid.set_card_icons(race_icons)
 		_race_grid.picked.connect(set_race)
 	for grid: SwatchGrid in [_mane2_grid, _tail_grid]:
 		if grid == null:

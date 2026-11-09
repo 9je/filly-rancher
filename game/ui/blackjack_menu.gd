@@ -683,9 +683,72 @@ func _paint_rules(ci: Control, title_font: Font) -> void:
 		lines.append(line)
 	lines.append("The house keeps %.1f bits of every 100 against that card."
 		% (BlackjackScript.house_edge() * 100.0))
-	PaintScript.paragraph(ci, MenuStyleScript.numeral_font(), Rect2(RULES.position
-		+ Vector2(28.0, 80.0), RULES.size - Vector2(56.0, 100.0)), lines, 24,
-		MenuStyleScript.COLOR_NAME)
+	# ICON ROWS, NOT EIGHT BULLET SENTENCES (Fable AAA review round 1, #8): two columns of
+	# rules, each led by a chip that says what it is about at a glance (a suit, the face-down
+	# card, 17, 3:2, x2, a split pair, the sign, a coin). The words are the placard's own.
+	var top := RULES.position.y + 80.0
+	var col_w := (RULES.size.x - 56.0 - 30.0) * 0.5
+	var rows := int(ceil(float(lines.size()) / 2.0))
+	var row_h := (RULES.size.y - 100.0) / float(maxi(rows, 1))
+	for i in lines.size():
+		var col := i / rows
+		var r := i % rows
+		var cell := Rect2(RULES.position.x + 28.0 + float(col) * (col_w + 30.0),
+			top + float(r) * row_h, col_w, row_h - 10.0)
+		var badge := Rect2(cell.position + Vector2(0.0, (cell.size.y - RULE_BADGE) * 0.5),
+			Vector2(RULE_BADGE, RULE_BADGE))
+		_rule_badge(ci, badge, lines[i], title_font)
+		var words: Array[String] = [lines[i]]
+		var text_box := Rect2(cell.position + Vector2(RULE_BADGE + 16.0, 0.0),
+			Vector2(cell.size.x - RULE_BADGE - 16.0, cell.size.y))
+		var px := PaintScript.paragraph_size(MenuStyleScript.numeral_font(), words, 21,
+			text_box.size)
+		var h := PaintScript.paragraph_height(MenuStyleScript.numeral_font(), words, px,
+			text_box.size.x)
+		PaintScript.paragraph(ci, MenuStyleScript.numeral_font(), Rect2(text_box.position
+			+ Vector2(0.0, (text_box.size.y - h) * 0.5), Vector2(text_box.size.x, h + 4.0)),
+			words, 21, MenuStyleScript.COLOR_NAME)
+
+
+const RULE_BADGE := 58.0
+## What leads each rule: [a word in it, an icon from the set or a short token on a chip].
+const RULE_BADGES := [["deck", "suit_spades"], ["face down", "#back"], ["Dealer draws", "17"],
+	["pays 3 to 2", "3:2"], ["Double", "x2"], ["Split", "#pair"], ["sign", "board"],
+	["house keeps", "coin"]]
+
+
+## One rule's chip: a gold-rimmed disc on the felt with the rule's picture or token.
+func _rule_badge(ci: Control, box: Rect2, line: String, font: Font) -> void:
+	var what := "star"
+	for pair: Array in RULE_BADGES:
+		if line.contains(String(pair[0])):
+			what = String(pair[1])
+			break
+	var c := box.get_center()
+	ci.draw_circle(c + Vector2(0, 3), box.size.x * 0.5, Color(0, 0, 0, 0.3))
+	ci.draw_circle(c, box.size.x * 0.5, PaintScript.PLUM)
+	ci.draw_arc(c, box.size.x * 0.5 - 1.5, 0.0, TAU, 40, PaintScript.GOLD, 3.0, true)
+	ci.draw_arc(c, box.size.x * 0.36, 0.0, TAU, 40, Color(PaintScript.GOLD_DIM, 0.6), 1.5, true)
+	var inner := box.grow(-box.size.x * 0.2)
+	match what:
+		"#back":
+			var card := Rect2(inner.get_center() - Vector2(13, 17), Vector2(26, 34))
+			PaintScript.rounded(ci, card, 4.0, PaintScript.PLUM_DARK, PaintScript.GOLD, 2.0)
+			for k in 3:
+				ci.draw_line(card.position + Vector2(5, 8 + k * 9), card.position + Vector2(21, 2 + k * 9),
+					Color(PaintScript.GOLD, 0.6), 1.5, true)
+		"#pair":
+			for k in 2:
+				var card := Rect2(inner.get_center() + Vector2(-18 + k * 12, -15 + k * 4), Vector2(22, 28))
+				PaintScript.rounded(ci, card, 3.0, PaintScript.CARD_FACE, PaintScript.CARD_INK, 1.5)
+				PaintScript.label(ci, font, card.grow(-3.0), "A", 16, PaintScript.CARD_RED)
+		_:
+			if IconSet.has(what):
+				# A picture sits on a cream face inside the gold ring, so a black suit reads.
+				ci.draw_circle(c, box.size.x * 0.5 - 4.0, PaintScript.CARD_FACE)
+				IconSet.draw(ci, what, inner)
+			else:
+				PaintScript.label(ci, font, inner, what, 22, PaintScript.GOLD)
 
 
 ## A chip's colour by its value: white 10, green 50, black 100, gold 500.

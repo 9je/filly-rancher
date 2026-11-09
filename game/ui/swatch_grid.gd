@@ -37,6 +37,12 @@ const CURSOR_BORDER := 4
 
 const DEFAULT_COLUMNS := 6
 
+## The house style's three edges (game/ui/house_style.gd's palette, restated: a GridContainer
+## script stays free of the HUD's helpers).
+const PICK_GOLD := Color(0.98, 0.78, 0.25)
+const HOVER_GOLD := Color(0.86, 0.66, 0.3)
+const IDLE_PLUM := Color(0.36, 0.16, 0.42, 0.75)
+
 var _colours: Array[Color] = []
 var _labels: Array[String] = []
 var _cells: Array[Button] = []
@@ -116,6 +122,24 @@ func set_icons(icons: Array[Texture2D]) -> void:
 	_restyle()
 
 
+## CARDS WITH A PICTURE BESIDE THE WORD (Fable AAA review round 1, #8: the race choices
+## wanted a silhouette each). Unlike set_icons() the card keeps its size and its word; the
+## picture sits at its left.
+func set_card_icons(icons: Array[Texture2D]) -> void:
+	for i in _cells.size():
+		var tex: Texture2D = icons[i] if i < icons.size() else null
+		_cells[i].icon = tex
+		_cells[i].expand_icon = false
+		_cells[i].icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		_cells[i].vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
+		_cells[i].add_theme_constant_override(&"h_separation", 10)
+		_cells[i].add_theme_constant_override(&"icon_max_width", 52)
+		# Room for the picture as well as the whole word ("Earth pony" clipped at card size).
+		if tex != null:
+			_cells[i].custom_minimum_size = Vector2(CARD_SIZE.x + 56.0, CARD_SIZE.y)
+	_restyle()
+
+
 func cell_count() -> int:
 	return _cells.size()
 
@@ -180,9 +204,20 @@ func _restyle() -> void:
 			box.set_border_width_all(border)
 			if i < _icons.size() and _icons[i] != null:
 				box.set_content_margin_all(float(border) + 2.0)
-			box.border_color = MenuStyleScript.COLOR_TAB_ON if chosen \
-				else (MenuStyleScript.COLOR_HOVER_BORDER if (cursor or state == &"hover") \
-					else MenuStyleScript.ROW_IDLE_BORDER)
+			# THE CASINO'S CHIP EDGE (Fable AAA review round 1, #8: "a web-form creator"): every
+			# swatch is ringed in plum so a pale coat still has an edge on cream paper, the pick
+			# is ringed in gold with a gold glow, and the cursor or the pointer in a dimmer gold.
+			box.border_color = PICK_GOLD if chosen \
+				else (HOVER_GOLD if (cursor or state == &"hover") else IDLE_PLUM)
+			box.set_corner_radius_all(CELL_RADIUS + 4)
+			if chosen:
+				box.shadow_color = Color(PICK_GOLD, 0.55)
+				box.shadow_size = 8
+			else:
+				box.shadow_color = Color(0, 0, 0, 0.18)
+				box.shadow_size = 2
+				box.shadow_offset = Vector2(0, 2)
+			box.anti_aliasing = true
 			_cells[i].add_theme_stylebox_override(state, box)
 		MenuStyleScript.style_label_button(_cells[i])
 		# Ink that reads on its own swatch: dark on a light card, white on a dark one.
