@@ -21,9 +21,16 @@ func _run() -> void:
 		await process_frame
 	await RenderingServer.frame_post_draw
 	root.get_texture().get_image().save_png(out.path_join("title.png"))
+	# As _enter_world() does it: the menu goes, then the card comes up over the title. The
+	# ranch claims the screen while it builds, so the probe claims it too; otherwise the card
+	# finds the cached title already loaded and is caught mid-fade.
+	var menu := current_scene.get_node_or_null(^"Centre") as CanvasItem
+	if menu != null:
+		menu.visible = false
 	var ls: CanvasLayer = load("res://ui/loading_screen.gd").new()
 	ls.set("scene_path", "res://ui/title_screen.tscn")
 	root.add_child(ls)
+	ls.get_script().claim()
 	for i in 30:
 		await process_frame
 	await RenderingServer.frame_post_draw

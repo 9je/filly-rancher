@@ -23,6 +23,9 @@ const SaveIOScript := preload("res://systems/save_io.gd")
 const SettingsScript := preload("res://systems/settings.gd")
 const LoadingScreenScript := preload("res://ui/loading_screen.gd")
 const SettingsMenuScene := preload("res://ui/settings_menu.tscn")
+const HouseStyleScript := preload("res://ui/house_style.gd")
+const PaintScript := preload("res://ui/casino_paint.gd")
+const LogotypeScript := preload("res://ui/logotype.gd")
 
 enum Row { NEW_GAME, CONTINUE, SETTINGS, QUIT }
 
@@ -92,6 +95,7 @@ func _ready() -> void:
 	# non-interactive boot runs under -- test_every_row_is_armed_for_the_pointer and
 	# test_the_footer_still_prints_the_keys check the rows and the footer with no row taken
 	# first, so this has to have already run by the time _ready() returns either way.
+	_dress_as_title()
 	_refresh()
 	_dress_with_key_art()
 	if not is_interactive():
@@ -153,15 +157,89 @@ func _dress_with_key_art() -> void:
 	_style_wordmark()
 
 
-## The name as a wordmark over the art, the way a title screen announces itself. Applied after
-## every _refresh(), which restyles the title.
+## The name was a Label in a heading size (Fable AAA review round 1, #9); it is a drawn
+## logotype now (game/ui/logotype.gd), so the Label stays for its text and is not shown.
 func _style_wordmark() -> void:
-	if _art == null or _title == null:
-		return
-	_title.add_theme_font_size_override(&"font_size", 72)
-	_title.add_theme_color_override(&"font_color", Color(1.0, 0.95, 0.82))
-	_title.add_theme_color_override(&"font_shadow_color", Color(0.2, 0.05, 0.25, 0.7))
-	_title.add_theme_constant_override(&"shadow_offset_y", 5)
+	if _title != null:
+		_title.visible = false
+
+
+## THE MENU IS THE ART'S, NOT A BOX'S (Fable AAA review round 1, #9; Hades, Cult of the Lamb):
+## no panel behind the column, the logotype on top, and the rows as painted buttons with a
+## picture each. Built once; _refresh() redraws the rows.
+var _logo: Control
+
+
+func _dress_as_title() -> void:
+	var panel := get_node_or_null(^"Centre/Panel") as PanelContainer
+	if panel != null:
+		panel.add_theme_stylebox_override(&"panel", StyleBoxEmpty.new())
+		panel.custom_minimum_size = Vector2(640, 0)
+	var column := get_node_or_null(^"Centre/Panel/Margin/Column") as VBoxContainer
+	if column != null:
+		column.add_theme_constant_override(&"separation", 26)
+		_logo = LogotypeScript.new()
+		_logo.name = "Logotype"
+		_logo.custom_minimum_size = Vector2(640, 274)
+		column.add_child(_logo)
+		column.move_child(_logo, 0)
+	if _rows != null:
+		_rows.add_theme_constant_override(&"separation", 12)
+
+
+## Each row's picture: a fresh start, home, the settings gear, the way out.
+const ROW_ICONS: Array[String] = ["sparkler", "house", "", "arrow"]
+const ROW_HEIGHT := 64.0
+
+
+## A row as a painted button: plum, a gold edge, lit gold and slid a little right when it is the
+## pick, the casino's own button language.
+static func row_button_box(picked: bool, hovered: bool) -> StyleBoxFlat:
+	var b := StyleBoxFlat.new()
+	b.bg_color = HouseStyleScript.PLUM.lightened(0.06) if picked else \
+		(HouseStyleScript.PLUM if hovered else Color(HouseStyleScript.PLUM_DARK, 0.86))
+	b.border_color = HouseStyleScript.GOLD if picked or hovered else Color(HouseStyleScript.GOLD_DIM, 0.8)
+	b.set_border_width_all(3 if picked else 2)
+	b.set_corner_radius_all(int(ROW_HEIGHT * 0.5))
+	b.content_margin_left = 34.0 if picked else 14.0
+	b.content_margin_right = 20.0
+	b.content_margin_top = 6.0
+	b.content_margin_bottom = 6.0
+	b.shadow_color = Color(1.0, 0.8, 0.3, 0.45) if picked else Color(0.0, 0.0, 0.0, 0.35)
+	b.shadow_size = 14 if picked else 6
+	b.shadow_offset = Vector2.ZERO if picked else Vector2(0, 4)
+	b.anti_aliasing = true
+	return b
+
+
+## The row's picture on a cream disc in a gold ring. Settings has no icon in the set, so its
+## gear is drawn here.
+func _row_icon(index: int, picked: bool) -> Control:
+	var icon := Control.new()
+	icon.custom_minimum_size = Vector2(ROW_HEIGHT - 12.0, ROW_HEIGHT - 12.0)
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var name_ := ROW_ICONS[index] if index < ROW_ICONS.size() else ""
+	icon.draw.connect(func() -> void:
+		var r := Rect2(Vector2.ZERO, icon.size)
+		icon.draw_style_box(HouseStyleScript.disc_box(r.size.x, HouseStyleScript.KEY_FACE,
+			HouseStyleScript.GOLD if picked else HouseStyleScript.GOLD_DIM, 3), r)
+		if name_ != "":
+			IconSet.draw(icon, name_, r.grow(-9.0))
+		else:
+			_draw_gear(icon, r.get_center(), r.size.x * 0.3))
+	return icon
+
+
+static func _draw_gear(ci: CanvasItem, c: Vector2, r: float) -> void:
+	var pts := PackedVector2Array()
+	var teeth := 8
+	for i in teeth * 4:
+		var a := TAU * float(i) / float(teeth * 4)
+		var out := (i % 4) < 2
+		pts.append(c + Vector2(cos(a), sin(a)) * (r * (1.0 if out else 0.74)))
+	ci.draw_colored_polygon(pts, HouseStyleScript.PLUM)
+	ci.draw_circle(c, r * 0.32, HouseStyleScript.KEY_FACE)
 
 
 func _process(delta: float) -> void:
@@ -314,6 +392,12 @@ func _enter_world() -> void:
 	# load and a moving bar instead of a title frozen for the whole boot. An automated boot
 	# changes scene exactly as it always has.
 	if is_interactive():
+		# THE LOADING CARD REPLACES THE MENU (Fable AAA review round 1, #9: two titles on the
+		# loading screen): the column goes the moment the load starts, so nothing of the menu
+		# shows through the card's fade.
+		var centre := get_node_or_null(^"Centre") as CanvasItem
+		if centre != null:
+			centre.visible = false
 		LoadingScreenScript.change_scene(get_tree(), WORLD_SCENE, LoadingScreenScript.Look.RANCH,
 			"A new ranch" if BootIntentScript.peek_new_game() else "Back to the ranch")
 		return
@@ -351,25 +435,38 @@ func _refresh() -> void:
 		var picked: bool = i == _selected
 		var holder: PanelContainer = MouseRowsScript.row(i, picked, i == _hovered,
 			point_at_row, take_row)
+		# A painted button, not a caret in a list (Fable AAA review round 1, #9: "a '> New
+		# game' caret"): the pick is lit gold and slides right; the pointer lights a row too.
+		var hovered: bool = i == _hovered
+		holder.add_theme_stylebox_override(&"panel", row_button_box(picked, hovered))
+		holder.custom_minimum_size = Vector2(0, ROW_HEIGHT)
+		if not picked:
+			holder.mouse_entered.connect(func() -> void:
+				holder.add_theme_stylebox_override(&"panel", row_button_box(false, true)))
+			holder.mouse_exited.connect(func() -> void:
+				holder.add_theme_stylebox_override(&"panel", row_button_box(false, false)))
 		var line := HBoxContainer.new()
 		line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		line.add_theme_constant_override(&"separation", 16)
+		line.add_child(_row_icon(i, picked))
 		var label := Label.new()
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		label.text = MenuStyleScript.caret(picked) + names[i]
+		label.text = names[i]
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		# A CONTINUE WITH NOTHING TO CONTINUE READS AS UNAVAILABLE rather than as broken.
 		var dimmed: bool = i == Row.CONTINUE and not can_continue()
-		MenuStyleScript.style_label(label, MenuStyleScript.ROW_SIZE,
-			MenuStyleScript.COLOR_UNAFFORDABLE if dimmed \
-				else (MenuStyleScript.COLOR_VALUE if picked else MenuStyleScript.COLOR_NAME))
+		HouseStyleScript.ink_label(label, 30,
+			Color(HouseStyleScript.CREAM, 0.4) if dimmed \
+				else (HouseStyleScript.GOLD if picked else HouseStyleScript.CREAM))
 		line.add_child(label)
 		var value: String = NO_SAVE_NOTE if dimmed else ""
 		if not value.is_empty():
 			var val := Label.new()
 			val.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			val.text = value
-			MenuStyleScript.style_label(val, MenuStyleScript.SUBTITLE_SIZE,
-				MenuStyleScript.COLOR_DIM)
+			HouseStyleScript.ink_label(val, 16, HouseStyleScript.CREAM_DIM, false)
+			val.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 			line.add_child(val)
 		holder.add_child(line)
 		_rows.add_child(holder)

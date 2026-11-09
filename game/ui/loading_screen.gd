@@ -77,6 +77,8 @@ const CLOUDS: Array[Vector3] = [
 
 const MenuStyleScript := preload("res://ui/menu_style.gd")
 const StagedLoaderScript := preload("res://ui/staged_loader.gd")
+const HouseStyleScript := preload("res://ui/house_style.gd")
+const LogotypeScript := preload("res://ui/logotype.gd")
 ## Milliseconds of each frame the staged load may spend before the screen draws again. A
 ## single resource can take longer (ranch.gd compiles in about 0.6 s); the bar moves after it.
 const LOAD_BUDGET_MS := 12.0
@@ -117,6 +119,8 @@ var _caption_label: Label
 var _percent: Label
 var _art: Texture2D
 var _tip: Label
+## The drawn name (game/ui/logotype.gd), the title screen's own, over the art.
+var _logo: Control
 
 
 ## Change to `path` behind the loading screen. The one door every interactive transition
@@ -233,7 +237,15 @@ func _build() -> void:
 	_build_bar()
 	_title = _label(MenuStyleScript.title_font(), 96 if _art != null else 84, MenuStyleScript.COLOR_TITLE)
 	_title.text = "Filly Rancher"
-	_headline = _label(MenuStyleScript.numeral_font(), 30, MenuStyleScript.COLOR_NAME)
+	# THE NAME IS THE LOGOTYPE (Fable AAA review round 1, #9), the same drawing the title
+	# screen wears; the Label keeps the words for a reader of the tree and is not shown.
+	_title.visible = false
+	_logo = LogotypeScript.new()
+	_logo.name = "Logotype"
+	_canvas.add_child(_logo)
+	_headline = _label(MenuStyleScript.title_font(), 32, HouseStyleScript.GOLD)
+	_headline.add_theme_constant_override(&"outline_size", 10)
+	_headline.add_theme_color_override(&"font_outline_color", HouseStyleScript.PLUM_DARK)
 	_headline.text = headline if headline != "" else \
 		("Off to the ranch" if look == Look.RANCH else "Up to the Rainbow Factory")
 	_caption_label = _label(MenuStyleScript.numeral_font(), 26, MenuStyleScript.COLOR_NAME)
@@ -243,6 +255,22 @@ func _build() -> void:
 	_tip.text = TIPS[int(Time.get_unix_time_from_system()) % TIPS.size()] \
 		if look == Look.RANCH else ""
 	_tip.visible = _art != null
+	# The tip is a card: a lightbulb on a cream disc, the line on the HUD's plum pill.
+	_tip.add_theme_stylebox_override(&"normal", HouseStyleScript.pill_box(26, 0.9, Vector2(22, 10)))
+	(_tip.get_theme_stylebox(&"normal") as StyleBoxFlat).content_margin_left = 22.0 + TIP_ICON + 14.0
+	HouseStyleScript.ink_label(_tip, 24, HouseStyleScript.CREAM)
+	_tip.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var bulb := Control.new()
+	bulb.name = "Bulb"
+	bulb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bulb.draw.connect(func() -> void:
+		var r := Rect2(Vector2.ZERO, Vector2(TIP_ICON, TIP_ICON))
+		bulb.draw_style_box(HouseStyleScript.disc_box(TIP_ICON, HouseStyleScript.KEY_FACE,
+			HouseStyleScript.GOLD, 3), r)
+		IconSet.draw(bulb, "hint", r.grow(-8.0)))
+	_tip.add_child(bulb)
+	_tip.resized.connect(func() -> void:
+		bulb.position = Vector2(16.0, (_tip.size.y - TIP_ICON) * 0.5))
 	if _art != null:
 		for l: Label in [_title, _headline, _tip, _caption_label, _percent]:
 			l.add_theme_color_override(&"font_shadow_color", Color(0.08, 0.04, 0.12, 0.75))
@@ -251,6 +279,9 @@ func _build() -> void:
 			l.add_theme_constant_override(&"shadow_outline_size", 6)
 	_canvas.resized.connect(_layout)
 	_layout()
+
+
+const TIP_ICON := 44.0
 
 
 func _label(font: Font, size: int, colour: Color) -> Label:
@@ -279,7 +310,10 @@ func _build_bar() -> void:
 	_frame = Panel.new()
 	_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var wood := StyleBoxFlat.new()
-	wood.bg_color = BAR_WOOD
+	# The house frame: plum with a gold edge, the casino's own, round the rainbow.
+	wood.bg_color = HouseStyleScript.PLUM_DARK
+	wood.border_color = HouseStyleScript.GOLD
+	wood.set_border_width_all(2)
 	wood.set_corner_radius_all(40)
 	wood.shadow_color = Color(0, 0, 0, 0.22)
 	wood.shadow_size = 10
@@ -345,11 +379,15 @@ func _layout() -> void:
 		_headline.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		_title.position = Vector2(s.x * 0.06, s.y * 0.07)
 		_title.size = Vector2(s.x * 0.6, 116.0)
-		_headline.position = Vector2(s.x * 0.06 + 4.0, s.y * 0.07 + 112.0)
+		_logo.size = Vector2(s.x * 0.36, s.x * 0.36 * 300.0 / 700.0)
+		_logo.position = Vector2(s.x * 0.05, s.y * 0.05)
+		_headline.position = Vector2(s.x * 0.06 + 4.0, _logo.position.y + _logo.size.y + 6.0)
 		_headline.size = Vector2(s.x * 0.6, 40.0)
 		_tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		_tip.position = Vector2(bar.position.x, bar.position.y - 88.0)
-		_tip.size = Vector2(bar.size.x * 0.8, 36.0)
+		var tip_w := _tip.get_theme_font(&"font").get_string_size(_tip.text,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, _tip.get_theme_font_size(&"font_size")).x
+		_tip.size = Vector2(tip_w + 22.0 + TIP_ICON + 14.0 + 26.0, 64.0)
+		_tip.position = Vector2(bar.position.x, bar.position.y - 132.0)
 		_caption_label.position = Vector2(bar.position.x, bar.position.y - 46.0)
 		_caption_label.size = Vector2(bar.size.x * 0.8, 36.0)
 		_caption_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -359,7 +397,9 @@ func _layout() -> void:
 		return
 	_title.position = Vector2(0.0, s.y * 0.25)
 	_title.size = Vector2(s.x, 104.0)
-	_headline.position = Vector2(0.0, s.y * 0.25 + 104.0)
+	_logo.size = Vector2(s.x * 0.4, s.x * 0.4 * 300.0 / 700.0)
+	_logo.position = Vector2((s.x - _logo.size.x) * 0.5, s.y * 0.53 - _logo.size.y - 60.0)
+	_headline.position = Vector2(0.0, s.y * 0.53 - 54.0)
 	_headline.size = Vector2(s.x, 40.0)
 	_caption_label.position = Vector2(bar.position.x + 4.0, bar.end.y + 18.0)
 	_caption_label.size = Vector2(bar.size.x * 0.8, 36.0)
