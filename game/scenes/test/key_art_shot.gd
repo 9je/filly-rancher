@@ -7,8 +7,8 @@ extends SceneTree
 const Boot := preload("res://scenes/test/ps_boot.gd")
 const WorldStateScript := preload("res://systems/world_state.gd")
 var out := ""
-var from := Vector3(26.0, 9.0, 24.0)
-var at := Vector3(-6.0, 3.0, -14.0)
+var from := Vector3(-34.0, 16.0, 46.0)
+var at := Vector3(2.0, 2.0, -12.0)
 
 
 func _initialize() -> void:
@@ -29,15 +29,11 @@ func _run() -> void:
 	root.get_window().size = Vector2i(1920, 1080)
 	await Boot.frames(self, 60)
 	var w: Object = ranch.get("_world")
-	w.call("pin", WorldStateScript.Phase.DAY, WorldStateScript.Weather.CLEAR)
+	# The end of the day: DUSK, its warm low sun and long shadows (the rig owns the sun, so the
+	# phase is what is pinned, not the light).
+	w.call("pin", WorldStateScript.Phase.DUSK, WorldStateScript.Weather.CLEAR)
 	var sky: Node = ranch.get("sky_rig")
 	sky.call("apply_immediately", w)
-	# Late afternoon: the sun low in the west, warm, long shadows.
-	var sun: DirectionalLight3D = ranch.get_node(^"Sun")
-	sun.rotation_degrees = Vector3(-24.0, -60.0, 0.0)
-	sun.light_color = Color(1.0, 0.86, 0.68)
-	for layer: Node in ranch.find_children("*", "CanvasLayer", true, false):
-		(layer as CanvasLayer).visible = false
 	var player: Node3D = ranch.get("player")
 	player.visible = false
 	var cam := Camera3D.new()
@@ -47,6 +43,10 @@ func _run() -> void:
 	cam.look_at(at)
 	cam.current = true
 	await Boot.frames(self, 60)
+	# Every screen layer off at the last moment (a talk box opens after boot).
+	for layer: Node in root.find_children("*", "CanvasLayer", true, false):
+		(layer as CanvasLayer).visible = false
+	await Boot.frames(self, 4)
 	await RenderingServer.frame_post_draw
 	root.get_texture().get_image().save_png(out)
 	print("KEY_ART_OK ", out)
