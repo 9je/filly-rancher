@@ -3021,6 +3021,20 @@ func _on_debt_cleared() -> void:
 	_game_state.story.set_flag("debt_cleared")
 	_toast("Collection day: your account is paid in full. Marigold would like a word.")
 	_novelty("story", "debt_cleared", "Paid the Company in full")
+	# THE BEAT (idea F5): Marigold, and her smile held a second too long. Her words wait for
+	# the talk (marigold_paid_up); the camera only lingers.
+	var m: Node3D = people.npc(&"marigold") if people != null else null
+	if _interactive and m != null and player != null:
+		var face := m.global_position + Vector3.UP * 1.5
+		var front := (player.global_position - m.global_position)
+		front.y = 0.0
+		front = front.normalized() if front.length() > 0.1 else Vector3.BACK
+		Cinematic.shared(get_tree()).play([
+			{"from": face + front * 4.0 + Vector3.UP * 0.6, "to": face + front * 2.6, "look": face,
+				"time": 2.6, "caption": "Paid in full."},
+			{"from": face + front * 2.6, "to": face + front * 2.2, "look": face, "time": 2.2},
+		], {"freeze": [player], "host": self, "can_start": func() -> bool:
+			return not _in_palace and _no_other_menu_open()})
 	debt_cleared.emit()
 	var bus := get_node_or_null("/root/Events") if is_inside_tree() else null
 	if bus != null and bus.has_signal("debt_cleared"):
