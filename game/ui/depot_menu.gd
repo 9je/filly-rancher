@@ -35,6 +35,7 @@ const TileEntranceScript := preload("res://ui/tile_entrance.gd")
 const RarityGlyphScript := preload("res://ui/rarity_glyph.gd")
 const LedgerScript := preload("res://systems/ledger.gd")
 const HouseStyleScript := preload("res://ui/house_style.gd")
+const CounterFaceScript := preload("res://ui/counter_face.gd")
 
 ## Under the clerk and her counter, the tiles get what is left of a 1080 p screen.
 const SCROLL_MAX := 470.0
@@ -195,49 +196,8 @@ func _build_clerk() -> void:
 	clerk.add_theme_constant_override(&"separation", 26)
 	column.add_child(clerk)
 	column.move_child(clerk, _title.get_index() + 1)
-	# Her face: the picture clipped to a disc of buttercup, a gold ring over its edge (a
-	# sibling drawn after the disc, so the clip does not cut it).
-	var holder := Control.new()
-	holder.name = "Face"
-	holder.custom_minimum_size = Vector2(CLERK_FACE, CLERK_FACE)
-	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	holder.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	clerk.add_child(holder)
-	var face := Panel.new()
-	face.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	face.set_anchors_preset(Control.PRESET_FULL_RECT)
-	face.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
-	var disc := StyleBoxFlat.new()
-	disc.bg_color = CLERK_BACKDROP
-	disc.set_corner_radius_all(int(CLERK_FACE * 0.5))
-	disc.anti_aliasing = true
-	face.add_theme_stylebox_override(&"panel", disc)
-	holder.add_child(face)
-	if ResourceLoader.exists(CLERK_PORTRAIT):
-		var pic := TextureRect.new()
-		pic.texture = load(CLERK_PORTRAIT) as Texture2D
-		pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-		pic.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-		pic.set_anchors_preset(Control.PRESET_FULL_RECT)
-		# A little closer than the bake, her eyes at the disc's middle.
-		pic.offset_left = -CLERK_FACE * 0.14
-		pic.offset_right = CLERK_FACE * 0.06
-		pic.offset_top = -CLERK_FACE * 0.04
-		pic.offset_bottom = CLERK_FACE * 0.16
-		face.add_child(pic)
-	var ring := Panel.new()
-	ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	ring.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var rb := StyleBoxFlat.new()
-	rb.draw_center = false
-	rb.border_color = PaintScript.GOLD
-	rb.set_border_width_all(4)
-	rb.set_corner_radius_all(int(CLERK_FACE * 0.5))
-	rb.anti_aliasing = true
-	ring.add_theme_stylebox_override(&"panel", rb)
-	holder.add_child(ring)
+	# Her face in a gold ring on a disc of Cloudsdale sky.
+	clerk.add_child(CounterFaceScript.build(CLERK_PORTRAIT, CLERK_FACE, CLERK_BACKDROP))
 	# Her line, on paper, with a tail pointing at her.
 	var bubble := PanelContainer.new()
 	bubble.name = "Speech"

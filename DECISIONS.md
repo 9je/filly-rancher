@@ -754,3 +754,49 @@ the cinematics. Calls made:
 
 ## 2026-11-09: Renders on the GPU (owner: "why does it take 2 hours to screenshot")
 - Every probe and showcase ran under xvfb, which leaves Godot only llvmpipe (software Vulkan on the CPU); the machine has a Radeon RX 9070 XT. A user-space weston 13 (unpacked from the distro's .debs, no root) runs headless with the GL renderer on the Radeon, and Godot renders into it through its Wayland driver: the character probe took 14 s, with the same image. Nothing shows on the owner's desktop. Showcases now run this way.
+
+## 2026-11-09: Fable AAA round 4's UI items (creator, Depot and Market, HUD, casino)
+
+An Opus agent in a worktree took the 2D surfaces again; the lead kept the world, the ponies and
+the catch's in-world beat. Calls made:
+
+- **The creator's stage is the Carousel Boutique** (ui/boutique_stage.gd, built in code round
+  the turntable): the round wall in lavender stripes with gold diamonds over a cream wainscot
+  and gold rail, a pink carpet, a white dais with a gold rim and a plum top, a tall gold oval
+  mirror, a sun hat on a stand, bolts of cloth, velvet drapes with gold tie-backs and a swag
+  framing the lens, a warm spot and two lamps. Toon styled as props. The dawn sky gave way to
+  the room's air; the full-screen backdrop round the panels is the same wallpaper. A dress
+  form was tried and read as a lamp, so it is a hat.
+- **She reacts to every pick**: a swing to three-quarter front, a hop with a squash, a happy
+  face looking at the lens, a 2.4 s rest before the spin resumes (not on the mark step, where
+  the flank hold already turns her).
+- **No more web form**: the name is a gold-rimmed plaque in the title face (the "Your name"
+  label hides; the placeholder says it); every colour row is round pots with a gloss
+  (SwatchGrid.set_round); mane styles are a two-row strip of picture cards that scrolls
+  sideways (35 for an earth pony), rebaked in the tint keys so they show her own coat and
+  mane, the arrows and "Style 1 of 9" gone; the help paragraph is four pictures and a word
+  (Draw, Move, Size, Turn), the full sentence kept as the canvas's tooltip; inks are pots with
+  their names as tooltips; brushes are dots of their size; the eraser, Undo, Clear and Remove
+  stamp carry pictures (eight new icons in tools/make_icons.py). The keyboard cursor now puts
+  a button's own face back when it moves on (a pot or a tool lost its look before).
+- **The Depot is a counter**: Marigold Mayfair (she runs it, STORY.md) in a gold ring on a
+  disc of Cloudsdale sky, with one line of hers in a speech bubble per tab and state, over a
+  wooden counter rail. Her line carries what the three rule sentences said. The Pay tab's
+  terms are one row of chips (owed, the day, coloured ponies only) under the quota stamps; the
+  fact tiles and the sentence are gone, the headline stays as text for the record.
+- **The Market is a stall**: a red and cream scalloped awning, the things for sale standing on
+  wooden shelves four across with the name under the shelf and the price on its own line, so
+  no name meets a price; the detail is a side counter to the right of the shelves, fixed in
+  size (a permit's pony list scrolls inside it), never over the grid. Bramble's face sits by
+  the stall's name. Portraits are baked once (scenes/test/counter_portraits.gd) into
+  assets/ui/portraits, not live.
+- **HUD**: a compass letter fades out as a place badge or the goal ring comes within 10 px of
+  it, and back as it passes. The two reticles in catch_before were the probe's world still,
+  which had the crosshair baked in; scenes/test/hud_world_probe.gd writes a clean still
+  (sign_clean.png) for the fast probes. The plot's price sign (world/plot_slot.gd, the label
+  and the board's height only) is a coin and the number, no word, on a taller board: "115"
+  reads at 7 m instead of a 6 px "115 bits".
+- **Casino**: "BLACKJACK PAYS 3 TO 2" printed in gold along the felt's arc (CasinoPaint.arc_text);
+  the wheel's tiers are 34 px glyphs stacked upright along each slice's radius (left to right
+  on the flanks, top to bottom at the pointer and the foot), never turned; the slots win
+  banner lights the marquee above the reels instead of covering the third row.

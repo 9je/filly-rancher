@@ -32,6 +32,7 @@ const RarityGlyphScript := preload("res://ui/rarity_glyph.gd")
 const HoursIconScript := preload("res://ui/hours_icon.gd")
 const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const TileEntranceScript := preload("res://ui/tile_entrance.gd")
+const CounterFaceScript := preload("res://ui/counter_face.gd")
 
 ## The scroll area's tallest, in 1920 x 1080 base pixels: what is left of the screen once the
 ## title, the tabs, the footer and the Close button have theirs.
@@ -53,6 +54,7 @@ const ICON_SIZE := 112.0
 const SHELF_Y := 128.0
 const SHELF_H := 14.0
 const AWNING_H := 44.0
+const STALL_PORTRAIT := "res://assets/ui/portraits/bramble.png"
 const SELL_ICON_SIZE := 72.0
 const TAB_NAMES: Array[String] = ["Sell", "Buy"]
 
@@ -149,6 +151,17 @@ func _ready() -> void:
 	# WHAT THE PLACE IS, IN ITS NAME (P8, playtest 2026-11-08 item 68: "not clear the Market is
 	# for buying and selling"; Pierre's shop is the reference): whose stall, and both trades.
 	_title.text = "Bramble's Market: gems bought, food and gear sold"
+	# BRAMBLE AT HER STALL (Fable AAA round 4): her face beside the stall's name.
+	var head := HBoxContainer.new()
+	head.name = "Head"
+	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	head.add_theme_constant_override(&"separation", 16)
+	var column := $Centre/Panel/Margin/Column as VBoxContainer
+	column.add_child(head)
+	column.move_child(head, _title.get_index())
+	head.add_child(CounterFaceScript.build(STALL_PORTRAIT, 64.0, Color(0.99, 0.90, 0.66)))
+	_title.reparent(head)
+	_title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var dim := get_node_or_null(^"Dim") as Control
 	if dim != null:
 		dim.mouse_filter = Control.MOUSE_FILTER_STOP
