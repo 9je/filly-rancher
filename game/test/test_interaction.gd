@@ -415,8 +415,12 @@ func test_in_the_overlap_band_exactly_one_slot_is_ghosted() -> void:
 	var kinds: Array[int] = []
 	for entry: Dictionary in ranch.interaction_candidates():
 		kinds.append(int(entry["kind"]))
-	assert_eq(kinds.count(InteractionScript.Kind.PLOT_BUILD), 2,
-		"she really is inside both triggers, or this test proves nothing")
+	# P8 S7 PUT 12 m BETWEEN SLOTS (a 4 m walk between pens, item 53): the two triggers no
+	# longer overlap at all, so the band the review found is gone rather than resolved. What is
+	# left to hold is that standing there still offers exactly one build, on the nearer slot.
+	var spacing: float = near_slot.global_position.distance_to(far_slot.global_position)
+	assert_eq(kinds.count(InteractionScript.Kind.PLOT_BUILD), 2 if spacing < 9.5 else 1,
+		"inside both triggers on a 9 m grid, inside one on the plaza plan's 12 m grid")
 	var chosen: Dictionary = ranch.current_interaction()
 	assert_eq(int(chosen.get("kind", -1)), InteractionScript.Kind.PLOT_BUILD)
 	assert_eq(String(chosen.get("subject", "")), String(near_slot.name),
