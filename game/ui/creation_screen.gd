@@ -501,9 +501,10 @@ func _retint_mane_style_grid() -> void:
 		if ResourceLoader.exists(path):
 			icons.append(load(path) as Texture2D)
 	var pictures := icons.size() == count
+	# The card keeps her mane's colour behind the picture, and its number.
 	for i in count:
-		swatches.append(Color(0.93, 0.9, 0.84) if pictures else _palette.mane_at(mane_index))
-		labels.append("" if pictures else str(i + 1))
+		swatches.append(_palette.mane_at(mane_index))
+		labels.append(str(i + 1))
 	_mane_style_grid.set_swatches(swatches, labels)
 	if not pictures:
 		icons.clear()
