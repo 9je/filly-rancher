@@ -392,10 +392,16 @@ const LOBBY_SIGN_GAP := 0.10
 ## wall, sized off the building's own numbers the way every other sign on this map is.
 const REQUEST_BOARD_WIDTH_FRACTION := 0.72
 const REQUEST_BOARD_HEIGHT := 0.95
-const REQUEST_BOARD_BASE := 1.15
-const REQUEST_BOARD_STANDOFF := 0.30
-const REQUEST_BOARD_HEADLINE := "Favours"
-const REQUEST_BOARD_SUBLINE := "ask inside, paid on delivery"
+## HUNG ON THE WALL, NOT STOOD IN FRONT OF IT (P8 S7, playtest 2026-11-08 item 45: "a board
+## floats detached from the building; Favours overlaps Requests"). It stood 0.30 m off the wall
+## with its foot a hand over the grass, so it read as a panel propped in a field, and a second
+## post sign named the same place by another word in front of it. Now it is nailed flat to the
+## front wall under its porch lamp, and it is the one sign: the post sign is gone from
+## PLACE_SIGNS and the board says "Requests", the word the pause menu files them under.
+const REQUEST_BOARD_BASE := 1.35
+const REQUEST_BOARD_STANDOFF := 0.04
+const REQUEST_BOARD_HEADLINE := "Requests"
+const REQUEST_BOARD_SUBLINE := "favours for hire, paid on delivery"
 
 ## THE TWO PONIES BEHIND COUNTERS, and where they stand.
 ##
@@ -5665,12 +5671,13 @@ const PLACE_SIGNS := [
 	[&"Market", "Market", PlaceSign.Icon.COIN],
 	[&"Depot", "Depot", PlaceSign.Icon.CRATE],
 	[&"Farmhouse", "Home", PlaceSign.Icon.HOUSE],
-	[&"Board", "Requests", PlaceSign.Icon.SCROLL],
+	# (The Board's own post sign is gone: its wall board is its sign, item 45.)
 ]
-## Where the fingerpost stands, on the plaza's south-east corner, off both roads.
-const SIGNPOST_AT := Vector3(4.6, 0.0, 0.9)
-## Where the yard sign stands, where the spur path reaches the pens.
-const YARD_SIGN_AT := Vector3(-3.4, 0.0, 12.6)
+## Where the fingerpost stands: just off the plaza's south-west kerb, in the fork where the pen
+## lane leaves the main street (P8 S7's plaza plan), off both.
+const SIGNPOST_AT := Vector3(-2.5, 0.0, 5.5)
+## Where the yard sign stands, where the pen lane reaches the pens.
+const YARD_SIGN_AT := Vector3(-17.5, 0.0, 11.5)
 
 
 func _stand_place_signs() -> void:
@@ -9198,6 +9205,8 @@ func _lay_street() -> void:
 	street.name = "Street"
 	add_child(street)
 	street.call("build", Callable(terrain, "height_at"), houses, PropsScript.DOOR_OFFSET)
+	street.call("build_plaza", Callable(terrain, "height_at"))
+	street.call("build_footings", Callable(terrain, "height_at"), get_node(^"Buildings").get_children())
 
 
 ## What Spike's tips read (SpikeTips' keys).
@@ -9267,7 +9276,7 @@ func _spike_rare_hint() -> Dictionary:
 
 ## SPIKE, at the mailbox (world/spike_actor.gd): he burps the post in on green dragonfire.
 const SpikeActorScript := preload("res://world/spike_actor.gd")
-const SPIKE_AT := Vector3(5.5, 0.0, 3.5)
+const SPIKE_AT := Vector3(4.6, 0.0, 9.0)
 var spike: SpikeActor
 
 
@@ -10247,3 +10256,4 @@ func _update_guide(delta: float) -> void:
 			_explain_once(String(o.get("words", "")))
 	var target := guide_target()
 	_guide_trail.point(player.global_position, target.global_position if target != null else Vector3.INF)
+

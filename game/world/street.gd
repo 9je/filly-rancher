@@ -32,6 +32,17 @@ const FENCE_COLOUR := Color(0.96, 0.93, 0.86)
 ## The yards stop short of the Strip's paving (its rim crosses the row near z 48.8).
 const YARD_END_Z := 48.3
 
+## THE PLAZA (P8 S7, playtest 2026-11-08 item 42; docs/aaa-review-2026-11-08.md 2.14): a round
+## of the same flagstones in the middle of town, the Market and the Depot facing each other
+## across it and the well in the middle, kerbed all round where the paving meets the grass.
+const PLAZA_CENTRE := Vector2(1.5, -3.0)
+const PLAZA_RADIUS := 8.0
+const PLAZA_RING_STEP := 1.0
+const PLAZA_SEGMENTS := 72
+## The kerb round it: this wide, standing this high, its outer face dropping past the grass.
+const PLAZA_KERB_WIDTH := 0.35
+const PLAZA_KERB_HEIGHT := 0.12
+
 var _height: Callable
 ## Each yard as {"house": name, "door": Vector2, "front_x": float, "z0": float, "z1": float,
 ## "side": +1 east of the street or -1 west, "runs": Array of [Vector2, Vector2]}.
@@ -102,6 +113,125 @@ func build(height_at: Callable, houses: Array[Node3D], door_offset: Dictionary) 
 	# Lit like every other prop on the map (systems/toon_styler.gd), not as a plain material.
 	ToonStylerScript.style(fences, &"prop")
 	add_child(body)
+
+
+## Pave the plaza and kerb it. Drawing only, like the street: the kerb is a hand high and
+## nothing about it should catch a hoof.
+func build_plaza(height_at: Callable) -> void:
+	_height = height_at
+	var paving := SurfaceTool.new()
+	paving.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var kerb := SurfaceTool.new()
+	kerb.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var rings := maxi(1, int(ceil(PLAZA_RADIUS / PLAZA_RING_STEP)))
+	for i in PLAZA_SEGMENTS:
+		var a0 := TAU * float(i) / PLAZA_SEGMENTS
+		var a1 := TAU * float(i + 1) / PLAZA_SEGMENTS
+		var d0 := Vector2(cos(a0), sin(a0))
+		var d1 := Vector2(cos(a1), sin(a1))
+		for r in rings:
+			var r0 := PLAZA_RADIUS * float(r) / rings
+			var r1 := PLAZA_RADIUS * float(r + 1) / rings
+			_quad_up(paving, [PLAZA_CENTRE + d0 * r0, PLAZA_CENTRE + d1 * r0,
+				PLAZA_CENTRE + d1 * r1, PLAZA_CENTRE + d0 * r1], LIFT)
+		# The kerb: a top, and an outer face down into the grass so it reads as a stone with
+		# thickness rather than a painted line.
+		var ri := PLAZA_RADIUS
+		var ro := PLAZA_RADIUS + PLAZA_KERB_WIDTH
+		_quad_up(kerb, [PLAZA_CENTRE + d0 * ri, PLAZA_CENTRE + d1 * ri,
+			PLAZA_CENTRE + d1 * ro, PLAZA_CENTRE + d0 * ro], PLAZA_KERB_HEIGHT)
+		var o0 := PLAZA_CENTRE + d0 * ro
+		var o1 := PLAZA_CENTRE + d1 * ro
+		var face: Array[Vector3] = [
+			Vector3(o0.x, _y(o0.x, o0.y) - 0.05, o0.y), Vector3(o1.x, _y(o1.x, o1.y) - 0.05, o1.y),
+			Vector3(o1.x, _y(o1.x, o1.y) + PLAZA_KERB_HEIGHT, o1.y),
+			Vector3(o0.x, _y(o0.x, o0.y) + PLAZA_KERB_HEIGHT, o0.y)]
+		var n := Vector3((d0 + d1).x, 0.0, (d0 + d1).y).normalized()
+		_tri_facing(kerb, face, n)
+	_commit(paving, "PlazaPaving", _stone(Color(0.78, 0.71, 0.63), Color(0.55, 0.48, 0.44)))
+	_commit(kerb, "PlazaKerb", _stone(Color(0.62, 0.57, 0.53), Color(0.42, 0.38, 0.36)))
+
+
+## A FOOTING ROUND EVERY WORN BUILDING (P8 S7, playtest 2026-11-08 item 52: "the casino's brick
+## base and path cut off hard against the grass"). A model's stone plinth went straight into the
+## lawn, a box pushed into a field. Each one now stands in a low stone course a little wider than
+## itself, the way a real wall meets the ground: the join, said out loud, as the street's kerb
+## says it. Drawing only.
+const FOOTING_WIDTH := 0.45
+const FOOTING_HEIGHT := 0.14
+
+
+func build_footings(height_at: Callable, buildings: Array) -> void:
+	_height = height_at
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var any := false
+	for b: Node in buildings:
+		if not (b is Building) or not (b as Building).wears_a_model():
+			continue
+		var bb := b as Building
+		var r: Rect2 = bb.plinth_rect()
+		var corners: Array[Vector2] = []
+		for c: Vector2 in [r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)]:
+			var w: Vector3 = bb.global_transform * Vector3(c.x, 0.0, c.y)
+			corners.append(Vector2(w.x, w.z))
+		kerb_loop(st, corners, FOOTING_WIDTH, FOOTING_HEIGHT)
+		any = true
+	if any:
+		_commit(st, "Footings", _stone(Color(0.6, 0.55, 0.5), Color(0.4, 0.36, 0.33)))
+
+
+## A kerb round the closed polygon `pts` (xz, either winding), `width` wide outside it and
+## `height` over the ground, with an outer face down into the grass. Each run is carried past
+## its corners by its own width, so the corners close.
+func kerb_loop(st: SurfaceTool, pts: Array[Vector2], width: float, height: float) -> void:
+	var centre := Vector2.ZERO
+	for p: Vector2 in pts:
+		centre += p
+	centre /= float(pts.size())
+	for i in pts.size():
+		var a: Vector2 = pts[i]
+		var b: Vector2 = pts[(i + 1) % pts.size()]
+		var along := (b - a).normalized()
+		var n := Vector2(-along.y, along.x)
+		if n.dot((a + b) * 0.5 - centre) < 0.0:
+			n = -n
+		a -= along * width
+		b += along * width
+		kerb_run(st, a, b, n, width, height)
+
+
+## One straight run of kerb from `a` to `b`, `n` its outward side.
+func kerb_run(st: SurfaceTool, a: Vector2, b: Vector2, n: Vector2, width: float, height: float) -> void:
+	var steps := maxi(1, int(ceil(a.distance_to(b) / STEP)))
+	for k in steps:
+		var p0 := a.lerp(b, float(k) / steps)
+		var p1 := a.lerp(b, float(k + 1) / steps)
+		_quad_up(st, [p0, p1, p1 + n * width, p0 + n * width], height)
+		var o0 := p0 + n * width
+		var o1 := p1 + n * width
+		var face: Array[Vector3] = [
+			Vector3(o0.x, _y(o0.x, o0.y) - 0.05, o0.y), Vector3(o1.x, _y(o1.x, o1.y) - 0.05, o1.y),
+			Vector3(o1.x, _y(o1.x, o1.y) + height, o1.y), Vector3(o0.x, _y(o0.x, o0.y) + height, o0.y)]
+		_tri_facing(st, face, Vector3(n.x, 0.0, n.y))
+
+
+## A four-cornered patch laid `lift` over the ground, facing up whichever way it was wound.
+func _quad_up(st: SurfaceTool, c: Array, lift: float) -> void:
+	var q: Array[Vector3] = []
+	for p: Vector2 in c:
+		q.append(Vector3(p.x, _y(p.x, p.y) + lift, p.y))
+	_tri_facing(st, q, Vector3.UP)
+
+
+## Two triangles over the quad `q`, wound so their front face points along `n` (Godot's
+## front faces are clockwise, so a right-hand normal along `n` means emitting it reversed).
+func _tri_facing(st: SurfaceTool, q: Array[Vector3], n: Vector3) -> void:
+	var rh := (q[1] - q[0]).cross(q[2] - q[0])
+	var order: Array = [0, 2, 1, 0, 3, 2] if rh.dot(n) > 0.0 else [0, 1, 2, 0, 2, 3]
+	for i: int in order:
+		st.set_normal(n)
+		st.add_vertex(q[i])
 
 
 ## A house's yard: its door, the front wall facing the street, and the fence runs (gated at the

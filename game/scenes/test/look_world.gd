@@ -9,9 +9,9 @@ const Boot := preload("res://scenes/test/ps_boot.gd")
 const WorldStateScript := preload("res://systems/world_state.gd")
 const VIEWS := {
 	"plaza": [Vector3(0, 8, 16), Vector3(0, 1, -8)],
-	"houses": [Vector3(4, 2.4, -5), Vector3(1, 3.5, -18.5)],
+	"houses": [Vector3(8, 2.5, -20), Vector3(1.5, 3.5, -35.5)],
 	"hill": [Vector3(6, 3, -2), Vector3(-10, 6, 61.6)],
-	"pens": [Vector3(-4, 3.2, 5), Vector3(-14, 0.6, 15)],
+	"pens": [Vector3(-14, 3.2, 4), Vector3(-29, 0.6, 16)],
 }
 const TIMES := {
 	"day": [WorldStateScript.Phase.DAY, WorldStateScript.Weather.CLEAR],
@@ -24,6 +24,7 @@ var views: Array = VIEWS.keys() + ["pony"]
 var times: Array = TIMES.keys()
 ## --small: 960x540, about a third of the cost on the software renderer.
 var small := false
+var _extra := {}
 
 
 func _initialize() -> void:
@@ -36,6 +37,12 @@ func _initialize() -> void:
 			small = true
 		elif a.begins_with("--times="):
 			times = Array(a.substr(8).split(","))
+		elif a.begins_with("--cams="):
+			# Extra lenses: name:x,y,z,tx,ty,tz;name2:... (each also added to --views).
+			for c: String in a.substr(7).split(";"):
+				var kv := c.split(":")
+				var n := PackedFloat64Array(Array(kv[1].split(",")).map(func(v: String) -> float: return float(v)))
+				_extra[kv[0]] = [Vector3(n[0], n[1], n[2]), Vector3(n[3], n[4], n[5])]
 	DirAccess.make_dir_recursive_absolute(out)
 	_run.call_deferred()
 
@@ -66,8 +73,9 @@ func _run() -> void:
 				cam.global_position = at + fwd * 3.2 + Vector3(1.2, 1.7, 0)
 				cam.look_at(at + Vector3(0, 1.1, 0))
 			else:
-				cam.global_position = VIEWS[v][0]
-				cam.look_at(VIEWS[v][1])
+				var lens: Array = _extra[v] if _extra.has(v) else VIEWS[v]
+				cam.global_position = lens[0]
+				cam.look_at(lens[1])
 			cam.current = true
 			await Boot.frames(self, 30)
 			await Boot.shot(self, out, "%s_%s" % [v, t])
