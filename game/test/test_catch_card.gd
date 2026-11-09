@@ -107,3 +107,34 @@ func test_any_click_skips_the_moment_to_the_corner() -> void:
 	card.get("_tween").custom_step(CardScript.FLY)
 	assert_eq(card.get_node("Panel").position, Vector2.ZERO)
 	assert_true(card.is_showing(), "the card itself stays up in its corner")
+
+
+## Fable AAA round 2, #10: "dim behind and hide the rest of the HUD for the beat". The HUD steps
+## out for the moment, the card staying on its own layer above it, and comes back when the
+## card has gone to its corner.
+func test_the_rest_of_the_hud_steps_out_for_the_moment() -> void:
+	var hud = HudScene.instantiate()
+	add_child_autofree(hud)
+	await wait_process_frames(1)
+	hud.call("_on_captured", PonyInstanceScript.create(&"fluttershy"))
+	await wait_process_frames(2)
+	var card: Control = hud.catch_card()
+	assert_true(card.in_moment())
+	assert_false(hud.visible, "the HUD is away for the moment")
+	assert_true(card.is_visible_in_tree(), "the card is not")
+	card.skip_moment()
+	await wait_process_frames(2)
+	assert_true(hud.visible, "and back once the card has flown")
+
+
+## Round 2, #10: the portrait aims at her head bone, so the crop is the same on every rig.
+func test_the_portrait_finds_her_head() -> void:
+	var pony: Node3D = load("res://actors/pony/pony.tscn").instantiate()
+	add_child_autofree(pony)
+	pony.call("setup", PonyInstanceScript.create(&"fluttershy").data())
+	await wait_process_frames(2)
+	var vis := pony.get("visuals") as Node3D
+	var model := vis.get_child(0) as Node3D
+	var head: Vector3 = CardScript.head_point(model)
+	assert_ne(head, Vector3.INF, "her rig has a head bone")
+	assert_gt(head.y, 0.5, "and it is up where a head is: %s" % head)

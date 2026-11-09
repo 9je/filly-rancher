@@ -57,7 +57,10 @@ const MOMENT_SCALE := 1.6
 const STAR_FIRST := 0.30
 const STAR_GAP := 0.17
 const STAR_POP := 0.28
-const DIM := Color(0.08, 0.03, 0.12, 0.62)
+const DIM := Color(0.08, 0.03, 0.12, 0.72)
+const RAY_GOLD := Color(1.0, 0.80, 0.26)
+const RAY_CREAM := Color(1.0, 0.95, 0.78)
+const RAY_WARM := Color(1.0, 0.91, 0.62)
 const RAYS := 18
 ## The burst's colour per rarity: warm gold for the common run, her tier's own hue above it.
 const BURST := {
@@ -173,6 +176,12 @@ func show_catch(instance: PonyInstance, body: Node3D = null) -> void:
 	clip_box.bg_color = coat.lightened(0.55).lerp(Color(0.80, 0.90, 1.0), 0.45)
 	clip_box.set_corner_radius_all(int(PORTRAIT * 0.5))
 	_portrait_clip.add_theme_stylebox_override(&"panel", clip_box)
+	var backdrop := _portrait_clip.get_node(^"Backdrop") as Control
+	backdrop.set_meta(&"coat", coat)
+	backdrop.queue_redraw()
+	# A gold line inside the coat ring, the card's own trim.
+	ring_box.border_color = Color(1.0, 0.82, 0.36)
+	ring_box.set_border_width_all(2)
 
 	_fill_chips(instance, data)
 	var has_portrait := _take_portrait(body)
@@ -274,6 +283,22 @@ func _build() -> void:
 	_portrait_clip.position = Vector2(RING, RING)
 	_portrait_clip.size = Vector2(PORTRAIT, PORTRAIT)
 	_ring.add_child(_portrait_clip)
+	# Behind her, a soft pool of light in her own coat's colours, so the disc reads as a lit
+	# portrait rather than an empty plate round a cut-out.
+	var backdrop := Control.new()
+	backdrop.name = "Backdrop"
+	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	backdrop.size = Vector2(PORTRAIT, PORTRAIT)
+	backdrop.draw.connect(func() -> void:
+		var coat: Color = backdrop.get_meta(&"coat", NAMED_COAT)
+		var edge := coat.lightened(0.25).lerp(Color(0.62, 0.78, 0.95), 0.5)
+		var mid := Vector2(PORTRAIT, PORTRAIT) * 0.5
+		backdrop.draw_circle(mid, PORTRAIT * 0.5, edge)
+		for k in 14:
+			var t := float(k) / 14.0
+			backdrop.draw_circle(mid + Vector2(0.0, -PORTRAIT * 0.08 * t),
+				PORTRAIT * (0.5 - 0.3 * t), Color(edge.lerp(Color(1.0, 0.98, 0.9), t), 0.35)))
+	_portrait_clip.add_child(backdrop)
 	_portrait = TextureRect.new()
 	_portrait.name = "Portrait"
 	_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -462,8 +487,14 @@ func _ensure_viewport() -> void:
 	_viewport.add_child(env)
 
 
-## Aim at her head: the top front of her bounds. The models face -Z (a first probe render
-## from +Z was a row of tails), so the camera stands in front of her and a little to her side.
+## A HEAD-AND-SHOULDERS PORTRAIT, CENTRED IN THE RING (Fable AAA round 2, #10: "off-centre,
+## the head cut by the ring and 60% of the circle empty"). Aimed at her head bone where the rig
+## has one (her eyes are a little above it), else at the top front of her bounds; the lens
+## stands in front of her and a little to her side (the models face -Z), at a distance that
+## fits her head, mane and withers inside the disc whatever her size.
+const HEAD_BONES := ["DEF_Head", "Head", "head", "DEF-head"]
+
+
 func _frame(model: Node3D) -> void:
 	var box := AABB()
 	var first := true
@@ -477,15 +508,30 @@ func _frame(model: Node3D) -> void:
 	if first:
 		box = AABB(Vector3(-0.5, 0.0, -0.8), Vector3(1.0, 2.0, 1.6))
 	var height := box.size.y
-	# Her head is the top third of her, at the front.
-	# Head and withers, centred, with room round her ears (P8 item 71: "off-centre and
-	# cropped"): aimed a little lower and from further back than it was.
-	var head := Vector3(box.get_center().x, box.position.y + height * 0.64,
-		box.position.z + box.size.z * 0.16)
-	var dist := height * 1.7
-	var from := head + Vector3(dist * 0.5, height * 0.06, -dist * 0.86)
-	_camera.look_at_from_position(from, head, Vector3.UP)
-	_camera.set_meta(&"head", head)
+	var head := Vector3(box.get_center().x, box.position.y + height * 0.72,
+		box.position.z + box.size.z * 0.12)
+	var bone := head_point(model)
+	if bone != Vector3.INF:
+		head = bone + Vector3.UP * height * 0.06
+	# The picture's centre sits a touch under the eyes, so the ears and mane top clear the
+	# ring and the withers fill its lower edge.
+	var aim := head - Vector3.UP * height * 0.07
+	var dist := height * 1.5
+	var from := aim + Vector3(0.45, 0.1, -0.89).normalized() * dist
+	_camera.look_at_from_position(from, aim, Vector3.UP)
+	_camera.set_meta(&"head", aim)
+
+
+## Her head bone's position in `model`'s space, or Vector3.INF on a rig without one.
+static func head_point(model: Node3D) -> Vector3:
+	for n in model.find_children("*", "Skeleton3D", true, false):
+		var sk := n as Skeleton3D
+		for name: String in HEAD_BONES:
+			var i := sk.find_bone(name)
+			if i >= 0:
+				var world: Vector3 = sk.global_transform * sk.get_bone_global_pose(i).origin
+				return model.global_transform.affine_inverse() * world
+	return Vector3.INF
 
 
 func _clear_stage() -> void:
@@ -598,7 +644,7 @@ func _process(delta: float) -> void:
 	# A slow sway, so the portrait is alive rather than a pasted photo.
 	_spin += delta
 	if _stage != null and _stage.get_child_count() > 0:
-		(_stage.get_child(0) as Node3D).rotation.y = sin(_spin * 1.3) * 0.18
+		(_stage.get_child(0) as Node3D).rotation.y = sin(_spin * 1.3) * 0.09
 
 
 # --- drawing -------------------------------------------------------------------------------
@@ -638,41 +684,51 @@ func _draw_burst() -> void:
 	var c := screen * 0.5 - Vector2(0.0, screen.y * 0.04)
 	var tint: Color = BURST.get(_rarity, BURST[PonyDataScript.Rarity.COMMON])
 	_burst.draw_rect(Rect2(Vector2.ZERO, screen), Color(DIM, DIM.a * a))
+	# THE VIGNETTE: the screen's edges sink further, so the eye has one place to go.
+	var corner := screen.length() * 0.5
+	for k in 10:
+		var t := float(k) / 10.0
+		var r_in := corner * (0.55 + 0.45 * t)
+		_burst.draw_arc(c, r_in, 0.0, TAU, 72, Color(DIM, 0.07 * a), corner * 0.05 + 2.0, true)
 	var reach := screen.length() * 0.6
 	var turn: float = _moment_t * 0.22 if _moment_t < 50.0 else 0.0
-	# The rays: white gold at the root, her rarity's colour along their length.
-	var warm := tint.lerp(Color(1.0, 0.95, 0.75), 0.45)
+	# THE RAYS, WITH PUNCH (Fable AAA round 2, #10: "near sky colour"): solid gold and cream
+	# wedges, alternating, strong at the root and still there at the screen's edge, over a
+	# dim deep enough that sky never shows through them.
+	var warm := tint.lerp(Color(1.0, 0.95, 0.75), 0.25)
 	for i in RAYS:
 		var a0 := turn + TAU * float(i) / float(RAYS)
-		var a1 := a0 + TAU / float(RAYS) * 0.45
+		var a1 := a0 + TAU / float(RAYS) * 0.5
+		var ray: Color = RAY_GOLD if i % 2 == 0 else RAY_WARM
 		var pts := PackedVector2Array([c, c + Vector2(cos(a0), sin(a0)) * reach,
 			c + Vector2(cos(a1), sin(a1)) * reach])
-		_burst.draw_polygon(pts, PackedColorArray([Color(warm, 0.55 * a), Color(tint, 0.0),
-			Color(tint, 0.0)]))
+		_burst.draw_polygon(pts, PackedColorArray([Color(ray, 0.85 * a), Color(ray, 0.12 * a),
+			Color(ray, 0.12 * a)]))
 	# The glow: one smooth radial fan, bright behind the card and gone by the screen's edge.
-	var glow := 620.0
+	var glow := 560.0
 	for i in 48:
 		var b0 := TAU * float(i) / 48.0
 		var b1 := TAU * float(i + 1) / 48.0
 		_burst.draw_polygon(PackedVector2Array([c, c + Vector2(cos(b0), sin(b0)) * glow,
-			c + Vector2(cos(b1), sin(b1)) * glow]), PackedColorArray([Color(warm, 0.5 * a),
-			Color(tint, 0.0), Color(tint, 0.0)]))
+			c + Vector2(cos(b1), sin(b1)) * glow]), PackedColorArray([Color(RAY_CREAM, 0.55 * a),
+			Color(warm, 0.0), Color(warm, 0.0)]))
 	var ring_k := clampf(_moment_t / 0.55, 0.0, 1.0)
 	if ring_k < 1.0:
 		_burst.draw_arc(c, 160.0 + 720.0 * ring_k, 0.0, TAU, 96,
-			Color(1.0, 0.97, 0.85, 0.8 * (1.0 - ring_k) * a), 14.0 * (1.0 - ring_k) + 2.0, true)
+			Color(warm, 0.9 * (1.0 - ring_k) * a), 16.0 * (1.0 - ring_k) + 2.0, true)
 	for i in 14:
 		var ang := TAU * float(i) / 14.0 + 0.3 * float(i % 3)
 		var dist := 470.0 + 90.0 * float((i * 7) % 5) + 30.0 * sin(_moment_t * 1.5 + float(i))
 		var p := c + Vector2(cos(ang) * dist * 1.25, sin(ang) * dist * 0.7)
 		var tw := 0.5 + 0.5 * sin(_moment_t * 7.0 + float(i) * 1.9)
-		_sparkle(p, 9.0 + 9.0 * tw, Color(1.0, 0.98, 0.9, (0.35 + 0.6 * tw) * a))
+		_sparkle(p, 9.0 + 9.0 * tw, Color(1.0, 0.95, 0.7, (0.4 + 0.6 * tw) * a))
 	if _moment_t > 50.0:
 		return
-	# THE WORD AND THE STARS, BIG: "Caught!" lands over the card and her rarity's stars pop
-	# under it one by one, in step with the card's own.
+	# THE WORD: "Caught!" lands over the card. Her stars are the card's own, popping in one by
+	# one at the card's moment size (round 2, #10: the stars were drawn twice, once on the
+	# card and again as a big row under it).
 	var half: float = _panel.size.y * _panel.scale.y * 0.5
-	# These two leave faster than the rays, so nothing big lingers once the card has flown.
+	# This leaves faster than the rays, so nothing big lingers once the card has flown.
 	a *= a
 	var font: Font = MenuStyleScript.title_font()
 	var land := clampf(_moment_t / 0.26, 0.0, 1.0)
@@ -684,21 +740,6 @@ func _draw_burst() -> void:
 	_burst.draw_string_outline(font, wat, word, HORIZONTAL_ALIGNMENT_LEFT, -1, px, 22,
 		Color(0.25, 0.08, 0.3, a * land))
 	_burst.draw_string(font, wat, word, HORIZONTAL_ALIGNMENT_LEFT, -1, px, wcol)
-	for i in 4:
-		var sc := Vector2(c.x + (float(i) - 1.5) * 92.0, c.y + half + 78.0)
-		var k := star_pop(i)
-		var on := i <= _rarity and k >= 0.0
-		var r := 36.0
-		if on and k < 1.0:
-			r *= 1.0 + 0.8 * sin(k * PI) * (1.0 - k * 0.5)
-			_burst.draw_arc(sc, 34.0 + 70.0 * k, 0.0, TAU, 40, Color(1.0, 0.95, 0.7, 0.9 * (1.0 - k) * a),
-				6.0 * (1.0 - k) + 1.0, true)
-		CatchIconScript.star(_burst, sc + Vector2(0.0, 4.0), r, Color(0.1, 0.03, 0.12, 0.45 * a),
-			Color(0.0, 0.0, 0.0, 0.0))
-		if on:
-			CatchIconScript.star(_burst, sc, r, Color(STAR_ON, a), Color(0.55, 0.32, 0.02, a))
-		else:
-			CatchIconScript.star(_burst, sc, r, Color(1.0, 1.0, 1.0, 0.22 * a), Color(1.0, 1.0, 1.0, 0.5 * a))
 
 
 func _sparkle(p: Vector2, r: float, colour: Color) -> void:

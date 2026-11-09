@@ -238,6 +238,9 @@ var _storage: Storage
 var _toast_left := 0.0
 ## The card a catch slides in (game/ui/catch_card.gd). See _on_captured().
 var _catch_card: Control = null
+var _catch_layer: CanvasLayer = null
+## Whether the HUD is hidden behind a catch moment (_veil_for_catch).
+var _veiled := false
 ## Toasts raised while another one is on screen, oldest first. See toast().
 var _toast_queue: Array[String] = []
 ## Whether a letter or a menu is on screen right now, and whether the player had asked for
@@ -300,8 +303,15 @@ func _ready() -> void:
 	set_overlay_open(false)
 	_toast.modulate.a = 0.0
 	_restyle()
+	# THE CATCH IS THE WHOLE SCREEN FOR ITS MOMENT (Fable AAA round 2, #10: "dim behind and hide
+	# the rest of the HUD for the beat"): the card rides a layer of its own above the HUD, so
+	# the HUD can step out (see _veil_for_catch) while the card stays.
+	_catch_layer = CanvasLayer.new()
+	_catch_layer.name = "CatchLayer"
+	_catch_layer.layer = layer + 1
+	add_child(_catch_layer)
 	_catch_card = CatchCardScript.new()
-	add_child(_catch_card)
+	_catch_layer.add_child(_catch_card)
 
 	_bind()
 
@@ -309,6 +319,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if _hints_device != InputDeviceScript.last():
 		_build_hints()
+	_veil_for_catch()
 
 	_elapsed += delta
 	_fade_tip(delta)
@@ -771,6 +782,27 @@ func _on_captured(instance: PonyInstance) -> void:
 	_catch_card.show_catch(instance, body)
 
 
+## While the catch card holds its centre moment the rest of the HUD is hidden, and it comes
+## back the moment the card flies to its corner. Only a HUD this hid is shown again, so a HUD a
+## cinematic put away stays away.
+func _veil_for_catch() -> void:
+	if _catch_card == null:
+		return
+	if _catch_layer != null:
+		_catch_layer.layer = layer + 1
+	var moment: bool = _catch_card.call("in_moment")
+	if moment and not _veiled and visible:
+		_veiled = true
+		visible = false
+	elif not moment and _veiled:
+		_veiled = false
+		visible = true
+
+
+func catch_veiled() -> bool:
+	return _veiled
+
+
 ## The catch card, for the tests and gates.
 func catch_card() -> Control:
 	return _catch_card
@@ -980,7 +1012,10 @@ func _draw_pips() -> void:
 		if filled:
 			_pips.draw_colored_polygon(RarityGlyph.outline(_rarities[i], rect.get_center(),
 				PIP_SIZE.x * 0.28), Color(1, 1, 1, 0.9))
-	# The count, in a gold chip at the strip's end: full reads warm red.
+	# The count, in a gold chip at the strip's end: full reads warm red. A bag with no slots yet
+	# (before the Scoop is hers) shows no "0/0" (Fable AAA round 2, #9): there is nothing to count.
+	if _capacity <= 0:
+		return
 	var chip := Rect2(Vector2(BAG_DISC + STRIP_GAP + _slots_width() + STRIP_GAP,
 		(h - COUNT_CHIP.y) * 0.5), COUNT_CHIP)
 	var full := _storage != null and _rarities.size() >= _capacity and _capacity > 0
