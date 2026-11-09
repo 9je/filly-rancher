@@ -9472,22 +9472,55 @@ func _depot_cart() -> int:
 	if not _owns(&"depot_cart"):
 		return 0
 	var sent := 0
+	var names: Array[String] = []
+	var where := Vector3.INF
 	begin_delivery_batch()
 	for slot in _plot_slots():
 		var pen := slot.get_built() as Pen
 		if pen == null or not pen.is_full():
 			continue
 		for inst in pen.ponies():
-			if inst.is_marked():
+			# WHAT THE COMPANY WANTS, AND ONLY THAT (P8, playtest 2026-11-08 item 7: rare ponies
+			# went up at dawn with nothing on screen). The cart takes Bloomed Drifters: never a
+			# named pony, who asks before she goes, and never a blank, who is worth a fee.
+			if not cart_takes(inst):
 				continue
+			var name := inst.display_name()
 			if bool(deliver_pony(inst.uid).get("ok", false)):
 				sent += 1
+				names.append(name)
+				if where == Vector3.INF:
+					where = pen.global_position
 	# The cart's own line below is the batch's one toast.
 	_batch = {}
 	if sent > 0:
 		_toast("The Depot cart called at dawn and took %d. Marigold sends her thanks." % sent)
 		_novelty("mechanic", "first_cart", "The Depot cart took ponies at dawn")
+		if _interactive and where != Vector3.INF:
+			_cart_cinematic(where, names)
 	return sent
+
+
+## Whom the dawn cart may take: a Bloomed Drifter, nobody else (item 7).
+static func cart_takes(inst: PonyInstance) -> bool:
+	return inst != null and inst.is_stock() and inst.is_marked()
+
+
+## THE CART ON CAMERA (item 7; idea F4): the pen it emptied, the names, and then the camera
+## stays on the gap a second too long. Waits for her to be outdoors with nothing open.
+func _cart_cinematic(pen_at: Vector3, names: Array[String]) -> void:
+	var listed := ", ".join(names.slice(0, 3)) + (" and %d more" % (names.size() - 3)
+		if names.size() > 3 else "")
+	var side := Vector3(7.0, 3.2, 6.0)
+	var shots := [
+		{"from": pen_at + side + Vector3(2.0, 1.5, 2.0), "to": pen_at + side, "look": pen_at + Vector3.UP,
+			"time": 3.2, "caption": "The Depot cart called at dawn: %s." % listed},
+		{"from": pen_at + side, "to": pen_at + side * 0.7, "look": pen_at + Vector3.UP * 0.6,
+			"time": 2.4},
+	]
+	Cinematic.shared(get_tree()).play(shots, {"freeze": [player], "host": self,
+		"can_start": func() -> bool: return not _in_palace and _no_other_menu_open() \
+			and (people == null or not people.is_talking())})
 
 
 # --- the novelty log (MISSION.md fun rules; systems/novelty.gd) ---------------------------

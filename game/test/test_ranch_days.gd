@@ -84,3 +84,19 @@ func test_paying_off_early_does_not_clear_before_collection_day() -> void:
 	gs.ledger.pay(LedgerScript.STARTING_BALANCE)
 	ranch._on_world_changed()
 	assert_false(gs.story.has_flag("debt_cleared"), "not before a collection day")
+
+
+## P8, playtest 2026-11-08 item 7: rare ponies went up on the dawn cart with nothing on screen.
+## The cart takes Bloomed Drifters and nobody else: never a named pony, never a blank.
+func test_the_dawn_cart_takes_only_bloomed_drifters() -> void:
+	var registry := PonyRegistry.new()
+	registry.load_all("res://data/ponies")
+	var named := PonyInstance.new()
+	named.data_id = &"fluttershy"
+	assert_false(RanchScript.cart_takes(named), "a named pony asks before she goes")
+	var blank := PonyInstance.new()
+	blank.data_id = &"stock_bold"
+	blank.stock = {"coat": 0, "mane": 0, "eyes": 0}
+	assert_true(blank.is_stock())
+	assert_eq(RanchScript.cart_takes(blank), blank.is_marked(),
+		"a blank Drifter stays; a Bloomed one goes")
