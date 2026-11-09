@@ -107,7 +107,9 @@ func derpy_crash() -> void:
 	derpy.global_position = start
 	derpy.look_at(land, Vector3.UP)
 	_play(derpy, &"struggle")
-	var cam_side := land + side * 4.5 + fwd * 2.0 + Vector3.UP * 1.4
+	# The landing is seen from beyond her, looking back toward the player, so nobody standing
+	# by the player is between the lens and Derpy (render check: Spike filled the frame).
+	var cam_side := land + fwd * 3.2 + side * 1.4 + Vector3.UP * 1.3
 	var fall := 1.7
 	var shots := [
 		{"from": "here", "to": player.global_position - fwd * 1.0 + Vector3.UP * 2.6,
