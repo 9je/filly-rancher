@@ -688,3 +688,9 @@ The lead takes the world, the ponies and the cinematics; an Opus agent in a work
   the two keys are swapped for hers on the CPU (ui/style_icon_tint.gd, cached per colour pair)
   when Finishing touches opens. The stray gold half-ring was the keyboard cursor's kit pill
   folded on a 44 px tab; the cursor now marks a button with its own pill and a gold edge.
+
+## 2026-11-09: The character pass (owner: "characters went down in score")
+- Diagnosis logged: hours went to one cinematic's framing while characters, in every frame, had no pass; and my own lens dither became review item #4. Characters now first, checked on scenes/test/char_probe.gd (one minute, ranch lighting, no ranch boot).
+- Pony preset: band_softness 0.075 -> 0.022 (round 1 asked softer, round 2 called that "smooth-shaded"; the show is hard), outline 1.7 -> 2.6 px at 0.36 of the coat's value, rim 0.18 -> 0.12, and no cast self-shadow (cast_shadow 0): the shadow map stair-stepped across necks.
+- Toon SPECULAR 0 (no sky Fresnel sheen). Manes and tails (ToonStyler.is_hair by name) carry one crisp lighter streak.
+- Reviewer brief: fixed score anchors (2/4/6/8/10 against named toon games) so rounds compare.
