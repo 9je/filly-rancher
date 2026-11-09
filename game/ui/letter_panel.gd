@@ -53,8 +53,8 @@ const LINE_HEIGHT := 26.0
 const SHEET_MARGIN := 44.0
 
 ## The letterhead band at the top of the sheet, and the wax seal at the bottom of it.
-const HEAD_HEIGHT := 76.0
-const SEAL_SIZE := 46.0
+const HEAD_HEIGHT := 80.0
+const SEAL_SIZE := 64.0
 
 ## THE TITLE'S OWN ROW, in the same LINE_HEIGHT grid as the body: half again as tall,
 ## because TITLE_SIZE (30) is half again ROW_SIZE (22). One row is all a title ever needs.
@@ -416,18 +416,17 @@ func paint(ci: Control) -> void:
 	# text() always adds: ink on cream reads fine without one, and an outline meant for a
 	# translucent menu panel is exactly the "week" look this task exists to remove.
 	var row_top: float = head_top + HEAD_HEIGHT
-	ci.draw_string(font, Vector2(text_left, row_top + TITLE_HEIGHT * 0.75), title_text(),
-		HORIZONTAL_ALIGNMENT_LEFT, text_width, MenuStyleScript.TITLE_SIZE,
-		MenuStyleScript.COLOR_INK)
+	ci.draw_string(MenuStyleScript.title_font(), Vector2(text_left, row_top + TITLE_HEIGHT * 0.75),
+		title_text(), HORIZONTAL_ALIGNMENT_LEFT, text_width, MenuStyleScript.TITLE_SIZE,
+		PaperPaintScript.HAND_INK)
 	row_top += TITLE_HEIGHT
 	_lay_body(ci, text_left, row_top, text_width)
 
 	# THE SEAL SITS UNDER THE SIGN OFF, bottom right, where a seal goes.
 	var seal := Rect2(box.size.x - SHEET_MARGIN - SEAL_SIZE,
 		box.size.y - SHEET_MARGIN - SEAL_SIZE, SEAL_SIZE, SEAL_SIZE)
-	ci.draw_circle(seal.get_center(), SEAL_SIZE * 0.5, PaperPaintScript.WAX)
-	PaperPaintScript.logo_mark(ci, seal.grow(-SEAL_SIZE * 0.24),
-		Color(1.0, 1.0, 1.0, 0.85), Color(1.0, 0.92, 0.55, 0.95))
+	PaperPaintScript.wax_seal(ci, seal.get_center() + Vector2(0, -SEAL_SIZE * 0.12),
+		SEAL_SIZE * 0.42)
 
 
 ## M10, final-review.md M2: A CLICK OFF THE SHEET CLOSES THE LETTER. Wired to Dim's own

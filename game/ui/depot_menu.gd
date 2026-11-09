@@ -34,6 +34,7 @@ const PaintScript := preload("res://ui/casino_paint.gd")
 const TileEntranceScript := preload("res://ui/tile_entrance.gd")
 const RarityGlyphScript := preload("res://ui/rarity_glyph.gd")
 const LedgerScript := preload("res://systems/ledger.gd")
+const HouseStyleScript := preload("res://ui/house_style.gd")
 
 const SCROLL_MAX := 600.0
 const PONY_TILE := Vector2(546.0, 76.0)
@@ -489,8 +490,13 @@ func refresh() -> void:
 	for i in lines.size():
 		var picked: bool = i == _selected and _tab != Tab.STATEMENT
 		var row: int = i if i < count else -1
+		if row < 0 and lines[i] in [EMPTY_TEXT, EMPTY_PAY_TEXT]:
+			# THE EMPTY STATES ARE PICTURES (Fable AAA review round 1, #8: "a paragraph with 70%
+			# empty space"): see _empty_card().
+			_rows.add_child(_empty_card(lines[i]))
+			continue
 		if row < 0:
-			# The statement and the empty notes: words, not choices.
+			# The statement: words, not choices.
 			var note := Label.new()
 			note.text = lines[i]
 			note.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -962,12 +968,29 @@ func _build_quota_card() -> void:
 	_quota_bar.add_theme_stylebox_override(&"background", bg)
 	_quota_bar.add_theme_stylebox_override(&"fill", fg)
 	v.add_child(_quota_bar)
+	# THE QUOTA AS STAMPS, THE RULES AS ROWS (Fable AAA review round 1, #8): one pony stamp
+	# per pony the Company expects, inked gold when she is delivered and an empty dashed ring
+	# while she is not, and the rule as three or four rows each with its picture. The bar and
+	# the rule's Label stay, hidden, so the words and the count are still there to be read.
+	_quota_bar.visible = false
+	_quota_stamps = HBoxContainer.new()
+	_quota_stamps.name = "QuotaStamps"
+	_quota_stamps.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_quota_stamps.add_theme_constant_override(&"separation", 14)
+	v.add_child(_quota_stamps)
+	_quota_rows = VBoxContainer.new()
+	_quota_rows.name = "QuotaRules"
+	_quota_rows.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_quota_rows.add_theme_constant_override(&"separation", 6)
+	v.add_child(_quota_rows)
 	_quota_rule = Label.new()
 	_quota_rule.name = "QuotaRule"
 	_quota_rule.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_quota_rule.custom_minimum_size = Vector2(WIDE_TILE.x - 40.0, 0.0)
 	MenuStyleScript.style_label(_quota_rule, 18, MenuStyleScript.COLOR_DIM)
 	v.add_child(_quota_rule)
+	_quota_rule.visible = false
+	_quota_card.add_theme_stylebox_override(&"panel", HouseStyleScript.plate_box(14, 18.0))
 	_quota_card.visible = false
 
 
@@ -1013,6 +1036,168 @@ func _draw_quota_card() -> void:
 	_quota_rule.text = String(words["rule"])
 	_quota_bar.max_value = maxf(1.0, float(q.get("quota", 1)))
 	_quota_bar.value = minf(float(q.get("delivered", 0)), _quota_bar.max_value)
+	_fill_stamps(int(q.get("delivered", 0)), int(q.get("quota", 0)))
+	_fill_rule_rows(String(words["rule"]))
+
+
+var _quota_stamps: HBoxContainer = null
+var _quota_rows: VBoxContainer = null
+const STAMP := 64.0
+
+
+## One stamp per pony the quota asks for; the delivered ones inked, the rest waiting, and any
+## over the quota stamped too, so a quota beaten is seen beaten.
+func _fill_stamps(delivered: int, quota: int) -> void:
+	for c in _quota_stamps.get_children():
+		_quota_stamps.remove_child(c)
+		c.queue_free()
+	for i in maxi(quota, delivered):
+		var inked := i < delivered
+		var stamp := Control.new()
+		stamp.custom_minimum_size = Vector2(STAMP, STAMP)
+		stamp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		stamp.draw.connect(func() -> void:
+			var c := Vector2(STAMP, STAMP) * 0.5
+			var r := STAMP * 0.46
+			if inked:
+				stamp.draw_circle(c, r, HouseStyleScript.GOLD)
+				stamp.draw_arc(c, r, 0.0, TAU, 40, HouseStyleScript.PLUM_DARK, 3.0, true)
+				stamp.draw_arc(c, r * 0.82, 0.0, TAU, 40, Color(HouseStyleScript.PLUM_DARK, 0.5), 1.5, true)
+				IconSet.draw(stamp, "earth", Rect2(c - Vector2(r, r) * 0.62, Vector2(r, r) * 1.24))
+			else:
+				# An empty stamp: a dashed gold ring round a faint pony.
+				for k in 16:
+					var a0 := TAU * float(k) / 16.0
+					stamp.draw_arc(c, r, a0, a0 + TAU / 32.0, 4, Color(HouseStyleScript.GOLD, 0.7), 3.0, true)
+				var faint := Rect2(c - Vector2(r, r) * 0.62, Vector2(r, r) * 1.24)
+				stamp.draw_texture_rect(IconSet.texture("earth", 128, false), faint, false,
+					Color(1, 1, 1, 0.22)))
+		_quota_stamps.add_child(stamp)
+	var count := Label.new()
+	count.text = "%d / %d" % [mini(delivered, maxi(quota, delivered)), quota]
+	HouseStyleScript.numeral_label(count, 30)
+	count.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_quota_stamps.add_child(count)
+
+
+## The rule, one clause a row, each with the picture of what it is about.
+const RULE_ICONS := [["Drifter", "escapee"], ["Owed", "coin"], ["Bits", "coin"],
+	["closes", "sun"], ["closed", "letter"], ["Paid", "sold"], ["quota", "crate"]]
+
+
+static func rule_clauses(rule: String) -> Array[String]:
+	var out: Array[String] = []
+	for sentence in rule.replace("; ", ". ").split(". ", false):
+		var t := String(sentence).strip_edges()
+		if t.is_empty():
+			continue
+		if not t.ends_with(".") and not t.ends_with("!"):
+			t += "."
+		out.append(t[0].to_upper() + t.substr(1))
+	return out
+
+
+func _fill_rule_rows(rule: String) -> void:
+	for c in _quota_rows.get_children():
+		_quota_rows.remove_child(c)
+		c.queue_free()
+	for clause in rule_clauses(rule):
+		var icon := "star"
+		for pair: Array in RULE_ICONS:
+			if clause.contains(String(pair[0])):
+				icon = String(pair[1])
+				break
+		_quota_rows.add_child(_icon_row(icon, clause))
+
+
+## A row of the house style's reading matter: a picture on a cream disc and one line beside it.
+func _icon_row(icon: String, text: String) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override(&"separation", 14)
+	row.add_child(_icon_disc(icon, 40.0))
+	var l := Label.new()
+	l.text = text
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	l.custom_minimum_size = Vector2(WIDE_TILE.x - 120.0, 0.0)
+	HouseStyleScript.ink_label(l, 20, HouseStyleScript.CREAM, false)
+	row.add_child(l)
+	return row
+
+
+## A picture on a cream disc in a dim gold ring, `px` across.
+func _icon_disc(icon: String, px: float) -> Control:
+	var disc := Control.new()
+	disc.custom_minimum_size = Vector2(px, px)
+	disc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	disc.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	disc.draw.connect(func() -> void:
+		var r := Rect2(Vector2.ZERO, Vector2(px, px))
+		disc.draw_style_box(HouseStyleScript.disc_box(px, HouseStyleScript.KEY_FACE,
+			HouseStyleScript.GOLD_DIM, 2), r)
+		IconSet.draw(disc, icon, r.grow(-px * 0.17)))
+	return disc
+
+
+## AN EMPTY COUNTER, DRAWN. The Deliver tab with nobody in the pens shows an empty pen and the
+## road to a delivery in four pictures (catch, pen, Bloom, deliver); the Pay tab with nothing
+## payable shows the coin. The words are the same line they always were.
+func _empty_card(text: String) -> PanelContainer:
+	var card := PanelContainer.new()
+	card.name = "EmptyCard"
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.custom_minimum_size = Vector2(WIDE_TILE.x, 0.0)
+	card.add_theme_stylebox_override(&"panel", HouseStyleScript.plate_box(16, 22.0))
+	var v := VBoxContainer.new()
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_theme_constant_override(&"separation", 14)
+	card.add_child(v)
+	var deliver := text == EMPTY_TEXT
+	var big := Control.new()
+	big.custom_minimum_size = Vector2(96, 96)
+	big.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	big.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	big.draw.connect(func() -> void:
+		var r := Rect2(Vector2.ZERO, Vector2(96, 96))
+		big.draw_style_box(HouseStyleScript.disc_box(96, HouseStyleScript.KEY_FACE,
+			HouseStyleScript.GOLD, 4), r)
+		IconSet.draw(big, "pen_small" if deliver else "coin", r.grow(-16.0)))
+	v.add_child(big)
+	var words := Label.new()
+	words.text = text
+	words.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	HouseStyleScript.ink_label(words, 26, HouseStyleScript.CREAM)
+	v.add_child(words)
+	if deliver:
+		var road := HBoxContainer.new()
+		road.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		road.alignment = BoxContainer.ALIGNMENT_CENTER
+		road.add_theme_constant_override(&"separation", 10)
+		var steps := [["catch", "Catch"], ["fence", "Pen"], ["bloom", "Bloom"], ["crate", "Deliver"]]
+		for i in steps.size():
+			if i > 0:
+				var arrow := Label.new()
+				arrow.text = ">"
+				HouseStyleScript.ink_label(arrow, 26, HouseStyleScript.GOLD_DIM)
+				arrow.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+				road.add_child(arrow)
+			var step := VBoxContainer.new()
+			step.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			step.add_theme_constant_override(&"separation", 2)
+			var pic := _icon_disc(String(steps[i][0]), 52.0)
+			pic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+			step.add_child(pic)
+			var word := Label.new()
+			word.text = String(steps[i][1])
+			word.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			HouseStyleScript.ink_label(word, 17, HouseStyleScript.GOLD)
+			step.add_child(word)
+			road.add_child(step)
+		v.add_child(road)
+	return card
 
 
 ## A payment (a coin and its amount) or one of the two answers to a named pony's confirm.

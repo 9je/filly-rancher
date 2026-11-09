@@ -809,15 +809,26 @@ func _add_row(index: int, row_name: String, blurb: String, price: String, enable
 		column.add_child(chip)
 	if not blurb.is_empty():
 		var sub := Label.new()
-		sub.text = blurb
+		# NO LINE ENDS IN "..." (Fable AAA review round 1, #8: "market copy truncated"). The
+		# tile carries the blurb's first sentence whole, wrapped, and the detail strip under
+		# the grid carries all of it; a cut-off sentence reads as a bug, a short one as a
+		# caption.
+		sub.text = tile_blurb(blurb) if _tab == Tab.BUY else blurb
 		sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		# ONE LINE, ENDED PROPERLY: the whole of it is in the detail strip under the grid.
-		sub.text_overrun_behavior = TextServer.OVERRUN_TRIM_WORD_ELLIPSIS
-		sub.clip_text = true
-		sub.custom_minimum_size = Vector2(0.0, 0.0)
+		sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		sub.custom_minimum_size = Vector2(150.0, 0.0)
 		MenuStyleScript.style_label(sub, 17, MenuStyleScript.COLOR_DIM)
 		column.add_child(sub)
 	_rows.add_child(row)
+
+
+## The first sentence of `blurb`, whole: what a Buy tile shows of an item's description.
+static func tile_blurb(blurb: String) -> String:
+	for stop in [". ", "! ", "? "]:
+		var i := blurb.find(stop)
+		if i >= 0:
+			return blurb.substr(0, i + 1)
+	return blurb
 
 
 func _refuse(text: String) -> void:
