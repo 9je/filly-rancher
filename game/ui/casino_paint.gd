@@ -234,6 +234,31 @@ static func fit_box_size(font: Font, string: String, size: int, box: Vector2) ->
 	return px
 
 
+## PRINTED ON THE FELT ALONG AN ARC (Fable AAA round 4: the 3 to 2 line was grey on green).
+## `string` is laid glyph by glyph along the circle about `centre` at `radius`, centred on
+## `mid` (radians, PI / 2 being straight below the centre), each glyph upright to the arc,
+## reading left to right as a real table's print does. A dark copy two pixels down first.
+static func arc_text(ci: CanvasItem, font: Font, centre: Vector2, radius: float, mid: float,
+		string: String, size: int, colour: Color) -> void:
+	if font == null or string.is_empty():
+		return
+	var px: int = MenuStyleScript.font_px(size)
+	var total: float = font.get_string_size(string, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x
+	# Left to right is decreasing angle below the centre.
+	var angle: float = mid + total * 0.5 / radius
+	for i in string.length():
+		var ch := string.substr(i, 1)
+		var w: float = font.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x
+		var at_angle: float = angle - w * 0.5 / radius
+		var at: Vector2 = centre + Vector2(cos(at_angle), sin(at_angle)) * radius
+		ci.draw_set_transform(at, at_angle - PI * 0.5, Vector2.ONE)
+		ci.draw_string(font, Vector2(-w * 0.5, 2.0), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, px,
+			Color(0.0, 0.0, 0.0, 0.35))
+		ci.draw_string(font, Vector2(-w * 0.5, 0.0), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, px, colour)
+		angle -= w / radius
+	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
 ## ONE LABEL, CENTRED IN ITS BOX VERTICALLY, aligned in it horizontally, fitted to it in both
 ## directions. The workhorse of every drawn screen in the Palace since the rebuild.
 static func label(ci: CanvasItem, font: Font, box: Rect2, string: String, size: int,

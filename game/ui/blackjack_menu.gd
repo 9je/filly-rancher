@@ -517,9 +517,11 @@ func paint(ci: Control) -> void:
 	_paint_felt_dressing(ci)
 	ci.draw_arc(Vector2(STAGE_WIDTH * 0.5, -620.0), 900.0, PI * 0.30, PI * 0.70, 64,
 		PaintScript.FELT_LINE, 2.0, true)
+	# Printed in gold along the arc, as a real table's felt is (Fable AAA round 4: grey on
+	# green, barely legible).
 	if not banner_up():
-		PaintScript.label(ci, title_font, Rect2(380.0, 212.0, 360.0, 34.0),
-			"Blackjack pays 3 to 2", 20, Color(1.0, 0.94, 0.72, 0.30))
+		PaintScript.arc_text(ci, title_font, Vector2(STAGE_WIDTH * 0.5, -620.0), 870.0,
+			PI * 0.5, "BLACKJACK PAYS 3 TO 2", 24, Color(PaintScript.GOLD, 0.92))
 
 	# --- the shoe ----------------------------------------------------------------------------
 	PaintScript.rounded(ci, SHOE, 10.0, PaintScript.PLUM_DARK, PaintScript.GOLD_DIM, 2.0)

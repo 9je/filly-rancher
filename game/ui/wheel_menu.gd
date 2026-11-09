@@ -33,7 +33,7 @@ const WHEEL_OUTER := 292.0
 const WHEEL_INNER := 104.0
 const RIM_WIDTH := 16.0
 const HUB_RADIUS := 92.0
-const LABEL_RADIUS := 206.0
+const LABEL_RADIUS := 214.0
 const BULBS := 30
 
 const COLUMN_X := 660.0
@@ -472,24 +472,47 @@ func _paint_wheel(ci: Control, t: float, title_font: Font) -> void:
 	_paint_pointer(ci)
 
 
-## The tier on its slice, reading along the radius, turned on the left half of the wheel so
-## no label is ever upside down.
+## THE TIER ON ITS SLICE, EVERY GLYPH UPRIGHT (Fable AAA round 4: the numbers were tiny and
+## turned). The glyphs are stacked along the slice's radius the way a show wheel prints its
+## prizes: one under the other at the top and bottom of the wheel, side by side at its flanks,
+## always reading left to right or top to bottom, and never turned, so "10x" reads the same at
+## the pointer as anywhere else.
+const LABEL_PX := 34
+
+
 func _paint_segment_label(ci: Control, font: Font, mid: float, tier: int) -> void:
-	var at: Vector2 = WHEEL_CENTRE + Vector2(cos(mid), sin(mid)) * LABEL_RADIUS
-	var rotation: float = mid
-	var facing_left: bool = cos(mid) < 0.0
-	if facing_left:
-		rotation += PI
-	ci.draw_set_transform(at, rotation, Vector2.ONE)
-	var size: int = 30 if tier >= WheelScript.Tier.TEN else 26
-	var box := Rect2(Vector2(-70.0, -18.0), Vector2(140.0, 36.0))
+	var text: String = WheelScript.TIER_LABELS[tier]
+	var out := Vector2(cos(mid), sin(mid))
+	# Left to right on the flanks and diagonals, top to bottom near the top and the foot.
+	var dir: Vector2 = out
+	if absf(out.x) > 0.38:
+		dir = out if out.x > 0.0 else -out
+	elif out.y < 0.0:
+		dir = -out
+	var px: int = LABEL_PX
+	var cap: float = font.get_ascent(px) * 0.72
+	var extents: Array[float] = []
+	var total := 0.0
+	for i in text.length():
+		var w: float = font.get_string_size(text.substr(i, 1), HORIZONTAL_ALIGNMENT_LEFT, -1, px).x
+		# The glyph's box projected on the reading direction, plus a hair of air.
+		var e: float = absf(dir.x) * w + absf(dir.y) * cap + 1.0
+		extents.append(e)
+		total += e
 	var ink: Color = PaintScript.CARD_INK if tier == WheelScript.Tier.ONE \
 		else Color(1.0, 1.0, 1.0)
-	# A soft dark copy one pixel down, so white on gold and white on red both read.
-	PaintScript.label(ci, font, Rect2(box.position + Vector2(0.0, 2.0), box.size),
-		WheelScript.TIER_LABELS[tier], size, Color(0.0, 0.0, 0.0, 0.30))
-	PaintScript.label(ci, font, box, WheelScript.TIER_LABELS[tier], size, ink)
-	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	var centre: Vector2 = WHEEL_CENTRE + out * LABEL_RADIUS
+	var cursor: Vector2 = centre - dir * total * 0.5
+	for i in text.length():
+		var ch := text.substr(i, 1)
+		var w: float = font.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x
+		var mid_at: Vector2 = cursor + dir * extents[i] * 0.5
+		var base := mid_at + Vector2(-w * 0.5, cap * 0.5)
+		# A soft dark copy down a little, so white on gold and white on red both read.
+		ci.draw_string(font, base + Vector2(0.0, 2.0), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, px,
+			Color(0.0, 0.0, 0.0, 0.30))
+		ci.draw_string(font, base, ch, HORIZONTAL_ALIGNMENT_LEFT, -1, px, ink)
+		cursor += dir * extents[i]
 
 
 func _paint_pointer(ci: Control) -> void:

@@ -47,7 +47,9 @@ const CHIP_PITCH := 114.0
 const COUNTER := Rect2(386.0, 484.0, 136.0, 56.0)
 const SPIN := Rect2(530.0, 466.0, 250.0, 92.0)
 const PAYTABLE := Rect2(808.0, 0.0, 312.0, 580.0)
-const BANNER := Rect2(170.0, 360.0, 400.0, 70.0)
+## THE WIN LIGHTS UP THE MARQUEE (Fable AAA round 4: the banner sat over the third row of
+## the reels): it covers the SPECTRA SLOTS sign, above the windows, never a symbol.
+const BANNER := Rect2(32.0, 7.0, 676.0, 72.0)
 const BULBS := 14
 const BULB_CHASE_SECONDS := 1.2
 
@@ -529,10 +531,12 @@ func paint(ci: Control) -> void:
 	var glow: float = 0.5 + 0.5 * sin(t * 2.0)
 	if _flash > 0.0:
 		glow = 0.5 + 0.5 * sin(t * 16.0)
-	PaintScript.label(ci, title_font, Rect2(sign.position + Vector2(0.0, 3.0), sign.size),
-		"SPECTRA SLOTS", 46, Color(0.0, 0.0, 0.0, 0.35))
-	PaintScript.label(ci, title_font, sign, "SPECTRA SLOTS", 46,
-		PaintScript.GOLD.lerp(Color(1.0, 0.98, 0.85), 0.35 * glow))
+	# The sign gives way to the win banner (drawn over the marquee by the overlay).
+	if not (_flash > 0.0 and _won > 0):
+		PaintScript.label(ci, title_font, Rect2(sign.position + Vector2(0.0, 3.0), sign.size),
+			"SPECTRA SLOTS", 46, Color(0.0, 0.0, 0.0, 0.35))
+		PaintScript.label(ci, title_font, sign, "SPECTRA SLOTS", 46,
+			PaintScript.GOLD.lerp(Color(1.0, 0.98, 0.85), 0.35 * glow))
 	for bulb: int in BULBS:
 		var phase: float = fposmod(t / BULB_CHASE_SECONDS - float(bulb) / float(BULBS), 1.0)
 		var lit: float = 0.35 + 0.65 * maxf(0.0, 1.0 - phase * 4.0)
