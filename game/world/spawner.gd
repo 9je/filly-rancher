@@ -301,7 +301,12 @@ func populate_paced(phase: int, weather: int, pace: Callable) -> int:
 		if _zoned_in_roster(marker.zone_id) == 0 and not marker.zone_id in _empty_zones:
 			_empty_zones.append(marker.zone_id)
 
-		pool = _without(pool, taken)
+		# Struck out of what earlier markers drew; but a marker whose every candidate stands
+		# elsewhere still fills from the old pool (owned ones out), never stands empty: the
+		# ranch's gate counts every slot ("every pony spawned"), and an old save that owns
+		# much of the roster leaves some zones nobody else.
+		var fresh := _without(pool, taken)
+		pool = fresh if not fresh.is_empty() else _without(pool, _owned())
 		if pool.is_empty():
 			continue
 		var drawn_here := {}
