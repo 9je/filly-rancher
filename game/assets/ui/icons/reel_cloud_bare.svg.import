@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://rppbpsm2buve"
-path="res://.godot/imported/reel_bell_bare.svg-5428dbdd06f0509af5eb09a1f9c4718d.ctex"
+uid="uid://bu1yoihb2ptc2"
+path="res://.godot/imported/reel_cloud_bare.svg-1b2ec34bf29f58d7babd05037aa7678b.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/icons/reel_bell_bare.svg"
-dest_files=["res://.godot/imported/reel_bell_bare.svg-5428dbdd06f0509af5eb09a1f9c4718d.ctex"]
+source_file="res://assets/ui/icons/reel_cloud_bare.svg"
+dest_files=["res://.godot/imported/reel_cloud_bare.svg-1b2ec34bf29f58d7babd05037aa7678b.ctex"]
 
 [params]
 

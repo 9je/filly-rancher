@@ -28,7 +28,7 @@ extends RefCounted
 ## by, so a gate can seed a hundred thousand spins and get the same hundred thousand back.
 ## Preload by path, never by the class_name.
 
-enum Symbol { APPLE, HORSESHOE, BELL, GEM, STAR, RAINBOW }
+enum Symbol { APPLE, HORSESHOE, CLOUD, GEM, STAR, RAINBOW }
 
 ## How many reels spin. Three, and named, because payout() indexes the array it is handed.
 const REELS := 3
@@ -65,7 +65,7 @@ const TWO_RAINBOW_PAY := 5
 const ONE_RAINBOW_PAY := 1
 
 ## Player facing, so no dashes.
-const SYMBOL_NAMES: Array[String] = ["Apple", "Horseshoe", "Bell", "Gem", "Star", "Rainbow"]
+const SYMBOL_NAMES: Array[String] = ["Apple", "Horseshoe", "Cloud", "Gem", "Star", "Rainbow"]
 
 
 ## Reel `reel`'s symbols, in strip order, top to bottom. An index off the machine answers the

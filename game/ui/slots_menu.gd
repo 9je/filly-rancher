@@ -679,7 +679,8 @@ func _paint_reel(reel: int, window: Control) -> void:
 		if blur < 0.6:
 			window.draw_line(Vector2(12.0, cell.position.y), Vector2(size.x - 12.0, cell.position.y),
 				Color(0.0, 0.0, 0.0, 0.08 * (1.0 - blur / 0.6)), 2.0)
-		var box := Rect2(cell.position + Vector2(size.x * 0.5 - 40.0, 10.0), Vector2(80.0, 80.0))
+		# 92 of the cell's 100: the pictures fill their drum the way the Market's fill a well.
+		var box := Rect2(cell.position + Vector2(size.x * 0.5 - 46.0, 4.0), Vector2(92.0, 92.0))
 		var symbol: int = strip[posmod(i, strip.size())]
 		if blur > 0.0:
 			_paint_streak(window, box, symbol, smear, blur)

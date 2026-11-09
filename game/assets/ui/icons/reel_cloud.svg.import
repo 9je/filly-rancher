@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cy0qx0pgmr7yt"
-path="res://.godot/imported/reel_bell.svg-b10b76895f185c9661a658cbf3f236ee.ctex"
+uid="uid://cjn4umx5ccerp"
+path="res://.godot/imported/reel_cloud.svg-b404bb72ea99d8f77ca935bd295dc78a.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/icons/reel_bell.svg"
-dest_files=["res://.godot/imported/reel_bell.svg-b10b76895f185c9661a658cbf3f236ee.ctex"]
+source_file="res://assets/ui/icons/reel_cloud.svg"
+dest_files=["res://.godot/imported/reel_cloud.svg-b404bb72ea99d8f77ca935bd295dc78a.ctex"]
 
 [params]
 

@@ -451,12 +451,12 @@ static func card_pip_points(rect: Rect2, rank: int) -> PackedVector2Array:
 
 
 ## The icon set's picture per Slots.Symbol and per suit (hearts, diamonds, spades, clubs).
-const SYMBOL_ICONS: Array[String] = ["reel_apple", "reel_horseshoe", "reel_bell", "reel_gem",
+const SYMBOL_ICONS: Array[String] = ["reel_apple", "reel_horseshoe", "reel_cloud", "reel_gem",
 	"reel_star", "reel_rainbow"]
 const SUIT_ICONS: Array[String] = ["suit_hearts", "suit_diamonds", "suit_spades", "suit_clubs"]
 
 
-## One per Slots.Symbol, in enum order: APPLE, HORSESHOE, BELL, GEM, STAR, RAINBOW.
+## One per Slots.Symbol, in enum order: APPLE, HORSESHOE, CLOUD, GEM, STAR, RAINBOW.
 static func draw_symbol(ci: CanvasItem, box: Rect2, symbol: int) -> void:
 	# The icon set's reel pictures (P8 S8; playtest 2026-11-08 item 60: "flat clip-art").
 	if IconSet.draw(ci, SYMBOL_ICONS[clampi(symbol, 0, SYMBOL_ICONS.size() - 1)], box):
@@ -484,13 +484,11 @@ static func draw_symbol(ci: CanvasItem, box: Rect2, symbol: int) -> void:
 				var a: float = lerpf(PI * 0.98, PI * 2.02, float(k) / 5.0)
 				ci.draw_circle(centre + Vector2(cos(a), sin(a)) * r, box.size.y * 0.025,
 					PLUM_DARK)
-		SlotsScript.Symbol.BELL:
-			ci.draw_colored_polygon(PackedVector2Array([_at(box, 0.30, 0.70),
-				_at(box, 0.38, 0.24), _at(box, 0.62, 0.24), _at(box, 0.70, 0.70)]),
-				Color(0.93, 0.76, 0.30))
-			ci.draw_rect(Rect2(_at(box, 0.24, 0.70),
-				Vector2(box.size.x * 0.52, box.size.y * 0.09)), GOLD_DIM)
-			ci.draw_circle(_at(box, 0.5, 0.86), box.size.y * 0.07, GOLD_DIM)
+		SlotsScript.Symbol.CLOUD:
+			for puff: Vector3 in [Vector3(0.32, 0.56, 0.17), Vector3(0.52, 0.44, 0.22),
+					Vector3(0.70, 0.56, 0.16)]:
+				ci.draw_circle(_at(box, puff.x, puff.y), box.size.y * puff.z,
+					Color(0.96, 0.95, 1.0))
 		SlotsScript.Symbol.GEM:
 			ci.draw_colored_polygon(hexagon_points(box), Color(0.42, 0.76, 0.86))
 			ci.draw_colored_polygon(PackedVector2Array([_at(box, 0.5, 0.0),

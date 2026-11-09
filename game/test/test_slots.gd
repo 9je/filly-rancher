@@ -59,7 +59,7 @@ func test_three_of_a_kind_pays_the_paytable_and_a_losing_line_pays_nothing() -> 
 		SlotsScript.Symbol.APPLE], 10), 40)
 	assert_eq(SlotsScript.payout([SlotsScript.Symbol.RAINBOW, SlotsScript.Symbol.RAINBOW,
 		SlotsScript.Symbol.RAINBOW], 10), 4500)
-	assert_eq(SlotsScript.payout([SlotsScript.Symbol.APPLE, SlotsScript.Symbol.BELL,
+	assert_eq(SlotsScript.payout([SlotsScript.Symbol.APPLE, SlotsScript.Symbol.CLOUD,
 		SlotsScript.Symbol.GEM], 10), 0)
 
 
@@ -67,7 +67,7 @@ func test_rainbows_outside_a_triple_pay_a_consolation() -> void:
 	assert_eq(SlotsScript.payout([SlotsScript.Symbol.RAINBOW, SlotsScript.Symbol.RAINBOW,
 		SlotsScript.Symbol.APPLE], 10), 50, "two rainbows pay five")
 	assert_eq(SlotsScript.payout([SlotsScript.Symbol.RAINBOW, SlotsScript.Symbol.APPLE,
-		SlotsScript.Symbol.BELL], 10), 10, "one rainbow hands the stake back")
+		SlotsScript.Symbol.CLOUD], 10), 10, "one rainbow hands the stake back")
 
 
 func test_a_zero_or_negative_stake_pays_nothing_at_all() -> void:

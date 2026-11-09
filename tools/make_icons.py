@@ -813,43 +813,92 @@ def _clubs(i):
     i.fill(circle(42, 36, 9), "ink")
 
 
+# ---- the slot reels ------------------------------------------------------------------------
+# Fable AAA round 3, #6: the reels read as stock emoji (an apple, a bell, a gem, a star) beside
+# the Market's tiles. They are drawn now in the Market pictures' hand and vocabulary: more of
+# the thing, a three quarter view where it helps, the valley's own objects. The apple IS the
+# Market's apples; the bell is gone for a Cloudsdale cloud; the star is the Spectra Palace's.
+
+@icon("reel_apple")
+def _reel_apple(i):
+    _apple_art(i)
+
+
 @icon("reel_horseshoe")
 def _reel_shoe(i):
-    _earth_shoe(i, 0)
+    # A lucky shoe, open end down and tilted, gold with a lit face, seven nail holes and a
+    # glint, so it reads as forged and not as a magnet.
+    i.parts.append('<g transform="rotate(-12 32 34)">')
+    i.fill(path("M15,52 V31 C15,19 22,11 32,11 C42,11 49,19 49,31 V52 H39 V32 "
+                "C39,26 36,22 32,22 C28,22 25,26 25,32 V52 Z", (15, 11, 49, 52)), "gold")
+    i.fill(rrect(13.5, 47, 13, 7, 2), shade(SW["gold"], 0.86), hl=False)
+    i.fill(rrect(37.5, 47, 13, 7, 2), shade(SW["gold"], 0.86), hl=False)
+    nail = line(SW["gold"])
+    for x, y in ((20, 42), (19.6, 33), (22, 24), (32, 16.5), (42, 24), (44.4, 33), (44, 42)):
+        i.parts.append(f'<rect x="{x - 1.3:.1f}" y="{y - 1.9:.1f}" width="2.6" height="3.8" '
+                       f'rx="0.9" fill="{nail}"/>')
+    i.parts.append("</g>")
+    i.flat(star(50, 13, 6, 0.32, 4), "white", stroke=1.6, outline=line(SW["gold"]))
 
 
-@icon("reel_bell")
-def _bell(i):
-    i.fill(path("M32,12 C42,12 45,20 45,30 C45,38 50,42 51,46 H13 C14,42 19,38 19,30 "
-                "C19,20 22,12 32,12 Z", (13, 12, 51, 46)), "gold")
-    i.fill(circle(32, 50, 4.5), "orange", hl=False, stroke=2)
+@icon("reel_cloud")
+def _reel_cloud(i):
+    # A Cloudsdale cloud: three puffs on a flat underside, lavender shade beneath, a little
+    # bolt peeking out under it (a pegasus is never far from one).
+    i.fill(poly([(36, 40), (30, 50), (35, 50), (31, 60), (43, 46), (37, 46), (41, 40)]), "gold",
+           hl=False, stroke=2.2)
+    i.fill(path("M10,42 C5,42 4,33 11,31 C10,22 20,18 25,23 C28,13 43,12 46,22 "
+                "C53,19 60,26 56,32 C62,35 59,44 53,43 Z", (4, 13, 61, 44)), "#F4F1FF",
+           outline=line("#A6A2D8"))
+    i.ink("M16,32 C17,28 21,27 23,29 M35,24 C37,21 41,21 43,24", "#C7C3EE", 2)
 
 
 @icon("reel_gem")
 def _gem(i):
-    i.fill(poly([(20, 16), (44, 16), (53, 27), (32, 52), (11, 27)]), "lake")
-    i.ink("M11,27 H53 M20,16 L26,27 L32,52 L38,27 L44,16", "lake", 1.8)
-
-
-@icon("reel_rainbow")
-def _rainbow(i):
-    for r, c in ((22, "red"), (17.5, "gold"), (13, "leaf"), (8.5, "lake")):
-        i.fill(path("M%g,44 A%g,%g 0 0 1 %g,44 Z" % (32 - r, r, r, 32 + r), (32 - r, 44 - r, 32 + r, 44)),
-               c, hl=False, sh=False, stroke=2)
-    i.fill(path("M8,46 A6,6 0 0 1 18,40 A7,7 0 0 1 28,46 Z", (8, 36, 28, 46)), "white", hl=False,
-           stroke=2.2)
-    i.fill(path("M36,46 A7,7 0 0 1 46,40 A6,6 0 0 1 56,46 Z", (36, 36, 56, 46)), "white",
-           hl=False, stroke=2.2)
+    # A cut gem in three quarter view: the table lit, the crown's facets in three tones, the
+    # pavilion deeper, a glint on the table; violet-blue, the Carousel's own.
+    base = "#7FA8F0"
+    i.fill(poly([(18, 14), (46, 14), (56, 26), (32, 56), (8, 26)]), base, hl=False)
+    i.flat(poly([(18, 14), (46, 14), (40, 26), (24, 26)]), "#CFE0FF", stroke=0)
+    i.flat(poly([(18, 14), (24, 26), (8, 26)]), "#A9C4F8", stroke=0)
+    i.flat(poly([(46, 14), (56, 26), (40, 26)]), shade(base, 0.86), stroke=0)
+    i.flat(poly([(8, 26), (24, 26), (32, 56)]), "#9DBAF4", stroke=0)
+    i.flat(poly([(24, 26), (40, 26), (32, 56)]), base, stroke=0)
+    i.flat(poly([(40, 26), (56, 26), (32, 56)]), shade(base, 0.72), stroke=0)
+    i.ink("M8,26 H56 M18,14 L24,26 L32,56 L40,26 L46,14", base, 1.6)
+    i.stroke(poly([(18, 14), (46, 14), (56, 26), (32, 56), (8, 26)])[0], line(base), STROKE)
+    i.flat(star(25, 19, 4.5, 0.3, 4), "white", stroke=0)
+    i.flat(star(51, 11, 4, 0.3, 4), "white", stroke=1.2, outline=line(base))
 
 
 @icon("reel_star")
 def _reel_star(i):
-    i.fill(star(32, 33, 20, 0.48), "gold")
+    # The Spectra Palace's star: gold, bevelled (a lighter inner star), on a plum rosette with
+    # gold beads, the sign over the Palace door.
+    for k in range(10):
+        a = math.radians(k * 36 + 18)
+        i.flat(circle(32 + 25 * math.cos(a), 33 + 25 * math.sin(a), 2.2), "gold", stroke=1.2)
+    i.fill(circle(32, 33, 21), "#6A3E86", hl=False)
+    i.fill(star(32, 33, 19, 0.47), "gold", hl=False)
+    i.flat(star(32, 33.5, 10, 0.47), "#FFE58F", stroke=0)
+    i.flat(star(25, 25, 3.2, 0.3, 4), "white", stroke=0)
 
 
-@icon("reel_apple")
-def _reel_apple(i):
-    _apple(i)
+@icon("reel_rainbow")
+def _rainbow(i):
+    # The six bands of the casino's own rainbow (casino_paint BAND_COLORS), ending in two clouds.
+    bands = ("#D93D42", "#ED8C33", "#F2D147", "#55AD5C", "#4585DB", "#9961D1")
+    for k, c in enumerate(bands):
+        r = 25 - k * 3.6
+        i.stroke("M%g,44 A%g,%g 0 0 1 %g,44" % (32 - r + 1.8, r - 1.8, r - 1.8, 32 + r - 1.8), c, 3.9,
+                 cap="butt")
+    i.ink("M7,44 A25,25 0 0 1 57,44 M14.4,44 A17.6,17.6 0 0 1 49.6,44", "#9961D1", 1.4)
+    for cx in (12, 52):
+        i.fill(path("M%g,50 C%g,50 %g,43 %g,42 C%g,36 %g,35 %g,38 C%g,35 %g,37 %g,42 "
+                    "C%g,43 %g,50 %g,50 Z" % (cx - 9, cx - 13, cx - 11, cx - 8, cx - 7, cx - 2,
+                                              cx, cx + 3, cx + 8, cx + 8, cx + 12, cx + 12,
+                                              cx + 9), (cx - 13, 35, cx + 12, 50)),
+               "#F4F1FF", outline=line("#A6A2D8"), stroke=2.4)
 
 
 def _chip(i, col):
