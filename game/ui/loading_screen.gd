@@ -239,7 +239,9 @@ func _build() -> void:
 	_caption_label = _label(MenuStyleScript.numeral_font(), 26, MenuStyleScript.COLOR_NAME)
 	_percent = _label(MenuStyleScript.numeral_font(), 26, MenuStyleScript.COLOR_VALUE)
 	_tip = _label(MenuStyleScript.numeral_font(), 24, Color(1.0, 0.97, 0.9, 0.92))
-	_tip.text = TIPS[randi() % TIPS.size()] if look == Look.RANCH else ""
+	# A different tip each time, by the clock: no random generator lives under game/ui/.
+	_tip.text = TIPS[int(Time.get_unix_time_from_system()) % TIPS.size()] \
+		if look == Look.RANCH else ""
 	_tip.visible = _art != null
 	if _art != null:
 		for l: Label in [_title, _headline, _tip, _caption_label, _percent]:

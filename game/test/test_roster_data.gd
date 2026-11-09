@@ -12,8 +12,8 @@ const WorldStateScript := preload("res://systems/world_state.gd")
 const MIN_ROSTER := 43
 const EXPECTED_TIERS := {
 	PonyDataScript.Rarity.COMMON: 17,
-	PonyDataScript.Rarity.UNCOMMON: 15,
-	PonyDataScript.Rarity.RARE: 8,
+	PonyDataScript.Rarity.UNCOMMON: 13,
+	PonyDataScript.Rarity.RARE: 10,  # P8: Fluttershy and Pinkie Pie joined the rest of the Mane Six
 	PonyDataScript.Rarity.LEGENDARY: 3,
 }
 
