@@ -10255,5 +10255,32 @@ func _update_guide(delta: float) -> void:
 			card.call("show_objective", o, d)
 			_explain_once(String(o.get("words", "")))
 	var target := guide_target()
-	_guide_trail.point(player.global_position, target.global_position if target != null else Vector3.INF)
+	_guide_trail.point(player.global_position,
+		walkable_aim(player.global_position, target.global_position) if target != null else Vector3.INF)
 
+
+## THROUGH THE GATE, NOT OVER THE FENCE (P8 S7, playtest 2026-11-08 item 27: "a sighting trail
+## leads over a fence into an enclosed field with no gate"). The trail ran straight at its goal;
+## a goal inside a fenced region with her outside it (or the other way round) aims the trail at
+## the gateway instead: first a spot GUIDE_GATE_STEP outside it on her side, then, once she is
+## at the gate, a spot as far through it, and from inside it at the goal itself.
+const GUIDE_GATE_STEP := 2.5
+const GUIDE_AT_GATE := 3.0
+
+
+func walkable_aim(from: Vector3, to: Vector3) -> Vector3:
+	for fence: RegionFence in _region_fence_cache:
+		if not is_instance_valid(fence) or fence.region() == null:
+			continue
+		var c: Vector2 = fence.region().centre
+		var ring := fence.ring_radius()
+		var from_in := Vector2(from.x, from.z).distance_to(c) < ring
+		var to_in := Vector2(to.x, to.z).distance_to(c) < ring
+		if from_in == to_in:
+			continue
+		var side := -1.0 if from_in else 1.0
+		var gate := fence.gate_point(0.0)
+		if Vector2(from.x - gate.x, from.z - gate.z).length() < GUIDE_AT_GATE:
+			return fence.gate_point(-side * GUIDE_GATE_STEP)
+		return fence.gate_point(side * GUIDE_GATE_STEP)
+	return to
