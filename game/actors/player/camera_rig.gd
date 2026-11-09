@@ -283,7 +283,11 @@ const MOUNT_MIN_Z := 0.10
 ## the same species), so writing `albedo_color.a` on them would fade the whole herd
 ## whenever the player backed into a wall. `transparency` is a per-instance render
 ## property and cannot leak that way.
-const FADE_START := 1.7
+## A NEAR-CUT, NOT A LINGERING HALF (Fable AAA round 4, #2: "the player turns into a jagged
+## translucent white ghost whenever the camera is close ... ACNH never shows a half-faded
+## character"). The band was half a metre, so a camera pressed against a sign or a wall sat
+## in it with her half dithered; at 0.18 m the in-between flashes past.
+const FADE_START := SPRING_MIN + 0.18
 const FADE_END := SPRING_MIN
 
 ## THE SHOULDER OFFSET: the camera sits off the pony's centre line, third-person-shooter

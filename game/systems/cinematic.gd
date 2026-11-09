@@ -117,6 +117,11 @@ func _ready() -> void:
 	_skip_hint.add_child(_skip_fill)
 	_skip_hint.visible = false
 	add_child(_skip_hint)
+	# The flash goes UNDER the bars (Fable round 4: a boom's white flash turned the letterbox
+	# beige), and the words over both.
+	move_child(_flash, 0)
+	move_child(_caption, -1)
+	move_child(_skip_hint, -1)
 	visible = false
 
 

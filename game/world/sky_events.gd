@@ -86,6 +86,9 @@ func _body(path: String) -> Node3D:
 	var body: Node3D = PonyVisuals.build(load(path))
 	if body == null:
 		return null
+	# Shaded like every pony in the valley: built bare, Derpy and Dash were the only ponies
+	# with no cel band and no line ("a plastic navy figure", Fable round 4; "a lower tier", 2).
+	ToonStyler.style(body, &"pony", {})
 	body.rotate_y(PI)
 	var holder := Node3D.new()
 	holder.add_child(body)
@@ -129,7 +132,17 @@ func derpy_crash() -> void:
 	var side := fwd.cross(Vector3.UP).normalized()
 	var land := _clear_spot(player.global_position + fwd * 7.0, side, fwd)
 	land.y = _ground(land.x, land.z)
-	var start := land - side * 14.0 + Vector3.UP * 11.0 - fwd * 3.0
+	# High and out over open sky, so the fall reads against blue and not past the rooftops
+	# (Fable AAA round 3, #4: "derpy_0 is a grey blob folded over a roof ridge").
+	var start := land - side * 12.0 + Vector3.UP * 17.0 - fwd * 3.0
+	# Through clear air: the first side whose straight line to the landing misses every roof
+	# (Fable round 4: from the higher start she fell through a cottage gable).
+	for cand: Vector3 in [land - side * 12.0 + Vector3.UP * 17.0 - fwd * 3.0,
+			land + side * 12.0 + Vector3.UP * 17.0 - fwd * 3.0,
+			land + fwd * 10.0 + Vector3.UP * 18.0, land - fwd * 10.0 + Vector3.UP * 18.0]:
+		if _clear_line(cand, land + Vector3.UP * 1.0) and _clear_line(cand, cand.lerp(land, 0.5) + Vector3.UP * 3.0):
+			start = cand
+			break
 	var derpy := _body(DERPY)
 	if derpy == null:
 		_busy = false
@@ -161,7 +174,8 @@ func derpy_crash() -> void:
 		close = face + facing * 3.4 - fside * 0.7 + Vector3.UP * 0.1
 	var shots := [
 		# A long lens on the way down, so she fills the frame instead of a smudge by a roof.
-		{"from": "here", "to": player.global_position - fwd * 1.0 + Vector3.UP * 2.6,
+		# Low, looking up at her against the sky.
+		{"from": "here", "to": player.global_position - fwd * 0.6 + side * 1.7 + Vector3.UP * 0.8,
 			"look_node": derpy, "look_height": 0.8, "time": fall, "fov": 45.0, "fov_to": 26.0,
 			"call": func() -> void: _fall(derpy, start, land, fall)},
 		{"from": cam_side, "to": cam_side + side * 0.4 - Vector3.UP * 0.3,
@@ -174,7 +188,10 @@ func derpy_crash() -> void:
 			"call": func() -> void:
 				_play(derpy, &"shake")
 				_say(derpy, 2.2)},
-		{"from": "here", "to": player.global_position - fwd * 4.0 + Vector3.UP * 3.0,
+		# A cut, not a move: dollied from the close-up the lens swept through the player's back
+		# (Fable round 4, derpy_5).
+		{"from": player.global_position - fwd * 4.0 + side * 2.0 + Vector3.UP * 3.0,
+			"to": player.global_position - fwd * 4.0 + side * 2.0 + Vector3.UP * 3.6,
 			"look": land + Vector3.UP * 4.0, "time": 1.6, "fov": 55.0,
 			"call": func() -> void: _fly_off(derpy, land, fwd)},
 	]
@@ -193,9 +210,10 @@ func _fall(derpy: Node3D, start: Vector3, land: Vector3, secs: float) -> void:
 		var p := start.lerp(land, k)
 		p.y += sin(k * PI) * 3.0 * (1.0 - k)
 		derpy.global_position = p
-		# Two whole tumbles, so the last frame of the fall is right way up (one and a half
-		# left her on her back: Fable round 2 renders, "two grey lumps" were her hooves).
-		derpy.rotation.z = k * TAU * 2.0, 0.0, 1.0, secs).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		# One whole tumble, so the last frame of the fall is right way up (one and a half left
+		# her on her back: Fable round 2, "two grey lumps" were her hooves) and any frame of it
+		# reads as a pony (two in 1.7 s caught her folded: Fable round 3).
+		derpy.rotation.z = k * TAU, 0.0, 1.0, secs).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
 
 func _flop(derpy: Node3D, land: Vector3, facing: Vector3) -> void:

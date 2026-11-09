@@ -6,8 +6,18 @@ extends RefCounted
 const BootIntentScript := preload("res://world/boot_intent.gd")
 
 
+## `n` frames, and never less than `n` frames took on the software renderer these probes were
+## written for (about six a second). On the GPU sixty frames pass in a second, so a strip
+## timed in frames caught a cinematic's flash at its peak and cameras mid-move (Fable round 4,
+## the first GPU showcase); this keeps every probe's moments where they were authored.
+const AUTHORED_FPS := 6.0
+
+
 static func frames(tree: SceneTree, n: int) -> void:
+	var until := Time.get_ticks_msec() + int(float(n) / AUTHORED_FPS * 1000.0)
 	for i in n:
+		await tree.process_frame
+	while Time.get_ticks_msec() < until:
 		await tree.process_frame
 
 
