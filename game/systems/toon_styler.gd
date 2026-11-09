@@ -21,8 +21,12 @@ const PRESETS := {
 	# A softer terminator on a pony (Fable AAA round 1, #6: "the toon terminator cuts faces at
 	# arbitrary angles"): a low sun still shades half her face, but as a short ramp the eye
 	# reads as a rounded cheek, not a line drawn across it.
-	&"pony": {"outline_px": 1.7, "rim": 0.18, "shadow_fill": 0.40, "fade_end": 42.0,
-		"band_softness": 0.075},
+	# THE SHOW'S CEL, NOT A RAMP (Fable AAA round 2, #3: "smooth-shaded, not cel-shaded ...
+	# make the 3D pony match its own card"): a hard terminator, a line you can see at a glance
+	# in the coat's own deep shade, and no cast self-shadow (the sun's shadow map stair-stepped
+	# across necks and flanks in hard steps; the show never draws a pony shadowing herself).
+	&"pony": {"outline_px": 2.6, "rim": 0.12, "shadow_fill": 0.46, "fade_end": 42.0,
+		"band_softness": 0.022, "cast_shadow": 0.0, "line_value": 0.36},
 	&"prop": {"outline_px": 1.1, "rim": 0.0, "shadow_fill": 0.34, "fade_end": 60.0},
 	&"building": {"outline_px": 1.3, "rim": 0.0, "shadow_fill": 0.34, "fade_end": 90.0},
 	&"foliage": {"outline_px": 0.9, "rim": 0.0, "shadow_fill": 0.42, "fade_end": 50.0},
@@ -459,6 +463,8 @@ static func to_toon(src: StandardMaterial3D, preset: Dictionary) -> ShaderMateri
 	var px: float = float(preset.get("outline_px", 0.0)) * outline_scale
 	if px > 0.0 and src.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED:
 		m.next_pass = make_outline(src.albedo_color, src.albedo_texture, px, float(preset.get("fade_end", 42.0)))
+		if preset.has("line_value"):
+			(m.next_pass as ShaderMaterial).set_shader_parameter(&"darken", float(preset.line_value))
 		m.set_meta(BARE_META, _toon_from(src, preset))
 	return m
 
@@ -510,6 +516,8 @@ static func _toon_from(src: StandardMaterial3D, preset: Dictionary) -> ShaderMat
 	m.set_shader_parameter(&"rim_strength", float(preset.get("rim", 0.0)))
 	if preset.has("band_softness"):
 		m.set_shader_parameter(&"band_softness", float(preset.band_softness))
+	if preset.has("cast_shadow"):
+		m.set_shader_parameter(&"cast_shadow", float(preset.cast_shadow))
 	if src.transparency == BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR:
 		m.set_shader_parameter(&"alpha_scissor", src.alpha_scissor_threshold)
 	elif src.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:

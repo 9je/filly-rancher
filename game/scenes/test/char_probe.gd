@@ -1,0 +1,105 @@
+extends SceneTree
+## CHARACTERS UNDER THE RANCH'S OWN NOON, WITHOUT BOOTING THE RANCH (a ranch boot is most of an
+## hour on the software renderer; this is minutes). Four canon ponies, toon-styled the way
+## pony.gd styles a live one, on a patch of grass under ranch.tscn's sun, fill and exposure.
+## Writes chars_line.png (the four side by side, three-quarter on) and chars_face.png (a close
+## head-and-shoulders of the first) into --out.
+##   xvfb-run ... godot --path game -s res://scenes/test/char_probe.gd -- --out=/abs/dir
+const ToonStylerScript := preload("res://systems/toon_styler.gd")
+const SkyRigScript := preload("res://world/sky_rig.gd")
+const PONIES := ["fluttershy", "derpyhooves", "rainbowdash", "twilight"]
+var out := ""
+
+
+func _initialize() -> void:
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--out="):
+			out = a.substr(6)
+	DirAccess.make_dir_recursive_absolute(out)
+	_run.call_deferred()
+
+
+func _run() -> void:
+	root.get_window().size = Vector2i(1600, 900)
+	var world := Node3D.new()
+	root.add_child(world)
+	# ranch.tscn's Environment and Sun at DAY, as the sky rig leaves them.
+	var sky_mat := ProceduralSkyMaterial.new()
+	sky_mat.sky_top_color = Color(0.31, 0.51, 0.76)
+	sky_mat.sky_horizon_color = Color(0.72, 0.80, 0.87)
+	var sky := Sky.new()
+	sky.sky_material = sky_mat
+	var env := Environment.new()
+	env.background_mode = Environment.BG_SKY
+	env.sky = sky
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	env.ambient_light_sky_contribution = SkyRigScript.AMBIENT_SKY_CONTRIBUTION
+	env.ambient_light_color = Color(0.729412, 0.803922, 0.878431)
+	env.ambient_light_energy = SkyRigScript.PHASE_AMBIENT_ENERGY[1]
+	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	env.tonemap_white = 4.5
+	env.tonemap_exposure = 0.8
+	env.glow_enabled = true
+	env.glow_intensity = 0.3
+	env.glow_hdr_threshold = 1.8
+	var we := WorldEnvironment.new()
+	we.environment = env
+	world.add_child(we)
+	var sun := DirectionalLight3D.new()
+	sun.transform = Transform3D(Basis(Vector3(0.7071068, 0, -0.7071068), Vector3(-0.3535534, 0.8660254, -0.3535534),
+		Vector3(0.6123724, 0.5, 0.6123724)), Vector3(0, 22, 0))
+	sun.light_color = Color(1, 0.968627, 0.905882)
+	sun.light_energy = 1.15
+	sun.shadow_enabled = true
+	sun.sky_mode = DirectionalLight3D.SKY_MODE_LIGHT_ONLY
+	world.add_child(sun)
+	var ground := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(40, 40)
+	var gm := StandardMaterial3D.new()
+	gm.albedo_color = Color(0.38, 0.6, 0.27)
+	gm.diffuse_mode = BaseMaterial3D.DIFFUSE_TOON
+	gm.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+	pm.material = gm
+	ground.mesh = pm
+	world.add_child(ground)
+	var bodies: Array[Node3D] = []
+	for i in PONIES.size():
+		var holder := Node3D.new()
+		world.add_child(holder)
+		var body := PonyVisuals.build(load("res://data/ponies/%s.tres" % PONIES[i]))
+		holder.add_child(body)
+		ToonStylerScript.style(body, &"pony", {})
+		if "--mats" in OS.get_cmdline_user_args() and i == 0:
+			for mi: MeshInstance3D in body.find_children("*", "MeshInstance3D", true, false):
+				for si in mi.mesh.get_surface_count():
+					var m := mi.get_active_material(si)
+					var sh := (m as ShaderMaterial).shader.resource_path if m is ShaderMaterial else m.get_class() if m != null else "null"
+					print("MAT %s/%d %s" % [mi.name, si, sh])
+		holder.position = Vector3((float(i) - 1.5) * 1.7, 0, 0)
+		# Three-quarter on to the lens (a holder's -Z is her tail).
+		holder.rotation.y = deg_to_rad(200.0)
+		bodies.append(holder)
+	var cam := Camera3D.new()
+	world.add_child(cam)
+	cam.fov = 40.0
+	cam.position = Vector3(0.0, 1.5, 7.2)
+	cam.look_at(Vector3(0, 0.85, 0))
+	cam.current = true
+	for k in 40:
+		await process_frame
+	await _shot("chars_line")
+	cam.fov = 28.0
+	var head := bodies[0].global_position + Vector3(0, 1.15, 0)
+	cam.position = head + Vector3(0.4, 0.15, 2.4)
+	cam.look_at(head)
+	for k in 10:
+		await process_frame
+	await _shot("chars_face")
+	print("CHAR_PROBE_OK")
+	quit(0)
+
+
+func _shot(name: String) -> void:
+	await RenderingServer.frame_post_draw
+	root.get_texture().get_image().save_png("%s/%s.png" % [out, name])

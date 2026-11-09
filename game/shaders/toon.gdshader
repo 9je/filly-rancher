@@ -27,6 +27,8 @@ uniform vec3 shadow_tint : source_color = vec3(0.72, 0.74, 0.92);
 uniform float shadow_fill : hint_range(0.0, 1.0) = 0.32;
 uniform float band_center : hint_range(-1.0, 1.0) = 0.0;
 uniform float band_softness : hint_range(0.0, 0.5) = 0.035;
+// How much of the sun's cast shadow lands on this surface (ponies 0: see ToonStyler's preset).
+uniform float cast_shadow : hint_range(0.0, 1.0) = 1.0;
 uniform float rim_strength : hint_range(0.0, 1.0) = 0.0;
 uniform float rim_width : hint_range(0.0, 1.0) = 0.22;
 uniform bool spectral = false;
@@ -159,6 +161,9 @@ void fragment() {
 	}
 	EMISSION = emission * emission_energy + vec3(1.0, 0.72, 0.38) * lit_window * 2.2;
 	ROUGHNESS = 1.0;
+	// No sky reflection: the engine's default 0.5 specular laid a Fresnel sheen of the sky
+	// round every silhouette, the glossy plastic look (Fable AAA round 2, #3).
+	SPECULAR = 0.0;
 }
 
 void light() {
@@ -171,7 +176,7 @@ void light() {
 		// while the ranch ran PCSS soft shadows, whose noisy penumbra a hard step turned to salt
 		// and pepper (playtest 2026-10-24); the shadows are hard now (P8 S4), so there is no
 		// noise to hide and the ramp only smeared every shadow edge.
-		lit = min(lit, smoothstep(0.42, 0.58, ATTENUATION));
+		lit = min(lit, mix(1.0, smoothstep(0.42, 0.58, ATTENUATION), cast_shadow));
 	} else {
 		// Omni and spot lights keep a soft distance falloff but still band the surface.
 		falloff = ATTENUATION;

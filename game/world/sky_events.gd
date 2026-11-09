@@ -398,3 +398,52 @@ func _ring(at: Vector3, fwd: Vector3) -> void:
 		.set_ease(Tween.EASE_OUT)
 	ct.tween_property(cm, "albedo_color", Color.BLACK, 0.8)
 	ct.chain().tween_callback(core.queue_free)
+	_cloud_ring(at, fwd)
+
+
+## THE BOOM PUSHES THE SKY (Fable AAA round 2, #6: "the boom is a soft flat gradient ring
+## that reads as a 2D overlay; no cloud ring"). A ring of the show's flat cloud puffs blown
+## out from where she broke the barrier, riding just behind the rainbow ring, so the boom has
+## something in the world to shove.
+func _cloud_ring(at: Vector3, fwd: Vector3) -> void:
+	var u := fwd.cross(Vector3.UP).normalized()
+	if u.length() < 0.1:
+		u = Vector3.RIGHT
+	var v := u.cross(fwd).normalized()
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.disable_fog = true
+	mat.albedo_color = Color(1.0, 1.0, 1.0, 0.95)
+	var puff := SphereMesh.new()
+	puff.radius = 1.0
+	puff.height = 2.0
+	puff.radial_segments = 20
+	puff.rings = 10
+	puff.material = mat
+	var count := 26
+	for i in count:
+		var a := TAU * float(i) / float(count) + randf_range(-0.08, 0.08)
+		var out := u * cos(a) + v * sin(a)
+		var p := MeshInstance3D.new()
+		p.mesh = puff
+		p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(p)
+		p.global_position = at + out * 2.0
+		# Squashed along the blast, so each reads as a puff driven outward.
+		p.look_at(at + out * 3.0 + fwd * 0.01, fwd)
+		var size := randf_range(1.6, 2.6)
+		p.scale = Vector3(size, size * 0.8, size * 0.55) * 0.3
+		var reach := randf_range(20.0, 26.0)
+		var tw := create_tween().set_parallel(true)
+		tw.tween_property(p, "global_position", at + out * reach, 1.6).set_trans(Tween.TRANS_EXPO) \
+			.set_ease(Tween.EASE_OUT)
+		tw.tween_property(p, "scale", Vector3(size, size * 0.8, size * 0.55), 0.7) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	var fade := create_tween()
+	fade.tween_interval(1.2)
+	fade.tween_property(mat, "albedo_color:a", 0.0, 1.6)
+	fade.tween_callback(func() -> void:
+		for c in get_children():
+			if c is MeshInstance3D and (c as MeshInstance3D).mesh == puff:
+				c.queue_free())
