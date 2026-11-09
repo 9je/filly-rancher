@@ -36,15 +36,23 @@ const TileEntranceScript := preload("res://ui/tile_entrance.gd")
 ## The scroll area's tallest, in 1920 x 1080 base pixels: what is left of the screen once the
 ## title, the tabs, the footer and the Close button have theirs.
 const SCROLL_MAX := 640.0
-const SCROLL_MAX_BUY := 400.0
+const SCROLL_MAX_BUY := 540.0
 ## The detail strip's one height (item 68).
-const DETAIL_HEIGHT := 170.0
-const DETAIL_ICON := 136.0
-const BUY_BUTTON := Vector2(270.0, 92.0)
-const BUY_COLUMNS := 3
-const BUY_TILE := Vector2(360.0, 136.0)
-const SELL_TILE := Vector2(1104.0, 92.0)
+## THE DETAIL IS THE STALL'S SIDE COUNTER, BESIDE THE SHELVES (Fable AAA round 4: the strip
+## under the grid covered its third row): a column of its own at the right.
+const DETAIL_WIDTH := 330.0
+const DETAIL_ICON := 150.0
+const BUY_BUTTON := Vector2(0.0, 88.0)
+## FOUR ACROSS ON SHELVES (round 4: "admin panels"): each thing stands on a wooden shelf
+## with its name under it and its price under that, so a long name never meets a price.
+const BUY_COLUMNS := 4
+const BUY_TILE := Vector2(176.0, 236.0)
+const SELL_TILE := Vector2(1060.0, 92.0)
 const ICON_SIZE := 112.0
+## Where a Buy card's shelf plank runs, from the card's top: under the picture.
+const SHELF_Y := 128.0
+const SHELF_H := 14.0
+const AWNING_H := 44.0
 const SELL_ICON_SIZE := 72.0
 const TAB_NAMES: Array[String] = ["Sell", "Buy"]
 
@@ -101,6 +109,8 @@ var _close: Button = null
 ## sentence). Under the BUY grid: the pick's big icon, its whole description, its price and
 ## a Buy button. Built once; refresh() fills it.
 var _detail: PanelContainer = null
+var _stall: HBoxContainer = null
+var _awning: Control = null
 var _detail_icon: Control = null
 var _detail_name: Label = null
 var _detail_text: Label = null
@@ -186,23 +196,64 @@ func wallet_target() -> Vector2:
 
 func _build_detail() -> void:
 	var column := $Centre/Panel/Margin/Column as VBoxContainer
+	# THE STALL: a striped awning, then the shelves and the side counter side by side.
+	_awning = Control.new()
+	_awning.name = "Awning"
+	_awning.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_awning.custom_minimum_size = Vector2(0, AWNING_H)
+	_awning.draw.connect(_draw_awning)
+	column.add_child(_awning)
+	column.move_child(_awning, _scroll.get_index())
+	_stall = HBoxContainer.new()
+	_stall.name = "Stall"
+	_stall.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_stall.add_theme_constant_override(&"separation", 14)
+	column.add_child(_stall)
+	column.move_child(_stall, _scroll.get_index())
+	_scroll.reparent(_stall)
+	_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# The back of the stall: deep plum boards behind the shelves.
+	var back := StyleBoxFlat.new()
+	back.bg_color = PaintScript.PLUM_DARK.darkened(0.25)
+	back.border_color = Color(PaintScript.GOLD_DIM, 0.7)
+	back.set_border_width_all(2)
+	back.set_corner_radius_all(14)
+	back.set_content_margin_all(10.0)
+	_scroll.add_theme_stylebox_override(&"panel", back)
+	_rows.draw.connect(_draw_shelves)
+	_rows.sort_children.connect(_rows.queue_redraw)
 	_detail = PanelContainer.new()
 	_detail.name = "Detail"
 	_detail.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var box := TileStyleScript.box(true, false)
 	box.bg_color = PaintScript.PLUM.darkened(0.15)
+	box.set_content_margin_all(16.0)
 	_detail.add_theme_stylebox_override(&"panel", box)
-	column.add_child(_detail)
-	column.move_child(_detail, _scroll.get_index() + 1)
+	_stall.add_child(_detail)
 	# ONE SIZE, WHATEVER IS PICKED (item 68: "the window resizes as the pony list scrolls"):
-	# the strip keeps a fixed height and clips, so the panel never breathes under the cursor.
-	_detail.custom_minimum_size = Vector2(0, DETAIL_HEIGHT)
+	# the counter keeps its width and clips, so the panel never breathes under the cursor.
+	_detail.custom_minimum_size = Vector2(DETAIL_WIDTH, 0)
 	_detail.clip_contents = true
-	var line := HBoxContainer.new()
+	var counter := VBoxContainer.new()
+	counter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	counter.add_theme_constant_override(&"separation", 10)
+	_detail.add_child(counter)
+	# The words scroll inside the counter (a permit's pony list is long) so the counter never
+	# grows past the shelves beside it; the Buy button stays at its foot.
+	var info := ScrollContainer.new()
+	info.name = "Info"
+	info.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	info.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+	info.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	info.mouse_filter = Control.MOUSE_FILTER_PASS
+	counter.add_child(info)
+	var line := VBoxContainer.new()
 	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	line.add_theme_constant_override(&"separation", 18)
-	_detail.add_child(line)
+	line.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	line.add_theme_constant_override(&"separation", 8)
+	info.add_child(line)
 	_detail_well = TileStyleScript.well(DETAIL_ICON, TileStyleScript.WELL_TINTS[&"food"])
+	_detail_well.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	line.add_child(_detail_well)
 	_detail_icon = ShopIconScript.new()
 	_detail_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -214,27 +265,25 @@ func _build_detail() -> void:
 	_detail_well.add_child(_detail_icon)
 	var words := VBoxContainer.new()
 	words.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	words.alignment = BoxContainer.ALIGNMENT_CENTER
+	words.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	words.add_theme_constant_override(&"separation", 6)
 	line.add_child(words)
-	var head := HBoxContainer.new()
-	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	head.add_theme_constant_override(&"separation", 14)
-	words.add_child(head)
 	_detail_name = Label.new()
 	_detail_name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_detail_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_detail_name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	MenuStyleScript.style_label(_detail_name, 28, MenuStyleScript.COLOR_TITLE)
 	_detail_name.add_theme_font_override(&"font", MenuStyleScript.title_font())
-	head.add_child(_detail_name)
+	words.add_child(_detail_name)
 	_detail_kind = Label.new()
 	_detail_kind.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_detail_kind.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_detail_kind.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	MenuStyleScript.style_label(_detail_kind, 16, PaintScript.GOLD)
-	head.add_child(_detail_kind)
+	words.add_child(_detail_kind)
 	_detail_text = Label.new()
 	_detail_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_detail_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_detail_text.custom_minimum_size = Vector2(700, 0)
+	_detail_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	MenuStyleScript.style_label(_detail_text, 19, MenuStyleScript.COLOR_NAME)
 	words.add_child(_detail_text)
 	_detail_ponies = HFlowContainer.new()
@@ -249,7 +298,7 @@ func _build_detail() -> void:
 	_detail_buy = Button.new()
 	_detail_buy.name = "Buy"
 	_detail_buy.custom_minimum_size = BUY_BUTTON
-	_detail_buy.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_detail_buy.size_flags_vertical = Control.SIZE_SHRINK_END
 	_detail_buy.focus_mode = Control.FOCUS_NONE
 	_detail_buy.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	_detail_buy.add_theme_font_override(&"font", MenuStyleScript.title_font())
@@ -280,7 +329,86 @@ func _build_detail() -> void:
 	_buy_amount.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_buy_tag.add_child(_buy_amount)
 	_detail_buy.pressed.connect(func() -> void: take_row(_selected))
-	line.add_child(_detail_buy)
+	counter.add_child(_detail_buy)
+
+
+## THE AWNING: red and cream stripes with a scalloped hem, the Market's own colours (its
+## icon's canopy), across the top of the stall.
+const AWNING_RED := Color(0.86, 0.30, 0.32)
+const AWNING_CREAM := Color(1.0, 0.95, 0.84)
+
+
+func _draw_awning() -> void:
+	var w := _awning.size.x
+	var h := _awning.size.y
+	var stripes := 18
+	var sw := w / float(stripes)
+	var hem := h * 0.62
+	# The shadow it casts on the stall below.
+	_awning.draw_rect(Rect2(6.0, hem, w - 12.0, h - hem), Color(0.08, 0.02, 0.10, 0.35))
+	for i in stripes:
+		var x := float(i) * sw
+		var col := AWNING_RED if i % 2 == 0 else AWNING_CREAM
+		_awning.draw_rect(Rect2(x, 0.0, sw + 0.5, hem), col)
+		# Each stripe ends in a scallop.
+		var pts := PackedVector2Array([Vector2(x, hem)])
+		for k in 9:
+			var a := PI * float(k) / 8.0
+			pts.append(Vector2(x + sw * 0.5 - cos(a) * sw * 0.5, hem + sin(a) * sw * 0.42))
+		_awning.draw_colored_polygon(pts, col)
+	# A shade band under the top rail, and the rail itself in the stall's wood.
+	_awning.draw_rect(Rect2(0.0, 6.0, w, 5.0), Color(0.0, 0.0, 0.0, 0.12))
+	PaintScript.rounded(_awning, Rect2(-4.0, -2.0, w + 8.0, 8.0), 4.0, Color(0.55, 0.34, 0.20),
+		Color(0.36, 0.21, 0.12), 1.5)
+
+
+## THE SHELVES: a wooden plank across the back of the stall under each row of things for
+## sale, drawn behind the cards so every picture stands on one.
+const PLANK := Color(0.66, 0.43, 0.25)
+
+
+func _draw_shelves() -> void:
+	if _tab != Tab.BUY:
+		return
+	var w := _rows.size.x
+	var seen := {}
+	for c in _rows.get_children():
+		var card := c as Control
+		if card == null or card.is_queued_for_deletion():
+			continue
+		var y := card.position.y + SHELF_Y
+		if seen.has(int(y)):
+			continue
+		seen[int(y)] = true
+		var top := Rect2(-6.0, y, w + 12.0, SHELF_H)
+		_rows.draw_rect(Rect2(top.position + Vector2(0.0, SHELF_H), Vector2(top.size.x, 10.0)),
+			Color(0.05, 0.01, 0.06, 0.45))
+		_rows.draw_rect(top, PLANK)
+		_rows.draw_rect(Rect2(top.position, Vector2(top.size.x, 3.0)), PLANK.lightened(0.3))
+		_rows.draw_rect(Rect2(top.position + Vector2(0.0, SHELF_H - 3.0), Vector2(top.size.x,
+			3.0)), PLANK.darkened(0.35))
+		# The brackets under it.
+		for bx: float in [w * 0.08, w * 0.5, w * 0.92]:
+			_rows.draw_colored_polygon(PackedVector2Array([Vector2(bx - 7.0, y + SHELF_H),
+				Vector2(bx + 7.0, y + SHELF_H), Vector2(bx, y + SHELF_H + 16.0)]),
+				PLANK.darkened(0.3))
+
+
+## A Buy card's frame: nothing at rest (the shelf and the thing on it are the tile), a soft
+## gold glow under the pointer, a gold frame for the pick.
+static func shelf_box(picked: bool, hovered: bool) -> StyleBoxFlat:
+	var b := StyleBoxFlat.new()
+	b.bg_color = Color(PaintScript.GOLD, 0.16) if picked \
+		else (Color(1.0, 0.96, 0.86, 0.08) if hovered else Color(0, 0, 0, 0))
+	b.border_color = PaintScript.GOLD if picked else Color(PaintScript.GOLD, 0.6 if hovered else 0.0)
+	b.set_border_width_all(3 if picked else 2)
+	b.set_corner_radius_all(16)
+	b.content_margin_left = 8.0
+	b.content_margin_right = 8.0
+	b.content_margin_top = 10.0
+	b.content_margin_bottom = 8.0
+	b.anti_aliasing = true
+	return b
 
 
 ## The Buy button's face in `state`: gold with a deep amber lip that sinks when pressed, or a
@@ -796,6 +924,7 @@ func _process(delta: float) -> void:
 		return
 	if _entrance.running(_rows.get_child_count()):
 		_entrance.advance(delta, _rows.get_children())
+	_apply_scroll()
 	if not _coins_due.is_empty() and _built_frame != Engine.get_process_frames():
 		_launch_coins()
 
@@ -835,13 +964,44 @@ func _fit_scroll() -> void:
 	if _selected == 0:
 		_scroll.scroll_vertical = 0
 	elif _selected > 0 and _selected < _rows.get_child_count():
-		_scroll.ensure_control_visible(_rows.get_child(_selected) as Control)
+		# By the row's place in the grid, not its laid-out rect: the tiles were rebuilt this
+		# frame and have not been placed yet.
+		var cols: int = maxi(1, _rows.columns)
+		var lines: int = ceili(float(_rows.get_child_count()) / float(cols))
+		var sep: float = float(_rows.get_theme_constant(&"v_separation"))
+		var pitch: float = (_rows.get_combined_minimum_size().y + sep) / float(lines)
+		var top: float = float(_selected / cols) * pitch
+		var bottom: float = top + pitch - sep
+		var pad: float = 20.0
+		var view: float = maxf(0.0, cap - pad)
+		if top < float(_scroll.scroll_vertical):
+			_want_scroll = int(top)
+		elif bottom > float(_scroll.scroll_vertical) + view:
+			_want_scroll = int(ceil(bottom - view))
+		_apply_scroll()
+
+
+## Where the scroll should come to rest, or -1. The bar clamps to its old range until the
+## rebuilt grid's size reaches it, so the wish is kept and applied again each frame until the
+## bar takes it.
+var _want_scroll := -1
+
+
+func _apply_scroll() -> void:
+	if _want_scroll < 0 or _scroll == null:
+		return
+	_scroll.scroll_vertical = _want_scroll
+	if _scroll.scroll_vertical == _want_scroll:
+		_want_scroll = -1
 
 
 func _add_row(index: int, row_name: String, blurb: String, price: String, enabled: bool,
 		icon_kind: StringName = &"", tag := "", family: StringName = &"gem") -> void:
 	var row := MouseRowsScript.row(index, index == _selected, index == _hovered,
 		point_at_row, take_row)
+	if _tab == Tab.BUY:
+		_shelf_card(row, index, row_name, price, enabled, icon_kind)
+		return
 	TileStyleScript.dress(row, index == _selected, index == _hovered)
 	row.custom_minimum_size = SELL_TILE if _tab == Tab.SELL else BUY_TILE
 	# What the tile says it costs, in words, for row_price_text(): the tile itself shows a coin.
@@ -931,6 +1091,63 @@ func _add_row(index: int, row_name: String, blurb: String, price: String, enable
 		each.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		MenuStyleScript.style_label(each, 16, MenuStyleScript.COLOR_DIM)
 		price_home.add_child(each)
+	_rows.add_child(row)
+
+
+## A THING ON THE SHELF (Fable AAA round 4): its picture standing on the plank, its name
+## under the plank in up to two centred lines, its price on a line of its own under that.
+## The family word lives on the side counter, not on the card.
+func _shelf_card(row: PanelContainer, index: int, row_name: String, price: String,
+		enabled: bool, icon_kind: StringName) -> void:
+	var picked := index == _selected
+	row.add_theme_stylebox_override(&"panel", shelf_box(picked, index == _hovered))
+	if not picked:
+		row.mouse_exited.connect(func() -> void:
+			row.add_theme_stylebox_override(&"panel", shelf_box(false, false)))
+	row.custom_minimum_size = BUY_TILE
+	row.set_meta(&"price", price)
+	var body := VBoxContainer.new()
+	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	body.add_theme_constant_override(&"separation", 0)
+	row.add_child(body)
+	var stand := Control.new()
+	stand.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stand.custom_minimum_size = Vector2(0.0, SHELF_Y - 10.0)
+	body.add_child(stand)
+	var icon: Control = ShopIconScript.new()
+	icon.kind = icon_kind
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Standing on the plank: centred, its foot at the shelf.
+	icon.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	icon.offset_left = -ICON_SIZE * 0.5
+	icon.offset_right = ICON_SIZE * 0.5
+	icon.offset_top = -ICON_SIZE + 4.0
+	icon.offset_bottom = 4.0
+	icon.modulate = Color(1, 1, 1) if enabled else Color(1, 1, 1, 0.55)
+	stand.add_child(icon)
+	var gap := Control.new()
+	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	gap.custom_minimum_size = Vector2(0.0, SHELF_H + 12.0)
+	body.add_child(gap)
+	var title := Label.new()
+	title.name = "Name"
+	title.text = row_name
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title.max_lines_visible = 2
+	title.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	MenuStyleScript.style_label(title, 21,
+		MenuStyleScript.COLOR_TITLE if enabled else MenuStyleScript.COLOR_DIM)
+	title.add_theme_font_override(&"font", MenuStyleScript.title_font())
+	body.add_child(title)
+	var foot := HBoxContainer.new()
+	foot.name = "Foot"
+	foot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	foot.alignment = BoxContainer.ALIGNMENT_CENTER
+	body.add_child(foot)
+	foot.add_child(TileStyleScript.price_tag(_price_amount(price), price, 24, enabled))
 	_rows.add_child(row)
 
 

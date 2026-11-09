@@ -110,7 +110,7 @@ func test_the_selected_tile_is_scrolled_into_view() -> void:
 		_menu.move_selection(1)
 	await wait_frames(3)
 	var last: Control = _menu.row_nodes()[_menu.selected_index()]
-	var view := (_menu.get_node(^"Centre/Panel/Margin/Column/Scroll") as Control).get_global_rect()
+	var view := (_menu.get_node(^"Centre/Panel/Margin/Column/Stall/Scroll") as Control).get_global_rect()
 	assert_true(view.grow(2.0).encloses(last.get_global_rect()), "the last tile scrolled into view")
 
 
@@ -198,7 +198,7 @@ func test_the_buy_tab_opens_with_its_first_row_in_view() -> void:
 	_menu.set_tab(MarketMenu.Tab.BUY)
 	for i in 30:
 		await wait_frames(1)
-	var scroll := _menu.get_node(^"Centre/Panel/Margin/Column/Scroll") as ScrollContainer
+	var scroll := _menu.get_node(^"Centre/Panel/Margin/Column/Stall/Scroll") as ScrollContainer
 	assert_eq(_menu.selected_index(), 0)
 	var rows := scroll.get_child(0) as Control
 	var first := rows.get_child(0) as Control

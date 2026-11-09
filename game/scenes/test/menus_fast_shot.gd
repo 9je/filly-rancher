@@ -84,6 +84,15 @@ func _run() -> void:
 		# A pick she cannot afford: the Buy button says what is missing.
 		market.call("point_at_row", 7)
 		await _shot("market_buy_short")
+		# The longest names on the shelf, the permits (Fable AAA round 4: "Permit: The Orchard"
+		# wrapped into its price).
+		var rows: Array = market.call("buy_rows")
+		for i in rows.size():
+			if (rows[i] as ShopItem).kind == ShopItem.Kind.PERMIT:
+				market.call("point_at_row", i)
+				market.call("take_row", i)
+				break
+		await _shot("market_permit")
 		market.call("set_tab", 0)
 		await _shot("market_sell")
 		market.call("close")
