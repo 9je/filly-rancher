@@ -105,6 +105,7 @@ extends CharacterBody3D
 ## game/scripts/pony_rig.gd: the global class cache lives in the gitignored game/.godot/
 ## and a fresh clone has not built it yet.
 
+const WorldMarkerScript := preload("res://ui/world_marker.gd")
 const BodySpaceScript := preload("res://systems/body_space.gd")
 ## Landing faster than this (m/s) bounces her hindquarters, as it does the player's.
 const LAND_BOUNCE_FROM := 3.0
@@ -1243,13 +1244,9 @@ static func _make_hunger_bubble() -> Node3D:
 	var quad := QuadMesh.new()
 	quad.size = Vector2(0.6, 0.6)
 	q.mesh = quad
-	var m := StandardMaterial3D.new()
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
-	m.albedo_texture = _hunger_tex
-	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-	q.material_override = m
+	# Never a giant (Fable AAA round 2, #9), the news bubble's own material: it shrinks inside
+	# a few metres and fades out beside the lens (game/ui/world_marker.gd).
+	q.material_override = WorldMarkerScript.material(_hunger_tex)
 	q.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return q
 
