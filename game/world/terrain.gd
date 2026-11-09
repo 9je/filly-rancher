@@ -57,6 +57,17 @@ const FLAT_RADIUS := 30.0
 const BLEND_RADIUS := 44.0
 ## Centre of the flat apron, in XZ. The homestead is composed around this point.
 const HOMESTEAD_CENTRE := Vector2(0.0, -4.0)
+## YARDS LEVELLED OUT PAST THE APRON (P8 S7, playtest 2026-11-08 items 42 and 52: the town was
+## crowded into the apron while the map round it stood empty, and the house sat crooked on the
+## slope). The plaza keeps the apron; the homestead and the pens now stand further out, each on
+## its own pad: [centre, flat radius, blend metres]. Inside a pad the relief is levelled to the
+## apron's own y = 0, easing back to the hills over the blend, so a building or a pen out there
+## stands on ground as level as the plaza's and joins it without a step.
+const YARD_PADS: Array = [
+	[Vector2(1.5, -35.0), 13.0, 9.0],
+	[Vector2(-21.0, -30.0), 13.0, 9.0],
+	[Vector2(-29.0, 16.0), 14.0, 9.0],
+]
 
 ## Invisible perimeter walls, so walking to the edge of the world is a wall rather
 ## than a fall.
@@ -130,12 +141,16 @@ const PATH_BREAK := Vector2(100000.0, 100000.0)
 ## (0, 74) with a 26 m radius, so its paving begins near z = 48 and is solid by 51; the
 ## road ran on to 58. It stops at 50.5, past the town row, where the blend still hides the end.
 const STRIP_EDGE_Z := 50.5
+## P8 S7, THE PLAZA PLAN: the main street runs from the Farmhouse door, 25 m out on its own
+## yard, down through the plaza (paved over it, game/world/street.gd's plaza) to the Strip;
+## the barn lane joins it from the Barn door; the pen lane leaves it south of the plaza for
+## the pen yard to the south-west.
 const PATH_POINTS: Array[Vector2] = [
-	Vector2(2.0, -13.5), Vector2(2.0, 0.0), Vector2(1.5, 10.0), Vector2(1.5, STRIP_EDGE_Z),
+	Vector2(1.5, -29.5), Vector2(1.5, 10.0), Vector2(1.5, STRIP_EDGE_Z),
 	PATH_BREAK,
-	Vector2(-11.8, -3.0), Vector2(14.4, -3.0),
+	Vector2(-19.0, -25.0), Vector2(0.0, -25.0),
 	PATH_BREAK,
-	Vector2(1.6, 8.0), Vector2(-4.5, 15.5),
+	Vector2(1.5, 7.5), Vector2(-17.0, 14.5),
 ]
 
 
@@ -326,13 +341,22 @@ func normal_at(x: float, z: float) -> Vector3:
 
 ## True if XZ is inside the flat apron the homestead is built on.
 func is_flat_at(x: float, z: float) -> bool:
-	return Vector2(x, z).distance_to(HOMESTEAD_CENTRE) <= FLAT_RADIUS
+	if Vector2(x, z).distance_to(HOMESTEAD_CENTRE) <= FLAT_RADIUS:
+		return true
+	for pad: Array in YARD_PADS:
+		if Vector2(x, z).distance_to(pad[0]) <= float(pad[1]):
+			return true
+	return false
 
 
-## 0 inside the flat apron, 1 out in open country, smooth in between.
+## 0 inside the flat apron or a yard pad, 1 out in open country, smooth in between.
 func _relief_weight(x: float, z: float) -> float:
-	var d := Vector2(x, z).distance_to(HOMESTEAD_CENTRE)
-	return smoothstep(FLAT_RADIUS, BLEND_RADIUS, d)
+	var p := Vector2(x, z)
+	var w := smoothstep(FLAT_RADIUS, BLEND_RADIUS, p.distance_to(HOMESTEAD_CENTRE))
+	for pad: Array in YARD_PADS:
+		var r: float = pad[1]
+		w = minf(w, smoothstep(r, r + float(pad[2]), p.distance_to(pad[0])))
+	return w
 
 
 ## The colour of the grass at world XZ, one vertex of the mesh's worth.

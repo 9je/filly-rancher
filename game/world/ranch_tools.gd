@@ -290,7 +290,7 @@ func _tick_lure(delta: float) -> void:
 	if _lure_t < LURE_PERIOD:
 		return
 	_lure_t = 0.0
-	var home := Vector3(-6.0, 0.0, 12.0)
+	var home := Vector3(-17.0, 0.0, 14.5)
 	for p in _wild():
 		if p.global_position.distance_to(home) < 70.0 and p.global_position.distance_to(home) > 12.0:
 			p.call("offer_treat", home + Vector3(randf_range(-4, 4), 0, randf_range(-4, 4)), &"lure")

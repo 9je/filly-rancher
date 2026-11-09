@@ -245,7 +245,8 @@ func test_the_farmstead_has_a_shed_beside_its_barn() -> void:
 	var files: Array[String] = []
 	for entry: Dictionary in PropsScript.LAYOUT:
 		var at: Vector2 = entry["at"]
-		if absf(at.x + 10.0) < 14.0 and absf(at.y + 9.0) < 14.0:
+		# Round the Barn, out on the homestead yard since P8 S7's plaza plan (ranch.tscn).
+		if absf(at.x + 19.0) < 14.0 and absf(at.y + 33.0) < 14.0:
 			files.append(String(entry["file"]))
 	assert_true(files.has("saa_shed.glb"),
 		"spec section 5.1's second ranch structure stands in the ranch yard")

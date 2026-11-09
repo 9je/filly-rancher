@@ -103,6 +103,9 @@ const LIBRARY: Dictionary = {
 	&"music_town_carefree": {
 		"paths": ["res://assets/audio/music/town_carefree.ogg"],
 		"bus": BUS_MUSIC, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": true},
+	&"music_market_stalls": {
+		"paths": ["res://assets/audio/music/market_stalls.ogg"],
+		"bus": BUS_MUSIC, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": true},
 	&"music_works_gone_beyond": {
 		"paths": ["res://assets/audio/music/works_gone_beyond.ogg"],
 		"bus": BUS_MUSIC, "volume_db": 0.0, "pitch_min": 1.0, "pitch_max": 1.0, "loop": true},

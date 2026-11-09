@@ -12,11 +12,11 @@ extends RefCounted
 
 const PROPS := "res://assets/converted/props/"
 const CATALOGUE: Array[Dictionary] = [
-	{"id": &"flower_bushes", "name": "Flower Bushes", "cost": 200, "at": Vector3(8.0, 0, -6.5), "yaw": 0.0, "clear": 1.2, "scene": PROPS + "mlp_bush.glb"},
-	{"id": &"hay_bales", "name": "Hay Bales", "cost": 300, "at": Vector3(-13.6, 0, -13.75), "yaw": 20.0, "clear": 1.2, "scene": PROPS + "saa_hay_pile.glb"},
-	{"id": &"picnic_table", "name": "Picnic Table", "cost": 450, "at": Vector3(10.0, 0, 4.0), "yaw": 15.0, "clear": 1.4, "scene": PROPS + "school_picnic_table.glb"},
-	{"id": &"wagon", "name": "Farm Wagon", "cost": 800, "at": Vector3(-5.0, 0, 2.8), "yaw": 70.0, "clear": 1.6, "scene": PROPS + "saa_wagon.glb"},
-	{"id": &"well", "name": "Wishing Well", "cost": 1200, "at": Vector3(6.0, 0, 12.0), "yaw": 0.0, "clear": 1.4, "scene": PROPS + "mlp_farm_well.glb"},
+	{"id": &"flower_bushes", "name": "Flower Bushes", "cost": 200, "at": Vector3(7.0, 0, -10.5), "yaw": 0.0, "clear": 1.2, "scene": PROPS + "mlp_bush.glb"},
+	{"id": &"hay_bales", "name": "Hay Bales", "cost": 300, "at": Vector3(-11.0, 0, -22.0), "yaw": 20.0, "clear": 1.2, "scene": PROPS + "saa_hay_pile.glb"},
+	{"id": &"picnic_table", "name": "Picnic Table", "cost": 450, "at": Vector3(11.0, 0, 17.5), "yaw": 15.0, "clear": 1.4, "scene": PROPS + "school_picnic_table.glb"},
+	{"id": &"wagon", "name": "Farm Wagon", "cost": 800, "at": Vector3(12.0, 0, -26.0), "yaw": 70.0, "clear": 1.6, "scene": PROPS + "saa_wagon.glb"},
+	{"id": &"well", "name": "Wishing Well", "cost": 1200, "at": Vector3(-6.5, 0, -20.5), "yaw": 0.0, "clear": 1.4, "scene": PROPS + "mlp_farm_well.glb"},
 	{"id": &"tetherball", "name": "Tetherball", "cost": 1500, "at": Vector3(7.0, 0, 18.0), "yaw": 90.0, "clear": 1.4, "scene": PROPS + "school_tetherball_pole.glb"},
 	{"id": &"garden_arch", "name": "Garden Arch", "cost": 2500, "at": Vector3(-2.2, 0, 24.0), "yaw": 90.0, "clear": 1.2, "scene": PROPS + "saa_wire_arch.glb"},
 	{"id": &"apple_tree", "name": "Apple Tree", "cost": 3500, "at": Vector3(7.0, 0, 26.0), "yaw": 0.0, "clear": 2.0, "scene": PROPS + "mlp_apple_tree.glb"},

@@ -126,7 +126,7 @@ script = ExtResource("3")
 [node name="Buildings" type="Node3D" parent="."]
 
 [node name="Barn" type="StaticBody3D" parent="Buildings"]
-transform = Transform3D(1, 0, -0, 0, 1, 0, 0, 0, 1, -17, 0, -23.387)
+transform = Transform3D(1, 0, -0, 0, 1, 0, 0, 0, 1, -19, 0, -33)
 script = ExtResource("7")
 width = 13.511
 depth = 13.705
@@ -143,7 +143,7 @@ model_door_height = 2.0
 model_yaw = 0.0
 
 [node name="Farmhouse" type="StaticBody3D" parent="Buildings"]
-transform = Transform3D(1, 0, -0, 0, 1, 0, 0, 0, 1, 1, 0, -18.529)
+transform = Transform3D(1, 0, -0, 0, 1, 0, 0, 0, 1, 1.5, 0, -35.5)
 script = ExtResource("7")
 width = 19.747
 depth = 9.357
@@ -160,7 +160,7 @@ model_door_height = 2.05
 model_yaw = 0.0
 
 [node name="Market" type="StaticBody3D" parent="Buildings"]
-transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 21.473, 0, -3)
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 17.895, 0, -3)
 script = ExtResource("7")
 width = 28.886
 depth = 13.791
@@ -177,7 +177,7 @@ model_door_height = 2.05
 model_yaw = 0.0
 
 [node name="Board" type="StaticBody3D" parent="Buildings"]
-transform = Transform3D(1, 0, -0, 0, 1, 0, 0, 0, 1, -6.5, 0, -8.3)
+transform = Transform3D(1, 0, -0, 0, 1, 0, 0, 0, 1, -4.5, 0, -14.5)
 script = ExtResource("7")
 width = 5.217
 depth = 3.959
@@ -193,7 +193,7 @@ model_scale = 1.85
 model_yaw = 180.0
 
 [node name="Depot" type="StaticBody3D" parent="Buildings"]
-transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -15.784, 0, -3)
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -11.767, 0, -3)
 script = ExtResource("7")
 width = 15.536
 depth = 7.534
@@ -259,7 +259,7 @@ script = ExtResource("22")
 [node name="Zones" type="Node3D" parent="."]
 
 [node name="NorthMeadow" type="Area3D" parent="Zones"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, -42)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, -64)
 script = ExtResource("4")
 zone_id = &"ranch"
 spawn_radius = 11.0
@@ -346,27 +346,27 @@ script = ExtResource("5")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.3, 9)
 
 [node name="PenPlots" type="Marker3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0, 15.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -29, 0, 16)
 
 [node name="Plots" type="Node3D" parent="."]
 
 [node name="Slot1" type="Area3D" parent="Plots"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.5, 0, 11)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -23, 0, 10)
 script = ExtResource("9")
 slot_id = &"slot_1"
 
 [node name="Slot2" type="Area3D" parent="Plots"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.5, 0, 20)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -23, 0, 22)
 script = ExtResource("9")
 slot_id = &"slot_2"
 
 [node name="Slot3" type="Area3D" parent="Plots"]
-transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -18.5, 0, 11)
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -35, 0, 10)
 script = ExtResource("9")
 slot_id = &"slot_3"
 
 [node name="Slot4" type="Area3D" parent="Plots"]
-transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -18.5, 0, 20)
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -35, 0, 22)
 script = ExtResource("9")
 slot_id = &"slot_4"
 

@@ -10,11 +10,13 @@ extends Node
 const TRACKS := {
 	&"day": "res://assets/audio/music/day_morning.ogg",
 	&"night": "res://assets/audio/music/night_evening.ogg",
-	&"town": "res://assets/audio/music/town_carefree.ogg",
-	# THE COUNTERS (PS10 gap G5; FS5.2): the town's carefree tune at the Market, and the same
-	# tune behind the Depot's glass (DEPOT_CUTOFF_HZ on the bus's low pass).
-	&"market": "res://assets/audio/music/town_carefree.ogg",
-	&"depot": "res://assets/audio/music/town_carefree.ogg",
+	# THE COUNTERS (PS10 gap G5; FS5.2): the town's tune at the Market, and the same tune behind
+	# the Depot's glass (DEPOT_CUTOFF_HZ on the bus's low pass). An original one since P8 S7
+	# (tools/make_market_tune.py; playtest 2026-11-08 item 66: "Carefree" is a stock track half
+	# the internet has heard, and it grated).
+	&"town": "res://assets/audio/music/market_stalls.ogg",
+	&"market": "res://assets/audio/music/market_stalls.ogg",
+	&"depot": "res://assets/audio/music/market_stalls.ogg",
 	&"casino": "res://assets/audio/music/casino_backbay.ogg",
 	&"works": "res://assets/audio/music/works_gone_beyond.ogg",
 	&"stealth": "res://assets/audio/music/stealth_stay_the_course.ogg",

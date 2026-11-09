@@ -409,6 +409,53 @@ func _paving() -> void:
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mi)
 	mi.global_transform = Transform3D.IDENTITY
+	_paving_kerb(c, r)
+
+
+## THE PAVING'S EDGE IS KERBED (P8 S7, playtest 2026-11-08 item 52: the casino's paving "cut off
+## hard against the grass"). A ring of kerb stone round the paving's rim, open where the town's
+## street runs in and where the track crosses it, laid by the street's own kerb code.
+const KERB_WIDTH := 0.4
+const KERB_HEIGHT := 0.12
+const KERB_SEGMENTS := 120
+## The town street's mouth on the rim (game/world/street.gd: x 1.5, 3.25 either side).
+const STREET_MOUTH := Vector2(1.5, 4.0)
+
+
+func _paving_kerb(c: Vector2, r: float) -> void:
+	var street: Node3D = (load("res://world/street.gd") as GDScript).new()
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	street.set("_height", Callable(self, "_y"))
+	for i in KERB_SEGMENTS:
+		var a0 := TAU * float(i) / KERB_SEGMENTS
+		var a1 := TAU * float(i + 1) / KERB_SEGMENTS
+		var p0 := c + Vector2.from_angle(a0) * r
+		var p1 := c + Vector2.from_angle(a1) * r
+		var mid := (p0 + p1) * 0.5
+		if PAVING_TRACK.grow(0.5).has_point(mid) or _avoided(mid):
+			continue
+		if absf(mid.x - STREET_MOUTH.x) < STREET_MOUTH.y and mid.y < c.y:
+			continue
+		street.call("kerb_run", st, p0, p1, (mid - c).normalized(), KERB_WIDTH, KERB_HEIGHT)
+	var mesh := st.commit()
+	street.free()
+	if mesh.get_surface_count() == 0:
+		return
+	var mi := MeshInstance3D.new()
+	mi.name = "PavingKerb"
+	mi.mesh = mesh
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://shaders/stonework.gdshader")
+	mat.set_shader_parameter(&"pattern", 0)
+	mat.set_shader_parameter(&"base", Color(0.6, 0.55, 0.5))
+	mat.set_shader_parameter(&"joint", Color(0.4, 0.36, 0.33))
+	mat.set_shader_parameter(&"block_w", 1.1)
+	mat.set_shader_parameter(&"block_h", 0.55)
+	mi.material_override = mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi)
+	mi.global_transform = Transform3D.IDENTITY
 
 
 ## `poly` clipped to the circle of radius `r` round `c`, the circle taken as a 360-sided polygon

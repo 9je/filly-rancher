@@ -69,6 +69,20 @@ func region() -> RegionData:
 	return _region
 
 
+## The ring's radius about the region's centre.
+func ring_radius() -> float:
+	return _region.radius + RING_MARGIN
+
+
+## The middle of the gateway in world space, pushed `off` metres out from the ring along the
+## bearing to it (negative: in). The guide's trail aims here to walk her through the gate
+## rather than over the rails (game/world/ranch.gd's walkable_aim(), item 27).
+func gate_point(off: float = 0.0) -> Vector3:
+	var g: Vector3 = to_global(_gate_local) if is_inside_tree() else _gate_local
+	var out := g - Vector3(_region.centre.x, g.y, _region.centre.y)
+	return g + out.normalized() * off if out.length_squared() > 0.0001 else g
+
+
 ## Ground height under an XZ point, or the y = 0 plane when nobody handed us a sampler (which
 ## is what game/test/test_region_fence.gd does, and what a fence built before the terrain
 ## would see).

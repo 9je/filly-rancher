@@ -197,15 +197,19 @@ const SHIPPED := {
 ## promise above holds where it matters. The Farmhouse also stepped 1 m west (it stood 0.4 m
 ## from the grown Market), and the Board moved to the lot west of the north road (the grown
 ## Farmhouse covered its old spot).
+##
+## RE-LAID P8 S7 AS A PLAZA (playtest 2026-11-08 item 42): the Market and the Depot face each other
+## across the paved plaza 19 m door to door, the Board heads it, and the Farmhouse and the Barn
+## went out 30 m north to their own levelled yard (Terrain.YARD_PADS). DECISIONS.md has the plan.
 const ORIGINS := {
-	"Barn": Vector2(-17.0, -23.387), "Farmhouse": Vector2(1.0, -18.529),
-	"Market": Vector2(21.473, -3.0), "Board": Vector2(-6.5, -8.3),
-	"Depot": Vector2(-15.784, -3.0), "Palace": Vector2(-10.0, 61.6),
+	"Barn": Vector2(-19.0, -33.0), "Farmhouse": Vector2(1.5, -35.5),
+	"Market": Vector2(17.895, -3.0), "Board": Vector2(-4.5, -14.5),
+	"Depot": Vector2(-11.767, -3.0), "Palace": Vector2(-10.0, 61.6),
 	"Mailbox": Vector2(8.0, 7.0),
 }
-## Where each grown building's front wall stands: these did not move (ranch.tscn).
+## Where each grown building's front wall stands (ranch.tscn).
 const DOOR_FRONTS := {
-	"Barn": Vector2(-17.0, -16.535), "Market": Vector2(14.578, -3.0), "Depot": Vector2(-12.017, -3.0),
+	"Barn": Vector2(-19.0, -26.148), "Market": Vector2(11.0, -3.0), "Depot": Vector2(-8.0, -3.0),
 }
 
 

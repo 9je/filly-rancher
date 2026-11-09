@@ -219,6 +219,17 @@ const MAX_RESIDENT_SPOTS := 8
 const POST_COLOR := Color(0.55, 0.36, 0.22)
 const RAIL_COLOR := Color(0.74, 0.54, 0.33)
 const GATE_COLOR := Color(0.66, 0.46, 0.28)
+## WHERE ONE PEN ENDS (P8 S7, playtest 2026-11-08 item 53: "the pen lattice is unreadable").
+## Four pens of the same rails in a row read as one lattice from the yard. Each pen now has a
+## floor of trodden earth inside its fence, so a pen reads as a patch of ground with a fence
+## round it, and its four corner posts stand taller and darker than the posts between, so the
+## corners mark where it stops. (The pens also moved apart: a 4 m walk between neighbours,
+## ranch.tscn's Plots.)
+const CORNER_COLOR := Color(0.38, 0.24, 0.15)
+const CORNER_RISE := 0.35
+const FLOOR_COLOR := Color(0.66, 0.55, 0.38)
+const FLOOR_STEP := 0.65
+const FLOOR_LIFT := 0.025
 
 # --- configuration ----------------------------------------------------------------------
 
@@ -988,6 +999,7 @@ func build_shell() -> void:
 	var post_mat := _material(POST_COLOR)
 	var rail_mat := _material(RAIL_COLOR)
 	var gate_mat := _material(GATE_COLOR)
+	_corner_mat = _material(CORNER_COLOR)
 
 	# Which side the gateway is in, as a quarter turn. Snapped rather than free so the
 	# gateway is always aligned with a fence side; a 37-degree gate would be a hole.
@@ -1001,6 +1013,50 @@ func build_shell() -> void:
 			post_mat, rail_mat, gate_mat)
 	# The show's shading and ink line, like every building beside it.
 	ToonStyler.style(self, &"prop", {})
+	# After the styling: the floor keeps its own mottled earth (see FLOOR_COLOR).
+	_build_floor()
+
+
+var _corner_mat: StandardMaterial3D = null
+
+
+## The pen's floor: trodden earth laid a hair over the ground inside the fence, following it,
+## with a little mottle so it reads as dirt and not as a mat. Drawing only.
+func _build_floor() -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var lo := -HALF_EXTENT + 0.08
+	var n := maxi(1, int(ceil((HALF_EXTENT * 2.0 - 0.16) / FLOOR_STEP)))
+	var step := (HALF_EXTENT * 2.0 - 0.16) / n
+	var base_y := global_position.y if is_inside_tree() else 0.0
+	for ix in n:
+		for iz in n:
+			var q: Array[Vector3] = []
+			var cols: Array[Color] = []
+			for c: Vector2 in [Vector2(ix, iz), Vector2(ix + 1, iz), Vector2(ix + 1, iz + 1),
+					Vector2(ix, iz + 1)]:
+				var lx := lo + c.x * step
+				var lz := lo + c.y * step
+				var w := to_global(Vector3(lx, 0.0, lz)) if is_inside_tree() else Vector3(lx, 0.0, lz)
+				q.append(Vector3(lx, _ground(w.x, w.z) - base_y + FLOOR_LIFT, lz))
+				var m := 0.9 + 0.2 * fposmod(sin(lx * 12.9898 + lz * 78.233) * 43758.5453, 1.0)
+				cols.append(Color(FLOOR_COLOR.r * m, FLOOR_COLOR.g * m, FLOOR_COLOR.b * m))
+			# Godot's front faces are clockwise from above: 0, 1, 2 here runs that way.
+			for i: int in [0, 1, 2, 0, 2, 3]:
+				st.set_color(cols[i])
+				st.set_normal(Vector3.UP)
+				st.add_vertex(q[i])
+	var mat := StandardMaterial3D.new()
+	mat.vertex_color_use_as_albedo = true
+	mat.vertex_color_is_srgb = true
+	mat.roughness = 1.0
+	mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+	var floor_mi := MeshInstance3D.new()
+	floor_mi.name = "PenFloor"
+	floor_mi.mesh = st.commit()
+	floor_mi.material_override = mat
+	floor_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(floor_mi)
 
 
 ## One fence side: posts, rails, and a solid barrier, with the gateway left out of the rails
@@ -1029,12 +1085,16 @@ func _build_side(side_name: String, outward: Vector3, along: Vector3, is_gate: b
 	for offset in offsets:
 		var at := line + along * offset
 		var top := FENCE_HEIGHT
+		var mat := post_mat
 		if is_gate and absf(absf(offset) - half_gate) < 0.001:
 			# The jambs carry the header beam, so they run past the fence line.
 			top = GATE_CLEARANCE + 0.30
+		elif absf(absf(offset) - HALF_EXTENT) < 0.001 and _corner_mat != null:
+			top = FENCE_HEIGHT + CORNER_RISE
+			mat = _corner_mat
 		_slab("%sPost%d" % [side_name, roundi(offset * 100.0)],
 			Vector3(POST_SIZE, top + POST_BURY, POST_SIZE),
-			Vector3(at.x, (top - POST_BURY) * 0.5, at.z), post_mat, false)
+			Vector3(at.x, (top - POST_BURY) * 0.5, at.z), mat, false)
 
 	# --- rails ---------------------------------------------------------------------------
 	# Two runs flanking the gateway when there is one, a single run when there is not.
