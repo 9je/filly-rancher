@@ -14,6 +14,10 @@ extends RefCounted
 const MarkComposerScript := preload("res://systems/mark_composer.gd")
 
 const MAX_STAMPS := 3
+## How far the shadow's copy of a stamp is nudged (stamp space, up and left).
+const SHADE_NUDGE := Vector2(0.07, 0.07)
+## How much every stamp's shape is grown (stamp space), so line-like symbols have a body.
+const FATTEN := 0.035
 const SCALE_RANGE := Vector2(0.18, 1.0)
 ## The plain shapes, beside the talents.
 const SHAPES: Array[StringName] = [&"circle", &"square", &"diamond", &"triangle", &"star",
@@ -97,12 +101,20 @@ static func draw_over(img: Image, stamps: Array) -> void:
 		for y in range(y0, y1 + 1):
 			for x in range(x0, x1 + 1):
 				var q := to_stamp(stamp, Vector2((x + 0.5) * px, (y + 0.5) * px))
-				var d: float = MarkComposerScript.shape(main, q) * s
+				# Fattened a touch, so the thin symbols (a wave, a bolt, a cross) read at flank size.
+				var d: float = (MarkComposerScript.shape(main, q) - FATTEN) * s
 				if d > 0.03:
 					continue
 				var edge: float = clampf(0.5 - d / px, 0.0, 1.0)
-				var ring: float = clampf(0.5 - (d + 0.022 * s) / px, 0.0, 1.0)
-				var col := line.lerp(a, ring)
+				# THE ICON SET'S HAND (P8, playtest 2026-11-08 item 41: "many stamp icons still
+				# look bad"): a bolder outline in the fill's own darker hue, and a hard shadow
+				# crescent on the lower right (the shape again, nudged up and left; where it no
+				# longer covers is shade), the way every icon in tools/make_icons.py is drawn.
+				var ring: float = clampf(0.5 - (d + 0.045 * s) / px, 0.0, 1.0)
+				var shifted: float = (MarkComposerScript.shape(main, q + SHADE_NUDGE) - FATTEN) * s
+				var shade: float = clampf(0.5 + shifted / px, 0.0, 1.0)
+				var body := a.lerp(Color(a.r * 0.78, a.g * 0.74, a.b * 0.82, a.a), shade)
+				var col := line.lerp(body, ring)
 				if detail != "":
 					var dd: float = MarkComposerScript.shape(detail, q) * s
 					col = col.lerp(b, clampf(0.5 - dd / px, 0.0, 1.0) * ring)
