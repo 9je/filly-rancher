@@ -16,6 +16,7 @@ const PaintScript := preload("res://ui/casino_paint.gd")
 const SlotsScript := preload("res://systems/slots.gd")
 const WheelScript := preload("res://systems/wheel.gd")
 const MenuStyleScript := preload("res://ui/menu_style.gd")
+const CourtArtScript := preload("res://ui/court_art.gd")
 
 ## An off origin, non square box, deliberately. A glyph authored against a unit square at the
 ## origin passes a containment test at (0, 0, 1, 1) by accident.
@@ -141,6 +142,26 @@ func test_a_bigger_text_size_draws_bigger_where_there_is_room() -> void:
 func test_there_is_one_chip_colour_per_stake() -> void:
 	var stakes: Array = load("res://ui/table_menu.gd").STAKES
 	assert_eq(PaintScript.CHIP_COLORS.size(), stakes.size())
+
+
+## THE COURT CARDS ARE ROYALS, NOT LETTERS (Fable AAA round 1). Each of the twelve paints from
+## its own markup, rasterises to a picture of the panel's shape, and a King of Hearts and a King
+## of Spades wear different robes.
+func test_every_court_card_paints_an_illustrated_royal() -> void:
+	var seen := {}
+	for suit: int in 4:
+		for rank: int in [CourtArtScript.JACK, CourtArtScript.QUEEN, CourtArtScript.KING]:
+			var markup: String = CourtArtScript.svg(rank, suit)
+			assert_false(seen.has(markup), "the %d of suit %d has art of its own" % [rank, suit])
+			seen[markup] = true
+			var tex: ImageTexture = CourtArtScript.texture(rank, suit, 96)
+			assert_eq(tex.get_width(), 96)
+			assert_almost_eq(float(tex.get_height()), 96.0 / CourtArtScript.ASPECT, 2.0)
+			# Not blank: the middle of the panel is painted, not transparent.
+			var img: Image = tex.get_image()
+			assert_gt(img.get_pixel(48, tex.get_height() / 4).a, 0.9)
+	assert_false(CourtArtScript.is_court(9), "a Ten is pips")
+	assert_true(CourtArtScript.is_court(12))
 
 
 ## NO RIGGING, AND IT IS CHECKED RATHER THAN REMEMBERED. game/systems/ owns every outcome in

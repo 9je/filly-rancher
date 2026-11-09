@@ -22,6 +22,7 @@ extends RefCounted
 
 const MenuStyleScript := preload("res://ui/menu_style.gd")
 const SlotsScript := preload("res://systems/slots.gd")
+const CourtArtScript := preload("res://ui/court_art.gd")
 
 # --- the palette ----------------------------------------------------------------------------
 
@@ -420,12 +421,15 @@ static func club_points(box: Rect2) -> PackedVector2Array:
 
 
 ## WHERE THE PIPS GO ON A CARD FACE, in the traditional arrangement. Rank 0 (an Ace) gets one
-## centred pip; ranks 1 to 8 (Two through Nine) get their own layout; ranks 9 to 12 get none,
-## because a Ten is drawn as ten pips and a court card is drawn as a monogram panel, both of
-## which draw_card() handles rather than this table.
+## centred pip; ranks 1 to 9 (Two through Ten) get their own layout; ranks 10 to 12 get none,
+## because a court card is an illustrated royal (game/ui/court_art.gd) that draw_card() paints.
 static func card_pip_points(rect: Rect2, rank: int) -> PackedVector2Array:
-	var cols: Array[float] = [0.30, 0.50, 0.70]
-	var rows: Array[float] = [0.26, 0.38, 0.50, 0.62, 0.74]
+	# The field sits clear of both corner indices (Fable AAA round 1: a Four's top pip sat on
+	# its index): columns a third in from each side, rows from just under the index down.
+	var cols: Array[float] = [0.34, 0.50, 0.66]
+	# Rows 5 to 8 are the Ten's own: its side columns are four even rows and its two centre
+	# pips sit between the outer pairs, as a printed Ten's do, rather than bunching three wide.
+	var rows: Array[float] = [0.23, 0.365, 0.50, 0.635, 0.77, 0.32, 0.68, 0.41, 0.59]
 	var layout: Array = []
 	match rank:
 		0: layout = [[1, 2]]
@@ -438,7 +442,7 @@ static func card_pip_points(rect: Rect2, rank: int) -> PackedVector2Array:
 		7: layout = [[0, 0], [2, 0], [0, 2], [2, 2], [1, 1], [1, 3], [0, 4], [2, 4]]
 		8: layout = [[0, 0], [2, 0], [0, 1], [2, 1], [0, 3], [2, 3], [1, 2],
 			[0, 4], [2, 4]]
-		9: layout = [[0, 0], [2, 0], [0, 1], [2, 1], [1, 1], [0, 3], [2, 3], [1, 3],
+		9: layout = [[0, 0], [2, 0], [0, 7], [2, 7], [1, 5], [0, 8], [2, 8], [1, 6],
 			[0, 4], [2, 4]]
 	var out := PackedVector2Array()
 	for cell: Array in layout:
@@ -557,30 +561,63 @@ static func draw_card(ci: CanvasItem, rect: Rect2, font: Font, card: int,
 		return
 	var rank: int = card % 13
 	var suit: int = card / 13
-	rounded(ci, rect, 8.0, CARD_FACE, CARD_INK, 1.0)
-	var letter: String = CARD_RANK_LETTERS[rank]
 	var colour: Color = SUIT_COLORS[suit]
+	# THE CARD LIFTS OFF THE FELT (Fable AAA round 1): a soft shadow under it, then the face,
+	# then a hairline gold rule inside the edge, as a printed card's border is.
+	rounded(ci, Rect2(rect.position + Vector2(1.5, 3.5), rect.size), 9.0, Color(0.0, 0.0, 0.0, 0.26),
+		Color(0.0, 0.0, 0.0, 0.0), 0.0)
+	rounded(ci, rect, 8.0, CARD_FACE, CARD_INK, 1.0)
+	rounded(ci, rect.grow(-3.5), 6.0, Color(0.0, 0.0, 0.0, 0.0), Color(GOLD_DIM, 0.45), 1.0)
+	if CourtArtScript.is_court(rank):
+		# AN ILLUSTRATED ROYAL, not a letter in a box (game/ui/court_art.gd): the panel sits
+		# between the two corner indices, sized to the art's own shape so nothing stretches,
+		# and rasterised at the pixels it covers on screen so it is crisp at any window size.
+		var w: float = rect.size.x * 0.53
+		var h: float = w / CourtArtScript.ASPECT
+		var panel := Rect2(rect.get_center() - Vector2(w, h) * 0.5, Vector2(w, h))
+		var px: int = int(ceil(w * _screen_scale(ci) / 16.0)) * 16
+		ci.draw_texture_rect(CourtArtScript.texture(rank, suit, px), panel, false)
+	elif rank == 0:
+		# THE ACE IS THE DECK'S SHOWPIECE: one big pip inside a gold medallion of two rings and
+		# twelve beads, so it reads as crafted rather than as a lonely icon.
+		var c: Vector2 = rect.get_center()
+		var r: float = rect.size.x * 0.30
+		ci.draw_circle(c, r, Color(GOLD, 0.16))
+		ci.draw_arc(c, r, 0.0, TAU, 48, GOLD_DIM, 2.0, true)
+		ci.draw_arc(c, r - 4.0, 0.0, TAU, 48, Color(GOLD_DIM, 0.6), 1.0, true)
+		for i: int in 12:
+			var a: float = TAU * float(i) / 12.0
+			ci.draw_circle(c + Vector2(cos(a), sin(a)) * (r + 4.5), 1.6, GOLD_DIM)
+		var ace: float = rect.size.x * 0.40
+		draw_suit(ci, Rect2(c - Vector2(ace, ace) * 0.5, Vector2(ace, ace)), suit)
+	else:
+		var pip_size: float = rect.size.x * 0.21
+		for p: Vector2 in card_pip_points(rect, rank):
+			draw_suit(ci, Rect2(p - Vector2(pip_size, pip_size) * 0.5,
+				Vector2(pip_size, pip_size)), suit)
 	# THE INDEX SITS IN FROM THE EDGE (item 59: "corner numbers touch the edge"): a tenth of
-	# the card's width in, as a printed card's is, with its suit under it at both ends.
+	# the card's width in, as a printed card's is, with its suit under it. The far corner is the
+	# same index turned half a turn, the way a real card reads from either end.
+	var letter: String = CARD_RANK_LETTERS[rank]
 	var inset: float = maxf(8.0, rect.size.x * 0.1)
-	text(ci, font, rect.position + Vector2(inset, inset + 18.0), letter, 20, colour,
-		HORIZONTAL_ALIGNMENT_LEFT, -1.0)
-	text(ci, font, rect.position + rect.size - Vector2(inset, inset + 14.0), letter, 20, colour,
-		HORIZONTAL_ALIGNMENT_RIGHT, -1.0)
-	draw_suit(ci, Rect2(rect.position + Vector2(inset - 1.0, inset + 22.0), Vector2(16.0, 16.0)), suit)
-	draw_suit(ci, Rect2(rect.position + rect.size - Vector2(inset + 15.0, inset + 12.0),
-		Vector2(16.0, 16.0)), suit)
-	if rank >= 10:
-		var panel := Rect2(rect.position + rect.size * Vector2(0.22, 0.26),
-			rect.size * Vector2(0.56, 0.48))
-		rounded(ci, panel, 4.0, Color(GOLD_DIM, 0.35), GOLD_DIM, 1.0)
-		text(ci, font, panel.position + Vector2(panel.size.x * 0.5, panel.size.y * 0.72),
-			letter, 30, colour, HORIZONTAL_ALIGNMENT_CENTER, -1.0)
-		return
-	var pip_size: float = rect.size.x * (0.34 if rank == 0 else 0.19)
-	for p: Vector2 in card_pip_points(rect, rank):
-		draw_suit(ci, Rect2(p - Vector2(pip_size, pip_size) * 0.5,
-			Vector2(pip_size, pip_size)), suit)
+	for flip: bool in [false, true]:
+		if flip:
+			ci.draw_set_transform(rect.end, PI, Vector2.ONE)
+		else:
+			ci.draw_set_transform(rect.position, 0.0, Vector2.ONE)
+		text(ci, font, Vector2(inset - 1.0, inset + 16.0), letter, 19, colour,
+			HORIZONTAL_ALIGNMENT_LEFT, -1.0)
+		draw_suit(ci, Rect2(Vector2(inset - 1.0, inset + 19.0), Vector2(13.0, 13.0)), suit)
+	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+## How many screen pixels one unit of `ci`'s canvas covers, so a rasterised picture can be
+## made at the size it is actually seen rather than at its base size.
+static func _screen_scale(ci: CanvasItem) -> float:
+	if not ci.is_inside_tree():
+		return 1.0
+	var xf: Transform2D = ci.get_viewport().get_final_transform() * ci.get_global_transform_with_canvas()
+	return maxf(1.0, xf.get_scale().x)
 
 
 ## ONE PER CasinoMenu.Row: CAGE, SLOTS, WHEEL, BLACKJACK, RACING, RULES. Works at 60 px on a
