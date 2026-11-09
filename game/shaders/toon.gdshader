@@ -8,7 +8,7 @@
 // `spectral`, which stay saturated, because in the dread grade the only color left is the
 // Works' output.
 shader_type spatial;
-render_mode cull_back, depth_draw_opaque, specular_disabled;
+render_mode cull_back, depth_draw_opaque, specular_disabled, alpha_to_coverage;
 #include "res://shaders/bounce.gdshaderinc"
 #include "res://shaders/dither.gdshaderinc"
 #include "res://shaders/hair.gdshaderinc"
@@ -133,9 +133,12 @@ void fragment() {
 		}
 		c *= tc;
 	}
-	if (alpha_scissor > 0.0 && c.a < alpha_scissor) {
-		discard;
-	}
+	// Cut hair cards and leaves through the engine's scissor with alpha to coverage, so under
+	// MSAA their edges are smoothed rather than stair-stepped (Fable round 4: "slab manes
+	// with serrated edges"). Surfaces with no cut pass at alpha 1.
+	ALPHA = alpha_scissor > 0.0 ? c.a : 1.0;
+	ALPHA_SCISSOR_THRESHOLD = max(alpha_scissor, 0.001);
+	ALPHA_ANTIALIASING_EDGE = alpha_scissor > 0.0 ? alpha_scissor * 0.85 : 0.0;
 	if (marking > 0) {
 		c.rgb = mix(c.rgb, marking_color.rgb, marking_mask(rest_pos));
 	}

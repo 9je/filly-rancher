@@ -26,6 +26,8 @@ func _initialize() -> void:
 
 func _run() -> void:
 	root.get_window().size = Vector2i(1600, 900)
+	# As the game's settings leave it (systems/settings.gd, high quality).
+	root.msaa_3d = Viewport.MSAA_4X
 	var world := Node3D.new()
 	root.add_child(world)
 	# ranch.tscn's Environment and Sun at DAY, as the sky rig leaves them.
