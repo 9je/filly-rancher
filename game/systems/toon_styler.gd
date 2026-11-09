@@ -58,6 +58,12 @@ static func lift_for(file: String) -> float:
 	return float(FAMILY_LIFT[best]) if best != "" else 1.0
 
 
+## A mane, forelock or tail surface, by its mesh or material name (they carry the shine).
+static func is_hair(mesh_name: String, material_name: String) -> bool:
+	var n := (mesh_name + " " + material_name).to_lower()
+	return "hair" in n or "mane" in n or "tail" in n or "forelock" in n
+
+
 ## Outline width is multiplied by this; the graphics settings set it (0 disables lines).
 static var outline_scale: float = 1.0
 
@@ -143,6 +149,8 @@ static func style(root: Node, category: StringName = &"prop", cache: Variant = n
 					out = to_toon(src as StandardMaterial3D, preset)
 					if category == &"pony":
 						_keep_pastel(out, src as StandardMaterial3D)
+						if is_hair(mi.name, src.resource_name):
+							out.set_shader_parameter(&"hair_shine", 1.0)
 					if lift != 1.0:
 						_lift(out, lift)
 					if ao != null:

@@ -29,6 +29,8 @@ uniform float band_center : hint_range(-1.0, 1.0) = 0.0;
 uniform float band_softness : hint_range(0.0, 0.5) = 0.035;
 // How much of the sun's cast shadow lands on this surface (ponies 0: see ToonStyler's preset).
 uniform float cast_shadow : hint_range(0.0, 1.0) = 1.0;
+// A mane or tail (ToonStyler.is_hair): one crisp lighter streak, the show's hair shine.
+uniform float hair_shine : hint_range(0.0, 1.0) = 0.0;
 uniform float rim_strength : hint_range(0.0, 1.0) = 0.0;
 uniform float rim_width : hint_range(0.0, 1.0) = 0.22;
 uniform bool spectral = false;
@@ -158,6 +160,13 @@ void fragment() {
 	ALBEDO = rgb;
 	if (hair_center.w > 0.0) {
 		NORMAL = normalize(mix(NORMAL, normalize(VERTEX - hair_mid_view), hair_center.w));
+	}
+	if (hair_shine > 0.0) {
+		// THE SHOW'S MANE SHINE (Fable AAA round 2, #3: "the mane is one dark mass"): one crisp
+		// lighter streak across the upper curve of the hair, a flat band, not a gloss.
+		float up = NORMAL.y;
+		float streak = smoothstep(0.40, 0.44, up) * (1.0 - smoothstep(0.64, 0.68, up));
+		ALBEDO = mix(ALBEDO, min(ALBEDO * 1.4 + vec3(0.09), vec3(1.0)), streak * 0.8 * hair_shine);
 	}
 	EMISSION = emission * emission_energy + vec3(1.0, 0.72, 0.38) * lit_window * 2.2;
 	ROUGHNESS = 1.0;
