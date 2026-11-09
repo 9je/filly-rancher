@@ -119,7 +119,17 @@ func _run() -> void:
 				if inst == null:
 					inst = load("res://systems/pony_instance.gd").create(d.id)
 				card.call("show_catch", inst, p)
-				await Boot.frames(self, 50)
+				# Frames are slow under llvmpipe: hold the card once it lands rather than
+				# counting past its 4.6 s stay.
+				var panel: Control = card.get("_panel")
+				for i in 120:
+					if panel.position.x <= 0.5:
+						break
+					await Boot.frames(self, 1)
+				var tw: Tween = card.get("_tween")
+				if tw != null and tw.is_valid():
+					tw.pause()
+				await Boot.frames(self, 10)
 				await Boot.shot(self, out, "catch_card_named")
 				break
 	if _want("spike"):
