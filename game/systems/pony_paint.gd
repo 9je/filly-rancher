@@ -31,7 +31,9 @@ const HAIR_ROUND := 0.6
 
 ## Line weight per role, in pixels before ToonStyler.outline_scale. Faces get none: an
 ## outline round an eyeball reads as a monocle.
-const OUTLINE_PX := {Role.COAT: 1.8, Role.MANE: 1.6, Role.MANE2: 1.6, Role.TAIL: 1.6}
+const OUTLINE_PX := {Role.COAT: 2.6, Role.MANE: 2.3, Role.MANE2: 2.3, Role.TAIL: 2.3}
+## ToonStyler's pony preset, the one source of a pony's cel.
+const PONY: Dictionary = ToonStylerScript.PRESETS[&"pony"]
 
 
 ## Role of material `name` on donor row `donor`.
@@ -217,6 +219,8 @@ static func _toon(c: Color, r: int) -> ShaderMaterial:
 	var px: float = float(OUTLINE_PX.get(r, 0.0)) * ToonStylerScript.outline_scale
 	if px > 0.0:
 		m.next_pass = ToonStylerScript.make_outline(c, null, px, 42.0)
+		(m.next_pass as ShaderMaterial).set_shader_parameter(&"darken",
+			float(PONY.get("line_value", 0.45)))
 		# Her far-off twin, without the pass (ToonStyler.BARE_META).
 		m.set_meta(ToonStylerScript.BARE_META, _flat_toon(c, r))
 	return m
@@ -226,8 +230,15 @@ static func _flat_toon(c: Color, r: int) -> ShaderMaterial:
 	var m := ShaderMaterial.new()
 	m.shader = TOON
 	m.set_shader_parameter(&"albedo", c)
-	m.set_shader_parameter(&"shadow_fill", 0.38)
-	m.set_shader_parameter(&"rim_strength", 0.16 if r == Role.COAT else 0.0)
+	# The same cel as every other pony (ToonStyler's pony preset; Fable round 4 zoom: the
+	# player and the crowd, painted here, kept the soft band, the stair-stepped self-shadow
+	# and the faint line after the canon ponies had lost them).
+	m.set_shader_parameter(&"shadow_fill", float(PONY.get("shadow_fill", 0.38)))
+	m.set_shader_parameter(&"band_softness", float(PONY.get("band_softness", 0.035)))
+	m.set_shader_parameter(&"cast_shadow", float(PONY.get("cast_shadow", 1.0)))
+	m.set_shader_parameter(&"rim_strength", float(PONY.get("rim", 0.16)) if r == Role.COAT else 0.0)
+	if r == Role.MANE or r == Role.MANE2 or r == Role.TAIL:
+		m.set_shader_parameter(&"hair_shine", 1.0)
 	# A flat recolour by design (her look replaces the donor's own texture), so an audit
 	# does not read the dropped donor texture as a lost one (test_input/pony_material_audit.gd).
 	m.set_meta(&"recolored", true)

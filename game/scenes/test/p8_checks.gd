@@ -297,8 +297,10 @@ func _run() -> void:
 			sky.call("sonic_rainboom")
 		# A strip through the scene: the software renderer draws a few frames a second, so a
 		# frame count is the only clock that lands shots inside it.
+		# Spaced in seconds, as the software renderer's eight frames were (about 1.3 s): a
+		# strip timed in frames caught a flash at its peak on the GPU (Fable round 4).
 		for k in 6:
-			await Boot.frames(self, 8)
+			await create_timer(1.3).timeout
 			await Boot.shot(self, out, "%s_%d" % [ev, k])
 		while Cinematic.shared(self).playing:
 			await process_frame

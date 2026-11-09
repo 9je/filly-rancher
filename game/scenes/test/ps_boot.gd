@@ -6,11 +6,11 @@ extends RefCounted
 const BootIntentScript := preload("res://world/boot_intent.gd")
 
 
-## `n` frames, and never less than `n` frames took on the software renderer these probes were
-## written for (about six a second). On the GPU sixty frames pass in a second, so a strip
-## timed in frames caught a cinematic's flash at its peak and cameras mid-move (Fable round 4,
-## the first GPU showcase); this keeps every probe's moments where they were authored.
-const AUTHORED_FPS := 6.0
+## `n` frames, and never less than `n` frames at 30 a second: a floor for settling (fades,
+## eases) on a GPU that draws hundreds a second. Strips through a cinematic are spaced in
+## seconds instead (p8_checks.gd); at six a second (the software renderer's pace) this floor
+## made a world probe slower on the GPU than it had been without it.
+const AUTHORED_FPS := 30.0
 
 
 static func frames(tree: SceneTree, n: int) -> void:
