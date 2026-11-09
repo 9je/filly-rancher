@@ -2115,7 +2115,8 @@ func _on_menu_opened_any() -> void:
 func _bind_letter_panel() -> void:
 	if letter_panel == null or not letter_panel.has_method("open"):
 		return
-	for pair in [["opened", _on_menu_opened_any], ["closed", _on_menu_closed]]:
+	for pair in [["opened", _on_menu_opened_any], ["closed", _on_menu_closed],
+			["closed", _on_letter_spent_interact]]:
 		if not letter_panel.is_connected(pair[0], pair[1]):
 			letter_panel.connect(pair[0], pair[1])
 
@@ -5253,6 +5254,13 @@ var _interact_spent := false
 
 
 func _on_talk_spent_interact(_who: StringName, _id: StringName) -> void:
+	_interact_spent = true
+
+
+## THE PRESS THAT CLOSED A LETTER IS SPENT TOO (P8, playtest 2026-11-08 item 77: "a letter
+## appeared to reopen after Back"): E on Back closed it, and the same press, still down,
+## reached the mailbox and opened it again.
+func _on_letter_spent_interact() -> void:
 	_interact_spent = true
 
 
