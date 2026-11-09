@@ -90,6 +90,23 @@ func _run() -> void:
 		# Three-quarter on to the lens (a holder's -Z is her tail).
 		holder.rotation.y = deg_to_rad(200.0)
 		bodies.append(holder)
+	if "--plot" in OS.get_cmdline_user_args():
+		# A free plot as the pen yard has it: chars_plot.png.
+		var slot: Node3D = load("res://world/plot_slot.gd").new()
+		world.add_child(slot)
+		slot.global_position = Vector3(0, 0, -2.0)
+		slot.call("set_marker_focus", 0.0)
+		var sc := Camera3D.new()
+		world.add_child(sc)
+		sc.fov = 60.0
+		sc.global_position = Vector3(5.5, 3.2, 6.5)
+		sc.look_at(Vector3(0, 0.3, -2.0))
+		sc.current = true
+		for k in 20:
+			await process_frame
+		await _shot("chars_plot")
+		sc.current = false
+		slot.queue_free()
 	if "--player" in OS.get_cmdline_user_args():
 		# The player as she is built in the ranch (her Scoop and all), from behind and to the
 		# side, the way the game's camera sees her: chars_player.png.

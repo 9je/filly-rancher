@@ -564,6 +564,7 @@ func _dress_plot() -> void:
 	earth.position = Vector3(0.0, 0.035, 0.0)
 	earth.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_stakes.add_child(earth)
+	_dress_site()
 	var rope_mat := _solid(Color(0.93, 0.88, 0.74), 1.0)
 	var y := STAKE_HEIGHT - 0.25
 	var corners := [Vector3(-1, 0, -1), Vector3(1, 0, -1), Vector3(1, 0, 1), Vector3(-1, 0, 1)]
@@ -594,6 +595,54 @@ func _dress_plot() -> void:
 			flag.position = at
 			flag.rotation = Vector3(0.0, atan2(b.x - a.x, b.z - a.z) + PI * 0.5, PI)
 			k += 1
+
+
+## A BUILDING SITE, NOT A PLACEHOLDER (Fable AAA round 3, #2: "the pens area is a greybox ...
+## a placement ghost left in"). In one corner of the turned earth, the makings of the pen:
+## a stack of rails and posts, a hay bale and a crate, waiting. Scenery only (no collision),
+## and gone with the rest of PlotMarks when the pen goes up.
+const SITE_WOOD := Color(0.70, 0.50, 0.30)
+const SITE_WOOD_DARK := Color(0.52, 0.35, 0.20)
+
+
+func _dress_site() -> void:
+	var corner := Vector3(STAKE_INSET - 1.3, 0.0, -STAKE_INSET + 1.1)
+	var rail := _solid(SITE_WOOD, 0.95)
+	var post := _solid(SITE_WOOD_DARK, 0.95)
+	for i in 4:
+		var plank := MeshInstance3D.new()
+		plank.name = "SiteRail%d" % i
+		var bm := BoxMesh.new()
+		bm.size = Vector3(0.16, 0.08, 2.3)
+		bm.material = rail
+		plank.mesh = bm
+		_stakes.add_child(plank)
+		plank.position = corner + Vector3(-0.2 * float(i % 2) + 0.18 * float(i / 2), 0.08 + 0.08 * float(i / 2), 0.0)
+		plank.rotation.y = deg_to_rad(4.0 * float(i % 3) - 4.0)
+	for i in 2:
+		var p := MeshInstance3D.new()
+		p.name = "SitePost%d" % i
+		var pm := BoxMesh.new()
+		pm.size = Vector3(0.14, 0.14, 1.2)
+		pm.material = post
+		p.mesh = pm
+		_stakes.add_child(p)
+		p.position = corner + Vector3(0.55 + 0.17 * float(i), 0.07, 0.4)
+		p.rotation.y = deg_to_rad(80.0 + 12.0 * float(i))
+	for prop: Array in [["saa_hay_block.glb", 1.93, Vector3(-1.4, 0, 0.3), 20.0],
+			["mlp_crate.glb", 3.4 * 0.8, Vector3(-0.6, 0, 1.3), -15.0]]:
+		var path := "res://assets/converted/props/%s" % prop[0]
+		if not ResourceLoader.exists(path):
+			continue
+		var node: Node3D = (load(path) as PackedScene).instantiate()
+		for c in node.find_children("*", "CollisionObject3D", true, false):
+			c.queue_free()
+		node.name = "Site" + String(prop[0]).get_basename().capitalize().replace(" ", "")
+		_stakes.add_child(node)
+		node.position = corner + (prop[2] as Vector3)
+		node.rotation.y = deg_to_rad(float(prop[3]))
+		node.scale = Vector3.ONE * float(prop[1])
+		ToonStyler.style(node, &"prop", {})
 
 
 const BUNTING: Array[Color] = [Color(0.96, 0.55, 0.72), Color(1.0, 0.82, 0.32),
