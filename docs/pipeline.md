@@ -1046,6 +1046,19 @@ one:
 
 ---
 
+## 5d. Baked ambient occlusion: `tools/bake_ao_all.sh`
+
+Run after `tools/convert_props.sh` (and after any re-conversion), then `godot --headless --import`.
+Each converted prop and building gets a second UV map and a Cycles AO map beside it,
+`<name>_ao.png` (256 to 1024 px by the model's size), baked with a temporary ground plane so wall
+feet get contact shade. The unbaked model is kept as `<name>.glb.noao` and every re-run bakes from
+it. ToonStyler finds the map by name and the toon shader multiplies it in (`use_ao`,
+`ao_strength`). About 7 s a model on the CPU; 53 models in a few minutes.
+
+Gotcha: Ubuntu's Blender is built without OpenImageDenoiser, and Cycles asks for it by default.
+Every bake then fails silently and writes a black map, so the script turns denoising off.
+Before and after: `look_world.gd -- --no-ao` renders the same lenses without it.
+
 ## 6. Animation strategy — verdict, and how to add animations to a new character
 
 **Verdict: CANONICAL RIG**, for the tier-a (CreatorOfPony/MythicSpeed)
