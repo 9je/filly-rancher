@@ -125,12 +125,22 @@ func _dress_with_key_art() -> void:
 	_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_art)
 	move_child(_art, 1)
-	var shade := ColorRect.new()
+	# A soft fall of shade from the left, never a hard edge across the picture.
+	var grad := Gradient.new()
+	grad.set_color(0, Color(0.08, 0.04, 0.12, 0.62))
+	grad.set_color(1, Color(0.08, 0.04, 0.12, 0.0))
+	var tex := GradientTexture2D.new()
+	tex.gradient = grad
+	tex.fill_from = Vector2(0.0, 0.5)
+	tex.fill_to = Vector2(1.0, 0.5)
+	var shade := TextureRect.new()
 	shade.name = "Shade"
+	shade.texture = tex
+	shade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	shade.stretch_mode = TextureRect.STRETCH_SCALE
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	shade.set_anchors_preset(Control.PRESET_LEFT_WIDE)
-	shade.anchor_right = 0.5
-	shade.color = Color(0.08, 0.04, 0.12, 0.45)
+	shade.anchor_right = 0.62
 	add_child(shade)
 	move_child(shade, 2)
 	var backdrop := get_node_or_null(^"Backdrop") as Control
@@ -140,6 +150,18 @@ func _dress_with_key_art() -> void:
 	if centre != null:
 		centre.anchor_left = 0.04
 		centre.anchor_right = 0.46
+	_style_wordmark()
+
+
+## The name as a wordmark over the art, the way a title screen announces itself. Applied after
+## every _refresh(), which restyles the title.
+func _style_wordmark() -> void:
+	if _art == null or _title == null:
+		return
+	_title.add_theme_font_size_override(&"font_size", 72)
+	_title.add_theme_color_override(&"font_color", Color(1.0, 0.95, 0.82))
+	_title.add_theme_color_override(&"font_shadow_color", Color(0.2, 0.05, 0.25, 0.7))
+	_title.add_theme_constant_override(&"shadow_offset_y", 5)
 
 
 func _process(delta: float) -> void:
@@ -314,6 +336,7 @@ func _refresh() -> void:
 		return
 	_title.text = TITLE
 	MenuStyleScript.apply_title(_title)
+	_style_wordmark()
 	if _new_game_armed:
 		_footer.text = MenuStyleScript.NO_CARET + NEW_GAME_CONFIRM_TEXT
 	else:
