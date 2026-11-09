@@ -14,6 +14,10 @@ const BULB_EMISSION := 5.0
 const FADE_SECONDS := 4.0
 ## How often the phase is looked at; a phase lasts minutes.
 const POLL_SECONDS := 0.5
+## Dusk is lamps coming on, not midnight: the windows and halos stand at this much of night.
+const DUSK_LEVEL := 0.6
+const HALO_SIZE := 1.5
+const HaloShader := preload("res://shaders/halo.gdshader")
 
 var _lamps: Array[OmniLight3D] = []
 var _bulbs: Array[StandardMaterial3D] = []
@@ -63,6 +67,8 @@ func _build() -> void:
 		add_child(bulb)
 		bulb.global_position = at
 		_bulbs.append(mat)
+		add_child(halo(LAMP_COLOR, HALO_SIZE, 0.9))
+		get_child(get_child_count() - 1).global_position = at
 	_poll = 0.0
 	_read_phase()
 	_level = _want
@@ -85,7 +91,8 @@ func _read_phase() -> void:
 	if w == null:
 		return
 	var p := int(w.call("phase"))
-	_want = 1.0 if p == WorldStateScript.Phase.DUSK or p == WorldStateScript.Phase.NIGHT else 0.0
+	_want = 1.0 if p == WorldStateScript.Phase.NIGHT \
+		else DUSK_LEVEL if p == WorldStateScript.Phase.DUSK else 0.0
 
 
 ## Lit at `level` (0 day, 1 full night), now. For renders and tests.
@@ -95,7 +102,25 @@ func set_level(level: float) -> void:
 	_write()
 
 
+## A soft billboard disc that glows with the night_glow global (shaders/halo.gdshader).
+static func halo(colour: Color, size: float, strength: float) -> MeshInstance3D:
+	var q := QuadMesh.new()
+	q.size = Vector2(size, size)
+	var m := ShaderMaterial.new()
+	m.shader = HaloShader
+	m.set_shader_parameter(&"tint", colour)
+	m.set_shader_parameter(&"strength", strength)
+	q.material = m
+	var mi := MeshInstance3D.new()
+	mi.name = "Halo"
+	mi.mesh = q
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return mi
+
+
 func _write() -> void:
+	# The windows painted into every house and every lamp's halo read this.
+	RenderingServer.global_shader_parameter_set(&"night_glow", _level)
 	for l in _lamps:
 		l.light_energy = LAMP_ENERGY * _level
 		l.visible = _level > 0.001

@@ -70,7 +70,10 @@ func _run() -> void:
 			sky.call("apply_immediately", w)
 		var lamps: Node = ranch.get_node_or_null(^"NightLights")
 		if lamps != null:
-			lamps.call("set_level", 0.0 if t == "day" else 1.0)
+			lamps.call("set_level", 0.0 if t == "day" else 0.6 if t == "dusk" else 1.0)
+		# The rain is a column over whoever it follows; a lens across town needs it overhead.
+		if sky != null and sky.has_method("follow"):
+			sky.call("follow", cam)
 		for v: String in views:
 			if v == "pony":
 				var at := player.global_position

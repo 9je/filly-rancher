@@ -1687,3 +1687,11 @@ durable home for a decision Phase 1 planning needs.
    root motion from the clip instead of hand-matching a scene-side speed
    constant — which would also remove the `WALK_STRIDE` duplication between
    `tools/author_anims.py` and `game/scenes/test/walk_test.gd` noted in §6.
+
+## 5e. Window glow masks: tools/window_masks.py
+
+After the Ponyville houses (pv_*.glb) are converted, run `python3 tools/window_masks.py` once. It keys the painted lavender and blue window panes out of each house texture and writes `<glb>_win_<image name>.png` beside the model. ToonStyler finds the mask by the texture's name, and the toon shader lights masked texels by the `night_glow` global after dark. Pass `--sheet out.png` for a contact sheet with the masks painted gold, to check what it caught.
+
+## 5f. The painted horizon: tools/paint_skyband.py
+
+`python3 tools/paint_skyband.py` repaints game/assets/sky/skyband.png (the mountain ring and Canterlot) and clouds.png, which the sky dome wraps round the world. The output is deterministic and committed.

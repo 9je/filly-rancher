@@ -524,8 +524,82 @@ func _refresh_stakes() -> void:
 			Vector3(span, MARK_HEIGHT, MARK_WIDTH),
 			Vector3(0.0, MARK_HEIGHT * 0.5 - 0.02, s * STAKE_INSET), board_mat)
 
+	_dress_plot()
 	add_child(_stakes)
 	_stakes.visible = _mark_alpha > 0.0
+
+
+## A STAKED-OUT PLOT, NOT A DIAGRAM (Fable AAA round 1, #4: "four thin posts and one knee-high
+## rail in nearly the same green as the grass ... invisible from ten metres"). Turned earth
+## inside the line and a rope of bunting round the stakes: things in the world, so solid and
+## never faded, and gone with the rest of PlotMarks the moment a pen is built.
+func _dress_plot() -> void:
+	var earth := MeshInstance3D.new()
+	earth.name = "Earth"
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(STAKE_INSET * 2.0 - 0.3, STAKE_INSET * 2.0 - 0.3)
+	var em := StandardMaterial3D.new()
+	em.albedo_texture = _earth_texture()
+	em.roughness = 1.0
+	em.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+	pm.material = em
+	earth.mesh = pm
+	earth.position = Vector3(0.0, 0.035, 0.0)
+	earth.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_stakes.add_child(earth)
+	var rope_mat := _solid(Color(0.93, 0.88, 0.74), 1.0)
+	var y := STAKE_HEIGHT - 0.25
+	var corners := [Vector3(-1, 0, -1), Vector3(1, 0, -1), Vector3(1, 0, 1), Vector3(-1, 0, 1)]
+	var k := 0
+	for i in 4:
+		var a: Vector3 = corners[i] * STAKE_INSET
+		var b: Vector3 = corners[(i + 1) % 4] * STAKE_INSET
+		var rope := MeshInstance3D.new()
+		rope.name = "Rope%d" % i
+		var bm := BoxMesh.new()
+		bm.size = Vector3(0.035, 0.035, a.distance_to(b))
+		bm.material = rope_mat
+		rope.mesh = bm
+		_stakes.add_child(rope)
+		rope.position = (a + b) * 0.5 + Vector3(0.0, y, 0.0)
+		rope.look_at_from_position(rope.position, b + Vector3(0.0, y, 0.0), Vector3.UP)
+		# Pennants every 0.7 m, hanging point down, in the town's bunting colours.
+		var n := int(a.distance_to(b) / 0.7)
+		for f in range(1, n):
+			var at := a.lerp(b, float(f) / float(n)) + Vector3(0.0, y - 0.13, 0.0)
+			var flag := MeshInstance3D.new()
+			flag.name = "Flag%d" % k
+			var pr := PrismMesh.new()
+			pr.size = Vector3(0.26, 0.26, 0.02)
+			pr.material = _solid(BUNTING[k % BUNTING.size()], 1.0)
+			flag.mesh = pr
+			_stakes.add_child(flag)
+			flag.position = at
+			flag.rotation = Vector3(0.0, atan2(b.x - a.x, b.z - a.z) + PI * 0.5, PI)
+			k += 1
+
+
+const BUNTING: Array[Color] = [Color(0.96, 0.55, 0.72), Color(1.0, 0.82, 0.32),
+	Color(0.55, 0.78, 0.96), Color(0.72, 0.58, 0.92)]
+static var _earth_tex: Texture2D = null
+
+
+## Turned earth: warm soil with darker furrows across it, the show's flat fill and stripes.
+static func _earth_texture() -> Texture2D:
+	if _earth_tex != null:
+		return _earth_tex
+	var img := Image.create(64, 64, false, Image.FORMAT_RGB8)
+	var soil := Color(0.62, 0.47, 0.32)
+	var furrow := Color(0.50, 0.36, 0.24)
+	for y in 64:
+		for x in 64:
+			var edge := mini(mini(x, 63 - x), mini(y, 63 - y))
+			var c := furrow if (y % 8) < 3 else soil
+			if edge < 2:
+				c = c.lerp(Color(0.46, 0.60, 0.30), 0.5)
+			img.set_pixel(x, y, c)
+	_earth_tex = ImageTexture.create_from_image(img)
+	return _earth_tex
 
 
 func _mark_material(colour: Color) -> StandardMaterial3D:

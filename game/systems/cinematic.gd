@@ -11,7 +11,9 @@ extends CanvasLayer
 ##
 ## A shot moves its own camera from `from` to `to` over `time` seconds (eased in and out) while
 ## it looks at `look` (a point, or `look_node`, a Node3D followed as it moves) and on to
-## `look_to` if given; `fov` sets the lens; `caption` puts one line low in the frame, the way a
+## `look_to` if given; `fov` sets the lens and `fov_to` pulls it over the shot; `shake` jolts the
+## camera by that many metres, dying away over the shot; `flash` whites the frame out and
+## fades it over that many seconds (a boom, a crash); `caption` puts one line low in the frame, the way a
 ## title card does; `call` runs as the shot starts (start an actor's move, a sound, a burst).
 ## `from` may be "here" to start from wherever the game camera is, so the cut is a move.
 ##
@@ -37,6 +39,7 @@ var _top: ColorRect
 var _bottom: ColorRect
 var _caption: Label
 var _skip_hint: Label
+var _flash: ColorRect
 var _skip_held := 0.0
 var _skip := false
 var _frozen: Array[Node] = []
@@ -66,9 +69,15 @@ func _ready() -> void:
 	_caption.add_theme_constant_override(&"shadow_offset_y", 3)
 	_caption.modulate.a = 0.0
 	add_child(_caption)
+	_flash = ColorRect.new()
+	_flash.color = Color(1.0, 0.98, 0.94, 0.0)
+	_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_flash)
 	_skip_hint = Label.new()
+	_skip_hint.add_theme_font_override(&"font", MenuStyle.title_font())
 	_skip_hint.add_theme_font_size_override(&"font_size", 20)
-	_skip_hint.add_theme_color_override(&"font_color", Color(1, 1, 1, 0.7))
+	_skip_hint.add_theme_color_override(&"font_color", Color(1.0, 0.92, 0.70, 0.8))
 	_skip_hint.visible = false
 	add_child(_skip_hint)
 	visible = false
@@ -114,6 +123,7 @@ func play(shots: Array, opts: Dictionary = {}) -> bool:
 			break
 		await _shot(shot)
 	_caption.modulate.a = 0.0
+	_flash.color.a = 0.0
 	await _bars(0.0)
 	if _was_current != null and is_instance_valid(_was_current):
 		_was_current.current = true
@@ -140,6 +150,13 @@ func _shot(shot: Dictionary) -> void:
 	var look_b: Vector3 = shot.get("look_to", look_a)
 	if shot.has("fov"):
 		_camera.fov = float(shot.fov)
+	var fov_a := _camera.fov
+	var fov_b := float(shot.get("fov_to", fov_a))
+	var shake := float(shot.get("shake", 0.0))
+	if shot.has("flash"):
+		_flash.color.a = 1.0
+		create_tween().tween_property(_flash, "color:a", 0.0, float(shot.flash)) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	var call: Callable = shot.get("call", Callable())
 	if call.is_valid():
 		call.call()
@@ -152,6 +169,10 @@ func _shot(shot: Dictionary) -> void:
 		e += dt
 		var k := smoothstep(0.0, 1.0, clampf(e / t, 0.0, 1.0))
 		_camera.global_position = start.lerp(end, k)
+		_camera.fov = lerpf(fov_a, fov_b, k)
+		if shake > 0.0:
+			var left := pow(1.0 - clampf(e / t, 0.0, 1.0), 2.0) * shake
+			_camera.global_position += Vector3(sin(e * 71.0), sin(e * 53.0 + 1.3), cos(e * 61.0)) * left
 		var at := look_node.global_position + Vector3(0, float(shot.get("look_height", 1.0)), 0) \
 			if look_node != null and is_instance_valid(look_node) else look_a.lerp(look_b, k)
 		if not _camera.global_position.is_equal_approx(at):

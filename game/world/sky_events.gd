@@ -115,20 +115,32 @@ func derpy_crash() -> void:
 		# Something in the way from beyond her: from the player's side instead.
 		cam_side = land - fwd * 3.6 + side * 1.4 + Vector3.UP * 1.4
 	var fall := 1.7
+	# HER FACE IS THE PAYOFF (Fable AAA round 1, #10: "the payoff shot is two grey lumps ...
+	# her face is never shown"). She lands facing the way she flew; the close-up stands off
+	# her nose and a little to the side, at her own eye height lying down.
+	var dfwd := land - start
+	dfwd.y = 0.0
+	dfwd = dfwd.normalized()
+	var dside := dfwd.cross(Vector3.UP).normalized()
+	var face := land + dfwd * 0.75 + Vector3.UP * 0.45
+	var close := face + dfwd * 1.5 + dside * 0.55 + Vector3.UP * 0.2
+	if not _clear_line(close, face):
+		close = face + dfwd * 1.5 - dside * 0.55 + Vector3.UP * 0.2
 	var shots := [
+		# A long lens on the way down, so she fills the frame instead of a smudge by a roof.
 		{"from": "here", "to": player.global_position - fwd * 1.0 + Vector3.UP * 2.6,
-			"look_node": derpy, "look_height": 0.8, "time": fall,
+			"look_node": derpy, "look_height": 0.8, "time": fall, "fov": 45.0, "fov_to": 26.0,
 			"call": func() -> void: _fall(derpy, start, land, fall)},
 		{"from": cam_side, "to": cam_side + side * 0.4 - Vector3.UP * 0.3,
-			"look": land + Vector3.UP * 0.7, "time": 2.6,
-			"caption": "Derpy!",
+			"look": land + Vector3.UP * 0.6, "time": 2.2, "fov": 50.0, "fov_to": 44.0,
+			"shake": 0.16, "caption": "Derpy!",
 			"call": func() -> void: _flop(derpy, land)},
-		{"from": cam_side + side * 0.4 - Vector3.UP * 0.3, "to": cam_side + side * 1.5 + Vector3.UP * 1.2,
-			"look": land + Vector3.UP * 0.9, "time": 2.2,
+		{"from": close, "to": close.lerp(face, 0.15), "look": face, "time": 2.4,
+			"fov": 40.0, "fov_to": 34.0,
 			"caption": "\"I just don't know what went wrong!\"",
 			"call": func() -> void: _play(derpy, &"shake")},
 		{"from": "here", "to": player.global_position - fwd * 4.0 + Vector3.UP * 3.0,
-			"look": land + Vector3.UP * 4.0, "time": 1.6,
+			"look": land + Vector3.UP * 4.0, "time": 1.6, "fov": 55.0,
 			"call": func() -> void: _fly_off(derpy, land, fwd)},
 	]
 	await Cinematic.shared(get_tree()).play(shots, {"freeze": [player], "host": _ranch()})
@@ -151,6 +163,7 @@ func _fall(derpy: Node3D, start: Vector3, land: Vector3, secs: float) -> void:
 func _flop(derpy: Node3D, land: Vector3) -> void:
 	derpy.global_position = land
 	derpy.rotation.z = 0.0
+	derpy.rotation.x = 0.0
 	_play(derpy, &"lie")
 	RumpBounce.kick_on(derpy, 2.0)
 	var puff := BloomCeremonyScript.sparkles([Color(0.95, 0.9, 0.8), Color(0.85, 0.8, 0.7)])
@@ -246,10 +259,15 @@ func sonic_rainboom() -> void:
 	var trail := _trail()
 	var eye := player.global_position + Vector3.UP * 1.6 - fwd * 1.5
 	var streak := 2.6
+	# A LONG LENS ON HER, THEN THE BOOM (Fable AAA round 1, #10: "Rainbow Dash is a 30 px
+	# sprite ... no bloom, flash, shake"). The streak is followed on a telephoto so she is the
+	# size of a hand in the frame; the boom whites the screen out and kicks the camera.
 	var shots := [
-		{"from": "here", "to": eye, "look": a, "look_to": mid, "time": streak * 0.5, "fov": 55.0,
+		{"from": "here", "to": eye, "look_node": dash, "look_height": 0.0, "time": streak * 0.5,
+			"fov": 30.0, "fov_to": 20.0,
 			"call": func() -> void: _streak(dash, trail, a, b, streak)},
 		{"from": eye, "to": eye - fwd * 2.0 + Vector3.UP * 0.5, "look": mid, "time": 1.8,
+			"fov": 52.0, "fov_to": 60.0, "flash": 0.55, "shake": 0.35,
 			"call": func() -> void: _ring(mid, fwd)},
 		{"from": "here", "to": eye - fwd * 3.0 + Vector3.UP * 1.0, "look": mid,
 			"look_to": b, "time": 2.4, "caption": "A Sonic Rainboom!"},
@@ -308,7 +326,9 @@ func _ring(at: Vector3, fwd: Vector3) -> void:
 	var torus := TorusMesh.new()
 	torus.inner_radius = 0.7
 	torus.outer_radius = 1.0
-	torus.rings = 48
+	# Smooth at the size it grows to: 48 sides read as a jagged polygon at full spread.
+	torus.rings = 160
+	torus.ring_segments = 16
 	ring.mesh = torus
 	var mat := ShaderMaterial.new()
 	mat.shader = RAINBOW_SHADER
@@ -327,3 +347,26 @@ func _ring(at: Vector3, fwd: Vector3) -> void:
 		.set_ease(Tween.EASE_OUT)
 	tw.tween_method(func(v: float) -> void: mat.set_shader_parameter(&"alpha", v), 1.0, 0.0, 2.6)
 	tw.chain().tween_callback(ring.queue_free)
+	# The hot core: a white burst at the heart of the ring, gone in a blink.
+	var core := MeshInstance3D.new()
+	var sm := SphereMesh.new()
+	sm.radius = 1.0
+	sm.height = 2.0
+	var cm := StandardMaterial3D.new()
+	cm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	cm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	cm.albedo_color = Color(1.0, 0.98, 0.92, 1.0)
+	cm.emission_enabled = true
+	cm.emission = Color(1.0, 0.95, 0.85)
+	cm.emission_energy_multiplier = 4.0
+	sm.material = cm
+	core.mesh = sm
+	core.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(core)
+	core.global_position = at
+	core.scale = Vector3.ONE * 0.6
+	var ct := create_tween().set_parallel(true)
+	ct.tween_property(core, "scale", Vector3.ONE * 7.0, 0.55).set_trans(Tween.TRANS_EXPO) \
+		.set_ease(Tween.EASE_OUT)
+	ct.tween_property(cm, "albedo_color:a", 0.0, 0.8)
+	ct.chain().tween_callback(core.queue_free)

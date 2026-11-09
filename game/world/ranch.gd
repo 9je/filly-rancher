@@ -1150,6 +1150,7 @@ func _ready() -> void:
 	terrain.paint_contact(self)
 	print("RANCH contact painted in %.0f ms, mean %.3f" % [(Time.get_ticks_usec() - contact_t) / 1000.0,
 		terrain.contact_mean()])
+	_lay_ground_cover()
 
 	# THE BEAM'S CATCHES, BEFORE THERE IS ANYTHING ON THE MAP TO CATCH. The beam is a child
 	# of the player scene and so has existed since the first line of this function; the
@@ -9286,6 +9287,22 @@ func pantry_counts() -> Vector2i:
 			if NeedsScript.resolve_food(id) != null:
 				food += inv.count(id)
 	return Vector2i(food, hungry)
+
+
+## Grass tufts and flowers over the bare ground (world/ground_cover.gd), once everything that
+## stands on the ground is standing.
+const GroundCoverScript := preload("res://world/ground_cover.gd")
+
+
+func _lay_ground_cover() -> void:
+	if terrain == null or get_node_or_null(^"GroundCover") != null:
+		return
+	var cover: Node3D = GroundCoverScript.new()
+	cover.name = "GroundCover"
+	add_child(cover)
+	var t := Time.get_ticks_usec()
+	var n: int = cover.call("build", terrain, _regions_registry().all())
+	print("RANCH ground cover %d in %.0f ms" % [n, (Time.get_ticks_usec() - t) / 1000.0])
 
 
 ## THE TOWN ROW'S STREET AND YARDS (PS4 item 36, world/street.gd), laid once the row's houses

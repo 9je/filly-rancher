@@ -372,3 +372,7 @@ dread={
 "type": "float",
 "value": 0.0
 }
+night_glow={
+"type": "float",
+"value": 0.0
+}

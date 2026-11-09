@@ -599,3 +599,18 @@ tools/blender_props/bake_ao.py now smart-projects a second UV map, bakes AO into
 hands it to the toon shader (use_ao, ao_strength 0.8). Ubuntu's Blender lacks OpenImageDenoiser and
 Cycles asks for it by default, which fails every bake silently (black maps): denoising is off.
 Owner 2026-11-08 cleared outside assets and Blender for the AAA goal, provided it feels like Equestria.
+
+## 2026-11-09: Fable AAA round 1 said NOT YET; the world answers (P8)
+
+An independent Fable 5 review of 70 fresh renders (docs/fable-aaa-round1-2026-11-09.md) scored world 5, characters 5, UI 4, menus 5, cinematics 3, cohesion 5. The work is split. An Opus agent in a worktree takes the 2D surfaces (HUD, title and loading, Depot, letters, market, creator), with the casino tables as the house style. I take the world:
+- **Painted horizon (#1, #2):** a sky dome round the camera carries a show-style mountain ring with Canterlot on its tallest peak and flat cartoon clouds, painted by tools/paint_skyband.py (fill plus one hard shadow shape, as the show paints). The sky rig's light, horizon and fog light and haze it, so dusk turns it pink and night sinks it.
+  - Painting it beat modelling it: a skybox at 300 m is a flat read in every reference game, and a painting is the show's own grammar.
+  - Stars and a moon come up after dark.
+- **Lit windows (#1):** tools/window_masks.py keys the lavender and blue panes out of each Ponyville house texture, keeping whole windows that have muntins in them, so flat pink doors and panels stay dark. The toon shader warms masked texels by a new `night_glow` global, which NightLights drives (dusk at 0.6, night at 1).
+  - Lamps gain a billboard halo.
+  - Night gets a haze floor (PHASE_HAZE_FLOOR), so the far hills go navy while the player's own few metres stay as lit as the playability work left them.
+- **Empty plots (#4):** turned earth plus a rope of bunting between the stakes. The review read the faded edge boards as "pens".
+- **Lens clipping (#5):** every toon material screen-doors out within a metre of the camera, the same Bayer dither the player's close-camera fade uses.
+- **Ground (#6):** grass tufts and five-petal flowers in chunked MultiMeshes, thicker on the path verges, only where a ray from above meets bare terrain.
+- **Cinematics (#10):** Cinematic gains `fov_to`, `shake` and `flash`. Derpy is followed on a long lens and ends on a close-up of her face. The Rainboom tracks Dash on a telephoto, and the boom flashes, shakes and leaves a hot core inside a smooth ring.
+- **Rain missing from houses_nightrain (#7):** a probe artifact. The rain is a column over the player, and that lens stood across town. look_world now points the rain at its own lens.

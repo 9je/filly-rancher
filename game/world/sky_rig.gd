@@ -201,6 +201,10 @@ const WEATHER_SKY_DARKEN: Array[float] = [1.0, 0.75, 0.85, 0.55]
 ## 0.018 the barn, the fences and every tree past the yard were gone from a shot taken 45 m
 ## out, which is not weather, it is a wall.
 const WEATHER_FOG_DENSITY: Array[float] = [0.0011, 0.004, 0.010, 0.0065]
+## The least fog each phase stands in (see fog_density): dawn, day, dusk, night.
+const PHASE_HAZE_FLOOR: Array[float] = [0.0016, 0.0, 0.0024, 0.0065]
+
+
 ## Drops alive at once. Rain is a wash of streaks around the player, not a simulation of a
 ## storm front, so these are tuned to read from the camera's usual distance and no further.
 ## PT7 (playtest 2026-11-05: "the rain makes it a little too hard to see ... its just falling
@@ -452,6 +456,11 @@ static func fog_density(weather: int, phase: int = -1) -> float:
 	# Rain's haze at night is half its day's: at night it only greys the dark (PS4 item 40).
 	if phase >= 0 and _night_rain(phase, weather):
 		d *= 0.5
+	# THE DARK HAS DEPTH (Fable AAA round 1, #1: "the distant hills stay fully lit mint"). The
+	# fog takes the horizon's colour, so at night a thicker one sinks the far hills into the
+	# navy while the few metres round the player stay as lit as before.
+	if phase >= 0:
+		d = maxf(d, float(PHASE_HAZE_FLOOR[_phase_index(phase)]))
 	return d
 
 

@@ -131,6 +131,7 @@ const MARQUEE_SPONSOR_SCALE := 0.55
 ## to, and pixel_size is then derived from it.
 const MARQUEE_FONT_SIZE := 96
 
+const NightLightsScript := preload("res://world/night_lights.gd")
 const POST_COLOR := Color(0.24, 0.22, 0.28)
 const LAMP_COLOR := Color(1.0, 0.86, 0.55)
 const MARQUEE_COLOR := Color(1.0, 0.92, 0.62)
@@ -598,6 +599,9 @@ func _lamp(lamp_name: String, base: Vector3) -> Node3D:
 	globe.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	globe.position = Vector3(0.0, POST_HEIGHT + 0.3, 0.0)
 	post.add_child(globe)
+	var halo := NightLightsScript.halo(LAMP_COLOR, 2.6, 1.0)
+	halo.position = globe.position
+	post.add_child(halo)
 	var cap := MeshInstance3D.new()
 	cap.name = "Cap"
 	var pm := CylinderMesh.new()

@@ -58,7 +58,7 @@ void vertex() {
 }
 
 void fragment() {
-	dither_clip(FRAGCOORD.xy);
+	dither_clip_near(FRAGCOORD.xy, -VERTEX.z);
 	vec2 base_uv = planar ? planar_uv : UV;
 	vec2 iuv = (planar ? base_uv : iris_centre + (UV - iris_centre) * iris_scale) - gaze;
 	vec4 tex = texture(eye_texture, iuv);

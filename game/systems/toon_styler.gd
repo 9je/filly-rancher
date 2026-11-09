@@ -126,8 +126,10 @@ static func style(root: Node, category: StringName = &"prop", cache: Variant = n
 					out = to_toon(_with_sibling_texture(src as StandardMaterial3D, root), preset)
 					store[key] = out
 				var ao: Texture2D = baked_ao(mi) if category != &"pony" else null
-				if out == null and ao != null:
-					key += ":ao"
+				var win: Texture2D = window_mask(mi, src as StandardMaterial3D) \
+					if category != &"pony" else null
+				if out == null and (ao != null or win != null):
+					key += (":ao" if ao != null else "") + (":win" if win != null else "")
 					out = store.get(key)
 				if out == null:
 					out = to_toon(src as StandardMaterial3D, preset)
@@ -135,6 +137,8 @@ static func style(root: Node, category: StringName = &"prop", cache: Variant = n
 						_lift(out, lift)
 					if ao != null:
 						_wear_ao(out, ao)
+					if win != null:
+						_wear_windows(out, win)
 					store[key] = out
 				mi.set_surface_override_material(i, out)
 				touched += 1
@@ -169,6 +173,36 @@ static func _wear_ao(m: ShaderMaterial, ao: Texture2D) -> void:
 		if each is ShaderMaterial:
 			(each as ShaderMaterial).set_shader_parameter(&"use_ao", true)
 			(each as ShaderMaterial).set_shader_parameter(&"ao_texture", ao)
+
+
+## THE WINDOWS PAINTED INTO A HOUSE'S TEXTURE (Fable AAA round 1, #1: "no window is warm"):
+## <model>_win_<image name>.png beside the .glb, keyed out by tools/window_masks.py, or null.
+## The toon shader lights the masked texels by the night_glow global.
+static var _win_maps := {}
+
+
+static func window_mask(mi: Node, src: StandardMaterial3D) -> Texture2D:
+	if src == null or src.albedo_texture == null:
+		return null
+	var image_name := src.albedo_texture.resource_name
+	if image_name.is_empty():
+		return null
+	var n: Node = mi
+	while n != null and not n.scene_file_path.ends_with(".glb"):
+		n = n.get_parent()
+	if n == null:
+		return null
+	var path := "%s_win_%s.png" % [n.scene_file_path.get_basename(), image_name]
+	if not _win_maps.has(path):
+		_win_maps[path] = load(path) if ResourceLoader.exists(path) else null
+	return _win_maps[path]
+
+
+static func _wear_windows(m: ShaderMaterial, mask: Texture2D) -> void:
+	for each: Variant in [m, m.get_meta(BARE_META) if m.has_meta(BARE_META) else null]:
+		if each is ShaderMaterial:
+			(each as ShaderMaterial).set_shader_parameter(&"use_windows", true)
+			(each as ShaderMaterial).set_shader_parameter(&"window_mask", mask)
 
 
 ## A TEXTURE WITH HER CUTIE MARK BAKED IN (the Mane Six's exports: CutieMark_baked). Those

@@ -14,6 +14,9 @@ render_mode cull_back, depth_draw_opaque, specular_disabled;
 #include "res://shaders/hair.gdshaderinc"
 
 global uniform float dread;
+// 0 by day, 1 after dark: set by NightLights. Lights the windows painted into a house's
+// texture (window_mask, from tools/window_masks.py) so a night street has warm panes.
+global uniform float night_glow;
 
 uniform vec4 albedo : source_color = vec4(1.0);
 uniform sampler2D albedo_texture : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
@@ -34,6 +37,8 @@ uniform float alpha_scissor : hint_range(0.0, 1.0) = 0.0;
 uniform bool use_ao = false;
 uniform sampler2D ao_texture : hint_default_white, filter_linear_mipmap, repeat_disable;
 uniform float ao_strength : hint_range(0.0, 1.0) = 0.85;
+uniform bool use_windows = false;
+uniform sampler2D window_mask : hint_default_black, filter_linear_mipmap, repeat_enable;
 uniform vec3 emission : source_color = vec3(0.0);
 uniform float emission_energy = 0.0;
 
@@ -114,7 +119,7 @@ void vertex() {
 }
 
 void fragment() {
-	dither_clip(FRAGCOORD.xy);
+	dither_clip_near(FRAGCOORD.xy, -VERTEX.z);
 	vec4 c = albedo;
 	if (use_texture) {
 		vec4 tc = texture(albedo_texture, UV);
@@ -142,11 +147,17 @@ void fragment() {
 		vec3 grey = vec3(lum) * vec3(0.96, 0.99, 1.02);
 		rgb = mix(rgb, grey, clamp(dread, 0.0, 1.0) * 0.62);
 	}
+	float lit_window = 0.0;
+	if (use_windows && night_glow > 0.0) {
+		lit_window = texture(window_mask, UV).r * clamp(night_glow, 0.0, 1.0);
+		// Lamplight behind the glass: the pane itself turns warm, and it glows.
+		rgb = mix(rgb, vec3(1.0, 0.80, 0.46), lit_window * 0.9);
+	}
 	ALBEDO = rgb;
 	if (hair_center.w > 0.0) {
 		NORMAL = normalize(mix(NORMAL, normalize(VERTEX - hair_mid_view), hair_center.w));
 	}
-	EMISSION = emission * emission_energy;
+	EMISSION = emission * emission_energy + vec3(1.0, 0.72, 0.38) * lit_window * 2.2;
 	ROUGHNESS = 1.0;
 }
 

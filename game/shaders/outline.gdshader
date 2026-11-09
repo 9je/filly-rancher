@@ -61,7 +61,7 @@ void vertex() {
 }
 
 void fragment() {
-	dither_clip(FRAGCOORD.xy);
+	dither_clip_near(FRAGCOORD.xy, -VERTEX.z);
 	vec3 base = albedo.rgb;
 	if (use_texture) {
 		base *= texture(albedo_texture, UV).rgb;

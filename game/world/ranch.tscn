@@ -1,4 +1,4 @@
-[gd_scene load_steps=31 format=3]
+[gd_scene load_steps=32 format=3]
 
 [ext_resource type="Script" path="res://world/ranch.gd" id="1"]
 [ext_resource type="Script" path="res://world/terrain.gd" id="2"]
@@ -27,6 +27,7 @@
 [ext_resource type="Script" path="res://world/mailbox.gd" id="25"]
 [ext_resource type="Script" path="res://world/night_lights.gd" id="26"]
 [ext_resource type="Script" path="res://world/sky_events.gd" id="27"]
+[ext_resource type="Script" path="res://world/sky_dome.gd" id="sky_dome"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
 sky_top_color = Color(0.309804, 0.505882, 0.760784, 1)
@@ -100,6 +101,9 @@ directional_shadow_split_2 = 0.22
 directional_shadow_split_3 = 0.5
 directional_shadow_blend_splits = true
 directional_shadow_fade_start = 0.8
+
+[node name="SkyDome" type="MeshInstance3D" parent="."]
+script = ExtResource("sky_dome")
 
 [node name="NightLights" type="Node3D" parent="."]
 script = ExtResource("26")
