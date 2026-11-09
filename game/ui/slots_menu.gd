@@ -351,10 +351,13 @@ func show_spin(reels: Array[int], won: int, _stake_played: int) -> void:
 		_tween.tween_method(set_pos, run_to, settle, LAND_SECONDS) \
 			.set_delay(landing).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	_tween.set_parallel(false)
+	var stake_now := maxi(1, selected_stake())
 	_tween.tween_callback(func() -> void:
 		_held_chips = -1
 		if _won > 0:
-			_sound_call(&"play", [&"slots_win"]))
+			_sound_call(&"play", [&"slots_win"])
+		if _won >= stake_now * JACKPOT_TIMES:
+			_jackpot())
 	if _won > 0:
 		_tween.tween_property(self, "_flash", 1.0, 0.12)
 		_tween.tween_property(self, "_flash", 0.0, WIN_FLASH_SECONDS)
@@ -368,6 +371,45 @@ func show_spin(reels: Array[int], won: int, _stake_played: int) -> void:
 	# animation would refuse the next bet when it is opened.
 	if not is_open():
 		finish_animation()
+
+
+## THE JACKPOT IS A MOMENT (P8 idea F12): a win of JACKPOT_TIMES the stake or more punches a
+## banner up over the machine and showers coins from it, rather than only flashing the line.
+const JACKPOT_TIMES := 15
+
+
+func _jackpot() -> void:
+	if not is_open():
+		return
+	var fx: Control = MenuStyleScript.effects_layer(self)
+	var screen := fx.get_viewport_rect().size
+	var banner := Label.new()
+	banner.text = "JACKPOT!"
+	banner.add_theme_font_override(&"font", MenuStyleScript.title_font())
+	banner.add_theme_font_size_override(&"font_size", 120)
+	banner.add_theme_color_override(&"font_color", PaintScript.GOLD)
+	banner.add_theme_color_override(&"font_outline_color", Color(0.3, 0.1, 0.35))
+	banner.add_theme_constant_override(&"outline_size", 18)
+	banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	banner.size = Vector2(screen.x, 160)
+	banner.position = Vector2(0, screen.y * 0.3)
+	banner.pivot_offset = banner.size * 0.5
+	banner.scale = Vector2(0.4, 0.4)
+	fx.add_child(banner)
+	var tw := banner.create_tween()
+	tw.tween_property(banner, "scale", Vector2.ONE * 1.1, 0.25).set_trans(Tween.TRANS_BACK) \
+		.set_ease(Tween.EASE_OUT)
+	tw.tween_property(banner, "scale", Vector2.ONE, 0.15)
+	tw.tween_interval(1.4)
+	tw.tween_property(banner, "modulate:a", 0.0, 0.4)
+	tw.tween_callback(banner.queue_free)
+	var from := Vector2(screen.x * 0.5, screen.y * 0.45)
+	for k in 16:
+		# A fan of coins on a fixed pattern (no random generator lives under game/ui/).
+		var spread := (float(k) / 15.0 - 0.5) * 0.84
+		var drop := 0.15 + 0.3 * absf(sin(float(k) * 1.7))
+		var to := from + Vector2(spread * screen.x, drop * screen.y)
+		MenuStyleScript.fly_coin(fx, from, to, k * 0.04)
 
 
 ## WHICH OF THE SYMBOL'S PLACES ON THIS REEL'S STRIP the reel stops at. Every place carrying the
