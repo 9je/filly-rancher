@@ -89,21 +89,96 @@ func _plant_ridges() -> void:
 						picks.append(base + Vector3(rng.randf_range(-3.0, 3.0), -0.4, rng.randf_range(-3.0, 3.0)))
 	if picks.is_empty():
 		return
-	var mm := MultiMesh.new()
-	mm.transform_format = MultiMesh.TRANSFORM_3D
-	mm.use_colors = true
-	mm.mesh = _ridge_tree_mesh()
-	mm.instance_count = picks.size()
-	for i in picks.size():
-		var sz := rng.randf_range(3.2, 5.6)
-		var xf := Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(sz, sz * rng.randf_range(0.9, 1.25), sz)), picks[i])
-		mm.set_instance_transform(i, xf)
-		mm.set_instance_color(i, RIDGE_GREENS[rng.randi() % RIDGE_GREENS.size()])
-	var mmi := MultiMeshInstance3D.new()
-	mmi.name = "RidgeTrees"
-	mmi.multimesh = mm
-	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(mmi)
+	# THREE SHAPES, NOT ONE (Fable AAA round 4, #6: "one lollipop tree duplicated across every
+	# hill"): round puffs, tall cone pines (the darker greens) and double-puff broadleaves,
+	# one MultiMesh per shape.
+	var kinds: Array = [[_ridge_tree_mesh(), []], [_ridge_pine_mesh(), []], [_ridge_double_mesh(), []]]
+	for p in picks:
+		var k := 0 if rng.randf() < 0.45 else (1 if rng.randf() < 0.55 else 2)
+		(kinds[k][1] as Array).append(p)
+	for k in kinds.size():
+		var spots: Array = kinds[k][1]
+		if spots.is_empty():
+			continue
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.use_colors = true
+		mm.mesh = kinds[k][0]
+		mm.instance_count = spots.size()
+		for i in spots.size():
+			var sz := rng.randf_range(3.2, 5.6)
+			var tall := rng.randf_range(0.9, 1.25) * (1.5 if k == 1 else 1.0)
+			var xf := Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(sz, sz * tall, sz)), spots[i])
+			mm.set_instance_transform(i, xf)
+			var green: Color = RIDGE_GREENS[rng.randi() % RIDGE_GREENS.size()]
+			mm.set_instance_color(i, green.darkened(0.22) if k == 1 else green)
+		var mmi := MultiMeshInstance3D.new()
+		mmi.name = "RidgeTrees%d" % k
+		mmi.multimesh = mm
+		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(mmi)
+
+
+## A tall cone pine: two stacked cones on a stub of trunk.
+static func _ridge_pine_mesh() -> Mesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for tier: Array in [[0.5, 0.75, 0.45], [0.36, 0.62, 0.95]]:
+		var cone := CylinderMesh.new()
+		cone.top_radius = 0.0
+		cone.bottom_radius = tier[0]
+		cone.height = tier[1]
+		cone.radial_segments = 10
+		st.append_from(_tinted(cone, Color.WHITE), 0, Transform3D(Basis(), Vector3(0, tier[2], 0)))
+	var trunk := CylinderMesh.new()
+	trunk.top_radius = 0.06
+	trunk.bottom_radius = 0.09
+	trunk.height = 0.3
+	trunk.radial_segments = 6
+	st.append_from(_tinted(trunk, Color(0.55, 0.38, 0.28)), 0, Transform3D(Basis(), Vector3(0, 0.15, 0)))
+	return _ridge_finish(st)
+
+
+## A broadleaf: two overlapping puffs, one higher and smaller, on a trunk.
+static func _ridge_double_mesh() -> Mesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for puff: Array in [[0.5, Vector3(-0.18, 0.85, 0.0)], [0.4, Vector3(0.22, 1.12, 0.05)]]:
+		var sph := SphereMesh.new()
+		sph.radius = puff[0]
+		sph.height = float(puff[0]) * 1.8
+		sph.radial_segments = 12
+		sph.rings = 6
+		st.append_from(_tinted(sph, Color.WHITE), 0, Transform3D(Basis(), puff[1]))
+	var trunk := CylinderMesh.new()
+	trunk.top_radius = 0.07
+	trunk.bottom_radius = 0.1
+	trunk.height = 0.6
+	trunk.radial_segments = 6
+	st.append_from(_tinted(trunk, Color(0.55, 0.38, 0.28)), 0, Transform3D(Basis(), Vector3(0, 0.3, 0)))
+	return _ridge_finish(st)
+
+
+static func _tinted(prim: PrimitiveMesh, colour: Color) -> ArrayMesh:
+	var arr := prim.get_mesh_arrays()
+	var cols := PackedColorArray()
+	cols.resize((arr[Mesh.ARRAY_VERTEX] as PackedVector3Array).size())
+	cols.fill(colour)
+	arr[Mesh.ARRAY_COLOR] = cols
+	var m := ArrayMesh.new()
+	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+	return m
+
+
+static func _ridge_finish(st: SurfaceTool) -> Mesh:
+	var mesh := st.commit()
+	var m := StandardMaterial3D.new()
+	m.vertex_color_use_as_albedo = true
+	m.diffuse_mode = BaseMaterial3D.DIFFUSE_TOON
+	m.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+	m.roughness = 1.0
+	mesh.surface_set_material(0, m)
+	return mesh
 
 
 ## One show tree: a short trunk under a round canopy, flat-shaded in the toon band.
