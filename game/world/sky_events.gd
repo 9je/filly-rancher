@@ -190,8 +190,9 @@ func derpy_crash() -> void:
 				_say(derpy, 2.2)},
 		# A cut, not a move: dollied from the close-up the lens swept through the player's back
 		# (Fable round 4, derpy_5).
-		{"from": player.global_position - fwd * 4.0 + side * 2.0 + Vector3.UP * 3.0,
-			"to": player.global_position - fwd * 4.0 + side * 2.0 + Vector3.UP * 3.6,
+		# From the landing camera's own clear spot (round 5 check: a fresh spot behind the
+		# player put a cottage wall and the sky's glare in the frame), tilted up after her.
+		{"from": cam_side + Vector3.UP * 0.3, "to": cam_side + Vector3.UP * 0.9,
 			"look": land + Vector3.UP * 4.0, "time": 1.6, "fov": 55.0,
 			"call": func() -> void: _fly_off(derpy, land, fwd)},
 	]
