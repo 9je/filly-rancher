@@ -179,7 +179,9 @@ func _run() -> void:
 
 	if _want("hall"):
 		# The casino hall's crowd (item 56): from the door, looking in.
-		ranch.call("enter_palace", true)
+		ranch.call("get_story").call("set_flag", "palace_open")
+		var entered: bool = ranch.call("enter_palace", true)
+		print("HALL entered=%s" % entered)
 		await Boot.frames(self, 40)
 		await Boot.shot(self, out, "hall")
 		ranch.call("exit_palace", true)
