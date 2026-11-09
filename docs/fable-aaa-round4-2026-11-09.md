@@ -1,0 +1,7 @@
+# Fable AAA review, round 4 (2026-11-09, first GPU-rendered showcase, 90 images)
+
+Verdict: NOT YET. World 6, characters 5, UI 6, menus 6 (creator 4, title 8, casino 7.5), cinematics 4, cohesion 6.
+Caveat: the capture scripts timed shots in frames, authored for ~6 fps; on the GPU several frames caught mid-moves and a flash peak (fixed in ps_boot.gd, dcf4495). Real issues it found and fixed in dcf4495: Derpy fell through a gable; the opener swept through the player; the last shot dollied through the player; cinematic ponies were never toon-styled (Dash "plastic", Derpy "lower tier"); the flash covered the letterbox; the player fade lingered half-dithered.
+
+Open from its list: pony proportions and eye placement (model level); the creator reads as a web form (text field, swatch grids, Style 1 of 9 arrows, help paragraph, flat preview stage); the catch moment has no in-world beat and says Caught twice; Depot and Market read as admin panels (rule sentences, detail panel covering the grid, wrapped names); compass letters under waypoint icons, two reticles in catch_before, 6 px sign text; one lollipop tree type on every hill, hard-edged grey puddles, triangle mountains, oversized flat cloud ellipses; blackjack 3:2 line low contrast, wheel numbers tiny, slots WIN banner over the third row.
+Keep: title and loading, houses_day, night windows, the UI kit, the catch card, the casino suite and hall, Spike, letters, the Rainboom ring frame, the race guide.
