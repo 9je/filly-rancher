@@ -217,7 +217,11 @@ void fragment() {
 	// reads as a decal with dirt on it.
 	if (path_point_count > 1) {
 		float pd = path_distance(v_world_pos.xz);
-		float wobble = (value_noise(v_world_pos.xz / 2.5) - 0.5) * path_edge_noise;
+		// Two octaves: the broad wander, and a finer one so that seen from a pony's eye height
+		// the border breaks into tongues of grass and bites of dirt instead of a ruled line
+		// (Fable round 2 renders: "a hard straight seam between grass and dirt").
+		float wobble = (value_noise(v_world_pos.xz / 2.5) - 0.5) * path_edge_noise
+			+ (value_noise(v_world_pos.xz / 0.55) - 0.5) * path_edge_noise * 0.9;
 		float path = clamp(1.0 - smoothstep(path_half_width + wobble,
 			path_half_width + path_edge_softness + wobble, pd), 0.0, 1.0);
 		// A ROAD WITH WEAR IN IT, NOT A FLAT FILL (owner, 2026-10-25: "starting area is

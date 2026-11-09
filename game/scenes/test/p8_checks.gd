@@ -181,7 +181,9 @@ func _run() -> void:
 				ranch.call("_portrait_of", key, p)
 				runners.append({"uid": StringName(key), "name": ["Lark Wish", "Cobble Ribbon",
 					"Honey Muffin"][k], "happiness": [0.9, 0.5, 0.3][k], "odds": [3.2, 6.5, 11.4][k],
-					"chance": [0.28, 0.14, 0.08][k], "body": p})
+					"chance": [0.28, 0.14, 0.08][k], "body": p,
+					"coat": Color(0.96, 0.95, 0.98), "mane": [Color(0.45, 0.85, 0.95),
+					Color(0.95, 0.45, 0.62), Color(0.9, 0.3, 0.45)][k]})
 				k += 1
 			await Boot.frames(self, 30)
 			for r: Dictionary in runners:

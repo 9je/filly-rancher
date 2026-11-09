@@ -153,7 +153,8 @@ func _frame(model: Node3D) -> void:
 	var height := box.size.y
 	var head := Vector3(box.get_center().x, box.position.y + height * 0.66,
 		box.position.z + box.size.z * 0.16)
-	var dist := height * 1.55
+	# Head and withers fill the plate; 1.55 framed her whole, a figure in a coin.
+	var dist := height * 1.2
 	_camera.look_at_from_position(head + Vector3(dist * 0.5, height * 0.06, -dist * 0.86),
 		head, Vector3.UP)
 

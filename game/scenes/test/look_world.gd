@@ -80,6 +80,14 @@ func _run() -> void:
 				var fwd := -(player.get("visuals") as Node3D).global_basis.z
 				cam.global_position = at + fwd * 3.2 + Vector3(1.2, 1.7, 0)
 				cam.look_at(at + Vector3(0, 1.1, 0))
+				# The game's own camera fades whoever stands at the lens (camera_rig.gd); this
+				# probe lens does not, so a follower at its shoulder steps out of frame.
+				for body: Node in ranch.find_children("*", "CharacterBody3D", true, false):
+					var b := body as Node3D
+					if b != player and b.global_position.distance_to(cam.global_position) < 2.6:
+						var away := b.global_position - cam.global_position
+						away.y = 0.0
+						b.global_position += away.normalized() * 2.5 + (b.global_position - at).normalized() * 1.5
 			else:
 				var lens: Array = _extra[v] if _extra.has(v) else VIEWS[v]
 				cam.global_position = lens[0]

@@ -6,11 +6,11 @@
 [ext_resource type="Script" path="res://ui/swatch_grid.gd" id="4"]
 
 [sub_resource type="ProceduralSkyMaterial" id="DawnSkyMaterial"]
-sky_top_color = Color(0.55, 0.72, 0.93, 1.0)
-sky_horizon_color = Color(0.96, 0.94, 0.9, 1.0)
+sky_top_color = Color(0.36, 0.6, 0.95, 1.0)
+sky_horizon_color = Color(0.93, 0.86, 0.95, 1.0)
 sky_curve = 0.22
-ground_bottom_color = Color(0.62, 0.74, 0.58, 1.0)
-ground_horizon_color = Color(0.9, 0.92, 0.86, 1.0)
+ground_bottom_color = Color(0.36, 0.6, 0.34, 1.0)
+ground_horizon_color = Color(0.7, 0.84, 0.66, 1.0)
 sun_angle_max = 30.0
 sun_curve = 0.15
 
@@ -22,10 +22,10 @@ background_mode = 2
 sky = SubResource("DawnSky")
 ambient_light_source = 2
 ambient_light_color = Color(0.93, 0.93, 1.0, 1.0)
-ambient_light_energy = 0.32
+ambient_light_energy = 0.2
 tonemap_mode = 2
 tonemap_white = 3.0
-tonemap_exposure = 0.82
+tonemap_exposure = 0.7
 
 [node name="CreationScreen" type="CanvasLayer"]
 layer = 4
@@ -72,13 +72,13 @@ environment = SubResource("DawnEnvironment")
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="Layout/Stage/Viewport/SubViewport"]
 transform = Transform3D(0.766, -0.408, 0.5, 0, 0.774, 0.634, -0.643, -0.486, 0.593, 0, 3, 0)
 light_color = Color(1.0, 0.97, 0.92, 1.0)
-light_energy = 1.05
+light_energy = 0.9
 shadow_enabled = true
 
 [node name="FillLight" type="DirectionalLight3D" parent="Layout/Stage/Viewport/SubViewport"]
 transform = Transform3D(-0.766, 0.2, -0.61, 0, 0.95, 0.31, 0.643, 0.24, -0.73, 0, 3, 0)
 light_color = Color(0.8, 0.86, 1.0, 1.0)
-light_energy = 0.35
+light_energy = 0.22
 
 [node name="Camera3D" type="Camera3D" parent="Layout/Stage/Viewport/SubViewport"]
 transform = Transform3D(0.9995, 0, 0, 0, 0.999, -0.0312, 0, 0.0312, 0.999, 0, 1.1, 3.2)

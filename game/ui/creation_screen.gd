@@ -1007,6 +1007,9 @@ func _sync_mark() -> void:
 ## The grassy hillock she stands on (Blender-built, tools/blender_props/build_props.py), so
 ## the turntable pony is on the ground of a little world rather than floating in a void.
 ## Static: only the pony on the turntable turns.
+const STAGE_LIFT := 0.62
+
+
 func _stand_stage() -> void:
 	var path := "res://assets/models/creator_stage.glb"
 	if _turntable == null or not ResourceLoader.exists(path):
@@ -1015,7 +1018,9 @@ func _stand_stage() -> void:
 	stage.name = "Stage"
 	_turntable.get_parent().add_child(stage)
 	stage.position = _turntable.position
-	ToonStyler.style(stage, &"prop", {})
+	# Deepened: under the studio key and fill the leaf green clipped to a mint white, a snow
+	# hill under the pony (Fable round 2 renders).
+	ToonStyler.style(stage, &"prop", {}, STAGE_LIFT)
 
 
 ## THE STREAK ROW ONLY WHERE THERE IS A STREAK (PT11; playtest 2026-11-05: "mane streak is

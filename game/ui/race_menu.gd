@@ -303,7 +303,9 @@ func paint(ci: Control) -> void:
 		var mane: Color = entry.get("mane", FALLBACK_MANE)
 		var plate := Rect2(card.position + Vector2(SILKS_X, (card.size.y - PORTRAIT) * 0.5),
 			Vector2(PORTRAIT, PORTRAIT))
-		PaintScript.rounded(ci, plate, PORTRAIT * 0.5, coat.lerp(Color.WHITE, 0.55),
+		# The plate takes her MANE's colour, deepened: a coat-coloured plate lost a white pony
+		# against it (Fable round 2 renders: three white silhouettes on three white discs).
+		PaintScript.rounded(ci, plate, PORTRAIT * 0.5, mane.darkened(0.25).lerp(PaintScript.FELT, 0.35),
 			coat.darkened(0.35), 3.0)
 		var face: Texture2D = entry.get("portrait", null)
 		if face != null:

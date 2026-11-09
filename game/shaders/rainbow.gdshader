@@ -9,6 +9,9 @@ uniform float brightness : hint_range(0.0, 3.0) = 1.0;
 uniform float alpha : hint_range(0.0, 1.0) = 0.72;
 uniform int bands : hint_range(0, 7) = 7;
 uniform float flow_speed = 0.06;
+// 0 by day, 1 at full dark (night_lights.gd). At night the arc keeps its glow but thins, so it
+// hangs in the dark sky instead of sitting on it like a sticker (Fable round 2 renders).
+global uniform float night_glow;
 
 const vec3 COLORS[7] = vec3[](vec3(0.95, 0.27, 0.32), vec3(1.0, 0.58, 0.22), vec3(1.0, 0.9, 0.3),
 	vec3(0.36, 0.84, 0.4), vec3(0.3, 0.62, 0.98), vec3(0.42, 0.36, 0.9), vec3(0.7, 0.4, 0.92));
@@ -27,5 +30,5 @@ void fragment() {
 	// A slow shimmer flowing out of the Works, as if it were being poured.
 	float flow = 0.9 + 0.1 * sin((UV.x * 40.0 - TIME * flow_speed * 40.0));
 	ALBEDO = c * brightness * flow;
-	ALPHA = alpha * edge * ends * shown;
+	ALPHA = alpha * edge * ends * shown * (1.0 - 0.45 * night_glow);
 }

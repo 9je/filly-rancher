@@ -26,6 +26,7 @@ var _wait := 0.0
 var _next := 0
 var _rng := RandomNumberGenerator.new()
 var _busy := false
+var _fall_tween: Tween
 
 
 func _ready() -> void:
@@ -151,16 +152,22 @@ func derpy_crash() -> void:
 
 func _fall(derpy: Node3D, start: Vector3, land: Vector3, secs: float) -> void:
 	var tw := create_tween()
+	_fall_tween = tw
 	tw.tween_method(func(k: float) -> void:
 		if not is_instance_valid(derpy):
 			return
 		var p := start.lerp(land, k)
 		p.y += sin(k * PI) * 3.0 * (1.0 - k)
 		derpy.global_position = p
-		derpy.rotation.z = k * TAU * 1.5, 0.0, 1.0, secs).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		# Two whole tumbles, so the last frame of the fall is right way up (one and a half
+		# left her on her back: Fable round 2 renders, "two grey lumps" were her hooves).
+		derpy.rotation.z = k * TAU * 2.0, 0.0, 1.0, secs).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
 
 func _flop(derpy: Node3D, land: Vector3) -> void:
+	# The fall's last tick can land after the cut on a slow frame and undo the flop.
+	if _fall_tween != null and _fall_tween.is_valid():
+		_fall_tween.kill()
 	derpy.global_position = land
 	derpy.rotation.z = 0.0
 	derpy.rotation.x = 0.0
@@ -241,9 +248,7 @@ func _clear_line(from: Vector3, to: Vector3) -> bool:
 func sonic_rainboom() -> void:
 	_busy = true
 	var player: Node3D = _ranch().get("player")
-	var fwd := -player.global_basis.z
-	fwd.y = 0.0
-	fwd = fwd.normalized() if fwd.length() > 0.1 else Vector3.FORWARD
+	var fwd := _open_sky(player)
 	var side := fwd.cross(Vector3.UP).normalized()
 	var mid := player.global_position + fwd * 40.0 + Vector3.UP * 22.0
 	var a := mid - side * 55.0 + Vector3.UP * 5.0
@@ -282,6 +287,27 @@ func sonic_rainboom() -> void:
 		0.9, 0.0, 6.0)
 	fade.tween_callback(trail.queue_free)
 	_busy = false
+
+
+## The way to look for the boom: the player's own facing if the sky is open that way, else
+## the first turn of her that is (Fable round 2 renders: every shot was a house wall). Open
+## means the lens, its pull-back, and the streak's ends and middle all see each other.
+func _open_sky(player: Node3D) -> Vector3:
+	var base := -player.global_basis.z
+	base.y = 0.0
+	base = base.normalized() if base.length() > 0.1 else Vector3.FORWARD
+	var head := player.global_position + Vector3.UP * 1.6
+	for turn: float in [0.0, 40.0, -40.0, 80.0, -80.0, 120.0, -120.0, 160.0, -160.0]:
+		var fwd := base.rotated(Vector3.UP, deg_to_rad(turn))
+		var side := fwd.cross(Vector3.UP).normalized()
+		var eye := head - fwd * 1.5
+		var back := eye - fwd * 3.0 + Vector3.UP * 1.0
+		var mid := player.global_position + fwd * 40.0 + Vector3.UP * 22.0
+		if _clear_line(head, eye) and _clear_line(eye, back) and _clear_line(eye, mid) \
+				and _clear_line(back, mid) and _clear_line(eye, mid - side * 40.0) \
+				and _clear_line(eye, mid + side * 40.0):
+			return fwd
+	return base
 
 
 func _trail() -> MeshInstance3D:
@@ -352,13 +378,14 @@ func _ring(at: Vector3, fwd: Vector3) -> void:
 	var sm := SphereMesh.new()
 	sm.radius = 1.0
 	sm.height = 2.0
+	# Added light, unfogged: alpha-blended, the fog and a half-faded alpha turned it a brown
+	# disc in front of the sky (Fable round 2 renders).
 	var cm := StandardMaterial3D.new()
 	cm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	cm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	cm.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	cm.disable_fog = true
+	cm.no_depth_test = true
 	cm.albedo_color = Color(1.0, 0.98, 0.92, 1.0)
-	cm.emission_enabled = true
-	cm.emission = Color(1.0, 0.95, 0.85)
-	cm.emission_energy_multiplier = 4.0
 	sm.material = cm
 	core.mesh = sm
 	core.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -368,5 +395,5 @@ func _ring(at: Vector3, fwd: Vector3) -> void:
 	var ct := create_tween().set_parallel(true)
 	ct.tween_property(core, "scale", Vector3.ONE * 7.0, 0.55).set_trans(Tween.TRANS_EXPO) \
 		.set_ease(Tween.EASE_OUT)
-	ct.tween_property(cm, "albedo_color:a", 0.0, 0.8)
+	ct.tween_property(cm, "albedo_color", Color.BLACK, 0.8)
 	ct.chain().tween_callback(core.queue_free)
