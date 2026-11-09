@@ -8854,6 +8854,10 @@ func _on_pony_bloomed(inst: PonyInstance) -> void:
 		MarkComposerScript.talent_name(StringName(str(inst.stock.get("mark", {}).get("talent", ""))))])
 
 
+## How near she must be to see the first Bloom staged (idea F3); further off, the call-over.
+const BLOOM_WITNESS_M := 14.0
+
+
 func _bloom_ceremony(inst: PonyInstance) -> void:
 	var body: Node3D = null
 	for slot in _plot_slots():
@@ -8865,6 +8869,21 @@ func _bloom_ceremony(inst: PonyInstance) -> void:
 	if body == null:
 		return
 	BloomCeremonyScript.play(body)
+	# THE FIRST ONE SHE SEES IS A MOMENT (P8 idea F3): the camera comes round to her flank as
+	# her mark appears. Once; every later Bloom is the ceremony in the world, unstaged.
+	if _interactive and _game_state != null and player != null \
+			and not _game_state.story.has_flag("first_bloom_seen") \
+			and player.global_position.distance_to(body.global_position) < BLOOM_WITNESS_M:
+		_game_state.story.set_flag("first_bloom_seen")
+		var talent := MarkComposerScript.talent_name(StringName(str(inst.stock.get("mark", {}).get("talent", ""))))
+		var side := body.global_basis.x.normalized()
+		var flank := body.global_position + Vector3.UP * 1.0
+		Cinematic.shared(get_tree()).play([
+			{"from": "here", "to": flank + side * 3.4 + Vector3.UP * 0.8, "look": flank, "time": 1.6},
+			{"from": flank + side * 3.4 + Vector3.UP * 0.8, "to": flank + side * 2.2 + Vector3.UP * 0.4,
+				"look_node": body, "look_height": 1.0, "time": 2.8,
+				"caption": "%s found her mark: %s!" % [inst.display_name(), talent]},
+		], {"freeze": [player], "host": self})
 
 
 ## THE BLOOM CALLS HER OVER (P8; playtest 2026-11-08 item 22). A Drifter who Blooms while the
