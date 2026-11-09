@@ -717,13 +717,17 @@ func build_paced(pace: Callable) -> int:
 ## and the yard ran 2300 to 3700 draw calls. A prop fades out past a distance that grows with
 ## its size (a pebble well before a tree), never inside the yard, and anything as big as a
 ## barn stays on the skyline.
-const FADE_NEAREST := 70.0
+## 90 m, NOT 70, AND A WIDER MARGIN (P8 S7, playtest 2026-11-08 item 50: "distant models break
+## up: the chicken coop becomes an orange blotch"). A yard-sized prop began its dithered fade at
+## 62 m, which since the plaza plan is the walk from the pens to the homestead yard: across
+## the valley the coop stood half dissolved. The fade now starts past the town's own width.
+const FADE_NEAREST := 90.0
 const FADE_FARTHEST := 220.0
 ## Metres of fade distance per metre of the prop's longest side.
 const FADE_PER_METRE := 25.0
 ## At or over this longest side, a prop never fades.
 const FADE_NEVER_FROM := 10.0
-const FADE_MARGIN := 8.0
+const FADE_MARGIN := 12.0
 ## Under this longest side a prop casts no shadow: a pebble's or a flower's shadow is a few
 ## pixels, but each one is drawn again in every shadow cascade (the sun's passes were about
 ## 2000 of the yard's 3500 draw calls).
