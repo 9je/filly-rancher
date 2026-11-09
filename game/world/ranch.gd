@@ -9727,6 +9727,15 @@ func _ride_lift_to_factory(mode: StringName) -> void:
 		# The playthrough driver changes the scene itself (scenes/test/playthrough.gd).
 		return
 	get_tree().paused = false
+	# THE RIDE UP, SEEN (P8 idea F6): the camera rises from her past the rooftops to the sky
+	# and the rainbow, holding there a beat, before the lift's loading screen takes over.
+	if _interactive and player != null and mode == &"reveal":
+		var at := player.global_position
+		await Cinematic.shared(get_tree()).play([
+			{"from": "here", "to": at + Vector3(0, 6, 6), "look": at + Vector3.UP, "time": 1.6},
+			{"from": at + Vector3(0, 6, 6), "to": at + Vector3(0, 28, 10), "look": at + Vector3(0, 60, -80),
+				"time": 3.2, "caption": "Up to the Rainbow Factory"},
+		], {"freeze": [player], "host": self})
 	LoadingScreenScript.change_scene(get_tree(), FACTORY_SCENE, LoadingScreenScript.Look.FACTORY)
 
 
