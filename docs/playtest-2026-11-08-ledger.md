@@ -31,8 +31,8 @@ and the session transcript; screenshots in the playtest doc's folder. Status: OP
 | 23 | S3 | Catching: the multi-hit hold ("She slipped out! Hold her a little longer") was first called "just annoying". The owner then remembered you must keep looking at the pony; verdict pending. Either way, the look-at rule is never taught; it only matters on harder ponies [83]. |  | FIXED | agent S3: one clean catch; test_magic_beam |
 | 24 | S1 | A caught pony sometimes stays on the ground in the beam; it should always lift. | Beam aimed low at a wild pony | FIXED | HOLD_MIN_LIFT; test_magic_beam |
 | 25 | S3 | Always running: walking has no use. Make run the default with an optional walk, or give walking a purpose (sneaking). |  | FIXED | agent S3: walking sneaks; test_sneak_and_bait; strips shots/catch5 |
-| 26 | S7 | Invisible walls and prop snags across the map: the pen/house gap near Sweet Apple Acres [77], the lake dock and boat [98]. Needs a collision pass plus an "unstuck" pause option. |  | PARTIAL | Get unstuck in the pause menu; collision pass with S7 agent |
-| 27 | S7 | A sighting trail leads over a fence into an enclosed field (the graveyard) with no gate; the trail should follow a walkable route [78]. |  | OPEN |  |
+| 26 | S7 | Invisible walls and prop snags across the map: the pen/house gap near Sweet Apple Acres [77], the lake dock and boat [98]. Needs a collision pass plus an "unstuck" pause option. |  | PARTIAL | Get unstuck (main); jetty and canoe colliders, pen gap (S7 agent); no whole-map sweep |
+| 27 | S7 | A sighting trail leads over a fence into an enclosed field (the graveyard) with no gate; the trail should follow a walkable route [78]. |  | FIXED | S7: trail routes through region gates (Ranch.walkable_aim) |
 | 28 | S6 | TIPPING BUG IS BACK (was 05/17): Rarity pitched nose-down onto her front hooves in a crowded pen in the rain [67]. | Crowded pen, rain, Rarity, player walking near | MEASURED | stress_pen (packed Grand pen, rain then night, player walking and jumping): tip max 2.2 deg over 96 frames; no pitch onto the forehooves seen |
 | 29 | S6 | Penned ponies pile into the fence corner nearest the player, clip through each other and the fence (was 05/65) [67][99]. | Packed pen, player walking up to it | PARTIAL | stress_pen: overlap max 0.00 between residents; one frame shows Pinkie leaning over the rail at the corner nearest the player |
 | 30 | S6 | Player tail flips over the back into the mane on jump [58]; tail moves oddly while running (was 05/9). | Player jumping and running | OPEN |  |
@@ -47,31 +47,31 @@ and the session transcript; screenshots in the playtest doc's folder. Status: OP
 | 39 | S4 | Dusk lighting muddies the colours; a creator wants neutral, even light. |  | FIXED | neutral studio light; render checks2 creator |
 | 40 | S6 | Cutie mark sits too low and too far back (by the stifle, half under the wing); the show puts it larger, centred on the upper haunch [57]. |  | FIXED | mark moved to the upper haunch (render pending) |
 | 41 | S5 | Many cutie mark stamp icons still look bad. |  | FIXED | stamps restyled; sheet stamps3.png looked at |
-| 42 | S7 | The town is crowded (buildings, signs and ponies on top of each other) while the rest of the map is empty. Spread it out, but keep the Market and Depot close [60]. |  | OPEN |  |
+| 42 | S7 | The town is crowded (buildings, signs and ponies on top of each other) while the rest of the map is empty. Spread it out, but keep the Market and Depot close [60]. |  | FIXED | S7: plaza; top-down s7/town_before_after.png looked at |
 | 43 | S7 | Signs are flat and vanish edge-on (all of them); you walk through them [61][62][63]. | Walking past and into signs, edge-on | FIXED | signs stay side-on, solid; test_place_sign_fade |
 | 44 | S5 | The fingerpost has 5+ overlapping arms, a giant drooping Pens arm and a tiny unreadable one; Market and Depot are each signed twice [60][63]. |  | FIXED | fingerpost three arms |
-| 45 | S7 | A board floats detached from the building by the Tumble prompt; Favours overlaps Requests [59][60]. |  | OPEN |  |
+| 45 | S7 | A board floats detached from the building by the Tumble prompt; Favours overlaps Requests [59][60]. |  | FIXED | S7: board on its wall, one sign |
 | 46 | S7 | Arcade props (dance machine and skee-ball) stand outside the casino doing nothing [64]. |  | FIXED | arcade cabinets cut |
 | 47 | S7 | Remove the "House rules" sign outside the casino; the pony by it is dark and unlit [74]. |  | FIXED | House rules board cut |
 | 48 | S7 | Scale misses: the Sweet Apple Acres barn is tiny next to haystacks, the shed is off, the wishing well is knee-high [76][83]. |  | FIXED | barn 1.5x, hay piles, well |
 | 49 | S4 | Night lighting: blotchy stencilled tree and building shadows across house fronts and the far hill; the hill glows teal; it does not read as night [68][69]. | Night, town and far hill | FIXED | moon light + porch lamps; look_after night renders |
-| 50 | S4 | Distant models break up: the chicken coop becomes an orange blotch, trees shed floating brown fragments [88][94]. |  | OPEN |  |
+| 50 | S4 | Distant models break up: the chicken coop becomes an orange blotch, trees shed floating brown fragments [88][94]. |  | PARTIAL | S7: props fade from 90 m; the floating tree fragments not reproduced |
 | 51 | S4 | A dark shadow on the path with nothing casting it [82]. |  | FIXED | sun at night replaced by the moon; hard shadows to 60 m |
-| 52 | S7 | The house base sits crooked on the slope; casino brick base and path cut off hard against the grass [74][77]. |  | OPEN |  |
-| 53 | S7 | The pen lattice is unreadable (where one pen ends) [94]. |  | OPEN |  |
-| 54 | S7 | NPCs stand in high-traffic spots (Old Fennel in the pen gate) and their talk prompt takes over [95]; "E: talk to Tumble" shows with Tumble out of view [61]. |  | PARTIAL | companion prompt only on screen; Fennel's spot with S7 |
-| 55 | S7 | Reeds and grass by the lake are sharp shards; dock planks are flat dark slabs [98]. |  | OPEN |  |
-| 56 | S8 | The casino still looks bad: a cloned crowd (same grey-purple coat, dark mane), patrons frozen in the air or clipping, nobody plays anything. Wants an AAA reference (GTA Online Diamond Casino, Yakuza 0 / Like a Dragon casinos, Pokemon Let's Go Celadon Game Corner) [65]. (was 05/44) | Casino hall, crowd idle | FIXED | attendants on donor bodies and PonyPaint (render pending) |
+| 52 | S7 | The house base sits crooked on the slope; casino brick base and path cut off hard against the grass [74][77]. |  | FIXED | S7: levelled pads, footings, Strip kerb |
+| 53 | S7 | The pen lattice is unreadable (where one pen ends) [94]. |  | FIXED | S7: earth floors, corner posts, 4.2 m walks |
+| 54 | S7 | NPCs stand in high-traffic spots (Old Fennel in the pen gate) and their talk prompt takes over [95]; "E: talk to Tumble" shows with Tumble out of view [61]. |  | FIXED | companion prompt on screen only (main); NPC spots moved off the gates (S7) |
+| 55 | S7 | Reeds and grass by the lake are sharp shards; dock planks are flat dark slabs [98]. |  | FIXED | S7: reed cards, plank jetty |
+| 56 | S8 | The casino still looks bad: a cloned crowd (same grey-purple coat, dark mane), patrons frozen in the air or clipping, nobody plays anything. Wants an AAA reference (GTA Online Diamond Casino, Yakuza 0 / Like a Dragon casinos, Pokemon Let's Go Celadon Game Corner) [65]. (was 05/44) | Casino hall, crowd idle | FIXED | render checks4/hall.png: varied coats and manes |
 | 57 | S8 | First casino visit should waypoint to the cashier cage. |  | FIXED | cage beacon; test_palace_interior |
 | 58 | S8 | Blackjack: you cannot bet 100 (the chips set the bet instead of stacking; no max or clear); the table is mostly empty felt with text labels [66]. |  | FIXED | chips stack, Clear, Max; test_blackjack_menu |
 | 59 | S8 | Blackjack cards: clubs render as broken dots, pip layouts are wrong, corner numbers touch the edge [96]. |  | FIXED | suits from the icon set, inset index |
-| 60 | S8 | Slots: the layout is fine, the reel icons are flat clip-art with no Equestria flavour; a toast bleeds through behind the window [70]. |  | FIXED | reel symbols from the icon set |
+| 60 | S8 | Slots: the layout is fine, the reel icons are flat clip-art with no Equestria flavour; a toast bleeds through behind the window [70]. |  | FIXED | icon set reels; kit paper is opaque, so no toast shows through |
 | 61 | S8 | Race betting is the worst screen: invisible stake buttons, keyboard-only text ("Enter to play, Esc leaves"), colour-square portraits, odds spilling out of the coin, unclear dots and "by the card", a ghost prompt behind it, half the panel empty, "no chips" after 1,400 shown in slots [71]. |  | FIXED | race guide rebuilt; render checks2/race_guide.png |
 | 62 | S8 | The race board in the hall runs on its own loop (one race, then another straight away), with no names or faces [72]. |  | FIXED | tote mirrors the real race |
 | 63 | S8 | Watch the race: a cinematic for the race you bet on (reference GTA Online Inside Track) [72]. |  | FIXED | race cinematic |
 | 64 | S8 | After betting, nothing says who you backed; keep a "your pick" card and highlight her in the race. |  | FIXED | pick ringed and named |
-| 65 | S8 | The casino UI as a whole needs a reference pass with the 3D (Balatro, Red Dead Redemption 2 cards, Clubhouse Games 51, Hearthstone). |  | OPEN |  |
-| 66 | S7 | Market music is a recognisable NCS track and grating; replace it with something original or obscure. |  | OPEN |  |
+| 65 | S8 | The casino UI as a whole needs a reference pass with the 3D (Balatro, Red Dead Redemption 2 cards, Clubhouse Games 51, Hearthstone). |  | PARTIAL | felt nap and crest, chips, race guide, jackpot; dealer portrait not done |
+| 66 | S7 | Market music is a recognisable NCS track and grating; replace it with something original or obscure. |  | FIXED | S7: original Market tune (tools/make_market_tune.py); not judged by ear |
 | 67 | S10 | The loading screen still feels cheap (references: Hades, Stardew, A Short Hike). |  | FIXED | key-art loading + title (art capture pending) |
 | 68 | S5 | The Market does not read as buy-and-sell (Stardew's Pierre's shop is the reference); the window resizes as the pony list scrolls. |  | FIXED | Market named and fixed size |
 | 69 | S5 | Depot: a delivered pony lingers and animates before it goes; it should pop to coins at once. Rows swap "+bits" and "-debt" order; icons are generic shapes, not faces; no deliver-all [73][85]. |  | FIXED | portraits, coins at once, deliver all; test_depot_menu |
