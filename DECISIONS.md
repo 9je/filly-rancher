@@ -706,3 +706,45 @@ The lead takes the world, the ponies and the cinematics; an Opus agent in a work
 - Rim hills carry clumps of round trees (valley_frame.gd, random points over up-facing triangles).
 - Probe close-ups clear bystanders within 2.6 m of the probe lens; the player-flank head twist is a probe artifact (root turned, body not), not chased.
 - The sun: the dome's painted sun works (sun_probe.gd; live values show=1); the engine sun is held light-only and its sky disc shrunk, which removed the dotted ring.
+
+## 2026-11-09: Fable AAA round 3's UI items (#6, #9 and the blackjack row)
+
+An Opus agent in a worktree took the 2D surfaces again; the lead kept the world, the ponies and
+the cinematics. Calls made:
+
+- **The slot reels (#6)** are drawn in the Market pictures' hand (tools/make_icons.py): the reel
+  apple IS the Market's apples, a tilted gold shoe with nail holes and a glint, a cut gem in
+  three quarter view, the Spectra Palace's star on a plum rosette, the casino's six band rainbow
+  ending in clouds. The bell is gone for a Cloudsdale cloud with a little bolt (Slots.Symbol
+  BELL renamed CLOUD, "Cloud" on the paytable; strips and pays unchanged). Pictures fill 92 of a
+  drum cell's 100 px.
+- **The cutie mark stamps (#6)** each have their own colours (MarkComposer.PALETTE: a red apple
+  with a green leaf, a pink butterfly with a teal body) and land on the mark in them; an ink
+  recolours after. They sit on cream tiles that go gold under the pointer. The twelve plain
+  shapes (circle, square, cross, the ring that read as a gender symbol) are no longer offered:
+  eight Equestrian ones instead (horseshoe, sparkle, balloons, crown, quill, hourglass,
+  cherries, shooting star). Kindness is three butterflies' kind now and Bubbles three bubbles,
+  so a wild pony's mark of those talents changes to match. The bell talent's cone is a domed
+  bell. The plain shapes still draw, for anything that asks.
+- **The live preview** is the pony herself: while she stamps or draws, the turntable swings to
+  the nearer flank and holds four seconds. The canvas draws the stamps crisp at 128 px over the
+  64 px mark (the saved mark and the flank are unchanged at 64).
+- **One creator sheet width (#9):** the sheet is measured with every step's rows shown and held
+  at the widest. The jump was on the cutie mark step, not Markings: its ink row is the widest.
+- **The catch beat (#9):** the HUD already hid the compass, objective and lessons (they are its
+  children); the round 3 frame was the probe compositing a world still that had a HUD baked in.
+  catch_card_shot now mounts all three on a clean still and photographs them going and coming.
+- **Toasts (#9)** sit on the saddlebag: the bag card's left end, 18 px above its top, popping
+  from the left. Bottom-left rather than bottom-centre, because the bottom centre is where the
+  pony stands and where the onboarding tip lives.
+- **The title (#9):** the four rows stand on a deep plum velvet card with a gold hairline, and
+  the rows are opaque, so nothing in the key art shows through a button. The art is unchanged.
+- **The race guide (#9)** was padded by TableMenu's empty hit holders, one per row, under its
+  stage; the guide takes its clicks on the stage, so they are removed and the panel hugs its
+  cards. The printed result block under it is still text with "= = =" rules: parked.
+- **Hover on paper (#9):** the paper pill's hover warms its face to gold, thickens its edge and
+  glows; the words go deep plum. Applies to every paper button (letters, the creator).
+- **The skip hint (#9)** is a plum pill with cream 28 px words and a gold bar that fills as the
+  key is held.
+- **Blackjack:** one gold primary per row (Hit during a hand, Deal before it); Stand, Double,
+  Split, Clear and Max are the plum secondary with a gold hairline (CasinoPaint.kit_button).
