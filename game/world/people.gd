@@ -550,14 +550,16 @@ static func news_marker() -> Node3D:
 	root.name = "NewsMarker"
 	var q := MeshInstance3D.new()
 	var quad := QuadMesh.new()
-	quad.size = Vector2(0.72, 0.72)
+	# Smaller, and hidden by walls like anything else in the world (Fable AAA round 1: "the
+	# '!' speech bubbles over NPCs ... are floating UI"): a cue, not a sign drawn over the town.
+	quad.size = Vector2(0.5, 0.5)
 	q.mesh = quad
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	m.albedo_texture = _news_tex
-	m.no_depth_test = true
+	m.no_depth_test = false
 	m.fixed_size = false
 	m.render_priority = 10
 	# A townspony beside the lens needs no bubble to be found, and one would fill the screen:
