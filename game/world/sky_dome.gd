@@ -86,6 +86,9 @@ func _tick(delta: float, snap: bool) -> void:
 		# By day only (at night the light is the moon's), faded under the horizon and in murk.
 		var show := clampf(1.0 - _stars * 1.4, 0.0, 1.0) * smoothstep(-0.06, 0.04, to_sun.y)
 		_mat.set_shader_parameter(&"sun_show", show * clampf(1.3 - fog * 60.0, 0.0, 1.0))
+		if OS.has_environment("FILLY_SKY_DEBUG") and Engine.get_process_frames() % 120 == 0:
+			print("SKYDOME show=%.2f stars=%.2f fog=%.4f to_sun=%s cam=%s" % [show, _stars, fog,
+				to_sun, cam.global_position if cam != null else Vector3.INF])
 	_drift = fmod(_drift + delta / DRIFT_SECONDS, 1.0)
 	_mat.set_shader_parameter(&"drift", _drift)
 

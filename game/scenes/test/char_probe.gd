@@ -30,8 +30,10 @@ func _run() -> void:
 	root.add_child(world)
 	# ranch.tscn's Environment and Sun at DAY, as the sky rig leaves them.
 	var sky_mat := ProceduralSkyMaterial.new()
-	sky_mat.sky_top_color = Color(0.31, 0.51, 0.76)
-	sky_mat.sky_horizon_color = Color(0.72, 0.80, 0.87)
+	sky_mat.sky_top_color = SkyRigScript.sky_top(phase, WorldState.Weather.CLEAR)
+	sky_mat.sky_horizon_color = SkyRigScript.sky_horizon(phase, WorldState.Weather.CLEAR)
+	sky_mat.ground_horizon_color = SkyRigScript.ground_horizon(phase, WorldState.Weather.CLEAR)
+	sky_mat.ground_bottom_color = sky_mat.ground_horizon_color.darkened(0.4)
 	var sky := Sky.new()
 	sky.sky_material = sky_mat
 	var env := Environment.new()

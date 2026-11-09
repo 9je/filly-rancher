@@ -139,12 +139,12 @@ func test_the_agreed_palette_is_the_one_that_shipped() -> void:
 	# If one of them changes, the change was deliberate and this line changes with it.
 	assert_eq(SkyRigScript.light_color(DAY, CLEAR), Color(1.0, 0.97, 0.91))
 	assert_eq(SkyRigScript.light_color(DAWN, CLEAR), Color(1.0, 0.84, 0.68))
-	assert_eq(SkyRigScript.light_color(DUSK, CLEAR), Color(1.0, 0.62, 0.45))
-	assert_eq(SkyRigScript.light_color(NIGHT, CLEAR), Color(0.55, 0.62, 0.85))
+	assert_eq(SkyRigScript.light_color(DUSK, CLEAR), Color(1.0, 0.70, 0.52))
+	assert_eq(SkyRigScript.light_color(NIGHT, CLEAR), Color(0.64, 0.69, 0.88))
 	assert_almost_eq(SkyRigScript.light_energy(NIGHT, CLEAR), 0.38, 0.0001)
 	assert_eq(SkyRigScript.sky_top(DAY, CLEAR), Color(0.31, 0.51, 0.76))
 	assert_eq(SkyRigScript.sky_top(DAWN, CLEAR), Color(0.50, 0.62, 0.88))
-	assert_eq(SkyRigScript.sky_top(DUSK, CLEAR), Color(0.58, 0.40, 0.55))
+	assert_eq(SkyRigScript.sky_top(DUSK, CLEAR), Color(0.36, 0.32, 0.60))
 	assert_eq(SkyRigScript.sky_top(NIGHT, CLEAR), Color(0.06, 0.08, 0.18))
 
 

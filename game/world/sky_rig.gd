@@ -71,8 +71,10 @@ const AZIMUTH_WEST := -90.0
 const PHASE_LIGHT_COLORS: Array[Color] = [
 	Color(1.0, 0.84, 0.68),
 	Color(1.0, 0.97, 0.91),
-	Color(1.0, 0.62, 0.45),
-	Color(0.55, 0.62, 0.85),
+	Color(1.0, 0.70, 0.52),
+	# A little nearer neutral than it was (Fable AAA round 3, #8: "night strips character
+	# identity ... everyone converges on one blue"): still moonlight, but Spike stays purple.
+	Color(0.64, 0.69, 0.88),
 ]
 ## DAY's 1.15 is the value game/world/ranch.tscn was hand lit at, so a clear noon looks
 ## exactly like the ranch always has and every other hour is measured against it.
@@ -88,7 +90,9 @@ const PHASE_LIGHT_ENERGY: Array[float] = [0.85, 1.15, 0.72, 0.38]
 const PHASE_SKY_TOP: Array[Color] = [
 	Color(0.50, 0.62, 0.88),
 	Color(0.31, 0.51, 0.76),
-	Color(0.58, 0.40, 0.55),
+	# A cool violet zenith over a warm horizon (Fable AAA round 3, #1: "the sky is one flat
+	# mauve with no horizon band").
+	Color(0.36, 0.32, 0.60),
 	Color(0.06, 0.08, 0.18),
 ]
 ## HOW MUCH OF THE FINISHED AMBIENT IS SAMPLED OFF THE SKY, the rest coming off
@@ -133,7 +137,7 @@ const PHASE_AMBIENT_COLORS: Array[Color] = [
 	Color(0.74, 0.74, 0.90),
 	Color(0.80, 0.86, 0.94),
 	Color(0.64, 0.62, 0.88),
-	Color(0.48, 0.56, 0.80),
+	Color(0.54, 0.58, 0.78),
 ]
 ## How far the fill light is dragged toward the same cloud the sky is mixed with, so an
 ## overcast hour fills its shadows with cloud light rather than with its own clear sky. It is
@@ -155,7 +159,7 @@ const WEATHER_AMBIENT_MIX: Array[float] = [0.0, 0.4, 0.4, 0.4]
 const HORIZON_TINT: Array[Color] = [
 	Color(0.96, 0.80, 0.66),
 	Color(0.78, 0.87, 0.95),
-	Color(0.92, 0.62, 0.50),
+	Color(1.0, 0.72, 0.42),
 	Color(0.10, 0.12, 0.22),
 ]
 const HORIZON_BLEND := 0.65
