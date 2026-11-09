@@ -177,6 +177,25 @@ func _run() -> void:
 			paused = false
 			await Boot.frames(self, 10)
 
+	if _want("jump"):
+		# Item 30: the tail on a jump and its landing, side on, a frame every few ticks.
+		var cam3 := Camera3D.new()
+		ranch.add_child(cam3)
+		var side3: Vector3 = (player.get("visuals") as Node3D).global_basis.x
+		cam3.global_position = player.global_position + side3 * 4.0 + Vector3(0, 1.3, 0)
+		cam3.look_at(player.global_position + Vector3(0, 1.1, 0))
+		cam3.current = true
+		await Boot.frames(self, 6)
+		Input.action_press(&"jump")
+		await physics_frame
+		Input.action_release(&"jump")
+		for k in 12:
+			for j in 4:
+				await physics_frame
+			await Boot.shot(self, out, "jump_%02d" % k)
+		cam3.current = false
+		cam3.queue_free()
+
 	if _want("hall"):
 		# The casino hall's crowd (item 56): from the door, looking in.
 		ranch.call("get_story").call("set_flag", "palace_open")
