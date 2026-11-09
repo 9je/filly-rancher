@@ -705,12 +705,60 @@ func set_step(value: int) -> void:
 			if node != null:
 				node.visible = step == _step
 	_show_streak()
+	_style_steps()
 	MenuStyleScript.tick_page()
 	# THE CURSOR MOVES WITH THE STEP. The two steps do not share a region list (MARK has no
 	# name field or colour grids; LOOK has no ink/stamp/tool/action rows), so a cursor left
 	# on the last step's region index would either point at a hidden control or an unrelated
 	# one now sitting at that index.
 	_enter_kb_region(0)
+
+
+const STEP_PLUM := Color(0.47, 0.31, 0.64)
+const STEP_CREAM := Color(1.0, 0.97, 0.9)
+
+
+## THE STEPS ARE A TAB STRIP (owner, 2026-11-09: the kit's pill, squeezed under its own corner
+## size, folded its ends over the words, and nothing said which step she was on). Flat boxes,
+## tall enough for their radius: the step she is on is filled plum with cream words, the rest
+## are cream with a plum edge, gold-edged under the pointer.
+static func _step_box(fill: Color, edge: Color) -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = fill
+	box.border_color = edge
+	box.set_border_width_all(2)
+	box.border_width_bottom = 4
+	box.set_corner_radius_all(18)
+	box.content_margin_left = 14.0
+	box.content_margin_right = 14.0
+	box.content_margin_top = 6.0
+	box.content_margin_bottom = 8.0
+	box.anti_aliasing = true
+	return box
+
+
+func _style_steps() -> void:
+	var on := _step_box(STEP_PLUM, STEP_PLUM.darkened(0.3))
+	var off := _step_box(STEP_CREAM, STEP_PLUM.lerp(STEP_CREAM, 0.35))
+	var lit := _step_box(STEP_CREAM, MenuStyleScript.COLOR_TAB_ON.darkened(0.15))
+	for pair: Array in [[^"StepLook", Step.LOOK], [^"StepHair", Step.HAIR],
+			[^"StepMark", Step.MARK], [^"StepStyle", Step.STYLE]]:
+		var b := get_node_or_null(NodePath("Layout/Panel/Margin/Column/StepRow/" + String(pair[0]))) as Button
+		if b == null:
+			continue
+		var picked: bool = int(pair[1]) == _step
+		b.add_theme_stylebox_override(&"normal", on if picked else off)
+		b.add_theme_stylebox_override(&"hover", on if picked else lit)
+		b.add_theme_stylebox_override(&"pressed", on)
+		b.add_theme_stylebox_override(&"focus", StyleBoxEmpty.new())
+		var ink: Color = STEP_CREAM if picked else MenuStyleScript.COLOR_INK
+		for slot: StringName in [&"font_color", &"font_hover_color", &"font_pressed_color",
+				&"font_focus_color", &"font_hover_pressed_color"]:
+			b.add_theme_color_override(slot, ink)
+		b.add_theme_font_override(&"font", MenuStyleScript.title_font())
+		b.add_theme_font_size_override(&"font_size", MenuStyle.font_px(19))
+		b.add_theme_constant_override(&"outline_size", 0)
+		b.custom_minimum_size.y = 44.0
 
 
 func _wire_steps() -> void:
@@ -1175,18 +1223,31 @@ func use_talent(talent: StringName) -> void:
 	_sync_mark()
 
 
+## SURPRISE ME LIVES ON HER PICTURE, NOT IN THE STEPS (owner, 2026-11-09: "surprise me being in
+## line also reads as another configuration option"). It re-rolls the pony on the stage, so it
+## sits on the stage: a gold pill with a sparkle at the foot of the frame, over the grass.
 func _build_surprise_button() -> void:
-	var row := get_node_or_null(^"Layout/Panel/Margin/Column/StepRow") as HBoxContainer
-	if row == null:
+	var stage := get_node_or_null(^"Layout/Stage") as Control
+	if stage == null:
 		return
+	var layer := Control.new()
+	layer.name = "StageOverlay"
+	layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stage.add_child(layer)
 	var b := Button.new()
 	b.name = "Surprise"
 	b.text = "Surprise me"
 	b.focus_mode = Control.FOCUS_NONE
+	b.icon = IconSet.texture("sparkler", 48, false)
+	b.expand_icon = false
 	b.pressed.connect(func() -> void: surprise())
-	_paper_button(b)
-	b.add_theme_color_override("font_color", Color(0.55, 0.25, 0.62))
-	row.add_child(b)
+	MenuStyleScript.primary_button(b)
+	b.add_theme_font_size_override(&"font_size", MenuStyle.font_px(26))
+	b.custom_minimum_size = Vector2(250.0, 60.0)
+	layer.add_child(b)
+	b.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 28)
+	b.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	b.grow_vertical = Control.GROW_DIRECTION_BEGIN
 
 
 func _build_model() -> void:
