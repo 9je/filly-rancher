@@ -63,6 +63,20 @@ const LAND_SECONDS := 0.45
 const WIN_FLASH_SECONDS := 1.6
 const SPIN_TURNS := 3
 const REEL_LANDED_SPEED := 1.2
+## THE SPIN READS AS A SPIN (Fable AAA round 1: "slot reels show no blur"). A reel faster than
+## BLUR_FROM symbols a second smears: each symbol is drawn as a streak of BLUR_SAMPLES fading
+## copies along the distance it covers in BLUR_EXPOSURE seconds, capped at BLUR_MAX_PX.
+const BLUR_FROM := 3.0
+const BLUR_FULL := 30.0
+const BLUR_EXPOSURE := 1.0 / 30.0
+const BLUR_MAX_PX := 150.0
+const BLUR_SAMPLES := 7
+## THE STOP SNAPS AND BOUNCES: each reel brakes hard past its symbol by LAND_OVERSHOOT of a
+## cell in LAND_BRAKE seconds, then springs back onto the line in the rest of LAND_SECONDS,
+## and the symbol it lands on pops once.
+const LAND_OVERSHOOT := 0.24
+const LAND_BRAKE := 0.20
+const LAND_POP_SECONDS := 0.30
 
 signal spin_requested(stake: int)
 
@@ -85,6 +99,12 @@ var _overlay: Control = null
 var _reel_step: Array[int] = [-1, -1, -1]
 var _reel_prev: Array[float] = [0.0, 0.0, 0.0]
 var _reel_landed: Array[bool] = [true, true, true]
+## Each reel's speed in symbols a second, measured as it is painted, and the last position
+## that was measured from (the sound's own _reel_prev is read before the paint runs).
+var _reel_speed: Array[float] = [0.0, 0.0, 0.0]
+var _reel_seen: Array[float] = [0.0, 0.0, 0.0]
+## The landing pop per reel, 1.0 the moment the reel stops and down to 0.0 after.
+var _pop: Array[float] = [0.0, 0.0, 0.0]
 
 
 func _ready() -> void:
@@ -348,8 +368,11 @@ func show_spin(reels: Array[int], won: int, _stake_played: int) -> void:
 		# tweener can bind to (the old cabinet's own finding).
 		_tween.tween_method(set_pos, _reel_pos[reel], run_to, landing) \
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-		_tween.tween_method(set_pos, run_to, settle, LAND_SECONDS) \
-			.set_delay(landing).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		_tween.tween_method(set_pos, run_to, settle + LAND_OVERSHOOT, LAND_BRAKE) \
+			.set_delay(landing).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		_tween.tween_method(set_pos, settle + LAND_OVERSHOOT, settle, LAND_SECONDS - LAND_BRAKE) \
+			.set_delay(landing + LAND_BRAKE).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		_tween.tween_callback(func() -> void: _pop[reel] = 1.0).set_delay(landing + LAND_BRAKE)
 	_tween.set_parallel(false)
 	var stake_now := maxi(1, selected_stake())
 	_tween.tween_callback(func() -> void:
@@ -433,11 +456,32 @@ func show_result(lines: Array[String]) -> void:
 
 func _process(delta: float) -> void:
 	super(delta)
+	_measure_reels(delta)
 	for window: Control in _reels:
 		window.queue_redraw()
 	if _overlay != null:
 		_overlay.queue_redraw()
 	_sound_reels(delta)
+
+
+## How fast each reel is rolling, for the blur, and the landing pops fading.
+func _measure_reels(delta: float) -> void:
+	for reel: int in SlotsScript.REELS:
+		var pos: float = _reel_pos[reel]
+		if delta > 0.0:
+			# The wrap back onto the strip after a spin is a jump of whole turns, not motion:
+			# measured the short way round, it reads as standing still.
+			var size: float = float(SlotsScript.REEL_SIZE)
+			var moved: float = fposmod(pos - _reel_seen[reel] + size * 0.5, size) - size * 0.5
+			_reel_speed[reel] = absf(moved) / delta
+		_reel_seen[reel] = pos
+		_pop[reel] = maxf(0.0, _pop[reel] - delta / LAND_POP_SECONDS)
+
+
+## How blurred a reel is, 0.0 sharp to 1.0 a full streak.
+func reel_blur(reel: int) -> float:
+	var speed: float = _reel_speed[clampi(reel, 0, SlotsScript.REELS - 1)]
+	return clampf((speed - BLUR_FROM) / (BLUR_FULL - BLUR_FROM), 0.0, 1.0)
 
 
 ## ONE TICK PER SYMBOL WHILE A REEL RUNS, ONE CLUNK WHEN IT STOPS, read off the positions the
@@ -619,34 +663,118 @@ func _winning_row() -> int:
 ## lit, shaded top and bottom so it reads as a cylinder.
 func _paint_reel(reel: int, window: Control) -> void:
 	var size: Vector2 = window.size
-	window.draw_rect(Rect2(Vector2.ZERO, size), Color(0.97, 0.94, 0.86))
+	var paper := Color(0.97, 0.94, 0.86)
+	window.draw_rect(Rect2(Vector2.ZERO, size), paper)
 	var strip: Array[int] = SlotsScript.reel_strip(reel)
 	var pos: float = _reel_pos[reel]
 	var mid: float = size.y * 0.5
 	var base: int = floori(pos)
-	var speed: float = absf(pos - _reel_prev[reel])
-	for i: int in range(base - 2, base + 4):
+	var blur: float = reel_blur(reel)
+	var smear: float = minf(BLUR_MAX_PX, _reel_speed[reel] * BLUR_EXPOSURE * CELL_HEIGHT) \
+		if blur > 0.0 else 0.0
+	for i: int in range(base - 3, base + 5):
 		# Rolling down: a higher strip index sits higher in the window.
 		var y: float = mid + (pos - float(i)) * CELL_HEIGHT
 		var cell := Rect2(Vector2(0.0, y - CELL_HEIGHT * 0.5), Vector2(size.x, CELL_HEIGHT))
-		window.draw_line(Vector2(12.0, cell.position.y), Vector2(size.x - 12.0, cell.position.y),
-			Color(0.0, 0.0, 0.0, 0.08), 2.0)
+		if blur < 0.6:
+			window.draw_line(Vector2(12.0, cell.position.y), Vector2(size.x - 12.0, cell.position.y),
+				Color(0.0, 0.0, 0.0, 0.08 * (1.0 - blur / 0.6)), 2.0)
 		var box := Rect2(cell.position + Vector2(size.x * 0.5 - 40.0, 10.0), Vector2(80.0, 80.0))
 		var symbol: int = strip[posmod(i, strip.size())]
-		if speed > 0.25:
-			# A fast reel smears: the symbol drawn twice more, fainter, along its path.
-			for ghost: int in 2:
-				var off := Vector2(0.0, -CELL_HEIGHT * 0.18 * float(ghost + 1))
-				var ghost_box := Rect2(box.position + off, box.size)
-				PaintScript.draw_symbol(window, ghost_box, symbol)
-				window.draw_rect(ghost_box, Color(0.97, 0.94, 0.86, 0.55))
+		if blur > 0.0:
+			_paint_streak(window, box, symbol, smear, blur)
+			continue
+		# THE LANDING POP: the symbol that just stopped on the line swells and settles.
+		if i == roundi(pos) and _pop[reel] > 0.0:
+			var k: float = 1.0 + 0.16 * sin(_pop[reel] * PI) * _pop[reel]
+			box = Rect2(box.get_center() - box.size * k * 0.5, box.size * k)
 		PaintScript.draw_symbol(window, box, symbol)
-	# The cylinder: darker bands at the top and bottom.
-	for band: int in 6:
-		var a: float = 0.30 * (1.0 - float(band) / 6.0)
-		window.draw_rect(Rect2(0.0, 8.0 * float(band), size.x, 8.0), Color(0.1, 0.05, 0.12, a))
-		window.draw_rect(Rect2(0.0, size.y - 8.0 * float(band + 1), size.x, 8.0),
-			Color(0.1, 0.05, 0.12, a))
+	# The cylinder: a smooth shade at the top and bottom, deeper while the reel is a blur, and
+	# a soft highlight down the middle where the drum faces the light.
+	var edge: float = size.y * (0.24 + 0.10 * blur)
+	var dark := Color(0.12, 0.05, 0.14, 0.42 + 0.22 * blur)
+	var clear := Color(0.12, 0.05, 0.14, 0.0)
+	window.draw_polygon(PackedVector2Array([Vector2.ZERO, Vector2(size.x, 0.0),
+		Vector2(size.x, edge), Vector2(0.0, edge)]), PackedColorArray([dark, dark, clear, clear]))
+	window.draw_polygon(PackedVector2Array([Vector2(0.0, size.y - edge), Vector2(size.x, size.y - edge),
+		Vector2(size.x, size.y), Vector2(0.0, size.y)]), PackedColorArray([clear, clear, dark, dark]))
+	var shine := Color(1.0, 1.0, 1.0, 0.10 + 0.12 * blur)
+	var none := Color(1.0, 1.0, 1.0, 0.0)
+	window.draw_polygon(PackedVector2Array([Vector2(0.0, mid - 70.0), Vector2(size.x, mid - 70.0),
+		Vector2(size.x, mid), Vector2(0.0, mid)]), PackedColorArray([none, none, shine, shine]))
+	window.draw_polygon(PackedVector2Array([Vector2(0.0, mid), Vector2(size.x, mid),
+		Vector2(size.x, mid + 70.0), Vector2(0.0, mid + 70.0)]), PackedColorArray([shine, shine, none, none]))
+	# The drum's sides curve away: a thin shade down each edge.
+	var side := Color(0.12, 0.05, 0.14, 0.18)
+	window.draw_polygon(PackedVector2Array([Vector2.ZERO, Vector2(14.0, 0.0), Vector2(14.0, size.y),
+		Vector2(0.0, size.y)]), PackedColorArray([side, clear, clear, side]))
+	window.draw_polygon(PackedVector2Array([Vector2(size.x - 14.0, 0.0), Vector2(size.x, 0.0),
+		Vector2(size.x, size.y), Vector2(size.x - 14.0, size.y)]), PackedColorArray([clear, side, side, clear]))
+
+
+## A SYMBOL IN MOTION: the sharp picture fades as the reel speeds up and its motion streak
+## (the same picture smeared down its own column, made once per symbol) stretches along the
+## distance it covers in a frame, so a fast reel is a column of colour, not stacked stamps.
+func _paint_streak(window: Control, box: Rect2, symbol: int, smear: float, blur: float) -> void:
+	var icon: String = PaintScript.SYMBOL_ICONS[clampi(symbol, 0, PaintScript.SYMBOL_ICONS.size() - 1)]
+	if not IconSet.has(icon):
+		PaintScript.draw_symbol(window, box, symbol)
+		return
+	var c: Vector2 = box.get_center()
+	var sharp: float = 1.0 - smoothstep(0.0, 0.7, blur)
+	if sharp > 0.0:
+		var tall := Vector2(box.size.x, box.size.y * (1.0 + 0.35 * blur))
+		window.draw_texture_rect(IconSet.texture(icon, 128, false), Rect2(c - tall * 0.5, tall),
+			false, Color(1.0, 1.0, 1.0, sharp))
+	var streak := Vector2(box.size.x * (1.0 - 0.1 * blur), (box.size.y + smear) * 1.7)
+	window.draw_texture_rect(_streak_texture(icon), Rect2(c - streak * 0.5, streak), false,
+		Color(1.0, 1.0, 1.0, minf(1.0, blur * 1.6)))
+
+
+static var _streaks := {}
+
+
+## The picture smeared down its own column: the 128 px icon in a 256 px tall strip, box blurred
+## vertically over STREAK_RADIUS pixels with its colour weighted by alpha, so the soft ends fade
+## to clear rather than to a dark fringe. Made once per symbol, the first time a reel spins.
+const STREAK_RADIUS := 40
+
+
+static func _streak_texture(icon: String) -> ImageTexture:
+	if _streaks.has(icon):
+		return _streaks[icon]
+	var src: Image = IconSet.texture(icon, 128, false).get_image()
+	src.clear_mipmaps()
+	src.convert(Image.FORMAT_RGBA8)
+	var w: int = src.get_width()
+	var h: int = src.get_height() * 2
+	var top: int = src.get_height() / 2
+	var out := Image.create(w, h, false, Image.FORMAT_RGBA8)
+	var span: float = float(STREAK_RADIUS * 2 + 1)
+	for x: int in w:
+		var col: Array[Color] = []
+		col.resize(h)
+		for y: int in h:
+			var sy: int = y - top
+			var px: Color = src.get_pixel(x, sy) if sy >= 0 and sy < src.get_height() \
+				else Color(0.0, 0.0, 0.0, 0.0)
+			col[y] = Color(px.r * px.a, px.g * px.a, px.b * px.a, px.a)
+		var sum := Color(0.0, 0.0, 0.0, 0.0)
+		for y: int in range(-STREAK_RADIUS, h + STREAK_RADIUS):
+			var add: int = y + STREAK_RADIUS
+			var drop: int = y - STREAK_RADIUS - 1
+			if add >= 0 and add < h:
+				sum += col[add]
+			if drop >= 0 and drop < h:
+				sum -= col[drop]
+			if y < 0 or y >= h:
+				continue
+			var a: float = sum.a / span
+			if sum.a > 0.0001:
+				out.set_pixel(x, y, Color(sum.r / sum.a, sum.g / sum.a, sum.b / sum.a, minf(1.0, a * 1.15)))
+	var tex := ImageTexture.create_from_image(out)
+	_streaks[icon] = tex
+	return tex
 
 
 ## Over the windows: the payline and, on a win, the banner. Its own Control so it draws above

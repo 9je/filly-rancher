@@ -102,8 +102,13 @@ func _slots(tag: String) -> void:
 	menu.call("set_stake_index", 1)
 	chips = 205 - 50
 	menu.call("show_spin", [0, 2, 1] as Array[int], 0, 50)
-	for i in 30:
-		await process_frame
+	# THE SPIN AS A STRIP OF FRAMES (Fable AAA round 1: "no blur"): the blur building, each
+	# reel snapping and bouncing onto the line in turn. Times are the tween's own clock.
+	var started := Time.get_ticks_msec()
+	for at: float in [0.35, 0.70, 0.98, 1.05, 1.40, 1.80]:
+		while (Time.get_ticks_msec() - started) / 1000.0 < at and menu.call("animating"):
+			await process_frame
+		await _shot("slots_%s_spin_%03d" % [tag, roundi(at * 100.0)], 1)
 	await _shot("slots_%s_spinning" % tag, 1)
 	menu.call("finish_animation")
 	await _shot("slots_%s_loss" % tag)

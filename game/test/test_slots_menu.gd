@@ -200,3 +200,21 @@ func test_the_chips_are_big_beside_the_reels_and_nothing_in_the_row_overlaps() -
 			assert_false(boxes[a].intersects(boxes[b]), "%s and %s overlap" % [boxes[a], boxes[b]])
 	for r: Rect2 in boxes:
 		assert_lte(r.end.y, SlotsMenuScript.STAGE_HEIGHT, "%s stays on the stage" % r)
+
+
+## Fable AAA round 1: "slot reels show no blur". A reel at speed is a blur, a landed one is
+## sharp, and the snap past the line and the bounce back still end exactly on the symbol.
+func test_a_running_reel_blurs_and_a_landed_one_snaps_sharp_onto_its_symbol() -> void:
+	_menu.show_spin([2, 4, 1] as Array[int], 0, 10)
+	var tween: Tween = _menu.get("_tween")
+	tween.custom_step(0.6)
+	_menu.call("_measure_reels", 0.0)
+	tween.custom_step(1.0 / 60.0)
+	_menu.call("_measure_reels", 1.0 / 60.0)
+	assert_gt(_menu.reel_blur(0), 0.5, "the first reel is a streak before it lands")
+	_menu.finish_animation()
+	for i in 4:
+		_menu.call("_measure_reels", 1.0 / 60.0)
+	for reel: int in SlotsScript.REELS:
+		assert_eq(_menu.reel_blur(reel), 0.0, "reel %d is sharp once it stops" % reel)
+	assert_eq(_menu.payline_symbols(), [2, 4, 1] as Array[int])
