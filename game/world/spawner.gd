@@ -288,6 +288,7 @@ func populate_paced(phase: int, weather: int, pace: Callable) -> int:
 	rng.seed = spawn_seed
 
 	var slot := 0
+	var taken := _owned()
 	for marker: ZoneMarker in markers:
 		var pool := _pool_for(marker, entries, phase, weather)
 
@@ -300,13 +301,20 @@ func populate_paced(phase: int, weather: int, pace: Callable) -> int:
 		if _zoned_in_roster(marker.zone_id) == 0 and not marker.zone_id in _empty_zones:
 			_empty_zones.append(marker.zone_id)
 
-		pool = _without(pool, _owned())
+		pool = _without(pool, taken)
 		if pool.is_empty():
 			continue
+		var drawn_here := {}
 
+		# NOBODY TWICE ACROSS MARKERS (P8 suite: two wild Sweetie Belles at boot). Each marker
+		# drew from its own pool with nobody struck out of the next marker's, so a named pony
+		# zoned in two places could be drawn in both. What a marker draws is struck out of every
+		# LATER marker's pool (within one marker the table behaves as it always has).
 		var table := SpawnTableScript.new(pool, rng)
 		for i in range(marker.spawn_count):
 			var data: PonyData = table.draw()
+			if data != null and not StockPaletteScript.is_stock_id(data.id):
+				drawn_here[data.id] = true
 			if data == null:
 				push_error("Spawner: SpawnTable.draw() returned null for zone '%s' slot %d"
 					% [marker.zone_id, i])
@@ -318,6 +326,7 @@ func populate_paced(phase: int, weather: int, pace: Callable) -> int:
 			slot += 1
 			if pace.is_valid():
 				await pace.call(_spawned.size(), WORLD_PONY_BUDGET)
+		taken.merge(drawn_here)
 
 	slot = int(await _fill_stock_paced(slot, pace)) if pace.is_valid() else _fill_stock(slot)
 	_next_slot = slot
