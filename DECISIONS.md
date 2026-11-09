@@ -694,3 +694,15 @@ The lead takes the world, the ponies and the cinematics; an Opus agent in a work
 - Pony preset: band_softness 0.075 -> 0.022 (round 1 asked softer, round 2 called that "smooth-shaded"; the show is hard), outline 1.7 -> 2.6 px at 0.36 of the coat's value, rim 0.18 -> 0.12, and no cast self-shadow (cast_shadow 0): the shadow map stair-stepped across necks.
 - Toon SPECULAR 0 (no sky Fresnel sheen). Manes and tails (ToonStyler.is_hair by name) carry one crisp lighter streak.
 - Reviewer brief: fixed score anchors (2/4/6/8/10 against named toon games) so rounds compare.
+
+## 2026-11-09: Fable round 3 fixes (world, characters, cinematics)
+- Round 3 (docs/fable-aaa-round3-2026-11-09.md): NOT YET, 6/5/7/7/5/6, every area up. UI items to an Opus 5.5 worktree agent.
+- Dusk: violet zenith (0.36, 0.32, 0.60) over a gold horizon tint (1.0, 0.72, 0.42); dusk key softened to (1.0, 0.70, 0.52) at 0.72. Night moonlight (0.64, 0.69, 0.88) and fill (0.54, 0.58, 0.78), nearer neutral so characters keep their hue (checked on char_probe --phase=2/3).
+- The crowd's white stock pony: off-white coat, grey-lavender mane (was white on white).
+- The Scoop rides on the barrel (SCOOP_AT -0.42, 0.98, 0.08; scale 1.1), off the face.
+- Free plots carry a building site (rails, posts, hay bale, crate; scenery only).
+- The Rainboom shock is a hard white torus racing ahead of the rainbow ring (the puffs read as bubbles). Derpy's jaw moves on her line (PonyFace.talk_amount).
+- Clouds: twice as many, each painted on its own sheet (overlaps had sliced neighbours). Meadow patches softened (the round-3 reviewer called the hard ones "blotchy ovals").
+- Rim hills carry clumps of round trees (valley_frame.gd, random points over up-facing triangles).
+- Probe close-ups clear bystanders within 2.6 m of the probe lens; the player-flank head twist is a probe artifact (root turned, body not), not chased.
+- The sun: the dome's painted sun works (sun_probe.gd; live values show=1); the engine sun is held light-only and its sky disc shrunk, which removed the dotted ring.
