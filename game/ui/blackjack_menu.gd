@@ -478,6 +478,28 @@ func drawn_lines() -> Array[String]:
 
 # --- the paint ----------------------------------------------------------------------------------
 
+## A TABLE, NOT A GREEN RECTANGLE (P8, playtest 2026-11-08 items 58 and 65: "the table is
+## mostly empty felt with text labels"; references Red Dead's tables and Clubhouse Games): a
+## faint diamond nap in the cloth, a darker rim where the light falls off, and the Spectra
+## Palace's crest pressed into the middle of the felt.
+func _paint_felt_dressing(ci: Control) -> void:
+	var nap := Color(0.0, 0.0, 0.0, 0.05)
+	var step := 34.0
+	var x := -STAGE_HEIGHT
+	while x < STAGE_WIDTH:
+		ci.draw_line(Vector2(x, 0.0), Vector2(x + STAGE_HEIGHT, STAGE_HEIGHT), nap, 1.0, true)
+		ci.draw_line(Vector2(x + STAGE_HEIGHT, 0.0), Vector2(x, STAGE_HEIGHT), nap, 1.0, true)
+		x += step
+	for k in 6:
+		var inset := 6.0 + float(k) * 7.0
+		PaintScript.rounded(ci, Rect2(inset, inset, STAGE_WIDTH - inset * 2.0,
+			STAGE_HEIGHT - inset * 2.0), 24.0, Color(0, 0, 0, 0), Color(0.0, 0.05, 0.02, 0.07), 7.0)
+	var crest_side := 190.0
+	var crest := IconSet.texture("palace", 256, false)
+	ci.draw_texture_rect(crest, Rect2(Vector2(STAGE_WIDTH * 0.5 - crest_side * 0.5, 150.0),
+		Vector2(crest_side, crest_side)), false, Color(1.0, 1.0, 1.0, 0.12))
+
+
 func paint(ci: Control) -> void:
 	var title_font: Font = MenuStyleScript.title_font()
 	var numeral_font: Font = MenuStyleScript.numeral_font()
@@ -489,6 +511,7 @@ func paint(ci: Control) -> void:
 	# --- the felt ---------------------------------------------------------------------------
 	PaintScript.rounded(ci, Rect2(0.0, 0.0, STAGE_WIDTH, STAGE_HEIGHT), 24.0,
 		PaintScript.FELT, PaintScript.FELT_DARK, 6.0)
+	_paint_felt_dressing(ci)
 	ci.draw_arc(Vector2(STAGE_WIDTH * 0.5, -620.0), 900.0, PI * 0.30, PI * 0.70, 64,
 		PaintScript.FELT_LINE, 2.0, true)
 	if not banner_up():
