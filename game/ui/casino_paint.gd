@@ -315,6 +315,22 @@ static func button(ci: CanvasItem, rect: Rect2, caption: String, fill: Color, en
 		caption, 28, ink)
 
 
+## THE KIT'S TWO BUTTONS ON THE FELT (Fable AAA round 3, lower list: Hit, Stand, Double and
+## Split were green, red, orange and blue, "mobile"). The one move a screen is about is the
+## gold primary; every other is the plum secondary with a gold hairline, the Back button's
+## language, so a row of them reads as one family.
+const KIT_SECONDARY := Color(0.40, 0.20, 0.48)
+
+
+static func kit_button(ci: CanvasItem, rect: Rect2, caption: String, primary: bool,
+		enabled: bool, lit: bool) -> void:
+	button(ci, rect, caption, GOLD if primary else KIT_SECONDARY, enabled, lit)
+	if not primary and enabled:
+		var radius: float = minf(rect.size.y * 0.5, 22.0)
+		rounded(ci, rect.grow(-1.0), radius, Color(0, 0, 0, 0),
+			Color(GOLD, 0.95 if lit else 0.6), 2.0)
+
+
 ## THE ONE FOCUS TREATMENT IN THE WHOLE CASINO. Every focusable thing on every screen gets
 ## this and nothing else does, so a player who has learned it once has learned it everywhere.
 ## `t` is a phase in seconds the stage advances; the alpha breathes so a still screenshot and

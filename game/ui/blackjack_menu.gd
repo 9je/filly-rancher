@@ -565,14 +565,14 @@ func paint(ci: Control) -> void:
 
 	# --- the controls -------------------------------------------------------------------------
 	if hand_live():
-		PaintScript.button(ci, HIT, "Hit", Color(0.30, 0.66, 0.40), button_enabled(&"hit"),
-			is_lit(&"hit"))
-		PaintScript.button(ci, STAND, "Stand", Color(0.86, 0.30, 0.32),
-			button_enabled(&"stand"), is_lit(&"stand"))
-		PaintScript.button(ci, DOUBLE, "Double", Color(0.95, 0.62, 0.18),
-			button_enabled(&"double"), is_lit(&"double"))
-		PaintScript.button(ci, SPLIT, "Split", Color(0.42, 0.52, 0.92),
-			button_enabled(&"split"), is_lit(&"split"))
+		# One gold primary (Hit, the move a hand is made of), the rest the kit's plum.
+		PaintScript.kit_button(ci, HIT, "Hit", true, button_enabled(&"hit"), is_lit(&"hit"))
+		PaintScript.kit_button(ci, STAND, "Stand", false, button_enabled(&"stand"),
+			is_lit(&"stand"))
+		PaintScript.kit_button(ci, DOUBLE, "Double", false, button_enabled(&"double"),
+			is_lit(&"double"))
+		PaintScript.kit_button(ci, SPLIT, "Split", false, button_enabled(&"split"),
+			is_lit(&"split"))
 	else:
 		for i: int in CHIPS.size():
 			var box: Rect2 = stake_chip_rect(i)
@@ -583,14 +583,12 @@ func paint(ci: Control) -> void:
 			PaintScript.label(ci, numeral_font, Rect2(centre - Vector2(CHIP_RADIUS * 0.7,
 				14.0), Vector2(CHIP_RADIUS * 1.4, 28.0)), str(CHIPS[i]), 20,
 				Color.WHITE if i >= 2 or not usable else PaintScript.CARD_INK)
-		PaintScript.button(ci, CLEAR, "Clear", Color(0.62, 0.56, 0.66), button_enabled(&"clear"),
+		PaintScript.kit_button(ci, CLEAR, "Clear", false, button_enabled(&"clear"),
 			is_lit(&"clear"))
-		PaintScript.button(ci, MAX, "Max", Color(0.95, 0.78, 0.30), button_enabled(&"max"),
-			is_lit(&"max"))
+		PaintScript.kit_button(ci, MAX, "Max", false, button_enabled(&"max"), is_lit(&"max"))
 		var deal_text := "Deal %d" % selected_stake() if selected_stake() > 0 \
 			else ("Place a bet" if _purse() > 0 else "No chips")
-		PaintScript.button(ci, DEAL, deal_text, Color(0.95, 0.62, 0.18), can_deal(),
-			is_lit(&"deal"))
+		PaintScript.kit_button(ci, DEAL, deal_text, true, can_deal(), is_lit(&"deal"))
 		PaintScript.rounded(ci, COUNTER, 29.0, Color(0.0, 0.0, 0.0, 0.35),
 			Color(PaintScript.GOLD, 0.5), 2.0)
 		PaintScript.draw_chip_icon(ci, Rect2(COUNTER.position + Vector2(12.0, 14.0),
