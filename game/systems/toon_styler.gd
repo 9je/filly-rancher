@@ -137,6 +137,8 @@ static func style(root: Node, category: StringName = &"prop", cache: Variant = n
 					out = store.get(key)
 				if out == null:
 					out = to_toon(src as StandardMaterial3D, preset)
+					if category == &"pony":
+						_keep_pastel(out, src as StandardMaterial3D)
 					if lift != 1.0:
 						_lift(out, lift)
 					if ao != null:
@@ -177,6 +179,22 @@ static func _wear_ao(m: ShaderMaterial, ao: Texture2D) -> void:
 		if each is ShaderMaterial:
 			(each as ShaderMaterial).set_shader_parameter(&"use_ao", true)
 			(each as ShaderMaterial).set_shader_parameter(&"ao_texture", ao)
+
+
+## A PASTEL MANE STAYS ITS COLOUR IN THE SUN (playtest 2026-11-08 item 71: "Fluttershy shows a
+## white mane with no pink"). Her canon mane is a pale pink, 0.96/0.71/0.82; lit by the noon
+## sun through the tone mapper it reads as white. A flat (untextured) hair colour that pale
+## gets more of its own hue and a touch less value, so it comes out of the light as pink.
+static func _keep_pastel(m: ShaderMaterial, src: StandardMaterial3D) -> void:
+	if src.albedo_texture != null or not src.resource_name.to_lower().contains("hair"):
+		return
+	var c := src.albedo_color
+	if c.s > 0.4 or c.v < 0.75:
+		return
+	var deeper := Color.from_hsv(c.h, minf(c.s * 1.9, 0.55), c.v * 0.93, c.a)
+	for each: Variant in [m, m.get_meta(BARE_META) if m.has_meta(BARE_META) else null]:
+		if each is ShaderMaterial:
+			(each as ShaderMaterial).set_shader_parameter(&"albedo", deeper)
 
 
 ## THE WINDOWS PAINTED INTO A HOUSE'S TEXTURE (Fable AAA round 1, #1: "no window is warm"):

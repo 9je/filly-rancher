@@ -137,8 +137,8 @@ static func _tuft_mesh() -> ArrayMesh:
 	for k in 5:
 		var a := TAU * float(k) / 5.0 + 0.4
 		var out := Vector3(cos(a), 0.0, sin(a))
-		var side := Vector3(-out.z, 0.0, out.x) * 0.075
-		var tip := out * 0.16 + Vector3.UP * (0.30 + 0.08 * float(k % 3))
+		var side := Vector3(-out.z, 0.0, out.x) * 0.065
+		var tip := out * 0.13 + Vector3.UP * (0.23 + 0.07 * float(k % 3))
 		var n := (out + Vector3.UP * 0.8).normalized()
 		st.set_normal(n)
 		st.set_color(Color(0.82, 0.82, 0.82))
