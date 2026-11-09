@@ -815,7 +815,7 @@ const WILD_WOOD := Color(0.45, 0.31, 0.19)
 ## Tall enough to clear the tallest clump.
 const SIGN_BOARD_Y := 2.05
 ## The board's height (PlaceSign.build's).
-const SIGN_BOARD_H := 0.55
+const SIGN_BOARD_H := 0.72
 
 
 func _make_sign() -> Node3D:
@@ -839,7 +839,9 @@ func _make_sign() -> Node3D:
 	var board: Node3D = (load("res://world/place_sign.gd") as GDScript).new()
 	board.name = "Board"
 	sign.add_child(board)
-	board.call("build", "%d bits" % _clear_cost, PlaceSign.Icon.COIN, 1.5, SIGN_BOARD_H, 0.0, true)
+	# A COIN AND A NUMBER, BIG (Fable AAA round 4: "115 bits" was squeezed to 6 px on screen):
+	# the coin says bits, so the word goes and the number fills the board.
+	board.call("build", "%d" % _clear_cost, PlaceSign.Icon.COIN, 1.7, SIGN_BOARD_H, 0.0, true)
 	board.position = Vector3(0.0, SIGN_BOARD_Y, 0.0)
 	board.rotation = Vector3(0.0, PI * 0.5, 0.0)
 	return sign

@@ -217,13 +217,6 @@ func _process(delta: float) -> void:
 	var forward := -cam.global_transform.basis.z
 	var from: Vector3 = player.global_position if player != null and is_instance_valid(player) \
 		else cam.global_position
-	for k in _cardinals.size():
-		var cu := strip_position(bearing(forward, CARDINALS[k][1]))
-		var cl := _cardinals[k]
-		cl.visible = cu > 0.04 and cu < 0.96
-		# On the band, between the badges.
-		cl.position = Vector2(left + cu * WIDTH - cl.size.x * 0.5, TOP)
-		cl.modulate.a = clampf(minf(cu - 0.04, 0.96 - cu) / 0.1, 0.0, 1.0) * (1.0 if k < 4 else 0.85)
 	for i in places.size():
 		var node := places[i].get("node") as Node3D
 		var r := _icons[i]
@@ -264,6 +257,41 @@ func _process(delta: float) -> void:
 	else:
 		_goal_dist.visible = false
 		_goal_chevron.visible = false
+	_place_cardinals(forward, left)
+
+
+## THE LETTERS GIVE WAY TO THE BADGES (Fable AAA round 4: "W" and "SE" hidden under waypoint
+## icons). Each letter rides the band where its bearing lands, and fades out as a place's
+## badge (or the goal ring) slides over it, coming back as the badge moves on, so a letter is
+## either readable or gone, never half covered.
+## Air, in pixels, between a letter's ink and a badge's rim for the letter to show in full; it
+## is gone by the time the two touch.
+const LETTER_AIR := 10.0
+
+
+func _place_cardinals(forward: Vector3, left: float) -> void:
+	var covers: Array[float] = []
+	for r: TextureRect in _icons:
+		if r.visible and r.modulate.a > 0.2:
+			covers.append(r.position.x + ICON * 0.5)
+	if _goal_mark.visible:
+		covers.append(_goal_mark.position.x + _goal_mark.size.x * 0.5)
+	for k in _cardinals.size():
+		var cu := strip_position(bearing(forward, CARDINALS[k][1]))
+		var cl := _cardinals[k]
+		cl.visible = cu > 0.04 and cu < 0.96
+		# On the band, between the badges.
+		var cx: float = left + cu * WIDTH
+		cl.position = Vector2(cx - cl.size.x * 0.5, TOP)
+		var font := cl.get_theme_font(&"font")
+		var half: float = font.get_string_size(cl.text, HORIZONTAL_ALIGNMENT_LEFT, -1,
+			cl.get_theme_font_size(&"font_size")).x * 0.5 if font != null else 12.0
+		var touch: float = half + ICON * 0.5 + 4.0
+		var clear := 1.0
+		for x: float in covers:
+			clear = minf(clear, clampf((absf(x - cx) - touch) / LETTER_AIR, 0.0, 1.0))
+		cl.modulate.a = clampf(minf(cu - 0.04, 0.96 - cu) / 0.1, 0.0, 1.0) \
+			* (1.0 if k < 4 else 0.85) * clear
 
 
 ## THE BAND: plum, fading to nothing at both ends, with a gold hairline along its middle that

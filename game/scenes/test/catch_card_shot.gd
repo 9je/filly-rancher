@@ -71,7 +71,8 @@ func _run() -> void:
 	# The rest of the HUD as ranch.gd mounts it (Fable AAA round 3, #9: the compass and Getting
 	# started stood at full strength under the sunburst): the compass strip, the objective card
 	# and the three lessons, so the frames show the HUD stepping out for the beat. Use a --bg
-	# still with no HUD baked into it.
+	# still with no HUD baked into it, not even the crosshair (Fable AAA round 4 saw two
+	# reticles): hud_world_probe.gd writes one, sign_clean.png.
 	var compass: Control = (load("res://ui/compass.gd") as GDScript).new()
 	compass.name = "Compass"
 	hud.add_child(compass)
