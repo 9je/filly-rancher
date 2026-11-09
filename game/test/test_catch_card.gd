@@ -71,3 +71,39 @@ func test_every_icon_kind_draws() -> void:
 		add_child_autofree(ic)
 	await wait_process_frames(2)
 	assert_true(true, "no draw errors across %d kinds" % kinds.size())
+
+
+## Fable AAA round 1: "keep the data; make it a full-screen moment rather than a toast". The
+## card opens big over the middle of the screen, then settles into its corner.
+func test_a_catch_is_a_centre_moment_that_settles_into_the_corner() -> void:
+	var card := _card()
+	card.show_catch(PonyInstanceScript.create(&"fluttershy"), null)
+	await wait_process_frames(2)
+	assert_true(card.in_moment(), "it opens as the moment")
+	var panel: Control = card.get_node("Panel")
+	var tw: Tween = card.get("_tween")
+	tw.custom_step(CardScript.POP_IN + 0.05)
+	assert_gt(panel.scale.x, 1.3, "big while it is the moment")
+	var mid: Vector2 = panel.get_global_rect().get_center()
+	assert_almost_eq(mid.x, 960.0, 60.0, "near the middle of the screen: %s" % mid)
+	tw.custom_step(CardScript.MOMENT)
+	assert_false(card.in_moment(), "the moment lasts about a second and a half")
+	card.get("_tween").custom_step(CardScript.FLY + 0.05)
+	assert_almost_eq(panel.scale.x, 1.0, 0.001)
+	assert_eq(panel.position, Vector2.ZERO, "settled where the corner card always sat")
+	assert_true(card.is_showing())
+
+
+func test_any_click_skips_the_moment_to_the_corner() -> void:
+	var card := _card()
+	card.show_catch(PonyInstanceScript.create(&"twilight"), null)
+	await wait_process_frames(1)
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	card._input(click)
+	assert_false(card.in_moment(), "the click skipped it")
+	assert_eq(card.star_pop(3), 1.0, "every star is in place at once")
+	card.get("_tween").custom_step(CardScript.FLY)
+	assert_eq(card.get_node("Panel").position, Vector2.ZERO)
+	assert_true(card.is_showing(), "the card itself stays up in its corner")

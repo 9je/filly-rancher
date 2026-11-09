@@ -16,10 +16,16 @@ extends Control
 ##     race, her quirk (game/systems/pony_traits.gd), her favourite food, and how she holds
 ##     in the Scoop (magic_beam.gd's grade).
 ##
-## WHERE IT SITS: the top right corner, which nothing else on the HUD uses. Never over the
+## A CATCH IS A MOMENT FIRST (Fable AAA round 1: "keep the data; make it a full-screen moment
+## rather than a toast", after Legends Arceus' caught card). The card bursts in large at the
+## centre of the screen over a dimmed backdrop with turning rays, a shock ring and sparkles in
+## her rarity's colour, her stars pop in one at a time, and after MOMENT seconds it flies to its
+## corner. Any click skips straight to the corner, so the moment never holds up play.
+##
+## WHERE IT SETTLES: the top right corner, which nothing else on the HUD uses. Never over the
 ## crosshair (centre) or the saddlebag (bottom left); game/test_input/test_catch_card.gd
-## measures both. It slides in from the right edge, holds, and slides back out. A second
-## catch while it is up replaces it rather than queueing behind it: the newest pony is news.
+## measures both once it has settled. It holds there, then slides back out. A second catch
+## while it is up replaces it rather than queueing behind it: the newest pony is news.
 ##
 ## Built in code, like the rest of the HUD's v1 dressing (hud.gd _restyle()), so there is no
 ## scene to keep in step with this file. No external art: every icon is drawn by CatchIcon.
@@ -41,6 +47,25 @@ const RING := 6.0
 const SLIDE_IN := 0.38
 const HOLD := 4.6
 const SLIDE_OUT := 0.32
+
+## THE CENTRE MOMENT: the card swells in over POP_IN, holds at MOMENT_SCALE until MOMENT, then
+## flies to its corner over FLY. The stars pop STAR_GAP apart from STAR_FIRST.
+const POP_IN := 0.32
+const MOMENT := 1.5
+const FLY := 0.42
+const MOMENT_SCALE := 1.6
+const STAR_FIRST := 0.30
+const STAR_GAP := 0.17
+const STAR_POP := 0.28
+const DIM := Color(0.08, 0.03, 0.12, 0.62)
+const RAYS := 18
+## The burst's colour per rarity: warm gold for the common run, her tier's own hue above it.
+const BURST := {
+	PonyDataScript.Rarity.COMMON: Color(1.0, 0.86, 0.48),
+	PonyDataScript.Rarity.UNCOMMON: Color(0.62, 0.92, 0.55),
+	PonyDataScript.Rarity.RARE: Color(0.55, 0.75, 1.0),
+	PonyDataScript.Rarity.LEGENDARY: Color(1.0, 0.78, 0.22),
+}
 
 ## The HUD's own paper and ink (hud.gd CARD_FILL / INK), restated so this file stands alone.
 const FILL := Color(1.0, 0.97, 0.91, 0.96)
@@ -92,6 +117,11 @@ var _rarity := 0
 var _spin := 0.0
 var _shown_name := ""
 var _shown_traits: Array[String] = []
+## The full-screen layer behind the card during the moment, its strength, and the moment's clock.
+var _burst: Control
+var _burst_a := 0.0
+var _moment_t := 99.0
+var _in_moment := false
 
 
 func _ready() -> void:
@@ -160,6 +190,20 @@ func is_showing() -> bool:
 	return _showing and visible
 
 
+## True while the card is the big centre moment rather than the corner card.
+func in_moment() -> bool:
+	return _in_moment and visible
+
+
+## Cut the centre moment short: the card flies straight to its corner. Any click does this.
+func skip_moment() -> void:
+	if not in_moment():
+		return
+	_moment_t = 99.0
+	_stars.queue_redraw()
+	_settle(FLY * 0.6)
+
+
 ## The card's rectangle on screen, in the HUD's canvas units, at its resting place (not
 ## mid slide). For the test that keeps it off the crosshair and the saddlebag.
 func resting_rect() -> Rect2:
@@ -186,6 +230,12 @@ func has_portrait() -> bool:
 # --- building ------------------------------------------------------------------------------
 
 func _build() -> void:
+	# The burst sits under the card: a full-screen layer drawn in screen space (see _process).
+	_burst = Control.new()
+	_burst.name = "Burst"
+	_burst.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_burst.draw.connect(_draw_burst)
+	add_child(_burst)
 	_panel = PanelContainer.new()
 	_panel.name = "Panel"
 	_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -467,24 +517,82 @@ func _slide() -> void:
 		_tween.kill()
 	visible = true
 	_showing = true
+	_in_moment = true
+	_moment_t = 0.0
 	modulate.a = 1.0
-	_panel.position = Vector2(CARD_WIDTH + MARGIN + 40.0, 0.0)
+	_panel.pivot_offset = _panel.size * 0.5
+	_panel.position = _centre_spot()
+	_panel.scale = Vector2.ONE * MOMENT_SCALE * 0.55
+	_panel.modulate.a = 0.0
+	_burst_a = 0.0
 	_tween = create_tween()
-	_tween.tween_property(_panel, "position:x", 0.0, SLIDE_IN) \
+	_tween.set_parallel(true)
+	_tween.tween_property(_panel, "scale", Vector2.ONE * MOMENT_SCALE, POP_IN) \
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_tween.tween_property(_panel, "modulate:a", 1.0, POP_IN * 0.5)
+	_tween.tween_property(self, "_burst_a", 1.0, 0.18)
+	_tween.set_parallel(false)
+	_tween.tween_interval(MOMENT - POP_IN)
+	_tween.tween_callback(_settle.bind(FLY))
+
+
+## Fly from wherever the card is now to its corner, then hold and slide out as it always has.
+func _settle(seconds: float) -> void:
+	if _tween != null and _tween.is_valid():
+		_tween.kill()
+	_in_moment = false
+	_panel.modulate.a = 1.0
+	_tween = create_tween()
+	_tween.set_parallel(true)
+	_tween.tween_property(_panel, "position", Vector2.ZERO, seconds) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	_tween.tween_property(_panel, "scale", Vector2.ONE, seconds) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	_tween.tween_property(self, "_burst_a", 0.0, seconds * 0.7)
+	_tween.set_parallel(false)
 	_tween.tween_interval(HOLD)
 	_tween.tween_property(_panel, "position:x", CARD_WIDTH + MARGIN + 40.0, SLIDE_OUT) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	_tween.tween_callback(_hidden)
 
 
+## Where the panel sits, in this control's own space, for its centre to be the screen's.
+func _centre_spot() -> Vector2:
+	var screen: Vector2 = get_viewport_rect().size
+	var here: Vector2 = get_global_transform().affine_inverse() * (screen * 0.5)
+	# A touch above centre, where the eye already is, with room for the stars' pop below.
+	return here - _panel.size * 0.5 - Vector2(0.0, screen.y * 0.04)
+
+
+## ANY CLICK SKIPS THE MOMENT, and that click is spent on the skip, not on the world behind.
+func _input(event: InputEvent) -> void:
+	if not in_moment():
+		return
+	var mouse := event is InputEventMouseButton and (event as InputEventMouseButton).pressed
+	if mouse or event.is_action_pressed(&"ui_accept") or event.is_action_pressed(&"ui_cancel"):
+		skip_moment()
+		get_viewport().set_input_as_handled()
+
+
 func _hidden() -> void:
 	_showing = false
+	_in_moment = false
 	visible = false
+	_burst_a = 0.0
 	_clear_stage()
 
 
 func _process(delta: float) -> void:
+	if visible and _moment_t < 50.0:
+		_moment_t += delta
+		_stars.queue_redraw()
+	if visible:
+		# The burst covers the whole screen whatever corner this control is anchored to.
+		var g: Vector2 = get_global_transform().origin
+		_burst.position = -g
+		_burst.size = get_viewport_rect().size
+		_burst.visible = _burst_a > 0.001
+		_burst.queue_redraw()
 	if not visible or _camera == null or not _camera.has_meta(&"head"):
 		return
 	# A slow sway, so the portrait is alive rather than a pasted photo.
@@ -499,8 +607,107 @@ func _draw_stars() -> void:
 	for i in 4:
 		var c := Vector2(14.0 + i * 28.0, 14.0)
 		var on := i <= _rarity
-		CatchIconScript.star(_stars, c, 12.5, STAR_ON if on else STAR_OFF,
+		# THE STARS POP IN ONE BY ONE during the moment: grey until their turn, then a gold
+		# star that swells past its size and settles, with a ring flashing out from it.
+		var k := star_pop(i)
+		if on and k < 0.0:
+			on = false
+		var r := 12.5
+		if on and k < 1.0:
+			r *= 1.0 + 0.75 * sin(k * PI) * (1.0 - k * 0.5)
+			_stars.draw_arc(c, 12.0 + 22.0 * k, 0.0, TAU, 24, Color(STAR_ON, 0.9 * (1.0 - k)),
+				3.0 * (1.0 - k) + 0.5, true)
+		CatchIconScript.star(_stars, c, r, STAR_ON if on else STAR_OFF,
 			Color(0.62, 0.42, 0.05) if on else Color(0.70, 0.64, 0.72))
+
+
+## How far star `i` is through its pop: below 0.0 not yet, 0.0 to 1.0 popping, 1.0 settled.
+func star_pop(i: int) -> float:
+	var k := (_moment_t - STAR_FIRST - STAR_GAP * float(i)) / STAR_POP
+	return -1.0 if k < 0.0 else minf(k, 1.0)
+
+
+## THE BURST BEHIND THE MOMENT, in screen space: the world dimmed, a glow, rays turning
+## slowly out from behind the card, one shock ring and a ring of twinkling sparkles. Fixed
+## patterns only: nothing under game/ui/ draws a random number.
+func _draw_burst() -> void:
+	if _burst_a <= 0.001:
+		return
+	var a := _burst_a
+	var screen: Vector2 = _burst.size
+	var c := screen * 0.5 - Vector2(0.0, screen.y * 0.04)
+	var tint: Color = BURST.get(_rarity, BURST[PonyDataScript.Rarity.COMMON])
+	_burst.draw_rect(Rect2(Vector2.ZERO, screen), Color(DIM, DIM.a * a))
+	var reach := screen.length() * 0.6
+	var turn: float = _moment_t * 0.22 if _moment_t < 50.0 else 0.0
+	# The rays: white gold at the root, her rarity's colour along their length.
+	var warm := tint.lerp(Color(1.0, 0.95, 0.75), 0.45)
+	for i in RAYS:
+		var a0 := turn + TAU * float(i) / float(RAYS)
+		var a1 := a0 + TAU / float(RAYS) * 0.45
+		var pts := PackedVector2Array([c, c + Vector2(cos(a0), sin(a0)) * reach,
+			c + Vector2(cos(a1), sin(a1)) * reach])
+		_burst.draw_polygon(pts, PackedColorArray([Color(warm, 0.55 * a), Color(tint, 0.0),
+			Color(tint, 0.0)]))
+	# The glow: one smooth radial fan, bright behind the card and gone by the screen's edge.
+	var glow := 620.0
+	for i in 48:
+		var b0 := TAU * float(i) / 48.0
+		var b1 := TAU * float(i + 1) / 48.0
+		_burst.draw_polygon(PackedVector2Array([c, c + Vector2(cos(b0), sin(b0)) * glow,
+			c + Vector2(cos(b1), sin(b1)) * glow]), PackedColorArray([Color(warm, 0.5 * a),
+			Color(tint, 0.0), Color(tint, 0.0)]))
+	var ring_k := clampf(_moment_t / 0.55, 0.0, 1.0)
+	if ring_k < 1.0:
+		_burst.draw_arc(c, 160.0 + 720.0 * ring_k, 0.0, TAU, 96,
+			Color(1.0, 0.97, 0.85, 0.8 * (1.0 - ring_k) * a), 14.0 * (1.0 - ring_k) + 2.0, true)
+	for i in 14:
+		var ang := TAU * float(i) / 14.0 + 0.3 * float(i % 3)
+		var dist := 470.0 + 90.0 * float((i * 7) % 5) + 30.0 * sin(_moment_t * 1.5 + float(i))
+		var p := c + Vector2(cos(ang) * dist * 1.25, sin(ang) * dist * 0.7)
+		var tw := 0.5 + 0.5 * sin(_moment_t * 7.0 + float(i) * 1.9)
+		_sparkle(p, 9.0 + 9.0 * tw, Color(1.0, 0.98, 0.9, (0.35 + 0.6 * tw) * a))
+	if _moment_t > 50.0:
+		return
+	# THE WORD AND THE STARS, BIG: "Caught!" lands over the card and her rarity's stars pop
+	# under it one by one, in step with the card's own.
+	var half: float = _panel.size.y * _panel.scale.y * 0.5
+	# These two leave faster than the rays, so nothing big lingers once the card has flown.
+	a *= a
+	var font: Font = MenuStyleScript.title_font()
+	var land := clampf(_moment_t / 0.26, 0.0, 1.0)
+	var px := int(round(96.0 * (1.0 + 0.5 * (1.0 - land) * (1.0 - land))))
+	var word := "Caught!"
+	var wsize: Vector2 = font.get_string_size(word, HORIZONTAL_ALIGNMENT_LEFT, -1, px)
+	var wat := Vector2(c.x - wsize.x * 0.5, c.y - half - 44.0)
+	var wcol := Color(1.0, 0.86, 0.32, a * land)
+	_burst.draw_string_outline(font, wat, word, HORIZONTAL_ALIGNMENT_LEFT, -1, px, 22,
+		Color(0.25, 0.08, 0.3, a * land))
+	_burst.draw_string(font, wat, word, HORIZONTAL_ALIGNMENT_LEFT, -1, px, wcol)
+	for i in 4:
+		var sc := Vector2(c.x + (float(i) - 1.5) * 92.0, c.y + half + 78.0)
+		var k := star_pop(i)
+		var on := i <= _rarity and k >= 0.0
+		var r := 36.0
+		if on and k < 1.0:
+			r *= 1.0 + 0.8 * sin(k * PI) * (1.0 - k * 0.5)
+			_burst.draw_arc(sc, 34.0 + 70.0 * k, 0.0, TAU, 40, Color(1.0, 0.95, 0.7, 0.9 * (1.0 - k) * a),
+				6.0 * (1.0 - k) + 1.0, true)
+		CatchIconScript.star(_burst, sc + Vector2(0.0, 4.0), r, Color(0.1, 0.03, 0.12, 0.45 * a),
+			Color(0.0, 0.0, 0.0, 0.0))
+		if on:
+			CatchIconScript.star(_burst, sc, r, Color(STAR_ON, a), Color(0.55, 0.32, 0.02, a))
+		else:
+			CatchIconScript.star(_burst, sc, r, Color(1.0, 1.0, 1.0, 0.22 * a), Color(1.0, 1.0, 1.0, 0.5 * a))
+
+
+func _sparkle(p: Vector2, r: float, colour: Color) -> void:
+	var pts := PackedVector2Array()
+	for i in 8:
+		var ang := -PI * 0.5 + TAU * float(i) / 8.0
+		var rr := r if i % 2 == 0 else r * 0.26
+		pts.append(p + Vector2(cos(ang), sin(ang)) * rr)
+	_burst.draw_colored_polygon(pts, colour)
 
 
 func _draw_medallion() -> void:

@@ -30,6 +30,12 @@ func _play() -> void:
 	note("screenshot %s" % shots.path_join("catch_card.png"))
 	if not check(card != null and bool(card.call("is_showing")), "no catch card on screen"):
 		return
+	# THE CENTRE MOMENT COMES FIRST (Fable AAA round 1): the card is meant to be over the
+	# middle of the screen for its first second and a half. The checks below are about where
+	# it settles, so they wait for it to fly to its corner.
+	while bool(card.call("in_moment")):
+		await process_frame
+	await wait(CatchCard.FLY + 0.1)
 	if not check(bool(card.call("has_portrait")), "the card has no portrait of her"):
 		return
 	var traits: Array = card.call("shown_traits")
