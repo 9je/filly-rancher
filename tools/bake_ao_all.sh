@@ -5,7 +5,7 @@
 #   tools/bake_ao_all.sh [samples]
 set -uo pipefail
 cd "$(dirname "$0")/.."
-SAMPLES="${1:-24}"
+SAMPLES="${1:-48}"
 ok=0; bad=0
 for f in game/assets/converted/props/*.glb; do
   [ -f "$f.noao" ] || cp "$f" "$f.noao"

@@ -63,6 +63,9 @@ func _run() -> void:
 	var player: Node3D = ranch.get("player")
 	var hud: Node = ranch.get("hud")
 
+	if "--talk" in OS.get_cmdline_user_args():
+		# Past the creator, the world as a player sees it after the welcome dialogue.
+		await Boot.talk_through(self, ranch)
 	if _want("toast") and hud != null:
 		hud.call("toast", "Lark Wish moved into the pen. It is now full.")
 		await Boot.frames(self, 12)
@@ -105,6 +108,20 @@ func _run() -> void:
 			rig.set("_look_pitch", -10.0)
 			await Boot.frames(self, 20)
 
+	if _want("card"):
+		# Item 71: the caught card as a real catch shows it, read off a wild named pony.
+		var hud2: Node = ranch.get("hud")
+		var card: Node = hud2.get("_catch_card") if hud2 != null else null
+		for p: Node3D in ranch.get("spawner").call("get_spawned"):
+			var d: PonyData = p.call("get_data")
+			if card != null and d != null and not String(d.id).begins_with("stock"):
+				var inst = p.call("get_instance") if p.has_method("get_instance") else null
+				if inst == null:
+					inst = load("res://systems/pony_instance.gd").create(d.id)
+				card.call("show_catch", inst, p)
+				await Boot.frames(self, 50)
+				await Boot.shot(self, out, "catch_card_named")
+				break
 	if _want("spike"):
 		var spike: Node3D = ranch.get("spike")
 		if spike != null:

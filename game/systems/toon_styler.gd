@@ -125,14 +125,50 @@ static func style(root: Node, category: StringName = &"prop", cache: Variant = n
 						and is_placeholder((src as StandardMaterial3D).albedo_texture):
 					out = to_toon(_with_sibling_texture(src as StandardMaterial3D, root), preset)
 					store[key] = out
+				var ao: Texture2D = baked_ao(mi) if category != &"pony" else null
+				if out == null and ao != null:
+					key += ":ao"
+					out = store.get(key)
 				if out == null:
 					out = to_toon(src as StandardMaterial3D, preset)
 					if lift != 1.0:
 						_lift(out, lift)
+					if ao != null:
+						_wear_ao(out, ao)
 					store[key] = out
 				mi.set_surface_override_material(i, out)
 				touched += 1
 	return touched
+
+
+## THE MODEL'S BAKED AMBIENT OCCLUSION (P8; tools/blender_props/bake_ao.py): <model>_ao.png
+## beside the nearest .glb this mesh came out of, or null. Read once per model and remembered.
+static var _ao_maps := {}
+
+
+## Off only for a before-and-after render (look_world.gd --no-ao).
+static var ao_enabled := true
+
+
+static func baked_ao(mi: Node) -> Texture2D:
+	if not ao_enabled:
+		return null
+	var n: Node = mi
+	while n != null and not n.scene_file_path.ends_with(".glb"):
+		n = n.get_parent()
+	if n == null:
+		return null
+	var path := n.scene_file_path.get_basename() + "_ao.png"
+	if not _ao_maps.has(path):
+		_ao_maps[path] = load(path) if ResourceLoader.exists(path) else null
+	return _ao_maps[path]
+
+
+static func _wear_ao(m: ShaderMaterial, ao: Texture2D) -> void:
+	for each: Variant in [m, m.get_meta(BARE_META, null)]:
+		if each is ShaderMaterial:
+			(each as ShaderMaterial).set_shader_parameter(&"use_ao", true)
+			(each as ShaderMaterial).set_shader_parameter(&"ao_texture", ao)
 
 
 ## A TEXTURE WITH HER CUTIE MARK BAKED IN (the Mane Six's exports: CutieMark_baked). Those

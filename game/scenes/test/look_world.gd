@@ -35,6 +35,8 @@ func _initialize() -> void:
 			views = Array(a.substr(8).split(","))
 		elif a == "--small":
 			small = true
+		elif a == "--no-ao":
+			(load("res://systems/toon_styler.gd") as GDScript).set(&"ao_enabled", false)
 		elif a.begins_with("--times="):
 			times = Array(a.substr(8).split(","))
 		elif a.begins_with("--cams="):
@@ -49,6 +51,9 @@ func _initialize() -> void:
 
 func _run() -> void:
 	var ranch: Node = await Boot.boot(self)
+	if "--talk" in OS.get_cmdline_user_args():
+		# The world as a player sees it after the welcome, not under its first dialogue box.
+		await Boot.talk_through(self, ranch)
 	if small:
 		root.get_window().size = Vector2i(960, 540)
 	await Boot.frames(self, 60)
