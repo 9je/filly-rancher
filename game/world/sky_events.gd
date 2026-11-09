@@ -311,7 +311,7 @@ func sonic_rainboom() -> void:
 	# size of a hand in the frame; the boom whites the screen out and kicks the camera.
 	var shots := [
 		{"from": eye, "to": eye + side * 0.6, "look_node": dash, "look_height": 0.0,
-			"time": streak * 0.5, "fov": 30.0, "fov_to": 20.0,
+			"time": streak * 0.5, "fov": 16.0, "fov_to": 11.0,
 			"call": func() -> void: _streak(dash, trail, a, b, streak)},
 		{"from": eye, "to": eye + Vector3.UP * 0.5, "look": mid, "time": 1.8,
 			"fov": 52.0, "fov_to": 60.0, "flash": 0.55, "shake": 0.35,
