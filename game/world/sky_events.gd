@@ -16,6 +16,7 @@ const DERPY := "res://data/ponies/derpyhooves.tres"
 const DASH := "res://data/ponies/rainbowdash.tres"
 const RAINBOW_SHADER := preload("res://shaders/rainbow.gdshader")
 const BloomCeremonyScript := preload("res://world/bloom_ceremony.gd")
+const LayersScript := preload("res://world/collision_layers.gd")
 
 ## Seconds of outdoor play between shows, the first one later than the rest.
 const FIRST_GAP := Vector2(360.0, 540.0)
@@ -110,6 +111,9 @@ func derpy_crash() -> void:
 	# The landing is seen from beyond her, looking back toward the player, so nobody standing
 	# by the player is between the lens and Derpy (render check: Spike filled the frame).
 	var cam_side := land + fwd * 3.2 + side * 1.4 + Vector3.UP * 1.3
+	if not _clear_line(cam_side, land + Vector3.UP * 0.7):
+		# Something in the way from beyond her: from the player's side instead.
+		cam_side = land - fwd * 3.6 + side * 1.4 + Vector3.UP * 1.4
 	var fall := 1.7
 	var shots := [
 		{"from": "here", "to": player.global_position - fwd * 1.0 + Vector3.UP * 2.6,
@@ -189,6 +193,10 @@ func _clear_spot(around: Vector3, side: Vector3, fwd: Vector3) -> Vector3:
 	for offset: Vector3 in [side * 1.5, -side * 2.5, side * 4.0, fwd * 3.0 + side * 2.0,
 			-side * 5.0, fwd * 5.0, fwd * 2.0 - side * 4.0]:
 		var at := around + offset
+		at.y = _ground(at.x, at.z)
+		# No prop there either (render check: she came down behind the Palace's heart rail).
+		if _prop_near(at, 2.2):
+			continue
 		var free := true
 		for b in bodies:
 			if is_instance_valid(b) and Vector2(b.global_position.x - at.x,
@@ -198,6 +206,22 @@ func _clear_spot(around: Vector3, side: Vector3, fwd: Vector3) -> Vector3:
 		if free:
 			return at
 	return around + side * 1.5
+
+
+func _prop_near(at: Vector3, radius: float) -> bool:
+	var q := PhysicsShapeQueryParameters3D.new()
+	var sphere := SphereShape3D.new()
+	sphere.radius = radius
+	q.shape = sphere
+	q.transform = Transform3D(Basis.IDENTITY, at + Vector3.UP * (radius + 0.2))
+	q.collision_mask = LayersScript.PROPS
+	return not get_world_3d().direct_space_state.intersect_shape(q, 1).is_empty()
+
+
+## True when nothing solid stands between `from` and `to`.
+func _clear_line(from: Vector3, to: Vector3) -> bool:
+	var q := PhysicsRayQueryParameters3D.create(from, to, LayersScript.PROPS)
+	return get_world_3d().direct_space_state.intersect_ray(q).is_empty()
 
 
 ## Rainbow Dash breaks the sound barrier across the sky.
