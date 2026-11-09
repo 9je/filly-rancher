@@ -28,6 +28,10 @@ uniform float rim_strength : hint_range(0.0, 1.0) = 0.0;
 uniform float rim_width : hint_range(0.0, 1.0) = 0.22;
 uniform bool spectral = false;
 uniform float alpha_scissor : hint_range(0.0, 1.0) = 0.0;
+// BAKED AO (P8; tools/blender_props/bake_ao.py): the props and buildings carry Cycles ambient
+// occlusion in COLOR_0, multiplied in here by this much. A mesh with no vertex colour reads
+// white (Godot's default), so ponies and everything unbaked are untouched.
+uniform float ao_strength : hint_range(0.0, 1.0) = 0.85;
 uniform vec3 emission : source_color = vec3(0.0);
 uniform float emission_energy = 0.0;
 
@@ -124,7 +128,7 @@ void fragment() {
 	if (marking > 0) {
 		c.rgb = mix(c.rgb, marking_color.rgb, marking_mask(rest_pos));
 	}
-	vec3 rgb = c.rgb;
+	vec3 rgb = c.rgb * mix(vec3(1.0), COLOR.rgb, ao_strength);
 	if (!spectral) {
 		float lum = dot(rgb, vec3(0.299, 0.587, 0.114));
 		// Toward a slightly cool grey, not neutral: dread reads as damp, not as sepia.
