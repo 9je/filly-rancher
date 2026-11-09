@@ -33,11 +33,11 @@ and the session transcript; screenshots in the playtest doc's folder. Status: OP
 | 25 | S3 | Always running: walking has no use. Make run the default with an optional walk, or give walking a purpose (sneaking). |  | FIXED | agent S3: walking sneaks; test_sneak_and_bait; strips shots/catch5 |
 | 26 | S7 | Invisible walls and prop snags across the map: the pen/house gap near Sweet Apple Acres [77], the lake dock and boat [98]. Needs a collision pass plus an "unstuck" pause option. |  | PARTIAL | Get unstuck in the pause menu; collision pass with S7 agent |
 | 27 | S7 | A sighting trail leads over a fence into an enclosed field (the graveyard) with no gate; the trail should follow a walkable route [78]. |  | OPEN |  |
-| 28 | S6 | TIPPING BUG IS BACK (was 05/17): Rarity pitched nose-down onto her front hooves in a crowded pen in the rain [67]. | Crowded pen, rain, Rarity, player walking near | OPEN |  |
-| 29 | S6 | Penned ponies pile into the fence corner nearest the player, clip through each other and the fence (was 05/65) [67][99]. | Packed pen, player walking up to it | OPEN |  |
+| 28 | S6 | TIPPING BUG IS BACK (was 05/17): Rarity pitched nose-down onto her front hooves in a crowded pen in the rain [67]. | Crowded pen, rain, Rarity, player walking near | MEASURED | stress_pen (packed Grand pen, rain then night, player walking and jumping): tip max 2.2 deg over 96 frames; no pitch onto the forehooves seen |
+| 29 | S6 | Penned ponies pile into the fence corner nearest the player, clip through each other and the fence (was 05/65) [67][99]. | Packed pen, player walking up to it | PARTIAL | stress_pen: overlap max 0.00 between residents; one frame shows Pinkie leaning over the rail at the corner nearest the player |
 | 30 | S6 | Player tail flips over the back into the mane on jump [58]; tail moves oddly while running (was 05/9). | Player jumping and running | OPEN |  |
 | 31 | S6 | A wild pony next to an AFK player vibrated its head (look-at tracking fighting itself) [97]. |  | FIXED | test_pony_face behind-target test |
-| 32 | S6 | A pony floating in mid-air outside the pens [86]. |  | OPEN |  |
+| 32 | S6 | A pony floating in mid-air outside the pens [86]. |  | MEASURED | stress_pen: 0 frames with a resident in the air |
 | 33 | S6 | The player pony renders see-through at normal distances [69][83][95]. |  | FIXED | dither fade (render pending) |
 | 34 | S6 | The player mane is a flat cutout over one eye; NPC tails are shapeless blue blobs [63][68][76][86]. |  | FIXED | hair_center rounded normals (render pending) |
 | 35 | S6 | Spike's eyes are darker than everyone else's, with no white or highlight; Spike looks slightly see-through [82]. |  | FIXED | render checks2/spike_close.png: sclera, iris, highlight |
