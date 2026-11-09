@@ -41,5 +41,23 @@ func _run() -> void:
 		await process_frame
 	await RenderingServer.frame_post_draw
 	root.get_texture().get_image().save_png("%s/creator_stamped.png" % out)
+	# Round 4: an earth pony's 35 mane cards, in her colours, on the strip; then a coat pick
+	# caught mid-reaction (she swings round, hops, smiles at the lens).
+	screen.call("set_step", 2)
+	screen.call("set_race", 0)
+	screen.call("set_coat", 4)
+	screen.call("set_mane", 10)
+	for i in 30:
+		await process_frame
+	await RenderingServer.frame_post_draw
+	root.get_texture().get_image().save_png("%s/creator_hair_earth.png" % out)
+	screen.call("set_step", 0)
+	for i in 10:
+		await process_frame
+	screen.call("set_coat", 2)
+	for i in 14:
+		await process_frame
+	await RenderingServer.frame_post_draw
+	root.get_texture().get_image().save_png("%s/creator_react.png" % out)
 	print("CREATOR_PROBE_OK")
 	quit(0)

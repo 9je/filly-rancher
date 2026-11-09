@@ -1,9 +1,9 @@
 extends SceneTree
 ## BAKES THE CREATOR'S MANE STYLE CARDS (P8 item 37; docs/aaa-review-2026-11-08.md 2.5: "mane
 ## styles are words"; Animal Crossing draws every hairstyle as a picture of that hairstyle). For
-## each race and each of its styles (PlayerLook.styles_for), the donor body with a neutral coat
-## and a mid-tone mane, three-quarter on at the head, into
-## res://assets/ui/style_icons/mane_<race>_<index>.png. Run again when the donor list changes:
+## each race and each of its styles (PlayerLook.styles_for), the donor body in the tint keys
+## (a ginger coat, a green mane; ui/style_icon_tint.gd swaps them for hers), three-quarter on
+## at the head, into res://assets/ui/style_icons/mane_<race>_<index>.png. Run again when the donor list changes:
 ##   xvfb-run ... tools/bin/godot ... --path game -s res://scenes/test/mane_icons.gd
 const PonyVisualsScript := preload("res://actors/pony/pony_visuals.gd")
 const PonyPaintScript := preload("res://systems/pony_paint.gd")
@@ -53,8 +53,10 @@ func _run() -> void:
 				sim.active = false
 			var look := PonyLookScript.new()
 			look.donor = donor
-			look.coat = Color(0.92, 0.88, 0.95)
-			look.mane = Color(0.55, 0.38, 0.72)
+			# The tint keys (ui/style_icon_tint.gd), so the creator shows each card in her own
+			# coat and mane colours (Fable AAA round 4).
+			look.coat = StyleIconTint.KEY_COAT
+			look.mane = StyleIconTint.KEY_MANE
 			look.tail = look.mane
 			look.mane2 = look.mane
 			look.race = PlayerLookScript.RACE_NAMES[race]

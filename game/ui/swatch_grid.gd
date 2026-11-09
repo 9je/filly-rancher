@@ -49,6 +49,37 @@ var _cells: Array[Button] = []
 var _icons: Array[Texture2D] = []
 var _selected := 0
 
+## PAINT POTS, NOT SQUARES (Fable AAA round 4: "grids of square swatches with default
+## borders"): a round grid draws every plain colour cell as a disc with a gloss on it.
+var _round := false
+## The side a picture card takes (set_icons), PICTURE_SIZE unless a caller asks otherwise.
+var _picture_side := PICTURE_SIZE
+
+
+func set_round(on: bool) -> void:
+	_round = on
+	_restyle()
+	for c in _cells:
+		c.queue_redraw()
+
+
+func is_round() -> bool:
+	return _round
+
+
+## The gloss on a pot: a soft white crescent at its upper left.
+func _gloss(cell: Button) -> void:
+	if not _round or cell.icon != null:
+		return
+	var s := cell.size
+	var c := Vector2(s.x * 0.36, s.y * 0.32)
+	var pts := PackedVector2Array()
+	for k in 20:
+		var a := TAU * float(k) / 20.0
+		pts.append(c + Vector2(cos(a) * s.x * 0.15, sin(a) * s.y * 0.09).rotated(-0.6))
+	cell.draw_colored_polygon(pts, Color(1.0, 1.0, 1.0, 0.45))
+
+
 ## THE KEYBOARD CURSOR, SEPARATE FROM THE PICK. -1 when nothing outside a mouse is pointing
 ## at this grid. creation_screen.gd's own cursor sets this as she moves the highlight with
 ## the arrow keys; it is not the chosen swatch (_selected) until Enter says so.
@@ -102,6 +133,7 @@ func set_swatches(colours: Array[Color], labels: Array[String]) -> void:
 		cell.pressed.connect(func() -> void:
 			MenuStyleScript.tick_move()
 			picked.emit(index))
+		cell.draw.connect(_gloss.bind(cell))
 		_cells.append(cell)
 		add_child(cell)
 	_restyle()
@@ -109,8 +141,9 @@ func set_swatches(colours: Array[Color], labels: Array[String]) -> void:
 
 ## PICTURE CARDS (PS7 item 6): each cell shows `icons[i]` (a baked render of the option) over
 ## its swatch colour. Called after set_swatches(); an empty list makes the cells plain again.
-func set_icons(icons: Array[Texture2D]) -> void:
+func set_icons(icons: Array[Texture2D], side: Vector2 = PICTURE_SIZE) -> void:
 	_icons = icons.duplicate()
+	_picture_side = side
 	for i in _cells.size():
 		var tex: Texture2D = _icons[i] if i < _icons.size() else null
 		_cells[i].icon = tex
@@ -118,7 +151,7 @@ func set_icons(icons: Array[Texture2D]) -> void:
 		_cells[i].icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		_cells[i].vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
 		if tex != null:
-			_cells[i].custom_minimum_size = PICTURE_SIZE
+			_cells[i].custom_minimum_size = _picture_side
 	_restyle()
 
 
@@ -210,6 +243,9 @@ func _restyle() -> void:
 			box.border_color = PICK_GOLD if chosen \
 				else (HOVER_GOLD if (cursor or state == &"hover") else IDLE_PLUM)
 			box.set_corner_radius_all(CELL_RADIUS + 4)
+			var picture: bool = i < _icons.size() and _icons[i] != null
+			if _round and not picture:
+				box.set_corner_radius_all(int(CELL_SIZE.x))
 			if chosen:
 				box.shadow_color = Color(PICK_GOLD, 0.55)
 				box.shadow_size = 8

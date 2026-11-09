@@ -787,6 +787,78 @@ def _sell_all(i):
            hl=False, stroke=2.4)
 
 
+# ---- the creator's mark tools (Fable AAA round 4: an icon legend, not a help paragraph) ----
+
+@icon("tool_draw")
+def _tool_draw(i):
+    # A paintbrush laid on the diagonal, its tip wet with violet.
+    i.fill(poly([(40, 12), (52, 24), (30, 46), (18, 34)]), "wood", hl=False)
+    i.fill(poly([(18, 34), (30, 46), (26, 50), (14, 38)]), "stone", hl=False, stroke=2.4)
+    i.fill(path("M14,38 L26,50 C20,56 12,56 9,55 C8,52 8,44 14,38 Z", (8, 38, 26, 56)), "violet",
+           hl=False, stroke=2.4)
+
+
+@icon("tool_move")
+def _tool_move(i):
+    # Four arrows from a centre dot.
+    for a in range(4):
+        rad = math.radians(a * 90)
+        cx, cy = 32 + 17 * math.cos(rad), 32 + 17 * math.sin(rad)
+        px, py = -math.sin(rad), math.cos(rad)
+        tip = (32 + 25 * math.cos(rad), 32 + 25 * math.sin(rad))
+        i.fill(poly([tip, (cx + px * 8, cy + py * 8), (cx - px * 8, cy - py * 8)]), "sky",
+               hl=False, stroke=2.4)
+    i.ink("M32,18 V46 M18,32 H46", "sky", 4.5)
+    i.fill(circle(32, 32, 5), "sky", hl=False, stroke=2.4)
+
+
+@icon("tool_size")
+def _tool_size(i):
+    # A square with a handle at its corner and an arrow pulling it out.
+    i.fill(rrect(12, 24, 26, 26, 3), "cream", hl=False, stroke=2.6)
+    i.fill(rrect(33, 19, 10, 10, 2), "gold", hl=False, stroke=2.4)
+    i.ink("M40,24 L50,14", "orange", 4)
+    i.fill(poly([(53, 11), (52, 22), (42, 12)]), "orange", hl=False, stroke=2.2)
+
+
+@icon("tool_turn")
+def _tool_turn(i):
+    # A round arrow.
+    i.ink("M47,36 A16,16 0 1,1 40,19", "leaf", 6)
+    i.fill(poly([(36, 10), (50, 16), (38, 27)]), "leaf", hl=False, stroke=2.4)
+
+
+@icon("tool_undo")
+def _tool_undo(i):
+    i.ink("M22,26 H38 C46,26 50,32 50,38 C50,45 45,50 38,50 H26", "lake", 6)
+    i.fill(poly([(10, 26), (24, 15), (24, 37)]), "lake", hl=False, stroke=2.4)
+
+
+@icon("tool_clear")
+def _tool_clear(i):
+    # A wash bucket tipping out a splash.
+    i.fill(poly([(14, 22), (40, 22), (36, 50), (18, 50)]), "stone", hl=False)
+    i.ink("M14,22 H40", "stone", 3)
+    i.ink("M17,30 H38", "stone", 2)
+    i.fill(path("M42,26 C50,22 56,28 52,34 C56,38 50,46 45,42 C42,46 36,42 40,36 C36,32 38,26 42,26 Z",
+                (36, 22, 56, 46)), "sky", hl=False, stroke=2.2)
+
+
+@icon("tool_eraser")
+def _tool_eraser(i):
+    i.fill(poly([(30, 12), (52, 34), (36, 50), (14, 28)]), "pink", hl=False)
+    i.fill(poly([(14, 28), (24, 38), (16, 46), (8, 38)]), "white", hl=False, stroke=2.4)
+    i.ink("M12,52 H52", "stone", 3)
+
+
+@icon("tool_unstamp")
+def _tool_unstamp(i):
+    # A stamp's star with a cross over it.
+    i.fill(star(30, 34, 17, 0.48), "gold", hl=False)
+    i.fill(circle(45, 18, 9), "red", hl=False, stroke=2.4)
+    i.stroke("M41,14 L49,22 M49,14 L41,22", "#FFFFFF", 3)
+
+
 # ---- casino ----------------------------------------------------------------------------
 
 @icon("suit_hearts")

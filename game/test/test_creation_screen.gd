@@ -147,8 +147,9 @@ func test_the_ink_buttons_exist_and_are_wired_to_the_canvas() -> void:
 		assert_not_null(button, "ink %d has no button to press" % index)
 		if button == null:
 			continue
-		assert_eq((button as Button).text, CreationScreen.ink_name(index),
-			"the button says what the const says")
+		# A pot of the ink (Fable AAA round 4), its name as the pointer's tooltip.
+		assert_eq((button as Button).tooltip_text, CreationScreen.ink_name(index),
+			"the pot is named what the const says")
 		button.pressed.emit()
 		canvas.clear_all()
 		canvas.paint_at(Vector2.ZERO)
@@ -298,7 +299,9 @@ func test_the_mane_style_row_is_a_card_grid_carrying_the_style_names() -> void:
 	var grid := _screen.find_child("ManeStyleGrid", true, false) as SwatchGrid
 	assert_not_null(grid)
 	assert_eq(grid.cell_count(), PlayerLookScript.style_count(_screen.look().race))
-	assert_eq(grid.cell(0).text, "1")
+	# Pictures of each style, in her colours, named in a tooltip (Fable AAA round 4).
+	assert_not_null(grid.cell(0).icon, "a style card is a picture of the style")
+	assert_eq(grid.cell(0).tooltip_text, "Style 1")
 
 
 func test_clicking_a_coat_swatch_sets_that_coat_on_the_look() -> void:
@@ -439,13 +442,14 @@ func test_the_mane_style_cards_retint_when_the_mane_changes() -> void:
 	var grid := _screen.find_child("ManeStyleGrid", true, false) as SwatchGrid
 	assert_not_null(grid)
 	var palette: StockPalette = StockPaletteScript.load_player()
+	# The cards are pictures in her colours (Fable AAA round 4): the picture is recoloured.
 	_screen.set_mane(0)
-	var before: Color = (grid.cell(0).get_theme_stylebox(&"normal") as StyleBoxFlat).bg_color
-	assert_eq(before, palette.mane_at(0), "the cards open tinted by the mane she is on")
+	var before: Texture2D = grid.cell(0).icon
+	assert_not_null(before, "the cards open as pictures")
 	_screen.set_mane(1)
-	var after: Color = (grid.cell(0).get_theme_stylebox(&"normal") as StyleBoxFlat).bg_color
+	var after: Texture2D = grid.cell(0).icon
 	assert_ne(before, after, "picking a different mane has to retint the cards")
-	assert_eq(after, palette.mane_at(1), "...to the mane she actually picked")
+	assert_eq(after, _card(palette, 1), "...to the mane she actually picked")
 
 
 func test_cycle_mane_also_retints_the_mane_style_cards() -> void:
@@ -453,9 +457,15 @@ func test_cycle_mane_also_retints_the_mane_style_cards() -> void:
 	_screen.set_mane(0)
 	_screen.cycle_mane(1)
 	var palette: StockPalette = StockPaletteScript.load_player()
-	var tint: Color = (grid.cell(0).get_theme_stylebox(&"normal") as StyleBoxFlat).bg_color
-	assert_eq(tint, palette.mane_at(_screen.look().mane),
+	assert_eq(grid.cell(0).icon, _card(palette, _screen.look().mane),
 		"cycle_mane() is set_mane() with a step added; the retint has to come along with it")
+
+
+## The first style card as the screen should show it for mane `mane` on her coat.
+func _card(palette: StockPalette, mane: int) -> Texture2D:
+	var path := "res://assets/ui/style_icons/mane_%d_0.png" % _screen.look().race
+	return StyleIconTint.tinted(load(path) as Texture2D, palette.coat_at(_screen.look().coat),
+		palette.mane_at(mane))
 
 
 func test_the_kind_of_pony_row_changes_her_race_and_her_style_pool() -> void:

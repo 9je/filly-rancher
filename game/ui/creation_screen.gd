@@ -156,6 +156,9 @@ var _kb_item := 0
 var _kb_grid: SwatchGrid = null
 var _kb_button: BaseButton = null
 var _kb_on_name := false
+## The cursor's button's own normal face, put back when the cursor moves on.
+var _kb_saved_box: StyleBox = null
+var _kb_cursor_box: StyleBox = null
 
 @onready var _backdrop: Control = get_node_or_null(^"Backdrop")
 @onready var _layout: Control = get_node_or_null(^"Layout")
@@ -244,11 +247,12 @@ func _ready() -> void:
 	_build_surprise_button()
 	_pin_confirm()
 	_dot_inks()
+	_dress_round4()
 	# Mane style first on the hair step, the first thing you pick about a mane.
 	var col := get_node_or_null(^"Layout/Panel/Margin/Column") as VBoxContainer
 	var mane_label := get_node_or_null(^"Layout/Panel/Margin/Column/ManeLabel") as Control
 	if col != null and mane_label != null:
-		for n: String in ["ManeStyleLabel", "StyleRow"]:
+		for n: String in ["ManeStyleLabel", "ManeStyleScroll"]:
 			var node := col.get_node_or_null(n) as Control
 			if node != null:
 				col.move_child(node, mane_label.get_index())
@@ -530,20 +534,27 @@ func _retint_mane_style_grid() -> void:
 	var count := PlayerLookScript.style_count(race)
 	# PICTURES, NOT NUMBERS (P8 item 37): each style's own baked card
 	# (scenes/test/mane_icons.gd), when the cards are there; numbered swatches otherwise.
+	# IN HER OWN COLOURS (Fable AAA round 4): the cards are baked in the tint keys and
+	# recoloured for her coat and mane (ui/style_icon_tint.gd).
+	var coat: Color = _palette.coat_at(_look.coat if _look != null else 0)
+	var mane: Color = _palette.mane_at(mane_index)
 	var icons: Array[Texture2D] = []
 	for i in count:
 		var path := STYLE_ICONS + "mane_%d_%d.png" % [race, i]
 		if ResourceLoader.exists(path):
-			icons.append(load(path) as Texture2D)
+			icons.append(StyleIconTintScript.tinted(load(path) as Texture2D, coat, mane))
 	var pictures := icons.size() == count
-	# The card keeps her mane's colour behind the picture, and its number.
 	for i in count:
-		swatches.append(_palette.mane_at(mane_index))
-		labels.append(str(i + 1))
+		swatches.append(Color(0.97, 0.94, 0.88) if pictures else mane)
+		labels.append("" if pictures else str(i + 1))
+	# Two rows deep; the strip scrolls sideways past the last column she can see.
+	_mane_style_grid.columns = maxi(1, ceili(float(count) / 2.0)) if pictures else 7
 	_mane_style_grid.set_swatches(swatches, labels)
 	if not pictures:
 		icons.clear()
-	_mane_style_grid.set_icons(icons)
+	_mane_style_grid.set_icons(icons, STYLE_CARD)
+	for i in _mane_style_grid.cell_count():
+		_mane_style_grid.cell(i).tooltip_text = "Style %d" % (i + 1)
 
 
 ## THE FOUR ABSOLUTE SETTERS THE GRIDS CALL. cycle_*() stays and is now written in terms of
@@ -554,6 +565,9 @@ func set_coat(index: int) -> void:
 	_look.coat = posmod(index, maxi(1, _palette.coats.size()))
 	_restyle()
 	_refresh_swatches()
+	_retint_mane_style_grid()
+	_refresh_swatches()
+	react()
 
 
 func set_mane(index: int) -> void:
@@ -561,12 +575,14 @@ func set_mane(index: int) -> void:
 	_restyle()
 	_refresh_swatches()
 	_retint_mane_style_grid()
+	react()
 
 
 func set_eyes(index: int) -> void:
 	_look.eyes = posmod(index, maxi(1, _palette.eyes.size()))
 	_restyle()
 	_refresh_swatches()
+	react()
 
 
 ## THE ONE ROW THAT IS NOT A TINT: a different mesh, so the pony on the turntable is rebuilt.
@@ -576,6 +592,7 @@ func set_mane_style(index: int) -> void:
 	_show_streak()
 	_restyle()
 	_refresh_swatches()
+	react()
 
 
 ## Earth pony, pegasus or unicorn: a different set of bodies, so the style resets to the
@@ -587,6 +604,9 @@ func set_race(index: int) -> void:
 	_build_model()
 	_restyle()
 	_refresh_swatches()
+	_retint_mane_style_grid()
+	_refresh_swatches()
+	react()
 
 
 ## -1 is "same as the mane".
@@ -594,18 +614,21 @@ func set_mane2(index: int) -> void:
 	_look.mane2 = clampi(index, -1, _palette.manes.size() - 1)
 	_restyle()
 	_refresh_swatches()
+	react()
 
 
 func set_tail(index: int) -> void:
 	_look.tail = clampi(index, -1, _palette.manes.size() - 1)
 	_restyle()
 	_refresh_swatches()
+	react()
 
 
 func set_marking(index: int) -> void:
 	_look.marking = clampi(index, PonyLookScript.Marking.NONE, PonyLookScript.Marking.DAPPLES)
 	_restyle()
 	_refresh_swatches()
+	react()
 
 
 ## -1 is white.
@@ -613,12 +636,14 @@ func set_marking_colour(index: int) -> void:
 	_look.marking_colour = clampi(index, -1, _palette.coats.size() - 1)
 	_restyle()
 	_refresh_swatches()
+	react()
 
 
 func set_eye_shape(index: int) -> void:
 	_look.eye_shape = clampi(index, PonyLookScript.EyeShape.ROUND, PonyLookScript.EyeShape.SLEEPY)
 	_restyle()
 	_refresh_swatches()
+	react()
 
 
 ## -1 is nothing.
@@ -626,6 +651,7 @@ func set_accessory(index: int) -> void:
 	_look.accessory = clampi(index, -1, AccessoriesScript.count() - 1)
 	_restyle()
 	_refresh_swatches()
+	react()
 
 
 func cycle_coat(step: int) -> void:
@@ -673,8 +699,12 @@ static func ink_name(index: int) -> String:
 ## which and keeps the swatch in step.
 func set_ink(index: int) -> void:
 	_canvas.set_colour(ink_at(index))
+	_ink_index = posmod(index, maxi(1, ink_count()))
 	if _ink_swatch != null:
 		_ink_swatch.color = ink_at(index)
+	_style_inks()
+	if _canvas != null:
+		_style_tools()
 
 
 ## Take the look as it stands and hand it over. Returns whether anything happened; a second
@@ -697,7 +727,8 @@ func drawn_lines() -> Array[String]:
 	var lines: Array[String] = [TITLE, NAME_LABEL, COAT_LABEL, MANE_LABEL, MANE_STYLE_LABEL,
 		EYES_LABEL, MARK_LABEL, CONFIRM_LABEL, HINT, STEP_LOOK_LABEL, STEP_MARK_LABEL,
 		STEP_HAIR_LABEL, RACE_LABEL, MANE2_LABEL, TAIL_LABEL, SAME_AS_MANE, STEP_STYLE_LABEL,
-		MARKING_LABEL, MARKING_COLOUR_LABEL, EYE_SHAPE_LABEL, WEAR_LABEL]
+		MARKING_LABEL, MARKING_COLOUR_LABEL, EYE_SHAPE_LABEL, WEAR_LABEL, NAME_PLACEHOLDER]
+	lines.append_array(LEGEND_WORDS)
 	for i in StockPaletteScript.mane_style_count():
 		lines.append(StockPaletteScript.mane_style_label(i))
 	for id: int in MarkStampsScript.ids():
@@ -734,11 +765,11 @@ func set_step(value: int) -> void:
 ## Which of the column's rows each step shows.
 static func _step_nodes() -> Dictionary:
 	return {
-		Step.LOOK: ["NameLabel", "NameBox", "RaceLabel", "RaceGrid", "CoatLabel", "CoatGrid",
+		Step.LOOK: ["NameBox", "RaceLabel", "RaceGrid", "CoatLabel", "CoatGrid",
 			"EyesLabel", "EyesGrid"],
-		Step.HAIR: ["ManeStyleLabel", "StyleRow", "ManeLabel", "ManeGrid", "Mane2Label",
+		Step.HAIR: ["ManeStyleLabel", "ManeStyleScroll", "ManeLabel", "ManeGrid", "Mane2Label",
 			"Mane2Grid", "TailLabel", "TailGrid"],
-		Step.MARK: ["MarkLabel", "MarkCanvas", "HintLabel", "InkRow", "TalentLabel", "TalentGrid",
+		Step.MARK: ["MarkLabel", "MarkCanvas", "Legend", "InkRow", "TalentLabel", "TalentGrid",
 			"ShapeGrid", "ToolRow", "ActionRow"],
 		Step.STYLE: ["MarkingLabel", "MarkingGrid", "MarkingColourLabel", "MarkingColourGrid",
 			"EyeShapeLabel", "EyeShapeGrid", "WearLabel", "WearGrid"],
@@ -870,6 +901,8 @@ func _region_grid(region: StringName) -> SwatchGrid:
 			return _eye_shape_grid
 		&"wear":
 			return _wear_grid
+		&"mane_style":
+			return _mane_style_grid
 	return null
 
 
@@ -903,9 +936,6 @@ func _region_buttons(region: StringName) -> Array[BaseButton]:
 		&"action":
 			paths = [^"Layout/Panel/Margin/Column/ActionRow/Undo",
 				^"Layout/Panel/Margin/Column/ActionRow/Clear"]
-		&"mane_style":
-			paths = [^"Layout/Panel/Margin/Column/StyleRow/StylePrev",
-				^"Layout/Panel/Margin/Column/StyleRow/StyleNext"]
 		&"confirm":
 			paths = [^"Layout/Panel/Margin/Column/Confirm"]
 	var out: Array[BaseButton] = []
@@ -1034,17 +1064,24 @@ func _apply_kb_highlight() -> void:
 		_kb_grid.set_highlighted(-1)
 		_kb_grid = null
 	if _kb_button != null:
-		_kb_button.remove_theme_stylebox_override(&"normal")
+		# Back to the button's own face (a paper pill, a pot, a tool), not the theme's.
+		# Only if nothing restyled it meanwhile (a step tab is restyled when the step turns).
+		if _kb_button.get_theme_stylebox(&"normal") == _kb_cursor_box:
+			if _kb_saved_box != null:
+				_kb_button.add_theme_stylebox_override(&"normal", _kb_saved_box)
+			else:
+				_kb_button.remove_theme_stylebox_override(&"normal")
 		_kb_button = null
+		_kb_saved_box = null
 	if _kb_on_name and _name_box != null:
-		_name_box.remove_theme_stylebox_override(&"normal")
+		_name_box.add_theme_stylebox_override(&"normal", plaque_box(false))
 	_kb_on_name = false
 	if not _open:
 		return
 	var region := kb_region()
 	if region == &"name":
 		if _name_box != null and not _name_box.has_focus():
-			_name_box.add_theme_stylebox_override(&"normal", MenuStyleScript.field_box(true))
+			_name_box.add_theme_stylebox_override(&"normal", plaque_box(true))
 			_kb_on_name = true
 		return
 	var grid := _region_grid(region)
@@ -1059,8 +1096,10 @@ func _apply_kb_highlight() -> void:
 		# under "Your pony" (Fable AAA round 2).
 		var b := buttons[_kb_item]
 		var fill := MenuStyleScript.PILL_PLUM if _step_of(b) == _step else MenuStyleScript.PILL_CREAM
-		b.add_theme_stylebox_override(&"normal",
-			MenuStyleScript.pill_box(fill, MenuStyleScript.COLOR_TAB_ON.darkened(0.15)))
+		_kb_saved_box = b.get_theme_stylebox(&"normal") \
+			if b.has_theme_stylebox_override(&"normal") else null
+		_kb_cursor_box = MenuStyleScript.pill_box(fill, MenuStyleScript.COLOR_TAB_ON.darkened(0.15))
+		b.add_theme_stylebox_override(&"normal", _kb_cursor_box)
 		_kb_button = b
 
 
@@ -1122,7 +1161,7 @@ func show_flank() -> void:
 	if _turntable == null or not is_inside_tree():
 		return
 	var yaw: float = wrapf(_turntable.rotation.y, -PI, PI)
-	# At 0 she faces away from the lens; a quarter turn either way shows a flank, and both
+	# At 0 she faces the lens; a quarter turn either way shows a flank, and both
 	# wear the mark.
 	var target: float = PI * 0.5 if yaw >= 0.0 else -PI * 0.5
 	_drag_rest = FLANK_HOLD_SECONDS
@@ -1198,9 +1237,11 @@ func surprise(seed_value: int = -1) -> void:
 	_build_model()
 	_retint_mane_style_grid()
 	_restyle()
+	_refresh_swatches()
 	_show_streak()
 	if _step == Step.STYLE:
 		_tint_style_cards()
+	react()
 
 
 ## A GALLERY OF REAL MARKS TO START FROM (PT11; playtest 2026-11-05: "cutie mark creation has to
@@ -1444,6 +1485,7 @@ func _restyle() -> void:
 func _process(delta: float) -> void:
 	if not _open or _turntable == null:
 		return
+	_settle_react(delta)
 	if _drag_rest > 0.0:
 		_drag_rest -= delta
 		return
@@ -1504,6 +1546,7 @@ func _refresh_swatches() -> void:
 		_eyes_grid.set_selected(_look.eyes)
 	if _mane_style_grid != null:
 		_mane_style_grid.set_selected(_look.mane_style)
+		_show_style_pick()
 	var style_name := get_node_or_null(^"Layout/Panel/Margin/Column/StyleRow/StyleName") as Label
 	if style_name != null:
 		style_name.text = "Style %d of %d" % [_look.mane_style + 1,
@@ -1522,3 +1565,370 @@ func _refresh_swatches() -> void:
 		_eye_shape_grid.set_selected(_look.eye_shape)
 	if _wear_grid != null:
 		_wear_grid.set_selected(_look.accessory + 1)
+
+# --- the boutique's dressing (Fable AAA round 4) ---------------------------------------------
+##
+## THE CREATOR WAS "A WEB FORM" (creator 4/10: a plain name field, square swatch grids, "Style
+## 1 of 9" with arrows, a paragraph of help, brush sizes as "1 2 4 8"). Each of those is
+## dressed here, after the scene's nodes are built and wired, so every tested method and every
+## keyboard region keeps its wire: the name is a gold-rimmed plaque, the colours are round pots,
+## the mane styles are a strip of pictures of each style in her own colours, the help is four
+## pictures with a word each (the full sentence stays as the canvas's tooltip), the inks are
+## pots, the brushes are dots of their size, and the tools carry their pictures.
+
+const NAME_PLACEHOLDER := "Name your pony"
+const LEGEND: Array = [["tool_draw", "Draw"], ["tool_move", "Move"], ["tool_size", "Size"],
+	["tool_turn", "Turn"]]
+const LEGEND_WORDS: Array[String] = ["Draw", "Move", "Size", "Turn"]
+const STYLE_CARD := Vector2(92.0, 92.0)
+## Brush radius (MarkPaint.BRUSHES) to the dot drawn on its button, in pixels across.
+const BRUSH_DOTS := {1: 6, 2: 11, 4: 17, 8: 26}
+const POT_PX := 44
+const TOOL_ICON_PX := 34
+
+var _ink_index := 0
+var _brush_px := 0
+
+
+func _dress_round4() -> void:
+	_plaque_name()
+	_mane_style_strip()
+	_legend()
+	_pot_inks()
+	_dot_brushes()
+	_icon_actions()
+	for g: SwatchGrid in [_coat_grid, _mane_grid, _eyes_grid, _mane2_grid, _tail_grid,
+			_marking_colour_grid]:
+		if g != null:
+			g.set_round(true)
+
+
+## The name on a plaque: cream, a gold rim, her name large and centred in the title face.
+static func plaque_box(lit: bool) -> StyleBoxFlat:
+	var b := StyleBoxFlat.new()
+	b.bg_color = Color(1.0, 0.97, 0.90)
+	b.border_color = MenuStyleScript.COLOR_TAB_ON.darkened(0.1) if lit \
+		else Color(0.86, 0.66, 0.30)
+	b.set_border_width_all(4 if lit else 3)
+	b.border_width_bottom = 6
+	b.set_corner_radius_all(30)
+	b.content_margin_left = 26.0
+	b.content_margin_right = 26.0
+	b.content_margin_top = 8.0
+	b.content_margin_bottom = 10.0
+	b.shadow_color = Color(0.36, 0.16, 0.42, 0.25)
+	b.shadow_size = 6
+	b.shadow_offset = Vector2(0.0, 3.0)
+	b.anti_aliasing = true
+	return b
+
+
+func _plaque_name() -> void:
+	if _name_box == null:
+		return
+	_name_box.placeholder_text = NAME_PLACEHOLDER
+	_name_box.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_name_box.add_theme_font_override(&"font", MenuStyleScript.title_font())
+	_name_box.add_theme_font_size_override(&"font_size", MenuStyle.font_px(30))
+	_name_box.add_theme_color_override(&"font_color", STEP_PLUM)
+	_name_box.add_theme_color_override(&"font_placeholder_color", Color(STEP_PLUM, 0.45))
+	_name_box.add_theme_color_override(&"caret_color", STEP_PLUM)
+	_name_box.custom_minimum_size.y = 66.0
+	_name_box.add_theme_stylebox_override(&"normal", plaque_box(false))
+	_name_box.add_theme_stylebox_override(&"focus", plaque_box(true))
+	_name_box.add_theme_stylebox_override(&"read_only", plaque_box(false))
+	if _name_label != null:
+		_name_label.visible = false
+
+
+## The mane styles as a strip of pictures, two rows deep, scrolling sideways.
+func _mane_style_strip() -> void:
+	var col := get_node_or_null(^"Layout/Panel/Margin/Column") as VBoxContainer
+	if col == null or _mane_style_grid == null:
+		return
+	var scroll := ScrollContainer.new()
+	scroll.name = "ManeStyleScroll"
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	scroll.custom_minimum_size = Vector2(0.0, STYLE_CARD.y * 2.0 + 30.0)
+	scroll.mouse_filter = Control.MOUSE_FILTER_PASS
+	col.add_child(scroll)
+	col.move_child(scroll, _mane_style_grid.get_index())
+	_mane_style_grid.reparent(scroll)
+	_mane_style_grid.visible = true
+	_mane_style_grid.add_theme_constant_override(&"h_separation", 8)
+	_mane_style_grid.add_theme_constant_override(&"v_separation", 8)
+	var bar := scroll.get_h_scroll_bar()
+	var track := StyleBoxFlat.new()
+	track.bg_color = Color(STEP_PLUM, 0.12)
+	track.set_corner_radius_all(5)
+	track.content_margin_top = 5.0
+	track.content_margin_bottom = 5.0
+	var grab := StyleBoxFlat.new()
+	grab.bg_color = Color(STEP_PLUM, 0.6)
+	grab.set_corner_radius_all(5)
+	for slot: StringName in [&"scroll", &"scroll_focus"]:
+		bar.add_theme_stylebox_override(slot, track)
+	for slot: StringName in [&"grabber", &"grabber_highlight", &"grabber_pressed"]:
+		bar.add_theme_stylebox_override(slot, grab)
+	var row := get_node_or_null(^"Layout/Panel/Margin/Column/StyleRow") as Control
+	if row != null:
+		row.visible = false
+
+
+func _mane_scroll() -> ScrollContainer:
+	return get_node_or_null(^"Layout/Panel/Margin/Column/ManeStyleScroll") as ScrollContainer
+
+
+## The picked style card kept in view in the strip.
+func _show_style_pick() -> void:
+	var scroll := _mane_scroll()
+	if scroll == null or _mane_style_grid == null or _look == null:
+		return
+	# Deferred, and the card looked up again then: a retint rebuilds the cards.
+	(func() -> void:
+		if not is_instance_valid(scroll) or _mane_style_grid == null or _look == null:
+			return
+		var cell := _mane_style_grid.cell(_look.mane_style)
+		if cell != null and is_instance_valid(cell) and scroll.is_ancestor_of(cell):
+			scroll.ensure_control_visible(cell)).call_deferred()
+
+
+## Four pictures and a word each under the canvas, in place of the paragraph.
+func _legend() -> void:
+	var col := get_node_or_null(^"Layout/Panel/Margin/Column") as VBoxContainer
+	if col == null:
+		return
+	if _hint_label != null:
+		_hint_label.visible = false
+	if _canvas != null:
+		_canvas.tooltip_text = HINT
+	var row := HBoxContainer.new()
+	row.name = "Legend"
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.mouse_filter = Control.MOUSE_FILTER_PASS
+	row.tooltip_text = HINT
+	row.add_theme_constant_override(&"separation", 22)
+	col.add_child(row)
+	if _hint_label != null:
+		col.move_child(row, _hint_label.get_index())
+	for pair: Array in LEGEND:
+		var chip := HBoxContainer.new()
+		chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		chip.add_theme_constant_override(&"separation", 6)
+		var pic := TextureRect.new()
+		pic.texture = IconSet.texture(String(pair[0]), 64)
+		pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		pic.custom_minimum_size = Vector2(34.0, 34.0)
+		pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		chip.add_child(pic)
+		var word := Label.new()
+		word.text = String(pair[1])
+		word.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		MenuStyleScript.style_label(word, 18, MenuStyleScript.COLOR_INK)
+		word.add_theme_constant_override(&"outline_size", 0)
+		chip.add_child(word)
+		row.add_child(chip)
+
+
+## A pot of colour: a disc with a darker rim and a gloss, `px` across.
+static func pot_texture(colour: Color, px: int) -> ImageTexture:
+	var img := Image.create(px, px, false, Image.FORMAT_RGBA8)
+	var c := Vector2(px, px) * 0.5
+	var r := float(px) * 0.5 - 1.0
+	var gloss := c + Vector2(-r * 0.32, -r * 0.36)
+	for y in px:
+		for x in px:
+			var p := Vector2(x + 0.5, y + 0.5)
+			var d := p.distance_to(c)
+			if d > r + 1.0:
+				continue
+			var col := colour
+			if d > r - 2.5:
+				col = colour.darkened(0.35)
+			else:
+				var g := ((p - gloss) / Vector2(r * 0.34, r * 0.2)).length()
+				if g < 1.0:
+					col = col.lerp(Color.WHITE, 0.5 * (1.0 - g))
+			col.a = clampf(r + 1.0 - d, 0.0, 1.0)
+			img.set_pixel(x, y, col)
+	return ImageTexture.create_from_image(img)
+
+
+## A tool button's frame: clear at rest, a gold ring when it is the one in use, a soft ring
+## under the pointer.
+static func tool_box(on: bool, state: StringName) -> StyleBoxFlat:
+	var b := StyleBoxFlat.new()
+	b.bg_color = Color(1.0, 0.94, 0.78, 0.9) if on else Color(1.0, 1.0, 1.0, 0.0)
+	b.border_color = MenuStyleScript.COLOR_TAB_ON.darkened(0.1) if on \
+		else Color(STEP_PLUM, 0.35 if state == &"hover" else 0.0)
+	b.set_border_width_all(4 if on else 2)
+	b.set_corner_radius_all(40)
+	if on:
+		b.shadow_color = Color(1.0, 0.8, 0.3, 0.5)
+		b.shadow_size = 6
+	b.set_content_margin_all(4.0)
+	b.anti_aliasing = true
+	return b
+
+
+func _tool_look(b: Button, on: bool) -> void:
+	for state: StringName in [&"normal", &"hover", &"pressed", &"hover_pressed", &"focus"]:
+		b.add_theme_stylebox_override(state, tool_box(on, state) if state != &"focus"
+			else StyleBoxEmpty.new())
+
+
+func _pot_inks() -> void:
+	var swatch := get_node_or_null(^"Layout/Panel/Margin/Column/InkRow/InkSwatch") as Control
+	if swatch != null:
+		swatch.visible = false
+	var row := get_node_or_null(^"Layout/Panel/Margin/Column/InkRow") as HBoxContainer
+	if row != null:
+		row.add_theme_constant_override(&"separation", 8)
+	for i in ink_count():
+		var b := get_node_or_null(NodePath("Layout/Panel/Margin/Column/InkRow/Ink%d" % i)) as Button
+		if b == null:
+			continue
+		b.text = ""
+		b.tooltip_text = ink_name(i)
+		b.icon = pot_texture(ink_at(i), POT_PX)
+		b.expand_icon = false
+		b.custom_minimum_size = Vector2(POT_PX + 18.0, POT_PX + 18.0)
+		b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	_style_inks()
+
+
+func _style_inks() -> void:
+	for i in ink_count():
+		var b := get_node_or_null(NodePath("Layout/Panel/Margin/Column/InkRow/Ink%d" % i)) as Button
+		if b != null and b.text.is_empty():
+			_tool_look(b, i == _ink_index)
+
+
+## A dot `px` across in plum ink, centred on a square the size of the biggest.
+static func dot_texture(px: int) -> ImageTexture:
+	var side := 30
+	var img := Image.create(side, side, false, Image.FORMAT_RGBA8)
+	var c := Vector2(side, side) * 0.5
+	var r := float(px) * 0.5
+	for y in side:
+		for x in side:
+			var d := Vector2(x + 0.5, y + 0.5).distance_to(c)
+			if d <= r + 1.0:
+				img.set_pixel(x, y, Color(STEP_PLUM.darkened(0.2), clampf(r + 1.0 - d, 0.0, 1.0)))
+	return ImageTexture.create_from_image(img)
+
+
+func _dot_brushes() -> void:
+	var row := get_node_or_null(^"Layout/Panel/Margin/Column/ToolRow") as HBoxContainer
+	if row != null:
+		row.add_theme_constant_override(&"separation", 8)
+		row.alignment = BoxContainer.ALIGNMENT_BEGIN
+	for radius: int in MarkPaintScript.BRUSHES:
+		var b := get_node_or_null(NodePath("Layout/Panel/Margin/Column/ToolRow/Brush%d" % radius)) as Button
+		if b == null:
+			continue
+		b.text = ""
+		b.tooltip_text = "Brush"
+		b.icon = dot_texture(int(BRUSH_DOTS.get(radius, 8)))
+		b.custom_minimum_size = Vector2(52.0, 52.0)
+		b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		b.pressed.connect(func() -> void:
+			_brush_px = radius
+			_style_tools())
+	var eraser := get_node_or_null(^"Layout/Panel/Margin/Column/ToolRow/Eraser") as Button
+	if eraser != null:
+		eraser.text = ""
+		eraser.tooltip_text = "Eraser"
+		eraser.icon = IconSet.texture("tool_eraser", 2 * TOOL_ICON_PX)
+		eraser.expand_icon = true
+		eraser.custom_minimum_size = Vector2(52.0, 52.0)
+		eraser.pressed.connect(func() -> void: _style_tools())
+	_brush_px = MarkPaintScript.BRUSHES[1] if MarkPaintScript.BRUSHES.size() > 1 else 1
+	if _canvas != null:
+		_canvas.set_brush(_brush_px)
+	_style_tools()
+
+
+func _style_tools() -> void:
+	var erasing: bool = _canvas != null and _canvas.is_erasing()
+	for radius: int in MarkPaintScript.BRUSHES:
+		var b := get_node_or_null(NodePath("Layout/Panel/Margin/Column/ToolRow/Brush%d" % radius)) as Button
+		if b != null:
+			_tool_look(b, radius == _brush_px and not erasing)
+	var eraser := get_node_or_null(^"Layout/Panel/Margin/Column/ToolRow/Eraser") as Button
+	if eraser != null:
+		_tool_look(eraser, erasing)
+
+
+func _icon_actions() -> void:
+	for pair: Array in [[^"Layout/Panel/Margin/Column/ActionRow/Undo", "tool_undo"],
+			[^"Layout/Panel/Margin/Column/ActionRow/Clear", "tool_clear"],
+			[^"Layout/Panel/Margin/Column/ActionRow/Remove", "tool_unstamp"]]:
+		var b := get_node_or_null(pair[0] as NodePath) as Button
+		if b == null:
+			continue
+		b.icon = IconSet.texture(String(pair[1]), 2 * TOOL_ICON_PX)
+		b.expand_icon = false
+		b.add_theme_constant_override(&"icon_max_width", TOOL_ICON_PX)
+		b.add_theme_constant_override(&"h_separation", 8)
+
+
+# --- she reacts to every pick ------------------------------------------------------------
+##
+## SHE TURNS AND REACTS ON EACH PICK (Fable AAA round 4): a quick swing to three-quarter front,
+## a little hop with a squash on landing, a happy face with her eyes on the lens, then the
+## turntable rests a moment before it spins on.
+const REACT_HOLD := 2.4
+## Three-quarter front: at a yaw of 0 she faces the lens.
+const REACT_YAW := 0.62
+var _react_tween: Tween = null
+var _react_clock := 0.0
+
+
+func react() -> void:
+	if not _open or _turntable == null or not is_inside_tree():
+		return
+	if _step == Step.MARK:
+		return
+	var yaw: float = wrapf(_turntable.rotation.y, -PI, PI)
+	var target: float = REACT_YAW if yaw >= 0.0 else -REACT_YAW
+	_turntable.rotation.y = yaw
+	_drag_rest = REACT_HOLD
+	if _react_tween != null and _react_tween.is_valid():
+		_react_tween.kill()
+	_react_tween = create_tween()
+	_react_tween.tween_property(_turntable, ^"rotation:y", target, 0.35) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	if _model != null:
+		var hop := create_tween()
+		_model.position.y = 0.0
+		_model.scale = Vector3.ONE
+		hop.tween_property(_model, ^"position:y", 0.12, 0.14).set_trans(Tween.TRANS_SINE) \
+			.set_ease(Tween.EASE_OUT)
+		hop.tween_property(_model, ^"position:y", 0.0, 0.14).set_trans(Tween.TRANS_SINE) \
+			.set_ease(Tween.EASE_IN)
+		hop.tween_property(_model, ^"scale", Vector3(1.04, 0.94, 1.04), 0.07)
+		hop.tween_property(_model, ^"scale", Vector3.ONE, 0.16).set_trans(Tween.TRANS_BACK) \
+			.set_ease(Tween.EASE_OUT)
+		for f in _model.find_children("*", "", true, false):
+			if f is PonyFace:
+				(f as PonyFace).mood = PonyFace.Mood.HAPPY
+				if _camera != null:
+					(f as PonyFace).look_target = _camera.global_position
+					(f as PonyFace).look_weight = 1.0
+		_react_clock = REACT_HOLD
+
+
+## The happy face lasts the hold, then she is herself again.
+func _settle_react(delta: float) -> void:
+	if _react_clock <= 0.0:
+		return
+	_react_clock -= delta
+	if _react_clock > 0.0 or _model == null:
+		return
+	for f in _model.find_children("*", "", true, false):
+		if f is PonyFace:
+			(f as PonyFace).mood = PonyFace.Mood.NEUTRAL
+			(f as PonyFace).look_weight = 0.0
