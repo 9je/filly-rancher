@@ -449,6 +449,15 @@ var _look_pitch := 0.0
 ## Every MeshInstance3D belonging to the body this rig is mounted on, collected once in
 ## _ready(). See FADE_START.
 var _subject_meshes: Array[MeshInstance3D] = []
+
+## ANYBODY AT THE LENS STEPS ASIDE IN DITHER (Fable AAA round 1 #5 and the round 2 renders: a
+## townspony or a companion standing beside the player filled a third of the frame with one
+## giant face, behind every menu). A pony or townspony whose middle is within NEAR_FADE_FAR
+## of the lens fades out in the screen-door dither, gone entirely by NEAR_FADE_CLOSE. The
+## player is on her own layer (PLAYER) with her own fade, so the query never sees her.
+const NEAR_FADE_FAR := 2.6
+const NEAR_FADE_CLOSE := 1.2
+var _near_faded: Dictionary = {}
 ## Last fade value written, so _process() does not touch every mesh every frame when
 ## nothing has moved.
 var _subject_fade := -1.0
@@ -522,6 +531,7 @@ func _process(delta: float) -> void:
 	_update_shoulder_offset()
 	_keep_above_ground()
 	_update_subject_fade()
+	_update_near_fade()
 	_apply_shake(delta)
 
 
@@ -864,6 +874,45 @@ func _update_subject_fade() -> void:
 		# this rig only actually cares about the two edges of that boolean.
 		if mesh.visible != should_be_visible:
 			mesh.visible = should_be_visible
+
+
+func _update_near_fade() -> void:
+	if _camera == null or not is_inside_tree():
+		return
+	var lens := _camera.global_position
+	var q := PhysicsShapeQueryParameters3D.new()
+	var ball := SphereShape3D.new()
+	ball.radius = NEAR_FADE_FAR + 0.6
+	q.shape = ball
+	q.transform = Transform3D(Basis.IDENTITY, lens)
+	q.collision_mask = CollisionLayersScript.PONY
+	var seen := {}
+	for hit: Dictionary in get_world_3d().direct_space_state.intersect_shape(q, 16):
+		var body := hit.collider as Node3D
+		if body == null or seen.has(body):
+			continue
+		seen[body] = true
+		var d := lens.distance_to(body.global_position + Vector3.UP * 0.7)
+		var opacity := clampf((d - NEAR_FADE_CLOSE) / (NEAR_FADE_FAR - NEAR_FADE_CLOSE), 0.0, 1.0)
+		_fade_body(body, opacity)
+	for body: Variant in _near_faded.keys():
+		if not seen.has(body):
+			if is_instance_valid(body):
+				_fade_body(body as Node3D, 1.0)
+			_near_faded.erase(body)
+
+
+func _fade_body(body: Node3D, opacity: float) -> void:
+	var entry: Array = _near_faded.get(body, [-1.0, []])
+	if is_equal_approx(float(entry[0]), opacity):
+		return
+	if (entry[1] as Array).is_empty():
+		entry[1] = body.find_children("*", "GeometryInstance3D", true, false)
+	for g: Variant in entry[1]:
+		if is_instance_valid(g):
+			(g as GeometryInstance3D).set_instance_shader_parameter(&"dither_fade", opacity)
+	entry[0] = opacity
+	_near_faded[body] = entry
 
 
 ## Collect the subject's own meshes -- and ONLY those.
