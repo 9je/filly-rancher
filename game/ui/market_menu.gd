@@ -39,10 +39,13 @@ const SCROLL_MAX := 640.0
 const SCROLL_MAX_BUY := 400.0
 ## The detail strip's one height (item 68).
 const DETAIL_HEIGHT := 170.0
+const DETAIL_ICON := 136.0
+const BUY_BUTTON := Vector2(270.0, 92.0)
 const BUY_COLUMNS := 3
-const BUY_TILE := Vector2(360.0, 128.0)
-const SELL_TILE := Vector2(1104.0, 84.0)
-const ICON_SIZE := 56.0
+const BUY_TILE := Vector2(360.0, 136.0)
+const SELL_TILE := Vector2(1104.0, 92.0)
+const ICON_SIZE := 112.0
+const SELL_ICON_SIZE := 72.0
 const TAB_NAMES: Array[String] = ["Sell", "Buy"]
 
 enum Tab { SELL, BUY }
@@ -103,6 +106,11 @@ var _detail_name: Label = null
 var _detail_text: Label = null
 var _detail_kind: Label = null
 var _detail_buy: Button = null
+var _detail_well: Control = null
+## The coin and amount drawn on the Buy button's right end.
+var _buy_tag: HBoxContainer = null
+var _buy_coin: TextureRect = null
+var _buy_amount: Label = null
 ## The permit's ponies (PS9 item 55); hidden for anything that is not a permit.
 var _detail_ponies: HFlowContainer = null
 ## The deal-in clock for the tiles (PS10, G6; game/ui/tile_entrance.gd).
@@ -134,6 +142,8 @@ func _ready() -> void:
 	var dim := get_node_or_null(^"Dim") as Control
 	if dim != null:
 		dim.mouse_filter = Control.MOUSE_FILTER_STOP
+		# The world behind, softened rather than blacked out (MenuStyle.soften_dim).
+		MenuStyleScript.soften_dim(dim)
 	_close = MouseRowsScript.close_button(MouseRowsScript.CLOSE_TEXT,
 		func(_index: int) -> void: close())
 	_build_detail()
@@ -192,12 +202,16 @@ func _build_detail() -> void:
 	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	line.add_theme_constant_override(&"separation", 18)
 	_detail.add_child(line)
-	var plate := TileStyleScript.disc(84.0)
-	line.add_child(plate)
+	_detail_well = TileStyleScript.well(DETAIL_ICON, TileStyleScript.WELL_TINTS[&"food"])
+	line.add_child(_detail_well)
 	_detail_icon = ShopIconScript.new()
-	_detail_icon.custom_minimum_size = Vector2(84, 84)
 	_detail_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	plate.add_child(_detail_icon)
+	_detail_icon.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_detail_icon.offset_left = DETAIL_ICON * 0.08
+	_detail_icon.offset_top = DETAIL_ICON * 0.04
+	_detail_icon.offset_right = -DETAIL_ICON * 0.08
+	_detail_icon.offset_bottom = -DETAIL_ICON * 0.12
+	_detail_well.add_child(_detail_icon)
 	var words := VBoxContainer.new()
 	words.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -229,29 +243,78 @@ func _build_detail() -> void:
 	_detail_ponies.add_theme_constant_override(&"h_separation", 8)
 	_detail_ponies.add_theme_constant_override(&"v_separation", 6)
 	words.add_child(_detail_ponies)
+	# THE CONFIRM IS BIG, GOLD AND TACTILE (Fable AAA round 2, #8: "a muted olive slab"): the
+	# kit's gold pill with a heavy lip, the price on it as a coin. Out of reach it stays a
+	# solid plum pill that says what is missing, never a dead slab.
 	_detail_buy = Button.new()
 	_detail_buy.name = "Buy"
-	_detail_buy.custom_minimum_size = Vector2(190, 64)
+	_detail_buy.custom_minimum_size = BUY_BUTTON
 	_detail_buy.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_detail_buy.focus_mode = Control.FOCUS_NONE
+	_detail_buy.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	_detail_buy.add_theme_font_override(&"font", MenuStyleScript.title_font())
-	_detail_buy.add_theme_font_size_override(&"font_size", MenuStyle.font_px(24))
-	for state: StringName in [&"normal", &"hover", &"pressed", &"disabled"]:
-		var b := StyleBoxFlat.new()
-		b.bg_color = PaintScript.GOLD if state != &"disabled" else PaintScript.GOLD_DIM.darkened(0.4)
-		if state == &"hover":
-			b.bg_color = PaintScript.GOLD.lightened(0.15)
-		elif state == &"pressed":
-			b.bg_color = PaintScript.GOLD.darkened(0.12)
-		b.set_corner_radius_all(18)
-		b.border_color = PaintScript.PLUM_DARK
-		b.set_border_width_all(2)
-		_detail_buy.add_theme_stylebox_override(state, b)
-	for c: StringName in [&"font_color", &"font_hover_color", &"font_pressed_color"]:
+	_detail_buy.add_theme_font_size_override(&"font_size", MenuStyle.font_px(30))
+	_detail_buy.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	for state: StringName in [&"normal", &"hover", &"pressed", &"disabled", &"focus"]:
+		_detail_buy.add_theme_stylebox_override(state, buy_box(state))
+	for c: StringName in [&"font_color", &"font_hover_color", &"font_pressed_color",
+			&"font_focus_color", &"font_hover_pressed_color"]:
 		_detail_buy.add_theme_color_override(c, PaintScript.CARD_INK)
-	_detail_buy.add_theme_color_override(&"font_disabled_color", Color(1, 1, 1, 0.45))
+	_detail_buy.add_theme_color_override(&"font_disabled_color", Color(1.0, 0.94, 0.86, 0.85))
+	_buy_tag = HBoxContainer.new()
+	_buy_tag.name = "Cost"
+	_buy_tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_buy_tag.add_theme_constant_override(&"separation", 6)
+	_buy_tag.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
+	_buy_tag.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_buy_tag.offset_right = -24.0
+	_buy_tag.offset_top = -22.0
+	_buy_tag.offset_bottom = 16.0
+	_detail_buy.add_child(_buy_tag)
+	_buy_coin = MenuStyleScript.coin_icon(36.0)
+	_buy_tag.add_child(_buy_coin)
+	_buy_amount = Label.new()
+	_buy_amount.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_buy_amount.add_theme_font_override(&"font", MenuStyleScript.numeral_font())
+	MenuStyleScript.style_label(_buy_amount, 32, PaintScript.CARD_INK)
+	_buy_amount.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_buy_tag.add_child(_buy_amount)
 	_detail_buy.pressed.connect(func() -> void: take_row(_selected))
 	line.add_child(_detail_buy)
+
+
+## The Buy button's face in `state`: gold with a deep amber lip that sinks when pressed, or a
+## plum pill when the pick is out of reach.
+static func buy_box(state: StringName) -> StyleBox:
+	if state == &"focus":
+		return StyleBoxEmpty.new()
+	var b := StyleBoxFlat.new()
+	b.set_corner_radius_all(26)
+	b.set_border_width_all(3)
+	b.border_width_bottom = 4 if state == &"pressed" else 9
+	b.content_margin_left = 30.0
+	b.content_margin_right = 30.0
+	b.content_margin_top = 8.0 if state != &"pressed" else 13.0
+	b.content_margin_bottom = 12.0
+	b.anti_aliasing = true
+	b.shadow_color = Color(0.1, 0.02, 0.12, 0.45)
+	b.shadow_size = 8
+	b.shadow_offset = Vector2(0, 4)
+	match state:
+		&"disabled":
+			b.bg_color = PaintScript.PLUM
+			b.border_color = Color(PaintScript.GOLD_DIM, 0.8)
+			b.shadow_size = 0
+		&"hover":
+			b.bg_color = Color(1.0, 0.90, 0.52)
+			b.border_color = Color(0.62, 0.38, 0.05)
+		&"pressed":
+			b.bg_color = Color(0.95, 0.78, 0.32)
+			b.border_color = Color(0.55, 0.32, 0.04)
+		_:
+			b.bg_color = PaintScript.GOLD
+			b.border_color = Color(0.62, 0.38, 0.05)
+	return b
 
 
 ## What kind of thing an item is, in a word, for its tile and the detail strip.
@@ -266,6 +329,20 @@ static func kind_word(item: ShopItem) -> String:
 		ShopItemScript.Kind.DECOR:
 			return "DECOR"
 	return "GEAR"
+
+
+## Which family colour an item's picture stands in (TileStyle.WELL_TINTS).
+static func family_of(item: ShopItem) -> StringName:
+	match item.kind:
+		ShopItemScript.Kind.CARE:
+			return &"food"
+		ShopItemScript.Kind.PERMIT:
+			return &"place"
+		ShopItemScript.Kind.BUILD:
+			return &"build"
+		ShopItemScript.Kind.DECOR:
+			return &"decor"
+	return &"gear"
 
 
 ## The detail strip's words, for the suite: {name, text, kind, buy, can}.
@@ -372,12 +449,27 @@ func _fill_detail() -> void:
 	_fill_ponies(item)
 	var why := shop.refusal(item)
 	_detail_buy.disabled = owned or not why.is_empty()
+	_buy_tag.visible = not owned and item.cost > 0
+	_buy_amount.text = str(item.cost)
+	var short := item.cost - shop.bits()
 	if owned:
 		_detail_buy.text = "Owned"
 	elif item.cost == 0:
 		_detail_buy.text = "Take it"
+	elif _detail_buy.disabled and short > 0:
+		# Out of reach: what is missing, on the button, rather than a dead slab.
+		_detail_buy.text = "Need"
+		_buy_amount.text = str(short)
 	else:
-		_detail_buy.text = "Buy  %d" % item.cost
+		_detail_buy.text = "Buy"
+	MenuStyleScript.style_label(_buy_amount, 32,
+		PaintScript.CARD_INK if not _detail_buy.disabled else Color(1.0, 0.94, 0.86))
+	_detail_buy.alignment = HORIZONTAL_ALIGNMENT_LEFT if _buy_tag.visible \
+		else HORIZONTAL_ALIGNMENT_CENTER
+	# The picture's window takes the item's family colour.
+	_detail_well.set_meta(&"tint", TileStyleScript.WELL_TINTS.get(family_of(item),
+		TileStyleScript.WELL_TINTS[&"gear"]))
+	_detail_well.queue_redraw()
 
 
 # --- opening and closing ------------------------------------------------------------------
@@ -485,11 +577,7 @@ func buy_rows() -> Array[ShopItem]:
 func row_price_text(index: int) -> String:
 	if index < 0 or index >= _rows.get_child_count():
 		return ""
-	var heads: Array = _rows.get_child(index).find_children("*", "HBoxContainer", true, false)
-	if heads.is_empty() or (heads[0] as HBoxContainer).get_child_count() < 2:
-		return ""
-	var cost := (heads[0] as HBoxContainer).get_child(1) as Label
-	return cost.text if cost != null else ""
+	return str(_rows.get_child(index).get_meta(&"price", ""))
 
 
 func _row_count() -> int:
@@ -678,13 +766,13 @@ func refresh() -> void:
 	_built_frame = Engine.get_process_frames()
 	if _tab == Tab.SELL:
 		_add_row(0, "Sell everything", "every gem in your pouch, in one go",
-			"%d bits" % _sell_all_value(), _pouch_total() > 0, &"sell_all")
+			"%d bits" % _sell_all_value(), _pouch_total() > 0, &"sell_all", "", &"gem")
 		for i in range(sell_rows().size()):
 			var rarity: int = sell_rows()[i]
 			var count := shop.gem_count(rarity)
 			_add_row(i + 1, "%s gems" % _rarity_name(rarity), "you have %d" % count,
 				"%d bits each" % shop.gem_price(rarity), count > 0,
-				StringName("gem_%d" % clampi(rarity, 0, 3)))
+				StringName("gem_%d" % clampi(rarity, 0, 3)), "", &"gem")
 	else:
 		for i in range(_catalogue.size()):
 			var item := _catalogue[i]
@@ -696,7 +784,7 @@ func refresh() -> void:
 			var owned := _owned(item)
 			var price := "OWNED" if owned else ("FREE" if item.cost == 0 else "%d bits" % item.cost)
 			_add_row(i, item.display_name, item.description, price, shop.can_buy(item),
-				ShopIconScript.kind_for(item), kind_word(item))
+				ShopIconScript.kind_for(item), kind_word(item), family_of(item))
 	_fill_detail()
 	_entrance.apply(_rows.get_children())
 	_fit_scroll.call_deferred()
@@ -751,84 +839,105 @@ func _fit_scroll() -> void:
 
 
 func _add_row(index: int, row_name: String, blurb: String, price: String, enabled: bool,
-		icon_kind: StringName = &"", tag := "") -> void:
+		icon_kind: StringName = &"", tag := "", family: StringName = &"gem") -> void:
 	var row := MouseRowsScript.row(index, index == _selected, index == _hovered,
 		point_at_row, take_row)
 	TileStyleScript.dress(row, index == _selected, index == _hovered)
 	row.custom_minimum_size = SELL_TILE if _tab == Tab.SELL else BUY_TILE
-	# A GRID OF TWO, NOT AN HBOX: row_price_text() reads the first HBoxContainer in a tile as
-	# its name-and-price line, so the icon and the text sit side by side in a GridContainer.
-	var body := GridContainer.new()
-	body.columns = 2
+	# What the tile says it costs, in words, for row_price_text(): the tile itself shows a coin.
+	row.set_meta(&"price", price)
+	var body := HBoxContainer.new()
 	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	body.add_theme_constant_override(&"h_separation", 14)
+	body.add_theme_constant_override(&"separation", 14)
 	row.add_child(body)
-	var plate := TileStyleScript.disc(ICON_SIZE,
-		PaintScript.CARD_FACE if enabled else PaintScript.CARD_FACE.darkened(0.35))
-	body.add_child(plate)
+	# THE PICTURE, BIG AND IN COLOUR (Fable AAA round 2, #8): the thing itself in a lit window
+	# of its family's colour, not a small glyph on a grey disc.
+	var side := ICON_SIZE if _tab == Tab.BUY else SELL_ICON_SIZE
+	var well := TileStyleScript.well(side, TileStyleScript.WELL_TINTS.get(family,
+		TileStyleScript.WELL_TINTS[&"gem"]), not enabled)
+	body.add_child(well)
 	var icon: Control = ShopIconScript.new()
 	icon.kind = icon_kind
-	icon.custom_minimum_size = Vector2(ICON_SIZE, ICON_SIZE)
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	icon.modulate = Color(1, 1, 1) if enabled else Color(1, 1, 1, 0.55)
-	plate.add_child(icon)
+	icon.set_anchors_preset(Control.PRESET_FULL_RECT)
+	icon.offset_left = side * 0.08
+	icon.offset_top = side * 0.04
+	icon.offset_right = -side * 0.08
+	icon.offset_bottom = -side * 0.12
+	icon.modulate = Color(1, 1, 1) if enabled else Color(1, 1, 1, 0.6)
+	well.add_child(icon)
 	var column := VBoxContainer.new()
 	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	column.alignment = BoxContainer.ALIGNMENT_CENTER
-	column.add_theme_constant_override(&"separation", 2)
+	column.add_theme_constant_override(&"separation", 3)
 	body.add_child(column)
-	var head := HBoxContainer.new()
-	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	head.add_theme_constant_override(&"separation", 24)
-	column.add_child(head)
 	var title := Label.new()
 	title.text = row_name
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	# Wraps rather than clipping: "Permit: The Night Meadow" is the longest name in the shop.
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	title.max_lines_visible = 2
 	title.custom_minimum_size = Vector2(140.0, 0.0)
-	MenuStyleScript.style_label(title, 22,
+	MenuStyleScript.style_label(title, 23,
 		MenuStyleScript.COLOR_TITLE if enabled else MenuStyleScript.COLOR_DIM)
 	title.add_theme_font_override(&"font", MenuStyleScript.title_font())
-	head.add_child(title)
-	var cost := Label.new()
-	cost.text = price
-	cost.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	cost.add_theme_font_override(&"font", MenuStyleScript.numeral_font())
-	MenuStyleScript.style_label(cost, 22,
-		MenuStyleScript.COLOR_VALUE if enabled else MenuStyleScript.COLOR_UNAFFORDABLE)
-	head.add_child(cost)
+	column.add_child(title)
+	# A BUY TILE IS A PICTURE, A NAME AND A PRICE (Fable AAA round 2, #8: "12 px grey text" on
+	# every card): the words live once, whole, on the detail strip under the grid. The Sell
+	# rows keep their one short line ("you have 3").
+	if not blurb.is_empty() and _tab == Tab.SELL:
+		var sub := Label.new()
+		sub.text = blurb
+		sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		sub.custom_minimum_size = Vector2(150.0, 0.0)
+		MenuStyleScript.style_label(sub, 17, Color(1.0, 0.96, 0.9, 0.78))
+		column.add_child(sub)
+	# The foot: her family in a small chip at the left, the price as a coin at the right.
+	var foot := HBoxContainer.new()
+	foot.name = "Foot"
+	foot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	foot.add_theme_constant_override(&"separation", 8)
+	column.add_child(foot)
 	if not tag.is_empty():
 		var chip := Label.new()
 		chip.text = tag
 		chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		MenuStyleScript.style_label(chip, 14, PaintScript.GOLD if enabled else PaintScript.GOLD_DIM)
-		column.add_child(chip)
-	if not blurb.is_empty():
-		var sub := Label.new()
-		# NO LINE ENDS IN "..." (Fable AAA review round 1, #8: "market copy truncated"). The
-		# tile carries the blurb's first sentence whole, wrapped, and the detail strip under
-		# the grid carries all of it; a cut-off sentence reads as a bug, a short one as a
-		# caption.
-		sub.text = tile_blurb(blurb) if _tab == Tab.BUY else blurb
-		sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		sub.custom_minimum_size = Vector2(150.0, 0.0)
-		MenuStyleScript.style_label(sub, 17, MenuStyleScript.COLOR_DIM)
-		column.add_child(sub)
+		chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		MenuStyleScript.style_label(chip, 14, Color(1.0, 0.97, 0.9))
+		var pill := StyleBoxFlat.new()
+		pill.bg_color = Color(TileStyleScript.WELL_TINTS.get(family, PaintScript.GOLD_DIM).darkened(0.25),
+			1.0 if enabled else 0.5)
+		pill.set_corner_radius_all(9)
+		pill.content_margin_left = 8.0
+		pill.content_margin_right = 8.0
+		pill.content_margin_top = 1.0
+		pill.content_margin_bottom = 1.0
+		chip.add_theme_stylebox_override(&"normal", pill)
+		foot.add_child(chip)
+	var gap := Control.new()
+	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	foot.add_child(gap)
+	foot.visible = _tab == Tab.BUY
+	# A Sell row is one long line: its price stands at the row's right end, mid height.
+	var price_home: HBoxContainer = foot if _tab == Tab.BUY else body
+	price_home.add_child(TileStyleScript.price_tag(_price_amount(price), price, 24, enabled))
+	if price.ends_with(" each"):
+		var each := Label.new()
+		each.text = "each"
+		each.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		each.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		MenuStyleScript.style_label(each, 16, MenuStyleScript.COLOR_DIM)
+		price_home.add_child(each)
 	_rows.add_child(row)
 
 
-## The first sentence of `blurb`, whole: what a Buy tile shows of an item's description.
-static func tile_blurb(blurb: String) -> String:
-	for stop in [". ", "! ", "? "]:
-		var i := blurb.find(stop)
-		if i >= 0:
-			return blurb.substr(0, i + 1)
-	return blurb
+## The number on a price string ("140 bits", "40 bits each"), or -1 for a word (OWNED, FREE).
+static func _price_amount(price: String) -> int:
+	var head := price.get_slice(" ", 0)
+	return int(head) if head.is_valid_int() else -1
 
 
 func _refuse(text: String) -> void:

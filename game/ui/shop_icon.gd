@@ -13,6 +13,9 @@ const KINDS: Array[StringName] = [&"hay", &"carrot", &"apple", &"daisy", &"daffo
 	&"permit_nightmeadow", &"permit_orchard", &"gem_0", &"gem_1", &"gem_2", &"gem_3",
 	&"sell_all", &"pen_small", &"pen_large", &"pen_grand", &"upgrade", &"clear"]
 const FOODS: Array[StringName] = [&"hay", &"carrot", &"apple", &"daisy", &"daffodil"]
+## From this many pixels across, a food draws its fuller Market picture (tools/make_icons.py's
+## "<food>_art"), below it the plain icon.
+const ART_FROM := 64.0
 
 ## A gem's colour by PonyData.Rarity: common, uncommon, rare, legendary.
 const GEM_COLOURS: Array[Color] = [Color(0.72, 0.86, 0.95), Color(0.45, 0.85, 0.55),
@@ -81,6 +84,10 @@ func _draw() -> void:
 			false)
 		return
 	if kind in FOODS:
+		# A Market tile's picture is drawn at 100 px and more, where the food's small icon
+		# looked like a placeholder (Fable AAA round 2, #8): there the fuller "_art" drawing.
+		if minf(size.x, size.y) >= ART_FROM and draw_from_set(self, String(kind) + "_art", size):
+			return
 		super._draw()
 		return
 	if draw_from_set(self, String(kind), size):

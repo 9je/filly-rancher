@@ -378,6 +378,120 @@ def _daffodil(i):
     i.ink(circle(32, 32, 4.5)[0], "orange", 1.8)
 
 
+# ---- the Market's pictures of the foods --------------------------------------------------
+# Fable AAA round 2, #8: on a Market tile the food icons above read as placeholders (a gold
+# box for hay, one flower for a posy). A tile shows its picture at 100 px and more, where an
+# icon built to read at 24 px looks bare, so the Market draws these instead: the same style,
+# more of the thing (a bale in three quarter view, a bunch of carrots, a posy with a bow).
+# The small icons stay as they are for chips and markers.
+
+def _vcarrot(cx, top, ln, w):
+    d = ("M%g,%g C%g,%g %g,%g %g,%g C%g,%g %g,%g %g,%g C%g,%g %g,%g %g,%g Z" % (
+        cx - w, top, cx - w, top + ln * 0.5, cx - 1.2, top + ln * 0.92, cx, top + ln,
+        cx + 1.2, top + ln * 0.92, cx + w, top + ln * 0.5, cx + w, top,
+        cx + w, top - 3.5, cx - w, top - 3.5, cx - w, top))
+    return d, (cx - w, top - 3, cx + w, top + ln)
+
+
+@icon("hay_art")
+def _hay_art(i):
+    # A bale in three quarter view: lit top, front, shaded side, straw drawn in short strokes,
+    # two thin twine bands and loose straws, so it reads as hay and not as a crate.
+    i.stroke("M13,24 L7,16 M17,21 L14,11 M21,19 L22,10 M50,19 L57,12 M53,24 L61,22", "#D9AE3E", 2.2)
+    i.fill(path("M10,28 C14,23 18,20 23,17 L55,17 C51,21 47,24 43,28 Z", (10, 17, 55, 28)),
+           "#FBE38E", hl=False, sh=False)
+    i.fill(path("M43,28 L55,17 C56,25 56,33 55,40 L43,52 C44,44 44,36 43,28 Z", (43, 17, 56, 52)),
+           shade("#F5CF55", 0.82), hl=False, sh=False)
+    i.fill(rrect(9, 28, 34, 24, 6), "#F5CF55")
+    straw = shade("#F5CF55", 0.62)
+    i.stroke("M13,33 L19,32 M23,36 L30,35 M33,31 L39,30 M12,40 L17,39 M26,43 L33,42 "
+             "M35,39 L40,38 M14,47 L21,46 M31,48 L38,47 M20,30 L24,29", straw, 1.5)
+    i.stroke("M22,22 L29,20 M35,23 L42,21 M44,20 L50,19 M28,25 L33,24", straw, 1.4)
+    i.stroke("M47,30 L51,27 M46,38 L52,33 M47,46 L52,41", shade(straw, 0.85), 1.4)
+    twine = "#9A5B2A"
+    for x in (18, 33):
+        i.stroke("M%g,52 L%g,28 L%g,17" % (x, x, x + 12), twine, 2.6)
+    i.stroke("M43,%g L55,%g" % (31, 20), twine, 2.4)
+    i.stroke("M43,%g L55,%g" % (45, 34), twine, 2.4)
+    i.stroke("M11,52 L7,58 M24,52 L22,59 M37,52 L40,58", "#D9AE3E", 2)
+
+
+@icon("carrot_art")
+def _carrot_art(i):
+    # A bunch of three, tops gathered, leaves fanned over them.
+    for a in (-48, 48, -22, 22, 0):
+        i.parts.append(f'<g transform="rotate({a} 32 18)">')
+        i.fill(ellipse(32, 9, 4.2, 10), "leaf", hl=False, stroke=2)
+        i.parts.append("</g>")
+    for a, ln in ((-30, 36), (30, 36), (0, 41)):
+        i.parts.append(f'<g transform="rotate({a} 32 17)">')
+        i.fill(_vcarrot(32, 19, ln, 6.2), "orange")
+        i.ink("M27.5,28 L31,29.5 M33,35 L36.5,34 M28.5,42 L31.5,43", "orange", 1.8)
+        i.parts.append("</g>")
+    i.flat(rrect(26, 15, 12, 6, 3), "red", stroke=2)
+
+
+@icon("apple_art")
+def _apple_art(i):
+    # Two apples, the back one a shade deeper, a leaf on the front one's stalk.
+    i.fill(path("M40,16 C45,11 55,13 55,25 C55,35 48,41 43,39 C41,38 40,38 38,39 "
+                "C33,41 26,35 26,25 C26,13 35,11 40,16 Z", (26, 11, 55, 41)), "#C93A3A")
+    i.ink("M40,16 C40,12 41,10 42,8", "wood", 2.6)
+    i.fill(path("M30,24 C37,17 51,19 51,36 C51,50 40,59 33,56 C31,55 29,55 27,56 "
+                "C20,59 9,50 9,36 C9,19 23,17 30,24 Z", (9, 17, 51, 59)), "red")
+    i.ink("M30,24 C30,18 31,14 34,11", "wood", 3)
+    i.fill(path("M33,16 C37,8 46,7 49,10 C46,16 39,19 33,16 Z", (33, 7, 49, 19)), "leaf",
+           hl=False, stroke=2)
+    i.ink("M35,15 C39,13 43,11 46,10", "leaf", 1.4)
+
+
+def _small_daisy(i, cx, cy, r, centre="gold"):
+    for k in range(8):
+        i.parts.append(f'<g transform="rotate({k * 45} {cx} {cy})">')
+        i.fill(ellipse(cx, cy - r * 0.62, r * 0.27, r * 0.5), "white", hl=False, stroke=1.8,
+               outline=line("#C9C3B8"))
+        i.parts.append("</g>")
+    i.fill(circle(cx, cy, r * 0.36), centre, stroke=1.8)
+
+
+@icon("daisy_art")
+def _daisy_art(i):
+    # A posy: three daisies on stems, tied with a pink bow.
+    i.stroke("M20,22 C24,34 29,44 31,56 M44,20 C40,34 34,44 32,56 M32,36 L32,56", "forest", 3)
+    i.fill(ellipse(24, 44, 5, 2.4), "leaf", hl=False, stroke=1.6)
+    i.fill(ellipse(41, 46, 5, 2.4), "leaf", hl=False, stroke=1.6)
+    _small_daisy(i, 19, 20, 13)
+    _small_daisy(i, 45, 18, 13)
+    _small_daisy(i, 32, 33, 14)
+    i.fill(path("M32,50 C26,44 20,47 22,52 C24,56 29,53 32,50 Z", (20, 44, 32, 56)), "pink",
+           hl=False, stroke=1.8)
+    i.fill(path("M32,50 C38,44 44,47 42,52 C40,56 35,53 32,50 Z", (32, 44, 44, 56)), "pink",
+           hl=False, stroke=1.8)
+    i.fill(circle(32, 50, 2.6), "rose", hl=False, stroke=1.6)
+    i.stroke("M31,52 L27,60 M33,52 L37,60", "rose", 2.2)
+
+
+@icon("daffodil_art")
+def _daffodil_art(i):
+    # One daffodil in three quarter view: six petals, the trumpet with its frilled rim, a stem
+    # and two long leaves.
+    i.stroke("M33,38 C34,46 33,52 31,60", "forest", 3.4)
+    i.fill(path("M31,60 C24,52 20,44 21,36 C26,42 29,50 31,60 Z", (20, 36, 31, 60)), "leaf",
+           hl=False, stroke=2)
+    i.fill(path("M33,60 C40,54 46,48 48,40 C42,44 37,50 33,60 Z", (33, 40, 48, 60)), "leaf",
+           hl=False, stroke=2)
+    for k in range(6):
+        i.parts.append(f'<g transform="rotate({k * 60 + 30} 32 26)">')
+        i.fill(ellipse(32, 15, 6, 10), "gold", hl=False, stroke=2)
+        i.parts.append("</g>")
+    i.fill(circle(32, 26, 9.5), "orange", stroke=2)
+    frill = " ".join("L%.1f,%.1f" % (32 + (9.5 if k % 2 else 11.2) * math.cos(math.radians(k * 20)),
+                                     26 + (9.5 if k % 2 else 11.2) * math.sin(math.radians(k * 20)))
+                     for k in range(1, 18))
+    i.ink("M43.2,26 " + frill + " Z", "orange", 1.8)
+    i.fill(circle(32, 26, 5), shade(SW["orange"], 0.75), hl=False, sh=False, stroke=1.6)
+
+
 # ---- quirks ------------------------------------------------------------------------------
 
 @icon("glutton")

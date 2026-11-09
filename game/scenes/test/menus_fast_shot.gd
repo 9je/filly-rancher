@@ -2,7 +2,8 @@ extends SceneTree
 ## THE TOWN'S COUNTERS AND THE LETTERS, FAST (Fable AAA review round 1, #8). Each menu scene on
 ## its own over a still of the world (--bg), fed the providers its tests feed it, so a look
 ## change is judged in seconds rather than after the whole valley boots on the software
-## renderer. --only picks from depot, market, letter, blackjack.
+## renderer. --only picks from depot, market, letter, blackjack. Shots: depot_empty, depot_pay,
+## depot_pay_bits, market_buy, market_buy_short, market_sell, letter_welcome.
 ##   xvfb-run ... godot --display-driver x11 --path game -s res://scenes/test/menus_fast_shot.gd -- --out=/abs/dir --bg=/abs/still.png [--only=depot,market]
 const LettersScript := preload("res://systems/letters.gd")
 var out := ""
@@ -63,6 +64,10 @@ func _run() -> void:
 		await _shot("depot_empty")
 		depot.call("set_tab", 1)
 		await _shot("depot_pay")
+		# With bits in her purse, the Pay tab's amounts as tiles.
+		depot.set("bits_provider", func() -> int: return 3000)
+		depot.call("refresh")
+		await _shot("depot_pay_bits")
 		depot.call("close")
 		depot.queue_free()
 	if _want("market"):
@@ -76,6 +81,11 @@ func _run() -> void:
 		market.call("open")
 		market.call("set_tab", 1)
 		await _shot("market_buy")
+		# A pick she cannot afford: the Buy button says what is missing.
+		market.call("point_at_row", 7)
+		await _shot("market_buy_short")
+		market.call("set_tab", 0)
+		await _shot("market_sell")
 		market.call("close")
 		market.queue_free()
 	if _want("letter"):

@@ -159,6 +159,8 @@ func _ready() -> void:
 	var dim := get_node_or_null(^"Dim") as Control
 	if dim != null:
 		dim.mouse_filter = Control.MOUSE_FILTER_STOP
+		# The world behind, softened rather than blacked out (MenuStyle.soften_dim).
+		MenuStyleScript.soften_dim(dim)
 	_close = MouseRowsScript.close_button(MouseRowsScript.CLOSE_TEXT,
 		func(_index: int) -> void: close())
 	$Centre/Panel/Margin/Column.add_child(_close)
@@ -1037,12 +1039,14 @@ func _draw_quota_card() -> void:
 	_quota_bar.max_value = maxf(1.0, float(q.get("quota", 1)))
 	_quota_bar.value = minf(float(q.get("delivered", 0)), _quota_bar.max_value)
 	_fill_stamps(int(q.get("delivered", 0)), int(q.get("quota", 0)))
-	_fill_rule_rows(String(words["rule"]))
+	_fill_rule_rows(String(words["rule"]), q)
 
 
 var _quota_stamps: HBoxContainer = null
 var _quota_rows: VBoxContainer = null
 const STAMP := 64.0
+const FACT_ICON := 76.0
+const WELL_SIZE := 56.0
 
 
 ## One stamp per pony the quota asks for; the delivered ones inked, the rest waiting, and any
@@ -1097,10 +1101,33 @@ static func rule_clauses(rule: String) -> Array[String]:
 	return out
 
 
-func _fill_rule_rows(rule: String) -> void:
+func _fill_rule_rows(rule: String, q: Dictionary = {}) -> void:
 	for c in _quota_rows.get_children():
 		_quota_rows.remove_child(c)
 		c.queue_free()
+	# THE TERMS AS PICTURES (Fable AAA round 2, #8: "Depot Pay is a bulleted 13 px rule
+	# list"): while money is owed, three tiles side by side, each a picture in its window, a
+	# big figure and a caption (what is owed, the collection day, who counts), and the one
+	# sentence the three add up to under them. A paid or closed account is one row.
+	var owed := int(q.get("balance", 0))
+	if not q.is_empty() and owed > 0 and not bool(q.get("closed", false)):
+		var days := int(q.get("days_left", 0))
+		var strip := HBoxContainer.new()
+		strip.name = "Facts"
+		strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		strip.add_theme_constant_override(&"separation", 14)
+		strip.add_child(_fact_tile("coin", str(owed), "bits owed to the Company",
+			TileStyleScript.WELL_TINTS[&"gem"]))
+		strip.add_child(_fact_tile("sun", "Day %d" % int(q.get("day", 0)),
+			"collection day, " + ("today" if days <= 0 else ("tomorrow" if days == 1
+				else "in %d days" % days)), TileStyleScript.WELL_TINTS[&"place"]))
+		strip.add_child(_fact_tile("escapee", "Coloured", "Blank Drifters do not count",
+			TileStyleScript.WELL_TINTS[&"food"]))
+		_quota_rows.add_child(strip)
+		var close := _icon_row("letter",
+			"Bits pay the balance. The account closes on a collection day, paid in full with the quota met.")
+		_quota_rows.add_child(close)
+		return
 	for clause in rule_clauses(rule):
 		var icon := "star"
 		for pair: Array in RULE_ICONS:
@@ -1110,19 +1137,61 @@ func _fill_rule_rows(rule: String) -> void:
 		_quota_rows.add_child(_icon_row(icon, clause))
 
 
+## One of the Pay tab's terms: `icon` in a lit window of `tint`, `figure` big in gold and
+## `caption` under it.
+func _fact_tile(icon: String, figure: String, caption: String, tint: Color) -> PanelContainer:
+	var tile := PanelContainer.new()
+	tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tile.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var box := TileStyleScript.box(false, false)
+	box.content_margin_top = 12.0
+	box.content_margin_bottom = 12.0
+	tile.add_theme_stylebox_override(&"panel", box)
+	var line := HBoxContainer.new()
+	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	line.add_theme_constant_override(&"separation", 14)
+	tile.add_child(line)
+	var well := TileStyleScript.well(FACT_ICON, tint)
+	var pic := Control.new()
+	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pic.set_anchors_preset(Control.PRESET_FULL_RECT)
+	pic.draw.connect(func() -> void:
+		IconSet.draw(pic, icon, Rect2(Vector2(FACT_ICON, FACT_ICON) * 0.14,
+			Vector2(FACT_ICON, FACT_ICON) * 0.68)))
+	well.add_child(pic)
+	line.add_child(well)
+	var words := VBoxContainer.new()
+	words.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	words.alignment = BoxContainer.ALIGNMENT_CENTER
+	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	words.add_theme_constant_override(&"separation", 0)
+	line.add_child(words)
+	var big := Label.new()
+	big.text = figure
+	HouseStyleScript.numeral_label(big, 32)
+	words.add_child(big)
+	var small := Label.new()
+	small.text = caption
+	small.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	small.custom_minimum_size = Vector2(170.0, 0.0)
+	HouseStyleScript.ink_label(small, 18, HouseStyleScript.CREAM, false)
+	words.add_child(small)
+	return tile
+
+
 ## A row of the house style's reading matter: a picture on a cream disc and one line beside it.
 func _icon_row(icon: String, text: String) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_theme_constant_override(&"separation", 14)
-	row.add_child(_icon_disc(icon, 40.0))
+	row.add_child(_icon_disc(icon, 46.0))
 	var l := Label.new()
 	l.text = text
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	l.custom_minimum_size = Vector2(WIDE_TILE.x - 120.0, 0.0)
-	HouseStyleScript.ink_label(l, 20, HouseStyleScript.CREAM, false)
+	HouseStyleScript.ink_label(l, 21, HouseStyleScript.CREAM, false)
 	row.add_child(l)
 	return row
 
@@ -1208,19 +1277,30 @@ func _word_tile(holder: PanelContainer, text: String, coin: bool) -> void:
 	body.add_theme_constant_override(&"separation", 14)
 	holder.add_child(body)
 	if coin:
-		var plate := TileStyleScript.disc(ICON_SIZE * 0.8)
+		# A payment is coins going out: the coin pile in its gold window, the amount as a coin.
+		var well := TileStyleScript.well(WELL_SIZE, TileStyleScript.WELL_TINTS[&"gem"])
 		var icon: Control = ShopIconScript.new()
 		icon.kind = &"sell_all"
-		icon.custom_minimum_size = Vector2(ICON_SIZE, ICON_SIZE) * 0.8
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		plate.add_child(icon)
-		body.add_child(plate)
+		icon.set_anchors_preset(Control.PRESET_FULL_RECT)
+		icon.offset_left = 6.0
+		icon.offset_top = 4.0
+		icon.offset_right = -6.0
+		icon.offset_bottom = -8.0
+		well.add_child(icon)
+		body.add_child(well)
 	var label := Label.new()
 	label.text = text
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	MenuStyleScript.style_label(label, 22, MenuStyleScript.COLOR_TITLE)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	MenuStyleScript.style_label(label, 24, MenuStyleScript.COLOR_TITLE)
+	label.add_theme_font_override(&"font", MenuStyleScript.title_font())
 	body.add_child(label)
+	var amount := int(text.get_slice(" ", 1)) if coin else -1
+	if coin and amount > 0:
+		label.text = "Pay"
+		body.add_child(TileStyleScript.price_tag(amount, "", 26))
 
 
 func _row_count() -> int:
