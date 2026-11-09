@@ -11,7 +11,7 @@ third-party material it uses is listed below with its source and licence.
 
 ## Music
 
-All music is by **Kevin MacLeod** (incompetech.com) and is licensed under Creative Commons:
+All licensed music is by **Kevin MacLeod** (incompetech.com) and is licensed under Creative Commons:
 By Attribution 4.0 (https://creativecommons.org/licenses/by/4.0/). Each track is credited as the
 licence asks:
 
@@ -24,6 +24,9 @@ licence asks:
 - "Promises to Keep" Kevin MacLeod (incompetech.com). Licensed under Creative Commons: By Attribution 4.0 License
 - "Lost Time" Kevin MacLeod (incompetech.com). Licensed under Creative Commons: By Attribution 4.0 License
 - "Backbay Lounge" Kevin MacLeod (incompetech.com). Licensed under Creative Commons: By Attribution 4.0 License
+
+The Market's tune ("Market Stalls", `music/market_stalls.ogg`) is original to this project,
+synthesised by `tools/make_market_tune.py`. "Carefree" stays on disk but no longer plays.
 
 ## Sound effects and ambience
 
