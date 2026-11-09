@@ -97,7 +97,11 @@ const PHASE_SKY_TOP: Array[Color] = [
 ## it, onto whatever Environment it is pointed at. A scene saved with the engine default
 ## (1.0, all of it off the sky) would take the whole ambient off a night zenith of luminance
 ## 0.04 and black the ranch out, and nothing in a headless gate can see that happen.
-const AMBIENT_SKY_CONTRIBUTION := 0.35
+## FLAT FILL, THE SHOW'S WAY (Fable AAA round 2, #3: "the terminator on the lavender pony's
+## muzzle is a soft gradient"). The toon light is banded already; the gradient came from the
+## sky's share of the ambient, which varies with the surface normal and so laid a smooth
+## shade over every body. All of the fill now comes off the flat fill colour.
+const AMBIENT_SKY_CONTRIBUTION := 0.0
 
 ## DAY's 0.32 is likewise ranch.tscn's own ambient_light_energy. NIGHT's 0.70 is not an art
 ## number at all, it is the answer to an arithmetic one. Ambient is what fills the shadows
@@ -110,7 +114,7 @@ const AMBIENT_SKY_CONTRIBUTION := 0.35
 ##
 ## IT IS THE NIGHT'S BASE, NOT A FLOOR UNDER IT, and the night is the one phase whose
 ## ordering against the day is NOT defined here: see the note on NIGHT_WEATHER_FLOOR.
-const PHASE_AMBIENT_ENERGY: Array[float] = [0.28, 0.32, 0.22, 0.70]
+const PHASE_AMBIENT_ENERGY: Array[float] = [0.28, 0.32, 0.22, 0.48]
 
 ## THE COLOUR OF THE FILL LIGHT, which is a separate question from how much of it there is.
 ## ranch.tscn's Environment now takes only 35% of its ambient colour off the sky and 65% off

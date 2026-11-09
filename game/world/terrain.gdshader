@@ -5,6 +5,8 @@ render_mode cull_back, specular_disabled;
 // band, so rolling ground reads as the show's painted backgrounds instead of cutting hard
 // terminator lines across every hill. `dread` greys it with everything else.
 global uniform float dread;
+global uniform float night_glow;
+global uniform float wet;
 uniform vec3 shadow_tint : source_color = vec3(0.74, 0.78, 0.92);
 uniform float shadow_fill = 0.42;
 uniform float band_softness = 0.16;
@@ -73,6 +75,14 @@ uniform float ridge_high = 6.0;
 uniform float fade_near = 30.0;
 uniform float fade_far = 70.0;
 uniform float ground_roughness = 0.95;
+// THE SHOW'S MEADOW IS PAINTED IN PATCHES (Fable AAA round 2, #2: "one green, no breakup ...
+// the strongest Roblox baseplate tell"). Hard-edged patches a few metres across in a sunnier
+// and a deeper green, flat fills with crisp edges the way the show's background painters lay
+// a field in, plus clover dots close to the lens.
+uniform float patch_metres = 6.5;
+uniform float patch_light = 0.14;
+uniform float patch_dark = 0.13;
+uniform float clover_amount = 0.10;
 
 // THE ROAD, PAINTED RATHER THAN LAID. A rigid dirt_road.glb plate cannot follow 0.70 m of
 // relief across a 2.28 m footprint -- it either buries its far end or floats its near one,
@@ -198,6 +208,19 @@ void fragment() {
 	float grain = (value_noise(stroke * vec2(1.0, 4.0) / 1.0) - 0.5) * 2.0;
 	base *= 1.0 + grain * grain_amount * fine_fade;
 
+	vec2 pq = v_world_pos.xz / patch_metres;
+	float pn = value_noise(pq + vec2(3.7, 9.2)) * 0.62 + value_noise(pq * 2.7 + vec2(1.1, 5.3)) * 0.38;
+	float lit_patch = smoothstep(0.645, 0.665, pn);
+	float deep_patch = smoothstep(0.355, 0.335, pn);
+	base *= 1.0 + lit_patch * patch_light - deep_patch * patch_dark;
+	base = mix(base, base * vec3(1.07, 1.04, 0.80), lit_patch * 0.7);
+	base = mix(base, base * vec3(0.88, 1.0, 1.10), deep_patch * 0.6);
+	// Clover: small round darker dots in drifts, only near enough to read as dots.
+	float drift_c = smoothstep(0.55, 0.7, value_noise(v_world_pos.xz / 3.3 + vec2(8.8, 2.2)));
+	vec2 cc = fract(v_world_pos.xz * 2.2) - 0.5;
+	float dot_c = smoothstep(0.24, 0.20, length(cc)) * step(0.55, value_noise(floor(v_world_pos.xz * 2.2) * 1.37));
+	base *= 1.0 - dot_c * drift_c * clover_amount * fine_fade;
+
 		// A SLOPE YOU CAN SEE IS A SLOPE YOU CAN PLAN A WALK AROUND. Hillsides and the lake basin
 	// walls become earth, which is both more believable and free relief reading.
 	float slope = 1.0 - clamp(v_world_normal.y, 0.0, 1.0);
@@ -232,6 +255,14 @@ void fragment() {
 		float rut = 1.0 - smoothstep(0.0, 0.16, abs(pd - path_half_width * 0.55));
 		float pebble = step(0.8, value_noise(v_world_pos.xz * 3.1)) * value_noise(v_world_pos.xz * 7.3);
 		vec3 road = dirt * (1.0 + 0.16 * crown - 0.18 * rut - 0.22 * pebble);
+		// RAIN LEAVES PUDDLES (Fable AAA round 2, #7: "no wet ground, no puddles"): flat
+		// sky-grey pools in the ruts and dips of the track, a pale rim on their far side.
+		float pn2 = value_noise(v_world_pos.xz / 1.7 + vec2(4.4, 1.9)) + rut * 0.18;
+		float pool = smoothstep(0.66, 0.68, pn2) * wet;
+		float rim = (smoothstep(0.64, 0.66, pn2) - smoothstep(0.66, 0.68, pn2)) * wet;
+		road = mix(road, srgb_to_linear(vec3(0.50, 0.55, 0.66)), pool * 0.85);
+		road = mix(road, road * 0.62, rim * 0.6);
+		road *= 1.0 - 0.22 * wet * (1.0 - pool);
 		base = mix(base, road, path);
 
 		// A WORN PATH READS AS PACKED, LIGHTER EARTH EVEN IN SHADOW -- REAL ambient-only
@@ -255,6 +286,13 @@ void fragment() {
 
 	float lum = dot(base, vec3(0.299, 0.587, 0.114));
 	base = mix(base, vec3(lum) * vec3(0.96, 0.99, 1.02), clamp(dread, 0.0, 1.0) * 0.55);
+	// MOONLIT, NOT A DIM NOON (Fable AAA round 2, #7: "fully lit saturated green grass under a
+	// starry sky"): at night the field loses most of its colour toward a blue-grey, and rain
+	// darkens everything a shade more, the way soaked ground reads.
+	float ng = clamp(night_glow, 0.0, 1.0);
+	base = mix(base, vec3(lum) * vec3(0.78, 0.9, 1.18), ng * 0.5);
+	base *= 1.0 - 0.2 * ng;
+	base *= 1.0 - 0.14 * clamp(wet, 0.0, 1.0);
 	ALBEDO = base;
 	ROUGHNESS = ground_roughness;
 	SPECULAR = 0.0;

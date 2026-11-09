@@ -124,14 +124,18 @@ const PENNANT_COLOR := Color(1.0, 0.78, 0.25)
 ## world node must not depend on one. Green-for-take and red-for-refuse in the same
 ## register the menus speak, chosen for this ground plane, not copied from any const.
 enum Ghost { OFF, VALID, REFUSED }
-const GHOST_VALID_COLOR := Color(0.443, 0.741, 0.463, 0.34)
-const GHOST_REFUSED_COLOR := Color(0.796, 0.373, 0.361, 0.34)
+const GHOST_VALID_COLOR := Color(1.0, 0.86, 0.45, 0.7)
+const GHOST_REFUSED_COLOR := Color(0.95, 0.42, 0.40, 0.7)
 ## The filled footprint sits a hair above the marker boards so the two never z fight.
 const GHOST_HEIGHT := 0.05
-## A low upstand around the edge, so the footprint reads as a volume the fence will occupy
-## rather than as a stain on the grass, without pretending to be the fence itself.
-const GHOST_WALL_HEIGHT := 0.55
-const GHOST_WALL_WIDTH := 0.14
+## THE FENCE THAT WILL STAND HERE, drawn in light (Fable AAA round 2, #5: the old low
+## translucent upstands read as "permanently translucent glass boxes"). Posts and two rails
+## at the real fence's height, glowing gold where it can go up and red where it cannot, over
+## a faint wash on the ground.
+const GHOST_WALL_HEIGHT := 0.95
+const GHOST_WALL_WIDTH := 0.07
+const GHOST_POST_EVERY := 1.3
+const GHOST_FLOOR_ALPHA := 0.16
 
 ## Emitted when the pen standing here grew to a bigger plot in place (upgrade()).
 signal upgraded(plot: PlotData, node: Node)
@@ -397,16 +401,29 @@ func set_ghost(state: int) -> void:
 	_ghost.name = "PlotGhost"
 	var colour: Color = GHOST_VALID_COLOR if _ghost_state == Ghost.VALID else GHOST_REFUSED_COLOR
 	var mat := _ghost_material(colour)
+	var wash := _ghost_material(Color(colour.r, colour.g, colour.b, GHOST_FLOOR_ALPHA))
 	var span := STAKE_INSET * 2.0
 	_ghost_box("Floor", Vector3(span, GHOST_HEIGHT, span),
-		Vector3(0.0, GHOST_HEIGHT * 0.5, 0.0), mat)
+		Vector3(0.0, GHOST_HEIGHT * 0.5, 0.0), wash)
+	var w := GHOST_WALL_WIDTH
 	for s in [-1.0, 1.0]:
-		_ghost_box("WallX%s" % ("N" if s < 0.0 else "P"),
-			Vector3(GHOST_WALL_WIDTH, GHOST_WALL_HEIGHT, span),
-			Vector3(s * STAKE_INSET, GHOST_WALL_HEIGHT * 0.5, 0.0), mat)
-		_ghost_box("WallZ%s" % ("N" if s < 0.0 else "P"),
-			Vector3(span, GHOST_WALL_HEIGHT, GHOST_WALL_WIDTH),
-			Vector3(0.0, GHOST_WALL_HEIGHT * 0.5, s * STAKE_INSET), mat)
+		var tag := "N" if s < 0.0 else "P"
+		for rail_y: float in [GHOST_WALL_HEIGHT * 0.45, GHOST_WALL_HEIGHT * 0.88]:
+			var r := "%d" % int(rail_y * 100.0)
+			_ghost_box("RailX%s%s" % [tag, r], Vector3(w, w, span),
+				Vector3(s * STAKE_INSET, rail_y, 0.0), mat)
+			_ghost_box("RailZ%s%s" % [tag, r], Vector3(span, w, w),
+				Vector3(0.0, rail_y, s * STAKE_INSET), mat)
+	var n := maxi(int(span / GHOST_POST_EVERY), 1)
+	var post := Vector3(w * 1.6, GHOST_WALL_HEIGHT, w * 1.6)
+	for i in n + 1:
+		var t := -STAKE_INSET + span * float(i) / float(n)
+		for s in [-1.0, 1.0]:
+			_ghost_box("PostX%d%s" % [i, "N" if s < 0.0 else "P"], post,
+				Vector3(s * STAKE_INSET, GHOST_WALL_HEIGHT * 0.5, t), mat)
+			if i > 0 and i < n:
+				_ghost_box("PostZ%d%s" % [i, "N" if s < 0.0 else "P"], post,
+					Vector3(t, GHOST_WALL_HEIGHT * 0.5, s * STAKE_INSET), mat)
 	add_child(_ghost)
 
 
@@ -639,6 +656,9 @@ func _ghost_material(colour: Color) -> StandardMaterial3D:
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.cull_mode = BaseMaterial3D.CULL_BACK
+	# A touch over white so the light-fence glows a little under the bloom.
+	mat.emission_enabled = true
+	mat.emission = Color(colour.r, colour.g, colour.b) * 0.35
 	return mat
 
 

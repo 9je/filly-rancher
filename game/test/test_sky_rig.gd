@@ -113,8 +113,10 @@ func test_a_stormy_night_keeps_the_ambient_that_makes_it_playable() -> void:
 	# is allowed to get. It is a ruling, not a taste, and nothing else in the suite pins it:
 	# the ordering tests are about light_energy and sky luminance, and both hold at any
 	# ambient at all.
-	assert_almost_eq(SkyRigScript.ambient_energy(NIGHT, STORM), 0.49, 0.001,
-		"a stormy night's ambient is 0.70 base x 0.7 night-only floor = 0.49")
+	# (Since the fill went flat, AMBIENT_SKY_CONTRIBUTION 0, the base is 0.48: the same 0.12
+	# of effective luminance off the storm's moonlight alone, 0.336 x 0.36.)
+	assert_almost_eq(SkyRigScript.ambient_energy(NIGHT, STORM), 0.336, 0.001,
+		"a stormy night's ambient is 0.48 base x 0.7 night-only floor = 0.336")
 
 
 func test_the_night_sky_is_darker_than_the_day_sky() -> void:

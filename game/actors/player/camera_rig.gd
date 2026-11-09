@@ -848,7 +848,7 @@ func _update_subject_fade() -> void:
 		if _subject_meshes.is_empty():
 			return
 
-	var opacity := subject_opacity_for_distance(get_arm_distance())
+	var opacity := subject_opacity_for_distance(get_arm_distance()) if _lens_live() else 1.0
 	if is_equal_approx(opacity, _subject_fade):
 		return
 	_subject_fade = opacity
@@ -879,6 +879,13 @@ func _update_subject_fade() -> void:
 func _update_near_fade() -> void:
 	if _camera == null or not is_inside_tree():
 		return
+	if not _lens_live():
+		# Another camera has the screen (a cinematic, a close-up): nobody is at this lens.
+		for body: Variant in _near_faded.keys():
+			if is_instance_valid(body):
+				_fade_body(body as Node3D, 1.0)
+		_near_faded.clear()
+		return
 	var lens := _camera.global_position
 	var q := PhysicsShapeQueryParameters3D.new()
 	var ball := SphereShape3D.new()
@@ -900,6 +907,14 @@ func _update_near_fade() -> void:
 			if is_instance_valid(body):
 				_fade_body(body as Node3D, 1.0)
 			_near_faded.erase(body)
+
+
+## True while this rig's camera is the one on screen. The fades are about what stands at
+## THIS lens (Fable AAA round 2, #4: a cut-in close-up showed Spike and a follower stippled
+## because they stood by the gameplay camera, which was not even drawing).
+func _lens_live() -> bool:
+	var vp := get_viewport()
+	return vp == null or vp.get_camera_3d() == null or vp.get_camera_3d() == _camera
 
 
 func _fade_body(body: Node3D, opacity: float) -> void:

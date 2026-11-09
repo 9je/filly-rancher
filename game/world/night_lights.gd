@@ -23,6 +23,9 @@ var _lamps: Array[OmniLight3D] = []
 var _bulbs: Array[StandardMaterial3D] = []
 var _level := 0.0
 var _want := 0.0
+## Rain on the ground (0 dry, 1 soaked), eased like the lamps; the `wet` shader global.
+var _wet := 0.0
+var _wet_want := 0.0
 var _poll := 0.0
 
 
@@ -72,6 +75,8 @@ func _build() -> void:
 	_poll = 0.0
 	_read_phase()
 	_level = _want
+	_wet = _wet_want
+	RenderingServer.global_shader_parameter_set(&"wet", _wet)
 	_write()
 
 
@@ -80,6 +85,9 @@ func _process(delta: float) -> void:
 	if _poll <= 0.0:
 		_poll = POLL_SECONDS
 		_read_phase()
+	if not is_equal_approx(_wet, _wet_want):
+		_wet = move_toward(_wet, _wet_want, delta / (FADE_SECONDS * 3.0))
+		RenderingServer.global_shader_parameter_set(&"wet", _wet)
 	if is_equal_approx(_level, _want):
 		return
 	_level = move_toward(_level, _want, delta / FADE_SECONDS)
@@ -93,13 +101,28 @@ func _read_phase() -> void:
 	var p := int(w.call("phase"))
 	_want = 1.0 if p == WorldStateScript.Phase.NIGHT \
 		else DUSK_LEVEL if p == WorldStateScript.Phase.DUSK else 0.0
+	var wx := int(w.call("weather"))
+	_wet_want = 1.0 if wx == WorldStateScript.Weather.RAIN or wx == WorldStateScript.Weather.STORM \
+		else 0.0
 
 
 ## Lit at `level` (0 day, 1 full night), now. For renders and tests.
 func set_level(level: float) -> void:
 	_want = level
 	_level = level
+	_read_wet_now()
 	_write()
+
+
+func _read_wet_now() -> void:
+	var w: Object = get_parent().get("_world") if get_parent() != null else null
+	if w == null:
+		return
+	var wx := int(w.call("weather"))
+	_wet_want = 1.0 if wx == WorldStateScript.Weather.RAIN or wx == WorldStateScript.Weather.STORM \
+		else 0.0
+	_wet = _wet_want
+	RenderingServer.global_shader_parameter_set(&"wet", _wet)
 
 
 ## A soft billboard disc that glows with the night_glow global (shaders/halo.gdshader).

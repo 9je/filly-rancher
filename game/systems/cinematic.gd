@@ -63,10 +63,23 @@ func _ready() -> void:
 	_caption = Label.new()
 	_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_caption.add_theme_font_override(&"font", MenuStyle.title_font())
-	_caption.add_theme_font_size_override(&"font_size", 34)
-	_caption.add_theme_color_override(&"font_color", Color(1.0, 0.97, 0.9))
-	_caption.add_theme_color_override(&"font_shadow_color", Color(0.1, 0.05, 0.15, 0.8))
-	_caption.add_theme_constant_override(&"shadow_offset_y", 3)
+	# A CAPTION CARD, NOT A SUBTITLE (Fable AAA round 2, #6: "small plain white text at the
+	# bottom"): the title face on a plum card with a gold rim, the game's own treatment.
+	_caption.add_theme_font_size_override(&"font_size", MenuStyle.font_px(38))
+	_caption.add_theme_color_override(&"font_color", Color(1.0, 0.95, 0.82))
+	var card := StyleBoxFlat.new()
+	card.bg_color = Color(0.25, 0.13, 0.32, 0.94)
+	card.border_color = Color(0.98, 0.78, 0.36)
+	card.set_border_width_all(3)
+	card.border_width_bottom = 5
+	card.set_corner_radius_all(26)
+	card.content_margin_left = 34.0
+	card.content_margin_right = 34.0
+	card.content_margin_top = 8.0
+	card.content_margin_bottom = 10.0
+	card.shadow_color = Color(0.05, 0.02, 0.08, 0.45)
+	card.shadow_size = 10
+	_caption.add_theme_stylebox_override(&"normal", card)
 	_caption.modulate.a = 0.0
 	add_child(_caption)
 	_flash = ColorRect.new()
@@ -162,6 +175,7 @@ func _shot(shot: Dictionary) -> void:
 		call.call()
 	var caption := String(shot.get("caption", ""))
 	_caption.text = caption
+	_place_caption()
 	var cap_target := 1.0 if caption != "" else 0.0
 	var e := 0.0
 	while e < t and not _skip:
@@ -203,13 +217,22 @@ func _bars(to: float) -> void:
 	var h := size.y * BAR_FRACTION
 	_top.size = Vector2(size.x, h)
 	_bottom.size = Vector2(size.x, h)
-	_caption.position = Vector2(0, size.y - h - 70.0)
-	_caption.size = Vector2(size.x, 60.0)
+	_place_caption()
 	_skip_hint.position = Vector2(size.x - 260.0, size.y - h * 0.5 - 14.0)
 	var tw := create_tween().set_parallel(true)
 	tw.tween_property(_top, "position:y", -h + h * to, BAR_SECONDS)
 	tw.tween_property(_bottom, "position:y", size.y - h * to, BAR_SECONDS)
 	await tw.finished
+
+
+## The card sits centred just above the lower bar, as wide as its line.
+func _place_caption() -> void:
+	var size := get_viewport().get_visible_rect().size
+	var h := size.y * BAR_FRACTION
+	_caption.size = Vector2.ZERO
+	var want := _caption.get_combined_minimum_size()
+	_caption.size = want
+	_caption.position = Vector2((size.x - want.x) * 0.5, size.y - h - want.y - 26.0)
 
 
 ## THE FRAME IS THE SCENE'S (P8 render check: the HUD and a talk box sat over Derpy's crash).

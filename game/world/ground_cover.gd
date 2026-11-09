@@ -24,10 +24,15 @@ const FLOWER_COLOURS: Array[Color] = [Color(1.0, 1.0, 0.97), Color(1.0, 0.72, 0.
 	Color(1.0, 0.86, 0.36), Color(0.80, 0.70, 1.0)]
 
 var _rng := RandomNumberGenerator.new()
+## Where the grass grows thick and where it thins (Fable AAA round 2, #2: "the same spiky
+## tuft every ~1.5 m at the same scale and rotation"): clumps drift in and out in drifts.
+var _drift := FastNoiseLite.new()
 
 
 func build(terrain: Node, region_list: Array) -> int:
 	_rng.seed = 20261109
+	_drift.seed = 1109
+	_drift.frequency = 0.09
 	var space := get_world_3d().direct_space_state
 	var tufts := {}
 	var flowers := {}
@@ -37,8 +42,8 @@ func build(terrain: Node, region_list: Array) -> int:
 	while x < half:
 		var z := -half
 		while z < half:
-			var px := x + _rng.randf_range(-0.45, 0.45) * STEP
-			var pz := z + _rng.randf_range(-0.45, 0.45) * STEP
+			var px := x + _rng.randf_range(-0.5, 0.5) * STEP
+			var pz := z + _rng.randf_range(-0.5, 0.5) * STEP
 			z += STEP
 			var p := Vector2(px, pz)
 			var path := TerrainScript.path_distance(p)
@@ -47,7 +52,8 @@ func build(terrain: Node, region_list: Array) -> int:
 			var verge := path < 2.6
 			var roll := _rng.randf()
 			var is_flower := roll < FLOWERS
-			if not is_flower and roll > (VERGE if verge else MEADOW):
+			var thick := 0.5 + 0.5 * _drift.get_noise_2d(px, pz)
+			if not is_flower and roll > (VERGE if verge else MEADOW * lerpf(0.25, 2.0, thick)):
 				continue
 			var y := float(terrain.call("height_at", px, pz))
 			var q := PhysicsRayQueryParameters3D.create(Vector3(px, y + 6.0, pz), Vector3(px, y - 1.0, pz))
@@ -61,10 +67,15 @@ func build(terrain: Node, region_list: Array) -> int:
 				xf = xf.scaled_local(Vector3.ONE * _rng.randf_range(0.8, 1.2))
 				_add(flowers, key, xf, FLOWER_COLOURS[_rng.randi() % FLOWER_COLOURS.size()])
 			else:
-				var s := _rng.randf_range(0.75, 1.25) * (1.15 if verge else 1.0)
-				xf = xf.scaled_local(Vector3(s, s * _rng.randf_range(0.85, 1.2), s))
-				# A shade darker and warmer than the ground under it, so a clump reads as a clump.
-				_add(tufts, key, xf, grass.darkened(0.10).lerp(Color(0.30, 0.62, 0.20), 0.25))
+				var s := _rng.randf_range(0.55, 1.45) * (1.15 if verge else 1.0) * lerpf(0.8, 1.2, thick)
+				xf.basis = xf.basis * Basis(Vector3.RIGHT, _rng.randf_range(-0.2, 0.2))
+				xf = xf.scaled_local(Vector3(s, s * _rng.randf_range(0.7, 1.5), s))
+				# A shade darker and warmer than the ground under it, so a clump reads as a clump;
+				# each one a little lighter or deeper than the next.
+				var tint := grass.darkened(0.10).lerp(Color(0.30, 0.62, 0.20), 0.25)
+				tint = tint.lightened(_rng.randf_range(0.0, 0.12)) if _rng.randf() < 0.5 \
+					else tint.darkened(_rng.randf_range(0.0, 0.12))
+				_add(tufts, key, xf, tint)
 			placed += 1
 		x += STEP
 	var tuft_mesh := _tuft_mesh()

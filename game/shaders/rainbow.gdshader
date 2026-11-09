@@ -30,5 +30,5 @@ void fragment() {
 	// A slow shimmer flowing out of the Works, as if it were being poured.
 	float flow = 0.9 + 0.1 * sin((UV.x * 40.0 - TIME * flow_speed * 40.0));
 	ALBEDO = c * brightness * flow;
-	ALPHA = alpha * edge * ends * shown * (1.0 - 0.45 * night_glow);
+	ALPHA = alpha * edge * ends * shown * (1.0 - 0.92 * night_glow);
 }

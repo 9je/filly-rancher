@@ -39,6 +39,10 @@ func _ready() -> void:
 	_mat.set_shader_parameter(&"moon_dir", basis.z)
 	s.material = _mat
 	mesh = s
+	# The sun is painted by the dome (shaders/sky_dome.gdshader); the light only lights.
+	var sun := _sun()
+	if sun != null:
+		sun.sky_mode = DirectionalLight3D.SKY_MODE_LIGHT_ONLY
 	cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	extra_cull_margin = 16384.0
 	_tick(0.0, true)
@@ -71,5 +75,16 @@ func _tick(delta: float, snap: bool) -> void:
 		want = STARS[clampi(int(world.call("phase")), 0, 3)]
 	_stars = want if snap else move_toward(_stars, want, delta / EASE_SECONDS)
 	_mat.set_shader_parameter(&"stars", _stars)
+	var sun := _sun()
+	if sun != null:
+		var to_sun := sun.global_basis.z
+		_mat.set_shader_parameter(&"sun_dir", to_sun)
+		# By day only (at night the light is the moon's), faded under the horizon and in murk.
+		var show := clampf(1.0 - _stars * 1.4, 0.0, 1.0) * smoothstep(-0.06, 0.04, to_sun.y)
+		_mat.set_shader_parameter(&"sun_show", show * clampf(1.3 - fog * 60.0, 0.0, 1.0))
 	_drift = fmod(_drift + delta / DRIFT_SECONDS, 1.0)
 	_mat.set_shader_parameter(&"drift", _drift)
+
+
+func _sun() -> DirectionalLight3D:
+	return get_parent().get_node_or_null(^"Sun") as DirectionalLight3D if get_parent() != null else null

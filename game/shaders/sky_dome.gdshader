@@ -21,6 +21,11 @@ uniform float cloud_alpha : hint_range(0.0, 1.0) = 1.0;
 uniform float drift = 0.0;
 uniform float stars : hint_range(0.0, 1.0) = 0.0;
 uniform vec3 moon_dir = vec3(0.4, 0.62, -0.67);
+// THE SUN (Fable AAA round 2, #1: the engine's own sun disc came out ringed with black dots,
+// "a selection gizmo left on"). Drawn here instead, the show's way: a flat warm disc with a
+// soft halo and no edge of any kind. The light no longer draws itself into the sky.
+uniform vec3 sun_dir = vec3(0.6, 0.5, 0.6);
+uniform float sun_show : hint_range(0.0, 1.0) = 1.0;
 
 varying vec3 dir;
 
@@ -65,6 +70,16 @@ void fragment() {
 		vec4 glow = vec4(vec3(0.75, 0.82, 1.0), exp(-max(md - 3.0, 0.0) / 5.0) * 0.35 * (1.0 - disc));
 		col = over(over(moon, glow), col);
 		col.a *= stars;
+	}
+	if (sun_show > 0.0) {
+		float sd = degrees(acos(clamp(dot(d, normalize(sun_dir)), -1.0, 1.0)));
+		float disc = smoothstep(4.4, 4.1, sd);
+		vec4 sun = vec4(vec3(1.7, 1.55, 1.1), disc);
+		vec4 halo = vec4(vec3(1.25, 1.15, 0.9), (exp(-max(sd - 4.2, 0.0) / 7.0) * 0.55
+				+ exp(-max(sd - 4.2, 0.0) / 1.6) * 0.35) * (1.0 - disc));
+		vec4 s = over(sun, halo);
+		s.a *= sun_show;
+		col = over(s, col);
 	}
 	if (v >= 0.0 && v <= 1.0) {
 		vec4 cl = textureLod(clouds, vec2(u + drift, v), 0.0);
