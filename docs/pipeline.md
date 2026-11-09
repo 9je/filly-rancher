@@ -1692,6 +1692,8 @@ durable home for a decision Phase 1 planning needs.
 
 After the Ponyville houses (pv_*.glb) are converted, run `python3 tools/window_masks.py` once. It keys the painted lavender and blue window panes out of each house texture and writes `<glb>_win_<image name>.png` beside the model. ToonStyler finds the mask by the texture's name, and the toon shader lights masked texels by the `night_glow` global after dark. Pass `--sheet out.png` for a contact sheet with the masks painted gold, to check what it caught.
 
+The masks overwrite themselves, so never clear them with a glob: on 2026-11-09 `rm *_win*.png` also took saa_barn_windows_doors.png, saa_barn_top_windows.png and the kenney_windmill textures. Godot extracted those from the .glb, and it does not extract them again while their .import files exist. All of them were restored from the .glb, and their .import files were rebuilt with the original UIDs. Without that, every ranch boot logged invalid-UID warnings, and 54 tests failed on them.
+
 ## 5f. The painted horizon: tools/paint_skyband.py
 
 `python3 tools/paint_skyband.py` repaints game/assets/sky/skyband.png (the mountain ring and Canterlot) and clouds.png, which the sky dome wraps round the world. The output is deterministic and committed.
