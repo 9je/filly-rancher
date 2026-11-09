@@ -191,7 +191,7 @@ def paint_clouds():
     az = -180.0
     while az < 180.0:
         elev = rng.uniform(9.0, 30.0)
-        size = rng.uniform(2.6, 5.0) * (1.0 - (elev - 9.0) / 60.0)
+        size = rng.uniform(1.8, 3.6) * (1.0 - (elev - 9.0) / 60.0)
         clouds.append(cloud(None, rng, az, elev, size))
         az += rng.uniform(11, 21)
     fill = np.zeros((H * SS, W * SS), bool)

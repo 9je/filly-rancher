@@ -258,10 +258,14 @@ void fragment() {
 		// RAIN LEAVES PUDDLES (Fable AAA round 2, #7: "no wet ground, no puddles"): flat
 		// sky-grey pools in the ruts and dips of the track, a pale rim on their far side.
 		float pn2 = value_noise(v_world_pos.xz / 1.7 + vec2(4.4, 1.9)) + rut * 0.18;
-		float pool = smoothstep(0.66, 0.68, pn2) * wet;
-		float rim = (smoothstep(0.64, 0.66, pn2) - smoothstep(0.66, 0.68, pn2)) * wet;
-		road = mix(road, srgb_to_linear(vec3(0.50, 0.55, 0.66)), pool * 0.85);
-		road = mix(road, road * 0.62, rim * 0.6);
+		// Soft-edged, sky-pale and partly see-through, with a lighter streak of reflected sky
+		// across each (Fable round 4: "hard-edged grey polygons that read as missing textures").
+		float pool = smoothstep(0.63, 0.71, pn2) * wet;
+		float rim = (smoothstep(0.60, 0.65, pn2) - smoothstep(0.65, 0.70, pn2)) * wet;
+		float glint = smoothstep(0.42, 0.5, fract(dot(v_world_pos.xz, vec2(0.35, 0.9)) * 0.6)) * (1.0 - smoothstep(0.5, 0.58, fract(dot(v_world_pos.xz, vec2(0.35, 0.9)) * 0.6)));
+		road = mix(road, srgb_to_linear(vec3(0.62, 0.68, 0.80)), pool * 0.6);
+		road = mix(road, srgb_to_linear(vec3(0.86, 0.90, 0.96)), pool * glint * 0.35);
+		road = mix(road, road * 0.78, rim * 0.5);
 		road *= 1.0 - 0.22 * wet * (1.0 - pool);
 		base = mix(base, road, path);
 
