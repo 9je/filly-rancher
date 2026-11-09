@@ -493,10 +493,21 @@ func _retint_mane_style_grid() -> void:
 	var mane_index: int = _look.mane if _look != null else 0
 	var race: int = _look.race if _look != null else PlayerLookScript.RACE_UNICORN
 	var count := PlayerLookScript.style_count(race)
+	# PICTURES, NOT NUMBERS (P8 item 37): each style's own baked card
+	# (scenes/test/mane_icons.gd), when the cards are there; numbered swatches otherwise.
+	var icons: Array[Texture2D] = []
 	for i in count:
-		swatches.append(_palette.mane_at(mane_index))
-		labels.append(str(i + 1))
+		var path := STYLE_ICONS + "mane_%d_%d.png" % [race, i]
+		if ResourceLoader.exists(path):
+			icons.append(load(path) as Texture2D)
+	var pictures := icons.size() == count
+	for i in count:
+		swatches.append(Color(0.93, 0.9, 0.84) if pictures else _palette.mane_at(mane_index))
+		labels.append("" if pictures else str(i + 1))
 	_mane_style_grid.set_swatches(swatches, labels)
+	if not pictures:
+		icons.clear()
+	_mane_style_grid.set_icons(icons)
 
 
 ## THE FOUR ABSOLUTE SETTERS THE GRIDS CALL. cycle_*() stays and is now written in terms of
