@@ -25,7 +25,9 @@ four [marigold happy nod] There's a Drifter grazing just past the gate. Why not 
 === tumble_meets
 speaker: tumble
 priority: 90
-when: {"flags_all": ["has_scoop"], "flags_none": ["tumble_joined"]}
+# After the first catches and Fennel's pens (P8, playtest 2026-11-08 item 15: she tried to
+# talk over Marigold's welcome). Found a little later, not on top of the arrival.
+when: {"flags_all": ["has_scoop", "met_fennel"], "flags_none": ["tumble_joined"]}
 
 start [tumble happy hop] Hee! You missed! Do it again!
   -> two

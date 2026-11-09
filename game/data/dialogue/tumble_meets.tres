@@ -10,7 +10,7 @@ priority = 90
 once = true
 bark = false
 when = {
-"flags_all": ["has_scoop"],
+"flags_all": ["has_scoop", "met_fennel"],
 "flags_none": ["tumble_joined"]
 }
 nodes = Array[Dictionary]([{
