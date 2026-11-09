@@ -471,3 +471,20 @@ func test_a_paid_balance_says_how_the_account_closes() -> void:
 		"days_left": 3, "balance": 0, "closed": true})
 	assert_true(String(closed["rule"]).contains("Account closed"))
 	assert_true(String(closed["headline"]).contains("Quota met"))
+
+
+## P8, playtest 2026-11-08 item 69: one press sends every Bloomed Drifter, and nobody else.
+func test_deliver_all_sends_only_the_bloomed_drifters() -> void:
+	_menu.rows_provider = func() -> Array[Dictionary]:
+		return [
+			{"uid": &"a", "name": "A", "stock": true, "bloomed": true, "credit": 300},
+			{"uid": &"b", "name": "B", "stock": true, "blank": true, "credit": 0},
+			{"uid": &"c", "name": "C", "stock": true, "bloomed": true, "credit": 300},
+			{"uid": &"d", "name": "Rarity", "stock": false, "credit": 1200},
+		] as Array[Dictionary]
+	_menu.open()
+	var sent: Array = []
+	_menu.deliver_requested.connect(func(uid: StringName) -> void: sent.append(uid))
+	assert_eq(_menu.bloomed_rows().size(), 2)
+	_menu.deliver_all_bloomed()
+	assert_eq(sent, [&"a", &"c"])

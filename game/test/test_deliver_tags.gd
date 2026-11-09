@@ -37,7 +37,7 @@ func _tags() -> Array:
 	var out: Array = []
 	for label: Label in _menu.find_children("*", "Label", true, false):
 		var t := label.text
-		if t.begins_with("one of a kind") or t.begins_with("from the crowd") \
+		if t.begins_with("one of a kind") or t.begins_with("Drifter,") \
 				or t.contains("of her here"):
 			out.append(t)
 	return out

@@ -39,6 +39,8 @@ const SCROLL_MAX := 600.0
 const PONY_TILE := Vector2(546.0, 76.0)
 const WIDE_TILE := Vector2(1104.0, 64.0)
 const ICON_SIZE := 44.0
+## A baked portrait is drawn bigger than the race icon it replaces: a face wants the room.
+const FACE_SIZE := 64.0
 
 ## The payout's beats, in seconds: each card counts up for PAYOUT_ROLL, holds its total for
 ## PAYOUT_HOLD (the next card starts as this one's coin leaves), and the purse rolls to the new
@@ -161,6 +163,7 @@ func _ready() -> void:
 	$Centre/Panel/Margin/Column.add_child(_close)
 	_build_purse()
 	_build_quota_card()
+	_build_deliver_all()
 	_fx = MenuStyleScript.effects_layer(self)
 
 
@@ -470,6 +473,7 @@ func refresh() -> void:
 	_built_frame = Engine.get_process_frames()
 	_sync_purse()
 	_draw_quota_card()
+	_draw_deliver_all()
 	MenuStyleScript.apply_title(_title)
 	var lines: Array[String] = drawn_lines()
 	var ponies: Array[Dictionary] = []
@@ -775,13 +779,24 @@ func _pony_tile(holder: PanelContainer, pony: Dictionary) -> void:
 	body.add_theme_constant_override(&"h_separation", 14)
 	holder.add_child(body)
 	var coat: Color = pony.get("coat_color", PaintScript.CARD_FACE)
-	var plate := TileStyleScript.disc(ICON_SIZE, coat)
+	var face: Texture2D = pony.get("portrait", null)
+	var plate := TileStyleScript.disc(FACE_SIZE if face != null else ICON_SIZE, coat)
 	body.add_child(plate)
-	var icon: Control = CatchIconScript.new()
-	icon.kind = StringName(pony.get("race", &"earth"))
-	icon.custom_minimum_size = Vector2(ICON_SIZE, ICON_SIZE)
-	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	plate.add_child(icon)
+	if face != null:
+		# HER FACE, baked from her own body (P8 item 69; game/ui/portrait_baker.gd).
+		var pic := TextureRect.new()
+		pic.texture = face
+		pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		pic.custom_minimum_size = Vector2(FACE_SIZE, FACE_SIZE)
+		pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		plate.add_child(pic)
+	else:
+		var icon: Control = CatchIconScript.new()
+		icon.kind = StringName(pony.get("race", &"earth"))
+		icon.custom_minimum_size = Vector2(ICON_SIZE, ICON_SIZE)
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		plate.add_child(icon)
 	var column := VBoxContainer.new()
 	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -854,6 +869,55 @@ static func paid_for(row: Dictionary) -> int:
 	if bool(row.get("blank", false)):
 		return LedgerScript.BLANK_INTAKE_FEE
 	return LedgerScript.handler_share(int(row.get("credit", 0)))
+
+
+# --- deliver all (P8 item 69) ----------------------------------------------------------------
+
+## ONE PRESS FOR THE WHOLE COLOURED HERD (playtest 2026-11-08 item 69: "no deliver-all"). The
+## Company wants Bloomed Drifters, and a pen of them was a row press each. Named ponies are
+## never in it: each of those still asks before she goes.
+var _deliver_all: Button = null
+
+
+func _build_deliver_all() -> void:
+	var column := $Centre/Panel/Margin/Column as VBoxContainer
+	_deliver_all = Button.new()
+	_deliver_all.name = "DeliverAll"
+	_deliver_all.focus_mode = Control.FOCUS_NONE
+	MenuStyleScript.primary_button(_deliver_all)
+	_deliver_all.pressed.connect(deliver_all_bloomed)
+	column.add_child(_deliver_all)
+	column.move_child(_deliver_all, _scroll.get_index())
+
+
+## The Bloomed Drifters a press would send.
+func bloomed_rows() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for r: Dictionary in deliver_rows():
+		if bool(r.get("stock", false)) and bool(r.get("bloomed", false)):
+			out.append(r)
+	return out
+
+
+func deliver_all_bloomed() -> int:
+	var sent := 0
+	var rects := _tile_rects
+	for r: Dictionary in bloomed_rows():
+		_deliver(StringName(r["uid"]))
+		_after_delivery(r, rects[0] if not rects.is_empty() else Rect2())
+		sent += 1
+	if sent > 0:
+		MenuStyleScript.tick_confirm()
+	refresh()
+	return sent
+
+
+func _draw_deliver_all() -> void:
+	if _deliver_all == null:
+		return
+	var n := bloomed_rows().size() if _tab == Tab.DELIVER and not is_confirming() else 0
+	_deliver_all.visible = n > 0
+	_deliver_all.text = "Deliver every Bloomed Drifter (%d)" % n
 
 
 # --- the quota card (P8 item 4) -------------------------------------------------------------

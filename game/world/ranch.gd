@@ -2263,6 +2263,8 @@ func _penned_rows() -> Array[Dictionary]:
 				"coat_color": _coat_colour(inst),
 				# Her rarity's shape on the tile (PS10, G8).
 				"rarity": rarity,
+				# Her face (P8 item 69: "icons are generic shapes, not faces").
+				"portrait": _portrait_of(String(inst.uid), pen.body_for(inst.uid)),
 			})
 	return rows
 
@@ -2351,8 +2353,9 @@ func _portrait_of(key: String, body: Node3D) -> Texture2D:
 
 
 func _on_portrait_ready(_key: String) -> void:
-	if race_menu != null and race_menu.has_method("is_open") and bool(race_menu.call("is_open")):
-		race_menu.call("refresh")
+	for menu: CanvasLayer in [race_menu, depot_menu]:
+		if menu != null and menu.has_method("is_open") and bool(menu.call("is_open")):
+			menu.call("refresh")
 
 
 ## ONE WORD THAT TELLS TWO STOCK PONIES APART, for the Deliver tab. Every member of the
@@ -3391,6 +3394,10 @@ func deliver_pony(uid: StringName) -> Dictionary:
 	if pen.release_body(uid, self) == null:
 		return refused
 	_game_state.remove_pony(uid)
+	# SHE GOES AT ONCE, IN A BURST OF GOLD (P8, playtest 2026-11-08 item 69: "a delivered pony
+	# lingers and animates before it goes; it should pop to coins"). The walk to the crate made
+	# a big run slow to watch and slower to sell.
+	_poof_to_coins(body)
 
 	var data: PonyData = inst.data()
 	var rarity: int = data.rarity if data != null else PonyDataScript.Rarity.COMMON
@@ -3824,6 +3831,24 @@ func _clear_race_bet() -> void:
 	_race_stake = 0
 	_race_field = []
 	_quoted_fields.clear()
+
+
+## A delivered body turns into a burst of coins where she stood, and is gone (item 69).
+func _poof_to_coins(body: Node3D) -> void:
+	if body == null or not is_instance_valid(body):
+		return
+	var at := body.global_position + Vector3(0, 0.9, 0)
+	if is_inside_tree():
+		var burst := BloomCeremonyScript.sparkles([Color(1.0, 0.84, 0.3), Color(1.0, 0.95, 0.6),
+			Color(0.95, 0.7, 0.2)])
+		burst.amount = 28
+		burst.lifetime = 0.9
+		add_child(burst)
+		burst.global_position = at
+		burst.emitting = true
+		get_tree().create_timer(1.6).timeout.connect(burst.queue_free)
+		_sound_call(&"play_at", [&"coins_grant", at])
+	body.queue_free()
 
 
 ## IS THERE A PONY ON THE TRACK RIGHT NOW, and is she this one? `_race_entrant` is set by
