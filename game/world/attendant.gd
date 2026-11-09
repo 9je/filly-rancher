@@ -35,6 +35,12 @@ const BODY_RADIUS := 0.55
 const BODY_HEIGHT := 1.60
 
 var _model: Node3D = null
+var _look: PonyLook = null
+
+
+## The look she was dressed in (her donor body and her colours), or null.
+func pony_look() -> PonyLook:
+	return _look
 var _facing := Vector3.FORWARD
 
 
@@ -59,8 +65,15 @@ func dress(data: PonyData, look: Dictionary, facing: Vector3) -> bool:
 		_model = null
 	if data == null:
 		return false
-	var built: Node3D = PonyVisualsScript.build(data,
-		StockPaletteScript.mane_style_path(int(look.get("mane_style", 0))))
+	# HER OWN BODY AND HER OWN PAINT, the way every wild pony gets hers (P8, playtest
+	# 2026-11-08 item 56: "a cloned crowd, same grey-purple coat, dark mane"). The old path
+	# tinted the default body by the palette triple, which on the donor bodies came out the
+	# same pony every time.
+	var pony_look: PonyLook = PonyLook.from_stock(look) if not look.is_empty() else null
+	_look = pony_look
+	var model_path := DonorTable.model_path(pony_look.donor) if pony_look != null \
+		and pony_look.donor != &"" else StockPaletteScript.mane_style_path(int(look.get("mane_style", 0)))
+	var built: Node3D = PonyVisualsScript.build(data, model_path)
 	if built == null:
 		return false
 	_model = built
@@ -70,7 +83,11 @@ func dress(data: PonyData, look: Dictionary, facing: Vector3) -> bool:
 	# add_child() would leave the model at index 1; every reader of "her body" (this file's
 	# own tests included) reads it as get_child(0).
 	move_child(_model, 0)
-	StockTintScript.apply(_model, StockPaletteScript.load_stock(), look)
+	if pony_look != null:
+		PonyPaint.apply(_model, pony_look)
+		_model.scale = Vector3.ONE * PonyPaint.body_scale(pony_look)
+	else:
+		StockTintScript.apply(_model, StockPaletteScript.load_stock(), look)
 	if facing.length_squared() > 0.0:
 		_facing = facing.normalized()
 		# The asset's forward is minus Z (baked in by tools/export_blend.py), the same

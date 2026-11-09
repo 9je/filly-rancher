@@ -54,8 +54,9 @@ func test_dressing_her_builds_a_body_tinted_from_her_own_look() -> void:
 	assert_true(_who.dress(data, LOOK, Vector3.FORWARD))
 	assert_true(_who.has_model())
 	var body: Node3D = _who.get_child(0)
-	assert_not_null(StockTintScript.override_of(body, &"body"),
-		"she goes through the same one recolour pipeline the crowd does")
+	# P8 item 56: the same look and paint every wild pony wears (PonyLook, PonyPaint), on her
+	# look's own donor body, so no two of the crowd come out the same pony.
+	assert_not_null(_who.pony_look(), "she goes through the same one recolour pipeline the crowd does")
 
 
 func test_dressing_her_twice_replaces_the_body_rather_than_stacking_two() -> void:

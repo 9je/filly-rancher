@@ -119,6 +119,10 @@ func _run() -> void:
 
 	if _want("flank"):
 		var vis: Node3D = player.get("visuals")
+		# A mark to see where it sits (item 40): a star stamp on her own body.
+		var mark: Image = MarkStamps.build(MarkStamps.Stamp.STAR, Color(0.95, 0.4, 0.7))
+		CutieMark.apply(vis.get_child(0), mark)
+		player.global_rotation.y = 0.0
 		var cam2 := Camera3D.new()
 		ranch.add_child(cam2)
 		var side := vis.global_basis.x
@@ -157,6 +161,14 @@ func _run() -> void:
 			await Boot.frames(self, 40)
 			await Boot.shot(self, out, "race_guide")
 			rm.call("close")
+	if _want("hall"):
+		# The casino hall's crowd (item 56): from the door, looking in.
+		ranch.call("enter_palace", true)
+		await Boot.frames(self, 40)
+		await Boot.shot(self, out, "hall")
+		ranch.call("exit_palace", true)
+		await Boot.frames(self, 20)
+
 	for ev: String in ["derpy", "rainboom"]:
 		if not _want(ev):
 			continue
