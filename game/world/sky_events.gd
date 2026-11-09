@@ -136,9 +136,10 @@ func derpy_crash() -> void:
 	var fside := facing.cross(Vector3.UP).normalized()
 	# She comes to rest sitting up, dazed: her face is about a metre off the ground.
 	var face := land + facing * 0.45 + Vector3.UP * 1.0
-	var close := face + facing * 1.7 + fside * 0.5 + Vector3.UP * 0.05
+	# Far enough back that she can get to her hooves (the shake) without filling the lens.
+	var close := face + facing * 2.3 + fside * 0.6 + Vector3.UP * 0.15
 	if not _clear_line(close, face):
-		close = face + facing * 1.7 - fside * 0.5 + Vector3.UP * 0.05
+		close = face + facing * 2.3 - fside * 0.6 + Vector3.UP * 0.15
 	var shots := [
 		# A long lens on the way down, so she fills the frame instead of a smudge by a roof.
 		{"from": "here", "to": player.global_position - fwd * 1.0 + Vector3.UP * 2.6,
@@ -148,7 +149,7 @@ func derpy_crash() -> void:
 			"look": land + Vector3.UP * 0.6, "time": 2.2, "fov": 50.0, "fov_to": 44.0,
 			"shake": 0.16, "caption": "Derpy!",
 			"call": func() -> void: _flop(derpy, land, facing)},
-		{"from": close, "to": close.lerp(face, 0.15), "look": face, "time": 2.4,
+		{"from": close, "to": close.lerp(face, 0.05), "look": face, "time": 2.4,
 			"fov": 40.0, "fov_to": 34.0,
 			"caption": "\"I just don't know what went wrong!\"",
 			"call": func() -> void: _play(derpy, &"shake")},
