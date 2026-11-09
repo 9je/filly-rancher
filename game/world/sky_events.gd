@@ -117,16 +117,17 @@ func derpy_crash() -> void:
 		cam_side = land - fwd * 3.6 + side * 1.4 + Vector3.UP * 1.4
 	var fall := 1.7
 	# HER FACE IS THE PAYOFF (Fable AAA round 1, #10: "the payoff shot is two grey lumps ...
-	# her face is never shown"). She lands facing the way she flew; the close-up stands off
-	# her nose and a little to the side, at her own eye height lying down.
-	var dfwd := land - start
-	dfwd.y = 0.0
-	dfwd = dfwd.normalized()
-	var dside := dfwd.cross(Vector3.UP).normalized()
-	var face := land + dfwd * 0.75 + Vector3.UP * 0.45
-	var close := face + dfwd * 1.5 + dside * 0.55 + Vector3.UP * 0.2
+	# her face is never shown"). She is turned on landing to face the impact lens (render
+	# check: a holder's -Z is her tail, so both shots had her rump), and the close-up stands
+	# off her nose a little to the side, at her own eye height lying down.
+	var facing := cam_side - land
+	facing.y = 0.0
+	facing = facing.normalized()
+	var fside := facing.cross(Vector3.UP).normalized()
+	var face := land + facing * 0.75 + Vector3.UP * 0.45
+	var close := face + facing * 1.5 + fside * 0.55 + Vector3.UP * 0.2
 	if not _clear_line(close, face):
-		close = face + dfwd * 1.5 - dside * 0.55 + Vector3.UP * 0.2
+		close = face + facing * 1.5 - fside * 0.55 + Vector3.UP * 0.2
 	var shots := [
 		# A long lens on the way down, so she fills the frame instead of a smudge by a roof.
 		{"from": "here", "to": player.global_position - fwd * 1.0 + Vector3.UP * 2.6,
@@ -135,7 +136,7 @@ func derpy_crash() -> void:
 		{"from": cam_side, "to": cam_side + side * 0.4 - Vector3.UP * 0.3,
 			"look": land + Vector3.UP * 0.6, "time": 2.2, "fov": 50.0, "fov_to": 44.0,
 			"shake": 0.16, "caption": "Derpy!",
-			"call": func() -> void: _flop(derpy, land)},
+			"call": func() -> void: _flop(derpy, land, facing)},
 		{"from": close, "to": close.lerp(face, 0.15), "look": face, "time": 2.4,
 			"fov": 40.0, "fov_to": 34.0,
 			"caption": "\"I just don't know what went wrong!\"",
@@ -164,13 +165,14 @@ func _fall(derpy: Node3D, start: Vector3, land: Vector3, secs: float) -> void:
 		derpy.rotation.z = k * TAU * 2.0, 0.0, 1.0, secs).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
 
-func _flop(derpy: Node3D, land: Vector3) -> void:
+func _flop(derpy: Node3D, land: Vector3, facing: Vector3) -> void:
 	# The fall's last tick can land after the cut on a slow frame and undo the flop.
 	if _fall_tween != null and _fall_tween.is_valid():
 		_fall_tween.kill()
 	derpy.global_position = land
-	derpy.rotation.z = 0.0
-	derpy.rotation.x = 0.0
+	derpy.rotation = Vector3.ZERO
+	# The holder looks down -Z at her tail, so it looks away from where her face should go.
+	derpy.look_at(land - facing, Vector3.UP)
 	_play(derpy, &"lie")
 	RumpBounce.kick_on(derpy, 2.0)
 	var puff := BloomCeremonyScript.sparkles([Color(0.95, 0.9, 0.8), Color(0.85, 0.8, 0.7)])
@@ -262,7 +264,9 @@ func sonic_rainboom() -> void:
 	dash.look_at(b, Vector3.UP)
 	_play(dash, &"gallop")
 	var trail := _trail()
-	var eye := player.global_position + Vector3.UP * 1.6 - fwd * 1.5
+	# Off her shoulder and over her head: straight behind at head height, the lens sat in her
+	# mane (render check: the near dither greyed the whole first shot).
+	var eye := player.global_position + Vector3.UP * 2.4 - fwd * 2.2 + side * 1.4
 	var streak := 2.6
 	# A LONG LENS ON HER, THEN THE BOOM (Fable AAA round 1, #10: "Rainbow Dash is a 30 px
 	# sprite ... no bloom, flash, shake"). The streak is followed on a telephoto so she is the
@@ -300,7 +304,7 @@ func _open_sky(player: Node3D) -> Vector3:
 	for turn: float in [0.0, 40.0, -40.0, 80.0, -80.0, 120.0, -120.0, 160.0, -160.0]:
 		var fwd := base.rotated(Vector3.UP, deg_to_rad(turn))
 		var side := fwd.cross(Vector3.UP).normalized()
-		var eye := head - fwd * 1.5
+		var eye := player.global_position + Vector3.UP * 2.4 - fwd * 2.2 + side * 1.4
 		var back := eye - fwd * 3.0 + Vector3.UP * 1.0
 		var mid := player.global_position + fwd * 40.0 + Vector3.UP * 22.0
 		if _clear_line(head, eye) and _clear_line(eye, back) and _clear_line(eye, mid) \
