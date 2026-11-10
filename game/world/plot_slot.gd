@@ -794,8 +794,39 @@ func _wild(model: String, at: Vector3, scale: float, yaw: float) -> Node3D:
 					var w := src.duplicate() as StandardMaterial3D
 					w.albedo_color = WILD_WOOD
 					mi.set_surface_override_material(i, w)
+		# Rounded, not cut glass (Fable round 7, #7: "hard-faceted low-poly leaves"): the kit's
+		# flat-shaded leaves are rebuilt with smooth normals, so the toon band draws one soft
+		# shape per clump. The tangle's silhouette is the kit's own (round balls in rows were
+		# PT7's "these look bad").
+		if not model.begins_with("log"):
+			for mi: MeshInstance3D in inst.find_children("*", "MeshInstance3D", true, false):
+				if mi.mesh != null:
+					mi.mesh = _smoothed(mi.mesh)
 		ToonStyler.style(inst, &"foliage")
 	return holder
+
+
+static var _smooth_cache := {}
+
+
+static func _smoothed(mesh: Mesh) -> Mesh:
+	if _smooth_cache.has(mesh):
+		return _smooth_cache[mesh]
+	var out := ArrayMesh.new()
+	for i in mesh.get_surface_count():
+		var arrays := mesh.surface_get_arrays(i)
+		arrays[Mesh.ARRAY_NORMAL] = null
+		arrays[Mesh.ARRAY_TANGENT] = null
+		var bare := ArrayMesh.new()
+		bare.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+		var st := SurfaceTool.new()
+		st.create_from(bare, 0)
+		st.index()
+		st.generate_normals()
+		st.commit(out)
+		out.surface_set_material(out.get_surface_count() - 1, mesh.surface_get_material(i))
+	_smooth_cache[mesh] = out
+	return out
 
 
 const WILD_GREEN := Color(0.40, 0.62, 0.28)
