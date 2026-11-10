@@ -142,7 +142,9 @@ func _run() -> void:
 			Input.action_release(beam2.get("BEAM_ACTION"))
 			print("CATCHSTRIP caught=%s frames=%d" % [caught[0], k])
 			rig2.set("_look_pitch", -10.0)
-			await Boot.frames(self, 20)
+			# Out of the card's centre moment before the next shot (round 7's "Spike close"
+			# was the catch card still on screen).
+			await create_timer(7.0).timeout
 
 	if _want("card"):
 		# Item 71: the caught card as a real catch shows it, read off a wild named pony.

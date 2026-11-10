@@ -137,11 +137,17 @@ func _dress_real(root: Node) -> void:
 			# The show's toon light, the one every pony wears (ToonStyler): the built-in
 			# DIFFUSE_TOON steps the soft shadow term hard and speckled him the way the old
 			# toon shader speckled the ponies (docs/playtest_fixes/ponies.md).
-			mi.set_surface_override_material(i,
-				ToonStyler.to_toon(mat, ToonStyler.PRESETS[&"pony"]) if ToonStyler.shading_enabled else mat)
+			var toon: Material = ToonStyler.to_toon(mat, ToonStyler.PRESETS[&"pony"]) \
+				if ToonStyler.shading_enabled else mat
+			# A step deeper, so his scales read the show's purple, not lavender (Fable round 7:
+			# "Spike is pale lavender-pink, not canon purple").
+			if toon is ShaderMaterial:
+				ToonStyler._lift(toon as ShaderMaterial, SPIKE_DEEPEN)
+			mi.set_surface_override_material(i, toon)
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 
 
+const SPIKE_DEEPEN := 0.78
 const EYE_SHADER := preload("res://shaders/pony_eye.gdshader")
 
 
