@@ -43,7 +43,7 @@ const FLANK := Vector3(0.26, 1.06, 0.3)
 
 ## Decal box: across the flank, INTO the pony (the projection depth), and along her. Larger
 ## than it was (0.30), as the show draws marks.
-const DECAL_SIZE := Vector3(0.38, 0.26, 0.38)
+const DECAL_SIZE := Vector3(0.46, 0.26, 0.46)
 ## THE MARK PAINTS HER BODY AND NOTHING ELSE. A Decal paints whatever is in its box: a tail
 ## swinging through, a wing, a mane thrown by the bounce (owner 2026-11-05: "Make sure this
 ## cutie mark bug doesn't happen anywhere"). Her body mesh carries this render layer, and the
@@ -63,7 +63,13 @@ static func apply(model: Node3D, mark: Image) -> int:
 	if mark == null or MarkPaintScript.is_blank(mark):
 		return 0
 	_mark_body(model)
-	var texture: ImageTexture = ImageTexture.create_from_image(mark)
+	# Up to 256 px before it becomes a decal (Fable round 6, #2: "a faint pink smudge"): the
+	# decal atlas filters with mipmaps, and a 64 px drawing's thin strokes averaged with its
+	# transparent ground into a pale ghost at play distance.
+	var big := mark.duplicate() as Image
+	if big.get_width() < 256:
+		big.resize(256, 256, Image.INTERPOLATE_LANCZOS)
+	var texture: ImageTexture = ImageTexture.create_from_image(big)
 	var anchor: Node3D = _anchor(model)
 	if anchor == null:
 		return 0
@@ -74,11 +80,17 @@ static func apply(model: Node3D, mark: Image) -> int:
 		decal.size = DECAL_SIZE
 		decal.texture_albedo = texture
 		decal.albedo_mix = 1.0
+		# A little of its own light, so its colours hold on a sunlit coat (a pink star lit like
+		# paint went pastel; the mark is the character, Fable round 6, #2).
+		decal.texture_emission = texture
+		decal.emission_energy = 0.45
 		# Softened at the rim so the square canvas does not read as a sticker with a hard
 		# edge on a curved barrel.
 		decal.cull_mask = MARK_LAYER
-		decal.upper_fade = 0.4
-		decal.lower_fade = 0.4
+		# Light fades only (Fable round 6, #2: at 0.4 the flank sat inside the faded part of
+		# the box and a stamped mark read as "a faint pink smudge").
+		decal.upper_fade = 0.08
+		decal.lower_fade = 0.08
 		anchor.add_child(decal)
 		decal.global_transform = _flank_transform(model, side)
 		placed += 1

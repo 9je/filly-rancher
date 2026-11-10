@@ -770,6 +770,11 @@ func set_held(is_held: bool) -> void:
 	_transition_to(State.IDLE)
 
 
+## In the beam right now.
+func is_held() -> bool:
+	return state == State.HELD
+
+
 ## How long the current (or most recent) beam hold has lasted, in seconds. Reset to zero
 ## at the start of each hold. This is the whole of what this pony reports about a hold --
 ## the beam reads it to run its struggle timer, and what counts as "too long" is the

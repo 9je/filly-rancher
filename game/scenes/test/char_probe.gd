@@ -151,6 +151,22 @@ func _run() -> void:
 		await _shot("chars_player")
 		pc.current = false
 		player.queue_free()
+	if "--mark" in OS.get_cmdline_user_args():
+		# A stamped mark on each of the four, side on: chars_mark.png (Fable round 6, #2).
+		var mark: Image = MarkStamps.build(MarkStamps.Stamp.STAR, Color(0.95, 0.4, 0.7))
+		for b in bodies:
+			CutieMark.apply(b.get_child(0), mark)
+			b.rotation.y = deg_to_rad(90.0)
+		var mc := Camera3D.new()
+		world.add_child(mc)
+		mc.fov = 40.0
+		mc.position = Vector3(0.0, 1.3, 7.0)
+		mc.look_at(Vector3(0, 0.9, 0))
+		mc.current = true
+		for k in 10:
+			await process_frame
+		await _shot("chars_mark")
+		mc.current = false
 	var cam := Camera3D.new()
 	world.add_child(cam)
 	cam.fov = 40.0

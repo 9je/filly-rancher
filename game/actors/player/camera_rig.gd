@@ -902,6 +902,10 @@ func _update_near_fade() -> void:
 		var body := hit.collider as Node3D
 		if body == null or seen.has(body):
 			continue
+		# Never the pony in the beam (Fable round 6, #1: a held pony, drawn toward the lens,
+		# screen-doored into "an alpha ghost"): she is what the player is looking at.
+		if body.has_method("is_held") and bool(body.call("is_held")):
+			continue
 		seen[body] = true
 		var d := lens.distance_to(body.global_position + Vector3.UP * 0.7)
 		var opacity := clampf((d - NEAR_FADE_CLOSE) / (NEAR_FADE_FAR - NEAR_FADE_CLOSE), 0.0, 1.0)
