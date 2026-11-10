@@ -924,3 +924,11 @@ and the cinematics. Calls made:
 - saa trees' canopies split from the trunk and swollen 1.28 about their centre, the trunk casting no shadow. Overgrown-plot leaves rebuilt with smooth normals (silhouettes kept: round balls were PT7's "these look bad").
 - Day sky top (0.24, 0.52, 0.90), horizon tint (0.68, 0.85, 1.0); the painted band's haze floor 0.22 -> 0.11.
 - Rounds 5-7 sit at 6-6.5 with about half a point of reviewer variance; the remaining distance to 8 is mostly art: pony head proportions, cinematic camera authoring, show-style foliage and pen models.
+
+## 2026-11-10: Round 8 follow-ups
+- Staked plots drawn opaque at any marker strength (the 60% floor read as glass boxes). Moonlight casts no hard shadows (lamps and windows light the night).
+- The catch card goes opaque in 0.05 s; its pop is the scale's. Blackjack's felt printing only on a bare table.
+- Spike's ear fins: LeftEar/RightEar bones scaled 1.8 after each frame's clip.
+- The canon ponies' mid-blink "grey disc" is their eyelid shell; an in-shader lash crease only reaches the painted eyes and was reverted unverified. Left for model or texture work.
+- The companion near the lens sits just past the 2.6 m fade; widening the fade would put more dithered ponies on screen (reviewers dislike that), so left as is.
+- gpu_run.sh stops a Godot that hangs on exit once its output has landed and the probe printed its OK line.
