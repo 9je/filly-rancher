@@ -684,6 +684,10 @@ func _write_to_scene() -> void:
 	if _sun != null:
 		var elevation := float(_current.get(KEY_SUN_ELEVATION, ELEVATION_DAY_EDGE))
 		var azimuth := float(_current.get(KEY_SUN_AZIMUTH, AZIMUTH_DAY_START))
+		# No hard cast shadows by moonlight (Fable round 8, #9: "a dark trapezoid covers the
+		# lawn with a razor edge"): the night is lit by the windows and lamps; the moon only
+		# tints. The toon band still shades each body's dark side.
+		_sun.shadow_enabled = elevation >= 0.0
 		if elevation < 0.0:
 			elevation = MOON_ELEVATION
 			azimuth = MOON_AZIMUTH

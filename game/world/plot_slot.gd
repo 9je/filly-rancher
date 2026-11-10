@@ -437,8 +437,13 @@ func set_marker_focus(distance: float) -> void:
 	if is_equal_approx(alpha, _mark_alpha):
 		return
 	_mark_alpha = alpha
+	# Drawn solid at any strength (Fable round 8, #1: dimmed see-through, a staked plot read as
+	# "a translucent grey bounding box"): the stakes and boards are wood in the world now, with
+	# the building site's rails, bale and crate beside them. The fade still decides whether
+	# they show at all (past MARK_SEEN_METRES).
 	for mat in _mark_materials:
-		mat.albedo_color.a = alpha
+		mat.albedo_color.a = 1.0
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
 	if _stakes != null:
 		_stakes.visible = alpha > 0.0
 
@@ -663,12 +668,12 @@ static func _earth_texture() -> Texture2D:
 
 func _mark_material(colour: Color) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(colour.r, colour.g, colour.b, _mark_alpha)
+	mat.albedo_color = Color(colour.r, colour.g, colour.b, 1.0)
 	mat.roughness = 0.95
 	mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
-	# Alpha because the markers fade with distance (see MARK_NEAR_METRES). Kept in a list so
-	# set_marker_focus() writes two materials rather than walking twelve meshes a frame.
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	# Opaque (see set_marker_focus()). Kept in a list so set_marker_focus() writes two
+	# materials rather than walking twelve meshes a frame.
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
 	_mark_materials.append(mat)
 	return mat
 
