@@ -210,6 +210,14 @@ layout_mode = 2
 columns = 8
 script = ExtResource("4")
 
+[node name="PresetLabel" type="Label" parent="Layout/Panel/Margin/Column"]
+layout_mode = 2
+
+[node name="PresetGrid" type="GridContainer" parent="Layout/Panel/Margin/Column"]
+layout_mode = 2
+columns = 5
+script = ExtResource("4")
+
 [node name="ManeStyleLabel" type="Label" parent="Layout/Panel/Margin/Column"]
 layout_mode = 2
 

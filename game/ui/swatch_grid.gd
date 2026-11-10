@@ -197,6 +197,13 @@ func selected() -> int:
 	return _selected
 
 
+## No cell chosen: a row of starting points (the creator's ready-made looks) is not a setting
+## she is on until she picks one.
+func clear_selection() -> void:
+	_selected = -1
+	_restyle()
+
+
 ## THE KEYBOARD CURSOR. Set by creation_screen.gd as its own _unhandled_input moves the
 ## highlight across whichever grid is the active region; -1 clears it (leaving the tree, or
 ## another region taking the cursor). Wraps like set_selected() when the grid is not empty,

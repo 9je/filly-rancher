@@ -581,3 +581,21 @@ func test_a_stamp_lands_in_its_own_colours() -> void:
 	assert_true(_screen.stamp_symbol(&"talent:orchards"))
 	var laid: Dictionary = _screen.canvas().stamps()[0]
 	assert_eq(laid.a, MarkLayoutScript.palette(&"talent:orchards")[0], "an apple is apple red")
+
+
+## Fable AAA round 5: the first step's empty lower panel is a row of ready-made looks. Each is
+## shown, picks nothing until clicked, and a click puts on a whole look the swatches offer.
+func test_a_ready_made_look_puts_on_a_whole_look_in_one_click() -> void:
+	var grid := _screen.get_node(^"Layout/Panel/Margin/Column/PresetGrid") as SwatchGrid
+	assert_not_null(grid)
+	assert_true(grid.visible, "on the first step")
+	assert_eq(grid.cell_count(), CreationScreen.PRESETS.size())
+	assert_eq(grid.selected(), -1, "nothing is picked until she clicks one")
+	var want: Dictionary = _screen.preset_look(1, _screen.look().race)
+	_screen.apply_preset(1)
+	var l: PlayerLook = _screen.look()
+	assert_eq([l.coat, l.mane, l.eyes, l.mane_style],
+		[want.coat, want.mane, want.eyes, want.mane_style])
+	assert_eq(grid.selected(), 1)
+	_screen.set_step(CreationScreen.Step.HAIR)
+	assert_false(grid.visible, "only on the first step")

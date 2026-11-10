@@ -125,7 +125,7 @@ const TURN_DEGREES_PER_SECOND := 24.0
 ## column count for a grid, or its own button count for a plain row (which makes ui_up/
 ## ui_down a no-op there: posmod(index + count, count) is index again), so one pair of
 ## helpers below drives a two column stepper and a six column swatch grid the same way.
-const LOOK_REGIONS: Array[StringName] = [&"name", &"step", &"race", &"coat", &"eyes",
+const LOOK_REGIONS: Array[StringName] = [&"name", &"step", &"race", &"coat", &"eyes", &"preset",
 	&"confirm"]
 ## MANE STYLE LIVES WITH THE MANE (PT11; playtest 2026-11-05: "mane style isnt under mane and
 ## tail").
@@ -181,6 +181,7 @@ var _kb_cursor_box: StyleBox = null
 	^"Layout/Panel/Margin/Column/MarkingColourGrid")
 @onready var _eye_shape_grid: SwatchGrid = get_node_or_null(^"Layout/Panel/Margin/Column/EyeShapeGrid")
 @onready var _wear_grid: SwatchGrid = get_node_or_null(^"Layout/Panel/Margin/Column/WearGrid")
+@onready var _preset_grid: SwatchGrid = get_node_or_null(^"Layout/Panel/Margin/Column/PresetGrid")
 
 ## The ink she is drawing in right now, shown beside the ink buttons the same way each
 ## colour row shows its own pick. The canvas is the authority on which ink is loaded; this
@@ -215,7 +216,7 @@ func _ready() -> void:
 	_mane_style_label.text = MANE_STYLE_LABEL
 	for pair in [["RaceLabel", RACE_LABEL], ["Mane2Label", MANE2_LABEL], ["TailLabel", TAIL_LABEL],
 			["MarkingLabel", MARKING_LABEL], ["MarkingColourLabel", MARKING_COLOUR_LABEL],
-			["EyeShapeLabel", EYE_SHAPE_LABEL], ["WearLabel", WEAR_LABEL]]:
+			["EyeShapeLabel", EYE_SHAPE_LABEL], ["WearLabel", WEAR_LABEL], ["PresetLabel", PRESET_LABEL]]:
 		var l := get_node_or_null(NodePath("Layout/Panel/Margin/Column/" + pair[0])) as Label
 		if l != null:
 			l.text = pair[1]
@@ -292,7 +293,8 @@ const _PAPER_LABEL_PATHS: Array[NodePath] = [^"Layout/Panel/Margin/Column/Title"
 	^"Layout/Panel/Margin/Column/HintLabel", ^"Layout/Panel/Margin/Column/RaceLabel",
 	^"Layout/Panel/Margin/Column/Mane2Label", ^"Layout/Panel/Margin/Column/TailLabel",
 	^"Layout/Panel/Margin/Column/MarkingLabel", ^"Layout/Panel/Margin/Column/MarkingColourLabel",
-	^"Layout/Panel/Margin/Column/EyeShapeLabel", ^"Layout/Panel/Margin/Column/WearLabel"]
+	^"Layout/Panel/Margin/Column/EyeShapeLabel", ^"Layout/Panel/Margin/Column/WearLabel",
+	^"Layout/Panel/Margin/Column/PresetLabel"]
 
 const _PAPER_BUTTON_PATHS: Array[NodePath] = [
 	^"Layout/Panel/Margin/Column/StepRow/StepLook",
@@ -389,6 +391,7 @@ func open(look: PlayerLook) -> void:
 	_build_model()
 	_restyle()
 	_refresh_swatches()
+	_retint_presets()
 	_retint_mane_style_grid()
 	_enter_kb_region(0)
 
@@ -452,10 +455,93 @@ func _build_grids() -> void:
 			lab.append("")
 		grid.set_swatches(sw, lab)
 	_build_style_grids()
+	if _preset_grid != null:
+		_retint_presets()
+		_preset_grid.picked.connect(apply_preset)
 	if _mane2_grid != null:
 		_mane2_grid.picked.connect(func(i: int) -> void: set_mane2(i - 1))
 	if _tail_grid != null:
 		_tail_grid.picked.connect(func(i: int) -> void: set_tail(i - 1))
+
+
+## READY-MADE LOOKS (Fable AAA round 5: "creator_step0 leaves the lower 40% of the right panel
+## empty"). Five whole looks she can start from in one click, each a picture card of its mane
+## style baked in its own coat and mane, in her chosen kind of pony: a coat, a mane, eyes and
+## a style that sit well together, which a first-time player picking one swatch at a time has
+## no way to see. Each target colour is matched to the nearest pot in the player palette, so a
+## preset can never land a colour the swatches do not offer.
+const PRESET_LABEL := "Ready-made looks"
+## [name (the card's tooltip), coat, mane, eyes, mane style]
+const PRESETS: Array = [
+	["Buttercup", Color(1.0, 0.93, 0.6), Color(0.98, 0.6, 0.78), Color(0.2, 0.65, 0.6), 1],
+	["Velvet", Color(0.98, 0.97, 0.98), Color(0.45, 0.25, 0.65), Color(0.25, 0.45, 0.85), 2],
+	["Sky Dash", Color(0.6, 0.8, 1.0), Color(0.9, 0.3, 0.3), Color(0.7, 0.25, 0.5), 3],
+	["Starlight", Color(0.8, 0.7, 0.95), Color(0.2, 0.2, 0.45), Color(0.45, 0.3, 0.7), 4],
+	["Harvest", Color(0.95, 0.6, 0.3), Color(0.98, 0.9, 0.55), Color(0.3, 0.6, 0.3), 5],
+]
+
+
+static func _nearest(colours: Array[Color], want: Color) -> int:
+	var best := 0
+	var best_d := INF
+	for i in colours.size():
+		var c: Color = colours[i]
+		var d: float = Vector3(c.r - want.r, c.g - want.g, c.b - want.b).length_squared()
+		if d < best_d:
+			best_d = d
+			best = i
+	return best
+
+
+## Preset `index` as palette indices for kind of pony `race`: {coat, mane, eyes, mane_style}.
+func preset_look(index: int, race: int) -> Dictionary:
+	var p: Array = PRESETS[clampi(index, 0, PRESETS.size() - 1)]
+	return {"coat": _nearest(_palette.coats, p[1]), "mane": _nearest(_palette.manes, p[2]),
+		"eyes": _nearest(_palette.eyes, p[3]),
+		"mane_style": int(p[4]) % maxi(1, PlayerLookScript.style_count(race))}
+
+
+## The preset cards, redrawn for the kind of pony she is (a unicorn's styles are not an earth
+## pony's).
+func _retint_presets() -> void:
+	if _preset_grid == null:
+		return
+	var race: int = _look.race if _look != null else PlayerLookScript.RACE_UNICORN
+	var swatches: Array[Color] = []
+	var icons: Array[Texture2D] = []
+	for i in PRESETS.size():
+		var p := preset_look(i, race)
+		swatches.append(Color(0.97, 0.94, 0.88))
+		var path := STYLE_ICONS + "mane_%d_%d.png" % [race, int(p.mane_style)]
+		if ResourceLoader.exists(path):
+			icons.append(StyleIconTintScript.tinted(load(path) as Texture2D,
+				_palette.coat_at(int(p.coat)), _palette.mane_at(int(p.mane))))
+	_preset_grid.set_swatches(swatches, [] as Array[String])
+	if icons.size() == PRESETS.size():
+		_preset_grid.set_icons(icons, STYLE_CARD)
+	for i in _preset_grid.cell_count():
+		_preset_grid.cell(i).tooltip_text = String(PRESETS[i][0])
+	_preset_grid.clear_selection()
+
+
+## Put on ready-made look `index`: her coat, mane, eyes and mane style in one go.
+func apply_preset(index: int) -> void:
+	if index < 0 or index >= PRESETS.size():
+		return
+	var p := preset_look(index, _look.race)
+	_look.coat = int(p.coat)
+	_look.mane = int(p.mane)
+	_look.eyes = int(p.eyes)
+	_look.mane_style = int(p.mane_style)
+	_build_model()
+	_show_streak()
+	_restyle()
+	_refresh_swatches()
+	_retint_mane_style_grid()
+	_refresh_swatches()
+	if _preset_grid != null:
+		_preset_grid.set_selected(index)
+	react()
 
 
 ## THE FINISHING TOUCHES (PS7 item 6): picture cards for the marking, eye shape and wear rows
@@ -601,6 +687,7 @@ func set_race(index: int) -> void:
 	_look.race = clampi(index, PlayerLookScript.RACE_EARTH, PlayerLookScript.RACE_UNICORN)
 	_look.mane_style = 0
 	_retint_mane_style_grid()
+	_retint_presets()
 	_build_model()
 	_restyle()
 	_refresh_swatches()
@@ -766,7 +853,7 @@ func set_step(value: int) -> void:
 static func _step_nodes() -> Dictionary:
 	return {
 		Step.LOOK: ["NameBox", "RaceLabel", "RaceGrid", "CoatLabel", "CoatGrid",
-			"EyesLabel", "EyesGrid"],
+			"EyesLabel", "EyesGrid", "PresetLabel", "PresetGrid"],
 		Step.HAIR: ["ManeStyleLabel", "ManeStyleScroll", "ManeLabel", "ManeGrid", "Mane2Label",
 			"Mane2Grid", "TailLabel", "TailGrid"],
 		Step.MARK: ["MarkLabel", "MarkCanvas", "Legend", "InkRow", "TalentLabel", "TalentGrid",
@@ -903,6 +990,8 @@ func _region_grid(region: StringName) -> SwatchGrid:
 			return _wear_grid
 		&"mane_style":
 			return _mane_style_grid
+		&"preset":
+			return _preset_grid
 	return null
 
 
