@@ -20,6 +20,12 @@ face close-up; the Rainboom cuts to a fixed meadow vantage, only on a clear day;
 pills kit-wide (owner flag on the creator steps); Surprise me on the stage; lens proximity fade.
 A fresh Fable round 2 reviews $S/showcase2 (87 images). Next: fix its ranked list, loop.
 
+2026-11-09/10, rounds 3-8: renders now run on the Radeon through a user-space headless weston
+(memory gpu-headless-renders; scratchpad gpu_run.sh, weston_up.sh, showcaseNr.sh). Rounds 5-8
+plateaued at about 6-6.5 (round notes in docs/fable-aaa-round*-2026-11-09.md); the UI and casino are
+at 7-8, the gap is 3D art (pony heads and manes, Spike's model, cinematic authoring, foliage).
+Suite on affa65a: 2282/2282. Owner told: a playtest now is a good checkpoint.
+
 If the owner reports back: start a NEW session, read this file and the ledger, and work from
 their new list. Open items to carry: 26, 29, 37, 50, 65, 71, 77.
 
