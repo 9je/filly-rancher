@@ -56,7 +56,7 @@ void fragment() {
 		vec3 p = d * 160.0;
 		vec3 cell = floor(p);
 		float h = hash(cell);
-		if (h > 0.93) {
+		if (h > 0.962) {
 			vec3 at = cell + 0.5 + (vec3(hash(cell + 3.1), hash(cell + 7.7), hash(cell + 1.3)) - 0.5) * 0.5;
 			float r = length(p - at);
 			float tw = 0.75 + 0.25 * sin(TIME * (1.5 + h * 4.0) + h * 40.0);

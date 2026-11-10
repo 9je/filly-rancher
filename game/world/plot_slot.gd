@@ -405,25 +405,18 @@ func set_ghost(state: int) -> void:
 	var span := STAKE_INSET * 2.0
 	_ghost_box("Floor", Vector3(span, GHOST_HEIGHT, span),
 		Vector3(0.0, GHOST_HEIGHT * 0.5, 0.0), wash)
-	var w := GHOST_WALL_WIDTH
+	# A LINE ON THE GROUND, NOT WALLS (Fable rounds 5 and 6 read the light-fence rails as
+	# "translucent glass walls"): the plot's outline drawn in light where the fence will stand,
+	# with a short post at each corner.
+	var w := 0.12
 	for s in [-1.0, 1.0]:
 		var tag := "N" if s < 0.0 else "P"
-		for rail_y: float in [GHOST_WALL_HEIGHT * 0.45, GHOST_WALL_HEIGHT * 0.88]:
-			var r := "%d" % int(rail_y * 100.0)
-			_ghost_box("RailX%s%s" % [tag, r], Vector3(w, w, span),
-				Vector3(s * STAKE_INSET, rail_y, 0.0), mat)
-			_ghost_box("RailZ%s%s" % [tag, r], Vector3(span, w, w),
-				Vector3(0.0, rail_y, s * STAKE_INSET), mat)
-	var n := maxi(int(span / GHOST_POST_EVERY), 1)
-	var post := Vector3(w * 1.6, GHOST_WALL_HEIGHT, w * 1.6)
-	for i in n + 1:
-		var t := -STAKE_INSET + span * float(i) / float(n)
-		for s in [-1.0, 1.0]:
-			_ghost_box("PostX%d%s" % [i, "N" if s < 0.0 else "P"], post,
-				Vector3(s * STAKE_INSET, GHOST_WALL_HEIGHT * 0.5, t), mat)
-			if i > 0 and i < n:
-				_ghost_box("PostZ%d%s" % [i, "N" if s < 0.0 else "P"], post,
-					Vector3(t, GHOST_WALL_HEIGHT * 0.5, s * STAKE_INSET), mat)
+		_ghost_box("LineX%s" % tag, Vector3(w, 0.04, span), Vector3(s * STAKE_INSET, 0.04, 0.0), mat)
+		_ghost_box("LineZ%s" % tag, Vector3(span, 0.04, w), Vector3(0.0, 0.04, s * STAKE_INSET), mat)
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			_ghost_box("Post%s%s" % ["N" if sx < 0.0 else "P", "N" if sz < 0.0 else "P"],
+				Vector3(0.14, 0.4, 0.14), Vector3(sx * STAKE_INSET, 0.2, sz * STAKE_INSET), mat)
 	add_child(_ghost)
 
 

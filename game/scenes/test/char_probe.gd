@@ -114,6 +114,7 @@ func _run() -> void:
 		world.add_child(slot)
 		slot.global_position = Vector3(0, 0, -2.0)
 		slot.call("set_marker_focus", 0.0)
+		slot.call("set_ghost", 1)
 		var sc := Camera3D.new()
 		world.add_child(sc)
 		sc.fov = 60.0
