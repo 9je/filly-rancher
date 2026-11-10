@@ -169,6 +169,12 @@ func _run() -> void:
 					tw.pause()
 				await Boot.frames(self, 10)
 				await Boot.shot(self, out, "catch_card_named")
+				# Let it go and clear it, or it hangs over the next probe's shot (round 8's
+				# "Spike close" was this card, paused, fading over him).
+				if tw != null and tw.is_valid():
+					tw.play()
+				card.call("skip_moment")
+				await create_timer(2.0).timeout
 				break
 	if _want("spike"):
 		var spike: Node3D = ranch.get("spike")

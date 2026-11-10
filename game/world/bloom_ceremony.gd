@@ -87,8 +87,9 @@ static func star_texture() -> Texture2D:
 	if _star != null:
 		return _star
 	# THE SHOW'S SPARKLE: a hard-edged, pinched four-point star with a pixel of antialiasing,
-	# not a soft glow (Fable round 6, #5: "stock engine sprites ... Gaussian falloff").
-	var n := 64
+	# not a soft glow (Fable round 6, #5: "stock engine sprites ... Gaussian falloff"). At 256
+	# px so a marker a metre across keeps its edge (64 px filtered soft again, round 8).
+	var n := 256
 	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
 	for y in range(n):
 		for x in range(n):
@@ -96,7 +97,7 @@ static func star_texture() -> Texture2D:
 			var v := absf((y + 0.5) / n * 2.0 - 1.0)
 			# An astroid, |u|^(2/3) + |v|^(2/3) <= 1, pinched to points.
 			var f := pow(u, 0.6) + pow(v, 0.6)
-			var a := clampf((0.98 - f) * 24.0, 0.0, 1.0)
+			var a := clampf((0.98 - f) * 90.0, 0.0, 1.0)
 			img.set_pixel(x, y, Color(1, 1, 1, a))
 	_star = ImageTexture.create_from_image(img)
 	return _star
