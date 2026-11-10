@@ -247,6 +247,11 @@ void fragment() {
 			+ (value_noise(v_world_pos.xz / 0.55) - 0.5) * path_edge_noise * 0.9;
 		float path = clamp(1.0 - smoothstep(path_half_width + wobble,
 			path_half_width + path_edge_softness + wobble, pd), 0.0, 1.0);
+		// A crisp darker rim on the grass side of the edge, the painted line the show draws
+		// round a path (Fable round 5: "crisp path decals with a darker edge").
+		float edge_d = pd - (path_half_width + path_edge_softness + wobble);
+		float path_rim = (1.0 - smoothstep(0.0, 0.16, edge_d)) * step(0.0, edge_d);
+		base *= 1.0 - 0.28 * path_rim;
 		// A ROAD WITH WEAR IN IT, NOT A FLAT FILL (owner, 2026-10-25: "starting area is
 		// terrible"; the plaza read as one orange sheet). The crown is packed lighter where the
 		// hooves go, two darker ruts run a cart's width apart, and small pebbles break it up.
@@ -296,7 +301,11 @@ void fragment() {
 	float ng = clamp(night_glow, 0.0, 1.0);
 	base = mix(base, vec3(lum) * vec3(0.78, 0.9, 1.18), ng * 0.5);
 	base *= 1.0 - 0.2 * ng;
-	base *= 1.0 - 0.14 * clamp(wet, 0.0, 1.0);
+	// Soaked: darker and cooler, plainly not the dry night (Fable round 5: "the ground is
+	// identical to the dry night frame").
+	float w = clamp(wet, 0.0, 1.0);
+	base *= 1.0 - 0.28 * w;
+	base = mix(base, base * vec3(0.82, 0.9, 1.08), w * 0.6);
 	ALBEDO = base;
 	ROUGHNESS = ground_roughness;
 	SPECULAR = 0.0;

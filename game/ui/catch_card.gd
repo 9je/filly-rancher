@@ -581,6 +581,9 @@ func _slide() -> void:
 	visible = true
 	_showing = true
 	_in_moment = true
+	# The big "Caught!" says it during the moment; the chip says it on the corner card
+	# (Fable round 5: "the card says Caught! twice").
+	_ribbon.visible = false
 	_moment_t = 0.0
 	modulate.a = 1.0
 	_panel.pivot_offset = _panel.size * 0.5
@@ -604,6 +607,7 @@ func _settle(seconds: float) -> void:
 	if _tween != null and _tween.is_valid():
 		_tween.kill()
 	_in_moment = false
+	_ribbon.visible = true
 	_panel.modulate.a = 1.0
 	_tween = create_tween()
 	_tween.set_parallel(true)
@@ -640,6 +644,7 @@ func _input(event: InputEvent) -> void:
 func _hidden() -> void:
 	_showing = false
 	_in_moment = false
+	_ribbon.visible = true
 	visible = false
 	_burst_a = 0.0
 	_clear_stage()

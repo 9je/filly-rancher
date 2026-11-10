@@ -175,7 +175,7 @@ static func path_distance(p: Vector2) -> float:
 ## The old edge was as wide as the road, so from the player's eye every road was a brown
 ## smear; the show paints its paths with a clean edge. Same overall width.
 const PATH_HALF_WIDTH := 1.5
-const PATH_EDGE_SOFTNESS := 0.6
+const PATH_EDGE_SOFTNESS := 0.12
 const PATH_EDGE_NOISE := 0.55
 
 ## HOW MUCH OF DIRT COMES BACK AS AN AMBIENT-INDEPENDENT EMISSION FLOOR ON THE PATH. Measured

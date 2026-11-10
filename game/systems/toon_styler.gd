@@ -25,7 +25,7 @@ const PRESETS := {
 	# make the 3D pony match its own card"): a hard terminator, a line you can see at a glance
 	# in the coat's own deep shade, and no cast self-shadow (the sun's shadow map stair-stepped
 	# across necks and flanks in hard steps; the show never draws a pony shadowing herself).
-	&"pony": {"outline_px": 2.6, "rim": 0.12, "shadow_fill": 0.46, "fade_end": 42.0,
+	&"pony": {"outline_px": 2.6, "rim": 0.0, "shadow_fill": 0.46, "fade_end": 42.0,
 		"band_softness": 0.022, "cast_shadow": 0.0, "line_value": 0.36},
 	&"prop": {"outline_px": 1.1, "rim": 0.0, "shadow_fill": 0.34, "fade_end": 60.0},
 	&"building": {"outline_px": 1.3, "rim": 0.0, "shadow_fill": 0.34, "fade_end": 90.0},
@@ -149,8 +149,8 @@ static func style(root: Node, category: StringName = &"prop", cache: Variant = n
 					out = to_toon(src as StandardMaterial3D, preset)
 					if category == &"pony":
 						_keep_pastel(out, src as StandardMaterial3D)
-						if is_hair(mi.name, src.resource_name):
-							out.set_shader_parameter(&"hair_shine", 1.0)
+						# (The hair shine streak is off: Fable round 5 read it, with the rim
+						# light, as "glossy plastic ... a specular hotspot". is_hair() stays.)
 					if lift != 1.0:
 						_lift(out, lift)
 					if ao != null:

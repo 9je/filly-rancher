@@ -15,6 +15,9 @@ var pony := "fluttershy"
 
 
 func _initialize() -> void:
+	# The card's own animation, read from the moment it is shown: the in-game wait for the
+	# world's catch beat (catch_card.gd) is the real-catch strip's to show (p8_checks catchstrip).
+	load("res://ui/catch_card.gd").default_entrance_delay = 0.0
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--out="):
 			out = a.substr(6)

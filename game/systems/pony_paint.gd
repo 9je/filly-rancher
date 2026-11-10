@@ -237,8 +237,7 @@ static func _flat_toon(c: Color, r: int) -> ShaderMaterial:
 	m.set_shader_parameter(&"band_softness", float(PONY.get("band_softness", 0.035)))
 	m.set_shader_parameter(&"cast_shadow", float(PONY.get("cast_shadow", 1.0)))
 	m.set_shader_parameter(&"rim_strength", float(PONY.get("rim", 0.16)) if r == Role.COAT else 0.0)
-	if r == Role.MANE or r == Role.MANE2 or r == Role.TAIL:
-		m.set_shader_parameter(&"hair_shine", 1.0)
+
 	# A flat recolour by design (her look replaces the donor's own texture), so an audit
 	# does not read the dropped donor texture as a lost one (test_input/pony_material_audit.gd).
 	m.set_meta(&"recolored", true)

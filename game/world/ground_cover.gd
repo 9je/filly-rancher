@@ -17,9 +17,14 @@ const STEP := 1.15
 const CHUNK := 27.5
 const VISIBLE_METRES := 62.0
 ## Chance of a clump in open meadow, and along a path's verge.
-const MEADOW := 0.45
-const VERGE := 0.95
-const FLOWERS := 0.05
+##
+## NO TUFTS, THE SHOW'S WAY (Fable AAA rounds 2 to 5: "identical spiky tufts on one flat
+## green ... this alone pulls every world shot to hobby tier"; round 5 offered "go fully
+## show-flat: painted ground, crisp path edges ... no tufts at all"). The meadow is painted
+## by the terrain shader; only the flowers stand on it, in drifts.
+const MEADOW := 0.0
+const VERGE := 0.0
+const FLOWERS := 0.09
 const FLOWER_COLOURS: Array[Color] = [Color(1.0, 1.0, 0.97), Color(1.0, 0.72, 0.84),
 	Color(1.0, 0.86, 0.36), Color(0.80, 0.70, 1.0)]
 
@@ -51,7 +56,7 @@ func build(terrain: Node, region_list: Array) -> int:
 				continue
 			var verge := path < 2.6
 			var roll := _rng.randf()
-			var is_flower := roll < FLOWERS
+			var is_flower := roll < FLOWERS * (0.15 + 1.7 * clampf(0.5 + 0.5 * _drift.get_noise_2d(px * 1.7, pz * 1.7), 0.0, 1.0))
 			var thick := 0.5 + 0.5 * _drift.get_noise_2d(px, pz)
 			if not is_flower and roll > (VERGE if verge else MEADOW * lerpf(0.25, 2.0, thick)):
 				continue
