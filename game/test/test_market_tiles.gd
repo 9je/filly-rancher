@@ -60,7 +60,7 @@ func test_every_icon_kind_draws_something() -> void:
 
 ## G14 (batch check of PS6, build/ps_evidence/batch/ui/market_open.png): "several Market decor
 ## tiles show blank grey icons". Every tile the Buy tab shows has a picture to draw, and a
-## decoration's is a real picture of the thing: a baked image with something on it.
+## decoration's is a picture of the thing from the icon set (tools/make_icons.py), not empty.
 func test_every_thing_for_sale_has_a_picture_not_a_blank_disc() -> void:
 	_menu.open()
 	_menu.set_tab(MarketMenu.Tab.BUY)
@@ -71,7 +71,7 @@ func test_every_thing_for_sale_has_a_picture_not_a_blank_disc() -> void:
 		if item.decor_id != &"":
 			decor += 1
 			var tex: Texture2D = ShopIconScript.picture(k)
-			assert_not_null(tex, "%s has a baked picture" % item.display_name)
+			assert_not_null(tex, "%s has a picture in the set" % item.display_name)
 			if tex != null:
 				var img := tex.get_image()
 				var solid := 0

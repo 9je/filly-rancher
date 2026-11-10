@@ -143,6 +143,34 @@ class Icon:
         self.parts.append("".join(out))
         return self
 
+    def group(self, shapes, color, offset=2.6, stroke=STROKE, outline=None, hl=None):
+        """Several shapes filled as ONE: a single outline round their union (each stroked
+        twice as wide first, the fills then cover the inner half), one shade crescent on the
+        union's lower right and one highlight at `hl` (x, y), if given. For a figure built of
+        parts (a pony in stone, a bush of lobes) that must not show a seam at every join."""
+        self.n += 1
+        cid = "%s_g%d" % (self.name, self.n)
+        col = SW.get(color, color)
+        ds = [s[0] for s in shapes]
+        clip = "".join(f'<path d="{d}"/>' for d in ds)
+        out = [f'<clipPath id="{cid}">{clip}</clipPath>']
+        if stroke:
+            for d in ds:
+                out.append(f'<path d="{d}" fill="none" stroke="{outline or line(col)}" '
+                           f'stroke-width="{stroke * 2}" stroke-linejoin="round"/>')
+        for d in ds:
+            out.append(f'<path d="{d}" fill="{shade(col)}"/>')
+        out.append(f'<g clip-path="url(#{cid})"><g transform="translate({-offset},{-offset})">')
+        for d in ds:
+            out.append(f'<path d="{d}" fill="{col}"/>')
+        out.append("</g></g>")
+        if hl:
+            out.append(f'<g clip-path="url(#{cid})"><ellipse cx="{hl[0]}" cy="{hl[1]}" rx="3.2" '
+                       f'ry="1.8" fill="#FFFFFF" fill-opacity="0.75" '
+                       f'transform="rotate(-30 {hl[0]} {hl[1]})"/></g>')
+        self.parts.append("".join(out))
+        return self
+
     def flat(self, shape, color, stroke=STROKE, outline=None):
         return self.fill(shape, color, hl=False, sh=False, stroke=stroke, outline=outline)
 
@@ -705,9 +733,18 @@ def _earth_shoe(i, dx):
 
 @icon("long_beam")
 def _beam(i):
-    i.fill(path("M11,47 L40,18 L46,24 L17,53 Z", (11, 18, 46, 53)), "wood", hl=False)
-    i.fill(star(44, 20, 10, 0.4, 4), "violet")
-    i.ink("M50,10 L54,6 M54,16 L59,15 M48,4 L49,0", "violet", 2.4)
+    # A unicorn's horn (Fable AAA round 6: the old one read as a stick) throwing a long beam of
+    # violet magic, with a gold reach arrow along it: "your magic reaches further".
+    i.stroke("M22,42 L55,9", "#C9B5F5", 11)
+    i.stroke("M22,42 L55,9", "violet", 6.5)
+    i.stroke("M22,42 L55,9", "#FFFFFF", 2.4)
+    i.fill(star(55, 9, 8, 0.36, 4), "white", hl=False, stroke=2, outline=line(SW["violet"]))
+    i.flat(star(47, 23, 3.4, 0.3, 4), "white", stroke=1.2, outline=line(SW["violet"]))
+    i.fill(poly([(4, 51), (13, 60), (27, 37)]), "pink")
+    i.ink("M8.5,49 L14,54.5 M13.5,44.5 L18.6,49.2 M18.5,40 L22.6,43.6", "pink", 1.8)
+    i.stroke("M36,48 L54,30", line(SW["gold"]), 5)
+    i.stroke("M36,48 L54,30", "gold", 2.6)
+    i.fill(poly([(57, 27), (49.5, 29.5), (54.5, 34.5)]), "gold", hl=False, sh=False, stroke=1.8)
 
 
 @icon("lure_post")
@@ -785,6 +822,334 @@ def _sell_all(i):
         i.fill(ellipse(30, y, 15, 6), "gold", hl=(y == 28))
     i.fill(poly([(40, 12), (54, 12), (54, 26), (49, 21), (42, 28), (38, 24), (45, 17)]), "leaf",
            hl=False, stroke=2.4)
+
+
+# ---- the decorations (Fable AAA round 6, #1) -----------------------------------------------
+# The Market's decor tiles were baked 3D cut-outs (game/scenes/test/decor_icons.gd) and read as
+# a second set beside the drawn foods and gear: a green blob, a beige blob, grey silhouettes.
+# Each is drawn here in the foods' "_art" hand instead: three quarter view (lit top, front,
+# shaded right side), the set's outline and shade crescent, more of the thing.
+
+def _lit(hexc, k=0.35):
+    r, g, b = _rgb(hexc)
+    return _hex((r + (1 - r) * k, g + (1 - g) * k, b + (1 - b) * k))
+
+
+def _box(i, x, y, w, h, dx, dy, col, top=None, side=None, hl=True):
+    """A box in three quarter view: front face x..x+w, y..y+h; its top and right side run
+    back (dx, -dy). Top lit, side in shade."""
+    c = SW.get(col, col)
+    i.fill(poly([(x + w, y), (x + w + dx, y - dy), (x + w + dx, y + h - dy), (x + w, y + h)]),
+           side or shade(c, 0.8), hl=False, sh=False)
+    i.fill(poly([(x, y), (x + dx, y - dy), (x + w + dx, y - dy), (x + w, y)]),
+           top or _lit(c), hl=False, sh=False)
+    i.fill(rrect(x, y, w, h, 1.5), col, hl=hl)
+
+
+def _blossom(i, cx, cy, r, col, centre="gold"):
+    for k in range(5):
+        a = math.radians(k * 72 - 90)
+        i.flat(circle(cx + r * 0.62 * math.cos(a), cy + r * 0.62 * math.sin(a), r * 0.5), col,
+               stroke=1.4)
+    i.flat(circle(cx, cy, r * 0.36), centre, stroke=1.2)
+
+
+@icon("decor_flower_bushes")
+def _d_bushes(i):
+    i.flat(ellipse(32, 53, 25, 5), shade(SW["forest"], 0.9), stroke=0)
+    i.group([circle(17, 40, 11), circle(30, 29, 14), circle(45, 33, 12), circle(52, 44, 8),
+             rrect(8, 38, 50, 15, 6)], "#6DBB5C", hl=(24, 22))
+    i.ink("M15,44 C18,41 21,41 23,43 M33,36 C36,33 40,33 42,35 M44,46 C47,43 50,43 52,45 "
+          "M24,30 C26,27 29,27 31,28", "#6DBB5C", 1.8)
+    for x, y, c in ((19, 34, "pink"), (34, 22, "rose"), (45, 30, "pink"), (28, 42, "white"),
+                    (50, 41, "rose"), (12, 44, "white"), (38, 40, "pink")):
+        _blossom(i, x, y, 5.2, c, "gold")
+
+
+def _bale(i, x, y, w, h, d):
+    hay = "#F5CF55"
+    _box(i, x, y, w, h, d, d * 0.75, hay, top="#FBE38E", side=shade(hay, 0.8))
+    straw = shade(hay, 0.62)
+    i.stroke("M%g,%g l5,-1 M%g,%g l6,-1 M%g,%g l5,-1 M%g,%g l5,-1" % (
+        x + 3, y + 5, x + w * 0.45, y + h * 0.4, x + 4, y + h * 0.7, x + w * 0.55, y + h * 0.82),
+        straw, 1.3)
+    twine = "#9A5B2A"
+    for t in (0.3, 0.7):
+        bx = x + w * t
+        i.stroke("M%g,%g L%g,%g L%g,%g" % (bx, y + h, bx, y, bx + d, y - d * 0.75), twine, 2.2)
+
+
+@icon("decor_hay_bales")
+def _d_hay(i):
+    i.stroke("M6,52 L2,57 M58,46 L62,50 M30,22 L27,15 M42,20 L46,13", "#D9AE3E", 2)
+    _bale(i, 4, 38, 26, 15, 8)
+    _bale(i, 30, 38, 22, 15, 8)
+    _bale(i, 15, 23, 26, 15, 8)
+    i.stroke("M10,53 L8,59 M24,53 L26,59 M40,53 L39,59", "#D9AE3E", 1.8)
+
+
+@icon("decor_picnic_table")
+def _d_picnic(i):
+    wood = "#DDA062"
+    # the far bench, peeking over the top
+    i.fill(poly([(12, 24), (38, 15), (41, 17), (15, 26)]), wood, hl=False, sh=False, stroke=2.4)
+    # A-frame legs
+    for a, b in (((14, 36), (9, 54)), ((20, 38), (24, 56)), ((46, 28), (42, 47)),
+                 ((52, 27), (56, 45))):
+        i.ink("M%g,%g L%g,%g" % (a + b), wood, 4.6)
+        i.stroke("M%g,%g L%g,%g" % (a + b), shade(wood, 0.8), 2.2)
+    # the top, its front edges thick
+    i.fill(poly([(4, 31), (26, 40), (26, 44), (4, 35)]), shade(wood, 0.8), hl=False, sh=False)
+    i.fill(poly([(26, 40), (58, 27), (58, 31), (26, 44)]), shade(wood, 0.66), hl=False, sh=False)
+    i.fill(poly([(4, 31), (36, 18), (58, 27), (26, 40)]), wood, hl=False)
+    i.ink("M11.3,34 L43.3,21 M18.7,37 L50.7,24", wood, 1.4)
+    # a gingham cloth and a basket
+    i.fill(poly([(16, 30), (34, 23), (44, 27.5), (26, 35)]), "red", hl=False, sh=False, stroke=2)
+    i.stroke("M21,28 L31,32.5 M27,25.5 L37,30 M20.5,32 L38.5,24.6", "#FFFFFF", 1.4)
+    i.fill(path("M27,22 H39 L37,29 H29 Z", (27, 22, 39, 29)), "wood", hl=False, stroke=2)
+    i.ink("M29,22 Q33,15 37,22", "wood", 2)
+    i.fill(circle(31, 21, 2.4), "red", hl=False, stroke=1.4)
+    # the near bench
+    i.fill(poly([(14, 47), (48, 34), (48, 37), (14, 50)]), shade(wood, 0.72), hl=False, sh=False,
+           stroke=2.2)
+    i.fill(poly([(10, 45), (44, 32), (48, 34), (14, 47)]), wood, hl=False, sh=False, stroke=2.2)
+    i.ink("M17,50 L17,57 M45,37 L45,44", wood, 3)
+
+
+@icon("decor_wagon")
+def _d_wagon(i):
+    wood = "#C08550"
+    i.ink("M8,40 L1,47", "wood", 3)
+    i.fill(circle(51, 41, 7), "wood", hl=False)
+    # the bed: hay heaped over the open top
+    i.fill(poly([(8, 27), (18, 19), (57, 19), (47, 27)]), shade(wood, 0.55), hl=False, sh=False)
+    i.group([circle(18, 22, 6), circle(28, 18, 7), circle(39, 19, 7), circle(48, 18, 5.5)],
+            "#F5CF55", stroke=2.4, hl=(26, 14))
+    i.stroke("M22,18 l4,-1 M35,16 l4,-1 M44,17 l3,-1", shade("#F5CF55", 0.62), 1.3)
+    _box(i, 8, 27, 39, 14, 10, 8, wood)
+    i.ink("M8,33.5 H47 M18,27 V41 M37,27 V41", wood, 1.6)
+    for cx in (17, 39):
+        i.fill(circle(cx, 44, 9), "#8C5A33", hl=False)
+        i.flat(circle(cx, 44, 6), _lit("#8C5A33", 0.25), stroke=0)
+        for k in range(6):
+            a = math.radians(k * 60 + 15)
+            i.stroke("M%g,%g L%g,%g" % (cx, 44, cx + 6 * math.cos(a), 44 + 6 * math.sin(a)),
+                     line("#8C5A33"), 1.6)
+        i.fill(circle(cx, 44, 2.4), "gold", hl=False, stroke=1.4)
+
+
+@icon("decor_well")
+def _d_well(i):
+    stone = "#B8B1C6"
+    # posts and the crank
+    i.fill(rrect(13, 14, 5, 30, 1.5), "wood", hl=False)
+    i.fill(rrect(46, 14, 5, 30, 1.5), "wood", hl=False)
+    i.ink("M17,22 H47", "wood", 3.2)
+    i.stroke("M51,22 H56 V27", "#8C8597", 2.4)
+    i.stroke("M32,22 V31", "#9A5B2A", 1.6)
+    # the roof, two slopes
+    i.fill(poly([(4, 19), (32, 3), (32, 9), (9, 22)]), "red", hl=False, sh=False)
+    i.fill(poly([(32, 3), (60, 19), (55, 22), (32, 9)]), shade(SW["red"], 0.75), hl=False, sh=False)
+    i.ink("M11,15 L32,4 M18,12 L23,15 M40,8 L45,11 M49,13 L53,16", "red", 1.4)
+    # the round wall: rim, water, stone body with courses
+    i.fill(path("M12,38 V51 A20,6 0 0 0 52,51 V38 Z", (12, 38, 52, 57)), stone)
+    i.ink("M12,44.5 A20,6 0 0 0 52,44.5 M20,39 V45 M33,44.5 V51 M44,39 V45 M24,50 V56 M42,50 V55",
+          stone, 1.5)
+    i.fill(ellipse(32, 38, 20, 6), _lit(stone, 0.3), hl=False, sh=False)
+    i.flat(ellipse(32, 38, 15, 3.8), "lake", stroke=1.6)
+    i.flat(ellipse(28, 37.4, 4, 1), "#BFE6FF", stroke=0)
+    i.fill(path("M28,30 H36 L35,35 H29 Z", (28, 30, 36, 35)), "wood", hl=False, stroke=1.8)
+
+
+@icon("decor_tetherball")
+def _d_tether(i):
+    i.fill(ellipse(26, 54, 12, 4), "stone", hl=False)
+    i.fill(rrect(23, 8, 6, 46, 2.5), "white", outline=line("#C9C3B8"))
+    for y in (12, 22, 32, 42):
+        i.flat(poly([(23, y + 4), (29, y), (29, y + 4), (23, y + 8)]), "red", stroke=0)
+    i.ink(rrect(23, 8, 6, 46, 2.5)[0], "#C9C3B8", 2.4)
+    i.fill(circle(26, 8, 3.4), "gold", hl=False, stroke=1.8)
+    i.stroke("M27,10 Q38,14 41,24", "#7B6A5A", 1.8)
+    i.fill(circle(44, 32, 10), "gold")
+    i.ink("M35,30 C39,34 47,36 53,33 M42,22.5 C40,28 41,36 46,41.6", "gold", 1.8)
+    i.stroke("M52,22 L56,19 M55,27 L60,26", "sky", 2.2)
+
+
+@icon("decor_garden_arch")
+def _d_arch(i):
+    arch = "M10,57 V30 A22,22 0 0 1 54,30 V57 H48 V30 A16,16 0 0 0 16,30 V57 Z"
+    i.parts.append('<g transform="translate(5,-4)">')
+    i.fill(path(arch, (10, 8, 54, 57)), "#C9C3D3", hl=False, sh=False)
+    i.parts.append("</g>")
+    i.fill(path(arch, (10, 8, 54, 57)), "white", outline=line("#B9B0C8"))
+    i.ink("M10,36 H16 M10,44 H16 M10,52 H16 M48,36 H54 M48,44 H54 M48,52 H54 "
+          "M13,22 L18,25 M22,12 L25,17 M32,8 V14 M42,12 L39,17 M51,22 L46,25", "#B9B0C8", 1.4)
+    i.stroke("M13,57 C10,48 18,44 13,36 C9,28 16,22 18,16 C22,9 30,8 34,9 C42,10 46,14 49,20 "
+             "C53,27 47,33 51,40 C55,47 48,51 51,57", "forest", 2.6)
+    for x, y, a in ((12, 47, 30), (16, 30, -30), (24, 11, 20), (42, 11, -20), (51, 31, 30),
+                    (50, 48, -30), (14, 40, 10), (52, 40, -10)):
+        i.parts.append(f'<g transform="rotate({a} {x} {y})">')
+        i.fill(ellipse(x, y, 3.6, 2), "leaf", hl=False, sh=False, stroke=1.4)
+        i.parts.append("</g>")
+    for x, y in ((14, 24), (33, 9), (50, 25), (51, 44), (13, 52), (27, 10)):
+        i.fill(circle(x, y, 3.8), "rose", hl=False, stroke=1.6)
+        i.stroke("M%g,%g a1.8,1.8 0 1,1 1.6,1.6" % (x - 1, y - 0.6), line(SW["rose"]), 1.2)
+
+
+@icon("decor_apple_tree")
+def _d_tree(i):
+    i.flat(ellipse(32, 56, 18, 3.5), shade(SW["forest"], 0.9), stroke=0)
+    i.fill(path("M27,56 C29,48 29,40 28,34 L36,34 C35,40 35,48 37,56 C34,55 30,55 27,56 Z",
+                (27, 34, 37, 56)), "wood", hl=False)
+    i.ink("M32,42 L37,37 M31,48 L28,45", "wood", 1.6)
+    i.group([circle(19, 27, 12), circle(45, 27, 12), circle(32, 15, 13), circle(32, 32, 13),
+             circle(24, 19, 10), circle(41, 19, 10)], "#6DBB5C", hl=(24, 11))
+    i.ink("M17,30 C20,27 24,27 26,29 M37,25 C40,22 44,22 46,24 M28,15 C31,12 35,12 37,14",
+          "#6DBB5C", 1.7)
+    for x, y in ((17, 22), (29, 24), (42, 15), (47, 31), (35, 35), (22, 34), (34, 8)):
+        i.fill(circle(x, y, 3.4), "red", hl=False, stroke=1.6)
+        i.flat(circle(x - 1, y - 1.2, 0.9), "#FFFFFF", stroke=0)
+
+
+@icon("decor_lemonade_stand")
+def _d_lemonade(i):
+    wood = "#C08550"
+    i.fill(rrect(10, 14, 4, 24, 1), "wood", hl=False)
+    i.fill(rrect(42, 14, 4, 24, 1), "wood", hl=False)
+    _box(i, 8, 36, 36, 18, 10, 7, wood)
+    i.fill(rrect(13, 39, 26, 12, 2), "cream", hl=False, sh=False, stroke=2, outline=line(SW["wood"]))
+    i.fill(ellipse(26, 45, 6, 4), "gold", hl=False, stroke=1.6)
+    i.ink("M22,45 H30 M26,42 V48", "gold", 1)
+    # a pitcher and two glasses on the counter
+    i.fill(path("M17,24 H27 L28,35 H16 Z", (16, 24, 28, 35)), "#FFF7C2", hl=False, sh=False,
+           stroke=2, outline=line("#B9B0C8"))
+    i.flat(path("M16.6,28 H27.4 L28,35 H16 Z", (16, 28, 28, 35)), "gold", stroke=0)
+    i.ink("M27,26 C31,26 31,32 27.6,32", "#B9B0C8", 1.8)
+    for gx in (33, 40):
+        i.fill(rrect(gx, 28, 5, 7, 1), "gold", hl=False, sh=False, stroke=1.6,
+               outline=line("#B9B0C8"))
+    # the striped awning, scalloped
+    stripes = ("#FFFFFF", "#F5C542")
+    for k in range(6):
+        x0 = 4 + k * 8.5
+        i.flat(poly([(x0 + 4, 6), (x0 + 12.5, 6), (x0 + 8.5, 18), (x0, 18)]), stripes[k % 2],
+               stroke=0)
+        i.flat(path("M%g,18 A4.25,4.25 0 0 0 %g,18 Z" % (x0, x0 + 8.5), (x0, 18, x0 + 8.5, 22)),
+               stripes[k % 2], stroke=0)
+    edge = line(SW["gold"])
+    i.stroke("M4,18 L8,6 H59 L55,18 " + " ".join("A4.25,4.25 0 0 1 %g,18" % (55 - (k + 1) * 8.5)
+                                               for k in range(6)), edge, 2.6)
+    i.stroke("M59,6 L60,14 L55,18", edge, 2.2)
+
+
+@icon("decor_chicken_coop")
+def _d_coop(i):
+    red = "#D9534B"
+    # side wall, roof, then the gable end in front
+    i.fill(poly([(38, 30), (56, 21), (56, 41), (38, 50)]), shade(red, 0.75), hl=False, sh=False)
+    i.ink("M42,33 V48 M47,30.5 V45.5 M52,28 V43", red, 1.2)
+    i.fill(poly([(24, 16), (42, 7), (59, 21), (40, 31)]), "#7E5AA6", hl=False, sh=False)
+    i.ink("M30,13 L46,26 M36,10 L52,23.5", "#7E5AA6", 1.2)
+    i.fill(poly([(9, 31), (24, 17), (39, 31), (39, 51), (9, 51)]), red)
+    i.ink("M9,36 H39 M9,43 H39", red, 1.2)
+    i.stroke("M6,33 L24,15 L42,32", "#FFFFFF", 3.2)
+    i.stroke("M6,33 L24,15 L42,32", line(red), 1.0)
+    i.fill(path("M17,51 V42 A7,7 0 0 1 31,42 V51 Z", (17, 35, 31, 51)), "ink", hl=False, sh=False,
+           stroke=2)
+    i.fill(circle(24, 26, 3.4), "gold", hl=False, stroke=1.6)
+    i.fill(poly([(17, 51), (31, 51), (26, 59), (10, 59)]), "wood", hl=False, sh=False, stroke=2)
+    i.ink("M15,55 H28", "wood", 1.4)
+    # a hen by the door
+    i.fill(path("M44,56 C40,56 39,50 42,47 C43,44 46,43 48,44 C50,41 54,42 54,46 "
+                "C57,45 59,47 58,50 C57,54 52,57 44,56 Z", (39, 41, 59, 57)), "white",
+           outline=line("#C9C3B8"), stroke=2.2)
+    i.fill(poly([(48, 41), (50, 38.5), (51, 41), (53, 39), (53, 42)]), "red", hl=False, sh=False,
+           stroke=1.4)
+    i.fill(poly([(45, 45), (41.5, 46.5), (45, 47.5)]), "orange", hl=False, sh=False, stroke=1.2)
+    i.flat(circle(47.5, 45, 0.9), "ink", stroke=0)
+
+
+MARBLE = "#ECE7F2"
+
+
+def _statue(i, pony, plaque):
+    """A pony in carved marble on a stone plinth with a gold plaque; her mane and tail in a
+    pale stone of her own colour, her mark inlaid on her flank and on the plaque."""
+    stone = "#B9B2C9"
+    _box(i, 10, 45, 36, 12, 8, 6, stone)
+    i.ink("M10,49 H46", stone, 1.2)
+    i.fill(rrect(20, 48.5, 16, 6.5, 1.5), "gold", hl=False, sh=False, stroke=1.6)
+    pony(i)
+    plaque(i)
+
+
+def _pony(i, head, mane, tail, mane_col, extra=()):
+    """A pony standing on the plinth (hooves at y 45), facing left. `head` is the head's centre;
+    `mane` and `tail` are paths drawn over her in `mane_col`; `extra` shapes join her body
+    (a raised wing)."""
+    hx, hy = head
+    body = [ellipse(35, 32, 12, 7.5),
+            poly([(hx - 2, hy + 4), (hx + 6, hy + 2), (31, 30), (24, 34)]),
+            circle(hx, hy, 8.2), ellipse(hx - 7, hy + 4.5, 5.2, 4.2),
+            poly([(hx + 1, hy - 6), (hx + 4, hy - 14), (hx + 7, hy - 4)]),
+            rrect(24.5, 33, 4, 12, 1.8), rrect(29.5, 34, 4, 11, 1.8),
+            rrect(39, 34, 4, 11, 1.8), rrect(43.5, 33, 4, 12, 1.8)] + list(extra)
+    i.group(body, MARBLE, stroke=STROKE, hl=(36, 27))
+    # the near legs a touch lighter than the far ones
+    i.ink("M29.5,44 H33.5 M24.5,44.5 H28.5 M39,44 H43 M43.5,44.5 H47.5", MARBLE, 1.4)
+    i.group([path(tail, (0, 0, 64, 64))], mane_col, stroke=STROKE)
+    i.group([path(mane, (0, 0, 64, 64))], mane_col, stroke=STROKE)
+    # her big eye, carved: socket, iris, catch-light; a smile on the muzzle
+    i.flat(ellipse(hx - 3, hy + 0.5, 2.5, 3.3), shade(MARBLE, 0.55), stroke=0)
+    i.flat(ellipse(hx - 3.5, hy - 0.6, 1.0, 1.3), "#FFFFFF", stroke=0)
+    i.ink("M%g,%g q1.4,0.8 2.6,0" % (hx - 10, hy + 6), MARBLE, 1.1)
+
+
+@icon("decor_statue_fluttershy")
+def _d_flutter(i):
+    def pony(i):
+        # Fluttershy, head a little bowed, her long mane over her eye and down past her neck,
+        # her tail to the plinth, her wing folded.
+        _pony(i, (20, 19),
+              "M14,13 C16,7 25,6 29,11 C32,16 32,25 30,33 C28,35 25,34 25,31 C27,26 26,20 22,16 "
+              "C20,14 17,14 14,13 Z",
+              "M46,28 C53,27 56,35 53,44 C51,45 49,44 50,41 C51,36 50,33 46,31.5 Z",
+              "#F6E3EC")
+        i.fill(path("M30,30 C34,25 41,25 44,28 C41,33 35,34 30,30 Z", (30, 25, 44, 34)), MARBLE,
+               hl=False, stroke=1.8)
+        i.ink("M33,30 C36,28 39,28 41,29", MARBLE, 1.2)
+        for x, y in ((38, 36), (42.5, 34.5)):
+            i.flat(ellipse(x - 1.3, y, 1.5, 2.0), "pink", stroke=0.9)
+            i.flat(ellipse(x + 1.3, y, 1.5, 2.0), "pink", stroke=0.9)
+
+    def plaque(i):
+        i.flat(ellipse(26.6, 51.7, 2, 1.8), "pink", stroke=1)
+        i.flat(ellipse(29.4, 51.7, 2, 1.8), "pink", stroke=1)
+    _statue(i, pony, plaque)
+
+
+@icon("decor_statue_rainbowdash")
+def _d_dash(i):
+    def pony(i):
+        # Rainbow Dash, head high, wings raised, her mane and tail streaming back.
+        wing = path("M30,28 C27,18 30,8 37,3 C37,8 40,9 43,8 C42,12 44,14 48,13 C46,17 47,20 "
+                    "50,21 C46,24 42,27 38,29 Z", (27, 3, 50, 29))
+        _pony(i, (19, 15),
+              "M13,9 C15,3 24,2 28,6 C32,5 35,8 33,11 C36,13 35,17 32,17 C33,21 31,24 28,25 "
+              "C28,20 26,16 22,13 C19,12 16,11 13,9 Z",
+              "M46,28 C51,26 55,28 60,25 C60,30 57,33 52,33.5 C54,37 51,40 48,39 C49,36 48,34 "
+              "45.5,32.5 Z",
+              "#DCEBF7", extra=[wing])
+        i.ink("M33,26 C33,19 36,12 39,8 M37,27 C38,21 42,17 46,15", MARBLE, 1.3)
+        i.flat(path("M38.5,37 L42.5,32.5 L41,36 L44.5,35.5 L39,40.5 L40.5,37.3 Z",
+                    (38, 32, 45, 41)), "red", stroke=0.9)
+        i.flat(circle(40.6, 33, 2.1), "sky", stroke=1)
+
+    def plaque(i):
+        for k, c in enumerate(("#D93D42", "#F2D147", "#4585DB")):
+            i.stroke("M%g,53.5 A%g,%g 0 0 1 %g,53.5" % (22.5 + k * 1.5, 5.5 - k * 1.5,
+                                                        4.5 - k * 1.2, 33.5 - k * 1.5), c, 1.3)
+    _statue(i, pony, plaque)
 
 
 # ---- the creator's mark tools (Fable AAA round 4: an icon legend, not a help paragraph) ----

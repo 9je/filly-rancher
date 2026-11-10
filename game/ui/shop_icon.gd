@@ -42,33 +42,15 @@ static func kind_for(item: ShopItem) -> StringName:
 	return item.id
 
 
-## THE DECORATIONS ARE PICTURES OF THEMSELVES (PS6, G14: every decor tile on the Market was a
-## blank grey disc, because no drawing here knew a single decoration). Each is the real prop,
-## or the real pony in stone, baked to a cut-out picture by game/scenes/test/decor_icons.gd.
-const DECOR_PICTURES := "res://assets/ui/decor_icons/"
-const DecorScript := preload("res://systems/decor.gd")
-
-
-static var _pictures: Dictionary = {}
-
-
-## A decoration's baked picture (`kind` is its ShopItem id, "decor_<id>"), or null. Cached, and
-## loaded in _ready() rather than first inside _draw(): a texture first loaded mid draw came out
-## as a plain white square on the tile.
+## THE DECORATIONS ARE DRAWN IN THE SET'S HAND (Fable AAA round 6, #1). They were baked 3D
+## cut-outs (PS6, G14) and read as a second icon set beside the drawn foods and gear: a green
+## blob, a beige blob, grey statues. Each is now tools/make_icons.py's "decor_<id>" (the
+## ShopItem's own id), three quarter view like the foods' Market pictures.
+## A decoration's picture (`kind` is its ShopItem id, "decor_<id>"), or null.
 static func picture(k: StringName) -> Texture2D:
-	if _pictures.has(k):
-		return _pictures[k]
-	var path := DECOR_PICTURES + String(k) + ".png"
-	var tex: Texture2D = null
-	if String(k).begins_with("decor_") and ResourceLoader.exists(path):
-		tex = load(path) as Texture2D
-	_pictures[k] = tex
-	return tex
-
-
-func _ready() -> void:
-	for d: Dictionary in DecorScript.CATALOGUE:
-		picture(StringName("decor_" + String(d.id)))
+	if not String(k).begins_with("decor_") or not IconSet.has(String(k)):
+		return null
+	return IconSet.texture(String(k), 256, false)
 
 
 static func draws(k: StringName) -> bool:
@@ -76,12 +58,7 @@ static func draws(k: StringName) -> bool:
 
 
 func _draw() -> void:
-	var baked := picture(kind)
-	if baked != null:
-		# Inset so the cut-out's corners stay inside the tile's round cream disc.
-		var side: float = minf(size.x, size.y) * 0.84
-		draw_texture_rect(baked, Rect2((size - Vector2(side, side)) * 0.5, Vector2(side, side)),
-			false)
+	if String(kind).begins_with("decor_") and draw_from_set(self, String(kind), size):
 		return
 	if kind in FOODS:
 		# A Market tile's picture is drawn at 100 px and more, where the food's small icon

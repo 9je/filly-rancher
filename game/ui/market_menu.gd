@@ -1136,7 +1136,10 @@ func _shelf_card(row: PanelContainer, index: int, row_name: String, price: Strin
 	icon.offset_right = ICON_SIZE * 0.5
 	icon.offset_top = -ICON_SIZE + 4.0
 	icon.offset_bottom = 4.0
-	icon.modulate = Color(1, 1, 1) if enabled else Color(1, 1, 1, 0.55)
+	# Out of reach, a picture is a shade dimmer but solid: see-through, the plum showed
+	# through it and a decoration read as a flat smudge (Fable AAA round 6). The red price
+	# says why.
+	icon.modulate = Color(1, 1, 1) if enabled else Color(0.8, 0.76, 0.84)
 	stand.add_child(icon)
 	var gap := Control.new()
 	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
