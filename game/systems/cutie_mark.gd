@@ -63,13 +63,7 @@ static func apply(model: Node3D, mark: Image) -> int:
 	if mark == null or MarkPaintScript.is_blank(mark):
 		return 0
 	_mark_body(model)
-	# Up to 256 px before it becomes a decal (Fable round 6, #2: "a faint pink smudge"): the
-	# decal atlas filters with mipmaps, and a 64 px drawing's thin strokes averaged with its
-	# transparent ground into a pale ghost at play distance.
-	var big := mark.duplicate() as Image
-	if big.get_width() < 256:
-		big.resize(256, 256, Image.INTERPOLATE_LANCZOS)
-	var texture: ImageTexture = ImageTexture.create_from_image(big)
+	var texture: ImageTexture = ImageTexture.create_from_image(mark)
 	var anchor: Node3D = _anchor(model)
 	if anchor == null:
 		return 0
