@@ -389,29 +389,28 @@ func _streak(dash: Node3D, trail: MeshInstance3D, a: Vector3, b: Vector3, secs: 
 
 func _ring(at: Vector3, fwd: Vector3) -> void:
 	var ring := MeshInstance3D.new()
-	var torus := TorusMesh.new()
-	torus.inner_radius = 0.7
-	torus.outer_radius = 1.0
-	# Smooth at the size it grows to: 48 sides read as a jagged polygon at full spread.
-	torus.rings = 160
-	torus.ring_segments = 16
-	ring.mesh = torus
+	# A FLAT RING OF SEVEN CRISP BANDS facing the lens (Fable round 5, #4: the torus read as
+	# "a pale translucent ring at maybe 40% opacity": its bands wrapped round the tube and
+	# showed edge-on). Red outside, as the show draws it.
+	ring.mesh = _flat_ring(0.58, 1.0, 160)
 	var mat := ShaderMaterial.new()
 	mat.shader = RAINBOW_SHADER
 	mat.set_shader_parameter(&"alpha", 1.0)
-	mat.set_shader_parameter(&"brightness", 1.8)
+	mat.set_shader_parameter(&"brightness", 1.35)
+	mat.set_shader_parameter(&"ring", true)
 	ring.material_override = mat
 	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(ring)
 	ring.global_position = at
-	# Face the player: the torus lies in its local XZ plane, so tip it up toward her.
+	# Face the player: the ring lies in its local XY plane, facing +Z.
 	ring.look_at(at - fwd, Vector3.UP)
-	ring.rotate_object_local(Vector3.RIGHT, PI * 0.5)
 	ring.scale = Vector3.ONE * 0.5
 	var tw := create_tween().set_parallel(true)
 	tw.tween_property(ring, "scale", Vector3.ONE * 26.0, 1.4).set_trans(Tween.TRANS_EXPO) \
 		.set_ease(Tween.EASE_OUT)
-	tw.tween_method(func(v: float) -> void: mat.set_shader_parameter(&"alpha", v), 1.0, 0.0, 2.6)
+	# Held solid while it spreads, then gone.
+	tw.tween_method(func(v: float) -> void: mat.set_shader_parameter(&"alpha", v), 1.0, 0.0, 1.4) \
+		.set_delay(1.4)
 	tw.chain().tween_callback(ring.queue_free)
 	# The hot core: a white burst at the heart of the ring, gone in a blink.
 	var core := MeshInstance3D.new()
@@ -467,3 +466,25 @@ func _cloud_ring(at: Vector3, fwd: Vector3) -> void:
 		.set_ease(Tween.EASE_OUT)
 	tw.tween_property(mat, "albedo_color:a", 0.0, 0.5).set_delay(0.45)
 	tw.chain().tween_callback(ring.queue_free)
+
+
+## A flat ring in the local XY plane, facing +Z: UV.x round it, UV.y from the outer rim (0)
+## to the inner (1), so the rainbow's first band (red) is outermost.
+static func _flat_ring(inner: float, outer: float, segments: int) -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in segments:
+		var a0 := TAU * float(i) / float(segments)
+		var a1 := TAU * float(i + 1) / float(segments)
+		var o0 := Vector3(cos(a0), sin(a0), 0.0) * outer
+		var o1 := Vector3(cos(a1), sin(a1), 0.0) * outer
+		var n0 := Vector3(cos(a0), sin(a0), 0.0) * inner
+		var n1 := Vector3(cos(a1), sin(a1), 0.0) * inner
+		var u0 := float(i) / float(segments)
+		var u1 := float(i + 1) / float(segments)
+		for v: Array in [[o0, Vector2(u0, 0.0)], [n0, Vector2(u0, 1.0)], [o1, Vector2(u1, 0.0)],
+				[o1, Vector2(u1, 0.0)], [n0, Vector2(u0, 1.0)], [n1, Vector2(u1, 1.0)]]:
+			st.set_normal(Vector3.BACK)
+			st.set_uv(v[1])
+			st.add_vertex(v[0])
+	return st.commit()
