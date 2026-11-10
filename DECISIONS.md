@@ -866,3 +866,51 @@ sky and the cinematics. Calls made:
   (gone by two fifths down), a plum pool behind the logotype and a few still first stars to
   its right, so the cloud blob and the pink haze sink into an evening sky and the cream name
   stands on dark, while the valley keeps its warm low sun.
+
+## 2026-11-09: Fable AAA round 6's UI items (decor icons, saddlebag HUD, title hero, blackjack verdict)
+
+An Opus agent in a worktree took the 2D items; the lead kept the world, the ponies, the sky
+and the cinematics. Calls made:
+
+- **One icon set**: the twelve decorations are drawn in tools/make_icons.py in the foods'
+  Market hand (three quarter view, lit top, shaded side, the set's outline and crescent):
+  flowering bushes, a stack of bales, a picnic table with a gingham cloth and basket, a hay
+  wagon, a roofed well, tetherball, a rose arch, an apple tree, a lemonade stand, a coop with
+  a hen, and the two statues as marble ponies on a plinth (Fluttershy head bowed, wing
+  folded; Rainbow Dash head up, wings raised; their marks inlaid). This reverses G14's call
+  (baked 3D cut-outs, 2026-11-07): the bakes read as a second set beside the drawn foods, and
+  a flowerless bush model cannot be fixed in a bake. The bake probe and the PNGs are gone.
+  The Long Beam is a horn throwing a long beam with a gold reach arrow. Icon.group() fills
+  several shapes as one (a single outline and crescent round their union). An unaffordable
+  tile's picture dims solid (it was see-through, and the plum muddied it).
+- **The saddlebag is a saddlebag**: no plum card. A leather bag drawn on the field (saddle
+  band, pouch with a round foot, stitched seams, a flap buckled with the count, red when
+  full), its pockets six to a row filling with gems in the rarity colour and shape; beside it
+  the wallet as a coin stack (more coins as it grows) and the number. The bits label keeps its
+  text for the gates and is hidden; the BagCard node stays, empty, because the toast stands on
+  it. The pantry row is outlined to stand on the field.
+- **Lesson chips have state**: done (felt, tick), next (the first open one: lit disc, glowing
+  gold ring) and locked (every open one after it: dark, faded picture, padlock). "Locked" is
+  presentation: the lessons can still be done in any order, and the next one is recomputed.
+- **The quest pill shows the target**: a new icon pair, "drifter" (a pony head with a badge
+  holding her blank mark, a dashed ring and a "?") and "drifter_bloom" (the badge a gold
+  star). Catch goals show the first, Bloom goals the second, a step about Marigold her baked
+  portrait, anything else the place icon as before. The Catch lesson chip uses the same head.
+- **The title's hero**: the key art is reshot from the near grass (eye 1.6 m) with Fluttershy
+  (the owner's favourite) standing at the right third, three quarters to the lens, the town
+  behind; wanderers within a few metres step out of the frame. The shot goes through a
+  1920x1080 SubViewport on the ranch's world, because the headless compositor's output is
+  fixed at 1600x900 and resizing the window past it crashes. The loading screen shares the
+  art, so its bar now keeps to the left half, clear of her.
+- **The logotype is an object**: per word, back to front, a drop shadow, a cream rim round the
+  silhouette (the plum outline alone vanished into the dusk), the plum outline, an extruded
+  side, then the face: a lit bevel, a shade toward each line's foot and a gloss band, clipped
+  to the letters with clip_children; star catch-lights on the F and the R. The horseshoe and
+  its star wear the same cream rim.
+- **Blackjack's verdict**: the dealer's and her rows of cards fill the felt's middle with only
+  34 px between them, so the banner became a plaque in the empty felt at the left (under the
+  chip rack, above her total): headline, the detail (a split's verdicts one per line), the
+  prize chip at its foot. A test pins that it covers no card at any hand size.
+- Not changed: the title's four menu rows; the slot cabinets and columns (scenery, as asked).
+  test_hud_layout.gd fails two checks (a long toast 1957 px wide, then overlapping the bag) on
+  v1-overhaul's own hud.gd as well; left for whoever owns the toast.
