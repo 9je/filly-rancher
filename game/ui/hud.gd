@@ -428,7 +428,11 @@ func _show_toast(text: String) -> void:
 	_set_toast_icon(String(card.icon))
 	_set_toast_chips(card.chips)
 	_fit_pill(_toast)
+	# Its minimum width recomputed now it wraps: the cached one-line minimum held the label
+	# at the unwrapped width (1957 px for a long toast, test_hud_layout) whatever its offsets.
+	_toast.update_minimum_size()
 	_place_toast()
+	_toast.size = Vector2(float(_toast.get_meta(&"pill_width", _toast.size.x)), _toast.size.y)
 	_place_toast_icon()
 	_place_toast_chips()
 	# A little pop on arrival, the way a show title card bounces in, from its left end.
@@ -637,22 +641,28 @@ const TOAST_GAP := 26.0
 
 
 func _place_toast() -> void:
-	var w := _toast.offset_right - _toast.offset_left
+	# The width _fit_pill chose (its meta), placed above the bag. Kept on the scene's own
+	# anchors (centre, bottom) and written as offsets from them: switched to the top left, the
+	# label held on to a 2823 px width at 150% text (test_hud_layout).
+	var w := float(_toast.get_meta(&"pill_width", _toast.offset_right - _toast.offset_left))
 	var h := _toast.offset_bottom - _toast.offset_top
 	var card := get_node_or_null(^"BagCard") as Control
+	var canvas := _canvas_size()
 	var left := 28.0
-	var top := _canvas_size().y - 200.0
+	var top := canvas.y - 200.0
 	if card != null and card.visible:
 		left = card.position.x
 		top = card.position.y
-	_toast.anchor_left = 0.0
-	_toast.anchor_right = 0.0
-	_toast.anchor_top = 0.0
-	_toast.anchor_bottom = 0.0
-	_toast.offset_left = left
-	_toast.offset_right = left + w
-	_toast.offset_bottom = top - TOAST_GAP
-	_toast.offset_top = _toast.offset_bottom - h
+	# Above the saddlebag as drawn (round 6 drew it on the field and left BagCard empty).
+	var bag := get_node_or_null(^"Bag") as Control
+	if bag != null and bag.is_visible_in_tree():
+		top = minf(top, bag.get_global_rect().position.y)
+	var ax := _toast.anchor_left * canvas.x
+	var ay := _toast.anchor_top * canvas.y
+	_toast.offset_left = left - ax
+	_toast.offset_right = left + w - ax
+	_toast.offset_bottom = top - TOAST_GAP - ay
+	_toast.offset_top = top - TOAST_GAP - h - ay
 
 
 func toast_rect() -> Rect2:
@@ -1772,6 +1782,7 @@ func _fit_pill(l: Label) -> void:
 		pad += _chips_width() + 10.0
 	var one_line := font.get_string_size(l.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + pad
 	var w := minf(one_line, PILL_MAX_WIDTH)
+	l.set_meta(&"pill_width", w)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if one_line > PILL_MAX_WIDTH \
 		else TextServer.AUTOWRAP_OFF
 	var h := font.get_multiline_string_size(l.text, HORIZONTAL_ALIGNMENT_CENTER, w - pad, fs).y \
