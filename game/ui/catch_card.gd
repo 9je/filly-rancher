@@ -595,7 +595,9 @@ func _slide() -> void:
 	_tween.set_parallel(true)
 	_tween.tween_property(_panel, "scale", Vector2.ONE * MOMENT_SCALE, POP_IN) \
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_tween.tween_property(_panel, "modulate:a", 1.0, POP_IN * 0.5)
+	# Opaque in a blink: the pop is the scale's (Fable round 8: a frame at 40% showed the
+	# world through her name).
+	_tween.tween_property(_panel, "modulate:a", 1.0, 0.05)
 	_tween.tween_property(self, "_burst_a", 1.0, 0.18)
 	_tween.set_parallel(false)
 	_tween.tween_interval(MOMENT - POP_IN)
