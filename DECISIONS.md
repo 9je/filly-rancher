@@ -800,3 +800,6 @@ the catch's in-world beat. Calls made:
   the wheel's tiers are 34 px glyphs stacked upright along each slice's radius (left to right
   on the flanks, top to bottom at the pointer and the foot), never turned; the slots win
   banner lights the marquee above the reels instead of covering the third row.
+
+## 2026-11-09: Rain splashes tried and dropped
+- GPU particle collision (a following GPUParticlesCollisionHeightField3D, hide-on-contact drops, an at-collision sub-emitter of ground rings) produced no visible splashes in three renders (bigger rings, the heightfield updating every frame). Time-boxed and reverted rather than shipped unverified. Rain's ground read rests on the soaked darkening and the soft puddles (973b5f7).
