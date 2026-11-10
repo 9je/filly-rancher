@@ -21,6 +21,9 @@ const HaloShader := preload("res://shaders/halo.gdshader")
 
 var _lamps: Array[OmniLight3D] = []
 var _bulbs: Array[StandardMaterial3D] = []
+## The bulbs themselves: lit orbs at night, hidden by day (Fable round 6: an unlit bulb read
+## as "a stray grey disc" on every facade).
+var _bulb_nodes: Array[MeshInstance3D] = []
 var _level := 0.0
 var _want := 0.0
 ## Rain on the ground (0 dry, 1 soaked), eased like the lamps; the `wet` shader global.
@@ -70,6 +73,7 @@ func _build() -> void:
 		add_child(bulb)
 		bulb.global_position = at
 		_bulbs.append(mat)
+		_bulb_nodes.append(bulb)
 		add_child(halo(LAMP_COLOR, HALO_SIZE, 0.9))
 		get_child(get_child_count() - 1).global_position = at
 	_poll = 0.0
@@ -147,6 +151,8 @@ func _write() -> void:
 	for l in _lamps:
 		l.light_energy = LAMP_ENERGY * _level
 		l.visible = _level > 0.001
+	for b in _bulb_nodes:
+		b.visible = _level > 0.02
 	for m in _bulbs:
 		m.emission_energy_multiplier = BULB_EMISSION * _level
 		m.albedo_color = Color(0.55, 0.5, 0.45).lerp(Color(1.0, 0.9, 0.7), _level)
