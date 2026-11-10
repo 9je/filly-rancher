@@ -137,7 +137,17 @@ static func build(data: PonyData, model_path_override: String = "") -> Node3D:
 		pony.free()
 		return null
 
+	_hide_teeth(pony)
 	return pony
+
+
+## NO TEETH ON A RESTING SMILE (Fable round 7: "the mouth is a toothy grimace"): the donors'
+## teeth showed as a white sliver along the closed mouth line, which the show never draws.
+## A talking mouth still opens to its dark inside and tongue.
+static func _hide_teeth(pony: Node3D) -> void:
+	for mi: MeshInstance3D in pony.find_children("*", "MeshInstance3D", true, false):
+		if String(mi.name).to_lower().contains("teeth"):
+			mi.visible = false
 
 
 ## THE MANE SIX'S FOLDED WINGS, AS THE SHOW FOLDS THEM. As exported they reached back over the
