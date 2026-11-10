@@ -670,6 +670,8 @@ func build_paced(pace: Callable) -> int:
 		if inst == null:
 			push_error("Props: '%s' failed to instantiate" % path)
 			continue
+		if file.begins_with("saa_tree_wide") or file.begins_with("saa_tree_narrow"):
+			_swell_canopy(inst)
 		# One light model for the whole valley (game/systems/toon_styler.gd).
 		ToonStylerScript.style(inst, ToonStylerScript.category_for(file), null,
 			ToonStylerScript.lift_for(file))
@@ -895,6 +897,39 @@ static func scale_for(entry: Dictionary) -> float:
 	var file: String = entry["file"]
 	var base: float = float(FAMILY_SCALE.get(family_of(entry), BASE_SCALE))
 	return base * float(SCALE_FIX.get(file, 1.0)) * float(entry.get("s", 1.0))
+
+
+## THE CANOPY HOLDS ITS BRANCHES (Fable round 7, #6: "purple twig branches extend past the
+## green foliage blob, so the tree looks like two assets overlapped"). The live saa trees are
+## one mesh of two surfaces, trunk and leaves; the leaves come out as their own mesh, drawn
+## CANOPY_SWELL bigger about their own centre, so the branch tips end inside them the way the
+## apple trees' do.
+const CANOPY_SWELL := 1.28
+
+
+static func _swell_canopy(tree: Node3D) -> void:
+	for mi: MeshInstance3D in tree.find_children("*", "MeshInstance3D", true, false):
+		var src := mi.mesh as ArrayMesh
+		if src == null or src.get_surface_count() != 2:
+			continue
+		var trunk := ArrayMesh.new()
+		trunk.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, src.surface_get_arrays(0))
+		trunk.surface_set_material(0, src.surface_get_material(0))
+		var leaves := ArrayMesh.new()
+		var arrays := src.surface_get_arrays(1)
+		leaves.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+		leaves.surface_set_material(0, src.surface_get_material(1))
+		var centre := leaves.get_aabb().get_center()
+		mi.mesh = trunk
+		# Inside the leaves now, the branches would shadow them in dark streaks; the canopy
+		# casts the tree's shadow on the ground.
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var canopy := MeshInstance3D.new()
+		canopy.name = "Canopy"
+		canopy.mesh = leaves
+		canopy.transform = Transform3D(Basis().scaled(Vector3.ONE * CANOPY_SWELL),
+			centre - centre * CANOPY_SWELL)
+		mi.add_child(canopy)
 
 
 ## True if `node_name` is one of the foliage families. See FOLIAGE_PREFIXES.
