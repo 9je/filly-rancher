@@ -914,3 +914,13 @@ and the cinematics. Calls made:
 - Not changed: the title's four menu rows; the slot cabinets and columns (scenery, as asked).
   test_hud_layout.gd fails two checks (a long toast 1957 px wide, then overlapping the bag) on
   v1-overhaul's own hud.gd as well; left for whoever owns the toast.
+
+## 2026-11-09: Rounds 6-7 world and character fixes
+- The pony in the beam is never faded at the lens (the "alpha ghost"); Pony.is_held().
+- Stamped cutie marks: decal 0.46 m, fades 0.08, emission 0.45 (the drawing stays 64 px; upscaling changed nothing on screen).
+- Derpy: wall-eyes applied to the cinematic body (ToonStyler.cross_eyes), a smaller jaw, and a held close-up as she flies off (any tilt up met an awning wherever she landed).
+- Sparkles: a hard-edged pinched four-point star. Porch bulbs only when lit. The plot preview a ground line with corner posts. Night rainbow at 3%. Thinner star field. Beam 0.11-0.6 m wide.
+- Spike's materials a step deeper (lift 0.78). Teeth meshes hidden on every pony (a resting smile showed a white sliver).
+- saa trees' canopies split from the trunk and swollen 1.28 about their centre, the trunk casting no shadow. Overgrown-plot leaves rebuilt with smooth normals (silhouettes kept: round balls were PT7's "these look bad").
+- Day sky top (0.24, 0.52, 0.90), horizon tint (0.68, 0.85, 1.0); the painted band's haze floor 0.22 -> 0.11.
+- Rounds 5-7 sit at 6-6.5 with about half a point of reviewer variance; the remaining distance to 8 is mostly art: pony head proportions, cinematic camera authoring, show-style foliage and pen models.
