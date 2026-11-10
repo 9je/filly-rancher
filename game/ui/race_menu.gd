@@ -34,18 +34,35 @@ const EMPTY_TEXT := "Nobody is standing in your pens. Catch a pony and move her 
 const CARDS_VISIBLE := 5
 const CARD_SIZE := Vector2(1080.0, 96.0)
 const CARD_LEFT := 20.0
-const CARD_TOP := 10.0
+const CARD_TOP := 176.0
 const CARD_PITCH := 106.0
 const STAKE_PITCH := 96.0
 const CHIP_RADIUS := 30.0
 const CARD_PAGE := Rect2(40.0, 20.0, 1040.0, 400.0)
 
+## THE TRACK STRIP over the cards (Fable AAA round 5: "the race guide wants silks colours and
+## a track strip with the runners' portraits"): the field loaded into a starting gate on the
+## dirt, each runner's face over her stall door in her silks with her number, the rail and the
+## finish post beyond.
+const TRACK := Rect2(20.0, 8.0, 1080.0, 156.0)
+const STALL_W := 118.0
+const GATE_SHOWN := 6
+## A runner's silks by her place on the card: the colour of her stall door, her saddle cloth
+## and the stripe down her card.
+const SILKS: Array[Color] = [Color(0.86, 0.20, 0.26), Color(0.22, 0.46, 0.90),
+	Color(0.98, 0.78, 0.18), Color(0.22, 0.66, 0.40), Color(0.62, 0.30, 0.82),
+	Color(0.96, 0.52, 0.18)]
+
+
+static func silks_colour(index: int) -> Color:
+	return SILKS[index % SILKS.size()]
+
 ## Where each thing on a card sits, measured from the card's own left edge (P8 S8 rebuild,
 ## after Inside Track's form board: her face, her name and form, her chance, her price).
 const SILKS_X := 14.0
 const PORTRAIT := 78.0
-const NAME_X := 112.0
-const SPIRITS_X := 112.0
+const NAME_X := 128.0
+const SPIRITS_X := 128.0
 const CHANCE_X := 560.0
 const CHANCE_WIDTH := 240.0
 const ODDS_X := 840.0
@@ -310,32 +327,29 @@ func paint(ci: Control) -> void:
 			HORIZONTAL_ALIGNMENT_CENTER, -1.0)
 		return
 
+	_paint_track(ci, field, t)
 	var first: int = first_visible_card()
 	for index: int in range(first, mini(first + CARDS_VISIBLE, field.size())):
 		var entry: Dictionary = field[index]
 		var card: Rect2 = card_rect(index)
 		var picked: bool = index == _selected
+		var silks: Color = silks_colour(index)
 		PaintScript.rounded(ci, card, 14.0, Color(PaintScript.FELT, 1.0 if picked else 0.78),
 			PaintScript.GOLD if picked else PaintScript.GOLD_DIM, 3.0 if picked else 2.0)
+		# Her silks down the card's left edge, a stripe of her colour with a white pinstripe.
+		PaintScript.rounded(ci, Rect2(card.position + Vector2(4.0, 4.0), Vector2(16.0, card.size.y - 8.0)),
+			8.0, silks, silks.darkened(0.3), 1.0)
+		ci.draw_line(card.position + Vector2(12.0, 10.0), card.position + Vector2(12.0, card.size.y - 10.0),
+			Color(1.0, 1.0, 1.0, 0.6), 2.0, true)
 
-		# HER FACE (PortraitBaker), on a plate in her coat colour, with the rail's lane flash
-		# under it; her coat and mane as a swatch only until the picture is baked.
+		# HER FACE in a gold ring on a disc of her mane's colour (a coat-coloured disc lost a
+		# white pony against it), her coat and mane as a swatch only until it is baked, and
+		# her saddle cloth with her number at its foot.
 		var coat: Color = entry.get("coat", FALLBACK_COAT)
 		var mane: Color = entry.get("mane", FALLBACK_MANE)
-		var plate := Rect2(card.position + Vector2(SILKS_X, (card.size.y - PORTRAIT) * 0.5),
-			Vector2(PORTRAIT, PORTRAIT))
-		# The plate takes her MANE's colour, deepened: a coat-coloured plate lost a white pony
-		# against it (Fable round 2 renders: three white silhouettes on three white discs).
-		PaintScript.rounded(ci, plate, PORTRAIT * 0.5, mane.darkened(0.25).lerp(PaintScript.FELT, 0.35),
-			coat.darkened(0.35), 3.0)
-		var face: Texture2D = entry.get("portrait", null)
-		if face != null:
-			ci.draw_texture_rect(face, plate.grow(-3.0), false)
-		else:
-			ci.draw_circle(plate.get_center() + Vector2(-8.0, 4.0), PORTRAIT * 0.26, coat)
-			ci.draw_circle(plate.get_center() + Vector2(10.0, -8.0), PORTRAIT * 0.2, mane)
-		ci.draw_rect(Rect2(plate.position + Vector2(PORTRAIT * 0.2, PORTRAIT - 4.0),
-			Vector2(PORTRAIT * 0.6, 6.0)), PaintScript.BAND_COLORS[0])
+		var centre: Vector2 = card.position + Vector2(SILKS_X + 14.0 + PORTRAIT * 0.5, card.size.y * 0.5)
+		_paint_face(ci, centre, PORTRAIT * 0.44, entry, coat, mane)
+		_saddle_cloth(ci, centre + Vector2(PORTRAIT * 0.34, PORTRAIT * 0.3), index, 15.0)
 
 		PaintScript.text(ci, MenuStyleScript.title_font(),
 			card.position + Vector2(NAME_X, 44.0), String(entry.get("name", "Pony")), 28,
@@ -417,6 +431,104 @@ func paint(ci: Control) -> void:
 	PaintScript.text(ci, MenuStyleScript.title_font(), Vector2(CARD_LEFT, row_y + 72.0),
 		"Click her card to back %s for %d" % [who, selected_stake()], 22, PaintScript.GOLD,
 		HORIZONTAL_ALIGNMENT_RIGHT, CARD_SIZE.x)
+
+
+## Her face on a disc, or her coat and mane as two dots until the baker has her.
+func _paint_face(ci: Control, centre: Vector2, radius: float, entry: Dictionary, coat: Color,
+		mane: Color) -> void:
+	var face: Texture2D = entry.get("portrait", null)
+	var backdrop: Color = mane.darkened(0.25).lerp(PaintScript.FELT, 0.35)
+	PaintScript.portrait_disc(ci, centre, radius, face, backdrop)
+	if face == null:
+		ci.draw_circle(centre + Vector2(-radius * 0.2, radius * 0.1), radius * 0.6, coat)
+		ci.draw_circle(centre + Vector2(radius * 0.25, -radius * 0.2), radius * 0.45, mane)
+
+
+## Her number on a square of her silks, white-edged, as a saddle cloth carries it.
+func _saddle_cloth(ci: Control, centre: Vector2, index: int, half: float) -> void:
+	var box := Rect2(centre - Vector2(half, half), Vector2(half, half) * 2.0)
+	PaintScript.rounded(ci, Rect2(box.position + Vector2(0.0, 2.0), box.size), 5.0,
+		Color(0.0, 0.0, 0.0, 0.35), Color(0, 0, 0, 0), 0.0)
+	PaintScript.rounded(ci, box, 5.0, silks_colour(index), Color.WHITE, 2.0)
+	PaintScript.label(ci, MenuStyleScript.numeral_font(), box.grow(-2.0), str(index + 1),
+		int(half * 1.3), Color.WHITE if index != 2 else PaintScript.CARD_INK)
+
+
+## THE GATE ON THE DIRT: grass and a rail behind, raked dirt in front, the field in a row of
+## stalls at the left (her face over her door, the door in her silks with her number, the
+## picked runner's stall lit) and the finish post with its chequered flag at the far right.
+func _paint_track(ci: Control, field: Array[Dictionary], t: float) -> void:
+	var r := TRACK
+	PaintScript.rounded(ci, Rect2(r.position + Vector2(0.0, 5.0), r.size), 16.0,
+		Color(0.0, 0.0, 0.0, 0.3), Color(0, 0, 0, 0), 0.0)
+	PaintScript.rounded(ci, r, 16.0, Color(0.30, 0.56, 0.32), PaintScript.GOLD_DIM, 3.0)
+	var dirt := Rect2(r.position.x + 3.0, r.position.y + r.size.y * 0.42, r.size.x - 6.0,
+		r.size.y * 0.58 - 3.0)
+	PaintScript.rounded(ci, dirt, 12.0, Color(0.66, 0.45, 0.28), Color(0, 0, 0, 0), 0.0)
+	# Rake lines in the dirt, and the far rail: white posts and a white top bar on the grass.
+	var y := dirt.position.y + 14.0
+	while y < dirt.end.y - 6.0:
+		ci.draw_line(Vector2(dirt.position.x + 10.0, y), Vector2(dirt.end.x - 10.0, y),
+			Color(0.5, 0.32, 0.18, 0.4), 2.0, true)
+		y += 14.0
+	var rail_y: float = dirt.position.y - 4.0
+	var x := r.position.x + 18.0
+	while x < r.end.x - 10.0:
+		ci.draw_line(Vector2(x, rail_y - 18.0), Vector2(x, rail_y + 2.0), Color(0.96, 0.96, 0.94), 3.0, true)
+		x += 44.0
+	ci.draw_line(Vector2(r.position.x + 10.0, rail_y - 16.0), Vector2(r.end.x - 10.0, rail_y - 16.0),
+		Color(0.98, 0.98, 0.96), 4.0, true)
+	# Bunting in the field's silks strung along the rail, swaying a little.
+	var bx: float = r.position.x + 30.0
+	var k := 0
+	while bx < r.end.x - 110.0:
+		var sway: float = sin(t * 2.0 + float(k) * 0.7) * 1.5
+		var top_y: float = rail_y - 16.0
+		ci.draw_colored_polygon(PackedVector2Array([Vector2(bx, top_y), Vector2(bx + 22.0, top_y),
+			Vector2(bx + 11.0 + sway, top_y + 20.0)]), silks_colour(k))
+		bx += 26.0
+		k += 1
+	# The finish post, and its flag.
+	var post := Vector2(r.end.x - 70.0, dirt.end.y - 8.0)
+	ci.draw_line(post, post - Vector2(0.0, r.size.y * 0.86), Color(0.98, 0.98, 0.96), 6.0, true)
+	ci.draw_circle(post - Vector2(0.0, r.size.y * 0.86), 12.0, Color(0.86, 0.20, 0.26))
+	ci.draw_circle(post - Vector2(0.0, r.size.y * 0.86), 6.0, Color(0.98, 0.98, 0.96))
+	var flag := Rect2(post + Vector2(8.0, -r.size.y * 0.8), Vector2(48.0, 32.0))
+	var wave: float = sin(t * 3.0) * 2.0
+	for i in 4:
+		for j in 3:
+			var cell := Rect2(flag.position + Vector2(12.0 * i, 10.67 * j + wave * float(i) * 0.4),
+				Vector2(12.0, 10.67))
+			ci.draw_rect(cell, Color(0.1, 0.1, 0.12) if (i + j) % 2 == 0 else Color(0.98, 0.98, 0.96))
+	# The gate: a stall per runner, as many as fit.
+	var shown: int = mini(field.size(), GATE_SHOWN)
+	var gate_left: float = r.position.x + 22.0
+	var top: float = r.position.y + 10.0
+	PaintScript.rounded(ci, Rect2(gate_left - 8.0, top, STALL_W * shown + 16.0, 14.0), 6.0,
+		Color(0.92, 0.92, 0.95), Color(0.55, 0.55, 0.62), 2.0)
+	for i: int in shown:
+		var entry: Dictionary = field[i]
+		var sx: float = gate_left + STALL_W * float(i)
+		var picked: bool = i == _selected
+		var silks: Color = silks_colour(i)
+		var stall := Rect2(sx, top + 12.0, STALL_W, r.end.y - top - 22.0)
+		if picked:
+			PaintScript.rounded(ci, stall.grow(2.0), 10.0, Color(PaintScript.GOLD, 0.25 + 0.1 * sin(t * 4.0)),
+				Color(0, 0, 0, 0), 0.0)
+		# Her face over the door, then the door in front of her.
+		var coat: Color = entry.get("coat", FALLBACK_COAT)
+		var mane: Color = entry.get("mane", FALLBACK_MANE)
+		var face_at := Vector2(stall.get_center().x, stall.position.y + 46.0)
+		_paint_face(ci, face_at, 38.0, entry, coat, mane)
+		var door := Rect2(sx + 12.0, stall.position.y + 70.0, STALL_W - 24.0, stall.end.y - stall.position.y - 70.0)
+		PaintScript.rounded(ci, door, 6.0, silks, silks.darkened(0.35), 2.0)
+		ci.draw_line(door.position + Vector2(6.0, 10.0), Vector2(door.end.x - 6.0, door.position.y + 10.0),
+			Color(1.0, 1.0, 1.0, 0.5), 2.0, true)
+		_saddle_cloth(ci, door.get_center() + Vector2(0.0, 6.0), i, 16.0)
+		# The stall's posts.
+		for px: float in [sx, sx + STALL_W]:
+			ci.draw_line(Vector2(px, top + 8.0), Vector2(px, stall.end.y + 4.0), Color(0.92, 0.92, 0.95), 6.0, true)
+			ci.draw_line(Vector2(px + 2.0, top + 8.0), Vector2(px + 2.0, stall.end.y + 4.0), Color(0.6, 0.6, 0.68), 1.5, true)
 
 
 func confirm() -> bool:

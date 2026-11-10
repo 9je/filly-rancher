@@ -27,27 +27,37 @@ const WheelScript := preload("res://systems/wheel.gd")
 const TITLE := "The Wheel"
 
 # --- the felt, in stage local pixels ---------------------------------------------------------
-const STAGE_HEIGHT := 640.0
-const WHEEL_CENTRE := Vector2(318.0, 324.0)
-const WHEEL_OUTER := 292.0
-const WHEEL_INNER := 104.0
-const RIM_WIDTH := 16.0
-const HUB_RADIUS := 92.0
-const LABEL_RADIUS := 214.0
-const BULBS := 30
+## A SHOW WHEEL, NOT A PIE CHART (Fable AAA round 5: "the wheel reads as a flat web panel";
+## "chasing bulbs round its rim and a croupier face"). The wheel stands on a sunburst
+## backboard in a wide wooden-and-gold rim set with real bulbs that chase round it, a gold
+## peg at every slice; the hall's wheel host stands at the head of the betting column with
+## her call in a bubble.
+const STAGE_HEIGHT := 728.0
+const WHEEL_CENTRE := Vector2(318.0, 364.0)
+const WHEEL_OUTER := 272.0
+const WHEEL_INNER := 100.0
+const RIM_WIDTH := 34.0
+const HUB_RADIUS := 88.0
+const LABEL_RADIUS := 196.0
+const BULBS := 36
 
+const BACKBOARD := Rect2(0.0, 0.0, 640.0, 728.0)
 const COLUMN_X := 660.0
 const COLUMN_W := 460.0
-const COUNTER := Rect2(660.0, 0.0, 190.0, 46.0)
-const HISTORY := Rect2(866.0, 0.0, 254.0, 46.0)
-const PAD_TOP := 62.0
-const PAD_HEIGHT := 68.0
-const PAD_GAP := 9.0
-const CHIP_ROW_Y := 506.0
+## The host: her face at the column's head, her call in a bubble beside it.
+const HOST_CENTRE := Vector2(712.0, 52.0)
+const HOST_RADIUS := 48.0
+const BUBBLE := Rect2(778.0, 16.0, 342.0, 66.0)
+const COUNTER := Rect2(660.0, 100.0, 190.0, 46.0)
+const HISTORY := Rect2(866.0, 100.0, 254.0, 46.0)
+const PAD_TOP := 160.0
+const PAD_HEIGHT := 66.0
+const PAD_GAP := 8.0
+const CHIP_ROW_Y := 600.0
 const CHIP_RADIUS := 34.0
 const CHIP_PITCH := 96.0
-const CLEAR := Rect2(970.0, 476.0, 150.0, 60.0)
-const SPIN := Rect2(660.0, 556.0, 460.0, 80.0)
+const CLEAR := Rect2(970.0, 570.0, 150.0, 60.0)
+const SPIN := Rect2(660.0, 644.0, 460.0, 80.0)
 const HISTORY_MAX := 7
 
 # --- the spin, and every one of these is a CONSTANT ------------------------------------------
@@ -385,6 +395,7 @@ func drawn_lines() -> Array[String]:
 	lines.append("Spin")
 	lines.append("Clear")
 	lines.append(_edge_text())
+	lines.append(host_call())
 	return lines
 
 
@@ -411,11 +422,30 @@ func paint(ci: Control) -> void:
 func _paint_wheel(ci: Control, t: float, title_font: Font) -> void:
 	var per: float = _per()
 	var landed_tier: int = WheelScript.tier_of(_landed)
-	# The drop shadow and the rim: a dark disc a little low, then the gold rim ring.
-	ci.draw_circle(WHEEL_CENTRE + Vector2(0.0, 10.0), WHEEL_OUTER + RIM_WIDTH + 4.0,
-		Color(0.0, 0.0, 0.0, 0.35))
-	ci.draw_circle(WHEEL_CENTRE, WHEEL_OUTER + RIM_WIDTH, PaintScript.GOLD_DIM.darkened(0.25))
-	ci.draw_circle(WHEEL_CENTRE, WHEEL_OUTER + RIM_WIDTH - 3.0, PaintScript.PLUM_DARK)
+	# The backboard: a sunburst of plum rays round the wheel, turning slowly, as a show set's is.
+	PaintScript.rounded(ci, BACKBOARD, 26.0, Color(0.24, 0.08, 0.26), PaintScript.GOLD_DIM, 3.0)
+	var board := PackedVector2Array([BACKBOARD.position + Vector2(6, 6),
+		Vector2(BACKBOARD.end.x - 6.0, BACKBOARD.position.y + 6.0), BACKBOARD.end - Vector2(6, 6),
+		Vector2(BACKBOARD.position.x + 6.0, BACKBOARD.end.y - 6.0)])
+	var rays := 24
+	for ray: int in rays:
+		var a: float = TAU * float(ray) / float(rays) + t * 0.05
+		var wedge := PaintScript.sector_points(WHEEL_CENTRE, WHEEL_OUTER, 640.0,
+			a - PI / float(rays) * 0.5, a + PI / float(rays) * 0.5)
+		for piece: PackedVector2Array in Geometry2D.intersect_polygons(wedge, board):
+			ci.draw_colored_polygon(piece, Color(0.40, 0.15, 0.38))
+	ci.draw_circle(WHEEL_CENTRE, WHEEL_OUTER + RIM_WIDTH + 30.0, Color(1.0, 0.85, 0.5, 0.06))
+	ci.draw_circle(WHEEL_CENTRE, WHEEL_OUTER + RIM_WIDTH + 16.0, Color(1.0, 0.85, 0.5, 0.07))
+	# The drop shadow and the rim: a dark disc a little low, then a wide wooden rim between two
+	# gold bands, the bulbs set into it.
+	ci.draw_circle(WHEEL_CENTRE + Vector2(0.0, 12.0), WHEEL_OUTER + RIM_WIDTH + 6.0,
+		Color(0.0, 0.0, 0.0, 0.4))
+	ci.draw_circle(WHEEL_CENTRE, WHEEL_OUTER + RIM_WIDTH + 4.0, PaintScript.GOLD_DIM)
+	ci.draw_circle(WHEEL_CENTRE, WHEEL_OUTER + RIM_WIDTH, Color(0.40, 0.17, 0.12))
+	ci.draw_arc(WHEEL_CENTRE, WHEEL_OUTER + RIM_WIDTH * 0.72, PI * 1.05, PI * 1.7, 48,
+		Color(1.0, 0.8, 0.6, 0.18), 8.0, true)
+	ci.draw_circle(WHEEL_CENTRE, WHEEL_OUTER + 5.0, PaintScript.GOLD)
+	ci.draw_circle(WHEEL_CENTRE, WHEEL_OUTER + 1.0, PaintScript.PLUM_DARK)
 	for segment: int in WheelScript.SEGMENTS:
 		var tier: int = WheelScript.tier_of(segment)
 		var mid: float = _angle + per * float(segment)
@@ -436,16 +466,25 @@ func _paint_wheel(ci: Control, t: float, title_font: Font) -> void:
 			WHEEL_CENTRE + Vector2(cos(edge), sin(edge)) * WHEEL_OUTER,
 			Color(PaintScript.GOLD, 0.85), 2.0, true)
 		_paint_segment_label(ci, title_font, mid, tier)
-	# The rim's bulbs: a chase while idle, a fast chase while spinning, all lit on a win.
+	# A gold peg at the rim end of every slice line, turning with the wheel: what the pointer's
+	# flap clicks over.
+	for segment: int in WheelScript.SEGMENTS:
+		var edge: float = _angle + per * (float(segment) - 0.5)
+		var peg: Vector2 = WHEEL_CENTRE + Vector2(cos(edge), sin(edge)) * (WHEEL_OUTER - 7.0)
+		ci.draw_circle(peg + Vector2(0.0, 1.5), 4.5, Color(0.0, 0.0, 0.0, 0.35))
+		ci.draw_circle(peg, 4.0, PaintScript.GOLD)
+		ci.draw_circle(peg - Vector2(1.2, 1.2), 1.5, Color(1.0, 1.0, 0.9, 0.9))
+	# The rim's bulbs CHASE: every third one lit, the pattern stepping round, faster while the
+	# wheel spins, and the whole ring flashing together on a win.
+	var speed: float = 9.0 if _spinning else 3.0
+	var step: int = int(floor(t * speed))
 	for bulb: int in BULBS:
-		var a: float = TAU * float(bulb) / float(BULBS)
-		var at: Vector2 = WHEEL_CENTRE + Vector2(cos(a), sin(a)) * (WHEEL_OUTER + RIM_WIDTH * 0.5)
-		var speed: float = 3.0 if _spinning else 1.0
-		var phase: float = fposmod(t * speed - float(bulb) / 6.0, 1.0)
-		var lit: float = 0.30 + 0.70 * (1.0 if phase < 0.5 else 0.0)
+		var a: float = TAU * float(bulb) / float(BULBS) - PI * 0.5
+		var at: Vector2 = WHEEL_CENTRE + Vector2(cos(a), sin(a)) * (WHEEL_OUTER + RIM_WIDTH * 0.52)
+		var lit: float = 1.0 if (bulb + step) % 3 == 0 else 0.18
 		if _flash > 0.0 and _won > 0:
-			lit = 0.5 + 0.5 * sin(t * 14.0 + float(bulb))
-		ci.draw_circle(at, 5.0, Color(1.0, 0.95, 0.70, lit))
+			lit = 1.0 if int(floor(t * 8.0)) % 2 == 0 else 0.25
+		PaintScript.bulb(ci, at, 7.0, lit)
 	# The hub, with a burst of light behind it on a win.
 	if _won > 0 and _flash > 0.0:
 		for ray: int in 16:
@@ -531,7 +570,46 @@ func _paint_pointer(ci: Control) -> void:
 	ci.draw_circle(pivot, 6.0, PaintScript.GOLD)
 
 
+## WHAT THE HOST CALLS, by the table's state: a show's few words, never a sentence of rules.
+func host_call() -> String:
+	if _landed >= 0 and _won > 0 and _flash > 0.0:
+		return "A winner!"
+	if _landed >= 0 and _flash > 0.0 and not _spinning:
+		return "So close! Again?"
+	if _spinning:
+		return "No more bets!"
+	if total_bet() > 0:
+		return "Spin when ready!"
+	return "Place your bets!"
+
+
+const HOST_PORTRAIT := "res://assets/ui/portraits/palace_host.png"
+static var _host_tex: Texture2D = null
+
+
+## THE WHEEL'S HOST at the head of the column: the hall's own host (baked once by
+## scenes/test/casino_portraits.gd) in a gold ring with a bow tie, and her call in a cream
+## speech bubble whose tail points at her.
+func _paint_host(ci: Control, title_font: Font) -> void:
+	if _host_tex == null and ResourceLoader.exists(HOST_PORTRAIT):
+		_host_tex = load(HOST_PORTRAIT) as Texture2D
+	PaintScript.portrait_disc(ci, HOST_CENTRE, HOST_RADIUS, _host_tex, Color(0.86, 0.80, 0.92))
+	PaintScript.bow_tie(ci, HOST_CENTRE + Vector2(0.0, HOST_RADIUS - 2.0), 34.0,
+		Color(0.62, 0.12, 0.2))
+	var tail := PackedVector2Array([BUBBLE.position + Vector2(2.0, BUBBLE.size.y * 0.42),
+		BUBBLE.position + Vector2(-16.0, BUBBLE.size.y * 0.62),
+		BUBBLE.position + Vector2(2.0, BUBBLE.size.y * 0.72)])
+	PaintScript.rounded(ci, Rect2(BUBBLE.position + Vector2(0.0, 4.0), BUBBLE.size), 22.0,
+		Color(0.0, 0.0, 0.0, 0.3), Color(0, 0, 0, 0), 0.0)
+	ci.draw_colored_polygon(tail, Color(1.0, 0.97, 0.9))
+	PaintScript.rounded(ci, BUBBLE, 22.0, Color(1.0, 0.97, 0.9), PaintScript.GOLD, 3.0)
+	ci.draw_colored_polygon(PackedVector2Array([tail[0] + Vector2(3.0, 0.0), tail[1] + Vector2(4.0, 0.0),
+		tail[2] + Vector2(3.0, 0.0)]), Color(1.0, 0.97, 0.9))
+	PaintScript.label(ci, title_font, BUBBLE.grow(-12.0), host_call(), 30, PaintScript.PLUM_DARK)
+
+
 func _paint_column(ci: Control, t: float, title_font: Font, numeral_font: Font) -> void:
+	_paint_host(ci, title_font)
 	# --- the chip counter and the last spins -----------------------------------------------
 	PaintScript.rounded(ci, COUNTER, 23.0, Color(0.0, 0.0, 0.0, 0.35),
 		Color(PaintScript.GOLD, 0.5), 2.0)
@@ -542,7 +620,7 @@ func _paint_column(ci: Control, t: float, title_font: Font, numeral_font: Font) 
 		COUNTER.size - Vector2(56.0, 4.0)), "%d" % counting, 28, PaintScript.GOLD,
 		HORIZONTAL_ALIGNMENT_LEFT)
 	for i: int in _history.size():
-		var dot := Rect2(Vector2(HISTORY.end.x - 34.0 - 36.0 * float(i), 6.0),
+		var dot := Rect2(Vector2(HISTORY.end.x - 34.0 - 36.0 * float(i), HISTORY.position.y + 6.0),
 			Vector2(34.0, 34.0))
 		var tier: int = _history[i]
 		ci.draw_circle(dot.get_center(), 16.0, PaintScript.TIER_COLOURS[tier].darkened(0.1 if i > 0 else 0.0))
@@ -585,8 +663,11 @@ func _paint_column(ci: Control, t: float, title_font: Font, numeral_font: Font) 
 		if stake > 0:
 			var stack_at: Vector2 = pad.position + Vector2(pad.size.x - 132.0,
 				pad.size.y - 18.0)
-			PaintScript.chip_stack(ci, stack_at, clampi(stake / 10, 1, 6),
-				_stack_colour(stake), 4.0)
+			# A real stack, chips big enough to read as chips (round 5).
+			var stacked: int = clampi(stake / 10, 1, 6)
+			for k: int in stacked:
+				PaintScript.chip(ci, stack_at + Vector2(-6.0, 4.0 - 5.0 * float(k)), 19.0,
+					_stack_colour(stake), k == stacked - 1)
 			PaintScript.label(ci, numeral_font, Rect2(pad.position + Vector2(pad.size.x - 104.0,
 				8.0), Vector2(96.0, pad.size.y - 16.0)), "%d" % stake, 30,
 				PaintScript.GOLD, HORIZONTAL_ALIGNMENT_RIGHT)
