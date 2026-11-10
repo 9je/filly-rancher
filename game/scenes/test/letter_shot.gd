@@ -72,6 +72,12 @@ func _run() -> void:
 	paused = false
 	for i in 10:
 		await process_frame
+	# The arrival flyover may still be playing, and no menu opens over a cinematic: the
+	# Market shots were frames of the flyover (Fable round 5 called them "mislabelled").
+	for i in 600:
+		if not Cinematic.shared(self).playing:
+			break
+		await process_frame
 	var market: Node = ranch.get("market_menu")
 	market.call("open")
 	market.call("set_tab", 1)

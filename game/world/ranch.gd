@@ -9160,10 +9160,12 @@ func _arrival(_delta: float) -> void:
 		_game_state.story.set_flag("arrival_flyover")
 		var behind := player.global_position + player.global_basis.z * 4.0 + Vector3.UP * 2.4
 		Cinematic.shared(get_tree()).play([
-			{"from": Vector3(70.0, 46.0, 70.0), "to": Vector3(42.0, 30.0, 40.0),
-				"look": Vector3(-5.0, 2.0, 10.0), "time": 3.4, "fov": 55.0,
+			# Low, a sweep at rooftop-and-a-bit (Fable round 5, #10: from 46 m up the valley
+			# read as "one flat plane"): the rim's tree lines and the sky frame the town.
+			{"from": Vector3(62.0, 15.0, 74.0), "to": Vector3(34.0, 9.0, 44.0),
+				"look": Vector3(-5.0, 5.0, 4.0), "time": 3.6, "fov": 50.0,
 				"caption": "Welcome to the valley"},
-			{"from": Vector3(42.0, 30.0, 40.0), "to": behind, "look": player.global_position + Vector3.UP,
+			{"from": Vector3(34.0, 9.0, 44.0), "to": behind, "look": player.global_position + Vector3.UP,
 				"look_to": player.global_position + Vector3.UP * 1.2, "time": 3.0},
 		], {"freeze": [player], "host": self})
 		return
