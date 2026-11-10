@@ -589,7 +589,12 @@ func _paint_table(ci: Control, title_font: Font) -> void:
 	ci.draw_polyline(table_points(1.0), PaintScript.GOLD_DIM, 3.0, true)
 	# The printing: two gold rules round the house's line, as a real felt is printed. A split's
 	# two hands sit over it, so it gives way to them.
-	if not banner_up() and not _split_round():
+	# And only on a bare table: dealt cards sat on the words (Fable round 8).
+	var bare := true
+	for h: Array in shown_hands():
+		if not h.is_empty():
+			bare = false
+	if bare and not banner_up() and not _split_round():
 		for r: float in [PRINT_RADIUS - 24.0, PRINT_RADIUS + 20.0]:
 			ci.draw_arc(PRINT_CENTRE, r, PI * 0.5 - 0.3, PI * 0.5 + 0.3, 64,
 				Color(PaintScript.GOLD, 0.35), 2.0, true)
