@@ -297,8 +297,10 @@ func _label(font: Font, size: int, colour: Color) -> Label:
 func _bar_rect() -> Rect2:
 	var s := _canvas.size
 	if _art != null:
-		# Slim, along the bottom, under the tip: the picture is the screen, not the bar.
-		return Rect2(Vector2(s.x * 0.06, s.y * 0.9), Vector2(s.x * 0.88, clampf(s.y * 0.014, 10.0, 18.0)))
+		# Slim, along the bottom, under the tip: the picture is the screen, not the bar. It
+		# keeps to the left half with the name and the tip, clear of the key art's hero at the
+		# right third (Fable AAA round 6).
+		return Rect2(Vector2(s.x * 0.06, s.y * 0.9), Vector2(s.x * 0.52, clampf(s.y * 0.014, 10.0, 18.0)))
 	var w := clampf(s.x * 0.46, 320.0, 900.0)
 	var h := clampf(s.y * 0.06, 28.0, 56.0)
 	return Rect2(Vector2((s.x - w) * 0.5, s.y * 0.53), Vector2(w, h))
