@@ -526,7 +526,10 @@ func test_the_control_card_is_closed_by_default_and_the_chip_names_its_key() -> 
 	assert_false(_hud.hints_visible())
 	var chip: Label = _hud.get_node("ControlsChip")
 	assert_true(chip.visible)
-	assert_string_contains(chip.text, "controls")
+	# Round 5: a keycap and a "?" disc, no word on it; the word is its name for the gates.
+	assert_eq(chip.text, "", "the chip draws no word")
+	assert_eq(_hud.controls_chip_word(), "controls")
+	assert_not_null(chip.get_node_or_null("Hint"), "the help disc beside the key")
 
 
 func test_pressing_h_opens_the_card_and_hides_the_chip() -> void:
@@ -651,6 +654,62 @@ func test_the_lessons_are_icon_chips_one_word_each_lit_when_done() -> void:
 		assert_not_null(c.icon, "%s has an icon" % c.word)
 
 
+## FABLE AAA ROUND 5: "objectives as icons with a progress ring, no reward numerals". The
+## ring counts the done lessons, and nothing the checklist draws is a number or a word.
+func test_the_lessons_are_icons_round_a_ring_with_no_words_or_numerals_drawn() -> void:
+	_hud.set_tasks([
+		{"id": "tutorial_catch", "text": "Catch a pony with your magic beam.", "done": true, "paid": false, "reward_bits": 20},
+		{"id": "tutorial_pen", "text": "Move a pony into a pen.", "done": false, "paid": false, "reward_bits": 30},
+		{"id": "tutorial_sell", "text": "Sell a gem at the market.", "done": false, "paid": false, "reward_bits": 50},
+	])
+	var ring := _hud.get_node("Tasks").find_child("TaskRing", true, false) as Control
+	assert_not_null(ring)
+	if ring != null:
+		assert_eq(int(ring.get_meta(&"done")), 1)
+		assert_eq(int(ring.get_meta(&"total")), 3)
+	for l: Node in _hud.get_node("Tasks").find_children("*", "Label", true, false):
+		assert_false((l as Label).is_visible_in_tree() and not (l as Label).text.is_empty(),
+			"no drawn words: %s" % (l as Label).text)
+
+
+## FABLE AAA ROUND 5: "toasts are sentences". The common lines become a picture, a few words
+## and chips for their numbers; a line no rule knows is drawn whole.
+func test_a_toast_is_a_picture_a_few_words_and_its_numbers_as_chips() -> void:
+	var pen: Dictionary = HudScript.toast_card_for("Lark Wish moved into the pen. It is now full.")
+	assert_eq(pen.words, "Lark Wish penned")
+	assert_eq(pen.icon, "fence")
+	assert_eq(pen.chips, [{"kind": "tag", "text": "Full"}])
+	var done: Dictionary = HudScript.toast_card_for(
+		"Request done: Catch a pony with your magic beam. (+20 bits)")
+	assert_eq(done.words, "Request done")
+	assert_eq(done.chips, [{"kind": "coin", "text": "+20"}], "the bits survive as a coin chip")
+	var food: Dictionary = HudScript.toast_card_for("Request done: Feed them (+40 bits and 2 hay)")
+	assert_eq(food.chips, [{"kind": "coin", "text": "+40"}, {"kind": "tag", "text": "+2 hay"}])
+	var sold: Dictionary = HudScript.toast_card_for("Sold 3 gems for 15 bits.")
+	assert_eq(sold.words, "Sold 3 gems")
+	assert_eq(sold.chips, [{"kind": "coin", "text": "+15"}])
+	var story := "An associate called: one pen is sealed pending payment. Everyone inside is fine!"
+	assert_eq(HudScript.toast_card_for(story).words, story, "the story's lines are drawn whole")
+	await wait_process_frames(1)
+	_hud.toast("Sold 3 gems for 15 bits.")
+	assert_eq(_hud.toast_text(), "Sold 3 gems for 15 bits.", "the gates still read the whole line")
+	assert_eq(_hud.toast_words(), "Sold 3 gems")
+	assert_eq(_hud.toast_chips(), [{"text": "+15"}])
+
+
+## FABLE AAA ROUND 5: "the centre crosshair dot shows in every world frame". It is asked for
+## only while it has something to say: the beam, a target, a townspony, a teaching tip.
+func test_the_crosshair_is_wanted_only_when_it_has_something_to_say() -> void:
+	_hud._tip_text = ""
+	_hud.set_aiming_person(false)
+	assert_false(_hud.crosshair_wanted(), "an empty view shows no reticle")
+	_hud.set_aiming_person(true)
+	assert_true(_hud.crosshair_wanted(), "a townspony under it")
+	_hud.set_aiming_person(false)
+	_hud._tip_text = "Walk up to a pony"  # what set_tip() keeps; its glyph row needs a keyboard
+	assert_true(_hud.crosshair_wanted(), "a tip that teaches the beam points at it")
+
+
 ## G1 (playtest ledger), FS1.4: "hovering a lesson chip shows its sentence as a tooltip." Each
 ## chip takes the pointer, its tooltip is the lesson's sentence, and what pops up is a drawn
 ## card carrying that sentence (and the reward), not the engine's bare grey box.
@@ -663,8 +722,10 @@ func test_hovering_a_lesson_chip_shows_its_sentence() -> void:
 		{"id": "tutorial_sell", "text": sentences[2], "done": false, "paid": false, "reward_bits": 50},
 	])
 	var strip := _hud.get_node("Tasks").get_child(1) as HBoxContainer
-	assert_not_null(strip, "the chip strip under the title")
-	var chips := strip.get_children()
+	assert_not_null(strip, "the chip strip under the (hidden) title")
+	# Round 5: the progress ring leads the strip, the three lesson chips follow it.
+	assert_eq(strip.get_child(0).name, "TaskRing")
+	var chips := strip.get_children().slice(1)
 	assert_eq(chips.size(), 3)
 	for i in chips.size():
 		var chip := chips[i] as Control

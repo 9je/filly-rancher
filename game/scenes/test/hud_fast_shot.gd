@@ -78,6 +78,13 @@ func _run() -> void:
 	compass.call("set_places", list)
 	compass.call("set_goal", list[1]["node"], int(icons[1]))
 	hud.call("set_tip", "")
+	# The three first lessons, one done (round 5: icons round a progress ring, no numerals).
+	hud.call("set_tasks", [
+		{"id": "tutorial_catch", "text": "Catch a pony with your magic beam.", "done": true, "paid": false, "reward_bits": 20},
+		{"id": "tutorial_pen", "text": "Move a pony into a pen.", "done": false, "paid": false, "reward_bits": 30},
+		{"id": "tutorial_sell", "text": "Sell a gem at the market.", "done": false, "paid": false, "reward_bits": 50}])
+	for i in 40:
+		await process_frame
 	await _shot("hud_rest_720")
 	for m in bubbles:
 		var at: Vector3 = m.global_position
@@ -92,5 +99,13 @@ func _run() -> void:
 	hud.call("toast", "Lark Wish moved into the pen. It is now full.")
 	await _shot("hud_toast_720")
 	print("TOAST_RECT ", hud.call("toast_rect"))
+	# The other lines it says most, each its own card (round 5: a picture, a few words, chips).
+	var lines := ["Request done: Catch a pony with your magic beam. (+20 bits)",
+		"Sold 3 gems for 15 bits.", "Paid 120 bits. Balance: 480.",
+		"An associate called: one pen is sealed pending payment. Everyone inside is fine!"]
+	for i in lines.size():
+		hud.set("_toast_left", 0.0)
+		hud.call("toast", lines[i])
+		await _shot("hud_toast_%d_720" % i)
 	print("HUD_FAST_SHOT_OK")
 	quit()

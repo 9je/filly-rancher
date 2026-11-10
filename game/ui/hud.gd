@@ -355,6 +355,20 @@ func _process(delta: float) -> void:
 		_crosshair.queue_redraw()
 	_was_beaming = beaming
 	_was_in_range = in_range
+	# THE RETICLE COMES WHEN IT HAS SOMETHING TO SAY (Fable AAA round 5: "the centre
+	# crosshair dot shows in every world frame"). It fades up while the beam is on, while a
+	# pony or a townspony is under it, and while a tip is teaching (the tip that says "Hold
+	# Right Mouse on a pony" points at it), and fades away over an empty view.
+	var want := crosshair_wanted()
+	_crosshair.modulate.a = move_toward(_crosshair.modulate.a, 1.0 if want else 0.0,
+		delta * (8.0 if want else 3.0))
+
+
+## Whether the reticle is asked for now (see _process). Public for the tests.
+func crosshair_wanted() -> bool:
+	if _beam != null and (_beam.is_active() or _beam.is_holding() or _beam.has_target()):
+		return true
+	return _aiming_person or not _tip_text.is_empty()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -394,13 +408,17 @@ func toast(text: String) -> void:
 
 
 func _show_toast(text: String) -> void:
-	_toast.text = text
-	_toast_left = toast_hold_for(text) + TOAST_FADE
+	var card := toast_card_for(text)
+	_toast_full = text
+	_toast.text = String(card.words)
+	_toast_left = toast_hold_for(String(card.words)) + TOAST_FADE
 	_toast.modulate.a = 1.0
-	_set_toast_icon(toast_icon_for(text))
+	_set_toast_icon(String(card.icon))
+	_set_toast_chips(card.chips)
 	_fit_pill(_toast)
 	_place_toast()
 	_place_toast_icon()
+	_place_toast_chips()
 	# A little pop on arrival, the way a show title card bounces in, from its left end.
 	_toast.pivot_offset = Vector2(0.0, _toast.size.y * 0.5)
 	_toast.scale = Vector2(0.86, 0.86)
@@ -460,6 +478,145 @@ func _set_toast_icon(icon_name: String) -> void:
 	_toast_icon.texture = IconSet.texture(icon_name, 96, false)
 
 
+## A TOAST IS A PICTURE AND A FEW WORDS (Fable AAA round 5: "toasts are sentences"). The
+## lines the game says most often are cut to their news and their numbers: "Lark Wish moved
+## into the pen. It is now full." is the fence, "Lark Wish penned" and a Full tag; "Request
+## done: Catch a pony with your magic beam. (+20 bits)" is the board's picture, "Request done"
+## and a gold coin chip reading +20. Every number that matters survives as a chip; a line
+## no rule knows (a letter's title, the Company's notices, Spike) is drawn whole, because
+## those words are the story. toast_text() still answers the whole line for the gates.
+##   -> {words, icon, chips: [{kind: "coin" | "chips" | "tag", text}]}
+const TOAST_RULES := [
+	# [pattern, words ($1.. from the match), icon, [[chip kind, chip text], ...]]
+	["^(.+) moved into the pen\\. It is now full\\.$", "$1 penned", "fence", [["tag", "Full"]]],
+	["^(.+) moved into the pen\\.$", "$1 penned", "fence", []],
+	["^Request done: .*\\(\\+(\\d+) bits and (\\d+) (.+)\\)$", "Request done", "objective",
+		[["coin", "+$1"], ["tag", "+$2 $3"]]],
+	["^Request done: .*\\(\\+(\\d+) bits\\)$", "Request done", "objective", [["coin", "+$1"]]],
+	["^Sold everything for (\\d+) bits\\.$", "Sold it all", "sell_all", [["coin", "+$1"]]],
+	["^Sold (\\d+) (.+) for (\\d+) bits\\.$", "Sold $1 $2", "sold", [["coin", "+$3"]]],
+	["^Set complete: (.+)! (\\d+) bits\\.$", "$1 complete!", "star", [["coin", "+$2"]]],
+	["^Contract met: \\+(\\d+) bits\\.$", "Contract met", "objective", [["coin", "+$1"]]],
+	["^Paid (\\d+) bits\\. Balance: (\\d+)\\.$", "Paid", "crate", [["coin", "-$1"], ["tag", "Owed $2"]]],
+	["^(\\d+) chips\\. Good luck!$", "Good luck!", "chip_gold", [["chips", "+$1"]]],
+	["^(\\d+) bits\\. Come back soon!$", "Cashed out", "coin", [["coin", "+$1"]]],
+	["^(.+) takes it\\. You win (\\d+) chips!$", "$1 wins!", "chip_gold", [["chips", "+$2"]]],
+	["^(.+) takes it\\. Your pony was not in front today\\.$", "$1 wins", "chip_red", []],
+	["^Good morning! Day (\\d+)\\. The ranch is saved\\.$", "Good morning!", "sun",
+		[["tag", "Day $1"]]],
+	["^Upgraded to a (.+)\\. Room for (\\d+) now\\.$", "$1", "upgrade", [["tag", "Room for $2"]]],
+	["^The Express Chute took (\\d+) in the night\\. \\+(\\d+) bits on your statement\\.$",
+		"Chute took $1", "express_chute", [["coin", "+$2"]]],
+	["^(.+) came home at dawn\\.$", "$1 is home", "house", []],
+]
+
+
+static func toast_card_for(text: String) -> Dictionary:
+	for rule: Array in TOAST_RULES:
+		var re := RegEx.create_from_string(String(rule[0]))
+		var m := re.search(text)
+		if m == null:
+			continue
+		var chips: Array = []
+		for c: Array in rule[3]:
+			chips.append({"kind": String(c[0]), "text": _fill(String(c[1]), m)})
+		return {"words": _fill(String(rule[1]), m), "icon": String(rule[2]), "chips": chips}
+	return {"words": text, "icon": toast_icon_for(text), "chips": []}
+
+
+static func _fill(template: String, m: RegExMatch) -> String:
+	var out := template
+	for i in range(m.get_group_count(), 0, -1):
+		out = out.replace("$%d" % i, m.get_string(i))
+	return out
+
+
+## The line on screen in full, as it was raised (toast_text()).
+var _toast_full := ""
+var _toast_chip_row: HBoxContainer
+const TOAST_CHIP_H := 38.0
+
+
+## The numbers a toast keeps, as chips at the pill's right end: gold numerals on a dark coin
+## chip with the coin (or a casino chip) at their left, or a cream tag for a state ("Full").
+func _set_toast_chips(chips: Array) -> void:
+	if _toast_chip_row == null:
+		_toast_chip_row = HBoxContainer.new()
+		_toast_chip_row.name = "ToastChips"
+		_toast_chip_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_toast_chip_row.add_theme_constant_override(&"separation", 6)
+		_toast.add_child(_toast_chip_row)
+	for c in _toast_chip_row.get_children():
+		_toast_chip_row.remove_child(c)
+		c.queue_free()
+	for chip: Dictionary in chips:
+		_toast_chip_row.add_child(_toast_chip(chip))
+	_toast_chip_row.visible = not chips.is_empty()
+	_toast_chip_row.reset_size()
+	var box := _toast.get_theme_stylebox(&"normal") as StyleBox
+	if box != null:
+		box.content_margin_right = 24.0 + (_chips_width() + 10.0 if not chips.is_empty() else 0.0)
+
+
+func _toast_chip(chip: Dictionary) -> Control:
+	var l := Label.new()
+	l.text = String(chip.text)
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	l.custom_minimum_size.y = TOAST_CHIP_H
+	var kind := String(chip.kind)
+	if kind == "tag":
+		var tag := HouseStyleScript.pill_box(int(TOAST_CHIP_H * 0.5), 1.0, Vector2(14, 2))
+		tag.bg_color = HouseStyleScript.KEY_FACE
+		tag.border_color = HouseStyleScript.GOLD
+		l.add_theme_stylebox_override(&"normal", tag)
+		HouseStyleScript.ink_label(l, 22, HouseStyleScript.PLUM_DARK, false)
+		l.add_theme_constant_override(&"outline_size", 0)
+		return l
+	var box := HouseStyleScript.pill_box(int(TOAST_CHIP_H * 0.5), 1.0, Vector2(12, 2))
+	box.bg_color = HouseStyleScript.PLUM_DARK
+	box.border_color = HouseStyleScript.GOLD
+	box.content_margin_left = TOAST_CHIP_H - 4.0 + 8.0
+	l.add_theme_stylebox_override(&"normal", box)
+	HouseStyleScript.numeral_label(l, 26)
+	var face := TextureRect.new()
+	face.texture = IconSet.texture("coin" if kind == "coin" else "chip_gold", 96, false)
+	face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	face.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	face.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	face.size = Vector2(TOAST_CHIP_H - 6.0, TOAST_CHIP_H - 6.0)
+	face.position = Vector2(4.0, 3.0)
+	l.add_child(face)
+	return l
+
+
+func _chips_width() -> float:
+	if _toast_chip_row == null or not _toast_chip_row.visible:
+		return 0.0
+	return _toast_chip_row.get_combined_minimum_size().x
+
+
+func _place_toast_chips() -> void:
+	if _toast_chip_row == null or not _toast_chip_row.visible:
+		return
+	var w := _toast.offset_right - _toast.offset_left
+	var h := _toast.offset_bottom - _toast.offset_top
+	var s := _toast_chip_row.get_combined_minimum_size()
+	_toast_chip_row.size = s
+	_toast_chip_row.position = Vector2(w - 18.0 - s.x, (h - s.y) * 0.5)
+
+
+## The toast card's chips as drawn, [{kind, text}], for the tests.
+func toast_chips() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if _toast_chip_row != null and _toast_chip_row.visible:
+		for c in _toast_chip_row.get_children():
+			if c.is_queued_for_deletion():
+				continue
+			out.append({"text": (c as Label).text})
+	return out
+
+
 ## THE TOAST SITS ON THE SADDLEBAG (Fable AAA round 3, #9: "the toast pill sits dead centre
 ## over the player"). Its left end is the bag card's, its foot TOAST_GAP above the card's top,
 ## so news stacks over the strip it is mostly about (a catch, a pen, a sale) and the pony in
@@ -512,6 +669,11 @@ static func toast_hold_for(text: String) -> float:
 ## same reason get_bits_text() is: what the player is told is a real requirement (the
 ## market gate reads the sale line back), and a gate has no other way to see it.
 func toast_text() -> String:
+	return _toast_full
+
+
+## The few words the toast card actually draws for the line on screen (toast_card_for).
+func toast_words() -> String:
 	return _toast.text
 
 
@@ -616,20 +778,23 @@ func set_tasks(rows: Array) -> void:
 		var done: bool = bool(row.get("done", false))
 		_task_lines.append("%s%s  (%d bits)" % [TASK_DONE if done else TASK_OPEN,
 			String(row.get("text", "")), int(row.get("reward_bits", 0))])
+	# THE TITLE IS KEPT FOR THE RECORD, NOT DRAWN (Fable AAA round 5: "Getting started" over
+	# "+20 +30 +50" read as text scaffolding). task_lines() still opens with it.
 	var title := Label.new()
 	title.text = TASK_TITLE
-	# Small gold words over the chips, the way the casino heads a plate: a label, not a headline.
-	HouseStyleScript.ink_label(title, 19, HouseStyleScript.GOLD)
+	title.visible = false
 	_tasks.add_child(title)
-	# CHIPS, NOT SENTENCES (FS1.4; owner, visual-first UIs): each lesson is its action's icon
-	# on a tile that turns green with a tick when done, one word, and its reward. The
-	# sentence is the objective card's job now (game/ui/objective_card.gd). task_lines()
-	# still reads as it always has.
+	# ICONS ROUND A PROGRESS RING (round 5): a medallion whose ring is cut into one arc per
+	# lesson, gold for each one done, and the lessons beside it as picture discs that go felt
+	# green with a tick when done. No words and no reward numerals on the HUD: the sentence
+	# and the pay are each chip's hover card, and the objective card says what to do next
+	# (game/ui/objective_card.gd).
 	_chips = []
 	var strip := HBoxContainer.new()
 	strip.add_theme_constant_override(&"separation", 8)
 	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_tasks.add_child(strip)
+	var done_count := 0
 	for entry in rows:
 		if typeof(entry) != TYPE_DICTIONARY:
 			continue
@@ -640,6 +805,9 @@ func set_tasks(rows: Array) -> void:
 			"icon": PlaceSign.icon_texture(int(kind[1])), "reward": int(row.get("reward_bits", 0)),
 			"text": String(row.get("text", ""))}
 		_chips.append(chip)
+		done_count += 1 if bool(chip.done) else 0
+	strip.add_child(_task_ring(done_count, _chips.size()))
+	for chip: Dictionary in _chips:
 		strip.add_child(_task_chip(chip))
 	var card := get_node_or_null("TasksCard") as Panel
 	if card != null:
@@ -717,22 +885,45 @@ func _task_chip(chip: Dictionary) -> VBoxContainer:
 			tile.draw_polyline(PackedVector2Array([c + Vector2(-4, 0), c + Vector2(-1, 3),
 				c + Vector2(4.5, -3)]), HouseStyleScript.PLUM_DARK, 2.5, true))
 	col.add_child(tile)
-	var word := Label.new()
-	word.text = String(chip.word)
-	word.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	HouseStyleScript.ink_label(word, 15, HouseStyleScript.CREAM)
-	col.add_child(word)
-	var reward := Label.new()
-	reward.text = "+%d" % int(chip.reward)
-	reward.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	HouseStyleScript.ink_label(reward, 13, HouseStyleScript.GOLD, false)
-	reward.add_theme_font_override(&"font", MenuStyleScript.numeral_font())
-	col.add_child(reward)
+	# The word and the pay are the hover card's (round 5); the picture carries the chip.
 	return col
 
 
 ## The lesson chips' disc, across.
-const TASK_DISC := 44.0
+const TASK_DISC := 48.0
+## The progress medallion, across.
+const TASK_RING := 58.0
+
+
+## THE PROGRESS RING: one arc per lesson round a plum medallion with a star, gold for each
+## lesson done and a dim track for each still open, so how far through she is reads at a
+## glance without a number.
+func _task_ring(done: int, total: int) -> Control:
+	var ring := Control.new()
+	ring.name = "TaskRing"
+	ring.custom_minimum_size = Vector2(TASK_RING, TASK_RING)
+	ring.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ring.set_meta(&"done", done)
+	ring.set_meta(&"total", total)
+	var star := IconSet.texture("star", 96, false)
+	ring.draw.connect(func() -> void:
+		var c := ring.size * 0.5
+		var r := ring.size.x * 0.5
+		ring.draw_circle(c, r - 1.0, HouseStyleScript.PLUM_DARK)
+		var n := maxi(total, 1)
+		var gap := 0.24
+		for i in n:
+			var a0 := -PI * 0.5 + TAU * float(i) / n + gap * 0.5
+			var a1 := a0 + TAU / n - gap
+			ring.draw_arc(c, r - 6.0, a0, a1, 24, Color(0, 0, 0, 0.4), 9.0, true)
+			ring.draw_arc(c, r - 6.0, a0, a1, 24,
+				HouseStyleScript.GOLD if i < done else Color(1.0, 0.96, 0.86, 0.25), 6.5, true)
+		ring.draw_circle(c, r - 12.0, HouseStyleScript.PLUM)
+		if star != null:
+			var s := (r - 12.0) * 2.1
+			ring.draw_texture_rect(star, Rect2(c - Vector2(s, s) * 0.5, Vector2(s, s)), false))
+	return ring
 
 
 func task_lines() -> Array[String]:
@@ -1269,6 +1460,19 @@ func _restyle() -> void:
 	_chip_key = HouseStyleScript.KeyGlyph.new()
 	_chip_key.set("glyph_height", 28.0)
 	_chip.add_child(_chip_key)
+	# A gold disc with a question mark: help, in the one glyph every player knows.
+	_chip_hint = Label.new()
+	_chip_hint.name = "Hint"
+	_chip_hint.text = "?"
+	_chip_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_chip_hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_chip_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	HouseStyleScript.ink_label(_chip_hint, 22, HouseStyleScript.PLUM_DARK)
+	_chip_hint.add_theme_constant_override(&"outline_size", 0)
+	_chip_hint.add_theme_stylebox_override(&"normal", HouseStyleScript.disc_box(CHIP_HINT_PX,
+		HouseStyleScript.GOLD, HouseStyleScript.KEY_FACE, 2))
+	_chip_hint.size = Vector2(CHIP_HINT_PX, CHIP_HINT_PX)
+	_chip.add_child(_chip_hint)
 	_refresh_chip()
 
 
@@ -1295,18 +1499,33 @@ func _style_bits() -> void:
 
 const BITS_COIN := 36.0
 var _chip_key: Control
+var _chip_hint: Label
+const CHIP_HINT_PX := 28.0
+const CHIP_WORD := "controls"
+
+
+## What the corner chip stands for, as words, now that it draws none.
+func controls_chip_word() -> String:
+	return CHIP_WORD
 
 
 func _refresh_chip() -> void:
 	if _chip != null:
-		# The word stays "controls"; the key itself is the drawn cap at the chip's left.
+		# NO WORD (Fable AAA round 5: the "H controls" pill read as text scaffolding): the
+		# drawn keycap and a hint picture beside it, the way a console game marks its help
+		# button. The word is the chip's name for the gates (controls_chip_word()).
 		var key := InputDeviceScript.hint(&"toggle_hints")
-		_chip.text = "controls"
+		_chip.text = ""
 		if _chip_key != null:
 			_chip_key.set("key", key)
 			var box := _chip.get_theme_stylebox(&"normal") as StyleBoxFlat
-			box.content_margin_left = 10.0 + _chip_key.custom_minimum_size.x + 10.0
-			_chip_key.position = Vector2(10.0, 6.0)
+			var kw: float = _chip_key.custom_minimum_size.x
+			box.content_margin_left = 0.0
+			box.content_margin_right = 0.0
+			_chip_key.position = Vector2(8.0, 6.0)
+			if _chip_hint != null:
+				_chip_hint.position = Vector2(8.0 + kw + 6.0, 6.0)
+			_chip.offset_left = _chip.offset_right - (8.0 + kw + 6.0 + CHIP_HINT_PX + 8.0)
 		_chip.visible = _chip_enabled and not _hints.visible and not _overlay_open
 
 
@@ -1389,6 +1608,9 @@ func _fit_pill(l: Label) -> void:
 	l.offset_bottom = l.offset_top + float(l.get_meta(&"pill_height"))
 	# The toast's picture takes its own room at the left (P8 S5).
 	var pad := 56.0 + (TOAST_ICON_PX + 14.0 if l == _toast and _toast_icon != null else 0.0)
+	# And its chips their room at the right (round 5).
+	if l == _toast and _chips_width() > 0.0:
+		pad += _chips_width() + 10.0
 	var one_line := font.get_string_size(l.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + pad
 	var w := minf(one_line, PILL_MAX_WIDTH)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if one_line > PILL_MAX_WIDTH \
