@@ -803,3 +803,66 @@ the catch's in-world beat. Calls made:
 
 ## 2026-11-09: Rain splashes tried and dropped
 - GPU particle collision (a following GPUParticlesCollisionHeightField3D, hide-on-contact drops, an at-collision sub-emitter of ground rings) produced no visible splashes in three renders (bigger rings, the heightfield updating every frame). Time-boxed and reverted rather than shipped unverified. Rain's ground read rests on the soaked darkening and the soft puddles (973b5f7).
+
+## 2026-11-09: Fable AAA round 5's UI items (HUD, three casino tables, creator, letters, catch card, title)
+
+An Opus agent in a worktree took the 2D items again; the lead kept the world, the ponies, the
+sky and the cinematics. Calls made:
+
+- **The lessons are icons round a ring**: a plum medallion whose ring is cut into one arc per
+  lesson, gold for each one done, beside the lessons as picture discs (felt green with a tick
+  when done). The "Getting started" title and the +20/+30/+50 numerals are gone from the HUD;
+  the sentence and the pay stay on each chip's hover card, and the objective card still says
+  what to do next. task_lines() still reads as it did, title first.
+- **A toast is a picture, a few words and its numbers as chips** (HUD.toast_card_for): the lines
+  the game says most are cut by rule ("Lark Wish penned" + a Full tag; "Request done" + a gold
+  coin chip reading +20; "Sold 3 gems" + 15; "Paid" + -120 and an Owed tag; the chips' wins
+  with a casino chip). A line no rule knows (a letter title, the Company's notices, Spike's
+  tips) is drawn whole, because those words are the story. toast_text() still answers the full
+  line, so every gate that reads a sale back still works; toast_words() is what is drawn. The
+  icon stands in for a portrait: the HUD has no pony body to bake at toast time.
+- **The reticle comes when it has something to say**: it fades up while the beam is on, while a
+  pony or a townspony is under it, and while a tip is teaching (the "Hold Right Mouse on a
+  pony" tip points at it), and fades away over an empty view. Discoverable because it lights
+  the moment a pony is in reach, which is when it matters.
+- **The H controls pill is a keycap and a gold "?" disc**, no word.
+- **Blackjack is a table**: a half-moon of felt in perspective (the dealer's straight edge far
+  and 14% narrower than the near curve) in a padded leather rail with sheen, shade and
+  stitches on a wooden lip, gold piping, a warm pool of light; the dealer's bust over the far
+  edge behind a wooden rail with his bow tie, his chip rack and the shoe either side, velvet
+  drapes and a swagged valance behind him; his cards in a shallow smile under him, hers
+  fanned in an arc; chips as stacks (the stake chips three high, the bet a stack in a printed
+  circle); totals as gold pills with no words. The buttons stand in front of the rail.
+  PaintScript.draw_card takes a transform so a card can lie turned.
+- **The dealer and the wheel host are the hall's own staff**, baked once from their seeded
+  bodies (scenes/test/casino_portraits.gd, the counter portraits' studio, now shared as static
+  helpers) into assets/ui/portraits/palace_dealer.png and palace_host.png. The baked file is
+  preferred over ranch.gd's live PortraitBaker callable (kept as the fallback), because the
+  bust's crop is framed for the bake.
+- **The wheel is a show wheel**: a slowly turning sunburst backboard (rays clipped to the board
+  with Geometry2D), a wide wooden rim between gold bands set with 36 real bulbs (halo, glass,
+  glint) that chase in threes, faster while it spins and flashing together on a win, a gold
+  peg at every slice. The host stands at the head of the column with her call in a speech
+  bubble by state: "Place your bets!", "Spin when ready!", "No more bets!", "A winner!",
+  "So close! Again?". Tier stacks are real chip stacks.
+- **The race guide has a track strip**: the field in a starting gate on raked dirt, each
+  runner's face over a stall door in her silks with her number on a saddle cloth, bunting in
+  the silks along the rail and the finish post with a chequered flag beyond; every card carries
+  her silks down its left edge and her saddle cloth on her face. Silks are by card position
+  (six colours). The printed result block under the guide is only ever filled by the probe
+  (ranch.gd never pushes a race result to the guide), so it was left.
+- **The creator's first step fills its panel with five ready-made looks**: each a mane style
+  card baked in its own coat and mane for her kind of pony, one click for coat, mane, eyes and
+  style together, every colour snapped to the nearest pot in the player palette. Nothing is
+  picked until she clicks one (SwatchGrid.clear_selection). A new keyboard region, "preset".
+- **A letter's answers are rubber stamps on the sheet**: plum stamp-pad ink, a double rule, a
+  tick box that fills under the pointer, each a degree or two off straight, at the foot of the
+  page beside the seal after a hand-written "Tick one"; more answers than fit wrap and the page
+  grows. They are children of the page, not a row under it.
+- **The catch card's stars**: the same Common pony read as one star on the big card and four on
+  the corner card, where the three grey outlines read as stars at that size. Only earned stars
+  are stars now; an unearned slot is a small dot. The data was never inconsistent.
+- **The title**: the key art is unchanged; over it a fall of dusk plum from the top of the frame
+  (gone by two fifths down), a plum pool behind the logotype and a few still first stars to
+  its right, so the cloud blob and the pink haze sink into an evening sky and the cream name
+  stands on dark, while the valley keeps its warm low sun.
