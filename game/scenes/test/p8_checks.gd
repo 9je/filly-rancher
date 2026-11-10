@@ -156,6 +156,8 @@ func _run() -> void:
 				var inst = p.call("get_instance") if p.has_method("get_instance") else null
 				if inst == null:
 					inst = load("res://systems/pony_instance.gd").create(d.id)
+				# The card at rest, not the in-game wait for the world's beat (catch_card.gd).
+				card.set("entrance_delay", 0.0)
 				card.call("show_catch", inst, p)
 				# Frames are slow under llvmpipe: hold the card once it lands rather than
 				# counting past its 4.6 s stay.
