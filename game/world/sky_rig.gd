@@ -71,7 +71,9 @@ const AZIMUTH_WEST := -90.0
 const PHASE_LIGHT_COLORS: Array[Color] = [
 	Color(1.0, 0.84, 0.68),
 	Color(1.0, 0.97, 0.91),
-	Color(1.0, 0.70, 0.52),
+	# Gold-pink, not orange (Fable round 5: "at dusk every pixel, white plaster and grass
+	# alike, goes the same orange-mauve"): white walls stay near white in the low sun.
+	Color(1.0, 0.82, 0.70),
 	# A little nearer neutral than it was (Fable AAA round 3, #8: "night strips character
 	# identity ... everyone converges on one blue"): still moonlight, but Spike stays purple.
 	Color(0.64, 0.69, 0.88),
@@ -86,7 +88,7 @@ const PHASE_LIGHT_COLORS: Array[Color] = [
 ## look at the valley, and in their playtest it read as an overcast purple haze over olive
 ## grass ("starting area is terrible"). Now a show sunrise: a soft periwinkle zenith over the
 ## same peach horizon, a gentler sun, and enough of it that the plaza reads at once.
-const PHASE_LIGHT_ENERGY: Array[float] = [0.85, 1.15, 0.72, 0.38]
+const PHASE_LIGHT_ENERGY: Array[float] = [0.85, 1.15, 0.85, 0.38]
 const PHASE_SKY_TOP: Array[Color] = [
 	Color(0.50, 0.62, 0.88),
 	Color(0.31, 0.51, 0.76),
@@ -213,7 +215,7 @@ const WEATHER_SKY_DARKEN: Array[float] = [1.0, 0.75, 0.85, 0.55]
 ## out, which is not weather, it is a wall.
 const WEATHER_FOG_DENSITY: Array[float] = [0.0011, 0.004, 0.010, 0.0065]
 ## The least fog each phase stands in (see fog_density): dawn, day, dusk, night.
-const PHASE_HAZE_FLOOR: Array[float] = [0.0016, 0.0, 0.0024, 0.016]
+const PHASE_HAZE_FLOOR: Array[float] = [0.0016, 0.0, 0.0013, 0.016]
 
 
 ## Drops alive at once. Rain is a wash of streaks around the player, not a simulation of a
