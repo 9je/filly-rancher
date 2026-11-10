@@ -67,7 +67,7 @@ static func sparkles(colors: Array[Color]) -> GPUParticles3D:
 	pm.angular_velocity_max = 180.0
 	p.process_material = pm
 	var quad := QuadMesh.new()
-	quad.size = Vector2(0.22, 0.22)
+	quad.size = Vector2(0.17, 0.17)
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -86,15 +86,17 @@ static var _star: Texture2D
 static func star_texture() -> Texture2D:
 	if _star != null:
 		return _star
+	# THE SHOW'S SPARKLE: a hard-edged, pinched four-point star with a pixel of antialiasing,
+	# not a soft glow (Fable round 6, #5: "stock engine sprites ... Gaussian falloff").
 	var n := 64
 	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
 	for y in range(n):
 		for x in range(n):
-			var u := (x + 0.5) / n * 2.0 - 1.0
-			var v := (y + 0.5) / n * 2.0 - 1.0
-			var d := absf(u) * absf(v) * 6.0 + (u * u + v * v) * 0.6
-			var a := clampf(1.0 - d * 2.2, 0.0, 1.0)
-			a = maxf(a, clampf(1.0 - sqrt(u * u + v * v) * 3.2, 0.0, 1.0))
+			var u := absf((x + 0.5) / n * 2.0 - 1.0)
+			var v := absf((y + 0.5) / n * 2.0 - 1.0)
+			# An astroid, |u|^(2/3) + |v|^(2/3) <= 1, pinched to points.
+			var f := pow(u, 0.6) + pow(v, 0.6)
+			var a := clampf((0.98 - f) * 24.0, 0.0, 1.0)
 			img.set_pixel(x, y, Color(1, 1, 1, a))
 	_star = ImageTexture.create_from_image(img)
 	return _star

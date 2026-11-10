@@ -83,12 +83,15 @@ func _ground(x: float, z: float) -> float:
 
 
 func _body(path: String) -> Node3D:
-	var body: Node3D = PonyVisuals.build(load(path))
+	var data: PonyData = load(path)
+	var body: Node3D = PonyVisuals.build(data)
 	if body == null:
 		return null
 	# Shaded like every pony in the valley: built bare, Derpy and Dash were the only ponies
 	# with no cel band and no line ("a plastic navy figure", Fable round 4; "a lower tier", 2).
 	ToonStyler.style(body, &"pony", {})
+	# Derpy's own eyes (Fable round 6: "Derpy not derped", both pupils centred).
+	ToonStyler.cross_eyes(body, data.id)
 	body.rotate_y(PI)
 	var holder := Node3D.new()
 	holder.add_child(body)
@@ -109,7 +112,8 @@ func _say(holder: Node3D, secs: float) -> void:
 	var tw := create_tween()
 	tw.tween_method(func(t: float) -> void:
 		if is_instance_valid(face):
-			face.talk_amount = 0.5 + 0.5 * sin(t * TAU * 4.5) * (0.7 + 0.3 * sin(t * 7.0)), 0.0, secs, secs)
+			# Small: wide open, the jaw showed modelled teeth the show never draws (round 6).
+			face.talk_amount = 0.22 + 0.18 * sin(t * TAU * 4.5) * (0.7 + 0.3 * sin(t * 7.0)), 0.0, secs, secs)
 	tw.tween_callback(func() -> void:
 		if is_instance_valid(face):
 			face.talking = false
@@ -192,7 +196,9 @@ func derpy_crash() -> void:
 		# (Fable round 4, derpy_5).
 		# From the landing camera's own clear spot (round 5 check: a fresh spot behind the
 		# player put a cottage wall and the sky's glare in the frame), tilted up after her.
-		{"from": cam_side + Vector3.UP * 0.3, "to": cam_side + Vector3.UP * 0.9,
+		# From where the close-up already stood clear, tilted up after her (round 6: a fresh
+		# spot landed the lens in a Palace awning).
+		{"from": "here", "to": close + Vector3.UP * 0.6,
 			"look": land + Vector3.UP * 4.0, "time": 1.6, "fov": 55.0,
 			"call": func() -> void: _fly_off(derpy, land, fwd)},
 	]
