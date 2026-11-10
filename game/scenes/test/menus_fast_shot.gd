@@ -104,6 +104,23 @@ func _run() -> void:
 			{"name": "Twilight", "balance": 25000, "quota": 3}))
 		await _shot("letter_welcome")
 		panel.call("close")
+		# The survey, its answers stamped on the sheet (Fable AAA round 5), then one hovered.
+		panel.call("open", {"sender": "Cloudsdale Weather Corporation",
+			"title": "Employee Appreciation Survey", "body": ["Dear Twilight,", "",
+				"You work very hard, and we do notice.", "",
+				"One question, and it is not a hard one. Which of your ponies is the most",
+				"special to you?", "", "Answer below and we will put 50 bits on your account.", "",
+				"With appreciation, Partner Wellbeing"],
+			"replies": [{"label": "Trixie", "choice": "a"}, {"label": "Fluttershy", "choice": "b"}]})
+		await _shot("letter_survey")
+		var stamps: Array = panel.call("reply_buttons")
+		if not stamps.is_empty():
+			var hover := InputEventMouseMotion.new()
+			hover.position = root.get_final_transform() * (stamps[1] as Control).get_global_rect().get_center()
+			hover.global_position = hover.position
+			root.push_input(hover)
+			await _shot("letter_survey_hover")
+		panel.call("close")
 		panel.queue_free()
 	print("MENUS_FAST_SHOT_OK")
 	quit()

@@ -68,7 +68,7 @@ signal replied(choice: String)
 var _open := false
 var _letter: Dictionary = {}
 var _close: Button = null
-var _replies: HFlowContainer = null
+var _replies: Control = null
 
 @onready var _footer: Label = $Centre/Panel/Margin/Column/Footer
 @onready var _stage: Control = get_node_or_null(^"Centre/Panel/Margin/Column/Stage")
@@ -100,14 +100,17 @@ func _ready() -> void:
 		_stage.mouse_filter = Control.MOUSE_FILTER_STOP
 		_stage.focus_mode = Control.FOCUS_NONE
 		_stage.draw.connect(func() -> void: paint(_stage))
-	# THE ANSWERS, ON THE SHEET (PT5; playtest 2026-11-05: the survey said "answer below" and
-	# below was another page). One chip per answer, under the letter, above the way out.
-	_replies = HFlowContainer.new()
+	# THE ANSWERS ARE STAMPED ON THE SHEET (Fable AAA round 5: "the letter answer buttons sit
+	# beneath the paper -- make them part of the paper"). Each answer is a rubber stamp with a
+	# tick box, in the stamp pad's plum, laid at the foot of the page beside the seal; they
+	# are children of the page itself, so they move and scale with it.
+	_replies = Control.new()
 	_replies.name = "Replies"
-	_replies.add_theme_constant_override(&"h_separation", 10)
-	_replies.add_theme_constant_override(&"v_separation", 10)
-	_replies.custom_minimum_size = Vector2(SHEET_WIDTH, 0.0)
-	$Centre/Panel/Margin/Column.add_child(_replies)
+	_replies.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if _stage != null:
+		_stage.add_child(_replies)
+	else:
+		$Centre/Panel/Margin/Column.add_child(_replies)
 	_close = MouseRowsScript.close_button(MouseRowsScript.CLOSE_TEXT,
 		func(_index: int) -> void: close())
 	# The kit's one Back (MenuStyle.back_button): its plum pill stands on cream as well as it
@@ -193,15 +196,139 @@ func _build_replies() -> void:
 		child.queue_free()
 	var rows: Array = _letter.get("replies", [])
 	_replies.visible = not rows.is_empty()
+	var k := 0
 	for row: Dictionary in rows:
 		var b := Button.new()
 		b.text = String(row.get("label", ""))
 		b.focus_mode = Control.FOCUS_NONE
-		b.add_theme_font_size_override(&"font_size", MenuStyleScript.font_px(MenuStyleScript.ROW_SIZE))
-		MenuStyleScript.paper_button(b)
+		_stamp_button(b, k)
 		var choice := String(row.get("choice", ""))
 		b.pressed.connect(func() -> void: _answer(choice))
 		_replies.add_child(b)
+		k += 1
+	_place_stamps()
+
+
+## THE STAMPS' PLACES ON THE PAGE: left to right from the text's left edge along the foot of
+## the sheet, wrapping short of the seal; [Rect2] per answer, in page pixels, for a page of
+## `width`. The first row sits level with the seal; more rows push the page taller.
+const STAMP_H := 52.0
+const STAMP_GAP := 14.0
+const STAMP_TICK := 22.0
+const STAMP_FONT := 24
+
+
+func stamp_rects(width: float) -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	var rows: Array = _letter.get("replies", [])
+	var font: Font = MenuStyleScript.title_font()
+	var left := SHEET_MARGIN + _REPLY_LEAD
+	var right := width - SHEET_MARGIN - SEAL_SIZE - 20.0
+	var x := left
+	var row := 0
+	for r: Dictionary in rows:
+		var w: float = font.get_string_size(String(r.get("label", "")), HORIZONTAL_ALIGNMENT_LEFT,
+			-1, STAMP_FONT).x + STAMP_TICK + 44.0
+		if x > left and x + w > right:
+			x = left
+			row += 1
+		out.append(Rect2(x, float(row) * (STAMP_H + STAMP_GAP), w, STAMP_H))
+		x += w + STAMP_GAP
+	return out
+
+
+## How much taller than one stamp row the answers make the page.
+func _stamp_extra(width: float) -> float:
+	var rects := stamp_rects(width)
+	if rects.is_empty():
+		return 0.0
+	var bottom := 0.0
+	for r: Rect2 in rects:
+		bottom = maxf(bottom, r.end.y)
+	return maxf(0.0, bottom - SEAL_SIZE) + 18.0
+
+
+## Room at the row's left for the hand-written "Tick one".
+const _REPLY_LEAD := 118.0
+
+
+## Where the first row of stamps starts on a page of `size`: level with the seal when one row
+## fits beside it, else as high as the rows need.
+func _stamps_top(size: Vector2) -> float:
+	var bottom := 0.0
+	for r: Rect2 in stamp_rects(size.x):
+		bottom = maxf(bottom, r.end.y)
+	if bottom <= SEAL_SIZE:
+		return size.y - SHEET_MARGIN - SEAL_SIZE + (SEAL_SIZE - STAMP_H) * 0.5
+	return size.y - SHEET_MARGIN - bottom
+
+
+func _place_stamps() -> void:
+	if _replies == null or _stage == null:
+		return
+	var size := stage_size()
+	var rects := stamp_rects(size.x)
+	_replies.position = Vector2(0.0, _stamps_top(size))
+	var i := 0
+	for b in reply_buttons():
+		if i >= rects.size():
+			break
+		b.position = rects[i].position
+		b.size = rects[i].size
+		b.pivot_offset = rects[i].size * 0.5
+		# Stamped by hand: none of them quite straight.
+		b.rotation = deg_to_rad(-2.0 if i % 2 == 0 else 1.5)
+		i += 1
+
+
+## A RUBBER STAMP AS A BUTTON: plum stamp-pad ink on the paper, a double border, a tick box at
+## its left; under the pointer the pad's ink fills it and the box gets its tick.
+func _stamp_button(b: Button, index: int) -> void:
+	var ink: Color = Color(PaperPaintScript.STAMP_INK, 1.0)
+	var paper: Color = PaperPaintScript.PAPER.lerp(ink, 0.06)
+	paper.a = 1.0
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = paper
+	normal.border_color = ink
+	normal.set_border_width_all(3)
+	normal.set_corner_radius_all(5)
+	normal.content_margin_left = STAMP_TICK + 22.0
+	normal.content_margin_right = 16.0
+	normal.anti_aliasing = true
+	var hover := normal.duplicate() as StyleBoxFlat
+	hover.bg_color = ink
+	hover.border_color = ink.darkened(0.3)
+	hover.shadow_color = Color(ink, 0.35)
+	hover.shadow_size = 6
+	var pressed := hover.duplicate() as StyleBoxFlat
+	pressed.bg_color = ink.darkened(0.2)
+	b.add_theme_stylebox_override(&"normal", normal)
+	b.add_theme_stylebox_override(&"hover", hover)
+	b.add_theme_stylebox_override(&"pressed", pressed)
+	b.add_theme_stylebox_override(&"focus", StyleBoxEmpty.new())
+	b.add_theme_font_override(&"font", MenuStyleScript.title_font())
+	b.add_theme_font_size_override(&"font_size", STAMP_FONT)
+	for slot: StringName in [&"font_color", &"font_focus_color"]:
+		b.add_theme_color_override(slot, ink)
+	var cream := Color(1.0, 0.97, 0.9)
+	for slot: StringName in [&"font_hover_color", &"font_pressed_color", &"font_hover_pressed_color"]:
+		b.add_theme_color_override(slot, cream)
+	b.add_theme_constant_override(&"outline_size", 0)
+	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	b.set_meta(&"stamp", index)
+	# The inner rule of a stamp and its tick box, over the face.
+	b.draw.connect(func() -> void:
+		var lit := b.is_hovered() or b.button_pressed
+		var c: Color = cream if lit else ink
+		var r := Rect2(Vector2.ZERO, b.size).grow(-6.0)
+		b.draw_rect(r, Color(c, 0.6), false, 1.0)
+		var box := Rect2(Vector2(14.0, (b.size.y - STAMP_TICK) * 0.5), Vector2(STAMP_TICK, STAMP_TICK))
+		b.draw_rect(box, c, false, 2.5)
+		if lit:
+			b.draw_polyline(PackedVector2Array([box.position + Vector2(4, 11), box.position + Vector2(9, 17),
+				box.position + Vector2(19, 3)]), c, 3.5, true))
+	b.mouse_entered.connect(b.queue_redraw)
+	b.mouse_exited.connect(b.queue_redraw)
 
 
 func _answer(choice: String) -> void:
@@ -393,7 +520,8 @@ func _body_height(width: float) -> float:
 func stage_size() -> Vector2:
 	var body := maxf(_body_height(SHEET_WIDTH - SHEET_MARGIN * 2.0), LINE_HEIGHT)
 	return Vector2(SHEET_WIDTH,
-		HEAD_HEIGHT + SHEET_MARGIN + TITLE_HEIGHT + body + SEAL_SIZE + SHEET_MARGIN)
+		HEAD_HEIGHT + SHEET_MARGIN + TITLE_HEIGHT + body + SEAL_SIZE + SHEET_MARGIN
+		+ _stamp_extra(SHEET_WIDTH))
 
 
 ## THE WHOLE LETTER, DRAWN ONCE. Sheet, letterhead (which prints the sender itself), the
@@ -427,6 +555,15 @@ func paint(ci: Control) -> void:
 		box.size.y - SHEET_MARGIN - SEAL_SIZE, SEAL_SIZE, SEAL_SIZE)
 	PaperPaintScript.wax_seal(ci, seal.get_center() + Vector2(0, -SEAL_SIZE * 0.12),
 		SEAL_SIZE * 0.42)
+	# THE ANSWER LINE: "Tick one" in the hand that signed the letter, a ruled line under the
+	# stamps the way a form leaves room for a mark.
+	if not (_letter.get("replies", []) as Array).is_empty():
+		var top := _stamps_top(box.size)
+		ci.draw_string(PaperPaintScript.hand_font(), Vector2(text_left, top + STAMP_H * 0.68),
+			"Tick one", HORIZONTAL_ALIGNMENT_LEFT, _REPLY_LEAD - 10.0, 26, PaperPaintScript.HAND_INK)
+		var rule_y: float = box.size.y - SHEET_MARGIN + 6.0
+		ci.draw_line(Vector2(text_left, rule_y), Vector2(seal.position.x - 20.0, rule_y),
+			Color(PaperPaintScript.HAND_INK, 0.25), 1.5, true)
 
 
 ## M10, final-review.md M2: A CLICK OFF THE SHEET CLOSES THE LETTER. Wired to Dim's own
