@@ -58,7 +58,12 @@ const DEALER_BADGE := Rect2(632.0, 50.0, 96.0, 46.0)
 const PLAYER_BADGE := Rect2(212.0, 340.0, 96.0, 46.0)
 const RACK := Rect2(286.0, 138.0, 210.0, 46.0)
 const SHOE := Rect2(838.0, 142.0, 88.0, 118.0)
-const BANNER := Rect2(250.0, 234.0, 620.0, 122.0)
+## THE VERDICT IS A PLAQUE ON THE FELT BESIDE THE CARDS, NOT OVER THEM (Fable AAA round 6:
+## "the Dealer busts banner covers the dealer's cards"). The two rows of cards fill the middle
+## of the felt with no band between them, so the plaque stands in the empty felt at the left,
+## under his chip rack and above her total: headline, how it went, and what she won.
+const BANNER := Rect2(74.0, 194.0, 228.0, 156.0)
+const BANNER_PAD := 16.0
 const BET_SPOT := Vector2(856.0, 396.0)
 const CHIP_ROW_Y := 610.0
 const CHIP_RADIUS := 32.0
@@ -334,6 +339,11 @@ func stake_chip_rect(index: int) -> Rect2:
 
 func banner_rect() -> Rect2:
 	return BANNER
+
+
+## How wide the banner's headline may be drawn.
+func banner_headline_width() -> float:
+	return BANNER.size.x - BANNER_PAD * 2.0
 
 
 ## Card `index` of `count` on `side` (1 the dealer's, 0 hers), unturned: the box round where
@@ -825,17 +835,25 @@ func _paint_banner(ci: Control, title_font: Font, numeral_font: Font, t: float) 
 		Color(0.0, 0.0, 0.0, 0.35 * _banner), Color(0, 0, 0, 0), 0.0)
 	PaintScript.rounded(ci, rect, 26.0, Color(PaintScript.PLUM_DARK, 0.95 * _banner),
 		Color(edge, _banner), 4.0)
-	var inner: Rect2 = rect.grow_individual(-24.0, -10.0, -24.0, -10.0)
-	var right_w: float = 150.0 if _won > 0 else 0.0
-	PaintScript.label(ci, title_font, Rect2(inner.position, Vector2(inner.size.x - right_w,
-		inner.size.y * 0.62)), headline(), 50, Color(edge.lightened(0.2), _banner))
-	PaintScript.label(ci, numeral_font, Rect2(inner.position + Vector2(0.0,
-		inner.size.y * 0.62), Vector2(inner.size.x - right_w, inner.size.y * 0.38)), detail(),
-		22, Color(1.0, 1.0, 1.0, 0.8 * _banner))
+	var inner: Rect2 = rect.grow(-BANNER_PAD * grow)
+	# Stacked: the headline, how it went, and the prize at the foot when there is one; with no
+	# prize the two lines sit in the middle of the plaque.
+	var prize_h: float = 46.0 * grow if _won > 0 else 0.0
+	var words_h: float = inner.size.y - prize_h - (8.0 if _won > 0 else 0.0)
+	# A split's two verdicts ("Hand 1: ... · Hand 2: ...") one under the other.
+	var lines: PackedStringArray = detail().split(" · ", false)
+	var head_h: float = words_h * (0.6 if lines.size() <= 1 else 0.44)
+	var head := Rect2(inner.position, Vector2(inner.size.x, head_h))
+	PaintScript.label(ci, title_font, head, headline(), 40, Color(edge.lightened(0.2), _banner))
+	for i in lines.size():
+		var row_h: float = (words_h - head_h) / float(lines.size())
+		PaintScript.label(ci, numeral_font, Rect2(inner.position + Vector2(0.0,
+			head_h + row_h * float(i)), Vector2(inner.size.x, row_h)), lines[i], 18,
+			Color(1.0, 1.0, 1.0, 0.8 * _banner))
 	if _won > 0:
 		var pop: float = 1.0 + (0.05 * sin(t * 10.0) if good else 0.0)
-		var prize := Rect2(inner.end.x - right_w + 10.0, inner.position.y + 10.0,
-			right_w - 10.0, inner.size.y - 20.0)
+		var prize := Rect2(inner.position.x + inner.size.x * 0.18, inner.end.y - prize_h,
+			inner.size.x * 0.64, prize_h)
 		prize = Rect2(prize.get_center() - prize.size * pop * 0.5, prize.size * pop)
 		PaintScript.rounded(ci, prize, 20.0, Color(PaintScript.GOLD, _banner),
 			PaintScript.GOLD_DIM, 2.0)

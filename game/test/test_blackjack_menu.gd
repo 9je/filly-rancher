@@ -158,17 +158,27 @@ func test_the_deal_animates_card_by_card_and_refuses_actions_meanwhile() -> void
 	assert_eq(_menu.shown_player_cards().size(), 2)
 
 
+## FABLE AAA ROUND 6: "the Dealer busts banner covers the dealer's cards". It covers none of
+## his cards nor hers, however many either holds.
+func test_the_banner_covers_no_card() -> void:
+	var box: Rect2 = _menu.banner_rect()
+	for side: int in [0, 1]:
+		for count: int in range(1, 7):
+			for i: int in count:
+				assert_false(box.intersects(_menu.card_rect(side, i, count)),
+					"card %d of %d on side %d is clear of the banner" % [i, count, side])
+
+
 ## The banner's words stay inside its plate at every text size.
 func test_the_banner_text_fits_its_box_at_every_text_size() -> void:
 	var font: Font = MenuStyleScript.title_font()
-	var box: Rect2 = _menu.banner_rect()
 	for scale: float in [1.0, 1.25, 1.5]:
 		MenuStyleScript.text_scale = scale
 		for ending: int in range(1, RoundScript.Ending.TIE + 1):
 			var words: String = RoundScript.headline(ending)
-			var px: int = PaintScript.fit_size(font, words, 50, box.size.x - 48.0 - 150.0)
+			var px: int = PaintScript.fit_size(font, words, 40, _menu.banner_headline_width())
 			assert_lte(font.get_string_size(words, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x,
-				box.size.x - 48.0 - 150.0, "%s at %.2f" % [words, scale])
+				_menu.banner_headline_width(), "%s at %.2f" % [words, scale])
 	MenuStyleScript.text_scale = 1.0
 
 
@@ -253,10 +263,9 @@ func test_the_split_banner_says_both_hands_and_fits() -> void:
 	assert_string_contains(_menu.detail(), "Hand 1")
 	assert_string_contains(_menu.detail(), "Hand 2")
 	var font: Font = MenuStyleScript.title_font()
-	var box: Rect2 = _menu.banner_rect()
 	for line: String in [_menu.headline()]:
-		var px: int = PaintScript.fit_size(font, line, 50, box.size.x - 48.0 - 150.0)
-		assert_lte(font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x, box.size.x - 48.0 - 150.0)
+		var px: int = PaintScript.fit_size(font, line, 40, _menu.banner_headline_width())
+		assert_lte(font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x, _menu.banner_headline_width())
 
 
 
