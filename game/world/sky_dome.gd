@@ -66,7 +66,9 @@ func _tick(delta: float, snap: bool) -> void:
 	var lit := clampf(energy * 0.85 + 0.2, 0.3, 1.1)
 	_mat.set_shader_parameter(&"horizon", horizon)
 	_mat.set_shader_parameter(&"light", Color(lc.r * lit, lc.g * lit, lc.b * lit))
-	_mat.set_shader_parameter(&"haze", clampf(0.22 + fog * 60.0, 0.22, 0.88))
+	# Half the old floor by day (Fable round 7: "far hills fade to pale mint"); fog still
+	# thickens it toward night and weather.
+	_mat.set_shader_parameter(&"haze", clampf(0.11 + fog * 60.0, 0.11, 0.88))
 	_mat.set_shader_parameter(&"cloud_tint", Color.WHITE.lerp(lc, 0.45) * clampf(energy + 0.25, 0.35, 1.0))
 	_mat.set_shader_parameter(&"cloud_alpha", clampf(1.2 - fog * 40.0, 0.5, 1.0))
 	var want := 0.0

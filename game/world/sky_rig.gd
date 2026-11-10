@@ -91,7 +91,8 @@ const PHASE_LIGHT_COLORS: Array[Color] = [
 const PHASE_LIGHT_ENERGY: Array[float] = [0.85, 1.15, 0.85, 0.38]
 const PHASE_SKY_TOP: Array[Color] = [
 	Color(0.50, 0.62, 0.88),
-	Color(0.31, 0.51, 0.76),
+	# A saturated show blue (Fable round 7: "the sky is a grey-blue flat gradient").
+	Color(0.24, 0.52, 0.90),
 	# A cool violet zenith over a warm horizon (Fable AAA round 3, #1: "the sky is one flat
 	# mauve with no horizon band").
 	Color(0.36, 0.32, 0.60),
@@ -160,7 +161,7 @@ const WEATHER_AMBIENT_MIX: Array[float] = [0.0, 0.4, 0.4, 0.4]
 ## keeps its own hour at the horizon, and CLEAR stays the cleanest sky there is.
 const HORIZON_TINT: Array[Color] = [
 	Color(0.96, 0.80, 0.66),
-	Color(0.78, 0.87, 0.95),
+	Color(0.68, 0.85, 1.0),
 	Color(1.0, 0.72, 0.42),
 	Color(0.10, 0.12, 0.22),
 ]

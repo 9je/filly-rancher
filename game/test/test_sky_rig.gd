@@ -142,7 +142,7 @@ func test_the_agreed_palette_is_the_one_that_shipped() -> void:
 	assert_eq(SkyRigScript.light_color(DUSK, CLEAR), Color(1.0, 0.82, 0.70))
 	assert_eq(SkyRigScript.light_color(NIGHT, CLEAR), Color(0.64, 0.69, 0.88))
 	assert_almost_eq(SkyRigScript.light_energy(NIGHT, CLEAR), 0.38, 0.0001)
-	assert_eq(SkyRigScript.sky_top(DAY, CLEAR), Color(0.31, 0.51, 0.76))
+	assert_eq(SkyRigScript.sky_top(DAY, CLEAR), Color(0.24, 0.52, 0.90))
 	assert_eq(SkyRigScript.sky_top(DAWN, CLEAR), Color(0.50, 0.62, 0.88))
 	assert_eq(SkyRigScript.sky_top(DUSK, CLEAR), Color(0.36, 0.32, 0.60))
 	assert_eq(SkyRigScript.sky_top(NIGHT, CLEAR), Color(0.06, 0.08, 0.18))
