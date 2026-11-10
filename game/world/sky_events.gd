@@ -192,14 +192,9 @@ func derpy_crash() -> void:
 			"call": func() -> void:
 				_play(derpy, &"shake")
 				_say(derpy, 2.2)},
-		# A cut, not a move: dollied from the close-up the lens swept through the player's back
-		# (Fable round 4, derpy_5).
-		# From the landing camera's own clear spot (round 5 check: a fresh spot behind the
-		# player put a cottage wall and the sky's glare in the frame), tilted up after her.
-		# From where the close-up already stood clear, tilted up after her (round 6: a fresh
-		# spot landed the lens in a Palace awning).
-		{"from": "here", "to": close + Vector3.UP * 0.6,
-			"look": land + Vector3.UP * 4.0, "time": 1.6, "fov": 55.0,
+		# A held frame, the close-up's own, as she flies up out of it: any tilt up found an
+		# awning wherever she happened to land (rounds 6 and 7, derpy_5).
+		{"from": "here", "look": face, "time": 1.4, "fov": 38.0,
 			"call": func() -> void: _fly_off(derpy, land, fwd)},
 	]
 	await Cinematic.shared(get_tree()).play(shots, {"freeze": [player], "host": _ranch()})
