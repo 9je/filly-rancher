@@ -580,9 +580,14 @@ const CARD_RANK_LETTERS: Array[String] = ["A", "2", "3", "4", "5", "6", "7", "8"
 	"10", "J", "Q", "K"]
 
 
+## `xform` places the card's own frame on the canvas, so a dealt card can lie turned on the
+## felt (Fable AAA round 5: "cards dealt in an arc"); `rect` is then in that frame.
 static func draw_card(ci: CanvasItem, rect: Rect2, font: Font, card: int,
-		face_up: bool) -> void:
+		face_up: bool, xform: Transform2D = Transform2D.IDENTITY) -> void:
+	ci.draw_set_transform_matrix(xform)
 	if not face_up or card < 0 or card >= 52:
+		rounded(ci, Rect2(rect.position + Vector2(1.5, 3.5), rect.size), 9.0,
+			Color(0.0, 0.0, 0.0, 0.26), Color(0.0, 0.0, 0.0, 0.0), 0.0)
 		rounded(ci, rect, 8.0, PLUM, GOLD, 2.0)
 		# THE HATCH STAYS ON THE CARD (2026-11-05 render: it ran off both sides onto the felt).
 		# Each 45 degree line is cut to the inset back's own left and right edges.
@@ -597,6 +602,7 @@ static func draw_card(ci: CanvasItem, rect: Rect2, font: Font, card: int,
 				ci.draw_line(Vector2(x + h * t0, back.end.y - h * t0),
 					Vector2(x + h * t1, back.end.y - h * t1), Color(GOLD_DIM, 0.55), 1.5, true)
 			x += step
+		ci.draw_set_transform_matrix(Transform2D.IDENTITY)
 		return
 	var rank: int = card % 13
 	var suit: int = card / 13
@@ -641,13 +647,61 @@ static func draw_card(ci: CanvasItem, rect: Rect2, font: Font, card: int,
 	var inset: float = maxf(8.0, rect.size.x * 0.1)
 	for flip: bool in [false, true]:
 		if flip:
-			ci.draw_set_transform(rect.end, PI, Vector2.ONE)
+			ci.draw_set_transform_matrix(xform * Transform2D(PI, rect.end))
 		else:
-			ci.draw_set_transform(rect.position, 0.0, Vector2.ONE)
+			ci.draw_set_transform_matrix(xform * Transform2D(0.0, rect.position))
 		text(ci, font, Vector2(inset - 1.0, inset + 16.0), letter, 19, colour,
 			HORIZONTAL_ALIGNMENT_LEFT, -1.0)
 		draw_suit(ci, Rect2(Vector2(inset - 1.0, inset + 19.0), Vector2(13.0, 13.0)), suit)
-	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	ci.draw_set_transform_matrix(Transform2D.IDENTITY)
+
+
+## A FACE ON A DISC (Fable AAA round 5: the tables want "a dealer pony portrait/bust", the
+## counter_face.gd pattern drawn rather than built): her baked portrait clipped to a disc of
+## `backdrop`, framed a little closer than the bake as CounterFace frames it, in a gold ring
+## with a soft drop under it.
+static func portrait_disc(ci: CanvasItem, centre: Vector2, radius: float, tex: Texture2D,
+		backdrop: Color) -> void:
+	ci.draw_circle(centre + Vector2(0.0, 5.0), radius + 5.0, Color(0.0, 0.0, 0.0, 0.32))
+	ci.draw_circle(centre, radius + 5.0, GOLD_DIM)
+	ci.draw_circle(centre, radius, backdrop)
+	if tex != null:
+		var points := PackedVector2Array()
+		var uvs := PackedVector2Array()
+		for i: int in 56:
+			var a: float = TAU * float(i) / 56.0
+			var p: Vector2 = centre + Vector2(cos(a), sin(a)) * radius
+			points.append(p)
+			var local: Vector2 = (p - (centre - Vector2(radius, radius))) / (radius * 2.0)
+			uvs.append(Vector2((local.x + 0.14) / 1.2, (local.y + 0.04) / 1.2))
+		ci.draw_polygon(points, PackedColorArray([Color.WHITE]), uvs, tex)
+	ci.draw_arc(centre, radius + 2.0, 0.0, TAU, 64, GOLD, 4.0, true)
+	ci.draw_arc(centre, radius + 5.0, PI * 1.1, PI * 1.6, 24, Color(1.0, 1.0, 0.9, 0.5), 2.0, true)
+
+
+## A BOW TIE, the house's uniform, `width` across: two plum wings and a gold knot.
+static func bow_tie(ci: CanvasItem, centre: Vector2, width: float, colour: Color) -> void:
+	var w: float = width * 0.5
+	var h: float = width * 0.32
+	for side: float in [-1.0, 1.0]:
+		var wing := PackedVector2Array([centre, centre + Vector2(side * w, -h),
+			centre + Vector2(side * w * 1.06, 0.0), centre + Vector2(side * w, h)])
+		ci.draw_colored_polygon(wing, colour)
+		ci.draw_polyline(PackedVector2Array([wing[0], wing[1], wing[2], wing[3], wing[0]]),
+			GOLD_DIM, 1.5, true)
+	ci.draw_circle(centre, h * 0.55, GOLD)
+
+
+## A LIT BULB, the show's own light: a warm halo when lit, the glass, a white glint. `lit` in
+## 0..1 dims it toward an unlit amber.
+static func bulb(ci: CanvasItem, at: Vector2, radius: float, lit: float) -> void:
+	if lit > 0.05:
+		ci.draw_circle(at, radius * 2.4, Color(1.0, 0.85, 0.45, 0.16 * lit))
+		ci.draw_circle(at, radius * 1.6, Color(1.0, 0.9, 0.6, 0.28 * lit))
+	ci.draw_circle(at, radius + 1.5, Color(0.25, 0.12, 0.08, 0.8))
+	ci.draw_circle(at, radius, Color(0.55, 0.38, 0.22).lerp(Color(1.0, 0.97, 0.78), lit))
+	ci.draw_circle(at + Vector2(-radius * 0.3, -radius * 0.35), radius * 0.32,
+		Color(1.0, 1.0, 1.0, 0.35 + 0.5 * lit))
 
 
 ## How many screen pixels one unit of `ci`'s canvas covers, so a rasterised picture can be

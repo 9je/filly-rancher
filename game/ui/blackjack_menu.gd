@@ -26,19 +26,41 @@ const RoundScript := preload("res://systems/blackjack_round.gd")
 const TITLE := "Blackjack"
 
 # --- the felt, in stage local pixels ---------------------------------------------------------
-const STAGE_HEIGHT := 560.0
-const CARD_SIZE := Vector2(96.0, 134.0)
-const CARD_PITCH := 110.0
-const CARDS_LEFT := 290.0
-const CARDS_RIGHT := 960.0
-const DEALER_ROW_Y := 22.0
-const PLAYER_ROW_Y := 304.0
-const DEALER_BADGE := Rect2(40.0, 30.0, 190.0, 46.0)
-const PLAYER_BADGE := Rect2(40.0, 312.0, 190.0, 46.0)
-const SHOE := Rect2(990.0, 18.0, 104.0, 140.0)
-const BANNER := Rect2(250.0, 168.0, 620.0, 122.0)
-const BET_SPOT := Vector2(135.0, 470.0)
-const CHIP_ROW_Y := 506.0
+## A TABLE, SEEN FROM HER STOOL (Fable AAA round 5: "blackjack reads as a flat web panel";
+## slots proved the kit can be a thing). A half-moon of felt in perspective, its straight edge
+## (the dealer's) far and a touch narrower than the curve at her end, inside a padded leather
+## rail on a wooden lip; the dealer's bust over the far edge with his chip rack and the shoe
+## either side of him; his cards in a shallow arc under him and hers fanned in an arc at her
+## end; the bet a stack of chips in its printed circle. The buttons stand in front of the
+## rail, off the felt, as the slot machine's do under its cabinet.
+const STAGE_HEIGHT := 664.0
+const CARD_SIZE := Vector2(90.0, 126.0)
+const CARD_PITCH := 96.0
+const CARDS_LEFT := 300.0
+const CARDS_RIGHT := 820.0
+## The felt: the dealer's straight edge at TABLE_TOP, the curve of an ellipse round TABLE_CENTRE.
+const TABLE_CENTRE := Vector2(560.0, 148.0)
+const TABLE_RX := 540.0
+const TABLE_RY := 366.0
+## How much narrower the far edge is than the near curve: the perspective.
+const TABLE_FAR := 0.86
+const RAIL := 30.0
+const BUST_CENTRE := Vector2(560.0, 68.0)
+const BUST_RADIUS := 62.0
+## The dealer's arc and hers: card centres on circles round these, CARD_FAN radians apart.
+const DEALER_ARC_CENTRE := Vector2(560.0, -516.0)
+const DEALER_ARC_RADIUS := 760.0
+const PLAYER_ARC_CENTRE := Vector2(560.0, 874.0)
+const PLAYER_ARC_RADIUS := 470.0
+const DEALER_ROW_Y := 136.0
+const PLAYER_ROW_Y := 336.0
+const DEALER_BADGE := Rect2(632.0, 50.0, 96.0, 46.0)
+const PLAYER_BADGE := Rect2(212.0, 340.0, 96.0, 46.0)
+const RACK := Rect2(286.0, 138.0, 210.0, 46.0)
+const SHOE := Rect2(838.0, 142.0, 88.0, 118.0)
+const BANNER := Rect2(250.0, 234.0, 620.0, 122.0)
+const BET_SPOT := Vector2(856.0, 396.0)
+const CHIP_ROW_Y := 610.0
 const CHIP_RADIUS := 32.0
 const CHIP_PITCH := 74.0
 const CHIPS_LEFT := 296.0
@@ -48,16 +70,19 @@ const CHIPS_LEFT := 296.0
 ## the table allows. The bet stays out after a round, so "again" is one press of Deal.
 const CHIPS: Array[int] = [10, 50, 100, 500]
 const TABLE_MAX := 1000
-const CLEAR := Rect2(604.0, 462.0, 90.0, 40.0)
-const MAX := Rect2(604.0, 508.0, 90.0, 40.0)
-const DEAL := Rect2(704.0, 462.0, 210.0, 86.0)
-const HIT := Rect2(300.0, 462.0, 190.0, 86.0)
-const STAND := Rect2(502.0, 462.0, 190.0, 86.0)
-const DOUBLE := Rect2(704.0, 462.0, 190.0, 86.0)
+const CLEAR := Rect2(604.0, 566.0, 90.0, 40.0)
+const MAX := Rect2(604.0, 612.0, 90.0, 40.0)
+const DEAL := Rect2(704.0, 566.0, 210.0, 86.0)
+const HIT := Rect2(150.0, 566.0, 190.0, 86.0)
+const STAND := Rect2(352.0, 566.0, 190.0, 86.0)
+const DOUBLE := Rect2(578.0, 566.0, 190.0, 86.0)
 ## Split (PS5 item 48): a pair on her first two cards becomes two hands.
-const SPLIT := Rect2(906.0, 462.0, 190.0, 86.0)
-const COUNTER := Rect2(930.0, 476.0, 160.0, 58.0)
-const RULES := Rect2(40.0, 20.0, 1040.0, 520.0)
+const SPLIT := Rect2(780.0, 566.0, 190.0, 86.0)
+const COUNTER := Rect2(930.0, 580.0, 160.0, 58.0)
+const RULES := Rect2(40.0, 20.0, 1040.0, 624.0)
+## Where the felt is printed with its line: the arc's centre and radius.
+const PRINT_CENTRE := Vector2(560.0, -516.0)
+const PRINT_RADIUS := 846.0
 
 # --- the pacing, every one a CONSTANT: presentation only, never a card -------------------------
 const CARD_SECONDS := 0.32
@@ -311,12 +336,29 @@ func banner_rect() -> Rect2:
 	return BANNER
 
 
+## Card `index` of `count` on `side` (1 the dealer's, 0 hers), unturned: the box round where
+## card_xform() lays it.
 func card_rect(side: int, index: int, count: int) -> Rect2:
+	var xf: Transform2D = card_xform(side, index, count)
+	return Rect2(xf.origin - CARD_SIZE * 0.5, CARD_SIZE)
+
+
+## DEALT IN AN ARC (Fable AAA round 5): each card's centre on a circle and the card turned to
+## it, his row a shallow smile under him, hers a fan opening toward her. The pitch tightens as
+## a hand grows so the fan never leaves its half of the felt.
+func card_xform(side: int, index: int, count: int) -> Transform2D:
+	var centre: Vector2 = DEALER_ARC_CENTRE if side == 1 else PLAYER_ARC_CENTRE
+	var radius: float = DEALER_ARC_RADIUS if side == 1 else PLAYER_ARC_RADIUS
 	var pitch: float = CARD_PITCH
 	if count > 1:
 		pitch = minf(CARD_PITCH, (CARDS_RIGHT - CARDS_LEFT - CARD_SIZE.x) / float(count - 1))
-	var y: float = DEALER_ROW_Y if side == 1 else PLAYER_ROW_Y
-	return Rect2(Vector2(CARDS_LEFT + pitch * float(index), y), CARD_SIZE)
+	var step: float = pitch / radius
+	var a: float = (float(index) - float(count - 1) * 0.5) * step
+	# Down from the dealer's centre, up from hers.
+	var dir := Vector2(sin(a), cos(a)) if side == 1 else Vector2(sin(a), -cos(a))
+	var at: Vector2 = centre + dir * radius
+	var turn: float = -a if side == 1 else a
+	return Transform2D(turn, at)
 
 
 func stage_buttons() -> Array[Dictionary]:
@@ -481,26 +523,132 @@ func drawn_lines() -> Array[String]:
 
 # --- the paint ----------------------------------------------------------------------------------
 
-## A TABLE, NOT A GREEN RECTANGLE (P8, playtest 2026-11-08 items 58 and 65: "the table is
-## mostly empty felt with text labels"; references Red Dead's tables and Clubhouse Games): a
-## faint diamond nap in the cloth, a darker rim where the light falls off, and the Spectra
-## Palace's crest pressed into the middle of the felt.
-func _paint_felt_dressing(ci: Control) -> void:
-	var nap := Color(0.0, 0.0, 0.0, 0.05)
-	var step := 34.0
-	var x := -STAGE_HEIGHT
-	while x < STAGE_WIDTH:
-		ci.draw_line(Vector2(x, 0.0), Vector2(x + STAGE_HEIGHT, STAGE_HEIGHT), nap, 1.0, true)
-		ci.draw_line(Vector2(x + STAGE_HEIGHT, 0.0), Vector2(x, STAGE_HEIGHT), nap, 1.0, true)
-		x += step
+## THE TABLE'S OUTLINE: the felt's edge from the dealer's right corner round the near curve to
+## his left corner, `grow` pixels out, the far edge narrower than the near curve (TABLE_FAR)
+## so the half-moon lies in perspective.
+func table_points(grow: float) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	var n := 64
+	for i in n + 1:
+		var a: float = PI * float(i) / float(n)
+		var s: float = sin(a)
+		var w: float = lerpf(TABLE_FAR, 1.0, s)
+		out.append(TABLE_CENTRE + Vector2(cos(a) * (TABLE_RX + grow) * w, s * (TABLE_RY + grow)))
+	return out
+
+
+const LEATHER := Color(0.40, 0.12, 0.17)
+const WOOD := Color(0.42, 0.24, 0.13)
+const WOOD_DARK := Color(0.26, 0.14, 0.08)
+
+
+## THE TABLE AS A THING (Fable AAA round 5): a shadow on the floor, a wooden lip, the padded
+## leather rail with its sheen, its shade and a row of stitches, gold piping where it meets
+## the felt, the felt under a warm pool of light, the dealer's wooden rail along the far edge.
+func _paint_table(ci: Control, title_font: Font) -> void:
+	var shadow := table_points(RAIL + 10.0)
+	var lifted := PackedVector2Array()
+	for p: Vector2 in shadow:
+		lifted.append(p + Vector2(0.0, 14.0))
+	ci.draw_colored_polygon(lifted, Color(0.0, 0.0, 0.0, 0.35))
+	ci.draw_colored_polygon(table_points(RAIL + 8.0), WOOD_DARK)
+	ci.draw_colored_polygon(table_points(RAIL + 5.0), WOOD)
+	ci.draw_colored_polygon(table_points(RAIL), LEATHER)
+	# The pad's roll: shade at its inner and outer edges, a sheen along its crown.
+	ci.draw_polyline(table_points(RAIL - 3.0), LEATHER.darkened(0.35), 5.0, true)
+	ci.draw_polyline(table_points(RAIL * 0.58), Color(LEATHER.lightened(0.35), 0.75), 7.0, true)
+	ci.draw_polyline(table_points(RAIL * 0.58 - 4.0), Color(1.0, 0.9, 0.9, 0.18), 2.0, true)
+	ci.draw_polyline(table_points(4.0), LEATHER.darkened(0.45), 6.0, true)
+	var stitches := table_points(RAIL * 0.86)
+	for i: int in range(1, stitches.size() - 1):
+		ci.draw_circle(stitches[i], 1.6, Color(1.0, 0.85, 0.7, 0.45))
+	# The felt, under a warm pool of light toward her end.
+	var felt := table_points(0.0)
+	ci.draw_colored_polygon(felt, PaintScript.FELT)
+	var pool := TABLE_CENTRE + Vector2(0.0, TABLE_RY * 0.52)
 	for k in 6:
-		var inset := 6.0 + float(k) * 7.0
-		PaintScript.rounded(ci, Rect2(inset, inset, STAGE_WIDTH - inset * 2.0,
-			STAGE_HEIGHT - inset * 2.0), 24.0, Color(0, 0, 0, 0), Color(0.0, 0.05, 0.02, 0.07), 7.0)
-	var crest_side := 190.0
+		var f: float = 0.92 - 0.12 * float(k)
+		var ring := PackedVector2Array()
+		for p: Vector2 in felt:
+			ring.append(pool + (p - pool) * f)
+		ci.draw_colored_polygon(ring, Color(0.55, 0.85, 0.55, 0.035))
+	var crest_side := 170.0
 	var crest := IconSet.texture("palace", 256, false)
-	ci.draw_texture_rect(crest, Rect2(Vector2(STAGE_WIDTH * 0.5 - crest_side * 0.5, 150.0),
-		Vector2(crest_side, crest_side)), false, Color(1.0, 1.0, 1.0, 0.12))
+	ci.draw_texture_rect(crest, Rect2(Vector2(TABLE_CENTRE.x - crest_side * 0.5, 274.0),
+		Vector2(crest_side, crest_side)), false, Color(1.0, 1.0, 1.0, 0.08))
+	ci.draw_polyline(table_points(1.0), PaintScript.GOLD_DIM, 3.0, true)
+	# The printing: two gold rules round the house's line, as a real felt is printed. A split's
+	# two hands sit over it, so it gives way to them.
+	if not banner_up() and not _split_round():
+		for r: float in [PRINT_RADIUS - 24.0, PRINT_RADIUS + 20.0]:
+			ci.draw_arc(PRINT_CENTRE, r, PI * 0.5 - 0.3, PI * 0.5 + 0.3, 64,
+				Color(PaintScript.GOLD, 0.35), 2.0, true)
+		PaintScript.arc_text(ci, title_font, PRINT_CENTRE, PRINT_RADIUS, PI * 0.5,
+			"BLACKJACK PAYS 3 TO 2", 22, Color(PaintScript.GOLD, 0.92))
+
+
+## THE DEALER BEHIND IT: his face over the far edge in a gold ring (the hall's own dealer,
+## baked once by scenes/test/casino_portraits.gd), the wooden rail in front of him, his bow
+## tie over it, the chip rack at his right hand and the shoe at his left.
+func _paint_dealer(ci: Control, title_font: Font, numeral_font: Font) -> void:
+	var left: float = TABLE_CENTRE.x - (TABLE_RX + RAIL + 8.0) * TABLE_FAR
+	var right: float = TABLE_CENTRE.x + (TABLE_RX + RAIL + 8.0) * TABLE_FAR
+	var rail := Rect2(left, TABLE_CENTRE.y - 18.0, right - left, 22.0)
+	PaintScript.rounded(ci, Rect2(rail.position + Vector2(0.0, 5.0), rail.size), 10.0,
+		Color(0.0, 0.0, 0.0, 0.3), Color(0, 0, 0, 0), 0.0)
+	PaintScript.rounded(ci, rail, 10.0, WOOD, WOOD_DARK, 2.0)
+	ci.draw_line(rail.position + Vector2(12.0, 5.0), Vector2(rail.end.x - 12.0, rail.position.y + 5.0),
+		Color(1.0, 0.85, 0.6, 0.3), 2.0, true)
+	PaintScript.bow_tie(ci, Vector2(BUST_CENTRE.x, rail.position.y + 2.0), 46.0, Color(0.62, 0.12, 0.2))
+	_paint_rack(ci)
+	# The shoe: a plum box with the next card showing at its mouth.
+	PaintScript.rounded(ci, Rect2(SHOE.position + Vector2(0.0, 6.0), SHOE.size), 10.0,
+		Color(0.0, 0.0, 0.0, 0.3), Color(0, 0, 0, 0), 0.0)
+	PaintScript.rounded(ci, SHOE, 10.0, PaintScript.PLUM_DARK, PaintScript.GOLD_DIM, 2.0)
+	PaintScript.draw_card(ci, Rect2(Vector2(-CARD_SIZE.x * 0.42, -CARD_SIZE.y * 0.42),
+		CARD_SIZE * 0.84), title_font, -1, false,
+		Transform2D(-0.12, SHOE.get_center() + Vector2(-6.0, 4.0)))
+	_paint_total(ci, numeral_font, DEALER_BADGE, dealer_total_text())
+
+
+## The dealer's rack: six channels of chips lying on their edges, a colour to a channel.
+func _paint_rack(ci: Control) -> void:
+	PaintScript.rounded(ci, RACK, 8.0, Color(0.12, 0.06, 0.08), PaintScript.GOLD_DIM, 2.0)
+	var colours: Array[Color] = [PaintScript.CHIP_COLORS[0], PaintScript.CHIP_COLORS[1],
+		PaintScript.CHIP_COLORS[2], PaintScript.GOLD, PaintScript.CHIP_COLORS[1],
+		PaintScript.CHIP_COLORS[0]]
+	var w: float = (RACK.size.x - 14.0) / float(colours.size())
+	for i: int in colours.size():
+		var ch := Rect2(RACK.position + Vector2(7.0 + w * float(i) + 2.0, 6.0),
+			Vector2(w - 4.0, RACK.size.y - 12.0))
+		PaintScript.rounded(ci, ch, 5.0, colours[i].darkened(0.15), Color(0, 0, 0, 0), 0.0)
+		var y: float = ch.position.y + 3.0
+		while y < ch.end.y - 2.0:
+			ci.draw_line(Vector2(ch.position.x + 2.0, y), Vector2(ch.end.x - 2.0, y),
+				Color(colours[i].lightened(0.4), 0.7), 1.0, true)
+			y += 4.0
+
+
+static var _dealer_tex: Texture2D = null
+
+
+## The hall's dealer as baked (assets/ui/portraits/palace_dealer.png), or null on a checkout
+## without it.
+static func _dealer_face() -> Texture2D:
+	if _dealer_tex == null and ResourceLoader.exists(DEALER_PORTRAIT):
+		_dealer_tex = load(DEALER_PORTRAIT) as Texture2D
+	return _dealer_tex
+
+
+const DEALER_PORTRAIT := "res://assets/ui/portraits/palace_dealer.png"
+
+
+## A STACK OF CHIPS, standing: `count` chips bottom up, each showing its edge under the next.
+static func _stack(ci: Control, base: Vector2, count: int, colour: Color, radius: float,
+		step: float) -> void:
+	for k: int in mini(count, 8):
+		PaintScript.chip(ci, base - Vector2(0.0, step * float(k)), radius, colour,
+			k == mini(count, 8) - 1)
 
 
 func paint(ci: Control) -> void:
@@ -511,61 +659,47 @@ func paint(ci: Control) -> void:
 		return
 	var t: float = anim_time()
 
-	# --- the felt ---------------------------------------------------------------------------
-	PaintScript.rounded(ci, Rect2(0.0, 0.0, STAGE_WIDTH, STAGE_HEIGHT), 24.0,
-		PaintScript.FELT, PaintScript.FELT_DARK, 6.0)
-	_paint_felt_dressing(ci)
-	ci.draw_arc(Vector2(STAGE_WIDTH * 0.5, -620.0), 900.0, PI * 0.30, PI * 0.70, 64,
-		PaintScript.FELT_LINE, 2.0, true)
-	# Printed in gold along the arc, as a real table's felt is (Fable AAA round 4: grey on
-	# green, barely legible).
-	if not banner_up():
-		PaintScript.arc_text(ci, title_font, Vector2(STAGE_WIDTH * 0.5, -620.0), 870.0,
-			PI * 0.5, "BLACKJACK PAYS 3 TO 2", 24, Color(PaintScript.GOLD, 0.92))
-
-	# --- the shoe ----------------------------------------------------------------------------
-	PaintScript.rounded(ci, SHOE, 10.0, PaintScript.PLUM_DARK, PaintScript.GOLD_DIM, 2.0)
-	PaintScript.draw_card(ci, Rect2(SHOE.position + Vector2(10.0, 10.0),
-		CARD_SIZE * Vector2(0.88, 0.88)), title_font, -1, false)
-
-	# --- the two badges and their totals ------------------------------------------------------
-	_paint_badge(ci, title_font, numeral_font, DEALER_BADGE, "Dealer", dealer_total_text())
-	# THE DEALER HAS A FACE (P8 item 65; review 2.9: "the dealer is a word"): the table's own
-	# dealer, baked by the PortraitBaker, on a plate at the badge's left.
-	var face: Texture2D = dealer_portrait.call() if dealer_portrait.is_valid() else null
-	if face != null:
-		var plate := Rect2(DEALER_BADGE.position + Vector2(DEALER_BADGE.size.x + 10.0, -14.0),
-			Vector2(74.0, 74.0))
-		PaintScript.rounded(ci, plate, 37.0, Color(0.95, 0.9, 0.82), PaintScript.GOLD_DIM, 2.0)
-		ci.draw_texture_rect(face, plate.grow(-3.0), false)
-	_paint_badge(ci, title_font, numeral_font, PLAYER_BADGE, "You", player_total_text())
+	_paint_dealer_backdrop(ci)
+	_paint_table(ci, title_font)
+	_paint_dealer(ci, title_font, numeral_font)
 
 	# --- the hands ---------------------------------------------------------------------------
 	var dealer: Array[int] = shown_dealer_cards()
+	var local := Rect2(-CARD_SIZE * 0.5, CARD_SIZE)
 	for i: int in dealer.size():
 		var card: int = dealer[i]
-		PaintScript.draw_card(ci, card_rect(1, i, dealer.size()), title_font, card, card >= 0)
+		PaintScript.draw_card(ci, local, title_font, card, card >= 0,
+			card_xform(1, i, dealer.size()))
 	if _split_round():
 		_paint_split_hands(ci, title_font, numeral_font)
 	else:
 		var player: Array[int] = shown_player_cards()
 		for i: int in player.size():
-			PaintScript.draw_card(ci, card_rect(0, i, player.size()), title_font, player[i], true)
+			PaintScript.draw_card(ci, local, title_font, player[i], true,
+				card_xform(0, i, player.size()))
+		if not player.is_empty():
+			# Her total rides beside her fan, at its left end.
+			var first: Vector2 = card_xform(0, 0, player.size()).origin
+			_paint_total(ci, numeral_font, Rect2(first + Vector2(-CARD_SIZE.x * 0.5 - 24.0
+				- PLAYER_BADGE.size.x, -PLAYER_BADGE.size.y * 0.5), PLAYER_BADGE.size),
+				player_total_text())
 
-	# --- her bet on its spot -------------------------------------------------------------------
-	ci.draw_arc(BET_SPOT, 54.0, 0.0, TAU, 64, PaintScript.FELT_LINE, 3.0, true)
+	# --- her bet, a stack in its printed circle ----------------------------------------------
+	ci.draw_arc(BET_SPOT, 52.0, 0.0, TAU, 64, Color(PaintScript.GOLD, 0.55), 3.0, true)
+	ci.draw_arc(BET_SPOT, 44.0, 0.0, TAU, 64, Color(PaintScript.GOLD, 0.25), 1.5, true)
 	var riding: int = 0
 	if not _view.is_empty() and (hand_live() or banner_up()):
 		riding = _riding()
 	elif selected_stake() > 0:
 		riding = selected_stake()
 	if riding > 0:
-		PaintScript.chip_stack(ci, BET_SPOT + Vector2(0.0, 14.0),
-			clampi(riding / 25, 1, 6), PaintScript.CHIP_COLORS[_chip_colour(riding)], 6.0)
-		PaintScript.label(ci, numeral_font, Rect2(BET_SPOT + Vector2(-60.0, 34.0),
-			Vector2(120.0, 34.0)), str(riding), 26, PaintScript.GOLD)
+		_stack(ci, BET_SPOT + Vector2(0.0, 12.0), clampi(riding / 25, 1, 6),
+			PaintScript.CHIP_COLORS[_chip_colour(riding)], 30.0, 6.0)
+		var tag := Rect2(BET_SPOT + Vector2(-46.0, 48.0), Vector2(92.0, 30.0))
+		PaintScript.rounded(ci, tag, 15.0, Color(0.0, 0.0, 0.0, 0.45), Color(PaintScript.GOLD, 0.6), 1.5)
+		PaintScript.label(ci, numeral_font, tag.grow(-3.0), str(riding), 22, PaintScript.GOLD)
 
-	# --- the controls -------------------------------------------------------------------------
+	# --- the controls, in front of the rail -----------------------------------------------------
 	if hand_live():
 		# One gold primary (Hit, the move a hand is made of), the rest the kit's plum.
 		PaintScript.kit_button(ci, HIT, "Hit", true, button_enabled(&"hit"), is_lit(&"hit"))
@@ -580,10 +714,11 @@ func paint(ci: Control) -> void:
 			var box: Rect2 = stake_chip_rect(i)
 			var usable: bool = can_add(CHIPS[i])
 			var centre: Vector2 = box.get_center() - Vector2(0.0, 6.0 if is_lit(StringName("stake:%d" % i)) else 0.0)
-			PaintScript.chip(ci, centre, CHIP_RADIUS, _chip_tint(i) if usable
-				else Color(0.30, 0.28, 0.32), true)
+			# Each denomination a little stack of three, the way they sit in a tray.
+			_stack(ci, centre + Vector2(0.0, 8.0), 3, _chip_tint(i) if usable
+				else Color(0.30, 0.28, 0.32), CHIP_RADIUS, 5.0)
 			PaintScript.label(ci, numeral_font, Rect2(centre - Vector2(CHIP_RADIUS * 0.7,
-				14.0), Vector2(CHIP_RADIUS * 1.4, 28.0)), str(CHIPS[i]), 20,
+				16.0), Vector2(CHIP_RADIUS * 1.4, 28.0)), str(CHIPS[i]), 20,
 				Color.WHITE if i >= 2 or not usable else PaintScript.CARD_INK)
 		PaintScript.kit_button(ci, CLEAR, "Clear", false, button_enabled(&"clear"),
 			is_lit(&"clear"))
@@ -605,20 +740,56 @@ func paint(ci: Control) -> void:
 	paint_focus(ci)
 
 
-func _paint_badge(ci: Control, title_font: Font, numeral_font: Font, rect: Rect2,
-		caption: String, total: String) -> void:
-	PaintScript.rounded(ci, rect, 23.0, Color(0.0, 0.0, 0.0, 0.28),
-		Color(PaintScript.GOLD, 0.35), 2.0)
-	PaintScript.label(ci, title_font, Rect2(rect.position + Vector2(16.0, 4.0),
-		Vector2(rect.size.x - 96.0, rect.size.y - 8.0)), caption, 24,
-		MenuStyleScript.COLOR_NAME, HORIZONTAL_ALIGNMENT_LEFT)
+## The wall behind the dealer: a velvet drape in the hall's plum with gold-lit folds, so he
+## stands somewhere rather than on the panel.
+func _paint_dealer_backdrop(ci: Control) -> void:
+	var left: float = TABLE_CENTRE.x - (TABLE_RX + RAIL) * TABLE_FAR
+	var right: float = TABLE_CENTRE.x + (TABLE_RX + RAIL) * TABLE_FAR
+	var drape := Rect2(left, 0.0, right - left, TABLE_CENTRE.y)
+	ci.draw_rect(drape, Color(0.27, 0.08, 0.26))
+	var folds := 22
+	for i in folds:
+		var x: float = drape.position.x + drape.size.x * (float(i) + 0.5) / float(folds)
+		ci.draw_line(Vector2(x, 0.0), Vector2(x, drape.end.y), Color(0.0, 0.0, 0.0, 0.22), 12.0, true)
+		ci.draw_line(Vector2(x + 13.0, 0.0), Vector2(x + 13.0, drape.end.y),
+			Color(1.0, 0.7, 0.9, 0.09), 7.0, true)
+	# A warm spot on the dealer.
+	for k in 4:
+		ci.draw_circle(BUST_CENTRE, BUST_RADIUS * (2.2 - 0.3 * float(k)), Color(1.0, 0.85, 0.55, 0.05))
+	# The valance: scallops in the drape's colour along the top, gold-trimmed, tassels between.
+	var swags := 9
+	var w: float = drape.size.x / float(swags)
+	for i in swags:
+		var x0: float = drape.position.x + w * float(i)
+		var pts := PackedVector2Array([Vector2(x0, 0.0)])
+		for k in 13:
+			var u: float = float(k) / 12.0
+			pts.append(Vector2(x0 + w * u, 10.0 + sin(u * PI) * 16.0))
+		pts.append(Vector2(x0 + w, 0.0))
+		ci.draw_colored_polygon(pts, Color(0.36, 0.12, 0.34))
+		var trim := pts.slice(1, pts.size() - 1)
+		ci.draw_polyline(trim, PaintScript.GOLD_DIM, 3.0, true)
+		if i > 0:
+			ci.draw_line(Vector2(x0, 8.0), Vector2(x0, 26.0), PaintScript.GOLD_DIM, 2.0, true)
+			ci.draw_circle(Vector2(x0, 28.0), 4.0, PaintScript.GOLD)
+	# The bake in the assets first (framed for this bust); the ranch's live bake of the same
+	# seeded dealer only on a checkout without it.
+	var face: Texture2D = _dealer_face()
+	if face == null and dealer_portrait.is_valid():
+		face = dealer_portrait.call()
+	PaintScript.portrait_disc(ci, BUST_CENTRE, BUST_RADIUS, face, Color(0.86, 0.80, 0.92))
+
+
+## A HAND'S TOTAL, a gold pill with no word on it (a red Bust when over), beside its owner.
+func _paint_total(ci: Control, numeral_font: Font, rect: Rect2, total: String) -> void:
 	if total.is_empty():
 		return
-	var pill := Rect2(rect.end.x - 80.0, rect.position.y + 5.0, 74.0, rect.size.y - 10.0)
 	var bust: bool = total == "Bust"
-	PaintScript.rounded(ci, pill, 18.0, Color(0.86, 0.30, 0.32) if bust else PaintScript.GOLD,
-		PaintScript.GOLD_DIM, 2.0)
-	PaintScript.label(ci, numeral_font, pill.grow(-6.0), total, 24,
+	PaintScript.rounded(ci, Rect2(rect.position + Vector2(0.0, 4.0), rect.size), 23.0,
+		Color(0.0, 0.0, 0.0, 0.35), Color(0, 0, 0, 0), 0.0)
+	PaintScript.rounded(ci, rect, 23.0, Color(0.86, 0.30, 0.32) if bust else PaintScript.GOLD,
+		PaintScript.GOLD_DIM, 3.0)
+	PaintScript.label(ci, numeral_font, rect.grow(-6.0), total, 28,
 		Color.WHITE if bust else PaintScript.CARD_INK)
 
 
@@ -636,8 +807,8 @@ func _paint_split_hands(ci: Control, title_font: Font, numeral_font: Font) -> vo
 			PaintScript.draw_card(ci, Rect2(Vector2(left + pitch * float(i), PLAYER_ROW_Y), CARD_SIZE),
 				title_font, int(cards[i]), true)
 		var total: int = BlackjackScript.hand_total(cards as Array[int]) if cards.size() > 0 else 0
-		PaintScript.label(ci, numeral_font, Rect2(left, PLAYER_ROW_Y - 30.0, half, 28.0),
-			("Bust" if total > 21 else str(total)), 22, PaintScript.GOLD, HORIZONTAL_ALIGNMENT_LEFT)
+		_paint_total(ci, numeral_font, Rect2(left, PLAYER_ROW_Y - 46.0, 76.0, 38.0),
+			("Bust" if total > 21 else str(total)))
 		if hand_live() and h == active_hand():
 			PaintScript.rounded(ci, Rect2(left, PLAYER_ROW_Y + CARD_SIZE.y + 8.0, half, 6.0), 3.0,
 				PaintScript.GOLD, Color(0, 0, 0, 0), 0.0)
