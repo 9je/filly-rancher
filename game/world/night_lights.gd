@@ -8,8 +8,8 @@ extends Node3D
 
 const WorldStateScript := preload("res://systems/world_state.gd")
 const LAMP_COLOR := Color(1.0, 0.78, 0.5)
-const LAMP_ENERGY := 1.5
-const LAMP_RANGE := 6.5
+const LAMP_ENERGY := 2.8
+const LAMP_RANGE := 8.5
 const BULB_EMISSION := 5.0
 const FADE_SECONDS := 4.0
 ## How often the phase is looked at; a phase lasts minutes.
