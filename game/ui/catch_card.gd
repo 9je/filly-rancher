@@ -685,8 +685,13 @@ func _draw_stars() -> void:
 			r *= 1.0 + 0.75 * sin(k * PI) * (1.0 - k * 0.5)
 			_stars.draw_arc(c, 12.0 + 22.0 * k, 0.0, TAU, 24, Color(STAR_ON, 0.9 * (1.0 - k)),
 				3.0 * (1.0 - k) + 0.5, true)
-		CatchIconScript.star(_stars, c, r, STAR_ON if on else STAR_OFF,
-			Color(0.62, 0.42, 0.05) if on else Color(0.70, 0.64, 0.72))
+		# ONLY HER STARS ARE STARS (Fable AAA round 5: the same Common pony read as one star
+		# on the big card and four on the small one, the three grey outlines counting as stars
+		# at the corner card's size). A slot she has not earned is a small dot, never a star.
+		if on:
+			CatchIconScript.star(_stars, c, r, STAR_ON, Color(0.62, 0.42, 0.05))
+		else:
+			_stars.draw_circle(c, 3.5, Color(STAR_OFF, 0.9))
 
 
 ## How far star `i` is through its pop: below 0.0 not yet, 0.0 to 1.0 popping, 1.0 settled.
