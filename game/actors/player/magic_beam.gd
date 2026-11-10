@@ -566,8 +566,8 @@ const BOW_LIFT_FRACTION := 0.18
 ## Half-width of the ribbon at the horn and at the far end, in metres. Narrow where it
 ## leaves her and flared where it lands, so it reads as something being projected rather
 ## than as a rod -- and so the far end is still legible at REACH.
-const BEAM_WIDTH_NEAR := 0.06
-const BEAM_WIDTH_FAR := 0.30
+const BEAM_WIDTH_NEAR := 0.11
+const BEAM_WIDTH_FAR := 0.6
 
 ## Radius of the glow at the far end, in metres: a bright bead while the beam is sweeping
 ## for something, and a wider, fainter aura wrapping whatever it has hold of.
