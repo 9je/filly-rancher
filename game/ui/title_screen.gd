@@ -114,6 +114,12 @@ func _ready() -> void:
 ## picture the drawn backdrop stays.
 var _art: TextureRect
 var _art_t := 0.0
+## The evening's first stars: (x, y) as fractions of the screen, z the radius. Fixed, not
+## rolled (nothing under game/ui/ draws a random number); kept to the right of the name.
+const FIRST_STARS: Array[Vector3] = [Vector3(0.56, 0.05, 1.6), Vector3(0.63, 0.12, 1.2),
+	Vector3(0.71, 0.04, 2.0), Vector3(0.78, 0.15, 1.3), Vector3(0.86, 0.07, 1.7),
+	Vector3(0.93, 0.13, 1.1), Vector3(0.67, 0.21, 1.0), Vector3(0.97, 0.03, 1.4),
+	Vector3(0.52, 0.17, 1.0), Vector3(0.82, 0.24, 0.9)]
 
 
 func _dress_with_key_art() -> void:
@@ -147,6 +153,63 @@ func _dress_with_key_art() -> void:
 	shade.anchor_right = 0.62
 	add_child(shade)
 	move_child(shade, 2)
+	# THE SKY GOES TO EVENING OVER THE NAME (Fable AAA round 5: "a maroon cloud blob top-left
+	# and a pink fog that kills the logo contrast"). A fall of deep dusk plum from the top of
+	# the frame, gone by two fifths of the way down, so the cloud and the haze behind the name
+	# sink into an evening sky while the valley below keeps its warm low sun; and a soft plum
+	# pool behind the name itself, so the cream letters stand on dark, never on haze.
+	var dusk := Gradient.new()
+	dusk.offsets = PackedFloat32Array([0.0, 0.22, 0.42])
+	dusk.colors = PackedColorArray([Color(0.13, 0.05, 0.20, 0.92), Color(0.16, 0.06, 0.22, 0.62),
+		Color(0.16, 0.06, 0.22, 0.0)])
+	var dusk_tex := GradientTexture2D.new()
+	dusk_tex.gradient = dusk
+	dusk_tex.fill_from = Vector2(0.5, 0.0)
+	dusk_tex.fill_to = Vector2(0.5, 1.0)
+	var sky := TextureRect.new()
+	sky.name = "Dusk"
+	sky.texture = dusk_tex
+	sky.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	sky.stretch_mode = TextureRect.STRETCH_SCALE
+	sky.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	sky.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(sky)
+	move_child(sky, 3)
+	var pool := Gradient.new()
+	pool.offsets = PackedFloat32Array([0.0, 0.55, 1.0])
+	pool.colors = PackedColorArray([Color(0.10, 0.04, 0.16, 0.7), Color(0.10, 0.04, 0.16, 0.38),
+		Color(0.10, 0.04, 0.16, 0.0)])
+	var pool_tex := GradientTexture2D.new()
+	pool_tex.gradient = pool
+	pool_tex.fill = GradientTexture2D.FILL_RADIAL
+	pool_tex.fill_from = Vector2(0.5, 0.5)
+	pool_tex.fill_to = Vector2(1.0, 0.5)
+	var glow := TextureRect.new()
+	glow.name = "NamePool"
+	glow.texture = pool_tex
+	glow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	glow.stretch_mode = TextureRect.STRETCH_SCALE
+	glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	glow.anchor_left = -0.06
+	glow.anchor_right = 0.52
+	glow.anchor_top = -0.08
+	glow.anchor_bottom = 0.6
+	add_child(glow)
+	move_child(glow, 4)
+	# A few first stars in the evening band, still and faint, so the dark reads as sky.
+	var stars := Control.new()
+	stars.name = "FirstStars"
+	stars.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stars.set_anchors_preset(Control.PRESET_FULL_RECT)
+	stars.draw.connect(func() -> void:
+		var s := stars.size
+		for p: Vector3 in FIRST_STARS:
+			var at := Vector2(p.x * s.x, p.y * s.y)
+			stars.draw_circle(at, p.z * 2.4, Color(1.0, 0.95, 0.85, 0.14))
+			stars.draw_circle(at, p.z, Color(1.0, 0.97, 0.9, 0.85)))
+	stars.resized.connect(stars.queue_redraw)
+	add_child(stars)
+	move_child(stars, 5)
 	var backdrop := get_node_or_null(^"Backdrop") as Control
 	if backdrop != null:
 		backdrop.visible = false
