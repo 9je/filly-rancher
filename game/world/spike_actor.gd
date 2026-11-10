@@ -189,6 +189,7 @@ func _clear() -> StandardMaterial3D:
 
 
 func _process(delta: float) -> void:
+	_fin_scale()
 	_t += delta
 	if _body == null:
 		return
@@ -213,6 +214,29 @@ func _process(delta: float) -> void:
 
 ## A letter: a burp of green dragonfire and a little hop, the way he sends Twilight's mail.
 ## Asked for a tip (PT8): a wave, the same one he gives her on arrival.
+## HIS EAR FINS AT THE SHOW'S SIZE (Fable round 8, #3: "flat head with no ear fins"): the
+## model's fins are little tabs; the show draws them broad. Written after the clip each frame,
+## the ear bones scaled about their roots.
+const EAR_FIN_SCALE := 1.8
+var _ear_bones: Array[int] = []
+var _skeleton: Skeleton3D
+
+
+func _fin_scale() -> void:
+	if _skeleton == null:
+		if _body == null:
+			return
+		_skeleton = _body.find_child("Skeleton3D", true, false) as Skeleton3D
+		if _skeleton == null:
+			return
+		for n in ["LeftEar", "RightEar"]:
+			var b := _skeleton.find_bone(n)
+			if b >= 0:
+				_ear_bones.append(b)
+	for b in _ear_bones:
+		_skeleton.set_bone_pose_scale(b, Vector3.ONE * EAR_FIN_SCALE)
+
+
 func asked() -> void:
 	_play(&"wave")
 
