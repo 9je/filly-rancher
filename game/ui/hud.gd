@@ -155,18 +155,29 @@ const COLOR_WORLD_LINE := Color(0.82, 0.88, 1.0, 0.92)
 ## something you can do.
 const COLOR_PROMPT := Color(1.00, 0.86, 0.42, 1.0)
 
-## Saddlebag pip geometry. Compact (Fable AAA review round 1, #3: "the saddlebag box becomes a
-## compact painted widget"): small slots on one strip, the bag's own picture in a gold ring at
-## the left and the count in a gold chip at the right, all drawn on the one control.
+## THE SADDLEBAG IS A SADDLEBAG (Fable AAA round 6: "a 375x95 opaque purple panel with twelve
+## 16 px dots and '0 bits' -- unreadable as inventory, covers the player's hooves"). No panel:
+## a leather bag drawn on the field, its flap buckled with the count, the slots stitched
+## pockets on its face that fill with gems in her ponies' rarity colours; beside it the wallet
+## as a stack of bits and the number. Smaller than the old card and see-through round its
+## shapes, so the pony at the centre is never under it. All drawn on the one control.
 const PIP_SIZE := Vector2(20.0, 20.0)
-const PIP_GAP := 5.0
-const PIPS_PER_ROW := 12
-## The bag picture's disc and the count chip either side of the slots.
-const BAG_DISC := 44.0
-const COUNT_CHIP := Vector2(66.0, 30.0)
-const STRIP_GAP := 10.0
-const PIP_EMPTY := Color(1.0, 1.0, 1.0, 0.14)
-const PIP_BORDER := Color(0.0, 0.0, 0.0, 0.5)
+const PIP_GAP := 4.0
+const PIPS_PER_ROW := 6
+## The bag's leather round the pockets (sides, foot) and the flap over them.
+const BAG_PAD := Vector2(12.0, 10.0)
+const BAG_FLAP := 28.0
+## Headroom over the flap for the bag's strap.
+const BAG_STRAP := 10.0
+const BUCKLE := Vector2(54.0, 24.0)
+const STRIP_GAP := 14.0
+## The coin stack's width and the wallet number's size.
+const COIN_W := 40.0
+const BITS_PX := 36
+const LEATHER := Color(0.66, 0.41, 0.23)
+const LEATHER_FLAP := Color(0.56, 0.33, 0.18)
+const LEATHER_DARK := Color(0.27, 0.14, 0.09)
+const STITCH := Color(1.0, 0.86, 0.6, 0.6)
 
 ## Filled-pip colour by PonyData.Rarity. The bag is the only place the player ever sees
 ## what she has actually collected, so a caught pony's TIER being legible at a glance is
@@ -250,6 +261,7 @@ var _hints_wanted := false
 var _task_lines: Array[String] = []
 var _rarities: Array[int] = []
 var _capacity := 0
+var _bits_total := 0
 var _elapsed := 0.0
 ## Whether the beam was on last frame, so the reticle gets one final redraw when it
 ## switches off instead of being left frozen in its "beaming" colour.
@@ -621,7 +633,7 @@ func toast_chips() -> Array[Dictionary]:
 ## over the player"). Its left end is the bag card's, its foot TOAST_GAP above the card's top,
 ## so news stacks over the strip it is mostly about (a catch, a pen, a sale) and the pony in
 ## the middle of the screen stays clear. Measured at each toast: the card grows with the bag.
-const TOAST_GAP := 18.0
+const TOAST_GAP := 26.0
 
 
 func _place_toast() -> void:
@@ -802,10 +814,23 @@ func set_tasks(rows: Array) -> void:
 		var kind: Array = TASK_CHIPS.get(String(row.get("id", "")),
 			[String(row.get("text", "")).get_slice(" ", 0), PlaceSign.Icon.STAR])
 		var chip := {"word": String(kind[0]), "done": bool(row.get("done", false)),
-			"icon": PlaceSign.icon_texture(int(kind[1])), "reward": int(row.get("reward_bits", 0)),
+			"icon": IconSet.texture(String(kind[2]), 96, false) if kind.size() > 2
+				else PlaceSign.icon_texture(int(kind[1])), "reward": int(row.get("reward_bits", 0)),
 			"text": String(row.get("text", ""))}
 		_chips.append(chip)
 		done_count += 1 if bool(chip.done) else 0
+	# EACH CHIP HAS A STATE (Fable AAA round 6: "four unlabeled icons with no state"): done
+	# (felt green, ticked), next (the first open one: lit cream in a glowing gold ring), or
+	# locked (every open one after it: dark, its picture faded, a padlock on it).
+	var next_found := false
+	for chip: Dictionary in _chips:
+		if bool(chip.done):
+			chip["state"] = &"done"
+		elif not next_found:
+			chip["state"] = &"next"
+			next_found = true
+		else:
+			chip["state"] = &"locked"
 	strip.add_child(_task_ring(done_count, _chips.size()))
 	for chip: Dictionary in _chips:
 		strip.add_child(_task_chip(chip))
@@ -815,16 +840,18 @@ func set_tasks(rows: Array) -> void:
 
 
 const TASK_TICK := Color(0.36, 0.68, 0.36)
-## Each lesson's chip: one word and its action's place icon.
+## Each lesson's chip: one word and its action's place icon (the catch: a Drifter's head, the
+## objective card's own picture for a catch).
 const TASK_CHIPS := {
-	"tutorial_catch": ["Catch", PlaceSign.Icon.STAR],
+	"tutorial_catch": ["Catch", PlaceSign.Icon.STAR, "drifter"],
 	"tutorial_pen": ["Pen", PlaceSign.Icon.FENCE],
 	"tutorial_sell": ["Sell", PlaceSign.Icon.COIN],
 }
 var _chips: Array[Dictionary] = []
 
 
-## The checklist's chips as drawn: [{word, done, icon, reward, text}].
+## The checklist's chips as drawn: [{word, done, icon, reward, text, state}], state one of
+## &"done", &"next", &"locked".
 func task_chips() -> Array[Dictionary]:
 	return _chips.duplicate()
 
@@ -870,14 +897,40 @@ func _task_chip(chip: Dictionary) -> VBoxContainer:
 	tile.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var icon: Texture2D = chip.icon
+	var state: StringName = chip.get("state", &"done" if done else &"next")
 	tile.draw.connect(func() -> void:
 		var r := Rect2(Vector2.ZERO, tile.size)
-		tile.draw_style_box(HouseStyleScript.disc_box(r.size.x,
-			HouseStyleScript.FELT if done else Color(1.0, 0.97, 0.9),
-			HouseStyleScript.GOLD if not done else HouseStyleScript.TICK_GREEN, 3), r)
+		var mid := r.get_center()
+		if state == &"next":
+			# The one to do now: a warm halo round a lit disc.
+			for k in 3:
+				tile.draw_circle(mid, r.size.x * 0.5 + 7.0 - k * 2.5,
+					Color(HouseStyleScript.GOLD, 0.12 + 0.1 * k))
+		var fill := Color(1.0, 0.97, 0.9)
+		var ring := HouseStyleScript.GOLD
+		if done:
+			fill = HouseStyleScript.FELT
+			ring = HouseStyleScript.TICK_GREEN
+		elif state == &"locked":
+			fill = HouseStyleScript.PLUM_DARK
+			ring = Color(HouseStyleScript.GOLD_DIM, 0.7)
+		tile.draw_style_box(HouseStyleScript.disc_box(r.size.x, fill, ring,
+			4 if state == &"next" else 3), r)
 		if icon != null:
-			tile.draw_texture_rect(icon, r.grow(-8.0), false,
-				Color(1, 1, 1, 0.45) if done else Color.WHITE)
+			var tint := Color.WHITE
+			if done:
+				tint = Color(1, 1, 1, 0.45)
+			elif state == &"locked":
+				tint = Color(0.75, 0.68, 0.8, 0.4)
+			tile.draw_texture_rect(icon, r.grow(-8.0), false, tint)
+		if state == &"locked":
+			# A small gold padlock at the corner: later, not yet.
+			var p := Vector2(tile.size.x - 8.0, tile.size.y - 9.0)
+			tile.draw_arc(p + Vector2(0, -3), 4.2, PI, TAU, 10, HouseStyleScript.PLUM_DARK, 4.5, true)
+			tile.draw_arc(p + Vector2(0, -3), 4.2, PI, TAU, 10, HouseStyleScript.GOLD_DIM, 2.2, true)
+			PaintScript.rounded(tile, Rect2(p + Vector2(-6.5, -3.5), Vector2(13, 10)), 2.5,
+				HouseStyleScript.GOLD, HouseStyleScript.PLUM_DARK, 1.5)
+			tile.draw_circle(p + Vector2(0, 1.2), 1.4, HouseStyleScript.PLUM_DARK)
 		if done:
 			# The tick, on a gold badge at the corner.
 			var c := Vector2(tile.size.x - 7, 7)
@@ -979,15 +1032,35 @@ func _on_storage_changed() -> void:
 		var data: PonyData = instance.data() if instance != null else null
 		_rarities.append(data.rarity if data != null else PonyDataScript.Rarity.COMMON)
 	_bag_count.text = "%d / %d" % [_storage.count(), _capacity]
-	var rows := maxi(1, ceili(float(_capacity) / float(PIPS_PER_ROW)))
+	_size_bag()
+
+
+## The bag strip's size: the bag (none before the Scoop is hers), the coins and the number.
+func _size_bag() -> void:
+	var bag := _bag_size()
+	var font := MenuStyleScript.numeral_font()
+	var num := font.get_string_size(str(_bits_total), HORIZONTAL_ALIGNMENT_LEFT, -1, BITS_PX).x
 	_pips.custom_minimum_size = Vector2(
-		BAG_DISC + STRIP_GAP + _slots_width() + STRIP_GAP + COUNT_CHIP.x,
-		maxf(BAG_DISC, float(rows) * (PIP_SIZE.y + PIP_GAP) - PIP_GAP))
+		(bag.x + STRIP_GAP if bag.x > 0.0 else 0.0) + COIN_W + 8.0 + num + 8.0,
+		maxf(bag.y, 56.0))
 	_pips.queue_redraw()
 
 
 func _slots_width() -> float:
 	return float(mini(maxi(_capacity, 1), PIPS_PER_ROW)) * (PIP_SIZE.x + PIP_GAP) - PIP_GAP
+
+
+func _slots_height() -> float:
+	var rows := maxi(1, ceili(float(_capacity) / float(PIPS_PER_ROW)))
+	return float(rows) * (PIP_SIZE.y + PIP_GAP) - PIP_GAP
+
+
+## The drawn bag's size, strap to foot; zero before there is a bag.
+func _bag_size() -> Vector2:
+	if _capacity <= 0:
+		return Vector2.ZERO
+	return Vector2(_slots_width() + BAG_PAD.x * 2.0,
+		BAG_STRAP + BAG_FLAP + 6.0 + _slots_height() + BAG_PAD.y)
 
 
 ## A CATCH IS A CARD, NOT A TOAST (owner playtest 2026-10-25: "i think the text and traits
@@ -1203,49 +1276,145 @@ func _draw_wriggle_ring(centre: Vector2) -> void:
 
 func _draw_pips() -> void:
 	var h := _pips.size.y
-	# The bag itself, on a gold-ringed plum disc, the way the casino frames a chip.
-	var disc := Rect2(Vector2(0.0, (h - BAG_DISC) * 0.5), Vector2(BAG_DISC, BAG_DISC))
-	_pips.draw_style_box(HouseStyleScript.disc_box(BAG_DISC, HouseStyleScript.PLUM), disc)
-	IconSet.draw(_pips, "bag", disc.grow(-7.0))
-	var rows := maxi(1, ceili(float(_capacity) / float(PIPS_PER_ROW)))
-	var slots_h := float(rows) * (PIP_SIZE.y + PIP_GAP) - PIP_GAP
-	var origin := Vector2(BAG_DISC + STRIP_GAP, (h - slots_h) * 0.5)
+	var bag := _bag_size()
+	var x := 0.0
+	if bag.x > 0.0:
+		_draw_bag(Rect2(Vector2(0.0, h - bag.y), bag))
+		x = bag.x + STRIP_GAP
+	_draw_wallet(Vector2(x, h))
+
+
+## The saddlebag: strap, leather body with a stitched seam, the pockets, then the flap over
+## their top with the count on its buckle (warm red when full).
+func _draw_bag(r: Rect2) -> void:
+	var body := Rect2(r.position + Vector2(0.0, BAG_STRAP), r.size - Vector2(0.0, BAG_STRAP))
+	var cx := r.position.x + r.size.x * 0.5
+	# The saddle band the bag hangs from (the piece that lies over her back), behind the bag,
+	# two brass rivets on it.
+	var band := Rect2(Vector2(cx - r.size.x * 0.32, r.position.y),
+		Vector2(r.size.x * 0.64, BAG_STRAP + 16.0))
+	PaintScript.rounded(_pips, band, 8.0, LEATHER_FLAP.darkened(0.12), LEATHER_DARK, 3.0)
+	for side in [-1.0, 1.0]:
+		_pips.draw_circle(Vector2(cx + side * band.size.x * 0.36, r.position.y + 6.5), 2.6,
+			HouseStyleScript.GOLD)
+	# A soft shadow so it sits on grass and on sky alike, then the body.
+	_pouch(Rect2(body.position + Vector2(3, 5), body.size), 10.0, 24.0, Color(0, 0, 0, 0.3), 0)
+	_pouch(body, 10.0, 24.0, LEATHER)
+	_pips.draw_line(body.position + Vector2(10, body.size.y - 5), body.end - Vector2(10, 5),
+		Color(0, 0, 0, 0.18), 3.0, true)
+	_stitch(body.grow(-6.0), 5.0, 18.0)
+	# The pockets: stitched sockets in the leather, a gem in each one that holds a pony.
+	var origin := body.position + Vector2(BAG_PAD.x, BAG_FLAP + 6.0)
 	for i in range(_capacity):
-		# PIPS_PER_ROW to a row (PT5; playtest 2026-11-05: eighteen slots ran off the card).
 		var at := origin + Vector2(float(i % PIPS_PER_ROW) * (PIP_SIZE.x + PIP_GAP),
 			float(i / PIPS_PER_ROW) * (PIP_SIZE.y + PIP_GAP))
 		var rect := Rect2(at, PIP_SIZE)
-		var filled := i < _rarities.size()
-		var sb := StyleBoxFlat.new()
-		sb.set_corner_radius_all(6)
-		sb.anti_aliasing = true
-		if filled:
-			# A filled slot is her rarity's colour, ringed in gold, with her rarity's shape.
-			sb.bg_color = RARITY_COLORS.get(_rarities[i], RARITY_COLORS[PonyDataScript.Rarity.COMMON])
-			sb.border_color = HouseStyleScript.GOLD
-			sb.set_border_width_all(2)
-		else:
-			# An empty slot is a socket sunk into the plum.
-			sb.bg_color = Color(0.0, 0.0, 0.0, 0.28)
-			sb.border_color = Color(HouseStyleScript.GOLD_DIM, 0.55)
-			sb.set_border_width_all(1)
-		_pips.draw_style_box(sb, rect)
-		# Not colour alone (FS8.3): her rarity's shape, in white on the tint.
-		if filled:
-			_pips.draw_colored_polygon(RarityGlyph.outline(_rarities[i], rect.get_center(),
-				PIP_SIZE.x * 0.28), Color(1, 1, 1, 0.9))
-	# The count, in a gold chip at the strip's end: full reads warm red. A bag with no slots yet
-	# (before the Scoop is hers) shows no "0/0" (Fable AAA round 2, #9): there is nothing to count.
-	if _capacity <= 0:
-		return
-	var chip := Rect2(Vector2(BAG_DISC + STRIP_GAP + _slots_width() + STRIP_GAP,
-		(h - COUNT_CHIP.y) * 0.5), COUNT_CHIP)
-	var full := _storage != null and _rarities.size() >= _capacity and _capacity > 0
-	PaintScript.rounded(_pips, chip, COUNT_CHIP.y * 0.5,
-		Color(0.86, 0.32, 0.28) if full else HouseStyleScript.GOLD, HouseStyleScript.PLUM_DARK, 2.0)
-	PaintScript.label(_pips, MenuStyleScript.numeral_font(), chip.grow(-5.0),
-		"%d/%d" % [_rarities.size(), _capacity], 22,
+		PaintScript.rounded(_pips, rect, 6.0, Color(0.2, 0.09, 0.05, 0.6),
+			Color(LEATHER.lightened(0.35), 0.7), 1.0)
+		if i < _rarities.size():
+			_gem(rect.get_center(), PIP_SIZE.x * 0.5, _rarities[i])
+	# The flap over the pockets' tops, a tongue and the buckle with the count.
+	var flap := Rect2(body.position + Vector2(-2.0, -2.0), Vector2(body.size.x + 4.0, BAG_FLAP))
+	_pouch(flap, 10.0, 18.0, LEATHER_FLAP)
+	_pips.draw_line(flap.position + Vector2(12, 5), Vector2(flap.end.x - 12, flap.position.y + 5),
+		Color(1, 0.9, 0.75, 0.35), 2.0, true)
+	_stitch(Rect2(flap.position + Vector2(7, 7), flap.size - Vector2(14, 12)), 4.0, 11.0)
+	var tongue := Rect2(Vector2(cx - 15.0, flap.end.y - 14.0), Vector2(30.0, 20.0))
+	PaintScript.rounded(_pips, tongue, 8.0, LEATHER_FLAP, LEATHER_DARK, 3.0)
+	var full := _rarities.size() >= _capacity
+	var buckle := Rect2(Vector2(cx - BUCKLE.x * 0.5, flap.end.y - BUCKLE.y * 0.62), BUCKLE)
+	PaintScript.rounded(_pips, buckle, 7.0,
+		Color(0.86, 0.32, 0.28) if full else HouseStyleScript.GOLD, LEATHER_DARK, 2.5)
+	_pips.draw_line(buckle.position + Vector2(6, 4), Vector2(buckle.end.x - 6, buckle.position.y + 4),
+		Color(1, 1, 1, 0.45), 2.0, true)
+	PaintScript.label(_pips, MenuStyleScript.numeral_font(), buckle.grow(-4.0),
+		"%d/%d" % [_rarities.size(), _capacity], 20,
 		Color.WHITE if full else HouseStyleScript.INK)
+
+
+## A pouch of leather: square-ish shoulders (`top` radius), a full round foot (`foot`), the
+## dark seam round it, so the bag reads as a saddlebag and not a box.
+func _pouch(r: Rect2, top: float, foot: float, fill: Color, border := 3) -> void:
+	var box := StyleBoxFlat.new()
+	box.bg_color = fill
+	box.corner_radius_top_left = int(top)
+	box.corner_radius_top_right = int(top)
+	box.corner_radius_bottom_left = int(foot)
+	box.corner_radius_bottom_right = int(foot)
+	box.set_border_width_all(border)
+	box.border_color = LEATHER_DARK
+	box.anti_aliasing = true
+	box.draw(_pips.get_canvas_item(), r)
+
+
+## A dashed seam round `r`, the stitching that makes leather read as leather.
+## Its corners follow the pouch's: `top` and `foot` radii.
+func _stitch(r: Rect2, top: float, foot: float) -> void:
+	var pts := PackedVector2Array()
+	var corners := [[Vector2(r.end.x - top, r.position.y + top), top, -PI * 0.5],
+		[Vector2(r.end.x - foot, r.end.y - foot), foot, 0.0],
+		[Vector2(r.position.x + foot, r.end.y - foot), foot, PI * 0.5],
+		[Vector2(r.position.x + top, r.position.y + top), top, PI]]
+	for c: Array in corners:
+		for k in 5:
+			var a: float = float(c[2]) + PI * 0.5 * float(k) / 4.0
+			pts.append(Vector2(c[0]) + Vector2(cos(a), sin(a)) * float(c[1]))
+	pts.append(pts[0])
+	# Dashes laid along the whole path, so the corners keep the rhythm.
+	var on := true
+	var left := 5.0
+	for k in pts.size() - 1:
+		var a: Vector2 = pts[k]
+		var b: Vector2 = pts[k + 1]
+		while a.distance_to(b) > 0.01:
+			var step := minf(left, a.distance_to(b))
+			var n := a.move_toward(b, step)
+			if on:
+				_pips.draw_line(a, n, STITCH, 1.5, true)
+			left -= step
+			a = n
+			if left <= 0.01:
+				on = not on
+				left = 5.0
+
+
+## A pony in the bag: a cut gem in her rarity's colour in a gold bezel, lit at its top left,
+## her rarity's shape in white on it, so the tier never rests on colour alone (FS8.3).
+func _gem(c: Vector2, r: float, rarity: int) -> void:
+	var col: Color = RARITY_COLORS.get(rarity, RARITY_COLORS[PonyDataScript.Rarity.COMMON])
+	_pips.draw_circle(c, r, HouseStyleScript.GOLD)
+	_pips.draw_circle(c, r - 2.0, col.darkened(0.25))
+	_pips.draw_circle(c + Vector2(-0.8, -0.8), r - 3.4, col)
+	_pips.draw_circle(c + Vector2(-r * 0.32, -r * 0.36), r * 0.22, Color(1, 1, 1, 0.75))
+	_pips.draw_colored_polygon(RarityGlyph.outline(rarity, c + Vector2(0.5, 0.8), r * 0.42),
+		Color(1, 1, 1, 0.92))
+
+
+## The wallet: a stack of bits (one coin, more as it grows) and the number in the casino's
+## gold numerals, outlined to stand on grass or sky. `foot` is the strip's bottom left.
+func _draw_wallet(foot: Vector2) -> void:
+	var coins := 1 + int(_bits_total >= 50) + int(_bits_total >= 500) + int(_bits_total >= 5000)
+	var c := Vector2(foot.x + COIN_W * 0.5, foot.y - 12.0)
+	var rx := COIN_W * 0.5
+	var ry := rx * 0.42
+	for k in coins:
+		var at := c - Vector2(0.0, 7.0 * k)
+		PaintScript.ellipse(_pips, at + Vector2(0, 4), rx, ry, HouseStyleScript.GOLD_DIM,
+			LEATHER_DARK)
+		_pips.draw_rect(Rect2(at - Vector2(rx, 0), Vector2(rx * 2.0, 4.0)), HouseStyleScript.GOLD_DIM)
+		PaintScript.ellipse(_pips, at, rx, ry, HouseStyleScript.GOLD, LEATHER_DARK)
+		_pips.draw_line(at + Vector2(-rx, 0), at + Vector2(-rx, 4), LEATHER_DARK, 2.0, true)
+		_pips.draw_line(at + Vector2(rx, 0), at + Vector2(rx, 4), LEATHER_DARK, 2.0, true)
+	var top := c - Vector2(0.0, 7.0 * (coins - 1))
+	PaintScript.ellipse(_pips, top, rx * 0.66, ry * 0.62, Color(1.0, 0.88, 0.45),
+		Color(HouseStyleScript.GOLD_DIM, 0.9))
+	_pips.draw_circle(top + Vector2(-rx * 0.35, -ry * 0.35), 2.2, Color(1, 1, 1, 0.8))
+	var font := MenuStyleScript.numeral_font()
+	var base := Vector2(foot.x + COIN_W + 8.0, foot.y - 6.0)
+	_pips.draw_string_outline(font, base, str(_bits_total), HORIZONTAL_ALIGNMENT_LEFT, -1,
+		BITS_PX, 8, HouseStyleScript.PLUM_DARK)
+	_pips.draw_string(font, base, str(_bits_total), HORIZONTAL_ALIGNMENT_LEFT, -1, BITS_PX,
+		HouseStyleScript.GOLD)
 
 
 ## The rarity shapes the filled saddlebag slots carry (FS8.3), first slot first.
@@ -1271,7 +1440,7 @@ func _ring(centre: Vector2, radius: float, color: Color, width: float) -> void:
 ## pantry, and nothing says so; show the pantry stock and the hungry state"). A row under the
 ## bits: a bale, the word, the food in stock, and when anypony penned is hungry a sad face and
 ## how many. Warm red when hungry ponies meet an empty pantry: they cannot eat.
-## On the cream bag card, so the card's own inks (_restyle), not the white of the old HUD.
+## On the field beside the bag (no card since round 6), so outlined like the wallet.
 const PANTRY_WARN := Color(1.0, 0.56, 0.5)
 var _pantry: HBoxContainer
 var _pantry_food: Label
@@ -1294,13 +1463,14 @@ func _build_pantry() -> void:
 	var word := Label.new()
 	word.text = "Pantry"
 	word.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	HouseStyleScript.ink_label(word, 18, HouseStyleScript.CREAM_DIM)
-	word.add_theme_constant_override(&"outline_size", 0)
+	# Outlined: the row stands on the field now, not on a card (round 6).
+	HouseStyleScript.ink_label(word, 18, HouseStyleScript.CREAM)
+	word.add_theme_constant_override(&"outline_size", 6)
+	word.add_theme_color_override(&"font_outline_color", HouseStyleScript.PLUM_DARK)
 	_pantry.add_child(word)
 	_pantry_food = Label.new()
 	_pantry_food.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	HouseStyleScript.numeral_label(_pantry_food, 22, HouseStyleScript.CREAM)
-	_pantry_food.add_theme_constant_override(&"outline_size", 0)
 	_pantry.add_child(_pantry_food)
 	_pantry_face = PantryIconScript.new()
 	_pantry_face.kind = &"hungry"
@@ -1308,7 +1478,6 @@ func _build_pantry() -> void:
 	_pantry_hungry = Label.new()
 	_pantry_hungry.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	HouseStyleScript.numeral_label(_pantry_hungry, 22, HouseStyleScript.CREAM)
-	_pantry_hungry.add_theme_constant_override(&"outline_size", 0)
 	_pantry.add_child(_pantry_hungry)
 
 
@@ -1338,6 +1507,9 @@ func pantry_state() -> Dictionary:
 
 func set_bits(total: int) -> void:
 	_bits.text = "%d bits" % maxi(0, total)
+	_bits_total = maxi(0, total)
+	if _pips != null:
+		_size_bag()
 
 
 func get_bits_text() -> String:
@@ -1432,6 +1604,9 @@ func _restyle() -> void:
 		HouseStyleScript.ink_label(l, 18, HouseStyleScript.CREAM_DIM, false)
 	_style_bits()
 	_add_card_behind(bag, Vector2(16, 12))
+	# The bag is drawn standing on the field, not on a card (round 6); the card node stays,
+	# empty, because the toast measures where to stand from it.
+	(get_node(^"BagCard") as Panel).add_theme_stylebox_override(&"panel", StyleBoxEmpty.new())
 	_add_card_behind(_tasks, Vector2(14, 10))
 	_toast.add_theme_stylebox_override("normal", HouseStyleScript.pill_box(30, 0.92, Vector2(24, 10)))
 	HouseStyleScript.ink_label(_toast, 28, HouseStyleScript.CREAM)
@@ -1476,28 +1651,12 @@ func _restyle() -> void:
 	_refresh_chip()
 
 
-## THE WALLET IS A COIN AND A NUMBER: the bits coin at the left of the line and the count in
-## the casino's gold numerals, outlined so it stands on grass or sky.
+## THE WALLET IS DRAWN ON THE BAG'S STRIP (_draw_wallet, Fable AAA round 6): a coin stack and
+## the number. The label keeps the line's text for the gates and is not shown.
 func _style_bits() -> void:
-	HouseStyleScript.numeral_label(_bits, 34)
-	var box := StyleBoxEmpty.new()
-	box.content_margin_left = BITS_COIN + 10.0
-	_bits.add_theme_stylebox_override(&"normal", box)
-	var coin := TextureRect.new()
-	coin.name = "Coin"
-	coin.texture = IconSet.texture("coin", 96, false)
-	coin.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	coin.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	coin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	coin.size = Vector2(BITS_COIN, BITS_COIN)
-	_bits.add_child(coin)
-	var place := func() -> void:
-		coin.position = Vector2(0.0, (_bits.size.y - BITS_COIN) * 0.5)
-	_bits.resized.connect(place)
-	place.call()
+	_bits.visible = false
 
 
-const BITS_COIN := 36.0
 var _chip_key: Control
 var _chip_hint: Label
 const CHIP_HINT_PX := 28.0

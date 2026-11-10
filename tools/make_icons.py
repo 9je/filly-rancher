@@ -824,6 +824,46 @@ def _sell_all(i):
            hl=False, stroke=2.4)
 
 
+# ---- the objective card's target (Fable AAA round 6, #2: the quest pill's generic star) ----
+# A Drifter is a pony with no mark yet: her head, and a badge with her blank mark (a dashed
+# ring and a "?"), or for a Bloom the gold star of the mark she found.
+
+def _pony_head(i):
+    coat = "#DCCDF0"
+    i.group([path("M27,46 C30,52 30,58 28,63 H54 C54,54 50,46 46,40 Z", (27, 40, 54, 63)),
+             circle(33, 29, 15), ellipse(19, 37, 10, 8.5),
+             poly([(34, 15), (43, 3), (46, 19)])], coat, hl=(27, 20))
+    i.flat(poly([(37, 13), (42.5, 7), (43.5, 17)]), "pink", stroke=0)
+    i.flat(ellipse(14.5, 37, 1.4, 1.8), line(coat), stroke=0)
+    i.ink("M17,44 Q21,46 25,44", coat, 1.8)
+    i.fill(path("M30,14 C38,8 50,10 52,22 C55,32 54,44 58,56 C52,56 47,50 46,42 "
+                "C45,34 44,26 38,22 C35,24 31,22 30,14 Z", (30, 8, 58, 56)), "violet",
+           hl=False)
+    i.ink("M38,15 C45,16 48,24 49,34 M43,13 C50,17 52,28 53,40", "violet", 1.6)
+    i.fill(path("M36,13 C29,10 21,13 18,21 C23,19 28,19 33,22 C34,19 35,16 36,13 Z",
+                (18, 10, 36, 22)), "violet", hl=False)
+    i.fill(ellipse(27, 28, 4.6, 6.2), "ink", hl=False, sh=False, stroke=0)
+    i.flat(ellipse(27, 30, 3, 3.6), "lake", stroke=0)
+    i.flat(circle(25.6, 25.6, 1.8), "white", stroke=0)
+
+
+@icon("drifter")
+def _drifter(i):
+    _pony_head(i)
+    i.fill(circle(49, 50, 10), "cream", hl=False, outline=line("#E9D3A0"))
+    i.parts.append(f'<circle cx="49" cy="50" r="6.2" fill="none" stroke="{line(SW["violet"])}" '
+                   'stroke-width="1.6" stroke-dasharray="2.4 2"/>')
+    i.stroke("M46.6,47.6 C46.6,44.8 51.4,44.8 51.4,47.6 C51.4,49.4 49,49.4 49,51.6", "ink", 2)
+    i.flat(circle(49, 54.2, 1.2), "ink", stroke=0)
+
+
+@icon("drifter_bloom")
+def _drifter_bloom(i):
+    _pony_head(i)
+    i.fill(circle(49, 50, 10), "cream", hl=False, outline=line("#E9D3A0"))
+    i.fill(star(49, 50.5, 7, 0.45), "gold", hl=False, stroke=1.6)
+
+
 # ---- the decorations (Fable AAA round 6, #1) -----------------------------------------------
 # The Market's decor tiles were baked 3D cut-outs (game/scenes/test/decor_icons.gd) and read as
 # a second set beside the drawn foods and gear: a green blob, a beige blob, grey silhouettes.

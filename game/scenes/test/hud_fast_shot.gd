@@ -86,6 +86,30 @@ func _run() -> void:
 	for i in 40:
 		await process_frame
 	await _shot("hud_rest_720")
+	# Round 6: the saddlebag with five ponies in it (one of each tier and a second common),
+	# the wallet, the pantry row, and the objective card for a catch (a Drifter's head).
+	hud.set("_capacity", 12)
+	hud.set("_rarities", [0, 1, 2, 3, 0] as Array[int])
+	hud.call("set_bits", 345)
+	hud.call("set_pantry", 14, 0)
+	var card: Control = (load("res://ui/objective_card.gd") as GDScript).new()
+	hud.add_child(card)
+	card.call("show_objective", {"id": &"catch", "goal": &"catch", "icon": PlaceSign.Icon.STAR,
+		"words": "Catch a Drifter"}, 9.0)
+	for i in 30:
+		await process_frame
+	await _shot("hud_bag_720")
+	hud.set("_capacity", 18)
+	hud.set("_rarities", [0, 1, 2, 3, 0, 1, 2, 0, 0, 1, 1, 0, 2, 0, 0, 1, 3, 0] as Array[int])
+	hud.call("set_bits", 12850)
+	hud.call("set_pantry", 0, 3)
+	for i in 10:
+		await process_frame
+	await _shot("hud_bag_full_720")
+	hud.set("_capacity", 12)
+	hud.set("_rarities", [] as Array[int])
+	hud.call("set_bits", 0)
+	hud.call("set_pantry", -1, 0)
 	for m in bubbles:
 		var at: Vector3 = m.global_position
 		print("BUBBLE %.1f m from the lens, on screen at %s" % [at.distance_to(cam.global_position),

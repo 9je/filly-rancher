@@ -7,7 +7,13 @@ extends Control
 ## one piece of HUD.
 
 const HouseStyleScript := preload("res://ui/house_style.gd")
-const ICON := 28.0
+const ICON := 34.0
+## WHO THE STEP IS ABOUT, NOT A GENERIC STAR (Fable AAA round 6: "the quest pill could carry
+## the target's portrait or race icon"): a catch shows a Drifter's head with her blank mark, a
+## Bloom the same head with the gold star she found, a step about a townspony her portrait.
+const GOAL_PICTURES := {&"catch": "drifter", &"drifter": "drifter", &"bloom": "drifter_bloom",
+	&"bloomed": "drifter_bloom"}
+const GOAL_PORTRAITS := {&"marigold": "res://assets/ui/portraits/marigold.png"}
 ## Clear of the compass strip AND what hangs under it (the goal's distance pill): the strip is
 ## a thin band now (Fable AAA review round 1, #3), so the card sits closer under it.
 const TOP := 80.0
@@ -47,7 +53,8 @@ func _ready() -> void:
 	_icon = TextureRect.new()
 	_icon.custom_minimum_size = Vector2(ICON, ICON)
 	_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_icon.clip_contents = true
 	_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ring.add_child(_icon)
 	_words = Label.new()
@@ -69,7 +76,7 @@ func show_objective(o: Dictionary, distance_m: float) -> void:
 		_id = &""
 		return
 	_words.text = String(o.get("words", ""))
-	_icon.texture = PlaceSign.icon_texture(int(o.get("icon", 0)))
+	_icon.texture = picture_for(StringName(o.get("goal", &"")), int(o.get("icon", 0)))
 	if distance_m < 0.0:
 		_distance.text = ""
 	elif distance_m <= HERE_METRES:
@@ -82,6 +89,16 @@ func show_objective(o: Dictionary, distance_m: float) -> void:
 		_id = id
 		_slide_in()
 	_layout()
+
+
+## The card's picture for a step whose guide goal is `goal`: the target herself where there is
+## one, else the place's icon `place_icon` (PlaceSign.Icon).
+static func picture_for(goal: StringName, place_icon: int) -> Texture2D:
+	if GOAL_PICTURES.has(goal):
+		return IconSet.texture(String(GOAL_PICTURES[goal]), 96, false)
+	if GOAL_PORTRAITS.has(goal) and ResourceLoader.exists(String(GOAL_PORTRAITS[goal])):
+		return load(String(GOAL_PORTRAITS[goal])) as Texture2D
+	return PlaceSign.icon_texture(place_icon)
 
 
 func words() -> String:
