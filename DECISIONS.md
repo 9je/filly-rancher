@@ -932,3 +932,7 @@ and the cinematics. Calls made:
 - The canon ponies' mid-blink "grey disc" is their eyelid shell; an in-shader lash crease only reaches the painted eyes and was reverted unverified. Left for model or texture work.
 - The companion near the lens sits just past the 2.6 m fade; widening the fade would put more dithered ponies on screen (reviewers dislike that), so left as is.
 - gpu_run.sh stops a Godot that hangs on exit once its output has landed and the probe printed its OK line.
+
+## P9 (playtest 2026-11-10)
+- Item 75: Shift is a run TOGGLE, on at start (owner: "i like toggle"). C still sneaks while held. On a pad the sprint button shadows Gallop, so the same press that bursts the Gallop Shoes also flips the run; accepted for now, revisit if a pad player reports it.
+- Item 74: the Factory gets the ranch's pause menu with only Resume, Settings and Quit (pause_menu.hidden_rows). No save mid-Factory: the scene saves when it leaves, as before.

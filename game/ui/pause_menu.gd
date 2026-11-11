@@ -150,6 +150,10 @@ signal mail_reply(id: StringName, choice: String)
 var settings: Settings = null
 ## `func() -> bool`. Invalid means "always allowed".
 var can_open := Callable()
+## MAIN ROWS THIS SCENE DOES NOT OFFER (Row values). The Rainbow Factory has no saddlebag,
+## ledger or save slot of its own, so it hides those rows rather than showing dead ones
+## (playtest 2026-11-10 item 74: no pause at all up there).
+var hidden_rows: Array[int] = []
 
 ## Whether there is a save on disk to load. Injected by ranch.gd, like every other provider
 ## on this menu: game/ui/ may not reach SaveIO any more than it may reach Economy. A menu
@@ -440,6 +444,11 @@ func _row_count() -> int:
 
 func move_selection(step: int) -> void:
 	_selected = posmod(_selected + step, _row_count())
+	if _page == Page.MAIN and step != 0:
+		var guard := MAIN_ROWS.size()
+		while _selected in hidden_rows and guard > 0:
+			_selected = posmod(_selected + signi(step), _row_count())
+			guard -= 1
 	_sync_scroll()
 	_refresh()
 	MenuStyleScript.tick_move()
@@ -1024,6 +1033,8 @@ func _draw_main() -> void:
 	_footer.text = MenuStyleScript.footer_rows("select", "resume")
 	MenuStyleScript.style_label(_footer, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
 	for i in range(MAIN_ROWS.size()):
+		if i in hidden_rows:
+			continue
 		_add_row(i, MAIN_ROWS[i], "")
 
 

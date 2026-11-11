@@ -78,6 +78,6 @@ FIXED needs evidence from the real flow: a frame from the actual scene reached t
 | 71 | W4 | Spike's raised hand clips into his head; he reads pink rather than purple; his prompt covers his face [9]. | OPEN | |
 | 72 | W4 | Sighting cutscene camera flew through a building; nothing links a sighting to the decor you just bought. | OPEN | |
 | 73 | W4 | Bramble's spotted-pony cutscene timing is unexplained. | OPEN | |
-| 74 | W1 | REPEAT. Can't pause during dialogue, and the factory counts as dialogue the whole time (was 05/12, ticked fixed). | OPEN | |
-| 75 | W1 | REPEAT. Holding Shift to run all the time. The owner wants a toggle, starting in run (was 08/25; that fix made walking sneak, which did not solve it). | OPEN | |
+| 74 | W1 | REPEAT. Can't pause during dialogue, and the factory counts as dialogue the whole time (was 05/12, ticked fixed). | FIXED | The Factory had no pause menu at all. Now it has one (Resume, Settings, Quit); the line waits under it. Real-input test test_pause_factory (Esc over Marigold's welcome, real keys); frames build/p9_evidence/item74/factory_pause_open.png (looked at), factory_pause_closed.png. Ranch talk pause: test_pause_in_talk. |
+| 75 | W1 | REPEAT. Holding Shift to run all the time. The owner wants a toggle, starting in run (was 08/25; that fix made walking sneak, which did not solve it). | FIXED | Shift toggles the run, starting on (player.gd sprint_on). Real-input test test_sprint by real key taps: 7.7 m/s by default, 5.2 after a tap, 7.7 after the next; C sneaks 1.3. Pad: the same button toggles. |
 | 76 | W3 | Player tail still moves oddly when running. | OPEN | |

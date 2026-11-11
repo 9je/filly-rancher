@@ -381,10 +381,19 @@ func is_sneaking() -> bool:
 	return Input.is_action_pressed(SNEAK_ACTION)
 
 
-## Holding `sprint` (Shift) and not sneaking.
+## RUN IS A TOGGLE (owner playtest 2026-11-10, item 75: "im holding shift at all times ... i
+## like toggle"). She starts running; a press of `sprint` (Shift) drops her to the plain gait
+## and the next press brings the run back. Sneak (C, held) still wins while it is held.
+var sprint_on := true
+
+
+func toggle_sprint() -> void:
+	sprint_on = not sprint_on
+
+
+## Running (the toggle is on) and not sneaking.
 func is_sprinting() -> bool:
-	return InputMap.has_action(SPRINT_ACTION) and Input.is_action_pressed(SPRINT_ACTION) \
-		and not is_sneaking()
+	return sprint_on and not is_sneaking()
 
 
 ## The body's AnimationPlayer, or null if the visuals failed to build. Exposed so
@@ -776,6 +785,8 @@ func _physics_process(delta: float) -> void:
 
 	# Analog magnitude scales the target speed, so a gamepad gets the whole range
 	# between a standstill and the top speed rather than an on/off dash.
+	if InputMap.has_action(SPRINT_ACTION) and Input.is_action_just_pressed(SPRINT_ACTION):
+		toggle_sprint()
 	var top_speed := (SNEAK_SPEED if is_sneaking() else RUN_SPEED) * speed_mult
 	if is_sprinting():
 		top_speed *= SPRINT_MULT

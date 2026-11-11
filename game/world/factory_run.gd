@@ -29,6 +29,9 @@ const StoryV1Script := preload("res://systems/story_v1.gd")
 const PathRulesScript := preload("res://systems/path_rules.gd")
 const PlayerScene := preload("res://actors/player/player.tscn")
 const HudScene := preload("res://ui/hud.tscn")
+const PauseMenuScene := preload("res://ui/pause_menu.tscn")
+const PauseMenuScript := preload("res://ui/pause_menu.gd")
+const PauseSettingsScript := preload("res://systems/settings.gd")
 const InputDeviceScript := preload("res://systems/input_device.gd")
 
 static var mode: StringName = &"reveal"
@@ -104,6 +107,42 @@ func _ready() -> void:
 
 # --- building ------------------------------------------------------------------------
 
+## PAUSE UP HERE TOO (playtest 2026-11-10 item 74: "you cant pause when youre in dialogue and
+## this whole time im up here"). The Factory had no pause menu at all. Same menu as the
+## ranch, minus the rows that only mean something down there; a conversation waits under it.
+var pause_menu: CanvasLayer
+var _talk_hidden := false
+
+
+func _build_pause() -> void:
+	pause_menu = PauseMenuScene.instantiate()
+	add_child(pause_menu)
+	var st = PauseSettingsScript.new()
+	st.load_from()
+	pause_menu.set("settings", st)
+	var R := PauseMenuScript.Row
+	pause_menu.set("hidden_rows", [R.COMPENDIUM, R.REQUESTS, R.MAIL, R.LEDGER, R.SAVE, R.LOAD,
+		R.UNSTUCK] as Array[int])
+	pause_menu.connect("opened", func() -> void:
+		var talk: CanvasLayer = people.get("talk_box") if people != null else null
+		if talk != null and people.is_talking():
+			talk.visible = false
+			_talk_hidden = true
+		get_tree().paused = true
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE)
+	pause_menu.connect("closed", func() -> void:
+		if _talk_hidden:
+			_talk_hidden = false
+			var talk: CanvasLayer = people.get("talk_box") if people != null else null
+			if talk != null and people.is_talking():
+				talk.visible = true
+		get_tree().paused = false
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED)
+	pause_menu.connect("quit_requested", func() -> void:
+		get_tree().paused = false
+		get_tree().quit())
+
+
 func _build() -> void:
 	_env = WorldEnvironment.new()
 	var env := Environment.new()
@@ -151,6 +190,7 @@ func _build() -> void:
 	people.camera = player.get_camera_pivot().get_node_or_null("CameraRig/SpringArm3D/CameraMount/Camera3D") \
 		if player.has_method("get_camera_pivot") else null
 	people.effect.connect(_on_effect)
+	_build_pause()
 	_fade = ColorRect.new()
 	_fade.color = Color(1, 1, 1, 0)
 	_fade.set_anchors_preset(Control.PRESET_FULL_RECT)
