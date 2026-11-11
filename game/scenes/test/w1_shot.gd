@@ -107,5 +107,17 @@ func _run() -> void:
 		await process_frame
 	print("PHASE ", world.call("phase"))
 	await _shot("w1_rest_after", 2)
+	# Item 26: drawn in the Lottery, what does Tumble say now?
+	for fl in ["invited", "tumble_hides", "tumble_joined"]:
+		story.set_flag(fl)
+	var people: Node = ranch.get("people")
+	var tumble: Node3D = people.call("npc", &"tumble")
+	if tumble != null:
+		player.global_position = tumble.global_position + Vector3(0, 0.6, 2.4)
+		player.look_at(tumble.global_position, Vector3.UP)
+	for i in 30:
+		await process_frame
+	print("TUMBLE_TALK ", people.call("talk", "tumble"))
+	await _shot("w1_tumble_after_lottery", 200)
 	print("W1_SHOT_OK")
 	quit(0)
