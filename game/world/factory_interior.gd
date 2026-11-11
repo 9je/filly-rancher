@@ -238,7 +238,18 @@ func _dress(room: Node3D, spec: Dictionary, markers: Node3D) -> void:
 	_mark(markers, "exit", Vector3(0, 0, -half + 1.0))
 	match spec.name:
 		&"landing":
-			_piece("cloud_lift", room, Vector3(0, 0, 2.5), 0.0, 1.2)
+			var lift := _piece("cloud_lift", room, Vector3(0, 0, 2.5), 0.0, 1.2)
+			# NO CLOUD ROOF INDOORS (playtest 2026-11-10 item 7): the lift's canopy (its third
+			# surface) hung at 1.8 to 4 m, right where the camera sits, a grey slab over the
+			# whole first look at the Factory. Under the Factory's own ceiling it is not needed.
+			if lift != null:
+				for mi in lift.find_children("*", "MeshInstance3D", true, false):
+					var m := mi as MeshInstance3D
+					if m.mesh != null and m.mesh.get_surface_count() > 2:
+						var clear := StandardMaterial3D.new()
+						clear.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+						clear.albedo_color = Color(1, 1, 1, 0)
+						m.set_surface_override_material(2, clear)
 			_mark(markers, "lift", Vector3(0, 0.4, 2.5))
 		&"welcome":
 			for x in [-3.5, 3.5]:

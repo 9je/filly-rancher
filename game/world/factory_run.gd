@@ -107,6 +107,105 @@ func _ready() -> void:
 
 # --- building ------------------------------------------------------------------------
 
+## DIRECTION AT EVERY STEP (playtest 2026-11-10 items 14 and 85: "i had no clear direction at
+## any point", "im up here again idk what to do"). Every wait in this file already says where
+## it waits (`goal`: an area to walk into, or a spot to hold E at). The card under the compass
+## says it in words, the compass lights it, and a ring of light stands on the floor there.
+const AREA_WORDS := {
+	&"factory_welcome": "Follow Marigold into the Welcome Hall",
+	&"factory_classroom": "Follow Marigold to the classroom",
+	&"factory_giftshop": "Follow Marigold to the gift shop",
+	&"factory_gallery": "Sneak past the Collectors to the gallery",
+	&"factory_landing": "Run for the lift",
+	&"factory_holding": "Find the holding pens",
+	&"factory_control": "Get to the control room",
+}
+var _card: Control
+var _compass: Control
+var _beacon: Node3D
+var _goal_node: Node3D
+
+
+func _build_guidance() -> void:
+	_compass = (load("res://ui/compass.gd") as GDScript).new()
+	_compass.name = "Compass"
+	hud.add_child(_compass)
+	_compass.set("player", player)
+	_compass.call("set_places", [] as Array[Dictionary])
+	_card = (load("res://ui/objective_card.gd") as GDScript).new()
+	_card.name = "ObjectiveCard"
+	hud.add_child(_card)
+	_goal_node = Node3D.new()
+	_goal_node.name = "GoalPoint"
+	add_child(_goal_node)
+	_beacon = _make_beacon()
+	add_child(_beacon)
+	_beacon.visible = false
+
+
+## A ring of light on the floor with a soft column over it: where to go, without words in
+## the world (house rule: no floating text).
+func _make_beacon() -> Node3D:
+	var root := Node3D.new()
+	root.name = "GoalBeacon"
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_color = Color(1.0, 0.86, 0.42, 0.85)
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var ring := MeshInstance3D.new()
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.75
+	torus.outer_radius = 0.95
+	torus.rings = 40
+	torus.ring_segments = 8
+	ring.mesh = torus
+	ring.material_override = mat
+	ring.position.y = 0.06
+	ring.scale = Vector3(1, 0.25, 1)
+	root.add_child(ring)
+	var col_mat := mat.duplicate() as StandardMaterial3D
+	col_mat.albedo_color = Color(1.0, 0.9, 0.55, 0.16)
+	var col := MeshInstance3D.new()
+	var cyl := CylinderMesh.new()
+	cyl.top_radius = 0.55
+	cyl.bottom_radius = 0.85
+	cyl.height = 3.2
+	col.mesh = cyl
+	col.material_override = col_mat
+	col.position.y = 1.6
+	col.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(col)
+	var tw := root.create_tween().set_loops()
+	tw.tween_property(ring, "scale", Vector3(1.15, 0.25, 1.15), 0.7).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(ring, "scale", Vector3(1.0, 0.25, 1.0), 0.7).set_trans(Tween.TRANS_SINE)
+	return root
+
+
+func _process(_delta: float) -> void:
+	if _card == null:
+		return
+	if goal.is_empty() or people.is_talking():
+		_card.call("show_objective", {}, -1.0)
+		_compass.call("set_goal", null, 0)
+		_beacon.visible = false
+		return
+	var at: Vector3 = goal.get("at", Vector3.ZERO)
+	var words := ""
+	if String(goal.get("kind", "")) == "hold":
+		var verb := String(goal.get("verb", ""))
+		words = "Hold %s: %s" % [InputDeviceScript.hint(&"interact"), verb]
+	else:
+		words = String(AREA_WORDS.get(StringName(goal.get("area", &"")), "Go on"))
+	_goal_node.global_position = at
+	_compass.call("set_goal", _goal_node, PlaceSign.Icon.STAR)
+	_beacon.global_position = Vector3(at.x, player.global_position.y if absf(player.global_position.y - at.y) < 1.5 else at.y, at.z)
+	_beacon.visible = true
+	var d := Vector2(at.x - player.global_position.x, at.z - player.global_position.z).length()
+	_card.call("show_objective", {"id": StringName(words), "goal": &"", "icon": PlaceSign.Icon.STAR,
+		"words": words}, d)
+
+
 ## PAUSE UP HERE TOO (playtest 2026-11-10 item 74: "you cant pause when youre in dialogue and
 ## this whole time im up here"). The Factory had no pause menu at all. Same menu as the
 ## ranch, minus the rows that only mean something down there; a conversation waits under it.
@@ -176,7 +275,12 @@ func _build() -> void:
 	player.name = "Player"
 	player.add_to_group(&"player")
 	add_child(player)
-	player.global_position = interior.room_origin(&"landing") + Vector3(0, 0.3, -2.0)
+	# OFF THE LIFT, NOT UNDER IT (playtest 2026-11-10 item 7: the first look at the Factory
+	# was from floor level under the cloud-lift's canopy, a grey slab over half the screen).
+	# She stands far enough down the landing that the camera behind her is clear of the lift.
+	# room_origin() is the landing's far (+Z) edge; the lift stands 2.5 m in from its centre and
+	# its base reaches 0.4 m past the centre, 1.1 m tall. Off it, toward the Welcome Hall.
+	player.global_position = interior.room_origin(&"landing") + Vector3(0, 0.3, -8.0)
 	hud = HudScene.instantiate()
 	add_child(hud)
 	tone = WorldToneScript.new()
@@ -191,6 +295,7 @@ func _build() -> void:
 		if player.has_method("get_camera_pivot") else null
 	people.effect.connect(_on_effect)
 	_build_pause()
+	_build_guidance()
 	_fade = ColorRect.new()
 	_fade.color = Color(1, 1, 1, 0)
 	_fade.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -249,15 +354,18 @@ func _collector(index: int, at: Vector3) -> Npc:
 func _reveal() -> void:
 	tone.snap(0.0)
 	var landing := interior.room_origin(&"landing")
-	var marigold := _cast_npc(&"marigold", landing + Vector3(1.5, 0, -3.5))
-	var tumble := _cast_npc(&"tumble", landing + Vector3(-1.5, 0, -2.5))
+	# Marigold in front of her, Tumble at her side, the other stewards along the right wall:
+	# everyone the welcome is about is in the frame (item 7).
+	var marigold := _cast_npc(&"marigold", landing + Vector3(0.9, 0, -10.4))
+	var tumble := _cast_npc(&"tumble", landing + Vector3(-1.3, 0, -8.2))
 	tumble.set_mode_follow(player)
 	for i in range(3):
 		var s := CharacterDef.new()
 		s.id = StringName("steward_%d" % i)
 		s.char_seed = 5100 + i
-		_npc(s.id, s, landing + Vector3(-3.0 + i * 1.6, 0, -5.0)).set_mode_stand()
+		_npc(s.id, s, landing + Vector3(3.6, 0, -7.6 - i * 1.4)).set_mode_stand()
 	step_reached.emit(&"landing")
+	await _establish(landing)
 	await _say(&"marigold", &"factory_welcome")
 	for room in [&"welcome", &"classroom", &"giftshop"]:
 		var guide := interior.marker(room, "guide")
@@ -286,6 +394,20 @@ func _reveal() -> void:
 		await _contract_ending()
 	else:
 		await _escape()
+
+
+## THE FIRST LOOK (item 7): a short, skippable establishing move down the landing from the
+## lift to the doors of the Welcome Hall, the party colours and the cast in frame, before the
+## camera settles behind her.
+func _establish(landing: Vector3) -> void:
+	if skip_waits:
+		return
+	var c := Cinematic.shared(get_tree())
+	await c.play([
+		{"from": landing + Vector3(-4.4, 3.4, -4.6), "to": landing + Vector3(-3.4, 2.5, -6.6),
+			"look": landing + Vector3(0.6, 1.0, -9.8), "time": 3.2, "fov": 55.0,
+			"caption": "The Rainbow Factory"},
+	], {"freeze": [player]})
 
 
 func _walkway() -> void:
@@ -432,7 +554,7 @@ func _climax(m: StringName) -> void:
 func _jubilee() -> void:
 	tone.snap(0.15)
 	var landing := interior.room_origin(&"landing")
-	var marigold := _cast_npc(&"marigold", landing + Vector3(1.5, 0, -3.5))
+	var marigold := _cast_npc(&"marigold", landing + Vector3(0.9, 0, -10.4))
 	for i in range(8):
 		var s := CharacterDef.new()
 		s.id = StringName("guest_%d" % i)
@@ -470,7 +592,7 @@ func _lights_out() -> void:
 				allies.append(a)
 	var k := 0
 	for a in allies:
-		var n := _cast_npc(a, landing + Vector3(-2.0 + k * 1.4, 0, -1.0))
+		var n := _cast_npc(a, landing + Vector3(-2.0 + k * 1.4, 0, -9.6))
 		n.set_mode_follow(player)
 		k += 1
 	await _say(&"static", &"lights_out_landing")
