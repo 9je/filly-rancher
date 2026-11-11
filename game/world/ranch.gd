@@ -5852,8 +5852,12 @@ const PLACE_SIGNS := [
 ## Where the fingerpost stands: just off the plaza's south-west kerb, in the fork where the pen
 ## lane leaves the main street (P8 S7's plaza plan), off both.
 const SIGNPOST_AT := Vector3(-2.5, 0.0, 5.5)
-## Where the yard sign stands, where the pen lane reaches the pens.
-const YARD_SIGN_AT := Vector3(-17.5, 0.0, 11.5)
+## Where the yard sign stands: beside the pen lane, a few strides before it reaches the pens.
+## P9 item 65 (the owner: "the Pens sign is planted against one pen's corner, blocking the
+## view"): it stood 1.6 m off the first pen's fence, square in front of its corner; now on the
+## lane's south side, about 6.5 m short of the fence, where it announces the yard without
+## standing in front of any pen.
+const YARD_SIGN_AT := Vector3(-12.6, 0.0, 14.6)
 
 
 func _stand_place_signs() -> void:

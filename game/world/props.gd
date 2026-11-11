@@ -562,7 +562,10 @@ const LAYOUT := [
 	# re-review): the terrain-painted path serves the walk up, and a rigid plate on 0.36 to
 	# 0.80 m of relief was the same half-buried plank the road fix exists to end.
 	{"file": "mlp_bush.glb", "at": Vector2(-3.0, 54.0), "yaw": 200.0, "family": &"mlp"},
-	{"file": "mlp_bush.glb", "at": Vector2(-9.0, 53.5), "yaw": 40.0, "family": &"mlp"},
+	# P9 item 64 (the owner: "a bush blocks the foot of the ramp to the purple building"): the
+	# west bush stood at x -9, a pace off the ramp's foot (the doors are at x -10); it now
+	# mirrors the east one across the doors, so the pair frames the entrance and the ramp is clear.
+	{"file": "mlp_bush.glb", "at": Vector2(-16.5, 54.0), "yaw": 40.0, "family": &"mlp"},
 	# --- the homestead yard: a farmstead, not a field with objects dropped in it ---------
 	# RE-LAID 2026-10-25 with the buildings round the plaza (owner playtest: "all the
 	# buildings feel very randomly placed"): the barn's working corner north-west, the well
