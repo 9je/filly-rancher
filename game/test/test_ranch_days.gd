@@ -36,6 +36,19 @@ func test_sleeping_skips_to_the_next_dawn_and_saves() -> void:
 	assert_signal_emitted(ranch._game_state, "state_saved", "and the ranch is saved")
 
 
+## PLAYTEST 2026-11-10 ITEM 4: the pylons are night work; by day the bed rests till nightfall.
+func test_by_day_she_rests_till_nightfall_and_saves() -> void:
+	var ranch := _ranch(300.0)
+	assert_eq(ranch._world.phase(), WorldStateScript.Phase.DAY)
+	watch_signals(ranch._game_state)
+	var rested: float = ranch.rest_till_night()
+	assert_almost_eq(rested, 780.0 - 300.0, 0.01)
+	assert_eq(ranch._world.phase(), WorldStateScript.Phase.NIGHT, "she wakes as night falls")
+	assert_eq(ranch._world.cycle_index(), 0, "the same day")
+	assert_signal_emitted(ranch._game_state, "state_saved")
+	assert_almost_eq(ranch.rest_till_night(), 0.0, 0.01, "at night there is nothing to rest toward")
+
+
 func test_a_night_through_a_collection_day_still_bills_it() -> void:
 	# The night before cycle 3 (the first collection day): sleeping must not skip it.
 	var ranch := _ranch(3.0 * WorldStateScript.CYCLE_SECONDS - 200.0)

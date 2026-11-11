@@ -225,7 +225,9 @@ static func prompt_for(action: Dictionary, key: String) -> String:
 		Kind.TALK:
 			return "%s: talk to %s" % [key, subject]
 		Kind.SLEEP:
-			return "%s: sleep till dawn (the ranch saves)" % key
+			if subject == "night":
+				return "%s: rest till nightfall" % key
+			return "%s: sleep till dawn" % key
 	return ""
 
 

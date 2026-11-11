@@ -5034,7 +5034,8 @@ func interaction_candidates() -> Array[Dictionary]:
 			InteractionScript.Kind.DEPOT, _door_gap(^"Buildings/Depot")))
 	if can_sleep_here():
 		out.append(InteractionScript.candidate(
-			InteractionScript.Kind.SLEEP, _door_gap(^"Buildings/Farmhouse")))
+			InteractionScript.Kind.SLEEP, _door_gap(^"Buildings/Farmhouse"),
+			"dawn" if _night_or_dusk() else "night"))
 	# THE BAN CLOSES THE DOOR RATHER THAN GREYING IT OUT. The shipped code showed no prompt
 	# under a ban but still let the press through to casino_menu.open(), which then refused
 	# on its own can_open; a player got a silent nothing. A banned Palace is simply not
@@ -5590,14 +5591,30 @@ var _sleeping := false
 var autosaves := 0
 
 
-## Whether the farmhouse door offers sleep right now: at dusk or night, at the door, outdoors.
+## Whether the farmhouse door offers rest right now: at the door, outdoors, the clock running.
+## At dusk or night it sleeps till dawn; by day it rests till nightfall (playtest 2026-11-10
+## item 4: the pylons are night work, and the bed only skipped past the night).
 func can_sleep_here() -> bool:
 	if _world == null or _in_palace or player == null or _world.is_pinned():
 		return false
-	var phase := _world.phase()
-	if phase != WorldStateScript.Phase.DUSK and phase != WorldStateScript.Phase.NIGHT:
-		return false
 	return _door_gap(^"Buildings/Farmhouse") <= SLEEP_DOOR_RADIUS
+
+
+func _night_or_dusk() -> bool:
+	if _world == null:
+		return false
+	var phase := _world.phase()
+	return phase == WorldStateScript.Phase.DUSK or phase == WorldStateScript.Phase.NIGHT
+
+
+## Seconds from now to nightfall (the start of NIGHT); 0 at dusk or night.
+func seconds_to_night() -> float:
+	if _world == null or _night_or_dusk():
+		return 0.0
+	var start := 0.0
+	for p in range(WorldStateScript.Phase.NIGHT):
+		start += WorldStateScript.PHASE_SECONDS[p]
+	return maxf(0.0, start - fposmod(_world.elapsed(), WorldStateScript.CYCLE_SECONDS))
 
 
 ## Seconds from now to the next dawn (the start of the next cycle).
@@ -5612,7 +5629,19 @@ func seconds_to_dawn() -> float:
 func sleep_till_dawn() -> float:
 	if _world == null or _world.is_pinned() or _game_state == null:
 		return 0.0
-	var left := seconds_to_dawn()
+	return _pass_time(seconds_to_dawn(), true)
+
+
+## REST TILL NIGHTFALL (item 4): the same skip as a night's sleep, pens ticking and the ranch
+## saved, ending as NIGHT begins. Returns the seconds rested (0 if she could not).
+func rest_till_night() -> float:
+	if _world == null or _world.is_pinned() or _game_state == null:
+		return 0.0
+	return _pass_time(seconds_to_night(), false)
+
+
+func _pass_time(seconds: float, to_dawn: bool) -> float:
+	var left := seconds
 	var slept := left
 	var pens: Array[Pen] = []
 	for slot in _plot_slots():
@@ -5627,16 +5656,22 @@ func sleep_till_dawn() -> float:
 		left -= step
 	var ok := save_game()
 	_autosave_t = 0.0
-	_toast("Good morning! Day %d. %s" % [_world.cycle_index() + 1,
-		"The ranch is saved." if ok else "SAVE FAILED. See the log."])
-	_novelty("mechanic", "first_sleep", "Slept the night through at the farmhouse")
+	if to_dawn:
+		_toast("Good morning! Day %d. %s" % [_world.cycle_index() + 1,
+			"The ranch is saved." if ok else "SAVE FAILED. See the log."])
+		_novelty("mechanic", "first_sleep", "Slept the night through at the farmhouse")
+	else:
+		_toast("Nightfall. %s" % ["The ranch is saved." if ok else "SAVE FAILED. See the log."])
 	return slept
 
 
 func _sleep_with_fade() -> void:
 	_sleeping = true
 	await _palace_fade_to(1.0, 0.6)
-	sleep_till_dawn()
+	if _night_or_dusk():
+		sleep_till_dawn()
+	else:
+		rest_till_night()
 	await get_tree().create_timer(0.4).timeout
 	await _palace_fade_to(0.0, 0.8)
 	_sleeping = false
