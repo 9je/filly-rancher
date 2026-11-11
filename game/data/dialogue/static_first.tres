@@ -15,28 +15,28 @@ when = {
 }
 nodes = Array[Dictionary]([{
 "id": "start",
-"text": "You're the steward who ran. Good. I've been waiting at this fence a long time for one of you to run.",
+"text": "You ran. Good. I've stood at this fence a long time, waiting for a steward to run.",
 "who": "static",
 "mood": "blank",
 "next": "two"
 }, {
 "id": "two",
-"text": "I can't fix the Works. But there's a path through the Everfree, past the tangle. The Lantern Line. Marked ponies can walk it and live free on the other side.",
+"text": "I went up on a Color Day too. I came back down without mine.",
 "who": "static",
-"mood": "blank",
+"mood": "sad",
+"anim": "look",
 "next": "three"
 }, {
 "id": "three",
-"text": "Unmarked ones get found. So help them Bloom. A marked pony can't be drained. That's the whole trick.",
-"who": "static",
-"mood": "blank",
-"anim": "look",
-"next": "four"
-}, {
-"id": "four",
-"text": "And the pylons. Four of them, one in every region. Each one feeds the rainbow. Cut all four and I can get you back inside on Color Day.",
+"text": "Four pylons feed that rainbow, one in every region. Cut them at night and the Works goes hungry.",
 "who": "static",
 "mood": "blank",
 "anim": "nod",
+"next": "four"
+}, {
+"id": "four",
+"text": "Cut all four, and I'll get you back inside. Find friends on the way. You'll need them.",
+"who": "static",
+"mood": "happy",
 "flag": "static_met"
 }])

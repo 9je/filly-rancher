@@ -18,7 +18,7 @@ when = {
 }
 nodes = Array[Dictionary]([{
 "id": "start",
-"text": "Pylons first. Then the corrals, at night, past the lanterns. Then bring your marked ones to the gate beyond the Everfree.",
+"text": "Pylons, at night. If you can get past the lanterns, the corrals too. Marked ponies can walk the Lantern Line past the Everfree, and live.",
 "who": "static",
 "mood": "blank"
 }])

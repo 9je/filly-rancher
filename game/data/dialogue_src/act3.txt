@@ -8,13 +8,15 @@ speaker: static
 priority: 110
 when: {"path": "rescue", "flags_none": ["static_met"]}
 
-start [static blank] You're the steward who ran. Good. I've been waiting at this fence a long time for one of you to run.
+# PLAYTEST 2026-11-10 ITEM 25 ("dialogue with mayor was terrible after"): four flat lines that
+# dumped the whole of Act Three. Now a pony with a reason, and one job to start with.
+start [static blank] You ran. Good. I've stood at this fence a long time, waiting for a steward to run.
   -> two
-two [static blank] I can't fix the Works. But there's a path through the Everfree, past the tangle. The Lantern Line. Marked ponies can walk it and live free on the other side.
+two [static sad look] I went up on a Color Day too. I came back down without mine.
   -> three
-three [static blank look] Unmarked ones get found. So help them Bloom. A marked pony can't be drained. That's the whole trick.
+three [static blank nod] Four pylons feed that rainbow, one in every region. Cut them at night and the Works goes hungry.
   -> four
-four [static blank nod] And the pylons. Four of them, one in every region. Each one feeds the rainbow. Cut all four and I can get you back inside on Color Day.
+four [static happy] Cut all four, and I'll get you back inside. Find friends on the way. You'll need them.
   flag: static_met
 
 === static_status
@@ -22,7 +24,7 @@ speaker: static
 priority: 60
 when: {"path": "rescue", "flags_all": ["static_met"], "max": {"pylons": 3}}
 
-start [static blank] Pylons first. Then the corrals, at night, past the lanterns. Then bring your marked ones to the gate beyond the Everfree.
+start [static blank] Pylons, at night. If you can get past the lanterns, the corrals too. Marked ponies can walk the Lantern Line past the Everfree, and live.
 
 === static_ready
 speaker: static
