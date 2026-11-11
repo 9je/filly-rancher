@@ -117,6 +117,19 @@ func _run() -> void:
 			for k in 40:
 				await process_frame
 			print("GUARD caught=", caught[0])
+			# A close front view of the Collector in uniform (owner 2026-11-11).
+			var gcam := Camera3D.new()
+			scene.add_child(gcam)
+			var gf: Vector3 = pat.call("forward")
+			gcam.global_position = pat.global_position + gf * 3.2 + Vector3(0.8, 1.6, 0)
+			gcam.look_at(pat.global_position + Vector3(0, 1.2, 0))
+			pat.enabled = false
+			for k in 20:
+				gcam.make_current()
+				await process_frame
+			await _shot("lights_out_collector", 2)
+			player.call("get_camera_pivot").get_node("CameraRig").call("get_camera").make_current()
+			gcam.queue_free()
 		var gallery: Vector3 = interior.call("room_origin", &"gallery")
 		for k in 300:
 			var g: Dictionary = scene.get("goal")

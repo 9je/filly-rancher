@@ -450,6 +450,13 @@ static func _dress_collector(n: Node) -> void:
 		var piece: Node3D = AccessoriesScript.wear_kit(body, id)
 		if piece != null and ToonStyler.shading_enabled:
 			PonyPaintScript.paint_piece(piece)
+	# The fitted goggles from the wardrobe (owner 2026-11-11: "do they still look like shit?"),
+	# pushed up on the brow: a uniform, not a grey pony.
+	for e: Dictionary in AccessoriesScript.LIST:
+		if e.id == &"pony_goggles":
+			var g := AccessoriesScript.put_on(body, e, &"CollectorGoggles")
+			if g != null and ToonStyler.shading_enabled:
+				PonyPaintScript.paint_piece(g)
 
 
 ## A brisk walk, not a shuffle.

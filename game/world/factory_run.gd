@@ -22,6 +22,7 @@ const LoadingScreenScript := preload("res://ui/loading_screen.gd")
 const InteriorScript := preload("res://world/factory_interior.gd")
 const WindowScript := preload("res://world/factory_window.gd")
 const PatrolScript := preload("res://world/collector_patrol.gd")
+const HappeningsScript := preload("res://world/happenings.gd")
 const PeopleScript := preload("res://world/people.gd")
 const NpcScript := preload("res://actors/npc/npc.gd")
 const WorldToneScript := preload("res://world/world_tone.gd")
@@ -346,8 +347,9 @@ func _collector(index: int, at: Vector3) -> Npc:
 	def.gen = {"race": &"earth"}
 	def.look = {"coat": "8a8f99", "mane": "4d525c", "mane2": "5f6470", "tail": "4d525c"}
 	var n := _npc(def.id, def, at)
-	# No goggles (playtest 2026-11-10 item 12: "a weird thing on their head"): they sat as a
-	# ring over the crown, not over the eyes. The grey coat and the lantern are the uniform.
+	# The Collector's uniform (coat, clipboard, fitted goggles; owner 2026-11-11), the same
+	# as the one who walks past the ranch. The old goggles prop sat as a ring over the crown.
+	HappeningsScript._dress_collector(n)
 	return n
 
 

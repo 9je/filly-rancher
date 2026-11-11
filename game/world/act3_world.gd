@@ -118,6 +118,7 @@ func _guard(at: Vector2, cid: String) -> Npc:
 	var y := float(height_at.call(at.x, at.y))
 	n.position = Vector3(at.x + 4.5, y, at.y)
 	n.setup(def)
+	load("res://world/happenings.gd")._dress_collector(n)
 	var patrol: CollectorPatrol = PatrolScript.new()
 	patrol.points.assign([Vector3(at.x + 4.5, y, at.y + 4.0), Vector3(at.x + 4.5, y, at.y - 4.0),
 		Vector3(at.x - 4.5, y, at.y - 4.0), Vector3(at.x - 4.5, y, at.y + 4.0)])
