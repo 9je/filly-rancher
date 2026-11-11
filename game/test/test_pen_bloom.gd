@@ -119,3 +119,45 @@ func test_a_full_grand_pen_of_drifters_keeps_blooming() -> void:
 		pen.tick(1.0)
 	for d in all:
 		assert_gt(d.bloom, 0.0, "eight in a Grand pen still make progress (CROWDED_AT froze them)")
+
+
+## PLAYTEST 2026-11-10 ITEM 1: "you force them to grow up so youre not waiting idly". Play
+## gives every Drifter PLAY_BOOST at once, cures boredom for PLAY_GLOW, then waits out the
+## cooldown; a pen with no Drifters offers no game.
+func test_playing_with_the_drifters_pushes_their_bloom_and_has_a_cooldown() -> void:
+	var pen := _pen()
+	var a := _drifter(21)
+	var b := _drifter(22)
+	pen.add_pony(a)
+	pen.add_pony(b)
+	assert_true(pen.can_play())
+	assert_eq(pen.play(), 2, "both Drifters played")
+	assert_almost_eq(a.bloom, PenScript.PLAY_BOOST, 0.001)
+	assert_false(pen.can_play(), "then a cooldown")
+	assert_eq(pen.play(), 0)
+	assert_true(pen._has_friend(a), "nopony is bored while the game's glow lasts")
+	pen.tick(PenScript.PLAY_COOLDOWN + 0.1)
+	assert_true(pen.can_play(), "the next game after the cooldown")
+	# A brisk few minutes of play and care Blooms a fresh Drifter well inside the old wait.
+	var c := _drifter(23)
+	var p2 := _pen()
+	p2.add_pony(c)
+	var t := 0.0
+	while not c.is_marked() and t < 600.0:
+		c.happiness = 1.0
+		c.hunger = 0.0
+		if p2.can_play():
+			p2.play()
+		p2.tick(1.0)
+		t += 1.0
+	assert_true(c.is_marked(), "she Blooms with play")
+	assert_lt(t, 100.0, "inside 100 s of play (took %.0f s)" % t)
+
+
+func test_no_drifters_no_game() -> void:
+	var pen := _pen()
+	assert_false(pen.can_play(), "an empty pen")
+	var a := _drifter(31)
+	pen.add_pony(a)
+	pen.bloom_now(a)
+	assert_false(pen.can_play(), "a pen of Bloomed ponies")

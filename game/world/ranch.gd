@@ -5065,6 +5065,10 @@ func _pen_candidate(slot: PlotSlot, gap: float) -> Dictionary:
 	var pen := slot.get_built() as Pen
 	var full: bool = pen != null and pen.is_full()
 	var bigger := _upgrade_for(slot)
+	# PLAY TAKES THE KEY AT A PEN OF DRIFTERS WITH AN EMPTY BAG (playtest 2026-11-10 items 1
+	# and 36): the old prompt there was "the pen is here, your saddlebag is empty".
+	if next_pony.is_empty() and pen != null and pen.can_play():
+		return InteractionScript.candidate(InteractionScript.Kind.PEN_PLAY, gap, String(slot.name))
 	if bigger != null and (next_pony.is_empty() or full):
 		var price: int = slot.contents.upgrade_price(bigger)
 		return InteractionScript.priced(InteractionScript.Kind.PEN_UPGRADE, gap,
@@ -5140,6 +5144,15 @@ func perform_interaction(action: Dictionary) -> bool:
 		InteractionScript.Kind.PEN_MOVE_IN:
 			var pen_slot: PlotSlot = _nearest_occupied_slot()
 			return _move_pony_into_pen(pen_slot) if pen_slot != null else false
+		InteractionScript.Kind.PEN_PLAY:
+			var play_slot: PlotSlot = _slot_named(String(action.get("subject", "")))
+			var play_pen := play_slot.get_built() as Pen if play_slot != null else null
+			if play_pen == null:
+				return false
+			var n := play_pen.play()
+			if n > 0:
+				_novelty("mechanic", "first_play", "Played with the Drifters to help them Bloom")
+			return n > 0
 		InteractionScript.Kind.PEN_UPGRADE:
 			var up_slot: PlotSlot = _slot_named(String(action.get("subject", "")))
 			var bigger := _upgrade_for(up_slot)

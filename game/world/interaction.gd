@@ -24,7 +24,7 @@ extends RefCounted
 ## PEN_UPGRADE and PLOT_CLEAR are appended rather than slotted in beside the other ground
 ## kinds, so every int a driver or a test log already holds keeps its meaning.
 enum Kind { NONE, PLOT_BUILD, PEN_MOVE_IN, MARKET, BOARD, MAILBOX, DEPOT, PALACE, TALK,
-	PEN_UPGRADE, PLOT_CLEAR, PALACE_STATION, PALACE_EXIT, SPIKE, SLEEP }
+	PEN_UPGRADE, PLOT_CLEAR, PALACE_STATION, PALACE_EXIT, SPIKE, SLEEP, PEN_PLAY }
 
 ## THE ORDER, HIGHEST FIRST, and every one of these positions is a decision.
 ##
@@ -58,7 +58,7 @@ enum Kind { NONE, PLOT_BUILD, PEN_MOVE_IN, MARKET, BOARD, MAILBOX, DEPOT, PALACE
 ## and nothing more), so where they rank only matters against each other: a game station
 ## beats the way out, because a player standing between the cage and the doors came in to
 ## play.
-const PRIORITY: Array[int] = [Kind.PLOT_BUILD, Kind.PEN_MOVE_IN, Kind.PEN_UPGRADE,
+const PRIORITY: Array[int] = [Kind.PLOT_BUILD, Kind.PEN_MOVE_IN, Kind.PEN_PLAY, Kind.PEN_UPGRADE,
 	Kind.PLOT_CLEAR, Kind.TALK, Kind.MARKET, Kind.BOARD, Kind.MAILBOX, Kind.SPIKE, Kind.DEPOT,
 	Kind.PALACE, Kind.PALACE_STATION, Kind.PALACE_EXIT, Kind.SLEEP]
 
@@ -198,6 +198,8 @@ static func prompt_for(action: Dictionary, key: String) -> String:
 			if subject.is_empty():
 				return "%s: the pen is here, %s" % [key, EMPTY_BAG]
 			return "%s: move %s in" % [key, subject]
+		Kind.PEN_PLAY:
+			return "%s: play with the Drifters" % key
 		Kind.PEN_UPGRADE:
 			var line := "%s: %supgrade to %s (%s)" % [key,
 				"pen full, " if bool(action.get("full", false)) else "",

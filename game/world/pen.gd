@@ -504,6 +504,7 @@ func tick(delta: float) -> int:
 		return 0
 	var produced := 0
 	var night := PonyTraitsScript.night
+	_tick_play(delta)
 	for inst in _residents:
 		# HER QUIRK SHAPES HER DAY (game/systems/pony_traits.gd): a glutton gets hungry twice
 		# as fast, a loner frets in a crowd, a sleepyhead is never sad at night, a night owl
@@ -591,6 +592,79 @@ signal bloomed(inst: PonyInstance)
 ## Set by the Factory path's Calm Lamp upgrade: residents never Bloom (and stop emoting).
 var calm_lamp := false
 
+## PLAY WITH THEM (playtest 2026-11-10 item 1: "in slime rancher you force them to grow up so
+## youre not waiting idly"). E at a pen with Drifters in it, saddlebag empty: every Drifter
+## here gets PLAY_BOOST of her Bloom at once and a lift in spirits, and for PLAY_GLOW seconds
+## nopony here is bored (she has a friend: you). Then PLAY_COOLDOWN before the next game. A
+## pen of happy, fed Drifters Blooms in a few minutes of play instead of a wait.
+const PLAY_BOOST := 0.15
+const PLAY_HAPPY := 0.25
+const PLAY_GLOW := 120.0
+const PLAY_COOLDOWN := 20.0
+var _play_cd := 0.0
+var _play_glow := 0.0
+
+signal played(count: int)
+
+
+## Drifters here who can still Bloom.
+func drifters_waiting() -> int:
+	var n := 0
+	for inst in _residents:
+		if inst.is_stock() and not inst.is_marked():
+			n += 1
+	return n
+
+
+## Whether a game of play is on offer: Drifters waiting, the last game over, no Calm Lamp.
+func can_play() -> bool:
+	return _play_cd <= 0.0 and not calm_lamp and drifters_waiting() > 0
+
+
+## Seconds until the next game (0 when ready).
+func play_cooldown_left() -> float:
+	return maxf(0.0, _play_cd)
+
+
+## Play with the herd. Returns how many Drifters it reached (0 if it was not on offer).
+func play() -> int:
+	if not can_play():
+		return 0
+	var n := 0
+	for inst in _residents.duplicate():
+		if not inst.is_stock() or inst.is_marked():
+			continue
+		inst.happiness = minf(PonyInstanceScript.STATE_MAX, inst.happiness + PLAY_HAPPY)
+		inst.bloom = minf(1.0, inst.bloom + PLAY_BOOST)
+		n += 1
+		_hop(_bodies.get(String(inst.uid), _bodies.get(inst.uid)), 0.08 * float(n))
+		if inst.bloom >= 1.0:
+			bloom_now(inst)
+	_play_glow = PLAY_GLOW
+	_play_cd = PLAY_COOLDOWN
+	played.emit(n)
+	return n
+
+
+## A happy little double hop of her visuals (the body stays where physics has it).
+func _hop(body: Node, delay: float) -> void:
+	if body == null or not is_instance_valid(body) or not body.is_inside_tree():
+		return
+	var vis := body.get_node_or_null("Visuals") as Node3D
+	if vis == null:
+		return
+	var base := vis.position.y
+	var tw := body.create_tween()
+	tw.tween_interval(delay)
+	for h in [0.45, 0.25]:
+		tw.tween_property(vis, "position:y", base + h, 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw.tween_property(vis, "position:y", base, 0.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+
+
+func _tick_play(delta: float) -> void:
+	_play_cd = maxf(0.0, _play_cd - delta)
+	_play_glow = maxf(0.0, _play_glow - delta)
+
 
 func _tick_bloom(inst: PonyInstance, delta: float) -> void:
 	inst.favorite_glow = maxf(0.0, inst.favorite_glow - delta)
@@ -667,6 +741,8 @@ func body_of(uid: StringName) -> Node3D:
 
 
 func _has_friend(inst: PonyInstance) -> bool:
+	if _play_glow > 0.0:
+		return true
 	var mine := _personality_of(inst)
 	var social := PonyTraitsScript.is_friend_to_all(PonyTraitsScript.quirk_of(inst))
 	for other in _residents:
