@@ -1014,3 +1014,17 @@ func test_the_catch_ghost_flies_from_her_into_the_nozzle() -> void:
 	var mid: Vector3 = Beam.ghost_scale(0.5)
 	assert_gt(mid.y, mid.x, "stretched along the pull")
 	assert_lt(Beam.ghost_scale(1.0).length(), 0.2, "nothing left by the nozzle")
+
+
+## PLAYTEST 2026-11-10 ITEM 27: a corral silhouette (physics off) let slip from the beam hung in
+## the air. Scenery ponies are not grabbable; a living pony still is.
+func test_a_scenery_pony_with_her_physics_off_is_not_grabbable() -> void:
+	var beam = load("res://actors/player/magic_beam.gd").new()
+	var live: Node3D = PonyScene.instantiate()
+	var scenery: Node3D = PonyScene.instantiate()
+	add_child_autofree(live)
+	add_child_autofree(scenery)
+	scenery.set_physics_process(false)
+	assert_true(beam._is_grabbable(live), "a living pony must still be beamable")
+	assert_false(beam._is_grabbable(scenery), "a corral silhouette must not be beamable")
+	beam.free()

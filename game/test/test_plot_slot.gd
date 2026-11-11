@@ -370,3 +370,25 @@ func _a_plot() -> PlotData:
 	registry.load_all(load("res://systems/plot_registry.gd").PLOT_DIR)
 	var all: Array = registry.all()
 	return all[0] if not all.is_empty() else null
+
+
+## PLAYTEST 2026-11-10 ITEM 29: a townspony standing on the plot was fenced into the new pen.
+## Building steps her out past the nearest fence; one standing clear of it is left alone.
+func test_building_a_pen_steps_a_townspony_out_of_its_footprint() -> void:
+	var slot := _slot()
+	add_child(slot)
+	var inside := CharacterBody3D.new()
+	inside.add_to_group(&"townsfolk")
+	add_child_autofree(inside)
+	inside.global_position = Vector3(1.0, 0.0, 0.5)
+	var outside := CharacterBody3D.new()
+	outside.add_to_group(&"townsfolk")
+	add_child_autofree(outside)
+	outside.global_position = Vector3(12.0, 0.0, 0.0)
+	assert_true(slot.build(_plot("paddock", 0, 3)))
+	var half := PenScript.HALF_EXTENT
+	var p := inside.global_position
+	assert_true(absf(p.x) > half or absf(p.z) > half,
+		"she is still inside the fence at %s" % str(p))
+	assert_almost_eq(p.x, half + PlotSlotScript.BYSTANDER_GAP, 0.01, "out past the nearest (+X) fence")
+	assert_eq(outside.global_position, Vector3(12.0, 0.0, 0.0), "a pony clear of the plot is left be")

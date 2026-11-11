@@ -274,6 +274,7 @@ func build(plot: PlotData) -> bool:
 	_built_node = node
 	_refresh_stakes()
 	set_ghost(Ghost.OFF)
+	clear_bystanders()
 	built.emit(plot, node)
 	return true
 
@@ -298,8 +299,53 @@ func upgrade(plot: PlotData) -> bool:
 	if node.has_method("configure"):
 		node.call("configure", plot, slot_id)
 	contents = plot
+	clear_bystanders()
 	upgraded.emit(plot, node)
 	return true
+
+
+## NOBODY IS FENCED IN BY A BUILD (playtest 2026-11-10 item 29: a townspony standing on the
+## plot was shut inside the new Grand Pen with the herd, for good). A pen that goes up, or
+## grows, steps every townspony standing on it out past the
+## nearest fence, onto the ground there. Returns how many were moved.
+const BYSTANDER_GAP := 1.3
+
+
+func clear_bystanders() -> int:
+	var node := get_built() as Node3D
+	if node == null or not is_inside_tree():
+		return 0
+	var half_v = node.get("HALF_EXTENT")
+	if half_v == null:
+		return 0
+	var half := float(half_v)
+	var moved := 0
+	var bodies: Array[Node] = []
+	# Townsfolk only: the player stands at the plot to build it and leaves by the gate.
+	bodies.append_array(get_tree().get_nodes_in_group(&"townsfolk"))
+	for b in bodies:
+		var body := b as Node3D
+		if body == null or not body.is_inside_tree():
+			continue
+		var local := node.to_local(body.global_position)
+		if absf(local.x) > half + 0.2 or absf(local.z) > half + 0.2:
+			continue
+		var out := local
+		if absf(local.x) >= absf(local.z):
+			out.x = (1.0 if local.x >= 0.0 else -1.0) * (half + BYSTANDER_GAP)
+		else:
+			out.z = (1.0 if local.z >= 0.0 else -1.0) * (half + BYSTANDER_GAP)
+		var world := node.to_global(out)
+		var space := body.get_world_3d().direct_space_state
+		var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(
+			world + Vector3(0, 4, 0), world + Vector3(0, -6, 0), LayersScript.TERRAIN))
+		if not hit.is_empty():
+			world = hit.position
+		body.global_position = world + Vector3(0, 0.3, 0)
+		if body is CharacterBody3D:
+			(body as CharacterBody3D).velocity = Vector3.ZERO
+		moved += 1
+	return moved
 
 
 ## Take down whatever is here and return the slot to empty and buildable. Returns false if

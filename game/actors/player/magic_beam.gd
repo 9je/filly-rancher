@@ -1647,9 +1647,15 @@ func _place_target_ring() -> void:
 ## beam that does not start; she keeps walking, and the only thing that ever frees her is
 ## still her own arrival in Pony._state_leaving. An ORDINARY departure (a pony whose hours
 ## ended, no target) stays grabbable to the last step, as it always was.
+## SCENERY PONIES ARE NOT BEAMABLE (playtest 2026-11-10 item 27: "i beamed her from over the
+## fence and let her slip out and she got stuck in air"). The Intake Corral's Drifters and the
+## Factory window's line stand with their physics switched off: they are set dressing, freed
+## by the raid or the hatch, never by the beam. Held and dropped, nothing ever ran her gravity
+## again, so she hung where the beam let go.
 func _is_grabbable(body: Object) -> bool:
 	if body is PonyScript:
-		return not (body as PonyScript).is_being_delivered()
+		var pony := body as PonyScript
+		return pony.is_physics_processing() and not pony.is_being_delivered()
 	return body is RigidBody3D
 
 
