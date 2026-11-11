@@ -1,0 +1,83 @@
+# Playtest 2026-11-10 ledger
+
+One row per item in docs/playtest-2026-11-10.md. Status: OPEN, FIXED (evidence given), PARTIAL, WONTFIX (reason in DECISIONS.md).
+FIXED needs evidence from the real flow: a frame from the actual scene reached the way the owner reaches it (fresh save or the save at that beat), looked at, path named here. A passing test alone is not FIXED.
+
+| # | Wave | Item | Status | Evidence |
+|---|---|---|---|---|
+| 1 | W1 | QUIT POINT. Early game dead end: pens full of ponies you want to keep, no bits to expand, objective "Keep Drifters fed to Bloom 0/2", nothing to do but wait. Slime Rancher lets you actively push growth. Needs a player-driven way to speed Bloom, or other productive work [13][24]. | OPEN | |
+| 2 | W1 | After the first one-of-a-kinds, the next step is unclear: nothing says to deliver at the Depot, or that gems turn into bits for pen upgrades [13]. | OPEN | |
+| 3 | W1 | Idle play wins: leaving the game running during a shower bloomed the Drifters, but every time-limited event fired and expired with nobody there. Needs events that wait for the player, or a "while you were away" recap. | OPEN | |
+| 4 | W1 | After Color Day, "Cut pylons at night" means killing time until dark; the bed only sleeps till dawn, which skips the night. Needs a "wait until night" option. | OPEN | |
+| 5 | W1 | Trixie, Derpy and Rainbow Dash events, plus several notifications, all fired at once. Needs a queue, spacing and priority. | OPEN | |
+| 6 | W1 | A "race day" notice appeared though the owner had raced the day before. | OPEN | |
+| 7 | W2 | Opening camera angle is horrible: floor level looking up, a grey slab fills half the screen, ponies sunk behind a railing, your own back in the middle, the speaker not in shot [31]. | OPEN | |
+| 8 | W2 | Welcome Hall posters are blank while Marigold says "Read the posters" [32]. | OPEN | |
+| 9 | W2 | NPCs walk into walls and stay there: Marigold face-first in the door frame, Tumble wedged in a corner [33]. | OPEN | |
+| 10 | W2 | You can walk through the staff-only door with nothing marking it as trespass or blocked [34]. | OPEN | |
+| 11 | W2 | Guards do nothing: no detection, no chase; you can push and spin them like props [36]. | OPEN | |
+| 12 | W2 | Guard visuals: light cone shows behind the head, a ring/halo object on the head, cones clip through walls and doors [35][36][40][49]. | OPEN | |
+| 13 | W2 | Almost every prop in the factory has no collision. | OPEN | |
+| 14 | W2 | No direction at any point, in the reveal or the finale: no objective, marker or step order. The owner was lost twice [48]. | OPEN | |
+| 15 | W2 | The two-path choice was unclear and the text was bad. | OPEN | |
+| 16 | W2 | Tumble bugged and teleported into place to be scooped, wrecking the key emotional beat. | OPEN | |
+| 17 | W2 | The finale's hatch is hard to find; the rescued ponies are tiny grey silhouettes far below. Hold progress is a bare "52%" in the prompt [49]. | OPEN | |
+| 18 | W2 | The lever does not read as a lever or a centrepiece: a stick with a pink ball and a yellow cylinder on a grey slab [50]. | OPEN | |
+| 19 | W2 | Art: almost all white or grey, a heavy pink or grey wash over the screen, a backstage room in a clashing grey style; no rainbow in the Rainbow Factory [31][32][35][37]. | OPEN | |
+| 20 | W2 | Ponies poke up through platforms and sink into the floor [31][36]. | OPEN | |
+| 21 | W2 | Guards ignore pylon cutting in plain view (Heat stays 0), but opening one corral fence gives Heat 9. Heat is never explained: what it is, its maximum, what it does. | OPEN | |
+| 22 | W2 | "Hold the scoop on the pylon" reads weirdly. | OPEN | |
+| 23 | W2 | Intake Corral is incomprehensible: "full of Drifters waiting for the lift" but empty; "the lift" and the pylons are never connected to it or explained [39]. | OPEN | |
+| 24 | W2 | Half Light ending: quick, no "this is the end" moment, straight back into the world. Nothing says which ending it was, that others exist, or what was missed (allies, Clover, rescue count). Fennel still talks as if there is more to do. | OPEN | |
+| 25 | W2 | Dialogue with the Mayor after the factory was terrible (no specifics given). | OPEN | |
+| 26 | W1 | REPEAT. Tumble still says "When I find my mark I hope it's a cupcake. Or a rocket." when she is about to die [30]. | OPEN | |
+| 27 | W1 | Beam bug: beam a pony from over a fence, let her slip out, and she freezes in mid-air. Two ponies stacked in the sky over the orchard; the "CAUGHT!" card shows at the same time as "She slipped out!" [39][43][44]. | OPEN | |
+| 28 | W3 | Full-screen catch animation for every catch is too much: keep it for one-of-a-kinds; it stops you catching Drifters in a row. | OPEN | |
+| 29 | W1 | Building a pen fences in whoever stands on the plot (an NPC trapped in a new Grand Pen) [47]. | OPEN | |
+| 30 | W3 | Ponies in pens lie sideways or face-down against the fence and pile into each other [13][24][28][42][46][47]. | OPEN | |
+| 31 | W3 | Flank jiggle slightly too strong on ponies dropped from the beam. | OPEN | |
+| 32 | W3 | Text over the pens, reported three times this session: two lines of Drifter mood, "Pen full" in big red outlined letters, "1 / 3", a progress bar and a price sign, all floating, overlapping each other, the signs and the objective banner. Replace with a compact badge or icon [11][13][28][42][46][47]. | OPEN | |
+| 33 | W3 | Tips as wordy dialogue toasts (Spike's three-line Escape Artist quote) are easy to miss and read oddly. Mechanics should be shown, not paragraphed [22]. | OPEN | |
+| 34 | W3 | Marigold's intake-fee line is tangled; the unbloomed-Drifter rule is unclear [12]. | OPEN | |
+| 35 | W3 | Collection-day letter: a wall of tangled prose; you still do not know what you owe, by when, or what to do [29]. | OPEN | |
+| 36 | W3 | Interact prompts are long sentences ("Upgrade to Big Pen (175 bits), not enough bits"; "The pen is here, your saddlebag is empty") [11][47]. | OPEN | |
+| 37 | W1 | "Talk to Tumble" sticks on screen over your own pony even with Tumble out of view, and pressing E does nothing [41][42][44][45][46]. | OPEN | |
+| 38 | W1 | A stale tip ("Sell gems to Bramble at the market") stays on screen against a different objective [41][45]. | OPEN | |
+| 39 | W3 | Speech and objective UI overlap: dialogue boxes cover the objective banner and run off the screen edge; the speaker is hidden behind your pony while talking [10][12][30]. | OPEN | |
+| 40 | W3 | "Bloom", "Bloomed" and "Drifter" naming feels weird. | OPEN | |
+| 41 | W1 | Market: buying hay repeatedly, the list jumped to the bottom and the next click bought an Apple Tree (4,025 bits). Scrolling also breaks at random. Needs a list that never moves after a buy, and a confirm for expensive items [26]. | OPEN | |
+| 42 | W3 | Owned decor still shows its price in red, identical to "can't afford". Needs an Owned state [26]. | OPEN | |
+| 43 | W3 | Shop price rows zigzag: one-line names sit lower than two-line names; the detail panel and Back button are cut off at the right edge [26]. | OPEN | |
+| 44 | W3 | Mailbox UI is confusing: no clear "no new mail" state, unclear cycling, which letter you are on. | OPEN | |
+| 45 | W3 | Mailbox and letter button should read "Close", not "Exit" or "Back". (Note: 05/30 set "one Back button" for every menu; the owner now wants Close for letters.) | OPEN | |
+| 46 | W1 | Racing: one click on a pony card places the bet; the owner bet by accident again while picking a stake. Needs pick pony, pick stake, then "Place bet" [21]. | OPEN | |
+| 47 | W3 | Stake chips look terrible: squashed ovals, "200" overflows its chip [21]. | OPEN | |
+| 48 | W3 | The owner's racer always finishes last and far behind, twice. Check that the race matches the odds, and show it before the bet if the pony is slow [20][25]. | OPEN | |
+| 49 | W3 | Race scene looks like a different game: plastic ponies with no toon shading or outlines, dark and murky, flat coloured slabs through the racers' backs, Rarity's mane a streaming ribbon; Scootaloo's portrait has the wrong colours [20][21][25]. | OPEN | |
+| 50 | W3 | Slots are a pure money sink while blackjack feels fair. Raise the payout (not overpowered); ideas: a bonus round, two different machines. | OPEN | |
+| 51 | W4 | Near hind leg missing, cut off at the thigh (pegasus) [5]. | OPEN | |
+| 52 | W4 | Tail colour does not follow the mane (near-black tail with a blond, orange or teal mane) [2][3][5][7]. | OPEN | |
+| 53 | W4 | Cutie marks broken everywhere: smeared, stretched, faint scraps, different on each flank [2][3][5][8]. | OPEN | |
+| 54 | W4 | Freckles are big white blobs and spread onto the wings [7]. | OPEN | |
+| 55 | W3 | Cutie mark editor: swatch row misaligned, selected ring off-centre, row clipped at the left edge [6]. | OPEN | |
+| 56 | W4 | Horn shows in one shot and not another (may be hidden by the forelock) [2][3]. | OPEN | |
+| 57 | W4 | Aliasing across the whole game at 1440p High: stair-stepped shadow edges, jagged model edges and toon bands. 4x MSAA is on, so shadow filtering and the toon cut-off are the suspects [1][19][25][46]. | OPEN | |
+| 58 | W4 | Fog is a flat grey veil that does not blend with the cel shading; ground shadows show as huge hard-edged patches [38]. | OPEN | |
+| 59 | W4 | Tree styles clash: low-poly blocks, soft show-style trees with purple trunks, lollipop trees. Pick one family [15]. | OPEN | |
+| 60 | W4 | Camera goes inside tree canopies in the forest: a dark green screen with bright seams [45]. | OPEN | |
+| 61 | W4 | A distant object (probably the wagon by the pink shed) flickers [18]. | OPEN | |
+| 62 | W4 | Casino interior: your pony floats above the floor and looks too small; the camera sits at floor level [16]. | OPEN | |
+| 63 | W4 | A striped tube prop is stuck through your pony's barrel in nearly every shot (eight or more sightings) [10][14][15][16][17][30][33][35]. | OPEN | |
+| 64 | W4 | A bush blocks the foot of the ramp to the purple building [17]. | OPEN | |
+| 65 | W4 | The Pens sign is planted against one pen's corner, blocking the view [46]. | OPEN | |
+| 66 | W4 | Night plus rain is very dark and murky; a washed-out purple-grey haze in town [24][30]. | OPEN | |
+| 67 | W4 | Signposts and Spike clip into the camera at the screen edge [38][41]. | OPEN | |
+| 68 | W3 | "Pantry N" at the bottom left is cut off by the screen edge [38][41]. | OPEN | |
+| 69 | W4 | Ponies stand nose-to-wall or nose-to-tree and stay there (two by a house wall; a guard into a tree trunk) [14][40]. | OPEN | |
+| 70 | W4 | A background pony jitters, snapping its head left and right during dialogue [10]. | OPEN | |
+| 71 | W4 | Spike's raised hand clips into his head; he reads pink rather than purple; his prompt covers his face [9]. | OPEN | |
+| 72 | W4 | Sighting cutscene camera flew through a building; nothing links a sighting to the decor you just bought. | OPEN | |
+| 73 | W4 | Bramble's spotted-pony cutscene timing is unexplained. | OPEN | |
+| 74 | W1 | REPEAT. Can't pause during dialogue, and the factory counts as dialogue the whole time (was 05/12, ticked fixed). | OPEN | |
+| 75 | W1 | REPEAT. Holding Shift to run all the time. The owner wants a toggle, starting in run (was 08/25; that fix made walking sneak, which did not solve it). | OPEN | |
+| 76 | W3 | Player tail still moves oddly when running. | OPEN | |
