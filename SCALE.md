@@ -29,7 +29,10 @@ game, so it is not measured by this test (see the fix doc). The Spectra Palace's
 built from.
 
 The two tables below are MACHINE READ by that test: keep the header rows exactly as they
-are. Heights are in PH; `-` means no bound.
+are. Heights are in PH; `-` means no bound. The test holds each bound to 2% either way: 1 PH
+is the player's body mane included, and a new game's pony measures 2.19 to 2.22 m by her mane.
+The sky dome, the night lights (lamp halos, lit windows) and the ground cover (grass tufts and
+flowers) are light and ground paint, not measured.
 
 ## Target sizes by category
 
@@ -54,6 +57,7 @@ are. Heights are in PH; `-` means no bound.
 | marker | 0.2 | 1.0 | - | build-plot stakes |
 | ground | 0.0 | 0.3 | - | things lying flat: lily pads, jetty planks, flat stepping stones |
 | character | 0.25 | 0.8 | - | Spike (a baby dragon, about half a pony) |
+| skyline_tree | 1.5 | 8.0 | - | the rim's tree lines: backdrop on the ridges past every path, never walked beside, sized to read as trees against the sky from the valley floor (the valley's own trees are `tree`) |
 | terrain | 15 | - | - | terrain features: the valley rim and the Prism Works on the skyline |
 | interior | 2.5 | 4.5 | - | a room you walk around inside, and its floor to ceiling columns: the Spectra Palace's hall, slab to roof. Tall enough that the camera's arm swings freely under the ceiling |
 | fixture | 0.3 | 1.5 | - | things hung from a ceiling: the hall's chandeliers, from the ceiling rose to the lowest drop |
@@ -97,6 +101,7 @@ without `.glb`, or the name the test gives a code-built thing.
 | flower_* | plant | Night Meadow |
 | grass* | plant | regions |
 | plant_flat* | plant | Lake reeds |
+| reed_card | plant | the Lake's reed beds (region_dressing.gd's drawn reed cards) |
 | mushroom_* | plant | Everfree |
 | mlp_crate | prop_small | yard, orchard |
 | mlp_basket | prop_small | yard, orchard |
@@ -128,6 +133,8 @@ without `.glb`, or the name the test gives a code-built thing.
 | path_wood | ground | the Lake jetty |
 | spike | character | the Depot |
 | valley_rim | terrain | the skyline |
+| Rim | terrain | the skyline (the valley rim, named Rim since the frame was rebuilt) |
+| ridge_tree | skyline_tree | the rim's tree lines (ValleyFrame/RidgeTrees*, one MultiMesh; each tree measured) |
 | prism_works | terrain | the skyline |
 | pc_hall | interior | the Spectra Palace's hall, under the Palace (2026-10-26) |
 | pc_column | interior | the hall's four columns |

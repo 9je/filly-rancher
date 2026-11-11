@@ -18,6 +18,11 @@ const PropsScript := preload("res://world/props.gd")
 const BuildingScript := preload("res://world/building.gd")
 
 var ph := 0.0
+## 1 PH is the player's own body, mane included, and a new game's pony is 2.19 to 2.22 m by her
+## mane alone (SCALE.md says "about 2.19"). Three rows sit exactly on a floor (the yard sign
+## 1.00, the Board 3.03, the Depot's door 1.32 at 2.19 m) and dropped to 0.99 to 1.30 under a
+## 2.22 m pony. A bound is held to 2% either way so the mane does not decide the verdict.
+const PH_SLACK := 0.02
 var categories: Dictionary = {}   # name -> {min, max, min_w}
 var patterns: Array = []          # [[glob, category], ...] in table order
 var rows: Array = []              # measured records
@@ -139,7 +144,7 @@ func _collect() -> void:
 			_cover(s)
 		elif String(s.name).begins_with("Marquee"):
 			_cover(s)
-		elif s.name == &"Paving":
+		elif s.name == &"Paving" or s.name == &"PavingKerb":
 			# The flagstones laid over the Strip's ground (PT7): paint on the ground, like a lake.
 			_cover(s)
 	if strip != null and strip.get_node_or_null(^"MarqueeBoard") != null:
@@ -172,7 +177,11 @@ func _collect() -> void:
 		_cover(spike)
 	var frame: Node = ranch.get_node_or_null(^"ValleyFrame")
 	for v: Node in (frame.get_children() if frame != null else []):
-		if v is Node3D and v.name != &"Rainbow":
+		if v is MultiMeshInstance3D:
+			# The rim's tree lines (8dcfd80): one MultiMesh of many trees, whose box spans the
+			# whole ridge. Each tree is measured on its own, as a "ridge_tree".
+			_multimesh(v as MultiMeshInstance3D, "ridge_tree", "ValleyFrame/%s" % v.name)
+		elif v is Node3D and v.name != &"Rainbow":
 			_add(String(v.name).rstrip("0123456789"), "ValleyFrame/%s" % v.name,
 				PropsScript.world_aabb(v).size.y)
 		_cover(v)
@@ -196,8 +205,11 @@ func _collect() -> void:
 		_cover(hall)
 	# Characters are the yardstick, not the thing measured; the sky, the ground and the UI are
 	# not assets standing in the world. Nor is the guide's trail of motes: an effect.
+	# Nor the sky dome, the lamp halos and lit windows after dark (NightLights, P8 S4), nor the
+	# grass tufts and flowers laid over the bare ground (GroundCover, P8 Fable round 1): light
+	# and ground paint, not things standing in the world.
 	for skip in [^"Player", ^"Spawner", ^"People", ^"Attendants", ^"Terrain", ^"SkyRig",
-			^"CaptureCamera", ^"HUD", ^"GuideTrail"]:
+			^"CaptureCamera", ^"HUD", ^"GuideTrail", ^"SkyDome", ^"NightLights", ^"GroundCover"]:
 		var n := ranch.get_node_or_null(skip)
 		if n != null:
 			_cover(n)
@@ -237,6 +249,19 @@ func _building(b: Node3D) -> void:
 			_add("lobby_sign", "Buildings/%s/LobbySign" % b.name, PropsScript.world_aabb(c).size.y)
 		elif c.name == &"Doors":
 			_add("pc_palace_doors", "Buildings/%s/Doors" % b.name, PropsScript.world_aabb(c).size.y)
+
+
+## Each instance of a MultiMesh, measured as its own placement: the mesh's box under that
+## instance's transform.
+func _multimesh(mmi: MultiMeshInstance3D, asset: String, where: String) -> void:
+	_cover(mmi)
+	var mm := mmi.multimesh
+	if mm == null or mm.mesh == null:
+		return
+	var box := mm.mesh.get_aabb()
+	for i in mm.instance_count:
+		var xf := mmi.global_transform * mm.get_instance_transform(i)
+		_add(asset, "%s #%d" % [where, i], (xf * box).size.y)
 
 
 ## The race track: its rails and their posts (fence), the finish wire's posts and the lane
@@ -351,7 +376,8 @@ func _judge() -> void:
 		else:
 			var c: Dictionary = categories[cat]
 			var h: float = r.h / ph
-			ok_row = (is_nan(c.min) or h >= c.min) and (is_nan(c.max) or h <= c.max)
+			ok_row = (is_nan(c.min) or h >= c.min * (1.0 - PH_SLACK)) \
+				and (is_nan(c.max) or h <= c.max * (1.0 + PH_SLACK))
 			var wtxt := ""
 			if not is_nan(r.w):
 				var w: float = r.w / ph
