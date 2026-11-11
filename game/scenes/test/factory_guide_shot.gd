@@ -62,6 +62,22 @@ func _run() -> void:
 	if mode == "lights_out":
 		var interior: Node = scene.get("interior")
 		var player: Node3D = scene.get("player")
+		# THE GUARDS SEE HER (item 11): stand her in a Collector's lantern, Tumble at her heels.
+		var patrols: Array = scene.get("_patrols")
+		var caught := [0]
+		if not patrols.is_empty():
+			var pat: Node3D = patrols[0]
+			pat.spotted.connect(func(_t: Node3D) -> void: caught[0] += 1)
+			pat.enabled = false
+			for k in 30:
+				await process_frame
+			var fwd: Vector3 = pat.call("forward")
+			player.global_position = pat.global_position + fwd * 4.0 + Vector3(0, 0.3, 0)
+			await _shot("lights_out_guard", 4)
+			pat.enabled = true
+			for k in 40:
+				await process_frame
+			print("GUARD caught=", caught[0])
 		var gallery: Vector3 = interior.call("room_origin", &"gallery")
 		for k in 300:
 			var g: Dictionary = scene.get("goal")

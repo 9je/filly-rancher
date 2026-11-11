@@ -10,6 +10,14 @@ extends Node3D
 
 signal spotted(target: Node3D)
 
+const LayersScript := preload("res://world/collision_layers.gd")
+## Walking into her is being caught (playtest 2026-11-10 item 11: "i can push and spin them").
+const BUMP_RADIUS := 1.4
+## Her lantern hangs at her head, ahead of her body's centre (item 12: the cone came out
+## behind her head).
+const LANTERN_AHEAD := 0.75
+const LANTERN_HEIGHT := 1.45
+
 @export var range := 8.5
 @export var half_angle_deg := 24.0
 @export var pause_seconds := 1.6
@@ -67,9 +75,20 @@ func _physics_process(delta: float) -> void:
 	if not enabled:
 		return
 	_walk(delta)
-	if target != null and _cooldown <= 0.0 and sees(target.global_position + Vector3(0, 0.8, 0)):
+	if target != null and _cooldown <= 0.0 and (bumped(target.global_position)
+			or sees(target.global_position + Vector3(0, 0.8, 0))):
 		_cooldown = 2.0
 		spotted.emit(target)
+
+
+## True when `point` is close enough that she has walked into her.
+func bumped(point: Vector3) -> bool:
+	var d := Vector2(point.x - global_position.x, point.z - global_position.z).length()
+	return d < BUMP_RADIUS
+
+
+func _lantern() -> Vector3:
+	return global_position + forward() * LANTERN_AHEAD + Vector3(0, LANTERN_HEIGHT, 0)
 
 
 func _walk(delta: float) -> void:
@@ -86,7 +105,7 @@ func _walk(delta: float) -> void:
 ## Point the lantern the way she is facing.
 func _aim() -> void:
 	var fwd := forward()
-	var origin := global_position + Vector3(0, 1.4, 0)
+	var origin := _lantern()
 	_light.global_transform = Transform3D(Basis.looking_at(fwd + Vector3(0, -0.25, 0), Vector3.UP), origin)
 	var centre := origin + fwd * range * 0.5 + Vector3(0, -0.6, 0)
 	var dir := (centre - origin).normalized()
@@ -103,7 +122,7 @@ func forward() -> Vector3:
 
 ## True when `point` is in the cone, in range, and in the clear.
 func sees(point: Vector3) -> bool:
-	var origin := global_position + Vector3(0, 1.4, 0)
+	var origin := _lantern()
 	var to := point - origin
 	if to.length() > range:
 		return false
@@ -113,9 +132,15 @@ func sees(point: Vector3) -> bool:
 	if rad_to_deg(forward().angle_to(flat.normalized())) > half_angle_deg:
 		return false
 	var space := get_world_3d().direct_space_state
-	var q := PhysicsRayQueryParameters3D.create(origin, point)
-	q.exclude = [_npc.get_rid()]
+	# WALLS AND PROPS HIDE HER, PONIES DO NOT (item 11: the companion at her heels stood in
+	# every line of sight, so no Collector ever saw her).
+	var q := PhysicsRayQueryParameters3D.create(origin, point, LayersScript.WORLD)
+	# BUILT, THEN ASSIGNED: `exclude` hands back a copy, so appending to it after the fact
+	# dropped the target and the ray stopped on her own body. That is why no Collector ever
+	# saw anyone (item 11).
+	var skip: Array[RID] = [_npc.get_rid()]
 	if target is CollisionObject3D:
-		q.exclude.append((target as CollisionObject3D).get_rid())
+		skip.append((target as CollisionObject3D).get_rid())
+	q.exclude = skip
 	var hit := space.intersect_ray(q)
 	return hit.is_empty()

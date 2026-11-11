@@ -345,7 +345,8 @@ func _collector(index: int, at: Vector3) -> Npc:
 	def.gen = {"race": &"earth"}
 	def.look = {"coat": "8a8f99", "mane": "4d525c", "mane2": "5f6470", "tail": "4d525c"}
 	var n := _npc(def.id, def, at)
-	n.attach_prop("res://assets/models/goggles.glb", "Head", Vector3(0, 1.95, -0.62), Vector3(0, 0, 0), 1.6)
+	# No goggles (playtest 2026-11-10 item 12: "a weird thing on their head"): they sat as a
+	# ring over the crown, not over the eyes. The grey coat and the lantern are the uniform.
 	return n
 
 
