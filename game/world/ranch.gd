@@ -10256,6 +10256,7 @@ func current_objective() -> Dictionary:
 		return {}
 	var built := 0
 	var drifters := 0
+	var ready := 0
 	for slot in _plot_slots():
 		var pen := slot.get_built() as Pen
 		if pen != null:
@@ -10263,10 +10264,12 @@ func current_objective() -> Dictionary:
 			for inst: PonyInstance in pen.ponies():
 				if inst.is_stock() and not inst.is_marked():
 					drifters += 1
+				elif inst.is_stock():
+					ready += 1
 	var beam: Node3D = player.get_magic_beam() if player != null else null
 	var storage: Storage = beam.get_storage() if beam != null else null
 	return ObjectiveScript.current({
-		"drifters": drifters,
+		"drifters": drifters, "ready": ready,
 		"chapter": story.chapter, "path": StoryV1Script.path(story),
 		"ending": String(story.get_var("ending", "")), "flags": story.flags.keys(),
 		"deliveries": story.deliveries, "blooms": int(story.get_var("blooms", 0)),

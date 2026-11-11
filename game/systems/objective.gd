@@ -8,7 +8,8 @@ extends RefCounted
 ##
 ## State keys: chapter (Story.Chapter), path ("", "factory", "rescue"), ending (non-empty
 ## once one has played), flags (the story flags set), deliveries, blooms, pens (built), bag
-## (ponies carried), drifters (unmarked Drifters penned), pylons (cut), contract
+## (ponies carried), drifters (unmarked Drifters penned), ready (Bloomed Drifters penned),
+## pylons (cut), contract
 ## (PathRules.contract: want, kind, got).
 ##
 ## Returns {id, goal, icon (PlaceSign.Icon), words} or {} for no objective. goal is a Guide
@@ -91,6 +92,12 @@ static func _acts_one_two(s: Dictionary, flags: Array) -> Dictionary:
 	if not flags.has("invited"):
 		var d := int(s.get("deliveries", 0))
 		if d < INVITE_DELIVERIES:
+			# NOTHING READY TO SHIP (playtest 2026-11-10 item 2): pens of keepers and blank
+			# Drifters, an empty bag, and "Deliver ponies 0/6" said nothing about how. Bloom one
+			# first; the trail goes to her pen, where E plays with them.
+			if int(s.get("ready", 1)) <= 0 and int(s.get("drifters", 0)) > 0 and int(s.get("bag", 0)) == 0:
+				return _o(&"deliver", &"bloom", PlaceSign.Icon.FENCE,
+					"Bloom a Drifter, then deliver her %d/%d" % [d, INVITE_DELIVERIES])
 			return _o(&"deliver", &"depot", PlaceSign.Icon.CRATE,
 				"Deliver ponies %d/%d" % [d, INVITE_DELIVERIES])
 		var b := int(s.get("blooms", 0))
@@ -121,7 +128,7 @@ static func _acts_one_two(s: Dictionary, flags: Array) -> Dictionary:
 ## {flag: [term, the explanation]}; the ranch shows each once and sets its flag.
 const EXPLAIN := {
 	"explained_drifter": ["Drifter", "A Drifter is a pony with no mark yet: a blank cutie mark. Catch her, pen her, and look after her."],
-	"explained_bloom": ["Bloom", "Bloom: a well kept Drifter finds her talent and her cutie mark appears. Her favourite food and a friend in the pen speed it up."],
+	"explained_bloom": ["Bloom", "Bloom: a Drifter finds her talent and her cutie mark. Play with her at her pen (E), and her favourite food and a friend speed it up."],
 }
 
 

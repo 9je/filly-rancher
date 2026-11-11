@@ -130,3 +130,19 @@ func test_each_term_is_explained_once() -> void:
 	assert_eq(b["flag"], "explained_bloom")
 	assert_false(String(b["text"]).contains("--"))
 	assert_true(ObjectiveScript.explainer_for("Ship ponies at the Depot", []).is_empty())
+
+
+## PLAYTEST 2026-11-10 ITEM 2: pens of keepers and blank Drifters, an empty bag, "Deliver ponies
+## 0/6" and no way forward. With nothing Bloomed to ship, the card sends her to Bloom one.
+func test_with_nothing_ready_to_ship_the_card_sends_her_to_bloom_one() -> void:
+	var f := ["has_scoop", "depot_explained"]
+	var stuck := {"flags": f, "pens": 2, "deliveries": 0, "drifters": 3, "ready": 0, "bag": 0}
+	assert_eq(_goal(stuck), &"bloom")
+	assert_string_contains(_words(stuck), "Bloom a Drifter")
+	assert_string_contains(_words(stuck), "0/6")
+	var one_ready := stuck.duplicate()
+	one_ready["ready"] = 1
+	assert_eq(_goal(one_ready), &"depot", "a Bloomed Drifter penned: to the Depot")
+	var carrying := stuck.duplicate()
+	carrying["bag"] = 2
+	assert_eq(_goal(carrying), &"depot", "ponies in the bag can be shipped")
