@@ -41,7 +41,13 @@ const BONE_NAMES: Array[StringName] = [&"Pelvis", &"Chest1"]
 ## back, placed by eye on a side render of the player (p8_checks, player_flank).
 ## P9 item 53 (the owner: "smeared, stretched, faint scraps, different on each flank"): the
 ## folded wing covered its front half, so lowered and moved back onto the round of the haunch.
-const FLANK := Vector3(0.26, 0.98, 0.33)
+## Round 3 (true side views of a Drifter batch, both flanks): at z 0.33 the box sat on the back
+## curve of the rump, 0.16 m behind the hip joint (thigh head at z 0.175 on the shared PonySFM
+## body), so half of each drawing wrapped round the back edge and smeared; on the far flank the
+## view made it read as a different, blurred mark. Centred on the round of the haunch just
+## behind the hip and a little lower, the whole drawing lands on the flat, still clear of the
+## folded wing's tip.
+const FLANK := Vector3(0.26, 0.95, 0.24)
 
 ## Decal box: across the flank, INTO the pony (the projection depth), and along her. Larger
 ## than it was (0.30), as the show draws marks.
