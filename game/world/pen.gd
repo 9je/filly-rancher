@@ -276,6 +276,12 @@ var _bodies: Dictionary = {}
 ## uids whose body was in a beam when this pen last looked. Read and cleared by
 ## _reseat_released_residents(), which is the whole of what it is for.
 var _held_bodies: Dictionary = {}
+## uid -> the standing spot (Pen.resident_spot index) her body was given. EACH SPOT HAS ONE
+## PONY (P9, playtest 2026-11-10 item 30, "pile into each other"): spots were handed out by
+## roster position, so once a resident left (a delivery, an escape) the next pony penned took
+## the roster's last index, which was a spot somepony still stood on; the two shared one patch
+## and wandered through each other for good. A new body now takes the lowest free spot.
+var _spot_of: Dictionary = {}
 
 ## The tray: gems by the rarity of the pony who made them (int rarity to int count). A
 ## transient staging area; game/world/ranch.gd folds it into GameState.gems before a save
@@ -426,6 +432,7 @@ func release_body(uid: StringName, new_parent: Node3D) -> Node3D:
 			_residents.remove_at(i)
 			break
 	_bodies.erase(uid)
+	_spot_of.erase(uid)
 	if body is CollisionObject3D:
 		(body as CollisionObject3D).collision_mask = LayersScript.WALKABLE
 	body.remove_from_group(&"penned")
@@ -970,7 +977,8 @@ func _spawn_body(inst: PonyInstance) -> void:
 	pony.position = Vector3.ZERO
 	add_child(pony)
 
-	_seat_body(pony, _residents.find(inst))
+	_spot_of[inst.uid] = _free_spot()
+	_seat_body(pony, int(_spot_of[inst.uid]))
 	pony.adopt(inst)
 
 	# SHE REPORTS HER OWN CAPTURE, and this pen acts on it. One line, and it is the whole
@@ -981,8 +989,25 @@ func _spawn_body(inst: PonyInstance) -> void:
 	_bodies[inst.uid] = pony
 
 
+## The lowest standing spot no living body holds.
+func _free_spot() -> int:
+	var taken := {}
+	for uid: StringName in _spot_of:
+		taken[int(_spot_of[uid])] = true
+	var i := 0
+	while taken.has(i):
+		i += 1
+	return i
+
+
+## The standing spot `uid`'s body holds, or -1.
+func spot_of(uid: StringName) -> int:
+	return int(_spot_of.get(uid, -1))
+
+
 func _despawn_body(uid: StringName) -> void:
 	var body: Node3D = body_for(uid)
+	_spot_of.erase(uid)
 	_bodies.erase(uid)
 	_held_bodies.erase(uid)
 	if body != null:
@@ -1057,7 +1082,7 @@ func _reseat_released_residents() -> void:
 			_held_bodies[uid] = true
 			continue
 		if _held_bodies.erase(uid):
-			_seat_body(body, i)
+			_seat_body(body, int(_spot_of.get(uid, i)))
 
 
 # --- carpentry -------------------------------------------------------------------------------
