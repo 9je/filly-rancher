@@ -2024,6 +2024,8 @@ func face(direction: Vector3) -> void:
 
 ## Whether her last turn was held by BodySpace.turn_allowed (a neighbour in the way).
 var _turn_held := false
+## The way round she committed to when the short way was blocked (+1, -1; 0 for none).
+var _turn_latch := 0.0
 
 
 func _update_facing(direction: Vector3, delta: float) -> void:
@@ -2047,12 +2049,23 @@ func _update_facing(direction: Vector3, delta: float) -> void:
 	# The short way round blocked, she turns the long way, away from her; held only when both are.
 	_turn_held = false
 	var step := angle_difference(before, visuals.rotation.y)
+	# ONE WAY ROUND, KEPT (P9 item 70: a pony beside the talk "snapping her head left and
+	# right"). Blocked the short way she turned the long way, and the next tick, a little further
+	# round, the short way was free again: she swung back, and back, every frame. Once she has
+	# gone the long way she keeps going that way until the turn is done.
+	if _turn_latch != 0.0 and absf(step) > 1e-4 and signf(step) != _turn_latch:
+		visuals.rotation.y = before - step
+		step = -step
 	if not room_before.is_empty() and absf(step) > 1e-4 \
 			and not BodySpaceScript.turn_allowed(self, room_before, body_footprint()):
 		visuals.rotation.y = before - step
 		if not BodySpaceScript.turn_allowed(self, room_before, body_footprint()):
 			visuals.rotation.y = before
 			_turn_held = true
+		else:
+			_turn_latch = signf(-step)
+	if absf(angle_difference(visuals.rotation.y, _visual_yaw)) < 0.12:
+		_turn_latch = 0.0
 	# Into a sharp turn she banks (FS4.2, systems/gait_blend.gd).
 	if delta > 0.0:
 		visuals.rotation.z = _gait_blend.lean(angle_difference(before, visuals.rotation.y) / delta,
