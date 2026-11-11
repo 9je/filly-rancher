@@ -69,7 +69,7 @@ func test_each_row_carries_a_happiness_hint() -> void:
 
 func test_a_stake_row_sits_under_the_last_pony() -> void:
 	var drawn: Array[String] = _menu.drawn_lines()
-	assert_eq(_menu.row_count(), 3, "two ponies and the stake")
+	assert_eq(_menu.row_count(), 4, "two ponies, the stake, and Place bet (P9 item 46)")
 	assert_true(drawn[drawn.size() - 1].to_lower().contains("stake"),
 		"the stake is the last row and it is drawn, so the caret can land on it")
 
@@ -83,11 +83,15 @@ func test_with_no_penned_ponies_it_says_so_and_enters_nobody() -> void:
 	assert_true("\n".join(_menu.drawn_lines()).contains("pen"))
 
 
-func test_confirming_on_a_pony_backs_her_at_the_stake_on_the_screen() -> void:
+## P9 item 46: a card only picks her; the Place bet button bets.
+func test_confirming_on_a_pony_picks_her_and_place_bet_backs_her() -> void:
 	_menu.set_stake_index(1)
 	_menu.move_selection(1)
 	watch_signals(_menu)
 	assert_true(_menu.confirm())
+	assert_signal_not_emitted(_menu, "race_requested", "picking a pony is not a bet")
+	assert_eq(_menu.picked_index(), 1)
+	assert_true(_menu.place_bet())
 	assert_signal_emitted_with_parameters(_menu, "race_requested",
 		[&"b#000002", _menu.stakes()[1]])
 	assert_eq(_menu.selected_entrant_uid(), &"b#000002")

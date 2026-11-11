@@ -2324,6 +2324,11 @@ func race_entrants() -> Array[Dictionary]:
 				RaceCardScript.entrant_from(inst), runners)
 			_quoted_fields[inst.uid] = field
 			var chances: Array[float] = RaceCardScript.win_chances(field)
+			# Where she ranks in this field, for the guide's pace word (P9 item 48).
+			var rank := 1
+			for e in field:
+				if float(e["rating"]) > float(field[RaceCardScript.PLAYER_LANE]["rating"]):
+					rank += 1
 			# HER COLOURS, FOR THE FORM GUIDE'S SILKS SWATCH, AND NOTHING ELSE. Resolved here and
 			# not in the menu, for the reason race_menu.gd's class comment gives: the menu never
 			# sees a PonyInstance, never reads a pen and cannot compute anything. Two Colors in a
@@ -2341,6 +2346,8 @@ func race_entrants() -> Array[Dictionary]:
 				"happiness": inst.happiness,
 				"odds": RaceCardScript.decimal_odds(field, RaceCardScript.PLAYER_LANE),
 				"chance": chances[RaceCardScript.PLAYER_LANE] if not chances.is_empty() else 0.0,
+				"rank": rank,
+				"field": field.size(),
 				"coat": coat,
 				"mane": mane,
 				# Her face on the form guide (P8 item 61); null until the baker has her.
@@ -2527,7 +2534,38 @@ func open_mailbox_letter() -> bool:
 	if letter_panel.has_signal("replied") and not letter_panel.is_connected("replied", _on_letter_replied):
 		letter_panel.connect("replied", _on_letter_replied)
 	_on_mail_opened(id)
+	# WHICH LETTER OF HOW MANY, AND THE REST ONE CLICK AWAY (P9, playtest 2026-11-10 item 44).
+	if letter_panel.has_method("set_pager"):
+		var at := -1
+		for i in rows.size():
+			if String(rows[i].get("id", "")) == String(id):
+				at = i
+		letter_panel.call("set_pager", maxi(at, 0), rows.size(), _unread_count(),
+			_mail_page_letter)
 	return true
+
+
+## How many letters she has not read yet.
+func _unread_count() -> int:
+	var n := 0
+	for r in mail_rows():
+		if not bool(r.get("read", false)):
+			n += 1
+	return n
+
+
+## Letter `i` of the mailbox (0 = oldest) for the reader's pager, marked read as it is shown.
+func _mail_page_letter(i: int) -> Dictionary:
+	var rows: Array[Dictionary] = mail_rows()
+	if i < 0 or i >= rows.size():
+		return {}
+	var row: Dictionary = rows[i]
+	var id := StringName(String(row.get("id", "")))
+	_letter_reply_id = id
+	_on_mail_opened(id)
+	return {"sender": String(row.get("sender", "")), "title": String(row.get("title", "")),
+		"body": row.get("body", []), "replies": PauseMenu.replies_for(row, owned_rows()),
+		"unread_after": _unread_count()}
 
 
 var _letter_reply_id: StringName = &""
@@ -3618,16 +3656,38 @@ func cash_out(chips: int) -> int:
 ## THE STAKE COMES OUT BEFORE THE REELS ARE ROLLED, always, and every game below does the
 ## same. A roll that happened before the chips were taken is a roll that pays out of a purse
 ## that might not have covered it.
+## Free spins banked by the Star bonus, and the stake they play at (P9 item 50). Held for the
+## session: a bonus is spent at the machine that gave it.
+var _slot_free_spins := 0
+var _slot_free_stake := 0
+
+
 func play_slots(stake: int) -> Dictionary:
 	var refused := {"ok": false, "reels": [], "won": 0, "stake": 0}
-	if _game_state == null or not _game_state.casino.can_stake(stake):
+	if _game_state == null:
 		return refused
-	if not _game_state.casino.remove_chips(stake):
-		return refused
+	# A FREE SPIN FROM THE STAR BONUS (P9 item 50) costs nothing and plays at the stake that
+	# won it.
+	var free := _slot_free_spins > 0
+	if free:
+		stake = _slot_free_stake
+		_slot_free_spins -= 1
+	else:
+		if not _game_state.casino.can_stake(stake):
+			return refused
+		if not _game_state.casino.remove_chips(stake):
+			return refused
 	var reels: Array[int] = SlotsScript.spin(_casino_rng)
 	var won: int = SlotsScript.payout(reels, stake)
 	if won > 0:
 		_game_state.casino.add_chips(won)
+	var bonus: int = SlotsScript.bonus_spins(reels)
+	if bonus > 0:
+		_slot_free_spins += bonus
+		_slot_free_stake = stake
+	if slots_menu != null:
+		slots_menu.set("free_spins", _slot_free_spins)
+		slots_menu.set("bonus_won", bonus)
 	if slots_menu != null and slots_menu.has_method("show_result"):
 		# TYPED BEFORE THE CALL, NOT AT IT. show_result()'s parameter is Array[String];
 		# a bare `[...]` literal is a loosely typed Array, and a dynamic call() does not
@@ -3635,7 +3695,8 @@ func play_slots(stake: int) -> Dictionary:
 		# call()'s own runtime type check. Same fix at wheel_menu's and blackjack_menu's
 		# call() below.
 		var lines: Array[String] = [SlotsScript.line_text(reels),
-			"You win %d chips." % won if won > 0 else "Nothing this time."]
+			"You win %d chips." % won if won > 0 else ("Two Stars: %d free spins!" % bonus
+				if bonus > 0 else "Nothing this time.")]
 		slots_menu.call("show_result", lines)
 	# THE STAGE IS TOLD, NEVER ASKED, and it is told LAST. Everything above this line has
 	# already happened: the stake came out, Slots.spin() rolled and the win was settled. So
@@ -4320,7 +4381,17 @@ func _story_params() -> Dictionary:
 		"count": _game_state.ledger.shipments if _game_state != null else 0,
 		"quota": _game_state.ledger.quota if _game_state != null else 0,
 		"balance": _game_state.ledger.balance if _game_state != null else 0,
+		# The next collection day and the days to it (P9 item 35: the letter says by when).
+		"owed": group_thousands(_game_state.ledger.balance if _game_state != null else 0),
+		"due_day": int(_quota_now().get("day", 0)),
+		"days": int(_quota_now().get("days_left", 0)),
 	}
+
+
+func _quota_now() -> Dictionary:
+	if _game_state == null:
+		return {}
+	return _game_state.ledger.quota_status(_delivery_cycle())
 
 
 ## THE MAILBOX, RENDERED. Oldest first, which is the order Story.mail keeps; the page turns
@@ -5023,7 +5094,7 @@ func interaction_candidates() -> Array[Dictionary]:
 			InteractionScript.Kind.BOARD, _flat_gap_to(^"Buildings/Board")))
 	if is_near_mailbox():
 		out.append(InteractionScript.candidate(
-			InteractionScript.Kind.MAILBOX, _flat_gap_to(^"Buildings/Mailbox")))
+			InteractionScript.Kind.MAILBOX, _flat_gap_to(^"Buildings/Mailbox"), str(_unread_count())))
 	if spike != null and player != null:
 		var sg := Vector2(player.global_position.x - spike.global_position.x,
 			player.global_position.z - spike.global_position.z).length()
@@ -9320,7 +9391,8 @@ func ask_spike() -> bool:
 	if spike == null:
 		return false
 	spike.asked()
-	_toast("Spike: \"%s\"" % SpikeTipsScript.pick(spike_state(), _spike_asks))
+	# A card, not a quote (P9 item 33): SpikeTips' line is drawn by the HUD's toast rules.
+	_toast(SpikeTipsScript.pick(spike_state(), _spike_asks))
 	_spike_asks += 1
 	return true
 

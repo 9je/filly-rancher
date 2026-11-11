@@ -37,7 +37,7 @@ const CARD_LEFT := 20.0
 const CARD_TOP := 176.0
 const CARD_PITCH := 106.0
 const STAKE_PITCH := 96.0
-const CHIP_RADIUS := 30.0
+const CHIP_RADIUS := 32.0
 const CARD_PAGE := Rect2(40.0, 20.0, 1040.0, 400.0)
 
 ## THE TRACK STRIP over the cards (Fable AAA round 5: "the race guide wants silks colours and
@@ -218,7 +218,8 @@ func row_count() -> int:
 	if _tab != Tab.ENTER:
 		return 0
 	var n: int = entrants().size()
-	return n + 1 if n > 0 else 0
+	# Cards, the stake row, and the Place bet button (item 46).
+	return n + 2 if n > 0 else 0
 
 
 func stage_size() -> Vector2:
@@ -265,6 +266,8 @@ func row_rect(index: int) -> Rect2:
 	var total: int = entrants().size()
 	if index < total:
 		return card_rect(index)
+	if index == total + 1:
+		return bet_button_rect()
 	var available: Array[int] = stakes()
 	if available.is_empty():
 		return Rect2()
@@ -297,6 +300,8 @@ func focus_rect() -> Rect2:
 		if stakes().is_empty():
 			return Rect2()
 		return to_viewport(stake_chip_rect(clampi(stake_index(), 0, stakes().size() - 1)))
+	if _on_bet_row():
+		return to_viewport(bet_button_rect())
 	return to_viewport(card_rect(clampi(_selected, 0, entrants().size() - 1)))
 
 
@@ -305,6 +310,8 @@ func focused_id() -> StringName:
 		return &""
 	if _on_stake_row():
 		return StringName("stake:%d" % stake_index())
+	if _on_bet_row():
+		return &"bet"
 	return StringName("entrant:%d" % clampi(_selected, 0, entrants().size() - 1))
 
 
@@ -391,6 +398,23 @@ func paint(ci: Control) -> void:
 		PaintScript.label(ci, MenuStyleScript.numeral_font(), ticket.grow(-6.0), "pays " + odds,
 			24, PaintScript.CARD_INK)
 
+		# HER PACE AGAINST THIS FIELD, BEFORE THE BET (P9 item 48: "show it before the bet if
+		# the pony is slow"): where her rating ranks among the six, as a coloured word.
+		var rank: int = int(entry.get("rank", 0))
+		if rank > 0:
+			var pace: String = "Quick" if rank <= 2 else ("Fair" if rank <= 4 else "Slow")
+			var tint: Color = Color(0.36, 0.7, 0.4) if rank <= 2 else (Color(0.85, 0.65, 0.25) if rank <= 4 else Color(0.85, 0.32, 0.3))
+			var pill := Rect2(card.position + Vector2(SPIRITS_X + 222.0, 59.0), Vector2(150.0, 26.0))
+			PaintScript.rounded(ci, pill, 14.0, tint, tint.darkened(0.3), 2.0)
+			PaintScript.label(ci, MenuStyleScript.title_font(), pill, "%s, %s of %d" % [pace,
+				_ordinal(rank), int(entry.get("field", 6))], 17, Color.WHITE)
+		if index == _picked:
+			# THE PICKED PONY: a gold frame and a tick, so the bet's target is never in doubt.
+			PaintScript.rounded(ci, card.grow(3.0), 16.0, Color(0, 0, 0, 0), PaintScript.GOLD, 5.0)
+			var tick := card.position + Vector2(card.size.x - 18.0, 14.0)
+			ci.draw_circle(tick, 14.0, PaintScript.GOLD)
+			ci.draw_polyline(PackedVector2Array([tick + Vector2(-6, 0), tick + Vector2(-1, 5),
+				tick + Vector2(7, -5)]), PaintScript.CARD_INK, 3.5, true)
 		if picked:
 			PaintScript.focus_ring(ci, card, 14.0, t)
 
@@ -413,24 +437,63 @@ func paint(ci: Control) -> void:
 	for i: int in available.size():
 		var box: Rect2 = stake_chip_rect(i)
 		var on: bool = i == stake_index()
-		var centre: Vector2 = box.get_center() - Vector2(0.0, 6.0 if on else 0.0)
-		if on:
-			ci.draw_arc(centre, CHIP_RADIUS + 6.0, 0.0, TAU, 40, PaintScript.GOLD, 4.0, true)
-		PaintScript.chip(ci, centre, CHIP_RADIUS,
-			PaintScript.CHIP_COLORS[i % PaintScript.CHIP_COLORS.size()], true)
-		PaintScript.text(ci, MenuStyleScript.numeral_font(), centre + Vector2(0.0, 7.0),
-			str(available[i]), 20, Color.WHITE if i == 2 else PaintScript.CARD_INK,
-			HORIZONTAL_ALIGNMENT_CENTER, -1.0)
+		var centre: Vector2 = box.get_center() - Vector2(0.0, 4.0 if on else 0.0)
+		round_chip(ci, centre, CHIP_RADIUS, PaintScript.CHIP_COLORS[i % PaintScript.CHIP_COLORS.size()],
+			available[i], on)
 		if _on_stake_row() and on:
 			PaintScript.focus_ring(ci, box.grow(6.0), 40.0, t)
-	# What she holds, and what pressing her card does, in one line under the chips' right.
-	var who: String = String(field[clampi(_selected, 0, field.size() - 1)].get("name", "her"))
-	PaintScript.text(ci, font, Vector2(CARD_LEFT, row_y + 40.0),
+	PaintScript.text(ci, font, Vector2(CARD_LEFT + 110.0 + STAKE_PITCH * float(available.size()), row_y + 52.0),
 		"%d chips held" % held, MenuStyleScript.SUBTITLE_SIZE, MenuStyleScript.COLOR_DIM,
-		HORIZONTAL_ALIGNMENT_RIGHT, CARD_SIZE.x)
-	PaintScript.text(ci, MenuStyleScript.title_font(), Vector2(CARD_LEFT, row_y + 72.0),
-		"Click her card to back %s for %d" % [who, selected_stake()], 22, PaintScript.GOLD,
-		HORIZONTAL_ALIGNMENT_RIGHT, CARD_SIZE.x)
+		HORIZONTAL_ALIGNMENT_LEFT, -1.0)
+	# THE ONE BUTTON THAT BETS (item 46), saying what it will do.
+	var bet := bet_button_rect()
+	var ready_: bool = _picked >= 0 and _picked < field.size()
+	PaintScript.rounded(ci, Rect2(bet.position + Vector2(0, 5), bet.size), 30.0,
+		Color(0.35, 0.22, 0.05) if ready_ else Color(0, 0, 0, 0.3), Color(0, 0, 0, 0), 0.0)
+	PaintScript.rounded(ci, bet, 30.0, PaintScript.GOLD if ready_ else Color(0.3, 0.22, 0.36),
+		Color(1.0, 0.95, 0.8) if ready_ else PaintScript.GOLD_DIM, 3.0)
+	var words := "Pick a pony"
+	if ready_:
+		words = "Place bet: %d on %s" % [selected_stake(), String(field[_picked].get("name", "her"))]
+	PaintScript.label(ci, MenuStyleScript.title_font(), bet.grow(-10.0), words, 24,
+		PaintScript.CARD_INK if ready_ else Color(1, 1, 1, 0.6))
+	if _on_bet_row():
+		PaintScript.focus_ring(ci, bet, 30.0, t)
+
+
+static func _ordinal(n: int) -> String:
+	match n:
+		1:
+			return "1st"
+		2:
+			return "2nd"
+		3:
+			return "3rd"
+	return "%dth" % n
+
+
+## A STAKE CHIP, ROUND (P9, playtest 2026-11-10 item 47: "squashed ovals, 200 overflows its
+## chip"): a disc with six white edge marks, an inner ring, and the value sized to sit inside
+## the inner ring whatever its digits. The picked one is lifted on a gold ring.
+static func round_chip(ci: CanvasItem, c: Vector2, r: float, colour: Color, value: int, on: bool) -> void:
+	ci.draw_circle(c + Vector2(0, 4), r, Color(0, 0, 0, 0.35))
+	if on:
+		ci.draw_circle(c, r + 7.0, PaintScript.GOLD)
+	ci.draw_circle(c, r, colour.darkened(0.35))
+	ci.draw_circle(c, r - 2.5, colour)
+	for k: int in 6:
+		var a: float = TAU * float(k) / 6.0 + PI / 6.0
+		var dir := Vector2(cos(a), sin(a))
+		ci.draw_line(c + dir * (r - 9.0), c + dir * (r - 2.5), Color(1, 1, 1, 0.9), 6.0, true)
+	ci.draw_circle(c, r * 0.62, colour.lightened(0.15))
+	ci.draw_arc(c, r * 0.62, 0.0, TAU, 40, Color(1, 1, 1, 0.75), 2.0, true)
+	var digits := str(value)
+	var size := 22 if digits.length() <= 2 else (18 if digits.length() == 3 else 15)
+	var font: Font = MenuStyleScript.numeral_font()
+	var ink: Color = Color.WHITE if colour.get_luminance() < 0.45 else PaintScript.CARD_INK
+	var w := font.get_string_size(digits, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+	ci.draw_string(font, c + Vector2(-w * 0.5, font.get_ascent(size) * 0.36), digits,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, size, ink)
 
 
 ## Her face on a disc, or her coat and mane as two dots until the baker has her.
@@ -531,6 +594,10 @@ func _paint_track(ci: Control, field: Array[Dictionary], t: float) -> void:
 			ci.draw_line(Vector2(px + 2.0, top + 8.0), Vector2(px + 2.0, stall.end.y + 4.0), Color(0.6, 0.6, 0.68), 1.5, true)
 
 
+## PICK HER, PICK A STAKE, THEN PLACE THE BET (P9, playtest 2026-11-10 item 46: one click
+## on a pony card placed the bet, and the owner bet by accident while picking a stake). A card
+## only picks the pony; a chip only picks the stake; the Place bet button is the one thing
+## that bets, and it says what it will do.
 func confirm() -> bool:
 	if _tab != Tab.ENTER:
 		return false
@@ -543,20 +610,59 @@ func confirm() -> bool:
 		# this table (see switch_tab() and move_selection() on the other tables).
 		MenuStyleScript.tick_move()
 		return true
-	if _selected < 0 or _selected >= list.size():
+	if _on_bet_row():
+		return place_bet()
+	if _selected < 0 or _selected >= list.size() or selected_stake() <= 0:
 		return false
-	if selected_stake() <= 0:
+	_picked = _selected
+	MenuStyleScript.tick_move()
+	refresh()
+	return true
+
+
+## Back the picked pony for the picked stake. False with nothing picked or no chips.
+func place_bet() -> bool:
+	var list: Array[Dictionary] = entrants()
+	if _picked < 0 or _picked >= list.size() or selected_stake() <= 0:
 		return false
-	_entrant = StringName(list[_selected]["uid"])
+	_entrant = StringName(list[_picked]["uid"])
 	MenuStyleScript.tick_confirm()
 	_sound_call(&"play", [&"chip_clink"])
 	race_requested.emit(_entrant, selected_stake())
 	return true
 
 
+## The pony the bet is on: an entrant index, or -1 before one is picked.
+var _picked := -1
+
+
+func picked_index() -> int:
+	return _picked
+
+
+func open() -> bool:
+	_picked = -1
+	return super.open()
+
+
 func _on_stake_row() -> bool:
 	var n: int = entrants().size()
 	return n > 0 and _selected == n
+
+
+func _on_bet_row() -> bool:
+	var n: int = entrants().size()
+	return n > 0 and _selected == n + 1
+
+
+## The Place bet button, in stage space: right of the stake chips.
+func bet_button_rect() -> Rect2:
+	var shown: int = mini(entrants().size(), CARDS_VISIBLE)
+	var y: float = CARD_TOP + CARD_PITCH * float(shown) + 18.0
+	return Rect2(Vector2(CARD_LEFT + CARD_SIZE.x - BET_SIZE.x, y), BET_SIZE)
+
+
+const BET_SIZE := Vector2(400.0, 64.0)
 
 
 func _step_stake(step: int) -> void:
@@ -568,12 +674,32 @@ func _step_stake(step: int) -> void:
 
 ## THE CARD TAB IS READING MATTER: row_count() already answers 0 there, so this returns empty
 ## on its own with no special case.
+## Every card, then each stake chip on its own (a click on a chip takes THAT stake, not the
+## next one), then the Place bet button.
 func stage_hit_rects() -> Array[Rect2]:
 	var out: Array[Rect2] = []
-	for i in row_count():
-		out.append(row_rect(i))
+	if _tab != Tab.ENTER:
+		return out
+	var n: int = entrants().size()
+	if n == 0:
+		return out
+	for i in n:
+		out.append(card_rect(i))
+	for i in stakes().size():
+		out.append(stake_chip_rect(i))
+	out.append(bet_button_rect())
 	return out
 
 
 func on_stage_hit(index: int) -> void:
-	take_row(index)
+	var n: int = entrants().size()
+	var k: int = stakes().size()
+	if index < n:
+		take_row(index)
+	elif index < n + k:
+		point_at_row(n)
+		set_stake_index(index - n)
+		MenuStyleScript.tick_move()
+	else:
+		point_at_row(n + 1)
+		place_bet()

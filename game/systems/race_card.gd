@@ -70,7 +70,11 @@ const HAPPINESS_SPAN := 0.4
 const MIN_RATING := 0.05
 
 ## The Company keeps its runners at exactly this morale. It is in the staff handbook.
-const COMPANY_HAPPINESS := 0.7
+## P9 (playtest 2026-11-10 item 48): at 0.7 the Company field out-rated every pony on the
+## roster but Rainbow Dash, so a player's pony was the slowest on the card nearly every race
+## and finished last a quarter of the time. At an even 0.5 a well-fed favourite can be the
+## pick of the field. The odds still follow the ratings exactly (see the class comment).
+const COMPANY_HAPPINESS := 0.5
 
 ## Metres from the gate to the wire. Matches RaceTrack's own LENGTH; the track reads this
 ## one rather than declaring a second.
@@ -79,7 +83,9 @@ const TRACK_LENGTH := 40.0
 ## The band a runner's speed is squashed into, in metres per second. Inside Gait's skate free
 ## gallop band (GALLOP_HANDOVER_SPEED 1.98 to TOP_SKATE_FREE_SPEED 4.785) so every lane reads
 ## as a gallop and none of them slides.
-const SLOWEST_SPEED := 2.6
+## 3.1, not 2.6 (P9 item 48): the last pony home came in six seconds behind the winner, "far
+## behind" to the owner; the order is unchanged, the gaps are closer.
+const SLOWEST_SPEED := 3.1
 const FASTEST_SPEED := 4.2
 
 ## Centre and width of the squash, in score units. A typical field scores around 2.3, so a

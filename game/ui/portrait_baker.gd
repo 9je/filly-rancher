@@ -132,7 +132,13 @@ func _ensure_viewport() -> void:
 	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	e.ambient_light_color = STUDIO_FILL
 	e.ambient_light_energy = 0.5
-	e.tonemap_mode = Environment.TONE_MAPPER_LINEAR
+	# THE WORLD'S OWN TONEMAP (P9, playtest 2026-11-10 item 49: "Scootaloo's portrait has the
+	# wrong colours"). Linear at this light washed her orange coat to pale yellow, so on the
+	# race guide she read as Fluttershy; ranch.tscn's filmic curve keeps the coat she has in
+	# the field.
+	e.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	e.tonemap_white = 4.5
+	e.tonemap_exposure = 0.95
 	env.environment = e
 	_viewport.add_child(env)
 

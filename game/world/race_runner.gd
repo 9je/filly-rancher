@@ -23,6 +23,10 @@ extends Node3D
 
 const PonyVisualsScript := preload("res://actors/pony/pony_visuals.gd")
 const StockTintScript := preload("res://systems/stock_tint.gd")
+const PonyLookScript := preload("res://systems/pony_look.gd")
+const PonyPaintScript := preload("res://systems/pony_paint.gd")
+const DonorTableScript := preload("res://systems/donor_table.gd")
+const ToonStylerScript := preload("res://systems/toon_styler.gd")
 const StockPaletteScript := preload("res://systems/stock_palette.gd")
 const GaitScript := preload("res://systems/gait.gd")
 const PaintScript := preload("res://ui/casino_paint.gd")
@@ -78,15 +82,25 @@ func dress(data: PonyData, triple: Dictionary, display: String, lane := -1) -> b
 		_anim = null
 	if data == null:
 		return false
+	# DRESSED EXACTLY AS A PONY IN THE FIELD IS (P9, playtest 2026-11-10 item 49: "the race
+	# scene looks like a different game: plastic ponies with no toon shading or outlines").
+	# This used the legacy StockTint recolour over the raw glTF materials, so the runners had
+	# none of the show's shading; Pony._apply_stock_tint() is the one look, and this is it:
+	# a stock look is built on its donor and painted by PonyPaint, a named record is styled by
+	# ToonStyler.
+	var look: PonyLook = PonyLookScript.from_stock(triple) if not triple.is_empty() else null
 	var built: Node3D = PonyVisualsScript.build(data,
-		StockPaletteScript.mane_style_path(int(triple.get("mane_style", 0))) \
-			if not triple.is_empty() else "")
+		DonorTableScript.model_path(look.donor) if look != null else "")
 	if built == null:
 		return false
 	_model = built
 	add_child(_model)
-	if not triple.is_empty():
-		StockTintScript.apply(_model, StockPaletteScript.load_stock(), triple)
+	if look != null:
+		PonyPaintScript.apply(_model, look)
+		_model.scale = Vector3.ONE * PonyPaintScript.body_scale(look)
+	else:
+		ToonStylerScript.style(_model, &"pony", {})
+		ToonStylerScript.cross_eyes(_model, data.id)
 	_anim = _model.get_node_or_null(PonyVisualsScript.ANIMATION_PLAYER_PATH) as AnimationPlayer
 	rest()
 	_dress_lane()
@@ -144,16 +158,25 @@ func _dress_lane() -> void:
 	_chevron = null
 	if _lane < 0 or _lane >= PaintScript.BAND_COLORS.size():
 		return
+	# HER LANE'S COLOUR ON THE DIRT UNDER HER, NOT A SLAB ON HER BACK (P9 item 49: "flat
+	# coloured slabs through the racers' backs"). A box at one fixed height cut through every
+	# body that was not exactly that tall; a disc at her hooves fits every size and reads as
+	# her lane marker from the rail.
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = PaintScript.BAND_COLORS[_lane]
-	mat.roughness = 0.8
-	var box := BoxMesh.new()
-	box.size = SADDLECLOTH_SIZE
-	box.material = mat
+	mat.albedo_color = Color(PaintScript.BAND_COLORS[_lane], 0.85)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	var disc := CylinderMesh.new()
+	disc.top_radius = 0.62
+	disc.bottom_radius = 0.62
+	disc.height = 0.01
+	disc.radial_segments = 32
+	disc.material = mat
 	var cloth := MeshInstance3D.new()
 	cloth.name = "Saddlecloth"
-	cloth.mesh = box
-	cloth.position = Vector3(0.0, SADDLECLOTH_HEIGHT, 0.0)
+	cloth.mesh = disc
+	cloth.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	cloth.position = Vector3(0.0, 0.03, 0.0)
 	add_child(cloth)
 	if _lane != RaceCardScript.PLAYER_LANE:
 		return

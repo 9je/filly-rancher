@@ -87,8 +87,8 @@ func test_a_lane_gets_a_saddlecloth_in_its_colour_and_no_nameplate() -> void:
 	assert_eq(_runner.lane(), 3)
 	var cloth := _runner.get_node_or_null(^"Saddlecloth") as MeshInstance3D
 	assert_not_null(cloth)
-	var mat := (cloth.mesh as BoxMesh).material as StandardMaterial3D
-	assert_eq(mat.albedo_color, PaintScript.BAND_COLORS[3])
+	var mat := (cloth.mesh as CylinderMesh).material as StandardMaterial3D
+	assert_eq(Color(mat.albedo_color, 1.0), PaintScript.BAND_COLORS[3], "P9 item 49: a disc at her hooves in her lane colour")
 	assert_null(_runner.get_node_or_null(^"Nameplate"),
 		"the last billboarded text in the game is gone")
 	assert_null(_runner.get_node_or_null(^"Chevron"),
