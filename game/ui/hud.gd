@@ -524,6 +524,8 @@ const TOAST_RULES := [
 	["^The Express Chute took (\\d+) in the night\\. \\+(\\d+) bits on your statement\\.$",
 		"Chute took $1", "express_chute", [["coin", "+$2"]]],
 	["^(.+) came home at dawn\\.$", "$1 is home", "house", []],
+	# SPIKE'S TIP AS A CARD (P9 item 33): his icon, a few words, the hint on a chip.
+	["^(?:Spike|Tip)\\[(\\w+)\\]: (.+) \\| (.+)$", "$2", "$1", [["tag", "$3"]]],
 ]
 
 
@@ -536,7 +538,7 @@ static func toast_card_for(text: String) -> Dictionary:
 		var chips: Array = []
 		for c: Array in rule[3]:
 			chips.append({"kind": String(c[0]), "text": _fill(String(c[1]), m)})
-		return {"words": _fill(String(rule[1]), m), "icon": String(rule[2]), "chips": chips}
+		return {"words": _fill(String(rule[1]), m), "icon": _fill(String(rule[2]), m), "chips": chips}
 	return {"words": text, "icon": toast_icon_for(text), "chips": []}
 
 

@@ -1021,7 +1021,10 @@ func _physics_process(delta: float) -> void:
 			move_and_slide()
 	velocity -= room
 	if was_airborne and is_on_floor() and fall_speed > LAND_BOUNCE_FROM:
-		RumpBounce.kick_on(visuals, clampf(fall_speed / 7.0, 0.3, 1.2))
+		# A touch softer than the player's own (P9, playtest 2026-11-10 item 31: "flank jiggle
+		# slightly too strong on ponies dropped from the beam"): a beam drop lands at 5 to 7 m/s,
+		# which at /7 kicked the spring at nearly full; /9, topped at 0.9, is about a quarter less.
+		RumpBounce.kick_on(visuals, clampf(fall_speed / 9.0, 0.25, 0.9))
 	_stood_still = desired == Vector3.ZERO and velocity.length_squared() < 0.0001 and is_on_floor()
 	# A WANDERER WHO WALKS INTO A WALL STOPS WALKING INTO IT. She has nowhere to be, and a pony
 	# pressed against a coop or a barn grinds move_and_slide through its full recovery every

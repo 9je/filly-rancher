@@ -1875,6 +1875,9 @@ func _pot_inks() -> void:
 	var row := get_node_or_null(^"Layout/Panel/Margin/Column/InkRow") as HBoxContainer
 	if row != null:
 		row.add_theme_constant_override(&"separation", 8)
+		# The row centred in the column, its glow clear of both edges (item 55: "row clipped at
+		# the left edge").
+		row.alignment = BoxContainer.ALIGNMENT_CENTER
 	for i in ink_count():
 		var b := get_node_or_null(NodePath("Layout/Panel/Margin/Column/InkRow/Ink%d" % i)) as Button
 		if b == null:
@@ -1883,6 +1886,11 @@ func _pot_inks() -> void:
 		b.tooltip_text = ink_name(i)
 		b.icon = pot_texture(ink_at(i), POT_PX)
 		b.expand_icon = false
+		# CENTRED IN ITS RING (P9, playtest 2026-11-10 item 55: "selected ring off-centre"): a
+		# Button with no text draws its icon at the LEFT by default, so every pot sat 5 px
+		# left of the round box drawn around it.
+		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		b.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
 		b.custom_minimum_size = Vector2(POT_PX + 18.0, POT_PX + 18.0)
 		b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	_style_inks()

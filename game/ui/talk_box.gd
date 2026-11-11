@@ -13,6 +13,10 @@ signal chose(index: int)
 
 const REVEAL_CPS := 46.0
 const MAX_WIDTH := 640.0
+## The top of the screen the box keeps clear (compass and objective banner), as a fraction of
+## its height, and the gap it keeps from every edge (P9 item 39).
+const TOP_CLEAR := 0.17
+const EDGE := 32.0
 const MIN_WIDTH := 540.0
 ## A short line's bubble fits it, down to this (Tumble's "Yay!" sat in a bubble built for a
 ## paragraph); the name tab and the "click or E" hint still need the room.
@@ -202,9 +206,16 @@ func _place() -> void:
 		var head := anchor.global_position + Vector3(0, 2.3, 0)
 		if not camera.is_position_behind(head):
 			at = camera.unproject_position(head)
+	# The laid-out size if the box has grown past its minimum (wrapped text), so the clamp
+	# below holds the box it actually draws.
+	size = Vector2(maxf(size.x, _panel.size.x), maxf(size.y, _panel.size.y))
 	var pos := at - Vector2(size.x * 0.5, size.y + 24.0)
-	pos.x = clampf(pos.x, 24.0, vp.x - size.x - 24.0)
-	pos.y = clampf(pos.y, 70.0, vp.y - size.y - 40.0)
+	# ON SCREEN AND UNDER THE OBJECTIVE BANNER (P9, playtest 2026-11-10 item 39: the box
+	# covered the banner and ran off the screen edge). The top band (compass, banner) is kept
+	# clear, and the box never crosses an edge whatever the speaker's head is doing.
+	var top := vp.y * TOP_CLEAR
+	pos.x = clampf(pos.x, EDGE, maxf(EDGE, vp.x - size.x - EDGE))
+	pos.y = clampf(pos.y, top, maxf(top, vp.y - size.y - 40.0))
 	_panel.position = pos
 	_name_tab.position = pos + Vector2(26, -_name_tab.get_combined_minimum_size().y * 0.6)
 

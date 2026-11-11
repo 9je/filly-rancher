@@ -130,8 +130,10 @@ static func _acts_one_two(s: Dictionary, flags: Array) -> Dictionary:
 ## THE ONE-TIME EXPLAINERS (item 74): the first time a term is on the card, what it means.
 ## {flag: [term, the explanation]}; the ranch shows each once and sets its flag.
 const EXPLAIN := {
-	"explained_drifter": ["Drifter", "A Drifter is a pony with no mark yet: a blank cutie mark. Catch her, pen her, and look after her."],
-	"explained_bloom": ["Bloom", "Bloom: a Drifter finds her talent and her cutie mark. Play with her at her pen (E), and her favourite food and a friend speed it up."],
+	# AS CARDS, NOT SENTENCES (P9 item 33): "Tip[icon]: head | hint", drawn by hud.gd's toast
+	# rules with the icon, the head in the pill and the hint on a chip.
+	"explained_drifter": ["Drifter", "Tip[drifter]: Drifter: a pony with no mark yet | Catch her, pen her, look after her"],
+	"explained_bloom": ["Bloom", "Tip[drifter_bloom]: Bloom: her cutie mark appears | Play with her at her pen (E); her favourite food and a friend help"],
 }
 
 
