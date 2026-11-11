@@ -50,6 +50,11 @@ uniform float emission_energy = 0.0;
 // drawn only where she faces sideways (her flanks), and her plain coat everywhere else, so the
 // back of her rump does not wear a sliver of the mark (ToonStyler.is_mark_texture).
 uniform bool mark_sides_only = false;
+// A HUE REMAP (P9 item 71: Spike's texture is a mauve pink, the show draws him purple). Texels
+// within hue_remap.y (0..1 hue units) of hue hue_remap.x with some colour in them are turned to
+// hue_remap.z, their saturation and value scaled by hue_remap_sv. Off while hue_remap.x < 0.
+uniform vec4 hue_remap = vec4(-1.0, 0.0, 0.0, 0.0);
+uniform vec2 hue_remap_sv = vec2(1.0, 1.0);
 uniform vec4 mark_coat : source_color = vec4(1.0);
 varying vec3 model_normal;
 
@@ -136,6 +141,18 @@ void fragment() {
 		if (mark_sides_only) {
 			float side = smoothstep(0.35, 0.6, abs(normalize(model_normal).x));
 			tc = mix(mark_coat, tc, side);
+		}
+		if (hue_remap.x >= 0.0) {
+			vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+			vec4 P = mix(vec4(tc.bg, K.wz), vec4(tc.gb, K.xy), step(tc.b, tc.g));
+			vec4 Q = mix(vec4(P.xyw, tc.r), vec4(tc.r, P.yzx), step(P.x, tc.r));
+			float dd = Q.x - min(Q.w, Q.y);
+			vec3 hsv = vec3(abs(Q.z + (Q.w - Q.y) / (6.0 * dd + 1e-10)), dd / (Q.x + 1e-10), Q.x);
+			float dh = abs(fract(hsv.x - hue_remap.x + 0.5) - 0.5);
+			float k = (1.0 - smoothstep(hue_remap.y * 0.8, hue_remap.y, dh)) * smoothstep(0.06, 0.14, hsv.y);
+			vec3 to = vec3(hue_remap.z, clamp(hsv.y * hue_remap_sv.x, 0.0, 1.0), hsv.z * hue_remap_sv.y);
+			vec3 rgb2 = to.z * mix(vec3(1.0), clamp(abs(fract(to.x + vec3(1.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0) - 1.0, 0.0, 1.0), to.y);
+			tc.rgb = mix(tc.rgb, rgb2, k);
 		}
 		c *= tc;
 	}

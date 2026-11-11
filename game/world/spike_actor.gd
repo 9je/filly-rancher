@@ -73,6 +73,8 @@ func _dress_animated(root: Node) -> void:
 				eye.shader = SPIKE_EYE
 				eye.set_shader_parameter(&"iris_texture", IRIS_L if key == "eyeball_l" else IRIS_R)
 				mi.set_surface_override_material(i, eye)
+				continue
+			_purple(mi.get_surface_override_material(i))
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	var players := root.find_children("*", "AnimationPlayer", true, false)
 	if players.is_empty():
@@ -81,7 +83,27 @@ func _dress_animated(root: Node) -> void:
 	if _anim.has_animation(&"idle"):
 		_anim.get_animation(&"idle").loop_mode = Animation.LOOP_LINEAR
 	_anim.animation_finished.connect(func(_n: StringName) -> void: _play(&"idle"))
+	# After the clip has posed him, not before (a _process write lost to the mixer's own).
+	_anim.mixer_applied.connect(_clear_wave)
 	_play(&"idle")
+
+
+## HIS SCALES PURPLE (P9 item 71, the owner: "he reads pink rather than purple"). The animated
+## model's body texture is a mauve pink (hue ~0.87); the toon shader turns that hue to the show's
+## violet (~0.76), a touch richer and a shade deeper. His green spines, fins and cream belly are
+## other hues and stay as drawn.
+const SPIKE_HUE_FROM := 0.87
+const SPIKE_HUE_TO := 0.765
+const SPIKE_HUE_RANGE := 0.09
+
+
+func _purple(m: Material) -> void:
+	var bare: Variant = m.get_meta(ToonStyler.BARE_META) if m != null and m.has_meta(ToonStyler.BARE_META) else null
+	for mat: Variant in [m, bare]:
+		if mat is ShaderMaterial and (mat as ShaderMaterial).shader == ToonStyler.TOON:
+			(mat as ShaderMaterial).set_shader_parameter(&"hue_remap",
+				Vector4(SPIKE_HUE_FROM, SPIKE_HUE_RANGE, SPIKE_HUE_TO, 0.0))
+			(mat as ShaderMaterial).set_shader_parameter(&"hue_remap_sv", Vector2(1.45, 0.9))
 
 
 ## His AnimationPlayer (null on the clip-less models).
@@ -235,6 +257,34 @@ func _fin_scale() -> void:
 				_ear_bones.append(b)
 	for b in _ear_bones:
 		_skeleton.set_bone_pose_scale(b, Vector3.ONE * EAR_FIN_SCALE)
+
+
+## HIS WAVE CLEARS HIS HEAD (P9 item 71: "Spike's raised hand clips into his head"). The clip's
+## raised hand lands on his cheek, and the show-size fins (above) sit in its path; while he waves,
+## the raised arm (the one whose hand is above its shoulder) is swung out WAVE_CLEAR from his side.
+const WAVE_CLEAR := deg_to_rad(24.0)
+
+
+func _clear_wave() -> void:
+	if _skeleton == null and _body != null:
+		_skeleton = _body.find_child("Skeleton3D", true, false) as Skeleton3D
+	if _skeleton == null or _anim == null or _anim.current_animation != "wave":
+		return
+	for arm: String in ["LeftArm", "RightArm"]:
+		var b := _skeleton.find_bone(arm)
+		var fore := _skeleton.find_bone(arm.replace("Arm", "Forearm"))
+		var hand := _skeleton.find_bone("ValveBiped.Bip01_%s_Hand" % arm.left(1))
+		if b < 0 or fore < 0:
+			continue
+		var g := _skeleton.get_bone_global_pose(b)
+		var tip := _skeleton.get_bone_global_pose(hand if hand >= 0 else fore).origin
+		if tip.y <= g.origin.y:
+			continue
+		var side := signf(_skeleton.get_bone_global_pose(fore).origin.x - g.origin.x)
+		var turned := Transform3D(Basis(Vector3(0, 0, 1), -side * WAVE_CLEAR) * g.basis, g.origin)
+		var parent := _skeleton.get_bone_parent(b)
+		var local := (_skeleton.get_bone_global_pose(parent).affine_inverse() * turned) if parent >= 0 else turned
+		_skeleton.set_bone_pose_rotation(b, local.basis.get_rotation_quaternion())
 
 
 func asked() -> void:
