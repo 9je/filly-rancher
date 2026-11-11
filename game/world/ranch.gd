@@ -5106,7 +5106,7 @@ func interaction_candidates() -> Array[Dictionary]:
 	if can_sleep_here():
 		out.append(InteractionScript.candidate(
 			InteractionScript.Kind.SLEEP, _door_gap(^"Buildings/Farmhouse"),
-			"dawn" if _night_or_dusk() else "night"))
+			"night" if _rest_to_night_wanted() else "dawn"))
 	# THE BAN CLOSES THE DOOR RATHER THAN GREYING IT OUT. The shipped code showed no prompt
 	# under a ban but still let the press through to casino_menu.open(), which then refused
 	# on its own can_open; a player got a silent nothing. A banned Palace is simply not
@@ -5684,6 +5684,15 @@ func can_sleep_here() -> bool:
 	return _door_gap(^"Buildings/Farmhouse") <= SLEEP_DOOR_RADIUS
 
 
+## ONE PRESS SKIPS THE DAY (owner 2026-11-11: "you have to sleep twice to skip to start of
+## new day? annoying"). The bed sleeps till dawn at any hour; only while the story wants a
+## night (cutting pylons) and it is still day does it rest till nightfall instead.
+func _rest_to_night_wanted() -> bool:
+	if _night_or_dusk():
+		return false
+	return StringName(current_objective().get("id", &"")) == &"pylons"
+
+
 func _night_or_dusk() -> bool:
 	if _world == null:
 		return false
@@ -5752,10 +5761,10 @@ func _pass_time(seconds: float, to_dawn: bool) -> float:
 func _sleep_with_fade() -> void:
 	_sleeping = true
 	await _palace_fade_to(1.0, 0.6)
-	if _night_or_dusk():
-		sleep_till_dawn()
-	else:
+	if _rest_to_night_wanted():
 		rest_till_night()
+	else:
+		sleep_till_dawn()
 	await get_tree().create_timer(0.4).timeout
 	await _palace_fade_to(0.0, 0.8)
 	_sleeping = false
@@ -10380,6 +10389,7 @@ func current_objective() -> Dictionary:
 	var storage: Storage = beam.get_storage() if beam != null else null
 	return ObjectiveScript.current({
 		"drifters": drifters, "ready": ready,
+		"endings_seen": (story.get_var("endings_seen", []) as Array).size(),
 		"chapter": story.chapter, "path": StoryV1Script.path(story),
 		"ending": String(story.get_var("ending", "")), "flags": story.flags.keys(),
 		"deliveries": story.deliveries, "blooms": int(story.get_var("blooms", 0)),

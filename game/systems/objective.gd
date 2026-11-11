@@ -29,7 +29,12 @@ static func current(s: Dictionary) -> Dictionary:
 		return {}
 	# AFTER AN ENDING, SAY SO (playtest 2026-11-10 item 24: "idk if theres more to do").
 	if String(s.get("ending", "")) != "":
-		return _o(&"free_play", &"", PlaceSign.Icon.HOUSE, "Story complete: the valley is yours")
+		# Owner 2026-11-11: say what is left. Another ending means a new game.
+		var seen := int(s.get("endings_seen", 1))
+		if seen < 5:
+			return _o(&"free_play", &"", PlaceSign.Icon.HOUSE,
+				"The end: new game for another ending %d/5" % seen)
+		return _o(&"free_play", &"", PlaceSign.Icon.HOUSE, "All five endings found")
 	var flags: Array = s.get("flags", [])
 	var path := String(s.get("path", ""))
 	if not flags.has("has_scoop"):
@@ -100,7 +105,7 @@ static func _acts_one_two(s: Dictionary, flags: Array) -> Dictionary:
 			# first; the trail goes to her pen, where E plays with them.
 			if int(s.get("ready", 1)) <= 0 and int(s.get("drifters", 0)) > 0 and int(s.get("bag", 0)) == 0:
 				return _o(&"deliver", &"bloom", PlaceSign.Icon.FENCE,
-					"Bloom a Drifter, then deliver her %d/%d" % [d, INVITE_DELIVERIES])
+					"Bloom a Drifter")
 			return _o(&"deliver", &"depot", PlaceSign.Icon.CRATE,
 				"Deliver ponies %d/%d" % [d, INVITE_DELIVERIES])
 		var b := int(s.get("blooms", 0))

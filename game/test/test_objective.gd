@@ -140,7 +140,7 @@ func test_with_nothing_ready_to_ship_the_card_sends_her_to_bloom_one() -> void:
 	var stuck := {"flags": f, "pens": 2, "deliveries": 0, "drifters": 3, "ready": 0, "bag": 0}
 	assert_eq(_goal(stuck), &"bloom")
 	assert_string_contains(_words(stuck), "Bloom a Drifter")
-	assert_string_contains(_words(stuck), "0/6")
+	assert_eq(_words(stuck), "Bloom a Drifter", "short (owner 2026-11-11)")
 	var one_ready := stuck.duplicate()
 	one_ready["ready"] = 1
 	assert_eq(_goal(one_ready), &"depot", "a Bloomed Drifter penned: to the Depot")
