@@ -202,7 +202,50 @@ func show_catch(instance: PonyInstance, body: Node3D = null) -> void:
 		await get_tree().create_timer(entrance_delay).timeout
 		if token != _entrance_token:
 			return
-	_slide()
+	# A DRIFTER IS A LIGHT CATCH (P9, playtest 2026-11-10 item 28: "full-screen catch animation
+	# for every catch is too much ... it stops you catching Drifters in a row"). The full-screen
+	# moment is kept for the one-of-a-kinds; a Drifter's card slides into its corner small and
+	# short, never dims the world and never eats a click.
+	if instance.is_stock():
+		_slide_light()
+	else:
+		_slide()
+
+
+## How a Drifter's card sits in its corner: smaller, and gone sooner.
+const LIGHT_SCALE := 0.62
+const LIGHT_HOLD := 2.2
+var _light := false
+
+
+func is_light() -> bool:
+	return _light and visible
+
+
+func _slide_light() -> void:
+	if _tween != null and _tween.is_valid():
+		_tween.kill()
+	visible = true
+	_showing = true
+	_in_moment = false
+	_light = true
+	_ribbon.visible = true
+	_moment_t = 99.0
+	_burst_a = 0.0
+	modulate.a = 1.0
+	_panel.modulate.a = 1.0
+	# Scaled about its top right corner, so it stays tucked in the corner.
+	_panel.pivot_offset = Vector2(CARD_WIDTH, 0.0)
+	_panel.scale = Vector2.ONE * LIGHT_SCALE
+	_panel.position = Vector2(CARD_WIDTH * LIGHT_SCALE + MARGIN + 40.0, 0.0)
+	_stars.queue_redraw()
+	_tween = create_tween()
+	_tween.tween_property(_panel, "position", Vector2.ZERO, SLIDE_IN) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_tween.tween_interval(LIGHT_HOLD)
+	_tween.tween_property(_panel, "position:x", CARD_WIDTH + MARGIN + 40.0, SLIDE_OUT) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	_tween.tween_callback(_hidden)
 
 
 ## Seconds between the catch and the card: the beam's ghost flight (MagicBeam.GHOST_SECONDS)
@@ -581,6 +624,7 @@ func _slide() -> void:
 	visible = true
 	_showing = true
 	_in_moment = true
+	_light = false
 	# The big "Caught!" says it during the moment; the chip says it on the corner card
 	# (Fable round 5: "the card says Caught! twice").
 	_ribbon.visible = false
@@ -644,6 +688,7 @@ func _input(event: InputEvent) -> void:
 
 
 func _hidden() -> void:
+	_light = false
 	_showing = false
 	_in_moment = false
 	_ribbon.visible = true
