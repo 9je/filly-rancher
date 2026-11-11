@@ -41,7 +41,7 @@ func _play() -> void:
 		return
 	note("at the Palace steps %s, prompt '%s'" % [player.global_position.snapped(Vector3.ONE * 0.1),
 		_prompt()])
-	if not check(_prompt().contains("go into the Spectra Palace"),
+	if not check(_prompt().contains("go into the Palace"),
 			"the Palace door does not say it goes in: '%s'" % _prompt()):
 		return
 	await look_at_point(palace.global_position + Vector3(0, 3.0, 0), true, 0.06, 60)
@@ -74,7 +74,7 @@ func _play() -> void:
 	for p: Vector3 in [hall.to_global(Vector3(0, 0, 9.0)), hall.to_global(Vector3(-8.5, 0, 4.0)),
 			Vector3(slot.x, floor_y, slot.z)]:
 		await _walk(p, 0.7, 25.0)
-	if not check(_prompt().contains("play the slots"),
+	if not check(_prompt().contains("play slots"),
 			"at the slot machine the prompt is '%s'" % _prompt()):
 		return
 	# The camera, swung all the way round against the west wall, stays in the room.

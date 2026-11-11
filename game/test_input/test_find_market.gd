@@ -17,7 +17,7 @@ func _play() -> void:
 	if not check(compass != null, "there is no compass on the HUD"):
 		return
 	var hud: Node = ranch.get_node(^"HUD")
-	for goal: Array in [["Market", "Market"], ["Pens", "build here"]]:
+	for goal: Array in [["Market", "Market"], ["Pens", "E: build"]]:
 		var idx := -1
 		var places: Array = compass.get("places")
 		for i in places.size():

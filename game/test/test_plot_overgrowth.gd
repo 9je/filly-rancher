@@ -108,10 +108,10 @@ func test_a_built_slot_cannot_be_overgrown() -> void:
 
 func test_the_prompt_says_clear_and_the_price() -> void:
 	var c := InteractionScript.priced(InteractionScript.Kind.PLOT_CLEAR, 1.0, "Slot3", 100, true)
-	assert_eq(InteractionScript.prompt_for(c, "E"), "E: clear this plot (100 bits)")
+	assert_eq(InteractionScript.prompt_for(c, "E"), "E: clear, 100 bits")
 	c["afford"] = false
 	assert_eq(InteractionScript.prompt_for(c, "E"),
-		"E: clear this plot (100 bits), not enough bits")
+		"E: clear, 100 bits (need more)")
 
 
 func test_standing_on_an_overgrown_plot_offers_the_clearing() -> void:

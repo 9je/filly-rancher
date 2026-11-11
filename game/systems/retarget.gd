@@ -37,6 +37,13 @@ const FPS := 30.0
 ## Locomotion stays the rig's own (its walk and gallop are native): a borrowed trot would be
 ## mixed into every move she makes.
 const SKIP: Array[StringName] = [&"trot"]
+## HOW MUCH OF A CLIP'S TURN IS CARRIED (P9, playtest 2026-11-10 item 30: "ponies in pens lie
+## sideways or face-down"). The donor's graze drops a mare's long neck 62 to 68 degrees and
+## pitches her body 16; on the Mane Six's big head and short neck the same turn buried the
+## muzzle in the dirt and folded the forelegs, so from the pen rail she read as a pony lying
+## face-down. Graze carries this share of every bone's turn and of the body's drop: the head
+## still goes down to the grass, the body stays a standing pony's.
+const CLIP_CARRY := {&"graze": 0.5}
 
 static var _cache := {}
 
@@ -86,7 +93,7 @@ static func _space(node: Node, root: Node) -> Transform3D:
 ## by bone index). Unmapped target bones keep their reference pose relative to their parent.
 static func _locals_for(src: Skeleton3D, src_now: Array[Transform3D], src_ref: Array[Transform3D],
 		tgt: Skeleton3D, tgt_ref: Array[Transform3D], map: Dictionary,
-		src_space := Quaternion.IDENTITY, tgt_space := Quaternion.IDENTITY) -> Dictionary:
+		src_space := Quaternion.IDENTITY, tgt_space := Quaternion.IDENTITY, carry := 1.0) -> Dictionary:
 	var out := {}
 	# Each skeleton sits in its own turned space inside its model (the two rigs were exported
 	# with different rotations): a source turn is carried through model space.
@@ -97,6 +104,8 @@ static func _locals_for(src: Skeleton3D, src_now: Array[Transform3D], src_ref: A
 		var s := src.find_bone(String(map[name]))
 		if s >= 0 and tgt.find_bone(name) >= 0:
 			var delta := _q(src_now[s].basis) * _q(src_ref[s].basis).inverse()
+			if carry < 1.0:
+				delta = Quaternion.IDENTITY.slerp(delta.normalized(), carry)
 			deltas[name] = to_tgt * delta * to_tgt.inverse()
 	if deltas.has("DEF_Neck1") and deltas.has("DEF_Head"):
 		var neck: Quaternion = deltas["DEF_Neck1"]
@@ -159,6 +168,7 @@ static func bake(donor: Node3D, target: Node3D, map: Dictionary = MANE_SIX_MAP) 
 		if tgt_anim.has_animation(clip) or String(clip).begins_with("RESET") or clip in SKIP:
 			continue
 		var src_clip := src_anim.get_animation(clip)
+		var carry := float(CLIP_CARRY.get(clip, 1.0))
 		var a := Animation.new()
 		a.length = src_clip.length
 		a.loop_mode = src_clip.loop_mode
@@ -198,13 +208,13 @@ static func bake(donor: Node3D, target: Node3D, map: Dictionary = MANE_SIX_MAP) 
 		for f in frames + 1:
 			var t := minf(float(f) / FPS, src_clip.length)
 			var now := _globals(src_sk, src_clip, t)
-			var locals := _locals_for(src_sk, now, src_ref, tgt_sk, tgt_ref, map, src_space, tgt_space)
+			var locals := _locals_for(src_sk, now, src_ref, tgt_sk, tgt_ref, map, src_space, tgt_space, carry)
 			for name: String in locals:
 				if tracks.has(name):
 					a.rotation_track_insert_key(tracks[name], t, locals[name])
 			if hip_track >= 0 and src_hip >= 0:
 				# Through model space, at the target's hip height.
-				var travel := tgt_xf.basis.inverse() * (src_xf.basis * (now[src_hip].origin - src_ref[src_hip].origin) * ratio)
+				var travel := tgt_xf.basis.inverse() * (src_xf.basis * (now[src_hip].origin - src_ref[src_hip].origin) * ratio * carry)
 				var parent := tgt_sk.get_bone_parent(body_bone)
 				var pg: Transform3D = tgt_ref[parent] if parent >= 0 else Transform3D()
 				a.position_track_insert_key(hip_track, t, pg.affine_inverse() * (tgt_ref[body_bone].origin + travel))

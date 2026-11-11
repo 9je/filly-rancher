@@ -111,11 +111,11 @@ func test_every_kind_has_a_place_in_the_priority_list() -> void:
 
 func test_the_prompt_names_the_verb_for_every_kind() -> void:
 	var expected := {
-		InteractionScript.Kind.PLOT_BUILD: "E: build here",
+		InteractionScript.Kind.PLOT_BUILD: "E: build",
 		InteractionScript.Kind.MARKET: "E: Market, sell gems",
 		InteractionScript.Kind.BOARD: "E: read the board",
-		InteractionScript.Kind.DEPOT: "E: Depot, deliver and pay",
-		InteractionScript.Kind.PALACE: "E: go into the Spectra Palace",
+		InteractionScript.Kind.DEPOT: "E: Depot",
+		InteractionScript.Kind.PALACE: "E: go into the Palace",
 	}
 	for kind: int in expected:
 		assert_eq(InteractionScript.prompt_for(
@@ -125,7 +125,7 @@ func test_the_prompt_names_the_verb_for_every_kind() -> void:
 func test_the_pen_prompt_names_the_pony_who_is_about_to_go_in() -> void:
 	assert_eq(InteractionScript.prompt_for(InteractionScript.candidate(
 		InteractionScript.Kind.PEN_MOVE_IN, 1.0, "Buttercup"), "E"),
-		"E: move Buttercup in")
+		"E: pen Buttercup")
 
 
 func test_an_empty_saddlebag_still_holds_the_ground_and_says_why() -> void:

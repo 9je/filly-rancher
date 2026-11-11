@@ -115,17 +115,17 @@ func test_an_upgrade_must_be_the_next_size() -> void:
 func test_the_prompt_names_the_upgrade_and_its_price() -> void:
 	var c := InteractionScript.priced(InteractionScript.Kind.PEN_UPGRADE, 1.0, "Slot1", 150,
 		true, "Big Pen")
-	assert_eq(InteractionScript.prompt_for(c, "E"), "E: upgrade to Big Pen (150 bits)")
+	assert_eq(InteractionScript.prompt_for(c, "E"), "E: Big Pen, 150 bits")
 	var poor := InteractionScript.priced(InteractionScript.Kind.PEN_UPGRADE, 1.0, "Slot1", 150,
 		false, "Big Pen", true)
 	assert_eq(InteractionScript.prompt_for(poor, "E"),
-		"E: pen full, upgrade to Big Pen (150 bits), not enough bits")
+		"E: Big Pen, 150 bits (need more)")
 
 
 func test_a_full_top_size_pen_says_what_to_do() -> void:
 	var c := InteractionScript.candidate(InteractionScript.Kind.PEN_MOVE_IN, 1.0, "Fluttershy")
 	c["full"] = true
-	assert_eq(InteractionScript.prompt_for(c, "E"), "E: this pen is full, build another pen")
+	assert_eq(InteractionScript.prompt_for(c, "E"), "E: full, build another pen")
 
 
 func test_the_upgrade_is_ground_like_the_pen() -> void:

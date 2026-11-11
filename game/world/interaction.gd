@@ -64,11 +64,11 @@ const PRIORITY: Array[int] = [Kind.PLOT_BUILD, Kind.PEN_MOVE_IN, Kind.PEN_PLAY, 
 
 ## What each station in the hall says it does (game/world/palace_interior.gd's STATIONS).
 const STATION_PROMPTS := {
-	"cage": "the cage, buy and cash chips",
-	"slots": "play the slots",
-	"wheel": "bet on the wheel",
-	"blackjack": "sit down at blackjack",
-	"racing": "bet on the races",
+	"cage": "chips",
+	"slots": "play slots",
+	"wheel": "play the wheel",
+	"blackjack": "play blackjack",
+	"racing": "bet on races",
 }
 
 ## THE KINDS THAT SHARE ONE RANK, so resolve() settles them on distance instead of on the
@@ -101,11 +101,11 @@ const GROUND_TIER: Array[int] = [Kind.PLOT_BUILD, Kind.PEN_MOVE_IN, Kind.PEN_UPG
 ## that state, deliberately: a pen that dropped out of the running with an empty bag would
 ## hand E to whatever building is next nearest, so the player standing in her own paddock
 ## would press E and open the Market. She keeps the ground and the prompt says why.
-const EMPTY_BAG := "your saddlebag is empty"
+const EMPTY_BAG := "saddlebag empty"
 
 ## What a full pen with no bigger size left says. "That pen is full." alone was the owner's
 ## dead end (2026-10-25): it said what was wrong and not what to do about it.
-const FULL_PEN := "this pen is full, build another pen"
+const FULL_PEN := "full, build another pen"
 
 
 ## One candidate, as ranch.gd hands them over. `distance` is metres in the XZ plane and is
@@ -187,39 +187,46 @@ static func prompt_for(action: Dictionary, key: String) -> String:
 		return ""
 	var subject: String = String(action.get("subject", ""))
 	match int(action.get("kind", Kind.NONE)):
+		# SHORT, A VERB AND ITS OBJECT (P9, playtest 2026-11-10 item 36: "Upgrade to Big Pen
+		# (175 bits), not enough bits" and "The pen is here, your saddlebag is empty" were
+		# sentences). The pen's count and mood are on its badge, the bits on the HUD.
 		Kind.PLOT_BUILD:
 			var reason: String = String(action.get("reason", ""))
 			if not reason.is_empty():
 				return "%s: cannot build, %s" % [key, reason]
-			return "%s: build here" % key
+			return "%s: build" % key
 		Kind.PEN_MOVE_IN:
 			if bool(action.get("full", false)):
 				return "%s: %s" % [key, FULL_PEN]
 			if subject.is_empty():
-				return "%s: the pen is here, %s" % [key, EMPTY_BAG]
-			return "%s: move %s in" % [key, subject]
+				return "%s: %s" % [key, EMPTY_BAG]
+			return "%s: pen %s" % [key, subject]
 		Kind.PEN_PLAY:
 			return "%s: play with the Drifters" % key
 		Kind.PEN_UPGRADE:
-			var line := "%s: %supgrade to %s (%s)" % [key,
-				"pen full, " if bool(action.get("full", false)) else "",
-				String(action.get("what", "")), _price(int(action.get("price", 0)))]
-			return line if bool(action.get("afford", true)) else line + ", not enough bits"
+			var line := "%s: %s, %s" % [key, String(action.get("what", "upgrade")),
+				_price(int(action.get("price", 0)))]
+			return line if bool(action.get("afford", true)) else line + " (need more)"
 		Kind.PLOT_CLEAR:
-			var clear := "%s: clear this plot (%s)" % [key, _price(int(action.get("price", 0)))]
-			return clear if bool(action.get("afford", true)) else clear + ", not enough bits"
+			var clear := "%s: clear, %s" % [key, _price(int(action.get("price", 0)))]
+			return clear if bool(action.get("afford", true)) else clear + " (need more)"
 		Kind.MARKET:
 			return "%s: Market, sell gems" % key
 		Kind.BOARD:
 			return "%s: read the board" % key
 		Kind.MAILBOX:
-			return "%s: read your mail" % key
+			# `subject` is the unread count when the ranch knows it (P9 item 44).
+			if subject == "0":
+				return "%s: read mail (no new mail)" % key
+			if subject.is_valid_int():
+				return "%s: read mail (%s new)" % [key, subject]
+			return "%s: read mail" % key
 		Kind.SPIKE:
-			return "%s: ask Spike for a tip" % key
+			return "%s: ask Spike" % key
 		Kind.DEPOT:
-			return "%s: Depot, deliver and pay" % key
+			return "%s: Depot" % key
 		Kind.PALACE:
-			return "%s: go into the Spectra Palace" % key
+			return "%s: go into the Palace" % key
 		Kind.PALACE_STATION:
 			return "%s: %s" % [key, String(STATION_PROMPTS.get(subject, "play"))]
 		Kind.PALACE_EXIT:
