@@ -371,7 +371,10 @@ func test_a_pinned_night_storm_puts_the_sun_down_and_the_rain_up() -> void:
 		"the sun has set; the light shines down from the moon")
 	assert_lt(_sun.light_energy, SkyRigScript.light_energy(DAY, CLEAR),
 		"a stormy night must be dimmer than a clear day")
-	assert_almost_eq(_environment.fog_density, SkyRigScript.fog_density(STORM, NIGHT), 0.000001)
+	# P9 item 58: depth fog, its far opacity from the storm night's density over its span.
+	assert_almost_eq(_environment.fog_density, SkyRigScript.fog_opacity(SkyRigScript.fog_density(STORM, NIGHT),
+		SkyRigScript.WEATHER_FOG_BEGIN[STORM], SkyRigScript.WEATHER_FOG_END[STORM]), 0.000001)
+	assert_eq(_environment.fog_mode, Environment.FOG_MODE_DEPTH)
 	assert_almost_eq(_sky_material.sky_top_color.get_luminance(),
 		SkyRigScript.sky_top(NIGHT, STORM).get_luminance(), 0.001)
 
@@ -440,7 +443,7 @@ func test_a_pinned_clear_day_puts_the_sun_up_and_the_rain_away() -> void:
 	assert_lt(_sun.rotation_degrees.x, 0.0, "a pinned DAY reads as noon; the sun is up")
 	assert_almost_eq(_sun.rotation_degrees.x, -SkyRigScript.ELEVATION_NOON, 0.01,
 		"a pinned state has no meaningful progress, so it is read as mid phase")
-	assert_almost_eq(_environment.fog_density, SkyRigScript.fog_density(CLEAR), 0.000001)
+	assert_almost_eq(_environment.fog_density, SkyRigScript.scene_fog(CLEAR), 0.000001)
 
 	var rain: GPUParticles3D = _rig.get_node("Rain")
 	assert_false(rain.emitting, "nothing falls out of a clear sky")
@@ -462,7 +465,7 @@ func test_a_transition_is_a_ramp_that_actually_arrives() -> void:
 	_rig.step(SkyRigScript.TRANSITION_SECONDS * 0.5)
 	var halfway: float = _environment.fog_density
 	assert_gt(halfway, clear_density, "half a ramp has left the clear sky behind")
-	assert_lt(halfway, SkyRigScript.fog_density(STORM, NIGHT), "and has not arrived at the storm")
+	assert_lt(halfway, SkyRigScript.scene_fog(STORM, NIGHT), "and has not arrived at the storm")
 
 	_rig.step(SkyRigScript.TRANSITION_SECONDS * 0.5)
 	# Read the arrival off the rig, not off the light: Environment.fog_density and
@@ -473,7 +476,7 @@ func test_a_transition_is_a_ramp_that_actually_arrives() -> void:
 		"a full TRANSITION_SECONDS of steps lands exactly on the target")
 	assert_eq(float(arrived["light_energy"]), SkyRigScript.light_energy(NIGHT, STORM),
 		"and lands the light exactly too, not a rounding error short")
-	assert_almost_eq(_environment.fog_density, SkyRigScript.fog_density(STORM, NIGHT), 0.0000001,
+	assert_almost_eq(_environment.fog_density, SkyRigScript.scene_fog(STORM, NIGHT), 0.000001,
 		"and the scene has it, to whatever precision a float property can hold")
 
 

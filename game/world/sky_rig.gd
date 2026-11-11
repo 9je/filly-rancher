@@ -215,6 +215,22 @@ const WEATHER_SKY_DARKEN: Array[float] = [1.0, 0.75, 0.85, 0.55]
 ## 0.018 the barn, the fences and every tree past the yard were gone from a shot taken 45 m
 ## out, which is not weather, it is a wall.
 const WEATHER_FOG_DENSITY: Array[float] = [0.0011, 0.004, 0.010, 0.0065]
+## DEPTH FOG, NOT A VEIL (P9 item 58; the owner: "a flat grey veil that does not blend with the
+## cel shading"). Exponential fog greys every pixel from the lens out, so the pony two metres
+## away and the barn at ten wore the same wash over their flat toon colours. The fog now starts
+## FOG_BEGIN metres out (clear of the yard the player stands in) and is full by FOG_END, per
+## weather; the densities above still say how thick each weather is (fog_opacity()).
+const WEATHER_FOG_BEGIN: Array[float] = [36.0, 16.0, 9.0, 12.0]
+const WEATHER_FOG_END: Array[float] = [220.0, 110.0, 64.0, 90.0]
+## The thickest a fog may get at its far end, so a horizon is never a solid wall.
+const FOG_MAX_OPACITY := 0.92
+## OVERCAST HAS NO HARD SHADOWS (item 58: "huge hard-edged ground shadow patches" under a fog).
+## The sun's cast shadow is this strong per weather; the toon step reads the weakened
+## attenuation as a pale, soft patch, or none.
+const WEATHER_SHADOW_OPACITY: Array[float] = [1.0, 0.62, 0.45, 0.55]
+const KEY_FOG_BEGIN := "fog_begin"
+const KEY_FOG_END := "fog_end"
+const KEY_SHADOW_OPACITY := "shadow_opacity"
 ## The least fog each phase stands in (see fog_density): dawn, day, dusk, night.
 const PHASE_HAZE_FLOOR: Array[float] = [0.0016, 0.0, 0.0013, 0.016]
 
@@ -478,6 +494,19 @@ static func fog_density(weather: int, phase: int = -1) -> float:
 	return d
 
 
+## The depth fog's opacity at its far end for exponential `density` over begin..end: the
+## same thickness the old fog reached across that stretch of air, capped (FOG_MAX_OPACITY).
+static func fog_opacity(density: float, begin: float, end: float) -> float:
+	return clampf(1.0 - exp(-density * maxf(0.0, end - begin) * 1.8), 0.0, FOG_MAX_OPACITY)
+
+
+## What the scene's Environment.fog_density holds once the sky has arrived at this hour and
+## weather (depth mode: the far opacity), with no dread grade on top.
+static func scene_fog(weather: int, phase: int = -1) -> float:
+	var w := _weather_index(weather)
+	return fog_opacity(fog_density(weather, phase), WEATHER_FOG_BEGIN[w], WEATHER_FOG_END[w])
+
+
 ## Drops alive at once. FOG is deliberately dry: it is a thickness, not a downpour.
 static func rain_amount(weather: int) -> int:
 	return WEATHER_RAIN_AMOUNT[_weather_index(weather)]
@@ -629,6 +658,9 @@ func _set_targets_from(state: WorldState) -> void:
 		KEY_AMBIENT_ENERGY: ambient_energy(phase, weather),
 		KEY_AMBIENT_COLOR: ambient_light_color(phase, weather),
 		KEY_FOG_DENSITY: fog_density(weather, phase),
+		KEY_FOG_BEGIN: WEATHER_FOG_BEGIN[_weather_index(weather)],
+		KEY_FOG_END: WEATHER_FOG_END[_weather_index(weather)],
+		KEY_SHADOW_OPACITY: WEATHER_SHADOW_OPACITY[_weather_index(weather)],
 		KEY_RAIN_AMOUNT: rain_amount(weather),
 	}
 	_has_targets = true
@@ -693,6 +725,7 @@ func _write_to_scene() -> void:
 			azimuth = MOON_AZIMUTH
 		_sun.rotation_degrees = Vector3(-elevation, azimuth, 0.0)
 		_sun.light_energy = float(_current.get(KEY_LIGHT_ENERGY, 1.0))
+		_sun.shadow_opacity = float(_current.get(KEY_SHADOW_OPACITY, 1.0))
 		_sun.light_color = (_current.get(KEY_LIGHT_COLOR, _sun.light_color) as Color) \
 			* (_tone.get("sun_tint", Color.WHITE) as Color)
 	var horizon: Color = _current.get(KEY_SKY_HORIZON, Color.WHITE)
@@ -711,8 +744,14 @@ func _write_to_scene() -> void:
 		# out on its own.
 		_environment.ambient_light_color = _current.get(
 			KEY_AMBIENT_COLOR, _environment.ambient_light_color)
-		_environment.fog_density = float(_current.get(KEY_FOG_DENSITY, WEATHER_FOG_DENSITY[0])) \
-			* float(_tone.get("fog_mult", 1.0))
+		var fog_begin := float(_current.get(KEY_FOG_BEGIN, WEATHER_FOG_BEGIN[0]))
+		var fog_end := float(_current.get(KEY_FOG_END, WEATHER_FOG_END[0]))
+		_environment.fog_mode = Environment.FOG_MODE_DEPTH
+		_environment.fog_depth_begin = fog_begin
+		_environment.fog_depth_end = fog_end
+		_environment.fog_depth_curve = 0.7
+		_environment.fog_density = fog_opacity(float(_current.get(KEY_FOG_DENSITY,
+			WEATHER_FOG_DENSITY[0])) * float(_tone.get("fog_mult", 1.0)), fog_begin, fog_end)
 		# The fog is lit by the same air the horizon band is, so it takes that colour and
 		# a night fog goes dark instead of glowing white in the dark.
 		_environment.fog_light_color = horizon
