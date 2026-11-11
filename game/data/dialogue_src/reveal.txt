@@ -49,18 +49,20 @@ speaker: marigold
 once: false
 when: {"flags_all": ["in_factory"]}
 
-start [marigold blank] Oh! You found the good part.
+start [marigold blank] Oh. You found the window.
   -> two
-two [marigold happy] Don't look so worried. The valley needs weather, weather needs color, and Drifters really don't need theirs. They were never going to use it.
+two [marigold happy] Don't make that face. Weather needs color, and a Drifter's color was only ever on loan.
   -> three
-three [marigold happy] It doesn't hurt. Well. Nopony has ever complained.
+three [marigold happy look] It doesn't hurt. Nopony has ever said it hurts.
   -> four
-four [marigold happy nod] Now. I have a little offer, because Cloudsdale looks after its own. Sign the Senior Steward contract. Double stipend. Better equipment. And your Tumble? Struck right off the lottery. She goes home with you tonight.
+four [marigold happy nod] So, my little offer. Sign the Senior Steward contract: double stipend, better tools, and Tumble struck off the lottery. She goes home with you tonight.
   * Sign. Tumble comes home, and the line keeps running. -> sign
   * Refuse. I'll get Tumble out of that line myself. -> run
-sign [marigold happy] Wonderful! I knew you were one of us. She'll be waiting at the lift.
+sign [marigold happy] Wonderful. I knew you were one of us. She'll be waiting at the lift.
   event: path_factory
-run [marigold blank] Oh, {name}. That's a shame.
+run [marigold blank] Oh, {name}.
+  -> run2
+run2 [marigold blank look] Then you'd better be quick. I'll count to ten. That's a kindness.
   event: path_rescue
 
 # ----- the climaxes ---------------------------------------------------------------------

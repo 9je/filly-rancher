@@ -14,25 +14,26 @@ when = {
 }
 nodes = Array[Dictionary]([{
 "id": "start",
-"text": "Oh! You found the good part.",
+"text": "Oh. You found the window.",
 "who": "marigold",
 "mood": "blank",
 "next": "two"
 }, {
 "id": "two",
-"text": "Don't look so worried. The valley needs weather, weather needs color, and Drifters really don't need theirs. They were never going to use it.",
+"text": "Don't make that face. Weather needs color, and a Drifter's color was only ever on loan.",
 "who": "marigold",
 "mood": "happy",
 "next": "three"
 }, {
 "id": "three",
-"text": "It doesn't hurt. Well. Nopony has ever complained.",
+"text": "It doesn't hurt. Nopony has ever said it hurts.",
 "who": "marigold",
 "mood": "happy",
+"anim": "look",
 "next": "four"
 }, {
 "id": "four",
-"text": "Now. I have a little offer, because Cloudsdale looks after its own. Sign the Senior Steward contract. Double stipend. Better equipment. And your Tumble? Struck right off the lottery. She goes home with you tonight.",
+"text": "So, my little offer. Sign the Senior Steward contract: double stipend, better tools, and Tumble struck off the lottery. She goes home with you tonight.",
 "who": "marigold",
 "mood": "happy",
 "anim": "nod",
@@ -45,14 +46,21 @@ nodes = Array[Dictionary]([{
 }]
 }, {
 "id": "sign",
-"text": "Wonderful! I knew you were one of us. She'll be waiting at the lift.",
+"text": "Wonderful. I knew you were one of us. She'll be waiting at the lift.",
 "who": "marigold",
 "mood": "happy",
 "event": "path_factory"
 }, {
 "id": "run",
-"text": "Oh, {name}. That's a shame.",
+"text": "Oh, {name}.",
 "who": "marigold",
 "mood": "blank",
+"next": "run2"
+}, {
+"id": "run2",
+"text": "Then you'd better be quick. I'll count to ten. That's a kindness.",
+"who": "marigold",
+"mood": "blank",
+"anim": "look",
 "event": "path_rescue"
 }])
