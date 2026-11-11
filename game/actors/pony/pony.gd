@@ -487,6 +487,9 @@ var _tick_count := 0
 ## How long she has been wandering into a wall. See _physics_process.
 var _wall_time := 0.0
 const WALL_GIVE_UP_SECONDS := 0.75
+## Away from the last wall she gave up against (zero once she has walked off): her next wander
+## pick lies on this side of her.
+var _wall_away := Vector3.ZERO
 var _tick_accum := 0.0
 var _stood_still := false
 static var _headless := -1
@@ -1026,13 +1029,31 @@ func _physics_process(delta: float) -> void:
 		# which at /7 kicked the spring at nearly full; /9, topped at 0.9, is about a quarter less.
 		RumpBounce.kick_on(visuals, clampf(fall_speed / 9.0, 0.25, 0.9))
 	_stood_still = desired == Vector3.ZERO and velocity.length_squared() < 0.0001 and is_on_floor()
+	# Once she has come to rest, never nose to a wall (item 69; see _face_off_the_wall).
+	if _stood_still and not _wall_checked and (state == State.IDLE or state == State.GRAZE):
+		_wall_checked = true
+		_face_off_the_wall()
 	# A WANDERER WHO WALKS INTO A WALL STOPS WALKING INTO IT. She has nowhere to be, and a pony
 	# pressed against a coop or a barn grinds move_and_slide through its full recovery every
 	# tick: one such pony cost the 60-pony check as much as twenty grazing ones (900 us a
 	# slide against the coop, scenes/test/perf.gd exp=timing). She stands, then picks again.
-	if state == State.WANDER and is_on_wall():
+	# A stall counts as a wall too (item 69): a building's rescue pushes a pony back out of it, so
+	# one whose home lies behind a house walked into its wall, was put back, and walked in again
+	# without move_and_slide ever reporting the wall.
+	var stalled := state == State.WANDER and desired.length() > 0.1 \
+		and Vector2(velocity.x, velocity.z).length() < _wander_speed * 0.25
+	if state == State.WANDER and (is_on_wall() or stalled):
 		_wall_time += delta
 		if _wall_time > WALL_GIVE_UP_SECONDS:
+			# P9 item 69 ("ponies stand nose-to-wall and stay there"): she gave up facing the
+			# wall and her next pick was as likely behind it again. She now turns her back on
+			# it and walks off on the open side.
+			var n := get_wall_normal() if is_on_wall() else -Vector3(desired.x, 0.0, desired.z)
+			n.y = 0.0
+			if n.length_squared() > 0.01:
+				_wall_away = n.normalized()
+				_visual_yaw = atan2(-_wall_away.x, -_wall_away.z)
+			_wall_time = 0.0
 			_transition_to(State.IDLE)
 	else:
 		_wall_time = 0.0
@@ -1600,6 +1621,12 @@ var _fled := 0.0
 func _settle_wary() -> void:
 	_wary = WARY_SECONDS
 	_pinned = 0.0
+	# Pinned against a wall she turns her back on it (item 69), not her nose into it.
+	var n := get_wall_normal() if is_on_wall() else Vector3.ZERO
+	n.y = 0.0
+	if n.length_squared() > 0.01:
+		_wall_away = n.normalized()
+		_visual_yaw = atan2(-_wall_away.x, -_wall_away.z)
 	_transition_to(State.IDLE)
 
 
@@ -1615,6 +1642,7 @@ func _transition_to(next: int) -> void:
 		State.WANDER:
 			_state_timer = WANDER_TIMEOUT_SECONDS
 			_wander_target = _pick_wander_target()
+			_wall_away = Vector3.ZERO
 			_has_wandered = true
 		State.GRAZE:
 			_state_timer = _rng.randf_range(GRAZE_SECONDS.x, GRAZE_SECONDS.y)
@@ -1623,6 +1651,7 @@ func _transition_to(next: int) -> void:
 			_state_timer = 0.0
 	if state == State.IDLE or state == State.GRAZE:
 		_face_out_of_the_pen()
+		_wall_checked = false
 
 
 ## Walk to `point` now (a WANDER with that target): the ranch's pen probe drives residents
@@ -1636,6 +1665,39 @@ func wander_to(point: Vector3) -> void:
 ## ring neighbours then stand side by side with a metre of grass between them, not nose to
 ## rump in a chain round the middle (item 65's acceptance review). Turned smoothly by
 ## _update_facing; the one in the middle keeps her heading.
+## NOSE NOT TO THE WALL (P9 item 69: two ponies by a house wall, nose to it, for good). Settling
+## to idle or graze with a wall, fence or trunk within NOSE_ROOM of her muzzle, she turns to the
+## most open of eight directions. Not in a pen (her fence-facing is _face_out_of_the_pen's).
+const NOSE_ROOM := 1.2
+var _wall_checked := true
+
+
+func _face_off_the_wall() -> void:
+	if pen_patch != Vector3.INF or not is_inside_tree() or _offscreen:
+		return
+	var space := get_world_3d().direct_space_state
+	var from := global_position + Vector3.UP * 0.7
+	if _open_ahead(space, from, _visual_yaw, NOSE_ROOM) >= NOSE_ROOM:
+		return
+	var best := _visual_yaw
+	var room := -1.0
+	for k in 8:
+		var yaw := _visual_yaw + PI + (float(k) - 3.5) * TAU / 8.0
+		var r := _open_ahead(space, from, yaw, 4.0)
+		if r > room:
+			room = r
+			best = yaw
+	_visual_yaw = best
+
+
+func _open_ahead(space: PhysicsDirectSpaceState3D, from: Vector3, yaw: float, reach: float) -> float:
+	var q := PhysicsRayQueryParameters3D.create(from, from + Vector3(-sin(yaw), 0.0, -cos(yaw)) * reach)
+	q.exclude = [get_rid()]
+	q.collision_mask = 1 << 1
+	var hit := space.intersect_ray(q)
+	return reach if hit.is_empty() else from.distance_to(hit.position)
+
+
 func _face_out_of_the_pen() -> void:
 	if pen_patch == Vector3.INF:
 		return
@@ -1716,6 +1778,10 @@ func _pick_wander_target() -> Vector3:
 		target.y = _home.y
 		# Not a spot in a lake (PS2 item 61): she would only walk to the shore ring and stand.
 		if _in_lake(target):
+			continue
+		# Not back through the wall she just turned from (item 69).
+		if _wall_away != Vector3.ZERO and attempt < WANDER_TARGET_ATTEMPTS - 1 \
+				and (target - global_position).dot(_wall_away) < 0.5:
 			continue
 		dry = target
 		if Vector2(target.x - global_position.x, target.z - global_position.z).length() > ARRIVAL_RADIUS * 3.0:

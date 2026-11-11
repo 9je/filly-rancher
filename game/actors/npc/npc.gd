@@ -298,6 +298,39 @@ func set_mode_stand(at: Vector3 = Vector3.INF) -> void:
 		_yield = Vector3.ZERO
 
 
+## NOT NOSE TO THE WALL (P9 item 69: two townsponies by a house wall, a Collector into a tree
+## trunk, standing there for good). Arrived at her spot, if a wall, fence or trunk is within
+## NOSE_ROOM ahead of her she turns to the most open of eight directions instead.
+const NOSE_ROOM := 1.1
+
+
+func _face_open() -> void:
+	if not is_inside_tree():
+		return
+	var space := get_world_3d().direct_space_state
+	var from := global_position + Vector3.UP * 0.8
+	var ahead := Vector3(-sin(_yaw), 0.0, -cos(_yaw))
+	if _ray_room(space, from, ahead, NOSE_ROOM) >= NOSE_ROOM:
+		return
+	var best := _yaw
+	var room := -1.0
+	for k in 8:
+		var yaw := _yaw + PI + (float(k) - 3.5) * TAU / 8.0
+		var r := _ray_room(space, from, Vector3(-sin(yaw), 0.0, -cos(yaw)), 4.0)
+		if r > room:
+			room = r
+			best = yaw
+	_yaw = best
+
+
+func _ray_room(space: PhysicsDirectSpaceState3D, from: Vector3, dir: Vector3, reach: float) -> float:
+	var q := PhysicsRayQueryParameters3D.create(from, from + dir * reach)
+	q.exclude = [get_rid()]
+	q.collision_mask = LayersScript.PROPS
+	var hit := space.intersect_ray(q)
+	return reach if hit.is_empty() else from.distance_to(hit.position)
+
+
 func set_mode_follow(target: Node3D) -> void:
 	mode = Mode.FOLLOW
 	follow_target = target
@@ -368,6 +401,7 @@ func _physics_process(delta: float) -> void:
 				walk_target = walk_route.pop_front()
 			else:
 				set_mode_stand(walk_target)
+				_face_open()
 		Mode.STAND:
 			var back := home + _yield - global_position
 			back.y = 0.0
