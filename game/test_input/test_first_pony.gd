@@ -52,8 +52,24 @@ func _play() -> void:
 			fail("attempt %d failed: %s" % [attempts, _why])
 			return
 		elif int(t * 10) % 50 == 0:
-			note("waiting: talking=%s tip='%s'" % [people.call("is_talking"), tip])
-			RI.look(Vector2(60, 0))
+			note("waiting: talking=%s tip='%s' guide=%s" % [people.call("is_talking"), tip, ranch.call("guide_goal")])
+			# THE TRAIL, AS A PERSON WOULD (2026-11-11): since the round-8 world the nearest
+			# Drifter is not in reach of the arrival spot; the card says "Catch a Drifter" and
+			# the compass points at one. Walk most of the way toward it, then look about.
+			var target: Node3D = ranch.call("guide_target")
+			if target != null and player.global_position.distance_to(target.global_position) > 7.0:
+				var to := target.global_position - player.global_position
+				await walk_to(player.global_position + to * 0.8, 2.0, 12.0)
+				await look_at_point(target.global_position + Vector3(0, 0.8, 0), true)
+			elif target != null:
+				# Close: face her from a few metres off, the way you line up a catch.
+				var away := player.global_position - target.global_position
+				away.y = 0.0
+				if away.length() < 5.0:
+					await walk_to(target.global_position + away.normalized() * 6.0, 1.0, 6.0)
+				await look_at_point(target.global_position + Vector3(0, 0.8, 0), true)
+			else:
+				RI.look(Vector2(60, 0))
 		else:
 			# No prompt yet: a person looks around for ponies.
 			RI.look(Vector2(60, 0))

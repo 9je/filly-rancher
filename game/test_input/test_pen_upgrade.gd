@@ -95,7 +95,7 @@ func _play() -> void:
 	tip = _prompt()
 	note("prompt at plot 3: '%s'" % tip)
 	var clear_cost := int(s3.call("clear_cost"))
-	if not check(tip.contains("clear this plot (%d bits), not enough bits" % clear_cost),
+	if not check(tip.contains("clear, %d bits (need more)" % clear_cost),
 			"plot 3's prompt does not name the clearing and the shortfall: '%s'" % tip):
 		return
 	await look_at_point(s3.global_position + Vector3(0, 1.6, 0), true, 0.05, 60)
