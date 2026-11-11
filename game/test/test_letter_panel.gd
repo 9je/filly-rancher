@@ -165,7 +165,7 @@ func test_the_footer_wears_the_one_menu_style_like_every_other_panel() -> void:
 	assert_eq(footer.get_theme_constant("outline_size"), 0,
 		"paper is read against itself, not against the world; no outline needed")
 	assert_false(footer.visible, "PT5: no key hints; the Back button is the way out")
-	assert_eq(panel.close_button_node().text, "Back")
+	assert_eq(panel.close_button_node().text, "Close", "P9 item 45: a letter is closed, not backed out of")
 
 
 # --- the crafted sheet ------------------------------------------------------------------
@@ -288,7 +288,7 @@ func test_the_tallest_authored_letter_still_fits_the_1080_viewport() -> void:
 func test_the_letter_offers_the_pointer_a_way_out() -> void:
 	var button: Button = _panel.close_button_node()
 	assert_not_null(button)
-	assert_eq(button.text, MouseRowsScript.CLOSE_TEXT)
+	assert_eq(button.text, MouseRowsScript.CLOSE_LETTER)
 	assert_eq(button.focus_mode, Control.FOCUS_NONE)
 	_panel.open(_letter())
 	button.pressed.emit()

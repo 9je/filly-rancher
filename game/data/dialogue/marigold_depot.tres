@@ -55,7 +55,7 @@ nodes = Array[Dictionary]([{
 "next": "quota"
 }, {
 "id": "quota",
-"text": "One little thing. A Drifter who hasn't Bloomed yet, we take for a small intake fee, and she doesn't count. Help her find her mark first. The Academy adores a pony with color! Rules are rules!",
+"text": "One rule! Only ponies with their mark count for the quota. A Drifter without one still comes along, but she earns you just 30 bits and doesn't count. Help her find her mark first!",
 "who": "marigold",
 "mood": "happy",
 "anim": "nod",

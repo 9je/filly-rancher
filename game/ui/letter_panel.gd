@@ -44,6 +44,7 @@ const MenuStyleScript := preload("res://ui/menu_style.gd")
 const MouseRowsScript := preload("res://ui/mouse_rows.gd")
 const PaperPaintScript := preload("res://ui/paper_paint.gd")
 const PlaceSignScript := preload("res://world/place_sign.gd")
+const IconSetScript := preload("res://ui/icon_set.gd")
 
 ## THE SHEET, IN 1920x1080 BASE PIXELS. The width is the Panel's existing 860 so nothing
 ## about where the letter sits on screen moves; the rest is what turns a column of Labels
@@ -111,12 +112,141 @@ func _ready() -> void:
 		_stage.add_child(_replies)
 	else:
 		$Centre/Panel/Margin/Column.add_child(_replies)
-	_close = MouseRowsScript.close_button(MouseRowsScript.CLOSE_TEXT,
+	# A LETTER IS CLOSED, NOT BACKED OUT OF (P9, playtest 2026-11-10 item 45): the kit's pill,
+	# saying "Close" with a cross where Back has its chevron.
+	_close = MouseRowsScript.close_button(MouseRowsScript.CLOSE_LETTER,
 		func(_index: int) -> void: close())
-	# The kit's one Back (MenuStyle.back_button): its plum pill stands on cream as well as it
-	# does on velvet, so the sheet no longer needs a paper button of its own here.
-	$Centre/Panel/Margin/Column.add_child(_close)
+	MenuStyleScript.cross_mark(_close)
+	# THE BAR UNDER THE SHEET: which letter of how many, and arrows through them, on the left
+	# (P9 item 44: "no clear no new mail state, unclear cycling, which letter you are on");
+	# Close on the right.
+	_bar = HBoxContainer.new()
+	_bar.name = "Bar"
+	_bar.add_theme_constant_override(&"separation", 12)
+	_prev = _arrow_button(true)
+	_next = _arrow_button(false)
+	_count = Label.new()
+	_count.name = "Count"
+	MenuStyleScript.style_label(_count, MenuStyleScript.ROW_SIZE, MenuStyleScript.COLOR_INK)
+	_count.add_theme_font_override(&"font", MenuStyleScript.title_font())
+	_count.add_theme_constant_override(&"outline_size", 0)
+	_count.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_news = Label.new()
+	_news.name = "News"
+	MenuStyleScript.style_label(_news, MenuStyleScript.FOOTER_SIZE, Color(0.55, 0.2, 0.45))
+	_news.add_theme_constant_override(&"outline_size", 0)
+	_news.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for c: Control in [_prev, _count, _next, _news, spacer, _close]:
+		_bar.add_child(c)
+	$Centre/Panel/Margin/Column.add_child(_bar)
+	_show_pager()
 	visible = false
+
+
+var _bar: HBoxContainer = null
+var _prev: Button = null
+var _next: Button = null
+var _count: Label = null
+var _news: Label = null
+## The pager: which letter (0 based) of `_pages`, whether each is unread, and the callable
+## that renders letter `i` into the dictionary open() takes. Unset: no pager, as before.
+var _page := 0
+var _pages := 0
+var _unread := 0
+var _fetch := Callable()
+
+
+## PAGE THROUGH THE MAILBOX from this reader: `count` letters, this one `index` (0 = oldest),
+## `unread` still unread after this one, `fetch.call(i)` the letter at `i`.
+func set_pager(index: int, count: int, unread: int, fetch: Callable) -> void:
+	_page = index
+	_pages = count
+	_unread = unread
+	_fetch = fetch
+	_show_pager()
+
+
+func clear_pager() -> void:
+	set_pager(0, 0, 0, Callable())
+
+
+## "Letter 2 of 5", as drawn; "" with no pager.
+func pager_text() -> String:
+	return _count.text if _count != null and _count.visible else ""
+
+
+func news_text() -> String:
+	return _news.text if _news != null and _news.visible else ""
+
+
+func _show_pager() -> void:
+	if _bar == null:
+		return
+	var paging := _pages > 0 and _fetch.is_valid()
+	_count.visible = paging
+	_prev.visible = paging and _pages > 1
+	_next.visible = paging and _pages > 1
+	_news.visible = paging
+	if not paging:
+		return
+	# Newest is the highest index; counted from the newest so "1 of 5" is the latest letter.
+	_count.text = "Letter %d of %d" % [_pages - _page, _pages]
+	_prev.disabled = _page >= _pages - 1
+	_next.disabled = _page <= 0
+	_news.text = ("%d more new" % _unread) if _unread > 0 else "No new mail"
+
+
+func _turn(step: int) -> void:
+	var to := clampi(_page + step, 0, _pages - 1)
+	if to == _page or not _fetch.is_valid():
+		return
+	var letter: Dictionary = _fetch.call(to)
+	if letter.is_empty():
+		return
+	_page = to
+	_letter = letter.duplicate(true)
+	if letter.has("unread_after"):
+		_unread = int(letter["unread_after"])
+	MenuStyleScript.tick_page()
+	refresh()
+	_show_pager()
+	page_turned.emit(to)
+
+
+## A page turned in the mailbox: `index` is the letter now shown (ranch marks it read).
+signal page_turned(index: int)
+
+
+func _arrow_button(left: bool) -> Button:
+	var b := Button.new()
+	b.name = "Newer" if left else "Older"
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(52, 48)
+	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	for state: StringName in [&"normal", &"hover", &"pressed", &"disabled", &"hover_pressed"]:
+		b.add_theme_stylebox_override(state, MenuStyleScript.paper_button_box(
+			&"normal" if state == &"disabled" else state))
+	b.add_theme_stylebox_override(&"focus", StyleBoxEmpty.new())
+	var mark := Control.new()
+	mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mark.set_anchors_preset(Control.PRESET_FULL_RECT)
+	mark.draw.connect(func() -> void:
+		var c := mark.size * 0.5 + Vector2(0, -1)
+		var s := 8.0
+		var d := -1.0 if left else 1.0
+		var ink := Color(MenuStyleScript.COLOR_INK, 0.3 if b.disabled else 1.0)
+		mark.draw_polyline(PackedVector2Array([c + Vector2(-d * s * 0.5, -s), c + Vector2(d * s * 0.5, 0),
+			c + Vector2(-d * s * 0.5, s)]), ink, 4.0, true))
+	b.add_child(mark)
+	for sig: StringName in [&"mouse_entered", &"mouse_exited", &"button_down", &"button_up"]:
+		b.connect(sig, mark.queue_redraw)
+	# Left is newer (towards "Letter 1 of N"), right is older.
+	b.pressed.connect(func() -> void:
+		_turn(1 if left else -1)
+		mark.queue_redraw())
+	return b
 
 
 func close_button_node() -> Button:
@@ -146,6 +276,8 @@ func close() -> void:
 		return
 	_open = false
 	visible = false
+	# A pager belongs to the one mailbox visit that set it.
+	clear_pager()
 	closed.emit()
 
 
@@ -362,6 +494,13 @@ func paragraphs() -> Array[String]:
 				cur.clear()
 			out.append("")
 			continue
+		# A FACT LINE IS A PARAGRAPH OF ITS OWN (P9 item 35).
+		if not _fact(line).is_empty():
+			if not cur.is_empty():
+				out.append(" ".join(cur))
+				cur.clear()
+			out.append(line.strip_edges())
+			continue
 		# A NUMBERED STEP STARTS ITS OWN PARAGRAPH (PS6 item 8: the welcome letter's four
 		# steps joined into one run on block, "1. CATCH ... 2. PEN ... 3. COLLECT ...").
 		if _step_marker().search(line.strip_edges()) != null and not cur.is_empty():
@@ -413,6 +552,22 @@ func _step(p: String) -> Dictionary:
 		"icon": STEP_ICONS.get(verb, &"star")}
 
 
+## A FACT: a line "LABEL: value" with the label in capitals, drawn as a band (P9 item 35).
+const FACT_HEIGHT := 50.0
+const FACT_ICONS := {"YOU OWE": "coin", "QUOTA": "drifter_bloom", "DUE BY": "sun",
+	"DUE": "sun", "DELIVERED": "crate"}
+static var _fact_re: RegEx = null
+
+
+static func _fact(p: String) -> Dictionary:
+	if _fact_re == null:
+		_fact_re = RegEx.create_from_string("^([A-Z][A-Z ]{1,20}):\\s+(.+)$")
+	var m := _fact_re.search(p.strip_edges())
+	if m == null:
+		return {}
+	return {"label": m.get_string(1), "value": m.get_string(2)}
+
+
 ## The step rows' measurements, in base pixels: the picture tile and the gap after a row.
 const STEP_TILE := 56.0
 const STEP_GAP := 12.0
@@ -427,6 +582,29 @@ func _lay_body(ci: Control, left: float, top: float, width: float) -> float:
 	for p in paragraphs():
 		if p.is_empty():
 			y += LINE_HEIGHT * 0.6
+			continue
+		var fact := _fact(p)
+		if not fact.is_empty():
+			# A FACT ROW (P9 item 35): what you owe, the quota, the day, on a tinted band with
+			# its picture, the label small and the value large, before any prose.
+			if ci != null:
+				var band := StyleBoxFlat.new()
+				band.bg_color = Color(0.47, 0.31, 0.64, 0.12)
+				band.border_color = Color(0.47, 0.31, 0.64, 0.35)
+				band.set_border_width_all(2)
+				band.set_corner_radius_all(12)
+				band.anti_aliasing = true
+				ci.draw_style_box(band, Rect2(left, y, width, FACT_HEIGHT - 6.0))
+				var icon := String(FACT_ICONS.get(fact.label, "star"))
+				IconSetScript.draw(ci, icon, Rect2(left + 10.0, y + 6.0, FACT_HEIGHT - 18.0,
+					FACT_HEIGHT - 18.0))
+				var lx := left + FACT_HEIGHT + 4.0
+				ci.draw_string(bold, Vector2(lx, y + FACT_HEIGHT * 0.5 + 4.0), String(fact.label),
+					HORIZONTAL_ALIGNMENT_LEFT, 150.0, MenuStyleScript.FOOTER_SIZE, Color(MenuStyleScript.COLOR_INK, 0.7))
+				ci.draw_string(bold, Vector2(lx + 150.0, y + FACT_HEIGHT * 0.5 + 6.0), String(fact.value),
+					HORIZONTAL_ALIGNMENT_LEFT, width - (lx - left) - 160.0, MenuStyleScript.TITLE_SIZE - 4,
+					MenuStyleScript.COLOR_INK)
+			y += FACT_HEIGHT
 			continue
 		var step := _step(p)
 		if step.is_empty():

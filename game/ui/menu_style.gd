@@ -621,6 +621,23 @@ static func back_button(button: Button) -> void:
 		button.connect(sig, chevron.queue_redraw)
 
 
+## A Back pill that says Close: its chevron becomes a cross (P9 item 45, letters).
+static func cross_mark(button: Button) -> void:
+	var chevron := button.get_node_or_null(^"Chevron") as Control
+	if chevron == null:
+		return
+	for c in chevron.draw.get_connections():
+		chevron.draw.disconnect(c["callable"])
+	chevron.draw.connect(func() -> void:
+		var lip := 3.0 if button.is_pressed() else 0.0
+		var c := Vector2(27.0, chevron.size.y * 0.5 - 2.0 + lip)
+		var s := 7.0
+		var ink: Color = Color(1.0, 0.93, 0.62) if button.is_hovered() else COLOR_TITLE
+		chevron.draw_line(c + Vector2(-s, -s), c + Vector2(s, s), ink, 4.5, true)
+		chevron.draw_line(c + Vector2(-s, s), c + Vector2(s, -s), ink, 4.5, true))
+	chevron.queue_redraw()
+
+
 ## THE WOODEN FRAME. Used around the turntable and the cutie mark canvas, which are the two
 ## things on screen that are pictures rather than text.
 static func frame_box() -> StyleBox:

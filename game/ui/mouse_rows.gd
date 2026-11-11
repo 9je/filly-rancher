@@ -23,6 +23,8 @@ const ROW_INDEX_META := &"filly_row_index"
 
 ## "Back", not "Close" (PT5; owner: "back button please"), on every panel.
 const CLOSE_TEXT := "Back"
+## A letter is closed, not backed out of (P9, playtest 2026-11-10 item 45).
+const CLOSE_LETTER := "Close"
 
 
 ## Whether `event` is the one gesture this kit acts on: a LEFT button going DOWN. A release

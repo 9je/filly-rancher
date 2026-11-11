@@ -47,6 +47,9 @@ const DEFAULTS := {
 	"count": 1,
 	"quota": 2,
 	"balance": 0,
+	"owed": "0",
+	"due_day": 4,
+	"days": 3,
 }
 
 @export var id: StringName = &""
