@@ -400,14 +400,17 @@ func paint(ci: Control) -> void:
 
 		# HER PACE AGAINST THIS FIELD, BEFORE THE BET (P9 item 48: "show it before the bet if
 		# the pony is slow"): where her rating ranks among the six, as a coloured word.
-		var rank: int = int(entry.get("rank", 0))
-		if rank > 0:
-			var pace: String = "Quick" if rank <= 2 else ("Fair" if rank <= 4 else "Slow")
-			var tint: Color = Color(0.36, 0.7, 0.4) if rank <= 2 else (Color(0.85, 0.65, 0.25) if rank <= 4 else Color(0.85, 0.32, 0.3))
-			var pill := Rect2(card.position + Vector2(SPIRITS_X + 222.0, 59.0), Vector2(150.0, 26.0))
+		# Read off her chance against a fair share of the field, not her rating's place: the
+		# ratings sit close, so every roster pony read "Slow, 6th of 6" at 13-16% (review of
+		# the Lane B frames, 2026-11-10).
+		var field_n: int = maxi(1, int(entry.get("field", 6)))
+		if int(entry.get("rank", 0)) > 0:
+			var share := float(entry.get("chance", 0.0)) * float(field_n)
+			var pace: String = "Quick" if share >= 1.15 else ("Fair" if share >= 0.8 else "Slow")
+			var tint: Color = Color(0.36, 0.7, 0.4) if pace == "Quick" else (Color(0.85, 0.65, 0.25) if pace == "Fair" else Color(0.85, 0.32, 0.3))
+			var pill := Rect2(card.position + Vector2(SPIRITS_X + 262.0, 59.0), Vector2(110.0, 26.0))
 			PaintScript.rounded(ci, pill, 14.0, tint, tint.darkened(0.3), 2.0)
-			PaintScript.label(ci, MenuStyleScript.title_font(), pill, "%s, %s of %d" % [pace,
-				_ordinal(rank), int(entry.get("field", 6))], 17, Color.WHITE)
+			PaintScript.label(ci, MenuStyleScript.title_font(), pill, pace, 17, Color.WHITE)
 		if index == _picked:
 			# THE PICKED PONY: a gold frame and a tick, so the bet's target is never in doubt.
 			PaintScript.rounded(ci, card.grow(3.0), 16.0, Color(0, 0, 0, 0), PaintScript.GOLD, 5.0)
