@@ -1,5 +1,12 @@
 # Progress
 
+## Playtest sprint P9, 2026-11-10/11 (overnight; ledger docs/playtest-2026-11-10-ledger.md)
+The owner played a fresh game to the Half Light ending and logged 76 items (docs/playtest-2026-11-10.md), disappointed after the review rounds. Rule for this sprint: FIXED needs a looked-at GPU frame from the real scene reached the owner's way. Lane A (me) W1+W2, Lane B (one Opus 5.5 worktree agent) W3 then W4.
+- **Found by root cause:** the Collectors could never see anyone (PhysicsRayQueryParameters3D.exclude returns a copy; the append was lost), the Factory had no pause menu, the arrival stood the player inside the cloud-lift with the camera under its canopy, the Factory kit had no collision, Marigold walked into walls beside doorways, the corral Drifters (physics off) froze in mid-air when beamed, any key skipped the ending, world events fired as a backlog, Tumble's cheerful barks had no Lottery condition, a talk was offered with no line to say.
+- **Added:** play with the Drifters (an active Bloom push), rest till nightfall, run toggle, objective card + compass + floor beacon in the Factory, painted posters, pastel party rooms, a lever that reads, Staff Only plate, Heat gauge, an ending results card, Static's rewrite.
+- **Lane B W3 merged** (dd484a0 range): pen badge, short prompts, light Drifter catch, letters/mailbox, Market (no jump, confirm, Owned), racing (pick, stake, Place bet; odds match), slots bonus. Review notes in the ledger.
+- Suite on dd484a0: 2292/2294 (two player tests pinned the old default gait; fixed in 012c0e6).
+
 ## Owner direction (2026-10-22)
 Canon MLP stays: real names, looks and places ("lean into mlp fully", private build). The roster de-canon was reverted; the Company is the Cloudsdale Weather Corporation, the cloud palace is the Rainbow Factory, the town is Ponyville. The OC story cast lives alongside the canon ponies.
 
