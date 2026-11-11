@@ -9180,6 +9180,8 @@ func _v1_tick(delta: float) -> void:
 	_back_down()
 	_announce_stock()
 	_setup_act3()
+	if act3 != null:
+		_update_heat_gauge()
 	_maybe_ending()
 	var hud := get_node_or_null(^"HUD")
 	if hud != null and hud.has_method("set_tip"):
@@ -10134,14 +10136,43 @@ func _setup_act3() -> void:
 	act3.bag_store = func(inst: PonyInstance) -> bool:
 		var st := _bag()
 		return st != null and st.store(inst)
+	_mount_heat_gauge()
 	act3.acted.connect(func(_id: String, r: Dictionary) -> void:
 		if str(r.get("text", "")) != "":
 			_toast(str(r.text))
+		_update_heat_gauge()
 		if r.has("cut") and valley_frame != null:
 			valley_frame.set_bands(PathRulesScript.PYLONS.size() - int(r.cut)))
 	add_child(act3)
 	if valley_frame != null:
 		valley_frame.set_bands(PathRulesScript.PYLONS.size() - PathRulesScript.pylons_cut(story))
+
+
+## HEAT ON SCREEN (playtest 2026-11-10 items 21-22): a gauge under the compass on the Rescue
+## path, and the first time it moves, one line on what it is.
+const HeatGaugeScript := preload("res://ui/heat_gauge.gd")
+
+
+func _mount_heat_gauge() -> void:
+	var hud_node := get_node_or_null(^"HUD")
+	if hud_node == null or hud_node.get_node_or_null(^"HeatGauge") != null:
+		return
+	var g: Control = HeatGaugeScript.new()
+	g.name = "HeatGauge"
+	hud_node.add_child(g)
+	_update_heat_gauge()
+
+
+func _update_heat_gauge() -> void:
+	var g := get_node_or_null(^"HUD/HeatGauge")
+	var story: Story = get_story()
+	if g == null or story == null:
+		return
+	var h := PathRulesScript.heat(story)
+	g.call("set_heat", h)
+	if h > 0 and not story.has_flag("explained_heat"):
+		story.set_flag("explained_heat")
+		_toast("Heat: how hard the Collectors are looking for you. Raids and lanterns raise it; cut pylons and each dawn cool it. High Heat on a collection day costs you.")
 
 
 func _bag() -> Storage:

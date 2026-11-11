@@ -134,7 +134,7 @@ func _on_spotted() -> void:
 		return
 	var h := PathRulesScript.add_heat(story, "spotted")
 	_hold = 0.0
-	acted.emit("spotted", {"heat": h, "text": "A Collector's lantern found you. Heat %d." % h})
+	acted.emit("spotted", {"heat": h, "text": "A Collector's lantern found you."})
 
 
 ## The site in reach, or {}.
@@ -166,13 +166,13 @@ func offer(key: String) -> String:
 				return "This pylon is down. The sky over here is a band thinner."
 			if not bool(is_night.call()):
 				return "A Cloudsdale weather pylon. Come back at night to cut it."
-			return "%s: hold the Scoop on the core to cut the pylon  %d%%" % [key, _pct(s)]
+			return "%s: hold to cut the pylon  %d%%" % [key, _pct(s)]
 		"corral":
 			if s.id in (story.get_var("raided", []) as Array):
 				return "An empty Intake Corral. They will not use this one again."
 			if not bool(is_night.call()):
 				return "An Intake Corral, full of Drifters waiting for the lift. Come back at night."
-			return "%s: hold to slip the gate  %d%%" % [key, _pct(s)]
+			return "%s: hold to open the gate  %d%%" % [key, _pct(s)]
 		"gate":
 			return "%s: send your marked ponies down the Lantern Line" % key
 		"vat":
@@ -233,7 +233,7 @@ func act(id: String) -> Dictionary:
 			if PathRulesScript.cut_pylon(story, id):
 				_topple(s.node, true)
 				var n := PathRulesScript.pylons_cut(story)
-				r.text = "The pylon is down. %d of 4. Heat %d." % [n, PathRulesScript.heat(story)]
+				r.text = "The pylon is down. %d of 4. The Collectors' trail goes cold." % n
 				if PathRulesScript.lights_out_ready(story):
 					r.text += " Every pylon is cut: Static can get you back into the Works."
 				r.cut = n
@@ -280,14 +280,13 @@ func _raid(s: Dictionary) -> Dictionary:
 	PathRulesScript.add_heat(story, "raid", freed)
 	if left > 0:
 		# A bag too small for the whole corral: the rest wait for the next trip.
-		return {"text": "%d Drifters into your saddlebag, %d still inside. Heat %d." % [freed, left,
-			PathRulesScript.heat(story)], "freed": freed}
+		return {"text": "%d Drifters into your saddlebag, %d still inside." % [freed, left], "freed": freed}
 	raided.append(s.id)
 	story.set_var("raided", raided)
 	var guard: Node = s.get("guard")
 	if guard != null and is_instance_valid(guard):
 		guard.queue_free()
-	var text := "%d Drifters out of the corral and into your saddlebag. Heat %d." % [freed, PathRulesScript.heat(story)]
+	var text := "%d Drifters out of the corral and into your saddlebag." % freed
 	if not story.has_flag("intake_ledger"):
 		story.set_flag("intake_ledger")
 		text += " On the gatepost: a page torn from the Works' intake ledger. Fennel should see this."
