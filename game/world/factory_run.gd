@@ -432,6 +432,7 @@ func _walkway() -> void:
 		room.add_child(crate)
 		crate.position = Vector3(-1.5, 0, z)
 		ToonStyler.style(crate, &"prop", {})
+		InteriorScript.make_solid(crate)
 	step_reached.emit(&"walkway")
 
 

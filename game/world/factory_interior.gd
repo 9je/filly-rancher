@@ -20,6 +20,7 @@ extends Node3D
 
 const KIT := "res://assets/models/"
 const ToonStylerScript := preload("res://systems/toon_styler.gd")
+const LayersScript := preload("res://world/collision_layers.gd")
 const ROOM_SIZE := 12.0
 const TILE := 4.0
 
@@ -98,7 +99,49 @@ func _piece(file: String, parent: Node3D, at: Vector3, yaw_deg: float = 0.0, s: 
 	inst.scale = Vector3.ONE * s
 	parent.add_child(inst)
 	ToonStylerScript.style(inst, &"building")
+	if file in SOLID_PIECES:
+		make_solid(inst)
 	return inst
+
+
+## THE FURNITURE IS SOLID (playtest 2026-11-10 item 13: "i can walk through almost all props
+## up here"). Pieces a pony stands beside, not under or on: one box over their meshes.
+const SOLID_PIECES := ["fx_canisters", "fx_column", "fx_console", "fx_counter", "fx_crates",
+	"fx_planter", "fx_stall", "fx_tank", "fx_lever", "fx_window_wall", "fx_ring"]
+
+
+## A StaticBody3D with one box fitted to every mesh under `inst`, in its own space (so its
+## scale carries over), on the props layer.
+static func make_solid(inst: Node3D) -> void:
+	var box := AABB()
+	var first := true
+	for m in inst.find_children("*", "MeshInstance3D", true, false):
+		var mi := m as MeshInstance3D
+		if mi.mesh == null:
+			continue
+		# Its transform in `inst`'s space, walked up the parents (the tree may not be live yet).
+		var xf := Transform3D.IDENTITY
+		var n: Node = mi
+		while n != null and n != inst:
+			if n is Node3D:
+				xf = (n as Node3D).transform * xf
+			n = n.get_parent()
+		var b := xf * mi.mesh.get_aabb()
+		box = b if first else box.merge(b)
+		first = false
+	if first or box.size.length() < 0.05:
+		return
+	var body := StaticBody3D.new()
+	body.name = "Solid"
+	body.collision_layer = LayersScript.PROPS
+	body.collision_mask = 0
+	var col := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = box.size
+	col.shape = shape
+	col.position = box.get_center()
+	body.add_child(col)
+	inst.add_child(body)
 
 
 func _floor(room: Node3D, spec: Dictionary) -> void:
