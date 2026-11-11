@@ -59,6 +59,8 @@ func _ready() -> void:
 		ToonStyler.style(_body, &"pony", {})
 	_base_y = position.y
 	_yaw = rotation.y
+	# Steps aside in dither when the camera comes up against him (camera_rig, item 67).
+	add_to_group(&"lens_fade")
 
 
 ## The animated Spike: the game's toon light, his own iris on his eyes, idling.

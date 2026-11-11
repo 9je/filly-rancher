@@ -5984,6 +5984,7 @@ func _sign_post_body(n: String, at: Vector3, post_h: float) -> StaticBody3D:
 	cs.shape = shape
 	cs.position = mi.position
 	body.add_child(cs)
+	body.add_to_group(&"lens_hide")
 	return body
 
 

@@ -462,6 +462,10 @@ var _subject_meshes: Array[MeshInstance3D] = []
 const NEAR_FADE_FAR := 2.6
 const NEAR_FADE_CLOSE := 1.2
 var _near_faded: Dictionary = {}
+## A sign post's pole hides inside POLE_HIDE_M of the lens (flat distance) and comes back past
+## POLE_SHOW_M, so it never fills the edge of the screen and never flickers on the line.
+const POLE_HIDE_M := 0.9
+const POLE_SHOW_M := 1.4
 ## Last fade value written, so _process() does not touch every mesh every frame when
 ## nothing has moved.
 var _subject_fade := -1.0
@@ -919,6 +923,31 @@ func _update_near_fade() -> void:
 		var d := lens.distance_to(body.global_position + Vector3.UP * 0.7)
 		var opacity := clampf((d - NEAR_FADE_CLOSE) / (NEAR_FADE_FAR - NEAR_FADE_CLOSE), 0.0, 1.0)
 		_fade_body(body, opacity)
+	# P9 item 67 ("signposts and Spike clip into the camera at the screen edge"): Spike is no
+	# pony-layer body, so he steps aside by group, in the same dither; a sign post's pole (a
+	# plain wooden cylinder) simply hides while the lens is at it.
+	for n: Node in get_tree().get_nodes_in_group(&"lens_fade"):
+		var who := n as Node3D
+		if who == null or not who.is_visible_in_tree():
+			continue
+		seen[who] = true
+		var dd := lens.distance_to(who.global_position + Vector3.UP * 0.5)
+		_fade_body(who, clampf((dd - NEAR_FADE_CLOSE) / (NEAR_FADE_FAR - NEAR_FADE_CLOSE), 0.0, 1.0))
+	for n: Node in get_tree().get_nodes_in_group(&"lens_hide"):
+		var post := n as Node3D
+		if post == null:
+			continue
+		var flat := Vector2(lens.x - post.global_position.x, lens.z - post.global_position.z).length()
+		var hidden := bool(post.get_meta(&"lens_hidden", false))
+		if flat < POLE_HIDE_M and not hidden:
+			hidden = true
+		elif flat > POLE_SHOW_M and hidden:
+			hidden = false
+		if hidden != bool(post.get_meta(&"lens_hidden", false)):
+			post.set_meta(&"lens_hidden", hidden)
+			for g: Node in post.get_children():
+				if g is MeshInstance3D:
+					(g as MeshInstance3D).visible = not hidden
 	for body: Variant in _near_faded.keys():
 		if not seen.has(body):
 			if is_instance_valid(body):

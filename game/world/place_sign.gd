@@ -51,8 +51,10 @@ const HIDE_AT := 0.85
 ## the line test padded the board 15 cm all round, so a board seen side-on, covering a sliver
 ## of the screen, counted as in the way and vanished. Now only a board whose FACE the line
 ## crosses, seen at least FACE_ON off edge-on, gets out of her way; side-on it always stays.
-const HIDE_M := 0.9
-const SHOW_M := 1.6
+## P9 item 67: a board at the very edge of the screen still filled a quarter of it at 1 m;
+## it now steps aside within 1.3 m and comes back past 2.0.
+const HIDE_M := 1.3
+const SHOW_M := 2.0
 ## The sine of how far off edge-on the lens must look through a board before it counts as
 ## in the way (0.5: thirty degrees).
 const FACE_ON := 0.5
@@ -181,7 +183,7 @@ func update_fade(cam: Camera3D) -> void:
 	var gone := _fade >= 1.0
 	if blocking or d < HIDE_M:
 		gone = true
-	elif d > SHOW_M:
+	elif d > SHOW_M - 0.001:
 		gone = false
 	var f := 1.0 if gone else 0.0
 	if f == _fade:
