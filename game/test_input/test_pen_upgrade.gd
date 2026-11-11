@@ -64,7 +64,8 @@ func _play() -> void:
 		return
 	var tip := _prompt()
 	note("prompt at the Paddock: '%s'" % tip)
-	if not check(tip.contains("upgrade to Big Pen (%d bits)" % big_cost),
+	# Short prompts (playtest 2026-11-10 item 36): "E: Big Pen, 175 bits".
+	if not check(tip.contains("Big Pen, %d bits" % big_cost),
 			"the Paddock's prompt does not name the upgrade: '%s'" % tip):
 		return
 	await wait(0.4)

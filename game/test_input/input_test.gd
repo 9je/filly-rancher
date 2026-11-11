@@ -194,10 +194,22 @@ func close_letter() -> bool:
 		if lp != null and bool(lp.call("is_open")):
 			var b: Button = lp.call("close_button_node")
 			await click(b)
+			await wait_out_cinematic()
 			return true
 		await wait(0.1)
 		t += 0.1
+	await wait_out_cinematic()
 	return true
+
+
+## A person watches the arrival flyover (P8 idea F1) before playing: the camera is the
+## scene's until it ends, and mouse look and tips wait. (2026-11-11: camera_terrain and
+## catch_card had failed since the flyover landed, steering during it.)
+func wait_out_cinematic(max_s := 30.0) -> void:
+	var t := 0.0
+	while Cinematic.is_playing() and t < max_s:
+		await wait(0.2)
+		t += 0.2
 
 
 ## Mouse-look until the camera faces `point` (yaw within `tol` radians). Pitch toward it too
