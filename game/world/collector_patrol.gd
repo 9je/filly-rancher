@@ -107,10 +107,21 @@ func _aim() -> void:
 	var fwd := forward()
 	var origin := _lantern()
 	_light.global_transform = Transform3D(Basis.looking_at(fwd + Vector3(0, -0.25, 0), Vector3.UP), origin)
-	var centre := origin + fwd * range * 0.5 + Vector3(0, -0.6, 0)
+	# THE BEAM STOPS AT A WALL (playtest 2026-11-10 item 12: the cone showed through walls and
+	# doorways). Its length is the lantern's range, cut at the first wall or prop ahead.
+	var reach := range
+	if is_inside_tree():
+		var q := PhysicsRayQueryParameters3D.create(origin, origin + (fwd * range + Vector3(0, -1.2, 0)),
+			LayersScript.WORLD)
+		q.exclude = [_npc.get_rid()] as Array[RID]
+		var hit := get_world_3d().direct_space_state.intersect_ray(q)
+		if not hit.is_empty():
+			reach = clampf(origin.distance_to(hit.position) + 0.1, 0.6, range)
+	var k := reach / range
+	var centre := origin + fwd * reach * 0.5 + Vector3(0, -0.6 * k, 0)
 	var dir := (centre - origin).normalized()
 	# CylinderMesh's axis is +Y with its wide end down: aim -Y along the look.
-	_cone.global_transform = Transform3D(Basis(Quaternion(Vector3.DOWN, dir)), centre)
+	_cone.global_transform = Transform3D(Basis(Quaternion(Vector3.DOWN, dir)).scaled(Vector3(k, k, k)), centre)
 
 
 func forward() -> Vector3:
