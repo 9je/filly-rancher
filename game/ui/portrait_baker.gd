@@ -124,21 +124,29 @@ func _ensure_viewport() -> void:
 	# The studio the review asks for (2.2): a warm key, and a cool even fill from the ambient.
 	var key := DirectionalLight3D.new()
 	key.rotation_degrees = Vector3(-35.0, 150.0, 0.0)
-	key.light_energy = 0.95
+	key.light_energy = 0.85
 	_viewport.add_child(key)
 	var env := WorldEnvironment.new()
 	var e := Environment.new()
 	e.background_mode = Environment.BG_CLEAR_COLOR
 	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	e.ambient_light_color = STUDIO_FILL
-	e.ambient_light_energy = 0.5
+	e.ambient_light_energy = 0.32
 	# THE WORLD'S OWN TONEMAP (P9, playtest 2026-11-10 item 49: "Scootaloo's portrait has the
 	# wrong colours"). Linear at this light washed her orange coat to pale yellow, so on the
 	# race guide she read as Fluttershy; ranch.tscn's filmic curve keeps the coat she has in
 	# the field.
 	e.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	e.tonemap_white = 4.5
-	e.tonemap_exposure = 0.95
+	# THE FIELD'S OWN EXPOSURE AND GRADE (P9 item 49, review of round 1: Scootaloo still pale
+	# yellow with a pink mane, Derpy near white). The studio's key 0.95 over a 0.5 near-white
+	# ambient at exposure 0.95 burned saturated coats toward white; the ranch is 0.8 exposure,
+	# 0.32 ambient, a little contrast and saturation (ranch.tscn), so the face on the card is
+	# the pony in the field.
+	e.tonemap_exposure = 0.72
+	e.adjustment_enabled = true
+	e.adjustment_contrast = 1.08
+	e.adjustment_saturation = 1.3
 	env.environment = e
 	_viewport.add_child(env)
 
