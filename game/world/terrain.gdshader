@@ -313,10 +313,13 @@ void fragment() {
 
 void light() {
 	float ndl = dot(NORMAL, LIGHT);
-	float lit = smoothstep(-band_softness, band_softness, ndl);
+	float bw = max(band_softness, fwidth(ndl) * 0.75);
+	float lit = smoothstep(-bw, bw, ndl);
 	float falloff = 1.0;
 	if (LIGHT_IS_DIRECTIONAL) {
-		lit = min(lit, smoothstep(0.35, 0.65, ATTENUATION));
+		// P9 item 57: at least a pixel of ramp on the shadow's edge (see toon.gdshader).
+		float aw = max(0.35, fwidth(ATTENUATION) * 0.6);
+		lit = min(lit, smoothstep(0.5 - aw, 0.5 + aw, ATTENUATION));
 	} else {
 		falloff = ATTENUATION;
 	}

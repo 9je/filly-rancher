@@ -39,11 +39,19 @@ const BONE_NAMES: Array[StringName] = [&"Pelvis", &"Chest1"]
 ## ("the show puts it larger, centred on the upper haunch"): the old (0.26, 0.86, 0.22) sat
 ## down by the stifle, half under a wing. Raised onto the top of the haunch and a little further
 ## back, placed by eye on a side render of the player (p8_checks, player_flank).
-const FLANK := Vector3(0.26, 1.06, 0.3)
+## P9 item 53 (the owner: "smeared, stretched, faint scraps, different on each flank"): the
+## folded wing covered its front half, so lowered and moved back onto the round of the haunch.
+const FLANK := Vector3(0.26, 0.98, 0.33)
 
 ## Decal box: across the flank, INTO the pony (the projection depth), and along her. Larger
 ## than it was (0.30), as the show draws marks.
-const DECAL_SIZE := Vector3(0.46, 0.26, 0.46)
+## P9 item 53: 0.46 reached round the curve of the rump, where a side projection lands at a
+## glancing angle and smears each drawn pixel into a streak; 0.34 keeps the drawing on the
+## flat of the haunch (normal_fade below drops what still lands at a glance).
+const DECAL_SIZE := Vector3(0.34, 0.26, 0.34)
+## How far the surface may turn from the projection before the mark fades out (0 never, 1 at
+## once): the stretched streaks over the top of the rump and down the back of the thigh.
+const NORMAL_FADE := 0.3
 ## THE MARK PAINTS HER BODY AND NOTHING ELSE. A Decal paints whatever is in its box: a tail
 ## swinging through, a wing, a mane thrown by the bounce (owner 2026-11-05: "Make sure this
 ## cutie mark bug doesn't happen anywhere"). Her body mesh carries this render layer, and the
@@ -83,6 +91,7 @@ static func apply(model: Node3D, mark: Image) -> int:
 		decal.cull_mask = MARK_LAYER
 		# Light fades only (Fable round 6, #2: at 0.4 the flank sat inside the faded part of
 		# the box and a stamped mark read as "a faint pink smudge").
+		decal.normal_fade = NORMAL_FADE
 		decal.upper_fade = 0.08
 		decal.lower_fade = 0.08
 		anchor.add_child(decal)

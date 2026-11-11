@@ -513,7 +513,9 @@ func apply_graphics(viewport: Viewport, with_window := true) -> void:
 	viewport.scaling_3d_scale = [0.67, 0.85, 1.0][quality]
 	viewport.msaa_3d = [Viewport.MSAA_DISABLED, Viewport.MSAA_2X, Viewport.MSAA_4X][quality]
 	viewport.screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA if quality == Quality.LOW else Viewport.SCREEN_SPACE_AA_DISABLED
-	RenderingServer.directional_shadow_atlas_set_size([1024, 2048, 4096][quality], true)
+	# P9 item 57: High is the project's own 8192 (P8 S4 chose it for clean hard edges); this
+	# preset used to cut it to 4096, which doubled every stair on a shadow's edge at 1440p.
+	RenderingServer.directional_shadow_atlas_set_size([2048, 4096, 8192][quality], true)
 	var tree := viewport.get_tree()
 	var scene := tree.current_scene if tree != null else null
 	if scene != null:

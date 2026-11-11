@@ -109,7 +109,9 @@ float marking_mask(vec3 p) {
 	}
 	if (marking == 4) {
 		float rear = smoothstep(-0.12, 0.05, p.z) * smoothstep(0.62, 0.72, p.y) * step(p.y, 1.3);
-		float spot = 1.0 - smoothstep(0.30, 0.36, marking_cells(p * 10.0));
+		// Freckles, not blobs (P9 item 54): small dots, about 1.5 cm across with gaps between,
+		// where they were 3-4 cm white patches that ran together.
+		float spot = 1.0 - smoothstep(0.17, 0.22, marking_cells(p * 15.0));
 		return rear * spot;
 	}
 	return 0.0;
@@ -123,7 +125,11 @@ void vertex() {
 }
 
 void fragment() {
-	dither_clip_near(FRAGCOORD.xy, -VERTEX.z);
+	// Never in the shadow map (P9 item 57): a faded pony still casts her whole shadow, and the
+	// near-lens test read the LIGHT's depth there, so a faded body cast a checkerboard.
+	if (!IN_SHADOW_PASS) {
+		dither_clip_near(FRAGCOORD.xy, -VERTEX.z);
+	}
 	vec4 c = albedo;
 	if (use_texture) {
 		vec4 tc = texture(albedo_texture, UV);
@@ -180,7 +186,12 @@ void fragment() {
 
 void light() {
 	float ndl = dot(NORMAL, LIGHT);
-	float lit = smoothstep(band_center - band_softness, band_center + band_softness, ndl);
+	// SCREEN-SPACE SOFTENED STEPS (P9 item 57, "jagged toon bands" at 1440p): a fixed band
+	// is a sub-pixel step on a surface seen at a slant, which MSAA cannot touch (it resolves
+	// edges, not shading). Widening each step to at least one pixel's worth of its own
+	// gradient (fwidth) keeps it crisp head-on and stops it stair-stepping at a slant.
+	float bw = max(band_softness, fwidth(ndl) * 0.75);
+	float lit = smoothstep(band_center - bw, band_center + bw, ndl);
 	float falloff = 1.0;
 	if (LIGHT_IS_DIRECTIONAL) {
 		// ATTENUATION is the sun's (or the moon's) shadow term, stepped like N.L so a cast
@@ -188,7 +199,8 @@ void light() {
 		// while the ranch ran PCSS soft shadows, whose noisy penumbra a hard step turned to salt
 		// and pepper (playtest 2026-10-24); the shadows are hard now (P8 S4), so there is no
 		// noise to hide and the ramp only smeared every shadow edge.
-		lit = min(lit, mix(1.0, smoothstep(0.42, 0.58, ATTENUATION), cast_shadow));
+		float aw = max(0.3, fwidth(ATTENUATION) * 0.6);
+		lit = min(lit, mix(1.0, smoothstep(0.5 - aw, 0.5 + aw, ATTENUATION), cast_shadow));
 	} else {
 		// Omni and spot lights keep a soft distance falloff but still band the surface.
 		falloff = ATTENUATION;

@@ -84,6 +84,9 @@ func _ready() -> void:
 	settings.load_from()
 	settings.apply_audio()
 	settings.apply_text()
+	# P9 item 57: MSAA and the shadow map from the first frame, not only once the ranch loads
+	# (the window is left alone: the launcher already set it).
+	settings.apply_graphics(get_viewport(), false)
 	# C2: THE CURSOR STARTS ON CONTINUE WHENEVER THERE IS SOMETHING TO CONTINUE. Before this
 	# the cursor defaulted to row 0, New game, one Enter away from `_game_state.reset()` with
 	# no confirmation -- the exact keypress a returning player makes out of habit on every

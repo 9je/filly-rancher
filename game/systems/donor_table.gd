@@ -40,10 +40,19 @@ func find(id: StringName) -> Dictionary:
 
 ## Donors that can wear `race`: any donor makes an earth pony (horn and wings hidden);
 ## unicorns and pegasi need a donor that natively has the part.
+## P9 item 51: bodies that are not whole once their canon signature is hidden. Kerfuffle's
+## prosthetic hind leg is part of her "clothes" surface, which `hide` takes away, so a pony
+## built on her (the owner's pegasus) stood on three legs, the near hind cut off at the thigh.
+## Kept in the table (her own canon model still loads) but never offered as a body.
+const NOT_WHOLE: Array[StringName] = [&"kerfuffle"]
+
+
 func for_race(race: StringName, foal: bool = false) -> Array[StringName]:
 	var out: Array[StringName] = []
 	for d: Dictionary in donors:
 		if bool(d.get("foal", false)) != foal:
+			continue
+		if StringName(d.get("id", "")) in NOT_WHOLE:
 			continue
 		if race == &"earth" or StringName(d.get("race", "")) == race:
 			out.append(StringName(d.get("id", "")))

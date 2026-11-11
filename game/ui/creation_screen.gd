@@ -236,6 +236,12 @@ func _ready() -> void:
 	_canvas.changed.connect(func() -> void: _sync_mark())
 	set_ink(0)
 	_camera.look_at(Vector3(0.0, 1.0, 0.0), Vector3.UP)
+	# P9 item 57: the stage is its own SubViewport, and a SubViewport has no MSAA unless it is
+	# asked for; Settings.apply_graphics only ever reached the window's own viewport, so the
+	# creator (the owner's very first look at their pony) drew with no anti-aliasing at all.
+	var sub := get_node_or_null(^"Layout/Stage/Viewport/SubViewport") as SubViewport
+	if sub != null:
+		sub.msaa_3d = Viewport.MSAA_4X
 	_stand_stage()
 	_wire_controls()
 	MenuStyleScript.apply_panel_box(get_node_or_null(^"Layout/Panel") as PanelContainer,

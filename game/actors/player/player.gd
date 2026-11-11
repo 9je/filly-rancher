@@ -722,8 +722,9 @@ func _record_tick() -> void:
 	_yaw_expected = _yaw_curr
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	_draw_between_ticks(Engine.get_physics_interpolation_fraction())
+	_update_scoop(delta)
 
 
 ## Place her Visuals and the camera pivot `fraction` of the way through the last tick.
@@ -1000,9 +1001,19 @@ const SCOOP_MODEL := "res://assets/models/scoop.glb"
 ## Back on her barrel and below the neck, like a saddle lantern (Fable AAA round 3, #5: at
 ## the shoulder, from the camera behind her, it sat beside her muzzle and "reads as a ball in
 ## the mouth").
-const SCOOP_AT := Vector3(-0.42, 0.98, 0.08)
-const SCOOP_NOZZLE := Vector3(-0.42, 1.01, -0.30)
-const SCOOP_SCALE := 1.1
+## P9 item 63: worn there all the time it read as "a striped tube stuck through her barrel"
+## in nearly every one of the owner's shots (the body's side bulges past 0.42 m in a stride,
+## and from the camera behind her it is seen end-on, a ringed cylinder through her flank).
+## Now the Scoop is magic, not tack: it is put away while the beam is off and pops out to
+## hover clear of her shoulder only while she is beaming (see _update_scoop()).
+const SCOOP_AT := Vector3(-0.66, 1.08, 0.02)
+const SCOOP_NOZZLE := Vector3(-0.66, 1.11, -0.36)
+const SCOOP_SCALE := 0.95
+## How fast it pops out and away (fraction of the way per second).
+const SCOOP_POP_RATE := 7.0
+var _scoop: Node3D = null
+var _scoop_rest := Transform3D.IDENTITY
+var _scoop_out := 0.0
 
 
 func _mount_scoop(pony: Node3D) -> void:
@@ -1030,6 +1041,27 @@ func _mount_scoop(pony: Node3D) -> void:
 	var basis := Basis(Vector3.UP, deg_to_rad(90.0)).scaled(Vector3.ONE * SCOOP_SCALE)
 	scoop.global_transform = visuals.global_transform * Transform3D(basis, SCOOP_AT)
 	beam_origin.position = SCOOP_NOZZLE
+	_scoop = scoop
+	_scoop_rest = scoop.transform
+	_scoop_out = 0.0
+	_update_scoop(0.0)
+
+
+## Out while the beam is on, away while it is off (item 63); a quick ease so it pops, with a
+## slow bob while out so it reads as floating at her side rather than strapped through her.
+func _update_scoop(delta: float) -> void:
+	if _scoop == null or not is_instance_valid(_scoop):
+		return
+	var want := 1.0 if magic_beam != null and bool(magic_beam.call("is_active")) else 0.0
+	_scoop_out = move_toward(_scoop_out, want, delta * SCOOP_POP_RATE)
+	_scoop.visible = _scoop_out > 0.01
+	if not _scoop.visible:
+		return
+	var s := ease(_scoop_out, 0.4)
+	var t := _scoop_rest
+	t.basis = t.basis.scaled(Vector3.ONE * maxf(s, 0.01))
+	t.origin.y += sin(Time.get_ticks_msec() * 0.004) * 0.025
+	_scoop.transform = t
 
 
 func _place_beam_origin(pony: Node3D) -> void:

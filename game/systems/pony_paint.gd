@@ -84,6 +84,8 @@ static func apply(body: Node3D, look: PonyLook) -> int:
 		if names.size() == 1:
 			if names[0] == "horn":
 				mi.visible = look.race == &"unicorn"
+				if mi.visible and mi.mesh is ArrayMesh and look.donor not in HORN_NATIVE:
+					mi.mesh = long_horn(mi.mesh as ArrayMesh)
 			elif names[0] == "wings":
 				mi.visible = look.race == &"pegasus"
 		# A mesh that is only hair shades as one rounded mass (P8 item 34; hair.gdshaderinc).
@@ -102,7 +104,7 @@ static func apply(body: Node3D, look: PonyLook) -> int:
 				mi.set_surface_override_material(i, hidden_material())
 				continue
 			var src: Material = mi.mesh.surface_get_material(i)
-			var mat: Material = _material_for(r, src, look, donor)
+			var mat: Material = _material_for(r, src, look, donor, names[i] in ["wings", "horn"])
 			if mat != null:
 				mi.set_surface_override_material(i, mat)
 				painted += 1
@@ -126,6 +128,62 @@ static func paint_piece(piece: Node3D) -> void:
 
 
 static var _baked: Dictionary = {}
+static var _horns: Dictionary = {}
+
+## P9 item 56 ("the horn shows in one shot and not another"): on the bodies whose forelock is
+## thick (pokeypierce, the default unicorn, among them) the stock horn is shorter than the hair
+## piled over the brow, so from most of the turntable it was buried. Every player and Drifter
+## unicorn's horn is drawn this much longer from its base, so it clears any forelock. A canon
+## unicorn wears her own model, never PonyPaint, so her look is untouched.
+const HORN_LENGTH := 1.3
+## Donors whose horn already stands clear of the hair (left exactly as modelled).
+const HORN_NATIVE: Array[StringName] = []
+
+
+## `mesh` (a horn on its own) stretched HORN_LENGTH times along its own axis, from its base:
+## the axis runs from the mesh's middle to its highest point (the tip) in model space, where
+## up is +Y. Bone weights are untouched, so it still rides the head. One copy per mesh.
+static func long_horn(mesh: ArrayMesh) -> ArrayMesh:
+	if mesh.has_meta(&"long_horn"):
+		return mesh
+	var key := mesh.get_instance_id()
+	if _horns.has(key) and is_instance_valid(_horns[key]):
+		return _horns[key]
+	var all := PackedVector3Array()
+	for si in mesh.get_surface_count():
+		all.append_array(mesh.surface_get_arrays(si)[Mesh.ARRAY_VERTEX])
+	if all.is_empty():
+		return mesh
+	var mid := Vector3.ZERO
+	var tip := all[0]
+	for v in all:
+		mid += v
+		if v.y > tip.y:
+			tip = v
+	mid /= float(all.size())
+	var axis := (tip - mid).normalized()
+	if axis.is_zero_approx():
+		return mesh
+	var base := INF
+	for v in all:
+		base = minf(base, v.dot(axis))
+	var out := ArrayMesh.new()
+	for si in mesh.get_surface_count():
+		var arrays: Array = mesh.surface_get_arrays(si)
+		var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		for i in verts.size():
+			var along := verts[i].dot(axis) - base
+			verts[i] += axis * along * (HORN_LENGTH - 1.0)
+		arrays[Mesh.ARRAY_VERTEX] = verts
+		var flags: int = mesh.surface_get_format(si) & (Mesh.ARRAY_FLAG_USE_8_BONE_WEIGHTS \
+			| (7 << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT))
+		out.add_surface_from_arrays(mesh.surface_get_primitive_type(si), arrays, [], {}, flags)
+		out.surface_set_material(si, mesh.surface_get_material(si))
+		out.surface_set_name(si, mesh.surface_get_name(si))
+	out.resource_name = mesh.resource_name
+	out.set_meta(&"long_horn", true)
+	_horns[key] = out
+	return out
 
 
 static func _has_coat(mesh: Mesh, donor: Dictionary) -> bool:
@@ -162,6 +220,8 @@ static func rest_baked(mesh: ArrayMesh) -> ArrayMesh:
 		out.surface_set_material(s, mesh.surface_get_material(s))
 		out.surface_set_name(s, mesh.surface_get_name(s))
 	out.resource_name = mesh.resource_name
+	if mesh.has_meta(&"long_horn"):
+		out.set_meta(&"long_horn", true)
 	_baked[key] = out
 	return out
 
@@ -183,11 +243,14 @@ static func body_scale(look: PonyLook) -> float:
 	return FOAL_SCALE if look != null and look.foal else 1.0
 
 
-static func _material_for(r: int, src: Material, look: PonyLook, donor: Dictionary) -> Material:
+## `bare_part`: a wing or a horn wears her coat but never her marking (P9 item 54: the freckles,
+## masked by height and depth alone, spilled across a folded wing as white blobs).
+static func _material_for(r: int, src: Material, look: PonyLook, donor: Dictionary,
+		bare_part := false) -> Material:
 	match r:
 		Role.COAT:
 			var coat := _toon(look.coat, r)
-			if look.marking != PonyLookScript.Marking.NONE:
+			if look.marking != PonyLookScript.Marking.NONE and not bare_part:
 				coat.set_shader_parameter(&"marking", look.marking)
 				coat.set_shader_parameter(&"marking_color", look.marking_color)
 				var bare: Variant = coat.get_meta(ToonStylerScript.BARE_META, null)
