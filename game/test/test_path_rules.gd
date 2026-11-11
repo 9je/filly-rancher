@@ -67,10 +67,11 @@ func test_factory_pay_doubles_and_the_lens_triples_vivid() -> void:
 
 func test_heat_rises_with_raids_and_falls_with_cuts() -> void:
 	var s := _story("rescue")
-	Rules.add_heat(s, "raid", 3)
-	assert_eq(Rules.heat(s), 36)
+	Rules.add_heat(s, "raid", 5)
+	assert_eq(Rules.heat(s), 35, "a full corral (5) stays under the fine")
+	assert_lt(Rules.heat(s), Rules.FINE_AT)
 	assert_true(Rules.cut_pylon(s, "pylon_lake"))
-	assert_eq(Rules.heat(s), 21)
+	assert_eq(Rules.heat(s), 20)
 	assert_false(Rules.cut_pylon(s, "pylon_lake"), "a pylon is cut once")
 	Rules.add_heat(s, "raid", 20)
 	assert_eq(Rules.heat(s), Rules.HEAT_MAX, "Heat stops at the top")

@@ -19,7 +19,7 @@ const NpcScript := preload("res://actors/npc/npc.gd")
 const REACH := 3.6
 const PYLON_HOLD := 4.0
 const CORRAL_HOLD := 2.5
-const CORRAL_PONIES := 3
+const CORRAL_PONIES := 5
 ## Pylon and corral offsets from each region's centre (x, z).
 const PYLON_AT := {
 	"pylon_meadow": [&"nightmeadow", Vector2(9, -6)],
@@ -101,7 +101,7 @@ func _fill_corral(corral: Node3D) -> void:
 		p.set_stock(GeneratorScript.generate(7300 + i + int(corral.position.x * 7.0)).to_dict())
 		p.setup(load("res://data/hidden/stock_shy.tres"))
 		p.set_physics_process(false)
-		p.position = Vector3(-1.2 + i * 1.2, 0, 0.3 * float(i % 2))
+		p.position = Vector3(-1.6 + i * 0.8, 0, 0.45 * float(i % 2) - 0.2)
 		p.rotation.y = randf() * TAU
 		p.set_meta(&"penned", true)
 
@@ -165,13 +165,13 @@ func offer(key: String) -> String:
 			if s.id in (story.get_var("pylons", []) as Array):
 				return "This pylon is down. The sky over here is a band thinner."
 			if not bool(is_night.call()):
-				return "A Cloudsdale weather pylon. Come back at night to cut it."
+				return "A weather pylon: it carries the valley's color up to the Works. Cut it at night."
 			return "%s: hold to cut the pylon  %d%%" % [key, _pct(s)]
 		"corral":
 			if s.id in (story.get_var("raided", []) as Array):
 				return "An empty Intake Corral. They will not use this one again."
 			if not bool(is_night.call()):
-				return "An Intake Corral, full of Drifters waiting for the lift. Come back at night."
+				return "An Intake Corral: Drifters waiting to be sent up to the Works. Open it at night."
 			return "%s: hold to open the gate  %d%%" % [key, _pct(s)]
 		"gate":
 			return "%s: send your marked ponies down the Lantern Line" % key

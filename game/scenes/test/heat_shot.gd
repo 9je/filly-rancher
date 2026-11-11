@@ -80,5 +80,22 @@ func _run() -> void:
 	Input.action_release(&"interact")
 	await _shot("heat_after_cut", 60)
 	print("HEAT ", load("res://systems/path_rules.gd").heat(story), " CUT ", load("res://systems/path_rules.gd").pylons_cut(story))
+	# THE CORRAL (item 23): stand back from one and look.
+	var corral: Node3D = null
+	for s2 in act3.get("sites"):
+		if String(s2.kind) == "corral":
+			corral = s2.node
+			break
+	player.global_position = corral.global_position + Vector3(0, 0.5, 7.5)
+	player.look_at(corral.global_position, Vector3.UP)
+	for i in 90:
+		await process_frame
+	var kids := 0
+	for c in corral.get_children():
+		if c.has_meta(&"penned"):
+			kids += 1
+			print("CORRAL pony at ", c.global_position, " vis ", c.is_visible_in_tree())
+	print("CORRAL ponies ", kids, " at ", corral.global_position)
+	await _shot("corral_view", 2)
 	print("HEAT_SHOT_OK")
 	quit(0)

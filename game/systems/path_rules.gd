@@ -151,7 +151,7 @@ static func factory_pay(story: Story, base: int, coat: Color, has_lens: bool) ->
 
 const HEAT_MAX := 100
 const HEAT := {
-	"raid": 12,        # each pony freed from an Intake Corral
+	"raid": 7,         # each pony freed from an Intake Corral (5 a corral: 35, under FINE_AT)
 	"spotted": 8,      # a Collector lantern caught you
 	"lantern": 2,      # a pony walked out along the Lantern Line
 	"missed_quota": 10,
