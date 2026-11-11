@@ -6,6 +6,8 @@ The owner played a fresh game to the Half Light ending and logged 76 items (docs
 - **Added:** play with the Drifters (an active Bloom push), rest till nightfall, run toggle, objective card + compass + floor beacon in the Factory, painted posters, pastel party rooms, a lever that reads, Staff Only plate, Heat gauge, an ending results card, Static's rewrite.
 - **Lane B W3 merged** (dd484a0 range): pen badge, short prompts, light Drifter catch, letters/mailbox, Market (no jump, confirm, Owned), racing (pick, stake, Place bet; odds match), slots bonus. Review notes in the ledger.
 - Suite on dd484a0: 2292/2294 (two player tests pinned the old default gait; fixed in 012c0e6).
+- **Lane B rounds 2-4 merged** (W4 art: Scoop worn only while beaming, AA/soft High shadows, one tree family, depth fog, creator body/tail/marks/freckles/horn, Spike, signs, nose-to-wall, sighting camera; round 3: running tail, talk box and prompts off faces, pen spots, marks; round 4: stale input-harness tip reader, test_scale). Review fixes: Kerfuffle body indices kept stable, Marigold's line in its source.
+- Suite on a7718e7: 2305/2305. Real-input tests all green incl. first_pony, catch_card, camera_terrain, scale, find_market, factory_solid, pause_factory, sprint.
 
 ## Owner direction (2026-10-22)
 Canon MLP stays: real names, looks and places ("lean into mlp fully", private build). The roster de-canon was reverted; the Company is the Cloudsdale Weather Corporation, the cloud palace is the Rainbow Factory, the town is Ponyville. The OC story cast lives alongside the canon ponies.
