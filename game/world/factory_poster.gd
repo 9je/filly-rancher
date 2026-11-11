@@ -15,6 +15,7 @@ const DESIGNS := [
 	{"words": "Find your talent today!", "art": "blank_marks", "bg": Color(1.0, 0.93, 0.95)},
 	{"words": "Thank you for your color", "art": "heart", "bg": Color(0.95, 0.99, 0.93)},
 	{"words": "Where does a rainbow come from?", "art": "flow", "bg": Color(0.99, 0.97, 0.9)},
+	{"words": "UP  rainbow   DOWN  off", "art": "lever_dial", "bg": Color(0.2, 0.18, 0.24)},
 ]
 const RAINBOW := [Color(0.93, 0.36, 0.4), Color(0.98, 0.62, 0.3), Color(0.98, 0.86, 0.36),
 	Color(0.45, 0.78, 0.45), Color(0.38, 0.62, 0.9), Color(0.62, 0.46, 0.82)]
@@ -39,11 +40,11 @@ func _ready() -> void:
 	words.text = String(d.words)
 	words.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	words.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	words.position = Vector2(18, 268)
+	words.position = Vector2(18, 284)
 	words.size = Vector2(PX.x - 36, 120)
 	words.add_theme_font_override(&"font", MenuStyleScript.title_font())
 	words.add_theme_font_size_override(&"font_size", 34)
-	words.add_theme_color_override(&"font_color", Color(0.3, 0.16, 0.36))
+	words.add_theme_color_override(&"font_color", Color(0.3, 0.16, 0.36) if d.bg.get_luminance() > 0.5 else Color(1.0, 0.94, 0.8))
 	vp.add_child(words)
 	var quad := MeshInstance3D.new()
 	var qm := QuadMesh.new()
@@ -92,6 +93,17 @@ class _Art:
 				for i in RAINBOW.size():
 					var s := 1.0 - i * 0.13
 					_heart(c, 100 * s, RAINBOW[i])
+			"lever_dial":
+				# Up, the spectrum fanning out; down, a dark disc. The arrow between.
+				for i in RAINBOW.size():
+					draw_arc(Vector2(size.x * 0.5, 120), 96 - i * 10, PI, TAU, 40, RAINBOW[i], 10.0)
+				draw_circle(Vector2(size.x * 0.5, 215), 34, Color(0.08, 0.07, 0.1))
+				draw_arc(Vector2(size.x * 0.5, 215), 34, 0, TAU, 32, Color(0.6, 0.6, 0.66), 3.0)
+				draw_line(Vector2(size.x * 0.5, 60), Vector2(size.x * 0.5, 250), Color(0.95, 0.85, 0.5), 6.0)
+				draw_colored_polygon(PackedVector2Array([Vector2(size.x * 0.5 - 14, 66), Vector2(size.x * 0.5, 42),
+					Vector2(size.x * 0.5 + 14, 66)]), Color(0.95, 0.85, 0.5))
+				draw_colored_polygon(PackedVector2Array([Vector2(size.x * 0.5 - 14, 244), Vector2(size.x * 0.5, 268),
+					Vector2(size.x * 0.5 + 14, 244)]), Color(0.95, 0.85, 0.5))
 			"flow":
 				_pony(Vector2(70, 170), 0.7)
 				draw_line(Vector2(120, 150), Vector2(165, 150), Color(0.45, 0.38, 0.5), 8.0)

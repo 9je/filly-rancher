@@ -127,5 +127,25 @@ func _run() -> void:
 		player.global_position = gallery + Vector3(-1.0, 0.3, 0.5)
 		await _shot("lights_out_hatch", 60)
 		print("GOAL ", scene.get("goal"))
+		# On to the lever (item 18): every hold done with E, every walk by setting her down.
+		for k in 3000:
+			if bool(scene.get("people").call("is_talking")):
+				await _talk_through(scene)
+			var g: Dictionary = scene.get("goal")
+			if String(g.get("kind", "")) == "hold":
+				var lever := String(g.get("verb", "")).contains("lever")
+				player.global_position = (g["at"] as Vector3) + Vector3(-1.0, 0.3, 1.4)
+				if lever:
+					await _shot("lights_out_lever", 40)
+				Input.action_press(&"interact")
+				for f in 240:
+					await process_frame
+				Input.action_release(&"interact")
+				if lever:
+					await _shot("lights_out_lever_pulled", 30)
+					break
+			elif String(g.get("kind", "")) == "area":
+				player.global_position = (g["at"] as Vector3) + Vector3(0, 0.3, 0)
+			await process_frame
 	print("FACTORY_SHOT_OK")
 	quit(0)

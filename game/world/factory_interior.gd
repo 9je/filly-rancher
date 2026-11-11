@@ -392,9 +392,22 @@ func _dress(room: Node3D, spec: Dictionary, markers: Node3D) -> void:
 				_piece("fx_tank", room, Vector3(x * 1.35, 0, -4.4))
 				_piece("fx_tank", room, Vector3(x * 1.35, 0, 3.2))
 			_piece("fx_lamp_hanging", room, Vector3(0, 0, 1.0))
-			var handle := _piece("fx_lever_handle", room, Vector3(0.6, 1.1, -3.5))
+			# A LEVER THAT READS AS ONE (playtest 2026-11-10 item 18: "a stick with a pink ball on
+			# one end and a yellow cylinder on the other"). The handle turns about the slot, not
+			# its own middle, stands twice the size, and a dial plate behind says which way is
+			# the rainbow and which way is off.
+			var pivot := Node3D.new()
+			pivot.name = "LeverHandle"
+			pivot.position = Vector3(0.6, 1.12, -3.5)
+			room.add_child(pivot)
+			var handle := _piece("fx_lever_handle", pivot, Vector3(0, 0.45 * 1.9, 0), 0.0, 1.9)
 			if handle != null:
-				handle.name = "LeverHandle"
+				handle.name = "Grip"
+			var plate := _piece("fx_poster", room, Vector3(0.0, 2.55, -3.95), 0.0, 0.7)
+			if plate != null:
+				var face: Node3D = (load("res://world/factory_poster.gd") as GDScript).new()
+				face.set("design", 5)
+				plate.add_child(face)
 			_mark(markers, "lever", Vector3(0, 0, -2.2))
 
 
