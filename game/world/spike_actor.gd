@@ -93,7 +93,7 @@ func _dress_animated(root: Node) -> void:
 ## violet (~0.76), a touch richer and a shade deeper. His green spines, fins and cream belly are
 ## other hues and stay as drawn.
 const SPIKE_HUE_FROM := 0.87
-const SPIKE_HUE_TO := 0.765
+const SPIKE_HUE_TO := 0.735
 const SPIKE_HUE_RANGE := 0.09
 
 
@@ -103,7 +103,7 @@ func _purple(m: Material) -> void:
 		if mat is ShaderMaterial and (mat as ShaderMaterial).shader == ToonStyler.TOON:
 			(mat as ShaderMaterial).set_shader_parameter(&"hue_remap",
 				Vector4(SPIKE_HUE_FROM, SPIKE_HUE_RANGE, SPIKE_HUE_TO, 0.0))
-			(mat as ShaderMaterial).set_shader_parameter(&"hue_remap_sv", Vector2(1.45, 0.9))
+			(mat as ShaderMaterial).set_shader_parameter(&"hue_remap_sv", Vector2(1.6, 0.86))
 
 
 ## His AnimationPlayer (null on the clip-less models).

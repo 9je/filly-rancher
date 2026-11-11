@@ -819,15 +819,24 @@ func _resolve_arm() -> void:
 ## from). The sweeps above already keep it there; this holds even if a sweep ever tunnels
 ## between two of the ground's triangles. A scene with no terrain (the Factory, a GUT test)
 ## has nothing to hold it above, and is left alone.
+## NEVER A WORM'S-EYE VIEW (P9 item 62, the owner in the Palace: "the camera sits at floor
+## level", her pony small and seeming to float). Looking up swings the lens down the arm's
+## sphere; in the hall (ground_guard off) nothing stopped it until the carpet, 0.44 m up. The
+## lens now stays at least this high over her own hooves, indoors and out.
+const LENS_OVER_HOOVES := 0.95
+
+
 func _keep_above_ground() -> void:
-	if not ground_guard:
-		return
-	if _terrain == null or not is_instance_valid(_terrain):
-		_terrain = get_tree().get_first_node_in_group(&"terrain") if is_inside_tree() else null
-		if _terrain == null:
-			return
 	var at := _camera.global_position
-	var floor_y: float = float(_terrain.call("surface_height_at", at.x, at.z)) + LENS_RADIUS
+	var floor_y := -INF
+	var body := _find_collision_ancestor()
+	if body != null:
+		floor_y = body.global_position.y + LENS_OVER_HOOVES
+	if ground_guard:
+		if _terrain == null or not is_instance_valid(_terrain):
+			_terrain = get_tree().get_first_node_in_group(&"terrain") if is_inside_tree() else null
+		if _terrain != null:
+			floor_y = maxf(floor_y, float(_terrain.call("surface_height_at", at.x, at.z)) + LENS_RADIUS)
 	if at.y < floor_y:
 		_camera.global_position = Vector3(at.x, floor_y, at.z)
 
