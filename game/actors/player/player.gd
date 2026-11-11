@@ -1032,6 +1032,10 @@ const SCOOP_POP_RATE := 7.0
 var _scoop: Node3D = null
 var _scoop_rest := Transform3D.IDENTITY
 var _scoop_out := 0.0
+var _scoop_stow := Transform3D.IDENTITY
+## Along her spine, behind the withers, a little smaller than in use.
+const SCOOP_STOW_AT := Vector3(0.0, 1.30, 0.18)
+const SCOOP_STOW_SCALE := 0.8
 
 
 func _mount_scoop(pony: Node3D) -> void:
@@ -1061,6 +1065,12 @@ func _mount_scoop(pony: Node3D) -> void:
 	beam_origin.position = SCOOP_NOZZLE
 	_scoop = scoop
 	_scoop_rest = scoop.transform
+	# STOWED ON HER BACK (owner 2026-11-11: "its just gonna appear and dissapear from your
+	# side?"). Off, it lies along her spine like a saddle tube; beaming, it glides out to her
+	# side. Worked out in the same parent space as the side spot.
+	var parent3d := scoop.get_parent() as Node3D
+	var stow_world := visuals.global_transform * Transform3D(basis.scaled(Vector3.ONE * SCOOP_STOW_SCALE), SCOOP_STOW_AT)
+	_scoop_stow = parent3d.global_transform.affine_inverse() * stow_world if parent3d != null else stow_world
 	_scoop_out = 0.0
 	_update_scoop(0.0)
 
@@ -1072,13 +1082,10 @@ func _update_scoop(delta: float) -> void:
 		return
 	var want := 1.0 if magic_beam != null and bool(magic_beam.call("is_active")) else 0.0
 	_scoop_out = move_toward(_scoop_out, want, delta * SCOOP_POP_RATE)
-	_scoop.visible = _scoop_out > 0.01
-	if not _scoop.visible:
-		return
+	_scoop.visible = true
 	var s := ease(_scoop_out, 0.4)
-	var t := _scoop_rest
-	t.basis = t.basis.scaled(Vector3.ONE * maxf(s, 0.01))
-	t.origin.y += sin(Time.get_ticks_msec() * 0.004) * 0.025
+	var t := _scoop_stow.interpolate_with(_scoop_rest, s)
+	t.origin.y += sin(Time.get_ticks_msec() * 0.004) * 0.025 * s
 	_scoop.transform = t
 
 
