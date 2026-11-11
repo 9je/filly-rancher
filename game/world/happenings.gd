@@ -259,6 +259,15 @@ func _sighting() -> bool:
 		return false
 	pool.sort_custom(func(a: PonyData, b: PonyData) -> bool: return a.rarity < b.rarity)
 	var pick: PonyData = pool[randi() % mini(4, pool.size())]
+	# THE DECOR BROUGHT HER (P9 item 73: "nothing links a sighting to the decor you just
+	# bought"). A pony who only comes once the ranch has built her decoration is seen first, and
+	# Tumble says what drew her.
+	var lured: Array = pool.filter(func(d: PonyData) -> bool: return d.needs_decor != &"")
+	if not lured.is_empty():
+		pick = lured[randi() % lured.size()]
+	var lure := ""
+	if pick.needs_decor != &"":
+		lure = String(Decor.find(pick.needs_decor).get("name", "")).to_lower()
 	var at := _spot(22.0, 40.0)
 	if at == Vector3.INF:
 		return false
@@ -268,20 +277,69 @@ func _sighting() -> bool:
 		return false
 	# THE TRAIL TAKES YOU TO HER, not a compass word (PT8; the owner could not tell which way
 	# was north-east and never found Octavia). Ranch.guide picks her up as &"sighting".
-	ranch.call("_toast", "Tumble: \"Look, look! It's %s! Follow the sparkles, quick!\"" % pick.display_name)
+	if lure != "":
+		ranch.call("_toast", "Tumble: \"Look, look! It's %s! Your %s brought her! Follow the sparkles, quick!\""
+			% [pick.display_name, lure])
+	else:
+		ranch.call("_toast", "Tumble: \"Look, look! It's %s! Follow the sparkles, quick!\"" % pick.display_name)
 	# A RARE ONE IS SHOWN, NOT ONLY NAMED (P8 idea F11): three seconds of where she is, from
 	# over the player's shoulder, then the trail.
 	if pick.rarity >= PonyData.Rarity.RARE and bool(ranch.get("_interactive")):
-		var player: Node3D = ranch.get("player")
-		if player != null:
-			var eye := player.global_position + Vector3.UP * 3.0 + (player.global_position - at).normalized() * 3.0
-			Cinematic.shared(ranch.get_tree()).play([
-				{"from": "here", "to": eye, "look_node": sighting, "look_height": 1.0, "time": 1.2},
-				{"from": eye, "to": eye.lerp(at, 0.35) + Vector3.UP, "look_node": sighting,
-					"look_height": 1.0, "time": 2.2, "caption": "Tumble: \"Look! It's %s!\"" % pick.display_name},
-			], {"freeze": [player], "host": ranch})
+		film_sighting(pick, at, lure)
 	ranch.call("_novelty", "event", "sighting_" + String(pick.id), "Tumble spots %s out in the grass" % pick.display_name)
 	return true
+
+
+## The rare one's three seconds on screen: from over the player's shoulder up and toward her.
+func film_sighting(pick: PonyData, at: Vector3, lure: String) -> void:
+	var player: Node3D = ranch.get("player")
+	if player != null:
+		var eye := player.global_position + Vector3.UP * 3.0 + (player.global_position - at).normalized() * 3.0
+		# OVER THE ROOFS, NEVER THROUGH THEM (P9 item 72: "the sighting camera flew through a
+		# building"). Both legs were straight lines at roof height toward a pony 22 to 40 m
+		# off; each point now rises until its leg, and its view of her, are clear.
+		var cam_space := player.get_world_3d().direct_space_state
+		# The first leg only has to be clear (it is the lift off her shoulder); the second has to
+		# see her.
+		eye = _clear_height(cam_space, player.global_position + Vector3.UP * 1.6, eye, at, 24.0, false)
+		# Closer in rather than higher up where a roof stands between: a point further toward her
+		# that sees her at a modest height beats a crane shot of a rooftop.
+		var near := Vector3.INF
+		for f: float in [0.35, 0.55, 0.72]:
+			var cand := _clear_height(cam_space, eye, eye.lerp(at, f) + Vector3.UP, at, 10.0)
+			if cand != Vector3.INF:
+				near = cand
+				break
+		if near == Vector3.INF:
+			near = _clear_height(cam_space, eye, eye.lerp(at, 0.35) + Vector3.UP, at)
+		var caption := "Tumble: \"Look! It's %s!\"" % pick.display_name
+		if lure != "":
+			caption = "Tumble: \"It's %s! Your %s brought her!\"" % [pick.display_name, lure]
+		Cinematic.shared(ranch.get_tree()).play([
+			{"from": "here", "to": eye, "look_node": sighting, "look_height": 1.0, "time": 1.2},
+			{"from": eye, "to": near, "look_node": sighting,
+				"look_height": 1.0, "time": 2.2, "caption": caption},
+		], {"freeze": [player], "host": ranch})
+
+
+## `to` raised (in 1.5 m steps, at most 24 m) until nothing solid lies on the line from `from`
+## to it, nor on its line of sight to `subject` at head height.
+## With `max_rise` given, INF if it would have to rise further than that.
+static func _clear_height(space: PhysicsDirectSpaceState3D, from: Vector3, to: Vector3,
+		subject: Vector3, max_rise := 24.0, need_view := true) -> Vector3:
+	var p := to
+	while p.y - to.y <= max_rise:
+		if not _blocked(space, from, p) \
+				and (not need_view or not _blocked(space, p, subject + Vector3.UP * 1.0)):
+			return p
+		p += Vector3.UP * 1.5
+	return Vector3.INF if max_rise < 24.0 else p
+
+
+static func _blocked(space: PhysicsDirectSpaceState3D, a: Vector3, b: Vector3) -> bool:
+	var q := PhysicsRayQueryParameters3D.create(a, b)
+	q.collision_mask = 1 << 1
+	return not space.intersect_ray(q).is_empty()
 
 
 func _palace_flyer() -> void:
