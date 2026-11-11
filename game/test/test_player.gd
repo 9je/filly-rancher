@@ -46,6 +46,9 @@ func before_each() -> void:
 
 	_player_node = PlayerScene.instantiate()
 	_world.add_child(_player_node)
+	# The run toggle starts ON (playtest 2026-11-10 item 75); these tests measure the plain
+	# gait under it, so they start with the toggle off. test_the_run_toggle_starts_on pins it.
+	_player_node.set("sprint_on", false)
 
 
 func after_each() -> void:
@@ -302,3 +305,13 @@ func test_the_player_wears_the_look_she_is_given() -> void:
 	# swap, so the look itself is what is checked; the mark decals apply either way).
 	assert_eq(player.current_look().coat, StockPalette.load_player().coat_at(2))
 	assert_eq(CutieMark.decals_of(body).size(), 2)
+
+
+
+## PLAYTEST 2026-11-10 ITEM 75: "i like toggle". A new player runs; Shift flips it.
+func test_the_run_toggle_starts_on() -> void:
+	var fresh: Node = PlayerScene.instantiate()
+	add_child_autofree(fresh)
+	assert_true(bool(fresh.get("sprint_on")), "she starts running")
+	fresh.call("toggle_sprint")
+	assert_false(bool(fresh.get("sprint_on")))

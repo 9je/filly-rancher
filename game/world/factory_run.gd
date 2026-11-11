@@ -394,8 +394,16 @@ func _reveal() -> void:
 	step_reached.emit(&"gallery")
 	tone.set_target(0.8)
 	await _window_scene()
-	marigold.global_position = interior.room_origin(&"gallery") + Vector3(1.0, 0, -1.0)
-	marigold.set_mode_stand(marigold.global_position)
+	# IN FRONT OF HER, FACING HER (playtest 2026-11-10 item 39: the speaker stood at the lens,
+	# a dithered ghost over the most important offer in the game).
+	var cam := get_viewport().get_camera_3d()
+	var ahead := -cam.global_basis.z if cam != null else -player.global_basis.z
+	ahead.y = 0.0
+	ahead = ahead.normalized() if ahead.length() > 0.01 else Vector3(0, 0, -1)
+	var spot := player.global_position + ahead * 2.6 + ahead.cross(Vector3.UP) * 0.7
+	spot.y = player.global_position.y
+	marigold.global_position = spot
+	marigold.set_mode_stand(spot)
 	step_reached.emit(&"choice")
 	await _say(&"marigold", &"factory_window")
 	if outcome == &"":

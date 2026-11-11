@@ -9,6 +9,7 @@ const FACTORY := "res://world/factory.tscn"
 var out := ""
 var mode := "reveal"
 var choice_shot := false
+var choice_done := false
 var rooms_shot: Array[String] = []
 
 
@@ -38,9 +39,9 @@ func _talk_through(scene: Node) -> void:
 	while bool(people.call("is_talking")) and guard < 80:
 		var runner = people.get("runner")
 		if runner != null and bool(runner.call("has_choices")):
-			if choice_shot:
-				choice_shot = false
-				await _shot(mode + "_choice", 30)
+			if not choice_done:
+				choice_done = true
+				await _shot(mode + "_choice", 300)
 			people.get("talk_box").chose.emit(pick)
 		else:
 			people.get("talk_box").advanced.emit()
