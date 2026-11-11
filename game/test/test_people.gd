@@ -68,3 +68,15 @@ func test_a_character_with_nothing_new_still_has_a_bark() -> void:
 	_flags["has_scoop"] = true
 	assert_false(_people.has_news(&"marigold"))
 	assert_true(_people.talk("marigold"), "a bark is still something to say")
+
+
+## PLAYTEST 2026-11-10 ITEM 37: "Talk to Tumble" was offered when she had no line, and E did
+## nothing. Someone with nothing to say is not a candidate; with a line, she is again.
+func test_someone_with_nothing_to_say_is_not_offered() -> void:
+	var at: Vector3 = PeopleScript.SPOTS[&"fennel"][0] + Vector3(1.0, 0, 0)
+	assert_eq(_people.candidates(at).size(), 1, "Fennel is offered with her lines in the library")
+	var kept := _people.library.all.duplicate()
+	_people.library.all = _people.library.all.filter(func(d: Dialogue) -> bool: return d.speaker != &"fennel")
+	assert_eq(_people.candidates(at).size(), 0, "nothing to say: no prompt")
+	assert_false(_people.talk("fennel"), "and talk() would have refused, which is the bug")
+	_people.library.all = kept

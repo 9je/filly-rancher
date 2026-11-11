@@ -131,7 +131,7 @@ start [bramble happy] Rainbow Dye's flying off the shelf! Everypony wants a bit 
 speaker: tumble
 bark: true
 once: false
-when: {"chapters": [1]}
+when: {"chapters": [1], "flags_none": ["invited"]}
 
 start [tumble sad look] The rainbow's really bright today. It wasn't this bright before.
 
@@ -142,6 +142,26 @@ once: false
 when: {"chapters": [1]}
 
 start [marigold happy] Happy ponies make the brightest colors!
+
+# ----- Tumble after the Lottery (playtest 2026-11-10 item 26) ----------------------------
+# Drawn for the lift, she stops hoping about her mark (her cheerful barks end at "invited").
+# Innocent words, a scared face (memory: story cracks are emphasised, never said).
+
+=== tumble_bark_lottery_1
+speaker: tumble
+bark: true
+once: false
+when: {"flags_all": ["invited"], "flags_none": ["reveal_done"]}
+
+start [tumble scared look] Is it tomorrow already? It feels like it should be further away.
+
+=== tumble_bark_lottery_2
+speaker: tumble
+bark: true
+once: false
+when: {"flags_all": ["invited"], "flags_none": ["reveal_done"]}
+
+start [tumble sad] I practised the hoof-shake. In case you forget it. You won't forget it.
 
 # ----- Color Day barks (P8, playtest 2026-11-08 item 16) ---------------------------------
 # The town on the morning of the lift. Innocent words; the unease is in the face and the beat

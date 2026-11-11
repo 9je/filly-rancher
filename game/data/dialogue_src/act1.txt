@@ -153,7 +153,7 @@ start [marigold happy] Your first Placement! Did you see the rainbow? It got a t
 speaker: tumble
 bark: true
 once: false
-when: {"chapters": [0, 1]}
+when: {"chapters": [0, 1], "flags_none": ["invited"]}
 
 start [tumble happy hop] There's a pony over there! No, over THERE!
 
@@ -161,7 +161,7 @@ start [tumble happy hop] There's a pony over there! No, over THERE!
 speaker: tumble
 bark: true
 once: false
-when: {"chapters": [0, 1]}
+when: {"chapters": [0, 1], "flags_none": ["invited"]}
 
 start [tumble happy] When I find my mark I hope it's a cupcake. Or a rocket. A cupcake rocket.
 
@@ -169,7 +169,7 @@ start [tumble happy] When I find my mark I hope it's a cupcake. Or a rocket. A c
 speaker: tumble
 bark: true
 once: false
-when: {"chapters": [0, 1]}
+when: {"chapters": [0, 1], "flags_none": ["invited"]}
 
 start [tumble happy look] Do you think the rainbow is warm? It looks warm.
 

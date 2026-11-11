@@ -121,3 +121,23 @@ func test_the_cast_are_generated_ponies_on_real_donors() -> void:
 	var tumble: CharacterDef = load("res://data/characters/tumble.tres")
 	assert_true(tumble.build_look().foal)
 	assert_false(tumble.build_look().has_mark(), "Tumble is a Drifter")
+
+
+## PLAYTEST 2026-11-10 ITEM 26: drawn in the Lottery, Tumble still hoped her mark would be "a
+## cupcake rocket". From "invited" until the reveal, none of her cheerful barks can be picked.
+func test_tumble_stops_hoping_about_her_mark_once_she_is_drawn_for_the_lift() -> void:
+	var lib: TalkLibrary = LibraryScript.new()
+	lib.load_all()
+	var cheerful := [&"tumble_bark_1", &"tumble_bark_2", &"tumble_bark_3", &"tumble_bark_a2"]
+	var rng := RandomNumberGenerator.new()
+	for chapter in [1, 2]:
+		var ctx := _ctx(chapter, {"invited": true, "tumble_hides": true, "color_day": chapter == 2})
+		for i in range(60):
+			rng.seed = i
+			var d := lib.pick(&"tumble", ctx, rng)
+			if d == null:
+				continue
+			assert_false(d.id in cheerful, "chapter %d picked %s after the Lottery" % [chapter, d.id])
+	# Before the Lottery she still has them.
+	var before := lib.pick(&"tumble", _ctx(0, {"tumble_joined": true, "has_scoop": true, "met_fennel": true}))
+	assert_not_null(before, "Tumble has nothing to say in Act One")

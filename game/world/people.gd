@@ -201,9 +201,15 @@ func candidates(at: Vector3) -> Array[Dictionary]:
 		return out
 	var best: StringName = &""
 	var best_d := TALK_RADIUS
+	var ctx: Dictionary = context_provider.call() if context_provider.is_valid() else {}
 	for id: StringName in npcs:
 		var n: Node3D = npcs[id]
 		var d := Vector2(at.x - n.global_position.x, at.z - n.global_position.z).length()
+		# NOBODY IS OFFERED WITH NOTHING TO SAY (playtest 2026-11-10 item 37: "Talk to Tumble"
+		# on screen and E did nothing). talk() picks her line the same way; when there is none
+		# it refuses, so the prompt was a promise the key could not keep.
+		if d < best_d and library.pick(id, ctx) == null:
+			continue
 		# A COMPANION WITH NOTHING NEW IS TALKED TO ONLY WHEN LOOKED AT (PT4; playtest
 		# 2026-11-05 item 18: aiming at Twilight, the prompt read "E: talk to Tumble").
 		if d < best_d and (n as Npc).mode == NpcScript.Mode.FOLLOW and not has_news(id) \

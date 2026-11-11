@@ -10,7 +10,8 @@ priority = 0
 once = false
 bark = true
 when = {
-"chapters": [1]
+"chapters": [1],
+"flags_none": ["invited"]
 }
 nodes = Array[Dictionary]([{
 "id": "start",
