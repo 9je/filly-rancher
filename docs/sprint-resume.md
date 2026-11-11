@@ -28,3 +28,11 @@ docs/playtest-2026-11-08-ledger.md.
 - A full suite on the merged snapshot was started ~23:43 (task bthj71yjj).
 - Probes: scenes/test/factory_guide_shot.gd (modes reveal, lights_out), play_pen_shot.gd,
   heat_shot.gd, ending_shot.gd, laneb_*.gd.
+
+## Status 2026-11-11 02:20 (Lane A)
+- Lane B round 2 (W4) cherry-picked (474ad02..90545f3); review fixes a68b606 (Kerfuffle index
+  stability, Marigold's line moved into its source).
+- Suite on 3a6dc53: 2296/2296. Input tests: camera_terrain, pen_upgrade, loading, factory_solid
+  pass; first_pony, catch_card, find_market, scale fail and failed before this sprint.
+- Lane B round 3 (76 tail, 39 talk box, 71 prompt over faces, 30 pile-up, 53 marks, 31, 61, 57)
+  running in a worktree; review its frames before cherry-picking.
