@@ -275,10 +275,14 @@ func walk_to(point: Vector3, arrive := 1.5, max_s := 30.0, sneak := false) -> bo
 	return Vector2(point.x - player.global_position.x, point.z - player.global_position.z).length() < arrive
 
 
+## The tip line as the player sees it: its text while it is on screen, "" while it is not.
+## Asked of the HUD (tip_text(), tip_showing()): since the plum-and-gold HUD (442c99c) the tip is
+## a pill of glyphs and words, not one Label, and reading a Label named "Tip" saw nothing at all.
 func hud_tip() -> String:
 	var hud := ranch.get_node_or_null(^"HUD")
-	var label := hud.find_child("Tip", true, false) as Label if hud != null else null
-	return label.text if label != null and label.is_visible_in_tree() else ""
+	if hud == null or not hud.has_method("tip_text"):
+		return ""
+	return str(hud.call("tip_text")) if bool(hud.call("tip_showing")) else ""
 
 
 ## Click through the conversation that is open, and stop when IT finishes: one more E would

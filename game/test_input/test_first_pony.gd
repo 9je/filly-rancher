@@ -121,6 +121,13 @@ func _scoop_one(beam: Node) -> void:
 	attempts += 1
 	note("attempt %d at %.1f m, pony state %s" % [attempts, pony.global_position.distance_to(player.global_position), pony.get("state")])
 	await look_at_point(pony.global_position + Vector3(0, 0.6, 0), true, 0.02, 60)
+	# Evidence: lined up on her, before the button: her target ring and the Scoop line.
+	await wait(0.3)
+	var shots := ProjectSettings.globalize_path("res://").path_join("../build/playtest_evidence/first_pony")
+	DirAccess.make_dir_recursive_absolute(shots)
+	root.get_texture().get_image().save_png(shots.path_join("scoop_tip.png"))
+	note("screenshot %s (beam target %s, she is %s, tip '%s')" % [shots.path_join("scoop_tip.png"),
+		beam.call("get_target"), pony.name if is_instance_valid(pony) else "gone", hud_tip()])
 	RI.press(_beam_action)
 	var hold := 0.0
 	var ever_held := false
@@ -132,6 +139,9 @@ func _scoop_one(beam: Node) -> void:
 		ever_held = ever_held or bool(beam.call("is_holding"))
 		if bool(beam.call("is_secured")):
 			await physics(6)
+			break
+		if not is_instance_valid(pony):
+			# Caught: the Scoop took her body (a freed node has no name to report).
 			break
 		if ever_held and not bool(beam.call("is_holding")):
 			_why = "she got out of the beam after %.1fs (%s, loss %d)" % [hold, pony.name,

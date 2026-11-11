@@ -24,6 +24,11 @@ func _play() -> void:
 		return
 	var hud: Node = ranch.get_node_or_null(^"HUD")
 	var card: Control = hud.call("catch_card")
+	# The card waits for her flight into the Scoop (CatchCard.entrance_delay) before it comes.
+	var tw := 0.0
+	while card != null and not bool(card.call("is_showing")) and tw < 2.0:
+		await wait(0.05)
+		tw += 0.05
 	var shots := ProjectSettings.globalize_path("res://").path_join("../build/playtest_evidence/round2")
 	DirAccess.make_dir_recursive_absolute(shots)
 	root.get_texture().get_image().save_png(shots.path_join("catch_card.png"))
@@ -33,9 +38,14 @@ func _play() -> void:
 	# THE CENTRE MOMENT COMES FIRST (Fable AAA round 1): the card is meant to be over the
 	# middle of the screen for its first second and a half. The checks below are about where
 	# it settles, so they wait for it to fly to its corner.
-	while bool(card.call("in_moment")):
-		await process_frame
-	await wait(CatchCard.FLY + 0.1)
+	# A DRIFTER'S CARD IS LIGHT (P9 item 28): no centre moment, it slides straight into its
+	# corner, holds CatchCard.LIGHT_HOLD seconds and goes. It is read once it has slid in.
+	if bool(card.call("is_light")):
+		await wait(CatchCard.SLIDE_IN + 0.1)
+	else:
+		while bool(card.call("in_moment")):
+			await process_frame
+		await wait(CatchCard.FLY + 0.1)
 	if not check(bool(card.call("has_portrait")), "the card has no portrait of her"):
 		return
 	var traits: Array = card.call("shown_traits")
@@ -56,7 +66,7 @@ func _play() -> void:
 		return
 	if not check(not r.intersects(bag), "the card covers the saddlebag (%s)" % r):
 		return
-	await wait(0.8)
+	await wait(0.3)
 	root.get_texture().get_image().save_png(shots.path_join("catch_card_settled.png"))
 	super.ok("%s; then a card with her portrait, %d trait chips, clear of the crosshair and bag"
 		% [_verdict, traits.size()])
