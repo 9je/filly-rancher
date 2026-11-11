@@ -9,6 +9,7 @@ const FACTORY := "res://world/factory.tscn"
 var out := ""
 var mode := "reveal"
 var choice_shot := false
+var rooms_shot: Array[String] = []
 
 
 func _initialize() -> void:
@@ -89,6 +90,10 @@ func _run() -> void:
 				await _shot("reveal_scoop_up", 30)
 				break
 			if String(g.get("kind", "")) == "area":
+				var area := String(g.get("area", ""))
+				if area in ["factory_classroom", "factory_giftshop", "factory_gallery"] and not (area in rooms_shot):
+					rooms_shot.append(area)
+					await _shot("reveal_room_before_" + area.trim_prefix("factory_"), 30)
 				player.global_position = (g["at"] as Vector3) + Vector3(0, 0.3, 0)
 			await process_frame
 		print("GOAL ", scene.get("goal"))

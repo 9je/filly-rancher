@@ -104,6 +104,15 @@ func _piece(file: String, parent: Node3D, at: Vector3, yaw_deg: float = 0.0, s: 
 	return inst
 
 
+## Paint `design` onto a poster piece (item 8; world/factory_poster.gd).
+func _poster(piece: Node3D, design: int) -> void:
+	if piece == null:
+		return
+	var p: Node3D = (load("res://world/factory_poster.gd") as GDScript).new()
+	p.set("design", design)
+	piece.add_child(p)
+
+
 ## THE FURNITURE IS SOLID (playtest 2026-11-10 item 13: "i can walk through almost all props
 ## up here"). Pieces a pony stands beside, not under or on: one box over their meshes.
 const SOLID_PIECES := ["fx_canisters", "fx_column", "fx_console", "fx_counter", "fx_crates",
@@ -173,25 +182,58 @@ func _floor(room: Node3D, spec: Dictionary) -> void:
 	room.add_child(body)
 
 
+## THE PUBLIC ROOMS HAVE COLOUR (playtest 2026-11-10 item 19: "almost all flat white and grey
+## -- no colour or rainbow anywhere in the Rainbow Factory"). Each party room's pale wall
+## surfaces take a pastel of its own; the metal rooms behind the staff door stay grey, which
+## is the point of them.
+const WALL_TINT := {
+	&"landing": Color(0.76, 0.86, 1.0),
+	&"welcome": Color(1.0, 0.78, 0.86),
+	&"classroom": Color(0.76, 0.94, 0.82),
+	&"giftshop": Color(1.0, 0.91, 0.66),
+}
+
+
+func _tint(piece: Node3D, room_name: StringName) -> void:
+	if piece == null or not WALL_TINT.has(room_name):
+		return
+	var tint: Color = WALL_TINT[room_name]
+	for m in piece.find_children("*", "MeshInstance3D", true, false):
+		var mi := m as MeshInstance3D
+		if mi.mesh == null:
+			continue
+		for i in mi.mesh.get_surface_count():
+			var mat := mi.get_active_material(i) as ShaderMaterial
+			if mat == null:
+				continue
+			var a = mat.get_shader_parameter(&"albedo")
+			if not (a is Color) or (a as Color).get_luminance() < 0.75:
+				continue
+			var mine := mat.duplicate() as ShaderMaterial
+			mine.set_shader_parameter(&"albedo", (a as Color) * tint)
+			mi.set_surface_override_material(i, mine)
+
+
 func _walls(room: Node3D, spec: Dictionary, index: int) -> void:
 	var wall := "fx_wall_metal" if spec.metal else "fx_wall"
 	var half := ROOM_SIZE * 0.5
+	var rn: StringName = spec.name
 	for k in [-1, 0, 1]:
 		var along := float(k) * TILE
 		# Side walls face inward (east wall faces -X, west wall faces +X).
-		_piece(wall, room, Vector3(-half, 0, along), 90.0)
+		_tint(_piece(wall, room, Vector3(-half, 0, along), 90.0), rn)
 		# The gallery's east wall is the window onto the processing floor beside it.
-		_piece("fx_window_wall" if spec.name == &"gallery" else wall, room, Vector3(half, 0, along), -90.0)
+		_tint(_piece("fx_window_wall" if spec.name == &"gallery" else wall, room, Vector3(half, 0, along), -90.0), rn)
 	# The far wall: an arch into the next room, solid walls either side; the last room ends.
 	var last := index == ROOMS.size() - 1
 	for k in [-1, 0, 1]:
 		var file := wall
 		if k == 0 and not last:
 			file = "fx_arch"
-		_piece(file, room, Vector3(float(k) * TILE, 0, -half), 0.0)
+		_tint(_piece(file, room, Vector3(float(k) * TILE, 0, -half), 0.0), rn)
 	if index == 0:
 		for k in [-1, 1]:
-			_piece(wall, room, Vector3(float(k) * TILE, 0, half), 180.0)
+			_tint(_piece(wall, room, Vector3(float(k) * TILE, 0, half), 180.0), rn)
 	_collide_walls(room, index)
 
 
@@ -298,12 +340,14 @@ func _dress(room: Node3D, spec: Dictionary, markers: Node3D) -> void:
 			for x in [-3.5, 3.5]:
 				for z in [-3.0, 3.0]:
 					_piece("fx_column", room, Vector3(x, 0, z))
+			var n := 0
 			for z in [-2.0, 2.0]:
-				_piece("fx_poster", room, Vector3(-half + 0.35, 2.6, z), 90.0)
-				_piece("fx_poster", room, Vector3(half - 0.35, 2.6, z), -90.0)
+				_poster(_piece("fx_poster", room, Vector3(-half + 0.35, 2.6, z), 90.0), n)
+				_poster(_piece("fx_poster", room, Vector3(half - 0.35, 2.6, z), -90.0), n + 1)
+				n += 2
 			_mark(markers, "guide", Vector3(0, 0, 0))
 		&"classroom":
-			_piece("fx_poster", room, Vector3(0, 2.8, -half + 0.45), 0.0, 2.4)
+			_poster(_piece("fx_poster", room, Vector3(0, 2.8, -half + 0.45), 0.0, 2.4), 4)
 			_mark(markers, "guide", Vector3(2.0, 0, 0))
 		&"giftshop":
 			_piece("fx_counter", room, Vector3(-3.0, 0, -1.0), 90.0)

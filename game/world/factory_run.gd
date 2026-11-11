@@ -251,16 +251,17 @@ func _build() -> void:
 	env.ambient_light_color = Color(0.92, 0.9, 0.96)
 	env.ambient_light_energy = 0.28
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	env.tonemap_white = 6.0
-	env.tonemap_exposure = 0.78
+	# Less milk (item 19): a lower white point for contrast, and a thinner, warmer haze.
+	env.tonemap_white = 3.2
+	env.tonemap_exposure = 0.82
 	env.ssao_enabled = true
 	env.ssao_intensity = 1.2
 	env.glow_enabled = true
 	env.glow_intensity = 0.4
 	env.glow_hdr_threshold = 1.6
 	env.fog_enabled = true
-	env.fog_density = 0.006
-	env.fog_light_color = Color(0.85, 0.87, 0.95)
+	env.fog_density = 0.0025
+	env.fog_light_color = Color(0.95, 0.88, 0.9)
 	_env.environment = env
 	_env.name = "WorldEnvironment"
 	add_child(_env)
