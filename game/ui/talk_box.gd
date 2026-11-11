@@ -24,8 +24,12 @@ const SHORT_MIN_WIDTH := 300.0
 ## The bubble's padding round its text, each side together.
 const TEXT_PAD := 52.0
 
+const FaceGuardScript := preload("res://ui/face_guard.gd")
+
 var anchor: Node3D
 var camera: Camera3D
+## Which spot round the speaker's face the box took last (kept while it still covers none).
+var _spot := -1
 var outline := Color(0.55, 0.4, 0.75)
 var _panel: PanelContainer
 var _name_tab: PanelContainer
@@ -129,6 +133,7 @@ func show_line(line: Dictionary, speaker: Node3D, color: Color) -> void:
 func close() -> void:
 	visible = false
 	anchor = null
+	_spot = -1
 
 
 func _style() -> void:
@@ -201,23 +206,42 @@ func _place() -> void:
 	var size := _panel.get_combined_minimum_size()
 	size.x = clampf(size.x, _panel.custom_minimum_size.x, MAX_WIDTH)
 	_panel.size = size
-	var at := Vector2(vp.x * 0.5, vp.y * 0.2)
-	if anchor != null and is_instance_valid(anchor) and camera != null:
-		var head := anchor.global_position + Vector3(0, 2.3, 0)
-		if not camera.is_position_behind(head):
-			at = camera.unproject_position(head)
 	# The laid-out size if the box has grown past its minimum (wrapped text), so the clamp
 	# below holds the box it actually draws.
 	size = Vector2(maxf(size.x, _panel.size.x), maxf(size.y, _panel.size.y))
-	var pos := at - Vector2(size.x * 0.5, size.y + 24.0)
 	# ON SCREEN AND UNDER THE OBJECTIVE BANNER (P9, playtest 2026-11-10 item 39: the box
 	# covered the banner and ran off the screen edge). The top band (compass, banner) is kept
 	# clear, and the box never crosses an edge whatever the speaker's head is doing.
 	var top := vp.y * TOP_CLEAR
-	pos.x = clampf(pos.x, EDGE, maxf(EDGE, vp.x - size.x - EDGE))
-	pos.y = clampf(pos.y, top, maxf(top, vp.y - size.y - 40.0))
-	_panel.position = pos
-	_name_tab.position = pos + Vector2(26, -_name_tab.get_combined_minimum_size().y * 0.6)
+	# BESIDE HER, NEVER ON HER FACE (round 3: with her head high in the frame the clamp pushed
+	# the box down over it, as at the Factory's offer). Spots round her face: above, to the
+	# right, to the left, below; the first that covers no face (hers or the player's) wins.
+	var face := FaceGuardScript.face_rect(camera, anchor) if anchor != null and is_instance_valid(anchor) else Rect2()
+	var spots: Array[Rect2] = []
+	if face.has_area():
+		var fc := face.get_center()
+		var gap := 26.0
+		spots.append(Rect2(Vector2(fc.x - size.x * 0.5, face.position.y - size.y - gap), size))
+		spots.append(Rect2(Vector2(face.end.x + gap, fc.y - size.y * 0.5), size))
+		spots.append(Rect2(Vector2(face.position.x - size.x - gap, fc.y - size.y * 0.5), size))
+		spots.append(Rect2(Vector2(fc.x - size.x * 0.5, face.end.y + gap), size))
+	else:
+		spots.append(Rect2(Vector2(vp.x * 0.5 - size.x * 0.5, top), size))
+	for i in spots.size():
+		spots[i] = FaceGuardScript.clamp_rect(spots[i], Rect2(Vector2.ZERO, vp - Vector2(0, 8.0)),
+			EDGE, top)
+	var faces: Array[Rect2] = []
+	if face.has_area():
+		faces.append(face)
+		# The player's own face counts for half: hers first, then the speaker's.
+		var player := FaceGuardScript.player_of(camera) if camera != null else null
+		if player != null:
+			var pf := FaceGuardScript.face_rect(camera, player)
+			if pf.has_area():
+				faces.append(pf)
+	_spot = FaceGuardScript.pick(spots, faces, _spot)
+	_panel.position = spots[_spot].position
+	_name_tab.position = _panel.position + Vector2(26, -_name_tab.get_combined_minimum_size().y * 0.6)
 
 
 func _select(i: int) -> void:

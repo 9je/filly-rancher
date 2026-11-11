@@ -74,6 +74,7 @@ extends CanvasLayer
 ## below is in those units on every screen.
 
 const PonyTraitsScript := preload("res://systems/pony_traits.gd")
+const FaceGuardScript := preload("res://ui/face_guard.gd")
 const PonyDataScript := preload("res://systems/pony_data.gd")
 const PonyInstanceScript := preload("res://systems/pony_instance.gd")
 const MagicBeamScript := preload("res://actors/player/magic_beam.gd")
@@ -335,6 +336,8 @@ func _process(delta: float) -> void:
 
 	_elapsed += delta
 	_fade_tip(delta)
+	if _prompt_card != null and _prompt_card.visible:
+		_place_prompt_card()
 
 	# See the class comment: sibling ready order is not something to depend on.
 	if _storage == null:
@@ -1954,13 +1957,33 @@ func set_prompt(text: String) -> void:
 		_place_prompt_card.call_deferred()
 
 
+## THE PROMPT NEVER SITS ON A FACE (P9, playtest 2026-11-10 item 71: Spike's prompt covered
+## his face; "Talk to Tumble" sat over the player's own pony, several times). Under the reticle
+## is where it reads best, and that is exactly where the face of whoever you are aiming at is.
+## So: spots round the reticle (under, right, left, above, then lower down), and the first that
+## covers no face on screen (ui/face_guard.gd) wins; it stays put while it still covers none.
+var _prompt_spot := -1
+
+
 func _place_prompt_card() -> void:
 	if not is_instance_valid(_prompt_card):
 		return
 	var s := _prompt_card.get_combined_minimum_size()
 	_prompt_card.size = s
-	var c := _canvas_size() * 0.5
-	_prompt_card.position = Vector2(c.x - s.x * 0.5, c.y + 58.0)
+	var vp := _canvas_size()
+	var c := vp * 0.5
+	var spots: Array[Rect2] = [
+		Rect2(Vector2(c.x - s.x * 0.5, c.y + 58.0), s),
+		Rect2(Vector2(c.x + 64.0, c.y - s.y * 0.5), s),
+		Rect2(Vector2(c.x - 64.0 - s.x, c.y - s.y * 0.5), s),
+		Rect2(Vector2(c.x - s.x * 0.5, c.y - 58.0 - s.y), s),
+		Rect2(Vector2(c.x - s.x * 0.5, vp.y * 0.74), s),
+		Rect2(Vector2(c.x - s.x * 0.5, vp.y * 0.22), s),
+	]
+	var cam := get_viewport().get_camera_3d() if is_inside_tree() else null
+	var faces: Array[Rect2] = FaceGuardScript.faces(get_tree(), cam) if cam != null else [] as Array[Rect2]
+	_prompt_spot = FaceGuardScript.pick(spots, faces, _prompt_spot)
+	_prompt_card.position = spots[_prompt_spot].position
 
 
 ## The prompt as drawn: [words before the key, the key, the verb after it].

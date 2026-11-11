@@ -20,6 +20,7 @@ const RunnerScript := preload("res://systems/dialogue_runner.gd")
 const TalkBoxScript := preload("res://ui/talk_box.gd")
 const BabbleScript := preload("res://systems/babble.gd")
 const InteractionScript := preload("res://world/interaction.gd")
+const FaceGuardScript := preload("res://ui/face_guard.gd")
 
 ## Where each character stands by default (ranch space), and the way she faces (degrees).
 const SPOTS := {
@@ -194,6 +195,60 @@ func _keep_talk_clear() -> void:
 		BodySpaceScript.TALK_RADIUS, [player, speaker])
 
 
+## THE SPEAKER IS NOT HIDDEN BEHIND THE PLAYER (P9, playtest 2026-11-10 item 39: "the speaker
+## is hidden behind your pony while talking"). E is pressed facing her, so the lens, the
+## player and the speaker are often on one line and the player's own body covers her. While
+## her face is over the player's body on screen (and she is the further of the two), the lens
+## swings round the player, a little each frame, until she stands clear beside her; at most
+## NUDGE_MAX in all, so it never turns the view away from the scene.
+const NUDGE_RATE := deg_to_rad(70.0)
+const NUDGE_MAX := deg_to_rad(40.0)
+## Half the player's body width on screen, as metres either side of her centre.
+const BODY_HALF_W := 0.55
+var _nudged := 0.0
+
+
+func _keep_speaker_in_view(delta: float) -> void:
+	var who: StringName = runner.current().get("who", _speaker)
+	var n := npc(who)
+	if n == null:
+		n = npc(_speaker)
+	var cam := camera if camera != null else (get_viewport().get_camera_3d() if is_inside_tree() else null)
+	if n == null or cam == null or player == null or n == player:
+		return
+	var rig := player.get_node_or_null(^"CameraPivot/CameraRig")
+	if rig == null or not rig.has_method(&"add_look_delta") or absf(_nudged) >= NUDGE_MAX:
+		return
+	var face := FaceGuardScript.face_rect(cam, n)
+	var body := player_screen_rect(cam, player)
+	if not face.has_area() or not body.has_area() or not face.intersects(body):
+		return
+	if cam.global_position.distance_to(n.global_position) <= cam.global_position.distance_to(player.global_position):
+		return
+	# Swinging the lens round her by +yaw moves what stands beyond her to the right on screen;
+	# push the speaker the way she already leans (right if dead behind), so the turn is short.
+	var dx := face.get_center().x - body.get_center().x
+	var dir := 1.0 if dx >= 0.0 else -1.0
+	var step := minf(NUDGE_RATE * delta, NUDGE_MAX - absf(_nudged))
+	rig.call(&"add_look_delta", -dir * step, 0.0)
+	_nudged += dir * step
+
+
+## The player's body on screen: hooves to ears, BODY_HALF_W either side.
+static func player_screen_rect(cam: Camera3D, who: Node3D) -> Rect2:
+	var foot := who.global_position
+	var top := foot + Vector3.UP * 1.9
+	if cam.is_position_behind(foot) or cam.is_position_behind(top):
+		return Rect2()
+	var a := cam.unproject_position(foot)
+	var b := cam.unproject_position(top)
+	var mid := cam.unproject_position(foot + Vector3.UP * 0.95)
+	var hw := absf(cam.unproject_position(foot + Vector3.UP * 0.95
+		+ cam.global_transform.basis.x * BODY_HALF_W).x - mid.x)
+	var y0 := minf(a.y, b.y)
+	return Rect2(Vector2(mid.x - hw, y0), Vector2(hw * 2.0, absf(a.y - b.y)))
+
+
 ## Interaction candidates: the nearest character in reach, as a TALK action.
 func candidates(at: Vector3) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
@@ -357,7 +412,9 @@ func _process(delta: float) -> void:
 	_update_news(delta)
 	_keep_talk_clear()
 	if not is_talking():
+		_nudged = 0.0
 		return
+	_keep_speaker_in_view(delta)
 	var who: StringName = runner.current().get("who", _speaker)
 	var n := npc(who)
 	if n != null:
