@@ -288,6 +288,9 @@ func stumble_slow() -> float:
 
 var _anim: AnimationPlayer
 var _hair: SpringBoneSimulator3D = null
+## Her tail's run carriage (actors/pony/tail_carry.gd, item 76), ahead of the hair springs.
+var _tail: SkeletonModifier3D = null
+const TailCarryScript := preload("res://actors/pony/tail_carry.gd")
 var _visual_yaw := 0.0
 var _coyote_left := 0.0
 var _jump_buffered := 0.0
@@ -814,6 +817,7 @@ func _physics_process(delta: float) -> void:
 	_update_animation(ground_speed, delta)
 	if _hair != null:
 		_hair.influence = PonyRigScript.influence_for_speed(ground_speed)
+	_update_tail(ground_speed)
 	if _anim != null and step_on_clip(_anim.current_animation,
 			_anim.current_animation_position, ground_speed, is_on_floor()) \
 			and not (_last_footfall_rear and _anim.current_animation == &"gallop"):
@@ -824,6 +828,19 @@ func _physics_process(delta: float) -> void:
 			REAR_ACCENT_DB if _last_footfall_rear else 0.0])
 		hoofstep.emit(surface, _last_footfall_rear)
 	_record_tick()
+
+
+## The tail streams out behind her as she speeds up and rises and falls once a stride, on the
+## clip's own phase (item 76: at a run it hung straight down as one rigid mass).
+func _update_tail(ground_speed: float) -> void:
+	if _tail == null:
+		return
+	var t := clampf((ground_speed - PonyRigScript.SPEED_PIN_START)
+		/ (RUN_SPEED - PonyRigScript.SPEED_PIN_START), 0.0, 1.0)
+	_tail.set(&"carry", t * t * (3.0 - 2.0 * t))
+	if _anim != null and _anim.current_animation != &"":
+		var length := maxf(0.001, _anim.current_animation_length)
+		_tail.set(&"phase", fposmod(_anim.current_animation_position / length, 1.0))
 
 
 ## Basis whose -Z is "forward" for input purposes: the current camera's facing,
@@ -963,6 +980,7 @@ func _build_visuals(mane_style: int = 0, donor: StringName = &"") -> void:
 	# Re-found on every rebuild rather than kept: apply_look() frees the whole body when the
 	# mane style changes, and a stale simulator reference would be a freed node.
 	_hair = PonyRigScript.hair_simulator(pony)
+	_tail = TailCarryScript.attach(pony)
 	# HER POSE AND HER HAIR MOVE ON EVERY DRAWN FRAME (item 9; playtest 2026-11-05: "your tail
 	# bugs out as you walk ... it like stutters between frames"). PT11 put both on the physics
 	# tick, which stopped the springs being thrown but left the tail moving only 60 times a
