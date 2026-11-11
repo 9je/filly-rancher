@@ -516,6 +516,16 @@ func apply_graphics(viewport: Viewport, with_window := true) -> void:
 	# P9 item 57: High is the project's own 8192 (P8 S4 chose it for clean hard edges); this
 	# preset used to cut it to 4096, which doubled every stair on a shadow's edge at 1440p.
 	RenderingServer.directional_shadow_atlas_set_size([2048, 4096, 8192][quality], true)
+	# P9 item 57, round 4: the stair left on a long grazing edge (3-4 px at 1440p at dusk) is
+	# the sun's texel stretched by its low angle, so no map size or split removes it (40 m and
+	# tighter splits were measured: no better). High filters the sun's edge instead, at the
+	# HIGH soft quality: its many samples average out, so with the toon step's 0.3 window
+	# the edge comes out a clean 2 px ramp, not the salt-and-pepper the VERY LOW filter gave
+	# in P8 S4 (project.godot keeps 0 for Low and Medium). The ranch's sun sets the radius
+	# (shadow_blur); a light that keeps blur 0 stays hard.
+	RenderingServer.directional_soft_shadow_filter_set_quality(
+		[RenderingServer.SHADOW_QUALITY_HARD, RenderingServer.SHADOW_QUALITY_HARD,
+		RenderingServer.SHADOW_QUALITY_SOFT_HIGH][quality])
 	var tree := viewport.get_tree()
 	var scene := tree.current_scene if tree != null else null
 	if scene != null:

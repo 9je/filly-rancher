@@ -5,6 +5,7 @@ extends SceneTree
 ##      --shot=name,px,pz,tx,tz[,zoom[,pitch[,ty]]] ...   (zoom: rig distance, pitch: degrees)
 ##      a shot named *_beam holds the beam (right mouse) through it
 ##      [--walk=secs]  hold move_forward that long before each shot (her real stride)
+##      [--maxd=m] [--splits=a,b,c]  the sun's shadow max distance and split ratios (item 57)
 ## The ranch's own --phase=/--weather= pin the sky.
 const Boot := preload("res://scenes/test/laneb_boot.gd")
 var out := ""
@@ -14,6 +15,8 @@ var walk := 0.0
 var atlas := 0
 var softq := -1
 var blur := -1.0
+var maxd := -1.0
+var splits: PackedStringArray = []
 
 
 func _initialize() -> void:
@@ -31,6 +34,10 @@ func _initialize() -> void:
 			softq = int(a.substr(8))
 		elif a.begins_with("--blur="):
 			blur = float(a.substr(7))
+		elif a.begins_with("--maxd="):
+			maxd = float(a.substr(7))
+		elif a.begins_with("--splits="):
+			splits = a.substr(9).split(",")
 		elif a.begins_with("--walk="):
 			walk = float(a.substr(7))
 	DirAccess.make_dir_recursive_absolute(out)
@@ -48,6 +55,14 @@ func _run() -> void:
 		RenderingServer.directional_soft_shadow_filter_set_quality(softq)
 	if blur >= 0.0:
 		(ranch.get_node(^"Sun") as DirectionalLight3D).shadow_blur = blur
+	var sun := ranch.get_node(^"Sun") as DirectionalLight3D
+	if maxd > 0.0:
+		sun.directional_shadow_max_distance = maxd
+	if splits.size() == 3:
+		sun.directional_shadow_split_1 = float(splits[0])
+		sun.directional_shadow_split_2 = float(splits[1])
+		sun.directional_shadow_split_3 = float(splits[2])
+	print("SUN max=", sun.directional_shadow_max_distance, " splits=", sun.directional_shadow_split_1, "/", sun.directional_shadow_split_2, "/", sun.directional_shadow_split_3)
 	print("VIEWPORT msaa=", root.msaa_3d, " scale=", root.scaling_3d_scale, " size=", root.get_visible_rect().size)
 	for s in shots:
 		var at := Vector3(float(s[1]), 0.0, float(s[2]))
