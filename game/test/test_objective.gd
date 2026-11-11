@@ -75,7 +75,8 @@ func test_the_rescue_path_is_static_then_the_pylons() -> void:
 
 
 func test_an_ending_or_a_state_it_does_not_know_shows_nothing() -> void:
-	assert_true(ObjectiveScript.current(_s({"ending": "placement"})).is_empty())
+	assert_eq(String(ObjectiveScript.current(_s({"ending": "placement"})).get("id", "")), "free_play",
+		"after an ending the card says the story is complete (playtest 2026-11-10 item 24)")
 	assert_true(ObjectiveScript.current(_s({"chapter": 3, "path": "nonsense",
 		"flags": ["has_scoop", "reveal_done"]})).is_empty())
 	assert_true(ObjectiveScript.current({}).is_empty(), "an empty state from an old save")

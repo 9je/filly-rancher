@@ -25,8 +25,11 @@ const CLIMAX_PYLONS := 4
 
 
 static func current(s: Dictionary) -> Dictionary:
-	if s.is_empty() or not s.has("chapter") or String(s.get("ending", "")) != "":
+	if s.is_empty() or not s.has("chapter"):
 		return {}
+	# AFTER AN ENDING, SAY SO (playtest 2026-11-10 item 24: "idk if theres more to do").
+	if String(s.get("ending", "")) != "":
+		return _o(&"free_play", &"", PlaceSign.Icon.HOUSE, "Story complete: the valley is yours")
 	var flags: Array = s.get("flags", [])
 	var path := String(s.get("path", ""))
 	if not flags.has("has_scoop"):

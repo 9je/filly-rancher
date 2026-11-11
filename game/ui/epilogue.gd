@@ -26,6 +26,12 @@ var _title: Label
 var _letter: PanelContainer
 var _credits: VBoxContainer
 var _hint: Label
+var _sub: Label
+var _results: PanelContainer
+## SECONDS EACH STAGE STAYS BEFORE A PRESS MOVES IT ON (item 24: a key still held from the
+## lever, or the move keys, skipped the whole ending in a blink). Only the confirm keys count.
+const STAGE_MIN_SECONDS := 2.5
+var _stage_t := 0.0
 ## The one tween at a time: a quick reader's clicks cannot leave two fighting one property.
 var _tw: Tween
 var _prev_mouse := Input.MOUSE_MODE_VISIBLE
@@ -50,12 +56,40 @@ func _ready() -> void:
 	_title.text = EndingsScript.title(ending)
 	_title.modulate.a = 0.0
 	add_child(_title)
+	_sub = Label.new()
+	_sub.set_anchors_preset(Control.PRESET_CENTER)
+	_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_sub.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_sub.position.y += 70
+	MenuStyleScript.style_label(_sub, 30, MenuStyleScript.COLOR_NAME)
+	var res := EndingsScript.results(ending, lines.get("input", {}), int(lines.get("seen", 1)))
+	_sub.text = "The End  -  " + res[0]
+	for lab in [_title, _sub]:
+		lab.add_theme_color_override(&"font_outline_color", Color(0.17, 0.09, 0.2, 0.95))
+		lab.add_theme_constant_override(&"outline_size", 14 if lab == _title else 9)
+	_sub.modulate.a = 0.0
+	add_child(_sub)
+	# On paper, like the letter: never bare words over the valley.
+	_results = PanelContainer.new()
+	_results.add_theme_stylebox_override(&"panel", _paper())
+	_results.set_anchors_preset(Control.PRESET_CENTER)
+	_results.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_results.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_results.custom_minimum_size = Vector2(620, 0)
+	var rl := Label.new()
+	rl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rl.add_theme_color_override(&"font_color", MenuStyleScript.COLOR_INK)
+	rl.add_theme_font_size_override(&"font_size", MenuStyle.font_px(26))
+	rl.text = "\n".join(res)
+	_results.add_child(rl)
+	_results.visible = false
+	add_child(_results)
 	_hint = Label.new()
 	_hint.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	_hint.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_hint.position.y -= 56
 	MenuStyleScript.style_label(_hint, MenuStyleScript.FOOTER_SIZE, MenuStyleScript.COLOR_DIM)
-	_hint.text = "click or press any key"
+	_hint.text = "click to continue"
 	_hint.modulate.a = 0.0
 	add_child(_hint)
 	_build_letter()
@@ -64,8 +98,9 @@ func _ready() -> void:
 	_prev_mouse = Input.mouse_mode
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	var t := _tween()
-	t.tween_property(_veil, "color:a", 0.18, 2.5)
+	t.tween_property(_veil, "color:a", 0.5, 2.5)
 	t.parallel().tween_property(_title, "modulate:a", 1.0, 2.5)
+	t.parallel().tween_property(_sub, "modulate:a", 1.0, 2.5)
 	t.tween_property(_hint, "modulate:a", 1.0, 1.0)
 
 
@@ -111,6 +146,7 @@ func _orbit(t: float) -> void:
 
 func _process(delta: float) -> void:
 	_t += delta
+	_stage_t += delta
 	_orbit(_t)
 	if _credits.visible:
 		_credits.position.y -= delta * 46.0
@@ -123,12 +159,14 @@ func _process(delta: float) -> void:
 func _input(event: InputEvent) -> void:
 	if _stage < 0:
 		return
-	var pressed: bool = (event is InputEventKey and event.pressed and not event.echo) \
-		or (event is InputEventMouseButton and event.pressed) \
-		or (event is InputEventJoypadButton and event.pressed)
-	if not pressed:
-		return
 	get_viewport().set_input_as_handled()
+	if event.is_echo() or not event.is_pressed():
+		return
+	var confirm: bool = (event is InputEventMouseButton and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT) \
+		or event.is_action_pressed(&"ui_accept") or event.is_action_pressed(&"interact") \
+		or event.is_action_pressed(&"ui_cancel")
+	if not confirm or _stage_t < STAGE_MIN_SECONDS:
+		return
 	advance()
 
 
@@ -137,16 +175,24 @@ func advance() -> void:
 	if _stage < 0:
 		return
 	_stage += 1
+	_stage_t = 0.0
 	match _stage:
 		1:
 			var t := _tween()
 			t.tween_property(_title, "modulate:a", 0.0, 0.6)
+			t.parallel().tween_property(_sub, "modulate:a", 0.0, 0.6)
 			_letter.visible = true
 			_letter.modulate.a = 0.0
 			t.tween_property(_letter, "modulate:a", 1.0, 0.8)
 		2:
+			var tr := _tween()
+			tr.tween_property(_letter, "modulate:a", 0.0, 0.6)
+			_results.visible = true
+			_results.modulate.a = 0.0
+			tr.tween_property(_results, "modulate:a", 1.0, 0.8)
+		3:
 			var t2 := _tween()
-			t2.tween_property(_letter, "modulate:a", 0.0, 0.6)
+			t2.tween_property(_results, "modulate:a", 0.0, 0.6)
 			t2.parallel().tween_property(_veil, "color:a", 0.55, 0.6)
 			_credits.visible = true
 			_credits.position.y = get_viewport().get_visible_rect().size.y
@@ -167,6 +213,21 @@ func _finish() -> void:
 		_cam.queue_free()
 	done.emit()
 	queue_free()
+
+
+func _paper() -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = MenuStyleScript.COLOR_PAPER
+	box.border_color = MenuStyleScript.COLOR_PAPER_EDGE
+	box.set_border_width_all(3)
+	box.set_corner_radius_all(10)
+	box.content_margin_left = 48
+	box.content_margin_right = 48
+	box.content_margin_top = 36
+	box.content_margin_bottom = 36
+	box.shadow_color = Color(0, 0, 0, 0.35)
+	box.shadow_size = 18
+	return box
 
 
 func _build_letter() -> void:

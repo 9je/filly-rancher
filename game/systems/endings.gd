@@ -75,3 +75,31 @@ static func tone(ending: StringName) -> Dictionary:
 		PLACEMENT:
 			return {"music": &"ending_sad", "dread": 1.0, "free": false}
 	return {"music": &"day", "dread": 0.0, "free": false}
+
+
+## THE RESULTS CARD (playtest 2026-11-10 item 24: "didnt really show its an ending ... idk if
+## theres more to do"). Which ending this is, how many there are, and for the two that have a
+## better sibling, what that one asks for, against what this save did. `input` is
+## StoryV1.ending_input(); `seen` how many endings this save has found.
+static func results(ending: StringName, input: Dictionary, seen: int) -> Array[String]:
+	var out: Array[String] = []
+	out.append("Ending %d of %d: %s" % [ALL.find(ending) + 1, ALL.size(), title(ending)])
+	out.append("Endings found: %d of %d" % [maxi(seen, 1), ALL.size()])
+	var net := int(input.get("rescued", 0)) - int(input.get("delivered", 0))
+	match ending:
+		HALF_LIGHT:
+			out.append("")
+			out.append("For Lights Out:")
+			out.append("rescue %d ponies (you: %d)" % [LIGHTS_OUT_RESCUES, maxi(net, 0)])
+			out.append("three friends at your side (you: %d)" % int(input.get("allies", 0)))
+			out.append("find Clover (%s)" % ("found" if bool(input.get("clover", false)) else "not found"))
+		BRIGHTEST_RAINBOW:
+			out.append("")
+			out.append("For Gray Gold:")
+			out.append("quietly save %d ponies on the way (you: %d)" % [GRAY_GOLD_RESCUES, int(input.get("rescued", 0))])
+		LIGHTS_OUT:
+			out.append("")
+			out.append("The brightest ending there is.")
+	out.append("")
+	out.append("The valley stays open: play on.")
+	return out

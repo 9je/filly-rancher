@@ -10083,7 +10083,9 @@ func _epilogue_lines(ending: StringName) -> Dictionary:
 		if bool(d.get("after_reveal", false)) and lost.size() < 8:
 			lost.append(str(d.get("name", "")))
 	return {"rescued": int(story.get_var("rescued", 0)), "delivered": StoryV1Script.delivered_after_reveal(book),
-		"lost": lost, "rank": PathRulesScript.rank_name(story), "allies": StoryV1Script.allies(story)}
+		"lost": lost, "rank": PathRulesScript.rank_name(story), "allies": StoryV1Script.allies(story),
+		"input": StoryV1Script.ending_input(story, book),
+		"seen": (story.get_var("endings_seen", []) as Array).size()}
 
 
 ## Back down from a climax: the ending it earned plays once.
