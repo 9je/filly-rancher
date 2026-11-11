@@ -66,6 +66,7 @@ const PRIORITY: Array[int] = [Kind.PLOT_BUILD, Kind.PEN_MOVE_IN, Kind.PEN_PLAY, 
 const STATION_PROMPTS := {
 	"cage": "chips",
 	"slots": "play slots",
+	"slots_rush": "play Rainbow Rush",
 	"wheel": "play the wheel",
 	"blackjack": "play blackjack",
 	"racing": "bet on races",

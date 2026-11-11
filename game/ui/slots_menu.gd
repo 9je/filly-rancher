@@ -25,6 +25,17 @@ extends "res://ui/casino_table.gd"
 ## spin count; the symbol itself is ranch.gd's roll.
 
 const SlotsScript := preload("res://systems/slots.gd")
+const SlotsRushScript := preload("res://systems/slots_rush.gd")
+## WHICH MACHINE (owner 2026-11-11: "i wanted 2 slot machines"): 0 the classic row along the
+## wall, 1 Rainbow Rush on the island. Everything the menu draws or settles reads `rules`.
+var machine := 0
+var rules: GDScript = SlotsScript
+
+
+func open_machine(m: int) -> bool:
+	machine = m
+	rules = SlotsRushScript if m == 1 else SlotsScript
+	return open()
 
 const TITLE := "Slots"
 
@@ -120,7 +131,7 @@ func _ready() -> void:
 		return
 	# THE WINDOWS CLIP. One Control per reel with clip_contents on, drawn after the stage, so a
 	# symbol rolling past the top or bottom edge is cut off by the engine, not by arithmetic.
-	for reel: int in SlotsScript.REELS:
+	for reel: int in rules.REELS:
 		var window := Control.new()
 		window.name = "Reel%d" % reel
 		window.clip_contents = true
@@ -142,7 +153,7 @@ func _ready() -> void:
 
 
 func title_text() -> String:
-	return TITLE
+	return "Rainbow Rush" if machine == 1 else TITLE
 
 
 func stage_size() -> Vector2:
@@ -316,13 +327,13 @@ func _spring_lever() -> void:
 # --- the spin ---------------------------------------------------------------------------------
 
 func reel_position(index: int) -> float:
-	return _reel_pos[clampi(index, 0, SlotsScript.REELS - 1)]
+	return _reel_pos[clampi(index, 0, rules.REELS - 1)]
 
 
 ## The three symbols a window shows, top to bottom, read off the live reel position: what the
 ## drawing draws, for the tests to ask.
 func window_symbols(reel: int) -> Array[int]:
-	var strip: Array[int] = SlotsScript.reel_strip(reel)
+	var strip: Array[int] = rules.reel_strip(reel)
 	var at: int = roundi(_reel_pos[reel])
 	return [strip[posmod(at + 1, strip.size())], strip[posmod(at, strip.size())],
 		strip[posmod(at - 1, strip.size())]]
@@ -331,7 +342,7 @@ func window_symbols(reel: int) -> Array[int]:
 ## The symbol on the payline of every reel, left to right.
 func payline_symbols() -> Array[int]:
 	var out: Array[int] = []
-	for reel: int in SlotsScript.REELS:
+	for reel: int in rules.REELS:
 		out.append(window_symbols(reel)[1])
 	return out
 
@@ -344,10 +355,10 @@ func shown_chips() -> int:
 ## Slots.spin() and settled the win by the time this is called; `reels` is that roll. A symbol
 ## that is not on the machine is a still frame: this arrives over a dynamic call().
 func show_spin(reels: Array[int], won: int, _stake_played: int) -> void:
-	if reels.size() != SlotsScript.REELS:
+	if reels.size() != rules.REELS:
 		return
 	for symbol: int in reels:
-		if symbol < 0 or symbol >= SlotsScript.SYMBOL_NAMES.size():
+		if symbol < 0 or symbol >= rules.SYMBOL_NAMES.size():
 			return
 	if _tween != null and _tween.is_valid():
 		_tween.kill()
@@ -356,7 +367,7 @@ func show_spin(reels: Array[int], won: int, _stake_played: int) -> void:
 	_won = maxi(0, won)
 	_held_chips = maxi(0, _purse() - _won)
 	_flash = 0.0
-	for reel: int in SlotsScript.REELS:
+	for reel: int in rules.REELS:
 		_reel_prev[reel] = _reel_pos[reel]
 		_reel_landed[reel] = true
 	_tween = create_tween()
@@ -364,8 +375,8 @@ func show_spin(reels: Array[int], won: int, _stake_played: int) -> void:
 	_tween.tween_property(self, "_lever", 1.0, LEVER_DROP_SECONDS)
 	_tween.tween_property(self, "_lever", 0.0, LEVER_RISE_SECONDS) \
 		.set_delay(LEVER_DROP_SECONDS)
-	var size: float = float(SlotsScript.REEL_SIZE)
-	for reel: int in SlotsScript.REELS:
+	var size: float = float(rules.REEL_SIZE)
+	for reel: int in rules.REELS:
 		var target: float = float(_stop_for(reel, reels[reel]))
 		var landing: float = LAND_FIRST + LAND_STAGGER * float(reel)
 		var run_to: float = _reel_pos[reel] + float(SPIN_TURNS) * size
@@ -392,7 +403,7 @@ func show_spin(reels: Array[int], won: int, _stake_played: int) -> void:
 		_tween.tween_property(self, "_flash", 1.0, 0.12)
 		_tween.tween_property(self, "_flash", 0.0, WIN_FLASH_SECONDS)
 	_tween.tween_callback(func() -> void:
-		for reel: int in SlotsScript.REELS:
+		for reel: int in rules.REELS:
 			_reel_pos[reel] = fposmod(_reel_pos[reel], size)
 		_spinning = false
 		_fit_stake()
@@ -446,7 +457,7 @@ func _jackpot() -> void:
 ## symbol shows the same payline; which one walks with the spin count and the reel, so the
 ## neighbours above and below vary the way a real machine's do.
 func _stop_for(reel: int, symbol: int) -> int:
-	var strip: Array[int] = SlotsScript.reel_strip(reel)
+	var strip: Array[int] = rules.reel_strip(reel)
 	var places: Array[int] = []
 	for i: int in strip.size():
 		if strip[i] == symbol:
@@ -473,12 +484,12 @@ func _process(delta: float) -> void:
 
 ## How fast each reel is rolling, for the blur, and the landing pops fading.
 func _measure_reels(delta: float) -> void:
-	for reel: int in SlotsScript.REELS:
+	for reel: int in rules.REELS:
 		var pos: float = _reel_pos[reel]
 		if delta > 0.0:
 			# The wrap back onto the strip after a spin is a jump of whole turns, not motion:
 			# measured the short way round, it reads as standing still.
-			var size: float = float(SlotsScript.REEL_SIZE)
+			var size: float = float(rules.REEL_SIZE)
 			var moved: float = fposmod(pos - _reel_seen[reel] + size * 0.5, size) - size * 0.5
 			_reel_speed[reel] = absf(moved) / delta
 		_reel_seen[reel] = pos
@@ -487,7 +498,7 @@ func _measure_reels(delta: float) -> void:
 
 ## How blurred a reel is, 0.0 sharp to 1.0 a full streak.
 func reel_blur(reel: int) -> float:
-	var speed: float = _reel_speed[clampi(reel, 0, SlotsScript.REELS - 1)]
+	var speed: float = _reel_speed[clampi(reel, 0, rules.REELS - 1)]
 	return clampf((speed - BLUR_FROM) / (BLUR_FULL - BLUR_FROM), 0.0, 1.0)
 
 
@@ -496,7 +507,7 @@ func reel_blur(reel: int) -> float:
 func _sound_reels(delta: float) -> void:
 	if not is_open() or delta <= 0.0:
 		return
-	for reel: int in SlotsScript.REELS:
+	for reel: int in rules.REELS:
 		var pos: float = _reel_pos[reel]
 		var speed: float = absf(pos - _reel_prev[reel]) / delta
 		_reel_prev[reel] = pos
@@ -513,8 +524,8 @@ func _sound_reels(delta: float) -> void:
 
 ## The text model, for the dash test and test_published_payouts' neighbours.
 func drawn_lines() -> Array[String]:
-	var lines: Array[String] = ["SPECTRA SLOTS", "Spin"]
-	for line in SlotsScript.paytable_lines():
+	var lines: Array[String] = ["RAINBOW RUSH" if machine == 1 else "SPECTRA SLOTS", "Spin"]
+	for line in rules.paytable_lines():
 		lines.append(line)
 	return lines
 
@@ -540,7 +551,7 @@ func paint(ci: Control) -> void:
 	if not (_flash > 0.0 and (_won > 0 or bonus_won > 0)):
 		# THE STAR BONUS LIGHTS THE MARQUEE (P9 item 50): while free spins are banked the sign
 		# says how many, in the rainbow's colours.
-		var words := "SPECTRA SLOTS"
+		var words := "RAINBOW RUSH" if machine == 1 else "SPECTRA SLOTS"
 		var ink: Color = PaintScript.GOLD.lerp(Color(1.0, 0.98, 0.85), 0.35 * glow)
 		if free_spins > 0 and not _spinning:
 			words = "FREE SPINS  x%d" % free_spins
@@ -560,7 +571,7 @@ func paint(ci: Control) -> void:
 
 	# --- the reel housing (the windows draw themselves, clipped, on top of this) --------------
 	PaintScript.rounded(ci, HOUSING, 18.0, Color(0.10, 0.06, 0.13), PaintScript.GOLD, 3.0)
-	for reel: int in SlotsScript.REELS:
+	for reel: int in rules.REELS:
 		PaintScript.rounded(ci, reel_rect(reel).grow(6.0), 12.0, PaintScript.GOLD_DIM,
 			PaintScript.GOLD, 2.0)
 
@@ -622,7 +633,9 @@ func _paint_paytable(ci: Control, title_font: Font, numeral_font: Font) -> void:
 		Vector2(PAYTABLE.size.x - 32.0, 40.0)), "Chips back per chip", 22, PaintScript.GOLD)
 	var row_h := 56.0
 	var top: float = PAYTABLE.position.y + 60.0
-	var rows: int = SlotsScript.SYMBOL_NAMES.size() + 3
+	# A machine that pays nothing on one Rainbow (Rainbow Rush) shows no "x0" row.
+	var one_row: bool = int(rules.ONE_RAINBOW_PAY) > 0
+	var rows: int = rules.SYMBOL_NAMES.size() + (3 if one_row else 2)
 	var winning_row: int = _winning_row()
 	for row: int in rows:
 		var y: float = top + row_h * float(row)
@@ -635,19 +648,19 @@ func _paint_paytable(ci: Control, title_font: Font, numeral_font: Font) -> void:
 				Color(0, 0, 0, 0), 0.0)
 		var icons: Array[int] = []
 		var pay: int = 0
-		if row < SlotsScript.SYMBOL_NAMES.size():
+		if row < rules.SYMBOL_NAMES.size():
 			icons = [row, row, row]
-			pay = SlotsScript.TRIPLE_PAYS[row]
-		elif row == SlotsScript.SYMBOL_NAMES.size():
-			icons = [SlotsScript.Symbol.RAINBOW, SlotsScript.Symbol.RAINBOW, -1]
-			pay = SlotsScript.TWO_RAINBOW_PAY
-		elif row == SlotsScript.SYMBOL_NAMES.size() + 1:
-			icons = [SlotsScript.Symbol.RAINBOW, -1, -1]
-			pay = SlotsScript.ONE_RAINBOW_PAY
+			pay = rules.TRIPLE_PAYS[row]
+		elif row == rules.SYMBOL_NAMES.size():
+			icons = [rules.Symbol.RAINBOW, rules.Symbol.RAINBOW, -1]
+			pay = rules.TWO_RAINBOW_PAY
+		elif row == rules.SYMBOL_NAMES.size() + 1 and one_row:
+			icons = [rules.Symbol.RAINBOW, -1, -1]
+			pay = rules.ONE_RAINBOW_PAY
 		else:
 			# THE STAR BONUS (P9 item 50): two Stars, free spins.
-			icons = [SlotsScript.Symbol.STAR, SlotsScript.Symbol.STAR, -1]
-			pay = -SlotsScript.FREE_SPINS
+			icons = [rules.Symbol.STAR, rules.Symbol.STAR, -1]
+			pay = -rules.FREE_SPINS
 		for i: int in 3:
 			var box := Rect2(band.position + Vector2(8.0 + 50.0 * float(i), 4.0),
 				Vector2(46.0, 46.0))
@@ -672,11 +685,11 @@ func _winning_row() -> int:
 	var line: Array[int] = payline_symbols()
 	if line[0] == line[1] and line[1] == line[2]:
 		return line[0]
-	var rainbows: int = line.count(SlotsScript.Symbol.RAINBOW)
+	var rainbows: int = line.count(rules.Symbol.RAINBOW)
 	if rainbows == 2:
-		return SlotsScript.SYMBOL_NAMES.size()
+		return rules.SYMBOL_NAMES.size()
 	if rainbows == 1:
-		return SlotsScript.SYMBOL_NAMES.size() + 1
+		return rules.SYMBOL_NAMES.size() + 1
 	return -1
 
 
@@ -686,7 +699,7 @@ func _paint_reel(reel: int, window: Control) -> void:
 	var size: Vector2 = window.size
 	var paper := Color(0.97, 0.94, 0.86)
 	window.draw_rect(Rect2(Vector2.ZERO, size), paper)
-	var strip: Array[int] = SlotsScript.reel_strip(reel)
+	var strip: Array[int] = rules.reel_strip(reel)
 	var pos: float = _reel_pos[reel]
 	var mid: float = size.y * 0.5
 	var base: int = floori(pos)
@@ -809,7 +822,7 @@ func _paint_overlay() -> void:
 	var colour: Color = PaintScript.GOLD if not lit \
 		else PaintScript.BAND_COLORS[int(t * 10.0) % PaintScript.BAND_COLORS.size()]
 	var left: float = reel_rect(0).position.x - 22.0
-	var right: float = reel_rect(SlotsScript.REELS - 1).end.x + 22.0
+	var right: float = reel_rect(rules.REELS - 1).end.x + 22.0
 	_overlay.draw_line(Vector2(left + 14.0, payline_y()), Vector2(right - 14.0, payline_y()),
 		Color(colour, 0.35 + 0.55 * _flash), 2.0 + 3.0 * _flash, true)
 	for side: float in [left, right]:
@@ -817,7 +830,7 @@ func _paint_overlay() -> void:
 		_overlay.draw_colored_polygon(PackedVector2Array([Vector2(side, payline_y() - 14.0),
 			Vector2(side, payline_y() + 14.0), Vector2(side + 18.0 * dir, payline_y())]), colour)
 	if lit:
-		for reel: int in SlotsScript.REELS:
+		for reel: int in rules.REELS:
 			var cell := Rect2(reel_rect(reel).position + Vector2(4.0, REEL_SIZE_PX.y * 0.5
 				- CELL_HEIGHT * 0.5 + 4.0), Vector2(REEL_SIZE_PX.x - 8.0, CELL_HEIGHT - 8.0))
 			PaintScript.rounded(_overlay, cell, 12.0, Color(1.0, 0.9, 0.4, 0.0),

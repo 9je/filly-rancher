@@ -3677,11 +3677,13 @@ func play_slots(stake: int) -> Dictionary:
 			return refused
 		if not _game_state.casino.remove_chips(stake):
 			return refused
-	var reels: Array[int] = SlotsScript.spin(_casino_rng)
-	var won: int = SlotsScript.payout(reels, stake)
+	# The machine she is at (owner 2026-11-11: two machines): the menu holds its rules.
+	var rules: GDScript = slots_menu.get("rules") if slots_menu != null and slots_menu.get("rules") != null else SlotsScript
+	var reels: Array[int] = rules.spin(_casino_rng)
+	var won: int = rules.payout(reels, stake)
 	if won > 0:
 		_game_state.casino.add_chips(won)
-	var bonus: int = SlotsScript.bonus_spins(reels)
+	var bonus: int = rules.bonus_spins(reels)
 	if bonus > 0:
 		_slot_free_spins += bonus
 		_slot_free_stake = stake
@@ -3694,7 +3696,7 @@ func play_slots(stake: int) -> Dictionary:
 		# get the compile time coercion a direct call would, so the untyped literal fails
 		# call()'s own runtime type check. Same fix at wheel_menu's and blackjack_menu's
 		# call() below.
-		var lines: Array[String] = [SlotsScript.line_text(reels),
+		var lines: Array[String] = [rules.line_text(reels),
 			"You win %d chips." % won if won > 0 else ("Two Stars: %d free spins!" % bonus
 				if bonus > 0 else "Nothing this time.")]
 		slots_menu.call("show_result", lines)
@@ -6324,7 +6326,9 @@ func _open_palace_station(id: String) -> bool:
 			casino_menu.call("set_tab", CasinoMenuScript.Tab.CAGE)
 			return true
 		"slots":
-			return slots_menu != null and bool(slots_menu.call("open"))
+			return slots_menu != null and bool(slots_menu.call("open_machine", 0))
+		"slots_rush":
+			return slots_menu != null and bool(slots_menu.call("open_machine", 1))
 		"wheel":
 			return wheel_menu != null and bool(wheel_menu.call("open"))
 		"blackjack":

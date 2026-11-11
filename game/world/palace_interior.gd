@@ -57,7 +57,10 @@ const ARRIVAL := Vector3(0.0, 0.05, 12.8)
 const ARRIVAL_YAW := 0.0
 
 ## The games, in the order the old lobby listed them. Ids, not menu rows: ranch.gd maps them.
-const STATIONS: Array[StringName] = [&"cage", &"slots", &"wheel", &"blackjack", &"racing"]
+const STATIONS: Array[StringName] = [&"cage", &"slots", &"slots_rush", &"wheel", &"blackjack", &"racing"]
+## The island's machines (SLOT_ROW from here on) are Rainbow Rush, the second machine
+## (owner 2026-11-11); the wall row is the classic one.
+const RUSH_FROM := 8
 ## How near a spot she has to be for E to mean that game. Wide enough that "in front of the
 ## machine" is enough, narrow enough that two machines 1.3 m apart are both the slots anyway.
 const STATION_RADIUS := 1.9
@@ -390,12 +393,14 @@ func tick_patrons(delta: float) -> void:
 ## The slots station's spots: in front of every machine nobody is playing.
 func _refresh_slot_spots() -> void:
 	var spots: Array[Vector3] = []
+	var rush: Array[Vector3] = []
 	var taken := slots_taken()
 	for i in SLOT_ROW.size():
 		if not (i in taken):
 			var row: Array = SLOT_ROW[i]
-			spots.append(Vector3(float(row[0]), 0.0, float(row[1])) + _facing(float(row[2])) * 1.45)
+			(rush if i >= RUSH_FROM else spots).append(Vector3(float(row[0]), 0.0, float(row[1])) + _facing(float(row[2])) * 1.45)
 	_spots[&"slots"] = spots
+	_spots[&"slots_rush"] = rush
 
 
 func staff_count() -> int:
@@ -498,15 +503,17 @@ func _shell() -> void:
 func _furniture() -> void:
 	# The slots. Every machine is a station spot unless a regular is already at it.
 	var slot_spots: Array[Vector3] = []
+	var rush_spots: Array[Vector3] = []
 	for i in SLOT_ROW.size():
 		var row: Array = SLOT_ROW[i]
 		var at := Vector3(float(row[0]), 0.0, float(row[1]))
 		var yaw := float(row[2])
-		_piece("pc_slot" if i % 2 == 0 else "pc_slot_b", at, yaw)
+		_piece("pc_slot_b" if i >= RUSH_FROM else "pc_slot", at, yaw)
 		_box_body(LayersScript.PROPS, Vector3(0.92, 2.1, 0.86), at + Vector3(0, 1.05, 0), yaw)
 		if not (i in SLOT_TAKEN):
-			slot_spots.append(at + _facing(yaw) * 1.45)
+			(rush_spots if i >= RUSH_FROM else slot_spots).append(at + _facing(yaw) * 1.45)
 	_spots[&"slots"] = slot_spots
+	_spots[&"slots_rush"] = rush_spots
 	# The wheel on its stage, the clapper at the top, a spot in front of the stage.
 	_piece("pc_stage", STAGE_AT)
 	_round_body(3.2, 0.3, STAGE_AT)

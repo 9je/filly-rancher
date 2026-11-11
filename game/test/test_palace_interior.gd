@@ -49,7 +49,7 @@ func test_the_two_new_verbs_are_ranked() -> void:
 
 
 func test_every_station_prompt_names_its_game_and_carries_no_dash() -> void:
-	var words := {&"slots": "slots", &"wheel": "wheel", &"blackjack": "blackjack",
+	var words := {&"slots": "slots", &"slots_rush": "rainbow rush", &"wheel": "wheel", &"blackjack": "blackjack",
 		&"racing": "races", &"cage": "chips"}
 	for id: StringName in PalaceInteriorScript.STATIONS:
 		var line: String = InteractionScript.prompt_for(InteractionScript.candidate(
@@ -147,7 +147,7 @@ func test_each_station_opens_the_existing_game_straight_at_its_own_screen() -> v
 	ranch.call("enter_palace", true)
 	var interior: Node3D = ranch.get("palace_interior")
 	var player: Node3D = ranch.get("player")
-	var menus := {&"slots": ranch.get("slots_menu"), &"wheel": ranch.get("wheel_menu"),
+	var menus := {&"slots": ranch.get("slots_menu"), &"slots_rush": ranch.get("slots_menu"), &"wheel": ranch.get("wheel_menu"),
 		&"blackjack": ranch.get("blackjack_menu"), &"racing": ranch.get("race_menu"),
 		&"cage": ranch.get("casino_menu")}
 	for id: StringName in PalaceInteriorScript.STATIONS:
