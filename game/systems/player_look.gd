@@ -90,9 +90,12 @@ static func styles_for(r: int) -> Array[StringName]:
 		for id in LEGACY_UNICORN_STYLES:
 			if not table.find(id).is_empty():
 				out.append(id)
-	for id in table.for_race(RACE_NAMES[clampi(r, 0, 2)], false):
-		if not id in out:
-			out.append(id)
+	var pool := table.for_race(RACE_NAMES[clampi(r, 0, 2)], false)
+	for id in pool:
+		if id in out:
+			continue
+		# Same index, a whole body (DonorTable.whole): a saved style number keeps its slot.
+		out.append(DonorTable.whole(id, pool))
 	return out
 
 

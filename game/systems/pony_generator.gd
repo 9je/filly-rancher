@@ -59,7 +59,7 @@ static func generate(pony_seed: int, opts: Dictionary = {}) -> PonyLook:
 	if pool.is_empty():
 		pool = table.ids()
 	if not pool.is_empty():
-		look.donor = pool[rng.randi_range(0, pool.size() - 1)]
+		look.donor = DonorTableScript.whole(pool[rng.randi_range(0, pool.size() - 1)], pool)
 	look.variant = StringName(opts.get("variant", &""))
 	_colors(look, rng, p)
 	if look.variant != &"":

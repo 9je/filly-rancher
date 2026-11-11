@@ -43,16 +43,31 @@ func find(id: StringName) -> Dictionary:
 ## P9 item 51: bodies that are not whole once their canon signature is hidden. Kerfuffle's
 ## prosthetic hind leg is part of her "clothes" surface, which `hide` takes away, so a pony
 ## built on her (the owner's pegasus) stood on three legs, the near hind cut off at the thigh.
-## Kept in the table (her own canon model still loads) but never offered as a body.
+## Kept in the table (her own canon model still loads) but never worn as a body.
+##
+## THE LIST KEEPS HER PLACE (Lane A review, 2026-11-11): taking her out of for_race() shifted
+## every index after her, so saved player looks and every seeded Drifter on that list would
+## have changed body. for_race() is unchanged; whole() swaps her for the next body at the
+## point a body is chosen.
 const NOT_WHOLE: Array[StringName] = [&"kerfuffle"]
+
+
+## `id`, or if it is NOT_WHOLE the next whole body after it in `pool` (wrapping).
+static func whole(id: StringName, pool: Array[StringName]) -> StringName:
+	if not (id in NOT_WHOLE) or pool.is_empty():
+		return id
+	var i := pool.find(id)
+	for k in range(1, pool.size() + 1):
+		var c: StringName = pool[(i + k) % pool.size()]
+		if not (c in NOT_WHOLE):
+			return c
+	return id
 
 
 func for_race(race: StringName, foal: bool = false) -> Array[StringName]:
 	var out: Array[StringName] = []
 	for d: Dictionary in donors:
 		if bool(d.get("foal", false)) != foal:
-			continue
-		if StringName(d.get("id", "")) in NOT_WHOLE:
 			continue
 		if race == &"earth" or StringName(d.get("race", "")) == race:
 			out.append(StringName(d.get("id", "")))

@@ -121,7 +121,7 @@ academy [marigold happy] Oh, all sorts! Lessons, sunshine, a lovely view. They'l
   -> quota
 have_to [marigold happy] Have to? Goodness, no. Well. There is a small quota on collection day, just to keep the program running. Two ponies with their color. Easy!
   -> quota
-quota [marigold happy nod] One little thing. A Drifter who hasn't Bloomed yet, we take for a small intake fee, and she doesn't count. Help her find her mark first. The Academy adores a pony with color! Rules are rules!
+quota [marigold happy nod] One rule! Only ponies with their mark count for the quota. A Drifter without one still comes along, but she earns you just 30 bits and doesn't count. Help her find her mark first!
   flag: depot_explained
   event: open_depot
 

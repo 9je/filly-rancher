@@ -206,3 +206,15 @@ func test_no_generated_pony_wears_a_canon_characters_colors() -> void:
 			"seed %d drew a canon signature (%s on %s)" % [i * 31 + 7, p.mane.to_html(), p.coat.to_html()])
 	# And the check itself recognises the signature it exists for.
 	assert_true(GeneratorScript.reads_as_canon(Color(0.78, 0.79, 0.84), Color(0.98, 0.93, 0.62)))
+
+
+## P9 ITEM 51 + LANE A REVIEW: Kerfuffle is never worn as a body, and the body list keeps her
+## place so saved style numbers and seeded Drifters keep theirs.
+func test_no_pony_wears_the_three_legged_body_and_the_list_keeps_its_order() -> void:
+	var table := DonorTableScript.load_table()
+	assert_true(&"kerfuffle" in table.for_race(&"pegasus", false), "the list keeps her slot")
+	for seed_value in range(600):
+		var look := GeneratorScript.generate(seed_value)
+		assert_ne(look.donor, &"kerfuffle", "seed %d wears Kerfuffle" % seed_value)
+	for r in range(3):
+		assert_false(&"kerfuffle" in PlayerLook.styles_for(r), "creator race %d offers Kerfuffle" % r)
