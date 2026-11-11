@@ -974,3 +974,9 @@ and the cinematics. Calls made:
 - **Items 64, 65.** The Palace's west entrance bush mirrors the east one across the doors; the Pens sign stands beside the pen lane short of the yard, not at a pen's corner.
 - **Item 71.** Spike's mauve texture is turned violet by a toon-shader hue remap (no new texture, so no re-import in the owner's checkout); his waving arm swings out 24 degrees after the mixer poses him.
 - Lane B renders on its own compositor (socket filly-wl-b in /tmp/claude-1000/wlb, binary named westonlb4) after Lane A's runs were knocked over by a shared socket.
+- **Item 67.** Spike joins the ponies' lens fade (group lens_fade); sign post poles hide inside 0.9 m of the lens (lens_hide); boards step aside at 1.3 m (was 0.9) and return at 2.0.
+- **Item 69.** A stalled wander counts as a wall (a building's rescue pushed ponies back out without move_and_slide ever reporting it); she turns her back on it and her next pick lies on the open side. Any pony coming to rest, and a townspony arriving at a spot, turns to open ground if a wall is at her nose.
+- **Item 70.** A pony that had to turn the long way round keeps turning that way until done (it was the likeliest source of the "head snapping"; not seen on screen).
+- **Items 72, 73.** The rare-sighting flight lifts each point until its leg (and the last point's view of her) is clear, trying a point further toward her before a higher one. Decor-drawn ponies are seen first and Tumble names the decoration in the toast and the caption.
+- **Item 49 (portraits).** The portrait studio uses the field's exposure (0.72) and a saturation grade. The remaining paleness is the converted models' own texture colours, an asset question, not a lighting one.
+- **Item 61, 76** left open: the wagon flicker did not reproduce in stills; the running tail hangs straight down (spring tuning next).
