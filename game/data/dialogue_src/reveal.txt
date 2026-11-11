@@ -56,8 +56,8 @@ two [marigold happy] Don't look so worried. The valley needs weather, weather ne
 three [marigold happy] It doesn't hurt. Well. Nopony has ever complained.
   -> four
 four [marigold happy nod] Now. I have a little offer, because Cloudsdale looks after its own. Sign the Senior Steward contract. Double stipend. Better equipment. And your Tumble? Struck right off the lottery. She goes home with you tonight.
-  * Sign the contract. -> sign
-  * Get Tumble out. -> run
+  * Sign. Tumble comes home, and the line keeps running. -> sign
+  * Refuse. I'll get Tumble out of that line myself. -> run
 sign [marigold happy] Wonderful! I knew you were one of us. She'll be waiting at the lift.
   event: path_factory
 run [marigold blank] Oh, {name}. That's a shame.

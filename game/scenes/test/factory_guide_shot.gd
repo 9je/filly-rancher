@@ -8,6 +8,7 @@ extends SceneTree
 const FACTORY := "res://world/factory.tscn"
 var out := ""
 var mode := "reveal"
+var choice_shot := false
 
 
 func _initialize() -> void:
@@ -27,13 +28,19 @@ func _shot(shot_name: String, frames: int = 20) -> void:
 	print("SHOT ", shot_name)
 
 
+var pick := 0
+
+
 func _talk_through(scene: Node) -> void:
 	var people: Node = scene.get("people")
 	var guard := 0
 	while bool(people.call("is_talking")) and guard < 80:
 		var runner = people.get("runner")
 		if runner != null and bool(runner.call("has_choices")):
-			people.get("talk_box").chose.emit(0)
+			if choice_shot:
+				choice_shot = false
+				await _shot(mode + "_choice", 30)
+			people.get("talk_box").chose.emit(pick)
 		else:
 			people.get("talk_box").advanced.emit()
 		guard += 1
@@ -59,6 +66,32 @@ func _run() -> void:
 	await _talk_through(scene)
 	await _shot(mode + "_goal", 40)
 	print("GOAL ", scene.get("goal"))
+	if mode == "reveal":
+		# ON THROUGH THE TOUR TO THE WINDOW, THE CHOICE AND THE SCOOP (items 15, 16): each wait
+		# walked by setting her down where it waits, every talk run through.
+		var player: Node3D = scene.get("player")
+		pick = 1
+		for k in 4000:
+			var people: Node = scene.get("people")
+			if bool(people.call("is_talking")):
+				var runner = people.get("runner")
+				if runner != null and bool(runner.call("has_choices")):
+					choice_shot = true
+				await _talk_through(scene)
+			var g: Dictionary = scene.get("goal")
+			if String(g.get("kind", "")) == "hold":
+				player.global_position = (g["at"] as Vector3) + Vector3(-1.2, 0.3, 1.2)
+				await _shot("reveal_scoop_goal", 40)
+				Input.action_press(&"interact")
+				for f in 260:
+					await process_frame
+				Input.action_release(&"interact")
+				await _shot("reveal_scoop_up", 30)
+				break
+			if String(g.get("kind", "")) == "area":
+				player.global_position = (g["at"] as Vector3) + Vector3(0, 0.3, 0)
+			await process_frame
+		print("GOAL ", scene.get("goal"))
 	if mode == "lights_out":
 		var interior: Node = scene.get("interior")
 		var player: Node3D = scene.get("player")

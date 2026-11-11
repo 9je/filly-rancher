@@ -306,6 +306,21 @@ func set_mode_follow(target: Node3D) -> void:
 func set_mode_walk_to(at: Vector3) -> void:
 	mode = Mode.WALK_TO
 	walk_target = at
+	walk_route.clear()
+
+
+## WALK A ROUTE, ONE POINT AFTER ANOTHER (playtest 2026-11-10 items 9 and 51: Marigold walked
+## a straight line at a room past the doorway and stood nose to the wall beside it). The last
+## point is where she stands.
+var walk_route: Array[Vector3] = []
+
+
+func set_mode_walk_route(points: Array[Vector3]) -> void:
+	if points.is_empty():
+		return
+	mode = Mode.WALK_TO
+	walk_target = points[0]
+	walk_route = points.slice(1)
 
 
 func is_walking_to() -> bool:
@@ -349,6 +364,8 @@ func _physics_process(delta: float) -> void:
 			to2.y = 0.0
 			if to2.length() > 0.3:
 				desired = to2.normalized() * walk_speed
+			elif not walk_route.is_empty():
+				walk_target = walk_route.pop_front()
 			else:
 				set_mode_stand(walk_target)
 		Mode.STAND:

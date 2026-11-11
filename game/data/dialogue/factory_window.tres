@@ -37,10 +37,10 @@ nodes = Array[Dictionary]([{
 "mood": "happy",
 "anim": "nod",
 "choices": [{
-"text": "Sign the contract.",
+"text": "Sign. Tumble comes home, and the line keeps running.",
 "next": "sign"
 }, {
-"text": "Get Tumble out.",
+"text": "Refuse. I'll get Tumble out of that line myself.",
 "next": "run"
 }]
 }, {

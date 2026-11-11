@@ -368,9 +368,17 @@ func _reveal() -> void:
 	step_reached.emit(&"landing")
 	await _establish(landing)
 	await _say(&"marigold", &"factory_welcome")
+	var from_room := &"landing"
 	for room in [&"welcome", &"classroom", &"giftshop"]:
 		var guide := interior.marker(room, "guide")
-		marigold.set_mode_walk_to(guide.global_position if guide != null else interior.room_origin(room))
+		# Through the doorway, not at the wall beside it (item 9).
+		var route: Array[Vector3] = []
+		for mk in [interior.marker(from_room, "exit"), interior.marker(room, "entry")]:
+			if mk != null:
+				route.append(mk.global_position)
+		route.append(guide.global_position if guide != null else interior.room_origin(room))
+		marigold.set_mode_walk_route(route)
+		from_room = room
 		await _until_area(StringName("factory_" + String(room)), interior.room_origin(room) + Vector3(0, 0, -2))
 		tone.set_target(InteriorScript.dread_of(room))
 		step_reached.emit(room)
@@ -496,14 +504,21 @@ func _escape() -> void:
 	var tb := window.tumble_body() if window != null else null
 	var gallery := interior.room_origin(&"gallery")
 	var tumble := people.npc(&"tumble")
-	if tumble != null:
-		tumble.global_position = gallery + Vector3(-2.0, 0, -3.0)
-		tumble.set_mode_stand(tumble.global_position)
-		tumble.act(&"scared", &"cower")
+	# SCOOPED OUT OF THE LINE, THROUGH THE HATCH (playtest 2026-11-10 item 16: she was
+	# teleported to the gallery floor to be scooped). She is in the line below; the hold is at
+	# the hatch, and the beam brings her up through it.
+	var hatch := gallery + Vector3(InteriorScript.ROOM_SIZE * 0.5 - 1.2, 0, -6.0)
+	await _hold_at(hatch, 3.0, "scoop Tumble out of the line")
 	if tb != null:
 		tb.visible = false
-	await _hold_to_scoop(tumble)
 	if tumble != null:
+		tumble.visible = true
+		tumble.process_mode = Node.PROCESS_MODE_INHERIT
+		tumble.global_position = hatch + Vector3(0, -1.8, 0)
+		var up := create_tween()
+		up.tween_property(tumble, "global_position", hatch + Vector3(-0.8, 0.3, 0.8), 0.0 if skip_waits else 0.9) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		await up.finished
 		tumble.act(&"happy", &"hop")
 		tumble.set_mode_follow(player)
 	_alarm()
@@ -525,10 +540,21 @@ func _escape() -> void:
 	_leave(&"rescue")
 
 
-## Hold interact beside her: the hardest catch in the game so far (she is too wiggly).
-func _hold_to_scoop(tumble: Npc) -> void:
-	if tumble != null:
-		await _hold_at(tumble.global_position, 3.0, "scoop Tumble out")
+## TAKEN (item 51: she walked a straight line at the gift shop and wedged in a corner). She
+## goes out through the nearest door, and once out of the room she is gone: her place is in
+## the line now, until the escape brings her back up through the hatch.
+func _take_tumble(tumble: Npc) -> void:
+	tumble.act(&"scared")
+	var room := String(_last_area).trim_prefix("factory_")
+	var door := interior.marker(StringName(room), "exit") if not room.is_empty() else null
+	if door != null:
+		tumble.set_mode_walk_route([door.global_position] as Array[Vector3])
+		var t := 0.0
+		while tumble.is_walking_to() and t < 6.0 and not skip_waits:
+			await get_tree().process_frame
+			t += get_process_delta_time()
+	tumble.visible = false
+	tumble.process_mode = Node.PROCESS_MODE_DISABLED
 
 
 func _alarm() -> void:
@@ -797,8 +823,7 @@ func _on_effect(kind: StringName, value: String) -> void:
 		"tumble_taken":
 			var tumble := people.npc(&"tumble")
 			if tumble != null:
-				tumble.set_mode_walk_to(interior.room_origin(&"giftshop") + Vector3(4.5, 0, -4.0))
-				tumble.act(&"scared")
+				_take_tumble(tumble)
 		"marigold_leaves":
 			var m := people.npc(&"marigold")
 			if m != null:
