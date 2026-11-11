@@ -78,13 +78,15 @@ func test_a_zero_or_negative_stake_pays_nothing_at_all() -> void:
 
 
 func test_the_return_to_player_is_the_enumerated_fraction_and_nothing_else() -> void:
-	assert_almost_eq(SlotsScript.return_to_player(), 3809.0 / 4096.0, 1e-9,
-		"3809 units returned over 4096 equally likely position triples")
-	assert_almost_eq(SlotsScript.house_edge(), 287.0 / 4096.0, 1e-9)
+	# P9 item 50: the Star bonus (45 lines of 4096 win 4 free spins) is in the return:
+	# 3809 / 4096 a spin, over 1 - 180 / 4096, is 3809 / 3916.
+	assert_almost_eq(SlotsScript.return_to_player(), 3809.0 / 3916.0, 1e-9,
+		"3809 units over 4096 position triples, with the free spins they buy")
+	assert_almost_eq(SlotsScript.house_edge(), 107.0 / 3916.0, 1e-9)
 
 
-func test_the_published_edge_reads_as_seven_per_cent() -> void:
-	assert_eq("%.1f" % (SlotsScript.house_edge() * 100.0), "7.0")
+func test_the_published_edge_reads_as_under_three_per_cent() -> void:
+	assert_eq("%.1f" % (SlotsScript.house_edge() * 100.0), "2.7")
 
 
 func test_a_spin_is_three_symbols_and_never_leaves_the_alphabet() -> void:

@@ -119,13 +119,38 @@ static func payout(reels: Array[int], stake: int) -> int:
 ## The exact long run return per unit staked, by walking every one of the REEL_SIZE cubed
 ## equally likely position triples of the three real strips. 4096 iterations, so this is cheap enough to call from a
 ## sign that is being drawn.
+##
+## THE STAR BONUS IS IN IT (P9, playtest 2026-11-10 item 50: "slots are a pure money sink
+## while blackjack feels fair"). Two Stars on a line win FREE_SPINS spins at that stake, and
+## a free spin can win more, so a spin is worth base + p * FREE_SPINS * itself:
+## rtp = base / (1 - p * FREE_SPINS). With p = 45 / 4096 that lifts 93.0 to 97.3 per cent:
+## closer to the blackjack table, still the house's.
 static func return_to_player() -> float:
 	var total := 0
+	var bonus := 0
 	for a in reel_strip(0):
 		for b in reel_strip(1):
 			for c in reel_strip(2):
 				total += payout([a, b, c], 1)
-	return float(total) / float(REEL_SIZE * REEL_SIZE * REEL_SIZE)
+				bonus += bonus_spins([a, b, c])
+	var n := float(REEL_SIZE * REEL_SIZE * REEL_SIZE)
+	return (float(total) / n) / (1.0 - float(bonus) / n)
+
+
+## Free spins this line wins: FREE_SPINS for exactly two Stars (three is the Star triple and
+## pays as one), else none.
+static func bonus_spins(reels: Array) -> int:
+	if reels.size() != REELS:
+		return 0
+	var stars := 0
+	for symbol in reels:
+		if int(symbol) == Symbol.STAR:
+			stars += 1
+	return FREE_SPINS if stars == 2 else 0
+
+
+## Free spins two Stars win (item 50).
+const FREE_SPINS := 4
 
 
 ## What the house keeps, per unit staked. This is the number on the lobby sign.
@@ -158,6 +183,7 @@ static func paytable_lines() -> Array[String]:
 	# of what comes back is the stake. Left in words because "returns 1 for 1" is a sentence
 	# nobody reads as "you broke even".
 	lines.append("One Rainbow anywhere hands your stake back")
+	lines.append("Two Stars anywhere win %d free spins" % FREE_SPINS)
 	return lines
 
 

@@ -82,6 +82,11 @@ const LAND_POP_SECONDS := 0.30
 
 signal spin_requested(stake: int)
 
+## Free spins banked by the Star bonus, pushed in by ranch.gd (P9 item 50), and how many the
+## last spin won (0 for none).
+var free_spins := 0
+var bonus_won := 0
+
 ## Each reel's position: the strip index sitting on the payline, as a float while it rolls.
 var _reel_pos: Array[float] = [0.0, 0.0, 0.0]
 var _lever := 0.0
@@ -202,7 +207,7 @@ func _fit_stake() -> void:
 
 
 func can_spin() -> bool:
-	return not _spinning and selected_stake() > 0
+	return not _spinning and (selected_stake() > 0 or free_spins > 0)
 
 
 ## PULL. The one place a spin is asked for, whether by the lever, the button or a key.
@@ -379,11 +384,11 @@ func show_spin(reels: Array[int], won: int, _stake_played: int) -> void:
 	var stake_now := maxi(1, selected_stake())
 	_tween.tween_callback(func() -> void:
 		_held_chips = -1
-		if _won > 0:
+		if _won > 0 or bonus_won > 0:
 			_sound_call(&"play", [&"slots_win"])
 		if _won >= stake_now * JACKPOT_TIMES:
 			_jackpot())
-	if _won > 0:
+	if _won > 0 or bonus_won > 0:
 		_tween.tween_property(self, "_flash", 1.0, 0.12)
 		_tween.tween_property(self, "_flash", 0.0, WIN_FLASH_SECONDS)
 	_tween.tween_callback(func() -> void:
@@ -532,11 +537,17 @@ func paint(ci: Control) -> void:
 	if _flash > 0.0:
 		glow = 0.5 + 0.5 * sin(t * 16.0)
 	# The sign gives way to the win banner (drawn over the marquee by the overlay).
-	if not (_flash > 0.0 and _won > 0):
+	if not (_flash > 0.0 and (_won > 0 or bonus_won > 0)):
+		# THE STAR BONUS LIGHTS THE MARQUEE (P9 item 50): while free spins are banked the sign
+		# says how many, in the rainbow's colours.
+		var words := "SPECTRA SLOTS"
+		var ink: Color = PaintScript.GOLD.lerp(Color(1.0, 0.98, 0.85), 0.35 * glow)
+		if free_spins > 0 and not _spinning:
+			words = "FREE SPINS  x%d" % free_spins
+			ink = PaintScript.BAND_COLORS[int(t * 6.0) % PaintScript.BAND_COLORS.size()].lightened(0.25)
 		PaintScript.label(ci, title_font, Rect2(sign.position + Vector2(0.0, 3.0), sign.size),
-			"SPECTRA SLOTS", 46, Color(0.0, 0.0, 0.0, 0.35))
-		PaintScript.label(ci, title_font, sign, "SPECTRA SLOTS", 46,
-			PaintScript.GOLD.lerp(Color(1.0, 0.98, 0.85), 0.35 * glow))
+			words, 46, Color(0.0, 0.0, 0.0, 0.35))
+		PaintScript.label(ci, title_font, sign, words, 46, ink)
 	for bulb: int in BULBS:
 		var phase: float = fposmod(t / BULB_CHASE_SECONDS - float(bulb) / float(BULBS), 1.0)
 		var lit: float = 0.35 + 0.65 * maxf(0.0, 1.0 - phase * 4.0)
@@ -597,7 +608,7 @@ func paint(ci: Control) -> void:
 
 	# --- spin ------------------------------------------------------------------------------------
 	# The kit's one gold primary (the round 3 kit pass left Spin its old orange).
-	PaintScript.kit_button(ci, SPIN, "Spin %d" % selected_stake() if selected_stake() > 0
+	PaintScript.kit_button(ci, SPIN, ("Free spin (%d)" % free_spins) if free_spins > 0 else ("Spin %d" % selected_stake()) if selected_stake() > 0
 		else "No chips", true, can_spin(), is_lit(&"spin"))
 
 	_paint_paytable(ci, title_font, numeral_font)
@@ -609,9 +620,9 @@ func _paint_paytable(ci: Control, title_font: Font, numeral_font: Font) -> void:
 		PaintScript.GOLD_DIM, 2.0)
 	PaintScript.label(ci, title_font, Rect2(PAYTABLE.position + Vector2(16.0, 10.0),
 		Vector2(PAYTABLE.size.x - 32.0, 40.0)), "Chips back per chip", 22, PaintScript.GOLD)
-	var row_h := 62.0
+	var row_h := 56.0
 	var top: float = PAYTABLE.position.y + 60.0
-	var rows: int = SlotsScript.SYMBOL_NAMES.size() + 2
+	var rows: int = SlotsScript.SYMBOL_NAMES.size() + 3
 	var winning_row: int = _winning_row()
 	for row: int in rows:
 		var y: float = top + row_h * float(row)
@@ -630,9 +641,13 @@ func _paint_paytable(ci: Control, title_font: Font, numeral_font: Font) -> void:
 		elif row == SlotsScript.SYMBOL_NAMES.size():
 			icons = [SlotsScript.Symbol.RAINBOW, SlotsScript.Symbol.RAINBOW, -1]
 			pay = SlotsScript.TWO_RAINBOW_PAY
-		else:
+		elif row == SlotsScript.SYMBOL_NAMES.size() + 1:
 			icons = [SlotsScript.Symbol.RAINBOW, -1, -1]
 			pay = SlotsScript.ONE_RAINBOW_PAY
+		else:
+			# THE STAR BONUS (P9 item 50): two Stars, free spins.
+			icons = [SlotsScript.Symbol.STAR, SlotsScript.Symbol.STAR, -1]
+			pay = -SlotsScript.FREE_SPINS
 		for i: int in 3:
 			var box := Rect2(band.position + Vector2(8.0 + 50.0 * float(i), 4.0),
 				Vector2(46.0, 46.0))
@@ -645,7 +660,8 @@ func _paint_paytable(ci: Control, title_font: Font, numeral_font: Font) -> void:
 				PaintScript.label(ci, title_font, box.grow(-8.0), "any", 14,
 					Color(1.0, 1.0, 1.0, 0.5))
 		PaintScript.label(ci, numeral_font, Rect2(band.position + Vector2(162.0, 0.0),
-			Vector2(band.size.x - 172.0, band.size.y)), "x%d" % pay, 32,
+			Vector2(band.size.x - 172.0, band.size.y)),
+			("x%d" % pay) if pay >= 0 else ("%d free" % -pay), 32 if pay >= 0 else 24,
 			PaintScript.GOLD, HORIZONTAL_ALIGNMENT_RIGHT)
 
 
@@ -811,4 +827,4 @@ func _paint_overlay() -> void:
 		PaintScript.rounded(_overlay, banner, 35.0, Color(PaintScript.PLUM_DARK, 0.92),
 			PaintScript.GOLD, 4.0)
 		PaintScript.label(_overlay, MenuStyleScript.title_font(), banner.grow(-12.0),
-			"WIN  +%d" % _won, 44, PaintScript.GOLD)
+			("WIN  +%d" % _won) if _won > 0 else ("%d FREE SPINS" % bonus_won), 44, PaintScript.GOLD)
