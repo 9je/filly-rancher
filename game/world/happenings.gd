@@ -52,6 +52,7 @@ func _mark(id: String) -> void:
 	var list: Array = _story().get_var("happened", [])
 	list.append(id)
 	_story().set_var("happened", list)
+	_story().set_var("happening_at", _t())
 
 
 func _physics_process(delta: float) -> void:
@@ -65,6 +66,16 @@ func _physics_process(delta: float) -> void:
 		return
 	var story := _story()
 	var t := _t()
+	# ONE AT A TIME, AND ONLY WITH HER THERE (playtest 2026-11-10 items 3 and 5: Trixie, Derpy
+	# and Rainbow Dash all at once; a shower's worth of events fired and gone while the game
+	# sat idle). The ladder below is keyed off play time, so a long menu, the Palace or an idle
+	# spell built up a backlog that then went off one a second. Now: EVENT_GAP between any two
+	# world events, and nothing while she has stood still for IDLE_HOLD.
+	_track_idle(delta_since_check())
+	if _idle_for >= IDLE_HOLD:
+		return
+	if t - float(story.get_var("happening_at", -INF)) < EVENT_GAP:
+		return
 	var catches := int(story.get_var("catches", 0))
 	if not _done("sun_shower") and t >= 9.0 * 60.0 and catches >= 2:
 		_sun_shower()
@@ -94,6 +105,7 @@ func _physics_process(delta: float) -> void:
 				story.set_var("sightings_today", 0)
 			story.set_var("sightings_today", int(story.get_var("sightings_today", 0)) + 1)
 			story.set_var("sighting_at", t)
+			story.set_var("happening_at", t)
 			story.set_var("sightings", int(story.get_var("sightings", 0)) + 1)
 	_check_lost_foal()
 
@@ -106,6 +118,35 @@ func out_and_free() -> bool:
 		return false
 	var people: Node = ranch.get("people")
 	return people == null or not bool(people.call("is_talking"))
+
+
+## Seconds of play between two world events (the ladder's own spacing is minutes; this only
+## bites when a backlog would fire them back to back).
+const EVENT_GAP := 75.0
+## Standing still this long, she is away from the keyboard: the world waits for her.
+const IDLE_HOLD := 60.0
+const IDLE_MOVE_M := 0.6
+var _idle_for := 0.0
+var _idle_at := Vector3.INF
+var _last_check_ms := 0
+
+
+func delta_since_check() -> float:
+	var now := Time.get_ticks_msec()
+	var d := 1.0 if _last_check_ms == 0 else float(now - _last_check_ms) / 1000.0
+	_last_check_ms = now
+	return clampf(d, 0.0, 5.0)
+
+
+func _track_idle(d: float) -> void:
+	var p := _player()
+	if p == null:
+		return
+	if _idle_at == Vector3.INF or p.global_position.distance_to(_idle_at) > IDLE_MOVE_M:
+		_idle_at = p.global_position
+		_idle_for = 0.0
+	else:
+		_idle_for += d
 
 
 func _cycle() -> int:
@@ -253,6 +294,11 @@ func _palace_flyer() -> void:
 func _race_day() -> void:
 	_mark("race_day")
 	_story().set_flag("race_day")
+	# She has raced already (playtest 2026-11-10 item 6): the invitation would be old news.
+	var gs := _gs()
+	var nov = gs.get("novelty") if gs != null else null
+	if nov != null and nov.has_method("has") and bool(nov.call("has", "first_race")):
+		return
 	ranch.call("_toast", "Race day at the Palace track! Bring a pony from your pens and enter her. Show-offs run faster.")
 	ranch.call("_novelty", "event", "race_day", "Race day at the track")
 

@@ -9188,7 +9188,9 @@ func _v1_tick(delta: float) -> void:
 		# ONE THING TO DO AT A TIME (playtest 2026-11-08 item 75: "Read your new letter" on the
 		# card over "Sell gems to Bramble" in the tip line). A tip that sends her somewhere is
 		# only shown when the card is pointing there too, or nowhere.
-		if StringName(tip.get("id", &"")) == &"sell" and not (_guide_goal in [&"market", &""]):
+		# And never with no card at all (playtest 2026-11-10 item 38: "Sell gems to Bramble"
+		# under "Cut pylons at night", the card pointing at nothing it named).
+		if StringName(tip.get("id", &"")) == &"sell" and _guide_goal != &"market":
 			tip = {}
 		hud.call("set_tip", str(tip.get("text", "")))
 
