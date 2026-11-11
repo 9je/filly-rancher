@@ -374,9 +374,114 @@ func _mlp_scale(path: String) -> float:
 	return PropsScript.scale_for({"file": path.get_file(), "family": PropsScript.FAMILY_MLP})
 
 
+## ONE TREE FAMILY (P9 item 59; the owner: "low-poly blocks, soft show-style trees with purple
+## trunks, lollipop trees: pick one"). The regions asked for the Kenney kit's faceted oaks and
+## pines while the valley round the ranch stands the show-style Sweet Apple Acres trees (props.gd).
+## Each kit name now maps to the SAA tree of the same build (a pine or thin tree to the narrow
+## one, a round oak to the wide one; the Everfree's thin and fat dark trees to the dead pair,
+## its spooky note), placed with the SAME random draws so nothing else on the seed moves.
+const SAA_TREE := {
+	"tree_pineTallA_detailed": "saa_tree_narrow", "tree_pineTallB_detailed": "saa_tree_narrow",
+	"tree_pineTallC_detailed": "saa_tree_narrow", "tree_pineRoundC": "saa_tree_narrow",
+	"tree_oak_dark": "saa_tree_wide", "tree_default_dark": "saa_tree_wide",
+	"tree_fat_darkh": "saa_tree_dead_wide", "tree_thin_dark": "saa_tree_dead_narrow",
+}
+const SAA_DIR := "res://assets/converted/props/"
+## In the Lake's and the Night Meadow's woods a "dead" kit name stays a living tree.
+const SAA_LIVING := {"saa_tree_dead_wide": "saa_tree_wide", "saa_tree_dead_narrow": "saa_tree_narrow"}
+
+
 ## A tree `h` metres tall, whichever model it is.
 func _tree(r: RegionData, model: String, a: float, d: float, h: float, leaves: Color) -> void:
-	_place(r, model, a, d, Vector2(h, h), true, leaves, false, false, true)
+	var saa: String = SAA_TREE.get(model, "")
+	if saa != "" and r.id != &"everfree":
+		saa = SAA_LIVING.get(saa, saa)
+	var path := SAA_DIR + saa + ".glb"
+	if saa == "" or not ResourceLoader.exists(path):
+		_place(r, model, a, d, Vector2(h, h), true, leaves, false, false, true)
+		return
+	# The same two draws _place() makes (its scale, then its yaw), in the same order.
+	_rng.randf_range(h, h)
+	var yaw := _rng.randf() * TAU
+	var x := r.centre.x + cos(a) * d
+	var z := r.centre.y + sin(a) * d
+	var at := Vector3(x, float(height_at.call(x, z)) - 0.03, z)
+	if _dry:
+		_wanted[path] = [path]
+		return
+	var box := _tree_box(path)
+	var s := h / box.size.y if box.size.y > 0.01 else 1.0
+	var xf := Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3.ONE * s), at)
+	placements.append({"model": saa, "at": at})
+	for part: Array in _tree_parts(path):
+		var key := path + "|" + str(part[2])
+		if not _batches.has(key):
+			_batches[key] = {"mesh": part[0], "xf": [], "shadow": bool(part[3])}
+		(_batches[key].xf as Array).append(xf * (part[1] as Transform3D))
+	# The trunk stops her and the ponies; the crown stops only the camera (item 60: the lens
+	# sank into the Everfree's leaves and the screen went dark green with bright seams).
+	_collider(Transform3D(Basis().scaled(Vector3.ONE * 1.6 * s), at))
+	var crown := _tree_crown(path)
+	if crown.size.y > 0.01:
+		var body := StaticBody3D.new()
+		body.collision_layer = LayersScript.CANOPY
+		body.collision_mask = 0
+		body.set_meta(&"canopy", true)
+		var shape := CollisionShape3D.new()
+		var ball := SphereShape3D.new()
+		ball.radius = 0.5 * minf(crown.size.x, crown.size.z) * s
+		shape.shape = ball
+		body.add_child(shape)
+		add_child(body)
+		body.global_transform = Transform3D(Basis(), xf * crown.get_center())
+
+
+## A show-style tree's meshes with its canopy swelled over its branches (props.gd's own look):
+## [[mesh, local transform, index, casts a shadow, is the canopy], ...].
+func _tree_parts(path: String) -> Array:
+	var key := "tree|" + path
+	if _meshes.has(key):
+		return _meshes[key]
+	var out: Array = []
+	var node: Node3D = (load(path) as PackedScene).instantiate()
+	PropsScript._swell_canopy(node)
+	var i := 0
+	for m in node.find_children("*", "MeshInstance3D", true, false):
+		var mi := m as MeshInstance3D
+		if mi.mesh == null or not mi.visible:
+			continue
+		var mesh := mi.mesh.duplicate() as Mesh
+		for sidx in mesh.get_surface_count():
+			var src := mi.get_active_material(sidx)
+			if src is StandardMaterial3D and ToonStylerScript.shading_enabled:
+				mesh.surface_set_material(sidx, ToonStylerScript.to_toon(src as StandardMaterial3D,
+					ToonStylerScript.PRESETS[&"foliage"]))
+			elif src != null:
+				mesh.surface_set_material(sidx, src)
+		out.append([mesh, _relative(node, mi), i,
+			mi.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF, mi.name == &"Canopy"])
+		i += 1
+	node.free()
+	_meshes[key] = out
+	return out
+
+
+func _tree_box(path: String) -> AABB:
+	var box := AABB()
+	var first := true
+	for part: Array in _tree_parts(path):
+		var b: AABB = (part[1] as Transform3D) * (part[0] as Mesh).get_aabb()
+		box = b if first else box.merge(b)
+		first = false
+	return box
+
+
+## The leaves' box (the swelled canopy), or none for a bare tree.
+func _tree_crown(path: String) -> AABB:
+	for part: Array in _tree_parts(path):
+		if bool(part[4]):
+			return (part[1] as Transform3D) * (part[0] as Mesh).get_aabb()
+	return AABB()
 
 
 func _scatter(r: RegionData, models: Array, n: int, inner: float, outer: float, scale: Vector2,

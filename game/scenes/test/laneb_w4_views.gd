@@ -51,6 +51,19 @@ func _run() -> void:
 	print("VIEWPORT msaa=", root.msaa_3d, " scale=", root.scaling_3d_scale, " size=", root.get_visible_rect().size)
 	for s in shots:
 		var at := Vector3(float(s[1]), 0.0, float(s[2]))
+		if String(s[1]) == "tree":
+			# Stand 2 m in front of dressing tree #s[2] (Everfree first), facing away from it,
+			# so the camera behind her has to sit where its crown is.
+			var dress: Node = ranch.find_child("Dressing", true, false)
+			var pl: Array = dress.get("placements") if dress != null else []
+			var trees := pl.filter(func(e: Dictionary) -> bool: return String(e.model).begins_with("saa_tree"))
+			var t: Dictionary = trees[int(s[2]) % trees.size()]
+			var away := Vector3(1, 0, 0).rotated(Vector3.UP, float(s[3]))
+			at = (t.at as Vector3) + away * 2.2
+			s[3] = str(at.x + away.x * 10.0)
+			s[4] = str(at.z + away.z * 10.0)
+			s[1] = str(at.x)
+			s[2] = str(at.z)
 		at.y = float(terrain.call("height_at", at.x, at.z)) + 0.2
 		var tgt := Vector3(float(s[3]), at.y, float(s[4]))
 		if s.size() > 7:

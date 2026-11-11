@@ -92,7 +92,11 @@ func _plant_ridges() -> void:
 	# THREE SHAPES, NOT ONE (Fable AAA round 4, #6: "one lollipop tree duplicated across every
 	# hill"): round puffs, tall cone pines (the darker greens) and double-puff broadleaves,
 	# one MultiMesh per shape.
-	var kinds: Array = [[_ridge_tree_mesh(), []], [_ridge_pine_mesh(), []], [_ridge_double_mesh(), []]]
+	# ONE FAMILY WITH THE VALLEY'S OWN TREES (P9 item 59: "lollipop trees" beside the show-style
+	# ones): every ridge tree is now a lumpy cloud of puffs on a lavender trunk, as the Sweet
+	# Apple Acres trees in the valley are drawn; the round, the tall and the double keep their
+	# share of the hills and their draws.
+	var kinds: Array = [[_ridge_cloud_mesh(false), []], [_ridge_cloud_mesh(true), []], [_ridge_double_mesh(), []]]
 	for p in picks:
 		var k := 0 if rng.randf() < 0.45 else (1 if rng.randf() < 0.55 else 2)
 		(kinds[k][1] as Array).append(p)
@@ -117,6 +121,36 @@ func _plant_ridges() -> void:
 		mmi.multimesh = mm
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(mmi)
+
+
+## The show-style trunk colour of the valley's own trees (saa_tree_*), a dusky lavender.
+const RIDGE_TRUNK := Color(0.52, 0.43, 0.58)
+
+
+## A cloud-canopy tree (item 59): four overlapping puffs over a lavender trunk; `tall` stacks
+## them higher and narrower (the pine's place on the hills, in the same family).
+static func _ridge_cloud_mesh(tall: bool) -> Mesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var puffs: Array = [[0.42, Vector3(0.0, 0.95, 0.0)], [0.34, Vector3(-0.3, 0.82, 0.12)],
+		[0.33, Vector3(0.3, 0.86, -0.1)], [0.3, Vector3(0.04, 1.22, 0.04)]]
+	if tall:
+		puffs = [[0.36, Vector3(0.0, 0.8, 0.0)], [0.3, Vector3(0.12, 1.12, 0.06)],
+			[0.26, Vector3(-0.08, 1.4, -0.04)], [0.28, Vector3(-0.2, 0.92, 0.1)]]
+	for puff: Array in puffs:
+		var sph := SphereMesh.new()
+		sph.radius = puff[0]
+		sph.height = float(puff[0]) * 1.7
+		sph.radial_segments = 12
+		sph.rings = 6
+		st.append_from(_tinted(sph, Color.WHITE), 0, Transform3D(Basis(), puff[1]))
+	var trunk := CylinderMesh.new()
+	trunk.top_radius = 0.06
+	trunk.bottom_radius = 0.12
+	trunk.height = 0.6
+	trunk.radial_segments = 6
+	st.append_from(_tinted(trunk, RIDGE_TRUNK), 0, Transform3D(Basis(), Vector3(0, 0.3, 0)))
+	return _ridge_finish(st)
 
 
 ## A tall cone pine: two stacked cones on a stub of trunk.
@@ -155,7 +189,7 @@ static func _ridge_double_mesh() -> Mesh:
 	trunk.bottom_radius = 0.1
 	trunk.height = 0.6
 	trunk.radial_segments = 6
-	st.append_from(_tinted(trunk, Color(0.55, 0.38, 0.28)), 0, Transform3D(Basis(), Vector3(0, 0.3, 0)))
+	st.append_from(_tinted(trunk, RIDGE_TRUNK), 0, Transform3D(Basis(), Vector3(0, 0.3, 0)))
 	return _ridge_finish(st)
 
 
