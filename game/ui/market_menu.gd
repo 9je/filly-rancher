@@ -601,6 +601,8 @@ func _fill_detail() -> void:
 		# Out of reach: what is missing, on the button, rather than a dead slab.
 		_detail_buy.text = "Need"
 		_buy_amount.text = str(short)
+	elif _armed == item:
+		_detail_buy.text = "Sure?"
 	else:
 		_detail_buy.text = "Buy"
 	MenuStyleScript.style_label(_buy_amount, 32,
@@ -638,9 +640,11 @@ func open() -> bool:
 	_open = true
 	_catalogue.assign(_all_items.filter(func(it: ShopItem) -> bool: return shop.listed(it)))
 	_last_bits = -1
+	_armed = null
 	visible = true
 	_entrance.restart()
 	refresh()
+	_want_scroll = 0
 	opened.emit()
 	MenuStyleScript.tick_open()
 	MenuStyleScript.pop_in(get_node_or_null(^"Centre/Panel") as Control)
@@ -670,8 +674,10 @@ func set_tab(next: int) -> void:
 		return
 	_tab = next
 	_selected = 0
+	_armed = null
 	_entrance.restart()
 	refresh()
+	_want_scroll = 0
 	MenuStyleScript.tick_page()
 
 
@@ -735,6 +741,8 @@ func move_selection(step: int) -> void:
 	if n == 0:
 		return
 	_selected = posmod(_selected + step, n)
+	_armed = null
+	_keyed = true
 	refresh()
 	MenuStyleScript.tick_move()
 
@@ -770,6 +778,15 @@ func confirm() -> bool:
 	if not why.is_empty():
 		_refuse(why)
 		return false
+	# A BIG PURCHASE ASKS ONCE (P9, playtest 2026-11-10 item 41: one stray click bought an
+	# Apple Tree for 4,025 bits). The first press arms it and the button says so; the second
+	# buys. Anything cheaper than CONFIRM_FROM still buys on one press, so hay goes fast.
+	if item.cost >= CONFIRM_FROM and _armed != item:
+		_armed = item
+		_fill_detail()
+		MenuStyleScript.tick_confirm()
+		return false
+	_armed = null
 	if _paying(func() -> void: buy_requested.emit(item)) < 0:
 		purchased.emit(item)
 	return true
@@ -793,6 +810,18 @@ func _paying(request: Callable) -> int:
 	refresh()
 	_pop_delay = 0.0
 	return moved
+
+
+## The pick was moved by the keys this frame, so the list may scroll to show it (item 41).
+var _keyed := false
+## Bits at and above which a purchase needs a second press (item 41).
+const CONFIRM_FROM := 1000
+## The big purchase waiting for its second press, or null.
+var _armed: ShopItem = null
+
+
+func armed_item() -> ShopItem:
+	return _armed
 
 
 ## Coins waiting for the grid to settle: {index, count}, or empty.
@@ -882,7 +911,11 @@ func refresh() -> void:
 	var now := shop.bits()
 	if _last_bits >= 0 and now != _last_bits and _open and _fx != null:
 		# Beside the purse line, clear of its words, rising into the empty top right.
-		var beside := Vector2(_gems.get_global_rect().end.x + 110.0, wallet_target().y)
+		# At the panel's right, where the title's words never reach: it rises from there
+		# (P9: in the middle it rose through "gems bought, food and gear sold").
+		var panel_rect := (get_node(^"Centre/Panel") as Control).get_global_rect()
+		var beside := Vector2(maxf(_gems.get_global_rect().end.x + 110.0, panel_rect.end.x - 170.0),
+			wallet_target().y)
 		MenuStyleScript.payout_pop(_fx, beside, now - _last_bits, _pop_delay)
 	_last_bits = now
 	_gems.text = "%d gems in your pouch" % _pouch_total()
@@ -901,6 +934,10 @@ func refresh() -> void:
 	# remove_child BEFORE queue_free: a queued node is still a child until the end of the
 	# frame, so freeing alone would leave the old rows laid out underneath the new ones for
 	# one frame every time the cursor moves.
+	# THE LIST KEEPS ITS PLACE through a rebuild (item 41: after buying hay the list jumped to
+	# the bottom): the scroll it had is put back once the new tiles have their size.
+	if _scroll != null and _rows.get_child_count() > 0 and _rows.columns == (1 if _tab == Tab.SELL else BUY_COLUMNS):
+		_want_scroll = _scroll.scroll_vertical
 	for child in _rows.get_children():
 		_rows.remove_child(child)
 		child.queue_free()
@@ -952,6 +989,10 @@ func _owned(item: ShopItem) -> bool:
 		return shop.owns_gear(item.gear_id)
 	if item.kind == ShopItemScript.Kind.PERMIT:
 		return shop.owns_permit(item.permit_zone)
+	# OWNED DECOR READS OWNED (P9, playtest 2026-11-10 item 42: an Apple Tree she had bought
+	# still showed its price in red, the same red as "can't afford").
+	if item.kind == ShopItemScript.Kind.DECOR and shop.decor_provider.is_valid():
+		return bool(shop.decor_provider.call(item.decor_id))
 	return false
 
 
@@ -974,9 +1015,13 @@ func _fit_scroll() -> void:
 	_scroll.custom_minimum_size.y = cap
 	# The first row is the top (PS10 gap G17): ensure_control_visible on a grid whose layout
 	# had not settled scrolled the Buy tab 256 px past its pick, Hay out of view.
-	if _selected == 0:
-		_scroll.scroll_vertical = 0
-	elif _selected > 0 and _selected < _rows.get_child_count():
+	# Only when the pick is out of view does the list move (item 41), measured against the
+	# place a rebuild is putting it back to.
+	var at_now: float = float(_want_scroll if _want_scroll >= 0 else _scroll.scroll_vertical)
+	# The pointer's pick is already where the pointer is: only the keys scroll to theirs.
+	var follow := _keyed
+	_keyed = false
+	if follow and _selected >= 0 and _selected < _rows.get_child_count():
 		# By the row's place in the grid, not its laid-out rect: the tiles were rebuilt this
 		# frame and have not been placed yet.
 		var cols: int = maxi(1, _rows.columns)
@@ -987,9 +1032,9 @@ func _fit_scroll() -> void:
 		var bottom: float = top + pitch - sep
 		var pad: float = 20.0
 		var view: float = maxf(0.0, cap - pad)
-		if top < float(_scroll.scroll_vertical):
+		if top < at_now:
 			_want_scroll = int(top)
-		elif bottom > float(_scroll.scroll_vertical) + view:
+		elif bottom > at_now + view:
 			_want_scroll = int(ceil(bottom - view))
 		_apply_scroll()
 
@@ -1012,6 +1057,11 @@ func _add_row(index: int, row_name: String, blurb: String, price: String, enable
 		icon_kind: StringName = &"", tag := "", family: StringName = &"gem") -> void:
 	var row := MouseRowsScript.row(index, index == _selected, index == _hovered,
 		point_at_row, take_row)
+	# Leaving a tile restyles it from the LIVE pick (connected after every other exit handler,
+	# so it has the last word): tiles are no longer rebuilt when the pick moves (item 41).
+	row.tree_entered.connect(func() -> void:
+		if not row.mouse_exited.is_connected(_on_tile_exit.bind(index)):
+			row.mouse_exited.connect(_on_tile_exit.bind(index)), CONNECT_ONE_SHOT)
 	if _tab == Tab.BUY:
 		_shelf_card(row, index, row_name, price, enabled, icon_kind)
 		return
@@ -1153,7 +1203,9 @@ func _shelf_card(row: PanelContainer, index: int, row_name: String, price: Strin
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	title.max_lines_visible = 2
 	title.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	# Names hang from the plank and the prices stand on one line at the card's foot (P9 item
+	# 43: centred, a one-line name sat lower than a two-line one and the prices zigzagged).
+	title.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	MenuStyleScript.style_label(title, 21,
 		MenuStyleScript.COLOR_TITLE if enabled else MenuStyleScript.COLOR_DIM)
 	title.add_theme_font_override(&"font", MenuStyleScript.title_font())
@@ -1200,8 +1252,38 @@ func point_at_row(index: int) -> void:
 	_hovered = index
 	if index != _selected:
 		_selected = index
+		_armed = null
 		MenuStyleScript.tick_move()
-	refresh()
+	# THE TILES STAY PUT UNDER THE POINTER (P9, playtest 2026-11-10 item 41). This used to call
+	# refresh(), which tore down and rebuilt every tile on every hover: for a frame the grid had
+	# no height, the scroll clamped, and the list jumped, so the next click landed on another
+	# item. Pointing now restyles the tiles where they stand and refills the counter.
+	_restyle_rows()
+	_fill_detail()
+
+
+func _on_tile_exit(i: int) -> void:
+	if _hovered == i:
+		_hovered = -1
+	_restyle_row(i)
+
+
+## Each tile's look from the live pick and hover, in place (no rebuild, no scroll change).
+func _restyle_rows() -> void:
+	for i in _rows.get_child_count():
+		_restyle_row(i)
+
+
+func _restyle_row(i: int) -> void:
+	if i < 0 or i >= _rows.get_child_count():
+		return
+	var row := _rows.get_child(i) as PanelContainer
+	if row == null:
+		return
+	if _tab == Tab.BUY:
+		row.add_theme_stylebox_override(&"panel", shelf_box(i == _selected, i == _hovered))
+	else:
+		row.add_theme_stylebox_override(&"panel", TileStyleScript.box(i == _selected, i == _hovered))
 
 
 func take_row(index: int) -> void:
