@@ -1982,6 +1982,10 @@ func _place_prompt_card() -> void:
 	]
 	var cam := get_viewport().get_camera_3d() if is_inside_tree() else null
 	var faces: Array[Rect2] = FaceGuardScript.faces(get_tree(), cam) if cam != null else [] as Array[Rect2]
+	# Nor over the player's own pony ("Talk to Tumble" over her, several times).
+	var me := FaceGuardScript.body_rect(cam, FaceGuardScript.player_of(cam)) if cam != null else Rect2()
+	if me.has_area():
+		faces.append(me)
 	_prompt_spot = FaceGuardScript.pick(spots, faces, _prompt_spot)
 	_prompt_card.position = spots[_prompt_spot].position
 

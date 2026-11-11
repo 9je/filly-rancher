@@ -220,7 +220,7 @@ func _keep_speaker_in_view(delta: float) -> void:
 	if rig == null or not rig.has_method(&"add_look_delta") or absf(_nudged) >= NUDGE_MAX:
 		return
 	var face := FaceGuardScript.face_rect(cam, n)
-	var body := player_screen_rect(cam, player)
+	var body := FaceGuardScript.body_rect(cam, player, 1.9, BODY_HALF_W)
 	if not face.has_area() or not body.has_area() or not face.intersects(body):
 		return
 	if cam.global_position.distance_to(n.global_position) <= cam.global_position.distance_to(player.global_position):
@@ -232,21 +232,6 @@ func _keep_speaker_in_view(delta: float) -> void:
 	var step := minf(NUDGE_RATE * delta, NUDGE_MAX - absf(_nudged))
 	rig.call(&"add_look_delta", -dir * step, 0.0)
 	_nudged += dir * step
-
-
-## The player's body on screen: hooves to ears, BODY_HALF_W either side.
-static func player_screen_rect(cam: Camera3D, who: Node3D) -> Rect2:
-	var foot := who.global_position
-	var top := foot + Vector3.UP * 1.9
-	if cam.is_position_behind(foot) or cam.is_position_behind(top):
-		return Rect2()
-	var a := cam.unproject_position(foot)
-	var b := cam.unproject_position(top)
-	var mid := cam.unproject_position(foot + Vector3.UP * 0.95)
-	var hw := absf(cam.unproject_position(foot + Vector3.UP * 0.95
-		+ cam.global_transform.basis.x * BODY_HALF_W).x - mid.x)
-	var y0 := minf(a.y, b.y)
-	return Rect2(Vector2(mid.x - hw, y0), Vector2(hw * 2.0, absf(a.y - b.y)))
 
 
 ## Interaction candidates: the nearest character in reach, as a TALK action.

@@ -81,6 +81,22 @@ static func faces(tree: SceneTree, camera: Camera3D, extra: Array = []) -> Array
 	return out
 
 
+## `who`'s whole body on screen: hooves to ears (`height` m), `half_w` m either side of her.
+static func body_rect(cam: Camera3D, who: Node3D, height := 1.9, half_w := 0.55) -> Rect2:
+	if cam == null or who == null or not is_instance_valid(who):
+		return Rect2()
+	var foot := who.global_position
+	var top := foot + Vector3.UP * height
+	if cam.is_position_behind(foot) or cam.is_position_behind(top):
+		return Rect2()
+	var a := cam.unproject_position(foot)
+	var b := cam.unproject_position(top)
+	var mid := cam.unproject_position(foot + Vector3.UP * height * 0.5)
+	var hw := absf(cam.unproject_position(foot + Vector3.UP * height * 0.5
+		+ cam.global_transform.basis.x * half_w).x - mid.x)
+	return Rect2(Vector2(mid.x - hw, minf(a.y, b.y)), Vector2(hw * 2.0, absf(a.y - b.y)))
+
+
 ## The player a gameplay camera belongs to (its rig hangs under her), or null.
 static func player_of(camera: Camera3D) -> Node3D:
 	var n: Node = camera
