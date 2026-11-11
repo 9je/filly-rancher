@@ -16,6 +16,7 @@ const DESIGNS := [
 	{"words": "Thank you for your color", "art": "heart", "bg": Color(0.95, 0.99, 0.93)},
 	{"words": "Where does a rainbow come from?", "art": "flow", "bg": Color(0.99, 0.97, 0.9)},
 	{"words": "UP  rainbow   DOWN  off", "art": "lever_dial", "bg": Color(0.2, 0.18, 0.24)},
+	{"words": "STAFF ONLY", "art": "no_entry", "bg": Color(0.98, 0.95, 0.88)},
 ]
 const RAINBOW := [Color(0.93, 0.36, 0.4), Color(0.98, 0.62, 0.3), Color(0.98, 0.86, 0.36),
 	Color(0.45, 0.78, 0.45), Color(0.38, 0.62, 0.9), Color(0.62, 0.46, 0.82)]
@@ -93,6 +94,9 @@ class _Art:
 				for i in RAINBOW.size():
 					var s := 1.0 - i * 0.13
 					_heart(c, 100 * s, RAINBOW[i])
+			"no_entry":
+				draw_circle(c + Vector2(0, 20), 100, Color(0.85, 0.22, 0.25))
+				draw_rect(Rect2(c + Vector2(-70, 4), Vector2(140, 32)), Color(1, 1, 1))
 			"lever_dial":
 				# Up, the spectrum fanning out; down, a dark disc. The arrow between.
 				for i in RAINBOW.size():

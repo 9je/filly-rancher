@@ -347,12 +347,18 @@ func _dress(room: Node3D, spec: Dictionary, markers: Node3D) -> void:
 				n += 2
 			_mark(markers, "guide", Vector3(0, 0, 0))
 		&"classroom":
-			_poster(_piece("fx_poster", room, Vector3(0, 2.8, -half + 0.45), 0.0, 2.4), 4)
+			# On the side wall: at 2.4x over the far wall it hung across the doorway to the gift
+			# shop, 0.4 m off the floor, and she walked through it.
+			_poster(_piece("fx_poster", room, Vector3(-half + 0.35, 2.7, 0.0), 90.0, 1.5), 4)
 			_mark(markers, "guide", Vector3(2.0, 0, 0))
 		&"giftshop":
 			_piece("fx_counter", room, Vector3(-3.0, 0, -1.0), 90.0)
 			_mark(markers, "guide", Vector3(1.5, 0, 1.0))
 			_mark(markers, "service_door", Vector3(half - 1.2, 0, -3.5))
+			# THE WAY ON IS STAFF ONLY, AND SAYS SO (playtest 2026-11-10 item 10: she walked
+			# through with nothing to say she was trespassing). A plate beside the arch into
+			# the metal rooms; the objective card says to sneak.
+			_poster(_piece("fx_poster", room, Vector3(1.75, 2.3, -half + 0.32), 0.0, 0.55), 6)
 		&"walkway":
 			for z in [-4.0, 0.0, 4.0]:
 				_piece("fx_catwalk", room, Vector3(0, 2.4, z), 90.0)
