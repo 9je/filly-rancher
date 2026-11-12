@@ -1033,9 +1033,10 @@ var _scoop: Node3D = null
 var _scoop_rest := Transform3D.IDENTITY
 var _scoop_out := 0.0
 var _scoop_stow := Transform3D.IDENTITY
-## Along her spine, behind the withers, a little smaller than in use.
-const SCOOP_STOW_AT := Vector3(0.0, 1.30, 0.18)
-const SCOOP_STOW_SCALE := 0.8
+## Holstered low on her near side, small: along her spine it read end-on from the camera
+## behind her as a ring on her back (review 2026-11-11).
+const SCOOP_STOW_AT := Vector3(-0.34, 0.86, 0.22)
+const SCOOP_STOW_SCALE := 0.62
 
 
 func _mount_scoop(pony: Node3D) -> void:
