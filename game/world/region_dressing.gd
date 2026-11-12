@@ -391,10 +391,17 @@ const SAA_DIR := "res://assets/converted/props/"
 const SAA_LIVING := {"saa_tree_dead_wide": "saa_tree_wide", "saa_tree_dead_narrow": "saa_tree_narrow"}
 
 
+## THE EVERFREE'S RIM TOWARD TOWN IS LIVING (review 2026-11-11: its dead trees stood among
+## the green ones behind the pens). The gloom starts as you walk in, not at the town's edge.
+func _faces_town(r: RegionData, a: float, d: float) -> bool:
+	var to_town := (Vector2.ZERO - r.centre).normalized()
+	return d > r.radius * 0.5 and Vector2(cos(a), sin(a)).dot(to_town) > 0.35
+
+
 ## A tree `h` metres tall, whichever model it is.
 func _tree(r: RegionData, model: String, a: float, d: float, h: float, leaves: Color) -> void:
 	var saa: String = SAA_TREE.get(model, "")
-	if saa != "" and r.id != &"everfree":
+	if saa != "" and (r.id != &"everfree" or _faces_town(r, a, d)):
 		saa = SAA_LIVING.get(saa, saa)
 	var path := SAA_DIR + saa + ".glb"
 	if saa == "" or not ResourceLoader.exists(path):

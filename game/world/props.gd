@@ -385,9 +385,10 @@ const LAYOUT := [
 	# darkest, so the corner of the world the palette already made gloomy also LOOKS
 	# like woodland rather than like a lawn at dusk. Dead trunks now, not live pines:
 	# saa_tree_dead_narrow for six of the eight, and saa_dead_tree_large -- the Everfree's
-	# one landmark -- at the two coordinates that stood furthest into the gloom.
-	{"file": "saa_tree_dead_narrow.glb", "at": Vector2(-62.7, -18.0), "yaw": 15.0, "s": 1.30, "family": &"mlp"},
-	{"file": "saa_tree_dead_narrow.glb", "at": Vector2(-79.7, -16.5), "yaw": 105.0, "s": 1.20, "family": &"mlp"},
+	# one landmark -- at the two coordinates that stood furthest into the gloom. The two on
+	# the town side (-62.7, -18) and (-79.7, -16.5) are living (review 2026-11-11).
+	{"file": "saa_tree_narrow.glb", "at": Vector2(-62.7, -18.0), "yaw": 15.0, "s": 1.30, "family": &"mlp"},
+	{"file": "saa_tree_narrow.glb", "at": Vector2(-79.7, -16.5), "yaw": 105.0, "s": 1.20, "family": &"mlp"},
 	{"file": "saa_dead_tree_large.glb", "at": Vector2(-95.2, -23.7), "yaw": 200.0, "s": 1.35, "family": &"mlp"},
 	{"file": "saa_tree_dead_narrow.glb", "at": Vector2(-105.0, -37.7), "yaw": 285.0, "s": 1.15, "family": &"mlp"},
 	{"file": "saa_tree_dead_narrow.glb", "at": Vector2(-105.9, -57.5), "yaw": 40.0, "s": 1.30, "family": &"mlp"},
