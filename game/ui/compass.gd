@@ -257,7 +257,44 @@ func _process(delta: float) -> void:
 	else:
 		_goal_dist.visible = false
 		_goal_chevron.visible = false
+	_unstack(from)
 	_place_cardinals(forward, left)
+
+
+## NO TWO MARKS ON ONE SPOT (review 2026-11-11: the Depot's crate badge sat half under the
+## goal's star). A place badge that would overlap the goal ring gives way to it; of two
+## badges that overlap, the nearer place keeps the spot.
+func _unstack(from: Vector3) -> void:
+	var gap := ICON * 0.85
+	var goal_x := INF
+	if _goal_mark.visible:
+		goal_x = _goal_mark.position.x + _goal_mark.size.x * 0.5
+	var shown: Array[int] = []
+	for i in _icons.size():
+		var r := _icons[i]
+		if not r.visible:
+			continue
+		var cx := r.position.x + ICON * 0.5
+		if absf(cx - goal_x) < gap:
+			r.visible = false
+			continue
+		shown.append(i)
+	shown.sort_custom(func(a: int, b: int) -> bool:
+		var na := places[a].get("node") as Node3D
+		var nb := places[b].get("node") as Node3D
+		return na.global_position.distance_to(from) < nb.global_position.distance_to(from))
+	var kept: Array[float] = []
+	for i in shown:
+		var cx := _icons[i].position.x + ICON * 0.5
+		var clash := false
+		for k in kept:
+			if absf(cx - k) < gap:
+				clash = true
+				break
+		if clash:
+			_icons[i].visible = false
+		else:
+			kept.append(cx)
 
 
 ## THE LETTERS GIVE WAY TO THE BADGES (Fable AAA round 4: "W" and "SE" hidden under waypoint
