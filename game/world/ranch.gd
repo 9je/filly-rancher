@@ -9303,7 +9303,7 @@ func _arrival(_delta: float) -> void:
 		Cinematic.shared(get_tree()).play([
 			# Low, a sweep at rooftop-and-a-bit (Fable round 5, #10: from 46 m up the valley
 			# read as "one flat plane"): the rim's tree lines and the sky frame the town.
-			{"from": Vector3(62.0, 15.0, 74.0), "to": Vector3(34.0, 9.0, 44.0),
+			{"from": Vector3(62.0, 15.0, 74.0), "to": Vector3(36.0, 13.0, 48.0),
 				"look": Vector3(-5.0, 5.0, 4.0), "time": 3.6, "fov": 50.0,
 				"caption": "Welcome to the valley"},
 			{"from": Vector3(34.0, 9.0, 44.0), "to": behind, "look": player.global_position + Vector3.UP,
