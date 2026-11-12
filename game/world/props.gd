@@ -401,13 +401,15 @@ const LAYOUT := [
 	{"file": "saa_tree_narrow.glb", "at": Vector2(49.1, -92.1), "yaw": 250.0, "s": 1.10, "family": &"mlp"},
 	{"file": "saa_tree_narrow.glb", "at": Vector2(76.0, -89.7), "yaw": 330.0, "s": 1.20, "family": &"mlp"},
 	# The Night Meadow, (-61, 69) r 24: a windbreak along the far side, leaving the
-	# south-east open toward the homestead so the walk out to it has a view. Dead wide
-	# trunks: the same species as the Everfree, a wider silhouette to break up the skyline.
-	{"file": "saa_tree_dead_wide.glb", "at": Vector2(-33.3, 85.0), "yaw": 50.0, "s": 1.15, "family": &"mlp"},
-	{"file": "saa_tree_dead_wide.glb", "at": Vector2(-55.4, 100.5), "yaw": 125.0, "s": 1.30, "family": &"mlp"},
-	{"file": "saa_tree_dead_wide.glb", "at": Vector2(-81.6, 93.5), "yaw": 210.0, "s": 1.20, "family": &"mlp"},
-	{"file": "saa_tree_dead_wide.glb", "at": Vector2(-93.0, 69.0), "yaw": 285.0, "s": 1.25, "family": &"mlp"},
-	{"file": "saa_tree_dead_wide.glb", "at": Vector2(-81.6, 44.5), "yaw": 355.0, "s": 1.15, "family": &"mlp"},
+	# south-east open toward the homestead so the walk out to it has a view. LIVING wide
+	# trees (review 2026-11-11: dead trunks here stood among the green trees behind the
+	# pens and the homestead, the "tree styles clash" the owner named; the Everfree keeps
+	# its dead ones, and region_dressing already makes this region's woods living).
+	{"file": "saa_tree_wide.glb", "at": Vector2(-33.3, 85.0), "yaw": 50.0, "s": 1.15, "family": &"mlp"},
+	{"file": "saa_tree_wide.glb", "at": Vector2(-55.4, 100.5), "yaw": 125.0, "s": 1.30, "family": &"mlp"},
+	{"file": "saa_tree_wide.glb", "at": Vector2(-81.6, 93.5), "yaw": 210.0, "s": 1.20, "family": &"mlp"},
+	{"file": "saa_tree_wide.glb", "at": Vector2(-93.0, 69.0), "yaw": 285.0, "s": 1.25, "family": &"mlp"},
+	{"file": "saa_tree_wide.glb", "at": Vector2(-81.6, 44.5), "yaw": 355.0, "s": 1.15, "family": &"mlp"},
 	# --- Sweet Apple Acres, on the walk out to the Orchard --------------------------
 	# APPLEJACK'S FARM, NOT THE PLAYER'S. The homestead's own barn is still the same
 	# procedural shell (game/world/building.gd, `Buildings/Barn` in ranch.tscn) -- it just
