@@ -253,7 +253,7 @@ func _build() -> void:
 	env.background_color = Color(0.82, 0.86, 0.95)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.92, 0.9, 0.96)
-	env.ambient_light_energy = 0.28
+	env.ambient_light_energy = 0.14
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	# Less milk (item 19): a lower white point for contrast, and a thinner, warmer haze.
 	env.tonemap_white = 3.2

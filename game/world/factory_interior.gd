@@ -194,7 +194,7 @@ func _floor(room: Node3D, spec: Dictionary) -> void:
 	var half := ROOM_SIZE * 0.5 - TILE * 0.5
 	for x in [-half, 0.0, half]:
 		for z in [-half, 0.0, half]:
-			_piece(file, room, Vector3(x, 0, z))
+			_tint(_piece(file, room, Vector3(x, 0, z)), spec.name, FLOOR_TINT)
 	# A base slab under the tiles, so a bevelled seam shows floor, never what is beneath.
 	var slab := MeshInstance3D.new()
 	var bm := BoxMesh.new()
@@ -223,17 +223,36 @@ func _floor(room: Node3D, spec: Dictionary) -> void:
 ## surfaces take a pastel of its own; the metal rooms behind the staff door stay grey, which
 ## is the point of them.
 const WALL_TINT := {
-	&"landing": Color(0.76, 0.86, 1.0),
-	&"welcome": Color(1.0, 0.78, 0.86),
-	&"classroom": Color(0.76, 0.94, 0.82),
-	&"giftshop": Color(1.0, 0.91, 0.66),
+	&"landing": Color(0.62, 0.78, 1.0),
+	&"welcome": Color(1.0, 0.62, 0.78),
+	&"classroom": Color(0.6, 0.9, 0.72),
+	&"giftshop": Color(1.0, 0.84, 0.5),
+	# THE BACK OF THE HOUSE GOES DARK (pre-review 2026-11-21 item 1: "one pale value from wall
+	# to floor"). Steel, not milk: the metal rooms read as the other side of the same building.
+	&"walkway": Color(0.56, 0.6, 0.72),
+	&"gallery": Color(0.5, 0.54, 0.66),
+	&"holding": Color(0.48, 0.5, 0.62),
+	&"control": Color(0.54, 0.5, 0.62),
+}
+
+## Floors take a colour of their own instead of white tile (same item): candy in the party
+## rooms, dark grate behind.
+const FLOOR_TINT := {
+	&"landing": Color(0.84, 0.8, 1.0),
+	&"welcome": Color(1.0, 0.82, 0.9),
+	&"classroom": Color(0.82, 0.96, 0.88),
+	&"giftshop": Color(1.0, 0.9, 0.76),
+	&"walkway": Color(0.46, 0.48, 0.56),
+	&"gallery": Color(0.42, 0.44, 0.52),
+	&"holding": Color(0.4, 0.42, 0.5),
+	&"control": Color(0.44, 0.42, 0.5),
 }
 
 
-func _tint(piece: Node3D, room_name: StringName) -> void:
-	if piece == null or not WALL_TINT.has(room_name):
+func _tint(piece: Node3D, room_name: StringName, table: Dictionary = WALL_TINT) -> void:
+	if piece == null or not table.has(room_name):
 		return
-	var tint: Color = WALL_TINT[room_name]
+	var tint: Color = table[room_name]
 	for m in piece.find_children("*", "MeshInstance3D", true, false):
 		var mi := m as MeshInstance3D
 		if mi.mesh == null:
@@ -243,7 +262,7 @@ func _tint(piece: Node3D, room_name: StringName) -> void:
 			if mat == null:
 				continue
 			var a = mat.get_shader_parameter(&"albedo")
-			if not (a is Color) or (a as Color).get_luminance() < 0.75:
+			if not (a is Color) or (a as Color).get_luminance() < 0.6:
 				continue
 			var mine := mat.duplicate() as ShaderMaterial
 			mine.set_shader_parameter(&"albedo", (a as Color) * tint)
@@ -328,14 +347,36 @@ func _ceiling(room: Node3D, spec: Dictionary) -> void:
 
 
 func _light(room: Node3D, spec: Dictionary) -> void:
+	# A SOFT FILL, then ONE KEY THAT CASTS (pre-review item 1: no pools, no shadows, nothing
+	# lit). The fill keeps the corners readable; the key makes a pool on the floor under it.
 	for x in [-3.0, 3.0]:
 		var l := OmniLight3D.new()
 		l.light_color = spec.light
-		l.light_energy = 1.1 if not spec.metal else 0.7
-		l.omni_range = 11.0
+		l.light_energy = 0.45 if not spec.metal else 0.22
+		l.omni_range = 9.0
 		l.shadow_enabled = false
 		l.position = Vector3(x, 5.0, 0)
 		room.add_child(l)
+	var key := SpotLight3D.new()
+	key.name = "Key"
+	key.light_color = Color(1.0, 0.9, 0.74) if not spec.metal else Color(1.0, 0.68, 0.32)
+	key.light_energy = 3.2 if not spec.metal else 4.5
+	key.spot_range = 9.0
+	key.spot_angle = 48.0 if not spec.metal else 34.0
+	key.spot_attenuation = 0.8
+	key.shadow_enabled = true
+	key.position = Vector3(0, 5.6, 0)
+	key.rotation_degrees = Vector3(-90, 0, 0)
+	room.add_child(key)
+	if spec.metal:
+		# A red warning lamp low on the far wall: the only colour back here is a warning.
+		var warn := OmniLight3D.new()
+		warn.name = "Warning"
+		warn.light_color = Color(1.0, 0.2, 0.22)
+		warn.light_energy = 0.9
+		warn.omni_range = 5.0
+		warn.position = Vector3(-4.5, 3.2, -ROOM_SIZE * 0.5 + 0.8)
+		room.add_child(warn)
 
 
 func _trigger(room: Node3D, spec: Dictionary) -> void:
