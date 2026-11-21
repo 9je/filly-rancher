@@ -184,6 +184,9 @@ func _make_beacon() -> Node3D:
 
 
 func _process(_delta: float) -> void:
+	var lens := get_viewport().get_camera_3d()
+	if interior != null and lens != null and player != null:
+		interior.cutaway(lens.global_position, player.global_position)
 	if _card == null:
 		return
 	if goal.is_empty() or people.is_talking():

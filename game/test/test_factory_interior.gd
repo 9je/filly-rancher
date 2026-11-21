@@ -52,3 +52,27 @@ func test_the_furniture_is_solid() -> void:
 	await wait_physics_frames(1)
 	assert_true(walker.test_move(walker.global_transform, Vector3(-4.0, 0, 0)),
 		"a body walking at %s passes through it" % column.get_parent().name)
+
+
+## PRE-REVIEW 2026-11-21 ITEM 2: the camera, still in the last room as she walks through an
+## arch, saw the arch's wall across half the screen. The wall between lens and player turns
+## shadow-only, and comes back once both are on the same side.
+func test_the_wall_between_the_lens_and_her_is_cut_away() -> void:
+	var fi: Node3D = InteriorScript.new()
+	add_child_autofree(fi)
+	assert_gt(fi.divider_count(), 0)
+	var half := InteriorScript.ROOM_SIZE * 0.5
+	# Divider 0 is the landing's far wall, at z = -half. She is just through it, the lens 3 m behind.
+	fi.cutaway(Vector3(0.7, 2.0, -half + 2.0), Vector3(0.0, 0.0, -half - 1.0))
+	assert_true(fi.is_cut(0), "the arch wall between them is cut away")
+	var tile: Node3D = fi.get_node("Rooms").get_child(0)
+	var any_cut := false
+	for m: GeometryInstance3D in fi.find_children("*", "GeometryInstance3D", true, false):
+		if m.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY:
+			any_cut = true
+	assert_true(any_cut, "its meshes still cast shadows but are not drawn")
+	assert_not_null(tile)
+	fi.cutaway(Vector3(0.7, 2.0, -half - 0.5), Vector3(0.0, 0.0, -half - 3.0))
+	assert_false(fi.is_cut(0), "with both through, the wall is back")
+	for m: GeometryInstance3D in fi.find_children("*", "GeometryInstance3D", true, false):
+		assert_ne(m.cast_shadow, GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY)

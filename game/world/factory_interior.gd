@@ -38,6 +38,15 @@ const ROOMS: Array[Dictionary] = [
 var rooms: Dictionary = {}
 var _cache: Dictionary = {}
 
+## THE WALL BETWEEN THE LENS AND HER STEPS ASIDE (pre-review 2026-11-21, item 2: at every
+## arch the camera was still in the last room and the arch's wall filled half the screen).
+## One entry per wall that splits the corridor: its plane's z in this node's space and the
+## kit tiles that draw it. cutaway() turns a wall's tiles to shadow-only while the lens and
+## the player stand on opposite sides of it, so the room ahead is seen and the light in it
+## does not change.
+var _dividers: Array[Dictionary] = []
+var _cut: Dictionary = {}
+
 
 func _ready() -> void:
 	build()
@@ -63,6 +72,33 @@ func build() -> void:
 		markers.name = "Markers"
 		room.add_child(markers)
 		_dress(room, spec, markers)
+
+
+## Called every frame with the lens and the player in world space (factory_run.gd).
+func cutaway(lens: Vector3, subject: Vector3) -> void:
+	var a := to_local(lens)
+	var b := to_local(subject)
+	var half := ROOM_SIZE * 0.5
+	for i in _dividers.size():
+		var d: Dictionary = _dividers[i]
+		var z: float = d["z"]
+		var cut := absf(a.x) < half + 0.5 and (a.z - z) * (b.z - z) < 0.0
+		if bool(_cut.get(i, false)) == cut:
+			continue
+		_cut[i] = cut
+		for tile: Node3D in d["tiles"]:
+			for m: GeometryInstance3D in tile.find_children("*", "GeometryInstance3D", true, false):
+				m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY if cut \
+					else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+
+
+## Whether divider `i` is cut away right now (for tests).
+func is_cut(i: int) -> bool:
+	return bool(_cut.get(i, false))
+
+
+func divider_count() -> int:
+	return _dividers.size()
 
 
 ## Where room `name` starts (its entry edge centre), in this node's space.
@@ -226,14 +262,24 @@ func _walls(room: Node3D, spec: Dictionary, index: int) -> void:
 		_tint(_piece("fx_window_wall" if spec.name == &"gallery" else wall, room, Vector3(half, 0, along), -90.0), rn)
 	# The far wall: an arch into the next room, solid walls either side; the last room ends.
 	var last := index == ROOMS.size() - 1
+	var far: Array[Node3D] = []
 	for k in [-1, 0, 1]:
 		var file := wall
 		if k == 0 and not last:
 			file = "fx_arch"
-		_tint(_piece(file, room, Vector3(float(k) * TILE, 0, -half), 0.0), rn)
+		var tile := _piece(file, room, Vector3(float(k) * TILE, 0, -half), 0.0)
+		_tint(tile, rn)
+		if tile != null:
+			far.append(tile)
+	_dividers.append({"z": room.position.z - half, "tiles": far})
 	if index == 0:
+		var back: Array[Node3D] = []
 		for k in [-1, 1]:
-			_tint(_piece(wall, room, Vector3(float(k) * TILE, 0, half), 180.0), rn)
+			var tile := _piece(wall, room, Vector3(float(k) * TILE, 0, half), 180.0)
+			_tint(tile, rn)
+			if tile != null:
+				back.append(tile)
+		_dividers.append({"z": room.position.z + half, "tiles": back})
 	_collide_walls(room, index)
 
 
